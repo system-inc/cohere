@@ -65,6 +65,12 @@ func (walk *replayWalk) returns(function *intermediate_representation.Function) 
 		return defaultNilnessForSignature(function.Signature)
 	}
 	declared := declaredFunction(function)
+	if function.Package == walk.irPackage && !anyPointers(function.Signature) {
+		// The push answers such a function the defaults of its signature, whatever its body, and leaves it seen,
+		// which nothing reads of it: judged, imported and markSeen read seen only of a function with a result that
+		// may be nil. So it is answered unbuilt, where imported, through home.Function, and then Build built it.
+		return defaultNilnessForSignature(function.Signature)
+	}
 	if results, holds := walk.imported(declared); holds {
 		return results
 	}

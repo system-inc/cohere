@@ -28,10 +28,17 @@ func stateIn(home *fact_resolver.Package) *verdicts {
 
 // replayOf is the push's walk of home, replayed as far as answers have needed it, begun on the first call. The caller
 // holds home's lock.
+//
+// Its roots are home's declared functions unbuilt, in the order SourceFunctions lists them, which is the order of the
+// package's Functions: a package created from its syntax holds every declared function there from its creation, and
+// building them adds none. The walk builds each root as it reaches it, so a root past the last one an answer needed
+// is never built, where building them all first cost a replay in a dependency package every function of the package
+// (#efs50c3: 8,904 functions over a cold run at cohere's root, 0.53 of the replays' 0.60 CPU-s).
 func (state *verdicts) replayOf(resolver *fact_resolver.Resolver, home *fact_resolver.Package) *replayWalk {
 	if state.replay == nil {
-		state.replay = &replayWalk{resolver: resolver, home: home, irPackage: home.IntermediateRepresentation(),
-			state: state, functions: home.SourceFunctions(), seen: map[*intermediate_representation.Function]bool{},
+		irPackage := home.IntermediateRepresentation()
+		state.replay = &replayWalk{resolver: resolver, home: home, irPackage: irPackage, state: state,
+			functions: irPackage.Functions, seen: map[*intermediate_representation.Function]bool{},
 			begun: map[*intermediate_representation.Function]bool{}}
 	}
 	return state.replay
