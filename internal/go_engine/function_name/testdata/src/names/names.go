@@ -25,7 +25,7 @@ type alias = record
 type List[T any] struct{ items []T }
 
 func (list *List[T]) Push(item T) { list.items = append(list.items, item) }
-func (list List[T]) Length() int   { return len(list.items) }
+func (list List[T]) Length() int  { return len(list.items) }
 
 type speaker interface{ speak() string }
 
