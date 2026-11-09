@@ -12,7 +12,14 @@ import (
 var Kind = &fact_resolver.Kind{Name: "return_nil_ness"}
 
 func init() {
-	fact_resolver.Register(Kind, whole)
+	fact_resolver.Register(Kind, whole,
+		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) []ValueNilness {
+			function, isFunction := object.(*types.Func)
+			if !isFunction {
+				return nil
+			}
+			return heldResults(resolver, home, function)
+		})
 }
 
 // Result is one package's nilness of results, as its readers ask it.
@@ -55,14 +62,20 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, functi
 	if !fact_resolver.Visible(reader, function) {
 		return nil, false
 	}
-	results := fact_resolver.Ask(resolver, Kind, function, func(home *fact_resolver.Package) []ValueNilness {
-		judged, holds := judgeIn(resolver, home, function)
-		if !holds {
-			return nil
-		}
-		return judged
+	results := fact_resolver.Ask(resolver, reader, Kind, function, func(home *fact_resolver.Package) []ValueNilness {
+		return heldResults(resolver, home, function)
 	})
 	return results, results != nil
+}
+
+// heldResults is the nilness of function's results, of home, as a fact holds it: nil when it says no more than the
+// defaults.
+func heldResults(resolver *fact_resolver.Resolver, home *fact_resolver.Package, function *types.Func) []ValueNilness {
+	judged, holds := judgeIn(resolver, home, function)
+	if !holds {
+		return nil
+	}
+	return judged
 }
 
 // judgeIn is the nilness of function's results, of home, and whether they say more than the defaults, judged there
@@ -88,7 +101,7 @@ func judgeIn(
 	results := walk.verdict(declared)
 	if walk.orderDependent {
 		resolver.Counts(Kind).Fallbacks.Add(1)
-		state.replayOf(resolver, home).until(declared)
+		state.replayUntil(resolver, home, declared)
 		results = state.results[function]
 	}
 	return results, interesting(function.Signature(), results)

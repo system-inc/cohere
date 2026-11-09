@@ -44,13 +44,33 @@ type answerKey struct {
 // and is kept for the store. A package the run restored, with no answer for object in the store, is never answered
 // no fact: the question fails, and the run loads the package from source and runs again (see Reloads).
 //
+// reader is the package whose analysis asks, the asking rule's package or the package a judgment runs in. An answer
+// about another package's object is among reader's reads (see Reads), which its entry keeps, so a later run restoring
+// reader by anything but its own first key can tell whether the answer still holds (#w7zmvat wave 3b).
+//
 // compute is the kind's own judgment in home, which takes home's lock itself. Each answer is asked of compute or the
 // store once in a run, and memoized.
-func Ask[Value any](resolver *Resolver, kind *Kind, object types.Object, compute func(home *Package) Value) Value {
+func Ask[Value any](
+	resolver *Resolver,
+	reader *Package,
+	kind *Kind,
+	object types.Object,
+	compute func(home *Package) Value,
+) Value {
 	var zero Value
 	if object.Pkg() == nil || !isOrigin(object) {
 		return zero
 	}
+	answer := answerOf(resolver, kind, object, compute)
+	if resolver.store != nil && object.Pkg() != reader.Types {
+		resolver.read(reader.Types, kind, object, func() []byte { return encodeAnswer(kind, object, answer) })
+	}
+	return answer
+}
+
+// answerOf is Ask's answer about object, an object of a package and its own origin: memoized, the store's, or
+// compute's.
+func answerOf[Value any](resolver *Resolver, kind *Kind, object types.Object, compute func(home *Package) Value) Value {
 	key := answerKey{kind: kind, object: object}
 	if memoized, held := resolver.answers.Load(key); held {
 		answer, isValue := memoized.(Value)
@@ -66,8 +86,8 @@ func Ask[Value any](resolver *Resolver, kind *Kind, object types.Object, compute
 		// on one that was not.
 		home = resolver.Owner(object)
 	}
-	path, pathError := objectpath.For(object)
-	if pathError == nil && resolver.store != nil {
+	path, hasPath := resolver.pathOf(object)
+	if hasPath && resolver.store != nil {
 		if stored, held := resolver.stored(kind, object.Pkg(), path); held {
 			var answer Value
 			if len(stored) > 0 {
@@ -87,7 +107,7 @@ func Ask[Value any](resolver *Resolver, kind *Kind, object types.Object, compute
 		resolver.reload(kind, object)
 	}
 	answer := compute(home)
-	if pathError == nil && resolver.store != nil {
+	if hasPath && resolver.store != nil {
 		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
 	}
 	resolver.answers.Store(key, answer)
@@ -149,6 +169,10 @@ func (resolver *Resolver) record(kind *Kind, packageTypes *types.Package, path o
 // kept or reported. A package the run already loaded from source for this, and still never learned, is a reload that
 // failed, and the pass's failure names it.
 func (resolver *Resolver) reload(kind *Kind, object types.Object) {
+	if resolver.probing.Load() {
+		// Invariant: a probe runs only inside Probe, which recovers this one value and answers that it could not.
+		panic(probeAbandoned{})
+	}
 	if resolver.store.Reloaded(object.Pkg()) {
 		// Invariant: a kind's question returns no error, so one that has no answer ends the pass that asked it, which
 		// the engine's recovering run turns into that pass's error (check's recoveringRun), never into an answer.
@@ -215,10 +239,13 @@ func (resolver *Resolver) Whole(home *Package) map[string]map[objectpath.Path][]
 	return whole
 }
 
-// registeredKind is one kind as it registered: the kind, and its whole, each answer encoded as Ask encodes it.
+// registeredKind is one kind as it registered: the kind; its whole, each answer encoded as Ask encodes it; probe, its
+// answer about one object of home, encoded, asked as Ask asks it; and zero, its answer of no fact, encoded.
 type registeredKind struct {
 	kind  *Kind
 	whole func(resolver *Resolver, home *Package) map[types.Object][]byte
+	probe func(resolver *Resolver, home *Package, object types.Object) []byte
+	zero  []byte
 }
 
 // registered is every kind registered, in the order each registered, under registeredLock.
@@ -227,10 +254,22 @@ var (
 	registered     []registeredKind
 )
 
-// Register adds kind to the kinds Whole computes, with whole, which computes every answer of kind in a package, each
-// answer of no fact left out, as Ask's compute would answer it, for the standard library's table. A kind registers as
-// its package initializes.
-func Register[Value any](kind *Kind, whole func(resolver *Resolver, home *Package) map[types.Object]Value) {
+// Register adds kind to the kinds Whole computes and Probe asks: whole computes every answer of kind in a package,
+// each answer of no fact left out, as Ask's compute would answer it, for the standard library's table, and compute
+// is the kind's own judgment of one object of home, as the compute it hands Ask. A kind registers as its package
+// initializes.
+func Register[Value any](
+	kind *Kind,
+	whole func(resolver *Resolver, home *Package) map[types.Object]Value,
+	compute func(resolver *Resolver, home *Package, object types.Object) Value,
+) {
+	var zero Value
+	encodedZero, encodeError := json.Marshal(zero)
+	if encodeError != nil {
+		// Invariant: a kind's Value is plain data, a boolean or a slice of structs of integers, which JSON always
+		// encodes.
+		panic(fmt.Sprintf("fact_resolver: %s's answer of no fact does not encode: %v", kind.Name, encodeError))
+	}
 	registeredLock.Lock()
 	defer registeredLock.Unlock()
 	registered = append(registered, registeredKind{
@@ -243,6 +282,13 @@ func Register[Value any](kind *Kind, whole func(resolver *Resolver, home *Packag
 			}
 			return encoded
 		},
+		probe: func(resolver *Resolver, home *Package, object types.Object) []byte {
+			answer := Ask(resolver, home, kind, object, func(owner *Package) Value {
+				return compute(resolver, owner, object)
+			})
+			return encodeAnswer(kind, object, answer)
+		},
+		zero: encodedZero,
 	})
 }
 

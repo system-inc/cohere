@@ -77,6 +77,13 @@ type Resolver struct {
 	recordedLock sync.Mutex
 	recorded     map[*types.Package]map[string]map[objectpath.Path][]byte
 
+	// reads are each package's reads (see Read), under readsLock; paths memoizes each object's objectpath; probing is
+	// set while Probe asks, between the analysis's waves.
+	readsLock sync.Mutex
+	reads     map[*types.Package]*readSet
+	paths     sync.Map
+	probing   atomic.Bool
+
 	// timing is the run's collector under `--timing`, taken from the first pass that hands the resolver over, nil for
 	// a run that did not ask (see Question).
 	timing atomic.Pointer[timing.Collector]
@@ -114,7 +121,11 @@ type Counts struct {
 // New is an empty resolver, which learns each package as the checker tells it ctrlflow has finished there, and reads
 // and keeps answers in store, or in none when store is nil, for a run that restores nothing.
 func New(store Store) *Resolver {
-	return &Resolver{store: store, recorded: map[*types.Package]map[string]map[objectpath.Path][]byte{}}
+	return &Resolver{
+		store:    store,
+		recorded: map[*types.Package]map[string]map[objectpath.Path][]byte{},
+		reads:    map[*types.Package]*readSet{},
+	}
 }
 
 // Of is the resolver the checker hands pass, or an error naming what pass held instead, for a driver that set no

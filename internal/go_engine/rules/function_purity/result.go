@@ -11,7 +11,11 @@ import (
 var Kind = &fact_resolver.Kind{Name: "function_purity"}
 
 func init() {
-	fact_resolver.Register(Kind, whole)
+	fact_resolver.Register(Kind, whole,
+		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) bool {
+			function, isFunction := object.(*types.Func)
+			return isFunction && judgeIn(resolver, home, function)
+		})
 }
 
 // Result is one package's purity, as its readers ask it.
@@ -43,7 +47,7 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, functi
 	if !fact_resolver.Visible(reader, function) {
 		return false
 	}
-	return fact_resolver.Ask(resolver, Kind, function, func(home *fact_resolver.Package) bool {
+	return fact_resolver.Ask(resolver, reader, Kind, function, func(home *fact_resolver.Package) bool {
 		return judgeIn(resolver, home, function)
 	})
 }

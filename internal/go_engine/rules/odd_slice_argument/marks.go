@@ -12,7 +12,11 @@ import (
 var Kind = &fact_resolver.Kind{Name: "odd_slice_argument"}
 
 func init() {
-	fact_resolver.Register(Kind, whole)
+	fact_resolver.Register(Kind, whole,
+		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) bool {
+			parameter, isParameter := object.(*types.Var)
+			return isParameter && judgeIn(resolver, home, parameter)
+		})
 }
 
 // marks is SA5012's state in one package: the parameters of each function judged that it marks, by the function,
@@ -39,7 +43,7 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, parame
 	if !fact_resolver.Visible(reader, parameter) {
 		return false
 	}
-	return fact_resolver.Ask(resolver, Kind, parameter, func(home *fact_resolver.Package) bool {
+	return fact_resolver.Ask(resolver, reader, Kind, parameter, func(home *fact_resolver.Package) bool {
 		return judgeIn(resolver, home, parameter)
 	})
 }
