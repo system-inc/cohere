@@ -1,280 +1,280 @@
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package0/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package0/file0.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package1/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package1/file1.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package2/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package2/file2.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package3/file3.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package4/file4.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package5/file5.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package6>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package7/file7.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package0/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package0/file0.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package1/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package1/file1.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package2/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package2/file2.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package3/file3.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package4/file4.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package5/file5.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package6>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package7/file7.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1001
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package7/file7.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package7/file7.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1002
 1002 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1002 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package10/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package10/file10.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package11/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package11/file11.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package12/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package12/file12.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package13/file0.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package14/file1.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package15/file2.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package16>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package17/file4.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package10/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package10/file10.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package11/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package11/file11.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package12/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package12/file12.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package13/file0.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package14/file1.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package15/file2.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package16>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package17/file4.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1003
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package17/file4.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package17/file4.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1004
 1004 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1004 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package20/file7.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package20/file7.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package21/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package21/file8.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package22/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package22/file9.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package23/file10.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package24/file11.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package25/file12.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package26>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package27/file1.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package20/file7.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package20/file7.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package21/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package21/file8.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package22/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package22/file9.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package23/file10.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package24/file11.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package25/file12.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package26>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package27/file1.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1005
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package27/file1.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package27/file1.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1006
 1006 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1006 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package30/file4.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package30/file4.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package31/file5.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package31/file5.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package32/file6.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package32/file6.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package33/file7.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package34/file8.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package35/file9.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package36>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package37/file11.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package30/file4.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package30/file4.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package31/file5.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package31/file5.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package32/file6.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package32/file6.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package33/file7.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package34/file8.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package35/file9.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package36>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package37/file11.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1007
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package37/file11.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package37/file11.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1008
 1008 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1008 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package40/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package40/file1.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package41/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package41/file2.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package42/file3.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package42/file3.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package43/file4.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package44/file5.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package45/file6.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package46>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package47/file8.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package40/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package40/file1.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package41/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package41/file2.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package42/file3.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package42/file3.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package43/file4.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package44/file5.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package45/file6.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package46>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package47/file8.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1009
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package47/file8.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package47/file8.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1010
 1010 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1010 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package50/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package50/file11.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package51/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package51/file12.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package52/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package52/file0.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package53/file1.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package54/file2.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package55/file3.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package56>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package57/file5.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package50/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package50/file11.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package51/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package51/file12.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package52/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package52/file0.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package53/file1.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package54/file2.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package55/file3.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package56>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package57/file5.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1011
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package57/file5.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package57/file5.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1012
 1012 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1012 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package60/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package60/file8.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package61/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package61/file9.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package62/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package62/file10.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package63/file11.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package64/file12.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package65/file0.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package66>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package67/file2.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package60/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package60/file8.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package61/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package61/file9.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package62/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package62/file10.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package63/file11.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package64/file12.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package65/file0.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package66>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package67/file2.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1013
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package67/file2.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package67/file2.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1014
 1014 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1014 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package70/file5.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package70/file5.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package71/file6.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package71/file6.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package72/file7.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package72/file7.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package73/file8.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package74/file9.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package75/file10.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package76>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package77/file12.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package70/file5.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package70/file5.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package71/file6.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package71/file6.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package72/file7.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package72/file7.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package73/file8.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package74/file9.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package75/file10.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package76>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package77/file12.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1015
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package77/file12.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package77/file12.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1016
 1016 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1016 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package80/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package80/file2.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package81/file3.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package81/file3.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package82/file4.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package82/file4.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package83/file5.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package84/file6.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package85/file7.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package86>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package87/file9.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package80/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package80/file2.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package81/file3.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package81/file3.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package82/file4.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package82/file4.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package83/file5.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package84/file6.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package85/file7.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package86>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package87/file9.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1017
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package87/file9.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package87/file9.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1018
 1018 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1018 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package90/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package90/file12.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package91/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package91/file0.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package92/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package92/file1.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package93/file2.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package94/file3.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package95/file4.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package96>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package0/file6.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package90/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package90/file12.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package91/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package91/file0.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package92/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package92/file1.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package93/file2.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package94/file3.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package95/file4.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package96>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package0/file6.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1019
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package0/file6.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package0/file6.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1020
 1020 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1020 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package3/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package3/file9.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package4/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package4/file10.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package5/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package5/file11.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package6/file12.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package7/file0.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package8/file1.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package9>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package10/file3.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package3/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package3/file9.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package4/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package4/file10.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package5/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package5/file11.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package6/file12.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package7/file0.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package8/file1.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package9>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package10/file3.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1021
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package10/file3.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package10/file3.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1022
 1022 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1022 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package13/file6.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package13/file6.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package14/file7.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package14/file7.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package15/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package15/file8.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package16/file9.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package17/file10.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package18/file11.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package19>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package20/file0.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package13/file6.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package13/file6.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package14/file7.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package14/file7.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package15/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package15/file8.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package16/file9.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package17/file10.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package18/file11.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package19>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package20/file0.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1023
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package20/file0.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package20/file0.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1024
 1024 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1024 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package23/file3.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package23/file3.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package24/file4.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package24/file4.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package25/file5.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package25/file5.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package26/file6.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package27/file7.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package28/file8.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package29>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package30/file10.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package23/file3.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package23/file3.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package24/file4.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package24/file4.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package25/file5.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package25/file5.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package26/file6.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package27/file7.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package28/file8.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package29>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package30/file10.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1025
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package30/file10.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package30/file10.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1026
 1026 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1026 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package33/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package33/file0.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package34/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package34/file1.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package35/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package35/file2.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package36/file3.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package37/file4.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package38/file5.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package39>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package40/file7.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package33/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package33/file0.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package34/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package34/file1.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package35/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package35/file2.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package36/file3.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package37/file4.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package38/file5.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package39>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package40/file7.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1027
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package40/file7.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package40/file7.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1028
 1028 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1028 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package43/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package43/file10.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package44/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package44/file11.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package45/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package45/file12.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package46/file0.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package47/file1.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package48/file2.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package49>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package50/file4.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package43/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package43/file10.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package44/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package44/file11.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package45/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package45/file12.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package46/file0.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package47/file1.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package48/file2.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package49>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package50/file4.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1029
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package50/file4.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package50/file4.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1030
 1030 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1030 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package53/file7.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package53/file7.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package54/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package54/file8.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package55/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package55/file9.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package56/file10.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package57/file11.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package58/file12.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package59>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package60/file1.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package53/file7.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package53/file7.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package54/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package54/file8.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package55/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package55/file9.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package56/file10.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package57/file11.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package58/file12.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package59>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package60/file1.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1031
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package60/file1.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package60/file1.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1032
 1032 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1032 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package63/file4.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package63/file4.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package64/file5.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package64/file5.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package65/file6.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package65/file6.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package66/file7.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package67/file8.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package68/file9.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package69>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package70/file11.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package63/file4.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package63/file4.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package64/file5.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package64/file5.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package65/file6.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package65/file6.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package66/file7.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package67/file8.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package68/file9.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package69>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package70/file11.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1033
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package70/file11.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package70/file11.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1034
 1034 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1034 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package73/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package73/file1.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package74/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package74/file2.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package75/file3.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package75/file3.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package76/file4.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package77/file5.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package78/file6.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package79>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package80/file8.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package73/file1.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package73/file1.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package74/file2.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package74/file2.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package75/file3.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package75/file3.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package76/file4.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package77/file5.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package78/file6.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package79>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package80/file8.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1035
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package80/file8.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package80/file8.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1036
 1036 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1036 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package83/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package83/file11.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package84/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package84/file12.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package85/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package85/file0.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package86/file1.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package87/file2.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package88/file3.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package89>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package90/file5.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package83/file11.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package83/file11.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package84/file12.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package84/file12.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package85/file0.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package85/file0.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package86/file1.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package87/file2.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package88/file3.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package89>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package90/file5.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1037
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package90/file5.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package90/file5.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1038
 1038 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1038 +++ exited with 0 +++
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package93/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package93/file8.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package94/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package94/file9.go>
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package95/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/ahra/levers/adamic/internal/package95/file10.go>
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package96/file11.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package0/file12.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
-1000 newfstatat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package1/file0.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
-1000 getdents64(3</home/ahra/levers/adamic/internal/package2>, 0xc000400000 /* 24 entries */, 8192) = 784
-1000 openat(AT_FDCWD</home/ahra/levers/adamic>, "/home/ahra/levers/adamic/internal/package3/file2.go", O_RDONLY|O_CLOEXEC <unfinished ...>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package93/file8.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package93/file8.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package94/file9.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package94/file9.go>
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package95/file10.go", O_RDONLY|O_CLOEXEC) = 3</home/user/levers/adamic/internal/package95/file10.go>
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package96/file11.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package0/file12.go.missing", 0xc0001a2b38, 0) = -1 ENOENT (No such file or directory)
+1000 newfstatat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package1/file0.go", {st_mode=S_IFREG|0644, st_size=1234, ...}, 0) = 0
+1000 getdents64(3</home/user/levers/adamic/internal/package2>, 0xc000400000 /* 24 entries */, 8192) = 784
+1000 openat(AT_FDCWD</home/user/levers/adamic>, "/home/user/levers/adamic/internal/package3/file2.go", O_RDONLY|O_CLOEXEC <unfinished ...>
 1000 clone(child_stack=0xc000200000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0xc000100090) = 1039
-1000 <... openat resumed>) = 4</home/ahra/levers/adamic/internal/package3/file2.go>
-1000 readlinkat(AT_FDCWD</home/ahra/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
+1000 <... openat resumed>) = 4</home/user/levers/adamic/internal/package3/file2.go>
+1000 readlinkat(AT_FDCWD</home/user/levers/adamic>, "/proc/self/exe", "/usr/lib/go/pkg/tool/linux_amd64/compile", 128) = 40
 1000 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 1040
 1040 execve("/usr/lib/go/pkg/tool/linux_amd64/compile", ["compile", "-o"], 0x7ffd /* 40 vars */) = 0
 1040 +++ exited with 0 +++
