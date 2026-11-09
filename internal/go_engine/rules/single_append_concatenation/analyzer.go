@@ -69,22 +69,18 @@ func judgeFunction(context *rule.Context, function *intermediate_representation.
 	if syntax == nil || function.Parent() != nil && function.Parent().Syntax() != nil {
 		return
 	}
-	pure, isPurity := context.ResultOf(function_purity.Analyzer).(function_purity.Result)
-	if !isPurity {
+	pure, isPurity := context.ResultOf(function_purity.Analyzer).(*function_purity.Result)
+	if !isPurity || pure == nil {
 		// Invariant: the listener requires function_purity, whose result is always a function_purity.Result, so
 		// anything else is a mistake in building the rule, which the dispatcher's recover makes this rule's crash on
 		// the package.
 		panic("single_append_concatenation: the purity pass's result is missing")
 	}
-	// The purity pass's result is never nil, so the original's MayHaveSideEffects always reads it, and a function is
-	// pure where the map holds it.
-	isPure := func(callee *types.Func) bool {
-		_, isHeld := pure[callee]
-		return isHeld
-	}
+	// The purity pass's result is never nil, so the original's MayHaveSideEffects always asks it, and a function is
+	// pure where it answers so.
 	ast.Inspect(syntax, func(node ast.Node) bool {
 		if statement, isRange := node.(*ast.RangeStmt); isRange {
-			Check(context, isPure, statement)
+			Check(context, pure.IsPure, statement)
 		}
 		return true
 	})

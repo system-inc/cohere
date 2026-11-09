@@ -1,6 +1,7 @@
 package function_purity
 
-// IsPure marks a function judged pure. It prints as staticcheck's fact does, so the two compare by what they say.
+// IsPure marks a function the push judged pure. It prints as staticcheck's fact does, so the two compare by what they
+// say.
 type IsPure struct{}
 
 func (*IsPure) AFact() {
