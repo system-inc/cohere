@@ -1236,3 +1236,33 @@ func TestAppendingToChildrenLeavesTheNextBlocksChildren(test *testing.T) {
 	}
 }
 
+// TestACollapsedComponentResolvesTheNextComponentsOperand: componentA holds only x and collapses to it, and
+// componentB's outside values are x and componentA's phiA1. The step visits componentA first, since componentB
+// uses it, and reads phiA1 through its collapse as x, so componentB holds one value too and collapses in the
+// same pass. Read as itself, phiA1 would be a second value and componentB would wait for another round, which
+// EliminateRedundantPhis's fixed point gives it, so this runs the step once, alone.
+func TestACollapsedComponentResolvesTheNextComponentsOperand(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, loopA, loopB, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	x := function.define(entry, "x")
+	phiA1, phiA2 := function.value("x"), function.value("x")
+	phiB1, phiB2 := function.value("x"), function.value("x")
+	loopA.phis = []*ssa.Phi[testPlace]{handPhi(phiA1, x.defines[0], phiA2), handPhi(phiA2, x.defines[0], phiA1)}
+	loopB.phis = []*ssa.Phi[testPlace]{handPhi(phiB1, phiA1, phiB2), handPhi(phiB2, x.defines[0], phiB1)}
+	read := &testInstruction{uses: []testPlace{phiB1, phiB2}}
+	exit.instructions = append(exit.instructions, read)
+
+	if !ssa.EliminateRedundantComponentsOnceForTest(testGraph{}, function) {
+		test.Fatal("the step collapsed nothing")
+	}
+
+	if phis := phiIds(function); len(phis) != 0 {
+		test.Errorf("one pass kept the phis %v, want none", phis)
+	}
+	if read.uses[0].id != x.defines[0].id || read.uses[1].id != x.defines[0].id {
+		test.Errorf("the reads of phiB1 and phiB2 name $%d and $%d, want x's $%d",
+			read.uses[0].id, read.uses[1].id, x.defines[0].id)
+	}
+}
