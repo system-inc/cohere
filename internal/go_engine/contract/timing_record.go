@@ -29,9 +29,8 @@ type TimingRecord struct {
 	Rules []RuleTiming `json:"rules"`
 
 	// Shared holds the analyzers that are no rule's own, by analyzer name, most expensive first: the intermediate
-	// representation builds (staticcheck's buildir and the engine's own, each its own row while both run), the
-	// helpers several rules read (inspect, ctrlflow), and each dispatcher's walk less the calls into its listeners,
-	// which are billed to their rules. Written `[]` when none ran.
+	// representation's build, the helpers several rules read (inspect, ctrlflow), and each dispatcher's walk less the
+	// calls into its listeners, which are billed to their rules. Written `[]` when none ran.
 	Shared []SharedTiming `json:"shared"`
 
 	// MeasuredCalls is how many pieces of work were measured, each costing two reads of the clock.
@@ -100,8 +99,7 @@ type SharedTiming struct {
 type SharedKind string
 
 const (
-	// SharedIntermediateRepresentation is an intermediate representation's build: staticcheck's buildir, or the
-	// engine's own.
+	// SharedIntermediateRepresentation is the engine's intermediate representation build.
 	SharedIntermediateRepresentation SharedKind = "intermediateRepresentation"
 	// SharedDispatcher is a dispatcher's walk, less the calls into its listeners.
 	SharedDispatcher SharedKind = "dispatcher"

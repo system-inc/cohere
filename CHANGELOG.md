@@ -65,9 +65,8 @@ changed in cohere outside the sets is written under the same heading.
   `--json` name each.
 - `--timing` covers Go. A Go run under it prints what its CPU went to in the shape of TypeScript's table: each
   rule's CPU from each analyzer's own thread clock, most expensive first with its share, the intermediate
-  representation builds (staticcheck's `buildir` and the engine's own) and each dispatcher's walk as rows of their
-  own, the load's list, parse, type-check and export data, and what share of the process's CPU the rows cover, the
-  rest named as what no row measures. `--json` writes it as a `timing` line, and the run cache never replays or
+  representation's build and each dispatcher's walk as rows of their own, the load's list, parse, type-check and
+  export data, and what share of the process's CPU the rows cover, the rest named as what no row measures. `--json` writes it as a `timing` line, and the run cache never replays or
   records a `--timing` run. A Swift run still refuses it.
 - A root that's a Go workspace or a Swift package is format-checked too: when it holds JSON, Markdown,
   YAML or anything else the house formatter reads, outside every TypeScript project's directory, the run

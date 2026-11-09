@@ -370,7 +370,12 @@ func populatedRecords() []Record {
 			},
 			Rules: []RuleTiming{{Name: "cohere-go/printf", CpuMicroseconds: 2500, Packages: 3, Calls: 640}},
 			Shared: []SharedTiming{
-				{Name: "buildir", Kind: SharedIntermediateRepresentation, CpuMicroseconds: 8000, Packages: 40},
+				{
+					Name:            "build_intermediate_representation",
+					Kind:            SharedIntermediateRepresentation,
+					CpuMicroseconds: 8000,
+					Packages:        40,
+				},
 			},
 			MeasuredCalls:            2300,
 			MeasuringCpuMicroseconds: 230,
