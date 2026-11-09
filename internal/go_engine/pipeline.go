@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -74,6 +75,11 @@ type pipeline struct {
 	// (see pipeline_speculative_lint.go).
 	overlaps    bool
 	speculation *speculativeLint
+
+	// duplicates is the duplicates report the lint phase built, nil until it has, and duplicatesNotRun why it never
+	// did, under `--duplicates` (see pipeline_duplicates.go).
+	duplicates       *duplicate_functions.Report
+	duplicatesNotRun string
 }
 
 func newPipeline(
@@ -135,6 +141,7 @@ func (engine *pipeline) run() int {
 	engine.runTypes(loaded, loadError)
 	engine.runLint(loaded, loadError, linted)
 	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
+	engine.writeDuplicates()
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
 	// read is not known.
@@ -175,6 +182,10 @@ func (engine *pipeline) phase(
 ) {
 	if outcome == contract.OutcomeNotReached {
 		engine.incomplete = true
+	}
+	// The duplicates report reads the lint phase's pass, so a lint phase that did not run says why the report did not.
+	if name == contract.PhaseLint && outcome != contract.OutcomeRan {
+		engine.duplicatesNotRun = "the lint phase did not run (" + detail + "), and the report reads its pass"
 	}
 	engine.write(contract.PhaseRecord{
 		Name: name, Outcome: outcome, ElapsedMilliseconds: int(elapsed.Milliseconds()), Detail: detail,

@@ -84,6 +84,10 @@ type CacheTable struct {
 	// Types is each project file's semantic diagnostics under its shape fingerprint, for the types phase to
 	// replay. Nil until a run has recorded them. See TypesSection.
 	Types *TypesSection
+
+	// Duplicates is each project file's functions as the duplicates report's hash read them. Nil until a run with
+	// `--duplicates` has hashed. See DuplicatesSection.
+	Duplicates *DuplicatesSection
 }
 
 // FormatSection is the format record's section of the table. Key names the binary and root its entries
@@ -107,6 +111,8 @@ type FormatEntry struct {
 // cacheTableVersion is the format, and it moves whenever the encoded shape or its meaning does. The shape
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
+//
+// 17: the table holds the duplicates report's section (#jfvhbj7).
 //
 // 16: a stored type diagnostic names its offset Start and its arguments MessageArguments, as findings entries
 // spell them.
@@ -142,7 +148,7 @@ type FormatEntry struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 16
+const cacheTableVersion = 17
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -173,6 +179,7 @@ const (
 	cacheTableSignaturesSection = "signatures"
 	cacheTableFormatSection     = "format"
 	cacheTableTypesSection      = "types"
+	cacheTableDuplicatesSection = "duplicates"
 )
 
 // legacyCacheTableFile is the single file the table was until format 8, removed on sight.
@@ -193,6 +200,7 @@ type cacheTableBodies struct {
 	Signatures map[string]SignatureEntry
 	Formatted  *FormatSection
 	Types      *TypesSection
+	Duplicates *DuplicatesSection
 }
 
 // CacheTableSections names the parts of a table a read loads or a write replaces. Runs names invocations;
@@ -204,6 +212,7 @@ type CacheTableSections struct {
 	Signatures bool
 	Formatted  bool
 	Types      bool
+	Duplicates bool
 }
 
 // EveryCacheTableSection is the whole table.
@@ -213,6 +222,7 @@ var EveryCacheTableSection = CacheTableSections{
 	Signatures: true,
 	Formatted:  true,
 	Types:      true,
+	Duplicates: true,
 }
 
 // cacheTableRunFile is the file a recorded run lives in: a hash of its invocation, since an invocation is
@@ -505,6 +515,13 @@ func readCacheTable(directory string, identity CacheTableIdentity, sections Cach
 			table.Types = types
 		}
 	}
+	if sections.Duplicates {
+		var duplicates *DuplicatesSection
+		if readCacheTableSection(read, cacheTableFile(cacheTableDuplicatesSection), cacheTableDuplicatesSection,
+			&duplicates) {
+			table.Duplicates = duplicates
+		}
+	}
 
 	switch {
 	case len(read.dropped) == 0 && !read.found:
@@ -601,6 +618,17 @@ func WriteCacheTable(
 			return writeCacheTableSectionError
 		}
 	}
+	if sections.Duplicates && anchored.Duplicates != nil {
+		if writeCacheTableSectionError := writeCacheTableSection(
+			directory,
+			cacheTableFile(cacheTableDuplicatesSection),
+			cacheTableDuplicatesSection,
+			anchored.Duplicates,
+			identity,
+		); writeCacheTableSectionError != nil {
+			return writeCacheTableSectionError
+		}
+	}
 	return nil
 }
 
@@ -627,8 +655,8 @@ func (table *CacheTable) spell(anchor PathAnchor) {
 }
 
 // mapPaths is a copy of the table with path applied to every file path a section keys on: each recorded run's
-// inputs, each findings entry's, the shapes', the format record's and the types section's. Sections it does not
-// hold stay nil.
+// inputs, each findings entry's, the shapes', the format record's, the types section's and the duplicates section's.
+// Sections it does not hold stay nil.
 func (table *CacheTable) mapPaths(path func(string) string) *CacheTable {
 	mapped := *table
 	if table.Runs != nil {
@@ -682,6 +710,16 @@ func (table *CacheTable) mapPaths(path func(string) string) *CacheTable {
 			}
 		}
 		mapped.Types = &types
+	}
+	if table.Duplicates != nil {
+		duplicates := *table.Duplicates
+		if table.Duplicates.Entries != nil {
+			duplicates.Entries = make(map[string]DuplicatesEntry, len(table.Duplicates.Entries))
+			for name, entry := range table.Duplicates.Entries {
+				duplicates.Entries[path(name)] = entry
+			}
+		}
+		mapped.Duplicates = &duplicates
 	}
 	return &mapped
 }

@@ -58,6 +58,13 @@ type Options struct {
 	// must not run at all (see checker.Options).
 	Ready   func(*packages.Package) <-chan struct{}
 	Abandon <-chan struct{}
+
+	// Report, when not nil, is an analyzer that is no rule, run beside the rules on every package to analyze: it
+	// reports nothing, and its result on each package is in Result.Reports. The findings cache keeps that result with
+	// the package, so a package it restores still has one, and an entry written without it is a miss. Under
+	// `--duplicates` it is the duplicates report's hasher (#jfvhbj7). Its ResultType must be a pointer to a type gob
+	// can encode.
+	Report *analysis.Analyzer
 }
 
 // ErrAbandoned is Run's error when Options.Abandon closed before every rule had run, so the result would be partial.
@@ -157,6 +164,15 @@ type Result struct {
 	// Cache is what the per-package findings cache did, all zero on a run without it.
 	Cache CacheCounts
 
+	// Reports is Options.Report's result on each analyzed package it finished on, live or restored, nil without one.
+	// ReportCrashes are the packages it did not finish on, as Crashes says a rule's, which it never joins: the report
+	// is no rule, and its crash leaves the lint phase's verdict whole.
+	Reports       map[*packages.Package]any
+	ReportCrashes []Crash
+
+	// ReportsRestored is how many of Reports came from the findings cache rather than from an analysis this run.
+	ReportsRestored int
+
 	Elapsed time.Duration
 }
 
@@ -194,7 +210,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		ruleOf[enabled.Analyzer] = enabled
 		analyzers = append(analyzers, enabled.Analyzer)
 	}
-	if wrapError := wrapRuns(analyzers); wrapError != nil {
+	// roots are what the checker runs on every package to analyze: the rules, and the report beside them.
+	roots := analyzers
+	if options.Report != nil {
+		roots = append(slices.Clone(analyzers), options.Report)
+	}
+	if wrapError := wrapRuns(roots); wrapError != nil {
 		return nil, wrapError
 	}
 	record := &walkRecord{files: map[*packages.Package][]storedFile{}}
@@ -214,7 +235,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		checkerOptions.Finished = record.take
 	}
 	session := options.Cache
-	roots := analyzed
+	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
+		// Its entries would hold no report, and a package they restored would come back without one.
+		return nil, fmt.Errorf("running report %s: the findings cache was opened without it", options.Report.Name)
+	}
+	toAnalyze := analyzed
 	var graphs []*checker.Graph
 	if session != nil {
 		if !session.opened {
@@ -223,23 +248,23 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			session.Restore(load.LoaderSource, reachable, analyzed)
 		}
 		checkerOptions.Restored, checkerOptions.Restore = session.restoredInWave, session.restore
-		firstGraph, waveError := session.firstWave(analyzers, checkerOptions, options.Withheld)
+		firstGraph, waveError := session.firstWave(roots, checkerOptions, options.Withheld)
 		if waveError != nil {
 			return nil, waveError
 		}
 		if firstGraph != nil {
 			graphs = append(graphs, firstGraph)
 		}
-		roots = slices.DeleteFunc(slices.Clone(analyzed), session.restoredInWave)
+		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), session.restoredInWave)
 		// A session without a store counts only what it restored from the binary, as a run without the cache counts
 		// no wave.
-		if len(roots) > 0 && session.HasStore() {
+		if len(toAnalyze) > 0 && session.HasStore() {
 			session.counts.Waves++
 		}
 	}
-	graph, analyzeError := checker.Analyze(analyzers, roots, checkerOptions)
+	graph, analyzeError := checker.Analyze(roots, toAnalyze, checkerOptions)
 	if analyzeError != nil {
-		return nil, fmt.Errorf("analyzing %d packages: %w", len(roots), analyzeError)
+		return nil, fmt.Errorf("analyzing %d packages: %w", len(toAnalyze), analyzeError)
 	}
 	if abandoned(options.Abandon) {
 		return nil, ErrAbandoned
@@ -314,6 +339,14 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 				result.FindingsByRule[finding.Rule]++
 			}
 		}
+	}
+	if options.Report != nil {
+		ranOn := func(analyzedPackage *packages.Package) (*checker.Action, bool) {
+			action, ran := actionOf[rootKey{options.Report, analyzedPackage}]
+			return action, ran
+		}
+		result.Reports, result.ReportCrashes, result.ReportsRestored = reportsOf(options.Report, analyzed, session,
+			ranOn)
 	}
 	slices.SortFunc(result.Findings, func(left, right Finding) int {
 		return cmp.Or(
@@ -498,4 +531,37 @@ func walk(files map[*packages.Package][]storedFile) (filesWalked int, nodes int)
 		}
 	}
 	return len(seen), nodes
+}
+
+// reportsOf is a report analyzer's result on every analyzed package, from its restored entry or from the action that
+// ran it, the packages it crashed on, and how many it restored. action finds the action that ran on a package that
+// was not restored.
+func reportsOf(
+	report *analysis.Analyzer,
+	analyzed []*packages.Package,
+	session *CacheSession,
+	action func(*packages.Package) (*checker.Action, bool),
+) (map[*packages.Package]any, []Crash, int) {
+	reports := map[*packages.Package]any{}
+	var crashes []Crash
+	restoredCount := 0
+	for _, analyzedPackage := range analyzed {
+		if restored, hit := session.reportOf(report, analyzedPackage); hit {
+			reports[analyzedPackage] = restored
+			restoredCount++
+			continue
+		}
+		ran, found := action(analyzedPackage)
+		if !found {
+			crashes = append(crashes, Crash{File: firstFile(analyzedPackage),
+				Error: fmt.Sprintf("%s has no action on %s", report.Name, analyzedPackage.ID)})
+			continue
+		}
+		if ran.Err != nil {
+			crashes = append(crashes, Crash{File: firstFile(ran.Package), Error: ran.Err.Error()})
+			continue
+		}
+		reports[analyzedPackage] = ran.Result
+	}
+	return reports, crashes, restoredCount
 }

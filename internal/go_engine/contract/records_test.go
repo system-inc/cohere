@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/duplicate_functions"
 )
 
 // The contract is read from the files swift/Contract.md is made of, the ones the front door's and the
@@ -332,6 +334,22 @@ func populatedRecords() []Record {
 		},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
 		RuleRecord{Name: "cohere-go/printf", Severity: "error"},
+		DuplicatesRecord{Report: duplicate_functions.Report{
+			Ran: true, NotRun: "a reason", Floor: 11, Files: 2, FilesIgnored: 1, Functions: 4, Hashed: 2,
+			Groups: []duplicate_functions.Group{{Digest: duplicate_functions.Digest{1}, Size: 12,
+				Members: []duplicate_functions.Function{
+					{File: "/project/a.go", Line: 3, Name: "A", Size: 12, Digest: duplicate_functions.Digest{1},
+						Kept: "port of upstream"},
+				}}},
+			Withheld: 1, BelowFloor: 2,
+			Refused: []duplicate_functions.Refusal{{File: "/project/b.go", Line: 4, Name: "B",
+				Reason: duplicate_functions.RefusalUnsupportedInstruction, Detail: "*ir.Select"}},
+			NotRead:             map[duplicate_functions.NotReadReason]int{duplicate_functions.NotReadGenerated: 1},
+			Crashes:             []duplicate_functions.Crash{{File: "/project/c.go", Error: "a panic"}},
+			DeadSuppressions:    []duplicate_functions.Place{{File: "/project/a.go", Line: 9}},
+			ElapsedMilliseconds: 7,
+			Cache:               duplicate_functions.CacheUse{Unit: "packages", Read: 1, Hashed: 1},
+		}},
 		InputsRecord{
 			Files:       []string{"/project/a.go", "/project/go.mod"},
 			Directories: []string{"/project"},

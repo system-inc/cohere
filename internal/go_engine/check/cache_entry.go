@@ -25,8 +25,9 @@ import (
 // cache's own, so an entry written in another format is never read. It changes whenever cacheEntry or anything it
 // holds changes shape, Finding included, or what a field means: at 5, Output became a digest of the package's API and
 // facts by value rather than of their bytes (#z14ch7c), so an entry written at 4 holds a digest no second key of 5
-// can match, and would only be a miss read the long way.
-const CacheFormatVersion = "go-engine-cache-5"
+// can match, and would only be a miss read the long way. At 6, an analysis holds its report analyzer's result
+// (#jfvhbj7).
+const CacheFormatVersion = "go-engine-cache-6"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.
@@ -66,11 +67,13 @@ type storedFile struct {
 }
 
 // storedAnalysis is one analyzer on one package: its findings, as newFinding makes them before the dedupe and the
-// withholding, and the facts the package itself exported that an importer inherits.
+// withholding, and the facts the package itself exported that an importer inherits. For a report analyzer (see
+// Options.Report), Report is its result, gob-encoded, where the others hold nothing.
 type storedAnalysis struct {
 	Findings     []Finding
 	ObjectFacts  []storedObjectFact
 	PackageFacts []storedFact
+	Report       []byte
 }
 
 // storedObjectFact is a fact about one object of the package: the object as its objectpath within the package, and
@@ -121,6 +124,9 @@ type restoredAnalysis struct {
 	findings     []Finding
 	objectFacts  []pathFact
 	packageFacts []analysis.Fact
+
+	// report is a report analyzer's result, decoded into its ResultType, nil for any other analyzer.
+	report any
 }
 
 // pathFact is a decoded fact about the object at an objectpath of its package.
@@ -173,6 +179,14 @@ func encodeEntry(
 			for _, diagnostic := range action.Diagnostics {
 				stored.Findings = append(stored.Findings, newFinding(actionRule, action.Package.Fset, diagnostic))
 			}
+		}
+		if known.reports[action.Analyzer] {
+			var report bytes.Buffer
+			if gobError := gob.NewEncoder(&report).Encode(action.Result); gobError != nil {
+				return encodedEntry{}, fmt.Errorf("storing %s's result: %w: %w", action.Analyzer.Name,
+					errorUnstorable, gobError)
+			}
+			stored.Report = report.Bytes()
 		}
 		objectFacts, packageFacts := action.ExportedFacts()
 		for _, objectFact := range objectFacts {
@@ -388,6 +402,13 @@ func decodeAnalysis(
 	stored storedAnalysis,
 ) (restoredAnalysis, error) {
 	restored := restoredAnalysis{findings: stored.Findings}
+	if known.reports[analyzer] {
+		report, reportError := decodeReport(analyzer, stored.Report)
+		if reportError != nil {
+			return restoredAnalysis{}, reportError
+		}
+		restored.report = report
+	}
 	for _, objectFact := range stored.ObjectFacts {
 		fact, factError := decodeFact(known, analyzer, objectFact.Fact)
 		if factError != nil {
@@ -419,4 +440,17 @@ func decodeFact(known *cacheAnalyzers, analyzer *analysis.Analyzer, stored store
 		return nil, fmt.Errorf("decoding a %s fact of %s: %w", stored.Type, analyzer.Name, decodeError)
 	}
 	return fact, nil
+}
+
+// decodeReport is a report analyzer's stored result as a value of its ResultType, a pointer to the type gob encoded.
+func decodeReport(analyzer *analysis.Analyzer, encoded []byte) (any, error) {
+	if analyzer.ResultType == nil || analyzer.ResultType.Kind() != reflect.Pointer {
+		return nil, fmt.Errorf("decoding %s's result: its result type %v is no pointer", analyzer.Name,
+			analyzer.ResultType)
+	}
+	report := reflect.New(analyzer.ResultType.Elem())
+	if decodeError := gob.NewDecoder(bytes.NewReader(encoded)).DecodeValue(report.Elem()); decodeError != nil {
+		return nil, fmt.Errorf("decoding %s's result: %w", analyzer.Name, decodeError)
+	}
+	return report.Interface(), nil
 }
