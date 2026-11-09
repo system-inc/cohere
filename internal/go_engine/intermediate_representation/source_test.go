@@ -95,8 +95,8 @@ package main
 	for _, testCase := range tests {
 		test.Run(testCase.desc, func(test *testing.T) {
 			test.Parallel()
-			goEnginePackage, file := buildPackage(test, testCase.input, nil)
-			fset := goEnginePackage.Program.FileSet
+			irPackage, file := buildPackage(test, testCase.input, nil)
+			fset := irPackage.Program.FileSet
 
 			// Find [start,end) positions of the first occurrence of substr in file.
 			index := strings.Index(testCase.input, testCase.substr)
@@ -112,7 +112,7 @@ package main
 			}
 
 			name := "(none)"
-			function := intermediate_representation.EnclosingFunction(goEnginePackage, path)
+			function := intermediate_representation.EnclosingFunction(irPackage, path)
 			if function != nil {
 				name = function.String()
 			}
@@ -124,7 +124,7 @@ package main
 
 			// While we're here: test HasEnclosingFunction.
 			if has := intermediate_representation.HasEnclosingFunction(
-				goEnginePackage,
+				irPackage,
 				path,
 			); has != (function != nil) {
 				test.Errorf("HasEnclosingFunction(%q in %q) got %v, want %v",

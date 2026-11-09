@@ -20,10 +20,10 @@ func relativeType(resolvedType types.Type, from *types.Package) string {
 // relString is `member`'s name, qualified by the path of pkg, its package, when that is not from. go/ir reads
 // the package through Member's Package method; ours has none, since Function and Global hold theirs
 // as a field, so each member passes its own.
-func relativeString(member Member, goEnginePackage *Package, from *types.Package) string {
+func relativeString(member Member, irPackage *Package, from *types.Package) string {
 	// NB: not all globals have an Object (e.g. init$guard),
 	// so use the member's Package, not Object().Pkg().
-	if goPackage := goEnginePackage.Types; goPackage != nil && goPackage != from {
+	if goPackage := irPackage.Types; goPackage != nil && goPackage != from {
 		return fmt.Sprintf("%s.%s", goPackage.Path(), member.Name())
 	}
 	return member.Name()

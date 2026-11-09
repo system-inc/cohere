@@ -38,54 +38,54 @@ type Package struct {
 
 // Function returns the package-level function of the specified name,
 // or nil if not found.
-func (goEnginePackage *Package) Function(name string) (function *Function) {
-	function, _ = goEnginePackage.Members[name].(*Function)
+func (irPackage *Package) Function(name string) (function *Function) {
+	function, _ = irPackage.Members[name].(*Function)
 	return
 }
 
 // Variable returns the package-level variable of the specified name,
 // or nil if not found.
-func (goEnginePackage *Package) Variable(name string) (global *Global) {
-	global, _ = goEnginePackage.Members[name].(*Global)
+func (irPackage *Package) Variable(name string) (global *Global) {
+	global, _ = irPackage.Members[name].(*Global)
 	return
 }
 
 // Constant returns the package-level constant of the specified name,
 // or nil if not found.
-func (goEnginePackage *Package) Constant(name string) (namedConstant *NamedConstant) {
-	namedConstant, _ = goEnginePackage.Members[name].(*NamedConstant)
+func (irPackage *Package) Constant(name string) (namedConstant *NamedConstant) {
+	namedConstant, _ = irPackage.Members[name].(*NamedConstant)
 	return
 }
 
 // Type returns the package-level type of the specified name,
 // or nil if not found.
-func (goEnginePackage *Package) Type(name string) (namedType *Type) {
-	namedType, _ = goEnginePackage.Members[name].(*Type)
+func (irPackage *Package) Type(name string) (namedType *Type) {
+	namedType, _ = irPackage.Members[name].(*Type)
 	return
 }
 
-// Build builds IR code for all functions and vars in package `goEnginePackage`.
+// Build builds IR code for all functions and vars in package `irPackage`.
 //
-// CreatePackage must have been called for all of `goEnginePackage`'s direct imports
+// CreatePackage must have been called for all of `irPackage`'s direct imports
 // (and hence its direct imports must have been error-free). It is not
 // necessary to call CreatePackage for indirect dependencies.
 // Functions will be created for all necessary methods in those
 // packages on demand.
 //
 // Build is idempotent and thread-safe.
-func (goEnginePackage *Package) Build() { goEnginePackage.buildOnce.Do(goEnginePackage.build) }
+func (irPackage *Package) Build() { irPackage.buildOnce.Do(irPackage.build) }
 
-func (goEnginePackage *Package) build() {
-	if goEnginePackage.info == nil {
+func (irPackage *Package) build() {
+	if irPackage.info == nil {
 		return // synthetic package, e.g. "testmain"
 	}
 
-	builder := builder{fns: goEnginePackage.created}
+	builder := builder{fns: irPackage.created}
 	builder.iterate()
 
 	// We no longer need transient information: ASTs or go/types deductions.
-	goEnginePackage.info = nil
-	goEnginePackage.created = nil
-	goEnginePackage.files = nil
-	goEnginePackage.initVersion = nil
+	irPackage.info = nil
+	irPackage.created = nil
+	irPackage.files = nil
+	irPackage.initVersion = nil
 }

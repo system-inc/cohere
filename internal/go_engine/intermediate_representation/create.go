@@ -45,12 +45,12 @@ func NewProgram(fset *token.FileSet) *Program {
 // (for funcs and vars only) and goversion defines the appropriate
 // interpretation; they will be used during the build phase.
 //
-// Mutates: goEnginePackage gains the member, its value and, for a function, its created and Functions entries
-func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.Node, goversion string) {
+// Mutates: irPackage gains the member, its value and, for a function, its created and Functions entries
+func memberFromObject(irPackage *Package, object types.Object, syntax ast.Node, goversion string) {
 	name := object.Name()
 	switch typedObject := object.(type) {
 	case *types.Builtin:
-		if goEnginePackage.Types != types.Unsafe {
+		if irPackage.Types != types.Unsafe {
 			// Invariant: go/types declares builtins only in the universe scope and in package unsafe's scope, and
 			// the objects given here come from a package's own declarations or scope.
 			panic("unexpected builtin object: " + typedObject.String())
@@ -58,9 +58,9 @@ func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.
 
 	case *types.TypeName:
 		if name != "_" {
-			goEnginePackage.Members[name] = &Type{
+			irPackage.Members[name] = &Type{
 				object:    typedObject,
-				irPackage: goEnginePackage,
+				irPackage: irPackage,
 			}
 		}
 
@@ -68,24 +68,24 @@ func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.
 		constant := &NamedConstant{
 			object:    typedObject,
 			Value:     NewConstant(typedObject.Val(), typedObject.Type(), syntax),
-			irPackage: goEnginePackage,
+			irPackage: irPackage,
 		}
-		goEnginePackage.values[typedObject] = constant
+		irPackage.values[typedObject] = constant
 		if name != "_" {
-			goEnginePackage.Members[name] = constant
+			irPackage.Members[name] = constant
 		}
 
 	case *types.Var:
 		global := &Global{
-			Package: goEnginePackage,
+			Package: irPackage,
 			name:    name,
 			object:  typedObject,
 			typ:     types.NewPointer(typedObject.Type()), // address
 		}
 		global.source = syntax
-		goEnginePackage.values[typedObject] = global
+		irPackage.values[typedObject] = global
 		if name != "_" {
-			goEnginePackage.Members[name] = global
+			irPackage.Members[name] = global
 		}
 
 	case *types.Func:
@@ -96,16 +96,16 @@ func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.
 				"memberFromObject: func %s has type %s, not a signature", typedObject, typedObject.Type()))
 		}
 		if sig.Recv() == nil && name == "init" {
-			goEnginePackage.ninit++
-			name = fmt.Sprintf("init#%d", goEnginePackage.ninit)
+			irPackage.ninit++
+			name = fmt.Sprintf("init#%d", irPackage.ninit)
 		}
-		function := createFunction(goEnginePackage.Program, typedObject, name, syntax, goEnginePackage.info, goversion)
-		function.Package = goEnginePackage
-		goEnginePackage.created = append(goEnginePackage.created, function)
-		goEnginePackage.values[typedObject] = function
-		goEnginePackage.Functions = append(goEnginePackage.Functions, function)
+		function := createFunction(irPackage.Program, typedObject, name, syntax, irPackage.info, goversion)
+		function.Package = irPackage
+		irPackage.created = append(irPackage.created, function)
+		irPackage.values[typedObject] = function
+		irPackage.Functions = append(irPackage.Functions, function)
 		if name != "_" && sig.Recv() == nil {
-			goEnginePackage.Members[name] = function // package-level function
+			irPackage.Members[name] = function // package-level function
 		}
 
 	default: // (incl. *types.Package)
@@ -160,7 +160,7 @@ func createFunction(
 // membersFromDecl populates package pkg with members for each
 // typechecker object (var, func, const or type) associated with the
 // specified decl.
-func membersFromDecl(goEnginePackage *Package, decl ast.Decl, goversion string) {
+func membersFromDecl(irPackage *Package, decl ast.Decl, goversion string) {
 	switch decl := decl.(type) {
 	case *ast.GenDecl: // import, const, type or var
 		switch decl.Tok {
@@ -172,7 +172,7 @@ func membersFromDecl(goEnginePackage *Package, decl ast.Decl, goversion string) 
 					panic(fmt.Sprintf("membersFromDecl: const declaration holds %T, not a value spec", spec))
 				}
 				for _, id := range valueSpec.Names {
-					memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], nil, "")
+					memberFromObject(irPackage, irPackage.info.Defs[id], nil, "")
 				}
 			}
 
@@ -184,10 +184,10 @@ func membersFromDecl(goEnginePackage *Package, decl ast.Decl, goversion string) 
 					panic(fmt.Sprintf("membersFromDecl: var declaration holds %T, not a value spec", spec))
 				}
 				for _, rhs := range valueSpec.Values {
-					goEnginePackage.initVersion[rhs] = goversion
+					irPackage.initVersion[rhs] = goversion
 				}
 				for _, id := range valueSpec.Names {
-					memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], spec, goversion)
+					memberFromObject(irPackage, irPackage.info.Defs[id], spec, goversion)
 				}
 			}
 
@@ -199,12 +199,12 @@ func membersFromDecl(goEnginePackage *Package, decl ast.Decl, goversion string) 
 					panic(fmt.Sprintf("membersFromDecl: type declaration holds %T, not a type spec", spec))
 				}
 				id := typeSpec.Name
-				memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], nil, "")
+				memberFromObject(irPackage, irPackage.info.Defs[id], nil, "")
 			}
 		}
 
 	case *ast.FuncDecl:
 		id := decl.Name
-		memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], decl, goversion)
+		memberFromObject(irPackage, irPackage.info.Defs[id], decl, goversion)
 	}
 }

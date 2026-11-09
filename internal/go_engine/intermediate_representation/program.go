@@ -144,8 +144,8 @@ func (prog *Program) CreatePackage(
 // prog.CreatePackage in unspecified order.
 func (prog *Program) AllPackages() []*Package {
 	pkgs := make([]*Package, 0, len(prog.packages))
-	for _, goEnginePackage := range prog.packages {
-		pkgs = append(pkgs, goEnginePackage)
+	for _, irPackage := range prog.packages {
+		pkgs = append(pkgs, irPackage)
 	}
 	return pkgs
 }
@@ -215,8 +215,8 @@ func (prog *Program) Package(object *types.Package) *Package {
 // It returns nil if the object belongs to a package that has not been
 // created by prog.CreatePackage.
 func (prog *Program) packageLevelMember(object types.Object) Member {
-	if goEnginePackage, ok := prog.packages[object.Pkg()]; ok {
-		return goEnginePackage.values[object]
+	if irPackage, ok := prog.packages[object.Pkg()]; ok {
+		return irPackage.values[object]
 	}
 	return nil
 }

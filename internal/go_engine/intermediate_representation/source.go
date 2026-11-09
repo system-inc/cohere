@@ -28,9 +28,9 @@ import (
 //   - the node is within an anonymous function (FuncLit) and
 //     its IR function has not been created yet
 //     (pkg.Build() has not yet been called).
-func EnclosingFunction(goEnginePackage *Package, path []ast.Node) *Function {
+func EnclosingFunction(irPackage *Package, path []ast.Node) *Function {
 	// Start with package-level function...
-	function := findEnclosingPackageLevelFunction(goEnginePackage, path)
+	function := findEnclosingPackageLevelFunction(irPackage, path)
 	if function == nil {
 		return nil // not in any function
 	}
@@ -72,29 +72,29 @@ func anonymousFunctionAt(function *Function, literal *ast.FuncLit) *Function {
 // depend on whether IR code for pkg has been built, so it can be
 // used to quickly reject check inputs that will cause
 // EnclosingFunction to fail, prior to IR building.
-func HasEnclosingFunction(goEnginePackage *Package, path []ast.Node) bool {
-	return findEnclosingPackageLevelFunction(goEnginePackage, path) != nil
+func HasEnclosingFunction(irPackage *Package, path []ast.Node) bool {
+	return findEnclosingPackageLevelFunction(irPackage, path) != nil
 }
 
 // findEnclosingPackageLevelFunction returns the Function
 // corresponding to the package-level function enclosing path.
-func findEnclosingPackageLevelFunction(goEnginePackage *Package, path []ast.Node) *Function {
+func findEnclosingPackageLevelFunction(irPackage *Package, path []ast.Node) *Function {
 	if pathLength := len(path); pathLength >= 2 { // [... {Gen,Func}Decl File]
 		switch decl := path[pathLength-2].(type) {
 		case *ast.GenDecl:
 			if decl.Tok == token.VAR && pathLength >= 3 {
 				// Package-level 'var' initializer.
-				return goEnginePackage.init
+				return irPackage.init
 			}
 
 		case *ast.FuncDecl:
 			if decl.Recv == nil && decl.Name.Name == "init" {
 				// Explicit init() function.
-				for _, block := range goEnginePackage.init.Blocks {
+				for _, block := range irPackage.init.Blocks {
 					for _, instr := range block.Instructions {
 						if instr, ok := instr.(*Call); ok {
 							if callee, ok := instr.Call.Value.(*Function); ok &&
-								callee.Package == goEnginePackage &&
+								callee.Package == irPackage &&
 								callee.Pos() == decl.Name.NamePos {
 								return callee
 							}
@@ -103,10 +103,10 @@ func findEnclosingPackageLevelFunction(goEnginePackage *Package, path []ast.Node
 				}
 				// Hack: return non-nil when IR is not yet
 				// built so that HasEnclosingFunction works.
-				return goEnginePackage.init
+				return irPackage.init
 			}
 			// Declared function/method.
-			return findNamedFunc(goEnginePackage, decl.Name.NamePos)
+			return findNamedFunc(irPackage, decl.Name.NamePos)
 		}
 	}
 	return nil // not in any function
@@ -114,17 +114,17 @@ func findEnclosingPackageLevelFunction(goEnginePackage *Package, path []ast.Node
 
 // findNamedFunc returns the named function whose FuncDecl.Ident is at
 // position pos.
-func findNamedFunc(goEnginePackage *Package, position token.Pos) *Function {
+func findNamedFunc(irPackage *Package, position token.Pos) *Function {
 	// Look at all package members and method sets of named types.
 	// Not very efficient.
-	for _, mem := range goEnginePackage.Members {
+	for _, mem := range irPackage.Members {
 		switch mem := mem.(type) {
 		case *Function:
 			if mem.Pos() == position {
 				return mem
 			}
 		case *Type:
-			mset := goEnginePackage.Program.MethodSets.MethodSet(types.NewPointer(mem.Type()))
+			mset := irPackage.Program.MethodSets.MethodSet(types.NewPointer(mem.Type()))
 			for index, length := 0, mset.Len(); index < length; index++ {
 				// Don't call Program.Method: avoid creating wrappers.
 				object, isFunc := mset.At(index).Obj().(*types.Func)
@@ -135,14 +135,14 @@ func findNamedFunc(goEnginePackage *Package, position token.Pos) *Function {
 				if object.Pos() == position {
 					// obj from MethodSet may not be the origin type.
 					function := object.Origin()
-					declared, isFunction := goEnginePackage.values[function].(*Function)
+					declared, isFunction := irPackage.values[function].(*Function)
 					if !isFunction {
 						// Invariant: a method at a FuncDecl's name in this package was declared here, and
 						// memberFromObject records every declared method in values as its *Function.
 						panic(fmt.Sprintf(
 							"method %s has no function in package %s",
 							function,
-							goEnginePackage.Types.Path(),
+							irPackage.Types.Path(),
 						))
 					}
 					return declared

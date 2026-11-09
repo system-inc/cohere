@@ -54,11 +54,11 @@ func buildPackage(
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
-	goEnginePackage, buildError := buildFiles(fset, file.Name.Name, []*ast.File{file}, importer)
+	irPackage, buildError := buildFiles(fset, file.Name.Name, []*ast.File{file}, importer)
 	if buildError != nil {
 		test.Fatal(buildError)
 	}
-	return goEnginePackage, file
+	return irPackage, file
 }
 
 // buildFiles is irutil.BuildPackage: type-check files as the package at path, create its imports
@@ -219,21 +219,21 @@ func main() {
 		test.Errorf("unexpected set of loaded packages: %q", paths)
 	}
 	for _, path := range deps {
-		goEnginePackage := prog.ImportedPackage(path)
-		if goEnginePackage == nil {
+		irPackage := prog.ImportedPackage(path)
+		if irPackage == nil {
 			test.Errorf("package not loaded: %q", path)
 			continue
 		}
 
 		// External packages should have no function bodies (except for wrappers).
-		isExt := goEnginePackage != mainPackage
+		isExt := irPackage != mainPackage
 
 		// init()
-		if isExt && !isEmpty(goEnginePackage.Function("init")) {
-			test.Errorf("external package %s has non-empty init", goEnginePackage.Types.Path())
+		if isExt && !isEmpty(irPackage.Function("init")) {
+			test.Errorf("external package %s has non-empty init", irPackage.Types.Path())
 		}
 
-		for _, mem := range goEnginePackage.Members {
+		for _, mem := range irPackage.Members {
 			if mem, ok := mem.(*intermediate_representation.Function); ok {
 				// Functions at package level.
 				if isExt && !isEmpty(mem) {
