@@ -12,6 +12,10 @@
 //   absent   saves a file where no cohere can be found and requires it saved as typed. The message is
 //            shown by VS Code, which offers no way to read a notification back, so its wording is held
 //            by cohere-format.test.js and its look by a person.
+//   go       in a Go module, saves a Go file and requires it saved as typed and never handed to cohere,
+//            which is how no error can show, then a TypeScript file, which cohere is handed and refuses
+//            there, and requires it saved as typed. COHERE_GATE_LOG holds each command line cohere ran
+//            with. That the refusal shows no message is held by cohere-format.test.js, for the same reason.
 
 const NodeAssert = require('node:assert/strict');
 const NodeChildProcess = require('node:child_process');
@@ -23,12 +27,15 @@ const Vscode = require('vscode');
 // formatted, or only fixed, would not match the gate.
 const typed = 'export function cohereVscodeGateProbe(): number {\n  let   first = 1\n    return first }\n';
 
-async function saveAsTyped(filePath) {
+// A Go file misformatted on purpose, which gofmt would change.
+const typedGo = 'package probe\nfunc  Value( ) int { return 1 }\n';
+
+async function saveAsTyped(filePath, text = typed) {
     NodeFileSystem.writeFileSync(filePath, '');
     const document = await Vscode.workspace.openTextDocument(filePath);
     await Vscode.window.showTextDocument(document);
     const edit = new Vscode.WorkspaceEdit();
-    edit.insert(document.uri, new Vscode.Position(0, 0), typed);
+    edit.insert(document.uri, new Vscode.Position(0, 0), text);
     NodeAssert.ok(await Vscode.workspace.applyEdit(edit), 'the edit was not applied');
     const formatter = Vscode.workspace.getConfiguration('editor', document).get('defaultFormatter');
     NodeAssert.equal(formatter, 'system-inc.cohere', `${document.languageId} files here are formatted by ${formatter}`);
@@ -83,9 +90,35 @@ async function run() {
         return;
     }
 
+    if(process.env.COHERE_GATE_CASE === 'go') {
+        await checkGoModule(folder, probe);
+        return;
+    }
+
     const saved = await saveAsTyped(probe);
     NodeAssert.equal(saved, typed, 'with no cohere, the file did not save as typed');
     console.log('cohere gate: absent: the file saved as typed');
+}
+
+// What cohere was run with so far, one command line a line.
+function cohereRuns() {
+    const log = process.env.COHERE_GATE_LOG;
+    return NodeFileSystem.existsSync(log) ? NodeFileSystem.readFileSync(log, 'utf8') : '';
+}
+
+async function checkGoModule(folder, probe) {
+    const goProbe = NodePath.join(folder, 'main.go');
+    const savedGo = await saveAsTyped(goProbe, typedGo);
+    NodeAssert.equal(savedGo, typedGo, 'the Go file did not save as typed');
+    NodeAssert.ok(!cohereRuns().includes(goProbe), `the Go file was handed to cohere:\n${cohereRuns()}`);
+    await Vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+
+    const saved = await saveAsTyped(probe);
+    NodeAssert.ok(cohereRuns().includes(probe), `the TypeScript file was never handed to cohere:\n${cohereRuns()}`);
+    NodeAssert.equal(saved, typed, 'cohere refused the Go module, and the TypeScript file did not save as typed');
+    console.log(
+        'cohere gate: go: the Go file saved as typed without reaching cohere, and the refused TypeScript file saved as typed',
+    );
 }
 
 // The diagnostics VS Code's JSON support reports for a settings file, once the schema has had time to load.
