@@ -1,0 +1,79 @@
+
+not a line strace prints
+12
+[pid 7] openat(AT_FDCWD</w>, "a.txt", O_RDONLY) = 3</w/a.txt>
+[pid    7] newfstatat(AT_FDCWD</w>, "b.txt", 0x7ffd, 0) = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD</w>, "no-pid.txt", O_RDONLY) = 3</w/no-pid.txt>
+   12 openat(AT_FDCWD</w>, "indented.txt", O_RDONLY) = 4</w/indented.txt>
+12 openat(AT_FDCWD</w>, "trailing.txt", O_RDONLY) = 4</w/trailing.txt>   
+12	openat(AT_FDCWD</w>, "tab.txt", O_RDONLY) = 4</w/tab.txt>
+20 openat(AT_FDCWD</w>, "split-a.txt", O_RDONLY|O_CLOEXEC <unfinished ...>
+21 openat(AT_FDCWD</w>, "split-b.txt", O_RDONLY|O_CLOEXEC <unfinished ...>
+21 <... openat resumed>) = 5</w/split-b.txt>
+20 <... openat resumed>) = 6</w/split-a.txt>
+[pid 22] read(3,  <unfinished ...>
+[pid 23] newfstatat(AT_FDCWD</w>, "c.txt", {st_mode=S_IFREG|0644, st_size=1, ...}, 0) = 0
+[pid 22] <... read resumed>"abc", 10) = 3
+[pid 23] openat(AT_FDCWD</w>, "split-bracketed.txt", O_RDONLY <unfinished ...>
+23 <... openat resumed>) = 7</w/split-bracketed.txt>
+24 openat(AT_FDCWD</w>, "old-space.txt", O_RDONLY <unfinished ...>
+24 <... openat resumed> ) = 3</w/old-space.txt>
+25 <... openat resumed>) = 3</w/never-started.txt>
+26 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD <unfinished ...>
+26 <... clone resumed>, child_tidptr=0x7f00) = 27
+28 execve("/usr/bin/x", ["x"], 0x7ffd /* 3 vars */ <unfinished ...>
+28 <... execve resumed>) = 0
+29 openat(AT_FDCWD</w>, "abandoned.txt", O_RDONLY <unfinished ...>
+29 +++ killed by SIGKILL +++
+30 openat(AT_FDCWD</w/d\303\251>, "\303\251t\303\251.txt", O_RDONLY) = 3</w/d\303\251/\303\251t\303\251.txt>
+30 openat(AT_FDCWD</w>, "quote\"inside.txt", O_RDONLY) = 3</w/quote\"inside.txt>
+30 openat(AT_FDCWD</w>, "back\\slash.txt", O_RDONLY) = 3</w/back\\slash.txt>
+30 openat(AT_FDCWD</w>, "angle<>.txt", O_RDONLY) = 3</w/angle\74\76.txt>
+30 openat(AT_FDCWD</w>, "escape\33[0m.txt", O_RDONLY) = -1 ENOENT (No such file or directory)
+30 openat(AT_FDCWD</w>, "byte\1.txt", O_RDONLY) = -1 ENOENT (No such file or directory)
+30 openat(AT_FDCWD</w>, "byte\0017.txt", O_RDONLY) = -1 ENOENT (No such file or directory)
+30 openat(AT_FDCWD</w>, "tab\there.txt", O_RDONLY) = 3</w/tab\there.txt>
+30 openat(AT_FDCWD</w>, "\x68\x65\x78.txt", O_RDONLY) = 3</w/hex.txt>
+30 openat(AT_FDCWD</w>, "paren).txt", O_RDONLY) = 3</w/paren).txt>
+30 openat(AT_FDCWD</w>, "fake) = 7<x>", O_RDONLY) = -1 ENOENT (No such file or directory)
+31 execve("/bin/sh", ["sh", "-c", "test $(a) = 1"], 0x7ffd /* 40 vars */) = 0
+31 execve("/bin/sh", ["sh", "-c", "a) = 1"], 0x7ffd /* 40 vars */) = ?
+31 execve("/bin/sh", ["sh"], 0x7ffd /* 40 vars */) = ?
+32 read(0,  <unfinished ...>) = ?
+32 exit_group(0) = ?
+33 +++ exited with 0 +++
+33 +++ killed by SIGKILL +++
+33 +++ killed by SIGSEGV (core dumped) +++
+33 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=34, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+33 --- stopped by SIGSTOP ---
+40 openat(AT_FDCWD, "relative.txt", O_RDONLY) = 3
+40 openat(5</w/dir>, "in-dir.txt", O_RDONLY) = 3</w/dir/in-dir.txt>
+40 openat(5, "undecoded.txt", O_RDONLY) = 3
+40 openat(-100, "/absolute.txt", O_RDONLY) = 3
+40 fchdir(5</w/dir>) = 0
+40 fchdir(5) = 0
+40 getdents64(5</w/dir>, 0x55d0 /* 4 entries */, 32768) = 112
+40 newfstatat(5</w/dir>, "", {st_mode=S_IFDIR|0755, st_size=4096, ...}, AT_EMPTY_PATH) = 0
+40 renameat2(AT_FDCWD</w>, "a", 5</w/dir>, "b", RENAME_NOREPLACE) = 0
+40 symlinkat("target", AT_FDCWD</w>, "link") = 0
+40 linkat(AT_FDCWD</w>, "a", AT_FDCWD</w>, "c", 0) = -1 EEXIST (File exists)
+40 openat(AT_FDCWD</w>, "deleted.txt", O_RDONLY) = 3</w/deleted.txt (deleted)>
+41 readlinkat(AT_FDCWD</w>, "link", "0123456789012345678901234567890"..., 32) = 32
+41 write(1, "long output"..., 4096) = 4096
+42 openat(AT_FDCWD</w>, "denied", O_RDONLY) = -1 EACCES (Permission denied)
+42 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+42 mkdir("/w/exists", 0755) = -1 EEXIST (File exists)
+42 wait4(-1, 0x7ffd, 0, NULL) = ? ERESTARTSYS (To be restarted if SA_RESTART is set)
+42 openat(AT_FDCWD</w>, "timed", O_RDONLY) = -1 ENOENT (No such file or directory) <0.000010>
+43 openat(AT_FDCWD</w>, "huge", O_RDONLY) = 99999999999999999999
+43 brk(NULL) = 0x55d0c0000000
+43 rt_sigreturn({mask=[]}) = 0
+44 openat(
+44 openat(AT_FDCWD, "unterminated, O_RDONLY) = 3
+44 openat(AT_FDCWD, "x") =
+44 openat(AT_FDCWD, "x") = -
+44 OPENAT(AT_FDCWD, "capital") = 3
+<unfinished ...>
+<... resumed>) = 3
+[pid 45 openat(AT_FDCWD, "x") = 3
+[pid] openat(AT_FDCWD, "x") = 3

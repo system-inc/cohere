@@ -1,0 +1,163 @@
+3315478 openat(AT_FDCWD</tmp/a>, "w\303\251.txt", O_RDONLY) = 3</tmp/a/w\303\251.txt>
+3315478 openat(AT_FDCWD</tmp/a>, "a>b\"c<d.txt", O_RDONLY) = 3</tmp/a/a\76b\"c\74d.txt>
+3315479 getdents64(3</tmp/a/d\303\251>, 0x65530c0ca910 /* 2 entries */, 32768) = 48
+12 newfstatat(AT_FDCWD, "/x", 0x7ffd5e1c, 0) = -1 ENOENT (No such file or directory)
+12 newfstatat(AT_FDCWD, "/x", 0x7ffd5e1c, 0) = -1 ENOTDIR (Not a directory)
+12 faccessat2(AT_FDCWD, "/x", X_OK, AT_EACCESS) = -1 EACCES (Permission denied)
+12 openat(-100, "/x", O_RDONLY) = 3
+12 openat(4</a/b>,  "c", O_RDONLY) = 5</a/b/c>
+12 openat(4</a/b>, "c", O_RDONLY) = 5</a/b/c (deleted)>
+12 openat(4, "c", O_RDONLY) = 5
+12 openat(4<unclosed, "c", O_RDONLY) = 5
+12 openat(4</a>x, "c", O_RDONLY) = 5
+12 execve("/bin/sh", ["sh", "-c", "a) = 1"], 0x7ffd /* 40 vars */) = 0
+12 execve("/bin/sh", ["sh"], 0x7ffd /* 40 vars */) = ?
+12 openat(AT_FDCWD, "/odd) = 3<x>", O_RDONLY) = -1 ENOENT (No such file or directory)
+12 openat(AT_FDCWD, "/x", O_RDONLY <unfinished ...>
+12 <... openat resumed>) = 3</x>
+12 <... openat resumed>, 0) = 3</x>
+12 <... openat resumed> ) = 3
+12 <...  openat resumed>) = 3
+12 <... resumed>) = 3
+12 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f) = 3315480
+12 clone3({flags=CLONE_VM|CLONE_VFORK, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 13
+12 fchdir(3</home/ahra>) = 0
+12 fchdir(-1</nowhere>) = -1 EBADF (Bad file descriptor)
+12 rename("/a", "/b") = 0
+12 renameat2(AT_FDCWD</a>, "x", 4</b>, "y", RENAME_NOREPLACE) = 0
+12 readlinkat(AT_FDCWD, "/proc/self/exe", "/usr/bin/go", 128) = 11
+12 +++ exited with 0 +++
+12 +++ exited with 137 +++
+12 +++ killed by SIGKILL +++
+12 +++ killed by SIGSEGV (core dumped) +++
+12 +++ killed by SIGSEGV (core dumped) (core dumped) +++
+12 +++ exited with  +++
+12 +++ exited with 1 +++ +++
+12 --- SIGCHLD {si_signo=SIGCHLD} ---
+12	openat(AT_FDCWD, "/x", O_RDONLY)	=	3
+12 openat(AT_FDCWD, "/x", O_RDONLY) = 3 	EAGAIN
+12 openat(AT_FDCWD, "/x", O_RDONLY) = 3 E
+12 openat(AT_FDCWD, "/x", O_RDONLY) = 3ENOENT
+12 openat(AT_FDCWD, "/x", O_RDONLY) = 3 Eagain
+12 openat(AT_FDCWD, "/x\", O_RDONLY) = 3
+12 openat(AT_FDCWD, "/x\
+", O_RDONLY) = 3
+12 openat(AT_FDCWD, "/x
+y", O_RDONLY) = 3
+12 openat(AT_FDCWD, "/x", O_RDONLY) = -
+12 openat(AT_FDCWD, "/x", O_RDONLY) = --1
+12 openat(AT_FDCWD, "/x", O_RDONLY) =3
+12 openat(AT_FDCWD, "/x", O_RDONLY)= 3
+12 openat(AT_FDCWD, "/x", O_RDONLY) = 3<x
+12 openat(AT_FDCWD, "/x", O_RDONLY) = 3<x
+>
+12 openat(AT_FDCWD, "ÿ\ÿ", O_RDONLY) = 3<ÿ>
+12
+ openat(AT_FDCWD, "/x", O_RDONLY) = 3
+12 open
+("/x") = 3
+openat(AT_FDCWD, "/x", O_RDONLY) = 3
+12
+12 
+
+AT_FDCWD
+AT_FDCWD<
+-
+-<x>,
+"
+"\
+12 +++ exited with 0 +++
+12 +++ exited with 2 +++
+12 +++ killed by SIGKILL +++
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 +++ exited with 0 +++
+12 +++ exited with 0 +++
+12 newfstatat(AT_FDCWD, "/home/ahra/t/file.txt", {st_mode=S_IFREG|0644, st_size=7, ...}, 0) = 0
+12 +++ exited with 0 +++
+12 +++ exited with 0 +++
+12 +++ exited with 0 +++
+12 +++ exited with 0 +++
+12 +++ exited with 0 +++
+12 +++ exited with 0 +++
+12 openat(AT_FDCWD, "/home/ahra/t/file.txt", O_RDONLY|O_CLOEXEC) = 3</home/ahra/t/file>
+12 openat(AT_FDCWD, "/home/ahra/t/file.txt", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0644) = 3</home/ahra/t/file>
+12 newfstatat(AT_FDCWD, "/home/ahra/t/file.txt", 0x7ffd5e1c, 0) = -1 ENOENT (No such file or directory)
+12 getdents64(3</home/ahra/t/file>, 0x55d0 /* 4 entries */, 32768) = 112
+12 access("/adamic-trace//home/ahra/t/file//home/ahra/t/file", F_OK) = -1 ENOENT (No such file or directory)
+12 execve("/home/ahra/t/file.txt", ["/home/ahra/t/file.txt"], 0x7ffd5e1c /* 3 vars */) = 0
+12 execve("/home/ahra/t/file.txt", ["/home/ahra/t/file.txt"], 0x7ffd5e1c /* 3 vars */) = 0
+12 openat(AT_FDCWD, "/home/ahra/t/file.txt", O_RDONLY|O_CLOEXEC) = 8</home/ahra/t/file>
+12 clone(child_stack=0x7f, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM) = 4242
+12 clone3({flags=CLONE_VM|CLONE_VFORK, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 4242
+12 +++ exited with 0 +++
+12 clone3({flags=CLONE_VM|CLONE_VFORK, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88 <unfinished ...>
+12 <... clone3 resumed>) = 4242
+12 openat(AT_FDCWD</home/ahra/t/file>, "source/a.c", O_RDONLY) = 3</home/ahra/t/file>
+12 +++ exited with 0 +++
+12 clone(child_stack=0x7f, flags=CLONE_VM|CLONE_THREAD) = 4242
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 openat(AT_FDCWD, "/home/ahra/t/file.txt", O_RDONLY|O_CLOEXEC) = 3</home/ahra/t/file>
+12 openat(AT_FDCWD, "/home/ahra/t/file.txt", O_RDONLY|O_DIRECTORY|O_CLOEXEC) = 3</home/ahra/t/file>
+12 newfstatat(AT_FDCWD, "/home/ahra/t/file.txt", {st_mode=S_IFREG|0644, st_size=7, ...}, 0) = 0
+12 openat(AT_FDCWD, "/home/ahra/t/file.txt", O_RDONLY) = 3</home/ahra/t/file>
+12 execve("/home/ahra/t/file.txt", ["/home/ahra/t/file.txt"], 0x7ffd5e1c /* 3 vars */) = 0
+12 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD) = 4242
+12 chdir("/home/ahra/t/file.txt") = 0
+12 openat(AT_FDCWD, "a.c", O_RDONLY) = 3</home/ahra/t/file>
+12 fchdir(4</home/ahra/t/file>) = 0
+12 newfstatat(AT_FDCWD, "x.h", {st_mode=S_IFREG|0644, st_size=12, ...}, 0) = 0
+12 +++ exited with 0 +++
+12 openat(AT_FDCWD, "notes.txt", O_RDONLY) = 3</home/ahra/t/file>
+12 mkdirat(AT_FDCWD, "/tmp/adamic-test-dir", 0700) = 0
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 +++ exited with 0 +++
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 +++ exited with 0 +++
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 rename("/home/ahra/t/file.txt", "/home/ahra/t/file.txt") = 0
+12 +++ exited with 0 +++
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 +++ exited with 0 +++
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 +++ exited with 0 +++
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 execve("/home/ahra/t/file.txt", ["ld"], 0x7ffd /* 30 vars */) = 0
+12 newfstatat(AT_FDCWD, "/home/ahra/t/file.txt", {st_mode=S_IFLNK|0777, st_size=7, ...}, AT_SYMLINK_NOFOLLOW) = 0
+12 +++ exited with 0 +++
+12 openat(AT_FDCWD, "/home/ahra/t/file", O_RDONLY|O_CLOEXEC) = 3</home/ahra/t/file>
+12 openat(AT_FDCWD, "/home/ahra/t/file", O_RDONLY|O_DIRECTORY|O_CLOEXEC) = 4</home/ahra/t/file>
+12 getdents64(4</home/ahra/t/file>, 0x55d0 /* 4 entries */, 32768) = 112
+12 openat(4</home/ahra/t/file>, "x.txt", O_RDONLY|O_CLOEXEC) = 5</home/ahra/t/file>
+12 openat(4</home/ahra/t/file>, "\357\277\275.txt", O_RDONLY|O_CLOEXEC) = 6</home/ahra/t/file>
+12 fchdir(4</home/ahra/t/file>) = 0
+12 newfstatat(AT_FDCWD, "y.txt", 0x7ffd5e1c, 0) = -1 ENOENT (No such file or directory)
+12 openat(AT_FDCWD, "/etc/resolv.conf", O_RDONLY|O_CLOEXEC) = 3</mnt/wsl/resolv.conf>
+12 openat(AT_FDCWD, "/usr/lib/wsl/lib/libcuda.so.1", O_RDONLY|O_CLOEXEC) = 3
+12 openat(AT_FDCWD, "/etc/localtime", O_RDONLY|O_CLOEXEC) = 3
+12 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libadamic-absent.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+12 newfstatat(AT_FDCWD, "/usr/bin", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+12 openat(AT_FDCWD, "/usr/lib", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3</usr/lib>
+12 openat(AT_FDCWD, "/usr/share", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 4</usr/share>
+12 getdents64(4</usr/share>, 0x55d0 /* 40 entries */, 32768) = 1280
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 +++ exited with 0 +++
+12 clone(child_stack=NULL, flags=SIGCHLD) = 4242
+12 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD) = 4242
+12 +++ exited with 0 +++
+12 clone(child_stack=0x7f, flags=CLONE_VM|CLONE_THREAD) = 4242
+12 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD) = 4242
+12 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD) = 4242
+12 clone(child_stack=0x7f, flags=CLONE_VM|CLONE_THREAD) = 4242
+12 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD) = 4242
+12 clone(child_stack=0x7f, flags=CLONE_VM|CLONE_THREAD) = 4242
+12 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD) = 4242
+12 newfstatat(AT_FDCWD, "/home/ahra/t/file.txt", {st_mode=S_IFLNK|0777, st_size=10, ...}, AT_SYMLINK_NOFOLLOW) = 0
+12 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD) = 4242
+12 chdir("/home/ahra/t/file.txt") = 0
+12 newfstatat(AT_FDCWD, "link-deep/../deeper/leaf.txt", {st_mode=S_IFREG|0644, st_size=5, ...}, 0) = 0
+12 newfstatat(AT_FDCWD, "link-directory/../link-deep", {st_mode=S_IFLNK|0777, st_size=13, ...}, AT_SYMLINK_NOFOLLOW) = 0
+12 newfstatat(AT_FDCWD, "dangling/../plain.txt", 0x7ffc, 0) = -1 ENOENT (No such file or directory)
+12 +++ exited with 0 +++

@@ -1,0 +1,12 @@
+100 execve("/usr/bin/go", 0x0, 0x0) = 0 <executed "/usr/lib/go-1.22/bin/go">
+100 openat(AT_FDCWD</w>, "a.txt", O_RDONLY|O_CLOEXEC) = 3</w/a.txt>
+100 newfstatat(AT_FDCWD</w>, "missing", 0x7ffd, AT_SYMLINK_NOFOLLOW) = -1 ENOENT (No such file or directory)
+100 chdir("sub") = 0
+100 fork( <unfinished ...>
+101 execve("/bin/sh", 0x0, 0x0) = 0 <executed "/usr/bin/dash">
+101 stat("rel", 0x0) = -1 ENOENT (No such file or directory)
+100 <... fork resumed>) = 101
+101 openat(AT_FDCWD</w/sub>, "dir", O_RDONLY|O_DIRECTORY|O_CLOEXEC) = 4</w/sub/dir>
+101 getdents64(4</w/sub/dir>, 0x7ff0, 32768) = 80
+101 +++ exited with 0 +++
+100 +++ exited with 0 +++

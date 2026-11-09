@@ -29,4 +29,5 @@ use (
 	./mutation_aliasing
 	./product_store_manifest
 	./static_single_assignment
+	./strace_events
 )

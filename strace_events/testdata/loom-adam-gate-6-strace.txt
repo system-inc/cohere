@@ -1,0 +1,151 @@
+207650 execve("/home/ahra/.adamic-tools/go/bin/go", ["/home/ahra/.adamic-tools/go/bin/"..., "build", "-a", "-o", "/dev/null", "cmd/gofmt"], 0x7fffc1c68790 /* 19 vars */) = 0
+207650 openat(AT_FDCWD</home/ahra>, "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", O_RDONLY) = 3</sys/kernel/mm/transparent_hugepage/hpage_pmd_size>
+207650 openat(AT_FDCWD</home/ahra>, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC) = 3</proc/207650/cgroup>
+207650 openat(AT_FDCWD</home/ahra>, "/proc/self/mountinfo", O_RDONLY|O_CLOEXEC) = 3</proc/207650/mountinfo>
+207650 openat(AT_FDCWD</home/ahra>, "/sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max", O_RDONLY|O_CLOEXEC) = 3</sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max>
+207650 clone(child_stack=0x2ca9dc71e000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0x2ca9dc82c090) = 207655
+207650 clone(child_stack=0x2ca9dc848000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0x2ca9dc82c890) = 207656
+207650 clone(child_stack=0x2ca9dc844000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0x2ca9dc82d090) = 207657
+207650 clone(child_stack=0x2ca9dc894000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS <unfinished ...>
+207656 clone(child_stack=0x2ca9dc898000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS <unfinished ...>
+207650 <... clone resumed>, tls=0x2ca9dc82d890) = 207658
+207656 <... clone resumed>, tls=0x2ca9dc880090) = 207659
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/env", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+207650 readlinkat(AT_FDCWD</home/ahra>, "/proc/self/exe", "/home/ahra/adamic-tools/go/bin/g"..., 128) = 33
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/adamic-tools/go/pkg/tool", {st_mode=S_IFDIR|0555, st_size=4096, ...}, 0) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, "", 0x2ca9dc8b65e8, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/adamic-tools/go", {st_mode=S_IFDIR|0555, st_size=4096, ...}, 0) = 0
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/adamic-tools/go/go.env", O_RDONLY|O_CLOEXEC) = 4</home/ahra/adamic-tools/go/go.env>
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/local/sbin/gcc", 0x2ca9dc8b6858, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/local/bin/gcc", 0x2ca9dc8b6928, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/sbin/gcc", 0x2ca9dc8b69f8, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/bin/gcc", {st_mode=S_IFREG|0755, st_size=1023032, ...}, 0) = 0
+207650 faccessat2(AT_FDCWD</home/ahra>, "/usr/bin/gcc", X_OK, AT_EACCESS) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/local/sbin/gccgo", 0x2ca9dc938448, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/local/bin/gccgo", 0x2ca9dc938518, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/sbin/gccgo", 0x2ca9dc9385e8, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/bin/gccgo", 0x2ca9dc9386b8, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/sbin/gccgo", 0x2ca9dc938788, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/bin/gccgo", 0x2ca9dc938858, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/games/gccgo", 0x2ca9dc938928, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/usr/local/games/gccgo", 0x2ca9dc9389f8, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/snap/bin/gccgo", 0x2ca9dc938ac8, 0) = -1 ENOENT (No such file or directory)
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/mode", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/mode", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/local/weekends", O_RDONLY|O_CLOEXEC) = 4</home/ahra/.config/go/telemetry/local/weekends>
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/local/weekends", O_RDONLY|O_CLOEXEC) = 4</home/ahra/.config/go/telemetry/local/weekends>
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/local", {st_mode=S_IFDIR|0775, st_size=4096, ...}, 0) = 0
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/local/go@go1.27.1-go1.27.1-linux-amd64-2026-10-16.v1.count", O_RDWR|O_CREAT|O_CLOEXEC, 0666) = 4</home/ahra/.config/go/telemetry/local/go@go1.27.1-go1.27.1-linux-amd64-2026-10-16.v1.count>
+207650 newfstatat(AT_FDCWD</home/ahra>, ".", {st_mode=S_IFDIR|0750, st_size=4096, ...}, 0) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra", {st_mode=S_IFDIR|0750, st_size=4096, ...}, 0) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/go.work", 0x2ca9dc950858, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/go.work", 0x2ca9dc950928, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/go.work", 0x2ca9dc9509f8, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "", 0x2ca9dc950ac8, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/go.mod", 0x2ca9dc950b98, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/go.mod", 0x2ca9dc950c68, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/go.mod", 0x2ca9dc950d38, 0) = -1 ENOENT (No such file or directory)
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/mode", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/local", {st_mode=S_IFDIR|0775, st_size=4096, ...}, 0) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/local/upload.token", {st_mode=S_IFREG|0664, st_size=0, ...}, 0) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/adamic-tools/go", {st_mode=S_IFDIR|0555, st_size=4096, ...}, 0) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, ".", {st_mode=S_IFDIR|0750, st_size=4096, ...}, 0) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra", {st_mode=S_IFDIR|0750, st_size=4096, ...}, 0) = 0
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/go.work", 0x2ca9dc951218, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/go.work", 0x2ca9dc9512e8, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/go.work", 0x2ca9dc9513b8, 0) = -1 ENOENT (No such file or directory)
+207650 openat(AT_FDCWD</home/ahra>, "/home/ahra/.config/go/telemetry/mode", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/ahra/go.work", 0x2ca9dc951558, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/home/go.work", 0x2ca9dc951628, 0) = -1 ENOENT (No such file or directory)
+207650 newfstatat(AT_FDCWD</home/ahra>, "/go.work", 0x2ca9dc9516f8, 0) = -1 ENOENT (No such file or directory)
+207659 <... newfstatat resumed>{st_mode=S_IFDIR|0750, st_size=4096, ...}, 0) = 0
+207716 openat(AT_FDCWD</home/ahra>, "/dev/null", O_RDONLY|O_CLOEXEC <unfinished ...>
+207715 <... newfstatat resumed>{st_mode=S_IFDIR|0750, st_size=4096, ...}, 0) = 0
+207698 <... utimensat resumed>)         = 0
+207696 <... newfstatat resumed>{st_mode=S_IFDIR|0750, st_size=4096, ...}, 0) = 0
+207657 openat(AT_FDCWD</home/ahra>, "/tmp/go-build4017211246/b046/importcfg", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666 <unfinished ...>
+207698 openat(AT_FDCWD</home/ahra>, "/tmp/go-build4017211246/b015/importcfg", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666 <unfinished ...>
+207684 openat(AT_FDCWD</home/ahra>, "/dev/null", O_RDONLY|O_CLOEXEC <unfinished ...>
+207667 openat(AT_FDCWD</home/ahra>, "/dev/null", O_RDONLY|O_CLOEXEC <unfinished ...>
+207804 execve("/home/ahra/adamic-tools/go/pkg/tool/linux_amd64/asm", ["/home/ahra/adamic-tools/go/pkg/t"..., "-V=full"], 0x2ca9dd0c2300 /* 44 vars */ <unfinished ...>
+207807 chdir("/home/ahra" <unfinished ...>
+207806 chdir("/home/ahra" <unfinished ...>
+207809 chdir("/home/ahra" <unfinished ...>
+207807 <... chdir resumed>)             = 0
+207806 <... chdir resumed>)             = 0
+207809 <... chdir resumed>)             = 0
+207807 execve("/home/ahra/adamic-tools/go/pkg/tool/linux_amd64/compile", ["/home/ahra/adamic-tools/go/pkg/t"..., "-o", "/tmp/go-build4017211246/b018/_pk"..., "-trimpath", "/tmp/go-build4017211246/b018=>", "-p", "internal/profilerecord", "-lang=go1.27", "-std", "-complete", "-buildid", "Nv1zFnYBweHL6tZB-ORh/Nv1zFnYBweH"..., "-goversion", "go1.27.1", "-c=64", "-nolocalimports", "-importcfg", "/tmp/go-build4017211246/b018/imp"..., "-pack", "/home/ahra/adamic-tools/go/src/i"...], 0x2ca9ddb06000 /* 45 vars */ <unfinished ...>
+207671 <... clone resumed>, parent_tid=[13<anon_inode:[pidfd]>]) = 207804
+207809 execve("/home/ahra/adamic-tools/go/pkg/tool/linux_amd64/compile", ["/home/ahra/adamic-tools/go/pkg/t"..., "-o", "/tmp/go-build4017211246/b035/_pk"..., "-trimpath", "/tmp/go-build4017211246/b035=>", "-p", "internal/trace/tracev2", "-lang=go1.27", "-std", "-complete", "-buildid", "3tzn4cpvUoZcSoDuJfVo/3tzn4cpvUoZ"..., "-goversion", "go1.27.1", "-c=6", "-nolocalimports", "-importcfg", "/tmp/go-build4017211246/b035/imp"..., "-pack", "/home/ahra/adamic-tools/go/src/i"..., "/home/ahra/adamic-tools/go/src/i"..., "/home/ahra/adamic-tools/go/src/i"...], 0x2ca9ddb8a000 /* 45 vars */ <unfinished ...>
+207806 execve("/home/ahra/adamic-tools/go/pkg/tool/linux_amd64/compile", ["/home/ahra/adamic-tools/go/pkg/t"..., "-o", "/tmp/go-build4017211246/b008/_pk"..., "-trimpath", "/tmp/go-build4017211246/b008=>", "-p", "internal/unsafeheader", "-lang=go1.27", "-std", "-complete", "-buildid", "nmi72KJjLR74NBuHOMR-/nmi72KJjLR7"..., "-goversion", "go1.27.1", "-c=36", "-nolocalimports", "-importcfg", "/tmp/go-build4017211246/b008/imp"..., "-pack", "/home/ahra/adamic-tools/go/src/i"...], 0x2ca9dd922000 /* 45 vars */ <unfinished ...>
+207812 chdir("/home/ahra" <unfinished ...>
+207811 chdir("/home/ahra" <unfinished ...>
+207804 <... execve resumed>)            = 0
+207812 <... chdir resumed>)             = 0
+207812 execve("/home/ahra/adamic-tools/go/pkg/tool/linux_amd64/compile", ["/home/ahra/adamic-tools/go/pkg/t"..., "-o", "/tmp/go-build4017211246/b023/_pk"..., "-trimpath", "/tmp/go-build4017211246/b023=>", "-p", "math/bits", "-lang=go1.27", "-std", "-complete", "-buildid", "yXLSXcNHiLoDZ8WG09TG/yXLSXcNHiLo"..., "-goversion", "go1.27.1", "-c=20", "-nolocalimports", "-importcfg", "/tmp/go-build4017211246/b023/imp"..., "-pack", "/home/ahra/adamic-tools/go/src/m"..., "/home/ahra/adamic-tools/go/src/m"..., "/home/ahra/adamic-tools/go/src/m"...], 0x2ca9dd996000 /* 45 vars */ <unfinished ...>
+207811 <... chdir resumed>)             = 0
+207703 <... clone resumed>, parent_tid=[41<anon_inode:[pidfd]>]) = 207806
+207699 <... clone resumed>, parent_tid=[42<anon_inode:[pidfd]>]) = 207807
+207811 execve("/home/ahra/adamic-tools/go/pkg/tool/linux_amd64/compile", ["/home/ahra/adamic-tools/go/pkg/t"..., "-o", "/tmp/go-build4017211246/b014/_pk"..., "-trimpath", "/tmp/go-build4017211246/b014=>", "-p", "internal/coverage/rtcov", "-lang=go1.27", "-std", "-complete", "-buildid", "IY9ETGJOZtMF-uIJc4mB/IY9ETGJOZtM"..., "-goversion", "go1.27.1", "-c=12", "-nolocalimports", "-importcfg", "/tmp/go-build4017211246/b014/imp"..., "-pack", "/home/ahra/adamic-tools/go/src/i"...], 0x2ca9dd5f0000 /* 45 vars */ <unfinished ...>
+207804 openat(AT_FDCWD</home/ahra>, "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", O_RDONLY <unfinished ...>
+207714 <... clone resumed>, parent_tid=[40<anon_inode:[pidfd]>]) = 207809
+207662 <... clone resumed>, parent_tid=[53<anon_inode:[pidfd]>]) = 207812
+207807 <... execve resumed>)            = 0
+207806 <... execve resumed>)            = 0
+207804 <... openat resumed>)            = 3</sys/kernel/mm/transparent_hugepage/hpage_pmd_size>
+207663 <... clone resumed>, parent_tid=[54<anon_inode:[pidfd]>]) = 207811
+207812 <... execve resumed>)            = 0
+207809 <... execve resumed>)            = 0
+207811 <... execve resumed>)            = 0
+207807 openat(AT_FDCWD</home/ahra>, "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", O_RDONLY <unfinished ...>
+207806 openat(AT_FDCWD</home/ahra>, "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", O_RDONLY <unfinished ...>
+207812 openat(AT_FDCWD</home/ahra>, "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", O_RDONLY <unfinished ...>
+207811 openat(AT_FDCWD</home/ahra>, "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", O_RDONLY <unfinished ...>
+207809 openat(AT_FDCWD</home/ahra>, "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", O_RDONLY <unfinished ...>
+207807 <... openat resumed>)            = 3</sys/kernel/mm/transparent_hugepage/hpage_pmd_size>
+207806 <... openat resumed>)            = 3</sys/kernel/mm/transparent_hugepage/hpage_pmd_size>
+207812 <... openat resumed>)            = 3</sys/kernel/mm/transparent_hugepage/hpage_pmd_size>
+207811 <... openat resumed>)            = 3</sys/kernel/mm/transparent_hugepage/hpage_pmd_size>
+207809 <... openat resumed>)            = 3</sys/kernel/mm/transparent_hugepage/hpage_pmd_size>
+207804 openat(AT_FDCWD</home/ahra>, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC) = 3</proc/207804/cgroup>
+207804 openat(AT_FDCWD</home/ahra>, "/proc/self/mountinfo", O_RDONLY|O_CLOEXEC) = 3</proc/207804/mountinfo>
+207804 openat(AT_FDCWD</home/ahra>, "/sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max", O_RDONLY|O_CLOEXEC) = 3</sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max>
+207812 openat(AT_FDCWD</home/ahra>, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC <unfinished ...>
+207811 openat(AT_FDCWD</home/ahra>, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC <unfinished ...>
+207806 openat(AT_FDCWD</home/ahra>, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC <unfinished ...>
+207812 <... openat resumed>)            = 3</proc/207812/cgroup>
+207807 openat(AT_FDCWD</home/ahra>, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC <unfinished ...>
+207811 <... openat resumed>)            = 3</proc/207811/cgroup>
+207809 openat(AT_FDCWD</home/ahra>, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC <unfinished ...>
+207806 <... openat resumed>)            = 3</proc/207806/cgroup>
+207812 openat(AT_FDCWD</home/ahra>, "/proc/self/mountinfo", O_RDONLY|O_CLOEXEC <unfinished ...>
+207811 openat(AT_FDCWD</home/ahra>, "/proc/self/mountinfo", O_RDONLY|O_CLOEXEC <unfinished ...>
+207807 <... openat resumed>)            = 3</proc/207807/cgroup>
+207812 <... openat resumed>)            = 3</proc/207812/mountinfo>
+207809 <... openat resumed>)            = 3</proc/207809/cgroup>
+207806 openat(AT_FDCWD</home/ahra>, "/proc/self/mountinfo", O_RDONLY|O_CLOEXEC <unfinished ...>
+207811 <... openat resumed>)            = 3</proc/207811/mountinfo>
+207807 openat(AT_FDCWD</home/ahra>, "/proc/self/mountinfo", O_RDONLY|O_CLOEXEC <unfinished ...>
+207809 openat(AT_FDCWD</home/ahra>, "/proc/self/mountinfo", O_RDONLY|O_CLOEXEC <unfinished ...>
+207806 <... openat resumed>)            = 3</proc/207806/mountinfo>
+207812 openat(AT_FDCWD</home/ahra>, "/sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max", O_RDONLY|O_CLOEXEC <unfinished ...>
+207807 <... openat resumed>)            = 3</proc/207807/mountinfo>
+207811 openat(AT_FDCWD</home/ahra>, "/sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max", O_RDONLY|O_CLOEXEC <unfinished ...>
+207809 <... openat resumed>)            = 3</proc/207809/mountinfo>
+207812 <... openat resumed>)            = 3</sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max>
+207811 <... openat resumed>)            = 3</sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max>
+207806 openat(AT_FDCWD</home/ahra>, "/sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max", O_RDONLY|O_CLOEXEC <unfinished ...>
+207807 openat(AT_FDCWD</home/ahra>, "/sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max", O_RDONLY|O_CLOEXEC <unfinished ...>
+207806 <... openat resumed>)            = 3</sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max>
+207809 openat(AT_FDCWD</home/ahra>, "/sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max", O_RDONLY|O_CLOEXEC <unfinished ...>
+207807 <... openat resumed>)            = 3</sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max>
+207809 <... openat resumed>)            = 3</sys/fs/cgroup/user.slice/user-1000.slice/session-4929.scope/cpu.max>
+207804 clone(child_stack=0x1558664000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0x1558772090) = 207814
+207804 clone(child_stack=0x1558790000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS, tls=0x1558772890) = 207815
+207804 clone(child_stack=0x155878c000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS <unfinished ...>
+207812 clone(child_stack=0x2ea146046000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS <unfinished ...>
+207811 clone(child_stack=0x39124d95a000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS <unfinished ...>
+207804 <... clone resumed>, tls=0x1558773090) = 207816
+207807 clone(child_stack=0x3a0254dc8000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS <unfinished ...>
+207812 <... clone resumed>, tls=0x2ea146154090) = 207817
+207811 <... clone resumed>, tls=0x39124da68090) = 207818

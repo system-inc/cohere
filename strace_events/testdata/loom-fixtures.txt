@@ -1,0 +1,305 @@
+100 execve("/opt/loom/loom-tracer", ["/opt/loom/loom-tracer", "--fixture-run", "/tmp/loom-fixture-1"], 0x7ffd /* 9 vars */) = 0
+100 openat(AT_FDCWD</tmp/loom-fixture-1>, "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", O_RDONLY) = 3</sys/kernel/mm/transparent_hugepage/hpage_pmd_size>
+100 openat(AT_FDCWD</tmp/loom-fixture-1>, "/tmp/loom-fixture-1/a", O_RDONLY|O_CLOEXEC) = 3</tmp/loom-fixture-1/a>
+100 openat(AT_FDCWD</tmp/loom-fixture-1>, "/tmp/loom-fixture-1/missing", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+100 openat(AT_FDCWD</tmp/loom-fixture-1>, "/tmp/loom-fixture-1/dir", O_RDONLY|O_DIRECTORY|O_CLOEXEC <unfinished ...>
+101 openat(AT_FDCWD</>, "/etc/hosts", O_RDONLY) = 3</etc/hosts>
+100 <... openat resumed>) = 4</tmp/loom-fixture-1/dir>
+100 getdents64(4</tmp/loom-fixture-1/dir>, 0xc000 /* 3 entries */, 4096) = 72
+100 openat(4</tmp/loom-fixture-1/dir>, "b", O_RDONLY|O_CLOEXEC) = 5</tmp/loom-fixture-1/dir/b>
+100 clone(child_stack=0xc000080000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_SYSVSEM|CLONE_THREAD) = 102
+100 clone(child_stack=NULL, flags=SIGCHLD) = 4711
+9 clone(||) = $PID
+9 openat($ROOT|$ROOT/dir|O_DIRECTORY) = d3<$ROOT/dir>
+9 openat($ROOT/dir|b|) = d1<$ROOT/dir/b>
+7 unshare(0) = 0
+7 unshare(CLONE_NEWNS) = -1 EPERM (Operation not permitted)
+7 setns(3<uts:[4026531838]>, CLONE_NEWUTS) = -1 EPERM (Operation not permitted)
+7 setns(4<anon_inode:[pidfd]>, CLONE_NEWUTS) = -1 EPERM (Operation not permitted)
+9 setns(anon_inode:[pidfd]||CLONE_NEWUTS) = -1 EPERM
+9 setns(uts:[$INODE]||CLONE_NEWUTS) = -1 EPERM
+9 unshare(||) = 0
+9 unshare(||CLONE_NEWNS) = -1 EPERM
+9 openat($ROOT|$ROOT/a|) = 3<$ROOT/a>
+9 openat($ROOT|$ROOT/missing|) = -1 ENOENT
+9 newfstatat($ROOT|$ROOT/dir/b|) = 0
+9 openat($ROOT|$ROOT/a|) = 3</wrong/a>
+9 openat($ROOT|$ROOT/a|) = 3</wrong/a>
+9 openat(|$ROOT/a|) = 10<$ROOT/a>
+9 openat(|$ROOT/a|) = 9<$ROOT/a>
+9 openat(|$ROOT/b|) = 10<$ROOT/b>
+9 openat(|$ROOT/a|) = 8<$ROOT/a>
+9 openat(|$ROOT/a|) = 9<$ROOT/a>
+9 openat(|$ROOT/b|) = 9<$ROOT/b>
+9 openat($ROOT|$ROOT/child|) = 4<$ROOT/child>
+9 openat($ROOT/dir|b|) = 5<$ROOT/dir/b>
+9 openat($ROOT|$ROOT/child|) = 6<$ROOT/child>
+9 openat($ROOT|$ROOT/a|) = d1<$ROOT/a>
+9 openat($ROOT|$ROOT/missing|) = -1 ENOENT
+9 clone3(||) = $PID
+9 mount(|$ROOT/a,$ROOT/dir|) = -1 EPERM
+100 +++ exited with 3 +++
+100 execve("/bin/true", 0x0, 0x0) = 0 <executed "/usr/bin/true">
+100 clone(child_stack=0x0, flags=CLONE_VM|CLONE_PIDFD|CLONE_VFORK|SIGCHLD <unfinished ...>
+101 execve("/bin/true", 0x0, 0x0) = 0 <executed "/usr/bin/true">
+100 <... clone resumed>, parent_tid=[14<anon_inode:[pidfd]>]) = 101
+9 clone(child_stack=0x0, flags=CLONE_VM|CLONE_PIDFD|SIGCHLD, parent_tid=[14<anon_inode:[pidfd]>]) = 1234
+9 clone(child_stack=0x0, flags=CLONE_VM|SIGCHLD) = 1234
+9 clone(child_stack=0x0, flags=CLONE_PIDFD|SIGCHLD) = -1 EAGAIN (Resource temporarily unavailable)
+9 fork() = 1234
+100 execve("/w/made-link", 0x0, 0x0) = 0 <executed "/usr/bin/true">
+100 +++ exited with 0 +++
+9 openat(AT_FDCWD</home/ahra/tree>, "etc/hosts", O_RDONLY|O_CLOEXEC) = 3</home/ahra/tree/etc/hosts>
+9 openat(AT_FDCWD</w>, "out", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 4</w/out>
+9 newfstatat(AT_FDCWD</w>, "missing", 0x7ffd, AT_SYMLINK_NOFOLLOW) = -1 ENOENT (No such file or directory)
+9 newfstatat(5</dev/pts/0>, "", 0x7ffd, AT_EMPTY_PATH) = 0
+9 getdents64(3</w/dir>, 0x7ff0, 32768) = 80
+9 chdir("sub") = 0
+9 rename("a", "b") = 0
+9 renameat2(AT_FDCWD</c>, "a", 5</d>, "b", 0x1) = 0
+9 symlinkat("../x", AT_FDCWD</w>, "ln") = 0
+9 openat(AT_FDCWD</w>, "slow", O_RDONLY) = ? ERESTARTSYS (To be restarted if SA_RESTART is set)
+9 mkdir("a\"b", 0755) = 0
+9 utimensat(AT_FDCWD</w>, NULL, 0x0, 0) = -1 EFAULT (Bad address)
+9 setns(3<mnt:[4026531841]>, CLONE_NEWNS) = -1 EPERM (Operation not permitted)
+9 setns(3<mnt:[4026531841]>, 0) = -1 EPERM (Operation not permitted)
+9 setns(4<anon_inode:[pidfd]>, CLONE_NEWNS|CLONE_NEWNET) = 0
+9 unshare(CLONE_NEWNS) = -1 EPERM (Operation not permitted)
+9 unshare(CLONE_NEWTIME) = 0
+9 unshare(0) = 0
+9 unshare(CLONE_FS) = 0
+9 fsopen(0x7ffd, 0x1) = -1 EPERM (Operation not permitted)
+9 fsmount(-1, 0x0, 0x0) = -1 EPERM (Operation not permitted)
+9 execve("/usr/bin/go", 0x0, 0x0) = 0
+9 execve("/usr/bin/go", 0x0, 0x0) = 0
+9 execveat(AT_FDCWD</w>, "bin/go", 0x0, 0x0, 0) = 0
+9 execveat(3</w/bin>, "go", 0x0, 0x0, 0) = 0
+9 execveat(3</w/bin/go>, "", 0x0, 0x0, AT_EMPTY_PATH) = 0
+9 execveat(3</w/bin>, "/dev/fd/3/go", 0x0, 0x0, 0) = 0
+9 execve("/nope", 0x0, 0x0) = -1 ENOENT (No such file or directory)
+9 getdents64(9, 0x0, 0) = -1 EBADF (Bad file descriptor)
+9 newfstatat(-1, "x", 0x0, 0) = -1 EBADF (Bad file descriptor)
+9 clone(child_stack=0x0, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD <unfinished ...>
+9 <... clone resumed>) = 11
+9 fork() = -1 EAGAIN (Resource temporarily unavailable)
+9 clone3({flags=CLONE_VM|CLONE_THREAD}, 88 <unfinished ...>
+9 +++ exited with 0 +++
+9 +++ exited with 1 +++
+9 +++ exited with 127 +++
+9 +++ killed by SIGKILL +++
+9 +++ killed by SIGSEGV (core dumped) +++
+100 execve("/w/link", 0x0, 0x0) = 0 
+9 execve(|/w/link|) = 0
+100 execve("/w/link", 0x0, 0x0) = 0
+100 openat(AT_FDCWD</w>, "a", O_RDONLY) = 3</w/a>
+100 execve("/w/link", 0x0, 0x0) = 0 <executed "/w/\1x">
+100 execve("/w/link", 0x0, 0x0) = 0 
+ openat(AT_FDCWD</w>, "a.txt", O_RDONLY|O_CLOEXEC) = 3</w/a.txt>
+ +++ exited with 0 +++
+ unshare(0) = 0
+7 openat(AT_FDCWD</d>, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3</etc/ld.so.cache>
+7 openat(AT_FDCWD</d>, "/proc/sys/kernel/ngroups_max", O_RDONLY|O_CLOEXEC) = 3</proc/sys/kernel/ngroups_max>
+7 openat(AT_FDCWD</d>, "testdata/a.css", O_RDONLY|O_CLOEXEC) = 3</d/testdata/a.css>
+7 clone(child_stack=0x0, flags=SIGCHLD) = 8
+8 openat(AT_FDCWD</d>, "/etc/passwd", O_RDONLY) = 3</etc/passwd>
+7 execve("/f/bin/a.test", 0x3, 0x4) = 0 <executed "/f/bin/a.test">
+7 access("testdata/b.css", R_OK) = 0
+7 openat(AT_FDCWD<@DIR@>, "testdata/a.css", O_RDONLY|O_CLOEXEC) = 3<@DIR@/testdata/a.css>
+7 execve("/f/bin/a.test", 0x3, 0x4) = 0 <executed "/f/bin/a.test">
+9 openat(AT_FDCWD</unit>, "/unit/adamic-build/.digest-123", O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC, 0600) = 3</unit/adamic-build/.digest-123>
+9 ", ["tool"], 0x7ffd /* 3 vars */ <unfinished ...>
+10 getpid() = 10
+9 <... execve resumed>) = 0 
+101 openat(AT_FDCWD</work/p>, "testdata/case.txt", O_RDONLY|O_CLOEXEC) = 3</work/p/testdata/case.txt>
+[pid   102] openat(AT_FDCWD, "relative.txt", O_RDONLY) = 4
+103 openat(7</work/q>, "data.txt", O_RDWR|O_CREAT, 0644) = 5
+104 openat(AT_FDCWD</work/p>, "missing.txt", O_RDONLY) = -1 ENOENT (No such file or directory)
+105 openat(AT_FDCWD</work/p>, "out.txt", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 6
+106 openat(AT_FDCWD</work/p>, "probe", O_RDONLY|O_PATH) = 7
+107 openat(AT_FDCWD</work/p>, "split.txt", O_RDONLY <unfinished ...>
+108 open("/work/r/old.txt", O_RDONLY) = 8
+107 <... openat resumed>) = 9</work/p/split.txt>
+109 execve("/work/tools/run.sh", ["run.sh"], 0x7ffd /* 12 vars */) = 0
+110 openat2(AT_FDCWD</work>, "s/new.txt", {flags=O_RDONLY|O_CLOEXEC, resolve=0}, 24) = 10
+111 openat(AT_FDCWD</work>, "esc\x61ped\n.txt", O_RDONLY) = 11
+112 +++ exited with 0 +++
+201 openat(AT_FDCWD</work/p>, "testdata/case.txt", O_RDONLY|O_CLOEXEC) = 3</work/p/testdata/case.txt>
+202 newfstatat(AT_FDCWD</work/p>, "../sub/data.txt", {st_mode=S_IFREG|0644, st_size=5, ...}, 0) = 0
+203 newfstatat(3</work/sub/dir>, "", {st_mode=S_IFDIR|0755, st_size=4096, ...}, AT_EMPTY_PATH) = 0
+204 stat("/work/sub/missing.txt", 0x7ffd) = -1 ENOENT (No such file or directory)
+205 openat(AT_FDCWD</work>, "sub/gone.txt", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+206 openat(AT_FDCWD</work>, "sub/probe", O_RDONLY|O_PATH) = 4</work/sub/probe>
+207 getdents64(5</work/sub/dir>, 0x55d0 /* 4 entries */, 32768) = 112
+208 openat(AT_FDCWD</work>, "sub/out.txt", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 6</work/sub/out.txt>
+[pid   209] faccessat2(AT_FDCWD</work>, "sub/bin/tool", X_OK, AT_EACCESS) = 0
+210 readlinkat(AT_FDCWD</work>, "sub/link", "data.txt", 4095) = 8
+211 statx(AT_FDCWD</work>, "sub/x", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL, ...}) = 0
+212 mkdir("/work/sub/made", 0755) = 0
+7 getdents64(5, 0x55d0 /* 4 entries */, 32768) = 112
+100 openat(AT_FDCWD</work/p>, "x.txt", O_RDONLY) = 3
+100 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD <unfinished ...>
+101 chdir("../sub") = 0
+101 execve("./script.sh", ["./script.sh"], 0x7ffd /* 3 vars */) = 0
+100 <... clone resumed>, child_tidptr=0x7f00) = 101
+101 stat("data.txt", {st_mode=S_IFREG|0644, ...}) = 0
+101 clone3({flags=CLONE_VM|CLONE_VFORK, exit_signal=SIGCHLD, stack=0x7f, stack_size=0x9000}, 88) = 102
+102 open("dir/a.txt", O_RDONLY) = 3
+101 fchdir(4</work/sub/dir>) = 0
+101 access("b.txt", R_OK) = -1 ENOENT (No such file or directory)
+100 execveat(AT_FDCWD</work/p>, "tool", ["tool"], 0x7ffd /* 3 vars */, 0) = 0
+103 stat("orphan.txt", 0x7ffd) = -1 ENOENT (No such file or directory)
+7 openat(5, "x", O_RDONLY) = 3
+9 symlink("/usr/bin/true", "/w/made") = 0
+9 rename("/w/made", "/w/renamed") = 0
+9 execve("/w/renamed", ["renamed"], 0x7ffd /* 3 vars */) = 0 
+9 execve("/w/sub/../tool", ["O_PATH"], 0x7ffd /* 3 vars */) = 0
+9 execve("/w/missing", ["missing"], 0x7ffd /* 3 vars */) = -1 ENOENT (No such file or directory)
+9 unshare(CLONE_NEWNS) = 0
+9 unshare(CLONE_FS) = 0
+9 setns(3<mnt:[4026531841]>, CLONE_NEWNS) = 0
+9 fsopen("tmpfs", FSOPEN_CLOEXEC) = 3
+9 fsmount(3, FSMOUNT_CLOEXEC, 0) = 4
+9 clone(child_stack=NULL, flags=CLONE_NEWNS|CLONE_NEWUSER|SIGCHLD) = 10
+9 clone3({flags=CLONE_NEWPID, exit_signal=SIGCHLD, stack=NULL, stack_size=0}, 88) = 11
+9 unshare(CLONE_NEWNS) = -1 EPERM (Operation not permitted)
+9 clone(child_stack=NULL, flags=CLONE_NEWNS|SIGCHLD) = -1 EPERM (Operation not permitted)
+9 clone(child_stack=NULL, flags=CLONE_VM|CLONE_FS|SIGCHLD) = 12
+9 newfstatat(AT_FDCWD</w>, "sub/out.txt", 0x7ffd, 0) = -1 ENOENT (No such file or directory)
+9 openat(AT_FDCWD</w>, "sub/out.txt", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0644) = 3</w/sub/out.txt>
+9 openat(AT_FDCWD</w>, "sub/out.txt", O_RDONLY|O_CLOEXEC) = 3</w/sub/out.txt>
+9 mkdir("sub/cache", 0755) = 0
+9 openat(AT_FDCWD</w>, "sub/cache/entry", O_WRONLY|O_CREAT|O_APPEND, 0600) = 4</w/sub/cache/entry>
+9 openat(AT_FDCWD</w>, "sub/lock", O_RDWR|O_CREAT|O_EXCL, 0600) = 4</w/sub/lock>
+9 newfstatat(AT_FDCWD</w>, "sub/lock", {st_mode=S_IFREG|0600, ...}, 0) = 0
+9 openat(AT_FDCWD</w>, "sub/cache/entry", O_RDONLY) = 3</w/sub/cache/entry>
+9 getdents64(5</w/sub/cache>, 0x55 /* 3 entries */, 32768) = 72
+9 renameat2(AT_FDCWD</w>, "sub/input.txt", AT_FDCWD</w>, "sub/moved.txt", RENAME_NOREPLACE) = 0
+9 openat(AT_FDCWD</w>, "sub/moved.txt", O_RDONLY) = 3</w/sub/moved.txt>
+9 newfstatat(AT_FDCWD</w>, "sub/input.txt", 0x7ffd, 0) = -1 ENOENT (No such file or directory)
+9 unlink("/w/sub/old.txt") = 0
+9 openat(AT_FDCWD</w>, "sub/old.txt", O_RDONLY) = -1 ENOENT (No such file or directory)
+9 symlinkat("data.txt", AT_FDCWD</w>, "sub/alias") = 0
+9 openat(AT_FDCWD</w>, "sub/alias", O_RDONLY) = 3</w/sub/data.txt>
+9 openat(AT_FDCWD</w>, "sub/log.txt", O_WRONLY|O_CREAT|O_APPEND, 0644) = 3</w/sub/log.txt>
+100 clone(child_stack=0xc000, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS) = 101
+101 chdir("/tree/sub") = 0
+100 execve("./tool", ["./tool"], 0x0 /* 1 vars */) = 0
+100 clone3({flags=CLONE_VM|CLONE_FS|CLONE_THREAD|CLONE_SIGHAND, stack=0x7f, stack_size=0x9000}, 88) = 102
+102 fchdir(5</tree/sub/dir>) = 0
+101 stat("a.txt", {st_mode=S_IFREG|0644, ...}) = 0
+100 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|SIGCHLD) = 200
+101 newfstatat(AT_FDCWD</tree/q>, "b.txt", {st_mode=S_IFREG|0644, ...}, 0) = 0
+102 access("c.txt", R_OK) = 0
+200 stat("d.txt", {st_mode=S_IFREG|0644, ...}) = 0
+10 clone(child_stack=NULL, flags=SIGCHLD) = 11
+10 openat(AT_FDCWD</w>, "a.txt", O_RDONLY) = 3</w/a.txt>
+9 symlink("/home/someone/bin/tool", "/unit/tmp/tool") = 0
+9 symlink("/usr/lib/ld.so", "/unit/tmp/ld") = 0
+9 symlink("/usr/lib/libc.so.6", "/unit/tmp/tool") = 0
+9 unlink("/unit/tmp/tool") = 0
+9 symlink("/home/someone/bin/evil", "/unit/tmp/tool") = 0
+9 execve("/unit/tmp/tool", ["tool"], 0x7ffd /* 3 vars */) = 0
+9 symlink("/home/someone/dir", "/unit/tmp/d") = 0
+9 symlink("../evil", "/unit/tmp/d/l") = 0
+9 execve("/unit/tmp/d/l", ["l"], 0x7ffd /* 3 vars */) = 0
+9 symlink("/home/someone/dir", "/unit/tmp/d") = 0
+9 symlink("evil", "/unit/tmp/d/sub/l") = 0
+9 execve("/unit/tmp/d/sub/l", ["l"], 0x7ffd /* 3 vars */) = 0
+9 symlink("d/../evil", "/unit/tmp/l") = 0
+9 symlink("/unit/tmp/d/../evil", "/unit/tmp/l") = 0
+9 link("/unit/tmp/d/../evil", "/unit/tmp/l") = 0
+9 symlink("/home/someone/dir", "/unit/tmp/d") = 0
+9 openat(AT_FDCWD</unit/tmp>, "/unit/tmp/evil", O_WRONLY|O_CREAT|O_TRUNC, 0755) = 3</unit/tmp/evil>
+9 execve("/unit/tmp/l", ["l"], 0x7ffd /* 3 vars */) = 0
+9 symlink("/home/someone/dir", "/unit/tmp/d") = 0
+9 symlink("/unit/tmp/b", "/unit/tmp/a") = 0
+9 symlink("/unit/tmp/d/../evil", "/unit/tmp/b") = 0
+9 execve("/unit/tmp/a", ["a"], 0x7ffd /* 3 vars */) = 0
+9 mkdir("/unit/tmp/x", 0755) = 0
+9 mkdir("/unit/tmp/x/y", 0755) = 0
+9 symlink("/unit/tmp/x/y", "/unit/tmp/d") = 0
+9 symlink("/home/someone/bin/evil", "/unit/tmp/d/tool") = 0
+9 execve("/unit/tmp/x/y/tool", ["tool"], 0x7ffd /* 3 vars */) = 0
+9 mkdir("/unit/tmp/x", 0755) = 0
+9 symlink("/unit/tmp/x", "/unit/tmp/d") = 0
+9 symlink("/home/someone/bin/evil", "/unit/tmp/d/tool") = 0
+9 mkdir("/unit/tmp/x", 0755) = 0
+9 mkdir("/unit/tmp/x/y", 0755) = 0
+9 symlink("/unit/tmp/x/y", "/unit/tmp/d") = 0
+9 symlink("/home/someone/bin/evil", "/unit/tmp/d/../tool") = 0
+9 execve("/unit/tmp/x/tool", ["tool"], 0x7ffd /* 3 vars */) = 0
+9 mkdir("/unit/tmp/d", 0755) = 0
+9 rename("/unit/tmp/d", "/unit/tmp/e") = 0
+9 symlink("/home/someone/bin/evil", "/unit/tmp/e/tool") = 0
+9 execve("/unit/tmp/e/tool", ["tool"], 0x7ffd /* 3 vars */) = 0
+9 mkdir("/unit/tmp/d", 0755) = 0
+9 rename("/unit/tmp/d", "/unit/tmp/e") = 0
+9 rename("/unit/tmp/.tool.tmp", "/unit/tmp/tool") = 0
+9 openat(AT_FDCWD</unit/tmp>, "/unit/tmp/own", O_WRONLY|O_CREAT|O_TRUNC, 0755) = 3</unit/tmp/own>
+9 symlink("own", "/unit/tmp/l") = 0
+9 symlink("/usr/lib/ld.so", "/unit/tmp/ld") = 0
+9 symlink("/usr/lib/tool", "/unit/tmp/l") = 0
+9 execve("/usr/lib/libc.so.6", ["libc"], 0x7ffd /* 3 vars */) = 0
+9 openat(AT_FDCWD</unit/tmp>, "/unit/tmp/run.sh", O_WRONLY|O_CREAT|O_TRUNC, 0755) = 3</unit/tmp/run.sh>
+9 openat(AT_FDCWD</unit/tmp>, "/unit/tmp/interp", O_WRONLY|O_CREAT|O_TRUNC, 0755) = 3</unit/tmp/interp>
+9 mkdir("/unit/tmp/x", 0755) = 0
+9 mkdir("/unit/tmp/x/y", 0755) = 0
+9 openat(AT_FDCWD</unit/tmp>, "/unit/tmp/x/y", O_RDONLY|O_DIRECTORY) = 5</unit/tmp/x/y>
+9 openat(AT_FDCWD</unit/tmp/x>, "tool", O_WRONLY|O_CREAT|O_TRUNC, 0755) = 3</unit/tmp/x/tool>
+9 chdir("/unit/tmp/x/y") = 0
+9 rename("/unit/tmp/l", "/proc/self/fd/5/tool") = 0
+9 renameat2(AT_FDCWD</unit/tmp/x>, "tool", AT_FDCWD</unit/tmp/x>, "l", 0x2) = 0
+9 renameat2(AT_FDCWD</unit/tmp/x>, "tool", AT_FDCWD</unit/tmp/x>, "l", RENAME_EXCHANGE) = 0
+9 mount("/home/someone/bin", "/unit/tmp/x", NULL, MS_BIND, NULL) = 0
+9 open_tree(AT_FDCWD</unit/tmp>, "/home/someone/bin", OPEN_TREE_CLONE) = 6</home/someone/bin>
+9 move_mount(6</home/someone/bin>, "", AT_FDCWD</unit/tmp>, "/unit/tmp/x", MOVE_MOUNT_F_EMPTY_PATH) = 0
+9 chroot("/unit/tmp/x") = 0
+9 pivot_root("/unit/tmp/x", "/unit/tmp/x/y") = 0
+9 symlink("/unit/tmp/x/y", "/unit/tmp/d") = 0
+9 chdir("/unit/tmp/d") = 0
+9 symlink("/unit/tmp/x/y", "/unit/tmp/d") = 0
+9 openat(AT_FDCWD</unit/tmp>, "/unit/tmp/tool", O_WRONLY|O_CREAT|O_TRUNC, 0755) = 3</unit/tmp/tool>
+9 chdir("/unit/tmp/d") = 0
+9 mount("/home/someone/bin", "/unit/tmp/x", NULL, MS_BIND, NULL) = -1 EPERM (Operation not permitted)
+9 renameat2(AT_FDCWD</unit/tmp/x>, "tool", AT_FDCWD</unit/tmp/x>, "t2", RENAME_NOREPLACE) = 0
+9 chdir("/unit/tmp/x") = 0
+9 newfstatat(AT_FDCWD</unit/tmp/x>, "", {st_mode=S_IFDIR|0755, ...}, AT_EMPTY_PATH) = 0
+9 openat(AT_FDCWD</unit/tmp/x>, "helper", O_WRONLY|O_CREAT|O_TRUNC, 0755) = 3</unit/tmp/x/helper>
+210 mkdir("/tmp/rm-options-Gp3X4P", 0700) = 0
+210 openat(AT_FDCWD</work>, "/tmp/rm-options-Gp3X4P/no-force", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666) = 3</tmp/rm-options-Gp3X4P/no-force>
+210 unlinkat(AT_FDCWD</work>, "/tmp/rm-options-Gp3X4P/no-force", 0) = 0
+210 newfstatat(AT_FDCWD</work>, "/tmp/rm-options-Gp3X4P/no-force", 0x7ffd, 0) = -1 ENOENT (No such file or directory)
+210 rmdir("/tmp/rm-options-Gp3X4P") = 0
+210 newfstatat(AT_FDCWD</work>, "/tmp/shared", {st_mode=S_IFREG|0644, ...}, 0) = 0
+210 newfstatat(AT_FDCWD</work>, "/tmp/shared", 0x7ffd, 0) = -1 ENOENT (No such file or directory)
+210 newfstatat(AT_FDCWD</work>, "/tmp/shared", 0x7ffd, 0) = -1 ENOENT (No such file or directory)
+210 openat(AT_FDCWD</work>, "/tmp", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3</tmp>
+210 newfstatat(AT_FDCWD</work>, "/tmp/shared", {st_mode=S_IFREG|0644, ...}, 0) = 0
+210 openat(AT_FDCWD</work>, "/tmp/shared", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3</tmp/shared>
+210 mkdir("/tmp/theirs/mine", 0700) = 0
+210 openat(AT_FDCWD</work>, "/tmp/theirs/mine/file", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3</tmp/theirs/mine/file>
+210 openat(AT_FDCWD</work>, "/tmp/shared", O_RDONLY) = 3</tmp/shared>
+210 openat(AT_FDCWD</work>, "/tmp/shared", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3</tmp/shared>
+210 newfstatat(AT_FDCWD</work>, "/tmp", {st_mode=S_IFDIR|S_ISVTX|0777, ...}, 0) = 0
+210 newfstatat(AT_FDCWD</work>, "/tmp", 0x7ffd, 0) = -1 ENOENT (No such file or directory)
+9 openat(AT_FDCWD<%[1]s>, "p/testdata/link", O_RDONLY|O_CLOEXEC) = 3<%[1]s/p/testdata/b.txt>
+9 newfstatat(AT_FDCWD<%[1]s>, "p/testdata/link", {st_mode=S_IFREG|0644, st_size=2, ...}, 0) = 0
+9 faccessat2(AT_FDCWD<%[1]s>, "p/testdata/link", R_OK, 0) = 0
+9 execve("%[1]s/p/testdata/link", ["link"], 0x7ffd /* 3 vars */) = 0
+9 newfstatat(AT_FDCWD<%[1]s>, "p/testdata/out", {st_mode=S_IFREG|0755, st_size=2, ...}, 0) = 0
+9 execve("%[1]s/p/testdata/out", ["out"], 0x7ffd /* 3 vars */) = 0
+3841519 statx(20</>, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=STATX_ATTR_MOUNT_ROOT, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+3841519 statx(21</etc/hostname>, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=5, ...}) = 0
+3841604 newfstatat(3</>, "etc/hostname", {st_mode=S_IFREG|0644, st_size=5, ...}, 0) = 0
+3841604 openat(3</>, "etc/hosts", O_RDONLY|O_CLOEXEC) = 4</etc/hosts>
+3841604 newfstatat(4</>, "etc/passwd", {st_mode=S_IFREG|0644, st_size=1846, ...}, 0) = 0
+3841519 getdents64(20</>, 0x55d0 /* 24 entries */, 32768) = 744
+3841604 getdents64(5</>, 0x3071ca30 /* 24 entries */, 32768) = 744
+100 clone(child_stack=NULL, flags=CLONE_VM|CLONE_VFORK|SIGCHLD <unfinished ...>
+200 execve("/root/units/u1/binaries/0.test", ["/root/units/u1/binaries/0.test", "-test.run=^TestP$"], 0xc000 /* 40 vars */) = 0
+100 <... clone resumed>) = 200
+200 clone(child_stack=NULL, flags=CLONE_VM|CLONE_VFORK|SIGCHLD) = 300
+300 execve("/root/units/u1/stand-in/go", ["go", "list"], 0xc000 /* 40 vars */) = 0
+9 openat(AT_FDCWD</>, "/proc/self/fd/7", O_RDONLY) = 8<
+9 stat("gone.txt", 0x7ffd) = -1 ENOENT (No such file or directory)
+9 openat(AT_FDCWD, "x", O_RDONLY) = 3</x>
