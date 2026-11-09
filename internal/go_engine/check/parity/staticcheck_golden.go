@@ -153,6 +153,23 @@ func requireGolden(test testing.TB, golden goldenFile, editsByMessage map[string
 // and whether it could be: edits that overlap, or that make source gofmt cannot format, fail the test.
 func applied(test testing.TB, golden goldenFile, source []byte, edits []Edit) ([]byte, bool) {
 	test.Helper()
+	fixed, isFixed := appliedExactly(test, golden, source, edits)
+	if !isFixed {
+		return nil, false
+	}
+	formatted, formatError := format.Source(fixed)
+	if formatError != nil {
+		test.Errorf("the port's fixes in %s make source gofmt cannot format, for %s: %v\n%s", golden.packageName,
+			golden.name, formatError, fixed)
+		return nil, false
+	}
+	return formatted, true
+}
+
+// appliedExactly is source, the fixture file of golden, with edits applied and nothing more, and whether it could be:
+// edits that overlap fail the test.
+func appliedExactly(test testing.TB, golden goldenFile, source []byte, edits []Edit) ([]byte, bool) {
+	test.Helper()
 	ordered := slices.Clone(edits)
 	// Applied from the last to the first, each edit's offsets still name the bytes they were read against, and of two
 	// at one offset the one that replaces comes first, so an insertion there lands before what replaced the rest, as
@@ -169,13 +186,7 @@ func applied(test testing.TB, golden goldenFile, source []byte, edits []Edit) ([
 		}
 		fixed = slices.Concat(fixed[:edit.Start], []byte(edit.NewText), fixed[edit.End:])
 	}
-	formatted, formatError := format.Source(fixed)
-	if formatError != nil {
-		test.Errorf("the port's fixes in %s make source gofmt cannot format, for %s: %v\n%s", golden.packageName,
-			golden.name, formatError, fixed)
-		return nil, false
-	}
-	return formatted, true
+	return fixed, true
 }
 
 // compareGolden fails the test unless fixed, the port's fixes applied, is expected, what the golden file's part named

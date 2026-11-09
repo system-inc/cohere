@@ -10,8 +10,10 @@
 // there or in the doc comment of the declaration it is in, and any in an assembly file, which has no declarations,
 // on the line directly above it too.
 //
-// A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: the
-// port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
+// A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: a
+// fixed file beside the fixture's file holds that fix, the source every fix the port offers there leaves, byte for
+// byte (see requireFixedFiles), or else the port's own tests do, with a golden file or by applying the edit and
+// checking what it makes.
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
 // RequireUpstreamWantsWithFixes where the original's own test holds its fixes to golden files, or
@@ -300,8 +302,11 @@ func fixesText(written string) (string, bool) {
 // test logs how many fixes the records withhold and related entries they omit beside each side's count, so the counts
 // read as one line.
 //
-// A `moves:` record pairs by line and message only, so the port's own tests must hold its fix there, with a golden file
-// or by applying the edit and checking the result. It reads the one package directory fixture names, not the packages
+// A `moves:` record pairs by line and message only, so its fix there is held by a fixed file beside the fixture's
+// file, `<name>.go.fixed`, which every fix the port offers in that file, on a finding both make or one it alone makes,
+// applied, must make byte for byte, unformatted (see requireFixedFiles), or else by the port's own tests, with a
+// golden file or by applying the edit and checking the result. A fixed file also pins what a `fixes:` record cannot,
+// each edit's exact span and the source it leaves. It reads the one package directory fixture names, not the packages
 // nested below it, so a fixture tree with nested packages takes one call for each. It loads for the machine's own
 // target, and Target.RequireOnlyAdjudicated for another, and reads the records of every Go and assembly file of that
 // directory (see recordFiles), whichever target builds it, so a record in a file the target does not build fails
@@ -343,7 +348,8 @@ func requireOnlyAdjudicated(
 	test.Helper()
 	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
 	originalFindings, portFindings := findingsOver(test, original, port, loads)
-	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName, given)
+	folder := recordsFolder(test, loads[0])
+	recorded := adjudicated(test, folder, loads[0].fileName, given)
 	test.Logf("the original found %d, the port %d, and the records withhold %d fixes and omit %d related entries",
 		len(originalFindings), len(portFindings), len(recorded.withheld), len(recorded.omitted))
 	for _, record := range recorded.findsNothing {
@@ -362,6 +368,7 @@ func requireOnlyAdjudicated(
 		originalOnly, portOnly)
 	originalOnly, portOnly = pairMoved(test, recorded.moved, originalOnly, portOnly)
 	requireRecordedFixes(test, recorded, portOnly, editLines(loads))
+	requireFixedFiles(test, folder, loads[0].fileName, fixture, portFindings)
 	portAlone := asRecorded(portOnly)
 	for _, unrecorded := range Difference(portAlone, recorded.portAlone) {
 		test.Errorf("the port alone found %s, which the fixture does not record", unrecorded)

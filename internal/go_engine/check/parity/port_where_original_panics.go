@@ -41,7 +41,8 @@ func recovering(original *analysis.Analyzer) *analysis.Analyzer {
 // reason given as any record's is: the port must then find nothing there, each finding it makes failing, named whole,
 // and the record beside a `finds:` record, which it contradicts, fails and compares nothing.
 //
-// Like RequireOnlyAdjudicated, it reads the one package directory fixture names, and a file that cannot carry a
+// Like RequireOnlyAdjudicated, it holds the port's fixes in a file with a fixed file beside it to that fixed file,
+// byte for byte (see requireFixedFiles), reads the one package directory fixture names, and a file that cannot carry a
 // comment, as one copied byte for byte cannot, takes its records beside the call, as given, each held as there, one
 // with no Reason failing. It loads for the machine's own target, and Target.RequirePortWhereOriginalPanics for
 // another.
@@ -95,7 +96,8 @@ func requirePortWhereOriginalPanics(
 			portFindings = append(portFindings, finding.WithFileNames(fixtures.fileName))
 		}
 	}
-	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName, given)
+	folder := recordsFolder(test, loads[0])
+	recorded := adjudicated(test, folder, loads[0].fileName, given)
 	refusedAny := false
 	for _, refused := range []struct {
 		kind    string
@@ -149,4 +151,5 @@ func requirePortWhereOriginalPanics(
 	}
 	requirePlaced(test, "the port finds", recorded.placed, portFindings)
 	requireRecordedFixes(test, recorded, portFindings, editLines(loads))
+	requireFixedFiles(test, folder, loads[0].fileName, fixture, portFindings)
 }
