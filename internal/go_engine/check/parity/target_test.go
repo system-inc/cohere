@@ -1,8 +1,12 @@
 package parity
 
 import (
+	"cmp"
+	"go/build"
 	"reflect"
 	"testing"
+
+	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 )
@@ -108,4 +112,75 @@ func TestTargetRefusesAVariableTheLoadSets(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		On("GOARCH").Findings(recording, original, port, analysistest.TestData(), "same")
 	}), `the target's "GOARCH" names no value`)
+}
+
+// judging is an analyzer that reports, at each package's clause, the target go/build's default context names while it
+// runs, as asmdecl and framepointer read the target they judge there. Each call makes a new one, since the checker
+// tells the two sides of a pair apart by their analyzers.
+func judging() *analysis.Analyzer {
+	return &analysis.Analyzer{
+		Name: "judging",
+		Doc:  "judging reports the target go/build's default context names.",
+		Run: func(pass *analysis.Pass) (any, error) {
+			for _, file := range pass.Files {
+				pass.Reportf(file.Name.Pos(), "judged for %s/%s", build.Default.GOOS, build.Default.GOARCH)
+			}
+			return nil, nil
+		},
+	}
+}
+
+// machineTarget is the target go/build's default context names before any test runs, the machine's own unless the
+// environment named another, read while the package is initialized, so no harness call can have set it.
+var machineTarget = build.Default.GOOS + "/" + build.Default.GOARCH
+
+// A Target that names `GOOS` and `GOARCH` sets them in go/build's default context for its call, so a check that reads
+// its target there judges the one named, and the zero Target leaves the machine's own. Every target runs beside the
+// others, so each finds its own only if no call reads a default context another call has set.
+func TestTargetSetsTheDefaultContextForItsRun(test *testing.T) {
+	test.Parallel()
+	for _, architecture := range []string{"386", "amd64", "arm64", "riscv64", ""} {
+		test.Run(cmp.Or(architecture, "the machine's own"), func(subtest *testing.T) {
+			subtest.Parallel()
+			target, judged := On("GOOS=linux", "GOARCH="+architecture, "CGO_ENABLED=0"), "linux/"+architecture
+			if architecture == "" {
+				target, judged = Target{}, machineTarget
+			}
+			originalFindings, portFindings := target.Findings(subtest, judging(), judging(), analysistest.TestData(),
+				"same")
+			wanted := []Finding{{File: "same/same.go", Line: 2, Column: 9, Message: "judged for " + judged}}
+			if !reflect.DeepEqual(originalFindings, wanted) || !reflect.DeepEqual(portFindings, wanted) {
+				subtest.Errorf("the original found %v and the port %v, want %v from each", originalFindings,
+					portFindings, wanted)
+			}
+		})
+	}
+}
+
+// A Target puts go/build's default context back when its call ends, and when the call fails too.
+//
+// Not parallel: it reads go/build's default context outside a harness call, which no other test may set meanwhile.
+func TestTargetPutsTheDefaultContextBack(test *testing.T) {
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		on386.Findings(recording, judging(), judging(), analysistest.TestData(), "same")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		on386.Findings(recording, judging(), judging(), analysistest.TestData(), "absent")
+	}), "fixture package absent does not load clean")
+	if judged := build.Default.GOOS + "/" + build.Default.GOARCH; judged != machineTarget {
+		test.Errorf("after the calls go/build's default context names %s, want %s", judged, machineTarget)
+	}
+}
+
+// A target that names a variable twice is refused, since which value counts would be the order's accident, and so is
+// a `GOOS` or `GOARCH` that is empty, a target go/build's default context cannot judge by.
+func TestTargetRefusesATargetTheDefaultContextCannotTake(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		On("GOOS=linux", "GOARCH=386", "GOARCH=amd64").Findings(recording, original, port, analysistest.TestData(),
+			"same")
+	}), `the target names GOARCH twice, as "GOARCH=386" and "GOARCH=amd64"`)
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		On("GOOS=linux", "GOARCH=").Findings(recording, original, port, analysistest.TestData(), "same")
+	}), "the target's GOARCH is empty, and go/build's default context judges by no empty target")
 }

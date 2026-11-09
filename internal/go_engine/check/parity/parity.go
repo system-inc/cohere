@@ -24,8 +24,9 @@
 // RequirePortWhereOriginalPanics over a fixture the original panics on. Each takes testdata and patterns, and a pattern
 // naming a folder of testdata that holds a go.mod loads that folder as a module (see fixtureLoad). Each loads for the
 // machine's own target, and a port whose check judges another calls the same on the target it judges, as
-// `parity.On("GOOS=linux", "GOARCH=386", "CGO_ENABLED=0").RequireIdentical(...)` (see Target). The census command,
-// command/cohere-parity, runs Analyze over a real tree.
+// `parity.On("GOOS=linux", "GOARCH=386", "CGO_ENABLED=0").RequireIdentical(...)`, which sets the `GOOS` and `GOARCH`
+// it names in go/build's default context as well for the call, where asmdecl and framepointer read their target (see
+// Target). The census command, command/cohere-parity, runs Analyze over a real tree.
 package parity
 
 import (
@@ -79,8 +80,16 @@ type Outcome struct {
 
 // Analyze runs every pair's original and port in one checker over roots and returns each pair's outcome, in the
 // order of pairs. The two sides share the checker's prerequisites and see the same packages, so where they differ it
-// is the analyzers that differ.
+// is the analyzers that differ. It holds go/build's default context to read while it runs, as every call of the
+// harness does, so no Target's call sets it meanwhile (see Target.held); the load of roots is the caller's.
 func Analyze(pairs []Pair, roots []*packages.Package) ([]Outcome, error) {
+	defaultContext.RLock()
+	defer defaultContext.RUnlock()
+	return analyze(pairs, roots)
+}
+
+// analyze is Analyze within a call that already holds go/build's default context.
+func analyze(pairs []Pair, roots []*packages.Package) ([]Outcome, error) {
 	analyzers := []*analysis.Analyzer{}
 	// sideOf is where an analyzer's results go, keyed by the analyzer itself, since a port and its original share
 	// a name.
@@ -164,6 +173,7 @@ func Findings(
 	patterns ...string,
 ) (originalFindings []Finding, portFindings []Finding) {
 	test.Helper()
+	defer Target{}.held(test)()
 	return findingsOver(test, original, port, loadFixtures(test, Target{}, testdata, patterns, nil))
 }
 
@@ -179,7 +189,7 @@ func findingsOver(
 	originalFindings, portFindings = []Finding{}, []Finding{}
 	for _, fixtures := range loads {
 		// The roots, as analysistest analyzes them: every package the patterns match and every test variant of it.
-		outcomes, analyzeError := Analyze([]Pair{{Original: original, Port: port}}, fixtures.roots)
+		outcomes, analyzeError := analyze([]Pair{{Original: original, Port: port}}, fixtures.roots)
 		if analyzeError != nil {
 			test.Fatalf("%v", analyzeError)
 		}
@@ -226,6 +236,7 @@ func requireIdentical(
 	patterns ...string,
 ) {
 	test.Helper()
+	defer target.held(test)()
 	originalFindings, portFindings := findingsOver(test, original, port,
 		loadFixtures(test, target, testdata, patterns, expected))
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
@@ -346,6 +357,7 @@ func requireOnlyAdjudicated(
 	given []Record,
 ) {
 	test.Helper()
+	defer target.held(test)()
 	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
 	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	folder := recordsFolder(test, loads[0])

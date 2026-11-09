@@ -69,10 +69,11 @@ func requirePortWhereOriginalPanics(
 	given []Record,
 ) {
 	test.Helper()
+	defer target.held(test)()
 	portFindings := []Finding{}
 	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
 	for _, fixtures := range loads {
-		outcomes, analyzeError := Analyze([]Pair{{Original: recovering(original), Port: port}}, fixtures.roots)
+		outcomes, analyzeError := analyze([]Pair{{Original: recovering(original), Port: port}}, fixtures.roots)
 		if analyzeError != nil {
 			test.Fatalf("%v", analyzeError)
 		}

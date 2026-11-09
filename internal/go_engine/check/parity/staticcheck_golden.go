@@ -43,6 +43,7 @@ func requireStaticcheckGolden(
 	patterns ...string,
 ) {
 	test.Helper()
+	defer target.held(test)()
 	suggested := 0
 	held := 0
 	for _, fixtures := range loadFixtures(test, target, testdata, patterns, nil) {

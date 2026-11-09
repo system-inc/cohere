@@ -1,8 +1,10 @@
 package parity
 
 import (
+	"go/build"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -13,6 +15,20 @@ import (
 // nothing on another, so its fixtures load for the target it judges. Its methods are the package's Require functions
 // and Findings, each the same but for the load, and the package's own load for the machine's own target, the zero
 // Target's. RequireUpstreamWants has no method: analysistest loads its fixtures under an environment of its own.
+//
+// A check can read its target from go/build's default context, build.Default, as asmdecl and framepointer, original
+// and port alike, read the architecture and the system they judge, and go/build fixes that from the environment as
+// the process begins, before any test can name one. So a Target that names `GOOS` or `GOARCH` sets that field of
+// build.Default as well, for its call's load and run, and puts it back when the call ends, failed or not (see
+// contextFields). build.Default is the process's own and tests run in parallel, so every call of the harness holds it
+// (see held): a call on such a Target holds it alone, and every other call holds it beside the rest, so no call ever
+// reads a build.Default another call has set.
+//
+// A test outside the harness holds none of this. One that reads build.Default by hand reads whatever a harness call
+// beside it has set, so it runs in parallel with no test of its package that calls the harness on a Target naming
+// `GOOS` or `GOARCH`, and one that sets it runs in parallel with no harness call at all. RequireUpstreamWants, which
+// takes no Target, runs under the default context as it stands, so a port whose upstream fixtures need another target
+// there still sets it by hand, under those rules.
 type Target struct {
 	// environment is the variables the caller named, each `NAME=value`, appended after the fixture load's own.
 	environment []string
@@ -33,6 +49,7 @@ func (target Target) Findings(
 	patterns ...string,
 ) (originalFindings []Finding, portFindings []Finding) {
 	test.Helper()
+	defer target.held(test)()
 	return findingsOver(test, original, port, loadFixtures(test, target, testdata, patterns, nil))
 }
 
@@ -108,17 +125,75 @@ func (target Target) RequirePortWhereOriginalPanics(
 	requirePortWhereOriginalPanics(test, target, original, port, testdata, fixture, given)
 }
 
+// contextFields are the variables a Target sets in go/build's default context, build.Default, beside the
+// environment, each with the field of a context it sets: the system and the architecture a check reads its target
+// from there. `CGO_ENABLED` is not among them: no original or port this repository holds reads the default context's
+// CgoEnabled, and the load sets its own from the environment.
+var contextFields = map[string]func(context *build.Context) *string{
+	"GOOS":   func(context *build.Context) *string { return &context.GOOS },
+	"GOARCH": func(context *build.Context) *string { return &context.GOARCH },
+}
+
+// defaultContext guards build.Default for the harness's calls: a call on a Target that sets it holds defaultContext
+// to write for its whole load and run, and every other call holds it to read (see held).
+var defaultContext sync.RWMutex
+
+// held is target held for one call's load and run, and what lets it go, which the call defers, so a call that fails
+// lets go too. A target that names `GOOS` or `GOARCH` sets each in build.Default and holds defaultContext to write,
+// and letting go puts back what it set; any other target holds it to read, since the load copies build.Default and a
+// check may read it. So a call reads build.Default only as its own target set it or as the process began, and no call
+// sets it while another reads it. A variable named with no value, a variable named twice, since which value counts
+// would be the order's accident, and an empty `GOOS` or `GOARCH`, a target build.Default cannot judge by, each fail
+// the test before anything is held. A call holds it once, at its start, since a call that held it again beneath
+// would wait behind a call waiting to write.
+func (target Target) held(test testing.TB) (release func()) {
+	test.Helper()
+	named := map[string]string{}
+	judged := map[string]string{}
+	for _, variable := range target.environment {
+		name, value, hasValue := strings.Cut(variable, "=")
+		if !hasValue {
+			test.Fatalf("the target's %q names no value: write it NAME=value", variable)
+		}
+		if earlier, isNamed := named[name]; isNamed {
+			test.Fatalf("the target names %s twice, as %q and %q, so which it is for is the order's accident: name "+
+				"it once", name, earlier, variable)
+		}
+		named[name] = variable
+		if _, isContextField := contextFields[name]; !isContextField {
+			continue
+		}
+		if value == "" {
+			test.Fatalf("the target's %s is empty, and go/build's default context judges by no empty target", name)
+		}
+		judged[name] = value
+	}
+	if len(judged) == 0 {
+		defaultContext.RLock()
+		return defaultContext.RUnlock
+	}
+	defaultContext.Lock()
+	saved := map[string]string{}
+	for name, value := range judged {
+		field := contextFields[name](&build.Default)
+		saved[name], *field = *field, value
+	}
+	return func() {
+		for name, value := range saved {
+			*contextFields[name](&build.Default) = value
+		}
+		defaultContext.Unlock()
+	}
+}
+
 // environmentOf is the environment fixtures load under for target: the fixture load's own, then target's. A variable
-// target names that has no value, or that the fixture load already sets, fails the test, since the second would
-// override how the fixtures are found rather than the target they are checked for.
+// target names that the fixture load already sets fails the test, since it would override how the fixtures are found
+// rather than the target they are checked for. held has already refused one with no value.
 func (target Target) environmentOf(test testing.TB, fixtures fixtureLoad) []string {
 	test.Helper()
 	own := fixtureEnvironment(fixtures.directory)
 	for _, variable := range target.environment {
-		name, _, hasValue := strings.Cut(variable, "=")
-		if !hasValue {
-			test.Fatalf("the target's %q names no value: write it NAME=value", variable)
-		}
+		name, _, _ := strings.Cut(variable, "=")
 		if slices.ContainsFunc(own, func(set string) bool { return strings.HasPrefix(set, name+"=") }) {
 			test.Fatalf("the target sets %s, which the load of %s sets itself", name, fixtures.described())
 		}

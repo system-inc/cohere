@@ -37,6 +37,7 @@ func requireStaticcheckWants(
 	patterns ...string,
 ) {
 	test.Helper()
+	defer target.held(test)()
 	wanted := 0
 	reported := 0
 	factsWanted := 0

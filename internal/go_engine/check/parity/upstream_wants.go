@@ -47,6 +47,8 @@ func requireUpstreamWants(
 	patterns []string,
 ) {
 	test.Helper()
+	// Held as the machine's own target's call is, since a check analysistest runs may read build.Default.
+	defer Target{}.held(test)()
 	for _, fixtures := range fixtureLoads(testdata, patterns) {
 		run(errorsOnly{test}, fixtures.directory, port, fixtures.patterns...)
 	}
