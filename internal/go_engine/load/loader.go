@@ -49,9 +49,10 @@ type loader struct {
 	// restored are the packages the findings cache holds, whose types come from their export data (see Restorer).
 	restored map[*packages.Package]*Restored
 
-	// analyzed are the packages to analyze (analyzedOfGraph), and testFunctions each analyzed test variant's refused
-	// test functions, judged as it is checked, while its syntax is surely there: an analysis beside the load lets an
-	// analyzed package's syntax go once it has finished with it, which may be before the load ends.
+	// analyzed are the packages to analyze (analyzedOfGraph), those Caching.Analyzes turns down included, and
+	// testFunctions each such test variant's refused test functions, judged as it is checked, while its syntax is
+	// surely there: an analysis beside the load lets an analyzed package's syntax go once it has finished with it,
+	// which may be before the load ends.
 	analyzed          map[*packages.Package]bool
 	testFunctionsLock sync.Mutex
 	testFunctions     map[*packages.Package][]Diagnostic
