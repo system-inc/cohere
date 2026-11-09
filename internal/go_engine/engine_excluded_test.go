@@ -150,3 +150,42 @@ func TestAPackageWithAFileInScopeIsLintedAndCountsOnlyThatFile(test *testing.T) 
 		test.Errorf("want a rule given both files of the package, got %q", ran.read)
 	}
 }
+
+// A run narrowed to inside saves outside, which inside imports and which holds a finding of a rule with no facts, in
+// the findings cache as a dependency: its facts and none of that finding. A whole run over the same store then
+// analyzes outside as a package to analyze, so the entry falls short of what it asks (dropShortHits) and is a miss,
+// never restored as a package with no findings: the whole run reads as a run without the cache does, outside's
+// finding included.
+func TestAWholeRunAfterANarrowedOneFindsWhatTheNarrowedRunSavedAsADependency(test *testing.T) {
+	test.Parallel()
+
+	root := excludedModule(test, map[string]string{
+		"inside/inside.go": "// Package inside reports through outside.\npackage inside\n\n" +
+			"import \"example.com/value/outside\"\n\n// Run reports.\nfunc Run() { outside.Report() }\n",
+		"outside/outside.go": "// Package outside holds one line past the house limit.\npackage outside\n\n" +
+			"// Report reports nothing, and its comment runs past the limit, which the long-line rule finds" +
+			strings.Repeat(" and finds", 4) + ".\nfunc Report() {}\n",
+	})
+	outsideFinding := `"file":"` + filepath.Join(root, "outside", "outside.go") + `"`
+
+	narrowed := runCachedEngine(test, root, filepath.Join(root, "inside"))
+	if strings.Contains(narrowed.stream, outsideFinding) || narrowed.counts.Written == 0 {
+		test.Fatalf("want a narrowed run that writes entries and reports nothing in outside, got %+v in\n%s",
+			narrowed.counts, narrowed.stream)
+	}
+	whole := runCachedEngine(test, root)
+	uncached := runCachedEngine(test, root, "--no-cache")
+	if !strings.Contains(uncached.stream, outsideFinding) {
+		test.Fatalf("want the run without the cache to report outside's finding, got\n%s", uncached.stream)
+	}
+	if !strings.Contains(whole.stream, outsideFinding) {
+		test.Errorf("the whole run over the narrowed run's store lost outside's finding:\n%s", whole.stream)
+	}
+	if whole.counts.Hit == 0 {
+		test.Errorf("want the whole run to restore what the narrowed run saved, got %+v", whole.counts)
+	}
+	if whole.withoutCounts != uncached.withoutCounts {
+		test.Errorf("the whole run over the narrowed run's store\n%s\nunder --no-cache\n%s", whole.withoutCounts,
+			uncached.withoutCounts)
+	}
+}
