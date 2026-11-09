@@ -13,7 +13,7 @@ package intermediate_representation
 // https://doi.acm.org/10.1145/357062.357071
 //
 // We also apply the optimizations to SLT described in Georgiadis et
-// al, Finding Dominators in Practice, JGAA 2006,
+// al, Finding Dominators in Practice, Journal of Graph Algorithms and Applications 2006,
 // https://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
 // to avoid the need for buckets of size > 1.
 
@@ -124,11 +124,12 @@ func buildDominatorTree(function *Function) {
 // answer dominance queries in constant time.
 func numberDominatorTree(block *BasicBlock, pre, post int32) (int32, int32) {
 	block.dom.pre = pre
-	pre++
+	nextPre := pre + 1
+	nextPost := post
 	for _, child := range block.dom.children {
-		pre, post = numberDominatorTree(child, pre, post)
+		nextPre, nextPost = numberDominatorTree(child, nextPre, nextPost)
 	}
-	block.dom.post = post
-	post++
-	return pre, post
+	block.dom.post = nextPost
+	nextPost++
+	return nextPre, nextPost
 }

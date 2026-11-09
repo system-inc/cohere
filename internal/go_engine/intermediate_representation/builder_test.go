@@ -174,6 +174,8 @@ func callsOf(function *intermediate_representation.Function) []*intermediate_rep
 // go/ir's test also checks the method sets of the external types through Program.MethodValue, which ours
 // doesn't carry, so that half is left out.
 func TestBuildPackage(test *testing.T) {
+	test.Parallel()
+
 	input := `
 package main
 
@@ -279,6 +281,8 @@ func main() {
 // Tests that methods from indirect dependencies not subject to
 // CreatePackage are created as needed.
 func TestNoIndirectCreatePackage(test *testing.T) {
+	test.Parallel()
+
 	loaded := checkSources(test, []string{"testdata/c", "testdata/b", "testdata/a"}, map[string]string{
 		"testdata/a": `package a
 
@@ -316,8 +320,12 @@ func (C) F() {}
 	// Find the function in the sole call in the sole block of function a.A. Unlifted, the block opens with
 	// the call to the ssa:deferstack builtin that every function makes and lifting removes when nothing
 	// defers (#ee33njz), so the call sought is the sole one to a function.
+	functionA, isFunction := aSsa.Members["A"].(*intermediate_representation.Function)
+	if !isFunction {
+		test.Fatalf("member A of package a is %T, want a function", aSsa.Members["A"])
+	}
 	var got string
-	for _, instr := range aSsa.Members["A"].(*intermediate_representation.Function).Blocks[0].Instructions {
+	for _, instr := range functionA.Blocks[0].Instructions {
 		if call, ok := instr.(*intermediate_representation.Call); ok {
 			function, isFunction := call.Call.Value.(*intermediate_representation.Function)
 			if !isFunction {
@@ -336,6 +344,8 @@ func (C) F() {}
 // TestOrderOfOperations reads each call's callee where go/ir's test read the call's printed form, a()
 // and b(), so the sequence it wants is the same.
 func TestOrderOfOperations(test *testing.T) {
+	test.Parallel()
+
 	// Testing for the order of operations within an expression is done
 	// by collecting the sequence of direct function calls within a *Function.
 	// Callees are all external functions so they cannot be safely re-ordered by ssa.
@@ -380,6 +390,8 @@ func sliceMax(s []int) []int { return s[a():b():c()] }
 // runs it once more with InstantiateGenerics, which ours doesn't have; every callee is an instantiation
 // wrapper, as in its first run.
 func TestGenericFunctionSelector(test *testing.T) {
+	test.Parallel()
+
 	loaded := checkSources(test, []string{"example.com/a", "example.com"}, map[string]string{
 		"example.com":   `package main; import "example.com/a"; func main() { a.F[int](); a.G[int,string](); a.H(0) }`,
 		"example.com/a": `package a; func F[T any](){}; func G[S, T any](){}; func H[T any](a T){} `,
@@ -413,6 +425,8 @@ func TestGenericFunctionSelector(test *testing.T) {
 }
 
 func TestGo117Builtins(test *testing.T) {
+	test.Parallel()
+
 	tests := []struct {
 		name     string
 		source   string
@@ -433,6 +447,8 @@ func TestGo117Builtins(test *testing.T) {
 
 // TestLabels just tests that anonymous labels are handled.
 func TestLabels(test *testing.T) {
+	test.Parallel()
+
 	tests := []string{
 		`package main
 		  func main() { _:println(1) }`,
@@ -448,6 +464,8 @@ func TestLabels(test *testing.T) {
 // checker; ours builds the generic bodies in generic form, and the test holds that building them doesn't
 // panic.
 func TestFixedBugs(test *testing.T) {
+	test.Parallel()
+
 	for _, name := range []string{
 		"issue66783a",
 		"issue66783b",
@@ -456,6 +474,7 @@ func TestFixedBugs(test *testing.T) {
 		"issue73871",
 	} {
 		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			path := filepath.Join("testdata", "fixedbugs", name+".go")
 			fset := token.NewFileSet()
 			file, parseFileError := parser.ParseFile(fset, path, nil, parser.ParseComments)
@@ -470,6 +489,8 @@ func TestFixedBugs(test *testing.T) {
 }
 
 func TestBuildPackageGo120(test *testing.T) {
+	test.Parallel()
+
 	tests := []struct {
 		name     string
 		source   string
@@ -555,6 +576,8 @@ func TestBuildPackageGo120(test *testing.T) {
 // slice marks its loop header RangeIndexLoop, where go/ir writes the label "rangeindex.loop", and no other
 // block is marked. This one is ours; go/ir has no test of the label.
 func TestRangeIndexLoop(test *testing.T) {
+	test.Parallel()
+
 	const input = `
 package p
 

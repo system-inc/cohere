@@ -1,6 +1,7 @@
 package intermediate_representation
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -92,9 +93,22 @@ func (common *CallCommon) Pos() token.Pos {
 // receiver is represented by sig.Recv, not sig.Params().At(0).
 func (common *CallCommon) Signature() *types.Signature {
 	if common.Method != nil {
-		return common.Method.Type().(*types.Signature)
+		signature, isSignature := common.Method.Type().(*types.Signature)
+		if !isSignature {
+			// Invariant: go/types gives every *types.Func a *types.Signature as its type.
+			panic(fmt.Sprintf("CallCommon.Signature: method %s has type %s, not a signature", common.Method,
+				common.Method.Type()))
+		}
+		return signature
 	}
-	return typeutil.CoreType(common.Value.Type()).(*types.Signature)
+	signature, isSignature := typeutil.CoreType(common.Value.Type()).(*types.Signature)
+	if !isSignature {
+		// Invariant: a call-mode value is the callee of a call go/types accepted, so its core type is a
+		// function signature.
+		panic(fmt.Sprintf("CallCommon.Signature: callee %s has type %s, whose core type is not a signature",
+			common.Value, common.Value.Type()))
+	}
+	return signature
 }
 
 // StaticCallee returns the callee if this is a trivially static
@@ -104,7 +118,12 @@ func (common *CallCommon) StaticCallee() *Function {
 	case *Function:
 		return callee
 	case *MakeClosure:
-		return callee.Function.(*Function)
+		function, isFunction := callee.Function.(*Function)
+		if !isFunction {
+			// Invariant: the builder makes every closure from a *Function, as MakeClosure.Function says.
+			panic(fmt.Sprintf("StaticCallee: closure %s is over %T, not a *Function", callee.Name(), callee.Function))
+		}
+		return function
 	}
 	return nil
 }
@@ -130,9 +149,9 @@ func (common *CallCommon) Description() string {
 }
 
 func (common *CallCommon) Operands(rands []*Value) []*Value {
-	rands = append(rands, &common.Value)
+	operands := append(rands, &common.Value)
 	for index := range common.Arguments {
-		rands = append(rands, &common.Arguments[index])
+		operands = append(operands, &common.Arguments[index])
 	}
-	return rands
+	return operands
 }

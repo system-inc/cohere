@@ -1,6 +1,7 @@
 package intermediate_representation
 
 import (
+	"fmt"
 	"go/types"
 	"sync"
 
@@ -54,30 +55,45 @@ func (canonizer *canonizer) List(ts []types.Type) *typeList {
 // For performance, reasons the canonical instance is order-dependent,
 // and may contain deeply nested aliases.
 func (canonizer *canonizer) Type(goType types.Type) types.Type {
-	goType = types.Unalias(goType) // remove the top level alias.
+	unaliased := types.Unalias(goType) // remove the top level alias.
 
 	canonizer.mutex.Lock()
 	defer canonizer.mutex.Unlock()
 
-	if resolvedType, _ := canonizer.types.At(goType); resolvedType != nil {
+	if resolvedType, _ := canonizer.types.At(unaliased); resolvedType != nil {
 		return resolvedType
 	}
-	canonizer.types.Set(goType, goType)
-	return goType
+	canonizer.types.Set(unaliased, unaliased)
+	return unaliased
 }
 
 // instantiateMethod instantiates `function` with targs and returns a canonical representative for this method.
-func (canonizer *canonizer) instantiateMethod(function *types.Func, targs []types.Type, ctxt *types.Context) *types.Func {
+func (canonizer *canonizer) instantiateMethod(
+	function *types.Func,
+	targs []types.Type,
+	ctxt *types.Context,
+) *types.Func {
 	recv := recvType(function)
 	if pointer, ok := types.Unalias(recv).(*types.Pointer); ok {
 		recv = pointer.Elem()
 	}
-	named := types.Unalias(recv).(*types.Named)
+	named, isNamed := types.Unalias(recv).(*types.Named)
+	if !isNamed {
+		// Invariant: callers instantiate only a method with receiver type arguments, which is declared on a generic
+		// named type, so its receiver is that type or a pointer to it.
+		panic(fmt.Sprintf("instantiateMethod: %s has receiver %s, not a named type", function, recv))
+	}
 	inst, instantiateError := types.Instantiate(ctxt, named.Origin(), targs, false)
 	if instantiateError != nil {
+		// Invariant: with validate false, go/types documents that Instantiate never returns an error.
 		panic(instantiateError)
 	}
 	rep := canonizer.Type(inst)
 	object, _, _ := types.LookupFieldOrMethod(rep, true, function.Pkg(), function.Name())
-	return object.(*types.Func)
+	method, isMethod := object.(*types.Func)
+	if !isMethod {
+		// Invariant: an instance of a named type has every method of its origin, function among them.
+		panic(fmt.Sprintf("instantiateMethod: %s has no method %s", rep, function.Name()))
+	}
+	return method
 }

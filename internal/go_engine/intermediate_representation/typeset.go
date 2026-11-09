@@ -14,6 +14,14 @@ import (
 
 const debug = false
 
+const (
+	ixInvalid     indexMode = iota // index is invalid
+	ixValue                        // index is a computed value (not addressable)
+	ixArrVariable                  // like ixVar, but index operand contains an array
+	ixVariable                     // index is an addressable variable
+	ixMap                          // index is a map index (a variable on the lhs, comma-ok on the rhs of an assignment)
+)
+
 // typeset is an iterator over the (type/underlying type) pairs of the
 // specific type terms of the type set implied by t.
 // If t is a type parameter, the implied type set is the type set of t's constraint.
@@ -138,11 +146,3 @@ func indexType(typ types.Type) (types.Type, indexMode) {
 	}
 	return nil, ixInvalid
 }
-
-const (
-	ixInvalid     indexMode = iota // index is invalid
-	ixValue                        // index is a computed value (not addressable)
-	ixArrVariable                  // like ixVar, but index operand contains an array
-	ixVariable                     // index is an addressable variable
-	ixMap                          // index is a map index expression (acts like a variable on lhs, commaok on rhs of an assignment)
-)
