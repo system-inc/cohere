@@ -1,5 +1,5 @@
 // Package discarded_pure_call is staticcheck's SA4017, a call to a function without side effects whose results are
-// all discarded, so the call does nothing, ported onto staticcheck's intermediate representation with the purity
+// all discarded, so the call does nothing, ported onto the engine's own intermediate representation with the purity
 // staticcheck's purity pass judges, reporting through the kit every port of staticcheck shares.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4017/sa4017.go, whose logic it keeps and
@@ -30,21 +30,24 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/purity"
-	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own with
-// the purity judgment of the package. It requires staticcheck's purity pass, whose result it reads.
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, each judged on its own with the purity judgment of the package. It requires
+// staticcheck's purity pass, whose result it reads.
 var Listener = rule.Listener{
 	Requires: []*analysis.Analyzer{purity.Analyzer},
-	Function: func(context *rule.Context, function *ir.Function) {
-		Check(context, function, purityJudgment(context))
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+		Function: func(context *rule.Context, function *intermediate_representation.Function) {
+			Check(context, function, purityJudgment(context))
+		},
 	},
 }
 
@@ -55,7 +58,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4017",
 	"SA4017",
 	"Flags a call to a function without side effects whose results are discarded: staticcheck's SA4017, "+
-		"ported onto its intermediate representation.",
+		"ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -76,7 +79,11 @@ func purityJudgment(context *rule.Context) func(function *types.Func) bool {
 
 // Check judges one function: each call whose results nothing reads, of a named function isPure judges free of side
 // effects.
-func Check(context *rule.Context, function *ir.Function, isPure func(function *types.Func) bool) {
+func Check(
+	context *rule.Context,
+	function *intermediate_representation.Function,
+	isPure func(function *types.Func) bool,
+) {
 	if staticcheck_code.IsInTest(context, function) {
 		for parameter := range function.Signature.Params().Variables() {
 			if typeutil.IsPointerToTypeWithName(parameter.Type(), "testing.B") {
@@ -89,8 +96,8 @@ func Check(context *rule.Context, function *ir.Function, isPure func(function *t
 		}
 	}
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
-			call, isCall := instruction.(*ir.Call)
+		for _, instruction := range block.Instructions {
+			call, isCall := instruction.(*intermediate_representation.Call)
 			if !isCall {
 				continue
 			}
