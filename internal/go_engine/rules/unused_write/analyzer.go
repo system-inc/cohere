@@ -3,10 +3,10 @@
 // build for every package, so the run no longer builds x/tools' single assignment form for this pass.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/unusedwrite/unusedwrite.go, whose
-// logic it keeps and whose messages it reports word for word. Where staticcheck's form is built differently from
-// x/tools', the code says how, and how the translation still finds what the original finds. The registry runs the
-// port in the original's place, and the original stays the oracle: the parity tests beside this file run both over
-// the same packages.
+// logic it keeps and whose messages it reports word for word, but for the index a write lands at (see indexText). Where
+// staticcheck's form is built differently from x/tools', the code says how, and how the translation still finds what
+// the original finds. The registry runs the port in the original's place, and the original stays the oracle: the parity
+// tests beside this file run both over the same packages.
 //
 // The two differ only where adjudicated, each case in testdata/src/differences and held by
 // TestPortDiffersFromOriginalOnlyWhereItIsRight. The port finds writes the original misses, rightly: staticcheck lifts
@@ -16,14 +16,17 @@
 // initializers, which buildssa's leave out. It misses nothing the original finds: the writes staticcheck's form
 // erases when it lifts away the allocation of a pointer to a literal, the element of an array literal of one element
 // and the given fields of a struct literal, are found from the function's syntax (reportLiftedArrayLiterals) and from
-// the literal's value it leaves (liftedStructLiteralWrites). Where both report a write at an index the function
-// computes, the message names the index by the form's registers, as the original's does, and the forms number their
-// registers differently, so the text differs in those names alone, an artifact of the single assignment form.
+// the literal's value it leaves (liftedStructLiteralWrites). Both report a write to an array element at the same place,
+// and the port names its index as the source writes it, where the original prints the index as its form holds it, a
+// constant as value and type and an index the function computes by the form's registers, which no reader wrote and
+// which the forms number differently; each such finding is recorded as a rename.
 package unused_write
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/printer"
 	"go/token"
 	"go/types"
 
@@ -99,7 +102,7 @@ func Check(context *rule.Context, function *ir.Function) {
 		case *ir.IndexAddr:
 			context.Report(analysis.Diagnostic{
 				Pos:     indexPosition(dead.store, address),
-				Message: fmt.Sprintf("unused write to array index %s", address.Index),
+				Message: "unused write to array index " + indexText(context, address),
 			})
 		case nil:
 			if dead.arrayLiteral != nil {
@@ -409,4 +412,43 @@ func indexPosition(store *ir.Store, address *ir.IndexAddr) token.Pos {
 		}
 	}
 	return store.Pos()
+}
+
+// indexText is how the message names the index address writes at, as the source writes it: the index expression of
+// `values[index] = x` and the key of a keyed element of an array literal, printed by go/printer, so with gofmt's
+// spacing. A positional element of a literal has no index in its source, and its index is always a constant, so it is
+// named by that constant's value. Nothing else unused_write reports writes through an index address: the array of a
+// variadic call's arguments and a slice literal's backing array are read whole by the Slice that follows, an array
+// literal into a variable is skipped as the original's copy (isLiteralElementOfVariable), and a range loop's address
+// is only loaded. So no index is ever named by a register, which the forms number differently.
+func indexText(context *rule.Context, address *ir.IndexAddr) string {
+	if indexExpression, isIndexExpression := address.Source().(*ast.IndexExpr); isIndexExpression {
+		return sourceText(context, indexExpression.Index)
+	}
+	if allocation, isAllocation := address.X.(*ir.Alloc); isAllocation {
+		if literal, isLiteral := allocation.Source().(*ast.CompositeLit); isLiteral {
+			for _, element := range literal.Elts {
+				if keyed, isKeyed := element.(*ast.KeyValueExpr); isKeyed && ast.Node(keyed.Value) == address.Source() {
+					return sourceText(context, keyed.Key)
+				}
+			}
+		}
+	}
+	if constant, isConstant := address.Index.(*ir.Const); isConstant && constant.Value != nil {
+		return constant.Value.String()
+	}
+	// Never reached by a write the port reports, as above; should one ever reach it, it names no index rather than a
+	// register.
+	return "?"
+}
+
+// sourceText is expression printed as the source writes it, with gofmt's spacing.
+func sourceText(context *rule.Context, expression ast.Expr) string {
+	var text bytes.Buffer
+	if printer.Fprint(&text, context.Fset, expression) != nil {
+		// Never met: printing a parsed expression into a buffer has no write that can fail. Should it, the message
+		// names no index rather than a wrong one.
+		return "?"
+	}
+	return text.String()
 }

@@ -270,8 +270,9 @@ func isBlank(expression ast.Expr) bool {
 	return isIdentifier && identifier.Name == "_"
 }
 
-// arrayLiteralElement is where and how the original reports the one element of literal: at the colon of a keyed
-// element and the start of a positional one, its index printed as x/tools prints a constant, value and type.
+// arrayLiteralElement is where the original reports the one element of literal, at the colon of a keyed element and
+// the start of a positional one, and how the port names its index, as indexText names one: a keyed element's key as
+// written, and a positional one's by its value, 0.
 func arrayLiteralElement(context *rule.Context, literal *ast.CompositeLit) (token.Pos, string, bool) {
 	if len(literal.Elts) != 1 {
 		return token.NoPos, "", false
@@ -279,13 +280,14 @@ func arrayLiteralElement(context *rule.Context, literal *ast.CompositeLit) (toke
 	element := literal.Elts[0]
 	keyed, isKeyed := element.(*ast.KeyValueExpr)
 	if !isKeyed {
-		return element.Pos(), "0:int", true
+		// A positional element has no index in its source, so it is named by its value (see indexText).
+		return element.Pos(), "0", true
 	}
 	key := context.TypesInfo.Types[keyed.Key]
 	if key.Value == nil || key.Type == nil {
 		return token.NoPos, "", false
 	}
-	return keyed.Colon, key.Value.String() + ":" + types.TypeString(key.Type, types.RelativeTo(nil)), true
+	return keyed.Colon, sourceText(context, keyed.Key), true
 }
 
 // arrayLiteralElementWrite is the write of the one element of an array literal of one element store writes whole into
