@@ -16,7 +16,7 @@ import (
 // instruction, in block order, to every listener whose Instructions list its kind, then every FunctionExit; and once
 // the functions are walked, every PackageExit. Listeners are called in the order they were registered.
 //
-// Each function is built as the walk reaches it, and a pass that starts no listener reads none, so builds none.
+// The package is built whole as the walk starts, and a pass that starts no listener reads none of it, so builds none.
 type IntermediateRepresentation struct {
 	*listeners
 }
@@ -78,7 +78,7 @@ func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, err
 	if readError != nil {
 		return nil, readError
 	}
-	// With no started listener the functions are not read, so none of them is built.
+	// With no started listener the functions are not read, so the package is not built.
 	if len(started.runs) == 0 {
 		return finish(started), nil
 	}

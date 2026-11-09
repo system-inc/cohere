@@ -65,3 +65,12 @@ func ranged() int {
 	}
 	return total
 }
+
+// caller reaches callee, declared after it, through a static call, as a reader following StaticCallee would.
+func caller() int {
+	return callee() + 1
+}
+
+func callee() int {
+	return first() * 2
+}
