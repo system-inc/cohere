@@ -28,13 +28,11 @@ const timingMarginChildVariable = "COHERE_TEST_TIMING_MARGIN_CHILD"
 // marginSpin is the planted rule's known CPU, enough that the work the rows measure dominates the run.
 const marginSpin = 400 * time.Millisecond
 
-// marginLowerShare is the least share of the process's CPU the rows must cover, in percent. Measured in six runs on
-// darwin/arm64 at a load average of 14 to 17 (2026-11-09), the rows covered 84.6 to 88.3% of the child's 0.91 to
-// 0.99s of CPU, leaving 115 to 150ms out: the process's own start, the test binary's package initializers included,
-// the census and the fix phase, which no row measures, and the runtime's collector working on threads of its own. 80
-// leaves room for a slower start or a busier collector, about 40ms more than the worst run left out, and still fails a
-// record that drops the planted rule's 400ms, about 40% of the run alone.
-const marginLowerShare = 80
+// marginSpinCeiling bounds the planted rule's row from above at half again its spin. The row is the rule's Run on a
+// thread held for it, and Run does nothing but spin, so it bills the spin and a few clock reads; a row billed twice
+// holds twice the spin and is caught here even where the rows' sum, which moves with what the runtime's own threads
+// cost on a busy machine, would still fit under the process's CPU.
+const marginSpinCeiling = marginSpin * 3 / 2
 
 // runTimingMarginChild is the child's whole run: the engine over arguments, under --timing, with only the rule that
 // spins marginSpin once registered.
@@ -57,13 +55,17 @@ func runTimingMarginChild(arguments []string, standardOutput io.Writer, standard
 	return run(arguments, standardOutput, standardError, []rule.Rule{spinning}, nil)
 }
 
-// The timing table accounts for the run's CPU within a stated margin: its rows, every rule, every shared analyzer,
-// the load's phases this process ran and the measuring's own cost, are no more than the process's user and system
-// CPU, and at least marginLowerShare percent of it, with the planted rule's row first. The run is a child process,
-// this test binary started as the engine (TestMain), so the process's CPU is that run's alone, where in this process
-// every parallel test would add to it. The go commands the listing ran are its children's CPU, never this process's,
-// so their row is left out of the sum.
-func TestTheTimingTableSumsToTheRunsCpuWithinAMargin(test *testing.T) {
+// The timing table bills a planted rule's known CPU to that rule, once, and its rows never sum past the process's
+// CPU: the planted rule is the first row, billed at least its spin and less than half again more, and the rows,
+// every rule, every shared analyzer, the load's phases this process ran and the measuring's own cost, are no more
+// than the process's user and system CPU. The run is a child process, this test binary started as the engine
+// (TestMain), so the process's CPU is that run's alone, where in this process every parallel test would add to it.
+// The go commands the listing ran are its children's CPU, never this process's, so their row is left out of the sum.
+//
+// What share of the process the rows cover is logged, never asserted: what no row measures (start, the census, the
+// fix phase, the runtime's collector on its own threads) grows with the machine's load, so a floor on the share is a
+// performance number, and land's gate refused one at 78.5% on a busy machine where an idle one read 84 to 88%.
+func TestTheTimingTableBillsAPlantedRuleOnceWithinTheRunsCpu(test *testing.T) {
 	test.Parallel()
 	timing_testing.RequireThreadClock(test)
 	executable, executableError := os.Executable()
@@ -110,12 +112,11 @@ func TestTheTimingTableSumsToTheRunsCpuWithinAMargin(test *testing.T) {
 	if rows > process {
 		test.Errorf("the rows hold %dµs, more than the process's %dµs, so something was billed twice", rows, process)
 	}
-	if rows*100 < process*marginLowerShare {
-		test.Errorf("the rows hold %dµs of the process's %dµs, under %d%%", rows, process, marginLowerShare)
-	}
 	// Less a millisecond for the calibrated reads taken out and what the record rounds away.
 	if top := record.Rules[0]; top.Name != spinningRuleName ||
-		top.CpuMicroseconds < (marginSpin-time.Millisecond).Microseconds() {
-		test.Errorf("the first rule row is %+v, want %s, billed about its %v", top, spinningRuleName, marginSpin)
+		top.CpuMicroseconds < (marginSpin-time.Millisecond).Microseconds() ||
+		top.CpuMicroseconds >= marginSpinCeiling.Microseconds() {
+		test.Errorf("the first rule row is %+v, want %s, billed its %v once, under %v", top, spinningRuleName,
+			marginSpin, marginSpinCeiling)
 	}
 }
