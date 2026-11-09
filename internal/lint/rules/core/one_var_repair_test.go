@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// oneVariableRepairCases are the rows whose `output` upstream pins to a rewritten string.
+// oneDeclarationRepairCases are the rows whose `output` upstream pins to a rewritten string.
 //
 // `output` is the specification for the repair, and it is the only coverage a fixer has: a fixer
 // that reports in the right place and rewrites wrongly is indistinguishable, at the message-id
@@ -16,7 +16,7 @@ import (
 // loops to a fixed point, and three of these cases converge somewhere else because the second
 // pass merges declarations the first one only just created. Asserting the fixed point here would
 // disagree with upstream's own expectations on exactly those three.
-var oneVariableRepairCases = []oneVariableFixCase{
+var oneDeclarationRepairCases = []oneDeclarationFixCase{
 	{name: "invalid-152", source: "var bar = true, baz = false;", options: "\"never\"",
 		wanted: "var bar = true; var baz = false;"},
 	{name: "invalid-153", source: "function foo() { var bar = true, baz = false; }", options: "\"never\"",
@@ -459,13 +459,13 @@ var oneVariableRepairCases = []oneVariableFixCase{
 		wanted: "await using a = 0; await using b = 1;"},
 }
 
-// oneVariableDeclineCases are the rows upstream reports and deliberately does not repair.
+// oneDeclarationDeclineCases are the rows upstream reports and deliberately does not repair.
 //
 // `output: null` is a decision rather than an omission. Twenty-six of them here, more than any
 // other rule in this batch, and they are asserted as the absence of a proposed fix -- never as
 // "the output equals the input", because `ExpectFixedSource` fatals when no fix was proposed and
 // would therefore agree with any expectation at all.
-var oneVariableDeclineCases = []oneVariableCase{
+var oneDeclarationDeclineCases = []oneDeclarationCase{
 	{name: "invalid-158", source: "var a = 1; for (var b = 2;;) {}", options: "\"always\""},
 	{
 		name:    "invalid-175",
@@ -522,30 +522,30 @@ var oneVariableDeclineCases = []oneVariableCase{
 	{name: "invalid-283", source: "class C { static { var x; if (foo) { var y; } } }", options: "\"always\""},
 }
 
-func TestOneVariableRepairsWhatUpstreamRepairs(test *testing.T) {
+func TestOneDeclarationRepairsWhatUpstreamRepairs(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range oneVariableRepairCases {
+	for _, testCase := range oneDeclarationRepairCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
-				decodedOneVariable(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneDeclaration, oneDeclarationFile, testCase.source,
+				decodedOneDeclaration(test, testCase.options))
 			rule_testing.ExpectFixedSource(test, result, testCase.wanted)
 		})
 	}
 }
 
-// TestOneVariableDeclinesTheRepairsUpstreamDeclines asserts the absence of a fix.
+// TestOneDeclarationDeclinesTheRepairsUpstreamDeclines asserts the absence of a fix.
 //
 // Not "the output equals the input": `ExpectFixedSource` fatals when no fix was proposed, so
 // routing a decline through it would make the assertion agree with any expectation at all. The
 // decline withholds the repair, not the report, so the finding must still be there.
-func TestOneVariableDeclinesTheRepairsUpstreamDeclines(test *testing.T) {
+func TestOneDeclarationDeclinesTheRepairsUpstreamDeclines(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range oneVariableDeclineCases {
+	for _, testCase := range oneDeclarationDeclineCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
-				decodedOneVariable(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneDeclaration, oneDeclarationFile, testCase.source,
+				decodedOneDeclaration(test, testCase.options))
 			if len(result.Diagnostics) == 0 {
 				test.Fatalf("expected a finding; a decline withholds the FIX, not the report")
 			}

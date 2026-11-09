@@ -9,10 +9,10 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // `Decode` rather than `rule.DecodeOptionsInto`, because upstream's single schema element is a
 // union of a string enum and two object shapes, which no one Go struct decodes. See
-// `DecodeOneVariableOptions`.
+// `DecodeOneDeclarationOptions`.
 //
 // Deliberately not enabled in `CohereSettings.json`. See `one_var.md` and the entry in
 // `internal/lint/registry/live_wiring_test.go`.
 func init() {
-	rule.Register(rule.Registration[OneVariableSettings]{Rule: OneVariable, Decode: DecodeOneVariableOptions})
+	rule.Register(rule.Registration[OneDeclarationSettings]{Rule: OneDeclaration, Decode: DecodeOneDeclarationOptions})
 }

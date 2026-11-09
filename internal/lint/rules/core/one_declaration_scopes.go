@@ -1,27 +1,27 @@
 package core
 
-// oneVariableScopes carries the two stacks upstream maintains while walking.
-type oneVariableScopes struct {
-	functions []oneVariableStateFlags
-	blocks    []oneVariableBlockFrame
+// oneDeclarationScopes carries the two stacks upstream maintains while walking.
+type oneDeclarationScopes struct {
+	functions []oneDeclarationStateFlags
+	blocks    []oneDeclarationBlockFrame
 }
 
-func (scopes *oneVariableScopes) startBlock() {
-	scopes.blocks = append(scopes.blocks, oneVariableBlockFrame{})
+func (scopes *oneDeclarationScopes) startBlock() {
+	scopes.blocks = append(scopes.blocks, oneDeclarationBlockFrame{})
 }
 
-func (scopes *oneVariableScopes) endBlock() {
+func (scopes *oneDeclarationScopes) endBlock() {
 	if len(scopes.blocks) > 0 {
 		scopes.blocks = scopes.blocks[:len(scopes.blocks)-1]
 	}
 }
 
-func (scopes *oneVariableScopes) startFunction() {
-	scopes.functions = append(scopes.functions, oneVariableStateFlags{})
+func (scopes *oneDeclarationScopes) startFunction() {
+	scopes.functions = append(scopes.functions, oneDeclarationStateFlags{})
 	scopes.startBlock()
 }
 
-func (scopes *oneVariableScopes) endFunction() {
+func (scopes *oneDeclarationScopes) endFunction() {
 	if len(scopes.functions) > 0 {
 		scopes.functions = scopes.functions[:len(scopes.functions)-1]
 	}
@@ -34,8 +34,8 @@ func (scopes *oneVariableScopes) endFunction() {
 // recorded flags have to outlive the call. Returning a copy makes `recordTypes` write to nothing,
 // which reads as a rule that never remembers a previous declaration -- every `always` case would
 // then pass and only the corpus could tell. A mutant dropping the `var` arm is caught by 91 lines.
-func (scopes *oneVariableScopes) current(kind oneVariableKind) *oneVariableStateFlags {
-	if kind == oneVariableKindVariable {
+func (scopes *oneDeclarationScopes) current(kind oneDeclarationKind) *oneDeclarationStateFlags {
+	if kind == oneDeclarationKindVarKeyword {
 		if len(scopes.functions) == 0 {
 			return nil
 		}
@@ -46,13 +46,13 @@ func (scopes *oneVariableScopes) current(kind oneVariableKind) *oneVariableState
 	}
 	frame := &scopes.blocks[len(scopes.blocks)-1]
 	switch kind {
-	case oneVariableKindLet:
+	case oneDeclarationKindLet:
 		return &frame.Let
-	case oneVariableKindConst:
+	case oneDeclarationKindConst:
 		return &frame.Const
-	case oneVariableKindUsing:
+	case oneDeclarationKindUsing:
 		return &frame.Using
-	case oneVariableKindAwaitUsing:
+	case oneDeclarationKindAwaitUsing:
 		return &frame.AwaitUsing
 	}
 	return nil

@@ -9,20 +9,20 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// OneVariableMode is one of upstream's three settings for a declaration group.
+// OneDeclarationMode is one of upstream's three settings for a declaration group.
 //
 // PascalCase literals, per this repository's convention for string-literal unions. The wire
 // spellings upstream uses are lowercase and are mapped in the decoder, so the enum a reader sees at
 // a call site and the JSON a config carries stay separate concerns.
-type OneVariableMode string
+type OneDeclarationMode string
 
 const (
-	// OneVariableAlways requires one declaration statement per scope for the group.
-	OneVariableAlways OneVariableMode = "Always"
-	// OneVariableNever requires one declarator per statement.
-	OneVariableNever OneVariableMode = "Never"
-	// OneVariableConsecutive allows several statements but merges ones that are adjacent.
-	OneVariableConsecutive OneVariableMode = "Consecutive"
+	// OneDeclarationAlways requires one declaration statement per scope for the group.
+	OneDeclarationAlways OneDeclarationMode = "Always"
+	// OneDeclarationNever requires one declarator per statement.
+	OneDeclarationNever OneDeclarationMode = "Never"
+	// OneDeclarationConsecutive allows several statements but merges ones that are adjacent.
+	OneDeclarationConsecutive OneDeclarationMode = "Consecutive"
 )
 
 // is answers whether a half is set to a particular mode, treating absent as "no".
@@ -31,29 +31,29 @@ const (
 // be `undefined`, and `undefined === "always"` is false. Folding that into one method keeps the
 // three-way absent/equal/different logic in one place rather than at each of the fourteen sites
 // that ask.
-func modeIs(mode *OneVariableMode, wanted OneVariableMode) bool {
+func modeIs(mode *OneDeclarationMode, wanted OneDeclarationMode) bool {
 	return mode != nil && *mode == wanted
 }
 
-// OneVariableSettings is the decoded option surface.
+// OneDeclarationSettings is the decoded option surface.
 //
 // Five declaration kinds because upstream carries five: `var`, `let`, `const`, `using` and
 // `await using`. The last is spelled `awaitUsing` in the config, matching upstream's schema.
-type OneVariableSettings struct {
-	Variable   oneVariableGroup `json:"Var"`
-	Let        oneVariableGroup
-	Const      oneVariableGroup
-	Using      oneVariableGroup
-	AwaitUsing oneVariableGroup
+type OneDeclarationSettings struct {
+	VarKeyword oneDeclarationGroup `json:"Var"`
+	Let        oneDeclarationGroup
+	Const      oneDeclarationGroup
+	Using      oneDeclarationGroup
+	AwaitUsing oneDeclarationGroup
 
 	// SeparateRequires reproduces upstream's `!!mode.separateRequires`, which only has meaning
 	// alongside an `initialized: "always"` group.
 	SeparateRequires bool
 }
 
-// oneVariableObjectOptions is the wire shape of the object form.
+// oneDeclarationObjectOptions is the wire shape of the object form.
 //
-// Every field is a pointer for the same reason `oneVariableGroup`'s are: upstream distinguishes an
+// Every field is a pointer for the same reason `oneDeclarationGroup`'s are: upstream distinguishes an
 // absent key from a present one with `Object.hasOwn`, and the two take different paths. A plain
 // string field would decode an absent `initialized` to `""`, which matches no mode and reads as
 // "configured to something invalid" rather than as "not configured".
@@ -62,9 +62,9 @@ type OneVariableSettings struct {
 // they are disjoint by `additionalProperties: false` and a config carrying keys from both is
 // refused below. Decoding into one struct and then refusing the mixture keeps the refusal in a
 // place that can explain itself.
-type oneVariableObjectOptions struct {
+type oneDeclarationObjectOptions struct {
 	SeparateRequires *bool   `json:"separateRequires"`
-	Variable         *string `json:"var"`
+	VarKeyword       *string `json:"var"`
 	Let              *string `json:"let"`
 	Const            *string `json:"const"`
 	Using            *string `json:"using"`
@@ -73,38 +73,38 @@ type oneVariableObjectOptions struct {
 	Uninitialized    *string `json:"uninitialized"`
 }
 
-// oneVariableModeFromWire maps upstream's lowercase spelling onto the enum.
+// oneDeclarationModeFromWire maps upstream's lowercase spelling onto the enum.
 //
 // A value outside the three is an error rather than a silent fallback. Upstream gets that refusal
 // from `meta.schema`'s enum before the rule ever runs; there is no schema layer here, so a bad
 // value would otherwise decode to a mode matching nothing and produce a rule that registers, runs,
 // and enforces nothing. That is the inert-but-configured shape section 7c of the porting standard
 // exists to refuse.
-func oneVariableModeFromWire(wire string) (OneVariableMode, error) {
+func oneDeclarationModeFromWire(wire string) (OneDeclarationMode, error) {
 	switch wire {
 	case "always":
-		return OneVariableAlways, nil
+		return OneDeclarationAlways, nil
 	case "never":
-		return OneVariableNever, nil
+		return OneDeclarationNever, nil
 	case "consecutive":
-		return OneVariableConsecutive, nil
+		return OneDeclarationConsecutive, nil
 	}
 	return "", fmt.Errorf("one-var takes \"always\", \"never\" or \"consecutive\", got %q", wire)
 }
 
-// DefaultOneVariableSettings is what a bare `"error"` gets.
+// DefaultOneDeclarationSettings is what a bare `"error"` gets.
 //
 // Upstream's `defaultOptions: ["always"]`, which is the string form applied to all five kinds. A
 // rule configured without options is handed nil by the options registry, and returning the default
 // here rather than a zero value is what keeps such a rule from registering on every file while
 // enforcing nothing.
-func DefaultOneVariableSettings() OneVariableSettings {
-	always := OneVariableAlways
-	group := oneVariableGroup{Uninitialized: &always, Initialized: &always}
-	return OneVariableSettings{Variable: group, Let: group, Const: group, Using: group, AwaitUsing: group}
+func DefaultOneDeclarationSettings() OneDeclarationSettings {
+	always := OneDeclarationAlways
+	group := oneDeclarationGroup{Uninitialized: &always, Initialized: &always}
+	return OneDeclarationSettings{VarKeyword: group, Let: group, Const: group, Using: group, AwaitUsing: group}
 }
 
-// DecodeOneVariableOptions reads the string or object form off the config.
+// DecodeOneDeclarationOptions reads the string or object form off the config.
 //
 // Hand rolled rather than routed through `rule.DecodeOptionsInto` because the wire shape is a
 // union: upstream's single schema element is `oneOf` a string enum and two object shapes, and no
@@ -123,29 +123,29 @@ func DefaultOneVariableSettings() OneVariableSettings {
 // The object form's keys are optional and an absent one means "leave this kind unconfigured", which
 // upstream expresses as `undefined` flowing into `options[key]` and being caught by `if
 // (!options[key]) return;`. So absence survives as nil through the wire struct, through
-// `oneVariableGroup`, and into the comparisons. Collapsing any of the three to a zero value makes
+// `oneDeclarationGroup`, and into the comparisons. Collapsing any of the three to a zero value makes
 // `{ "var": "never" }` govern `let` and `const` too, and no fixture written from the string form
 // could see it.
-func DecodeOneVariableOptions(raw []byte) (OneVariableSettings, error) {
+func DecodeOneDeclarationOptions(raw []byte) (OneDeclarationSettings, error) {
 	if len(raw) == 0 {
-		return DefaultOneVariableSettings(), nil
+		return DefaultOneDeclarationSettings(), nil
 	}
 
 	// The string form first, because it is the common one and because a JSON string cannot also
 	// decode as an object, so trying it costs nothing and cannot misfire.
 	var wire string
 	if decodeError := json.Unmarshal(raw, &wire); decodeError == nil {
-		mode, modeError := oneVariableModeFromWire(wire)
+		mode, modeError := oneDeclarationModeFromWire(wire)
 		if modeError != nil {
-			return DefaultOneVariableSettings(), modeError
+			return DefaultOneDeclarationSettings(), modeError
 		}
-		group := oneVariableGroup{Uninitialized: &mode, Initialized: &mode}
-		return OneVariableSettings{Variable: group, Let: group, Const: group, Using: group, AwaitUsing: group}, nil
+		group := oneDeclarationGroup{Uninitialized: &mode, Initialized: &mode}
+		return OneDeclarationSettings{VarKeyword: group, Let: group, Const: group, Using: group, AwaitUsing: group}, nil
 	}
 
-	var object oneVariableObjectOptions
+	var object oneDeclarationObjectOptions
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
-		return DefaultOneVariableSettings(),
+		return DefaultOneDeclarationSettings(),
 			fmt.Errorf("one-var takes a string or an object, %q: %w", string(raw), unmarshalOptionsError)
 	}
 
@@ -153,29 +153,29 @@ func DecodeOneVariableOptions(raw []byte) (OneVariableSettings, error) {
 	// declaration kind and an initialization state is rejected by the schema before the rule runs.
 	// Reproduced as a refusal rather than by picking one arm, because either choice silently
 	// enforces something the author did not write.
-	namesKind := object.Variable != nil || object.Let != nil || object.Const != nil ||
+	namesKind := object.VarKeyword != nil || object.Let != nil || object.Const != nil ||
 		object.Using != nil || object.AwaitUsing != nil
 	namesState := object.Initialized != nil || object.Uninitialized != nil
 	if namesKind && namesState {
-		return DefaultOneVariableSettings(), fmt.Errorf(
+		return DefaultOneDeclarationSettings(), fmt.Errorf(
 			"one-var takes either declaration kinds (var/let/const/using/awaitUsing) or "+
 				"initialization states (initialized/uninitialized), not both: %q", string(raw))
 	}
 
-	settings := OneVariableSettings{}
+	settings := OneDeclarationSettings{}
 	if object.SeparateRequires != nil {
 		settings.SeparateRequires = *object.SeparateRequires
 	}
 
 	// Each named kind sets both halves of its group, which is upstream's
 	// `options.var = { uninitialized: mode.var, initialized: mode.var }`.
-	assignKind := func(wire *string, group *oneVariableGroup) error {
+	assignKind := func(wire *string, group *oneDeclarationGroup) error {
 		if wire == nil {
 			return nil
 		}
-		mode, oneVariableModeFromWireError := oneVariableModeFromWire(*wire)
-		if oneVariableModeFromWireError != nil {
-			return oneVariableModeFromWireError
+		mode, oneDeclarationModeFromWireError := oneDeclarationModeFromWire(*wire)
+		if oneDeclarationModeFromWireError != nil {
+			return oneDeclarationModeFromWireError
 		}
 		group.Uninitialized = &mode
 		group.Initialized = &mode
@@ -183,16 +183,16 @@ func DecodeOneVariableOptions(raw []byte) (OneVariableSettings, error) {
 	}
 	for _, pair := range []struct {
 		wire  *string
-		group *oneVariableGroup
+		group *oneDeclarationGroup
 	}{
-		{object.Variable, &settings.Variable},
+		{object.VarKeyword, &settings.VarKeyword},
 		{object.Let, &settings.Let},
 		{object.Const, &settings.Const},
 		{object.Using, &settings.Using},
 		{object.AwaitUsing, &settings.AwaitUsing},
 	} {
 		if assignKindError := assignKind(pair.wire, pair.group); assignKindError != nil {
-			return DefaultOneVariableSettings(), assignKindError
+			return DefaultOneDeclarationSettings(), assignKindError
 		}
 	}
 
@@ -200,22 +200,22 @@ func DecodeOneVariableOptions(raw []byte) (OneVariableSettings, error) {
 	// `Object.hasOwn` blocks. Note it overwrites rather than merges, matching the order upstream
 	// applies them in -- though the mixture is refused above, so the two never meet in practice.
 	if object.Uninitialized != nil {
-		mode, oneVariableModeFromWireError := oneVariableModeFromWire(*object.Uninitialized)
-		if oneVariableModeFromWireError != nil {
-			return DefaultOneVariableSettings(), oneVariableModeFromWireError
+		mode, oneDeclarationModeFromWireError := oneDeclarationModeFromWire(*object.Uninitialized)
+		if oneDeclarationModeFromWireError != nil {
+			return DefaultOneDeclarationSettings(), oneDeclarationModeFromWireError
 		}
-		settings.Variable.Uninitialized = &mode
+		settings.VarKeyword.Uninitialized = &mode
 		settings.Let.Uninitialized = &mode
 		settings.Const.Uninitialized = &mode
 		settings.Using.Uninitialized = &mode
 		settings.AwaitUsing.Uninitialized = &mode
 	}
 	if object.Initialized != nil {
-		mode, oneVariableModeFromWireError := oneVariableModeFromWire(*object.Initialized)
-		if oneVariableModeFromWireError != nil {
-			return DefaultOneVariableSettings(), oneVariableModeFromWireError
+		mode, oneDeclarationModeFromWireError := oneDeclarationModeFromWire(*object.Initialized)
+		if oneDeclarationModeFromWireError != nil {
+			return DefaultOneDeclarationSettings(), oneDeclarationModeFromWireError
 		}
-		settings.Variable.Initialized = &mode
+		settings.VarKeyword.Initialized = &mode
 		settings.Let.Initialized = &mode
 		settings.Const.Initialized = &mode
 		settings.Using.Initialized = &mode
@@ -225,7 +225,7 @@ func DecodeOneVariableOptions(raw []byte) (OneVariableSettings, error) {
 	return settings, nil
 }
 
-// oneVariableUpstreamSentence maps a message id to the sentence upstream renders for it.
+// oneDeclarationUpstreamSentence maps a message id to the sentence upstream renders for it.
 //
 // Upstream's seven messages are four distinct sentences plus three that differ only in the
 // interpolated type, and the four specific ones name the initialization state explicitly. Keeping
@@ -233,7 +233,7 @@ func DecodeOneVariableOptions(raw []byte) (OneVariableSettings, error) {
 // upstream's `meta.messages` by eye.
 //
 // `%s` is upstream's `{{type}}`, which is the declaration spelling.
-var oneVariableUpstreamSentence = map[string]string{
+var oneDeclarationUpstreamSentence = map[string]string{
 	"combineUninitialized": "Combine this with the previous '%s' statement with uninitialized variables.",
 	"combineInitialized":   "Combine this with the previous '%s' statement with initialized variables.",
 	"splitUninitialized":   "Split uninitialized '%s' declarations into multiple statements.",
@@ -243,14 +243,14 @@ var oneVariableUpstreamSentence = map[string]string{
 	"splitRequires":        "Split requires to be separated into a single block.",
 }
 
-// oneVariableRender builds the message a finding carries.
+// oneDeclarationRender builds the message a finding carries.
 //
 // The upstream sentence comes first and this tree's explanation follows it, so the text a reader
 // sees opens with exactly what ESLint says and the fixtures can assert that prefix.
 //
 // `splitRequires` interpolates nothing, which is why the table's value for it carries no verb.
-func oneVariableRender(message rule.Message, kind oneVariableKind) rule.Message {
-	template, found := oneVariableUpstreamSentence[message.Id]
+func oneDeclarationRender(message rule.Message, kind oneDeclarationKind) rule.Message {
+	template, found := oneDeclarationUpstreamSentence[message.Id]
 	if !found {
 		return message
 	}
@@ -261,49 +261,49 @@ func oneVariableRender(message rule.Message, kind oneVariableKind) rule.Message 
 	return rule.Message{Id: message.Id, Description: sentence + " " + message.Description}
 }
 
-var messageOneVariableCombineUninitialized = rule.Message{
+var messageOneDeclarationCombineUninitialized = rule.Message{
 	Id: "combineUninitialized",
 	Description: "This declares uninitialized variables in a second statement where the scope " +
 		"already has one. Reading the declarations of a scope means finding every statement that " +
 		"declares, and one list per scope makes that a single place to look.",
 }
 
-var messageOneVariableCombineInitialized = rule.Message{
+var messageOneDeclarationCombineInitialized = rule.Message{
 	Id: "combineInitialized",
 	Description: "This declares initialized variables in a second statement where the scope " +
 		"already has one. Reading the declarations of a scope means finding every statement that " +
 		"declares, and one list per scope makes that a single place to look.",
 }
 
-var messageOneVariableSplitUninitialized = rule.Message{
+var messageOneDeclarationSplitUninitialized = rule.Message{
 	Id: "splitUninitialized",
 	Description: "This declares several uninitialized variables in one statement. One binding per " +
 		"statement makes each declaration its own line to move, comment or delete, and keeps a " +
 		"diff that touches one variable from touching the others.",
 }
 
-var messageOneVariableSplitInitialized = rule.Message{
+var messageOneDeclarationSplitInitialized = rule.Message{
 	Id: "splitInitialized",
 	Description: "This declares several initialized variables in one statement. One binding per " +
 		"statement makes each declaration its own line to move, comment or delete, and keeps a " +
 		"diff that touches one variable from touching the others.",
 }
 
-var messageOneVariableSplitRequires = rule.Message{
+var messageOneDeclarationSplitRequires = rule.Message{
 	Id: "splitRequires",
 	Description: "This mixes require calls with other initializers in one declaration. Separating " +
 		"the requires keeps the module's dependencies readable as a block rather than interleaved " +
 		"with ordinary locals.",
 }
 
-var messageOneVariableCombine = rule.Message{
+var messageOneDeclarationCombine = rule.Message{
 	Id: "combine",
 	Description: "This declares variables in a second statement where the scope already has one. " +
 		"Reading the declarations of a scope means finding every statement that declares, and one " +
 		"list per scope makes that a single place to look.",
 }
 
-var messageOneVariableSplit = rule.Message{
+var messageOneDeclarationSplit = rule.Message{
 	Id: "split",
 	Description: "This declares several variables in one statement. One binding per statement " +
 		"makes each declaration its own line to move, comment or delete, and keeps a diff that " +
@@ -311,15 +311,15 @@ var messageOneVariableSplit = rule.Message{
 }
 
 const (
-	// oneVariableKindVariable is a declaration list the `var` keyword opens.
-	oneVariableKindVariable oneVariableKind = iota
-	oneVariableKindLet
-	oneVariableKindConst
-	oneVariableKindUsing
-	oneVariableKindAwaitUsing
+	// oneDeclarationKindVarKeyword is a declaration list the `var` keyword opens.
+	oneDeclarationKindVarKeyword oneDeclarationKind = iota
+	oneDeclarationKindLet
+	oneDeclarationKindConst
+	oneDeclarationKindUsing
+	oneDeclarationKindAwaitUsing
 )
 
-// oneVariableKindOf classifies a VariableDeclarationList by its flags.
+// oneDeclarationKindOf classifies a VariableDeclarationList by its flags.
 //
 // # The composite flag, which is the trap this function exists to avoid
 //
@@ -338,51 +338,51 @@ const (
 //
 // So the discriminator is both bits set together, tested before either alone. A mutant using the
 // composite mask is caught by 89 assertions.
-func oneVariableKindOf(list *ast.Node) oneVariableKind {
+func oneDeclarationKindOf(list *ast.Node) oneDeclarationKind {
 	flags := list.Flags
 	isConst := flags&ast.NodeFlagsConst != 0
 	isUsing := flags&ast.NodeFlagsUsing != 0
 	switch {
 	case isConst && isUsing:
-		return oneVariableKindAwaitUsing
+		return oneDeclarationKindAwaitUsing
 	case isUsing:
-		return oneVariableKindUsing
+		return oneDeclarationKindUsing
 	case isConst:
-		return oneVariableKindConst
+		return oneDeclarationKindConst
 	case flags&ast.NodeFlagsLet != 0:
-		return oneVariableKindLet
+		return oneDeclarationKindLet
 	}
-	return oneVariableKindVariable
+	return oneDeclarationKindVarKeyword
 }
 
-// oneVariableCounts is upstream's `countDeclarations` result.
-type oneVariableCounts struct {
+// oneDeclarationCounts is upstream's `countDeclarations` result.
+type oneDeclarationCounts struct {
 	Uninitialized int
 	Initialized   int
 }
 
-// oneVariableStateFlags is one scope's record of what it has already seen.
+// oneDeclarationStateFlags is one scope's record of what it has already seen.
 //
 // Upstream keeps `{ initialized, uninitialized }` on a function frame and the same pair per
 // declaration kind on a block frame, plus a `required` flag that only `separateRequires` sets.
-type oneVariableStateFlags struct {
+type oneDeclarationStateFlags struct {
 	Initialized   bool
 	Uninitialized bool
 	Required      bool
 }
 
-// oneVariableBlockFrame is upstream's `blockStack` entry.
+// oneDeclarationBlockFrame is upstream's `blockStack` entry.
 //
 // `var` is deliberately absent: it lives on the function frame, which is what makes a `var` in a
 // nested block collide with one in the enclosing function while a `let` does not.
-type oneVariableBlockFrame struct {
-	Let        oneVariableStateFlags
-	Const      oneVariableStateFlags
-	Using      oneVariableStateFlags
-	AwaitUsing oneVariableStateFlags
+type oneDeclarationBlockFrame struct {
+	Let        oneDeclarationStateFlags
+	Const      oneDeclarationStateFlags
+	Using      oneDeclarationStateFlags
+	AwaitUsing oneDeclarationStateFlags
 }
 
-// oneVariableIsFunctionScope answers which nodes upstream gives a `startFunction` listener.
+// oneDeclarationIsFunctionScope answers which nodes upstream gives a `startFunction` listener.
 //
 // Upstream registers Program, FunctionDeclaration, FunctionExpression, ArrowFunctionExpression and
 // StaticBlock. ESTree wraps every method, constructor and accessor body in a FunctionExpression, so
@@ -394,11 +394,11 @@ type oneVariableBlockFrame struct {
 // Omitting them puts a `var` inside a method on the enclosing frame, so two methods each declaring
 // `var x` report the second as a duplicate. The whole 296-case corpus is blind to that -- it writes
 // zero class methods, constructors, getters or setters -- which is why
-// `TestOneVariableStaysSilentOnTypeScriptShapesUpstreamCannotWrite` exists.
+// `TestOneDeclarationStaysSilentOnTypeScriptShapesUpstreamCannotWrite` exists.
 //
 // A namespace body is deliberately not here. Measured: two sibling namespaces each declaring a
 // `const` do report upstream, because a TSModuleBlock is not a function scope.
-func oneVariableIsFunctionScope(node *ast.Node) bool {
+func oneDeclarationIsFunctionScope(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindSourceFile,
 		ast.KindFunctionDeclaration,
@@ -414,7 +414,7 @@ func oneVariableIsFunctionScope(node *ast.Node) bool {
 	return false
 }
 
-// oneVariableIsBlockScope answers which nodes upstream gives a `startBlock` listener.
+// oneDeclarationIsBlockScope answers which nodes upstream gives a `startBlock` listener.
 //
 // Upstream's list is BlockStatement, ForStatement, ForInStatement, ForOfStatement and
 // SwitchStatement.
@@ -434,7 +434,7 @@ func oneVariableIsFunctionScope(node *ast.Node) bool {
 // Kept regardless, because it is upstream's stack depth rather than ours, and a divergence chosen
 // for being unobservable today is the kind that stops being unobservable quietly. Not kept as a
 // claim that any fixture discriminates it -- none does, and the sweep says so.
-func oneVariableIsBlockScope(node *ast.Node) bool {
+func oneDeclarationIsBlockScope(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindBlock:
 		if node.Parent != nil && node.Parent.Kind == ast.KindClassStaticBlockDeclaration {
@@ -448,7 +448,7 @@ func oneVariableIsBlockScope(node *ast.Node) bool {
 	return false
 }
 
-// oneVariableStatementOf returns the node that plays the part of ESTree's VariableDeclaration.
+// oneDeclarationStatementOf returns the node that plays the part of ESTree's VariableDeclaration.
 //
 // ESTree's VariableDeclaration is the statement and holds every declarator. Ours splits that into a
 // VariableStatement wrapping a VariableDeclarationList, except in a for-head where the list stands
@@ -457,14 +457,14 @@ func oneVariableIsBlockScope(node *ast.Node) bool {
 //
 // This is the node upstream reports on and the node it indexes within `parent.body`, so getting it
 // wrong moves every span and breaks every consecutive verdict at once.
-func oneVariableStatementOf(list *ast.Node) *ast.Node {
+func oneDeclarationStatementOf(list *ast.Node) *ast.Node {
 	if list.Parent != nil && list.Parent.Kind == ast.KindVariableStatement {
 		return list.Parent
 	}
 	return list
 }
 
-// oneVariableStatementList returns the siblings upstream's `parent.body` would hold, or nil.
+// oneDeclarationStatementList returns the siblings upstream's `parent.body` would hold, or nil.
 //
 // Upstream's consecutive check reads
 //
@@ -485,7 +485,7 @@ func oneVariableStatementOf(list *ast.Node) *ast.Node {
 // the port report where upstream is silent. The corpus writes three switch cases and none of them
 // is under `consecutive`, so nothing in it could see the divergence.
 //
-// `oneVariableIsInStatementList` does include the clause, and that is not an inconsistency: it answers
+// `oneDeclarationIsInStatementList` does include the clause, and that is not an inconsistency: it answers
 // upstream's `isInStatementList`, which tests `astUtils.STATEMENT_LIST_PARENTS` -- a set that names
 // SwitchCase explicitly. Two different questions, two different answers, one node.
 //
@@ -495,7 +495,7 @@ func oneVariableStatementOf(list *ast.Node) *ast.Node {
 // KindSourceFile panics instead of answering nil. A shared `case KindA, KindB:` arm reaching for one
 // accessor is exactly the shape that crashes, and the walk recovers per file rather than per rule,
 // so one such panic costs every rule its verdict on that file.
-func oneVariableStatementList(container *ast.Node) []*ast.Node {
+func oneDeclarationStatementList(container *ast.Node) []*ast.Node {
 	if container == nil {
 		return nil
 	}
@@ -510,7 +510,7 @@ func oneVariableStatementList(container *ast.Node) []*ast.Node {
 	return nil
 }
 
-// oneVariableIsInStatementList answers upstream's `isInStatementList`, which gates the split fixer.
+// oneDeclarationIsInStatementList answers upstream's `isInStatementList`, which gates the split fixer.
 //
 // Upstream tests whether the node's parent is one of Program, BlockStatement, StaticBlock or
 // SwitchCase, which is exactly "this statement is a member of a statement list". `if (foo) var x, y;`
@@ -522,8 +522,8 @@ func oneVariableStatementList(container *ast.Node) []*ast.Node {
 // an export modifier, sitting directly in the statement list -- so the statement node is already the
 // right thing to test and the branch collapses.
 //
-// The switch clauses are here, unlike in `oneVariableStatementList`. See that function's note.
-func oneVariableIsInStatementList(statement *ast.Node) bool {
+// The switch clauses are here, unlike in `oneDeclarationStatementList`. See that function's note.
+func oneDeclarationIsInStatementList(statement *ast.Node) bool {
 	if statement == nil || statement.Parent == nil {
 		return false
 	}
@@ -535,14 +535,14 @@ func oneVariableIsInStatementList(statement *ast.Node) bool {
 	return false
 }
 
-// oneVariableDeclarators returns the list's declarators.
-func oneVariableDeclarators(list *ast.Node) []*ast.Node {
+// oneDeclarationDeclarators returns the list's declarators.
+func oneDeclarationDeclarators(list *ast.Node) []*ast.Node {
 	return list.AsVariableDeclarationList().Declarations.Nodes
 }
 
-// oneVariableCountDeclarations is upstream's `countDeclarations`.
-func oneVariableCountDeclarations(declarators []*ast.Node) oneVariableCounts {
-	counts := oneVariableCounts{}
+// oneDeclarationCountDeclarations is upstream's `countDeclarations`.
+func oneDeclarationCountDeclarations(declarators []*ast.Node) oneDeclarationCounts {
+	counts := oneDeclarationCounts{}
 	for _, declarator := range declarators {
 		if declarator.AsVariableDeclaration().Initializer == nil {
 			counts.Uninitialized++
@@ -553,7 +553,7 @@ func oneVariableCountDeclarations(declarators []*ast.Node) oneVariableCounts {
 	return counts
 }
 
-// oneVariableIsRequire is upstream's `isRequire`.
+// oneDeclarationIsRequire is upstream's `isRequire`.
 //
 // Upstream reads `decl.init.callee.name === "require"`, which is a name test rather than a
 // resolution: a locally declared `function require()` satisfies it, and so does a shadowed one.
@@ -567,8 +567,8 @@ func oneVariableCountDeclarations(declarators []*ast.Node) oneVariableCounts {
 //
 // Every one of the corpus's ten `separateRequires` cases calls `require` and nothing else, so a
 // mutant answering true for every call survives all 296. See
-// `TestOneVariableRequireIsASpellingNotAResolution`.
-func oneVariableIsRequire(declarator *ast.Node) bool {
+// `TestOneDeclarationRequireIsASpellingNotAResolution`.
+func oneDeclarationIsRequire(declarator *ast.Node) bool {
 	initializer := declarator.AsVariableDeclaration().Initializer
 	if initializer == nil || initializer.Kind != ast.KindCallExpression {
 		return false
@@ -580,35 +580,35 @@ func oneVariableIsRequire(declarator *ast.Node) bool {
 	return callee.Text() == "require"
 }
 
-// oneVariableAnyRequire and oneVariableAllRequire are upstream's `.some(isRequire)` and `.every(isRequire)`.
+// oneDeclarationAnyRequire and oneDeclarationAllRequire are upstream's `.some(isRequire)` and `.every(isRequire)`.
 //
 // Note `every` on an empty slice is true in JavaScript, and Go's loop form gives the same answer,
 // so a list with no declarators is "all requires" in both. That only ever combines with `some`
 // being false, so the pair reads as "no requires" either way.
-func oneVariableAnyRequire(declarators []*ast.Node) bool {
+func oneDeclarationAnyRequire(declarators []*ast.Node) bool {
 	for _, declarator := range declarators {
-		if oneVariableIsRequire(declarator) {
+		if oneDeclarationIsRequire(declarator) {
 			return true
 		}
 	}
 	return false
 }
 
-func oneVariableAllRequire(declarators []*ast.Node) bool {
+func oneDeclarationAllRequire(declarators []*ast.Node) bool {
 	for _, declarator := range declarators {
-		if !oneVariableIsRequire(declarator) {
+		if !oneDeclarationIsRequire(declarator) {
 			return false
 		}
 	}
 	return true
 }
 
-// oneVariableIndexOf finds a statement among its siblings by node identity.
+// oneDeclarationIndexOf finds a statement among its siblings by node identity.
 //
 // Upstream uses `parent.body.indexOf(node)`, which is identity in JavaScript too. Position would
 // also work here and is the wrong instrument: two nodes can share a Pos when one is synthesized,
 // and identity is what upstream actually asks.
-func oneVariableIndexOf(siblings []*ast.Node, statement *ast.Node) int {
+func oneDeclarationIndexOf(siblings []*ast.Node, statement *ast.Node) int {
 	for index, sibling := range siblings {
 		if sibling == statement {
 			return index
@@ -617,12 +617,12 @@ func oneVariableIndexOf(siblings []*ast.Node, statement *ast.Node) int {
 	return -1
 }
 
-// oneVariableDeclarationListOfStatement returns the declaration list a statement holds, or nil.
+// oneDeclarationDeclarationListOfStatement returns the declaration list a statement holds, or nil.
 //
 // Upstream's test is `previousNode.type === "VariableDeclaration"`, which in ESTree is the
 // statement itself. Ours has to step through the VariableStatement to reach the list where the kind
 // flags live.
-func oneVariableDeclarationListOfStatement(statement *ast.Node) *ast.Node {
+func oneDeclarationDeclarationListOfStatement(statement *ast.Node) *ast.Node {
 	if statement == nil || statement.Kind != ast.KindVariableStatement {
 		return nil
 	}
@@ -635,7 +635,7 @@ func oneVariableDeclarationListOfStatement(statement *ast.Node) *ast.Node {
 	// null` upstream, while without this the port repaired it to `export const a = 1,  b = 2;` --
 	// which moves a binding into an export and changes the module's public surface. The corpus
 	// cannot reach it: its exported cases are all under "never".
-	if oneVariableIsExported(statement) {
+	if oneDeclarationIsExported(statement) {
 		return nil
 	}
 	list := statement.AsVariableStatement().DeclarationList
@@ -645,12 +645,12 @@ func oneVariableDeclarationListOfStatement(statement *ast.Node) *ast.Node {
 	return list
 }
 
-// oneVariableIsForStatementInitializer answers upstream's `parent.type !== "ForStatement" || parent.init !== node`.
+// oneDeclarationIsForStatementInitializer answers upstream's `parent.type !== "ForStatement" || parent.init !== node`.
 //
 // Only the classic three-part `for` head is excluded. A `for...in` or `for...of` head is a different
 // parent kind and is not excluded here, which is upstream's behaviour and is why the `always` arm
 // carries its own separate for-in/for-of guard.
-func oneVariableIsForStatementInitializer(list *ast.Node) bool {
+func oneDeclarationIsForStatementInitializer(list *ast.Node) bool {
 	parent := list.Parent
 	if parent == nil || parent.Kind != ast.KindForStatement {
 		return false
@@ -658,12 +658,12 @@ func oneVariableIsForStatementInitializer(list *ast.Node) bool {
 	return parent.AsForStatement().Initializer == list
 }
 
-// oneVariableIsForInOrOfLeft answers upstream's `node.parent.left === node && (ForIn || ForOf)`.
+// oneDeclarationIsForInOrOfLeft answers upstream's `node.parent.left === node && (ForIn || ForOf)`.
 //
 // This guard sits inside the `always`/uninitialized arm only, and it suppresses the report entirely
 // rather than just the fix. `for (var x in y) {}` declares an uninitialized binding that cannot be
 // merged with anything, so reporting it would be unactionable.
-func oneVariableIsForInOrOfLeft(list *ast.Node) bool {
+func oneDeclarationIsForInOrOfLeft(list *ast.Node) bool {
 	parent := list.Parent
 	if parent == nil {
 		return false
@@ -681,7 +681,7 @@ func oneVariableIsForInOrOfLeft(list *ast.Node) bool {
 	return false
 }
 
-// oneVariableIsExported answers whether a statement carries an `export` modifier.
+// oneDeclarationIsExported answers whether a statement carries an `export` modifier.
 //
 // ESTree wraps an exported declaration in an ExportNamedDeclaration and upstream tests
 // `declaration.parent.type`. Our parser has no wrapper: the modifier hangs off the statement, which
@@ -708,7 +708,7 @@ func oneVariableIsForInOrOfLeft(list *ast.Node) bool {
 // which is not valid syntax. The corpus cannot see any of it: every one of its seven exported cases
 // is under `never`, which reaches the split fixer and never the join. The split fixer very much
 // does repair an export, which is why the collapse is scoped to the join.
-func oneVariableIsExported(statement *ast.Node) bool {
+func oneDeclarationIsExported(statement *ast.Node) bool {
 	modifiers := statement.Modifiers()
 	if modifiers == nil {
 		return false
@@ -721,11 +721,11 @@ func oneVariableIsExported(statement *ast.Node) bool {
 	return false
 }
 
-// oneVariableIsAmbient answers whether a statement carries a `declare` modifier.
+// oneDeclarationIsAmbient answers whether a statement carries a `declare` modifier.
 //
-// Read off the statement for the same reason `oneVariableIsExported` is: our parser hangs the modifier
+// Read off the statement for the same reason `oneDeclarationIsExported` is: our parser hangs the modifier
 // there, beside `export`, rather than on the declaration list.
-func oneVariableIsAmbient(statement *ast.Node) bool {
+func oneDeclarationIsAmbient(statement *ast.Node) bool {
 	modifiers := statement.Modifiers()
 	if modifiers == nil {
 		return false
@@ -738,7 +738,7 @@ func oneVariableIsAmbient(statement *ast.Node) bool {
 	return false
 }
 
-// oneVariablePreviousTokenEnd scans back from a token start over trivia to the end of the token before it.
+// oneDeclarationPreviousTokenEnd scans back from a token start over trivia to the end of the token before it.
 //
 // Returns -1 when nothing but trivia lies between here and the floor, which means there is no
 // previous token to attach a comma to.
@@ -747,7 +747,7 @@ func oneVariableIsAmbient(statement *ast.Node) bool {
 // `//` comment runs to the end of its line, so a backward scan that stopped at the first
 // non-whitespace byte would stop on the comment's last character and treat it as a token. The loop
 // therefore walks whole lines and re-examines each one for a comment start.
-func oneVariablePreviousTokenEnd(text string, from int, floor int) int {
+func oneDeclarationPreviousTokenEnd(text string, from int, floor int) int {
 	position := from
 	for position > floor {
 		// Skip whitespace directly before the cursor.
@@ -793,8 +793,8 @@ func oneVariablePreviousTokenEnd(text string, from int, floor int) int {
 	return -1
 }
 
-// oneVariableNextTokenOrCommentStart returns where the next token or comment begins, or -1.
-func oneVariableNextTokenOrCommentStart(text string, from int) int {
+// oneDeclarationNextTokenOrCommentStart returns where the next token or comment begins, or -1.
+func oneDeclarationNextTokenOrCommentStart(text string, from int) int {
 	position := from
 	for position < len(text) {
 		switch text[position] {
@@ -807,8 +807,8 @@ func oneVariableNextTokenOrCommentStart(text string, from int) int {
 	return -1
 }
 
-// oneVariableCrossesLine answers whether a newline sits in a span.
-func oneVariableCrossesLine(text string, from int, to int) bool {
+// oneDeclarationCrossesLine answers whether a newline sits in a span.
+func oneDeclarationCrossesLine(text string, from int, to int) bool {
 	for position := from; position < to && position < len(text); position++ {
 		if text[position] == '\n' {
 			return true
@@ -817,19 +817,19 @@ func oneVariableCrossesLine(text string, from int, to int) bool {
 	return false
 }
 
-// oneVariableStartsComment answers whether a position begins a line or block comment.
-func oneVariableStartsComment(text string, position int) bool {
+// oneDeclarationStartsComment answers whether a position begins a line or block comment.
+func oneDeclarationStartsComment(text string, position int) bool {
 	return position+1 < len(text) && text[position] == '/' &&
 		(text[position+1] == '/' || text[position+1] == '*')
 }
 
-// oneVariableLastCommentRunStart walks the run of comments after a comma and returns where the token
+// oneDeclarationLastCommentRunStart walks the run of comments after a comma and returns where the token
 // following them begins.
 //
 // Upstream's loop advances `lastComment` while it is a Line or Block comment, so it lands on the
 // first non-comment token; the replacement then runs up to that token's start. Reproduced by
 // skipping whitespace and comments alternately.
-func oneVariableLastCommentRunStart(text string, from int) int {
+func oneDeclarationLastCommentRunStart(text string, from int) int {
 	position := from
 	for position < len(text) {
 		for position < len(text) && (text[position] == ' ' || text[position] == '\t' ||
@@ -855,7 +855,7 @@ func oneVariableLastCommentRunStart(text string, from int) int {
 	return position
 }
 
-// OneVariable enforces that variables are declared together or separately, per configuration.
+// OneDeclaration enforces that variables are declared together or separately, per configuration.
 //
 //	valid:   function foo() { var bar, baz; }
 //	valid:   var foo = 1, bar = 2;
@@ -882,39 +882,39 @@ func oneVariableLastCommentRunStart(text string, from int) int {
 //
 // ESTree's `VariableDeclaration` is the statement and holds the declarators. Ours splits it into a
 // `VariableStatement` wrapping a `VariableDeclarationList`, and in a for-head the list stands alone
-// with no statement above it. `oneVariableStatementOf` picks whichever plays the statement's part, and
+// with no statement above it. `oneDeclarationStatementOf` picks whichever plays the statement's part, and
 // getting it wrong moves every span and breaks every consecutive verdict at once.
 //
 // ESTree wraps an exported declaration in `ExportNamedDeclaration`, and that wrapper has no `body`
 // array, so upstream neither reports a consecutive finding on an export nor repairs a combine on
-// one. Ours has no wrapper at all. See `oneVariableIsExported`, which carries the measurement and the
+// one. Ours has no wrapper at all. See `oneDeclarationIsExported`, which carries the measurement and the
 // invalid source the port produced before the collapse was added.
 //
 // An ESTree `SwitchCase` keeps its statements in `.consequent`, not `.body`, so upstream's
 // consecutive arm never fires inside one. Ours calls that node a statement list, because it is one.
-// See the note above `oneVariableIsInStatementList`.
+// See the note above `oneDeclarationIsInStatementList`.
 //
 // ESTree wraps a method body in a `FunctionExpression`, so upstream's one listener covers methods,
 // constructors and accessors. Ours has no wrapper -- a method is `KindMethodDeclaration` -- so those
 // four kinds are named explicitly as function scopes.
 //
 // The fifth is inert and recorded anyway: our `ClassStaticBlockDeclaration` holds a `Block` where
-// upstream's `StaticBlock` is itself the statement list. See `oneVariableIsBlockScope`.
+// upstream's `StaticBlock` is itself the statement list. See `oneDeclarationIsBlockScope`.
 //
 // # `await using` is two flags, never the constant named for it
 //
 // `NodeFlagsAwaitUsing` is defined as `NodeFlagsConst | NodeFlagsUsing`, so a mask against it is
-// true for every plain `const`. See `oneVariableKindOf`, which tests both bits together instead and
+// true for every plain `const`. See `oneDeclarationKindOf`, which tests both bits together instead and
 // carries the measured flag table.
-var OneVariable = rule.Rule[OneVariableSettings]{
+var OneDeclaration = rule.Rule[OneDeclarationSettings]{
 	Name: "one-var",
-	Run: func(ruleContext rule.Context, options rule.Given[OneVariableSettings]) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[OneDeclarationSettings]) rule.Listeners {
 		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil, and `options.(T)` on nil yields
 			// the zero value -- every group unconfigured, so the rule would register on every file
 			// and enforce nothing. Upstream's `defaultOptions: ["always"]` is the answer.
-			settings = DefaultOneVariableSettings()
+			settings = DefaultOneDeclarationSettings()
 		}
 
 		return rule.Listeners{
@@ -922,15 +922,15 @@ var OneVariable = rule.Rule[OneVariableSettings]{
 				if ruleContext.SourceFile == nil {
 					return
 				}
-				checker := &oneVariableChecker{context: ruleContext, settings: settings}
+				checker := &oneDeclarationChecker{context: ruleContext, settings: settings}
 
 				var walk func(*ast.Node)
 				walk = func(current *ast.Node) {
 					if current == nil {
 						return
 					}
-					isFunction := oneVariableIsFunctionScope(current)
-					isBlock := !isFunction && oneVariableIsBlockScope(current)
+					isFunction := oneDeclarationIsFunctionScope(current)
+					isBlock := !isFunction && oneDeclarationIsBlockScope(current)
 					if isFunction {
 						checker.scopes.startFunction()
 					} else if isBlock {
