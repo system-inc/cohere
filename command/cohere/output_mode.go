@@ -152,7 +152,8 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	// The phase line's sentence points at notes only --verbose prints, so the footer says the gap itself:
 	// each path that finds one sets Gaps with its count. A gap nothing counted still shows, saying where
 	// to look, so no run falls short in silence.
-	if report.incompleteBeyondPhases != "" && summary.Gaps.Unread == "" && summary.Gaps.CrashedFiles == 0 {
+	if report.incompleteBeyondPhases != "" && summary.Gaps.Unread == "" && summary.Gaps.CrashedFiles == 0 &&
+		len(summary.Gaps.NotWritten) == 0 {
 		summary.Gaps.Unread = "the run fell short of checking everything; --verbose says where"
 	}
 	if report.filesInScope > 0 && report.filesInScope < report.filesInProgram {
