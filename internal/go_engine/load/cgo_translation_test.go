@@ -179,7 +179,7 @@ func TestATranslatedDependencyWithholdsNothing(test *testing.T) {
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
-	listed, listError := list(directory, environment, []string{"./..."}, nil)
+	listed, listError := list(directory, environment, []string{"./..."}, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

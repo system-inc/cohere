@@ -18,6 +18,8 @@ import (
 
 	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // loader parses and type-checks a graph from source, every package once its imports are, as many at once as
@@ -57,6 +59,10 @@ type loader struct {
 	// filesParsed counts the files parsed, and fromExportData the packages whose types were read from export data.
 	filesParsed    atomic.Int64
 	fromExportData atomic.Int64
+
+	// timing is the run's collector under `--timing`, which each file's read and parse, each type check and each read
+	// of export data is added to, measured on the goroutine that does it. Nil measures nothing.
+	timing *timing.Collector
 }
 
 // parsedFile is one file's parse, ready once done is closed. reserved is closed once the package that claimed the file
@@ -251,13 +257,18 @@ func (loader *loader) readExportData(current *node, restored *Restored) error {
 		}
 	}
 	collect(loaded)
-	exportData, exportError := restored.ReadExportData()
-	if exportError != nil {
-		return fmt.Errorf("reading the export data of %s: %w", loaded.ID, exportError)
-	}
 	own := types.NewPackage(loaded.PkgPath, loaded.Name)
 	imports[loaded.PkgPath] = own
-	read, readError := gcexportdata.Read(bytes.NewReader(exportData), loader.fileSet, imports, loaded.PkgPath)
+	var read *types.Package
+	var readError error
+	exportDataCpu := loader.timing.Measure(func() {
+		exportData, exportError := restored.ReadExportData()
+		if exportError != nil {
+			readError = exportError
+			return
+		}
+		read, readError = gcexportdata.Read(bytes.NewReader(exportData), loader.fileSet, imports, loaded.PkgPath)
+	})
 	if readError != nil {
 		return fmt.Errorf("reading the export data of %s: %w", loaded.ID, readError)
 	}
@@ -273,6 +284,9 @@ func (loader *loader) readExportData(current *node, restored *Restored) error {
 	read.SetImports(ownImports)
 	loaded.Types = read
 	loader.fromExportData.Add(1)
+	// Added only once the types are set, so a package whose export data did not read is counted with those checked
+	// from source, and its read's CPU is no row's.
+	loader.timing.ExportData(exportDataCpu)
 	return nil
 }
 
@@ -316,7 +330,10 @@ func (loader *loader) parseClaimed(taken *claim) ([]*ast.File, []error) {
 		reads.Go(func() {
 			loader.slots <- struct{}{}
 			defer func() { <-loader.slots }()
-			contents[index], readErrors[index] = loader.readFile(file)
+			// The file is counted here, once, as filesParsed counts it, and its parse below adds CPU alone.
+			loader.timing.Parse(loader.timing.Measure(func() {
+				contents[index], readErrors[index] = loader.readFile(file)
+			}), 1)
 		})
 	}
 	reads.Wait()
@@ -347,7 +364,13 @@ func (loader *loader) parseClaimed(taken *claim) ([]*ast.File, []error) {
 			defer close(parse.done)
 			loader.slots <- struct{}{}
 			defer func() { <-loader.slots }()
-			parse.file, parse.parseError = loader.parseInto(taken.files[index], contents[index], placeholders[index])
+			loader.timing.Parse(loader.timing.Measure(func() {
+				parse.file, parse.parseError = loader.parseInto(
+					taken.files[index],
+					contents[index],
+					placeholders[index],
+				)
+			}), 0)
 		}()
 	}
 	var syntax []*ast.File
@@ -452,7 +475,10 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 	if current.listed.Module != nil && current.listed.Module.GoVersion != "" {
 		configuration.GoVersion = "go" + current.listed.Module.GoVersion
 	}
-	checkError := types.NewChecker(configuration, loader.fileSet, loaded.Types, loaded.TypesInfo).Files(syntax)
+	var checkError error
+	loader.timing.TypeCheck(loader.timing.Measure(func() {
+		checkError = types.NewChecker(configuration, loader.fileSet, loaded.Types, loaded.TypesInfo).Files(syntax)
+	}))
 	if len(judged) > 0 {
 		reach := newCgoReach(loader.fileSet, loaded, current.listed)
 		for _, typeError := range judged {
@@ -552,13 +578,14 @@ func newTypesInfo() *types.Info {
 }
 
 // newLoader is a loader for graph, with one slot per core, parsing each file in overlay from its bytes there and each
-// other file held holds from its held bytes.
+// other file held holds from its held bytes, and adding what it measures to collector.
 func newLoader(
 	built *graph,
 	sizes types.Sizes,
 	withheld *withheldErrors,
 	overlay map[string][]byte,
 	held Held,
+	collector *timing.Collector,
 ) *loader {
 	return &loader{
 		graph:         built,
@@ -571,5 +598,6 @@ func newLoader(
 		held:          held,
 		analyzed:      map[*packages.Package]bool{},
 		testFunctions: map[*packages.Package][]Diagnostic{},
+		timing:        collector,
 	}
 }

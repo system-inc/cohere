@@ -134,7 +134,7 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 		}
 		session = engine.cacheSession(environment, hostFiles)
 	}
-	caching := load.Caching{Held: engine.held}
+	caching := load.Caching{Held: engine.held, Timing: engine.timing}
 	if session != nil {
 		caching.Restorer = session
 		if session.HasStore() {

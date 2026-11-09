@@ -18,6 +18,8 @@ import (
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // goState is what the lister asks the go command: the build list, the build context go list reads files under, and
@@ -45,8 +47,9 @@ const contextTemplate = "{{context.GOOS}}\n{{context.GOARCH}}\n{{context.Compile
 	"{{join context.ReleaseTags \",\"}}"
 
 // readGoState runs the three go commands the lister needs, at once, in workspace under environment, and reads what
-// they print, or says why it cannot list from them.
-func readGoState(workspace string, environment []string) (goState, string) {
+// they print, or says why it cannot list from them. What the commands spend, and what starting them and reading their
+// answers costs this process, is added to collector.
+func readGoState(workspace string, environment []string, collector *timing.Collector) (goState, string) {
 	commands := [][]string{
 		{"list", "-m", "-json", "all"},
 		{"list", "-e", "-f", contextTemplate, "unsafe"},
@@ -54,11 +57,19 @@ func readGoState(workspace string, environment []string) (goState, string) {
 	}
 	outputs := make([][]byte, len(commands))
 	failures := make([]error, len(commands))
-	var group sync.WaitGroup
-	for index, arguments := range commands {
-		group.Go(func() { outputs[index], failures[index] = goOutput(workspace, environment, arguments) })
-	}
-	group.Wait()
+	// The three run at once, so their children's CPU is read once around all three, which a read around each would
+	// count up to three times.
+	measureGoCommands(collector, func() {
+		var group sync.WaitGroup
+		for index, arguments := range commands {
+			group.Go(func() {
+				measureListing(collector, func() {
+					outputs[index], failures[index] = goOutput(workspace, environment, arguments)
+				})
+			})
+		}
+		group.Wait()
+	})
 	for index, failure := range failures {
 		if failure != nil {
 			return goState{}, fmt.Sprintf("go %s: %v", strings.Join(commands[index], " "), failure)
