@@ -334,6 +334,63 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 	}
 }
 
+// A dispatcher that runs past a listener's failed requirement on a package and then fails there on its own, as a real
+// one does when what its walk reads fails or its run panics outside every listener, is the cause each rule on it
+// names: the rule beside names the dispatcher's failure alone, and the rule whose listener required what failed names
+// that failure beside the dispatcher's. A crash sentence that traced the dispatcher's failure on past it would name the
+// requirement as the cause of every rule on the dispatcher, though only one of them reads it. The stand-in fails only
+// where it ran past a failure, so its failure on base also shows that it ran there.
+func TestADispatcherFailingAfterRunningPastAFailureIsTheCauseItsRulesName(test *testing.T) {
+	test.Parallel()
+
+	// standIn is a dispatcher to check.Run, which knows one by its analyzer's result type (see dispatch.IsDispatcher),
+	// so the checker runs it past failsOnBase on base, where it then fails.
+	standIn := &analysis.Analyzer{
+		Name:             "stand_in_dispatcher",
+		Doc:              "runs past fails_on_base and then fails wherever it ran past a failure",
+		Requires:         []*analysis.Analyzer{failsOnBase},
+		RunDespiteErrors: true,
+		ResultType:       reflect.TypeFor[dispatch.Result](),
+		Run: func(pass *analysis.Pass) (any, error) {
+			if failed, _ := pass.ResultOf[rule.Failed].(map[*analysis.Analyzer]error); len(failed) > 0 {
+				return nil, fmt.Errorf("planted failure of the dispatcher itself on %s", pass.Pkg.Path())
+			}
+			return dispatch.Result{}, nil
+		},
+	}
+	if !dispatch.IsDispatcher(standIn) {
+		test.Fatalf("%s is no dispatcher to dispatch.IsDispatcher, so the checker would never run it past a failure",
+			standIn.Name)
+	}
+	// onTheStandIn is a rule requiring the stand-in and also requires, as a rule analyzer requires its listener's
+	// Requires, reporting nothing.
+	onTheStandIn := func(name string, requires ...*analysis.Analyzer) rule.Rule {
+		return houseRule(&analysis.Analyzer{
+			Name:     name,
+			Doc:      "requires the stand-in dispatcher and reports nothing",
+			Requires: append([]*analysis.Analyzer{standIn}, requires...),
+			Run:      func(*analysis.Pass) (any, error) { return nil, nil },
+		})
+	}
+	requiring := onTheStandIn("requires_the_failing", failsOnBase)
+	beside := onTheStandIn("beside_the_failing")
+
+	root := loadedFixtures(test)
+	result := runRules(test, Options{}, requiring, beside)
+	const base = "example.com/fixture/base"
+	dispatcherFailure := "stand_in_dispatcher@" + base + ": planted failure of the dispatcher itself on " + base
+	requirementFailure := "fails_on_base@" + base + ": planted failure on " + base
+	want := []Crash{
+		{File: fixturePath(root, "base/base.go"), Error: beside.Name + ": failed prerequisites: stand_in_dispatcher@" +
+			base + ", because " + dispatcherFailure},
+		{File: fixturePath(root, "base/base.go"), Error: requiring.Name + ": failed prerequisites: fails_on_base@" +
+			base + ", stand_in_dispatcher@" + base + ", because " + requirementFailure + "; " + dispatcherFailure},
+	}
+	if !reflect.DeepEqual(result.Crashes, want) {
+		test.Errorf("the run crashed\n%+v\nwhere exactly\n%+v\nwas expected", result.Crashes, want)
+	}
+}
+
 // plantedRuns is an analyzer that learns facts, so the checker runs it on every package below one it runs on, and
 // counts its runs by package path, standing in for staticcheck's purity, which only the listeners of SA4017 and its
 // kin require.

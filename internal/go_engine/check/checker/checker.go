@@ -124,6 +124,9 @@
 // under Failed what failed and how, so a dispatcher starts every listener
 // but those whose own requirements failed. A failed vertical prerequisite
 // still fails it, and every other action fails as upstream's does.
+// Action.RanPast says which failures an action ran past, so a caller
+// tracing a failure to its cause stops at an error the action ended with
+// on its own, rather than naming what it ran past.
 //
 // The ninth is Options.ForDependents. A dispatcher requires every one
 // of its listeners' Requires, and every listener is registered whether
@@ -604,7 +607,7 @@ func (act *Action) execOnce() {
 	for _, dep := range act.Deps {
 		if dep.Err != nil {
 			// cohere: a tolerant action runs past a failed horizontal edge.
-			if act.tolerant() && dep.Package == act.Package {
+			if act.RanPast(dep) {
 				if tolerated == nil {
 					tolerated = make(map[*analysis.Analyzer]error)
 				}
@@ -848,6 +851,14 @@ func requiredByAny(acts []*Action, dep *Action) bool {
 // are both set, so it is always told what it ran past.
 func (act *Action) tolerant() bool {
 	return act.opts.Failed != nil && act.opts.Tolerant != nil && act.opts.Tolerant(act.Analyzer)
+}
+
+// cohere: RanPast is whether act runs past dep, a failed prerequisite on
+// its own package, as a tolerant action does. dep's failure is then no part
+// of act's error: act ran without dep's input, and an error it ends with is
+// its own, which a caller tracing a failure to its cause stops at.
+func (act *Action) RanPast(dep *Action) bool {
+	return dep.Err != nil && act.tolerant() && dep.Package == act.Package
 }
 
 // inheritFacts populates act.facts with
