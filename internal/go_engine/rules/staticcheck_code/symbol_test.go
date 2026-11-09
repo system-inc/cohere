@@ -31,11 +31,25 @@ var symbolNames = []string{
 	"symbols.table", "symbols.lists", "symbols.limit", "math.Pi", "os.Args",
 	"symbols.identity", "symbols.both",
 	"local", "record", "symbols.parameter", "symbols.field", "missing",
+	// Names a step from a symbol's, each failing one of the comparisons the port makes in place of building the name:
+	// a method named as a function, a receiver without its parentheses or its dot, the wrong receiver, and a package
+	// path or a name a letter off or a letter short.
+	"symbols.method", "symbols.pointerMethod", "(symbols.record).pointerMethod", "(sync.WaitGroup).Add",
+	"*sync.WaitGroup).Add", "(*sync.WaitGroup)Add", "(*sync.WaitGroup).Ad", "symbolz.local", "symbols.loca",
+	"symbols/local", "fmt.Print", "Println", "strings.Repeatx", "math.P", "mathx.Pi", "os.Arg", "symbols.limits",
+	"symbols_table", "symbols.List", "symbols.List[int]", "symbols.List[T any", "symbols.Lis[T any]", "symbols.recor",
+	"symbols.records", "symbol.record", "sync.WaitGroups", "(symbols.record)", "integer", "in", "Pointer",
+	"unsafe.Pointer", "unsafe.Pointe", "string", "rune", "int32",
+	// A generic alias and an alias of one of its instances, asked by their printed forms and by those a step off: the
+	// alias's name without its brackets, with an instance's in place of its parameters, or with them cut short.
+	"symbols.genericAlias", "symbols.genericAlias[T any]", "symbols.genericAlias[int]", "symbols.genericAlias[T any",
+	"symbols.genericAlia[T any]", "symbols.integers", "symbols.integers[int]",
 }
 
-// symbolComparison is what one package's side by side run of IsSymbol found.
+// symbolComparison is what one package's side by side run of IsSymbol and SymbolIndex found.
 type symbolComparison struct {
-	// questions counts the expressions asked, each about every name of symbolNames.
+	// questions counts the expressions asked, each about every name of symbolNames, and of SymbolIndex about all of
+	// them at once.
 	questions int
 	// mismatches describes each question whose two answers differed.
 	mismatches []string
@@ -53,7 +67,8 @@ var symbolAnalyzer = &analysis.Analyzer{
 	ResultType: reflect.TypeFor[*symbolComparison](),
 }
 
-// Both sides answer alike for every expression of the symbols fixture about each name of symbolNames.
+// Both sides answer alike for every expression of the symbols fixture about each name of symbolNames, and SymbolIndex
+// asked about all of them names the first that staticcheck matches, as an Or of them would.
 // staticcheck's side is its pattern package matching a parsed `(Symbol "name")` through code.Match, as every pattern
 // that names a symbol asks it of a call's function or an operand. The test fails unless every branch of Symbol was
 // met finding a symbol and finding none, so a fixture that stops holding one cannot pass by asking nothing of it.
@@ -123,8 +138,14 @@ func compareSymbol(pass *analysis.Pass) (any, error) {
 			}
 			kind := reflect.TypeOf(expression).Elem().Name()
 			objectKind := resolvedKind(pass, expression)
-			for _, name := range symbolNames {
+			// The index of the first name staticcheck matches, or -1 when it matches none, which an Or of every name
+			// matches and SymbolIndex must name.
+			firstMatched := -1
+			for index, name := range symbolNames {
 				_, upstream := code.Match(pass, patterns[name], expression)
+				if upstream && firstMatched < 0 {
+					firstMatched = index
+				}
 				port := staticcheck_code.IsSymbol(context, expression, name)
 				compared.questions++
 				if upstream != port {
@@ -135,6 +156,14 @@ func compareSymbol(pass *analysis.Pass) (any, error) {
 				compared.met[fmt.Sprintf("%s, %t", kind, upstream)]++
 				compared.met[fmt.Sprintf("%s, %t", objectKind, upstream)]++
 			}
+			indexed := staticcheck_code.SymbolIndex(context, expression, symbolNames...)
+			compared.questions++
+			if indexed != firstMatched {
+				compared.mismatches = append(compared.mismatches, fmt.Sprintf(
+					"%s about every name at %s: staticcheck matched first index %d, SymbolIndex answered %d",
+					kind, pass.Fset.Position(expression.Pos()), firstMatched, indexed))
+			}
+			compared.met[fmt.Sprintf("SymbolIndex, %t", firstMatched >= 0)]++
 			return true
 		})
 	}
@@ -168,12 +197,13 @@ func resolvedKind(pass *analysis.Pass, expression ast.Expr) string {
 }
 
 // requiredSymbolLabels are what the fixture must meet for the comparison to prove each branch: each expression kind
-// Symbol reads through, and each kind of object it names, finding a symbol and finding none.
+// Symbol reads through, each kind of object it names, and SymbolIndex, finding a symbol and finding none.
 func requiredSymbolLabels() []string {
 	return []string{
 		"Ident, true", "Ident, false", "SelectorExpr, true", "SelectorExpr, false", "ParenExpr, true",
 		"ParenExpr, false", "IndexExpr, true", "IndexExpr, false", "IndexListExpr, true", "IndexListExpr, false",
 		"Func, true", "Func, false", "Builtin, true", "Builtin, false", "TypeName, true", "TypeName, false",
 		"alias, true", "alias, false", "Var, true", "Var, false", "Const, true", "Const, false",
+		"SymbolIndex, true", "SymbolIndex, false",
 	}
 }

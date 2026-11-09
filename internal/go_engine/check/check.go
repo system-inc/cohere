@@ -404,7 +404,9 @@ func crashSentence(enabled rule.Rule, action *checker.Action) string {
 }
 
 // originatingFailures is every action below action that failed on its own, with everything it required
-// finished, rather than because a prerequisite failed.
+// finished, rather than because a prerequisite failed. When an action ran past a failed prerequisite (see
+// checker.Action.RanPast), as a dispatcher runs past a listener's failed requirement, and failed all the same, the
+// failure is its own: the walk stops there and never names what it ran past as the cause.
 func originatingFailures(action *checker.Action) []*checker.Action {
 	seen := map[*checker.Action]bool{}
 	var found []*checker.Action
@@ -416,7 +418,7 @@ func originatingFailures(action *checker.Action) []*checker.Action {
 		seen[below] = true
 		prerequisiteFailed := false
 		for _, dependency := range below.Deps {
-			if dependency.Err != nil {
+			if dependency.Err != nil && !below.RanPast(dependency) {
 				prerequisiteFailed = true
 				visit(dependency)
 			}

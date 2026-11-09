@@ -500,30 +500,7 @@ func TestDominanceAgreesWithSetIntersection(test *testing.T) {
 	const graphs = 4000
 	behind := 0
 	for graph := 0; graph < graphs; graph++ {
-		function := newTestFunction()
-		count := 1 + random.Intn(12)
-		blocks := make([]*testBlock, 0, count)
-		for index := 0; index < count; index++ {
-			blocks = append(blocks, function.block())
-		}
-		function.entry = blocks[0].id
-		target := func() ssa.BlockId {
-			if random.Intn(25) == 0 {
-				return ssa.BlockId(int(function.next) + 3)
-			}
-			return blocks[random.Intn(len(blocks))].id
-		}
-		for _, block := range blocks {
-			if random.Intn(4) == 0 {
-				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Fallthrough})
-			}
-			for edges := random.Intn(3); edges > 0; edges-- {
-				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Real})
-			}
-			if random.Intn(10) == 0 {
-				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Exceptional})
-			}
-		}
+		function := generatedFunction(random)
 		finalize(function)
 
 		want := setIntersectionDominators(function)
@@ -544,6 +521,36 @@ func TestDominanceAgreesWithSetIntersection(test *testing.T) {
 		test.Fatalf("none of the %d graphs puts a reached block ahead of all its real predecessors", graphs)
 	}
 	test.Logf("%d graphs, %d of them with a reached block ahead of all its real predecessors", graphs, behind)
+}
+
+// generatedFunction is a random function of one to twelve blocks, with fallthroughs, exceptional edges,
+// self loops and edges to blocks that aren't there, not yet finalized.
+func generatedFunction(random *rand.Rand) *testFunction {
+	function := newTestFunction()
+	count := 1 + random.Intn(12)
+	blocks := make([]*testBlock, 0, count)
+	for index := 0; index < count; index++ {
+		blocks = append(blocks, function.block())
+	}
+	function.entry = blocks[0].id
+	target := func() ssa.BlockId {
+		if random.Intn(25) == 0 {
+			return ssa.BlockId(int(function.next) + 3)
+		}
+		return blocks[random.Intn(len(blocks))].id
+	}
+	for _, block := range blocks {
+		if random.Intn(4) == 0 {
+			block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Fallthrough})
+		}
+		for edges := random.Intn(3); edges > 0; edges-- {
+			block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Real})
+		}
+		if random.Intn(10) == 0 {
+			block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Exceptional})
+		}
+	}
+	return function
 }
 
 // reachedBlocks is the blocks the entry reaches by real edges.
@@ -692,5 +699,407 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 		blockB.id,
 	); !strings.Contains(refusal, want) {
 		test.Fatalf("Construct gives %q, want a refusal naming %q", refusal, want)
+	}
+}
+
+// blockIds is the blocks' ids, in order, for comparing with what Dominance answers.
+func blockIds(blocks ...*testBlock) []ssa.BlockId {
+	var ids []ssa.BlockId
+	for _, block := range blocks {
+		ids = append(ids, block.id)
+	}
+	return ids
+}
+
+// expectTree checks the tree ComputeDominance makes: each listed parent's children, every block's
+// immediate dominator against those lists, and the preorder walk. A block no list names as a child has
+// no immediate dominator.
+func expectTree(
+	test *testing.T,
+	function *testFunction,
+	children map[*testBlock][]*testBlock,
+	preorder []*testBlock,
+) *ssa.Dominance {
+	test.Helper()
+	dominance := ssa.ComputeDominance(testGraph{}, function)
+	parent := map[ssa.BlockId]ssa.BlockId{}
+	for block, want := range children {
+		if got := dominance.Children(block.id); !slices.Equal(got, blockIds(want...)) {
+			test.Errorf("bb%d's children are %v, want %v", block.id, got, blockIds(want...))
+		}
+		for _, child := range want {
+			parent[child.id] = block.id
+		}
+	}
+	for _, block := range function.blocks {
+		if _, listed := children[block]; !listed && len(dominance.Children(block.id)) != 0 {
+			test.Errorf("bb%d has children %v, want none", block.id, dominance.Children(block.id))
+		}
+		want, hasParent := parent[block.id]
+		if got, ok := dominance.ImmediateDominator(block.id); ok != hasParent || got != want {
+			test.Errorf("bb%d's immediate dominator is bb%d (%t), want bb%d (%t)", block.id, got, ok, want, hasParent)
+		}
+	}
+	if got := dominance.Preorder(); !slices.Equal(got, blockIds(preorder...)) {
+		test.Errorf("the preorder is %v, want %v", got, blockIds(preorder...))
+	}
+	return dominance
+}
+
+// TestTreeOfADiamondOrdersTheJoinBeforeTheSecondArm: the entry dominates both arms and the join, and
+// its children are in the order go/ir's search first reaches them: the left arm, the join through it,
+// then the right arm. Neither creation order (left, right, join) nor reverse postorder (right, left,
+// join) is that order.
+func TestTreeOfADiamondOrdersTheJoinBeforeTheSecondArm(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, left, right, join := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, left, right)
+	goTo(left, join)
+	goTo(right, join)
+	finalize(function)
+
+	expectTree(test, function, map[*testBlock][]*testBlock{entry: {left, join, right}},
+		[]*testBlock{entry, left, join, right})
+}
+
+// TestTreeOfALoopHangsTheBodyAndExitFromTheHeader: the back edge from the body changes no immediate
+// dominator, so the header is the entry's one child, and the body and exit are the header's, in the
+// order its terminal names them.
+func TestTreeOfALoopHangsTheBodyAndExitFromTheHeader(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, header, body, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, header)
+	goTo(header, body, exit)
+	goTo(body, header)
+	finalize(function)
+
+	expectTree(test, function, map[*testBlock][]*testBlock{entry: {header}, header: {body, exit}},
+		[]*testBlock{entry, header, body, exit})
+}
+
+// TestTreeOfANestedLoopFollowsTheOuterHeadersEdges: the outer header names its exit before the inner
+// loop, so go/ir's search reaches the exit first and it is the outer header's first child, ahead of the
+// inner header made before it. The inner loop's body and latch hang from the inner header.
+func TestTreeOfANestedLoopFollowsTheOuterHeadersEdges(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, outer, inner := function.block(), function.block(), function.block()
+	body, latch, exit := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, outer)
+	goTo(outer, exit, inner)
+	goTo(inner, body, latch)
+	goTo(body, inner)
+	goTo(latch, outer)
+	finalize(function)
+
+	expectTree(test, function,
+		map[*testBlock][]*testBlock{entry: {outer}, outer: {exit, inner}, inner: {body, latch}},
+		[]*testBlock{entry, outer, exit, inner, body, latch})
+}
+
+// TestTreeLeavesOutABlockTheRealEdgesDontReach: a fallthrough's placeholder stays in the slice with no
+// real edge into it, so it has no immediate dominator, no children, and no place in the walk, and the
+// entry's one child is the body. A block the function doesn't hold answers the same.
+func TestTreeLeavesOutABlockTheRealEdgesDontReach(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, body, continuation := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	entry.edges = []testEdge{{to: continuation.id, kind: ssa.Fallthrough}, {to: body.id, kind: ssa.Real}}
+	body.returns = true
+	finalize(function)
+	if !slices.Contains(blockIds(function.blocks...), continuation.id) {
+		test.Fatalf("the block order is %v; the test needs the placeholder in it", blockIds(function.blocks...))
+	}
+
+	dominance := expectTree(test, function, map[*testBlock][]*testBlock{entry: {body}}, []*testBlock{entry, body})
+	missing := ssa.BlockId(function.next + 7)
+	if _, ok := dominance.ImmediateDominator(missing); ok || dominance.Children(missing) != nil {
+		test.Errorf("a block the function doesn't hold has a place in the tree")
+	}
+}
+
+// TestTreePreorderIsNotTheSearchsPreorder: blocks are made in an order go/ir's isn't, and the walk of
+// the tree differs from the search's own preorder. The entry reaches blockB first, then blockX through
+// it, so the entry's children are blockB then blockX (creation made blockX first). blockX has the
+// entry's edge too, so it hangs from the entry, and the walk visits blockB's child blockY before it,
+// where the search visited blockX before blockY.
+func TestTreePreorderIsNotTheSearchsPreorder(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, blockX, blockY, blockB := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, blockB, blockX)
+	goTo(blockB, blockX, blockY)
+	finalize(function)
+
+	expectTree(test, function, map[*testBlock][]*testBlock{entry: {blockB, blockX}, blockB: {blockY}},
+		[]*testBlock{entry, blockB, blockY, blockX})
+}
+
+// TestTreeAgreesWithGoIrsConstruction: over thousands of generated graphs, the tree is the one go/ir's
+// buildDomTree makes, built here the plain way: immediate dominators from set intersection, each block
+// appended to its parent's children in the recursive depth-first preorder of the real edges, and the
+// walk a recursive one over those children.
+func TestTreeAgreesWithGoIrsConstruction(test *testing.T) {
+	test.Parallel()
+	random := rand.New(rand.NewSource(20261108))
+	const graphs = 4000
+	branching := 0
+	for graph := 0; graph < graphs; graph++ {
+		function := generatedFunction(random)
+		finalize(function)
+
+		dominators := setIntersectionDominators(function)
+		var searchPreorder []ssa.BlockId
+		searched := map[ssa.BlockId]bool{}
+		var search func(id ssa.BlockId)
+		search = func(id ssa.BlockId) {
+			block, ok := function.table[id]
+			if !ok || searched[id] {
+				return
+			}
+			searched[id] = true
+			searchPreorder = append(searchPreorder, id)
+			for _, edge := range block.edges {
+				if edge.kind != ssa.Fallthrough {
+					search(edge.to)
+				}
+			}
+		}
+		search(function.entry)
+
+		// A block's immediate dominator is the strict dominator every other strict one dominates, so the one
+		// with the most dominators of its own.
+		wantParent := map[ssa.BlockId]ssa.BlockId{}
+		wantChildren := map[ssa.BlockId][]ssa.BlockId{}
+		for _, id := range searchPreorder[1:] {
+			best, bestCount := ssa.BlockId(0), -1
+			for dominator := range dominators[id] {
+				if dominator != id && len(dominators[dominator]) > bestCount {
+					best, bestCount = dominator, len(dominators[dominator])
+				}
+			}
+			wantParent[id] = best
+			wantChildren[best] = append(wantChildren[best], id)
+		}
+		var wantPreorder []ssa.BlockId
+		var walk func(id ssa.BlockId)
+		walk = func(id ssa.BlockId) {
+			wantPreorder = append(wantPreorder, id)
+			for _, child := range wantChildren[id] {
+				walk(child)
+			}
+		}
+		walk(function.entry)
+
+		dominance := ssa.ComputeDominance(testGraph{}, function)
+		for _, block := range function.blocks {
+			if got := dominance.Children(block.id); !slices.Equal(got, wantChildren[block.id]) {
+				test.Fatalf("graph %d: bb%d's children are %v, go/ir's are %v\n%s",
+					graph, block.id, got, wantChildren[block.id], describeTestGraph(function))
+			}
+			if len(wantChildren[block.id]) > 1 {
+				branching++
+			}
+			want, hasParent := wantParent[block.id]
+			if got, ok := dominance.ImmediateDominator(block.id); ok != hasParent || got != want {
+				test.Fatalf("graph %d: bb%d's immediate dominator is bb%d (%t), want bb%d (%t)\n%s",
+					graph, block.id, got, ok, want, hasParent, describeTestGraph(function))
+			}
+		}
+		if got := dominance.Preorder(); !slices.Equal(got, wantPreorder) {
+			test.Fatalf("graph %d: the preorder is %v, go/ir's is %v\n%s",
+				graph, got, wantPreorder, describeTestGraph(function))
+		}
+	}
+	if branching == 0 {
+		test.Fatalf("none of the %d graphs has a block with two children, so the order was never tested", graphs)
+	}
+	test.Logf("%d graphs, %d blocks with two children or more", graphs, branching)
+}
+
+// phiIds is every phi's result in the function, block by block in the slice's order.
+func phiIds(function *testFunction) []ssa.IdentifierId {
+	var ids []ssa.IdentifierId
+	for _, block := range function.blocks {
+		for _, phi := range block.phis {
+			ids = append(ids, phi.Place.id)
+		}
+	}
+	return ids
+}
+
+// handPhi is a phi built without construction, its operands from predecessors 1, 2 and on, for a test
+// that hands EliminateRedundantPhis a web of phis no small graph makes.
+func handPhi(place testPlace, operands ...testPlace) *ssa.Phi[testPlace] {
+	phi := &ssa.Phi[testPlace]{Place: place}
+	for index, operand := range operands {
+		phi.Operands.Set(ssa.BlockId(index+1), operand)
+	}
+	return phi
+}
+
+// TestIrreducibleLoopWithOneValueLeavesNoPhi: the entry branches into a cycle at two blocks, blockA and
+// blockB, and x is written only before it. Construction places a phi in each, each naming the entry's x
+// and the other's phi, so neither is trivial. Together they hold only the entry's x, and the strongly
+// connected step collapses them to it (Braun et al., Figure 5).
+func TestIrreducibleLoopWithOneValueLeavesNoPhi(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, blockA, blockB, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	initial := function.define(entry, "x")
+	reads := []*testInstruction{function.use(blockA, "x"), function.use(blockB, "x"), function.use(exit, "x")}
+	goTo(entry, blockA, blockB)
+	goTo(blockA, blockB, exit)
+	goTo(blockB, blockA)
+
+	construct(test, function)
+
+	if phis := phiIds(function); len(phis) != 0 {
+		test.Errorf("the cycle kept phis %v, want none", phis)
+	}
+	for _, read := range reads {
+		if read.uses[0].id != initial.defines[0].id {
+			test.Errorf("a read names $%d, want the entry's write $%d", read.uses[0].id, initial.defines[0].id)
+		}
+	}
+}
+
+// TestIrreducibleLoopWithTwoValuesKeepsBothPhis: the same cycle, entered with x written differently on
+// each way in, so each entry's phi is a real merge and both stay.
+func TestIrreducibleLoopWithTwoValuesKeepsBothPhis(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, left, right := function.block(), function.block(), function.block()
+	blockA, blockB, exit := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	fromLeft := function.define(left, "x")
+	fromRight := function.define(right, "x")
+	readA, readB := function.use(blockA, "x"), function.use(blockB, "x")
+	function.use(exit, "x")
+	goTo(entry, left, right)
+	goTo(left, blockA)
+	goTo(right, blockB)
+	goTo(blockA, blockB, exit)
+	goTo(blockB, blockA)
+
+	construct(test, function)
+
+	if len(blockA.phis) != 1 || len(blockB.phis) != 1 {
+		test.Fatalf("blockA has %d phis and blockB %d, want one each", len(blockA.phis), len(blockB.phis))
+	}
+	if got := blockA.phis[0].Operands.At(left.id).id; got != fromLeft.defines[0].id {
+		test.Errorf("blockA's phi takes $%d from the left, want $%d", got, fromLeft.defines[0].id)
+	}
+	if got := blockB.phis[0].Operands.At(right.id).id; got != fromRight.defines[0].id {
+		test.Errorf("blockB's phi takes $%d from the right, want $%d", got, fromRight.defines[0].id)
+	}
+	if readA.uses[0].id != blockA.phis[0].Place.id || readB.uses[0].id != blockB.phis[0].Place.id {
+		test.Errorf("the reads in the cycle don't name their block's phi")
+	}
+}
+
+// TestNestedLoopWithTwoValuesKeepsItsCycleOfPhis: reducible flow can make a cycle of phis too. The outer
+// header's phi takes the inner header's from the latch, and the inner header's takes the outer's and the
+// body's write, so the two form a component whose outside values are the entry's i and the body's. Both
+// stay, as they did before the strongly connected step.
+func TestNestedLoopWithTwoValuesKeepsItsCycleOfPhis(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, outer, inner := function.block(), function.block(), function.block()
+	body, latch, exit := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	initial := function.define(entry, "i")
+	function.use(outer, "i")
+	function.use(inner, "i")
+	written := function.define(body, "i")
+	function.use(exit, "i")
+	goTo(entry, outer)
+	goTo(outer, inner, exit)
+	goTo(inner, body, latch)
+	goTo(body, inner)
+	goTo(latch, outer)
+
+	construct(test, function)
+
+	if len(outer.phis) != 1 || len(inner.phis) != 1 {
+		test.Fatalf("the outer header has %d phis and the inner %d, want one each", len(outer.phis), len(inner.phis))
+	}
+	outerPhi, innerPhi := outer.phis[0], inner.phis[0]
+	if outerPhi.Operands.At(entry.id).id != initial.defines[0].id ||
+		outerPhi.Operands.At(latch.id).id != innerPhi.Place.id {
+		test.Errorf("the outer header's phi is %+v, want the entry's i and the inner header's phi", outerPhi.Operands)
+	}
+	if innerPhi.Operands.At(outer.id).id != outerPhi.Place.id ||
+		innerPhi.Operands.At(body.id).id != written.defines[0].id {
+		test.Errorf("the inner header's phi is %+v, want the outer header's phi and the body's i", innerPhi.Operands)
+	}
+}
+
+// TestComponentRecursesIntoItsInnerPhis is Braun et al.'s Figure 6. phi1 to phi4 form one component with
+// two values from outside, phi0 and plus, so phi1 and phi2, which take them, are real merges. phi3 and
+// phi4 take only each other and phi2: the inner component, which the recursion collapses to phi2.
+// phi0's component is phi0 alone, and stays. The phis kept stay in the order they were in.
+func TestComponentRecursesIntoItsInnerPhis(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, head, loop, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	x, y, plus := function.define(entry, "x"), function.define(entry, "y"), function.define(loop, "plus")
+	phi0, phi1, phi2 := function.value("v"), function.value("v"), function.value("v")
+	phi3, phi4 := function.value("v"), function.value("v")
+	head.phis = []*ssa.Phi[testPlace]{handPhi(phi0, x.defines[0], y.defines[0])}
+	loop.phis = []*ssa.Phi[testPlace]{
+		handPhi(phi1, phi0, phi4),
+		handPhi(phi2, phi1, plus.defines[0]),
+		handPhi(phi3, phi2, phi4),
+		handPhi(phi4, phi3, phi2),
+	}
+	read := &testInstruction{uses: []testPlace{phi3, phi4}}
+	exit.instructions = append(exit.instructions, read)
+
+	ssa.EliminateRedundantPhis(testGraph{}, function)
+
+	if got, want := phiIds(function), []ssa.IdentifierId{phi0.id, phi1.id, phi2.id}; !slices.Equal(got, want) {
+		test.Fatalf("the phis kept are %v, want %v", got, want)
+	}
+	if got := loop.phis[0].Operands.At(2).id; got != phi2.id {
+		test.Errorf("phi1's operand from phi4 is $%d, want phi2's $%d", got, phi2.id)
+	}
+	if read.uses[0].id != phi2.id || read.uses[1].id != phi2.id {
+		test.Errorf("the reads of phi3 and phi4 name $%d and $%d, want phi2's $%d",
+			read.uses[0].id, read.uses[1].id, phi2.id)
+	}
+}
+
+// TestCollapsedComponentLeavesATrivialPhiForTheTrivialRule: phiA and phiB form a component holding only
+// x, and phiC merges x with phiA. phiC isn't trivial until the component collapses, and then it is, so
+// the trivial rule has to run again after the strongly connected step.
+func TestCollapsedComponentLeavesATrivialPhiForTheTrivialRule(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, loop, exit := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	x := function.define(entry, "x")
+	phiA, phiB, phiC := function.value("x"), function.value("x"), function.value("x")
+	loop.phis = []*ssa.Phi[testPlace]{handPhi(phiA, x.defines[0], phiB), handPhi(phiB, x.defines[0], phiA)}
+	exit.phis = []*ssa.Phi[testPlace]{handPhi(phiC, x.defines[0], phiA)}
+	read := &testInstruction{uses: []testPlace{phiC}}
+	exit.instructions = append(exit.instructions, read)
+
+	ssa.EliminateRedundantPhis(testGraph{}, function)
+
+	if phis := phiIds(function); len(phis) != 0 {
+		test.Errorf("the phis kept are %v, want none", phis)
+	}
+	if read.uses[0].id != x.defines[0].id {
+		test.Errorf("the read of phiC names $%d, want x's $%d", read.uses[0].id, x.defines[0].id)
 	}
 }

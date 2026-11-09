@@ -8,8 +8,8 @@
 // (CallExpr fun [b]))` of staticcheck's pattern package and builds its fix from `(CallExpr (SelectorExpr (Ident
 // "strings") (Ident "EqualFold")) [a b])`; the port tests the same shape by its syntax: an == or != between two
 // calls of one argument each, parentheses around either call looked through as the pattern does, the left one's
-// function strings.ToLower or strings.ToUpper as staticcheck_code.IsSymbol judges it, and the right one's the very
-// same function object, named by an identifier or a selector, which is how the pattern's binding fun is recalled
+// function strings.ToLower or strings.ToUpper as staticcheck_code.SymbolIndex judges the two, and the right one's the
+// very same function object, named by an identifier or a selector, which is how the pattern's binding fun is recalled
 // (calledFunction). It builds the fix's syntax itself as pattern.NodeToAST builds it, around the two arguments with
 // their parentheses looked through as the bindings a and b hold them, and prints it with staticcheck's analysis/edit,
 // borrowed in this wave as the original uses it, through staticcheck_report.Fixes; like the original's, the fix
@@ -70,8 +70,7 @@ func Check(context *rule.Context, comparison *ast.BinaryExpr) {
 	if !isLeftCall || !isRightCall || len(left.Args) != 1 || len(right.Args) != 1 {
 		return
 	}
-	if !staticcheck_code.IsSymbol(context, left.Fun, "strings.ToLower") &&
-		!staticcheck_code.IsSymbol(context, left.Fun, "strings.ToUpper") {
+	if staticcheck_code.SymbolIndex(context, left.Fun, "strings.ToLower", "strings.ToUpper") < 0 {
 		return
 	}
 	function := calledFunction(context, left.Fun)
