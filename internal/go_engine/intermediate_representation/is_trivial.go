@@ -18,6 +18,10 @@ func isTrivial(function *Function, seen map[*Function]struct{}) bool {
 	if _, isSeen := seen[function]; isSeen {
 		return false
 	}
+	// Our IR builds a function when it is first read, so a callee no one has read yet has no blocks, and with none
+	// it would read as trivial. Build is idempotent, so a function already built costs nothing here. buildir builds
+	// every function up front, so irutil never meets this.
+	function.Build()
 	// The function joins seen only when it makes a call, so a function that makes none allocates no map.
 	for _, block := range function.Blocks {
 		for _, instruction := range block.Instructions {

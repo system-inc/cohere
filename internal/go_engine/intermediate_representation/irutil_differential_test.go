@@ -397,3 +397,37 @@ func TestWalkMatchesIrutil(test *testing.T) {
 	}
 	whole.requireBoth(test, "Walk (visited every block)")
 }
+
+// TestIsTrivialBuildsAnUnreadCallee builds our IR lazily, as the analyzer's SourceFunctions does: only the caller,
+// whose callee is declared after it, does real work, and hasn't been read. IsTrivial must build the callee before
+// reading its blocks, since an unbuilt callee has none and would read as trivial, and answer false as irutil does
+// over go/ir, which buildir builds whole.
+func TestIsTrivialBuildsAnUnreadCallee(test *testing.T) {
+	test.Parallel()
+	unit := differentialCheck(test, "lazy", `package lazy
+
+func caller() int { return callee(1, 2) }
+
+func callee(left, right int) int { return left + right }
+`)
+	theirProgram := ir.NewProgram(unit.fileSet, 0)
+	theirPackage := theirProgram.CreatePackage(unit.types, unit.files, unit.typeInfo, false)
+	theirPackage.Build()
+	if irutil.IsTrivial(theirPackage.Func("caller")) {
+		test.Fatal("irutil reads caller as trivial, so the case doesn't hold a callee that does work")
+	}
+	ourProgram := intermediate_representation.NewProgram(unit.fileSet)
+	ourPackage := ourProgram.CreatePackage(unit.types, unit.files, unit.typeInfo, false)
+	caller := ourPackage.Function("caller")
+	callee := ourPackage.Function("callee")
+	caller.Build()
+	if callee.Blocks != nil {
+		test.Fatal("building caller built callee too, so the case holds no unbuilt callee")
+	}
+	if intermediate_representation.IsTrivial(caller) {
+		test.Error("IsTrivial reads caller as trivial over a callee it didn't build, where irutil reads it as not")
+	}
+	if callee.Blocks == nil {
+		test.Error("IsTrivial left callee unbuilt")
+	}
+}
