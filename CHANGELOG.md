@@ -103,6 +103,10 @@ changed in cohere outside the sets is written under the same heading.
   a warning. Its footer says how many files and why, quoting the rule that decided, as
   `no files checked: 1 file excluded, ignored by git (.gitignore:1)`, and `--json` reads `"verdict": "fail"` with
   each reason under `gaps.excluded`. A project with no file of its language at all keeps the warning and passes.
+- A file git tracks is never ignored, as `git check-ignore` decides it: a file added with `git add -f` under a
+  pattern that matches it is checked and formatted like any other, where it read "ignored by git". cohere reads the
+  repository's index itself, and a run whose index can't be read, a split or sparse one, decides by the ignore files
+  alone and says so.
 - The footer's checked count is the files a phase examined, never the files in scope. A Swift project whose
   files had no compiler record, with lint not run, read
   `1 type error (13 checked) • ⚠ 13 files nothing checked`, and now reads no checked count beside the gap, which
