@@ -8,6 +8,7 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -108,11 +109,35 @@ var unknownArchitectureFiles = []string{
 // parity_go_build.s, built for amd64 by a `//go:build` line the pass does not read, beside the files that name no
 // architecture at all (see unknownArchitectureFiles).
 //
+// Leaving those files alone proves only that nothing was found there, so the tier pins why beside it: the same load
+// judged as amd64, the default context naming the load's own target, where both sides find the same in every field and
+// each of those files holds findings of each side's, as parity_go_build.s holds `[amd64] quads: wrong argument size
+// 28; expected $...-32` at its `TEXT` line and `invalid MOVW of x+0(FP); int64 is 8-byte value` at line 8. So the
+// sparc64 half is green because the architecture is unknown, and a sparc64 half that went on judging as amd64 fails.
+//
 // Not parallel: the differences and shape tiers run asmdecl by hand, outside the harness, where it reads go/build's
 // default context, which this call sets.
 func TestNeitherJudgesAFileOfAnUnknownArchitecture(test *testing.T) {
-	parity.On("GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0").JudgingBy("GOARCH=sparc64").RequireIdenticalLeavingAlone(
-		test, asmdecl.Analyzer, Analyzer, analysistest.TestData(), unknownArchitectureFiles, fixturePackages...)
+	onAmd64 := parity.On("GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0")
+	// Not parallel: the subtests are this tier's two halves, each a harness call that sets the default context, run
+	// one after the other for the reason the tier itself is not parallel.
+	test.Run("judged as amd64", func(subtest *testing.T) {
+		onAmd64.RequireIdentical(subtest, asmdecl.Analyzer, Analyzer, analysistest.TestData(), fixturePackages...)
+		original, port := onAmd64.Findings(subtest, asmdecl.Analyzer, Analyzer, analysistest.TestData(),
+			fixturePackages...)
+		for _, file := range unknownArchitectureFiles {
+			isIn := func(found parity.Finding) bool { return found.File == file }
+			if !slices.ContainsFunc(original, isIn) || !slices.ContainsFunc(port, isIn) {
+				subtest.Errorf("judged as amd64, %s holds no finding of one side's, so leaving it alone where the "+
+					"architecture is unknown says nothing of the architecture", file)
+			}
+		}
+	})
+	// Not parallel: it sets the default context, after the amd64 half has run.
+	test.Run("judged as sparc64", func(subtest *testing.T) {
+		onAmd64.JudgingBy("GOARCH=sparc64").RequireIdenticalLeavingAlone(subtest, asmdecl.Analyzer, Analyzer,
+			analysistest.TestData(), unknownArchitectureFiles, fixturePackages...)
+	})
 }
 
 // differencesDirectory is the differences fixture, whose declarations crash the original. Its records sit on the
