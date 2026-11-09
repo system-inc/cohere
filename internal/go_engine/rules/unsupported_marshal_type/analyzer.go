@@ -37,7 +37,9 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -46,7 +48,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1026",
 	"SA1026",
 	"Flags a value given to encoding/json or encoding/xml to marshal whose type cannot be marshaled, such as a "+
-		"channel or a function: staticcheck's SA1026, ported onto staticcheck's intermediate representation.",
+		"channel or a function: staticcheck's SA1026, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 

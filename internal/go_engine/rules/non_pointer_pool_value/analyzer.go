@@ -29,7 +29,9 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -38,7 +40,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA6002",
 	"SA6002",
 	"Flags a value given to sync.Pool's Put that is not like a pointer, or is a slice, so putting it allocates: "+
-		"staticcheck's SA6002, ported onto staticcheck's intermediate representation.",
+		"staticcheck's SA6002, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 

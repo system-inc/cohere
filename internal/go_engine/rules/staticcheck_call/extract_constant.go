@@ -1,19 +1,17 @@
 package staticcheck_call
 
 import (
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"go/constant"
-
-	"honnef.co/go/tools/go/ir"
-	"honnef.co/go/tools/go/ir/irutil"
 )
 
 // ExtractConstant is the constant value is, seen through phis whose edges are all that one constant and through a
 // conversion to an interface, or nil when it is not one constant.
-func ExtractConstant(value ir.Value) *ir.Const {
-	switch flattened := irutil.Flatten(value).(type) {
-	case *ir.Const:
+func ExtractConstant(value intermediate_representation.Value) *intermediate_representation.Constant {
+	switch flattened := intermediate_representation.Flatten(value).(type) {
+	case *intermediate_representation.Constant:
 		return flattened
-	case *ir.MakeInterface:
+	case *intermediate_representation.MakeInterface:
 		return ExtractConstant(flattened.X)
 	}
 	return nil
@@ -21,7 +19,10 @@ func ExtractConstant(value ir.Value) *ir.Const {
 
 // ExtractConstantOfKind is ExtractConstant when the constant is of kind, and nil otherwise, nil too for a nil
 // constant, which has no value and so no kind.
-func ExtractConstantOfKind(value ir.Value, kind constant.Kind) *ir.Const {
+func ExtractConstantOfKind(
+	value intermediate_representation.Value,
+	kind constant.Kind,
+) *intermediate_representation.Constant {
 	extracted := ExtractConstant(value)
 	if extracted == nil || extracted.Value == nil || extracted.Value.Kind() != kind {
 		return nil

@@ -46,7 +46,9 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -55,7 +57,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA9005",
 	"SA9005",
 	"Flags a struct given to encoding/json or encoding/xml that has fields, none exported, and no method to "+
-		"marshal it: staticcheck's SA9005, ported onto staticcheck's intermediate representation.",
+		"marshal it: staticcheck's SA9005, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -85,7 +87,7 @@ func checkValue(argument string, methods ...string) staticcheck_call.Rule {
 		}
 		// The method set is of the value's own type, so a method on a pointer receiver counts only for a pointer.
 		// The methods' signatures are not checked, as the original does not, which vet's own check covers.
-		methodSet := call.Instruction.Parent().Prog.MethodSets.MethodSet(valueType)
+		methodSet := call.Instruction.Parent().Program.MethodSets.MethodSet(valueType)
 		for _, method := range methods {
 			if methodSet.Lookup(nil, method) != nil {
 				return

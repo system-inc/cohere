@@ -1,12 +1,12 @@
 // Package staticcheck_call judges the arguments of calls to named functions, the framework that nineteen of
 // staticcheck's SA1 checks and five others ride: a check is a map from a function's name to a Rule, the Rule reads
-// each call to that function in staticcheck's intermediate representation and marks an argument or the call itself
-// invalid, and the kit reports each mark where staticcheck would.
+// each call to that function in the engine's own intermediate representation and marks an argument or the call
+// itself invalid, and the kit reports each mark where staticcheck would.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/callcheck/callcheck.go, whose walk, argument
 // list and report positions it keeps. It differs in three places. A Call carries the rule.Context the check reads in
 // place of the analysis pass, so a Rule reads the package, its type information and its file set there. An Argument
-// holds its ir.Value directly, where the original wraps it in a struct of that one field. And where the original
+// holds its Value directly, where the original wraps it in a struct of that one field. And where the original
 // panics, on a call whose syntax is of a shape it does not know or a mark it has nowhere to report, the kit reports
 // at the next position it has, or drops the mark when there is none (report), since a panic loses every other
 // finding of the package along with the one it could not place. It also passes over a call whose function's bare
@@ -20,9 +20,9 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -34,12 +34,12 @@ type Rule func(call *Call)
 // name, as typeutil.FuncName spells it ("regexp.Compile", "(*bytes.Buffer).Write"), and reports what the Rule marks.
 // Only a call whose callee is known without running the program, a function or a method called on a concrete type,
 // is judged.
-func FunctionCheck(rules map[string]Rule) rule.FunctionCheck {
+func FunctionCheck(rules map[string]Rule) func(context *rule.Context, function *intermediate_representation.Function) {
 	ruledNames := ruledNamesOf(rules)
-	return func(context *rule.Context, function *ir.Function) {
+	return func(context *rule.Context, function *intermediate_representation.Function) {
 		for _, block := range function.Blocks {
-			for _, instruction := range block.Instrs {
-				site, isCall := instruction.(ir.CallInstruction)
+			for _, instruction := range block.Instructions {
+				site, isCall := instruction.(intermediate_representation.CallInstruction)
 				if !isCall {
 					continue
 				}
@@ -70,8 +70,8 @@ func checkCall(
 	context *rule.Context,
 	rules map[string]Rule,
 	ruledNames map[string]bool,
-	site ir.CallInstruction,
-	callee *ir.Function,
+	site intermediate_representation.CallInstruction,
+	callee *intermediate_representation.Function,
 ) {
 	object, isFunction := callee.Object().(*types.Func)
 	if !isFunction || !ruledNames[object.Name()] {
@@ -81,7 +81,7 @@ func checkCall(
 	if !isRuled {
 		return
 	}
-	values := site.Common().Args
+	values := site.Common().Arguments
 	if callee.Signature.Recv() != nil {
 		values = values[1:]
 	}
@@ -89,7 +89,7 @@ func checkCall(
 	for _, value := range values {
 		// A value passed as an interface is judged as what was converted, the constant and not the interface
 		// holding it.
-		if conversion, isConversion := value.(*ir.MakeInterface); isConversion {
+		if conversion, isConversion := value.(*intermediate_representation.MakeInterface); isConversion {
 			arguments = append(arguments, &Argument{Value: conversion.X})
 			continue
 		}
@@ -125,7 +125,7 @@ func checkCall(
 // expression, or the go or defer statement around it, and a call it makes itself, such as the call of a function
 // ranged over, no syntax at all. The original panics on any other shape; there is none today, and should the builder
 // make one, the call's marks are reported at the call (report) rather than losing the package's other findings.
-func callSyntax(site ir.CallInstruction) *ast.CallExpr {
+func callSyntax(site intermediate_representation.CallInstruction) *ast.CallExpr {
 	switch source := site.Source().(type) {
 	case *ast.CallExpr:
 		return source
@@ -140,7 +140,7 @@ func callSyntax(site ir.CallInstruction) *ast.CallExpr {
 // report reports message at instruction, over the range of the syntax it was built from, as staticcheck's
 // report.Report reports at an instruction. An instruction with no syntax has nowhere a reader could be sent, and
 // the original panics there, so the mark is dropped.
-func report(context *rule.Context, instruction ir.Instruction, message string) {
+func report(context *rule.Context, instruction intermediate_representation.Instruction, message string) {
 	source := instruction.Source()
 	if source == nil {
 		return

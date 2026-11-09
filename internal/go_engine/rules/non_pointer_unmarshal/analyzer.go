@@ -17,8 +17,7 @@ import (
 	"fmt"
 	"go/types"
 
-	"honnef.co/go/tools/go/ir"
-
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
@@ -34,7 +33,9 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -43,7 +44,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1014",
 	"SA1014",
 	"Flags a value that is not a pointer given to an encoding/json or encoding/xml function that unmarshals into it: "+
-		"staticcheck's SA1014, ported onto staticcheck's intermediate representation.",
+		"staticcheck's SA1014, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -62,7 +63,7 @@ func checkTarget(name string, index int) staticcheck_call.Rule {
 
 // isPointer is whether value may hold a pointer: it is one, or an interface, whose dynamic type the check cannot
 // know.
-func isPointer(value ir.Value) bool {
+func isPointer(value intermediate_representation.Value) bool {
 	switch value.Type().Underlying().(type) {
 	case *types.Pointer, *types.Interface:
 		return true
