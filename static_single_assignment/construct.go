@@ -84,11 +84,8 @@ func Construct[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	}
 
 	builder := &ssaBuilder[G, F, B, P]{
-		graph:         graph,
-		function:      function,
-		states:        map[BlockId]*ssaState[P]{},
-		unsealedPreds: map[BlockId]int{},
-		unknown:       map[DeclarationId]bool{},
+		graph:    graph,
+		function: function,
 	}
 	builder.run()
 

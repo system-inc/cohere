@@ -65,7 +65,12 @@ func newTestFunction() *testFunction {
 type testGraph struct{}
 
 func (testGraph) Entry(function *testFunction) ssa.BlockId { return function.entry }
-func (testGraph) BlockBound(function *testFunction) int    { return int(function.next) }
+func (testGraph) BlockBound(function *testFunction) int {
+	if function.boundUnderReported {
+		return 0
+	}
+	return int(function.next)
+}
 func (testGraph) Block(function *testFunction, id ssa.BlockId) (*testBlock, bool) {
 	block, ok := function.table[id]
 	return block, ok
@@ -229,6 +234,32 @@ func TestDiamondPlacesOnePhiAtTheJoin(test *testing.T) {
 
 // TestLoopPhiTakesTheBackEdge: i is written before a loop and in its body, so the header merges the
 // entry's value with the back edge's, an incomplete phi filled when the body is sealed.
+// TestConstructionReachesBlocksPastTheBound builds the diamond with BlockBound answering zero: the builder's
+// per-block state, dense by BlockId, grows to each block it meets rather than reading past its end.
+func TestConstructionReachesBlocksPastTheBound(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	function.boundUnderReported = true
+	entry, left, right, join := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	function.define(entry, "x")
+	function.define(left, "x")
+	read := function.use(join, "x")
+	goTo(entry, left, right)
+	goTo(left, join)
+	goTo(right, join)
+
+	construct(test, function)
+
+	if len(join.phis) != 1 {
+		test.Fatalf("join has %d phis, want 1", len(join.phis))
+	}
+	if read.uses[0].id != join.phis[0].Place.id {
+		test.Errorf("the read after the join names $%d, want the phi's $%d", read.uses[0].id,
+			join.phis[0].Place.id)
+	}
+}
+
 func TestLoopPhiTakesTheBackEdge(test *testing.T) {
 	test.Parallel()
 	function := newTestFunction()
