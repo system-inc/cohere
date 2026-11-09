@@ -84,48 +84,48 @@ func maybeInstance(prog *Program, name string, sig *types.Signature, targs []typ
 }
 
 // buildWrapper builds fn.Body for a method wrapper.
-func (b *builder) buildWrapper(fn *Function) {
+func (b *builder) buildWrapper(function *Function) {
 	var recv *types.Var // wrapper's receiver or thunk's params[0]
 	var start int       // first regular param
-	if fn.method.kind == types.MethodExpr {
-		recv = fn.Signature.Params().At(0)
+	if function.method.kind == types.MethodExpr {
+		recv = function.Signature.Params().At(0)
 		start = 1
 	} else {
-		recv = fn.Signature.Recv()
+		recv = function.Signature.Recv()
 	}
 
-	fn.startBody()
-	fn.addSpilledParameter(recv, nil)
-	createParameters(fn, start)
+	function.startBody()
+	function.addSpilledParameter(recv, nil)
+	createParameters(function, start)
 
-	indices := fn.method.index
+	indices := function.method.index
 
-	var v Value = fn.Locals[0] // spilled receiver
-	if isPointer(fn.method.recv) {
-		v = emitLoad(fn, v, nil)
+	var local Value = function.Locals[0] // spilled receiver
+	if isPointer(function.method.recv) {
+		local = emitLoad(function, local, nil)
 
 		// For simple indirection wrappers, perform an informative nil-check:
 		// "value method (T).f called using nil *T pointer"
-		if len(indices) == 1 && !isPointer(recvType(fn.object)) {
-			var c Call
-			c.Call.Value = &Builtin{
+		if len(indices) == 1 && !isPointer(recvType(function.object)) {
+			var call Call
+			call.Call.Value = &Builtin{
 				name: "ssa:wrapnilchk",
 				sig: types.NewSignatureType(
 					nil,
 					nil,
 					nil,
-					types.NewTuple(anonVariable(fn.method.recv), anonVariable(tString), anonVariable(tString)),
-					types.NewTuple(anonVariable(fn.method.recv)),
+					types.NewTuple(anonVariable(function.method.recv), anonVariable(tString), anonVariable(tString)),
+					types.NewTuple(anonVariable(function.method.recv)),
 					false,
 				),
 			}
-			c.Call.Arguments = []Value{
-				v,
-				stringConstant(deref(fn.method.recv).String(), nil),
-				stringConstant(fn.method.object.Name(), nil),
+			call.Call.Arguments = []Value{
+				local,
+				stringConstant(deref(function.method.recv).String(), nil),
+				stringConstant(function.method.object.Name(), nil),
 			}
-			c.setType(v.Type())
-			v = fn.emit(&c, nil)
+			call.setType(local.Type())
+			local = function.emit(&call, nil)
 		}
 	}
 
@@ -137,37 +137,37 @@ func (b *builder) buildWrapper(fn *Function) {
 	// Load) in preference to value extraction (Field possibly
 	// preceded by Load).
 
-	v = emitImplicitSelections(fn, v, indices[:len(indices)-1], nil)
+	local = emitImplicitSelections(function, local, indices[:len(indices)-1], nil)
 
 	// Invariant: v is a pointer, either
 	//   value of implicit *C field, or
 	// address of implicit  C field.
 
-	var c Call
-	if r := recvType(fn.object); !types.IsInterface(r) { // concrete method
-		if !isPointer(r) {
-			v = emitLoad(fn, v, nil)
+	var call Call
+	if resolvedType := recvType(function.object); !types.IsInterface(resolvedType) { // concrete method
+		if !isPointer(resolvedType) {
+			local = emitLoad(function, local, nil)
 		}
-		c.Call.Value = fn.Program.objectMethod(fn.object, fn.typeargs, b)
-		c.Call.Arguments = append(c.Call.Arguments, v)
+		call.Call.Value = function.Program.objectMethod(function.object, function.typeargs, b)
+		call.Call.Arguments = append(call.Call.Arguments, local)
 	} else {
-		c.Call.Method = fn.object
-		c.Call.Value = emitLoad(fn, v, nil) // interface (possibly a typeparam)
+		call.Call.Method = function.object
+		call.Call.Value = emitLoad(function, local, nil) // interface (possibly a typeparam)
 	}
-	for _, arg := range fn.Parameters[1:] {
-		c.Call.Arguments = append(c.Call.Arguments, arg)
+	for _, argument := range function.Parameters[1:] {
+		call.Call.Arguments = append(call.Call.Arguments, argument)
 	}
-	emitTailCall(fn, &c, nil)
-	fn.finishBody()
+	emitTailCall(function, &call, nil)
+	function.finishBody()
 }
 
 // createParameters creates parameters for wrapper method fn based on its
 // Signature.Params, which do not include the receiver.
 // start is the index of the first regular parameter to use.
-func createParameters(fn *Function, start int) {
-	tparams := fn.Signature.Params()
-	for i, n := start, tparams.Len(); i < n; i++ {
-		fn.addParamVariable(tparams.At(i), nil)
+func createParameters(function *Function, start int) {
+	tparams := function.Signature.Params()
+	for index, length := start, tparams.Len(); index < length; index++ {
+		function.addParamVariable(tparams.At(index), nil)
 	}
 }
 
@@ -200,7 +200,7 @@ func createBound(prog *Program, object *types.Func, targs []types.Type) *Functio
 	name, sig := maybeInstance(prog, object.Name(), object.Type().(*types.Signature), targs)
 
 	/* bound method wrapper */
-	fn := &Function{
+	function := &Function{
 		name:      name + "$bound",
 		object:    object,
 		Signature: changeRecv(sig, nil), // drop receiver
@@ -213,29 +213,29 @@ func createBound(prog *Program, object *types.Func, targs []types.Type) *Functio
 		info:      nil,
 		goversion: "",
 	}
-	fn.FreeVariables = []*FreeVariable{{name: "recv", typ: recvType(object), parent: fn}} // (cyclic)
-	return fn
+	function.FreeVariables = []*FreeVariable{{name: "recv", typ: recvType(object), parent: function}} // (cyclic)
+	return function
 }
 
 // buildBound builds fn.Body for a bound method closure.
-func (b *builder) buildBound(fn *Function) {
-	fn.startBody()
-	createParameters(fn, 0)
-	var c Call
+func (b *builder) buildBound(function *Function) {
+	function.startBody()
+	createParameters(function, 0)
+	var call Call
 
-	recv := fn.FreeVariables[0]
-	if !types.IsInterface(recvType(fn.object)) { // concrete
-		c.Call.Value = fn.Program.objectMethod(fn.object, fn.typeargs, b)
-		c.Call.Arguments = []Value{recv}
+	recv := function.FreeVariables[0]
+	if !types.IsInterface(recvType(function.object)) { // concrete
+		call.Call.Value = function.Program.objectMethod(function.object, function.typeargs, b)
+		call.Call.Arguments = []Value{recv}
 	} else {
-		c.Call.Method = fn.object
-		c.Call.Value = recv // interface (possibly a typeparam)
+		call.Call.Method = function.object
+		call.Call.Value = recv // interface (possibly a typeparam)
 	}
-	for _, arg := range fn.Parameters {
-		c.Call.Arguments = append(c.Call.Arguments, arg)
+	for _, argument := range function.Parameters {
+		call.Call.Arguments = append(call.Call.Arguments, argument)
 	}
-	emitTailCall(fn, &c, nil)
-	fn.finishBody()
+	emitTailCall(function, &call, nil)
+	function.finishBody()
 }
 
 // -- thunks -----------------------------------------------------------
@@ -261,15 +261,15 @@ func createThunk(prog *Program, sel *selection, targs []types.Type) *Function {
 		panic(sel)
 	}
 
-	fn := createWrapper(prog, sel, targs)
-	if fn.Signature.Recv() != nil {
-		panic(fn) // unexpected receiver
+	function := createWrapper(prog, sel, targs)
+	if function.Signature.Recv() != nil {
+		panic(function) // unexpected receiver
 	}
-	return fn
+	return function
 }
 
-func changeRecv(s *types.Signature, recv *types.Var) *types.Signature {
-	return types.NewSignatureType(recv, nil, nil, s.Params(), s.Results(), s.Variadic())
+func changeRecv(signature *types.Signature, recv *types.Var) *types.Signature {
+	return types.NewSignatureType(recv, nil, nil, signature.Params(), signature.Results(), signature.Variadic())
 }
 
 // A local version of *types.Selection.
@@ -299,57 +299,57 @@ func toSelection(sel *types.Selection) *selection {
 // buildInstantiationWrapper builds the body of an instantiation
 // wrapper fn. The body calls the original generic function,
 // bracketed by ChangeType conversions on its arguments and results.
-func (b *builder) buildInstantiationWrapper(fn *Function) {
-	orig := fn.topLevelOrigin
-	sig := fn.Signature
+func (b *builder) buildInstantiationWrapper(function *Function) {
+	orig := function.topLevelOrigin
+	sig := function.Signature
 
-	fn.startBody()
+	function.startBody()
 	if sig.Recv() != nil {
-		fn.addParamVariable(sig.Recv(), nil)
+		function.addParamVariable(sig.Recv(), nil)
 	}
-	createParameters(fn, 0)
+	createParameters(function, 0)
 
 	// Create body. Add a call to origin generic function
 	// and make type changes between argument and parameters,
 	// as well as return values.
-	var c Call
-	c.Call.Value = orig
+	var call Call
+	call.Call.Value = orig
 	if resultTypes := orig.Signature.Results(); resultTypes.Len() == 1 {
-		c.typ = resultTypes.At(0).Type()
+		call.typ = resultTypes.At(0).Type()
 	} else {
-		c.typ = resultTypes
+		call.typ = resultTypes
 	}
 
 	// parameter of instance becomes an argument to the call
 	// to the original generic function.
-	argOffset := 0
-	for i, arg := range fn.Parameters {
+	argumentOffset := 0
+	for index, argument := range function.Parameters {
 		var typ types.Type
-		if i == 0 && sig.Recv() != nil {
+		if index == 0 && sig.Recv() != nil {
 			typ = orig.Signature.Recv().Type()
-			argOffset = 1
+			argumentOffset = 1
 		} else {
-			typ = orig.Signature.Params().At(i - argOffset).Type()
+			typ = orig.Signature.Params().At(index - argumentOffset).Type()
 		}
-		c.Call.Arguments = append(c.Call.Arguments, emitTypeCoercion(fn, arg, typ, nil))
+		call.Call.Arguments = append(call.Call.Arguments, emitTypeCoercion(function, argument, typ, nil))
 	}
 
-	results := fn.emit(&c, nil)
+	results := function.emit(&call, nil)
 	var ret Return
 	switch resultTypes := sig.Results(); resultTypes.Len() {
 	case 0:
 		// no results, do nothing.
 	case 1:
-		ret.Results = []Value{emitTypeCoercion(fn, results, resultTypes.At(0).Type(), nil)}
+		ret.Results = []Value{emitTypeCoercion(function, results, resultTypes.At(0).Type(), nil)}
 	default:
-		for i := 0; i < sig.Results().Len(); i++ {
-			v := emitExtract(fn, results, i, nil)
-			ret.Results = append(ret.Results, emitTypeCoercion(fn, v, resultTypes.At(i).Type(), nil))
+		for index := 0; index < sig.Results().Len(); index++ {
+			value := emitExtract(function, results, index, nil)
+			ret.Results = append(ret.Results, emitTypeCoercion(function, value, resultTypes.At(index).Type(), nil))
 		}
 	}
 
-	fn.emit(&ret, nil)
-	fn.currentBlock = nil
+	function.emit(&ret, nil)
+	function.currentBlock = nil
 
-	fn.finishBody()
+	function.finishBody()
 }

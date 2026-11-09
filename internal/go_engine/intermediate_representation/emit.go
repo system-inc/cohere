@@ -16,7 +16,7 @@ import (
 	"golang.org/x/exp/typeparams"
 )
 
-// emitAllocation emits to f a new Allocation instruction allocating a variable
+// emitAllocation emits to `function` a new Allocation instruction allocating a variable
 // of type typ.
 //
 // The caller must set Allocation.Heap=true (for a heap-allocated variable)
@@ -27,99 +27,99 @@ import (
 // These Allocations are removed from f.Locals at the end.
 //
 // The builder should generally call one of the emit{New,Local,LocalVar} wrappers instead.
-func emitAllocation(f *Function, typ types.Type, source ast.Node, comment string) *Allocation {
-	v := &Allocation{}
-	v.comment = comment
-	v.setType(types.NewPointer(typ))
-	f.emit(v, source)
-	return v
+func emitAllocation(function *Function, typ types.Type, source ast.Node, comment string) *Allocation {
+	allocation := &Allocation{}
+	allocation.comment = comment
+	allocation.setType(types.NewPointer(typ))
+	function.emit(allocation, source)
+	return allocation
 }
 
-// emitNew emits to f a new Allocation instruction heap-allocating a
+// emitNew emits to `function` a new Allocation instruction heap-allocating a
 // variable of type typ.
-func emitNew(f *Function, typ types.Type, source ast.Node, comment string) *Allocation {
-	alloc := emitAllocation(f, typ, source, comment)
+func emitNew(function *Function, typ types.Type, source ast.Node, comment string) *Allocation {
+	alloc := emitAllocation(function, typ, source, comment)
 	alloc.Heap = true
 	return alloc
 }
 
-// emitLocal creates a local var for (t, source, comment) and
+// emitLocal creates a local var for (resolvedType, source, comment) and
 // emits an Allocation instruction for it.
 //
 // (Use this function or emitNew for synthetic variables;
 // for source-level variables in the same function, use emitLocalVar.)
-func emitLocal(f *Function, t types.Type, source ast.Node, comment string) *Allocation {
-	local := emitAllocation(f, t, source, comment)
-	f.Locals = append(f.Locals, local)
+func emitLocal(function *Function, resolvedType types.Type, source ast.Node, comment string) *Allocation {
+	local := emitAllocation(function, resolvedType, source, comment)
+	function.Locals = append(function.Locals, local)
 	return local
 }
 
-// emitLocalVariable creates a local var for v and emits an Allocation instruction for it.
-// Subsequent calls to f.lookup(v) return it.
+// emitLocalVariable creates a local var for `variable` and emits an Allocation instruction for it.
+// Subsequent calls to f.lookup(variable) return it.
 // It applies the appropriate generic instantiation to the type.
-func emitLocalVariable(f *Function, v *types.Var, source ast.Node) *Allocation {
-	alloc := emitLocal(f, f.typ(v.Type()), source, v.Name())
-	f.vars[v] = alloc
+func emitLocalVariable(function *Function, variable *types.Var, source ast.Node) *Allocation {
+	alloc := emitLocal(function, function.typ(variable.Type()), source, variable.Name())
+	function.vars[variable] = alloc
 	return alloc
 }
 
-// emitLoad emits to f an instruction to load the address addr into a
+// emitLoad emits to `function` an instruction to load the address addr into a
 // new temporary, and returns the value so defined.
-func emitLoad(f *Function, addr Value, source ast.Node) *Load {
-	v := &Load{X: addr}
-	v.setType(deref(addr.Type()))
-	f.emit(v, source)
-	return v
+func emitLoad(function *Function, addr Value, source ast.Node) *Load {
+	load := &Load{X: addr}
+	load.setType(deref(addr.Type()))
+	function.emit(load, source)
+	return load
 }
 
-func emitReceive(f *Function, channel Value, commaOk bool, typ types.Type, source ast.Node) Value {
+func emitReceive(function *Function, channel Value, commaOk bool, typ types.Type, source ast.Node) Value {
 	recv := &Receive{
 		Channel: channel,
 		CommaOk: commaOk,
 	}
 	recv.setType(typ)
-	return f.emit(recv, source)
+	return function.emit(recv, source)
 }
 
-// emitArith emits to f code to compute the binary operation op(x, y)
+// emitArith emits to `function` code to compute the binary operation op(x, y)
 // where op is an eager shift, logical or arithmetic operation.
 // (Use emitCompare() for comparisons and Builder.logicalBinop() for
 // non-eager operations.)
-func emitArith(f *Function, op token.Token, x, y Value, t types.Type, source ast.Node) Value {
+func emitArith(function *Function, op token.Token, x, y Value, resolvedType types.Type, source ast.Node) Value {
 	switch op {
 	case token.SHL, token.SHR:
-		x = emitConv(f, x, t, source)
+		x = emitConv(function, x, resolvedType, source)
 		// y may be signed or an 'untyped' constant.
 		// There is a runtime panic if y is signed and <0. Instead of inserting a check for y<0
 		// and converting to an unsigned value (like the compiler) leave y as is.
-		if b, ok := y.Type().Underlying().(*types.Basic); ok && b.Info()&types.IsUntyped != 0 {
+		if basic, ok := y.Type().Underlying().(*types.Basic); ok && basic.Info()&types.IsUntyped != 0 {
 			// Untyped conversion:
 			// Spec https://go.dev/ref/spec#Operators:
 			// The right operand in a shift expression must have integer type or be an untyped constant
 			// representable by a value of type uint.
-			y = emitConv(f, y, types.Typ[types.Uint], source)
+			y = emitConv(function, y, types.Typ[types.Uint], source)
 		}
 
 	case token.ADD, token.SUB, token.MUL, token.QUO, token.REM, token.AND, token.OR, token.XOR, token.AND_NOT:
-		x = emitConv(f, x, t, source)
-		y = emitConv(f, y, t, source)
+		x = emitConv(function, x, resolvedType, source)
+		y = emitConv(function, y, resolvedType, source)
 
 	default:
 		panic("illegal op in emitArith: " + op.String())
 
 	}
-	v := &BinaryOperation{
+	operation := &BinaryOperation{
 		Operator: op,
 		X:        x,
 		Y:        y,
 	}
-	v.setType(t)
-	return f.emit(v, source)
+	operation.setType(resolvedType)
+	return function.emit(operation, source)
 }
 
-// emitCompare emits to f code compute the boolean result of
+// emitCompare emits to `function` code compute the boolean result of
 // comparison 'x op y'.
-func emitCompare(f *Function, op token.Token, x, y Value, source ast.Node) Value {
+func emitCompare(function *Function, op token.Token, x, y Value, source ast.Node) Value {
 	xt := x.Type().Underlying()
 	yt := y.Type().Underlying()
 
@@ -143,25 +143,25 @@ func emitCompare(f *Function, op token.Token, x, y Value, source ast.Node) Value
 	if types.Identical(xt, yt) {
 		// no conversion necessary
 	} else if _, ok := xt.(*types.Interface); ok && !typeparams.IsTypeParam(x.Type()) {
-		y = emitConv(f, y, x.Type(), source)
+		y = emitConv(function, y, x.Type(), source)
 	} else if _, ok := yt.(*types.Interface); ok && !typeparams.IsTypeParam(y.Type()) {
-		x = emitConv(f, x, y.Type(), source)
+		x = emitConv(function, x, y.Type(), source)
 	} else if _, ok := x.(*Constant); ok {
-		x = emitConv(f, x, y.Type(), source)
+		x = emitConv(function, x, y.Type(), source)
 	} else if _, ok := y.(*Constant); ok {
-		y = emitConv(f, y, x.Type(), source)
+		y = emitConv(function, y, x.Type(), source)
 		//lint:ignore SA9003 no-op
 	} else {
 		// other cases, e.g. channels.  No-op.
 	}
 
-	v := &BinaryOperation{
+	operation := &BinaryOperation{
 		Operator: op,
 		X:        x,
 		Y:        y,
 	}
-	v.setType(tBool)
-	return f.emit(v, source)
+	operation.setType(tBool)
+	return function.emit(operation, source)
 }
 
 // isValuePreserving returns true if a conversion from ut_src to
@@ -187,11 +187,11 @@ func isValuePreserving(ut_src, ut_dst types.Type) bool {
 	return false
 }
 
-// emitConv emits to f code to convert Value val to exactly type typ,
+// emitConv emits to `function` code to convert Value val to exactly type typ,
 // and returns the converted value.  Implicit conversions are required
 // by language assignability rules in assignments, parameter passing,
 // etc.
-func emitConv(f *Function, value Value, t_dst types.Type, source ast.Node) Value {
+func emitConv(function *Function, value Value, t_dst types.Type, source ast.Node) Value {
 	t_src := value.Type()
 
 	// Identical types?  Conversion is a no-op.
@@ -206,16 +206,16 @@ func emitConv(f *Function, value Value, t_dst types.Type, source ast.Node) Value
 	if isNonTypeParamInterface(t_dst) {
 		// Interface name change?
 		if isValuePreserving(ut_src, ut_dst) {
-			c := &ChangeType{X: value}
-			c.setType(t_dst)
-			return f.emit(c, source)
+			changeType := &ChangeType{X: value}
+			changeType.setType(t_dst)
+			return function.emit(changeType, source)
 		}
 
 		// Assignment from one interface type to another?
 		if isNonTypeParamInterface(t_src) {
-			c := &ChangeInterface{X: value}
-			c.setType(t_dst)
-			return f.emit(c, source)
+			changeInterface := &ChangeInterface{X: value}
+			changeInterface.setType(t_dst)
+			return function.emit(changeInterface, source)
 		}
 
 		// Untyped nil constant?  Return interface-typed nil constant.
@@ -224,13 +224,13 @@ func emitConv(f *Function, value Value, t_dst types.Type, source ast.Node) Value
 		}
 
 		// Convert (non-nil) "untyped" literals to their default type.
-		if t, ok := ut_src.(*types.Basic); ok && t.Info()&types.IsUntyped != 0 {
-			value = emitConv(f, value, types.Default(ut_src), source)
+		if basic, ok := ut_src.(*types.Basic); ok && basic.Info()&types.IsUntyped != 0 {
+			value = emitConv(function, value, types.Default(ut_src), source)
 		}
 
 		mi := &MakeInterface{X: value}
 		mi.setType(t_dst)
-		return f.emit(mi, source)
+		return function.emit(mi, source)
 	}
 
 	// conversionCase describes an instruction pattern that maybe emitted to
@@ -258,11 +258,11 @@ func emitConv(f *Function, value Value, t_dst types.Type, source ast.Node) Value
 			var array *types.Array
 			var ptr bool
 			// Conversion from slice to array pointer?
-			switch d := d.(type) {
+			switch typed := d.(type) {
 			case *types.Array:
-				array = d
+				array = typed
 			case *types.Pointer:
-				array, _ = d.Elem().Underlying().(*types.Array)
+				array, _ = typed.Elem().Underlying().(*types.Array)
 				ptr = true
 			}
 			if array != nil && types.Identical(slice.Elem(), array.Elem()) {
@@ -286,7 +286,7 @@ func emitConv(f *Function, value Value, t_dst types.Type, source ast.Node) Value
 		if !isBasic(s) && !isBasic(d) {
 			panic(fmt.Sprintf(
 				"in %s: cannot convert term %s (%s [within %s]) to type %s [within %s]",
-				f,
+				function,
 				value,
 				value.Type(),
 				s,
@@ -307,7 +307,7 @@ func emitConv(f *Function, value Value, t_dst types.Type, source ast.Node) Value
 		})
 	})
 	if classifications == 0 {
-		panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", f, value, value.Type(), t_dst))
+		panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", function, value, value.Type(), t_dst))
 	}
 
 	// Conversion of a compile-time constant value?
@@ -333,143 +333,143 @@ func emitConv(f *Function, value Value, t_dst types.Type, source ast.Node) Value
 
 	switch classifications {
 	case changeType: // representation-preserving change
-		c := &ChangeType{X: value}
-		c.setType(t_dst)
-		return f.emit(c, source)
+		changeType := &ChangeType{X: value}
+		changeType.setType(t_dst)
+		return function.emit(changeType, source)
 
 	case sliceToArrayPtr, sliceTo0ArrayPtr: // slice to array pointer
-		c := &SliceToArrayPointer{X: value}
-		c.setType(t_dst)
-		return f.emit(c, source)
+		pointer := &SliceToArrayPointer{X: value}
+		pointer.setType(t_dst)
+		return function.emit(pointer, source)
 
 	case sliceToArray: // slice to arrays (not zero-length)
-		p := &SliceToArray{X: value}
-		p.setType(t_dst)
-		return f.emit(p, source)
+		array := &SliceToArray{X: value}
+		array.setType(t_dst)
+		return function.emit(array, source)
 
 	case sliceTo0Array: // slice to zero-length arrays (constant)
 		return zeroConstant(t_dst, source)
 
 	case convert: // representation-changing conversion
-		c := &Convert{X: value}
-		c.setType(t_dst)
-		return f.emit(c, source)
+		convert := &Convert{X: value}
+		convert.setType(t_dst)
+		return function.emit(convert, source)
 
 	default: // The conversion represents a cross product.
-		c := &MultiConvert{X: value, from: t_src, to: t_dst}
-		c.setType(t_dst)
-		return f.emit(c, source)
+		convert := &MultiConvert{X: value, from: t_src, to: t_dst}
+		convert.setType(t_dst)
+		return function.emit(convert, source)
 	}
 }
 
-// emitTypeCoercion emits to f code to coerce the type of a
-// Value v to exactly type typ, and returns the coerced value.
+// emitTypeCoercion emits to `function` code to coerce the type of a
+// Value `value` to exactly type typ, and returns the coerced value.
 //
 // Requires that coercing v.Typ() to typ is a value preserving change.
 //
 // Currently used only when v.Type() is a type instance of typ or vice versa.
-// A type v is a type instance of a type t if there exists a
-// type parameter substitution σ s.t. σ(v) == t. Example:
+// A type `value` is a type instance of a type t if there exists a
+// type parameter substitution σ s.t. σ(value) == t. Example:
 //
 //	σ(func(T) T) == func(int) int for σ == [T ↦ int]
 //
 // This happens in instantiation wrappers for conversion
 // from an instantiation to a parameterized type (and vice versa)
 // with σ substituting f.typeparams by f.typeargs.
-func emitTypeCoercion(f *Function, v Value, typ types.Type, source ast.Node) Value {
-	if types.Identical(v.Type(), typ) {
-		return v // no coercion needed
+func emitTypeCoercion(function *Function, value Value, typ types.Type, source ast.Node) Value {
+	if types.Identical(value.Type(), typ) {
+		return value // no coercion needed
 	}
 	// TODO(taking): for instances should we record which side is the instance?
-	c := &ChangeType{
-		X: v,
+	changeType := &ChangeType{
+		X: value,
 	}
-	c.setType(typ)
-	f.emit(c, source)
-	return c
+	changeType.setType(typ)
+	function.emit(changeType, source)
+	return changeType
 }
 
-// emitStore emits to f an instruction to store value val at location
+// emitStore emits to `function` an instruction to store value val at location
 // addr, applying implicit conversions as required by assignability rules.
-func emitStore(f *Function, addr, value Value, source ast.Node) *Store {
+func emitStore(function *Function, addr, value Value, source ast.Node) *Store {
 	typ := deref(addr.Type())
-	s := &Store{
+	store := &Store{
 		Address: addr,
-		Value:   emitConv(f, value, typ, source),
+		Value:   emitConv(function, value, typ, source),
 	}
-	f.emit(s, source)
-	return s
+	function.emit(store, source)
+	return store
 }
 
-// emitJump emits to f a jump to target, and updates the control-flow graph.
+// emitJump emits to `function` a jump to target, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
-func emitJump(f *Function, target *BasicBlock, source ast.Node) *Jump {
-	b := f.currentBlock
-	j := new(Jump)
-	b.emit(j, source)
-	addEdge(b, target)
-	f.currentBlock = nil
-	return j
+func emitJump(function *Function, target *BasicBlock, source ast.Node) *Jump {
+	block := function.currentBlock
+	jump := new(Jump)
+	block.emit(jump, source)
+	addEdge(block, target)
+	function.currentBlock = nil
+	return jump
 }
 
-// emitIf emits to f a conditional jump to tblock or fblock based on
+// emitIf emits to `function` a conditional jump to tblock or fblock based on
 // cond, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
-func emitIf(f *Function, cond Value, tblock, fblock *BasicBlock, source ast.Node) *If {
-	b := f.currentBlock
+func emitIf(function *Function, cond Value, tblock, fblock *BasicBlock, source ast.Node) *If {
+	block := function.currentBlock
 	stmt := &If{Condition: cond}
-	b.emit(stmt, source)
-	addEdge(b, tblock)
-	addEdge(b, fblock)
-	f.currentBlock = nil
+	block.emit(stmt, source)
+	addEdge(block, tblock)
+	addEdge(block, fblock)
+	function.currentBlock = nil
 	return stmt
 }
 
-// emitExtract emits to f an instruction to extract the index'th
+// emitExtract emits to `function` an instruction to extract the index'th
 // component of tuple.  It returns the extracted value.
-func emitExtract(f *Function, tuple Value, index int, source ast.Node) Value {
-	e := &Extract{Tuple: tuple, Index: index}
-	e.setType(tuple.Type().(*types.Tuple).At(index).Type())
-	return f.emit(e, source)
+func emitExtract(function *Function, tuple Value, index int, source ast.Node) Value {
+	extract := &Extract{Tuple: tuple, Index: index}
+	extract.setType(tuple.Type().(*types.Tuple).At(index).Type())
+	return function.emit(extract, source)
 }
 
-// emitTypeAssert emits to f a type assertion value := x.(t) and
+// emitTypeAssert emits to `function` a type assertion value := x.(resolvedType) and
 // returns the value.  x.Type() must be an interface.
-func emitTypeAssert(f *Function, x Value, t types.Type, source ast.Node) Value {
-	a := &TypeAssert{X: x, AssertedType: t}
-	a.setType(t)
-	return f.emit(a, source)
+func emitTypeAssert(function *Function, x Value, resolvedType types.Type, source ast.Node) Value {
+	assert := &TypeAssert{X: x, AssertedType: resolvedType}
+	assert.setType(resolvedType)
+	return function.emit(assert, source)
 }
 
-// emitTypeTest emits to f a type test value,ok := x.(t) and returns
+// emitTypeTest emits to `function` a type test value,ok := x.(resolvedType) and returns
 // a (value, ok) tuple.  x.Type() must be an interface.
-func emitTypeTest(f *Function, x Value, t types.Type, source ast.Node) Value {
-	a := &TypeAssert{
+func emitTypeTest(function *Function, x Value, resolvedType types.Type, source ast.Node) Value {
+	assert := &TypeAssert{
 		X:            x,
-		AssertedType: t,
+		AssertedType: resolvedType,
 		CommaOk:      true,
 	}
-	a.setType(types.NewTuple(
-		newVariable("value", t),
+	assert.setType(types.NewTuple(
+		newVariable("value", resolvedType),
 		varOk,
 	))
-	return f.emit(a, source)
+	return function.emit(assert, source)
 }
 
-// emitTailCall emits to f a function call in tail position.  The
+// emitTailCall emits to `function` a function call in tail position.  The
 // caller is responsible for all fields of 'call' except its type.
 // Intended for wrapper methods.
-// Precondition: f does/will not use deferred procedure calls.
+// Precondition: `function` does/will not use deferred procedure calls.
 // Postcondition: f.currentBlock is nil.
-func emitTailCall(f *Function, call *Call, source ast.Node) {
-	tresults := f.Signature.Results()
+func emitTailCall(function *Function, call *Call, source ast.Node) {
+	tresults := function.Signature.Results()
 	nr := tresults.Len()
 	if nr == 1 {
 		call.typ = tresults.At(0).Type()
 	} else {
 		call.typ = tresults
 	}
-	tuple := emitCall(f, call, source)
+	tuple := emitCall(function, call, source)
 	var ret Return
 	switch nr {
 	case 0:
@@ -477,136 +477,136 @@ func emitTailCall(f *Function, call *Call, source ast.Node) {
 	case 1:
 		ret.Results = []Value{tuple}
 	default:
-		for i := range nr {
-			v := emitExtract(f, tuple, i, source)
+		for index := range nr {
+			value := emitExtract(function, tuple, index, source)
 			// TODO(adonovan): in principle, this is required:
 			//   v = emitConv(f, o.Type, f.Signature.Results[i].Type)
 			// but in practice emitTailCall is only used when
 			// the types exactly match.
-			ret.Results = append(ret.Results, v)
+			ret.Results = append(ret.Results, value)
 		}
 	}
 
-	f.emit(&ret, source)
-	f.currentBlock = nil
+	function.emit(&ret, source)
+	function.currentBlock = nil
 }
 
 // emitCall emits a call instruction. If the callee is "no return",
 // it also emits a panic to eliminate infeasible CFG edges.
-func emitCall(fn *Function, call *Call, source ast.Node) Value {
-	result := fn.emit(call, source)
+func emitCall(function *Function, call *Call, source ast.Node) Value {
+	result := function.emit(call, source)
 
 	callee := call.Call.StaticCallee()
 	if callee != nil &&
 		callee.object != nil &&
-		fn.Program.noReturn != nil &&
-		fn.Program.noReturn(callee.object) {
+		function.Program.noReturn != nil &&
+		function.Program.noReturn(callee.object) {
 		// Call doesn't return normally. Either it doesn't return at all
 		// (infinitely blocked or exitting the process), or it unwinds the stack
 		// (panic, runtime.Goexit). Model this as a panic.
-		fn.emit(&Panic{
-			X: emitConv(fn, vNoReturn, tEface, source),
+		function.emit(&Panic{
+			X: emitConv(function, vNoReturn, tEface, source),
 		}, source)
-		fn.currentBlock = fn.newBasicBlock("unreachable")
+		function.currentBlock = function.newBasicBlock("unreachable")
 	}
 
 	return result
 }
 
-// emitImplicitSelections emits to f code to apply the sequence of
-// implicit field selections specified by indices to base value v, and
+// emitImplicitSelections emits to `function` code to apply the sequence of
+// implicit field selections specified by indices to base value `value`, and
 // returns the selected value.
 //
-// If v is the address of a struct, the result will be the address of
+// If `value` is the address of a struct, the result will be the address of
 // a field; if it is the value of a struct, the result will be the
 // value of a field.
-func emitImplicitSelections(f *Function, v Value, indices []int, source ast.Node) Value {
+func emitImplicitSelections(function *Function, value Value, indices []int, source ast.Node) Value {
 	for _, index := range indices {
 		// We may have a generic type containing a pointer, or a pointer to a generic type containing a struct. A
 		// pointer to a generic containing a pointer to a struct shouldn't be possible because the outer pointer gets
 		// dereferenced implicitly before we get here.
-		if isPointerCore(v.Type()) {
-			fld := fieldOf(deref(v.Type()), index)
+		if isPointerCore(value.Type()) {
+			fld := fieldOf(deref(value.Type()), index)
 			instr := &FieldAddress{
-				X:     v,
+				X:     value,
 				Field: index,
 			}
 			instr.setType(types.NewPointer(fld.Type()))
-			v = f.emit(instr, source)
+			value = function.emit(instr, source)
 			// Load the field's value iff indirectly embedded.
 			if isPointerCore(fld.Type()) {
-				v = emitLoad(f, v, source)
+				value = emitLoad(function, value, source)
 			}
 		} else {
-			fld := fieldOf(v.Type(), index)
+			fld := fieldOf(value.Type(), index)
 			instr := &Field{
-				X:     v,
+				X:     value,
 				Field: index,
 			}
 			instr.setType(fld.Type())
-			v = f.emit(instr, source)
+			value = function.emit(instr, source)
 		}
 	}
-	return v
+	return value
 }
 
-// emitFieldSelection emits to f code to select the index'th field of v.
+// emitFieldSelection emits to `function` code to select the index'th field of `value`.
 //
 // If wantAddr, the input must be a pointer-to-struct and the result
 // will be the field's address; otherwise the result will be the
 // field's value.
 // Ident id is used for position and debug info.
-func emitFieldSelection(f *Function, v Value, index int, wantAddr bool, id *ast.Ident) Value {
-	if isPointerCore(v.Type()) {
-		fld := fieldOf(deref(v.Type()), index)
+func emitFieldSelection(function *Function, value Value, index int, wantAddr bool, id *ast.Ident) Value {
+	if isPointerCore(value.Type()) {
+		fld := fieldOf(deref(value.Type()), index)
 		instr := &FieldAddress{
-			X:     v,
+			X:     value,
 			Field: index,
 		}
 		instr.setSource(id)
 		instr.setType(types.NewPointer(fld.Type()))
-		v = f.emit(instr, id)
+		value = function.emit(instr, id)
 		// Load the field's value iff we don't want its address.
 		if !wantAddr {
-			v = emitLoad(f, v, id)
+			value = emitLoad(function, value, id)
 		}
 	} else {
-		fld := fieldOf(v.Type(), index)
+		fld := fieldOf(value.Type(), index)
 		instr := &Field{
-			X:     v,
+			X:     value,
 			Field: index,
 		}
 		instr.setSource(id)
 		instr.setType(fld.Type())
-		v = f.emit(instr, id)
+		value = function.emit(instr, id)
 	}
-	return v
+	return value
 }
 
-// createRecoverBlock emits to f a block of code to return after a
+// createRecoverBlock emits to `function` a block of code to return after a
 // recovered panic, and sets f.Recover to it.
 //
-// If f's result parameters are named, the code loads and returns
+// If `function`'s result parameters are named, the code loads and returns
 // their current values, otherwise it returns the zero values of their
 // type.
 //
 // Idempotent.
-func createRecoverBlock(f *Function) {
-	if f.Recover != nil {
+func createRecoverBlock(function *Function) {
+	if function.Recover != nil {
 		return // already created
 	}
-	saved := f.currentBlock
+	saved := function.currentBlock
 
-	f.Recover = f.newBasicBlock("recover")
-	f.currentBlock = f.Recover
+	function.Recover = function.newBasicBlock("recover")
+	function.currentBlock = function.Recover
 
 	var results []Value
 	// Reload NRPs to form value tuple.
-	for _, nr := range f.results {
-		results = append(results, emitLoad(f, nr, nr.source))
+	for _, nr := range function.results {
+		results = append(results, emitLoad(function, nr, nr.source))
 	}
 
-	f.emit(&Return{Results: results}, nil)
+	function.emit(&Return{Results: results}, nil)
 
-	f.currentBlock = saved
+	function.currentBlock = saved
 }

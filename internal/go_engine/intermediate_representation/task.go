@@ -76,18 +76,18 @@ func (x *task) wait() {
 	// due to slices functions.
 	work := []*task{x}
 	enqueued := map[*task]unit{x: {}}
-	for i := 0; i < len(work); i++ {
-		u := work[i]
-		if u.isTransitivelyDone() { // already transitively done
-			work[i] = nil
+	for index := 0; index < len(work); index++ {
+		task := work[index]
+		if task.isTransitivelyDone() { // already transitively done
+			work[index] = nil
 			continue
 		}
-		<-u.done // wait for u to be marked done.
+		<-task.done // wait for u to be marked done.
 
-		for v := range u.edges {
-			if _, ok := enqueued[v]; !ok {
-				enqueued[v] = unit{}
-				work = append(work, v)
+		for key := range task.edges {
+			if _, ok := enqueued[key]; !ok {
+				enqueued[key] = unit{}
+				work = append(work, key)
 			}
 		}
 	}
@@ -95,8 +95,8 @@ func (x *task) wait() {
 	// work is transitively closed over dependencies.
 	// u in work is done (or transitively done and skipped).
 	// u is transitively done.
-	for _, u := range work {
-		if u != nil {
+	for _, task := range work {
+		if task != nil {
 			x.transitive.Store(true)
 		}
 	}

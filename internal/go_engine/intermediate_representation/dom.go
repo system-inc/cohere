@@ -26,23 +26,23 @@ import (
 // its parent in the dominator tree, if any.
 // Neither the entry node (b.Index==0) nor recover node
 // (b==b.Parent().Recover()) have a parent.
-func (b *BasicBlock) ImmediateDominator() *BasicBlock { return b.dom.idom }
+func (block *BasicBlock) ImmediateDominator() *BasicBlock { return block.dom.idom }
 
 // Dominees returns the list of blocks that b immediately dominates:
 // its children in the dominator tree.
-func (b *BasicBlock) Dominees() []*BasicBlock { return b.dom.children }
+func (block *BasicBlock) Dominees() []*BasicBlock { return block.dom.children }
 
-// Dominates reports whether b dominates c.
-func (b *BasicBlock) Dominates(c *BasicBlock) bool {
-	return b.dom.pre <= c.dom.pre && c.dom.post <= b.dom.post
+// Dominates reports whether b dominates `basicBlock`.
+func (block *BasicBlock) Dominates(basicBlock *BasicBlock) bool {
+	return block.dom.pre <= basicBlock.dom.pre && basicBlock.dom.post <= block.dom.post
 }
 
 // DominatorPreorder returns a new slice containing the blocks of f
 // in a preorder traversal of the dominator tree.
-func (f *Function) DominatorPreorder() []*BasicBlock {
-	slice := slices.Clone(f.Blocks)
-	sort.Slice(slice, func(i, j int) bool {
-		return slice[i].dom.pre < slice[j].dom.pre
+func (function *Function) DominatorPreorder() []*BasicBlock {
+	slice := slices.Clone(function.Blocks)
+	sort.Slice(slice, func(left, right int) bool {
+		return slice[left].dom.pre < slice[right].dom.pre
 	})
 	return slice
 }
@@ -50,10 +50,10 @@ func (f *Function) DominatorPreorder() []*BasicBlock {
 // DominatorPostorder returns a new slice containing the blocks of f
 // in a postorder traversal of the dominator tree.
 // (This is not the same as a postdominance order.)
-func (f *Function) DominatorPostorder() []*BasicBlock {
-	slice := slices.Clone(f.Blocks)
-	sort.Slice(slice, func(i, j int) bool {
-		return slice[i].dom.post < slice[j].dom.post
+func (function *Function) DominatorPostorder() []*BasicBlock {
+	slice := slices.Clone(function.Blocks)
+	sort.Slice(slice, func(left, right int) bool {
+		return slice[left].dom.post < slice[right].dom.post
 	})
 	return slice
 }
@@ -75,27 +75,27 @@ type ltState struct {
 }
 
 // dfs implements the depth-first search part of the LT algorithm.
-func (lt *ltState) dfs(v *BasicBlock, i int32, preorder []*BasicBlock) int32 {
-	preorder[i] = v
-	v.dom.pre = i // For now: DFS preorder of spanning tree of CFG
-	i++
-	lt.sdom[v.Index] = v
-	lt.link(nil, v)
-	for _, w := range v.Successors {
-		if lt.sdom[w.Index] == nil {
-			lt.parent[w.Index] = v
-			i = lt.dfs(w, i, preorder)
+func (state *ltState) dfs(block *BasicBlock, index int32, preorder []*BasicBlock) int32 {
+	preorder[index] = block
+	block.dom.pre = index // For now: DFS preorder of spanning tree of CFG
+	index++
+	state.sdom[block.Index] = block
+	state.link(nil, block)
+	for _, successor := range block.Successors {
+		if state.sdom[successor.Index] == nil {
+			state.parent[successor.Index] = block
+			index = state.dfs(successor, index, preorder)
 		}
 	}
-	return i
+	return index
 }
 
 // eval implements the EVAL part of the LT algorithm.
-func (lt *ltState) eval(v *BasicBlock) *BasicBlock {
+func (state *ltState) eval(v *BasicBlock) *BasicBlock {
 	// TODO(adonovan): opt: do path compression per simple LT.
 	u := v
-	for ; lt.ancestor[v.Index] != nil; v = lt.ancestor[v.Index] {
-		if lt.sdom[v.Index].dom.pre < lt.sdom[u.Index].dom.pre {
+	for ; state.ancestor[v.Index] != nil; v = state.ancestor[v.Index] {
+		if state.sdom[v.Index].dom.pre < state.sdom[u.Index].dom.pre {
 			u = v
 		}
 	}
@@ -103,8 +103,8 @@ func (lt *ltState) eval(v *BasicBlock) *BasicBlock {
 }
 
 // link implements the LINK part of the LT algorithm.
-func (lt *ltState) link(v, w *BasicBlock) {
-	lt.ancestor[w.Index] = v
+func (state *ltState) link(v, w *BasicBlock) {
+	state.ancestor[w.Index] = v
 }
 
 // buildDominatorTree computes the dominator tree of f using the LT algorithm.
@@ -113,16 +113,16 @@ func (lt *ltState) link(v, w *BasicBlock) {
 // The core's dominator tree goes here (#0scefye). This is go/ir's own until static_single_assignment's
 // tree, built in go/ir's Successors order, lands on main and is proven equal to it, block for block,
 // Recover's second root included; then this function and the domInfo it fills give way to it.
-func buildDominatorTree(fn *Function) {
+func buildDominatorTree(function *Function) {
 	// The step numbers refer to the original LT paper; the
 	// reordering is due to Georgiadis.
 
 	// Clear any previous domInfo.
-	for _, b := range fn.Blocks {
-		b.dom = domInfo{}
+	for _, block := range function.Blocks {
+		block.dom = domInfo{}
 	}
 
-	n := len(fn.Blocks)
+	n := len(function.Blocks)
 	// Allocate space for 5 contiguous [n]*BasicBlock arrays:
 	// sdom, parent, ancestor, preorder, buckets.
 	space := make([]*BasicBlock, 5*n)
@@ -134,9 +134,9 @@ func buildDominatorTree(fn *Function) {
 
 	// Step 1.  Number vertices by depth-first preorder.
 	preorder := space[3*n : 4*n]
-	root := fn.Blocks[0]
+	root := function.Blocks[0]
 	prenum := lt.dfs(root, 0, preorder)
-	recover := fn.Recover
+	recover := function.Recover
 	if recover != nil {
 		lt.dfs(recover, prenum, preorder)
 	}
@@ -145,23 +145,23 @@ func buildDominatorTree(fn *Function) {
 	copy(buckets, preorder)
 
 	// In reverse preorder...
-	for i := int32(n) - 1; i > 0; i-- {
-		w := preorder[i]
+	for index := int32(n) - 1; index > 0; index-- {
+		w := preorder[index]
 
 		// Step 3. Implicitly define the immediate dominator of each node.
-		for v := buckets[i]; v != w; v = buckets[v.dom.pre] {
-			u := lt.eval(v)
-			if lt.sdom[u.Index].dom.pre < i {
-				v.dom.idom = u
+		for bucket := buckets[index]; bucket != w; bucket = buckets[bucket.dom.pre] {
+			u := lt.eval(bucket)
+			if lt.sdom[u.Index].dom.pre < index {
+				bucket.dom.idom = u
 			} else {
-				v.dom.idom = w
+				bucket.dom.idom = w
 			}
 		}
 
 		// Step 2. Compute the semidominators of all nodes.
 		lt.sdom[w.Index] = lt.parent[w.Index]
-		for _, v := range w.Predecessors {
-			u := lt.eval(v)
+		for _, predecessor := range w.Predecessors {
+			u := lt.eval(predecessor)
 			if lt.sdom[u.Index].dom.pre < lt.sdom[w.Index].dom.pre {
 				lt.sdom[w.Index] = lt.sdom[u.Index]
 			}
@@ -172,27 +172,27 @@ func buildDominatorTree(fn *Function) {
 		if lt.parent[w.Index] == lt.sdom[w.Index] {
 			w.dom.idom = lt.parent[w.Index]
 		} else {
-			buckets[i] = buckets[lt.sdom[w.Index].dom.pre]
+			buckets[index] = buckets[lt.sdom[w.Index].dom.pre]
 			buckets[lt.sdom[w.Index].dom.pre] = w
 		}
 	}
 
 	// The final 'Step 3' is now outside the loop.
-	for v := buckets[0]; v != root; v = buckets[v.dom.pre] {
-		v.dom.idom = root
+	for bucket := buckets[0]; bucket != root; bucket = buckets[bucket.dom.pre] {
+		bucket.dom.idom = root
 	}
 
 	// Step 4. Explicitly define the immediate dominator of each
 	// node, in preorder.
-	for _, w := range preorder[1:] {
-		if w == root || w == recover {
-			w.dom.idom = nil
+	for _, block := range preorder[1:] {
+		if block == root || block == recover {
+			block.dom.idom = nil
 		} else {
-			if w.dom.idom != lt.sdom[w.Index] {
-				w.dom.idom = w.dom.idom.dom.idom
+			if block.dom.idom != lt.sdom[block.Index] {
+				block.dom.idom = block.dom.idom.dom.idom
 			}
 			// Calculate Children relation as inverse of ImmediateDominator.
-			w.dom.idom.dom.children = append(w.dom.idom.dom.children, w)
+			block.dom.idom.dom.children = append(block.dom.idom.dom.children, block)
 		}
 	}
 
@@ -203,15 +203,15 @@ func buildDominatorTree(fn *Function) {
 }
 
 // numberDomTree sets the pre- and post-order numbers of a depth-first
-// traversal of the dominator tree rooted at v.  These are used to
+// traversal of the dominator tree rooted at `block`.  These are used to
 // answer dominance queries in constant time.
-func numberDominatorTree(v *BasicBlock, pre, post int32) (int32, int32) {
-	v.dom.pre = pre
+func numberDominatorTree(block *BasicBlock, pre, post int32) (int32, int32) {
+	block.dom.pre = pre
 	pre++
-	for _, child := range v.dom.children {
+	for _, child := range block.dom.children {
 		pre, post = numberDominatorTree(child, pre, post)
 	}
-	v.dom.post = post
+	block.dom.post = post
 	post++
 	return pre, post
 }

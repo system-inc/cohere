@@ -9,26 +9,26 @@ package intermediate_representation
 // The rest of lift.go comes with lifting (#ee33njz).
 
 func removeInstruction(refs []Instruction, instr Instruction) []Instruction {
-	s := refs
+	instructions := refs
 	i := -1
-	for j := range s {
-		if instr == s[j] {
+	for j := range instructions {
+		if instr == instructions[j] {
 			i = j
 			break
 		}
 	}
 	if i == -1 {
-		return s
+		return instructions
 	}
 	// Don't start copying elements until we find one to delete.
-	for j := i + 1; j < len(s); j++ {
-		if v := s[j]; v != instr {
-			s[i] = v
+	for j := i + 1; j < len(instructions); j++ {
+		if instruction := instructions[j]; instruction != instr {
+			instructions[i] = instruction
 			i++
 		}
 	}
-	clear(s[i:]) // zero/nil out the obsolete elements, for GC
-	return s[:i]
+	clear(instructions[i:]) // zero/nil out the obsolete elements, for GC
+	return instructions[:i]
 }
 
 type BlockSet struct {
@@ -41,66 +41,66 @@ func NewBlockSet(size int) *BlockSet {
 	return &BlockSet{values: make([]bool, size)}
 }
 
-func (s *BlockSet) Set(s2 *BlockSet) {
-	copy(s.values, s2.values)
-	s.count = 0
-	for _, v := range s.values {
-		if v {
-			s.count++
+func (set *BlockSet) Set(s2 *BlockSet) {
+	copy(set.values, s2.values)
+	set.count = 0
+	for _, value := range set.values {
+		if value {
+			set.count++
 		}
 	}
 }
 
-func (s *BlockSet) Count() int {
-	return s.count
+func (set *BlockSet) Count() int {
+	return set.count
 }
 
-func (s *BlockSet) Has(b *BasicBlock) bool {
-	if b.Index >= len(s.values) {
+func (set *BlockSet) Has(block *BasicBlock) bool {
+	if block.Index >= len(set.values) {
 		return false
 	}
-	return s.values[b.Index]
+	return set.values[block.Index]
 }
 
-// add adds b to the set and returns true if the set changed.
-func (s *BlockSet) Add(b *BasicBlock) bool {
-	if s.values[b.Index] {
+// add adds `block` to the set and returns true if the set changed.
+func (set *BlockSet) Add(block *BasicBlock) bool {
+	if set.values[block.Index] {
 		return false
 	}
-	s.count++
-	s.values[b.Index] = true
-	s.index = b.Index
+	set.count++
+	set.values[block.Index] = true
+	set.index = block.Index
 
 	return true
 }
 
-func (s *BlockSet) Clear() {
-	for j := range s.values {
-		s.values[j] = false
+func (set *BlockSet) Clear() {
+	for index := range set.values {
+		set.values[index] = false
 	}
-	s.count = 0
+	set.count = 0
 }
 
 // take removes an arbitrary element from a set s and
 // returns its index, or returns -1 if empty.
-func (s *BlockSet) Take() int {
+func (set *BlockSet) Take() int {
 	// [i, end]
-	for i := s.index; i < len(s.values); i++ {
-		if s.values[i] {
-			s.values[i] = false
-			s.index = i
-			s.count--
-			return i
+	for index := set.index; index < len(set.values); index++ {
+		if set.values[index] {
+			set.values[index] = false
+			set.index = index
+			set.count--
+			return index
 		}
 	}
 
 	// [start, i)
-	for i := 0; i < s.index; i++ {
-		if s.values[i] {
-			s.values[i] = false
-			s.index = i
-			s.count--
-			return i
+	for index := 0; index < set.index; index++ {
+		if set.values[index] {
+			set.values[index] = false
+			set.index = index
+			set.count--
+			return index
 		}
 	}
 

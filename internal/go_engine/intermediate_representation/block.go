@@ -18,62 +18,62 @@ func addEdge(from, to *BasicBlock) {
 }
 
 // Control returns the last instruction in the block.
-func (b *BasicBlock) Control() Instruction {
-	if len(b.Instructions) == 0 {
+func (block *BasicBlock) Control() Instruction {
+	if len(block.Instructions) == 0 {
 		return nil
 	}
-	return b.Instructions[len(b.Instructions)-1]
+	return block.Instructions[len(block.Instructions)-1]
 }
 
 // Parent returns the function that contains block b.
-func (b *BasicBlock) Parent() *Function { return b.parent }
+func (block *BasicBlock) Parent() *Function { return block.parent }
 
-func (b *BasicBlock) Reaches(o *BasicBlock) bool {
-	return b.Scc.reachable.Bit(o.Scc.Index) != 0
+func (block *BasicBlock) Reaches(basicBlock *BasicBlock) bool {
+	return block.Scc.reachable.Bit(basicBlock.Scc.Index) != 0
 }
 
 // String returns a human-readable label of this block.
 // It is not guaranteed unique within the function.
-func (b *BasicBlock) String() string {
-	return fmt.Sprintf("%d", b.Index)
+func (block *BasicBlock) String() string {
+	return fmt.Sprintf("%d", block.Index)
 }
 
 // emit appends an instruction to the current basic block.
 // If the instruction defines a Value, it is returned.
-func (b *BasicBlock) emit(i Instruction, source ast.Node) Value {
-	i.setSource(source)
-	i.setBlock(b)
-	b.Instructions = append(b.Instructions, i)
-	v, _ := i.(Value)
-	return v
+func (block *BasicBlock) emit(instruction Instruction, source ast.Node) Value {
+	instruction.setSource(source)
+	instruction.setBlock(block)
+	block.Instructions = append(block.Instructions, instruction)
+	value, _ := instruction.(Value)
+	return value
 }
 
-// predecessorIndex returns the i such that b.Predecessors[i] == c or panics if
+// predecessorIndex returns the i such that b.Predecessors[i] == `basicBlock` or panics if
 // there is none.
-func (b *BasicBlock) predecessorIndex(c *BasicBlock) int {
-	for i, pred := range b.Predecessors {
-		if pred == c {
-			return i
+func (block *BasicBlock) predecessorIndex(basicBlock *BasicBlock) int {
+	for index, pred := range block.Predecessors {
+		if pred == basicBlock {
+			return index
 		}
 	}
-	panic(fmt.Sprintf("no edge %s -> %s", c, b))
+	panic(fmt.Sprintf("no edge %s -> %s", basicBlock, block))
 }
 
 // hasPhi returns true if b.Instructions contains φ-nodes.
-func (b *BasicBlock) hasPhi() bool {
-	_, ok := b.Instructions[0].(*Phi)
+func (block *BasicBlock) hasPhi() bool {
+	_, ok := block.Instructions[0].(*Phi)
 	return ok
 }
 
-func (b *BasicBlock) Phis() []Instruction {
-	return b.phis()
+func (block *BasicBlock) Phis() []Instruction {
+	return block.phis()
 }
 
 // phis returns the prefix of b.Instructions containing all the block's φ-nodes.
-func (b *BasicBlock) phis() []Instruction {
-	for i, instr := range b.Instructions {
+func (block *BasicBlock) phis() []Instruction {
+	for index, instr := range block.Instructions {
 		if _, ok := instr.(*Phi); !ok {
-			return b.Instructions[:i]
+			return block.Instructions[:index]
 		}
 	}
 	return nil // unreachable in well-formed blocks
@@ -81,51 +81,51 @@ func (b *BasicBlock) phis() []Instruction {
 
 // replacePred replaces all occurrences of p in b's predecessor list with q.
 // Ordinarily there should be at most one.
-func (b *BasicBlock) replacePredecessor(p, q *BasicBlock) {
-	for i, pred := range b.Predecessors {
+func (block *BasicBlock) replacePredecessor(p, q *BasicBlock) {
+	for index, pred := range block.Predecessors {
 		if pred == p {
-			b.Predecessors[i] = q
+			block.Predecessors[index] = q
 		}
 	}
 }
 
 // replaceSucc replaces all occurrences of p in b's successor list with q.
 // Ordinarily there should be at most one.
-func (b *BasicBlock) replaceSuccessor(p, q *BasicBlock) {
-	for i, succ := range b.Successors {
+func (block *BasicBlock) replaceSuccessor(p, q *BasicBlock) {
+	for index, succ := range block.Successors {
 		if succ == p {
-			b.Successors[i] = q
+			block.Successors[index] = q
 		}
 	}
 }
 
-// removePred removes all occurrences of p in b's
+// removePred removes all occurrences of `basicBlock` in b's
 // predecessor list and φ-nodes.
 // Ordinarily there should be at most one.
-func (b *BasicBlock) removePredecessor(p *BasicBlock) {
-	phis := b.phis()
+func (block *BasicBlock) removePredecessor(basicBlock *BasicBlock) {
+	phis := block.phis()
 
 	// We must preserve edge order for φ-nodes.
 	j := 0
-	for i, pred := range b.Predecessors {
-		if pred != p {
-			b.Predecessors[j] = b.Predecessors[i]
+	for predecessorIndex, pred := range block.Predecessors {
+		if pred != basicBlock {
+			block.Predecessors[j] = block.Predecessors[predecessorIndex]
 			// Strike out φ-edge too.
 			for _, instr := range phis {
 				phi := instr.(*Phi)
-				phi.Edges[j] = phi.Edges[i]
+				phi.Edges[j] = phi.Edges[predecessorIndex]
 			}
 			j++
 		}
 	}
 	// Nil out b.Predecessors[j:] and φ-edges[j:] to aid GC.
-	for i := j; i < len(b.Predecessors); i++ {
-		b.Predecessors[i] = nil
+	for predecessorIndex := j; predecessorIndex < len(block.Predecessors); predecessorIndex++ {
+		block.Predecessors[predecessorIndex] = nil
 		for _, instr := range phis {
-			instr.(*Phi).Edges[i] = nil
+			instr.(*Phi).Edges[predecessorIndex] = nil
 		}
 	}
-	b.Predecessors = b.Predecessors[:j]
+	block.Predecessors = block.Predecessors[:j]
 	for _, instr := range phis {
 		phi := instr.(*Phi)
 		phi.Edges = phi.Edges[:j]

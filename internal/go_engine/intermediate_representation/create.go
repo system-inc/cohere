@@ -45,59 +45,59 @@ func NewProgram(fset *token.FileSet) *Program {
 // For objects from Go source code, syntax is the associated syntax tree
 // (for funcs and vars only) and goversion defines the appropriate
 // interpretation; they will be used during the build phase.
-func memberFromObject(pkg *Package, object types.Object, syntax ast.Node, goversion string) {
+func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.Node, goversion string) {
 	name := object.Name()
 	switch obj := object.(type) {
 	case *types.Builtin:
-		if pkg.Types != types.Unsafe {
+		if goEnginePackage.Types != types.Unsafe {
 			panic("unexpected builtin object: " + obj.String())
 		}
 
 	case *types.TypeName:
 		if name != "_" {
-			pkg.Members[name] = &Type{
+			goEnginePackage.Members[name] = &Type{
 				object: obj,
-				pkg:    pkg,
+				pkg:    goEnginePackage,
 			}
 		}
 
 	case *types.Const:
-		c := &NamedConstant{
+		constant := &NamedConstant{
 			object: obj,
 			Value:  NewConstant(obj.Val(), obj.Type(), syntax),
-			pkg:    pkg,
+			pkg:    goEnginePackage,
 		}
-		pkg.values[obj] = c
+		goEnginePackage.values[obj] = constant
 		if name != "_" {
-			pkg.Members[name] = c
+			goEnginePackage.Members[name] = constant
 		}
 
 	case *types.Var:
-		g := &Global{
-			Package: pkg,
+		global := &Global{
+			Package: goEnginePackage,
 			name:    name,
 			object:  obj,
 			typ:     types.NewPointer(obj.Type()), // address
 		}
-		g.source = syntax
-		pkg.values[obj] = g
+		global.source = syntax
+		goEnginePackage.values[obj] = global
 		if name != "_" {
-			pkg.Members[name] = g
+			goEnginePackage.Members[name] = global
 		}
 
 	case *types.Func:
 		sig := obj.Type().(*types.Signature)
 		if sig.Recv() == nil && name == "init" {
-			pkg.ninit++
-			name = fmt.Sprintf("init#%d", pkg.ninit)
+			goEnginePackage.ninit++
+			name = fmt.Sprintf("init#%d", goEnginePackage.ninit)
 		}
-		fn := createFunction(pkg.Program, obj, name, syntax, pkg.info, goversion)
-		fn.Package = pkg
-		pkg.created = append(pkg.created, fn)
-		pkg.values[obj] = fn
-		pkg.Functions = append(pkg.Functions, fn)
+		function := createFunction(goEnginePackage.Program, obj, name, syntax, goEnginePackage.info, goversion)
+		function.Package = goEnginePackage
+		goEnginePackage.created = append(goEnginePackage.created, function)
+		goEnginePackage.values[obj] = function
+		goEnginePackage.Functions = append(goEnginePackage.Functions, function)
 		if name != "_" && sig.Recv() == nil {
-			pkg.Members[name] = fn // package-level function
+			goEnginePackage.Members[name] = function // package-level function
 		}
 
 	default: // (incl. *types.Package)
@@ -110,23 +110,23 @@ func memberFromObject(pkg *Package, object types.Object, syntax ast.Node, govers
 // of methods in non-created packages based on their types.Func.
 func createFunction(
 	prog *Program,
-	obj *types.Func,
+	object *types.Func,
 	name string,
 	syntax ast.Node,
 	info *types.Info,
 	goversion string,
 ) *Function {
-	sig := obj.Type().(*types.Signature)
+	sig := object.Type().(*types.Signature)
 
 	/* declared function/method (from syntax or export data) */
-	fn := &Function{
+	function := &Function{
 		name:           name,
-		object:         obj,
+		object:         object,
 		Signature:      sig,
 		build:          (*builder).buildFromSyntax,
 		info:           info,
 		goversion:      goversion,
-		pos:            obj.Pos(),
+		pos:            object.Pos(),
 		syntax:         syntax,
 		Package:        nil, // may be set by caller
 		Program:        prog,
@@ -134,49 +134,49 @@ func createFunction(
 		typeparams:     sig.TypeParams(),
 	}
 	if syntax == nil {
-		fn.Synthetic = "from type information"
-		fn.build = (*builder).buildParamsOnly
+		function.Synthetic = "from type information"
+		function.build = (*builder).buildParamsOnly
 	}
-	if fn.hasTypeParameters() {
-		fn.generic = new(generic)
+	if function.hasTypeParameters() {
+		function.generic = new(generic)
 	}
-	return fn
+	return function
 }
 
 // membersFromDecl populates package pkg with members for each
 // typechecker object (var, func, const or type) associated with the
 // specified decl.
-func membersFromDecl(pkg *Package, decl ast.Decl, goversion string) {
+func membersFromDecl(goEnginePackage *Package, decl ast.Decl, goversion string) {
 	switch decl := decl.(type) {
 	case *ast.GenDecl: // import, const, type or var
 		switch decl.Tok {
 		case token.CONST:
 			for _, spec := range decl.Specs {
 				for _, id := range spec.(*ast.ValueSpec).Names {
-					memberFromObject(pkg, pkg.info.Defs[id], nil, "")
+					memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], nil, "")
 				}
 			}
 
 		case token.VAR:
 			for _, spec := range decl.Specs {
 				for _, rhs := range spec.(*ast.ValueSpec).Values {
-					pkg.initVersion[rhs] = goversion
+					goEnginePackage.initVersion[rhs] = goversion
 				}
 				for _, id := range spec.(*ast.ValueSpec).Names {
-					memberFromObject(pkg, pkg.info.Defs[id], spec, goversion)
+					memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], spec, goversion)
 				}
 			}
 
 		case token.TYPE:
 			for _, spec := range decl.Specs {
 				id := spec.(*ast.TypeSpec).Name
-				memberFromObject(pkg, pkg.info.Defs[id], nil, "")
+				memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], nil, "")
 			}
 		}
 
 	case *ast.FuncDecl:
 		id := decl.Name
-		memberFromObject(pkg, pkg.info.Defs[id], decl, goversion)
+		memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], decl, goversion)
 	}
 }
 
@@ -189,15 +189,20 @@ func membersFromDecl(pkg *Package, decl ast.Decl, goversion string) {
 //
 // The real work of building IR form for each function is not done
 // until a subsequent call to Package.Build.
-func (prog *Program) CreatePackage(pkg *types.Package, files []*ast.File, info *types.Info, importable bool) *Package {
-	if pkg == nil {
+func (prog *Program) CreatePackage(
+	goPackage *types.Package,
+	files []*ast.File,
+	info *types.Info,
+	importable bool,
+) *Package {
+	if goPackage == nil {
 		panic("nil pkg") // otherwise pkg.Scope below returns types.Universe!
 	}
 	p := &Package{
 		Program: prog,
 		Members: make(map[string]Member),
 		values:  make(map[types.Object]Member),
-		Types:   pkg,
+		Types:   goPackage,
 		syntax:  info != nil,
 		// transient values (cleared after Package.Build)
 		info:        info,
@@ -235,13 +240,13 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*ast.File, info *
 		// No position information.
 		scope := p.Types.Scope()
 		for _, name := range scope.Names() {
-			obj := scope.Lookup(name)
-			memberFromObject(p, obj, nil, "")
-			if obj, ok := obj.(*types.TypeName); ok {
+			goObject := scope.Lookup(name)
+			memberFromObject(p, goObject, nil, "")
+			if typeName, ok := goObject.(*types.TypeName); ok {
 				// No Unalias: aliases should not duplicate methods.
-				if named, ok := obj.Type().(*types.Named); ok {
-					for i, n := 0, named.NumMethods(); i < n; i++ {
-						memberFromObject(p, named.Method(i), nil, "")
+				if named, ok := typeName.Type().(*types.Named); ok {
+					for index, n := 0, named.NumMethods(); index < n; index++ {
+						memberFromObject(p, named.Method(index), nil, "")
 					}
 				}
 			}
@@ -268,8 +273,8 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*ast.File, info *
 // prog.CreatePackage in unspecified order.
 func (prog *Program) AllPackages() []*Package {
 	pkgs := make([]*Package, 0, len(prog.packages))
-	for _, pkg := range prog.packages {
-		pkgs = append(pkgs, pkg)
+	for _, goEnginePackage := range prog.packages {
+		pkgs = append(pkgs, goEnginePackage)
 	}
 	return pkgs
 }
@@ -302,6 +307,6 @@ func (prog *Program) ImportedPackage(path string) *Package {
 //
 // A typical implementation is the [ctrlflow.CFGs.NoReturn] method from
 // [golang.org/x/tools/go/analysis/passes/ctrlflow].
-func (prog *Program) SetNoReturn(fn func(*types.Func) bool) {
-	prog.noReturn = fn
+func (prog *Program) SetNoReturn(predicate func(*types.Func) bool) {
+	prog.noReturn = predicate
 }

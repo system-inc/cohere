@@ -17,7 +17,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
-func TestConstString(t *testing.T) {
+func TestConstString(test *testing.T) {
 	const source = `
 	package P
 
@@ -27,18 +27,18 @@ func TestConstString(t *testing.T) {
 	func gen[T int]() {}
 	`
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "p.go", source, 0)
-	if err != nil {
-		t.Fatal(err)
+	file, parseFileError := parser.ParseFile(fset, "p.go", source, 0)
+	if parseFileError != nil {
+		test.Fatal(parseFileError)
 	}
 
 	var conf types.Config
-	pkg, err := conf.Check("P", fset, []*ast.File{f}, nil)
-	if err != nil {
-		t.Fatal(err)
+	goPackage, checkError := conf.Check("P", fset, []*ast.File{file}, nil)
+	if checkError != nil {
+		test.Fatal(checkError)
 	}
 
-	for _, test := range []struct {
+	for _, testCase := range []struct {
 		expr     string // type expression
 		constant any    // constant value
 		want     string // expected String() value
@@ -68,42 +68,42 @@ func TestConstString(t *testing.T) {
 		{"func() (int, bool, string)", nil, "nil:func() (int, bool, string)"},
 	} {
 		// Eval() expr for its type.
-		tv, evalError := types.Eval(fset, pkg, 0, test.expr)
+		tv, evalError := types.Eval(fset, goPackage, 0, testCase.expr)
 		if evalError != nil {
-			t.Fatalf("Eval(%s) failed: %v", test.expr, evalError)
+			test.Fatalf("Eval(%s) failed: %v", testCase.expr, evalError)
 		}
 		var value constant.Value
-		if test.constant != nil {
-			value = constant.Make(test.constant)
+		if testCase.constant != nil {
+			value = constant.Make(testCase.constant)
 		}
 		c := intermediate_representation.NewConstant(value, tv.Type, nil)
 		got := strings.ReplaceAll(c.String(), " | ", "|") // Accept both interface{a | b} and interface{a|b}.
-		if got != test.want {
-			t.Errorf(
+		if got != testCase.want {
+			test.Errorf(
 				"intermediate_representation.NewConstant(%v, %s).String() = %q, want %q",
 				value,
 				tv.Type,
 				got,
-				test.want,
+				testCase.want,
 			)
 		}
 	}
 
 	// Test tuples
-	fn := pkg.Scope().Lookup("fn")
-	tup := fn.Type().(*types.Signature).Results()
+	function := goPackage.Scope().Lookup("fn")
+	tup := function.Type().(*types.Signature).Results()
 	if got, want := intermediate_representation.NewConstant(
 		nil,
 		tup,
 		nil,
 	).String(), `(0, false, ""):(int, bool, string)`; got != want {
-		t.Errorf("intermediate_representation.NewConstant(%v, %s).String() = %v, want %v", nil, tup, got, want)
+		test.Errorf("intermediate_representation.NewConstant(%v, %s).String() = %v, want %v", nil, tup, got, want)
 	}
 
 	// Test type-param
-	gen := pkg.Scope().Lookup("gen")
+	gen := goPackage.Scope().Lookup("gen")
 	tp := gen.Type().(*types.Signature).TypeParams().At(0)
 	if got, want := intermediate_representation.NewConstant(nil, tp, nil).String(), "0:T"; got != want {
-		t.Errorf("intermediate_representation.NewConstant(%v, %s).String() = %v, want %v", nil, tup, got, want)
+		test.Errorf("intermediate_representation.NewConstant(%v, %s).String() = %v, want %v", nil, tup, got, want)
 	}
 }

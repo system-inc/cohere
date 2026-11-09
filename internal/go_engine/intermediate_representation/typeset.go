@@ -29,14 +29,14 @@ func typeset(typ types.Type, yield func(t, u types.Type) bool) {
 			return
 		}
 		for _, term := range terms {
-			u := types.Unalias(term.Type())
+			resolvedType := types.Unalias(term.Type())
 			if !term.Tilde() {
-				u = u.Underlying()
+				resolvedType = resolvedType.Underlying()
 			}
 			if debug {
-				assert(types.Identical(u, u.Underlying()), "Unalias(x) == under(x) for ~x terms")
+				assert(types.Identical(resolvedType, resolvedType.Underlying()), "Unalias(x) == under(x) for ~x terms")
 			}
-			if !yield(term.Type(), u) {
+			if !yield(term.Type(), resolvedType) {
 				break
 			}
 		}
@@ -54,8 +54,8 @@ func termListOf(typ types.Type) []*types.Term {
 // typeSetIsEmpty returns true if a typeset is empty.
 func typeSetIsEmpty(typ types.Type) bool {
 	var empty bool
-	typeset(typ, func(t, _ types.Type) bool {
-		empty = t == nil
+	typeset(typ, func(resolvedType, _ types.Type) bool {
+		empty = resolvedType == nil
 		return false
 	})
 	return empty
@@ -72,12 +72,12 @@ func isBytestring(T types.Type) bool {
 	}
 
 	hasBytes, hasString := false, false
-	ok := underIs(U, func(t types.Type) bool {
+	ok := underIs(U, func(resolvedType types.Type) bool {
 		switch {
-		case isString(t):
+		case isString(resolvedType):
 			hasString = true
 			return true
-		case isByteSlice(t):
+		case isByteSlice(resolvedType):
 			hasBytes = true
 			return true
 		default:
@@ -87,13 +87,13 @@ func isBytestring(T types.Type) bool {
 	return ok && hasBytes && hasString
 }
 
-// underIs calls f with the underlying types of the type terms
-// of the type set of typ and reports whether all calls to f returned true.
-// If there are no specific terms, underIs returns the result of f(nil).
-func underIs(typ types.Type, f func(types.Type) bool) bool {
+// underIs calls `predicate` with the underlying types of the type terms
+// of the type set of typ and reports whether all calls to `predicate` returned true.
+// If there are no specific terms, underIs returns the result of `predicate`(nil).
+func underIs(typ types.Type, predicate func(types.Type) bool) bool {
 	var ok bool
 	typeset(typ, func(t, u types.Type) bool {
-		ok = f(u)
+		ok = predicate(u)
 		return ok
 	})
 	return ok
@@ -122,16 +122,16 @@ func indexType(typ types.Type) (types.Type, indexMode) {
 			if t == nil {
 				return false // empty set
 			}
-			e, m := indexType(t)
+			e, indexMode := indexType(t)
 			if elem == nil {
-				elem, mode = e, m
+				elem, mode = e, indexMode
 			}
 			if debug && !types.Identical(elem, e) { // if type checked, just a sanity check
 				mode = ixInvalid
 				return false
 			}
 			// Update the mode to the most constrained address type.
-			mode = mode.meet(m)
+			mode = mode.meet(indexMode)
 			return mode != ixInvalid
 		})
 		return elem, mode
@@ -163,13 +163,13 @@ const (
 )
 
 // meet is the address type that is constrained by both x and y.
-func (x indexMode) meet(y indexMode) indexMode {
-	if (x == ixMap || y == ixMap) && x != y {
+func (mode indexMode) meet(y indexMode) indexMode {
+	if (mode == ixMap || y == ixMap) && mode != y {
 		return ixInvalid
 	}
 	// Use int representation and return min.
-	if x < y {
+	if mode < y {
 		return y
 	}
-	return x
+	return mode
 }

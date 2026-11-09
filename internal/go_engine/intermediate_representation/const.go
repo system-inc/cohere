@@ -29,14 +29,14 @@ func soleTypeKind(typ types.Type) types.BasicInfo {
 	// iteration, which executes at least once.
 	state := types.IsBoolean | types.IsInteger | types.IsString
 	underIs(typ, func(ut types.Type) bool {
-		var c types.BasicInfo
-		if t, ok := ut.(*types.Basic); ok {
-			c = t.Info()
+		var info types.BasicInfo
+		if basic, ok := ut.(*types.Basic); ok {
+			info = basic.Info()
 		}
-		if c&types.IsNumeric != 0 { // int/float/complex
-			c = types.IsInteger
+		if info&types.IsNumeric != 0 { // int/float/complex
+			info = types.IsInteger
 		}
-		state = state & c
+		state = state & info
 		return state != 0
 	})
 	return state
@@ -63,10 +63,10 @@ func NewConstant(value constant.Value, typ types.Type, source ast.Node) *Constan
 	return c
 }
 
-// intConst returns an 'int' constant that evaluates to i.
-// (i is an int64 in case the host is narrower than the target.)
-func intConstant(i int64, source ast.Node) *Constant {
-	return NewConstant(constant.MakeInt64(i), tInt, source)
+// intConst returns an 'int' constant that evaluates to `index`.
+// (index is an int64 in case the host is narrower than the target.)
+func intConstant(index int64, source ast.Node) *Constant {
+	return NewConstant(constant.MakeInt64(index), tInt, source)
 }
 
 // nilConst returns a nil constant of the specified type, which may
@@ -75,78 +75,78 @@ func nilConstant(typ types.Type, source ast.Node) *Constant {
 	return NewConstant(nil, typ, source)
 }
 
-// stringConst returns a 'string' constant that evaluates to s.
-func stringConstant(s string, source ast.Node) *Constant {
-	return NewConstant(constant.MakeString(s), tString, source)
+// stringConst returns a 'string' constant that evaluates to `text`.
+func stringConstant(text string, source ast.Node) *Constant {
+	return NewConstant(constant.MakeString(text), tString, source)
 }
 
 // zeroConst returns a new "zero" constant of the specified type.
-func zeroConstant(t types.Type, source ast.Node) *Constant {
-	return NewConstant(nil, t, source)
+func zeroConstant(resolvedType types.Type, source ast.Node) *Constant {
+	return NewConstant(nil, resolvedType, source)
 }
 
-func (c *Constant) RelativeString(from *types.Package) string {
+func (vFalse *Constant) RelativeString(from *types.Package) string {
 	var p string
-	if c.Value == nil {
-		switch c.typ.(type) {
+	if vFalse.Value == nil {
+		switch vFalse.typ.(type) {
 		case *types.Array, *types.Struct:
 			p = "{}"
 		case *types.Alias:
-			switch c.typ.Underlying().(type) {
+			switch vFalse.typ.Underlying().(type) {
 			case *types.Array, *types.Struct:
 				p = "{}"
 			default:
-				p, _ = zeroString(types.Unalias(c.typ), types.RelativeTo(from))
+				p, _ = zeroString(types.Unalias(vFalse.typ), types.RelativeTo(from))
 			}
 		default:
-			p, _ = zeroString(c.typ, types.RelativeTo(from))
+			p, _ = zeroString(vFalse.typ, types.RelativeTo(from))
 		}
-	} else if c.Value.Kind() == constant.String {
-		v := constant.StringVal(c.Value)
+	} else if vFalse.Value.Kind() == constant.String {
+		value := constant.StringVal(vFalse.Value)
 		const maximum = 20
 		// TODO(adonovan): don't cut a rune in half.
-		if len(v) > maximum {
-			v = v[:maximum-3] + "..." // abbreviate
+		if len(value) > maximum {
+			value = value[:maximum-3] + "..." // abbreviate
 		}
-		p = strconv.Quote(v)
+		p = strconv.Quote(value)
 	} else {
-		p = c.Value.String()
+		p = vFalse.Value.String()
 	}
-	return p + ":" + relativeType(c.Type(), from)
+	return p + ":" + relativeType(vFalse.Type(), from)
 }
 
-func (c *Constant) Name() string {
-	return c.RelativeString(nil)
+func (vFalse *Constant) Name() string {
+	return vFalse.RelativeString(nil)
 }
 
-func (c *Constant) String() string {
-	return c.RelativeString(nil)
+func (vFalse *Constant) String() string {
+	return vFalse.RelativeString(nil)
 }
 
-func (c *Constant) Type() types.Type {
-	return c.typ
+func (vFalse *Constant) Type() types.Type {
+	return vFalse.typ
 }
 
-func (c *Constant) Referrers() *[]Instruction {
+func (vFalse *Constant) Referrers() *[]Instruction {
 	return nil
 }
 
-func (c *Constant) Parent() *Function { return nil }
+func (vFalse *Constant) Parent() *Function { return nil }
 
 // IsNil returns true if this constant represents a typed or untyped nil value.
-func (c *Constant) IsNil() bool {
-	return c.Value == nil && nillable(c.typ)
+func (vFalse *Constant) IsNil() bool {
+	return vFalse.Value == nil && nillable(vFalse.typ)
 }
 
 // nillable reports whether *new(T) == nil is legal for type T.
-func nillable(t types.Type) bool {
-	if typeparams.IsTypeParam(t) {
-		return underIs(t, func(u types.Type) bool {
+func nillable(resolvedType types.Type) bool {
+	if typeparams.IsTypeParam(resolvedType) {
+		return underIs(resolvedType, func(resolvedType types.Type) bool {
 			// empty type set (u==nil) => any underlying types => not nillable
-			return u != nil && nillable(u)
+			return resolvedType != nil && nillable(resolvedType)
 		})
 	}
-	switch t.Underlying().(type) {
+	switch resolvedType.Underlying().(type) {
 	case *types.Pointer, *types.Slice, *types.Chan, *types.Map, *types.Signature:
 		return true
 	case *types.Interface:
@@ -160,24 +160,24 @@ func nillable(t types.Type) bool {
 
 // Int64 returns the numeric value of this constant truncated to fit
 // a signed 64-bit integer.
-func (c *Constant) Int64() int64 {
-	switch x := constant.ToInt(c.Value); x.Kind() {
+func (vFalse *Constant) Int64() int64 {
+	switch x := constant.ToInt(vFalse.Value); x.Kind() {
 	case constant.Int:
-		if i, ok := constant.Int64Val(x); ok {
-			return i
+		if index, ok := constant.Int64Val(x); ok {
+			return index
 		}
 		return 0
 	case constant.Float:
 		f, _ := constant.Float64Val(x)
 		return int64(f)
 	}
-	panic(fmt.Sprintf("unexpected constant value: %T", c.Value))
+	panic(fmt.Sprintf("unexpected constant value: %T", vFalse.Value))
 }
 
 // Uint64 returns the numeric value of this constant truncated to fit
 // an unsigned 64-bit integer.
-func (c *Constant) Uint64() uint64 {
-	switch x := constant.ToInt(c.Value); x.Kind() {
+func (vFalse *Constant) Uint64() uint64 {
+	switch x := constant.ToInt(vFalse.Value); x.Kind() {
 	case constant.Int:
 		if u, ok := constant.Uint64Val(x); ok {
 			return u
@@ -187,21 +187,21 @@ func (c *Constant) Uint64() uint64 {
 		f, _ := constant.Float64Val(x)
 		return uint64(f)
 	}
-	panic(fmt.Sprintf("unexpected constant value: %T", c.Value))
+	panic(fmt.Sprintf("unexpected constant value: %T", vFalse.Value))
 }
 
 // Float64 returns the numeric value of this constant truncated to fit
 // a float64.
-func (c *Constant) Float64() float64 {
-	x := constant.ToFloat(c.Value) // (c.Value == nil) => x.Kind() == Unknown
+func (vFalse *Constant) Float64() float64 {
+	x := constant.ToFloat(vFalse.Value) // (c.Value == nil) => x.Kind() == Unknown
 	f, _ := constant.Float64Val(x)
 	return f
 }
 
 // Complex128 returns the complex value of this constant truncated to
 // fit a complex128.
-func (c *Constant) Complex128() complex128 {
-	x := constant.ToComplex(c.Value) // (c.Value == nil) => x.Kind() == Unknown
+func (vFalse *Constant) Complex128() complex128 {
+	x := constant.ToComplex(vFalse.Value) // (c.Value == nil) => x.Kind() == Unknown
 	re, _ := constant.Float64Val(constant.Real(x))
 	im, _ := constant.Float64Val(constant.Imag(x))
 	return complex(re, im)

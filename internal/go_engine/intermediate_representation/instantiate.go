@@ -24,25 +24,25 @@ type generic struct {
 // Any created instance is added to cr.
 //
 // Acquires fn.generic.instancesMu.
-func (fn *Function) instance(rtargs, targs []types.Type, b *builder) *Function {
-	key := fn.Program.canon.List(slices.Concat(rtargs, targs))
+func (function *Function) instance(rtargs, targs []types.Type, builder *builder) *Function {
+	key := function.Program.canon.List(slices.Concat(rtargs, targs))
 
-	gen := fn.generic
+	gen := function.generic
 
 	gen.instancesMutex.Lock()
 	defer gen.instancesMutex.Unlock()
 	inst, ok := gen.instances[key]
 	if !ok {
-		inst = createInstance(fn, rtargs, targs)
-		inst.buildshared = b.shared()
-		b.enqueue(inst)
+		inst = createInstance(function, rtargs, targs)
+		inst.buildshared = builder.shared()
+		builder.enqueue(inst)
 
 		if gen.instances == nil {
 			gen.instances = make(map[*typeList]*Function)
 		}
 		gen.instances[key] = inst
 	} else {
-		b.waitForSharedFunction(inst)
+		builder.waitForSharedFunction(inst)
 	}
 	return inst
 }
@@ -52,20 +52,20 @@ func (fn *Function) instance(rtargs, targs []types.Type, b *builder) *Function {
 // using rtargs.
 //
 // Requires fn.generic.instancesMu.
-func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
-	prog := fn.Program
+func createInstance(function *Function, rtargs, targs []types.Type) *Function {
+	prog := function.Program
 
 	// Compute signature.
 	var sig *types.Signature
 	var object *types.Func
-	if recv := fn.Signature.Recv(); recv != nil {
+	if recv := function.Signature.Recv(); recv != nil {
 		// method, len(rtargs) > 0 || len(targs) > 0
 		if len(rtargs) > 0 {
 			// possibly generic method on generic type
-			object = prog.canon.instantiateMethod(fn.object, rtargs, prog.ctxt)
+			object = prog.canon.instantiateMethod(function.object, rtargs, prog.ctxt)
 		} else {
 			// generic method on non-generic type
-			object = fn.object // instantiation does not exist yet
+			object = function.object // instantiation does not exist yet
 		}
 		if len(targs) > 0 {
 			// generic method
@@ -88,7 +88,7 @@ func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
 		}
 	} else {
 		// function, len(rtargs) == 0 && len(targs) > 0
-		instSig, instantiateError := types.Instantiate(prog.ctxt, fn.Signature, targs, false)
+		instSig, instantiateError := types.Instantiate(prog.ctxt, function.Signature, targs, false)
 		if instantiateError != nil {
 			panic(instantiateError)
 		}
@@ -96,17 +96,17 @@ func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
 		if !ok {
 			panic("Instantiate of a Signature returned a non-signature")
 		}
-		object = fn.object // instantiation does not exist yet
+		object = function.object // instantiation does not exist yet
 		sig = prog.canon.Type(instance).(*types.Signature)
 	}
 
 	// Always a wrapper. go/ir builds an instance from the generic body with its type arguments
 	// substituted when its InstantiateGenerics mode is set; ours builds generic bodies in generic
 	// form only, as go/ir does without that mode.
-	synthetic := fmt.Sprintf("instantiation wrapper of %s", fn.Name())
+	synthetic := fmt.Sprintf("instantiation wrapper of %s", function.Name())
 	build := (*builder).buildInstantiationWrapper
 
-	name := fn.Name()
+	name := function.Name()
 	if len(targs) > 0 {
 		name = fmt.Sprintf("%s%s", name, targstr(targs)) // may not be unique
 	}
@@ -117,17 +117,17 @@ func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
 		object:         object,
 		Signature:      sig,
 		Synthetic:      synthetic,
-		syntax:         fn.syntax,    // \
-		info:           fn.info,      //  } empty for non-created packages
-		goversion:      fn.goversion, // /
+		syntax:         function.syntax,    // \
+		info:           function.info,      //  } empty for non-created packages
+		goversion:      function.goversion, // /
 		build:          build,
-		topLevelOrigin: fn,
+		topLevelOrigin: function,
 		pos:            object.Pos(),
 		Package:        nil,
-		Program:        fn.Program,
-		recvtypeparams: fn.recvtypeparams, // share with origin
+		Program:        function.Program,
+		recvtypeparams: function.recvtypeparams, // share with origin
 		recvtypeargs:   rtargs,
-		typeparams:     fn.typeparams, // share with origin
+		typeparams:     function.typeparams, // share with origin
 		typeargs:       targs,
 	}
 	return ret

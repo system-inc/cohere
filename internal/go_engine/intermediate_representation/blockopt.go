@@ -19,101 +19,103 @@ import (
 // optimizeBlocks.  Very verbose.
 const debugBlockOpt = false
 
-// markReachable sets Index=-1 for all blocks reachable from b.
-func markReachable(b *BasicBlock) {
-	b.gaps = -1
-	for _, succ := range b.Successors {
+// markReachable sets Index=-1 for all blocks reachable from `block`.
+func markReachable(block *BasicBlock) {
+	block.gaps = -1
+	for _, succ := range block.Successors {
 		if succ.gaps == 0 {
 			markReachable(succ)
 		}
 	}
 }
 
-// deleteUnreachableBlocks marks all reachable blocks of f and
+// deleteUnreachableBlocks marks all reachable blocks of `function` and
 // eliminates (nils) all others, including possibly cyclic subgraphs.
-func deleteUnreachableBlocks(f *Function) {
+func deleteUnreachableBlocks(function *Function) {
 	const white, black = 0, -1
 	// We borrow b.gaps temporarily as the mark bit.
-	for _, b := range f.Blocks {
-		b.gaps = white
+	for _, block := range function.Blocks {
+		block.gaps = white
 	}
-	markReachable(f.Blocks[0])
-	if f.Recover != nil {
-		markReachable(f.Recover)
+	markReachable(function.Blocks[0])
+	if function.Recover != nil {
+		markReachable(function.Recover)
 	}
-	for i, b := range f.Blocks {
-		if b.gaps == white {
-			for _, c := range b.Successors {
-				if c.gaps == black {
-					c.removePredecessor(b) // delete white->black edge
+	for index, block := range function.Blocks {
+		if block.gaps == white {
+			for _, successor := range block.Successors {
+				if successor.gaps == black {
+					successor.removePredecessor(block) // delete white->black edge
 				}
 			}
 			if debugBlockOpt {
-				fmt.Fprintln(os.Stderr, "unreachable", b)
+				fmt.Fprintln(os.Stderr, "unreachable", block)
 			}
-			f.Blocks[i] = nil // delete b
+			function.Blocks[index] = nil // delete b
 		}
 	}
-	f.removeNilBlocks()
+	function.removeNilBlocks()
 }
 
-// jumpThreading attempts to apply simple jump-threading to block b,
-// in which a->b->c become a->c if b is just a Jump.
+// jumpThreading attempts to apply simple jump-threading to block `block`,
+// in which a->b->c become a->c if `block` is just a Jump.
 // The result is true if the optimization was applied.
-func jumpThreading(f *Function, b *BasicBlock) bool {
-	if b.Index == 0 {
+func jumpThreading(function *Function, block *BasicBlock) bool {
+	if block.Index == 0 {
 		return false // don't apply to entry block
 	}
-	if len(b.Instructions) == 0 {
+	if len(block.Instructions) == 0 {
 		return false
 	}
-	for _, pred := range b.Predecessors {
+	for _, pred := range block.Predecessors {
 		switch pred.Control().(type) {
 		case *ConstantSwitch:
 			// don't optimize away the head blocks of switch statements
 			return false
 		}
 	}
-	if _, ok := b.Instructions[0].(*Jump); !ok {
+	if _, ok := block.Instructions[0].(*Jump); !ok {
 		return false // not just a jump
 	}
-	c := b.Successors[0]
-	if c == b {
+	successor := block.Successors[0]
+	if successor == block {
 		return false // don't apply to degenerate jump-to-self.
 	}
-	if c.hasPhi() {
+	if successor.hasPhi() {
 		return false // not sound without more effort
 	}
-	for j, a := range b.Predecessors {
-		a.replaceSuccessor(b, c)
+	for index, predecessor := range block.Predecessors {
+		predecessor.replaceSuccessor(block, successor)
 
 		// If a now has two edges to c, replace its degenerate If by Jump.
-		if len(a.Successors) == 2 && a.Successors[0] == c && a.Successors[1] == c {
+		if len(predecessor.Successors) == 2 &&
+			predecessor.Successors[0] == successor &&
+			predecessor.Successors[1] == successor {
 			jump := new(Jump)
-			jump.setBlock(a)
-			a.Instructions[len(a.Instructions)-1] = jump
-			a.Successors = a.Successors[:1]
-			c.removePredecessor(b)
+			jump.setBlock(predecessor)
+			predecessor.Instructions[len(predecessor.Instructions)-1] = jump
+			predecessor.Successors = predecessor.Successors[:1]
+			successor.removePredecessor(block)
 		} else {
-			if j == 0 {
-				c.replacePredecessor(b, a)
+			if index == 0 {
+				successor.replacePredecessor(block, predecessor)
 			} else {
-				c.Predecessors = append(c.Predecessors, a)
+				successor.Predecessors = append(successor.Predecessors, predecessor)
 			}
 		}
 
 		if debugBlockOpt {
-			fmt.Fprintln(os.Stderr, "jumpThreading", a, b, c)
+			fmt.Fprintln(os.Stderr, "jumpThreading", predecessor, block, successor)
 		}
 	}
-	f.Blocks[b.Index] = nil // delete b
+	function.Blocks[block.Index] = nil // delete b
 	return true
 }
 
 // fuseBlocks attempts to apply the block fusion optimization to block
 // a, in which a->b becomes ab if len(a.Successors)==len(b.Predecessors)==1.
 // The result is true if the optimization was applied.
-func fuseBlocks(f *Function, a *BasicBlock) bool {
+func fuseBlocks(function *Function, a *BasicBlock) bool {
 	if len(a.Successors) != 1 {
 		return false
 	}
@@ -151,39 +153,39 @@ func fuseBlocks(f *Function, a *BasicBlock) bool {
 		fmt.Fprintln(os.Stderr, "fuseBlocks", a, b)
 	}
 
-	f.Blocks[b.Index] = nil // delete b
+	function.Blocks[b.Index] = nil // delete b
 	return true
 }
 
 // optimizeBlocks() performs some simple block optimizations on a
 // completed function: dead block elimination, block fusion, jump
 // threading.
-func optimizeBlocks(f *Function) {
-	deleteUnreachableBlocks(f)
+func optimizeBlocks(function *Function) {
+	deleteUnreachableBlocks(function)
 
 	// Loop until no further progress.
 	changed := true
 	for changed {
 		changed = false
 
-		for _, b := range f.Blocks {
+		for _, block := range function.Blocks {
 			// f.Blocks will temporarily contain nils to indicate
 			// deleted blocks; we remove them at the end.
-			if b == nil {
+			if block == nil {
 				continue
 			}
 
 			// Fuse blocks.  b->c becomes bc.
-			if fuseBlocks(f, b) {
+			if fuseBlocks(function, block) {
 				changed = true
 			}
 
 			// a->b->c becomes a->c if b contains only a Jump.
-			if jumpThreading(f, b) {
+			if jumpThreading(function, block) {
 				changed = true
 				continue // (b was disconnected)
 			}
 		}
 	}
-	f.removeNilBlocks()
+	function.removeNilBlocks()
 }

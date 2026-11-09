@@ -44,21 +44,21 @@ func TestMain(main *testing.M) {
 // then creates and builds its own from syntax, as go/ir's irutil.BuildPackage does. It returns the built
 // package and the parsed file.
 func buildPackage(
-	t testing.TB,
+	test testing.TB,
 	input string,
 	importer types.Importer,
 ) (*intermediate_representation.Package, *ast.File) {
-	t.Helper()
+	test.Helper()
 	fset := token.NewFileSet()
 	file, parseError := parser.ParseFile(fset, "input.go", input, parser.ParseComments)
 	if parseError != nil {
-		t.Fatal(parseError)
+		test.Fatal(parseError)
 	}
-	pkg, buildError := buildFiles(fset, file.Name.Name, []*ast.File{file}, importer)
+	goEnginePackage, buildError := buildFiles(fset, file.Name.Name, []*ast.File{file}, importer)
 	if buildError != nil {
-		t.Fatal(buildError)
+		test.Fatal(buildError)
 	}
-	return pkg, file
+	return goEnginePackage, file
 }
 
 // buildFiles is irutil.BuildPackage: type-check files as the package at path, create its imports
@@ -70,8 +70,8 @@ func buildFiles(
 	importer types.Importer,
 ) (*intermediate_representation.Package, error) {
 	info := newInfo()
-	pkg := types.NewPackage(path, "")
-	if checkError := types.NewChecker(&types.Config{Importer: importer}, fset, pkg, info).Files(
+	goPackage := types.NewPackage(path, "")
+	if checkError := types.NewChecker(&types.Config{Importer: importer}, fset, goPackage, info).Files(
 		files,
 	); checkError != nil {
 		return nil, checkError
@@ -80,16 +80,16 @@ func buildFiles(
 	created := make(map[*types.Package]bool)
 	var createAll func(pkgs []*types.Package)
 	createAll = func(pkgs []*types.Package) {
-		for _, p := range pkgs {
-			if !created[p] {
-				created[p] = true
-				prog.CreatePackage(p, nil, nil, true)
-				createAll(p.Imports())
+		for _, typesPackage := range pkgs {
+			if !created[typesPackage] {
+				created[typesPackage] = true
+				prog.CreatePackage(typesPackage, nil, nil, true)
+				createAll(typesPackage.Imports())
 			}
 		}
 	}
-	createAll(pkg.Imports())
-	irpkg := prog.CreatePackage(pkg, files, info, false)
+	createAll(goPackage.Imports())
+	irpkg := prog.CreatePackage(goPackage, files, info, false)
 	irpkg.Build()
 	return irpkg, nil
 }
@@ -116,27 +116,27 @@ type sourcePackages struct {
 	infos    map[string]*types.Info
 }
 
-func checkSources(t testing.TB, order []string, sources map[string]string) *sourcePackages {
-	t.Helper()
+func checkSources(test testing.TB, order []string, sources map[string]string) *sourcePackages {
+	test.Helper()
 	loaded := &sourcePackages{fset: token.NewFileSet(), packages: map[string]*types.Package{},
 		files: map[string][]*ast.File{}, infos: map[string]*types.Info{}}
 	for _, path := range order {
 		file, parseError := parser.ParseFile(loaded.fset, path+"/source.go", sources[path], 0)
 		if parseError != nil {
-			t.Fatal(parseError)
+			test.Fatal(parseError)
 		}
 		info := newInfo()
 		configuration := &types.Config{Importer: importerFunc(func(imported string) (*types.Package, error) {
-			if pkg, ok := loaded.packages[imported]; ok {
-				return pkg, nil
+			if goPackage, ok := loaded.packages[imported]; ok {
+				return goPackage, nil
 			}
 			return nil, fmt.Errorf("no package %q among the sources", imported)
 		})}
-		pkg, checkError := configuration.Check(path, loaded.fset, []*ast.File{file}, info)
+		goPackage, checkError := configuration.Check(path, loaded.fset, []*ast.File{file}, info)
 		if checkError != nil {
-			t.Fatal(checkError)
+			test.Fatal(checkError)
 		}
-		loaded.packages[path] = pkg
+		loaded.packages[path] = goPackage
 		loaded.files[path] = []*ast.File{file}
 		loaded.infos[path] = info
 	}
@@ -145,17 +145,19 @@ func checkSources(t testing.TB, order []string, sources map[string]string) *sour
 
 type importerFunc func(path string) (*types.Package, error)
 
-func (f importerFunc) Import(path string) (*types.Package, error) { return f(path) }
+func (importerFunc importerFunc) Import(path string) (*types.Package, error) {
+	return importerFunc(path)
+}
 
-func isEmpty(f *intermediate_representation.Function) bool { return f.Blocks == nil }
+func isEmpty(function *intermediate_representation.Function) bool { return function.Blocks == nil }
 
 // callsOf are fn's calls in block order, but for calls to builtins. Unlifted, every function opens with a
 // call to the ssa:deferstack builtin, which lifting removes when nothing defers (#ee33njz); go/ir's tests
 // read the calls after lifting, so the ones they count are these.
-func callsOf(fn *intermediate_representation.Function) []*intermediate_representation.CallCommon {
+func callsOf(function *intermediate_representation.Function) []*intermediate_representation.CallCommon {
 	var calls []*intermediate_representation.CallCommon
-	for _, b := range fn.Blocks {
-		for _, instr := range b.Instructions {
+	for _, block := range function.Blocks {
+		for _, instr := range block.Instructions {
 			if call, ok := instr.(intermediate_representation.CallInstruction); ok {
 				if _, isBuiltin := call.Common().Value.(*intermediate_representation.Builtin); !isBuiltin {
 					calls = append(calls, call.Common())
@@ -171,7 +173,7 @@ func callsOf(fn *intermediate_representation.Function) []*intermediate_represent
 //
 // go/ir's test also checks the method sets of the external types through Program.MethodValue, which ours
 // doesn't carry, so that half is left out.
-func TestBuildPackage(t *testing.T) {
+func TestBuildPackage(test *testing.T) {
 	input := `
 package main
 
@@ -193,7 +195,7 @@ func main() {
 `
 	// Build an IR program from the parsed file.
 	// Load its dependencies from gc binary export data.
-	mainPackage, _ := buildPackage(t, input, importer.Default())
+	mainPackage, _ := buildPackage(test, input, importer.Default())
 
 	// The main package, its direct and indirect dependencies are loaded.
 	deps := []string{
@@ -209,46 +211,46 @@ func main() {
 	if len(all) <= len(deps) {
 		// go/ir prints the packages with %q through Package.String, which ours doesn't carry.
 		var paths []string
-		for _, pkg := range all {
-			paths = append(paths, pkg.Types.Path())
+		for _, allPackage := range all {
+			paths = append(paths, allPackage.Types.Path())
 		}
-		t.Errorf("unexpected set of loaded packages: %q", paths)
+		test.Errorf("unexpected set of loaded packages: %q", paths)
 	}
 	for _, path := range deps {
-		pkg := prog.ImportedPackage(path)
-		if pkg == nil {
-			t.Errorf("package not loaded: %q", path)
+		goEnginePackage := prog.ImportedPackage(path)
+		if goEnginePackage == nil {
+			test.Errorf("package not loaded: %q", path)
 			continue
 		}
 
 		// External packages should have no function bodies (except for wrappers).
-		isExt := pkg != mainPackage
+		isExt := goEnginePackage != mainPackage
 
 		// init()
-		if isExt && !isEmpty(pkg.Function("init")) {
-			t.Errorf("external package %s has non-empty init", pkg.Types.Path())
+		if isExt && !isEmpty(goEnginePackage.Function("init")) {
+			test.Errorf("external package %s has non-empty init", goEnginePackage.Types.Path())
 		}
 
-		for _, mem := range pkg.Members {
+		for _, mem := range goEnginePackage.Members {
 			if mem, ok := mem.(*intermediate_representation.Function); ok {
 				// Functions at package level.
 				if isExt && !isEmpty(mem) {
-					t.Errorf("external function %s is non-empty", mem)
+					test.Errorf("external function %s is non-empty", mem)
 				}
 			}
 		}
 	}
 	if isEmpty(mainPackage.Function("init")) {
-		t.Errorf("main package has empty init")
+		test.Errorf("main package has empty init")
 	}
 	for _, mem := range mainPackage.Members {
 		switch mem := mem.(type) {
 		case *intermediate_representation.Function:
 			if isEmpty(mem) {
-				t.Errorf("function %s is empty", mem)
+				test.Errorf("function %s is empty", mem)
 			}
 		case *intermediate_representation.Type:
-			t.Fatalf("unexpected name type in main package: %s", mem)
+			test.Fatalf("unexpected name type in main package: %s", mem)
 		}
 	}
 
@@ -263,21 +265,21 @@ func main() {
 		if want := expectedCallee[callNumber]; want != "N/A" {
 			got := call.StaticCallee().String()
 			if want != got {
-				t.Errorf("call #%d from main.main: got callee %s, want %s",
+				test.Errorf("call #%d from main.main: got callee %s, want %s",
 					callNumber, got, want)
 			}
 		}
 		callNumber++
 	}
 	if callNumber != 4 {
-		t.Errorf("in main.main: got %d calls, want %d", callNumber, 4)
+		test.Errorf("in main.main: got %d calls, want %d", callNumber, 4)
 	}
 }
 
 // Tests that methods from indirect dependencies not subject to
 // CreatePackage are created as needed.
-func TestNoIndirectCreatePackage(t *testing.T) {
-	loaded := checkSources(t, []string{"testdata/c", "testdata/b", "testdata/a"}, map[string]string{
+func TestNoIndirectCreatePackage(test *testing.T) {
+	loaded := checkSources(test, []string{"testdata/c", "testdata/b", "testdata/a"}, map[string]string{
 		"testdata/a": `package a
 
 import "testdata/b"
@@ -317,23 +319,23 @@ func (C) F() {}
 	var got string
 	for _, instr := range aSsa.Members["A"].(*intermediate_representation.Function).Blocks[0].Instructions {
 		if call, ok := instr.(*intermediate_representation.Call); ok {
-			f, isFunction := call.Call.Value.(*intermediate_representation.Function)
+			function, isFunction := call.Call.Value.(*intermediate_representation.Function)
 			if !isFunction {
 				continue
 			}
-			got = fmt.Sprintf("%v # %s", f, f.Synthetic)
+			got = fmt.Sprintf("%v # %s", function, function.Synthetic)
 			break
 		}
 	}
 	want := "(testdata/c.C).F # from type information (on demand)"
 	if got != want {
-		t.Errorf("for sole call in a.A, got: <<%s>>, want <<%s>>", got, want)
+		test.Errorf("for sole call in a.A, got: <<%s>>, want <<%s>>", got, want)
 	}
 }
 
 // TestOrderOfOperations reads each call's callee where go/ir's test read the call's printed form, a()
 // and b(), so the sequence it wants is the same.
-func TestOrderOfOperations(t *testing.T) {
+func TestOrderOfOperations(test *testing.T) {
 	// Testing for the order of operations within an expression is done
 	// by collecting the sequence of direct function calls within a *Function.
 	// Callees are all external functions so they cannot be safely re-ordered by ssa.
@@ -349,7 +351,7 @@ func sliceMax(s []int) []int { return s[a():b():c()] }
 
 `
 
-	p, _ := buildPackage(t, input, nil)
+	p, _ := buildPackage(test, input, nil)
 
 	for _, item := range []struct {
 		fn   string
@@ -358,17 +360,17 @@ func sliceMax(s []int) []int { return s[a():b():c()] }
 		{"sliceMax", "[a() b() c()]"},
 		{"slice", "[a() b()]"},
 	} {
-		fn := p.Function(item.fn)
+		function := p.Function(item.fn)
 		want := item.want
-		t.Run(item.fn, func(t *testing.T) {
-			t.Parallel()
+		test.Run(item.fn, func(test *testing.T) {
+			test.Parallel()
 
 			var calls []string
-			for _, call := range callsOf(fn) {
+			for _, call := range callsOf(function) {
 				calls = append(calls, call.StaticCallee().Name()+"()")
 			}
 			if got := fmt.Sprint(calls); got != want {
-				t.Errorf("Expected sequence of function calls in %s was %s. got %s", fn, want, got)
+				test.Errorf("Expected sequence of function calls in %s was %s. got %s", function, want, got)
 			}
 		})
 	}
@@ -377,8 +379,8 @@ func sliceMax(s []int) []int { return s[a():b():c()] }
 // TestGenericFunctionSelector ensures generic functions from other packages can be selected. go/ir's test
 // runs it once more with InstantiateGenerics, which ours doesn't have; every callee is an instantiation
 // wrapper, as in its first run.
-func TestGenericFunctionSelector(t *testing.T) {
-	loaded := checkSources(t, []string{"example.com/a", "example.com"}, map[string]string{
+func TestGenericFunctionSelector(test *testing.T) {
+	loaded := checkSources(test, []string{"example.com/a", "example.com"}, map[string]string{
 		"example.com":   `package main; import "example.com/a"; func main() { a.F[int](); a.G[int,string](); a.H(0) }`,
 		"example.com/a": `package a; func F[T any](){}; func G[S, T any](){}; func H[T any](a T){} `,
 	})
@@ -391,7 +393,7 @@ func TestGenericFunctionSelector(t *testing.T) {
 	p.Build()
 
 	if p.Types.Name() != "main" {
-		t.Fatalf("Expected the second package is main but got %s", p.Types.Name())
+		test.Fatalf("Expected the second package is main but got %s", p.Types.Name())
 	}
 
 	var callees []string // callees of the CallInstruction in main().
@@ -399,18 +401,18 @@ func TestGenericFunctionSelector(t *testing.T) {
 		if callee := call.StaticCallee(); callee != nil {
 			callees = append(callees, callee.String())
 		} else {
-			t.Errorf("CallInstruction without StaticCallee() in %s", p.Function("main"))
+			test.Errorf("CallInstruction without StaticCallee() in %s", p.Function("main"))
 		}
 	}
 	sort.Strings(callees) // ignore the order in the code.
 
 	want := "[example.com/a.F[int] example.com/a.G[int, string] example.com/a.H[int]]"
 	if got := fmt.Sprint(callees); got != want {
-		t.Errorf("Expected main() to contain calls %v. got %v", want, got)
+		test.Errorf("Expected main() to contain calls %v. got %v", want, got)
 	}
 }
 
-func TestGo117Builtins(t *testing.T) {
+func TestGo117Builtins(test *testing.T) {
 	tests := []struct {
 		name     string
 		src      string
@@ -422,30 +424,30 @@ func TestGo117Builtins(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			buildPackage(t, tc.src, tc.importer)
+		test.Run(tc.name, func(test *testing.T) {
+			test.Parallel()
+			buildPackage(test, tc.src, tc.importer)
 		})
 	}
 }
 
 // TestLabels just tests that anonymous labels are handled.
-func TestLabels(t *testing.T) {
+func TestLabels(test *testing.T) {
 	tests := []string{
 		`package main
 		  func main() { _:println(1) }`,
 		`package main
 		  func main() { _:println(1); _:println(2)}`,
 	}
-	for _, test := range tests {
-		buildPackage(t, test, nil)
+	for _, testCase := range tests {
+		buildPackage(test, testCase, nil)
 	}
 }
 
 // TestFixedBugs builds go/ir's fixed-bug programs. go/ir builds them with InstantiateGenerics and its sanity
 // checker; ours builds the generic bodies in generic form, and the test holds that building them doesn't
 // panic.
-func TestFixedBugs(t *testing.T) {
+func TestFixedBugs(test *testing.T) {
 	for _, name := range []string{
 		"issue66783a",
 		"issue66783b",
@@ -453,21 +455,21 @@ func TestFixedBugs(t *testing.T) {
 		"issue78110",
 		"issue73871",
 	} {
-		t.Run(name, func(t *testing.T) {
+		test.Run(name, func(test *testing.T) {
 			path := filepath.Join("testdata", "fixedbugs", name+".go")
 			fset := token.NewFileSet()
-			f, parseFileError := parser.ParseFile(fset, path, nil, parser.ParseComments)
+			file, parseFileError := parser.ParseFile(fset, path, nil, parser.ParseComments)
 			if parseFileError != nil {
-				t.Fatal(parseFileError)
+				test.Fatal(parseFileError)
 			}
-			if _, buildFilesError := buildFiles(fset, name, []*ast.File{f}, nil); buildFilesError != nil {
-				t.Error(buildFilesError)
+			if _, buildFilesError := buildFiles(fset, name, []*ast.File{file}, nil); buildFilesError != nil {
+				test.Error(buildFilesError)
 			}
 		})
 	}
 }
 
-func TestBuildPackageGo120(t *testing.T) {
+func TestBuildPackageGo120(test *testing.T) {
 	tests := []struct {
 		name     string
 		src      string
@@ -542,9 +544,9 @@ func TestBuildPackageGo120(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			buildPackage(t, tc.src, tc.importer)
+		test.Run(tc.name, func(test *testing.T) {
+			test.Parallel()
+			buildPackage(test, tc.src, tc.importer)
 		})
 	}
 }
@@ -552,7 +554,7 @@ func TestBuildPackageGo120(t *testing.T) {
 // TestRangeIndexLoop holds the one field that replaces a block label readers compared: a range over a
 // slice marks its loop header RangeIndexLoop, where go/ir writes the label "rangeindex.loop", and no other
 // block is marked. This one is ours; go/ir has no test of the label.
-func TestRangeIndexLoop(t *testing.T) {
+func TestRangeIndexLoop(test *testing.T) {
 	const input = `
 package p
 
@@ -572,13 +574,13 @@ func f(s []int, a [3]int, m map[int]int) (n int) {
 	return n
 }
 `
-	p, _ := buildPackage(t, input, nil)
+	p, _ := buildPackage(test, input, nil)
 	var marked []string
-	for _, b := range p.Function("f").Blocks {
-		if b.RangeIndexLoop {
+	for _, block := range p.Function("f").Blocks {
+		if block.RangeIndexLoop {
 			// The header increments the index and then branches on it against the length.
 			var kinds []string
-			for _, instr := range b.Instructions {
+			for _, instr := range block.Instructions {
 				kinds = append(kinds, strings.TrimPrefix(fmt.Sprintf("%T", instr), "*intermediate_representation."))
 			}
 			marked = append(marked, strings.Join(kinds, " "))
@@ -589,6 +591,6 @@ func f(s []int, a [3]int, m map[int]int) (n int) {
 		"Load BinaryOperation Store BinaryOperation If",
 	}
 	if fmt.Sprint(marked) != fmt.Sprint(want) {
-		t.Errorf("the RangeIndexLoop blocks hold %q, want %q", marked, want)
+		test.Errorf("the RangeIndexLoop blocks hold %q, want %q", marked, want)
 	}
 }

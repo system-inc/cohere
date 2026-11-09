@@ -16,10 +16,10 @@ import (
 // left-hand side of an assignment.  This is a generalization of a
 // pointer to permit updates to elements of maps.
 type lvalue interface {
-	store(fn *Function, v Value, source ast.Node) // stores v into the location
-	load(fn *Function, source ast.Node) Value     // loads the contents of the location
-	address(fn *Function) Value                   // address of the location
-	typ() types.Type                              // returns the type of the location
+	store(function *Function, value Value, source ast.Node) // stores v into the location
+	load(function *Function, source ast.Node) Value         // loads the contents of the location
+	address(function *Function) Value                       // address of the location
+	typ() types.Type                                        // returns the type of the location
 }
 
 // An address is an lvalue represented by a true pointer.
@@ -27,20 +27,20 @@ type address struct {
 	addr Value // must have a pointer core type.
 }
 
-func (a *address) load(fn *Function, source ast.Node) Value {
-	return emitLoad(fn, a.addr, source)
+func (address *address) load(function *Function, source ast.Node) Value {
+	return emitLoad(function, address.addr, source)
 }
 
-func (a *address) store(fn *Function, v Value, source ast.Node) {
-	emitStore(fn, a.addr, v, source)
+func (address *address) store(function *Function, value Value, source ast.Node) {
+	emitStore(function, address.addr, value, source)
 }
 
-func (a *address) address(fn *Function) Value {
-	return a.addr
+func (address *address) address(function *Function) Value {
+	return address.addr
 }
 
-func (a *address) typ() types.Type {
-	return deref(a.addr.Type())
+func (address *address) typ() types.Type {
+	return deref(address.addr.Type())
 }
 
 type compositeElement struct {
@@ -49,21 +49,21 @@ type compositeElement struct {
 	t     types.Type
 }
 
-func (ce *compositeElement) load(fn *Function, source ast.Node) Value {
+func (element *compositeElement) load(function *Function, source ast.Node) Value {
 	panic("not implemented")
 }
 
-func (ce *compositeElement) store(fn *Function, v Value, source ast.Node) {
-	v = emitConv(fn, v, ce.t, source)
-	ce.cv.Values[ce.index] = v
+func (element *compositeElement) store(function *Function, value Value, source ast.Node) {
+	value = emitConv(function, value, element.t, source)
+	element.cv.Values[element.index] = value
 }
 
-func (ce *compositeElement) address(fn *Function) Value {
+func (element *compositeElement) address(function *Function) Value {
 	panic("not implemented")
 }
 
-func (ce *compositeElement) typ() types.Type {
-	return ce.t
+func (element *compositeElement) typ() types.Type {
+	return element.t
 }
 
 // An element is an lvalue represented by m[k], the location of an
@@ -75,30 +75,30 @@ type element struct {
 	t    types.Type // map element type
 }
 
-func (e *element) load(fn *Function, source ast.Node) Value {
-	l := &MapLookup{
-		X:     e.m,
-		Index: e.k,
+func (element *element) load(function *Function, source ast.Node) Value {
+	lookup := &MapLookup{
+		X:     element.m,
+		Index: element.k,
 	}
-	l.setType(e.t)
-	return fn.emit(l, source)
+	lookup.setType(element.t)
+	return function.emit(lookup, source)
 }
 
-func (e *element) store(fn *Function, v Value, source ast.Node) {
+func (element *element) store(function *Function, value Value, source ast.Node) {
 	up := &MapUpdate{
-		Map:   e.m,
-		Key:   e.k,
-		Value: emitConv(fn, v, e.t, source),
+		Map:   element.m,
+		Key:   element.k,
+		Value: emitConv(function, value, element.t, source),
 	}
-	fn.emit(up, source)
+	function.emit(up, source)
 }
 
-func (e *element) address(fn *Function) Value {
+func (element *element) address(function *Function) Value {
 	panic("map elements are not addressable")
 }
 
-func (e *element) typ() types.Type {
-	return e.t
+func (element *element) typ() types.Type {
+	return element.t
 }
 
 // A lazyAddress is an lvalue whose address is the result of an instruction.
@@ -107,45 +107,45 @@ func (e *element) typ() types.Type {
 // A lazyAddress can be used to control when a side effect (nil pointer
 // dereference, index out of bounds) of using a location happens.
 type lazyAddress struct {
-	addr func(fn *Function) Value // emit to fn the computation of the address
-	t    types.Type               // type of the location
+	addr func(function *Function) Value // emit to fn the computation of the address
+	t    types.Type                     // type of the location
 }
 
-func (l *lazyAddress) load(fn *Function, source ast.Node) Value {
-	load := emitLoad(fn, l.addr(fn), source)
+func (address *lazyAddress) load(function *Function, source ast.Node) Value {
+	load := emitLoad(function, address.addr(function), source)
 	return load
 }
 
-func (l *lazyAddress) store(fn *Function, v Value, source ast.Node) {
-	emitStore(fn, l.addr(fn), v, source)
+func (address *lazyAddress) store(function *Function, value Value, source ast.Node) {
+	emitStore(function, address.addr(function), value, source)
 }
 
-func (l *lazyAddress) address(fn *Function) Value {
-	return l.addr(fn)
+func (address *lazyAddress) address(function *Function) Value {
+	return address.addr(function)
 }
 
-func (l *lazyAddress) typ() types.Type { return l.t }
+func (address *lazyAddress) typ() types.Type { return address.t }
 
 // A blank is a dummy variable whose name is "_".
 // It is not reified: loads are illegal and stores are ignored.
 type blank struct{}
 
-func (bl blank) load(fn *Function, source ast.Node) Value {
+func (blank blank) load(function *Function, source ast.Node) Value {
 	panic("blank.load is illegal")
 }
 
-func (bl blank) store(fn *Function, v Value, source ast.Node) {
-	s := &BlankStore{
-		Value: v,
+func (blank blank) store(function *Function, value Value, source ast.Node) {
+	store := &BlankStore{
+		Value: value,
 	}
-	fn.emit(s, source)
+	function.emit(store, source)
 }
 
-func (bl blank) address(fn *Function) Value {
+func (blank blank) address(function *Function) Value {
 	panic("blank var is not addressable")
 }
 
-func (bl blank) typ() types.Type {
+func (blank blank) typ() types.Type {
 	// This should be the type of the blank Ident; the typechecker
 	// doesn't provide this yet, but fortunately, we don't need it
 	// yet either.

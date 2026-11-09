@@ -18,7 +18,7 @@ import (
 // objectMethod panics if the function is not a method.
 //
 // Acquires prog.objectMethodsMu.
-func (prog *Program) objectMethod(object *types.Func, targs []types.Type, b *builder) *Function {
+func (prog *Program) objectMethod(object *types.Func, targs []types.Type, builder *builder) *Function {
 	sig := object.Type().(*types.Signature)
 	if sig.Recv() == nil {
 		panic("not a method: " + object.String())
@@ -26,30 +26,30 @@ func (prog *Program) objectMethod(object *types.Func, targs []types.Type, b *bui
 
 	// Instantiation of generic?
 	if orig := object.Origin(); orig != object || len(targs) > 0 {
-		return prog.objectMethod(orig, nil, b).instance(receiverTypeArguments(object), targs, b)
+		return prog.objectMethod(orig, nil, builder).instance(receiverTypeArguments(object), targs, builder)
 	}
 
 	// Belongs to a created package?
-	if fn := prog.FunctionValue(object); fn != nil {
-		return fn
+	if function := prog.FunctionValue(object); function != nil {
+		return function
 	}
 
 	// Consult/update cache of methods created from types.Func.
 	prog.objectMethodsMutex.Lock()
 	defer prog.objectMethodsMutex.Unlock()
-	fn, ok := prog.objectMethods[object]
+	function, ok := prog.objectMethods[object]
 	if !ok {
-		fn = createFunction(prog, object, object.Name(), nil, nil, "")
-		fn.Synthetic = "from type information (on demand)"
-		fn.buildshared = b.shared()
-		b.enqueue(fn)
+		function = createFunction(prog, object, object.Name(), nil, nil, "")
+		function.Synthetic = "from type information (on demand)"
+		function.buildshared = builder.shared()
+		builder.enqueue(function)
 
 		if prog.objectMethods == nil {
 			prog.objectMethods = make(map[*types.Func]*Function)
 		}
-		prog.objectMethods[object] = fn
+		prog.objectMethods[object] = function
 	} else {
-		b.waitForSharedFunction(fn)
+		builder.waitForSharedFunction(function)
 	}
-	return fn
+	return function
 }

@@ -1444,12 +1444,12 @@ type node struct {
 	source ast.Node
 }
 
-func (n *node) setSource(source ast.Node) { n.source = source }
-func (n *node) Source() ast.Node          { return n.source }
+func (node *node) setSource(source ast.Node) { node.source = source }
+func (node *node) Source() ast.Node          { return node.source }
 
-func (n *node) Pos() token.Pos {
-	if n.source != nil {
-		return n.source.Pos()
+func (node *node) Pos() token.Pos {
+	if node.source != nil {
+		return node.source.Pos()
 	}
 	return token.NoPos
 }
@@ -1539,13 +1539,13 @@ type CallCommon struct {
 }
 
 // IsInvoke returns true if this call has "invoke" (not "call") mode.
-func (c *CallCommon) IsInvoke() bool {
-	return c.Method != nil
+func (common *CallCommon) IsInvoke() bool {
+	return common.Method != nil
 }
 
-func (c *CallCommon) Pos() token.Pos {
-	if c.source != nil {
-		return c.source.Pos()
+func (common *CallCommon) Pos() token.Pos {
+	if common.source != nil {
+		return common.source.Pos()
 	}
 	return token.NoPos
 }
@@ -1557,17 +1557,17 @@ func (c *CallCommon) Pos() token.Pos {
 //
 // In either "call" or "invoke" mode, if the callee is a method, its
 // receiver is represented by sig.Recv, not sig.Params().At(0).
-func (c *CallCommon) Signature() *types.Signature {
-	if c.Method != nil {
-		return c.Method.Type().(*types.Signature)
+func (common *CallCommon) Signature() *types.Signature {
+	if common.Method != nil {
+		return common.Method.Type().(*types.Signature)
 	}
-	return typeutil.CoreType(c.Value.Type()).(*types.Signature)
+	return typeutil.CoreType(common.Value.Type()).(*types.Signature)
 }
 
 // StaticCallee returns the callee if this is a trivially static
 // "call"-mode call to a function.
-func (c *CallCommon) StaticCallee() *Function {
-	switch fn := c.Value.(type) {
+func (common *CallCommon) StaticCallee() *Function {
+	switch fn := common.Value.(type) {
 	case *Function:
 		return fn
 	case *MakeClosure:
@@ -1578,8 +1578,8 @@ func (c *CallCommon) StaticCallee() *Function {
 
 // Description returns a description of the mode of this call suitable
 // for a user interface, e.g., "static method call".
-func (c *CallCommon) Description() string {
-	switch fn := c.Value.(type) {
+func (common *CallCommon) Description() string {
+	switch fn := common.Value.(type) {
 	case *Builtin:
 		return "built-in function call"
 	case *MakeClosure:
@@ -1590,7 +1590,7 @@ func (c *CallCommon) Description() string {
 		}
 		return "static function call"
 	}
-	if c.IsInvoke() {
+	if common.IsInvoke() {
 		return "dynamic method call" // ("invoke" mode)
 	}
 	return "dynamic function call"
@@ -1605,65 +1605,65 @@ type CallInstruction interface {
 	Value() *Call
 }
 
-func (s *Call) Common() *CallCommon  { return &s.Call }
-func (s *Defer) Common() *CallCommon { return &s.Call }
-func (s *Go) Common() *CallCommon    { return &s.Call }
+func (call *Call) Common() *CallCommon { return &call.Call }
+func (s *Defer) Common() *CallCommon   { return &s.Call }
+func (s *Go) Common() *CallCommon      { return &s.Call }
 
-func (s *Call) setSource(source ast.Node)  { s.source = source; s.Call.source = source }
-func (s *Defer) setSource(source ast.Node) { s.source = source; s.Call.source = source }
-func (s *Go) setSource(source ast.Node)    { s.source = source; s.Call.source = source }
+func (call *Call) setSource(source ast.Node) { call.source = source; call.Call.source = source }
+func (s *Defer) setSource(source ast.Node)   { s.source = source; s.Call.source = source }
+func (s *Go) setSource(source ast.Node)      { s.source = source; s.Call.source = source }
 
-func (s *Call) Value() *Call  { return s }
-func (s *Defer) Value() *Call { return nil }
-func (s *Go) Value() *Call    { return nil }
+func (call *Call) Value() *Call { return call }
+func (s *Defer) Value() *Call   { return nil }
+func (s *Go) Value() *Call      { return nil }
 
-func (v *Builtin) Type() types.Type        { return v.sig }
-func (v *Builtin) Name() string            { return v.name }
-func (*Builtin) Referrers() *[]Instruction { return nil }
-func (v *Builtin) Pos() token.Pos          { return token.NoPos }
-func (v *Builtin) Object() types.Object    { return types.Universe.Lookup(v.name) }
-func (v *Builtin) Parent() *Function       { return nil }
+func (builtin *Builtin) Type() types.Type     { return builtin.sig }
+func (builtin *Builtin) Name() string         { return builtin.name }
+func (*Builtin) Referrers() *[]Instruction    { return nil }
+func (builtin *Builtin) Pos() token.Pos       { return token.NoPos }
+func (builtin *Builtin) Object() types.Object { return types.Universe.Lookup(builtin.name) }
+func (builtin *Builtin) Parent() *Function    { return nil }
 
-func (v *FreeVariable) Type() types.Type          { return v.typ }
-func (v *FreeVariable) Name() string              { return v.name }
-func (v *FreeVariable) Referrers() *[]Instruction { return &v.referrers }
-func (v *FreeVariable) Parent() *Function         { return v.parent }
+func (variable *FreeVariable) Type() types.Type          { return variable.typ }
+func (variable *FreeVariable) Name() string              { return variable.name }
+func (variable *FreeVariable) Referrers() *[]Instruction { return &variable.referrers }
+func (variable *FreeVariable) Parent() *Function         { return variable.parent }
 
-func (v *Global) Type() types.Type          { return v.typ }
-func (v *Global) Name() string              { return v.name }
-func (v *Global) Parent() *Function         { return nil }
-func (v *Global) Referrers() *[]Instruction { return nil }
-func (v *Global) Token() token.Token        { return token.VAR }
-func (v *Global) Object() types.Object      { return v.object }
-func (v *Global) String() string            { return v.RelativeString(nil) }
-func (v *Global) RelativeString(from *types.Package) string {
-	return relativeString(v, v.Package, from)
+func (global *Global) Type() types.Type          { return global.typ }
+func (global *Global) Name() string              { return global.name }
+func (global *Global) Parent() *Function         { return nil }
+func (global *Global) Referrers() *[]Instruction { return nil }
+func (global *Global) Token() token.Token        { return token.VAR }
+func (global *Global) Object() types.Object      { return global.object }
+func (global *Global) String() string            { return global.RelativeString(nil) }
+func (global *Global) RelativeString(from *types.Package) string {
+	return relativeString(global, global.Package, from)
 }
 
-func (v *Function) Name() string       { return v.name }
-func (v *Function) Type() types.Type   { return v.Signature }
-func (v *Function) Token() token.Token { return token.FUNC }
-func (v *Function) Object() types.Object {
-	if v.object != nil {
-		return types.Object(v.object)
+func (function *Function) Name() string       { return function.name }
+func (function *Function) Type() types.Type   { return function.Signature }
+func (function *Function) Token() token.Token { return token.FUNC }
+func (function *Function) Object() types.Object {
+	if function.object != nil {
+		return types.Object(function.object)
 	}
 	return nil
 }
-func (v *Function) String() string    { return v.RelativeString(nil) }
-func (v *Function) Parent() *Function { return v.parent }
-func (v *Function) Referrers() *[]Instruction {
-	if v.parent != nil {
-		return &v.referrers
+func (function *Function) String() string    { return function.RelativeString(nil) }
+func (function *Function) Parent() *Function { return function.parent }
+func (function *Function) Referrers() *[]Instruction {
+	if function.parent != nil {
+		return &function.referrers
 	}
 	return nil
 }
 
 // Returns returns an iterator over all blocks containing return statements.
-func (v *Function) Returns() iter.Seq[*BasicBlock] {
+func (function *Function) Returns() iter.Seq[*BasicBlock] {
 	return func(yield func(*BasicBlock) bool) {
-		for _, b := range v.Blocks {
-			if _, ok := b.Control().(*Return); ok {
-				if !yield(b) {
+		for _, block := range function.Blocks {
+			if _, ok := block.Control().(*Return); ok {
+				if !yield(block) {
 					return
 				}
 			}
@@ -1672,11 +1672,11 @@ func (v *Function) Returns() iter.Seq[*BasicBlock] {
 }
 
 // Exits returns an iterator over all blocks that have no successors.
-func (v *Function) Exits() iter.Seq[*BasicBlock] {
+func (function *Function) Exits() iter.Seq[*BasicBlock] {
 	return func(yield func(*BasicBlock) bool) {
-		for _, b := range v.Blocks {
-			if len(b.Successors) == 0 {
-				if !yield(b) {
+		for _, block := range function.Blocks {
+			if len(block.Successors) == 0 {
+				if !yield(block) {
 					return
 				}
 			}
@@ -1685,10 +1685,10 @@ func (v *Function) Exits() iter.Seq[*BasicBlock] {
 }
 
 // Nodes returns an iterator over the basic block indices.
-func (v *Function) Nodes() iter.Seq[int] {
+func (function *Function) Nodes() iter.Seq[int] {
 	return func(yield func(int) bool) {
-		for i := range v.Blocks {
-			if !yield(i) {
+		for index := range function.Blocks {
+			if !yield(index) {
 				return
 			}
 		}
@@ -1696,12 +1696,12 @@ func (v *Function) Nodes() iter.Seq[int] {
 }
 
 // NumNodes returns the number of basic blocks in the graph.
-func (v *Function) NumNodes() int { return len(v.Blocks) }
+func (function *Function) NumNodes() int { return len(function.Blocks) }
 
 // Out returns an iterator over the successor block indices of a given node.
-func (v *Function) Out(node int) iter.Seq[int] {
+func (function *Function) Out(node int) iter.Seq[int] {
 	return func(yield func(int) bool) {
-		for _, succ := range v.Blocks[node].Successors {
+		for _, succ := range function.Blocks[node].Successors {
 			if !yield(succ.Index) {
 				return
 			}
@@ -1709,12 +1709,12 @@ func (v *Function) Out(node int) iter.Seq[int] {
 	}
 }
 
-func (v *Parameter) Type() types.Type          { return v.typ }
-func (v *Parameter) Name() string              { return v.name }
-func (v *Parameter) Object() types.Object      { return v.object }
-func (v *Parameter) Referrers() *[]Instruction { return &v.referrers }
-func (v *Parameter) Pos() token.Pos            { return v.object.Pos() }
-func (v *Parameter) Parent() *Function         { return v.parent }
+func (parameter *Parameter) Type() types.Type          { return parameter.typ }
+func (parameter *Parameter) Name() string              { return parameter.name }
+func (parameter *Parameter) Object() types.Object      { return parameter.object }
+func (parameter *Parameter) Referrers() *[]Instruction { return &parameter.referrers }
+func (parameter *Parameter) Pos() token.Pos            { return parameter.object.Pos() }
+func (parameter *Parameter) Parent() *Function         { return parameter.parent }
 
 // TypeParameters are the function's type parameters if generic or the
 // type parameters that were instantiated if fn is an instantiation.
@@ -1731,8 +1731,8 @@ func (v *Parameter) Parent() *Function         { return v.parent }
 // Note that receiver type parameters precede other type parameters.
 // Also, type parameters may have the same index if they come from
 // different source type parameter lists.
-func (fn *Function) TypeParameters() *types.TypeParamList {
-	return consTypeParamLists(fn.recvtypeparams, fn.typeparams)
+func (function *Function) TypeParameters() *types.TypeParamList {
+	return consTypeParamLists(function.recvtypeparams, function.typeparams)
 }
 
 func consTypeParamLists(l, r *types.TypeParamList) *types.TypeParamList {
@@ -1744,11 +1744,11 @@ func consTypeParamLists(l, r *types.TypeParamList) *types.TypeParamList {
 	}
 
 	tpars := make([]*types.TypeParam, l.Len()+r.Len())
-	for i := range l.Len() {
-		tpars[i] = l.At(i)
+	for index := range l.Len() {
+		tpars[index] = l.At(index)
 	}
-	for i := range r.Len() {
-		tpars[i+l.Len()] = r.At(i)
+	for index := range r.Len() {
+		tpars[index+l.Len()] = r.At(index)
 	}
 	// This logic unsafely assumes (and asserts) that the layout of the
 	// TypeParamList is identical to that of a slice of TypeParams. This
@@ -1758,7 +1758,7 @@ func consTypeParamLists(l, r *types.TypeParamList) *types.TypeParamList {
 	if t.NumField() != 1 {
 		panic("TypeParamList has unexpected fields")
 	}
-	if f := t.Field(0); f.Offset != 0 || f.Type != reflect.TypeFor[[]*types.TypeParam]() {
+	if field := t.Field(0); field.Offset != 0 || field.Type != reflect.TypeFor[[]*types.TypeParam]() {
 		panic("TypeParamList field is not []*TypeParam")
 	}
 	return (*types.TypeParamList)(unsafe.Pointer(&tpars))
@@ -1777,40 +1777,40 @@ func consTypeParamLists(l, r *types.TypeParamList) *types.TypeParamList {
 //	T[int].m[uint]      // [int, uint]
 //
 // Note that receiver type arguments precede other type arguments.
-func (fn *Function) TypeArguments() []types.Type {
-	return slices.Concat(fn.recvtypeargs, fn.typeargs)
+func (function *Function) TypeArguments() []types.Type {
+	return slices.Concat(function.recvtypeargs, function.typeargs)
 }
 
 // Origin returns the generic function from which fn was instantiated,
 // or nil if fn is not an instantiation.
-func (fn *Function) Origin() *Function {
-	if fn.parent != nil && fn.parent.hasTypeArguments() {
+func (function *Function) Origin() *Function {
+	if function.parent != nil && function.parent.hasTypeArguments() {
 		// Nested functions are BUILT at a different time than their instances.
 		// Build declared package if not yet BUILT. This is not an expected use
 		// case, but is simple and robust.
-		fn.declaredPackage().Build()
+		function.declaredPackage().Build()
 	}
-	return origin(fn)
+	return origin(function)
 }
 
 // hasTypeParameters returns whether fn has any type parameters
-func (fn *Function) hasTypeParameters() bool {
-	return fn.recvtypeparams.Len()+fn.typeparams.Len() > 0
+func (function *Function) hasTypeParameters() bool {
+	return function.recvtypeparams.Len()+function.typeparams.Len() > 0
 }
 
 // hasTypeArguments returns whether fn has any type arguments
-func (fn *Function) hasTypeArguments() bool {
-	return len(fn.recvtypeargs)+len(fn.typeargs) > 0
+func (function *Function) hasTypeArguments() bool {
+	return len(function.recvtypeargs)+len(function.typeargs) > 0
 }
 
 // subrtargs returns fn's receiver type parameters substituted with receiver type arguments
-func (fn *Function) subrtargs(m *types.Func) []types.Type {
+func (function *Function) subrtargs(m *types.Func) []types.Type {
 	return receiverTypeArguments(m)
 }
 
 // subtargs returns fn's type parameters substituted with (possibly implied) type arguments
-func (fn *Function) subtargs(id *ast.Ident) []types.Type {
-	return instanceArguments(fn.info, id)
+func (function *Function) subtargs(id *ast.Ident) []types.Type {
+	return instanceArguments(function.info, id)
 }
 
 // targstr returns a comma-separated string of the types in targs
@@ -1818,11 +1818,11 @@ func targstr(targs []types.Type) string {
 	var sb strings.Builder
 	if len(targs) > 0 {
 		sb.WriteString("[")
-		for i := range targs {
-			if i > 0 {
+		for index := range targs {
+			if index > 0 {
 				sb.WriteString(", ")
 			}
-			sb.WriteString(targs[i].String())
+			sb.WriteString(targs[index].String())
 		}
 		sb.WriteString("]")
 	}
@@ -1833,25 +1833,25 @@ func targstr(targs []types.Type) string {
 // not an instantiation.
 //
 // Precondition: fn and the origin function are done building.
-func origin(fn *Function) *Function {
-	if fn.parent != nil && fn.parent.hasTypeArguments() {
-		return origin(fn.parent).AnonymousFunctions[fn.anonIndex]
+func origin(function *Function) *Function {
+	if function.parent != nil && function.parent.hasTypeArguments() {
+		return origin(function.parent).AnonymousFunctions[function.anonIndex]
 	}
-	return fn.topLevelOrigin
+	return function.topLevelOrigin
 }
 
-func (v *Allocation) Type() types.Type          { return v.typ }
-func (v *Allocation) Referrers() *[]Instruction { return &v.referrers }
+func (allocation *Allocation) Type() types.Type          { return allocation.typ }
+func (allocation *Allocation) Referrers() *[]Instruction { return &allocation.referrers }
 
-func (v *register) Type() types.Type          { return v.typ }
-func (v *register) setType(typ types.Type)    { v.typ = typ }
-func (v *register) Name() string              { return fmt.Sprintf("t%d", v.id) }
-func (v *register) Referrers() *[]Instruction { return &v.referrers }
+func (register *register) Type() types.Type          { return register.typ }
+func (register *register) setType(typ types.Type)    { register.typ = typ }
+func (register *register) Name() string              { return fmt.Sprintf("t%d", register.id) }
+func (register *register) Referrers() *[]Instruction { return &register.referrers }
 
-func (v *anInstruction) Parent() *Function          { return v.block.parent }
-func (v *anInstruction) Block() *BasicBlock         { return v.block }
-func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
-func (v *anInstruction) Referrers() *[]Instruction  { return nil }
+func (instruction *anInstruction) Parent() *Function          { return instruction.block.parent }
+func (instruction *anInstruction) Block() *BasicBlock         { return instruction.block }
+func (instruction *anInstruction) setBlock(block *BasicBlock) { instruction.block = block }
+func (instruction *anInstruction) Referrers() *[]Instruction  { return nil }
 
 func (t *Type) Name() string                              { return t.object.Name() }
 func (t *Type) Pos() token.Pos                            { return t.object.Pos() }
@@ -1862,62 +1862,62 @@ func (t *Type) String() string                            { return t.RelativeStr
 func (t *Type) Package() *Package                         { return t.pkg }
 func (t *Type) RelativeString(from *types.Package) string { return relativeString(t, t.pkg, from) }
 
-func (c *NamedConstant) Name() string         { return c.object.Name() }
-func (c *NamedConstant) Pos() token.Pos       { return c.object.Pos() }
-func (c *NamedConstant) String() string       { return c.RelativeString(nil) }
-func (c *NamedConstant) Type() types.Type     { return c.object.Type() }
-func (c *NamedConstant) Token() token.Token   { return token.CONST }
-func (c *NamedConstant) Object() types.Object { return c.object }
-func (c *NamedConstant) Package() *Package    { return c.pkg }
-func (c *NamedConstant) RelativeString(from *types.Package) string {
-	return relativeString(c, c.pkg, from)
+func (namedConstant *NamedConstant) Name() string         { return namedConstant.object.Name() }
+func (namedConstant *NamedConstant) Pos() token.Pos       { return namedConstant.object.Pos() }
+func (namedConstant *NamedConstant) String() string       { return namedConstant.RelativeString(nil) }
+func (namedConstant *NamedConstant) Type() types.Type     { return namedConstant.object.Type() }
+func (namedConstant *NamedConstant) Token() token.Token   { return token.CONST }
+func (namedConstant *NamedConstant) Object() types.Object { return namedConstant.object }
+func (namedConstant *NamedConstant) Package() *Package    { return namedConstant.pkg }
+func (namedConstant *NamedConstant) RelativeString(from *types.Package) string {
+	return relativeString(namedConstant, namedConstant.pkg, from)
 }
 
-func (v *Function) Pos() token.Pos   { return v.pos }
-func (v *Function) Source() ast.Node { return v.syntax }
+func (function *Function) Pos() token.Pos   { return function.pos }
+func (function *Function) Source() ast.Node { return function.syntax }
 
 // Function returns the package-level function of the specified name,
 // or nil if not found.
-func (p *Package) Function(name string) (f *Function) {
-	f, _ = p.Members[name].(*Function)
+func (goEnginePackage *Package) Function(name string) (function *Function) {
+	function, _ = goEnginePackage.Members[name].(*Function)
 	return
 }
 
 // Variable returns the package-level variable of the specified name,
 // or nil if not found.
-func (p *Package) Variable(name string) (g *Global) {
-	g, _ = p.Members[name].(*Global)
+func (goEnginePackage *Package) Variable(name string) (global *Global) {
+	global, _ = goEnginePackage.Members[name].(*Global)
 	return
 }
 
 // Constant returns the package-level constant of the specified name,
 // or nil if not found.
-func (p *Package) Constant(name string) (c *NamedConstant) {
-	c, _ = p.Members[name].(*NamedConstant)
+func (goEnginePackage *Package) Constant(name string) (namedConstant *NamedConstant) {
+	namedConstant, _ = goEnginePackage.Members[name].(*NamedConstant)
 	return
 }
 
 // Type returns the package-level type of the specified name,
 // or nil if not found.
-func (p *Package) Type(name string) (t *Type) {
-	t, _ = p.Members[name].(*Type)
+func (goEnginePackage *Package) Type(name string) (t *Type) {
+	t, _ = goEnginePackage.Members[name].(*Type)
 	return
 }
 
 // Operands.
 
-func (v *Allocation) Operands(rands []*Value) []*Value {
+func (allocation *Allocation) Operands(rands []*Value) []*Value {
 	return rands
 }
 
-func (v *BinaryOperation) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X, &v.Y)
+func (operation *BinaryOperation) Operands(rands []*Value) []*Value {
+	return append(rands, &operation.X, &operation.Y)
 }
 
-func (c *CallCommon) Operands(rands []*Value) []*Value {
-	rands = append(rands, &c.Value)
-	for i := range c.Arguments {
-		rands = append(rands, &c.Arguments[i])
+func (common *CallCommon) Operands(rands []*Value) []*Value {
+	rands = append(rands, &common.Value)
+	for index := range common.Arguments {
+		rands = append(rands, &common.Arguments[index])
 	}
 	return rands
 }
@@ -1926,73 +1926,73 @@ func (s *Go) Operands(rands []*Value) []*Value {
 	return s.Call.Operands(rands)
 }
 
-func (s *Call) Operands(rands []*Value) []*Value {
-	return s.Call.Operands(rands)
+func (call *Call) Operands(rands []*Value) []*Value {
+	return call.Call.Operands(rands)
 }
 
 func (s *Defer) Operands(rands []*Value) []*Value {
 	return append(s.Call.Operands(rands), &s.DeferStack)
 }
 
-func (v *ChangeInterface) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (changeInterface *ChangeInterface) Operands(rands []*Value) []*Value {
+	return append(rands, &changeInterface.X)
 }
 
-func (v *ChangeType) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (changeType *ChangeType) Operands(rands []*Value) []*Value {
+	return append(rands, &changeType.X)
 }
 
-func (v *Convert) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (convert *Convert) Operands(rands []*Value) []*Value {
+	return append(rands, &convert.X)
 }
 
-func (v *MultiConvert) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (convert *MultiConvert) Operands(rands []*Value) []*Value {
+	return append(rands, &convert.X)
 }
 
-func (v *SliceToArrayPointer) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (pointer *SliceToArrayPointer) Operands(rands []*Value) []*Value {
+	return append(rands, &pointer.X)
 }
 
-func (v *SliceToArray) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (array *SliceToArray) Operands(rands []*Value) []*Value {
+	return append(rands, &array.X)
 }
 
-func (v *Extract) Operands(rands []*Value) []*Value {
-	return append(rands, &v.Tuple)
+func (extract *Extract) Operands(rands []*Value) []*Value {
+	return append(rands, &extract.Tuple)
 }
 
-func (v *Field) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (field *Field) Operands(rands []*Value) []*Value {
+	return append(rands, &field.X)
 }
 
-func (v *FieldAddress) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (address *FieldAddress) Operands(rands []*Value) []*Value {
+	return append(rands, &address.X)
 }
 
-func (s *If) Operands(rands []*Value) []*Value {
-	return append(rands, &s.Condition)
+func (instr *If) Operands(rands []*Value) []*Value {
+	return append(rands, &instr.Condition)
 }
 
-func (s *ConstantSwitch) Operands(rands []*Value) []*Value {
-	rands = append(rands, &s.Tag)
-	for i := range s.Conditions {
-		rands = append(rands, &s.Conditions[i])
+func (constantSwitch *ConstantSwitch) Operands(rands []*Value) []*Value {
+	rands = append(rands, &constantSwitch.Tag)
+	for index := range constantSwitch.Conditions {
+		rands = append(rands, &constantSwitch.Conditions[index])
 	}
 	return rands
 }
 
-func (s *TypeSwitch) Operands(rands []*Value) []*Value {
-	rands = append(rands, &s.Tag)
+func (typeSwitch *TypeSwitch) Operands(rands []*Value) []*Value {
+	rands = append(rands, &typeSwitch.Tag)
 	return rands
 }
 
-func (v *Index) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X, &v.Index)
+func (index *Index) Operands(rands []*Value) []*Value {
+	return append(rands, &index.X, &index.Index)
 }
 
-func (v *IndexAddress) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X, &v.Index)
+func (address *IndexAddress) Operands(rands []*Value) []*Value {
+	return append(rands, &address.X, &address.Index)
 }
 
 func (*Jump) Operands(rands []*Value) []*Value {
@@ -2003,64 +2003,64 @@ func (*Unreachable) Operands(rands []*Value) []*Value {
 	return rands
 }
 
-func (v *MapLookup) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X, &v.Index)
+func (lookup *MapLookup) Operands(rands []*Value) []*Value {
+	return append(rands, &lookup.X, &lookup.Index)
 }
 
-func (v *StringLookup) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X, &v.Index)
+func (lookup *StringLookup) Operands(rands []*Value) []*Value {
+	return append(rands, &lookup.X, &lookup.Index)
 }
 
-func (v *MakeChannel) Operands(rands []*Value) []*Value {
-	return append(rands, &v.Size)
+func (channel *MakeChannel) Operands(rands []*Value) []*Value {
+	return append(rands, &channel.Size)
 }
 
-func (v *MakeClosure) Operands(rands []*Value) []*Value {
-	rands = append(rands, &v.Function)
-	for i := range v.Bindings {
-		rands = append(rands, &v.Bindings[i])
+func (closure *MakeClosure) Operands(rands []*Value) []*Value {
+	rands = append(rands, &closure.Function)
+	for index := range closure.Bindings {
+		rands = append(rands, &closure.Bindings[index])
 	}
 	return rands
 }
 
-func (v *MakeInterface) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (makeInterface *MakeInterface) Operands(rands []*Value) []*Value {
+	return append(rands, &makeInterface.X)
 }
 
-func (v *MakeMap) Operands(rands []*Value) []*Value {
-	return append(rands, &v.Reserve)
+func (makeMap *MakeMap) Operands(rands []*Value) []*Value {
+	return append(rands, &makeMap.Reserve)
 }
 
-func (v *MakeSlice) Operands(rands []*Value) []*Value {
-	return append(rands, &v.Length, &v.Capacity)
+func (slice *MakeSlice) Operands(rands []*Value) []*Value {
+	return append(rands, &slice.Length, &slice.Capacity)
 }
 
-func (v *MapUpdate) Operands(rands []*Value) []*Value {
-	return append(rands, &v.Map, &v.Key, &v.Value)
+func (update *MapUpdate) Operands(rands []*Value) []*Value {
+	return append(rands, &update.Map, &update.Key, &update.Value)
 }
 
-func (v *Next) Operands(rands []*Value) []*Value {
-	return append(rands, &v.Iterator)
+func (next *Next) Operands(rands []*Value) []*Value {
+	return append(rands, &next.Iterator)
 }
 
 func (s *Panic) Operands(rands []*Value) []*Value {
 	return append(rands, &s.X)
 }
 
-func (v *Phi) Operands(rands []*Value) []*Value {
-	for i := range v.Edges {
-		rands = append(rands, &v.Edges[i])
+func (phi *Phi) Operands(rands []*Value) []*Value {
+	for index := range phi.Edges {
+		rands = append(rands, &phi.Edges[index])
 	}
 	return rands
 }
 
-func (v *Range) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (span *Range) Operands(rands []*Value) []*Value {
+	return append(rands, &span.X)
 }
 
-func (s *Return) Operands(rands []*Value) []*Value {
-	for i := range s.Results {
-		rands = append(rands, &s.Results[i])
+func (ret *Return) Operands(rands []*Value) []*Value {
+	for index := range ret.Results {
+		rands = append(rands, &ret.Results[index])
 	}
 	return rands
 }
@@ -2069,56 +2069,56 @@ func (*RunDefers) Operands(rands []*Value) []*Value {
 	return rands
 }
 
-func (v *Select) Operands(rands []*Value) []*Value {
-	for i := range v.States {
-		rands = append(rands, &v.States[i].Channel, &v.States[i].Send)
+func (instr *Select) Operands(rands []*Value) []*Value {
+	for index := range instr.States {
+		rands = append(rands, &instr.States[index].Channel, &instr.States[index].Send)
 	}
 	return rands
 }
 
-func (s *Send) Operands(rands []*Value) []*Value {
-	return append(rands, &s.Channel, &s.X)
+func (send *Send) Operands(rands []*Value) []*Value {
+	return append(rands, &send.Channel, &send.X)
 }
 
 func (recv *Receive) Operands(rands []*Value) []*Value {
 	return append(rands, &recv.Channel)
 }
 
-func (v *Slice) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X, &v.Low, &v.High, &v.Maximum)
+func (slice *Slice) Operands(rands []*Value) []*Value {
+	return append(rands, &slice.X, &slice.Low, &slice.High, &slice.Maximum)
 }
 
-func (s *Store) Operands(rands []*Value) []*Value {
-	return append(rands, &s.Address, &s.Value)
+func (store *Store) Operands(rands []*Value) []*Value {
+	return append(rands, &store.Address, &store.Value)
 }
 
-func (s *BlankStore) Operands(rands []*Value) []*Value {
-	return append(rands, &s.Value)
+func (store *BlankStore) Operands(rands []*Value) []*Value {
+	return append(rands, &store.Value)
 }
 
-func (v *TypeAssert) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (assert *TypeAssert) Operands(rands []*Value) []*Value {
+	return append(rands, &assert.X)
 }
 
-func (v *UnaryOperation) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (operation *UnaryOperation) Operands(rands []*Value) []*Value {
+	return append(rands, &operation.X)
 }
 
-func (v *Load) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
+func (load *Load) Operands(rands []*Value) []*Value {
+	return append(rands, &load.X)
 }
 
-func (v *CompositeValue) Operands(rands []*Value) []*Value {
-	for i := range v.Values {
-		rands = append(rands, &v.Values[i])
+func (value *CompositeValue) Operands(rands []*Value) []*Value {
+	for index := range value.Values {
+		rands = append(rands, &value.Values[index])
 	}
 	return rands
 }
 
 // Non-Instruction Values:
-func (v *Builtin) Operands(rands []*Value) []*Value      { return rands }
-func (v *FreeVariable) Operands(rands []*Value) []*Value { return rands }
-func (v *Constant) Operands(rands []*Value) []*Value     { return rands }
-func (v *Function) Operands(rands []*Value) []*Value     { return rands }
-func (v *Global) Operands(rands []*Value) []*Value       { return rands }
-func (v *Parameter) Operands(rands []*Value) []*Value    { return rands }
+func (builtin *Builtin) Operands(rands []*Value) []*Value       { return rands }
+func (variable *FreeVariable) Operands(rands []*Value) []*Value { return rands }
+func (vFalse *Constant) Operands(rands []*Value) []*Value       { return rands }
+func (function *Function) Operands(rands []*Value) []*Value     { return rands }
+func (global *Global) Operands(rands []*Value) []*Value         { return rands }
+func (parameter *Parameter) Operands(rands []*Value) []*Value   { return rands }

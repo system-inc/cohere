@@ -27,21 +27,21 @@ import (
 //   - the node is within an anonymous function (FuncLit) and
 //     its IR function has not been created yet
 //     (pkg.Build() has not yet been called).
-func EnclosingFunction(pkg *Package, path []ast.Node) *Function {
+func EnclosingFunction(goEnginePackage *Package, path []ast.Node) *Function {
 	// Start with package-level function...
-	fn := findEnclosingPackageLevelFunction(pkg, path)
-	if fn == nil {
+	function := findEnclosingPackageLevelFunction(goEnginePackage, path)
+	if function == nil {
 		return nil // not in any function
 	}
 
 	// ...then walk down the nested anonymous functions.
 	n := len(path)
 outer:
-	for i := range path {
-		if lit, ok := path[n-1-i].(*ast.FuncLit); ok {
-			for _, anon := range fn.AnonymousFunctions {
+	for index := range path {
+		if lit, ok := path[n-1-index].(*ast.FuncLit); ok {
+			for _, anon := range function.AnonymousFunctions {
 				if anon.Pos() == lit.Type.Func {
-					fn = anon
+					function = anon
 					continue outer
 				}
 			}
@@ -53,7 +53,7 @@ outer:
 			return nil
 		}
 	}
-	return fn
+	return function
 }
 
 // HasEnclosingFunction returns true if the AST node denoted by path
@@ -64,29 +64,29 @@ outer:
 // depend on whether IR code for pkg has been built, so it can be
 // used to quickly reject check inputs that will cause
 // EnclosingFunction to fail, prior to IR building.
-func HasEnclosingFunction(pkg *Package, path []ast.Node) bool {
-	return findEnclosingPackageLevelFunction(pkg, path) != nil
+func HasEnclosingFunction(goEnginePackage *Package, path []ast.Node) bool {
+	return findEnclosingPackageLevelFunction(goEnginePackage, path) != nil
 }
 
 // findEnclosingPackageLevelFunction returns the Function
 // corresponding to the package-level function enclosing path.
-func findEnclosingPackageLevelFunction(pkg *Package, path []ast.Node) *Function {
+func findEnclosingPackageLevelFunction(goEnginePackage *Package, path []ast.Node) *Function {
 	if n := len(path); n >= 2 { // [... {Gen,Func}Decl File]
 		switch decl := path[n-2].(type) {
 		case *ast.GenDecl:
 			if decl.Tok == token.VAR && n >= 3 {
 				// Package-level 'var' initializer.
-				return pkg.init
+				return goEnginePackage.init
 			}
 
 		case *ast.FuncDecl:
 			if decl.Recv == nil && decl.Name.Name == "init" {
 				// Explicit init() function.
-				for _, b := range pkg.init.Blocks {
-					for _, instr := range b.Instructions {
+				for _, block := range goEnginePackage.init.Blocks {
+					for _, instr := range block.Instructions {
 						if instr, ok := instr.(*Call); ok {
 							if callee, ok := instr.Call.Value.(*Function); ok &&
-								callee.Package == pkg &&
+								callee.Package == goEnginePackage &&
 								callee.Pos() == decl.Name.NamePos {
 								return callee
 							}
@@ -95,10 +95,10 @@ func findEnclosingPackageLevelFunction(pkg *Package, path []ast.Node) *Function 
 				}
 				// Hack: return non-nil when IR is not yet
 				// built so that HasEnclosingFunction works.
-				return pkg.init
+				return goEnginePackage.init
 			}
 			// Declared function/method.
-			return findNamedFunc(pkg, decl.Name.NamePos)
+			return findNamedFunc(goEnginePackage, decl.Name.NamePos)
 		}
 	}
 	return nil // not in any function
@@ -106,24 +106,24 @@ func findEnclosingPackageLevelFunction(pkg *Package, path []ast.Node) *Function 
 
 // findNamedFunc returns the named function whose FuncDecl.Ident is at
 // position pos.
-func findNamedFunc(pkg *Package, pos token.Pos) *Function {
+func findNamedFunc(goEnginePackage *Package, pos token.Pos) *Function {
 	// Look at all package members and method sets of named types.
 	// Not very efficient.
-	for _, mem := range pkg.Members {
+	for _, mem := range goEnginePackage.Members {
 		switch mem := mem.(type) {
 		case *Function:
 			if mem.Pos() == pos {
 				return mem
 			}
 		case *Type:
-			mset := pkg.Program.MethodSets.MethodSet(types.NewPointer(mem.Type()))
-			for i, n := 0, mset.Len(); i < n; i++ {
+			mset := goEnginePackage.Program.MethodSets.MethodSet(types.NewPointer(mem.Type()))
+			for index, length := 0, mset.Len(); index < length; index++ {
 				// Don't call Program.Method: avoid creating wrappers.
-				object := mset.At(i).Obj().(*types.Func)
+				object := mset.At(index).Obj().(*types.Func)
 				if object.Pos() == pos {
 					// obj from MethodSet may not be the origin type.
-					m := object.Origin()
-					return pkg.values[m].(*Function)
+					function := object.Origin()
+					return goEnginePackage.values[function].(*Function)
 				}
 			}
 		}
@@ -148,8 +148,8 @@ func (prog *Program) Package(object *types.Package) *Package {
 // It returns nil if the object belongs to a package that has not been
 // created by prog.CreatePackage.
 func (prog *Program) packageLevelMember(object types.Object) Member {
-	if pkg, ok := prog.packages[object.Pkg()]; ok {
-		return pkg.values[object]
+	if goEnginePackage, ok := prog.packages[object.Pkg()]; ok {
+		return goEnginePackage.values[object]
 	}
 	return nil
 }
@@ -159,8 +159,8 @@ func (prog *Program) packageLevelMember(object types.Object) Member {
 // denotes an interface method, or belongs to a package that was not
 // created by prog.CreatePackage.
 func (prog *Program) FunctionValue(object *types.Func) *Function {
-	fn, _ := prog.packageLevelMember(object).(*Function)
-	return fn
+	function, _ := prog.packageLevelMember(object).(*Function)
+	return function
 }
 
 // ConstantValue returns the IR Value denoted by the source-level named
@@ -174,8 +174,8 @@ func (prog *Program) ConstantValue(object *types.Const) *Constant {
 		return NewConstant(object.Val(), object.Type(), nil)
 	}
 	// Package-level named constant?
-	if v := prog.packageLevelMember(object); v != nil {
-		return v.(*NamedConstant).Value
+	if member := prog.packageLevelMember(object); member != nil {
+		return member.(*NamedConstant).Value
 	}
 	return NewConstant(object.Val(), object.Type(), nil)
 }

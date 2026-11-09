@@ -18,7 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
-func TestEnclosingFunction(t *testing.T) {
+func TestEnclosingFunction(test *testing.T) {
 	type testcase struct {
 		desc   string
 		input  string // the input file
@@ -91,39 +91,42 @@ package main
 			"1100", "(main.S).Foo",
 		})
 	}
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			pkg, file := buildPackage(t, test.input, nil)
-			fset := pkg.Program.FileSet
+	for _, testCase := range tests {
+		test.Run(testCase.desc, func(test *testing.T) {
+			goEnginePackage, file := buildPackage(test, testCase.input, nil)
+			fset := goEnginePackage.Program.FileSet
 
 			// Find [start,end) positions of the first occurrence of substr in file.
-			index := strings.Index(test.input, test.substr)
+			index := strings.Index(testCase.input, testCase.substr)
 			if index < 0 {
-				t.Fatalf("%q is not a substring of input", test.substr)
+				test.Fatalf("%q is not a substring of input", testCase.substr)
 			}
 			filePos := fset.File(file.Package)
-			start, end := filePos.Pos(index), filePos.Pos(index+len(test.substr))
+			start, end := filePos.Pos(index), filePos.Pos(index+len(testCase.substr))
 
 			path, exact := astutil.PathEnclosingInterval(file, start, end)
 			if !exact {
-				t.Fatalf("PathEnclosingInterval(%q) not exact", test.substr)
+				test.Fatalf("PathEnclosingInterval(%q) not exact", testCase.substr)
 			}
 
 			name := "(none)"
-			fn := intermediate_representation.EnclosingFunction(pkg, path)
-			if fn != nil {
-				name = fn.String()
+			function := intermediate_representation.EnclosingFunction(goEnginePackage, path)
+			if function != nil {
+				name = function.String()
 			}
 
-			if name != test.fn {
-				t.Errorf("EnclosingFunction(%q in %q) got %s, want %s",
-					test.substr, test.input, name, test.fn)
+			if name != testCase.fn {
+				test.Errorf("EnclosingFunction(%q in %q) got %s, want %s",
+					testCase.substr, testCase.input, name, testCase.fn)
 			}
 
 			// While we're here: test HasEnclosingFunction.
-			if has := intermediate_representation.HasEnclosingFunction(pkg, path); has != (fn != nil) {
-				t.Errorf("HasEnclosingFunction(%q in %q) got %v, want %v",
-					test.substr, test.input, has, fn != nil)
+			if has := intermediate_representation.HasEnclosingFunction(
+				goEnginePackage,
+				path,
+			); has != (function != nil) {
+				test.Errorf("HasEnclosingFunction(%q in %q) got %v, want %v",
+					testCase.substr, testCase.input, has, function != nil)
 			}
 		})
 	}
