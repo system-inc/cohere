@@ -30,10 +30,23 @@ var (
 	// its third opening backtick and first closing one make.
 	inlineBackticks = regexp.MustCompile("`[^`]*`")
 
-	// warningWord finds the candidates. Whether one is a whole word is isWholeWord's to say, since Go's \b knows only
-	// ASCII and would read ÜTODO as holding the word.
-	warningWord = regexp.MustCompile(`TODO|FIXME|XXX`)
+	// warningWords are the words, written once: warningWord and holdsWarningWord are both built from this list, so
+	// the two can't disagree about which words there are.
+	warningWords = []string{"TODO", "FIXME", "XXX"}
+
+	// warningWord finds the candidates, any of warningWords as written. Whether one is a whole word is isWholeWord's
+	// to say, since Go's \b knows only ASCII and would read ÜTODO as holding the word.
+	warningWord = regexp.MustCompile(alternationOf(warningWords))
 )
+
+// alternationOf is a pattern matching any of words literally, each quoted so none is read as regexp syntax.
+func alternationOf(words []string) string {
+	quoted := make([]string, 0, len(words))
+	for _, word := range words {
+		quoted = append(quoted, regexp.QuoteMeta(word))
+	}
+	return strings.Join(quoted, "|")
+}
 
 // Word is one warning word in a comment group: which of the group's comments holds it, and where, as byte offsets
 // into that comment's text, so texts[Comment][Start:End] is the word.
@@ -99,12 +112,18 @@ func WordsIn(texts []string) []Word {
 	return words
 }
 
-// holdsWarningWord is whether text holds one of the words anywhere, as warningWord would say, read as three plain
-// substring searches, which cost a fraction of the regexp's backtracker over a comment that holds none of them. It is
-// exactly warningWord.MatchString while that pattern is these three literal words, in capitals and unbounded, so it
-// turns no comment away the regexp would read: a word added to warningWord is added here too.
+// holdsWarningWord is whether text holds one of warningWords anywhere, read as plain substring searches. Go's regexp
+// runs in linear time, but it steps its matcher through the text a byte at a time, so over a comment that holds none
+// of the words it costs many times what a substring search does. Since warningWord is warningWords quoted and joined,
+// in capitals and with no word boundary, this is exactly warningWord.MatchString, and it turns away no comment the
+// regexp would read.
 func holdsWarningWord(text string) bool {
-	return strings.Contains(text, "TODO") || strings.Contains(text, "FIXME") || strings.Contains(text, "XXX")
+	for _, word := range warningWords {
+		if strings.Contains(text, word) {
+			return true
+		}
+	}
+	return false
 }
 
 // isWholeWord is whether text[start:end] stands alone: no letter, digit or underscore of any script touches it on
