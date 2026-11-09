@@ -61,6 +61,17 @@ var Upstreams = []Upstream{
 		LicenseFile: "go.txt",
 	},
 	{
+		// go/ir began as x/tools' go/ssa, so its own LICENSE is BSD-3-Clause, the Go authors' and Dominik
+		// Honnef's, inside a module that is MIT. The text carries both.
+		Name:        "honnef.co/go/tools go/ir",
+		Url:         "https://pkg.go.dev/honnef.co/go/tools@v0.8.1/go/ir",
+		License:     "MIT AND BSD-3-Clause",
+		Version:     "v0.8.1",
+		Carries:     "The Go IR builder in internal/go_engine/intermediate_representation, copied from go/ir and renamed to cohere's words: builder.go, emit.go, func.go, ssa.go, const.go, lvalue.go, util.go, blockopt.go, dom.go, create.go, methods.go, wrappers.go, typeset.go, block.go, scc.go, source.go, task.go and instantiate.go, with the parts of lift.go and print.go the builder needs, and x/tools' internal typesinternal.ZeroString as go/ir vendors it.",
+		Reach:       Compiled,
+		LicenseFile: "staticcheck-go-ir.txt",
+	},
+	{
 		Name: "Prettier", Url: "https://github.com/prettier/prettier", License: "MIT",
 		Carries: "The formatter in internal/format: its document model and printers are ported from Prettier's.",
 		Reach:   Compiled, LicenseFile: "prettier.txt",
