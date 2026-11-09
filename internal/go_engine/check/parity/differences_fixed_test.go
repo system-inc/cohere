@@ -83,3 +83,21 @@ func TestRequirePortWhereOriginalPanicsHoldsFixesToTheFixedFile(test *testing.T)
 		`panicking_fixed/panicking_fixed.go.fixed: on line 13 they leave "\tfixed()// port finds: call to gained `+
 		`// port fixes: fixed()\n", and it holds "\tfixed() // port finds: call to gained // port fixes: fixed()\n"`)
 }
+
+// In a file with a fixed file, a move must prove the original's fix wrong: the original's fixes on its moved finding,
+// applied in place of the port's, must not make the fixed file. The two here differ in span, and the port fixes the
+// call by writing fixed(). The original writing other() passes, and the original writing fixed() too, whose fix is
+// right, fails, named by its finding.
+func TestRequireOnlyAdjudicatedFailsAMoveWhoseOriginalFixMakesTheFixedFile(test *testing.T) {
+	test.Parallel()
+	port := calling(sharedMessages, endingShort(1), writing("fixed()"))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, endingShort(0), writing("other()")), port,
+			analysistest.TestData(), "moved_fixed")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, endingShort(0), writing("fixed()")), port,
+			analysistest.TestData(), "moved_fixed")
+	}), "the original's fixes on its moved finding at moved_fixed/moved_fixed.go:10, applied in place of the port's, "+
+		"make moved_fixed/moved_fixed.go.fixed too, so the move proves no fix of the original's wrong")
+}

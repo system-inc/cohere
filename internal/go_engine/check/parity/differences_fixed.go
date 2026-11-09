@@ -24,6 +24,12 @@ import (
 // RequireUpstreamWantsWithFixes hold by formatting the fixed source first, and the tree already holds that convention,
 // while a `.fixed` file is the source as the port's edits leave it, unformatted.
 //
+// In a file with a fixed file, a move must also prove the original's fix wrong: for each of moved, the pairs the
+// fixture's `moves:` records make, the original's fixes on its finding, applied in place of the port's on its own,
+// must not make the fixed file, since a move whose original fix were right would be no difference in what either
+// leaves. A move of span alone, whose two findings offer the same fix, so fails there, and belongs in a file with no
+// fixed file.
+//
 // An edit offered twice, as a package and its test variant each offer it, is applied once, as RunWithSuggestedFixes's
 // merge coalesces identical edits; two fixes whose edits overlap, as alternatives on one finding do, fail, so a file
 // whose findings offer alternatives takes no fixed file. A failure names the first line the two part on. A file with
@@ -35,6 +41,7 @@ func requireFixedFiles(
 	fileName func(string) string,
 	fixture string,
 	portFindings []Finding,
+	moved []movedPair,
 ) {
 	test.Helper()
 	for _, pattern := range recordFiles {
@@ -55,24 +62,52 @@ func requireFixedFiles(
 			if sourceError != nil {
 				test.Fatalf("reading the differences fixture: %v", sourceError)
 			}
-			edits := []Edit{}
-			for _, finding := range portFindings {
-				for _, fix := range finding.Fixes {
-					for _, edit := range fix.Edits {
-						if edit.File == file && !slices.Contains(edits, edit) {
-							edits = append(edits, edit)
-						}
-					}
-				}
-			}
+			edits := editsIn(file, portFindings)
 			fixedFile := goldenFile{name: file + ".fixed", packageName: fixture, source: name}
 			fixed, isFixed := appliedExactly(test, fixedFile, source, edits)
 			if isFixed && !bytes.Equal(fixed, expected) {
 				test.Errorf("the port's fixes in %s, applied, do not make %s: %s", file, fixedFile.name,
 					firstDifference(fixed, expected))
 			}
+			for _, pair := range moved {
+				if pair.original.File != file {
+					continue
+				}
+				// The original's edits stand in for the port's on the pair, and every other edit of the port's stays.
+				portsOwn := editsIn(file, []Finding{pair.port})
+				substituted := slices.DeleteFunc(slices.Clone(edits), func(edit Edit) bool {
+					return slices.Contains(portsOwn, edit)
+				})
+				for _, edit := range editsIn(file, []Finding{pair.original}) {
+					if !slices.Contains(substituted, edit) {
+						substituted = append(substituted, edit)
+					}
+				}
+				// Edits that overlap make no file, so they cannot make the fixed one.
+				originalFixed, _, isApplied := editsApplied(source, substituted)
+				if isApplied && bytes.Equal(originalFixed, expected) {
+					test.Errorf("the original's fixes on its moved finding at %s:%d, applied in place of the port's, "+
+						"make %s too, so the move proves no fix of the original's wrong", file, pair.original.Line,
+						fixedFile.name)
+				}
+			}
 		}
 	}
+}
+
+// editsIn is every edit of the fixes of findings that lands in file, as findings name it, each once.
+func editsIn(file string, findings []Finding) []Edit {
+	edits := []Edit{}
+	for _, finding := range findings {
+		for _, fix := range finding.Fixes {
+			for _, edit := range fix.Edits {
+				if edit.File == file && !slices.Contains(edits, edit) {
+					edits = append(edits, edit)
+				}
+			}
+		}
+	}
+	return edits
 }
 
 // firstDifference is where fixed and expected, which differ, first part: the line, counted from 1, and that line of

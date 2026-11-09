@@ -152,5 +152,5 @@ func requirePortWhereOriginalPanics(
 	}
 	requirePlaced(test, "the port finds", recorded.placed, portFindings)
 	requireRecordedFixes(test, recorded, portFindings, editLines(loads))
-	requireFixedFiles(test, folder, loads[0].fileName, fixture, portFindings)
+	requireFixedFiles(test, folder, loads[0].fileName, fixture, portFindings, nil)
 }

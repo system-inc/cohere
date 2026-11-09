@@ -388,9 +388,9 @@ func requireOnlyAdjudicated(
 		Difference(originalFindings, portFindings), Difference(portFindings, originalFindings))
 	originalOnly, portOnly = pairLeftOut(test, "omits the related entry", recorded.omitted, withoutRelated,
 		originalOnly, portOnly)
-	originalOnly, portOnly = pairMoved(test, recorded.moved, originalOnly, portOnly)
+	originalOnly, portOnly, moved := pairMoved(test, recorded.moved, originalOnly, portOnly)
 	requireRecordedFixes(test, recorded, portOnly, editLines(loads))
-	requireFixedFiles(test, folder, loads[0].fileName, fixture, portFindings)
+	requireFixedFiles(test, folder, loads[0].fileName, fixture, portFindings, moved)
 	portAlone := asRecorded(portOnly)
 	for _, unrecorded := range Difference(portAlone, recorded.portAlone) {
 		test.Errorf("the port alone found %s, which the fixture does not record", unrecorded)
@@ -589,16 +589,23 @@ func withoutRelated(finding Finding, message string) (Finding, bool) {
 	return finding, true
 }
 
-// pairMoved takes out of originalOnly and portOnly each pair a moved record covers: a finding of each side's on the
-// record's line with the record's message, which differ in span or fixes. A record that pairs nothing fails. It pairs
-// by line and message alone and proves nothing of the port's fix, which the port's own tests hold, with a golden file
-// or by applying the edit and checking the result.
+// movedPair is the two findings a `moves:` record pairs, the original's and the port's.
+type movedPair struct {
+	original Finding
+	port     Finding
+}
+
+// pairMoved takes out of originalOnly and portOnly each pair a moved record covers, a finding of each side's on the
+// record's line with the record's message, which differ in span or fixes, and returns the pairs beside what remains.
+// A record that pairs nothing fails. It pairs by line and message alone and proves nothing of the port's fix, which a
+// fixed file holds (see requireFixedFiles), or the port's own tests, with a golden file or by applying the edit and
+// checking the result.
 func pairMoved(
 	test testing.TB,
 	moved []Finding,
 	originalOnly []Finding,
 	portOnly []Finding,
-) (remainingOriginal []Finding, remainingPort []Finding) {
+) (remainingOriginal []Finding, remainingPort []Finding, pairs []movedPair) {
 	test.Helper()
 	// Cloned, since a pair is deleted from each in place.
 	remainingOriginal, remainingPort = slices.Clone(originalOnly), slices.Clone(portOnly)
@@ -615,10 +622,11 @@ func pairMoved(
 				"other spans or fixes", record)
 			continue
 		}
+		pairs = append(pairs, movedPair{original: remainingOriginal[originalIndex], port: remainingPort[portIndex]})
 		remainingOriginal = slices.Delete(remainingOriginal, originalIndex, originalIndex+1)
 		remainingPort = slices.Delete(remainingPort, portIndex, portIndex+1)
 	}
-	return remainingOriginal, remainingPort
+	return remainingOriginal, remainingPort, pairs
 }
 
 // recordFiles are the files of a differences fixture's folder that can hold its records, by pattern: its Go files, and
