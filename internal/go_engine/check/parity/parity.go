@@ -4,9 +4,9 @@
 // with the finding in hand, the reason written above the record that drops it; nothing else can record one. A finding
 // both make that differs in span, fixes or related entries is paired only by a record that it moves, that the port
 // withholds the one fix of the original's it leaves out, or that it omits the one related entry. A finding the port
-// alone makes is recorded with the text each of its fixes writes, so no fix of the port's goes unread. Every record
-// gives its reason: a drop on the line directly above it, and any other there or in the doc comment of the declaration
-// it is in.
+// alone makes is recorded with the text each of its fixes writes, so no fix of the port's goes unread, and one it
+// offers with no edits, which no record can stand for, fails. Every record gives its reason: a drop on the line
+// directly above it, and any other there or in the doc comment of the declaration it is in.
 //
 // A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: the
 // port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
@@ -278,8 +278,8 @@ func fixesText(written string) (string, bool) {
 // fix is a `fixes:` record of where it lands and its new text, on the `finds:` record's line or the line after it, and
 // every `fixes:` record is met by an edit of a finding that record covers, both ways as a multiset by the file and line
 // the edit starts on and its text, so a fix the port offers there unrecorded fails, and so does one recorded that it
-// does not offer, or offers elsewhere. No original's edit is compared with a lone finding's, so the record holds where
-// it lands as well as what it writes.
+// does not offer, or offers elsewhere, and one with no edits, which no record can stand for. No original's edit is
+// compared with a lone finding's, so the record holds where it lands as well as what it writes.
 // Every record must give its reason, a drop on the line directly above it and any other there or in the doc comment
 // of the declaration it is in, and one with none fails, named by file and line. A `// port ` comment it cannot read
 // fails, and so does a fixture that records nothing. The census has no fixture, so no record covers anything there.
@@ -421,8 +421,9 @@ func editLines(loads []loadedFixtures) func(edit Edit) (int, bool) {
 // requireRecordedFixes fails the test unless the edits of the fixes the port offers on its lone findings, portOnly,
 // that a `finds:` record covers are the fixture's `fixes:` records, as a multiset by the finding, the file and line
 // the edit starts on, read by lineOf, and the edit's new text, naming each edit no record holds and each record no
-// edit meets. An edit in a file no fixture package holds fails, since where it lands cannot be read. The port's side of
-// a renaming is a finding both make, so its fixes are not held here.
+// edit meets. An edit in a file no fixture package holds fails, since where it lands cannot be read, and so does a fix
+// with no edits, named by its finding and its message, since records count edits and none can stand for it. The
+// port's side of a renaming is a finding both make, so its fixes are not held here.
 func requireRecordedFixes(
 	test testing.TB,
 	recorded records,
@@ -440,6 +441,10 @@ func requireRecordedFixes(
 			continue
 		}
 		for _, fix := range finding.Fixes {
+			if len(fix.Edits) == 0 {
+				test.Errorf("the port alone fixes its finding at %s:%d with %q, a fix with no edits, which no "+
+					"`fixes:` record can stand for", finding.File, finding.Line, fix.Message)
+			}
 			for _, edit := range fix.Edits {
 				line, isRead := lineOf(edit)
 				if !isRead {

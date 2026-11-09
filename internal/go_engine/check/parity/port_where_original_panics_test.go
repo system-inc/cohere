@@ -141,3 +141,16 @@ func TestRequirePortWhereOriginalPanicsHoldsTheFixesOfItsFindings(test *testing.
 			"panicking/panicking.go:14, which the fixture does not record",
 	)
 }
+
+// A fix with no edits on a finding of the port's fails there as it fails in RequireOnlyAdjudicated, since no record
+// can stand for it.
+func TestRequirePortWhereOriginalPanicsFailsAFixWithNoEdits(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
+			calling(portMessages, fixingWithNoEdits("change nothing")), analysistest.TestData(), "panicking")
+	}),
+		`the port alone fixes its finding at panicking/panicking.go:13 with "change nothing", a fix with no edits`,
+		`the port alone fixes its finding at panicking/panicking.go:14 with "change nothing", a fix with no edits`,
+	)
+}

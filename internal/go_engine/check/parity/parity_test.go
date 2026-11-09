@@ -90,6 +90,13 @@ func writing(text string) shape {
 	}
 }
 
+// fixingWithNoEdits suggests a fix of message with no edits, which writes nothing anywhere.
+func fixingWithNoEdits(message string) shape {
+	return func(_ *ast.CallExpr, diagnostic *analysis.Diagnostic) {
+		diagnostic.SuggestedFixes = append(diagnostic.SuggestedFixes, analysis.SuggestedFix{Message: message})
+	}
+}
+
 // originalMessages are the calls the original finds: to shared and lost, and to renamed in its words. portMessages
 // are the port's: to shared and gained, and to renamed in other words.
 var (
@@ -628,6 +635,22 @@ func TestRequireOnlyAdjudicatedFailsARecordedFixNotOffered(test *testing.T) {
 		`the fixture records that the port alone fixes its finding at fixed/fixed.go:11 writing "fixed()" at `+
 			"fixed/fixed.go:11, and it does not",
 	)
+}
+
+// A fix with no edits writes no text anywhere, so no `fixes:` record can stand for it, and one the port offers on its
+// lone finding fails, named by the finding and the fix's message, where the same finding with no fix passes. Both
+// sides offer it on the call both find, so only the found call's differs.
+func TestRequireOnlyAdjudicatedFailsAFixWithNoEdits(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(originalMessages, fixingWithNoEdits("change nothing")),
+			calling(portMessages, fixingWithNoEdits("change nothing")), analysistest.TestData(), "adjudicated")
+	}), `the port alone fixes its finding at adjudicated/adjudicated.go:12 with "change nothing", a fix with no `+
+		"edits, which no `fixes:` record can stand for")
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(originalMessages), calling(portMessages), analysistest.TestData(),
+			"adjudicated")
+	}))
 }
 
 // A `fixes:` record neither on the line of a `finds:` record nor on the line after one names no finding's fix, and
