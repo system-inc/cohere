@@ -1134,3 +1134,66 @@ func TestCollapsedComponentLeavesATrivialPhiForTheTrivialRule(test *testing.T) {
 		test.Errorf("the read of phiC names $%d, want x's $%d", read.uses[0].id, x.defines[0].id)
 	}
 }
+
+// TestATerminalNamingABlockTwiceSealsItOnce: the entry's terminal names the loop header twice, as a
+// MaybeThrow whose continuation is its handler or a switch with two cases on one block would. The entry is
+// one predecessor of the header, so the header stays unsealed until its latch is walked, and the header's
+// phi takes the latch's write. Counting the entry twice sealed the header before the latch, and the phi
+// read the latch's value before the latch had one (#mv39hpt).
+func TestATerminalNamingABlockTwiceSealsItOnce(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, header, latch, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	function.define(entry, "i")
+	headerRead := function.use(header, "i")
+	write := function.define(latch, "i")
+	function.use(exit, "i")
+	goTo(entry, header, header)
+	goTo(header, latch, exit)
+	goTo(latch, header)
+
+	construct(test, function)
+
+	if got, want := header.predecessors, blockIds(entry, latch); !slices.Equal(got, want) {
+		test.Fatalf("the header's predecessors are %v, want %v, each once", got, want)
+	}
+	if len(header.phis) != 1 {
+		test.Fatalf("the header has %d phis, want 1", len(header.phis))
+	}
+	phi := header.phis[0]
+	if got := phi.Operands.At(latch.id).id; got != write.defines[0].id {
+		test.Errorf("the latch's operand is $%d, want the latch's write $%d", got, write.defines[0].id)
+	}
+	if headerRead.uses[0].id != phi.Place.id {
+		test.Errorf("the header's read names $%d, want its phi $%d", headerRead.uses[0].id, phi.Place.id)
+	}
+}
+
+// TestVerifierCatchesPredecessorsTheEdgesDontGive: a block listing a predecessor twice, or one no edge comes
+// from, is reported, since construction counts the list to seal a block and a phi takes an operand per entry.
+func TestVerifierCatchesPredecessorsTheEdgesDontGive(test *testing.T) {
+	test.Parallel()
+	for _, extra := range []string{"twice", "without an edge"} {
+		function := newTestFunction()
+		entry, middle, join := function.block(), function.block(), function.block()
+		function.entry = entry.id
+		goTo(entry, middle, join)
+		goTo(middle, join)
+		finalize(function)
+		if violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function); len(violations) != 0 {
+			test.Fatalf("before the change, %v", violations)
+		}
+		switch extra {
+		case "twice":
+			join.predecessors = append(join.predecessors, entry.id)
+		case "without an edge":
+			middle.predecessors = append(middle.predecessors, join.id)
+		}
+		violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function)
+		if len(violations) != 1 || violations[0].Kind != ssa.StaticSingleAssignmentViolationPredecessorsDisagree {
+			test.Errorf("a predecessor listed %s read as %v, want one disagreement", extra, violations)
+		}
+	}
+}
+

@@ -32,7 +32,10 @@
 // implementation with the thing it checks can agree with it and both be wrong.
 package static_single_assignment
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // StaticSingleAssignmentViolationKind is which invariant a violation breaks: one of the two single assignment states,
 // or the precondition Construct rests on.
@@ -46,6 +49,11 @@ const (
 	// StaticSingleAssignmentViolationEntryHasPredecessors is an entry block some edge enters, which Graph.Entry rules
 	// out and Construct refuses.
 	StaticSingleAssignmentViolationEntryHasPredecessors
+	// StaticSingleAssignmentViolationPredecessorsDisagree is a block whose predecessors are not each block with a real
+	// edge into it, once each, as MarkPredecessors lists them: one listed twice, one missing, or one with no edge.
+	// Construction counts a block's predecessors to seal it, and a phi takes one operand per predecessor, so a list
+	// that disagrees with the edges is a phi missing a value or holding one no edge brings (#mv39hpt).
+	StaticSingleAssignmentViolationPredecessorsDisagree
 )
 
 // VerifyStaticSingleAssignment checks that a function is in single static assignment form and returns every violation.
@@ -73,6 +81,7 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 				entry, predecessors),
 		})
 	}
+	violations = append(violations, predecessorViolations(graph, function, blocks)...)
 	dominance := ComputeDominance(graph, function)
 
 	// Where each value is defined. A parameter is defined at the entry block.
@@ -215,6 +224,66 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 	}
 
 	return violations
+}
+
+// predecessorViolations is a violation for each block whose predecessors are not, once each, the blocks with a real
+// edge into it. A block with two edges to one successor is one predecessor of it, as MarkPredecessors counts it.
+func predecessorViolations[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+	blocks []B,
+) []StaticSingleAssignmentViolation {
+	// entering is, for each block, how many distinct blocks have a real edge into it, and from which.
+	entering := map[BlockId]map[BlockId]bool{}
+	scratch := takeEdgeScratch()
+	defer edgeScratchPool.Put(scratch)
+	for _, block := range blocks {
+		for _, edge := range edgesOf(graph, block, scratch) {
+			if edge.edge == Fallthrough {
+				continue
+			}
+			if _, held := graph.Block(function, edge.successor); !held {
+				continue
+			}
+			if entering[edge.successor] == nil {
+				entering[edge.successor] = map[BlockId]bool{}
+			}
+			entering[edge.successor][graph.Id(block)] = true
+		}
+	}
+	var violations []StaticSingleAssignmentViolation
+	for _, block := range blocks {
+		blockId := graph.Id(block)
+		listed := map[BlockId]int{}
+		for _, predecessor := range graph.Predecessors(block) {
+			listed[predecessor]++
+		}
+		agrees := len(listed) == len(entering[blockId])
+		for predecessor, times := range listed {
+			if times != 1 || !entering[blockId][predecessor] {
+				agrees = false
+			}
+		}
+		if !agrees {
+			violations = append(violations, StaticSingleAssignmentViolation{
+				Kind:  StaticSingleAssignmentViolationPredecessorsDisagree,
+				Block: blockId,
+				Detail: fmt.Sprintf("bb%d lists predecessors %v, where the real edges into it come from %v, once each",
+					blockId, graph.Predecessors(block), sortedBlockIds(entering[blockId])),
+			})
+		}
+	}
+	return violations
+}
+
+// sortedBlockIds is the ids in set, in ascending order, so a violation's detail reads the same every run.
+func sortedBlockIds(set map[BlockId]bool) []BlockId {
+	ids := make([]BlockId, 0, len(set))
+	for id := range set {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	return ids
 }
 
 // StaticSingleAssignmentStatistics counts what a verification actually had to look at.
