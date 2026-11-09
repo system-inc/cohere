@@ -50,3 +50,33 @@ func TestThePackageCacheLineSaysTheStandardLibraryFromTheBinary(test *testing.T)
 		}
 	}
 }
+
+// The account says the packages a run loaded again from source to answer a question of a fact computed on demand
+// (#w7zmvat wave 3), whether the store was on or not, and nothing of them when there were none, and `--json` carries
+// the count only when it is not 0.
+func TestThePackageCacheLineSaysTheReloads(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		cache packageCacheUse
+		want  string
+	}{
+		{cache: packageCacheUse{On: true, Hit: 4, Missed: 2, Written: 2, Reloads: 1, ReloadRounds: 1},
+			want: "package cache hit 4, missed 2, wrote 2, 1 reloaded from source in 1 rounds"},
+		{cache: packageCacheUse{FromBinary: 258, Reloads: 3, ReloadRounds: 2},
+			want: "package cache off, standard library: 258 from the binary, 3 reloaded from source in 2 rounds"},
+		{cache: packageCacheUse{Replays: 35}, want: "package cache off, 35 answers replayed"},
+		{cache: packageCacheUse{On: true, Hit: 4}, want: "package cache hit 4, missed 0, wrote 0"},
+	} {
+		if got := testCase.cache.line(); got != testCase.want {
+			test.Errorf("got %q, want %q", got, testCase.want)
+		}
+		encoded, encodeError := json.Marshal(testCase.cache)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		if carries := strings.Contains(string(encoded), `"reloads"`); carries != (testCase.cache.Reloads > 0) {
+			test.Errorf("want the reloads carried %t in %s", testCase.cache.Reloads > 0, encoded)
+		}
+	}
+}

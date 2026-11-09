@@ -47,11 +47,25 @@ func runEngineWith(
 	extra ...string,
 ) cachedRun {
 	test.Helper()
+	return runEngineAnsweringInPart(test, root, builtIn, registered, nil, extra...)
+}
+
+// runEngineAnsweringInPart is runEngineWith writing the entries of the packages answersInPart names, by import path,
+// with only the answers the run's questions computed in them (see check.Caching's AnswersInPart).
+func runEngineAnsweringInPart(
+	test *testing.T,
+	root string,
+	builtIn builtInStandardLibrary,
+	registered []rule.Rule,
+	answersInPart map[string]bool,
+	extra ...string,
+) cachedRun {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	if exitCode := runWithStandardLibrary(arguments, &standardOutput, &standardError, registered, nil,
-		builtIn); exitCode != exitClean && exitCode != exitFindings {
+	if exitCode := runOverlapping(arguments, &standardOutput, &standardError, registered, nil, builtIn, true,
+		answersInPart); exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
 	}
 	if standardError.Len() > 0 {

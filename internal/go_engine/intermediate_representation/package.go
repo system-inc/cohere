@@ -28,6 +28,10 @@ type Package struct {
 	// debug is whether the package's functions record the expression map ValueForExpression reads (SetDebugMode).
 	debug bool
 
+	// noReturn, when set, is the no-return predicate the package's functions are built with, in place of the
+	// program's (SetNoReturn).
+	noReturn func(*types.Func) bool
+
 	// The following fields are set transiently, then cleared
 	// after building.
 	buildOnce sync.Once   // ensures package building occurs once
@@ -47,6 +51,14 @@ type Package struct {
 // a package no reader asks of (a dependency, built for facts) leaves it off.
 func (irPackage *Package) SetDebugMode(debug bool) {
 	irPackage.debug = debug
+}
+
+// SetNoReturn sets the no-return predicate irPackage's functions are built with, its anonymous ones included, in
+// place of the program's (Program.SetNoReturn). Set it before any of them builds. A program whose packages each
+// answer from their own control-flow facts, as ctrlflow's are per package, sets one on each, so every function
+// builds as it would in a program of its package alone.
+func (irPackage *Package) SetNoReturn(predicate func(*types.Func) bool) {
+	irPackage.noReturn = predicate
 }
 
 // Function returns the package-level function of the specified name,

@@ -9,10 +9,10 @@
 // nothing from one function to the next: each call is judged by its own callee and readers. So Check judges one
 // function at a time and finds what the original finds.
 //
-// It reads which functions have no side effects from function_purity, staticcheck's purity pass ported onto the
-// engine's own intermediate representation, whose facts cross from every dependency and are the original's, fact for
-// fact (#w7zmvat). The listener requires it and reads its result through the context, handing Check the purity
-// judgment for every function.
+// It asks which functions have no side effects of function_purity, staticcheck's purity pass ported onto the
+// engine's own intermediate representation, which judges a function only when asked and answers as the original's
+// facts do, fact for fact (#w7zmvat). The listener requires it and reads its result through the context, handing
+// Check its IsPure.
 //
 // Two of the original's judgments look odd and are kept. The benchmark exception spares a function of a test file
 // taking a *testing.B, but not a closure inside one, which is a function of its own taking none, so a discarded pure
@@ -62,19 +62,16 @@ var Analyzer = dispatch.RuleAnalyzer(
 	&Listener,
 )
 
-// purityJudgment is whether a function has no side effects, as function_purity holds it, read from the pass's
+// purityJudgment is whether a function has no side effects, as function_purity holds it, asked of the pass's
 // result.
 func purityJudgment(context *rule.Context) func(function *types.Func) bool {
-	pure, isPurity := context.ResultOf(function_purity.Analyzer).(function_purity.Result)
-	if !isPurity {
+	pure, isPurity := context.ResultOf(function_purity.Analyzer).(*function_purity.Result)
+	if !isPurity || pure == nil {
 		// Invariant: the listener requires the purity pass, and the dispatcher hands over its result, of the type it
 		// declares.
 		panic("discarded_pure_call: the purity pass's result is missing")
 	}
-	return func(function *types.Func) bool {
-		_, isHeld := pure[function]
-		return isHeld
-	}
+	return pure.Asking(context.RuleName()).IsPure
 }
 
 // Check judges one function: each call whose results nothing reads, of a named function isPure judges free of side

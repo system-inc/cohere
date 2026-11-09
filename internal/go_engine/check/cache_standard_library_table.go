@@ -32,6 +32,10 @@ type standardLibraryEntry struct {
 	Imports     []string
 	Withheld    load.PackageWithheld
 	Output      []byte
+
+	// Answers are the package's answers of every fact kind computed on demand, each computed whole (see
+	// cacheEntry's), sorted by kind and objectpath.
+	Answers []kindAnswers
 }
 
 // slotAnalysis is one analyzer's analysis in a standardLibraryEntry, under its slot.
@@ -81,6 +85,7 @@ func cacheEntryOf(entry standardLibraryEntry) cacheEntry {
 		Imports:   entry.Imports,
 		Withheld:  entry.Withheld,
 		Output:    entry.Output,
+		Answers:   entry.Answers,
 	}
 }
 
@@ -126,6 +131,7 @@ func StandardLibraryTableOf(
 			Imports:     entry.Imports,
 			Withheld:    withheld,
 			Output:      entry.Output,
+			Answers:     entry.Answers,
 		}
 		for _, slot := range slices.Sorted(maps.Keys(entry.Analyzers)) {
 			stored := entry.Analyzers[slot]
@@ -217,6 +223,8 @@ func CanonicalStandardLibraryTable(tables [][]byte, registered []rule.Rule) ([]b
 			})
 			slices.SortFunc(stored.PackageFacts, compareStoredFacts)
 		}
+		// Each answer is JSON, the same bytes in any process, so sorting is all they need.
+		sortAnswers(entry.Answers)
 		encoded, encodeError := encodeStandardLibraryEntry(entry)
 		if encodeError != nil {
 			return nil, fmt.Errorf("writing the canonical table: %w", encodeError)

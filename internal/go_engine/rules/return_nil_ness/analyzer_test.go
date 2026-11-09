@@ -13,12 +13,12 @@ import (
 // the nilness of its results, so what the port judges is pinned apart from the original as well as against it.
 func TestPortMarksTheFixturesNilness(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(test, analysistest.TestData(), Analyzer, "nilness")
+	analysistest.Run(test, analysistest.TestData(), pushAnalyzer, "nilness")
 }
 
 // Over the nilness fixture, the original and the port export the same facts, on the fixture and on every package it
 // imports, errors and fmt among them, whose facts the fixture's calls stand on.
 func TestPortExportsTheOriginalsFacts(test *testing.T) {
 	test.Parallel()
-	parity.RequireIdenticalFacts(test, nilness.Analysis, Analyzer, analysistest.TestData(), "nilness")
+	parity.RequireIdenticalFacts(test, nilness.Analysis, pushAnalyzer, analysistest.TestData(), "nilness")
 }

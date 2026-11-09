@@ -46,7 +46,7 @@ func differentialTree(test *testing.T) string {
 // reads, and the port on buildir differed from it only in reporting a go or defer statement's call, never in a mark.
 func TestPortExportsTheOriginalsFactsOverATree(test *testing.T) {
 	test.Parallel()
-	parity.RequireIdenticalCorpusFacts(test, sa5012.Analyzer, Analyzer, differentialTree(test))
+	parity.RequireIdenticalCorpusFacts(test, sa5012.Analyzer, pushAnalyzer, differentialTree(test))
 }
 
 // Over the same tree, the original and the port find the same findings, every field of each, and fail to run on the

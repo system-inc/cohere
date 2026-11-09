@@ -3,6 +3,7 @@ package go_engine
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 
@@ -166,15 +167,34 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 	}
 	run.said = compiledFiles(loaded.Packages, ours)
 	enabled, _ := engine.enabledRules()
-	result, checkError := check.Run(loaded.Packages, enabled, check.Options{
-		SingleThreaded: engine.request.switches["single-threaded"],
-		Cache:          session,
-		Withheld:       loaded.Withheld,
-		// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
-		ReleaseAnalyzed: true,
-		ReadFile:        engine.sourceReader(nil),
-		Timing:          engine.timing,
-	})
+	runRules := func(over *load.Loaded) (*check.Result, error) {
+		return check.Run(over.Packages, enabled, check.Options{
+			SingleThreaded: engine.request.switches["single-threaded"],
+			Cache:          session,
+			Withheld:       over.Withheld,
+			// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
+			ReleaseAnalyzed: true,
+			ReadFile:        engine.sourceReader(nil),
+			Timing:          engine.timing,
+		})
+	}
+	result, checkError := runRules(loaded)
+	// As the host's lint does (reloadedPass), a question that reached a package the cache restored, with no answer
+	// stored, has the build loaded again with that package checked from source, until none does.
+	for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
+		reloads := strings.Join(result.Reloads, ", ")
+		loaded, loadError = load.PackagesCached(engine.described.workspace.Root,
+			engine.described.workspace.Patterns(), environment, engine.described.readableOurs, caching)
+		if loadError != nil {
+			return buildRun{}, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
+				loadError)
+		}
+		if len(loaded.Diagnostics) > 0 {
+			return buildRun{}, fmt.Errorf("loading the build %s again to check %s from source found %d type "+
+				"errors the first load did not", extra, reloads, len(loaded.Diagnostics))
+		}
+		result, checkError = runRules(loaded)
+	}
 	if checkError != nil {
 		return buildRun{}, fmt.Errorf("running the rules over the build %s: %w", extra, checkError)
 	}

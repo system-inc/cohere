@@ -89,6 +89,7 @@ func lintCache(
 			RuleSet:        cacheRuleSet(enabled),
 		},
 		StandardLibrary: standardLibrary,
+		AnswersInPart:   request.answersInPart,
 	}, nil
 }
 

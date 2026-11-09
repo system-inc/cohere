@@ -1,57 +1,22 @@
 package function_purity
 
 import (
-	"fmt"
 	"go/types"
-
-	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
-// judgment is one package's judging: its pass, its package in our representation, and every function of the package
-// whose judging has begun, so a call back into one still being judged answers not pure.
-type judgment struct {
-	pass      *analysis.Pass
-	irPackage *intermediate_representation.Package
-	seen      map[*intermediate_representation.Function]bool
-}
-
-// isPure is whether function is pure: held so by an IsPure fact, or of this package and judged so here, once, which
-// exports the fact. A function with no object, an anonymous one, is never judged, and one of another package that its
-// facts do not hold pure is not pure.
-func (judging *judgment) isPure(function *intermediate_representation.Function) bool {
-	object := function.Object()
-	if object == nil {
-		return false
-	}
-	if judging.pass.ImportObjectFact(object, new(IsPure)) {
-		return true
-	}
-	if function.Package != judging.irPackage {
-		return false
-	}
-	if judging.seen[function] {
-		return false
-	}
-	judging.seen[function] = true
-	declared, isDeclared := object.(*types.Func)
-	if !isDeclared {
-		// Invariant: a function's object is the *types.Func it was built from, so any other is a mistake in the
-		// representation, which the original's assertion would panic on too.
-		panic(fmt.Sprintf("function_purity: %s's object is a %T, not a function", function, object))
-	}
-	pure := judging.judge(function, declared)
-	if pure {
-		judging.pass.ExportObjectFact(object, &IsPure{})
-	}
-	return pure
+// callees is what judging a function's body asks of each function it calls statically: whether that one is pure.
+// The push walk answers from the facts and judges a function of its own package as it is met; the resolver's walk
+// answers from what it computed, on demand.
+type callees interface {
+	isPure(function *intermediate_representation.Function) bool
 }
 
 // judge is whether function, declared as declared, is pure by its own body: not a stub, and listed pure or returning
-// a result from parameters of basic types only, through a body that calls only pure functions, len and cap, and
-// writes, reads and allocates only on its own stack.
-func (judging *judgment) judge(function *intermediate_representation.Function, declared *types.Func) bool {
+// a result from parameters of basic types only, through a body that calls only functions asking judges pure, len and
+// cap, and writes, reads and allocates only on its own stack.
+func judge(asking callees, function *intermediate_representation.Function, declared *types.Func) bool {
 	if intermediate_representation.IsStub(function) {
 		return false
 	}
@@ -74,7 +39,7 @@ func (judging *judgment) judge(function *intermediate_representation.Function, d
 	}
 	for _, block := range function.Blocks {
 		for _, instruction := range block.Instructions {
-			if !judging.allows(function, instruction) {
+			if !allows(asking, function, instruction) {
 				return false
 			}
 		}
@@ -83,15 +48,16 @@ func (judging *judgment) judge(function *intermediate_representation.Function, d
 }
 
 // allows is whether instruction, in function, leaves function pure.
-func (judging *judgment) allows(
+func allows(
+	asking callees,
 	function *intermediate_representation.Function,
 	instruction intermediate_representation.Instruction,
 ) bool {
 	switch instruction := instruction.(type) {
 	case *intermediate_representation.Call:
-		return judging.allowsCall(function, instruction.Common())
+		return allowsCall(asking, function, instruction.Common())
 	case *intermediate_representation.Defer:
-		return judging.allowsCall(function, &instruction.Call)
+		return allowsCall(asking, function, &instruction.Call)
 	case *intermediate_representation.Select, *intermediate_representation.Send, *intermediate_representation.Go,
 		*intermediate_representation.Panic:
 		return false
@@ -110,7 +76,8 @@ func (judging *judgment) allows(
 
 // allowsCall is whether a call in function leaves it pure: a static call to function itself or to a pure function, or
 // a call of len or cap. A call through an interface, or to any other builtin, does not.
-func (judging *judgment) allowsCall(
+func allowsCall(
+	asking callees,
 	function *intermediate_representation.Function,
 	common *intermediate_representation.CallCommon,
 ) bool {
@@ -127,7 +94,7 @@ func (judging *judgment) allowsCall(
 	if callee == nil {
 		return false
 	}
-	return judging.isPure(callee)
+	return asking.isPure(callee)
 }
 
 // isBasic is whether a value of valueType holds only basic values: a basic type, or a struct whose fields are all

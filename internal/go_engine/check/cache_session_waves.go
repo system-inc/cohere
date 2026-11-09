@@ -127,7 +127,10 @@ func (session *CacheSession) firstWave(
 }
 
 // decideBySecondKey restores each package that still misses by its second key, in dependency order, so a package
-// restored here gives its output to the packages above it. A hit that falls short of what the run can ask of it is a
+// restored here gives its output to the packages above it. The entry stands only while every answer its package read
+// of another package still holds (see readsHold): each owner is below the package, so decided before it, restored, or
+// analyzed by the first wave, whose answers the resolver computes now, or still a miss, which fails the read. A hit
+// that falls short of what the run can ask of it is a
 // miss again (dropShortHits). Each package restored gets an alias under its first key, so the next run with the same
 // inputs restores it with no first wave.
 func (session *CacheSession) decideBySecondKey() {
@@ -141,13 +144,23 @@ func (session *CacheSession) decideBySecondKey() {
 		for _, imported := range current.Imports {
 			decide(imported)
 		}
-		if session.restoredInWave(current) || len(current.Errors) > 0 {
+		// A package the run reloads to answer a question is checked from source whatever its second key holds, or
+		// the run would restore it again with no answer, as it did before the reload (see Reload).
+		if session.restoredInWave(current) || len(current.Errors) > 0 || session.reloading(current) {
 			return
 		}
 		second, known := session.secondKey(current)
-		if known && session.hitAt(current, second) {
-			session.secondKeyHits[current] = true
+		if !known || !session.hitAt(current, second) {
+			return
 		}
+		// Every package below current is decided by now, restored, analyzed by the first wave, or still a miss, so
+		// each read's owner can answer for it, or the read fails and current misses (see readsHold).
+		if !session.holdsBySecondKey(current) {
+			delete(session.hits, current)
+			delete(session.stored, current)
+			return
+		}
+		session.secondKeyHits[current] = true
 	}
 	reachable := make([]*packages.Package, 0, len(session.keys))
 	for keyed := range session.keys {

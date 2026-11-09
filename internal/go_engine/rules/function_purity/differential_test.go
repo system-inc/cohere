@@ -16,9 +16,9 @@ import (
 const factsDifferentialVariable = "COHERE_GO_IR_FACTS_DIFFERENTIAL"
 
 // The fact differential (#w7zmvat): over the whole tree COHERE_GO_IR_FACTS_DIFFERENTIAL names, and every package it
-// imports, staticcheck's purity on buildir and the port on the engine's own intermediate representation export the same
-// facts on every package, the unexported functions' among them, failing on the first that differs. A port of another
-// fact pass runs the same comparison with its own pair. Unset, it skips, since a tree takes minutes.
+// imports, staticcheck's purity on buildir and the port's push on the engine's own intermediate representation export
+// the same facts on every package, the unexported functions' among them, failing on the first that differs. A port of
+// another fact pass runs the same comparison with its own pair. Unset, it skips, since a tree takes minutes.
 func TestPortExportsTheOriginalsFactsOverATree(test *testing.T) {
 	test.Parallel()
 	directory := os.Getenv(factsDifferentialVariable)
@@ -34,5 +34,5 @@ func TestPortExportsTheOriginalsFactsOverATree(test *testing.T) {
 		}
 		directory = root
 	}
-	parity.RequireIdenticalCorpusFacts(test, purity.Analyzer, Analyzer, directory)
+	parity.RequireIdenticalCorpusFacts(test, purity.Analyzer, pushAnalyzer, directory)
 }

@@ -34,5 +34,5 @@ func TestPortExportsTheOriginalsFactsOverATree(test *testing.T) {
 		}
 		directory = root
 	}
-	parity.RequireIdenticalCorpusFacts(test, nilness.Analysis, Analyzer, directory)
+	parity.RequireIdenticalCorpusFacts(test, nilness.Analysis, pushAnalyzer, directory)
 }

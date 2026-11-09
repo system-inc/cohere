@@ -2,38 +2,35 @@
 // intermediate representation, so the readers asking which calls have no side effects read them without buildir
 // (#w7zmvat).
 //
-// It is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/facts/purity/purity.go, whose algorithm it
-// keeps step for step: the package's source functions judged in the order buildir lists them, a callee of the same
-// package judged as it is met, a callee still being judged answering not pure, so a cycle of calls is never pure while
-// a function calling only itself can be, and each function judged pure marked with an IsPure fact on its object, which
-// the packages importing it read. Its Result is every function the facts hold pure, this package's and its imports',
-// keyed as staticcheck's is. The fact differential beside this file holds the two to the same facts over whole trees.
+// It is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/facts/purity/purity.go, whose judgment of a
+// function's body it keeps step for step: listed pure, or returning a result from parameters of basic types only,
+// through a body that calls only pure functions and touches only its own stack. The original pushes its facts: it
+// judges every source function of every package, dependencies included, in the order buildir lists them, a callee of
+// the same package as it is met, a callee still being judged answering not pure, and marks each function judged pure
+// with a fact its importers read. Here a reader asks instead (#w7zmvat unit 2): Result.IsPure judges a function only
+// when asked, through the run's fact resolver, building only what that judgment reaches, and gives every answer the
+// push gives. demand_walk.go says how; the push walk stays in push_walk.go, for the resolver's fallback and the tests.
 package function_purity
 
 import (
 	"fmt"
-	"go/types"
 	"reflect"
-	"slices"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
-	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
-// Result is every function the facts hold pure, as staticcheck's purity.Result holds them.
-type Result map[*types.Func]*IsPure
-
-// Analyzer judges each function of the package, exporting IsPure on those that are pure, and returns every function
-// the facts hold pure, the imported packages' among them.
+// Analyzer hands the package's readers its purity, which they ask of one function at a time. It requires ctrlflow, as
+// the build of every package it judges does, so ctrlflow has run on the package and on every package below it, and
+// the resolver holds each of them, before a reader asks.
 var Analyzer = &analysis.Analyzer{
 	Name:       "function_purity",
-	Doc:        "marks the functions that are pure, staticcheck's purity facts on the engine's own representation",
+	Doc:        "judges which functions are pure when a reader asks, staticcheck's purity on the engine's own representation",
 	Run:        run,
-	Requires:   []*analysis.Analyzer{build_intermediate_representation.Analyzer},
-	FactTypes:  []analysis.Fact{new(IsPure)},
-	ResultType: reflect.TypeFor[Result](),
+	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
+	ResultType: reflect.TypeFor[*Result](),
 }
 
 // pureStandardLibrary is the standard library functions held pure whatever their bodies do. It is a copy of
@@ -113,28 +110,16 @@ var pureStandardLibrary = map[string]struct{}{
 	"(time.Time).ZoneBounds":          {},
 }
 
-// run judges every source function of the package, in buildir's order, and returns every function the facts hold
-// pure.
+// run is the package's purity, asked of the run's resolver as the package's readers ask.
 func run(pass *analysis.Pass) (any, error) {
-	built, readError := build_intermediate_representation.ResultOf(pass)
-	if readError != nil {
-		return nil, readError
+	resolver, resolverError := fact_resolver.Of(pass)
+	if resolverError != nil {
+		return nil, resolverError
 	}
-	// Read first, so under `--timing` the package's build is billed to the representation's row, not to this pass.
-	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
-	judging := &judgment{pass: pass, irPackage: built.Package(), seen: map[*intermediate_representation.Function]bool{}}
-	for _, function := range functions {
-		judging.isPure(function)
+	reader := resolver.Package(pass.Pkg)
+	if reader == nil {
+		return nil, fmt.Errorf("reading the purity of %s: the fact resolver never learned it, though ctrlflow, "+
+			"which it learns a package from, ran on it first", pass.Pkg.Path())
 	}
-	result := Result{}
-	for _, fact := range pass.AllObjectFacts() {
-		function, isFunction := fact.Object.(*types.Func)
-		pure, isPure := fact.Fact.(*IsPure)
-		if !isFunction || !isPure {
-			return nil, fmt.Errorf("reading function_purity's facts: %s holds a %T, where only a function's IsPure "+
-				"was expected", fact.Object, fact.Fact)
-		}
-		result[function] = pure
-	}
-	return result, nil
+	return &Result{resolver: resolver, reader: reader}, nil
 }

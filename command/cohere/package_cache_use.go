@@ -8,8 +8,13 @@ import "fmt"
 // written entries left out, since nothing outside their package can name their object; the restored facts
 // skipped, whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at
 // most two. FromBinary is the standard-library packages restored from the entries a release binary carries, apart
-// from hit, which `--no-cache` reads too, since they are part of cohere; it is absent when 0. On is false under
-// `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as it was.
+// from hit, which `--no-cache` reads too, since they are part of cohere; it is absent when 0. Reloads is the packages
+// the run loaded again from source, though the cache held them, to answer a question of a fact computed on demand
+// that no store answered (#w7zmvat wave 3), and ReloadRounds the loads and lints again that took, and Replays the
+// questions of such a fact answered by replaying the push's walk of a package, which a cold run makes too, each absent
+// when 0.
+// On is false under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as
+// it was.
 type packageCacheUse struct {
 	On           bool `json:"on"`
 	Hit          int  `json:"hit"`
@@ -20,6 +25,9 @@ type packageCacheUse struct {
 	FactsDropped int  `json:"factsDropped"`
 	FactsSkipped int  `json:"factsSkipped"`
 	Waves        int  `json:"waves"`
+	Reloads      int  `json:"reloads,omitempty"`
+	ReloadRounds int  `json:"reloadRounds,omitempty"`
+	Replays      int  `json:"replays,omitempty"`
 }
 
 // line is the cache's clause of the --verbose account, after "lint: ": the three counts every run has, and the ones
@@ -27,10 +35,11 @@ type packageCacheUse struct {
 // library's packages from the binary are said whether the store was on or not.
 func (cache packageCacheUse) line() string {
 	if !cache.On {
+		line := "package cache off"
 		if cache.FromBinary > 0 {
-			return "package cache off, " + cache.segment()
+			line += ", " + cache.segment()
 		}
-		return "package cache off"
+		return line + cache.reloads()
 	}
 	line := fmt.Sprintf("package cache hit %d, missed %d, wrote %d", cache.Hit, cache.Missed, cache.Written)
 	if cache.FromBinary > 0 {
@@ -45,7 +54,20 @@ func (cache packageCacheUse) line() string {
 	if cache.FactsSkipped > 0 {
 		line += fmt.Sprintf(", %d facts skipped", cache.FactsSkipped)
 	}
-	return line
+	return line + cache.reloads()
+}
+
+// reloads is the account's clause of the packages loaded again from source and the rounds that took, and of the
+// answers replayed, empty when there were none.
+func (cache packageCacheUse) reloads() string {
+	clause := ""
+	if cache.Reloads > 0 {
+		clause = fmt.Sprintf(", %d reloaded from source in %d rounds", cache.Reloads, cache.ReloadRounds)
+	}
+	if cache.Replays > 0 {
+		clause += fmt.Sprintf(", %d answers replayed", cache.Replays)
+	}
+	return clause
 }
 
 // segment is the standard library's packages restored from the binary, as the footer and the account say them, so a

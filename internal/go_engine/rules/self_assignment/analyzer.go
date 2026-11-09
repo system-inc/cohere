@@ -62,19 +62,16 @@ func judgeFunction(context *rule.Context, function *intermediate_representation.
 	if syntax == nil || function.Parent() != nil && function.Parent().Syntax() != nil {
 		return
 	}
-	pure, isPurity := context.ResultOf(function_purity.Analyzer).(function_purity.Result)
-	if !isPurity {
+	pure, isPurity := context.ResultOf(function_purity.Analyzer).(*function_purity.Result)
+	if !isPurity || pure == nil {
 		// Invariant: the listener requires the purity pass, and the dispatcher hands over its result, of the type it
 		// declares.
 		panic("self_assignment: the purity pass's result is missing")
 	}
-	isPure := func(callee *types.Func) bool {
-		_, isHeld := pure[callee]
-		return isHeld
-	}
+	asking := pure.Asking(context.RuleName())
 	ast.Inspect(syntax, func(node ast.Node) bool {
 		if assignment, isAssignment := node.(*ast.AssignStmt); isAssignment {
-			Check(context, assignment, isPure)
+			Check(context, assignment, asking.IsPure)
 		}
 		return true
 	})

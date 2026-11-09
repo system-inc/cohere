@@ -19,6 +19,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -179,6 +180,16 @@ type Result struct {
 	// ReportsRestored is how many of Reports came from the findings cache rather than from an analysis this run.
 	ReportsRestored int
 
+	// Reloads are the IDs of the packages a question of a fact computed on demand reached restored, with no answer
+	// stored, sorted (#w7zmvat wave 3). Each question was answered with a placeholder, and its pass ran on, so one run
+	// names every package its passes need; the result is not the run's, and every package handed a placeholder is a
+	// crash in it, never clean. The caller has the session reload them (CacheSession.Reload) and loads and runs again.
+	Reloads []string
+
+	// Replays is how many questions of a fact computed on demand the run answered by replaying the push's walk of a
+	// package, every kind's (fact_resolver.Counts' Fallbacks), with the cache or without.
+	Replays int
+
 	Elapsed time.Duration
 }
 
@@ -237,6 +248,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
+	// The run's resolver, which reads and keeps answers in the session's store once the session has restored (below).
+	resolver := fact_resolver.New(nil)
+	checkerOptions.Resolver = resolver
 	session := options.Cache
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.
@@ -249,6 +263,15 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			var reachable []*packages.Package
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
 			session.Restore(load.LoaderSource, reachable, analyzed)
+		}
+		// The resolver reads answers of the packages the session restored, and keeps those it computes for the store.
+		// It is made once the session has restored, which lets go of the last run's. Under a run beside the load the
+		// packages' types are not final yet, so only each restored package is known, once an action on it restores
+		// it, and no store answers a package the run learns, which has none there.
+		resolver = fact_resolver.New(session)
+		checkerOptions.Resolver, session.resolver = resolver, resolver
+		if options.Ready == nil {
+			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
 		}
 		checkerOptions.Restored, checkerOptions.Restore = session.restoredInWave, session.restore
 		firstGraph, waveError := session.firstWave(roots, checkerOptions, options.Withheld)
@@ -361,11 +384,26 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			cmp.Compare(left.Message, right.Message),
 		)
 	})
+	if session != nil {
+		result.Reloads = session.reloadsOf(session.resolver)
+	}
+	if len(result.Reloads) > 0 {
+		// The pipeline runs again over a load that checks the reloads from source and drops this result, but a caller
+		// that does not must never read it as clean: each package handed a placeholder ran on a guess.
+		for _, analyzedPackage := range analyzed {
+			if analyzedPackage.Types != nil && resolver.Unsure(analyzedPackage.Types) {
+				result.Crashes = append(result.Crashes, Crash{File: firstFile(analyzedPackage), Error: fmt.Sprintf(
+					"the rules on %s were handed placeholders for answers of %s, which the run must load from "+
+						"source, so it runs again", analyzedPackage.ID, strings.Join(result.Reloads, ", "))})
+			}
+		}
+	}
 	slices.SortFunc(result.Crashes, func(left, right Crash) int {
 		return cmp.Or(cmp.Compare(left.File, right.File), cmp.Compare(left.Error, right.Error))
 	})
 	slices.Sort(result.CrashedRules)
 	result.FilesWalked, result.NodesVisited = walk(files)
+	result.Replays = int(resolver.Fallbacks())
 	if session != nil {
 		session.save(graph, options.Withheld, files)
 		result.Cache = session.counts
@@ -391,13 +429,17 @@ func abandoned(abandon <-chan struct{}) bool {
 // expression map only where a rule that reads it runs. Failed and Tolerant let a dispatcher run past a listener's
 // requirement failing on a package, so only that listener's rule fails there, as it did walking by itself, never every
 // rule on the dispatcher. ForDependents keeps a dispatcher's requirement for its listeners only where a rule of this
-// run requires it too, so what only a left-out rule reads never runs.
+// run requires it too, so what only a left-out rule reads never runs. Resolver is a new fact resolver, one for the run
+// the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat), with no
+// store, which Run gives the resolver of a run with the findings cache.
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
 		Failed:        rule.Failed,
 		Tolerant:      dispatch.IsDispatcher,
 		ForDependents: dispatch.ListenerRequirement,
+		Resolver:      fact_resolver.New(nil),
+		Resolved:      fact_resolver.Resolved,
 	}
 }
 

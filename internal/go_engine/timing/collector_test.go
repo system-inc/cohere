@@ -128,6 +128,31 @@ func TestAnAnalyzerThatIsARulesJoinsItsListenersCallsInOneRow(test *testing.T) {
 	}
 }
 
+// What a rule's listener calls or its own analyzer's action nested, its questions to the fact resolver, is taken out
+// of the rule's row, each part out of the part it was nested in, never below 0, and the rule's packages and calls stay.
+func TestNestedIsTakenOutOfARulesRow(test *testing.T) {
+	test.Parallel()
+	collector := newFixedCollector(time.Microsecond)
+	collector.Analyzer("SA5012", 6*time.Millisecond)
+	collector.Nested("SA5012", 2*time.Millisecond, 1000)
+	collector.Listener("cohere-go/SA4023", 9*time.Millisecond, 30)
+	collector.Nested("cohere-go/SA4023", 4*time.Millisecond, 0)
+	collector.Analyzer("SA4023", time.Millisecond)
+	collector.Nested("SA4023", 3*time.Millisecond, 0)
+	record := collector.Record(func(analyzer string) (string, contract.SharedKind) {
+		return "cohere-go/" + analyzer, ""
+	})
+	expected := []contract.RuleTiming{
+		// 9ms of listener calls less the 4ms nested; the analyzer's 1ms less 3ms nested is 0, not below.
+		{Name: "cohere-go/SA4023", CpuMicroseconds: 5000, Packages: 1, Calls: 30},
+		// 6ms less the 2ms nested and the 1ms its 1000 calls' reads cost.
+		{Name: "cohere-go/SA5012", CpuMicroseconds: 3000, Packages: 1},
+	}
+	if !slices.Equal(record.Rules, expected) {
+		test.Fatalf("the rule rows are %+v, want %+v", record.Rules, expected)
+	}
+}
+
 // A run that measured no rule and no analyzer writes both lists as `[]`, never `null`.
 func TestRulesAndSharedEncodeAsEmptyListsWhenEmpty(test *testing.T) {
 	test.Parallel()

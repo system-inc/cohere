@@ -521,10 +521,11 @@ func emitCall(function *Function, call *Call, source ast.Node) Value {
 	result := function.emit(call, source)
 
 	callee := call.Call.StaticCallee()
+	noReturn := function.Program.noReturnFor(function)
 	if callee != nil &&
 		callee.object != nil &&
-		function.Program.noReturn != nil &&
-		function.Program.noReturn(callee.object) {
+		noReturn != nil &&
+		noReturn(callee.object) {
 		// Call doesn't return normally. Either it doesn't return at all
 		// (infinitely blocked or exitting the process), or it unwinds the stack
 		// (panic, runtime.Goexit). Model this as a panic.

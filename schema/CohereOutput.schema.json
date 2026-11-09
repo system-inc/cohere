@@ -503,7 +503,7 @@
                     "properties": {
                         "on": {
                             "type": "boolean",
-                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromBinary and factsSkipped."
+                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromBinary, factsSkipped and reloads."
                         },
                         "hit": {
                             "type": "integer",
@@ -530,6 +530,18 @@
                         "waves": {
                             "type": "integer",
                             "description": "Times the lint phase analyzed packages, at most two: those whose own inputs moved, then the rest that missed once the early cutoff restored what it could above them."
+                        },
+                        "reloads": {
+                            "type": "integer",
+                            "description": "Packages loaded again from source, though the cache held them, because a rule asked of a fact computed on demand that no entry answered, so the lint phase ran again. Absent when zero."
+                        },
+                        "reloadRounds": {
+                            "type": "integer",
+                            "description": "Times the lint phase loaded and ran again for those reloads, each round loading every package the last one needed. Absent when zero."
+                        },
+                        "replays": {
+                            "type": "integer",
+                            "description": "Questions of a fact computed on demand that the lint phase answered by replaying the push's walk of a package, with the cache or without. Absent when zero."
                         }
                     }
                 },

@@ -234,7 +234,7 @@ func (judging *judgment) transfer(
 			*intermediate_representation.BinaryOperation, *intermediate_representation.CompositeValue,
 			*intermediate_representation.Range, *intermediate_representation.Next:
 		default:
-			position := judging.pass.Fset.PositionFor(instruction.Pos(), false)
+			position := from.Parent().Program.FileSet.PositionFor(instruction.Pos(), false)
 			// Invariant: every kind of instruction the representation builds has a case above, so a kind it builds
 			// that is new to this pass is found here, as staticcheck's pass finds one, rather than judged by chance.
 			panic(fmt.Sprintf("return_nil_ness: internal error: unhandled type %T at %s", instruction, position))
@@ -353,7 +353,7 @@ func (judging *judgment) transferReturnValue(
 		current.set(value, ValueNilness{MaybeNil, MaybeNil})
 		return
 	}
-	calleeNilness := judging.returns(callee)
+	calleeNilness := judging.callees.returns(callee)
 	if len(calleeNilness) > result {
 		current.set(value, normalize(calleeNilness[result], resultType))
 	} else {

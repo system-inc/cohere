@@ -799,7 +799,8 @@ restored from its entry, and no analyzer runs on it. A package's key holds its d
 an edit misses every package above the one edited, though most come out of an analysis as before.
 So the packages whose own inputs moved are analyzed first, and each package above them is then
 restored by a second key, its own inputs and what the analysis of everything below it came out as
-(its types without positions and the facts it exported), when that key holds an entry; what still
+(its types without positions and the facts it exported), when that key holds an entry and every
+answer of a fact computed on demand that the entry read of another package still holds; what still
 misses is analyzed together, so `waves`, the times the lint phase analyzed packages, is at most 2,
 and 0 when everything hit. A package one of whose findings names a file outside it, as vet's
 structtag names the line of a field embedded from another package, never takes the second key. On
@@ -827,7 +828,20 @@ A standard-library package whose key matches is restored from the binary, in a c
 mismatch computes it. `"standardLibraryFromBinary":258` counts those packages, which are neither
 `hit` nor `missed`, and is written only when it is not 0, so a build that carries none, as every
 build but a release does, writes the field as it always has. Under `--no-cache` it, and
-`factsSkipped` of what it restored, are the only counts that can be other than 0.
+`factsSkipped` of what it restored, are the only counts that can be other than 0, with `reloads`.
+
+A few facts are computed only when a rule asks of a function (#w7zmvat), from the function's
+package's syntax, which a restored package does not have. Every entry a run writes holds every
+answer of its package, computed whole under its key, as the binary's entries do, so a question of
+a restored package reads its answer from the entry and reloads nothing. An entry can still hold
+only some, as one a run writes when computing them all would need a package it restored and
+nothing answers. A question of a restored package that nothing holds an answer to is never
+answered "no fact": the pass is handed a placeholder and runs on, so it names every package it
+needs, and the run loads those again from source, never restoring them, and runs again; the pass
+that ran on placeholders is dropped unwritten, until a round needs no package it did not load
+already. `"reloads":2` counts the packages so loaded and `"reloadRounds":1` the rounds, each written only when it is not 0.
+Beside them, `"replays":35` counts the questions answered by replaying the order the push walked a
+package in, which a cold run makes too; it is written only when it is not 0. A package loaded again that still cannot answer is a crash naming it, never a quiet answer.
 
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
 which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive

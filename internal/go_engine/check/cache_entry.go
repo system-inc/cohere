@@ -26,8 +26,11 @@ import (
 // holds changes shape, Finding included, or what a field means: at 5, Output became a digest of the package's API and
 // facts by value rather than of their bytes (#z14ch7c), so an entry written at 4 holds a digest no second key of 5
 // can match, and would only be a miss read the long way. At 6, an analysis holds its report analyzer's result
-// (#jfvhbj7).
-const CacheFormatVersion = "go-engine-cache-6"
+// (#jfvhbj7). At 7, an entry holds the answers a standard-library package was computed whole in (#w7zmvat wave 3).
+// At 8, it holds the answers its package's analysis read of other packages (#w7zmvat wave 3b). At 9, a standard-library
+// package's entry holds every answer of its package whenever a run writes it, so an entry of 8 may hold only some. At
+// 10, every package's entry does, so an entry of 9 may hold only some for a package outside the standard library.
+const CacheFormatVersion = "go-engine-cache-10"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.
@@ -55,6 +58,30 @@ type cacheEntry struct {
 	// Output is the package's output digest (see outputDigest), what an importer can read of it, or nil for an entry
 	// that holds no facts, which therefore cannot say what an importer would inherit.
 	Output []byte
+
+	// Answers are the answers of the fact kinds computed on demand (#w7zmvat wave 3) of the package, which a run that
+	// restores it reads in place of a build: every answer, computed whole, whenever the run that wrote it could
+	// compute them all without a reload, and otherwise those the runs which checked the package from source computed
+	// in it (see demandOf). They depend only on the package's key, as everything else here does.
+	Answers []kindAnswers
+
+	// Reads are the answers of the fact kinds computed on demand that the package's analysis took from other packages,
+	// in the runs that wrote its findings and answers, each with its owner's first key then (#w7zmvat wave 3b). A run
+	// that restores the package by anything but its own first key holds the entry only while every read still holds
+	// (see readsHold). ReadsIncomplete is set when a read could not be named, an object with no objectpath or an owner
+	// the run did not key, and then the entry is held by its own first key alone.
+	Reads           []storedRead
+	ReadsIncomplete bool
+}
+
+// storedRead is one read (see fact_resolver.Read): the kind, the owner's ID and its first key when the read was
+// made, the object's objectpath in the owner, and the answer, as JSON.
+type storedRead struct {
+	Kind     string
+	Owner    string
+	OwnerKey []byte
+	Path     objectpath.Path
+	Value    []byte
 }
 
 // storedFile is one file of a package Analyze was given: its name as the syntax names it, the nodes of one
@@ -100,6 +127,11 @@ type restoredPackage struct {
 	// output is the entry's Output, and hasOutput whether it had one.
 	output    cache.Key
 	hasOutput bool
+
+	// answers are the entry's Answers, and reads and readsIncomplete its Reads and ReadsIncomplete.
+	answers         []kindAnswers
+	reads           []storedRead
+	readsIncomplete bool
 }
 
 // encodedEntry is one package's entry as encodeEntry makes it, with what the session needs of it beside the bytes.
@@ -146,7 +178,8 @@ func factTypeName(factType reflect.Type) string {
 }
 
 // encodeEntry is the entry of one package that missed, from every action on it, each of which finished without an
-// error, its types, what the load withheld of it, and, for a package Analyze was given, its files' walk, with its
+// error, its types, what the load withheld of it, the answers of the fact kinds computed on demand in it and those its
+// analysis read of other packages (demanded), and, for a package Analyze was given, its files' walk, with its
 // export data beside it, its output digest, and whether a finding of it names a file outside it, among knownFiles,
 // every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact the package exported, or
 // factValueDigest cannot read one, or its types cannot be written as export data.
@@ -156,14 +189,18 @@ func encodeEntry(
 	saved *packages.Package,
 	actions []*checker.Action,
 	withheld load.PackageWithheld,
+	demanded entryDemand,
 	files []storedFile,
 	knownFiles map[string]bool,
 ) (encodedEntry, error) {
 	entry := cacheEntry{
-		Version:   CacheFormatVersion,
-		Analyzers: map[string]storedAnalysis{},
-		Withheld:  withheld,
-		Files:     files,
+		Version:         CacheFormatVersion,
+		Analyzers:       map[string]storedAnalysis{},
+		Withheld:        withheld,
+		Files:           files,
+		Answers:         demanded.answers,
+		Reads:           demanded.reads,
+		ReadsIncomplete: demanded.readsIncomplete,
 	}
 	encoded := encodedEntry{}
 	digested := map[string]analysisFacts{}
@@ -366,7 +403,10 @@ func restoredOf(
 			Imports:        entry.Imports,
 			Withheld:       entry.Withheld,
 		},
-		files: entry.Files,
+		files:           entry.Files,
+		answers:         entry.Answers,
+		reads:           entry.Reads,
+		readsIncomplete: entry.ReadsIncomplete,
 	}
 	if len(entry.Output) == len(restored.output) {
 		copy(restored.output[:], entry.Output)

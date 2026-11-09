@@ -100,9 +100,10 @@ func (collector *Collector) Listener(rule string, cpu time.Duration, calls int64
 	collector.add(func() { collector.listeners.add(rule, cpu, calls) })
 }
 
-// Nested takes cpu out of the analyzer named name's row, for the work calls measurements inside its action billed
-// elsewhere: a dispatcher's calls into its listeners, which are their rules' rows. The clock reads of those calls are
-// taken out too, since the action's own measurement holds them and no row is to be inflated by the measuring.
+// Nested takes cpu out of the row of the analyzer or dispatched rule named name, for the work calls measurements
+// inside its action or its listener's calls billed elsewhere: a dispatcher's calls into its listeners, which are
+// their rules' rows, or a rule's questions to the fact resolver, which are the resolver's rows. The clock reads of
+// those calls are taken out too, since the outer measurement holds them and no row is to be inflated by the measuring.
 func (collector *Collector) Nested(name string, cpu time.Duration, calls int64) {
 	collector.add(func() { collector.nested[name] += cpu + time.Duration(calls)*collector.perCall })
 }
@@ -193,7 +194,7 @@ func (collector *Collector) Record(kinds Kinds) contract.TimingRecord {
 		rule, shared := kinds(analyzer)
 		if rule != "" {
 			row := ruleRow(rule)
-			row.CpuMicroseconds += spent.cpu.Microseconds()
+			row.CpuMicroseconds += max(spent.cpu-collector.nested[analyzer], 0).Microseconds()
 			row.Packages += int(spent.count)
 			continue
 		}
@@ -206,7 +207,7 @@ func (collector *Collector) Record(kinds Kinds) contract.TimingRecord {
 	}
 	for rule, spent := range collector.listeners {
 		row := ruleRow(rule)
-		row.CpuMicroseconds += spent.cpu.Microseconds()
+		row.CpuMicroseconds += max(spent.cpu-collector.nested[rule], 0).Microseconds()
 		row.Calls += spent.count
 	}
 	for _, row := range rules {

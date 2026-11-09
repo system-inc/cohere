@@ -8,6 +8,9 @@
 //     dominance frontiers; the values reaching each use match go/ir's (#ee33njz).
 //   - The expression map, ValueForExpression, is recorded per package, only where SetDebugMode asks,
 //     where go/ir's GlobalDebug records it for every package.
+//   - A package can carry its own no-return predicate (Package.SetNoReturn), and be created while
+//     others build, so one program can hold a run's packages each built as its own program would
+//     build it, which the fact resolver's does (#w7zmvat).
 //   - Constant composite simplification, which go/ir has switched off and buildir never runs.
 //   - Monomorphized generics. A generic body is built once, in generic form, and a call to an
 //     instance goes through an instantiation wrapper, as go/ir does without InstantiateGenerics.

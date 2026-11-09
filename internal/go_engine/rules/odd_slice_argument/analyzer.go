@@ -1,20 +1,23 @@
 // Package odd_slice_argument is staticcheck's SA5012, a slice of odd length passed to a function that panics unless
 // its slice has an even length, as strings.NewReplacer and logging APIs taking pairs do, ported onto the engine's own
-// intermediate representation as an analyzer that exports the facts it reads (#w7zmvat).
+// intermediate representation as an analyzer that asks the marks it reads of the run's fact resolver (#w7zmvat).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5012/sa5012.go, whose logic it keeps and
 // whose message it reports word for word, at the same range, the argument. It runs in three passes over the package's
 // functions, as the original does: it marks each slice parameter a function checks for even length on every path
 // before panicking, then each slice parameter a function passes on every path to a parameter so marked, and then
-// reports each call passing a slice of known odd length to a marked parameter. A mark is an object fact, of a type
-// of the port's own that prints as the original's does, "needs even elements", so a function of another package is
-// marked when that package was analyzed. A dispatched listener exports no facts, so this is a plain analyzer
-// on build_intermediate_representation.Analyzer, whose source functions it walks in the order buildir's SrcFuncs
-// lists them, and generated, whose judgment the context reads though this check filters nothing. Where the original
-// asks staticcheck's internal iterutil.All whether every return block is dominated, the port loops over them itself,
-// and where it asks irutil.IsCallTo whether a call is to len, the port asks whether the callee is the builtin len,
-// the one callee whose name irutil.CallName gives as "len". The fact differential beside this file holds the port to
-// the original's facts and findings over whole trees.
+// reports each call passing a slice of known odd length to a marked parameter. The original pushes its marks as
+// object facts, judging every package, dependencies included. Here the marks of another package's parameters are asked
+// of the run's fact resolver instead (#w7zmvat unit 2), which marks a parameter only when a call asks of it, judging
+// only its function and what that reaches, and gives every answer the push gives; demand_walk.go says how. The
+// analyzed package's own marks are found the push's way, on the package's own representation, which the report walks
+// anyway, so the marks of the instantiations and wrappers built there, objects of that representation alone, are the
+// push's too. It is a plain analyzer on build_intermediate_representation.Analyzer, whose source functions it walks in
+// the order buildir's SrcFuncs lists them, and generated, whose judgment the context reads though this check filters
+// nothing. Where the original asks staticcheck's internal iterutil.All whether every return block is dominated, the
+// port loops over them itself, and where it asks irutil.IsCallTo whether a call is to len, the port asks whether the
+// callee is the builtin len, the one callee whose name irutil.CallName gives as "len". The fact differential beside
+// this file holds the port's push to the original's facts and findings over whole trees.
 //
 // It differs in one place, adjudicated: the original reads a call's source as a call expression, and the source of a
 // go or defer statement's call is the statement, so a go or defer passing an odd slice to a marked parameter panics
@@ -36,6 +39,7 @@ import (
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
@@ -43,19 +47,18 @@ import (
 )
 
 // Analyzer runs the port under the original's name, so the rule, its settings and every `//cohere:ignore` naming it
-// read the same once the port takes the original's place. It exports evenElements facts, which its run on a package
-// reads from its runs on the packages that one imports.
+// read the same once the port takes the original's place. It asks the run's fact resolver of the marks of other
+// packages' parameters, which ctrlflow, required through build_intermediate_representation, has the resolver hold.
 var Analyzer = &analysis.Analyzer{
 	Name: "SA5012",
 	Doc: "Flags a slice of odd length passed to a function that needs an even one: staticcheck's SA5012, ported onto " +
 		"the engine's own intermediate representation.",
-	Requires:  []*analysis.Analyzer{build_intermediate_representation.Analyzer, generated.Analyzer},
-	FactTypes: []analysis.Fact{new(evenElements)},
-	Run:       run,
+	Requires: []*analysis.Analyzer{build_intermediate_representation.Analyzer, generated.Analyzer},
+	Run:      run,
 }
 
-// run marks the package's parameters, directly and then through the calls that pass them on, and reports the odd
-// slices passed to marked parameters.
+// run marks the package's parameters, directly and then through the calls that pass them on, asking the resolver of
+// other packages' parameters, and reports the odd slices passed to marked parameters.
 func run(pass *analysis.Pass) (any, error) {
 	context, contextError := staticcheck_report.PassContext(pass)
 	if contextError != nil {
@@ -65,11 +68,27 @@ func run(pass *analysis.Pass) (any, error) {
 	if readError != nil {
 		return nil, readError
 	}
+	resolver, resolverError := fact_resolver.Of(pass)
+	if resolverError != nil {
+		return nil, resolverError
+	}
+	reader := resolver.Package(pass.Pkg)
+	if reader == nil {
+		return nil, fmt.Errorf("reading the marks of %s: the fact resolver never learned it, though ctrlflow, which "+
+			"it learns a package from, ran on it first", pass.Pkg.Path())
+	}
 	// Collected once, so the three passes walk the same functions in the same order.
 	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
-	markLengthChecks(pass, functions)
-	markIndirectLengthChecks(pass, functions)
-	reportOddLengths(pass, context, functions)
+	marks := &packageFacts{
+		resolver: resolver,
+		home:     reader,
+		recorded: map[types.Object]bool{},
+		asking:   pass.Analyzer.Name,
+	}
+	walk := &pushWalk{facts: marks}
+	walk.markLengthChecks(functions)
+	walk.markIndirectLengthChecks(functions)
+	reportOddLengths(context, marks, functions)
 	return nil, nil
 }
 
@@ -86,127 +105,73 @@ func dominatesEveryReturn(
 	return true
 }
 
-// markLengthChecks marks each slice parameter a function checks on every path with `len(p) % 2 != 0` or
-// `len(p) % 2 == 1`, either way around, and panics when the check holds.
-func markLengthChecks(pass *analysis.Pass, functions []*intermediate_representation.Function) {
-	for _, function := range functions {
-		for _, block := range function.Blocks {
-			if !dominatesEveryReturn(function, block) {
-				continue
-			}
-			branch, isIf := block.Control().(*intermediate_representation.If)
-			if !isIf {
-				continue
-			}
-			comparison, isBinary := branch.Condition.(*intermediate_representation.BinaryOperation)
-			if !isBinary {
-				continue
-			}
-			var needle uint64
-			switch comparison.Operator {
-			case token.NEQ:
-				needle = 0
-			case token.EQL:
-				needle = 1
-			default:
-				continue
-			}
-			remainder, isRemainder := comparison.X.(*intermediate_representation.BinaryOperation)
-			compared, isConstant := comparison.Y.(*intermediate_representation.Constant)
-			// The original looks the other way around only when neither side is in place, so a remainder with no
-			// constant beside it, or a constant with no remainder, is no check.
-			if isRemainder != isConstant {
-				continue
-			}
-			if !isRemainder {
-				remainder, isRemainder = comparison.Y.(*intermediate_representation.BinaryOperation)
-				compared, isConstant = comparison.X.(*intermediate_representation.Constant)
-			}
-			if !isRemainder || !isConstant || remainder.Operator != token.REM ||
-				compared.Value.Kind() != constant.Int || compared.Uint64() != needle {
-				continue
-			}
-			divisor, isDivisorConstant := remainder.Y.(*intermediate_representation.Constant)
-			if !isDivisorConstant || divisor.Value.Kind() != constant.Int || divisor.Uint64() != 2 {
-				continue
-			}
-			length, isCall := remainder.X.(*intermediate_representation.Call)
-			if !isCall {
-				continue
-			}
-			builtin, isBuiltin := length.Call.Value.(*intermediate_representation.Builtin)
-			if !isBuiltin || builtin.Name() != "len" {
-				continue
-			}
-			// Only a parameter read directly; one that has flowed through a phi is not followed.
-			parameter, isParameter := length.Call.Arguments[0].(*intermediate_representation.Parameter)
-			if !isParameter || !typeutil.All(parameter.Type(), typeutil.IsSlice) {
-				continue
-			}
-			if _, panics := block.Successors[0].Control().(*intermediate_representation.Panic); !panics {
-				continue
-			}
-			pass.ExportObjectFact(parameter.Object(), new(evenElements))
+// directChecks is each slice parameter function checks on every path with `len(p) % 2 != 0` or `len(p) % 2 == 1`,
+// either way around, and panics when the check holds, which the push marks first, before any call passes one on.
+func directChecks(function *intermediate_representation.Function) []*intermediate_representation.Parameter {
+	var checked []*intermediate_representation.Parameter
+	for _, block := range function.Blocks {
+		if !dominatesEveryReturn(function, block) {
+			continue
 		}
-	}
-}
-
-// markIndirectLengthChecks marks each slice parameter a function passes on every path, as it is, to a parameter
-// already marked, following the calls into functions of the same package first, so a chain of them is marked from
-// its end.
-func markIndirectLengthChecks(pass *analysis.Pass, functions []*intermediate_representation.Function) {
-	seen := map[*intermediate_representation.Function]bool{}
-	var visit func(function *intermediate_representation.Function)
-	visit = func(function *intermediate_representation.Function) {
-		if seen[function] {
-			return
+		branch, isIf := block.Control().(*intermediate_representation.If)
+		if !isIf {
+			continue
 		}
-		seen[function] = true
-		for _, block := range function.Blocks {
-			if !dominatesEveryReturn(function, block) {
-				continue
-			}
-			for _, instruction := range block.Instructions {
-				call, isCall := instruction.(*intermediate_representation.Call)
-				if !isCall {
-					continue
-				}
-				callee := call.Call.StaticCallee()
-				if callee == nil {
-					continue
-				}
-				if callee.Package == function.Package || callee.Package == nil {
-					visit(callee)
-				}
-				for argumentIndex, argument := range call.Call.Arguments {
-					parameterIndex := argumentIndex
-					if callee.Signature.Recv() != nil {
-						if argumentIndex == 0 {
-							continue
-						}
-						parameterIndex--
-					}
-					parameter, isParameter := argument.(*intermediate_representation.Parameter)
-					if !isParameter || !typeutil.All(parameter.Type(), typeutil.IsSlice) {
-						continue
-					}
-					// The signature's parameters, not the callee's Parameters, which a function of another package,
-					// built from export data, does not hold.
-					if !pass.ImportObjectFact(callee.Signature.Params().At(parameterIndex), new(evenElements)) {
-						continue
-					}
-					pass.ExportObjectFact(parameter.Object(), new(evenElements))
-				}
-			}
+		comparison, isBinary := branch.Condition.(*intermediate_representation.BinaryOperation)
+		if !isBinary {
+			continue
 		}
+		var needle uint64
+		switch comparison.Operator {
+		case token.NEQ:
+			needle = 0
+		case token.EQL:
+			needle = 1
+		default:
+			continue
+		}
+		remainder, isRemainder := comparison.X.(*intermediate_representation.BinaryOperation)
+		compared, isConstant := comparison.Y.(*intermediate_representation.Constant)
+		// The original looks the other way around only when neither side is in place, so a remainder with no
+		// constant beside it, or a constant with no remainder, is no check.
+		if isRemainder != isConstant {
+			continue
+		}
+		if !isRemainder {
+			remainder, isRemainder = comparison.Y.(*intermediate_representation.BinaryOperation)
+			compared, isConstant = comparison.X.(*intermediate_representation.Constant)
+		}
+		if !isRemainder || !isConstant || remainder.Operator != token.REM ||
+			compared.Value.Kind() != constant.Int || compared.Uint64() != needle {
+			continue
+		}
+		divisor, isDivisorConstant := remainder.Y.(*intermediate_representation.Constant)
+		if !isDivisorConstant || divisor.Value.Kind() != constant.Int || divisor.Uint64() != 2 {
+			continue
+		}
+		length, isCall := remainder.X.(*intermediate_representation.Call)
+		if !isCall {
+			continue
+		}
+		builtin, isBuiltin := length.Call.Value.(*intermediate_representation.Builtin)
+		if !isBuiltin || builtin.Name() != "len" {
+			continue
+		}
+		// Only a parameter read directly; one that has flowed through a phi is not followed.
+		parameter, isParameter := length.Call.Arguments[0].(*intermediate_representation.Parameter)
+		if !isParameter || !typeutil.All(parameter.Type(), typeutil.IsSlice) {
+			continue
+		}
+		if _, panics := block.Successors[0].Control().(*intermediate_representation.Panic); !panics {
+			continue
+		}
+		checked = append(checked, parameter)
 	}
-	for _, function := range functions {
-		visit(function)
-	}
+	return checked
 }
 
 // reportOddLengths reports each call passing a slice whose length is known and odd to a marked parameter.
-func reportOddLengths(pass *analysis.Pass, context *rule.Context, functions []*intermediate_representation.Function) {
+func reportOddLengths(context *rule.Context, marks facts, functions []*intermediate_representation.Function) {
 	for _, function := range functions {
 		for _, block := range function.Blocks {
 			for _, instruction := range block.Instructions {
@@ -230,7 +195,7 @@ func reportOddLengths(pass *analysis.Pass, context *rule.Context, functions []*i
 						continue
 					}
 					parameter := callee.Signature.Params().At(parameterIndex)
-					if !pass.ImportObjectFact(parameter, new(evenElements)) {
+					if !marks.marked(parameter) {
 						continue
 					}
 					length := sliceLength(argument)
