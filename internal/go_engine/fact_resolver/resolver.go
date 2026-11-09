@@ -69,8 +69,9 @@ type Counts struct {
 	// answer there depended on the order the push walks the package in.
 	Fallbacks atomic.Int64
 
-	// Contradicted is how many verdicts a fallback found other than the ones the kind kept before it, which by the
-	// kind's reasoning is none; the differential requires it.
+	// Contradicted is how many verdicts a package's fallback computed otherwise than a verdict the kind's demand walk
+	// had already kept there, which is zero on a correct run, since a walk keeps a verdict only when it met no
+	// order-dependent answer, and such a verdict is the push's in every order; the differential requires zero.
 	Contradicted atomic.Int64
 }
 
