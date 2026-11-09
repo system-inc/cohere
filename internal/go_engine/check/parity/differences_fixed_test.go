@@ -103,15 +103,20 @@ func TestRequireOnlyAdjudicatedFailsAMoveWhoseOriginalFixMakesTheFixedFile(test 
 		"make moved_fixed/moved_fixed.go.fixed too, so the move proves no fix of the original's wrong")
 }
 
-// A fixed file whose source is not beside it, as one left behind when its source was renamed, is read by nothing, so
-// it fails, named, though every record of the fixture is met.
+// A fixed file whose source is not beside it, as one left behind when its source was renamed, is read by nothing, and
+// so is one beside a file that is there but holds no records, notes.txt, so each fails, named, though every record of
+// the fixture is met.
 func TestRequireOnlyAdjudicatedFailsAFixedFileWithNoSource(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, calling(sharedMessages, writing("fixed()")),
 			calling(fixingMessages, writing("fixed()")), analysistest.TestData(), "fixed_orphan")
-	}), "fixed_orphan/renamed.go.fixed is a fixed file with no source beside it that holds records, renamed.go, so "+
-		"nothing reads it: rename it for its source, or delete it")
+	}),
+		"fixed_orphan/notes.txt.fixed is a fixed file with no source beside it that holds records, notes.txt, so "+
+			"nothing reads it: rename it for its source, or delete it",
+		"fixed_orphan/renamed.go.fixed is a fixed file with no source beside it that holds records, renamed.go, so "+
+			"nothing reads it: rename it for its source, or delete it",
+	)
 }
 
 // A fixed file beside a fixture package that a form holding no fixed file loads is read by nothing, so it fails, named,

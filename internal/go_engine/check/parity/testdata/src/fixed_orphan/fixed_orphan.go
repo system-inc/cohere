@@ -1,5 +1,6 @@
-// Package fixed_orphan holds a call only the port finds and one both find, each fixed by the port, beside a fixed
-// file named for a source that is not here, as one whose source was renamed is, which nothing would read.
+// Package fixed_orphan holds a call only the port finds and one both find, each fixed by the port, beside two fixed
+// files nothing would read: one named for a source that is not here, as one whose source was renamed is, and one for
+// notes.txt, which is here and holds no records.
 package fixed_orphan
 
 func shared() {}
