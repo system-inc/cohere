@@ -26,11 +26,11 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
-	"slices"
 
 	"honnef.co/go/tools/analysis/edit"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
@@ -95,12 +95,23 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	if !isFunction || callee.Pkg() == context.Package {
 		return
 	}
-	name := callee.FullName()
+	// The callee's full name, compared in place and taken from the names it matched, since only a call that is
+	// reported needs it spelled.
+	var name string
 	var format ast.Expr
-	switch {
-	case slices.Contains(formatFirstFunctions, name) && len(call.Args) == 1:
+	switch len(call.Args) {
+	case 1:
+		index := function_name.Index(callee, formatFirstFunctions...)
+		if index < 0 {
+			return
+		}
+		name = formatFirstFunctions[index]
 		format = call.Args[0]
-	case name == fprintf && len(call.Args) == 2:
+	case 2:
+		if !function_name.Matches(callee, fprintf) {
+			return
+		}
+		name = fprintf
 		format = call.Args[1]
 	default:
 		return
