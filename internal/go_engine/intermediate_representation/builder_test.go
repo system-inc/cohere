@@ -233,7 +233,7 @@ func main() {
 			test.Errorf("external package %s has non-empty init", irPackage.Types.Path())
 		}
 
-		for _, mem := range irPackage.Members {
+		for _, mem := range irPackage.Members() {
 			if mem, ok := mem.(*intermediate_representation.Function); ok {
 				// Functions at package level.
 				if isExt && !isEmpty(mem) {
@@ -245,7 +245,7 @@ func main() {
 	if isEmpty(mainPackage.Function("init")) {
 		test.Errorf("main package has empty init")
 	}
-	for _, mem := range mainPackage.Members {
+	for _, mem := range mainPackage.Members() {
 		switch mem := mem.(type) {
 		case *intermediate_representation.Function:
 			if isEmpty(mem) {
@@ -320,9 +320,9 @@ func (C) F() {}
 	// Find the function in the sole call in the sole block of function a.A. Unlifted, the block opens with
 	// the call to the ssa:deferstack builtin that every function makes and lifting removes when nothing
 	// defers (#ee33njz), so the call sought is the sole one to a function.
-	functionA, isFunction := aSsa.Members["A"].(*intermediate_representation.Function)
+	functionA, isFunction := aSsa.Members()["A"].(*intermediate_representation.Function)
 	if !isFunction {
-		test.Fatalf("member A of package a is %T, want a function", aSsa.Members["A"])
+		test.Fatalf("member A of package a is %T, want a function", aSsa.Members()["A"])
 	}
 	var got string
 	for _, instr := range functionA.Blocks[0].Instructions {

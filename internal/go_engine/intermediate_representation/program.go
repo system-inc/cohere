@@ -56,7 +56,8 @@ func (prog *Program) Build() {
 
 // CreatePackage creates and returns an IR Package from the
 // specified type-checked, error-free file ASTs, and populates its
-// Members mapping.
+// Members mapping. A package given no type information, created from
+// its types alone, creates each member on first lookup instead.
 //
 // importable determines whether this package should be returned by a
 // subsequent call to ImportedPackage(pkg.Path()).
@@ -75,11 +76,12 @@ func (prog *Program) CreatePackage(
 		panic("nil pkg")
 	}
 	irPackage := &Package{
-		Program: prog,
-		Members: make(map[string]Member),
-		values:  make(map[types.Object]Member),
-		Types:   goPackage,
-		syntax:  info != nil,
+		Program:   prog,
+		members:   make(map[string]Member),
+		values:    make(map[types.Object]Member),
+		Types:     goPackage,
+		syntax:    info != nil,
+		fromTypes: info == nil,
 		// transient values (cleared after Package.Build)
 		info:        info,
 		files:       files,
@@ -97,11 +99,12 @@ func (prog *Program) CreatePackage(
 		info:      irPackage.info,
 		goversion: "", // See Package.build for details.
 	}
-	irPackage.Members[irPackage.init.name] = irPackage.init
+	irPackage.members[irPackage.init.name] = irPackage.init
 	irPackage.Functions = append(irPackage.Functions, irPackage.init)
 	irPackage.created = append(irPackage.created, irPackage.init)
 
-	// Allocate all package members: vars, funcs, consts and types.
+	// Allocate all package members: vars, funcs, consts and types. A package from its types alone allocates each
+	// on first lookup (memberOf, memberNamed).
 	if len(files) > 0 {
 		// Go source package.
 		for _, file := range files {
@@ -110,23 +113,13 @@ func (prog *Program) CreatePackage(
 				membersFromDecl(irPackage, decl, goversion)
 			}
 		}
-	} else {
+	} else if !irPackage.fromTypes {
 		// GC-compiled binary package (or "unsafe")
 		// No code.
 		// No position information.
-		scope := irPackage.Types.Scope()
-		for _, name := range scope.Names() {
-			goObject := scope.Lookup(name)
-			memberFromObject(irPackage, goObject, nil, "")
-			if typeName, ok := goObject.(*types.TypeName); ok {
-				// No Unalias: aliases should not duplicate methods.
-				if named, ok := typeName.Type().(*types.Named); ok {
-					for index, methodCount := 0, named.NumMethods(); index < methodCount; index++ {
-						memberFromObject(irPackage, named.Method(index), nil, "")
-					}
-				}
-			}
-		}
+		forEachScopeMember(irPackage.Types, func(object types.Object) {
+			memberFromObject(irPackage, object, nil, "")
+		})
 	}
 
 	// Add initializer guard variable.
@@ -135,7 +128,7 @@ func (prog *Program) CreatePackage(
 		name:    "init$guard",
 		typ:     types.NewPointer(tBool),
 	}
-	irPackage.Members[initguard.Name()] = initguard
+	irPackage.members[initguard.Name()] = initguard
 
 	prog.packagesMutex.Lock()
 	defer prog.packagesMutex.Unlock()
@@ -235,10 +228,11 @@ func (prog *Program) Package(object *types.Package) *Package {
 // package in prog.
 //
 // It returns nil if the object belongs to a package that has not been
-// created by prog.CreatePackage.
+// created by prog.CreatePackage. A package created from its types alone
+// creates the member here, on its first lookup.
 func (prog *Program) packageLevelMember(object types.Object) Member {
 	if irPackage := prog.Package(object.Pkg()); irPackage != nil {
-		return irPackage.values[object]
+		return irPackage.memberOf(object)
 	}
 	return nil
 }

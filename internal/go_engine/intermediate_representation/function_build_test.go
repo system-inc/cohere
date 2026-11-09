@@ -66,7 +66,7 @@ func TestBuildingOneFunctionBuildsOnlyIt(test *testing.T) {
 // one after another, and logs each build's time, the bytes it allocated and the bytes it holds once built: every
 // function eagerly with Package.Build, the packages created and no function built, and a seeded tenth of each
 // package's functions with Function.Build. The second is the part laziness can't save: each program creates every
-// import's members from type information. Run it alone for numbers.
+// member of its package, its imports' only as a build looks them up (#npb86tz). Run it alone for numbers.
 func TestLazyBuildCost(test *testing.T) {
 	test.Parallel()
 	corpus := os.Getenv(differentialCorpusVariable)
