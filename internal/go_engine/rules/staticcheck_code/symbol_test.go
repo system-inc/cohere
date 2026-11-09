@@ -40,6 +40,10 @@ var symbolNames = []string{
 	"symbols_table", "symbols.List", "symbols.List[int]", "symbols.List[T any", "symbols.Lis[T any]", "symbols.recor",
 	"symbols.records", "symbol.record", "sync.WaitGroups", "(symbols.record)", "integer", "in", "Pointer",
 	"unsafe.Pointer", "unsafe.Pointe", "string", "rune", "int32",
+	// A generic alias and an alias of one of its instances, asked by their printed forms and by those a step off: the
+	// alias's name without its brackets, with an instance's in place of its parameters, or with them cut short.
+	"symbols.genericAlias", "symbols.genericAlias[T any]", "symbols.genericAlias[int]", "symbols.genericAlias[T any",
+	"symbols.genericAlia[T any]", "symbols.integers", "symbols.integers[int]",
 }
 
 // symbolComparison is what one package's side by side run of IsSymbol and SymbolIndex found.
