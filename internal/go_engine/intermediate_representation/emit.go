@@ -48,6 +48,8 @@ func emitNew(function *Function, typ types.Type, source ast.Node, comment string
 //
 // (Use this function or emitNew for synthetic variables;
 // for source-level variables in the same function, use emitLocalVar.)
+//
+// Mutates: function gains the allocation among its frame locals
 func emitLocal(function *Function, resolvedType types.Type, source ast.Node, comment string) *Allocation {
 	local := emitAllocation(function, resolvedType, source, comment)
 	function.Locals = append(function.Locals, local)
@@ -86,9 +88,10 @@ func emitReceive(function *Function, channel Value, commaOk bool, typ types.Type
 // (Use emitCompare() for comparisons and Builder.logicalBinop() for
 // non-eager operations.)
 func emitArith(function *Function, op token.Token, x, y Value, resolvedType types.Type, source ast.Node) Value {
+	operandX, operandY := x, y
 	switch op {
 	case token.SHL, token.SHR:
-		x = emitConv(function, x, resolvedType, source)
+		operandX = emitConv(function, x, resolvedType, source)
 		// y may be signed or an 'untyped' constant.
 		// There is a runtime panic if y is signed and <0. Instead of inserting a check for y<0
 		// and converting to an unsigned value (like the compiler) leave y as is.
@@ -97,21 +100,23 @@ func emitArith(function *Function, op token.Token, x, y Value, resolvedType type
 			// Spec https://go.dev/ref/spec#Operators:
 			// The right operand in a shift expression must have integer type or be an untyped constant
 			// representable by a value of type uint.
-			y = emitConv(function, y, types.Typ[types.Uint], source)
+			operandY = emitConv(function, y, types.Typ[types.Uint], source)
 		}
 
 	case token.ADD, token.SUB, token.MUL, token.QUO, token.REM, token.AND, token.OR, token.XOR, token.AND_NOT:
-		x = emitConv(function, x, resolvedType, source)
-		y = emitConv(function, y, resolvedType, source)
+		operandX = emitConv(function, x, resolvedType, source)
+		operandY = emitConv(function, y, resolvedType, source)
 
 	default:
+		// Invariant: callers pass only the operators of shift, logical and arithmetic expressions and of
+		// op-assignments, since comparisons go to emitCompare and && and || go to logicalBinop.
 		panic("illegal op in emitArith: " + op.String())
 
 	}
 	operation := &BinaryOperation{
 		Operator: op,
-		X:        x,
-		Y:        y,
+		X:        operandX,
+		Y:        operandY,
 	}
 	operation.setType(resolvedType)
 	return function.emit(operation, source)
@@ -129,7 +134,7 @@ func emitCompare(function *Function, op token.Token, x, y Value, source ast.Node
 	//   switch true { case e: ... }
 	//   if e==true { ... }
 	// even in the case when e's type is an interface.
-	// TODO(adonovan): opt: generalise to x==true, false!=y, etc.
+	// Only a constant true on the left of == is optimised; x==true, false!=y and the like are not.
 	if x, ok := x.(*Constant); ok &&
 		op == token.EQL &&
 		x.Value != nil &&
@@ -140,16 +145,17 @@ func emitCompare(function *Function, op token.Token, x, y Value, source ast.Node
 		}
 	}
 
+	operandX, operandY := x, y
 	if types.Identical(xt, yt) {
 		// no conversion necessary
 	} else if _, ok := xt.(*types.Interface); ok && !typeparams.IsTypeParam(x.Type()) {
-		y = emitConv(function, y, x.Type(), source)
+		operandY = emitConv(function, y, x.Type(), source)
 	} else if _, ok := yt.(*types.Interface); ok && !typeparams.IsTypeParam(y.Type()) {
-		x = emitConv(function, x, y.Type(), source)
+		operandX = emitConv(function, x, y.Type(), source)
 	} else if _, ok := x.(*Constant); ok {
-		x = emitConv(function, x, y.Type(), source)
+		operandX = emitConv(function, x, y.Type(), source)
 	} else if _, ok := y.(*Constant); ok {
-		y = emitConv(function, y, x.Type(), source)
+		operandY = emitConv(function, y, x.Type(), source)
 		//lint:ignore SA9003 no-op
 	} else {
 		// other cases, e.g. channels.  No-op.
@@ -157,8 +163,8 @@ func emitCompare(function *Function, op token.Token, x, y Value, source ast.Node
 
 	operation := &BinaryOperation{
 		Operator: op,
-		X:        x,
-		Y:        y,
+		X:        operandX,
+		Y:        operandY,
 	}
 	operation.setType(tBool)
 	return function.emit(operation, source)
@@ -224,11 +230,12 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 		}
 
 		// Convert (non-nil) "untyped" literals to their default type.
+		typedValue := value
 		if basic, ok := fromUnderlyingType.(*types.Basic); ok && basic.Info()&types.IsUntyped != 0 {
-			value = emitConv(function, value, types.Default(fromUnderlyingType), source)
+			typedValue = emitConv(function, value, types.Default(fromUnderlyingType), source)
 		}
 
-		mi := &MakeInterface{X: value}
+		mi := &MakeInterface{X: typedValue}
 		mi.setType(toType)
 		return function.emit(mi, source)
 	}
@@ -269,21 +276,21 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 				if array.Len() == 0 {
 					if ptr {
 						return sliceTo0ArrayPtr
-					} else {
-						return sliceTo0Array
 					}
+					return sliceTo0Array
 				}
 				if ptr {
 					return sliceToArrayPtr
-				} else {
-					return sliceToArray
 				}
+				return sliceToArray
 			}
 		}
 
 		// The only remaining case in well-typed code is a representation-
 		// changing conversion of basic types (possibly with []byte/[]rune).
 		if !isBasic(fromTerm) && !isBasic(toTerm) {
+			// Invariant: go/types accepts only well-typed conversions, and every case of those but this one returned
+			// above, so at least one of the terms is basic.
 			panic(fmt.Sprintf(
 				"in %s: cannot convert term %s (%s [within %s]) to type %s [within %s]",
 				function,
@@ -307,6 +314,8 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 		})
 	})
 	if classifications == 0 {
+		// Invariant: go/types accepts a conversion between type sets only when every pair of specific terms
+		// converts, so both sides have terms here, and classify returns a nonzero case for each pair or panics.
 		panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", function, value, value.Type(), toType))
 	}
 
@@ -380,7 +389,7 @@ func emitTypeCoercion(function *Function, value Value, typ types.Type, source as
 	if types.Identical(value.Type(), typ) {
 		return value // no coercion needed
 	}
-	// TODO(taking): for instances should we record which side is the instance?
+	// The coercion does not record which side is the instance.
 	changeType := &ChangeType{
 		X: value,
 	}
@@ -403,6 +412,8 @@ func emitStore(function *Function, addr, value Value, source ast.Node) *Store {
 
 // emitJump emits to `function` a jump to target, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
+//
+// Mutates: function ends its current block with the jump
 func emitJump(function *Function, target *BasicBlock, source ast.Node) *Jump {
 	block := function.currentBlock
 	jump := new(Jump)
@@ -415,6 +426,8 @@ func emitJump(function *Function, target *BasicBlock, source ast.Node) *Jump {
 // emitIf emits to `function` a conditional jump to tblock or fblock based on
 // cond, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
+//
+// Mutates: function ends its current block with the conditional jump
 func emitIf(function *Function, cond Value, tblock, fblock *BasicBlock, source ast.Node) *If {
 	block := function.currentBlock
 	stmt := &If{Condition: cond}
@@ -429,7 +442,13 @@ func emitIf(function *Function, cond Value, tblock, fblock *BasicBlock, source a
 // component of tuple.  It returns the extracted value.
 func emitExtract(function *Function, tuple Value, index int, source ast.Node) Value {
 	extract := &Extract{Tuple: tuple, Index: index}
-	extract.setType(tuple.Type().(*types.Tuple).At(index).Type())
+	tupleType, isTuple := tuple.Type().(*types.Tuple)
+	if !isTuple {
+		// Invariant: callers extract only from a multi-value call, a comma-ok form, a select, a range step or a
+		// type switch, and each of those values has a tuple type.
+		panic(fmt.Sprintf("emitExtract: %s has type %s, not a tuple", tuple, tuple.Type()))
+	}
+	extract.setType(tupleType.At(index).Type())
 	return function.emit(extract, source)
 }
 
@@ -461,6 +480,9 @@ func emitTypeTest(function *Function, x Value, resolvedType types.Type, source a
 // Intended for wrapper methods.
 // Precondition: `function` does/will not use deferred procedure calls.
 // Postcondition: f.currentBlock is nil.
+//
+// Mutates: call takes its type from function's results
+// Mutates: function ends its current block with the call and its return
 func emitTailCall(function *Function, call *Call, source ast.Node) {
 	tresults := function.Signature.Results()
 	nr := tresults.Len()
@@ -479,10 +501,10 @@ func emitTailCall(function *Function, call *Call, source ast.Node) {
 	default:
 		for index := range nr {
 			value := emitExtract(function, tuple, index, source)
-			// TODO(adonovan): in principle, this is required:
+			// In principle each value needs converting to its result type,
 			//   v = emitConv(f, o.Type, f.Signature.Results[i].Type)
-			// but in practice emitTailCall is only used when
-			// the types exactly match.
+			// but emitTailCall is only used when the types exactly
+			// match, so it extracts without converting.
 			ret.Results = append(ret.Results, value)
 		}
 	}
@@ -493,6 +515,8 @@ func emitTailCall(function *Function, call *Call, source ast.Node) {
 
 // emitCall emits a call instruction. If the callee is "no return",
 // it also emits a panic to eliminate infeasible CFG edges.
+//
+// Mutates: function moves on to an unreachable block after a call that does not return
 func emitCall(function *Function, call *Call, source ast.Node) Value {
 	result := function.emit(call, source)
 
@@ -521,33 +545,34 @@ func emitCall(function *Function, call *Call, source ast.Node) Value {
 // a field; if it is the value of a struct, the result will be the
 // value of a field.
 func emitImplicitSelections(function *Function, value Value, indices []int, source ast.Node) Value {
+	selected := value
 	for _, index := range indices {
 		// We may have a generic type containing a pointer, or a pointer to a generic type containing a struct. A
 		// pointer to a generic containing a pointer to a struct shouldn't be possible because the outer pointer gets
 		// dereferenced implicitly before we get here.
-		if isPointerCore(value.Type()) {
-			fld := fieldOf(deref(value.Type()), index)
+		if isPointerCore(selected.Type()) {
+			fld := fieldOf(deref(selected.Type()), index)
 			instr := &FieldAddress{
-				X:     value,
+				X:     selected,
 				Field: index,
 			}
 			instr.setType(types.NewPointer(fld.Type()))
-			value = function.emit(instr, source)
+			selected = function.emit(instr, source)
 			// Load the field's value iff indirectly embedded.
 			if isPointerCore(fld.Type()) {
-				value = emitLoad(function, value, source)
+				selected = emitLoad(function, selected, source)
 			}
 		} else {
-			fld := fieldOf(value.Type(), index)
+			fld := fieldOf(selected.Type(), index)
 			instr := &Field{
-				X:     value,
+				X:     selected,
 				Field: index,
 			}
 			instr.setType(fld.Type())
-			value = function.emit(instr, source)
+			selected = function.emit(instr, source)
 		}
 	}
-	return value
+	return selected
 }
 
 // emitFieldSelection emits to `function` code to select the index'th field of `value`.
@@ -557,6 +582,7 @@ func emitImplicitSelections(function *Function, value Value, indices []int, sour
 // field's value.
 // Ident id is used for position and debug info.
 func emitFieldSelection(function *Function, value Value, index int, wantAddr bool, id *ast.Ident) Value {
+	var selected Value
 	if isPointerCore(value.Type()) {
 		fld := fieldOf(deref(value.Type()), index)
 		instr := &FieldAddress{
@@ -565,10 +591,10 @@ func emitFieldSelection(function *Function, value Value, index int, wantAddr boo
 		}
 		instr.setSource(id)
 		instr.setType(types.NewPointer(fld.Type()))
-		value = function.emit(instr, id)
+		selected = function.emit(instr, id)
 		// Load the field's value iff we don't want its address.
 		if !wantAddr {
-			value = emitLoad(function, value, id)
+			selected = emitLoad(function, selected, id)
 		}
 	} else {
 		fld := fieldOf(value.Type(), index)
@@ -578,9 +604,9 @@ func emitFieldSelection(function *Function, value Value, index int, wantAddr boo
 		}
 		instr.setSource(id)
 		instr.setType(fld.Type())
-		value = function.emit(instr, id)
+		selected = function.emit(instr, id)
 	}
-	return value
+	return selected
 }
 
 // createRecoverBlock emits to `function` a block of code to return after a
@@ -591,6 +617,8 @@ func emitFieldSelection(function *Function, value Value, index int, wantAddr boo
 // type.
 //
 // Idempotent.
+//
+// Mutates: function gains the recover block, and its current block is restored after building it
 func createRecoverBlock(function *Function) {
 	if function.Recover != nil {
 		return // already created
