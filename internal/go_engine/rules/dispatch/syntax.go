@@ -45,8 +45,8 @@ func (dispatcher *Syntax) RuleAnalyzer(
 	listener *rule.Listener,
 ) *analysis.Analyzer {
 	if !listener.IsSyntax() {
-		// Invariant: RuleAnalyzer hands a listener that is not syntax to Ir, so one here is a mistake in building the
-		// registry, never in a package.
+		// Invariant: RuleAnalyzer hands a listener that is not syntax to Ir or IntermediateRepresentation, so one here
+		// is a mistake in building the registry, never in a package.
 		panic("rule " + ruleName + " registers a listener that does not hear syntax on the syntax dispatcher, " +
 			"which would never call it")
 	}

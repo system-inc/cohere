@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -68,6 +69,36 @@ func (run *listenerRun) functionExit(function *ir.Function) {
 	}
 	defer run.recoverCrash()
 	run.registered.listener.FunctionExit(run.context, function)
+}
+
+// ownFunction calls the Function of the listener's walk over the engine's own intermediate representation on
+// function.
+func (run *listenerRun) ownFunction(function *intermediate_representation.Function) {
+	if run.crash != nil || run.registered.listener.IntermediateRepresentation.Function == nil {
+		return
+	}
+	defer run.recoverCrash()
+	run.registered.listener.IntermediateRepresentation.Function(run.context, function)
+}
+
+// ownInstruction calls the Instruction of the listener's walk over the engine's own intermediate representation on
+// instruction, a kind the walk lists.
+func (run *listenerRun) ownInstruction(instruction intermediate_representation.Instruction) {
+	if run.crash != nil {
+		return
+	}
+	defer run.recoverCrash()
+	run.registered.listener.IntermediateRepresentation.Instruction(run.context, instruction)
+}
+
+// ownFunctionExit calls the FunctionExit of the listener's walk over the engine's own intermediate representation on
+// function, once its instructions have been heard.
+func (run *listenerRun) ownFunctionExit(function *intermediate_representation.Function) {
+	if run.crash != nil || run.registered.listener.IntermediateRepresentation.FunctionExit == nil {
+		return
+	}
+	defer run.recoverCrash()
+	run.registered.listener.IntermediateRepresentation.FunctionExit(run.context, function)
 }
 
 // fileEnter calls the listener's FileEnter as the walk enters file.
