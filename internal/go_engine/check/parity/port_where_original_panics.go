@@ -36,17 +36,19 @@ func recovering(original *analysis.Analyzer) *analysis.Analyzer {
 // then belongs to RequireIdentical or RequireOnlyAdjudicated. A record of any other kind fails, since with no finding
 // of the original's there is nothing for it to pair or rename, and so does a fixture that records nothing, a `// port `
 // comment the harness cannot read, and a package the port did not run on. Like RequireOnlyAdjudicated, it reads the
-// one package directory fixture names. It loads for the machine's own target, and Target.RequirePortWhereOriginalPanics
-// for another.
+// one package directory fixture names, and a file that cannot carry a comment, as one copied byte for byte cannot,
+// takes its records beside the call, as given, each held as there, one with no Reason failing. It loads for the
+// machine's own target, and Target.RequirePortWhereOriginalPanics for another.
 func RequirePortWhereOriginalPanics(
 	test testing.TB,
 	original *analysis.Analyzer,
 	port *analysis.Analyzer,
 	testdata string,
 	fixture string,
+	given ...Record,
 ) {
 	test.Helper()
-	requirePortWhereOriginalPanics(test, Target{}, original, port, testdata, fixture)
+	requirePortWhereOriginalPanics(test, Target{}, original, port, testdata, fixture, given)
 }
 
 // requirePortWhereOriginalPanics is RequirePortWhereOriginalPanics with the fixture loaded for target.
@@ -57,6 +59,7 @@ func requirePortWhereOriginalPanics(
 	port *analysis.Analyzer,
 	testdata string,
 	fixture string,
+	given []Record,
 ) {
 	test.Helper()
 	portFindings := []Finding{}
@@ -86,7 +89,7 @@ func requirePortWhereOriginalPanics(
 			portFindings = append(portFindings, finding.WithFileNames(fixtures.fileName))
 		}
 	}
-	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName, nil)
+	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName, given)
 	refusedAny := false
 	for _, refused := range []struct {
 		kind    string

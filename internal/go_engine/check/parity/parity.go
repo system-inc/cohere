@@ -312,10 +312,11 @@ func RequireOnlyAdjudicated(
 	requireOnlyAdjudicated(test, Target{}, original, port, testdata, fixture, given)
 }
 
-// Record is a record of a differences fixture's given beside the call, for a file that cannot carry it as a comment:
-// File, the file as findings name it, by its path below the fixtures' root, as `typeparams/typeparams.go`; Line, the
-// line it is on; Text, the record as a comment writes it after `// port `, as `withholds: Format the number as a
-// decimal`; and Reason, why, as the comment above a record says it.
+// Record is a record of a differences fixture's given beside the call, to RequireOnlyAdjudicated or
+// RequirePortWhereOriginalPanics, for a file that cannot carry it as a comment: File, the file as findings name it, by
+// its path below the fixtures' root, as `typeparams/typeparams.go`; Line, the line it is on; Text, the record as a
+// comment writes it after `// port `, as `withholds: Format the number as a decimal`; and Reason, why, as the comment
+// above a record says it.
 type Record struct {
 	File   string
 	Line   int

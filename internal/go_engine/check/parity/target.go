@@ -102,9 +102,10 @@ func (target Target) RequirePortWhereOriginalPanics(
 	port *analysis.Analyzer,
 	testdata string,
 	fixture string,
+	given ...Record,
 ) {
 	test.Helper()
-	requirePortWhereOriginalPanics(test, target, original, port, testdata, fixture)
+	requirePortWhereOriginalPanics(test, target, original, port, testdata, fixture, given)
 }
 
 // environmentOf is the environment fixtures load under for target: the fixture load's own, then target's. A variable

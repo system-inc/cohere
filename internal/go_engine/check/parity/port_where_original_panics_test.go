@@ -154,3 +154,38 @@ func TestRequirePortWhereOriginalPanicsFailsAFixWithNoEdits(test *testing.T) {
 		`the port alone fixes its finding at panicking/panicking.go:14 with "change nothing", a fix with no edits`,
 	)
 }
+
+// foundWherePanicking is a record given beside the call for panicking_silent, a file with no record in it, as one
+// copied byte for byte is: the port finds the call the original panics on.
+var foundWherePanicking = Record{
+	File:   "panicking_silent/panicking_silent.go",
+	Line:   8,
+	Text:   "finds: call to panics",
+	Reason: "the port rightly finds the call the original panics on",
+}
+
+// A record given beside the call is held as one written as a comment is, by the package's function and by a target's
+// alike: met, it passes, and given with no reason, it fails, named by file and line, though it is met.
+func TestRequirePortWhereOriginalPanicsHoldsRecordsGivenBesideTheCall(test *testing.T) {
+	test.Parallel()
+	unreasoned := foundWherePanicking
+	unreasoned.Reason = " "
+	for _, require := range []func(
+		test testing.TB,
+		original *analysis.Analyzer,
+		port *analysis.Analyzer,
+		testdata string,
+		fixture string,
+		given ...Record,
+	){RequirePortWhereOriginalPanics, on386.RequirePortWhereOriginalPanics} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			require(recording, panicking(originalMessages), calling(map[string]string{"panics": "call to panics"}),
+				analysistest.TestData(), "panicking_silent", foundWherePanicking)
+		}))
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			require(recording, panicking(originalMessages), calling(map[string]string{"panics": "call to panics"}),
+				analysistest.TestData(), "panicking_silent", unreasoned)
+		}), "panicking_silent/panicking_silent.go:8 is given beside the call a record with no reason: write why in "+
+			"its Reason")
+	}
+}
