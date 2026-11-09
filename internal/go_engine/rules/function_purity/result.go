@@ -28,8 +28,9 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, functi
 	if !fact_resolver.Visible(reader, function) {
 		return false
 	}
-	home := resolver.Package(function.Pkg())
+	home := resolver.Owner(function)
 	if home == nil {
+		// A function of no package, an interface's of the universe, which the push never judged.
 		return false
 	}
 	home.Lock()

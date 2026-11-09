@@ -72,6 +72,69 @@ func TestDemandAnswersAsThePushOnTheFixture(test *testing.T) {
 	})
 }
 
+// A question that reaches a package the findings cache restored, which the resolver never learned and cannot build,
+// fails loudly, naming the package, rather than answer not pure and drop the finding it would have made. Here bottom is
+// restored, so middle.Middle, which calls bottom.Pure, cannot be judged.
+func TestARestoredPackageFailsLoudly(test *testing.T) {
+	test.Parallel()
+	directory := analysistest.TestData()
+	loaded, loadError := load.Packages(directory, []string{"demand/hops/top"}, []string{
+		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
+	}, nil)
+	if loadError != nil {
+		test.Fatalf("loading the fixture: %v", loadError)
+	}
+	probe := &analysis.Analyzer{
+		Name:       "restored_probe",
+		Doc:        "asks the purity of middle.Middle and returns what the question panicked with",
+		Requires:   []*analysis.Analyzer{function_purity.Analyzer},
+		ResultType: reflect.TypeFor[string](),
+		Run: func(pass *analysis.Pass) (any, error) {
+			asked, isAsked := pass.ResultOf[function_purity.Analyzer].(*function_purity.Result)
+			if !isAsked {
+				return nil, fmt.Errorf("function_purity's result is a %T", pass.ResultOf[function_purity.Analyzer])
+			}
+			middle, isMiddle := pass.Pkg.Imports()[0].Scope().Lookup("Middle").(*types.Func)
+			if !isMiddle {
+				return nil, fmt.Errorf("top's import declares no function Middle")
+			}
+			return panicOf(func() { asked.IsPure(middle) }), nil
+		},
+	}
+	options := check.DispatchOptions()
+	options.Restored = func(restored *packages.Package) bool { return restored.PkgPath == "demand/hops/bottom" }
+	options.Restore = func(*checker.Action) error {
+		// The restore gives no facts: what a cache entry holds is wave 3's.
+		return nil
+	}
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{probe}, loaded.Roots, options)
+	if analyzeError != nil {
+		test.Fatalf("analyzing the fixture: %v", analyzeError)
+	}
+	for _, action := range graph.Roots {
+		panicked, isString := action.Result.(string)
+		if action.Err != nil || !isString {
+			test.Fatalf("probing %s: %v", action.Package.ID, action.Err)
+		}
+		const want = "fact_resolver: asked about demand/hops/bottom.Pure of demand/hops/bottom, which it never " +
+			"learned: restored package, fact store not built yet (#w7zmvat wave 3)"
+		if panicked != want {
+			test.Errorf("asking middle.Middle over a restored bottom panicked with %q, want %q", panicked, want)
+		}
+	}
+}
+
+// panicOf is what run panicked with, as text, or empty when it returned.
+func panicOf(run func()) (panicked string) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			panicked = fmt.Sprint(recovered)
+		}
+	}()
+	run()
+	return ""
+}
+
 // Each package an order-dependent answer was asked in is computed whole once, and counted; a package with no such
 // answer never is.
 func TestTheFallbackIsCounted(test *testing.T) {

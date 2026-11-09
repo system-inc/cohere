@@ -138,6 +138,28 @@ func (resolver *Resolver) Package(packageTypes *types.Package) *Package {
 	return resolved
 }
 
+// Owner is the package that declares function, where a fact on function is computed, or nil for a function of no
+// package, as the error interface's Error is, which no package's facts ever held.
+//
+// It panics for a package the resolver never learned. On a cold run every package below one a question comes from was
+// learned first, since ctrlflow ran there first; one never learned is a package the findings cache restored, with no
+// syntax to build and, until #w7zmvat wave 3, no stored facts to read. Answering not pure there would silently drop
+// findings, so the question fails loudly instead, the reading rule's crash on its package.
+func (resolver *Resolver) Owner(function *types.Func) *Package {
+	if function.Pkg() == nil {
+		return nil
+	}
+	owner := resolver.Package(function.Pkg())
+	if owner == nil {
+		// Invariant: with no package restored, ctrlflow learns every package below a question before the question is
+		// asked. A package the findings cache restored breaks this until #w7zmvat wave 3 stores its facts, and the
+		// branch wants that loud, never a silent not pure.
+		panic(fmt.Sprintf("fact_resolver: asked about %s of %s, which it never learned: restored package, fact "+
+			"store not built yet (#w7zmvat wave 3)", function.FullName(), function.Pkg().Path()))
+	}
+	return owner
+}
+
 // Counts is kind's counts over the run.
 func (resolver *Resolver) Counts(kind *Kind) *Counts {
 	counts, _ := resolver.counts.LoadOrStore(kind, &Counts{})
