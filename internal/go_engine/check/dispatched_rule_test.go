@@ -210,7 +210,9 @@ var failsOnBase = &analysis.Analyzer{
 // dispatcher requires that requirement for it: the rule's crash reads exactly as check.Run writes it for the same
 // rule as a plain analyzer requiring the failing one, cause and all, and is the only crash, while the rule beside it
 // on the same dispatcher reports every function, base's included, and the failing rule still reports on user, where
-// its requirement held, reading the result it was handed.
+// its requirement held, reading the result it was handed. The failing listener is never called on base, where its
+// requirement failed: the rule's crash would read the same if it were, since the checker fails the rule's own action
+// there, so only its calls show that a listener walking on a missing input was never started.
 func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 	test.Parallel()
 
@@ -218,20 +220,24 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 	reportDeclared := func(context *rule.Context, position token.Pos, name string) {
 		context.Report(analysis.Diagnostic{Pos: position, Message: "declares " + name})
 	}
-	// readsItsRequirement panics, which the dispatcher makes the rule's crash, unless the listener was handed the
-	// result it requires.
-	readsItsRequirement := func(context *rule.Context) {
+	// readsItsRequirement counts a call on base into callsOnBase and panics, which the dispatcher makes the rule's
+	// crash, unless the listener was handed the result it requires.
+	readsItsRequirement := func(context *rule.Context, callsOnBase *atomic.Int64) {
+		if context.Package.Path() == "example.com/fixture/base" {
+			callsOnBase.Add(1)
+		}
 		if result, isResult := context.ResultOf(failsOnBase).(string); !isResult || result == "" {
 			panic(fmt.Sprintf("the listener was handed %v for %s", result, failsOnBase.Name))
 		}
 	}
 	cases := []struct {
 		name string
-		// register registers a listener that requires failsOnBase and one that does not, each reporting every
-		// function it is called for, on a fresh dispatcher of the walk the case is for, and returns their rules.
-		register func(failingName string, besideName string) (rule.Rule, rule.Rule)
+		// register registers a listener that requires failsOnBase, counting its calls on base into callsOnBase, and
+		// one that does not, each reporting every function it is called for, on a fresh dispatcher of the walk the
+		// case is for, and returns their rules.
+		register func(failingName string, besideName string, callsOnBase *atomic.Int64) (rule.Rule, rule.Rule)
 	}{
-		{"syntax", func(failingName string, besideName string) (rule.Rule, rule.Rule) {
+		{"syntax", func(failingName string, besideName string, callsOnBase *atomic.Int64) (rule.Rule, rule.Rule) {
 			dispatcher := dispatch.NewSyntax()
 			listener := func(requires []*analysis.Analyzer) *rule.Listener {
 				return &rule.Listener{
@@ -243,7 +249,7 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 							return
 						}
 						if len(requires) > 0 {
-							readsItsRequirement(context)
+							readsItsRequirement(context, callsOnBase)
 						}
 						reportDeclared(context, declaration.Name.Pos(), declaration.Name.Name)
 					},
@@ -257,7 +263,7 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_syntax", "requires nothing",
 						besideListener)}
 		}},
-		{"intermediate representation", func(failingName string, besideName string) (rule.Rule, rule.Rule) {
+		{"intermediate representation", func(failingName string, besideName string, callsOnBase *atomic.Int64) (rule.Rule, rule.Rule) {
 			dispatcher := dispatch.NewIr()
 			listener := func(requires []*analysis.Analyzer) *rule.Listener {
 				return &rule.Listener{
@@ -268,7 +274,7 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 							return
 						}
 						if len(requires) > 0 {
-							readsItsRequirement(context)
+							readsItsRequirement(context, callsOnBase)
 						}
 						reportDeclared(context, function.Pos(), function.Name())
 					},
@@ -285,9 +291,14 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(subtest *testing.T) {
 			subtest.Parallel()
+			callsOnBase := &atomic.Int64{}
 			failing, beside := testCase.register(rule.Namespace+"test-failing-requirement",
-				rule.Namespace+"test-beside-the-failing")
+				rule.Namespace+"test-beside-the-failing", callsOnBase)
 			dispatched := runRules(subtest, Options{}, failing, beside)
+			if calls := callsOnBase.Load(); calls != 0 {
+				subtest.Errorf("the failing rule's listener was called %d times on base, where its requirement "+
+					"failed and it is never started", calls)
+			}
 			// The same rule walking by itself: an analyzer of its own that requires the failing one.
 			alone := runRules(subtest, Options{}, rule.Rule{Name: failing.Name, Origin: rule.OriginHouse,
 				Analyzer: &analysis.Analyzer{
