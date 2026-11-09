@@ -1,6 +1,6 @@
 // Package hoisted_map_key_conversion is staticcheck's SA6001, a conversion of a byte slice to a string stored in a
 // variable and read only as the key of map lookups, where converting inside each lookup would let the compiler skip
-// the copy, ported onto staticcheck's intermediate representation as a rule.FunctionCheck.
+// the copy, ported onto the engine's own intermediate representation (#tf4cb8g).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa6001/sa6001.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the conversion, where staticcheck's report
@@ -19,15 +19,17 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -36,7 +38,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA6001",
 	"SA6001",
 	"Flags a byte slice converted to a string ahead of the map lookups that are its only readers: staticcheck's "+
-		"SA6001, ported onto its intermediate representation.",
+		"SA6001, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -45,16 +47,16 @@ const message = "m[string(key)] would be more efficient than k := string(key); m
 
 // Check judges one function: each conversion to string of a value whose type, or one of whose type set's terms, is a
 // byte slice, reported when map lookups written with a bare name for their key are all that read it.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
-			var conversion ir.Value
+		for _, instruction := range block.Instructions {
+			var conversion intermediate_representation.Value
 			var fromType types.Type
 			switch instruction := instruction.(type) {
-			case *ir.Convert:
+			case *intermediate_representation.Convert:
 				conversion = instruction
 				fromType = instruction.X.Type()
-			case *ir.MultiConvert:
+			case *intermediate_representation.MultiConvert:
 				// A conversion from a type parameter, one conversion per term of its type set.
 				conversion = instruction
 				fromType = instruction.X.Type()
@@ -91,13 +93,13 @@ func holdsByteSlice(fromType types.Type) bool {
 // isReadOnlyByNamedLookups is whether conversion has readers and every one is a map lookup whose syntax indexes the
 // map by a bare name, the variable the conversion was stored in. A lookup written another way, or a reader of any
 // other kind, a call, a map update, a comparison, means the string is not one only map lookups use.
-func isReadOnlyByNamedLookups(conversion ir.Value) bool {
+func isReadOnlyByNamedLookups(conversion intermediate_representation.Value) bool {
 	referrers := conversion.Referrers()
 	if referrers == nil || len(*referrers) == 0 {
 		return false
 	}
 	for _, referrer := range *referrers {
-		if _, isLookup := referrer.(*ir.MapLookup); !isLookup {
+		if _, isLookup := referrer.(*intermediate_representation.MapLookup); !isLookup {
 			return false
 		}
 		index, isIndex := referrer.Source().(*ast.IndexExpr)
