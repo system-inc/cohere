@@ -42,6 +42,9 @@ func TestMain(suite *testing.M) {
 		}
 		os.Exit(runStandardLibraryVerb(arguments, os.Stdout, os.Stderr, rules.All(), nil, childGenerator()))
 	}
+	if os.Getenv(timingMarginChildVariable) != "" {
+		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
+	}
 	os.Exit(suite.Run())
 }
 
