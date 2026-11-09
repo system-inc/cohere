@@ -10,8 +10,8 @@ import (
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/function_name"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // Every function the names fixture declares or uses, and every function of the packages it imports, is asked
