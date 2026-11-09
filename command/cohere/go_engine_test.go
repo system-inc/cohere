@@ -516,3 +516,43 @@ func TestAGoRunThatExcludedEveryFileFails(test *testing.T) {
 		}
 	})
 }
+
+// A Swift package's manifest was never a source to check, so a run that checked nothing counts only its sources in
+// its reasons: an all-ignored package names the ignored file alone, and a package whose only file is its manifest has
+// no reason at all, a project with none of its language's files, which passes with the warning (#08cv2mp).
+//
+// Not parallel: it reads and sets the package-level activeSummary, as countExcludedWhenNothingChecked does.
+func TestAManifestIsNoReasonANothingCheckedRunCounts(test *testing.T) {
+	type excludedEntry = struct {
+		File   string `json:"file"`
+		Reason string `json:"reason"`
+		Source string `json:"source"`
+	}
+	manifest := excludedEntry{File: "/package/Package.swift", Reason: "a package manifest"}
+	ignored := excludedEntry{File: "/package/Sources/Lib/Value.swift", Reason: "ignored by git", Source: ".gitignore:2"}
+	for _, testCase := range []struct {
+		name     string
+		excluded []excludedEntry
+		want     []excludedReason
+	}{
+		{"an all-ignored package", []excludedEntry{manifest, ignored},
+			[]excludedReason{{Reason: "ignored by git", Count: 1, Source: ".gitignore:2"}}},
+		{"a package of its manifest alone", []excludedEntry{manifest}, nil},
+	} {
+		// Not parallel: it reads and sets the package-level activeSummary.
+		test.Run(testCase.name, func(test *testing.T) {
+			activeSummary = runSummary{}
+			activeSummary.Gaps.NothingToCheck = true
+			run := newEngineRun(bufio.NewWriter(&bytes.Buffer{}), engineModeCheck, swiftLanguage, "", time.Now())
+			run.project = &engineProjectRecord{Excluded: testCase.excluded}
+			run.countExcludedWhenNothingChecked()
+			if !slices.Equal(activeSummary.Gaps.Excluded, testCase.want) {
+				test.Errorf("the reasons are %+v, want %+v", activeSummary.Gaps.Excluded, testCase.want)
+			}
+			if activeSummary.Gaps.nothingChecked() != (testCase.want != nil) {
+				test.Errorf("nothingChecked is %t with reasons %+v", activeSummary.Gaps.nothingChecked(),
+					activeSummary.Gaps.Excluded)
+			}
+		})
+	}
+}
