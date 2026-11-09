@@ -76,19 +76,19 @@ func (f *Function) selection(selector *ast.SelectorExpr) *selection {
 		if recv := f.typ(sel.Recv()); recv != sel.Recv() {
 			// recv changed during type substitution.
 			pkg := f.declaredPackage().Types
-			obj, index, indirect := types.LookupFieldOrMethod(recv, true, pkg, sel.Obj().Name())
+			object, index, indirect := types.LookupFieldOrMethod(recv, true, pkg, sel.Obj().Name())
 
 			// sig replaces sel.Type(). See (types.Selection).Typ() for details.
-			sig := obj.Type().(*types.Signature)
-			sig = changeRecv(sig, newVar(sig.Recv().Name(), recv))
+			sig := object.Type().(*types.Signature)
+			sig = changeRecv(sig, newVariable(sig.Recv().Name(), recv))
 			if sel.Kind() == types.MethodExpr {
-				sig = recvAsFirstArg(sig)
+				sig = recvAsFirstArgument(sig)
 			}
 			return &selection{
 				kind:     sel.Kind(),
 				recv:     recv,
 				typ:      sig,
-				obj:      obj,
+				object:   object,
 				index:    index,
 				indirect: indirect,
 			}
@@ -196,38 +196,38 @@ func targetedBlock(f *Function, tok token.Token) *BasicBlock {
 	return targetedBlock(f.parent, tok)
 }
 
-// addResultVar adds a result for a variable v to f.results and v to f.returnVars.
-func (f *Function) addResultVar(v *types.Var, source ast.Node) {
+// addResultVariable adds a result for a variable v to f.results and v to f.returnVars.
+func (f *Function) addResultVariable(v *types.Var, source ast.Node) {
 	name := v.Name()
 	if name == "" {
 		name = fmt.Sprintf("res.%d", len(f.results))
 	}
-	result := emitLocalVar(f, v, source)
+	result := emitLocalVariable(f, v, source)
 	result.comment = name
 	f.results = append(f.results, result)
-	f.returnVars = append(f.returnVars, v)
+	f.returnVariables = append(f.returnVariables, v)
 }
 
-// addParamVar adds a parameter to f.Params.
-func (f *Function) addParamVar(v *types.Var, source ast.Node) *Parameter {
+// addParamVariable adds a parameter to f.Parameters.
+func (f *Function) addParamVariable(v *types.Var, source ast.Node) *Parameter {
 	name := v.Name()
 	if name == "" {
 		name = fmt.Sprintf("arg%d", len(f.Parameters))
 	}
-	param := &Parameter{name: name, typ: f.typ(v.Type()), parent: f}
-	param.setSource(source)
-	param.object = v
-	f.Parameters = append(f.Parameters, param)
-	return param
+	parameter := &Parameter{name: name, typ: f.typ(v.Type()), parent: f}
+	parameter.setSource(source)
+	parameter.object = v
+	f.Parameters = append(f.Parameters, parameter)
+	return parameter
 }
 
-// addSpilledParam declares a parameter that is pre-spilled to the
+// addSpilledParameter declares a parameter that is pre-spilled to the
 // stack; the function body will load/store the spilled location.
 // Subsequent lifting will eliminate spills where possible.
-func (f *Function) addSpilledParam(obj *types.Var, source ast.Node) {
-	param := f.addParamVar(obj, source)
-	spill := emitLocalVar(f, obj, source)
-	emitStore(f, spill, param, source)
+func (f *Function) addSpilledParameter(object *types.Var, source ast.Node) {
+	parameter := f.addParamVariable(object, source)
+	spill := emitLocalVariable(f, object, source)
+	emitStore(f, spill, parameter, source)
 }
 
 // startBody initializes the function prior to generating IR code for its body.
@@ -253,24 +253,24 @@ func (f *Function) blockset(i int) *BlockSet {
 	return bs
 }
 
-// createSyntacticParams populates f.Params and generates code (spills
+// createSyntacticParameters populates f.Parameters and generates code (spills
 // and named result locals) for all the parameters declared in the
 // syntax.  In addition it populates the f.objects mapping.
 //
 // Preconditions:
 // f.startBody() was called. f.info != nil.
 // Postcondition:
-// len(f.Params) == len(f.Signature.Params) + (f.Signature.Recv() ? 1 : 0)
-func (f *Function) createSyntacticParams(recv *ast.FieldList, functype *ast.FuncType) {
+// len(f.Parameters) == len(f.Signature.Params) + (f.Signature.Recv() ? 1 : 0)
+func (f *Function) createSyntacticParameters(recv *ast.FieldList, functype *ast.FuncType) {
 	// Receiver (at most one inner iteration).
 	if recv != nil {
 		for _, field := range recv.List {
 			for _, n := range field.Names {
-				f.addSpilledParam(identVar(f, n), n)
+				f.addSpilledParameter(identVariable(f, n), n)
 			}
 			// Anonymous receiver?  No need to spill.
 			if field.Names == nil {
-				f.addParamVar(f.Signature.Recv(), field)
+				f.addParamVariable(f.Signature.Recv(), field)
 			}
 		}
 	}
@@ -280,11 +280,11 @@ func (f *Function) createSyntacticParams(recv *ast.FieldList, functype *ast.Func
 		n := len(f.Parameters) // 1 if has recv, 0 otherwise
 		for _, field := range functype.Params.List {
 			for _, n := range field.Names {
-				f.addSpilledParam(identVar(f, n), n)
+				f.addSpilledParameter(identVariable(f, n), n)
 			}
 			// Anonymous parameter?  No need to spill.
 			if field.Names == nil {
-				f.addParamVar(f.Signature.Params().At(len(f.Parameters)-n), field)
+				f.addParamVariable(f.Signature.Params().At(len(f.Parameters)-n), field)
 			}
 		}
 	}
@@ -294,13 +294,13 @@ func (f *Function) createSyntacticParams(recv *ast.FieldList, functype *ast.Func
 		for _, field := range functype.Results.List {
 			// Implicit "var" decl of locals for named results.
 			for _, n := range field.Names {
-				v := identVar(f, n)
-				f.addResultVar(v, n)
+				v := identVariable(f, n)
+				f.addResultVariable(v, n)
 			}
 			// Implicit "var" decl of local for an unnamed result.
 			if field.Names == nil {
 				v := f.Signature.Results().At(len(f.results))
-				f.addResultVar(v, field.Type)
+				f.addResultVariable(v, field.Type)
 			}
 		}
 	}
@@ -311,23 +311,23 @@ func (f *Function) createSyntacticParams(recv *ast.FieldList, functype *ast.Func
 func (fn *Function) createDeferStack() {
 	// Each syntactic function makes a call to ssa:deferstack,
 	// which is spilled to a local. Unused ones are later removed.
-	fn.deferstack = newVar("defer$stack", tDeferStack)
+	fn.deferstack = newVariable("defer$stack", tDeferStack)
 	call := &Call{Call: CallCommon{Value: vDeferStack}}
 	call.setType(tDeferStack)
 	deferstack := fn.emit(call, nil)
-	spill := emitLocalVar(fn, fn.deferstack, nil)
+	spill := emitLocalVariable(fn, fn.deferstack, nil)
 	emitStore(fn, spill, deferstack, nil)
 }
 
 func numberNodes(f *Function) {
-	var base ID
+	var base Id
 	for _, b := range f.Blocks {
 		for _, instr := range b.Instructions {
 			if instr == nil {
 				continue
 			}
 			base++
-			instr.setID(base)
+			instr.setId(base)
 		}
 	}
 }
@@ -374,12 +374,12 @@ func buildReferrers(f *Function) {
 func (f *Function) finishBody() {
 	f.currentBlock = nil
 	f.lblocks = nil
-	f.returnVars = nil
+	f.returnVariables = nil
 	f.jump = nil
 	f.source = nil
 	f.exits = nil
 
-	// Remove from f.Locals any Allocs that escape to the heap.
+	// Remove from f.Locals any Allocations that escape to the heap.
 	j := 0
 	for _, l := range f.Locals {
 		if !l.Heap {
@@ -396,7 +396,7 @@ func (f *Function) finishBody() {
 	optimizeBlocks(f)
 	buildReferrers(f)
 	buildDominatorTree(f)
-	buildSCCs(f)
+	buildSccs(f)
 
 	// Lifting goes here (#ee33njz). go/ir lifts in this spot, then simplifies constant composite values, unless
 	// its NaiveForm mode is set. Ours is always NaiveForm until then: locals stay Allocation, Load and Store, and
@@ -420,7 +420,7 @@ func (f *Function) done() {
 
 	var visit func(*Function)
 	visit = func(f *Function) {
-		for _, anon := range f.AnonFuncs {
+		for _, anon := range f.AnonymousFunctions {
 			visit(anon) // anon is done building before f.
 		}
 
@@ -452,10 +452,10 @@ func (f *Function) removeNilBlocks() {
 // that is local to function f or one of its enclosing functions.
 // If escaping, the reference comes from a potentially escaping pointer
 // expression and the referent must be heap-allocated.
-// We assume the referent is a *Alloc or *Phi.
+// We assume the referent is a *Allocation or *Phi.
 // (The only Phis at this stage are those created directly by go1.22 "for" loops.)
-func (f *Function) lookup(obj *types.Var, escaping bool) Value {
-	if v, ok := f.vars[obj]; ok {
+func (f *Function) lookup(object *types.Var, escaping bool) Value {
+	if v, ok := f.vars[object]; ok {
 		if escaping {
 			switch v := v.(type) {
 			case *Allocation:
@@ -474,16 +474,16 @@ func (f *Function) lookup(obj *types.Var, escaping bool) Value {
 	// Definition must be in an enclosing function;
 	// plumb it through intervening closures.
 	if f.parent == nil {
-		panic("no ir.Value for " + obj.String())
+		panic("no ir.Value for " + object.String())
 	}
-	outer := f.parent.lookup(obj, true) // escaping
+	outer := f.parent.lookup(object, true) // escaping
 	v := &FreeVariable{
-		name:   obj.Name(),
+		name:   object.Name(),
 		typ:    outer.Type(),
 		outer:  outer,
 		parent: f,
 	}
-	f.vars[obj] = v
+	f.vars[object] = v
 	f.FreeVariables = append(f.FreeVariables, v)
 	return v
 }
@@ -493,7 +493,7 @@ func (f *Function) emit(instr Instruction, source ast.Node) Value {
 	return f.currentBlock.emit(instr, source)
 }
 
-// RelString returns the full name of this function, qualified by
+// RelativeString returns the full name of this function, qualified by
 // package name, receiver type, etc.
 //
 // The specific formatting rules are not guaranteed and may change.
@@ -509,7 +509,7 @@ func (f *Function) emit(instr Instruction, source ast.Node) Value {
 //	"main.init"                   // the synthesized package initializer
 //
 // When these functions are referred to from within the same package
-// (i.e. from == f.Pkg.Object), they are rendered without the package path.
+// (i.e. from == f.Package.Types), they are rendered without the package path.
 // For example: "IsNaN", "(*Buffer).Bytes", etc.
 //
 // All non-synthetic functions have distinct package-qualified names.
@@ -522,7 +522,7 @@ func (f *Function) RelativeString(from *types.Package) string {
 		// An anonymous function's Name() looks like "parentName$1",
 		// but its String() should include the type/package/etc.
 		parent := f.parent.RelativeString(from)
-		for i, anon := range f.parent.AnonFuncs {
+		for i, anon := range f.parent.AnonymousFunctions {
 			if anon == f {
 				return fmt.Sprintf("%s$%d", parent, 1+i)
 			}
@@ -601,7 +601,7 @@ func (f *Function) newBasicBlock(comment string) *BasicBlock {
 // prog, with its name and signature fields set as specified.
 //
 // The caller is responsible for initializing the remaining fields of
-// the function object, e.g. Pkg, Params, Blocks.
+// the function object, e.g. Package, Parameters, Blocks.
 //
 // It is practically impossible for clients to construct well-formed
 // IR functions/packages/programs directly, so we assume this is the
@@ -626,14 +626,14 @@ func (n extentNode) End() token.Pos { return n[1] }
 // it is a range-over-func yield function.
 func (f *Function) Syntax() ast.Node { return f.syntax }
 
-// identVar returns the variable defined by id.
-func identVar(fn *Function, id *ast.Ident) *types.Var {
+// identVariable returns the variable defined by id.
+func identVariable(fn *Function, id *ast.Ident) *types.Var {
 	return fn.info.Defs[id].(*types.Var)
 }
 
 // unique returns a unique positive int within the source tree of f.
 // The source tree of f includes all of f's ancestors by parent and all
-// of the AnonFuncs contained within these.
+// of the AnonymousFunctions contained within these.
 func unique(f *Function) int64 {
 	f.uniq++
 	return f.uniq
@@ -663,8 +663,8 @@ type exit struct {
 	// block == nil && label == nil => return
 }
 
-// storeVar emits to function f code to store a value v to a *types.Var x.
-func storeVar(f *Function, x *types.Var, v Value, source ast.Node) {
+// storeVariable emits to function f code to store a value v to a *types.Var x.
+func storeVariable(f *Function, x *types.Var, v Value, source ast.Node) {
 	emitStore(f, f.lookup(x, true), v, source)
 }
 

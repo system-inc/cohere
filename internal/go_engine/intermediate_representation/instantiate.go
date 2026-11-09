@@ -14,8 +14,8 @@ import (
 // A generic records information about a generic origin function,
 // including a cache of existing instantiations.
 type generic struct {
-	instancesMu sync.Mutex
-	instances   map[*typeList]*Function // canonical type arguments to an instance.
+	instancesMutex sync.Mutex
+	instances      map[*typeList]*Function // canonical type arguments to an instance.
 }
 
 // instance returns a Function that is the instantiation of generic
@@ -29,8 +29,8 @@ func (fn *Function) instance(rtargs, targs []types.Type, b *builder) *Function {
 
 	gen := fn.generic
 
-	gen.instancesMu.Lock()
-	defer gen.instancesMu.Unlock()
+	gen.instancesMutex.Lock()
+	defer gen.instancesMutex.Unlock()
 	inst, ok := gen.instances[key]
 	if !ok {
 		inst = createInstance(fn, rtargs, targs)
@@ -57,21 +57,21 @@ func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
 
 	// Compute signature.
 	var sig *types.Signature
-	var obj *types.Func
+	var object *types.Func
 	if recv := fn.Signature.Recv(); recv != nil {
 		// method, len(rtargs) > 0 || len(targs) > 0
 		if len(rtargs) > 0 {
 			// possibly generic method on generic type
-			obj = prog.canon.instantiateMethod(fn.object, rtargs, prog.ctxt)
+			object = prog.canon.instantiateMethod(fn.object, rtargs, prog.ctxt)
 		} else {
 			// generic method on non-generic type
-			obj = fn.object // instantiation does not exist yet
+			object = fn.object // instantiation does not exist yet
 		}
 		if len(targs) > 0 {
 			// generic method
-			instSig, err := types.Instantiate(prog.ctxt, obj.Signature(), targs, false)
-			if err != nil {
-				panic(err)
+			instSig, instantiateError := types.Instantiate(prog.ctxt, object.Signature(), targs, false)
+			if instantiateError != nil {
+				panic(instantiateError)
 			}
 			instance, ok := instSig.(*types.Signature)
 			if !ok {
@@ -84,19 +84,19 @@ func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
 			sig = instance
 		} else {
 			// non-generic method on generic type
-			sig = obj.Signature()
+			sig = object.Signature()
 		}
 	} else {
 		// function, len(rtargs) == 0 && len(targs) > 0
-		instSig, err := types.Instantiate(prog.ctxt, fn.Signature, targs, false)
-		if err != nil {
-			panic(err)
+		instSig, instantiateError := types.Instantiate(prog.ctxt, fn.Signature, targs, false)
+		if instantiateError != nil {
+			panic(instantiateError)
 		}
 		instance, ok := instSig.(*types.Signature)
 		if !ok {
 			panic("Instantiate of a Signature returned a non-signature")
 		}
-		obj = fn.object // instantiation does not exist yet
+		object = fn.object // instantiation does not exist yet
 		sig = prog.canon.Type(instance).(*types.Signature)
 	}
 
@@ -114,7 +114,7 @@ func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
 	/* generic instance or instantiation wrapper */
 	ret := &Function{
 		name:           name,
-		object:         obj,
+		object:         object,
 		Signature:      sig,
 		Synthetic:      synthetic,
 		syntax:         fn.syntax,    // \
@@ -122,7 +122,7 @@ func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
 		goversion:      fn.goversion, // /
 		build:          build,
 		topLevelOrigin: fn,
-		pos:            obj.Pos(),
+		pos:            object.Pos(),
 		Package:        nil,
 		Program:        fn.Program,
 		recvtypeparams: fn.recvtypeparams, // share with origin

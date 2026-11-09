@@ -68,25 +68,35 @@ func TestConstString(t *testing.T) {
 		{"func() (int, bool, string)", nil, "nil:func() (int, bool, string)"},
 	} {
 		// Eval() expr for its type.
-		tv, err := types.Eval(fset, pkg, 0, test.expr)
-		if err != nil {
-			t.Fatalf("Eval(%s) failed: %v", test.expr, err)
+		tv, evalError := types.Eval(fset, pkg, 0, test.expr)
+		if evalError != nil {
+			t.Fatalf("Eval(%s) failed: %v", test.expr, evalError)
 		}
-		var val constant.Value
+		var value constant.Value
 		if test.constant != nil {
-			val = constant.Make(test.constant)
+			value = constant.Make(test.constant)
 		}
-		c := intermediate_representation.NewConstant(val, tv.Type, nil)
+		c := intermediate_representation.NewConstant(value, tv.Type, nil)
 		got := strings.ReplaceAll(c.String(), " | ", "|") // Accept both interface{a | b} and interface{a|b}.
 		if got != test.want {
-			t.Errorf("intermediate_representation.NewConstant(%v, %s).String() = %q, want %q", val, tv.Type, got, test.want)
+			t.Errorf(
+				"intermediate_representation.NewConstant(%v, %s).String() = %q, want %q",
+				value,
+				tv.Type,
+				got,
+				test.want,
+			)
 		}
 	}
 
 	// Test tuples
 	fn := pkg.Scope().Lookup("fn")
 	tup := fn.Type().(*types.Signature).Results()
-	if got, want := intermediate_representation.NewConstant(nil, tup, nil).String(), `(0, false, ""):(int, bool, string)`; got != want {
+	if got, want := intermediate_representation.NewConstant(
+		nil,
+		tup,
+		nil,
+	).String(), `(0, false, ""):(int, bool, string)`; got != want {
 		t.Errorf("intermediate_representation.NewConstant(%v, %s).String() = %v, want %v", nil, tup, got, want)
 	}
 

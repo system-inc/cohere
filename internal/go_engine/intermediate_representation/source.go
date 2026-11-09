@@ -39,7 +39,7 @@ func EnclosingFunction(pkg *Package, path []ast.Node) *Function {
 outer:
 	for i := range path {
 		if lit, ok := path[n-1-i].(*ast.FuncLit); ok {
-			for _, anon := range fn.AnonFuncs {
+			for _, anon := range fn.AnonymousFunctions {
 				if anon.Pos() == lit.Type.Func {
 					fn = anon
 					continue outer
@@ -85,7 +85,9 @@ func findEnclosingPackageLevelFunction(pkg *Package, path []ast.Node) *Function 
 				for _, b := range pkg.init.Blocks {
 					for _, instr := range b.Instructions {
 						if instr, ok := instr.(*Call); ok {
-							if callee, ok := instr.Call.Value.(*Function); ok && callee.Package == pkg && callee.Pos() == decl.Name.NamePos {
+							if callee, ok := instr.Call.Value.(*Function); ok &&
+								callee.Package == pkg &&
+								callee.Pos() == decl.Name.NamePos {
 								return callee
 							}
 						}
@@ -117,10 +119,10 @@ func findNamedFunc(pkg *Package, pos token.Pos) *Function {
 			mset := pkg.Program.MethodSets.MethodSet(types.NewPointer(mem.Type()))
 			for i, n := 0, mset.Len(); i < n; i++ {
 				// Don't call Program.Method: avoid creating wrappers.
-				obj := mset.At(i).Obj().(*types.Func)
-				if obj.Pos() == pos {
+				object := mset.At(i).Obj().(*types.Func)
+				if object.Pos() == pos {
 					// obj from MethodSet may not be the origin type.
-					m := obj.Origin()
+					m := object.Origin()
 					return pkg.values[m].(*Function)
 				}
 			}
@@ -134,46 +136,46 @@ func findNamedFunc(pkg *Package, pos token.Pos) *Function {
 // Package returns the IR Package corresponding to the specified
 // type-checker package object.
 // It returns nil if no such IR package has been created.
-func (prog *Program) Package(obj *types.Package) *Package {
-	return prog.packages[obj]
+func (prog *Program) Package(object *types.Package) *Package {
+	return prog.packages[object]
 }
 
 // packageLevelMember returns the package-level member corresponding
 // to the specified symbol, which may be a package-level const
-// (*NamedConst), var (*Global) or func/method (*Function) of some
+// (*NamedConstant), var (*Global) or func/method (*Function) of some
 // package in prog.
 //
 // It returns nil if the object belongs to a package that has not been
 // created by prog.CreatePackage.
-func (prog *Program) packageLevelMember(obj types.Object) Member {
-	if pkg, ok := prog.packages[obj.Pkg()]; ok {
-		return pkg.values[obj]
+func (prog *Program) packageLevelMember(object types.Object) Member {
+	if pkg, ok := prog.packages[object.Pkg()]; ok {
+		return pkg.values[object]
 	}
 	return nil
 }
 
-// FuncValue returns the SSA function or (non-interface) method
+// FunctionValue returns the SSA function or (non-interface) method
 // denoted by the specified func symbol. It returns nil if the symbol
 // denotes an interface method, or belongs to a package that was not
 // created by prog.CreatePackage.
-func (prog *Program) FunctionValue(obj *types.Func) *Function {
-	fn, _ := prog.packageLevelMember(obj).(*Function)
+func (prog *Program) FunctionValue(object *types.Func) *Function {
+	fn, _ := prog.packageLevelMember(object).(*Function)
 	return fn
 }
 
-// ConstValue returns the IR Value denoted by the source-level named
+// ConstantValue returns the IR Value denoted by the source-level named
 // constant obj.
-func (prog *Program) ConstValue(obj *types.Const) *Constant {
+func (prog *Program) ConstantValue(object *types.Const) *Constant {
 	// TODO(adonovan): opt: share (don't reallocate)
-	// Consts for const objects and constant ast.Exprs.
+	// Constants for const objects and constant ast.Exprs.
 
 	// Universal constant? {true,false,nil}
-	if obj.Parent() == types.Universe {
-		return NewConstant(obj.Val(), obj.Type(), nil)
+	if object.Parent() == types.Universe {
+		return NewConstant(object.Val(), object.Type(), nil)
 	}
 	// Package-level named constant?
-	if v := prog.packageLevelMember(obj); v != nil {
-		return v.(*NamedConst).Value
+	if v := prog.packageLevelMember(object); v != nil {
+		return v.(*NamedConstant).Value
 	}
-	return NewConstant(obj.Val(), obj.Type(), nil)
+	return NewConstant(object.Val(), object.Type(), nil)
 }

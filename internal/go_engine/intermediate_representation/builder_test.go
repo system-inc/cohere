@@ -43,7 +43,11 @@ func TestMain(main *testing.M) {
 // buildPackage type-checks the single file input, creates every package it imports from type information,
 // then creates and builds its own from syntax, as go/ir's irutil.BuildPackage does. It returns the built
 // package and the parsed file.
-func buildPackage(t testing.TB, input string, importer types.Importer) (*intermediate_representation.Package, *ast.File) {
+func buildPackage(
+	t testing.TB,
+	input string,
+	importer types.Importer,
+) (*intermediate_representation.Package, *ast.File) {
 	t.Helper()
 	fset := token.NewFileSet()
 	file, parseError := parser.ParseFile(fset, "input.go", input, parser.ParseComments)
@@ -59,10 +63,17 @@ func buildPackage(t testing.TB, input string, importer types.Importer) (*interme
 
 // buildFiles is irutil.BuildPackage: type-check files as the package at path, create its imports
 // transitively from type information, and create and build it from syntax.
-func buildFiles(fset *token.FileSet, path string, files []*ast.File, importer types.Importer) (*intermediate_representation.Package, error) {
+func buildFiles(
+	fset *token.FileSet,
+	path string,
+	files []*ast.File,
+	importer types.Importer,
+) (*intermediate_representation.Package, error) {
 	info := newInfo()
 	pkg := types.NewPackage(path, "")
-	if checkError := types.NewChecker(&types.Config{Importer: importer}, fset, pkg, info).Files(files); checkError != nil {
+	if checkError := types.NewChecker(&types.Config{Importer: importer}, fset, pkg, info).Files(
+		files,
+	); checkError != nil {
 		return nil, checkError
 	}
 	prog := intermediate_representation.NewProgram(fset)
@@ -182,7 +193,7 @@ func main() {
 `
 	// Build an IR program from the parsed file.
 	// Load its dependencies from gc binary export data.
-	mainPkg, _ := buildPackage(t, input, importer.Default())
+	mainPackage, _ := buildPackage(t, input, importer.Default())
 
 	// The main package, its direct and indirect dependencies are loaded.
 	deps := []string{
@@ -193,7 +204,7 @@ func main() {
 		"sync", "unicode", "time",
 	}
 
-	prog := mainPkg.Program
+	prog := mainPackage.Program
 	all := prog.AllPackages()
 	if len(all) <= len(deps) {
 		// go/ir prints the packages with %q through Package.String, which ours doesn't carry.
@@ -211,10 +222,10 @@ func main() {
 		}
 
 		// External packages should have no function bodies (except for wrappers).
-		isExt := pkg != mainPkg
+		isExt := pkg != mainPackage
 
 		// init()
-		if isExt && !isEmpty(pkg.Func("init")) {
+		if isExt && !isEmpty(pkg.Function("init")) {
 			t.Errorf("external package %s has non-empty init", pkg.Types.Path())
 		}
 
@@ -227,10 +238,10 @@ func main() {
 			}
 		}
 	}
-	if isEmpty(mainPkg.Func("init")) {
+	if isEmpty(mainPackage.Function("init")) {
 		t.Errorf("main package has empty init")
 	}
-	for _, mem := range mainPkg.Members {
+	for _, mem := range mainPackage.Members {
 		switch mem := mem.(type) {
 		case *intermediate_representation.Function:
 			if isEmpty(mem) {
@@ -247,19 +258,19 @@ func main() {
 		"testing.Short",
 		"N/A",
 	}
-	callNum := 0
-	for _, call := range callsOf(mainPkg.Func("main")) {
-		if want := expectedCallee[callNum]; want != "N/A" {
+	callNumber := 0
+	for _, call := range callsOf(mainPackage.Function("main")) {
+		if want := expectedCallee[callNumber]; want != "N/A" {
 			got := call.StaticCallee().String()
 			if want != got {
 				t.Errorf("call #%d from main.main: got callee %s, want %s",
-					callNum, got, want)
+					callNumber, got, want)
 			}
 		}
-		callNum++
+		callNumber++
 	}
-	if callNum != 4 {
-		t.Errorf("in main.main: got %d calls, want %d", callNum, 4)
+	if callNumber != 4 {
+		t.Errorf("in main.main: got %d calls, want %d", callNumber, 4)
 	}
 }
 
@@ -292,19 +303,19 @@ func (C) F() {}
 
 	// Create a from syntax, its direct deps b from types, but not indirect deps c.
 	prog := intermediate_representation.NewProgram(loaded.fset)
-	aSSA := prog.CreatePackage(a, loaded.files["testdata/a"], loaded.infos["testdata/a"], false)
+	aSsa := prog.CreatePackage(a, loaded.files["testdata/a"], loaded.infos["testdata/a"], false)
 	for _, p := range a.Imports() {
 		prog.CreatePackage(p, nil, nil, true)
 	}
 
 	// Build SSA for package a.
-	aSSA.Build()
+	aSsa.Build()
 
 	// Find the function in the sole call in the sole block of function a.A. Unlifted, the block opens with
 	// the call to the ssa:deferstack builtin that every function makes and lifting removes when nothing
 	// defers (#ee33njz), so the call sought is the sole one to a function.
 	var got string
-	for _, instr := range aSSA.Members["A"].(*intermediate_representation.Function).Blocks[0].Instructions {
+	for _, instr := range aSsa.Members["A"].(*intermediate_representation.Function).Blocks[0].Instructions {
 		if call, ok := instr.(*intermediate_representation.Call); ok {
 			f, isFunction := call.Call.Value.(*intermediate_representation.Function)
 			if !isFunction {
@@ -347,7 +358,7 @@ func sliceMax(s []int) []int { return s[a():b():c()] }
 		{"sliceMax", "[a() b() c()]"},
 		{"slice", "[a() b()]"},
 	} {
-		fn := p.Func(item.fn)
+		fn := p.Function(item.fn)
 		want := item.want
 		t.Run(item.fn, func(t *testing.T) {
 			t.Parallel()
@@ -384,11 +395,11 @@ func TestGenericFunctionSelector(t *testing.T) {
 	}
 
 	var callees []string // callees of the CallInstruction in main().
-	for _, call := range callsOf(p.Func("main")) {
+	for _, call := range callsOf(p.Function("main")) {
 		if callee := call.StaticCallee(); callee != nil {
 			callees = append(callees, callee.String())
 		} else {
-			t.Errorf("CallInstruction without StaticCallee() in %s", p.Func("main"))
+			t.Errorf("CallInstruction without StaticCallee() in %s", p.Function("main"))
 		}
 	}
 	sort.Strings(callees) // ignore the order in the code.
@@ -445,12 +456,12 @@ func TestFixedBugs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join("testdata", "fixedbugs", name+".go")
 			fset := token.NewFileSet()
-			f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
-			if err != nil {
-				t.Fatal(err)
+			f, parseFileError := parser.ParseFile(fset, path, nil, parser.ParseComments)
+			if parseFileError != nil {
+				t.Fatal(parseFileError)
 			}
-			if _, err := buildFiles(fset, name, []*ast.File{f}, nil); err != nil {
-				t.Error(err)
+			if _, buildFilesError := buildFiles(fset, name, []*ast.File{f}, nil); buildFilesError != nil {
+				t.Error(buildFilesError)
 			}
 		})
 	}
@@ -464,9 +475,21 @@ func TestBuildPackageGo120(t *testing.T) {
 	}{
 		{"slice to array", "package p; var s []byte; var _ = ([4]byte)(s)", nil},
 		{"slice to zero length array", "package p; var s []byte; var _ = ([0]byte)(s)", nil},
-		{"slice to zero length array type parameter", "package p; var s []byte; func f[T ~[0]byte]() { tmp := (T)(s); var z T; _ = tmp == z}", nil},
-		{"slice to non-zero length array type parameter", "package p; var s []byte; func h[T ~[1]byte | [4]byte]() { tmp := T(s); var z T; _ = tmp == z}", nil},
-		{"slice to maybe-zero length array type parameter", "package p; var s []byte; func g[T ~[0]byte | [4]byte]() { tmp := T(s); var z T; _ = tmp == z}", nil},
+		{
+			"slice to zero length array type parameter",
+			"package p; var s []byte; func f[T ~[0]byte]() { tmp := (T)(s); var z T; _ = tmp == z}",
+			nil,
+		},
+		{
+			"slice to non-zero length array type parameter",
+			"package p; var s []byte; func h[T ~[1]byte | [4]byte]() { tmp := T(s); var z T; _ = tmp == z}",
+			nil,
+		},
+		{
+			"slice to maybe-zero length array type parameter",
+			"package p; var s []byte; func g[T ~[0]byte | [4]byte]() { tmp := T(s); var z T; _ = tmp == z}",
+			nil,
+		},
 		{
 			"rune sequence to sequence cast patterns", `
 			package p
@@ -551,7 +574,7 @@ func f(s []int, a [3]int, m map[int]int) (n int) {
 `
 	p, _ := buildPackage(t, input, nil)
 	var marked []string
-	for _, b := range p.Func("f").Blocks {
+	for _, b := range p.Function("f").Blocks {
 		if b.RangeIndexLoop {
 			// The header increments the index and then branches on it against the length.
 			var kinds []string

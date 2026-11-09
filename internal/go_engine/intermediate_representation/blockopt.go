@@ -111,7 +111,7 @@ func jumpThreading(f *Function, b *BasicBlock) bool {
 }
 
 // fuseBlocks attempts to apply the block fusion optimization to block
-// a, in which a->b becomes ab if len(a.Succs)==len(b.Preds)==1.
+// a, in which a->b becomes ab if len(a.Successors)==len(b.Predecessors)==1.
 // The result is true if the optimization was applied.
 func fuseBlocks(f *Function, a *BasicBlock) bool {
 	if len(a.Successors) != 1 {
@@ -142,7 +142,7 @@ func fuseBlocks(f *Function, a *BasicBlock) bool {
 	// A inherits B's successors
 	a.Successors = append(a.successorsSpace[:0], b.Successors...)
 
-	// Fix up Preds links of all successors of B.
+	// Fix up Predecessors links of all successors of B.
 	for _, c := range b.Successors {
 		c.replacePredecessor(b, a)
 	}

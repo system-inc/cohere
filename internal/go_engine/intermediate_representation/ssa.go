@@ -24,7 +24,7 @@ import (
 	"honnef.co/go/tools/go/types/typeutil"
 )
 
-type ID int
+type Id int
 
 // A Program is a partial or complete Go program converted to IR form.
 type Program struct {
@@ -38,8 +38,8 @@ type Program struct {
 
 	// objectMethods is a memoization of objectMethod
 	// to avoid creation of duplicate methods from type information.
-	objectMethodsMu sync.Mutex
-	objectMethods   map[*types.Func]*Function
+	objectMethodsMutex sync.Mutex
+	objectMethods      map[*types.Func]*Function
 
 	noReturn func(*types.Func) bool // (optional) predicate that decides whether a given call cannot return
 }
@@ -47,7 +47,7 @@ type Program struct {
 // A Package is a single analyzed Go package containing Members for
 // all package-level functions, variables, constants and types it
 // declares.  These may be accessed directly via Members, or via the
-// type-specific accessor methods Func, Type, Var and Const.
+// type-specific accessor methods Function, Type, Variable and Constant.
 //
 // Members also contains entries for "init" (the synthetic package
 // initializer) and "init#%d", the nth declared init function,
@@ -57,8 +57,8 @@ type Package struct {
 	Types     *types.Package          // the corresponding go/types.Package
 	Members   map[string]Member       // all package members keyed by name (incl. init and init#%d)
 	Functions []*Function             // all functions, excluding anonymous ones
-	values    map[types.Object]Member // mapping of package objects to members (incl. methods). Contains *NamedConst, *Global, *Function (values but not types)
-	init      *Function               // Func("init"); the package's init function
+	values    map[types.Object]Member // mapping of package objects to members (incl. methods). Contains *NamedConstant, *Global, *Function (values but not types)
+	init      *Function               // Function("init"); the package's init function
 	syntax    bool                    // package was loaded from syntax
 
 	// The following fields are set transiently, then cleared
@@ -71,7 +71,7 @@ type Package struct {
 	initVersion map[ast.Expr]string // goversion to use for each global var init expr
 }
 
-// A Member is a member of a Go package, implemented by *NamedConst,
+// A Member is a member of a Go package, implemented by *NamedConstant,
 // *Global, *Function, or *Type; they are created by package-level
 // const, var, func and type declarations respectively.
 type Member interface {
@@ -89,15 +89,15 @@ type Type struct {
 	pkg    *Package
 }
 
-// A NamedConst is a Member of a Package representing a package-level
+// A NamedConstant is a Member of a Package representing a package-level
 // named constant.
 //
 // Pos() returns the position of the declaring ast.ValueSpec.Names[*]
 // identifier.
 //
-// NB: a NamedConst is not a Value; it contains a constant Value, which
+// NB: a NamedConstant is not a Value; it contains a constant Value, which
 // it augments with the name and position of its 'const' declaration.
-type NamedConst struct {
+type NamedConstant struct {
 	object *types.Const
 	Value  *Constant
 	pkg    *Package
@@ -110,7 +110,7 @@ type Value interface {
 	// Instruction.
 	//
 	// This is the same as the source name for Parameters,
-	// Builtins, Functions, FreeVars, Globals.
+	// Builtins, Functions, FreeVariables, Globals.
 	// For constants, it is a representation of the constant's value
 	// and type.  For all other Values this is the name of the
 	// virtual register defined by the instruction.
@@ -120,7 +120,7 @@ type Value interface {
 	Name() string
 
 	// Type returns the type of this value.  Many instructions
-	// (e.g. IndexAddr) change their behaviour depending on the
+	// (e.g. IndexAddress) change their behaviour depending on the
 	// types of their operands.
 	Type() types.Type
 
@@ -136,7 +136,7 @@ type Value interface {
 	// caller may perform mutations to the object's state.
 	//
 	// Referrers is currently only defined if Parent()!=nil,
-	// i.e. for the function-local values FreeVar, Parameter,
+	// i.e. for the function-local values FreeVariable, Parameter,
 	// Functions (iff anonymous) and all value-defining instructions.
 	// It returns nil for named Functions, Builtin and Global.
 	//
@@ -161,16 +161,16 @@ type Value interface {
 // An Instruction is an IR instruction that computes a new Value or
 // has some effect.
 //
-// An Instruction that defines a value (e.g. BinOp) also implements
+// An Instruction that defines a value (e.g. BinaryOperation) also implements
 // the Value interface; an Instruction that only has an effect (e.g. Store)
 // does not.
 type Instruction interface {
 	setSource(ast.Node)
-	setID(ID)
+	setId(Id)
 
 	Comment() string
 
-	// ID returns the ID of this instruction. IDs are unique within a single
+	// Id returns the Id of this instruction. IDs are unique within a single
 	// function and are densely numbered, but may contain gaps.
 	// Globally, instructions are identified by their addresses. However,
 	// IDs exist to facilitate efficient storage of mappings between
@@ -178,7 +178,7 @@ type Instruction interface {
 	//
 	// NB: IDs are allocated late in the IR construction process and
 	// are not available to early stages of said process.
-	ID() ID
+	Id() Id
 
 	// Parent returns the function to which this instruction
 	// belongs.
@@ -247,15 +247,15 @@ type Node interface {
 // or method.
 //
 // If Blocks is nil, this indicates an external function for which no
-// Go source code is available.  In this case, FreeVars, Locals, and
-// Params are nil too.  Clients performing whole-program analysis must
+// Go source code is available.  In this case, FreeVariables, Locals, and
+// Parameters are nil too.  Clients performing whole-program analysis must
 // handle external functions specially.
 //
 // Blocks contains the function's control-flow graph (CFG).
 // Blocks[0] is the function entry point; block order is not otherwise
 // semantically significant, though it may affect the readability of
 // the disassembly.
-// To iterate over the blocks in dominance order, use DomPreorder().
+// To iterate over the blocks in dominance order, use DominatorPreorder().
 //
 // Recover is an optional second entry point to which control resumes
 // after a recovered panic.  The Recover block may contain only a return
@@ -263,13 +263,13 @@ type Node interface {
 // parameters, if any.
 //
 // A nested function (Parent()!=nil) that refers to one or more
-// lexically enclosing local variables ("free variables") has FreeVars.
+// lexically enclosing local variables ("free variables") has FreeVariables.
 // Such functions cannot be called directly but require a
 // value created by MakeClosure which, via its Bindings, supplies
 // values for these parameters.
 //
 // If the function is a method (Signature.Recv() != nil) then the first
-// element of Params is the receiver parameter.
+// element of Parameters is the receiver parameter.
 //
 // A Go package may declare many functions called "init".
 // For each one, Object().Name() returns "init" but Name() returns
@@ -303,13 +303,13 @@ type Node interface {
 // Type() returns the function's Signature.
 //
 // A generic function is a function or method that has uninstantiated type
-// parameters (TypeParams() != nil). Consider a hypothetical generic
+// parameters (TypeParameters() != nil). Consider a hypothetical generic
 // method, (*Map[K,V]).Get. It may be instantiated with all
 // non-parameterized types as (*Map[string,int]).Get or with
 // parameterized types as (*Map[string,U]).Get, where U is a type parameter.
 // In both instantiations, Origin() refers to the instantiated generic
-// method, (*Map[K,V]).Get, TypeParams() refers to the parameters [K,V] of
-// the generic method. TypeArgs() refers to [string,U] or [string,int],
+// method, (*Map[K,V]).Get, TypeParameters() refers to the parameters [K,V] of
+// the generic method. TypeArguments() refers to [string,U] or [string,int],
 // respectively, and is nil in the generic method.
 type Function struct {
 	name      string
@@ -332,16 +332,16 @@ type Function struct {
 
 	// These fields are populated only when the function body is built:
 
-	Parameters    []*Parameter    // function parameters; for methods, includes receiver
-	FreeVariables []*FreeVariable // free variables whose values must be supplied by closure
-	Locals        []*Allocation   // frame-allocated variables of this function
-	Blocks        []*BasicBlock   // basic blocks of the function; nil => external
-	Recover       *BasicBlock     // optional; control transfers here after recovered panic
-	AnonFuncs     []*Function     // anonymous functions (from FuncLit, RangeStmt) directly beneath this one
-	referrers     []Instruction   // referring instructions (iff Parent() != nil)
-	anonIdx       int32           // position of a nested function in parent's AnonFuncs. fn.Parent()!=nil => fn.Parent().AnonFunc[fn.anonIdx] == fn.
+	Parameters         []*Parameter    // function parameters; for methods, includes receiver
+	FreeVariables      []*FreeVariable // free variables whose values must be supplied by closure
+	Locals             []*Allocation   // frame-allocated variables of this function
+	Blocks             []*BasicBlock   // basic blocks of the function; nil => external
+	Recover            *BasicBlock     // optional; control transfers here after recovered panic
+	AnonymousFunctions []*Function     // anonymous functions (from FuncLit, RangeStmt) directly beneath this one
+	referrers          []Instruction   // referring instructions (iff Parent() != nil)
+	anonIndex          int32           // position of a nested function in parent's AnonymousFunctions. fn.Parent()!=nil => fn.Parent().AnonymousFunctions[fn.anonIndex] == fn.
 
-	SCCs []*SCC // SCC DAG in reverse topological order
+	Sccs []*Scc // SCC DAG in reverse topological order
 
 	recvtypeparams *types.TypeParamList // receiver type parameters of this function. recvtypeparams.Len() > 0 => method on generic or instance of generic type
 	recvtypeargs   []types.Type         // type arguments that instantiated recvtypeparams. len(recvtypeargs) > 0 => method on instance of generic type
@@ -351,40 +351,40 @@ type Function struct {
 	generic        *generic             // instances of this function, if generic
 
 	// The following fields are cleared after building.
-	build        buildFunc                // algorithm to build function body (nil => built)
-	currentBlock *BasicBlock              // where to emit code
-	vars         map[*types.Var]Value     // addresses of local variables
-	results      []*Allocation            // result allocations of the current function
-	returnVars   []*types.Var             // variables for a return statement. Either results or for range-over-func a parent's results
-	targets      *targets                 // linked stack of branch targets
-	lblocks      map[*types.Label]*lblock // labelled blocks
-	jump         *types.Var               // synthetic variable for the yield state (non-nil => range-over-func)
-	deferstack   *types.Var               // synthetic variable holding enclosing ssa:deferstack()
-	source       *Function                // nearest enclosing source function
-	exits        []*exit                  // exits of the function that need to be resolved
-	uniq         int64                    // source of unique ints within the source tree while building
+	build           buildFunc                // algorithm to build function body (nil => built)
+	currentBlock    *BasicBlock              // where to emit code
+	vars            map[*types.Var]Value     // addresses of local variables
+	results         []*Allocation            // result allocations of the current function
+	returnVariables []*types.Var             // variables for a return statement. Either results or for range-over-func a parent's results
+	targets         *targets                 // linked stack of branch targets
+	lblocks         map[*types.Label]*lblock // labelled blocks
+	jump            *types.Var               // synthetic variable for the yield state (non-nil => range-over-func)
+	deferstack      *types.Var               // synthetic variable holding enclosing ssa:deferstack()
+	source          *Function                // nearest enclosing source function
+	exits           []*exit                  // exits of the function that need to be resolved
+	uniq            int64                    // source of unique ints within the source tree while building
 
 	blocksets [4]BlockSet
 }
 
 // BasicBlock represents an IR basic block.
 //
-// The final element of Instrs is always an explicit transfer of
+// The final element of Instructions is always an explicit transfer of
 // control (If, Jump, Return, Panic, or Unreachable).
 //
 // A block may contain no Instructions only if it is unreachable,
-// i.e., Preds is nil.  Empty blocks are typically pruned.
+// i.e., Predecessors is nil.  Empty blocks are typically pruned.
 //
-// BasicBlocks and their Preds/Succs relation form a (possibly cyclic)
+// BasicBlocks and their Predecessors/Successors relation form a (possibly cyclic)
 // graph independent of the IR Value graph: the control-flow graph or
 // CFG.  It is illegal for multiple edges to exist between the same
 // pair of blocks.
 //
 // Each BasicBlock is also a node in the dominator tree of the CFG.
-// The tree may be navigated using Idom()/Dominees() and queried using
+// The tree may be navigated using ImmediateDominator()/Dominees() and queried using
 // Dominates().
 //
-// The order of Preds and Succs is significant (to Phi and If
+// The order of Predecessors and Successors is significant (to Phi and If
 // instructions, respectively).
 type BasicBlock struct {
 	Index   int    // index of this block within Parent().Blocks
@@ -398,32 +398,32 @@ type BasicBlock struct {
 	parent                   *Function      // parent function
 	Instructions             []Instruction  // instructions in order
 	Predecessors, Successors []*BasicBlock  // predecessors and successors
-	SCC                      *SCC           // strongly connected component
-	successorsSpace          [2]*BasicBlock // initial space for Succs
+	Scc                      *Scc           // strongly connected component
+	successorsSpace          [2]*BasicBlock // initial space for Successors
 	dom                      domInfo        // dominator tree info
-	gaps                     int            // number of nil Instrs (transient)
+	gaps                     int            // number of nil Instructions (transient)
 	rundefers                int            // number of rundefers (transient)
 }
 
-type SCC struct {
+type Scc struct {
 	Index                    int
 	Blocks                   []*BasicBlock
-	Predecessors, Successors []*SCC
+	Predecessors, Successors []*Scc
 	reachable                big.Int
 }
 
 // Pure values ----------------------------------------
 
-// A FreeVar represents a free variable of the function to which it
+// A FreeVariable represents a free variable of the function to which it
 // belongs.
 //
-// FreeVars are used to implement anonymous functions, whose free
+// FreeVariables are used to implement anonymous functions, whose free
 // variables are lexically captured in a closure formed by
-// MakeClosure.  The value of such a free var is an Alloc or another
-// FreeVar and is considered a potentially escaping heap address, with
+// MakeClosure.  The value of such a free var is an Allocation or another
+// FreeVariable and is considered a potentially escaping heap address, with
 // pointer type.
 //
-// FreeVars are also used to implement bound method closures.  Such a
+// FreeVariables are also used to implement bound method closures.  Such a
 // free var represents the receiver value and may be of any type that
 // has concrete methods.
 //
@@ -452,12 +452,12 @@ type Parameter struct {
 	referrers []Instruction
 }
 
-// A Const represents a value known at build time.
+// A Constant represents a value known at build time.
 //
-// Consts include true constants of boolean, numeric, and string types, as
+// Constants include true constants of boolean, numeric, and string types, as
 // defined by the Go spec; these are represented by a non-nil Value field.
 //
-// Consts also include the "zero" value of any type, of which the nil values
+// Constants also include the "zero" value of any type, of which the nil values
 // of various pointer-like types are a special case; these are represented
 // by a nil Value field.
 //
@@ -485,7 +485,7 @@ type CompositeValue struct {
 	// Bitmap records which elements were explicitly provided. For example, [4]byte{2: x} would have a bitmap of 0010.
 	Bitmap big.Int
 	// The number of bits set in Bitmap
-	// TODO(dh): remove NumSet. we can just query the bitmap.
+	// TODO(dh): remove ExplicitCount. we can just query the bitmap.
 	ExplicitCount int
 	// Dense list of values in the composite literal. Omitted elements are filled in with zero values.
 	Values []Value
@@ -509,7 +509,7 @@ type Global struct {
 // A Builtin represents a specific use of a built-in function, e.g. len.
 //
 // Builtins are immutable values.  Builtins do not have addresses.
-// Builtins can only appear in CallCommon.Func.
+// Builtins can only appear in CallCommon.Value.
 //
 // Name() indicates the function: one of the built-in functions from the
 // Go spec (excluding "make" and "new") or one of these ir-defined
@@ -537,23 +537,23 @@ type Builtin struct {
 
 // Value-defining instructions  ----------------------------------------
 
-// The Alloc instruction reserves space for a variable of the given type,
+// The Allocation instruction reserves space for a variable of the given type,
 // zero-initializes it, and yields its address.
 //
-// Alloc values are always addresses, and have pointer types, so the
+// Allocation values are always addresses, and have pointer types, so the
 // type of the allocated variable is actually
 // Type().Underlying().(*types.Pointer).Elem().
 //
-// If Heap is false, Alloc zero-initializes the same local variable in
-// the call frame and returns its address; in this case the Alloc must
+// If Heap is false, Allocation zero-initializes the same local variable in
+// the call frame and returns its address; in this case the Allocation must
 // be present in Function.Locals. We call this a "local" alloc.
 //
-// If Heap is true, Alloc allocates a new zero-initialized variable
+// If Heap is true, Allocation allocates a new zero-initialized variable
 // each time the instruction is executed. We call this a "new" alloc.
 //
-// When Alloc is applied to a channel, map or slice type, it returns
+// When Allocation is applied to a channel, map or slice type, it returns
 // the address of an uninitialized (nil) reference of that kind; store
-// the result of MakeSlice, MakeMap or MakeChan in that location to
+// the result of MakeSlice, MakeMap or MakeChannel in that location to
 // instantiate these types.
 //
 // Pos() returns the ast.CompositeLit.Lbrace for a composite literal,
@@ -576,7 +576,7 @@ type Allocation struct {
 // nodes.
 //
 // Pos() returns the position of the && or || for short-circuit
-// control-flow joins, or that of the *Alloc for φ-nodes inserted
+// control-flow joins, or that of the *Allocation for φ-nodes inserted
 // during SSA renaming.
 //
 // Example printed form:
@@ -584,7 +584,7 @@ type Allocation struct {
 //	t2 = phi [0: t0, 1: t1]
 type Phi struct {
 	register
-	Edges []Value // Edges[i] is value for Block().Preds[i]
+	Edges []Value // Edges[i] is value for Block().Predecessors[i]
 
 	live bool // used during lifting
 }
@@ -609,7 +609,7 @@ type Call struct {
 	Call CallCommon
 }
 
-// The BinOp instruction yields the result of binary operation X Op Y.
+// The BinaryOperation instruction yields the result of binary operation X Operator Y.
 //
 // Pos() returns the ast.BinaryExpr.OpPos, if explicit in the source.
 //
@@ -626,7 +626,7 @@ type BinaryOperation struct {
 	X, Y     Value
 }
 
-// The UnOp instruction yields the result of Op X.
+// The UnaryOperation instruction yields the result of Operator X.
 // XOR is bitwise complement.
 // SUB is negation.
 // NOT is logical negation.
@@ -665,8 +665,8 @@ type Load struct {
 //     optionally adding/removing a name.
 //   - between a type (t) and an instance of the type (tσ), i.e.
 //     Type() == σ(X.Type()) (or X.Type()== σ(Type())) where
-//     σ is the type substitution of Parent().TypeParams by
-//     Parent().TypeArgs.
+//     σ is the type substitution of Parent().TypeParameters by
+//     Parent().TypeArguments.
 //
 // This operation cannot fail dynamically.
 //
@@ -799,7 +799,7 @@ type SliceToArray struct {
 //
 // To construct the zero value of an interface type T, use:
 //
-//	NewConst(constant.MakeNil(), T, pos)
+//	NewConstant(constant.MakeNil(), T, pos)
 //
 // Pos() returns the ast.CallExpr.Lparen, if the instruction arose
 // from an explicit conversion in the source.
@@ -814,7 +814,7 @@ type MakeInterface struct {
 }
 
 // The MakeClosure instruction yields a closure value whose code is
-// Fn and whose free variables' values are supplied by Bindings.
+// Function and whose free variables' values are supplied by Bindings.
 //
 // Type() returns a (possibly named) *types.Signature.
 //
@@ -828,7 +828,7 @@ type MakeInterface struct {
 type MakeClosure struct {
 	register
 	Function Value   // always a *Function
-	Bindings []Value // values for each free variable in Fn.FreeVars
+	Bindings []Value // values for each free variable in Function.FreeVariables
 }
 
 // The MakeMap instruction creates a new hash-table-based map object
@@ -848,7 +848,7 @@ type MakeMap struct {
 	Reserve Value // initial space reservation; nil => default
 }
 
-// The MakeChan instruction creates a new channel object and yields a
+// The MakeChannel instruction creates a new channel object and yields a
 // value of kind chan.
 //
 // Type() returns a (possibly named) *types.Chan.
@@ -865,13 +865,13 @@ type MakeChannel struct {
 	Size Value // int; size of buffer; zero => synchronous.
 }
 
-// The MakeSlice instruction yields a slice of length Len backed by a
-// newly allocated array of length Cap.
+// The MakeSlice instruction yields a slice of length Length backed by a
+// newly allocated array of length Capacity.
 //
-// Both Len and Cap must be non-nil Values of integer type.
+// Both Length and Capacity must be non-nil Values of integer type.
 //
-// (Alloc(types.Array) followed by Slice will not suffice because
-// Alloc can only create arrays of constant length.)
+// (Allocation(types.Array) followed by Slice will not suffice because
+// Allocation can only create arrays of constant length.)
 //
 // Type() returns a (possibly named) *types.Slice.
 //
@@ -884,8 +884,8 @@ type MakeChannel struct {
 //	t2 = make StringSlice t1 t0
 type MakeSlice struct {
 	register
-	Len Value
-	Cap Value
+	Length   Value
+	Capacity Value
 }
 
 // The Slice instruction yields a slice of an existing string, slice
@@ -910,7 +910,7 @@ type Slice struct {
 	Low, High, Maximum Value // each may be nil
 }
 
-// The FieldAddr instruction yields the address of Field of *struct X.
+// The FieldAddress instruction yields the address of Field of *struct X.
 //
 // The field is identified by its index within the field list of the
 // struct type of X.
@@ -954,7 +954,7 @@ type Field struct {
 	Field int   // index into CoreType(X.Type()).(*types.Struct).Fields
 }
 
-// The IndexAddr instruction yields the address of the element at
+// The IndexAddress instruction yields the address of the element at
 // index Index of collection X.  Index is an integer expression.
 //
 // The elements of maps and strings are not addressable; use Lookup (map),
@@ -1030,17 +1030,17 @@ type StringLookup struct {
 // SelectState is a helper for Select.
 // It represents one goal state and its corresponding communication.
 type SelectState struct {
-	Dir     types.ChanDir // direction of case (SendOnly or RecvOnly)
-	Channel Value         // channel to use (for send or receive)
-	Send    Value         // value to send (for send)
-	Pos     token.Pos     // position of token.ARROW
+	Direction types.ChanDir // direction of case (SendOnly or RecvOnly)
+	Channel   Value         // channel to use (for send or receive)
+	Send      Value         // value to send (for send)
+	Position  token.Pos     // position of token.ARROW
 }
 
 // The Select instruction tests whether (or blocks until) one
 // of the specified sent or received states is entered.
 //
-// Let n be the number of States for which Dir==RECV and Tᵢ (0 ≤ i < n)
-// be the element type of each such state's Chan.
+// Let n be the number of States for which Direction==RECV and Tᵢ (0 ≤ i < n)
+// be the element type of each such state's Channel.
 // Select returns an n+2-tuple
 //
 //	(index int, recvOk bool, r₀ T₀, ... rₙ-1 Tₙ-1)
@@ -1097,7 +1097,7 @@ type Range struct {
 }
 
 // The Next instruction reads and advances the (map or string)
-// iterator Iter and returns a 3-tuple value (ok, k, v).  If the
+// iterator Iterator and returns a 3-tuple value (ok, k, v).  If the
 // iterator is not exhausted, ok is true and k and v are the next
 // elements of the domain and range, respectively.  Otherwise ok is
 // false and k and v are undefined.
@@ -1116,7 +1116,7 @@ type Range struct {
 //	t1 = next t0
 type Next struct {
 	register
-	Iter     Value
+	Iterator Value
 	IsString bool // true => string iterator; false => map iterator.
 }
 
@@ -1169,7 +1169,7 @@ type TypeAssert struct {
 // The Extract instruction yields component Index of Tuple.
 //
 // This is used to access the results of instructions with multiple
-// return values, such as Call, TypeAssert, Next, Recv,
+// return values, such as Call, TypeAssert, Next, Receive,
 // MapLookup and others.
 //
 // Example printed form:
@@ -1212,7 +1212,7 @@ type Unreachable struct {
 }
 
 // The If instruction transfers control to one of the two successors
-// of its owning block, depending on the boolean Cond: the first if
+// of its owning block, depending on the boolean Condition: the first if
 // true, the second if false.
 //
 // An If instruction must be the last instruction of its containing
@@ -1252,7 +1252,7 @@ type TypeSwitch struct {
 // components which the caller must access using Extract instructions.
 //
 // There is no instruction to return a ready-made tuple like those
-// returned by a "value,ok"-mode TypeAssert, MapLookup or Recv or
+// returned by a "value,ok"-mode TypeAssert, MapLookup or Receive or
 // a tail-call to a function with multiple result parameters.
 //
 // Return must be the last instruction of its containing BasicBlock.
@@ -1345,7 +1345,7 @@ type Defer struct {
 	DeferStack Value // stack of deferred functions (from ssa:deferstack() intrinsic) onto which this function is pushed
 }
 
-// The Send instruction sends X on channel Chan.
+// The Send instruction sends X on channel Channel.
 //
 // Pos() returns the ast.SendStmt.Arrow, if explicit in the source.
 //
@@ -1357,7 +1357,7 @@ type Send struct {
 	Channel, X Value
 }
 
-// The Recv instruction receives from channel Chan.
+// The Receive instruction receives from channel Channel.
 //
 // If CommaOk, the result is a 2-tuple of the value above
 // and a boolean indicating the success of the receive.  The
@@ -1369,15 +1369,15 @@ type Send struct {
 //
 // Example printed form:
 //
-//	t2 = Recv <int> t1
-//	t3 = Recv <(int, bool)> t1
+//	t2 = Receive <int> t1
+//	t3 = Receive <(int, bool)> t1
 type Receive struct {
 	register
 	Channel Value
 	CommaOk bool
 }
 
-// The Store instruction stores Val at address Addr.
+// The Store instruction stores Value at address Address.
 // Stores can be of arbitrary types.
 //
 // Pos() returns the position of the source-level construct most closely
@@ -1458,16 +1458,16 @@ func (n *node) Pos() token.Pos {
 // It provides the implementations of the Block and setBlock methods.
 type anInstruction struct {
 	node
-	id      ID
+	id      Id
 	block   *BasicBlock // the basic block of this instruction
 	comment string
 }
 
-func (instr *anInstruction) setID(id ID) {
+func (instr *anInstruction) setId(id Id) {
 	instr.id = id
 }
 
-func (instr anInstruction) ID() ID {
+func (instr anInstruction) Id() Id {
 	return instr.id
 }
 
@@ -1501,8 +1501,8 @@ func (instr anInstruction) Comment() string {
 // StaticCallee returns the identity of the callee in cases
 // (a) and (b), nil otherwise.
 //
-// Args contains the arguments to the call.  If Value is a method,
-// Args[0] contains the receiver parameter.
+// Arguments contains the arguments to the call.  If Value is a method,
+// Arguments[0] contains the receiver parameter.
 //
 // Example printed form:
 //
@@ -1519,7 +1519,7 @@ func (instr anInstruction) Comment() string {
 // interface used for this call.
 //
 // Value is implicitly supplied to the concrete method implementation
-// as the receiver parameter; in other words, Args[0] holds not the
+// as the receiver parameter; in other words, Arguments[0] holds not the
 // receiver but the first true argument.
 //
 // Example printed form:
@@ -1529,7 +1529,7 @@ func (instr anInstruction) Comment() string {
 //	defer invoke t4.Handle(...t5)
 //
 // For all calls to variadic functions (Signature().Variadic()),
-// the last element of Args is a slice.
+// the last element of Arguments is a slice.
 type CallCommon struct {
 	Value     Value       // receiver (invoke mode) or func value (call mode)
 	Method    *types.Func // interface method (invoke mode)
@@ -1716,7 +1716,7 @@ func (v *Parameter) Referrers() *[]Instruction { return &v.referrers }
 func (v *Parameter) Pos() token.Pos            { return v.object.Pos() }
 func (v *Parameter) Parent() *Function         { return v.parent }
 
-// TypeParams are the function's type parameters if generic or the
+// TypeParameters are the function's type parameters if generic or the
 // type parameters that were instantiated if fn is an instantiation.
 //
 // Specifically, the resulting list behaves like:
@@ -1731,7 +1731,7 @@ func (v *Parameter) Parent() *Function         { return v.parent }
 // Note that receiver type parameters precede other type parameters.
 // Also, type parameters may have the same index if they come from
 // different source type parameter lists.
-func (fn *Function) TypeParams() *types.TypeParamList {
+func (fn *Function) TypeParameters() *types.TypeParamList {
 	return consTypeParamLists(fn.recvtypeparams, fn.typeparams)
 }
 
@@ -1764,7 +1764,7 @@ func consTypeParamLists(l, r *types.TypeParamList) *types.TypeParamList {
 	return (*types.TypeParamList)(unsafe.Pointer(&tpars))
 }
 
-// TypeArgs are the types that TypeParams() were instantiated by to create fn
+// TypeArguments are the types that TypeParameters() were instantiated by to create fn
 // from fn.Origin().
 //
 // Specifically, the resulting slice behaves like:
@@ -1777,14 +1777,14 @@ func consTypeParamLists(l, r *types.TypeParamList) *types.TypeParamList {
 //	T[int].m[uint]      // [int, uint]
 //
 // Note that receiver type arguments precede other type arguments.
-func (fn *Function) TypeArgs() []types.Type {
+func (fn *Function) TypeArguments() []types.Type {
 	return slices.Concat(fn.recvtypeargs, fn.typeargs)
 }
 
 // Origin returns the generic function from which fn was instantiated,
 // or nil if fn is not an instantiation.
 func (fn *Function) Origin() *Function {
-	if fn.parent != nil && fn.parent.hasTypeArgs() {
+	if fn.parent != nil && fn.parent.hasTypeArguments() {
 		// Nested functions are BUILT at a different time than their instances.
 		// Build declared package if not yet BUILT. This is not an expected use
 		// case, but is simple and robust.
@@ -1793,24 +1793,24 @@ func (fn *Function) Origin() *Function {
 	return origin(fn)
 }
 
-// hasTypeParams returns whether fn has any type parameters
-func (fn *Function) hasTypeParams() bool {
+// hasTypeParameters returns whether fn has any type parameters
+func (fn *Function) hasTypeParameters() bool {
 	return fn.recvtypeparams.Len()+fn.typeparams.Len() > 0
 }
 
-// hasTypeArgs returns whether fn has any type arguments
-func (fn *Function) hasTypeArgs() bool {
+// hasTypeArguments returns whether fn has any type arguments
+func (fn *Function) hasTypeArguments() bool {
 	return len(fn.recvtypeargs)+len(fn.typeargs) > 0
 }
 
 // subrtargs returns fn's receiver type parameters substituted with receiver type arguments
 func (fn *Function) subrtargs(m *types.Func) []types.Type {
-	return receiverTypeArgs(m)
+	return receiverTypeArguments(m)
 }
 
 // subtargs returns fn's type parameters substituted with (possibly implied) type arguments
 func (fn *Function) subtargs(id *ast.Ident) []types.Type {
-	return instanceArgs(fn.info, id)
+	return instanceArguments(fn.info, id)
 }
 
 // targstr returns a comma-separated string of the types in targs
@@ -1834,8 +1834,8 @@ func targstr(targs []types.Type) string {
 //
 // Precondition: fn and the origin function are done building.
 func origin(fn *Function) *Function {
-	if fn.parent != nil && fn.parent.hasTypeArgs() {
-		return origin(fn.parent).AnonFuncs[fn.anonIdx]
+	if fn.parent != nil && fn.parent.hasTypeArguments() {
+		return origin(fn.parent).AnonymousFunctions[fn.anonIndex]
 	}
 	return fn.topLevelOrigin
 }
@@ -1862,38 +1862,38 @@ func (t *Type) String() string                            { return t.RelativeStr
 func (t *Type) Package() *Package                         { return t.pkg }
 func (t *Type) RelativeString(from *types.Package) string { return relativeString(t, t.pkg, from) }
 
-func (c *NamedConst) Name() string         { return c.object.Name() }
-func (c *NamedConst) Pos() token.Pos       { return c.object.Pos() }
-func (c *NamedConst) String() string       { return c.RelativeString(nil) }
-func (c *NamedConst) Type() types.Type     { return c.object.Type() }
-func (c *NamedConst) Token() token.Token   { return token.CONST }
-func (c *NamedConst) Object() types.Object { return c.object }
-func (c *NamedConst) Package() *Package    { return c.pkg }
-func (c *NamedConst) RelativeString(from *types.Package) string {
+func (c *NamedConstant) Name() string         { return c.object.Name() }
+func (c *NamedConstant) Pos() token.Pos       { return c.object.Pos() }
+func (c *NamedConstant) String() string       { return c.RelativeString(nil) }
+func (c *NamedConstant) Type() types.Type     { return c.object.Type() }
+func (c *NamedConstant) Token() token.Token   { return token.CONST }
+func (c *NamedConstant) Object() types.Object { return c.object }
+func (c *NamedConstant) Package() *Package    { return c.pkg }
+func (c *NamedConstant) RelativeString(from *types.Package) string {
 	return relativeString(c, c.pkg, from)
 }
 
 func (v *Function) Pos() token.Pos   { return v.pos }
 func (v *Function) Source() ast.Node { return v.syntax }
 
-// Func returns the package-level function of the specified name,
+// Function returns the package-level function of the specified name,
 // or nil if not found.
-func (p *Package) Func(name string) (f *Function) {
+func (p *Package) Function(name string) (f *Function) {
 	f, _ = p.Members[name].(*Function)
 	return
 }
 
-// Var returns the package-level variable of the specified name,
+// Variable returns the package-level variable of the specified name,
 // or nil if not found.
-func (p *Package) Var(name string) (g *Global) {
+func (p *Package) Variable(name string) (g *Global) {
 	g, _ = p.Members[name].(*Global)
 	return
 }
 
-// Const returns the package-level constant of the specified name,
+// Constant returns the package-level constant of the specified name,
 // or nil if not found.
-func (p *Package) Const(name string) (c *NamedConst) {
-	c, _ = p.Members[name].(*NamedConst)
+func (p *Package) Constant(name string) (c *NamedConstant) {
+	c, _ = p.Members[name].(*NamedConstant)
 	return
 }
 
@@ -2032,7 +2032,7 @@ func (v *MakeMap) Operands(rands []*Value) []*Value {
 }
 
 func (v *MakeSlice) Operands(rands []*Value) []*Value {
-	return append(rands, &v.Len, &v.Cap)
+	return append(rands, &v.Length, &v.Capacity)
 }
 
 func (v *MapUpdate) Operands(rands []*Value) []*Value {
@@ -2040,7 +2040,7 @@ func (v *MapUpdate) Operands(rands []*Value) []*Value {
 }
 
 func (v *Next) Operands(rands []*Value) []*Value {
-	return append(rands, &v.Iter)
+	return append(rands, &v.Iterator)
 }
 
 func (s *Panic) Operands(rands []*Value) []*Value {

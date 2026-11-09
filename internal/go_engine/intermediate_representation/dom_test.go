@@ -11,7 +11,7 @@ import (
 
 // TestDominatorOrder is go/ir's, building the package in memory where go/ir's loads it with go/packages.
 func TestDominatorOrder(t *testing.T) {
-	const src = `package p
+	const source = `package p
 
 func f(cond bool) {
 	// (Print operands match BasicBlock IDs.)
@@ -24,8 +24,8 @@ func f(cond bool) {
 	print(3)
 }
 `
-	p, _ := buildPackage(t, src, nil)
-	f := p.Func("f")
+	p, _ := buildPackage(t, source, nil)
+	f := p.Function("f")
 
 	if got, want := fmt.Sprint(f.DominatorPreorder()), "[0 1 2 3]"; got != want {
 		t.Errorf("DominatorPreorder: got %v, want %s", got, want)

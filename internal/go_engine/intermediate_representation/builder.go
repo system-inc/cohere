@@ -11,7 +11,7 @@ package intermediate_representation
 // CreatePackage, either from syntax or from mere type information.
 // Each created package has a complete set of Members (const, var,
 // type, func) that can be accessed through methods like
-// Program.FuncValue.
+// Program.FunctionValue.
 //
 // It is not necessary to call CreatePackage for all dependencies of
 // each syntax package, only for its direct imports. (In future
@@ -22,7 +22,7 @@ package intermediate_representation
 // Program.Build, which builds all packages in parallel. Building
 // traverses the type-annotated syntax tree of each function body and
 // creates SSA-form IR, a control-flow graph of instructions,
-// populating fields such as Function.Body, .Params, and others.
+// populating fields such as Function.Body, .Parameters, and others.
 //
 // Building may create additional methods, including:
 // - wrapper methods (e.g. for embedding, or implicit &recv)
@@ -32,7 +32,7 @@ package intermediate_representation
 // As these methods are created, they are added to the build queue,
 // and then processed in turn, until a fixed point is reached,
 // Since these methods might belong to packages that were not
-// created (by a call to CreatePackage), their Pkg field is unset.
+// created (by a call to CreatePackage), their Package field is unset.
 //
 // Instances of generic functions are always wrapped (f[int] delegates
 // to f[T]), as go/ir does without its InstantiateGenerics mode: a
@@ -71,8 +71,8 @@ import (
 )
 
 var (
-	varOk    = newVar("ok", tBool)
-	varIndex = newVar("index", tInt)
+	varOk    = newVariable("ok", tBool)
+	varIndex = newVariable("index", tInt)
 
 	// Type constants.
 	tBool       = types.Typ[types.Bool]
@@ -97,7 +97,7 @@ var (
 
 	vDeferStack = &Builtin{
 		name: "ssa:deferstack",
-		sig:  types.NewSignatureType(nil, nil, nil, nil, types.NewTuple(anonVar(tDeferStack)), false),
+		sig:  types.NewSignatureType(nil, nil, nil, nil, types.NewTuple(anonVariable(tDeferStack)), false),
 	}
 )
 
@@ -247,7 +247,7 @@ func (b *builder) logicalBinop(fn *Function, e *ast.BinaryExpr) Value {
 //
 // Multi-result expressions include CallExprs in a multi-value
 // assignment or return statement, and "value,ok" uses of
-// TypeAssertExpr, IndexExpr (when X is a map), and Recv.
+// TypeAssertExpr, IndexExpr (when X is a map), and Receive.
 func (b *builder) exprN(fn *Function, e ast.Expr) Value {
 	typ := fn.typeOf(e).(*types.Tuple)
 	switch e := e.(type) {
@@ -289,9 +289,9 @@ func (b *builder) exprN(fn *Function, e ast.Expr) Value {
 // The result is nil if no special handling was required; in this case
 // the caller should treat this like an ordinary library function
 // call.
-func (b *builder) builtin(fn *Function, obj *types.Builtin, args []ast.Expr, typ types.Type, source ast.Node) Value {
+func (b *builder) builtin(fn *Function, object *types.Builtin, args []ast.Expr, typ types.Type, source ast.Node) Value {
 	typ = fn.typ(typ)
-	switch obj.Name() {
+	switch object.Name() {
 	case "make":
 		switch ct := typeutil.CoreType(typ).(type) {
 		case *types.Slice:
@@ -312,18 +312,18 @@ func (b *builder) builtin(fn *Function, obj *types.Builtin, args []ast.Expr, typ
 				return fn.emit(v, source)
 			}
 			v := &MakeSlice{
-				Len: n,
-				Cap: m,
+				Length:   n,
+				Capacity: m,
 			}
 			v.setType(typ)
 			return fn.emit(v, source)
 
 		case *types.Map:
-			var res Value
+			var reserve Value
 			if len(args) == 2 {
-				res = b.expr(fn, args[1])
+				reserve = b.expr(fn, args[1])
 			}
-			v := &MakeMap{Reserve: res}
+			v := &MakeMap{Reserve: reserve}
 			v.setType(typ)
 			return fn.emit(v, source)
 
@@ -404,12 +404,12 @@ func (b *builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 		if isBlankIdent(e) {
 			return blank{}
 		}
-		obj := fn.objectOf(e).(*types.Var)
+		object := fn.objectOf(e).(*types.Var)
 		var v Value
-		if g := fn.Program.packageLevelMember(obj); g != nil {
+		if g := fn.Program.packageLevelMember(object); g != nil {
 			v = g.(*Global) // var (address)
 		} else {
-			v = fn.lookup(obj, escaping)
+			v = fn.lookup(object, escaping)
 		}
 		return &address{addr: v}
 
@@ -457,10 +457,10 @@ func (b *builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 		var x Value
 		var et types.Type
 		switch mode {
-		case ixArrVar: // array, array|slice, array|*array, or array|*array|slice.
+		case ixArrVariable: // array, array|slice, array|*array, or array|*array|slice.
 			x = b.addr(fn, e.X, escaping).address(fn)
 			et = types.NewPointer(elem)
-		case ixVar: // *array, slice, *array|slice
+		case ixVariable: // *array, slice, *array|slice
 			x = b.expr(fn, e.X)
 			et = types.NewPointer(elem)
 		case ixMap:
@@ -599,7 +599,7 @@ func (b *builder) expr(fn *Function, e ast.Expr) Value {
 
 	var v Value
 	if tv.Addressable() {
-		// Prefer pointer arithmetic ({Index,Field}Addr) followed
+		// Prefer pointer arithmetic ({Index,Field}Address) followed
 		// by Load over subelement extraction (e.g. Index, Field),
 		// to avoid large copies.
 		v = b.addr(fn, e, false).load(fn, e)
@@ -617,11 +617,11 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 	case *ast.FuncLit:
 		/* function literal */
 		fn2 := &Function{
-			name:           fmt.Sprintf("%s$%d", fn.Name(), 1+len(fn.AnonFuncs)),
+			name:           fmt.Sprintf("%s$%d", fn.Name(), 1+len(fn.AnonymousFunctions)),
 			Signature:      fn.typeOf(e.Type).(*types.Signature),
 			pos:            e.Type.Func,
 			parent:         fn,
-			anonIdx:        int32(len(fn.AnonFuncs)),
+			anonIndex:      int32(len(fn.AnonymousFunctions)),
 			Package:        fn.Package,
 			Program:        fn.Program,
 			syntax:         e,
@@ -633,7 +633,7 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 			typeargs:       fn.typeargs,   // share the parent's type arguments.
 		}
 		fn2.uniq = fn.uniq // start from parent's unique values
-		fn.AnonFuncs = append(fn.AnonFuncs, fn2)
+		fn.AnonymousFunctions = append(fn.AnonymousFunctions, fn2)
 		// Build anon immediately, as it may cause fn's locals to escape.
 		// (It is not marked 'built' until the end of the enclosing FuncDecl.)
 		fn2.build(b, fn2)
@@ -661,8 +661,8 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 		}
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
 		if id, ok := ast.Unparen(e.Fun).(*ast.Ident); ok {
-			if obj, ok := fn.info.Uses[id].(*types.Builtin); ok {
-				if v := b.builtin(fn, obj, e.Args, fn.typ(tv.Type), e); v != nil {
+			if object, ok := fn.info.Uses[id].(*types.Builtin); ok {
+				if v := b.builtin(fn, object, e.Args, fn.typ(tv.Type), e); v != nil {
 					return v
 				}
 			}
@@ -718,7 +718,7 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 		}
 
 	case *ast.SliceExpr:
-		var low, high, max Value
+		var low, high, maximum Value
 		var x Value
 		xtyp := fn.typeOf(e.X)
 		switch typeutil.CoreType(xtyp).(type) {
@@ -742,21 +742,21 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 			high = b.expr(fn, e.High)
 		}
 		if e.Slice3 {
-			max = b.expr(fn, e.Max)
+			maximum = b.expr(fn, e.Max)
 		}
 		v := &Slice{
 			X:       x,
 			Low:     low,
 			High:    high,
-			Maximum: max,
+			Maximum: maximum,
 		}
 		v.setType(fn.typ(tv.Type))
 		return fn.emit(v, e)
 
 	case *ast.Ident:
-		obj := fn.info.Uses[e]
+		object := fn.info.Uses[e]
 		// Universal built-in or nil?
-		switch obj := obj.(type) {
+		switch obj := object.(type) {
 		case *types.Builtin:
 			return &Builtin{name: obj.Name(), sig: fn.instanceType(e).(*types.Signature)}
 		case *types.Nil:
@@ -765,7 +765,7 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 
 		// Package-level func or var?
 		// (obj must belong to same package or a direct import.)
-		if v := fn.Program.packageLevelMember(obj); v != nil {
+		if v := fn.Program.packageLevelMember(object); v != nil {
 			if g, ok := v.(*Global); ok {
 				return emitLoad(fn, g, e) // var (address)
 			}
@@ -777,7 +777,7 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 			return callee
 		}
 		// Local var.
-		return emitLoad(fn, fn.lookup(obj.(*types.Var), false), e) // var (address)
+		return emitLoad(fn, fn.lookup(object.(*types.Var), false), e) // var (address)
 
 	case *ast.SelectorExpr:
 		sel := fn.selection(e)
@@ -801,7 +801,7 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 		case types.MethodVal:
 			// e.f where e is an expression and f is a method.
 			// The result is a "bound".
-			m := sel.obj.(*types.Func)
+			m := sel.object.(*types.Func)
 			rt := fn.typ(recvType(m))
 			wantAddr := isPointer(rt)
 			escaping := true
@@ -879,15 +879,15 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 		// not a generic instantiation.
 		xt := fn.typeOf(e.X)
 		switch et, mode := indexType(xt); mode {
-		case ixVar:
-			// Addressable slice/array; use IndexAddr and Load.
+		case ixVariable:
+			// Addressable slice/array; use IndexAddress and Load.
 			return b.addr(fn, e, false).load(fn, e)
 
-		case ixArrVar, ixValue:
+		case ixArrVariable, ixValue:
 			// An array in a register, a string or a combined type that contains
 			// either an [_]array (ixArrVar) or string (ixValue).
 
-			// Note: for ixArrVar and CoreType(xt)==nil can be IndexAddr and Load.
+			// Note: for ixArrVar and CoreType(xt)==nil can be IndexAddress and Load.
 			index := b.expr(fn, e.Index)
 			if isUntyped(index.Type()) {
 				index = emitConv(fn, index, tInt, e.Index)
@@ -956,7 +956,7 @@ func (b *builder) receiver(fn *Function, e ast.Expr, wantAddr, escaping bool, se
 }
 
 // setCallFunc populates the function parts of a CallCommon structure
-// (Func, Method, Recv, Args[0]) based on the kind of invocation
+// (Function, Method, receiver, Arguments[0]) based on the kind of invocation
 // occurring in e.
 func (b *builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	// Is this a (possibly generic) method call?
@@ -970,7 +970,7 @@ func (b *builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	if selector, ok := m.(*ast.SelectorExpr); ok {
 		sel := fn.selection(selector)
 		if sel != nil && sel.kind == types.MethodVal {
-			obj := sel.obj.(*types.Func)
+			obj := sel.object.(*types.Func)
 			recv := recvType(obj)
 
 			wantAddr := isPointer(recv)
@@ -1024,10 +1024,10 @@ func (b *builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	c.Value = b.expr(fn, e.Fun)
 }
 
-// emitCallArgs emits to f code for the actual parameters of call e to
+// emitCallArguments emits to f code for the actual parameters of call e to
 // a (possibly built-in) function of effective type sig.
 // The argument values are appended to args, which is then returned.
-func (b *builder) emitCallArgs(fn *Function, sig *types.Signature, e *ast.CallExpr, args []Value) []Value {
+func (b *builder) emitCallArguments(fn *Function, sig *types.Signature, e *ast.CallExpr, args []Value) []Value {
 	// f(x, y, z...): pass slice z straight through.
 	if e.Ellipsis != 0 {
 		for i, arg := range e.Args {
@@ -1105,12 +1105,12 @@ func (b *builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	if sig == nil {
 		panic(fmt.Sprintf("no signature for call of %s", e.Fun))
 	}
-	c.Arguments = b.emitCallArgs(fn, sig, e, c.Arguments)
+	c.Arguments = b.emitCallArguments(fn, sig, e, c.Arguments)
 }
 
 // assignOp emits to fn code to perform loc <op>= val.
-func (b *builder) assignOp(fn *Function, loc lvalue, val Value, op token.Token, source ast.Node) {
-	loc.store(fn, emitArith(fn, op, loc.load(fn, source), val, loc.typ(), source), source)
+func (b *builder) assignOp(fn *Function, loc lvalue, value Value, op token.Token, source ast.Node) {
+	loc.store(fn, emitArith(fn, op, loc.load(fn, source), value, loc.typ(), source), source)
 }
 
 // localValueSpec emits to fn code to define all of the vars in the
@@ -1122,7 +1122,7 @@ func (b *builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 		// 1:1 assignment
 		for i, id := range spec.Names {
 			if !isBlankIdent(id) {
-				emitLocalVar(fn, identVar(fn, id), id)
+				emitLocalVariable(fn, identVariable(fn, id), id)
 			}
 			lval := b.addr(fn, id, false) // non-escaping
 			b.assign(fn, lval, spec.Values[i], true, nil, spec)
@@ -1133,7 +1133,7 @@ func (b *builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 		// Locals are implicitly zero-initialized.
 		for _, id := range spec.Names {
 			if !isBlankIdent(id) {
-				emitLocalVar(fn, identVar(fn, id), id)
+				emitLocalVariable(fn, identVariable(fn, id), id)
 			}
 		}
 
@@ -1142,7 +1142,7 @@ func (b *builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 		tuple := b.exprN(fn, spec.Values[0])
 		for i, id := range spec.Names {
 			if !isBlankIdent(id) {
-				emitLocalVar(fn, identVar(fn, id), id)
+				emitLocalVariable(fn, identVariable(fn, id), id)
 				lhs := b.addr(fn, id, false) // non-escaping
 				lhs.store(fn, emitExtract(fn, tuple, i, id), id)
 			}
@@ -1163,7 +1163,7 @@ func (b *builder) assignStmt(fn *Function, lhss, rhss []ast.Expr, isDef bool, so
 		if !isBlankIdent(lhs) {
 			if isDef {
 				if obj, ok := fn.info.Defs[lhs.(*ast.Ident)].(*types.Var); ok {
-					emitLocalVar(fn, obj, lhs)
+					emitLocalVariable(fn, obj, lhs)
 					isZero[i] = true
 				}
 			}
@@ -1192,9 +1192,9 @@ func (b *builder) assignStmt(fn *Function, lhss, rhss []ast.Expr, isDef bool, so
 	}
 }
 
-// arrayLen returns the length of the array whose composite literal elements are elts.
-func (b *builder) arrayLen(fn *Function, elts []ast.Expr) int64 {
-	var max int64 = -1
+// arrayLength returns the length of the array whose composite literal elements are elts.
+func (b *builder) arrayLength(fn *Function, elts []ast.Expr) int64 {
+	var maximum int64 = -1
 	var i int64 = -1
 	for _, e := range elts {
 		if kv, ok := e.(*ast.KeyValueExpr); ok {
@@ -1202,11 +1202,11 @@ func (b *builder) arrayLen(fn *Function, elts []ast.Expr) int64 {
 		} else {
 			i++
 		}
-		if i > max {
-			max = i
+		if i > maximum {
+			maximum = i
 		}
 	}
-	return max + 1
+	return maximum + 1
 }
 
 // compLit emits to fn code to initialize a composite literal e at
@@ -1288,9 +1288,9 @@ func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero 
 							ncv.setType(treeType)
 							chain.cv = ncv
 							ce := &compositeElement{
-								cv:  parent.cv,
-								idx: idx,
-								t:   ncv.Type(),
+								cv:    parent.cv,
+								index: idx,
+								t:     ncv.Type(),
 							}
 							parent.cv.Bitmap.SetBit(&parent.cv.Bitmap, idx, 1)
 							parent.cv.ExplicitCount++
@@ -1299,9 +1299,9 @@ func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero 
 					}
 
 					ce := &compositeElement{
-						cv:  chain.cv,
-						idx: index[len(index)-1],
-						t:   chainCoreType.Field(index[len(index)-1]).Type(),
+						cv:    chain.cv,
+						index: index[len(index)-1],
+						t:     chainCoreType.Field(index[len(index)-1]).Type(),
 					}
 					// We use b.assign for its handling of implicit & (which,
 					// albeit not needed for structs now, may be needed in the
@@ -1313,9 +1313,9 @@ func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero 
 					chain.cv.ExplicitCount++
 				} else {
 					ce := &compositeElement{
-						cv:  v,
-						idx: i,
-						t:   t.Field(i).Type(),
+						cv:    v,
+						index: i,
+						t:     t.Field(i).Type(),
 					}
 					b.assign(fn, ce, e, isZero, nil, e)
 					v.Bitmap.SetBit(&v.Bitmap, i, 1)
@@ -1343,7 +1343,7 @@ func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero 
 		var array Value
 		switch t := t.(type) {
 		case *types.Slice:
-			at = types.NewArray(t.Elem(), b.arrayLen(fn, e.Elts))
+			at = types.NewArray(t.Elem(), b.arrayLength(fn, e.Elts))
 			array = emitNew(fn, at, e, "slicelit")
 		case *types.Array:
 			at = t
@@ -1368,23 +1368,23 @@ func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero 
 				}
 				v.setType(at)
 
-				var idx *Constant
+				var index *Constant
 				for _, e := range e.Elts {
 					if kv, ok := e.(*ast.KeyValueExpr); ok {
-						idx = b.expr(fn, kv.Key).(*Constant)
+						index = b.expr(fn, kv.Key).(*Constant)
 						e = kv.Value
 					} else {
 						var idxval int64
-						if idx != nil {
-							idxval = idx.Int64() + 1
+						if index != nil {
+							idxval = index.Int64() + 1
 						}
-						idx = intConstant(idxval, e)
+						index = intConstant(idxval, e)
 					}
 
 					iaddr := &compositeElement{
-						cv:  v,
-						idx: int(idx.Int64()),
-						t:   at.Elem(),
+						cv:    v,
+						index: int(index.Int64()),
+						t:     at.Elem(),
 					}
 
 					// We use b.assign for its handling of implicit &, but no
@@ -1392,7 +1392,7 @@ func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero 
 					// conversions have to be emitted before we emit the
 					// CompositeValue.
 					b.assign(fn, iaddr, e, true, nil, e)
-					v.Bitmap.SetBit(&v.Bitmap, int(idx.Int64()), 1)
+					v.Bitmap.SetBit(&v.Bitmap, int(index.Int64()), 1)
 					v.ExplicitCount++
 				}
 				final = v
@@ -1405,21 +1405,21 @@ func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero 
 					sb.store(&address{array}, zeroConstant(deref(array.Type()), e), e)
 				}
 
-				var idx *Constant
+				var index *Constant
 				for _, e := range e.Elts {
 					if kv, ok := e.(*ast.KeyValueExpr); ok {
-						idx = b.expr(fn, kv.Key).(*Constant)
+						index = b.expr(fn, kv.Key).(*Constant)
 						e = kv.Value
 					} else {
 						var idxval int64
-						if idx != nil {
-							idxval = idx.Int64() + 1
+						if index != nil {
+							idxval = index.Int64() + 1
 						}
-						idx = intConstant(idxval, e)
+						index = intConstant(idxval, e)
 					}
 					iaddr := &IndexAddress{
 						X:     array,
-						Index: idx,
+						Index: index,
 					}
 					iaddr.setType(types.NewPointer(at.Elem()))
 					fn.emit(iaddr, e)
@@ -1728,7 +1728,7 @@ func (b *builder) typeSwitchStmt(fn *Function, s *ast.TypeSwitchStmt, label *lbl
 	for _, clause := range s.Body.List {
 		cc := clause.(*ast.CaseClause)
 		if obj, ok := fn.info.Implicits[cc].(*types.Var); ok {
-			emitLocalVar(fn, obj, cc)
+			emitLocalVariable(fn, obj, cc)
 		}
 		if cc.List == nil {
 			// default case
@@ -1755,7 +1755,7 @@ func (b *builder) typeSwitchStmt(fn *Function, s *ast.TypeSwitchStmt, label *lbl
 	var vars []*types.Var
 	vars = append(vars, varIndex)
 	for _, typ := range rets {
-		vars = append(vars, anonVar(typ))
+		vars = append(vars, anonVariable(typ))
 	}
 	tswtch.setType(types.NewTuple(vars...))
 	// default branch
@@ -1882,29 +1882,29 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 			continue
 
 		case *ast.SendStmt: // ch<- i
-			ch := b.expr(fn, comm.Chan)
+			channel := b.expr(fn, comm.Chan)
 			st = &SelectState{
-				Dir:     types.SendOnly,
-				Channel: ch,
+				Direction: types.SendOnly,
+				Channel:   channel,
 				Send: emitConv(fn, b.expr(fn, comm.Value),
-					typeutil.CoreType(fn.typ(ch.Type())).(*types.Chan).Elem(), comm),
-				Pos: comm.Arrow,
+					typeutil.CoreType(fn.typ(channel.Type())).(*types.Chan).Elem(), comm),
+				Position: comm.Arrow,
 			}
 
 		case *ast.AssignStmt: // x := <-ch
 			recv := ast.Unparen(comm.Rhs[0]).(*ast.UnaryExpr)
 			st = &SelectState{
-				Dir:     types.RecvOnly,
-				Channel: b.expr(fn, recv.X),
-				Pos:     recv.OpPos,
+				Direction: types.RecvOnly,
+				Channel:   b.expr(fn, recv.X),
+				Position:  recv.OpPos,
 			}
 
 		case *ast.ExprStmt: // <-ch
 			recv := ast.Unparen(comm.X).(*ast.UnaryExpr)
 			st = &SelectState{
-				Dir:     types.RecvOnly,
-				Channel: b.expr(fn, recv.X),
-				Pos:     recv.OpPos,
+				Direction: types.RecvOnly,
+				Channel:   b.expr(fn, recv.X),
+				Position:  recv.OpPos,
 			}
 		}
 		states = append(states, st)
@@ -1920,14 +1920,14 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 	var vars []*types.Var
 	vars = append(vars, varIndex, varOk)
 	for _, st := range states {
-		if st.Dir == types.RecvOnly {
+		if st.Direction == types.RecvOnly {
 			tElem := typeutil.CoreType(fn.typ(st.Channel.Type())).(*types.Chan).Elem()
-			vars = append(vars, anonVar(tElem))
+			vars = append(vars, anonVariable(tElem))
 		}
 	}
 	sel.setType(types.NewTuple(vars...))
 	fn.emit(sel, s)
-	idx := emitExtract(fn, sel, 0, s)
+	index := emitExtract(fn, sel, 0, s)
 
 	done := fn.newBasicBlock("select.done")
 	if label != nil {
@@ -1936,7 +1936,7 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 
 	entry := fn.currentBlock
 	swtch := &ConstantSwitch{
-		Tag: idx,
+		Tag: index,
 		// one condition per case
 		Conditions: make([]Value, 0, len(s.Body.List)+1),
 	}
@@ -1944,7 +1944,7 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 	var bodies []*BasicBlock
 
 	state := 0
-	r := 2 // index in 'sel' tuple of value; increments if st.Dir==RECV
+	r := 2 // index in 'sel' tuple of value; increments if st.Direction==RECV
 	for _, cc := range s.Body.List {
 		clause := cc.(*ast.CommClause)
 		if clause.Comm == nil {
@@ -1973,10 +1973,10 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 		case *ast.ExprStmt: // <-ch
 			r++
 
-		case *ast.AssignStmt: // x := <-states[state].Chan
+		case *ast.AssignStmt: // x := <-states[state].Channel
 			if comm.Tok == token.DEFINE {
 				id := comm.Lhs[0].(*ast.Ident)
-				emitLocalVar(fn, identVar(fn, id), id)
+				emitLocalVariable(fn, identVariable(fn, id), id)
 			}
 			x := b.addr(fn, comm.Lhs[0], false) // non-escaping
 			v := emitExtract(fn, sel, r, comm)
@@ -1985,7 +1985,7 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 			if len(comm.Lhs) == 2 { // x, ok := ...
 				if comm.Tok == token.DEFINE {
 					id := comm.Lhs[1].(*ast.Ident)
-					emitLocalVar(fn, identVar(fn, id), id)
+					emitLocalVariable(fn, identVariable(fn, id), id)
 				}
 				ok := b.addr(fn, comm.Lhs[1], false) // non-escaping
 				ok.store(fn, emitExtract(fn, sel, 1, comm), comm)
@@ -2106,7 +2106,7 @@ func (b *builder) forStmtGo122(fn *Function, s *ast.ForStmt, label *lblock) {
 	// For each of the n loop variables, we create five SSA values,
 	// outer, phi, next, load, and store in pre, loop, and post.
 	// There is no limit on n.
-	type loopVar struct {
+	type loopVariable struct {
 		obj   *types.Var
 		outer *Allocation
 		phi   *Phi
@@ -2114,9 +2114,9 @@ func (b *builder) forStmtGo122(fn *Function, s *ast.ForStmt, label *lblock) {
 		next  *Allocation
 		store *Store
 	}
-	vars := make([]loopVar, len(init.Lhs))
+	vars := make([]loopVariable, len(init.Lhs))
 	for i, lhs := range init.Lhs {
-		v := identVar(fn, lhs.(*ast.Ident))
+		v := identVariable(fn, lhs.(*ast.Ident))
 		typ := fn.typ(v.Type())
 
 		fn.currentBlock = pre
@@ -2136,7 +2136,7 @@ func (b *builder) forStmtGo122(fn *Function, s *ast.ForStmt, label *lblock) {
 		store := emitStore(fn, next, load, s)
 
 		phi.Edges = []Value{outer, next} // pre edge is emitted before post edge.
-		vars[i] = loopVar{v, outer, phi, load, next, store}
+		vars[i] = loopVariable{v, outer, phi, load, next, store}
 	}
 
 	// ...init... under fn.objects[v] = i_outer
@@ -2227,7 +2227,7 @@ func (b *builder) forStmtGo122(fn *Function, s *ast.ForStmt, label *lblock) {
 		}
 
 		// Remove instructions for phi, load, and store.
-		// lift() will remove the unused i_next *Alloc.
+		// lift() will remove the unused i_next *Allocation.
 		isDead := func(i Instruction) bool { return dead[i] }
 		loop.Instructions = slices.DeleteFunc(loop.Instructions, isDead)
 		post.Instructions = slices.DeleteFunc(post.Instructions, isDead)
@@ -2238,7 +2238,12 @@ func (b *builder) forStmtGo122(fn *Function, s *ast.ForStmt, label *lblock) {
 // over array, *array or slice value x.
 // The v result is defined only if tv is non-nil.
 // forPos is the position of the "for" token.
-func (b *builder) rangeIndexed(fn *Function, x Value, tv types.Type, source ast.Node) (k, v Value, loop, done *BasicBlock) {
+func (b *builder) rangeIndexed(
+	fn *Function,
+	x Value,
+	tv types.Type,
+	source ast.Node,
+) (k, v Value, loop, done *BasicBlock) {
 	//
 	//     length = len(x)
 	//     index = -1
@@ -2255,18 +2260,18 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv types.Type, source ast.
 	// Determine number of iterations.
 	var length Value
 	dt := deref(x.Type())
-	if arr, ok := typeutil.CoreType(dt).(*types.Array); ok {
+	if array, ok := typeutil.CoreType(dt).(*types.Array); ok {
 		// For array or *array, the number of iterations is
 		// known statically thanks to the type.  We avoid a
 		// data dependence upon x, permitting later dead-code
 		// elimination if x is pure, static unrolling, etc.
 		// Ranging over a nil *array may have >0 iterations.
 		// We still generate code for x, in case it has effects.
-		length = intConstant(arr.Len(), nil)
+		length = intConstant(array.Len(), nil)
 	} else {
 		// length = len(x).
 		var c Call
-		c.Call.Value = makeLen(x.Type())
+		c.Call.Value = makeLength(x.Type())
 		c.Call.Arguments = []Value{x}
 		c.setType(tInt)
 		length = fn.emit(&c, source)
@@ -2331,7 +2336,12 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv types.Type, source ast.
 // Range/Next/Extract to iterate over map or string value x.
 // tk and tv are the types of the key/value results k and v, or nil
 // if the respective component is not wanted.
-func (b *builder) rangeIter(fn *Function, x Value, tk, tv types.Type, source ast.Node) (k, v Value, loop, done *BasicBlock) {
+func (b *builder) rangeIter(
+	fn *Function,
+	x Value,
+	tk, tv types.Type,
+	source ast.Node,
+) (k, v Value, loop, done *BasicBlock) {
 	//
 	//	it = range x
 	// loop:                                   (target of continue)
@@ -2364,8 +2374,8 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv types.Type, source ast
 	rng := &Range{X: x}
 	rng.setType(typeutil.NewIterator(types.NewTuple(
 		varOk,
-		newVar("k", ak),
-		newVar("v", av),
+		newVariable("k", ak),
+		newVariable("v", av),
 	)))
 	it := fn.emit(rng, source)
 
@@ -2374,7 +2384,7 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv types.Type, source ast
 	fn.currentBlock = loop
 
 	okv := &Next{
-		Iter:     it,
+		Iterator: it,
 		IsString: isString,
 	}
 	okv.setType(rng.typ.(*typeutil.Iterator).Elem())
@@ -2402,7 +2412,12 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv types.Type, source ast
 // tk is the channel's element type, or nil if the k result is
 // not wanted
 // pos is the position of the '=' or ':=' token.
-func (b *builder) rangeChannel(fn *Function, x Value, tk types.Type, source ast.Node) (k Value, loop, done *BasicBlock) {
+func (b *builder) rangeChannel(
+	fn *Function,
+	x Value,
+	tk types.Type,
+	source ast.Node,
+) (k Value, loop, done *BasicBlock) {
 	//
 	// loop:                                   (target of continue)
 	//      ko = <-x                           (key, ok)
@@ -2418,7 +2433,13 @@ func (b *builder) rangeChannel(fn *Function, x Value, tk types.Type, source ast.
 	emitJump(fn, loop, source)
 	fn.currentBlock = loop
 
-	retv := emitReceive(fn, x, true, types.NewTuple(newVar("k", typeutil.CoreType(x.Type()).(*types.Chan).Elem()), varOk), source)
+	retv := emitReceive(
+		fn,
+		x,
+		true,
+		types.NewTuple(newVariable("k", typeutil.CoreType(x.Type()).(*types.Chan).Elem()), varOk),
+		source,
+	)
 
 	body := fn.newBasicBlock("rangechan.body")
 	done = fn.newBasicBlock("rangechan.done")
@@ -2493,17 +2514,17 @@ func (b *builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock, sourc
 	}
 
 	// create locals for s.Key and s.Value
-	createVars := func() {
+	createVariables := func() {
 		// Unlike a short variable declaration, a RangeStmt
 		// using := never redeclares an existing variable; it
 		// always creates a new one.
 		if tk != nil {
 			id := s.Key.(*ast.Ident)
-			emitLocalVar(fn, identVar(fn, id), id)
+			emitLocalVariable(fn, identVariable(fn, id), id)
 		}
 		if tv != nil {
 			id := s.Value.(*ast.Ident)
-			emitLocalVar(fn, identVar(fn, id), id)
+			emitLocalVariable(fn, identVariable(fn, id), id)
 		}
 	}
 
@@ -2511,7 +2532,7 @@ func (b *builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock, sourc
 	if s.Tok == token.DEFINE && !afterGo122 {
 		// pre-go1.22: If iteration variables are defined (:=), this
 		// occurs once outside the loop.
-		createVars()
+		createVariables()
 	}
 
 	x := b.expr(fn, s.X)
@@ -2554,7 +2575,7 @@ func (b *builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock, sourc
 
 	if s.Tok == token.DEFINE && afterGo122 {
 		// go1.22: If iteration variables are defined (:=), this occurs inside the loop.
-		createVars()
+		createVariables()
 	}
 
 	// Evaluate both LHS expressions before we update either.
@@ -2704,22 +2725,22 @@ func (b *builder) rangeFunc(fn *Function, x Value, rng *ast.RangeStmt, label *lb
 	// loop:
 	//     jump := READY
 
-	anonIdx := len(fn.AnonFuncs)
+	anonIndex := len(fn.AnonymousFunctions)
 
-	jump := newVar(fmt.Sprintf("jump$%d", anonIdx+1), tInt)
-	emitLocalVar(fn, jump, nil) // zero value is READY
+	jump := newVariable(fmt.Sprintf("jump$%d", anonIndex+1), tInt)
+	emitLocalVariable(fn, jump, nil) // zero value is READY
 
 	xsig := typeutil.CoreType(x.Type()).(*types.Signature)
 	ysig := typeutil.CoreType(xsig.Params().At(0).Type()).(*types.Signature)
 
 	/* synthetic yield function for body of range-over-func loop */
 	y := &Function{
-		name:           fmt.Sprintf("%s$%d", fn.Name(), anonIdx+1),
+		name:           fmt.Sprintf("%s$%d", fn.Name(), anonIndex+1),
 		Signature:      ysig,
 		Synthetic:      "range-over-func yield",
 		pos:            rng.Range,
 		parent:         fn,
-		anonIdx:        int32(len(fn.AnonFuncs)),
+		anonIndex:      int32(len(fn.AnonymousFunctions)),
 		Package:        fn.Package,
 		Program:        fn.Program,
 		syntax:         rng,
@@ -2732,14 +2753,14 @@ func (b *builder) rangeFunc(fn *Function, x Value, rng *ast.RangeStmt, label *lb
 	y.goversion = fn.goversion
 	y.jump = jump
 	y.deferstack = fn.deferstack
-	y.returnVars = fn.returnVars // use the parent's return variables
-	y.uniq = fn.uniq             // start from parent's unique values
+	y.returnVariables = fn.returnVariables // use the parent's return variables
+	y.uniq = fn.uniq                       // start from parent's unique values
 
 	// If the RangeStmt has a label, this is how it is passed to buildYieldFunc.
 	if label != nil {
 		y.lblocks = map[*types.Label]*lblock{label.label: nil}
 	}
-	fn.AnonFuncs = append(fn.AnonFuncs, y)
+	fn.AnonymousFunctions = append(fn.AnonymousFunctions, y)
 
 	// Build y immediately. It may:
 	// * cause fn's locals to escape, and
@@ -2809,7 +2830,7 @@ func (b *builder) buildYieldResume(fn *Function, jump *types.Var, exits []*exit,
 	)
 
 	fn.currentBlock = bodies[1]
-	storeVar(fn, jump, jDone, nil)
+	storeVariable(fn, jump, jDone, nil)
 	emitJump(fn, done, nil)
 
 	for _, e := range exits {
@@ -2835,7 +2856,7 @@ func (b *builder) buildYieldResume(fn *Function, jump *types.Var, exits []*exit,
 			// case EXIT(id): { fn.jump = id; return false }
 			// fn is a range-over-func function.
 
-			storeVar(fn, fn.jump, id, e.source)
+			storeVariable(fn, fn.jump, id, e.source)
 			vFalse := NewConstant(constant.MakeBool(false), tBool, e.source)
 			fn.emit(&Return{Results: []Value{vFalse}}, e.source)
 
@@ -3038,7 +3059,7 @@ func (b *builder) branchStmt(fn *Function, s *ast.BranchStmt) {
 		// fn must be a range-over-func
 		e := blockExit(fn, block, s)
 		id := intConstant(e.id, s)
-		storeVar(fn, fn.jump, id, s)
+		storeVariable(fn, fn.jump, id, s)
 		vFalse := NewConstant(constant.MakeBool(false), tBool, s)
 		fn.emit(&Return{Results: []Value{vFalse}}, e.source)
 	}
@@ -3077,7 +3098,7 @@ func (b *builder) returnStmt(fn *Function, s *ast.ReturnStmt) {
 		if fn == fn.source {
 			result = fn.results[i]
 		} else { // lookup needed?
-			result = fn.lookup(fn.returnVars[i], false)
+			result = fn.lookup(fn.returnVariables[i], false)
 		}
 		emitStore(fn, result, r, s)
 	}
@@ -3088,7 +3109,7 @@ func (b *builder) returnStmt(fn *Function, s *ast.ReturnStmt) {
 		// but the generated code is in the 'switch jump {...}' after it.
 		e := returnExit(fn, s)
 		id := intConstant(e.id, e.source)
-		storeVar(fn, fn.jump, id, e.source)
+		storeVariable(fn, fn.jump, id, e.source)
 		vFalse := NewConstant(constant.MakeBool(false), tBool, e.source)
 		fn.emit(&Return{Results: []Value{vFalse}}, e.source)
 		fn.currentBlock = fn.newBasicBlock("unreachable")
@@ -3136,19 +3157,19 @@ func (b *builder) buildFunction(fn *Function) {
 	}
 }
 
-// buildParamsOnly builds fn.Params from fn.Signature, but does not build fn.Body.
+// buildParamsOnly builds fn.Parameters from fn.Signature, but does not build fn.Body.
 func (b *builder) buildParamsOnly(fn *Function) {
 	// For external (C, asm) functions or functions loaded from
-	// export data, we must set fn.Params even though there is no
+	// export data, we must set fn.Parameters even though there is no
 	// body code to reference them.
 	if recv := fn.Signature.Recv(); recv != nil {
 		// TODO(dh): should we synthesize a node so we have position info?
-		fn.addParamVar(recv, nil)
+		fn.addParamVariable(recv, nil)
 	}
-	params := fn.Signature.Params()
-	for i, n := 0, params.Len(); i < n; i++ {
+	parameters := fn.Signature.Params()
+	for i, n := 0, parameters.Len(); i < n; i++ {
 		// TODO(dh): should we synthesize a node so we have position info?
-		fn.addParamVar(params.At(i), nil)
+		fn.addParamVariable(parameters.At(i), nil)
 	}
 }
 
@@ -3178,7 +3199,7 @@ func (b *builder) buildFromSyntax(fn *Function) {
 	}
 	fn.source = fn
 	fn.startBody()
-	fn.createSyntacticParams(recvField, functype)
+	fn.createSyntacticParameters(recvField, functype)
 	fn.createDeferStack()
 	b.stmt(fn, body)
 	if cb := fn.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Predecessors != nil) {
@@ -3213,9 +3234,9 @@ func (b *builder) buildYieldFunc(fn *Function) {
 	s := fn.syntax.(*ast.RangeStmt)
 	fn.source = fn.parent.source
 	fn.startBody()
-	params := fn.Signature.Params()
-	for v := range params.Variables() {
-		fn.addParamVar(v, nil)
+	parameters := fn.Signature.Params()
+	for v := range parameters.Variables() {
+		fn.addParamVariable(v, nil)
 	}
 
 	// Initial targets
@@ -3241,7 +3262,7 @@ func (b *builder) buildYieldFunc(fn *Function) {
 	//   return true
 	saved := fn.currentBlock
 	fn.currentBlock = ycont
-	storeVar(fn, fn.jump, jReady, s.Body)
+	storeVariable(fn, fn.jump, jReady, s.Body)
 	// A yield function's own deferstack is always empty, so rundefers is not needed.
 	fn.emit(&Return{Results: []Value{vTrue}}, nil)
 
@@ -3254,8 +3275,8 @@ func (b *builder) buildYieldFunc(fn *Function) {
 	yloop := fn.newBasicBlock("yield-loop")
 	invalid := fn.newBasicBlock("yield-invalid")
 
-	jumpVal := emitLoad(fn, fn.lookup(fn.jump, true), nil)
-	emitIf(fn, emitCompare(fn, token.EQL, jumpVal, jReady, nil), yloop, invalid, nil)
+	jumpValue := emitLoad(fn, fn.lookup(fn.jump, true), nil)
+	emitIf(fn, emitCompare(fn, token.EQL, jumpValue, jReady, nil), yloop, invalid, nil)
 	fn.currentBlock = invalid
 	fn.emit(
 		&Panic{
@@ -3265,7 +3286,7 @@ func (b *builder) buildYieldFunc(fn *Function) {
 	)
 
 	fn.currentBlock = yloop
-	storeVar(fn, fn.jump, jBusy, s.Body)
+	storeVariable(fn, fn.jump, jBusy, s.Body)
 
 	// Initialize k and v from params.
 	var tk, tv types.Type
@@ -3277,10 +3298,10 @@ func (b *builder) buildYieldFunc(fn *Function) {
 	}
 	if s.Tok == token.DEFINE {
 		if tk != nil {
-			emitLocalVar(fn, identVar(fn, s.Key.(*ast.Ident)), s.Key)
+			emitLocalVariable(fn, identVariable(fn, s.Key.(*ast.Ident)), s.Key)
 		}
 		if tv != nil {
-			emitLocalVar(fn, identVar(fn, s.Value.(*ast.Ident)), s.Value)
+			emitLocalVariable(fn, identVariable(fn, s.Value.(*ast.Ident)), s.Value)
 		}
 	}
 	var k, v Value
@@ -3331,7 +3352,7 @@ func (b *builder) buildYieldFunc(fn *Function) {
 			//     return false
 			fn.currentBlock = lb._goto
 			id := intConstant(e.id, e.source)
-			storeVar(fn, fn.jump, id, e.source)
+			storeVariable(fn, fn.jump, id, e.source)
 			vFalse := NewConstant(constant.MakeBool(false), tBool, e.source)
 			fn.emit(&Return{Results: []Value{vFalse}}, e.source)
 		}
@@ -3351,17 +3372,17 @@ func (b *builder) buildYieldFunc(fn *Function) {
 //
 // Build is idempotent and thread-safe.
 func (prog *Program) Build() {
-	var wg sync.WaitGroup
+	var waitGroup sync.WaitGroup
 	for _, p := range prog.packages {
-		wg.Add(1)
+		waitGroup.Add(1)
 		cpuLimit <- unit{} // acquire a token
 		go func(p *Package) {
 			p.Build()
-			wg.Done()
+			waitGroup.Done()
 			<-cpuLimit // release a token
 		}(p)
 	}
-	wg.Wait()
+	waitGroup.Wait()
 }
 
 // cpuLimit is a counting semaphore to limit CPU parallelism.
@@ -3399,7 +3420,7 @@ func (b *builder) buildPackageInit(init *Function) {
 	init.startBody()
 
 	// Make init() skip if package is already initialized.
-	initguard := p.Var("init$guard")
+	initguard := p.Variable("init$guard")
 	doinit := init.newBasicBlock("init.start")
 	done := init.newBasicBlock("init.done")
 	emitIf(init, emitLoad(init, initguard, nil), done, doinit, nil)
@@ -3410,7 +3431,11 @@ func (b *builder) buildPackageInit(init *Function) {
 	for _, pkg := range p.Types.Imports() {
 		prereq := p.Program.packages[pkg]
 		if prereq == nil {
-			panic(fmt.Sprintf("Package(%q).Build(): unsatisfied import: Program.CreatePackage(%q) was not called", p.Types.Path(), pkg.Path()))
+			panic(fmt.Sprintf(
+				"Package(%q).Build(): unsatisfied import: Program.CreatePackage(%q) was not called",
+				p.Types.Path(),
+				pkg.Path(),
+			))
 		}
 		var v Call
 		v.Call.Value = prereq.init

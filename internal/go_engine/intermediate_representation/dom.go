@@ -22,11 +22,11 @@ import (
 	"sort"
 )
 
-// Idom returns the block that immediately dominates b:
+// ImmediateDominator returns the block that immediately dominates b:
 // its parent in the dominator tree, if any.
 // Neither the entry node (b.Index==0) nor recover node
 // (b==b.Parent().Recover()) have a parent.
-func (b *BasicBlock) Idom() *BasicBlock { return b.dom.idom }
+func (b *BasicBlock) ImmediateDominator() *BasicBlock { return b.dom.idom }
 
 // Dominees returns the list of blocks that b immediately dominates:
 // its children in the dominator tree.
@@ -37,7 +37,7 @@ func (b *BasicBlock) Dominates(c *BasicBlock) bool {
 	return b.dom.pre <= c.dom.pre && c.dom.post <= b.dom.post
 }
 
-// DomPreorder returns a new slice containing the blocks of f
+// DominatorPreorder returns a new slice containing the blocks of f
 // in a preorder traversal of the dominator tree.
 func (f *Function) DominatorPreorder() []*BasicBlock {
 	slice := slices.Clone(f.Blocks)
@@ -47,7 +47,7 @@ func (f *Function) DominatorPreorder() []*BasicBlock {
 	return slice
 }
 
-// DomPostorder returns a new slice containing the blocks of f
+// DominatorPostorder returns a new slice containing the blocks of f
 // in a postorder traversal of the dominator tree.
 // (This is not the same as a postdominance order.)
 func (f *Function) DominatorPostorder() []*BasicBlock {
@@ -191,7 +191,7 @@ func buildDominatorTree(fn *Function) {
 			if w.dom.idom != lt.sdom[w.Index] {
 				w.dom.idom = w.dom.idom.dom.idom
 			}
-			// Calculate Children relation as inverse of Idom.
+			// Calculate Children relation as inverse of ImmediateDominator.
 			w.dom.idom.dom.children = append(w.dom.idom.dom.children, w)
 		}
 	}

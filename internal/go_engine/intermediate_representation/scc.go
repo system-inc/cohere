@@ -9,7 +9,7 @@ type sccState struct {
 	index int
 	lows  BlockMap[int]
 	F     []int
-	sccs  []*SCC
+	sccs  []*Scc
 }
 
 func (s *sccState) scc(v *BasicBlock) {
@@ -37,7 +37,7 @@ func (s *sccState) scc(v *BasicBlock) {
 	if lows[vi]&1 == 0 {
 		leaderLow := lows[vi]
 
-		scc := &SCC{
+		scc := &Scc{
 			Index: len(s.sccs),
 		}
 		F := s.F
@@ -47,21 +47,21 @@ func (s *sccState) scc(v *BasicBlock) {
 
 			lows[x] = math.MaxInt
 			scc.Blocks = append(scc.Blocks, s.fn.Blocks[x])
-			s.fn.Blocks[x].SCC = scc
+			s.fn.Blocks[x].Scc = scc
 		}
 		s.F = F
 
 		lows[vi] = math.MaxInt
 		scc.Blocks = append(scc.Blocks, v)
-		v.SCC = scc
+		v.Scc = scc
 		s.sccs = append(s.sccs, scc)
 	} else {
 		s.F = append(s.F, vi)
 	}
 }
 
-// buildSCCs computes the strongly connected components of fn's control flow graph.
-func buildSCCs(fn *Function) {
+// buildSccs computes the strongly connected components of fn's control flow graph.
+func buildSccs(fn *Function) {
 	n := len(fn.Blocks)
 
 	if n == 0 {
@@ -84,20 +84,20 @@ func buildSCCs(fn *Function) {
 		clear(seen)
 		for _, b := range scc.Blocks {
 			for _, succ := range b.Successors {
-				if succ.SCC != b.SCC && !seen[succ.SCC.Index] {
-					b.SCC.Successors = append(b.SCC.Successors, succ.SCC)
-					succ.SCC.Predecessors = append(succ.SCC.Predecessors, b.SCC)
-					seen[succ.SCC.Index] = true
+				if succ.Scc != b.Scc && !seen[succ.Scc.Index] {
+					b.Scc.Successors = append(b.Scc.Successors, succ.Scc)
+					succ.Scc.Predecessors = append(succ.Scc.Predecessors, b.Scc)
+					seen[succ.Scc.Index] = true
 				}
 			}
 		}
 	}
 
-	fn.SCCs = state.sccs
+	fn.Sccs = state.sccs
 
 	// This iterates over the SCCs in reverse topological order, i.e., "bottom
 	// up". This allows us to build up reachability sets.
-	for _, scc := range fn.SCCs {
+	for _, scc := range fn.Sccs {
 		scc.reachable.SetBit(&scc.reachable, scc.Index, 1)
 		for _, succ := range scc.Successors {
 			scc.reachable.Or(&scc.reachable, &succ.reachable)

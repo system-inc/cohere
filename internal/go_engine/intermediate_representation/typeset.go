@@ -104,13 +104,13 @@ func underIs(typ types.Type, f func(types.Type) bool) bool {
 func indexType(typ types.Type) (types.Type, indexMode) {
 	switch U := typ.Underlying().(type) {
 	case *types.Array:
-		return U.Elem(), ixArrVar
+		return U.Elem(), ixArrVariable
 	case *types.Pointer:
-		if arr, ok := U.Elem().Underlying().(*types.Array); ok {
-			return arr.Elem(), ixVar
+		if array, ok := U.Elem().Underlying().(*types.Array); ok {
+			return array.Elem(), ixVariable
 		}
 	case *types.Slice:
-		return U.Elem(), ixVar
+		return U.Elem(), ixVariable
 	case *types.Map:
 		return U.Elem(), ixMap
 	case *types.Basic:
@@ -155,11 +155,11 @@ func indexType(typ types.Type) (types.Type, indexMode) {
 type indexMode byte
 
 const (
-	ixInvalid indexMode = iota // index is invalid
-	ixValue                    // index is a computed value (not addressable)
-	ixArrVar                   // like ixVar, but index operand contains an array
-	ixVar                      // index is an addressable variable
-	ixMap                      // index is a map index expression (acts like a variable on lhs, commaok on rhs of an assignment)
+	ixInvalid     indexMode = iota // index is invalid
+	ixValue                        // index is a computed value (not addressable)
+	ixArrVariable                  // like ixVar, but index operand contains an array
+	ixVariable                     // index is an addressable variable
+	ixMap                          // index is a map index expression (acts like a variable on lhs, commaok on rhs of an assignment)
 )
 
 // meet is the address type that is constrained by both x and y.

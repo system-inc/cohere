@@ -114,8 +114,8 @@ func deref(typ types.Type) types.Type {
 }
 
 // recvType returns the receiver type of method obj.
-func recvType(obj *types.Func) types.Type {
-	return obj.Type().(*types.Signature).Recv().Type()
+func recvType(object *types.Func) types.Type {
+	return object.Type().(*types.Signature).Recv().Type()
 }
 
 // fieldOf returns the index'th field of the (core type of) a struct type;
@@ -139,16 +139,16 @@ func isUntyped(typ types.Type) bool {
 // declaredWithin reports whether an object is declared within a function.
 //
 // obj must not be a method or a field.
-func declaredWithin(obj types.Object, fn *types.Func) bool {
-	if obj.Pos() != token.NoPos {
-		return fn.Scope().Contains(obj.Pos()) // trust the positions if they exist.
+func declaredWithin(object types.Object, fn *types.Func) bool {
+	if object.Pos() != token.NoPos {
+		return fn.Scope().Contains(object.Pos()) // trust the positions if they exist.
 	}
-	if fn.Pkg() != obj.Pkg() {
+	if fn.Pkg() != object.Pkg() {
 		return false // fast path for different packages
 	}
 
 	// Traverse Parent() scopes for fn.Scope().
-	for p := obj.Parent(); p != nil; p = p.Parent() {
+	for p := object.Parent(); p != nil; p = p.Parent() {
 		if p == fn.Scope() {
 			return true
 		}
@@ -176,30 +176,30 @@ func goVersionAtLeast(v, release string) bool {
 	return version.Compare(version.Lang(v), version.Lang(release)) >= 0
 }
 
-// newVar creates a 'var' for use in a types.Tuple.
-func newVar(name string, typ types.Type) *types.Var {
+// newVariable creates a 'var' for use in a types.Tuple.
+func newVariable(name string, typ types.Type) *types.Var {
 	return types.NewParam(token.NoPos, nil, name, typ)
 }
 
-// anonVar creates an anonymous 'var' for use in a types.Tuple.
-func anonVar(typ types.Type) *types.Var {
-	return newVar("", typ)
+// anonVariable creates an anonymous 'var' for use in a types.Tuple.
+func anonVariable(typ types.Type) *types.Var {
+	return newVariable("", typ)
 }
 
-var lenResults = types.NewTuple(anonVar(tInt))
+var lenResults = types.NewTuple(anonVariable(tInt))
 
-// makeLen returns the len builtin specialized to type func(T)int.
-func makeLen(T types.Type) *Builtin {
-	lenParams := types.NewTuple(anonVar(T))
+// makeLength returns the len builtin specialized to type func(T)int.
+func makeLength(T types.Type) *Builtin {
+	lenParameters := types.NewTuple(anonVariable(T))
 	return &Builtin{
 		name: "len",
-		sig:  types.NewSignatureType(nil, nil, nil, lenParams, lenResults, false),
+		sig:  types.NewSignatureType(nil, nil, nil, lenParameters, lenResults, false),
 	}
 }
 
-func assert(x bool, msg string) {
+func assert(x bool, message string) {
 	if !x {
-		panic(msg)
+		panic(message)
 	}
 }
 
@@ -212,9 +212,9 @@ func isBasic(t types.Type) bool {
 	return ok
 }
 
-// receiverTypeArgs returns the type arguments to a method's receiver.
+// receiverTypeArguments returns the type arguments to a method's receiver.
 // Returns an empty list if the receiver does not have type arguments.
-func receiverTypeArgs(method *types.Func) []types.Type {
+func receiverTypeArguments(method *types.Func) []types.Type {
 	recv := method.Signature().Recv()
 	named := func() (named *types.Named) {
 		t := recv.Type()
@@ -238,15 +238,15 @@ func receiverTypeArgs(method *types.Func) []types.Type {
 	return targs
 }
 
-// recvAsFirstArg takes a method signature and returns a function
+// recvAsFirstArgument takes a method signature and returns a function
 // signature with receiver as the first parameter.
-func recvAsFirstArg(sig *types.Signature) *types.Signature {
-	params := make([]*types.Var, 0, 1+sig.Params().Len())
-	params = append(params, sig.Recv())
+func recvAsFirstArgument(sig *types.Signature) *types.Signature {
+	parameters := make([]*types.Var, 0, 1+sig.Params().Len())
+	parameters = append(parameters, sig.Recv())
 	for v := range sig.Params().Variables() {
-		params = append(params, v)
+		parameters = append(parameters, v)
 	}
-	return types.NewSignatureType(nil, nil, nil, types.NewTuple(params...), sig.Results(), sig.Variadic())
+	return types.NewSignatureType(nil, nil, nil, types.NewTuple(parameters...), sig.Results(), sig.Variadic())
 }
 
 // instance returns whether an expression is a simple or qualified identifier
@@ -272,8 +272,8 @@ func isNonTypeParamInterface(t types.Type) bool {
 	return !typeparams.IsTypeParam(t) && types.IsInterface(t)
 }
 
-// instanceArgs returns the Instance[id].TypeArgs as a slice.
-func instanceArgs(info *types.Info, id *ast.Ident) []types.Type {
+// instanceArguments returns the Instance[id].TypeArgs as a slice.
+func instanceArguments(info *types.Info, id *ast.Ident) []types.Type {
 	targList := info.Instances[id].TypeArgs
 	if targList == nil {
 		return nil
@@ -289,7 +289,7 @@ func instanceArgs(info *types.Info, id *ast.Ident) []types.Type {
 // Mapping of a type T to a canonical instance C s.t. types.Identical(T, C).
 // Thread-safe.
 type canonizer struct {
-	mu    sync.Mutex
+	mutex sync.Mutex
 	types typeutil.Map[types.Type] // map from type to a canonical instance
 	lists typeListMap              // map from a list of types to a canonical instance
 }
@@ -330,8 +330,8 @@ func (c *canonizer) List(ts []types.Type) *typeList {
 	}
 	l := unaliasAll(ts)
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	return c.lists.rep(l)
 }
 
@@ -343,8 +343,8 @@ func (c *canonizer) List(ts []types.Type) *typeList {
 func (c *canonizer) Type(T types.Type) types.Type {
 	T = types.Unalias(T) // remove the top level alias.
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	if r, _ := c.types.At(T); r != nil {
 		return r
@@ -425,13 +425,13 @@ func (canon *canonizer) instantiateMethod(m *types.Func, targs []types.Type, ctx
 		recv = p.Elem()
 	}
 	named := types.Unalias(recv).(*types.Named)
-	inst, err := types.Instantiate(ctxt, named.Origin(), targs, false)
-	if err != nil {
-		panic(err)
+	inst, instantiateError := types.Instantiate(ctxt, named.Origin(), targs, false)
+	if instantiateError != nil {
+		panic(instantiateError)
 	}
 	rep := canon.Type(inst)
-	obj, _, _ := types.LookupFieldOrMethod(rep, true, m.Pkg(), m.Name())
-	return obj.(*types.Func)
+	object, _, _ := types.LookupFieldOrMethod(rep, true, m.Pkg(), m.Name())
+	return object.(*types.Func)
 }
 
 // Exposed to irutil using the linkname hack.

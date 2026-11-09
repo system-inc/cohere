@@ -45,9 +45,9 @@ func NewProgram(fset *token.FileSet) *Program {
 // For objects from Go source code, syntax is the associated syntax tree
 // (for funcs and vars only) and goversion defines the appropriate
 // interpretation; they will be used during the build phase.
-func memberFromObject(pkg *Package, obj types.Object, syntax ast.Node, goversion string) {
-	name := obj.Name()
-	switch obj := obj.(type) {
+func memberFromObject(pkg *Package, object types.Object, syntax ast.Node, goversion string) {
+	name := object.Name()
+	switch obj := object.(type) {
 	case *types.Builtin:
 		if pkg.Types != types.Unsafe {
 			panic("unexpected builtin object: " + obj.String())
@@ -62,7 +62,7 @@ func memberFromObject(pkg *Package, obj types.Object, syntax ast.Node, goversion
 		}
 
 	case *types.Const:
-		c := &NamedConst{
+		c := &NamedConstant{
 			object: obj,
 			Value:  NewConstant(obj.Val(), obj.Type(), syntax),
 			pkg:    pkg,
@@ -108,7 +108,14 @@ func memberFromObject(pkg *Package, obj types.Object, syntax ast.Node, goversion
 // createFunction creates a function or method. It supports both
 // CreatePackage (with or without syntax) and the on-demand creation
 // of methods in non-created packages based on their types.Func.
-func createFunction(prog *Program, obj *types.Func, name string, syntax ast.Node, info *types.Info, goversion string) *Function {
+func createFunction(
+	prog *Program,
+	obj *types.Func,
+	name string,
+	syntax ast.Node,
+	info *types.Info,
+	goversion string,
+) *Function {
 	sig := obj.Type().(*types.Signature)
 
 	/* declared function/method (from syntax or export data) */
@@ -130,7 +137,7 @@ func createFunction(prog *Program, obj *types.Func, name string, syntax ast.Node
 		fn.Synthetic = "from type information"
 		fn.build = (*builder).buildParamsOnly
 	}
-	if fn.hasTypeParams() {
+	if fn.hasTypeParameters() {
 		fn.generic = new(generic)
 	}
 	return fn

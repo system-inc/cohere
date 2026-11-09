@@ -32,7 +32,7 @@ func removeInstruction(refs []Instruction, instr Instruction) []Instruction {
 }
 
 type BlockSet struct {
-	idx    int
+	index  int
 	values []bool
 	count  int
 }
@@ -51,7 +51,7 @@ func (s *BlockSet) Set(s2 *BlockSet) {
 	}
 }
 
-func (s *BlockSet) Num() int {
+func (s *BlockSet) Count() int {
 	return s.count
 }
 
@@ -69,7 +69,7 @@ func (s *BlockSet) Add(b *BasicBlock) bool {
 	}
 	s.count++
 	s.values[b.Index] = true
-	s.idx = b.Index
+	s.index = b.Index
 
 	return true
 }
@@ -85,20 +85,20 @@ func (s *BlockSet) Clear() {
 // returns its index, or returns -1 if empty.
 func (s *BlockSet) Take() int {
 	// [i, end]
-	for i := s.idx; i < len(s.values); i++ {
+	for i := s.index; i < len(s.values); i++ {
 		if s.values[i] {
 			s.values[i] = false
-			s.idx = i
+			s.index = i
 			s.count--
 			return i
 		}
 	}
 
 	// [start, i)
-	for i := 0; i < s.idx; i++ {
+	for i := 0; i < s.index; i++ {
 		if s.values[i] {
 			s.values[i] = false
-			s.idx = i
+			s.index = i
 			s.count--
 			return i
 		}

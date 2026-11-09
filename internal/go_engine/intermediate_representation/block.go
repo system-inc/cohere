@@ -29,7 +29,7 @@ func (b *BasicBlock) Control() Instruction {
 func (b *BasicBlock) Parent() *Function { return b.parent }
 
 func (b *BasicBlock) Reaches(o *BasicBlock) bool {
-	return b.SCC.reachable.Bit(o.SCC.Index) != 0
+	return b.Scc.reachable.Bit(o.Scc.Index) != 0
 }
 
 // String returns a human-readable label of this block.
@@ -48,7 +48,7 @@ func (b *BasicBlock) emit(i Instruction, source ast.Node) Value {
 	return v
 }
 
-// predIndex returns the i such that b.Preds[i] == c or panics if
+// predecessorIndex returns the i such that b.Predecessors[i] == c or panics if
 // there is none.
 func (b *BasicBlock) predecessorIndex(c *BasicBlock) int {
 	for i, pred := range b.Predecessors {
@@ -59,7 +59,7 @@ func (b *BasicBlock) predecessorIndex(c *BasicBlock) int {
 	panic(fmt.Sprintf("no edge %s -> %s", c, b))
 }
 
-// hasPhi returns true if b.Instrs contains φ-nodes.
+// hasPhi returns true if b.Instructions contains φ-nodes.
 func (b *BasicBlock) hasPhi() bool {
 	_, ok := b.Instructions[0].(*Phi)
 	return ok
@@ -69,7 +69,7 @@ func (b *BasicBlock) Phis() []Instruction {
 	return b.phis()
 }
 
-// phis returns the prefix of b.Instrs containing all the block's φ-nodes.
+// phis returns the prefix of b.Instructions containing all the block's φ-nodes.
 func (b *BasicBlock) phis() []Instruction {
 	for i, instr := range b.Instructions {
 		if _, ok := instr.(*Phi); !ok {
@@ -118,7 +118,7 @@ func (b *BasicBlock) removePredecessor(p *BasicBlock) {
 			j++
 		}
 	}
-	// Nil out b.Preds[j:] and φ-edges[j:] to aid GC.
+	// Nil out b.Predecessors[j:] and φ-edges[j:] to aid GC.
 	for i := j; i < len(b.Predecessors); i++ {
 		b.Predecessors[i] = nil
 		for _, instr := range phis {

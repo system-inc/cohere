@@ -16,15 +16,15 @@ import (
 	"golang.org/x/exp/typeparams"
 )
 
-// emitAlloc emits to f a new Alloc instruction allocating a variable
+// emitAllocation emits to f a new Allocation instruction allocating a variable
 // of type typ.
 //
-// The caller must set Alloc.Heap=true (for a heap-allocated variable)
-// or add the Alloc to f.Locals (for a frame-allocated variable).
+// The caller must set Allocation.Heap=true (for a heap-allocated variable)
+// or add the Allocation to f.Locals (for a frame-allocated variable).
 //
 // During building, a variable in f.Locals may have its Heap flag
 // set when it is discovered that its address is taken.
-// These Allocs are removed from f.Locals at the end.
+// These Allocations are removed from f.Locals at the end.
 //
 // The builder should generally call one of the emit{New,Local,LocalVar} wrappers instead.
 func emitAllocation(f *Function, typ types.Type, source ast.Node, comment string) *Allocation {
@@ -35,7 +35,7 @@ func emitAllocation(f *Function, typ types.Type, source ast.Node, comment string
 	return v
 }
 
-// emitNew emits to f a new Alloc instruction heap-allocating a
+// emitNew emits to f a new Allocation instruction heap-allocating a
 // variable of type typ.
 func emitNew(f *Function, typ types.Type, source ast.Node, comment string) *Allocation {
 	alloc := emitAllocation(f, typ, source, comment)
@@ -44,7 +44,7 @@ func emitNew(f *Function, typ types.Type, source ast.Node, comment string) *Allo
 }
 
 // emitLocal creates a local var for (t, source, comment) and
-// emits an Alloc instruction for it.
+// emits an Allocation instruction for it.
 //
 // (Use this function or emitNew for synthetic variables;
 // for source-level variables in the same function, use emitLocalVar.)
@@ -54,10 +54,10 @@ func emitLocal(f *Function, t types.Type, source ast.Node, comment string) *Allo
 	return local
 }
 
-// emitLocalVar creates a local var for v and emits an Alloc instruction for it.
+// emitLocalVariable creates a local var for v and emits an Allocation instruction for it.
 // Subsequent calls to f.lookup(v) return it.
 // It applies the appropriate generic instantiation to the type.
-func emitLocalVar(f *Function, v *types.Var, source ast.Node) *Allocation {
+func emitLocalVariable(f *Function, v *types.Var, source ast.Node) *Allocation {
 	alloc := emitLocal(f, f.typ(v.Type()), source, v.Name())
 	f.vars[v] = alloc
 	return alloc
@@ -72,9 +72,9 @@ func emitLoad(f *Function, addr Value, source ast.Node) *Load {
 	return v
 }
 
-func emitReceive(f *Function, ch Value, commaOk bool, typ types.Type, source ast.Node) Value {
+func emitReceive(f *Function, channel Value, commaOk bool, typ types.Type, source ast.Node) Value {
 	recv := &Receive{
-		Channel: ch,
+		Channel: channel,
 		CommaOk: commaOk,
 	}
 	recv.setType(typ)
@@ -130,7 +130,11 @@ func emitCompare(f *Function, op token.Token, x, y Value, source ast.Node) Value
 	//   if e==true { ... }
 	// even in the case when e's type is an interface.
 	// TODO(adonovan): opt: generalise to x==true, false!=y, etc.
-	if x, ok := x.(*Constant); ok && op == token.EQL && x.Value != nil && x.Value.Kind() == constant.Bool && constant.BoolVal(x.Value) {
+	if x, ok := x.(*Constant); ok &&
+		op == token.EQL &&
+		x.Value != nil &&
+		x.Value.Kind() == constant.Bool &&
+		constant.BoolVal(x.Value) {
 		if yt, ok := yt.(*types.Basic); ok && yt.Info()&types.IsBoolean != 0 {
 			return y
 		}
@@ -187,12 +191,12 @@ func isValuePreserving(ut_src, ut_dst types.Type) bool {
 // and returns the converted value.  Implicit conversions are required
 // by language assignability rules in assignments, parameter passing,
 // etc.
-func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
-	t_src := val.Type()
+func emitConv(f *Function, value Value, t_dst types.Type, source ast.Node) Value {
+	t_src := value.Type()
 
 	// Identical types?  Conversion is a no-op.
 	if types.Identical(t_src, t_dst) {
-		return val
+		return value
 	}
 
 	ut_dst := t_dst.Underlying()
@@ -202,14 +206,14 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 	if isNonTypeParamInterface(t_dst) {
 		// Interface name change?
 		if isValuePreserving(ut_src, ut_dst) {
-			c := &ChangeType{X: val}
+			c := &ChangeType{X: value}
 			c.setType(t_dst)
 			return f.emit(c, source)
 		}
 
 		// Assignment from one interface type to another?
 		if isNonTypeParamInterface(t_src) {
-			c := &ChangeInterface{X: val}
+			c := &ChangeInterface{X: value}
 			c.setType(t_dst)
 			return f.emit(c, source)
 		}
@@ -221,10 +225,10 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 
 		// Convert (non-nil) "untyped" literals to their default type.
 		if t, ok := ut_src.(*types.Basic); ok && t.Info()&types.IsUntyped != 0 {
-			val = emitConv(f, val, types.Default(ut_src), source)
+			value = emitConv(f, value, types.Default(ut_src), source)
 		}
 
-		mi := &MakeInterface{X: val}
+		mi := &MakeInterface{X: value}
 		mi.setType(t_dst)
 		return f.emit(mi, source)
 	}
@@ -251,18 +255,18 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 
 		// Conversion from slice to array or slice to array pointer?
 		if slice, ok := s.(*types.Slice); ok {
-			var arr *types.Array
+			var array *types.Array
 			var ptr bool
 			// Conversion from slice to array pointer?
 			switch d := d.(type) {
 			case *types.Array:
-				arr = d
+				array = d
 			case *types.Pointer:
-				arr, _ = d.Elem().Underlying().(*types.Array)
+				array, _ = d.Elem().Underlying().(*types.Array)
 				ptr = true
 			}
-			if arr != nil && types.Identical(slice.Elem(), arr.Elem()) {
-				if arr.Len() == 0 {
+			if array != nil && types.Identical(slice.Elem(), array.Elem()) {
+				if array.Len() == 0 {
 					if ptr {
 						return sliceTo0ArrayPtr
 					} else {
@@ -280,7 +284,15 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 		// The only remaining case in well-typed code is a representation-
 		// changing conversion of basic types (possibly with []byte/[]rune).
 		if !isBasic(s) && !isBasic(d) {
-			panic(fmt.Sprintf("in %s: cannot convert term %s (%s [within %s]) to type %s [within %s]", f, val, val.Type(), s, t_dst, d))
+			panic(fmt.Sprintf(
+				"in %s: cannot convert term %s (%s [within %s]) to type %s [within %s]",
+				f,
+				value,
+				value.Type(),
+				s,
+				t_dst,
+				d,
+			))
 		}
 		return convert
 	}
@@ -295,11 +307,11 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 		})
 	})
 	if classifications == 0 {
-		panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", f, val, val.Type(), t_dst))
+		panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", f, value, value.Type(), t_dst))
 	}
 
 	// Conversion of a compile-time constant value?
-	if c, ok := val.(*Constant); ok {
+	if c, ok := value.(*Constant); ok {
 		// Conversion to a basic type?
 		if isBasic(ut_dst) {
 			// Conversion of a compile-time constant to
@@ -321,17 +333,17 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 
 	switch classifications {
 	case changeType: // representation-preserving change
-		c := &ChangeType{X: val}
+		c := &ChangeType{X: value}
 		c.setType(t_dst)
 		return f.emit(c, source)
 
 	case sliceToArrayPtr, sliceTo0ArrayPtr: // slice to array pointer
-		c := &SliceToArrayPointer{X: val}
+		c := &SliceToArrayPointer{X: value}
 		c.setType(t_dst)
 		return f.emit(c, source)
 
 	case sliceToArray: // slice to arrays (not zero-length)
-		p := &SliceToArray{X: val}
+		p := &SliceToArray{X: value}
 		p.setType(t_dst)
 		return f.emit(p, source)
 
@@ -339,12 +351,12 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 		return zeroConstant(t_dst, source)
 
 	case convert: // representation-changing conversion
-		c := &Convert{X: val}
+		c := &Convert{X: value}
 		c.setType(t_dst)
 		return f.emit(c, source)
 
 	default: // The conversion represents a cross product.
-		c := &MultiConvert{X: val, from: t_src, to: t_dst}
+		c := &MultiConvert{X: value, from: t_src, to: t_dst}
 		c.setType(t_dst)
 		return f.emit(c, source)
 	}
@@ -379,11 +391,11 @@ func emitTypeCoercion(f *Function, v Value, typ types.Type, source ast.Node) Val
 
 // emitStore emits to f an instruction to store value val at location
 // addr, applying implicit conversions as required by assignability rules.
-func emitStore(f *Function, addr, val Value, source ast.Node) *Store {
+func emitStore(f *Function, addr, value Value, source ast.Node) *Store {
 	typ := deref(addr.Type())
 	s := &Store{
 		Address: addr,
-		Value:   emitConv(f, val, typ, source),
+		Value:   emitConv(f, value, typ, source),
 	}
 	f.emit(s, source)
 	return s
@@ -438,7 +450,7 @@ func emitTypeTest(f *Function, x Value, t types.Type, source ast.Node) Value {
 		CommaOk:      true,
 	}
 	a.setType(types.NewTuple(
-		newVar("value", t),
+		newVariable("value", t),
 		varOk,
 	))
 	return f.emit(a, source)
@@ -482,7 +494,7 @@ func emitTailCall(f *Function, call *Call, source ast.Node) {
 // emitCall emits a call instruction. If the callee is "no return",
 // it also emits a panic to eliminate infeasible CFG edges.
 func emitCall(fn *Function, call *Call, source ast.Node) Value {
-	res := fn.emit(call, source)
+	result := fn.emit(call, source)
 
 	callee := call.Call.StaticCallee()
 	if callee != nil &&
@@ -498,7 +510,7 @@ func emitCall(fn *Function, call *Call, source ast.Node) Value {
 		fn.currentBlock = fn.newBasicBlock("unreachable")
 	}
 
-	return res
+	return result
 }
 
 // emitImplicitSelections emits to f code to apply the sequence of

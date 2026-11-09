@@ -4,7 +4,7 @@
 
 package intermediate_representation
 
-// This file defines the Const SSA value type.
+// This file defines the Constant SSA value type.
 
 import (
 	"fmt"
@@ -42,22 +42,22 @@ func soleTypeKind(typ types.Type) types.BasicInfo {
 	return state
 }
 
-// NewConst returns a new constant of the specified value and type.
-// val must be valid according to the specification of Const.Value.
-func NewConstant(val constant.Value, typ types.Type, source ast.Node) *Constant {
-	if val == nil {
+// NewConstant returns a new constant of the specified value and type.
+// val must be valid according to the specification of Constant.Value.
+func NewConstant(value constant.Value, typ types.Type, source ast.Node) *Constant {
+	if value == nil {
 		switch soleTypeKind(typ) {
 		case types.IsBoolean:
-			val = constant.MakeBool(false)
+			value = constant.MakeBool(false)
 		case types.IsInteger:
-			val = constant.MakeInt64(0)
+			value = constant.MakeInt64(0)
 		case types.IsString:
-			val = constant.MakeString("")
+			value = constant.MakeString("")
 		}
 	}
 	c := &Constant{
 		typ:   typ,
-		Value: val,
+		Value: value,
 	}
 	c.setSource(source)
 	return c
@@ -103,10 +103,10 @@ func (c *Constant) RelativeString(from *types.Package) string {
 		}
 	} else if c.Value.Kind() == constant.String {
 		v := constant.StringVal(c.Value)
-		const max = 20
+		const maximum = 20
 		// TODO(adonovan): don't cut a rune in half.
-		if len(v) > max {
-			v = v[:max-3] + "..." // abbreviate
+		if len(v) > maximum {
+			v = v[:maximum-3] + "..." // abbreviate
 		}
 		p = strconv.Quote(v)
 	} else {

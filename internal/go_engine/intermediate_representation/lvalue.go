@@ -44,9 +44,9 @@ func (a *address) typ() types.Type {
 }
 
 type compositeElement struct {
-	cv  *CompositeValue
-	idx int
-	t   types.Type
+	cv    *CompositeValue
+	index int
+	t     types.Type
 }
 
 func (ce *compositeElement) load(fn *Function, source ast.Node) Value {
@@ -55,7 +55,7 @@ func (ce *compositeElement) load(fn *Function, source ast.Node) Value {
 
 func (ce *compositeElement) store(fn *Function, v Value, source ast.Node) {
 	v = emitConv(fn, v, ce.t, source)
-	ce.cv.Values[ce.idx] = v
+	ce.cv.Values[ce.index] = v
 }
 
 func (ce *compositeElement) address(fn *Function) Value {
