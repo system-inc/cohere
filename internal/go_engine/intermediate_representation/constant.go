@@ -65,7 +65,7 @@ func soleTypeKind(typ types.Type) types.BasicInfo {
 		if info&types.IsNumeric != 0 { // int/float/complex
 			info = types.IsInteger
 		}
-		state = state & info
+		state &= info
 		return state != 0
 	})
 	return state
@@ -74,19 +74,20 @@ func soleTypeKind(typ types.Type) types.BasicInfo {
 // NewConstant returns a new constant of the specified value and type.
 // val must be valid according to the specification of Constant.Value.
 func NewConstant(value constant.Value, typ types.Type, source ast.Node) *Constant {
+	constantValue := value
 	if value == nil {
 		switch soleTypeKind(typ) {
 		case types.IsBoolean:
-			value = constant.MakeBool(false)
+			constantValue = constant.MakeBool(false)
 		case types.IsInteger:
-			value = constant.MakeInt64(0)
+			constantValue = constant.MakeInt64(0)
 		case types.IsString:
-			value = constant.MakeString("")
+			constantValue = constant.MakeString("")
 		}
 	}
 	irConstant := &Constant{
 		typ:   typ,
-		Value: value,
+		Value: constantValue,
 	}
 	irConstant.setSource(source)
 	return irConstant
@@ -133,7 +134,7 @@ func (irConstant *Constant) RelativeString(from *types.Package) string {
 	} else if irConstant.Value.Kind() == constant.String {
 		value := constant.StringVal(irConstant.Value)
 		const maximum = 20
-		// TODO(adonovan): don't cut a rune in half.
+		// The abbreviation cuts at a byte, so it may cut a rune in half.
 		if len(value) > maximum {
 			value = value[:maximum-3] + "..." // abbreviate
 		}
@@ -185,7 +186,7 @@ func nillable(resolvedType types.Type) bool {
 	}
 }
 
-// TODO(adonovan): move everything below into honnef.co/go/tools/go/ir/interp.
+// The methods below read a constant's value as a Go number, the way an interpreter would.
 
 // Int64 returns the numeric value of this constant truncated to fit
 // a signed 64-bit integer.
@@ -200,6 +201,8 @@ func (irConstant *Constant) Int64() int64 {
 		floatValue, _ := constant.Float64Val(x)
 		return int64(floatValue)
 	}
+	// Invariant: the builder asks for Int64 only of an array index, length or capacity, which go/types holds to be a
+	// constant representable as an integer.
 	panic(fmt.Sprintf("unexpected constant value: %T", irConstant.Value))
 }
 
@@ -216,6 +219,8 @@ func (irConstant *Constant) Uint64() uint64 {
 		floatValue, _ := constant.Float64Val(x)
 		return uint64(floatValue)
 	}
+	// Invariant: nothing in this package calls Uint64, and it is for a constant representable as an integer, as
+	// Int64 is.
 	panic(fmt.Sprintf("unexpected constant value: %T", irConstant.Value))
 }
 

@@ -40,8 +40,17 @@ import (
 //   - meth.Obj() may denote a concrete or an interface method
 //   - the result may be a thunk or a wrapper.
 func createWrapper(prog *Program, sel *selection, targs []types.Type) *Function {
-	object := sel.object.(*types.Func) // the declared function
-	name, sig := maybeInstance(prog, object.Name(), sel.typ.(*types.Signature), targs)
+	object, isFunc := sel.object.(*types.Func) // the declared function
+	if !isFunc {
+		// Invariant: createThunk is the only caller and passes only a method expression, which selects a method.
+		panic(fmt.Sprintf("createWrapper: selection of %s is not a method", sel.object))
+	}
+	selectionSignature, isSignature := sel.typ.(*types.Signature)
+	if !isSignature {
+		// Invariant: the type of a method expression is a function signature, the receiver its first parameter.
+		panic(fmt.Sprintf("createWrapper: method expression %s has type %s, not a signature", object, sel.typ))
+	}
+	name, sig := maybeInstance(prog, object.Name(), selectionSignature, targs)
 
 	var description string
 	if sel.kind == types.MethodExpr {
@@ -71,16 +80,23 @@ func createWrapper(prog *Program, sel *selection, targs []types.Type) *Function 
 
 // maybeInstance returns name and sig instantiated to reflect any type arguments in targs.
 func maybeInstance(prog *Program, name string, sig *types.Signature, targs []types.Type) (string, *types.Signature) {
+	instanceName, instanceSignature := name, sig
 	if len(targs) > 0 {
-		name = fmt.Sprintf("%s%s", name, targstr(targs))
+		instanceName = fmt.Sprintf("%s%s", name, targstr(targs))
 		instSig, instantiateError := types.Instantiate(prog.ctxt, sig, targs, false)
 		if instantiateError != nil {
-			// validate was false, we should never get an error
+			// Invariant: with validate false, go/types documents that Instantiate never returns an error.
 			panic(instantiateError)
 		}
-		sig = prog.canon.Type(instSig).(*types.Signature)
+		canonicalSignature, isSignature := prog.canon.Type(instSig).(*types.Signature)
+		if !isSignature {
+			// Invariant: an instance of a signature is a signature, and the canonizer returns a type identical to
+			// the one it is given.
+			panic(fmt.Sprintf("maybeInstance: instance %s of %s is not a signature", instSig, sig))
+		}
+		instanceSignature = canonicalSignature
 	}
-	return name, sig
+	return instanceName, instanceSignature
 }
 
 // createParameters creates parameters for wrapper method fn based on its
@@ -119,7 +135,12 @@ func createParameters(function *Function, start int) {
 // constructed.
 func createBound(prog *Program, object *types.Func, targs []types.Type) *Function {
 	description := fmt.Sprintf("bound method wrapper for %s", object)
-	name, sig := maybeInstance(prog, object.Name(), object.Type().(*types.Signature), targs)
+	methodSignature, isSignature := object.Type().(*types.Signature)
+	if !isSignature {
+		// Invariant: go/types gives every *types.Func a *types.Signature as its type.
+		panic(fmt.Sprintf("createBound: method %s has type %s, not a signature", object, object.Type()))
+	}
+	name, sig := maybeInstance(prog, object.Name(), methodSignature, targs)
 
 	/* bound method wrapper */
 	function := &Function{
@@ -159,11 +180,14 @@ func createBound(prog *Program, object *types.Func, targs []types.Type) *Functio
 //	f := func(t T) { return t.meth() }
 func createThunk(prog *Program, sel *selection, targs []types.Type) *Function {
 	if sel.kind != types.MethodExpr {
+		// Invariant: the builder calls createThunk only in its case for a method expression selection.
 		panic(sel)
 	}
 
 	function := createWrapper(prog, sel, targs)
 	if function.Signature.Recv() != nil {
+		// Invariant: a method expression's signature takes its receiver as the first parameter and has none of its
+		// own, and instantiating it keeps that.
 		panic(function) // unexpected receiver
 	}
 	return function

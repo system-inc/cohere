@@ -65,6 +65,9 @@ func (block *BasicBlock) Dominates(basicBlock *BasicBlock) bool {
 // This file implements the BasicBlock type.
 
 // addEdge adds a control-flow graph edge from from to to.
+//
+// Mutates: from gains to among its successors
+// Mutates: to gains from among its predecessors
 func addEdge(from, to *BasicBlock) {
 	from.Successors = append(from.Successors, to)
 	to.Predecessors = append(to.Predecessors, from)
@@ -154,7 +157,11 @@ func (block *BasicBlock) removePredecessor(basicBlock *BasicBlock) {
 			block.Predecessors[keptCount] = block.Predecessors[predecessorIndex]
 			// Strike out φ-edge too.
 			for _, instr := range phis {
-				phi := instr.(*Phi)
+				phi, isPhi := instr.(*Phi)
+				if !isPhi {
+					// Invariant: phis returns only the prefix of the block's instructions that are φ-nodes.
+					panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instr))
+				}
 				phi.Edges[keptCount] = phi.Edges[predecessorIndex]
 			}
 			keptCount++
@@ -164,12 +171,21 @@ func (block *BasicBlock) removePredecessor(basicBlock *BasicBlock) {
 	for predecessorIndex := keptCount; predecessorIndex < len(block.Predecessors); predecessorIndex++ {
 		block.Predecessors[predecessorIndex] = nil
 		for _, instr := range phis {
-			instr.(*Phi).Edges[predecessorIndex] = nil
+			phi, isPhi := instr.(*Phi)
+			if !isPhi {
+				// Invariant: phis returns only the prefix of the block's instructions that are φ-nodes.
+				panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instr))
+			}
+			phi.Edges[predecessorIndex] = nil
 		}
 	}
 	block.Predecessors = block.Predecessors[:keptCount]
 	for _, instr := range phis {
-		phi := instr.(*Phi)
+		phi, isPhi := instr.(*Phi)
+		if !isPhi {
+			// Invariant: phis returns only the prefix of the block's instructions that are φ-nodes.
+			panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instr))
+		}
 		phi.Edges = phi.Edges[:keptCount]
 	}
 }
