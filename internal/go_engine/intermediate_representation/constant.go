@@ -4,8 +4,6 @@
 
 package intermediate_representation
 
-// This file defines the Constant SSA value type.
-
 import (
 	"fmt"
 	"go/ast"
@@ -15,6 +13,37 @@ import (
 
 	"golang.org/x/exp/typeparams"
 )
+
+// A Constant represents a value known at build time.
+//
+// Constants include true constants of boolean, numeric, and string types, as
+// defined by the Go spec; these are represented by a non-nil Value field.
+//
+// Constants also include the "zero" value of any type, of which the nil values
+// of various pointer-like types are a special case; these are represented
+// by a nil Value field.
+//
+// Example printed form:
+//
+//	42:int
+//	"hello":untyped string
+//	3+4i:MyComplex
+//	nil:*int
+//	nil:[]string
+//	[3]int{}:[3]int
+//	struct{x string}{}:struct{x string}
+//	0:interface{int|int64}
+//	nil:interface{bool|int} // no go/constant representation
+type Constant struct {
+	node
+
+	typ   types.Type
+	Value constant.Value
+}
+
+func (irConstant *Constant) Operands(rands []*Value) []*Value { return rands }
+
+// This file defines the Constant SSA value type.
 
 // soleTypeKind returns a BasicInfo for which constant.Value can
 // represent all zero values for the types in the type set.

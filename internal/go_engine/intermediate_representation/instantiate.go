@@ -7,7 +7,6 @@ package intermediate_representation
 import (
 	"fmt"
 	"go/types"
-	"slices"
 	"sync"
 )
 
@@ -16,35 +15,6 @@ import (
 type generic struct {
 	instancesMutex sync.Mutex
 	instances      map[*typeList]*Function // canonical type arguments to an instance.
-}
-
-// instance returns a Function that is the instantiation of generic
-// origin function fn with the type arguments rtargs and targs.
-//
-// Any created instance is added to cr.
-//
-// Acquires fn.generic.instancesMu.
-func (function *Function) instance(rtargs, targs []types.Type, builder *builder) *Function {
-	key := function.Program.canon.List(slices.Concat(rtargs, targs))
-
-	gen := function.generic
-
-	gen.instancesMutex.Lock()
-	defer gen.instancesMutex.Unlock()
-	inst, ok := gen.instances[key]
-	if !ok {
-		inst = createInstance(function, rtargs, targs)
-		inst.buildshared = builder.shared()
-		builder.enqueue(inst)
-
-		if gen.instances == nil {
-			gen.instances = make(map[*typeList]*Function)
-		}
-		gen.instances[key] = inst
-	} else {
-		builder.waitForSharedFunction(inst)
-	}
-	return inst
 }
 
 // createInstance returns the instantiation of generic function fn using targs.

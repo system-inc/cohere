@@ -4,7 +4,8 @@
 
 package intermediate_representation
 
-// This file implements the Function type.
+// This package defines a high-level intermediate representation for
+// Go programs using static single-assignment (SSA) form.
 
 import (
 	"fmt"
@@ -12,8 +13,523 @@ import (
 	"go/token"
 	"go/types"
 	"iter"
+	"math/big"
+	"reflect"
+	"slices"
 	"strings"
+	"unsafe"
 )
+
+type Id int
+
+// A Member is a member of a Go package, implemented by *NamedConstant,
+// *Global, *Function, or *Type; they are created by package-level
+// const, var, func and type declarations respectively.
+type Member interface {
+	Name() string                         // declared name of the package member
+	String() string                       // package-qualified name of the package member
+	RelativeString(*types.Package) string // like String, but relative refs are unqualified
+	Object() types.Object                 // typechecker's object for this member, if any
+	Type() types.Type                     // type of the package member
+	Token() token.Token                   // token.{VAR,FUNC,CONST,TYPE}
+}
+
+// A Value is an IR value that can be referenced by an instruction.
+type Value interface {
+	// Name returns the name of this value, and determines how
+	// this Value appears when used as an operand of an
+	// Instruction.
+	//
+	// This is the same as the source name for Parameters,
+	// Builtins, Functions, FreeVariables, Globals.
+	// For constants, it is a representation of the constant's value
+	// and type.  For all other Values this is the name of the
+	// virtual register defined by the instruction.
+	//
+	// The name of an IR Value is not semantically significant,
+	// and may not even be unique within a function.
+	Name() string
+
+	// Type returns the type of this value.  Many instructions
+	// (e.g. IndexAddress) change their behaviour depending on the
+	// types of their operands.
+	Type() types.Type
+
+	// Parent returns the function to which this Value belongs.
+	// It returns nil for named Functions, Builtin and Global.
+	Parent() *Function
+
+	// Referrers returns the list of instructions that have this
+	// value as one of their operands; it may contain duplicates
+	// if an instruction has a repeated operand.
+	//
+	// Referrers actually returns a pointer through which the
+	// caller may perform mutations to the object's state.
+	//
+	// Referrers is currently only defined if Parent()!=nil,
+	// i.e. for the function-local values FreeVariable, Parameter,
+	// Functions (iff anonymous) and all value-defining instructions.
+	// It returns nil for named Functions, Builtin and Global.
+	//
+	// Instruction.Operands contains the inverse of this relation.
+	Referrers() *[]Instruction
+
+	Operands(rands []*Value) []*Value // nil for non-Instructions
+
+	// Source returns the AST node responsible for creating this
+	// value. A single AST node may be responsible for more than one
+	// value, and not all values have an associated AST node.
+	//
+	// Do not use this method to find a Value given an ast.Expr; use
+	// ValueForExpr instead.
+	Source() ast.Node
+
+	// Pos returns Source().Pos() if Source is not nil, else it
+	// returns token.NoPos.
+	Pos() token.Pos
+}
+
+// An Instruction is an IR instruction that computes a new Value or
+// has some effect.
+//
+// An Instruction that defines a value (e.g. BinaryOperation) also implements
+// the Value interface; an Instruction that only has an effect (e.g. Store)
+// does not.
+type Instruction interface {
+	setSource(ast.Node)
+	setId(Id)
+
+	Comment() string
+
+	// Id returns the Id of this instruction. IDs are unique within a single
+	// function and are densely numbered, but may contain gaps.
+	// Globally, instructions are identified by their addresses. However,
+	// IDs exist to facilitate efficient storage of mappings between
+	// instructions and data when analysing functions.
+	//
+	// NB: IDs are allocated late in the IR construction process and
+	// are not available to early stages of said process.
+	Id() Id
+
+	// Parent returns the function to which this instruction
+	// belongs.
+	Parent() *Function
+
+	// Block returns the basic block to which this instruction
+	// belongs.
+	Block() *BasicBlock
+
+	// setBlock sets the basic block to which this instruction belongs.
+	setBlock(*BasicBlock)
+
+	// Operands returns the operands of this instruction: the
+	// set of Values it references.
+	//
+	// Specifically, it appends their addresses to rands, a
+	// user-provided slice, and returns the resulting slice,
+	// permitting avoidance of memory allocation.
+	//
+	// The operands are appended in undefined order, but the order
+	// is consistent for a given Instruction; the addresses are
+	// always non-nil but may point to a nil Value.  Clients may
+	// store through the pointers, e.g. to effect a value
+	// renaming.
+	//
+	// Value.Referrers is a subset of the inverse of this
+	// relation.  (Referrers are not tracked for all types of
+	// Values.)
+	Operands(rands []*Value) []*Value
+
+	Referrers() *[]Instruction // nil for non-Values
+
+	// Source returns the AST node responsible for creating this
+	// instruction. A single AST node may be responsible for more than
+	// one instruction, and not all instructions have an associated
+	// AST node.
+	Source() ast.Node
+
+	// Pos returns Source().Pos() if Source is not nil, else it
+	// returns token.NoPos.
+	Pos() token.Pos
+}
+
+// A Node is a node in the IR value graph.  Every concrete type that
+// implements Node is also either a Value, an Instruction, or both.
+//
+// Node contains the methods common to Value and Instruction, plus the
+// Operands and Referrers methods generalized to return nil for
+// non-Instructions and non-Values, respectively.
+//
+// Node is provided to simplify IR graph algorithms.  Clients should
+// use the more specific and informative Value or Instruction
+// interfaces where appropriate.
+type Node interface {
+	// Common methods:
+	Source() ast.Node
+	Pos() token.Pos
+	Parent() *Function
+
+	// Partial methods:
+	Operands(rands []*Value) []*Value // nil for non-Instructions
+	Referrers() *[]Instruction        // nil for non-Values
+}
+
+// Function represents the parameters, results, and code of a function
+// or method.
+//
+// If Blocks is nil, this indicates an external function for which no
+// Go source code is available.  In this case, FreeVariables, Locals, and
+// Parameters are nil too.  Clients performing whole-program analysis must
+// handle external functions specially.
+//
+// Blocks contains the function's control-flow graph (CFG).
+// Blocks[0] is the function entry point; block order is not otherwise
+// semantically significant, though it may affect the readability of
+// the disassembly.
+// To iterate over the blocks in dominance order, use DominatorPreorder().
+//
+// Recover is an optional second entry point to which control resumes
+// after a recovered panic.  The Recover block may contain only a return
+// statement, preceded by a load of the function's named return
+// parameters, if any.
+//
+// A nested function (Parent()!=nil) that refers to one or more
+// lexically enclosing local variables ("free variables") has FreeVariables.
+// Such functions cannot be called directly but require a
+// value created by MakeClosure which, via its Bindings, supplies
+// values for these parameters.
+//
+// If the function is a method (Signature.Recv() != nil) then the first
+// element of Parameters is the receiver parameter.
+//
+// A Go package may declare many functions called "init".
+// For each one, Object().Name() returns "init" but Name() returns
+// "init#1", etc, in declaration order.
+//
+// Pos() returns the declaring ast.FuncLit.Type.Func or the position
+// of the ast.FuncDecl.Name, if the function was explicit in the
+// source. Synthetic wrappers, for which Synthetic != "", may share
+// the same position as the function they wrap.
+// Syntax.Pos() always returns the position of the declaring "func" token.
+//
+// When the operand of a range statement is an iterator function,
+// the loop body is transformed into a synthetic anonymous function
+// that is passed as the yield argument in a call to the iterator.
+// In that case, Function.Source() is the ast.RangeStmt.
+// and Function.Syntax is the ast.RangeStmt.
+//
+// Synthetic functions, for which Synthetic != "", are functions
+// that do not appear in the source AST. These include:
+//   - method wrappers,
+//   - thunks,
+//   - bound functions,
+//   - empty functions built from loaded type information,
+//   - yield functions created from range-over-func loops,
+//   - package init functions, and
+//   - instantiations of generic functions.
+//
+// Synthetic wrapper functions may share the same position
+// as the function they wrap.
+//
+// Type() returns the function's Signature.
+//
+// A generic function is a function or method that has uninstantiated type
+// parameters (TypeParameters() != nil). Consider a hypothetical generic
+// method, (*Map[K,V]).Get. It may be instantiated with all
+// non-parameterized types as (*Map[string,int]).Get or with
+// parameterized types as (*Map[string,U]).Get, where U is a type parameter.
+// In both instantiations, Origin() refers to the instantiated generic
+// method, (*Map[K,V]).Get, TypeParameters() refers to the parameters [K,V] of
+// the generic method. TypeArguments() refers to [string,U] or [string,int],
+// respectively, and is nil in the generic method.
+type Function struct {
+	name      string
+	object    *types.Func // symbol for declared function (nil for FuncLit or synthetic init)
+	method    *selection  // info about provenance of synthetic methods; thunk => non-nil
+	Signature *types.Signature
+	position  token.Pos
+	syntax    ast.Node
+
+	// source information
+	Synthetic string      // provenance of synthetic function; "" for true source functions
+	info      *types.Info // type annotations (if syntax != nil)
+	goversion string      // Go version of syntax (NB: init is special)
+
+	parent  *Function // enclosing function if anon; nil if global
+	Package *Package  // enclosing package; nil for shared funcs (wrappers and error.Error)
+	Program *Program  // enclosing program
+
+	buildshared *task // wait for a shared function to be done building (may be nil if <=1 builder ever needs to wait)
+
+	// These fields are populated only when the function body is built:
+
+	Parameters         []*Parameter    // function parameters; for methods, includes receiver
+	FreeVariables      []*FreeVariable // free variables whose values must be supplied by closure
+	Locals             []*Allocation   // frame-allocated variables of this function
+	Blocks             []*BasicBlock   // basic blocks of the function; nil => external
+	Recover            *BasicBlock     // optional; control transfers here after recovered panic
+	AnonymousFunctions []*Function     // anonymous functions (from FuncLit, RangeStmt) directly beneath this one
+	referrers          []Instruction   // referring instructions (iff Parent() != nil)
+	anonIndex          int32           // position of a nested function in parent's AnonymousFunctions. fn.Parent()!=nil => fn.Parent().AnonymousFunctions[fn.anonIndex] == fn.
+
+	Sccs []*Scc // SCC DAG in reverse topological order
+
+	recvtypeparams *types.TypeParamList // receiver type parameters of this function. recvtypeparams.Len() > 0 => method on generic or instance of generic type
+	recvtypeargs   []types.Type         // type arguments that instantiated recvtypeparams. len(recvtypeargs) > 0 => method on instance of generic type
+	typeparams     *types.TypeParamList // type parameters of this function. typeparams.Len() > 0 => generic or instance of generic function or method
+	typeargs       []types.Type         // type arguments that instantiated typeparams. len(typeargs) > 0 => instance of generic function or method
+	topLevelOrigin *Function            // the origin function if this is an instance of a source function. nil if Parent()!=nil.
+	generic        *generic             // instances of this function, if generic
+
+	// The following fields are cleared after building.
+	build           buildFunc                // algorithm to build function body (nil => built)
+	currentBlock    *BasicBlock              // where to emit code
+	vars            map[*types.Var]Value     // addresses of local variables
+	results         []*Allocation            // result allocations of the current function
+	returnVariables []*types.Var             // variables for a return statement. Either results or for range-over-func a parent's results
+	targets         *targets                 // linked stack of branch targets
+	lblocks         map[*types.Label]*lblock // labelled blocks
+	jump            *types.Var               // synthetic variable for the yield state (non-nil => range-over-func)
+	deferstack      *types.Var               // synthetic variable holding enclosing ssa:deferstack()
+	source          *Function                // nearest enclosing source function
+	exits           []*exit                  // exits of the function that need to be resolved
+	uniq            int64                    // source of unique ints within the source tree while building
+}
+
+type Scc struct {
+	Index                    int
+	Blocks                   []*BasicBlock
+	Predecessors, Successors []*Scc
+	reachable                big.Int
+}
+
+// Pure values ----------------------------------------
+
+// Value-defining instructions  ----------------------------------------
+
+// SelectState is a helper for Select.
+// It represents one goal state and its corresponding communication.
+type SelectState struct {
+	Direction types.ChanDir // direction of case (SendOnly or RecvOnly)
+	Channel   Value         // channel to use (for send or receive)
+	Send      Value         // value to send (for send)
+	Position  token.Pos     // position of token.ARROW
+}
+
+// Instructions executed for effect.  They do not yield a value. --------------------
+
+// Embeddable mix-ins and helpers for common parts of other structs. -----------
+
+// The CallInstruction interface, implemented by *Go, *Defer and *Call,
+// exposes the common parts of function-calling instructions,
+// yet provides a way back to the Value defined by *Call alone.
+type CallInstruction interface {
+	Instruction
+	Common() *CallCommon // returns the common parts of the call
+	Value() *Call
+}
+
+func (function *Function) Name() string       { return function.name }
+func (function *Function) Type() types.Type   { return function.Signature }
+func (function *Function) Token() token.Token { return token.FUNC }
+func (function *Function) Object() types.Object {
+	if function.object != nil {
+		return types.Object(function.object)
+	}
+	return nil
+}
+func (function *Function) String() string    { return function.RelativeString(nil) }
+func (function *Function) Parent() *Function { return function.parent }
+func (function *Function) Referrers() *[]Instruction {
+	if function.parent != nil {
+		return &function.referrers
+	}
+	return nil
+}
+
+// Returns returns an iterator over all blocks containing return statements.
+func (function *Function) Returns() iter.Seq[*BasicBlock] {
+	return func(yield func(*BasicBlock) bool) {
+		for _, block := range function.Blocks {
+			if _, ok := block.Control().(*Return); ok {
+				if !yield(block) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// Exits returns an iterator over all blocks that have no successors.
+func (function *Function) Exits() iter.Seq[*BasicBlock] {
+	return func(yield func(*BasicBlock) bool) {
+		for _, block := range function.Blocks {
+			if len(block.Successors) == 0 {
+				if !yield(block) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// Nodes returns an iterator over the basic block indices.
+func (function *Function) Nodes() iter.Seq[int] {
+	return func(yield func(int) bool) {
+		for index := range function.Blocks {
+			if !yield(index) {
+				return
+			}
+		}
+	}
+}
+
+// NumNodes returns the number of basic blocks in the graph.
+func (function *Function) NumNodes() int { return len(function.Blocks) }
+
+// Out returns an iterator over the successor block indices of a given node.
+func (function *Function) Out(node int) iter.Seq[int] {
+	return func(yield func(int) bool) {
+		for _, succ := range function.Blocks[node].Successors {
+			if !yield(succ.Index) {
+				return
+			}
+		}
+	}
+}
+
+// TypeParameters are the function's type parameters if generic or the
+// type parameters that were instantiated if fn is an instantiation.
+//
+// Specifically, the resulting list behaves like:
+//
+//	func        f       // []
+//	func        f[P]    // [P]
+//	func (T)    m       // []
+//	func (T)    m[P]    // [P]
+//	func (T[P]) m       // [P]
+//	func (T[P]) m[Q]    // [P (index=0), Q (index=0)]
+//
+// Note that receiver type parameters precede other type parameters.
+// Also, type parameters may have the same index if they come from
+// different source type parameter lists.
+func (function *Function) TypeParameters() *types.TypeParamList {
+	return consTypeParamLists(function.recvtypeparams, function.typeparams)
+}
+
+func consTypeParamLists(first, second *types.TypeParamList) *types.TypeParamList {
+	if first.Len() == 0 {
+		return second
+	}
+	if second.Len() == 0 {
+		return first
+	}
+
+	tpars := make([]*types.TypeParam, first.Len()+second.Len())
+	for index := range first.Len() {
+		tpars[index] = first.At(index)
+	}
+	for index := range second.Len() {
+		tpars[index+first.Len()] = second.At(index)
+	}
+	// This logic unsafely assumes (and asserts) that the layout of the
+	// TypeParamList is identical to that of a slice of TypeParams. This
+	// is a hack while we work on getting a constructor for TypeParamList
+	// approved (see go.dev/issue/79603).
+	listType := reflect.TypeFor[types.TypeParamList]()
+	if listType.NumField() != 1 {
+		panic("TypeParamList has unexpected fields")
+	}
+	if field := listType.Field(0); field.Offset != 0 || field.Type != reflect.TypeFor[[]*types.TypeParam]() {
+		panic("TypeParamList field is not []*TypeParam")
+	}
+	return (*types.TypeParamList)(unsafe.Pointer(&tpars))
+}
+
+// TypeArguments are the types that TypeParameters() were instantiated by to create fn
+// from fn.Origin().
+//
+// Specifically, the resulting slice behaves like:
+//
+//	f                   // []
+//	f[int]              // [int]
+//	T.m                 // []
+//	T.m[int]            // [int]
+//	T[int].m            // [int]
+//	T[int].m[uint]      // [int, uint]
+//
+// Note that receiver type arguments precede other type arguments.
+func (function *Function) TypeArguments() []types.Type {
+	return slices.Concat(function.recvtypeargs, function.typeargs)
+}
+
+// Origin returns the generic function from which fn was instantiated,
+// or nil if fn is not an instantiation.
+func (function *Function) Origin() *Function {
+	if function.parent != nil && function.parent.hasTypeArguments() {
+		// Nested functions are BUILT at a different time than their instances.
+		// Build declared package if not yet BUILT. This is not an expected use
+		// case, but is simple and robust.
+		function.declaredPackage().Build()
+	}
+	return origin(function)
+}
+
+// hasTypeParameters returns whether fn has any type parameters
+func (function *Function) hasTypeParameters() bool {
+	return function.recvtypeparams.Len()+function.typeparams.Len() > 0
+}
+
+// hasTypeArguments returns whether fn has any type arguments
+func (function *Function) hasTypeArguments() bool {
+	return len(function.recvtypeargs)+len(function.typeargs) > 0
+}
+
+// subrtargs returns fn's receiver type parameters substituted with receiver type arguments
+func (function *Function) subrtargs(method *types.Func) []types.Type {
+	return receiverTypeArguments(method)
+}
+
+// subtargs returns fn's type parameters substituted with (possibly implied) type arguments
+func (function *Function) subtargs(id *ast.Ident) []types.Type {
+	return instanceArguments(function.info, id)
+}
+
+// targstr returns a comma-separated string of the types in targs
+func targstr(targs []types.Type) string {
+	var text strings.Builder
+	if len(targs) > 0 {
+		text.WriteString("[")
+		for index := range targs {
+			if index > 0 {
+				text.WriteString(", ")
+			}
+			text.WriteString(targs[index].String())
+		}
+		text.WriteString("]")
+	}
+	return text.String()
+}
+
+// origin is the function that fn is an instantiation of. Returns nil if fn is
+// not an instantiation.
+//
+// Precondition: fn and the origin function are done building.
+func origin(function *Function) *Function {
+	if function.parent != nil && function.parent.hasTypeArguments() {
+		return origin(function.parent).AnonymousFunctions[function.anonIndex]
+	}
+	return function.topLevelOrigin
+}
+
+func (function *Function) Pos() token.Pos   { return function.position }
+func (function *Function) Source() ast.Node { return function.syntax }
+
+// Operands.
+
+func (function *Function) Operands(rands []*Value) []*Value { return rands }
+
+// This file implements the Function type.
 
 // Like ObjectOf, but panics instead of returning nil.
 // Only valid during f's create and build phases.
@@ -23,19 +539,6 @@ func (function *Function) objectOf(id *ast.Ident) types.Object {
 	}
 	panic(fmt.Sprintf("no types.Object for ast.Ident %s @ %s",
 		id.Name, function.Program.FileSet.Position(id.Pos())))
-}
-
-// instrs returns an iterator that returns each reachable instruction of the SSA function.
-func (function *Function) instructions() iter.Seq[Instruction] {
-	return func(yield func(instruction Instruction) bool) {
-		for _, block := range function.Blocks {
-			for _, instr := range block.Instructions {
-				if !yield(instr) {
-					return
-				}
-			}
-		}
-	}
 }
 
 // Like TypeOf, but panics instead of returning nil.
@@ -236,21 +739,6 @@ func (function *Function) startBody() {
 	entry := function.newBasicBlock("entry")
 	function.currentBlock = entry
 	function.vars = make(map[*types.Var]Value) // needed for some synthetics, e.g. init
-}
-
-func (function *Function) blockset(index int) *BlockSet {
-	bs := &function.blocksets[index]
-	if len(bs.values) != len(function.Blocks) {
-		if cap(bs.values) >= len(function.Blocks) {
-			bs.values = bs.values[:len(function.Blocks)]
-			bs.Clear()
-		} else {
-			bs.values = make([]bool, len(function.Blocks))
-		}
-	} else {
-		bs.Clear()
-	}
-	return bs
 }
 
 // createSyntacticParameters populates f.Parameters and generates code (spills
@@ -596,30 +1084,6 @@ func (function *Function) newBasicBlock(comment string) *BasicBlock {
 	function.Blocks = append(function.Blocks, block)
 	return block
 }
-
-// NewFunction returns a new synthetic Function instance belonging to
-// prog, with its name and signature fields set as specified.
-//
-// The caller is responsible for initializing the remaining fields of
-// the function object, e.g. Package, Parameters, Blocks.
-//
-// It is practically impossible for clients to construct well-formed
-// IR functions/packages/programs directly, so we assume this is the
-// job of the Builder alone.  NewFunction exists to provide clients a
-// little flexibility.  For example, analysis tools may wish to
-// construct fake Functions for the root of the callgraph, a fake
-// "reflect" package, etc.
-//
-// TODO(adonovan): think harder about the API here.
-func (prog *Program) NewFunction(name string, sig *types.Signature, provenance string) *Function {
-	return &Function{Program: prog, name: name, Signature: sig, Synthetic: provenance}
-}
-
-//lint:ignore U1000 we may make use of this for functions loaded from export data
-type extentNode [2]token.Pos
-
-func (node extentNode) Pos() token.Pos { return node[0] }
-func (node extentNode) End() token.Pos { return node[1] }
 
 // Syntax returns the function's syntax (*ast.Func{Decl,Lit})
 // if it was produced from syntax or an *ast.RangeStmt if

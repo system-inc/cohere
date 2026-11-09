@@ -62,7 +62,6 @@ import (
 	"go/types"
 	"runtime"
 	"slices"
-	"sync"
 
 	"honnef.co/go/tools/analysis/lint"
 	"honnef.co/go/tools/go/types/typeutil"
@@ -508,18 +507,6 @@ type store struct {
 	lhs    lvalue
 	rhs    Value
 	source ast.Node
-}
-
-type storebuf struct{ stores []store }
-
-func (storebuf *storebuf) store(lhs lvalue, rhs Value, source ast.Node) {
-	storebuf.stores = append(storebuf.stores, store{lhs, rhs, source})
-}
-
-func (storebuf *storebuf) emit(function *Function) {
-	for _, store := range storebuf.stores {
-		store.lhs.store(function, store.rhs, store.source)
-	}
 }
 
 // assign emits to fn code to initialize the lvalue loc with the value
@@ -3394,54 +3381,8 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	function.finishBody()
 }
 
-// Build calls Package.Build for each package in prog, in parallel.
-//
-// Build is intended for whole-program analysis; a typical compiler
-// need only build a single package.
-//
-// Build is idempotent and thread-safe.
-func (prog *Program) Build() {
-	var waitGroup sync.WaitGroup
-	for _, value := range prog.packages {
-		waitGroup.Add(1)
-		cpuLimit <- unit{} // acquire a token
-		go func(irPackage *Package) {
-			irPackage.Build()
-			waitGroup.Done()
-			<-cpuLimit // release a token
-		}(value)
-	}
-	waitGroup.Wait()
-}
-
 // cpuLimit is a counting semaphore to limit CPU parallelism.
 var cpuLimit = make(chan unit, runtime.GOMAXPROCS(0))
-
-// Build builds IR code for all functions and vars in package `goEnginePackage`.
-//
-// CreatePackage must have been called for all of `goEnginePackage`'s direct imports
-// (and hence its direct imports must have been error-free). It is not
-// necessary to call CreatePackage for indirect dependencies.
-// Functions will be created for all necessary methods in those
-// packages on demand.
-//
-// Build is idempotent and thread-safe.
-func (goEnginePackage *Package) Build() { goEnginePackage.buildOnce.Do(goEnginePackage.build) }
-
-func (goEnginePackage *Package) build() {
-	if goEnginePackage.info == nil {
-		return // synthetic package, e.g. "testmain"
-	}
-
-	builder := builder{fns: goEnginePackage.created}
-	builder.iterate()
-
-	// We no longer need transient information: ASTs or go/types deductions.
-	goEnginePackage.info = nil
-	goEnginePackage.created = nil
-	goEnginePackage.files = nil
-	goEnginePackage.initVersion = nil
-}
 
 // buildPackageInit builds fn.Body for the synthetic package initializer.
 func (packageBuilder *builder) buildPackageInit(init *Function) {

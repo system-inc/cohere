@@ -17,94 +17,11 @@ package intermediate_representation
 // https://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
 // to avoid the need for buckets of size > 1.
 
-import (
-	"slices"
-	"sort"
-)
-
-// ImmediateDominator returns the block that immediately dominates b:
-// its parent in the dominator tree, if any.
-// Neither the entry node (b.Index==0) nor recover node
-// (b==b.Parent().Recover()) have a parent.
-func (block *BasicBlock) ImmediateDominator() *BasicBlock { return block.dom.idom }
-
-// Dominees returns the list of blocks that b immediately dominates:
-// its children in the dominator tree.
-func (block *BasicBlock) Dominees() []*BasicBlock { return block.dom.children }
-
-// Dominates reports whether b dominates `basicBlock`.
-func (block *BasicBlock) Dominates(basicBlock *BasicBlock) bool {
-	return block.dom.pre <= basicBlock.dom.pre && basicBlock.dom.post <= block.dom.post
-}
-
-// DominatorPreorder returns a new slice containing the blocks of f
-// in a preorder traversal of the dominator tree.
-func (function *Function) DominatorPreorder() []*BasicBlock {
-	slice := slices.Clone(function.Blocks)
-	sort.Slice(slice, func(left, right int) bool {
-		return slice[left].dom.pre < slice[right].dom.pre
-	})
-	return slice
-}
-
-// DominatorPostorder returns a new slice containing the blocks of f
-// in a postorder traversal of the dominator tree.
-// (This is not the same as a postdominance order.)
-func (function *Function) DominatorPostorder() []*BasicBlock {
-	slice := slices.Clone(function.Blocks)
-	sort.Slice(slice, func(left, right int) bool {
-		return slice[left].dom.post < slice[right].dom.post
-	})
-	return slice
-}
-
 // domInfo contains a BasicBlock's dominance information.
 type domInfo struct {
 	idom      *BasicBlock   // immediate dominator (parent in domtree)
 	children  []*BasicBlock // nodes immediately dominated by this one
 	pre, post int32         // pre- and post-order numbering within domtree
-}
-
-// ltState holds the working state for Lengauer-Tarjan algorithm
-// (during which domInfo.pre is repurposed for CFG DFS preorder number).
-type ltState struct {
-	// Each slice is indexed by b.Index.
-	sdom     []*BasicBlock // b's semidominator
-	parent   []*BasicBlock // b's parent in DFS traversal of CFG
-	ancestor []*BasicBlock // b's ancestor with least sdom
-}
-
-// dfs implements the depth-first search part of the LT algorithm.
-func (state *ltState) dfs(block *BasicBlock, index int32, preorder []*BasicBlock) int32 {
-	preorder[index] = block
-	block.dom.pre = index // For now: DFS preorder of spanning tree of CFG
-	index++
-	state.sdom[block.Index] = block
-	state.link(nil, block)
-	for _, successor := range block.Successors {
-		if state.sdom[successor.Index] == nil {
-			state.parent[successor.Index] = block
-			index = state.dfs(successor, index, preorder)
-		}
-	}
-	return index
-}
-
-// eval implements the EVAL part of the LT algorithm.
-func (state *ltState) eval(vertex *BasicBlock) *BasicBlock {
-	// TODO(adonovan): opt: do path compression per simple LT.
-	minimumVertex := vertex
-	for ; state.ancestor[vertex.Index] != nil; vertex = state.ancestor[vertex.Index] {
-		if state.sdom[vertex.Index].dom.pre < state.sdom[minimumVertex.Index].dom.pre {
-			minimumVertex = vertex
-		}
-	}
-	return minimumVertex
-}
-
-// link implements the LINK part of the LT algorithm.
-func (state *ltState) link(parent, vertex *BasicBlock) {
-	state.ancestor[vertex.Index] = parent
 }
 
 // buildDominatorTree computes the dominator tree of f using the LT algorithm.

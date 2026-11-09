@@ -9,6 +9,59 @@ import (
 	"go/ast"
 )
 
+// BasicBlock represents an IR basic block.
+//
+// The final element of Instructions is always an explicit transfer of
+// control (If, Jump, Return, Panic, or Unreachable).
+//
+// A block may contain no Instructions only if it is unreachable,
+// i.e., Predecessors is nil.  Empty blocks are typically pruned.
+//
+// BasicBlocks and their Predecessors/Successors relation form a (possibly cyclic)
+// graph independent of the IR Value graph: the control-flow graph or
+// CFG.  It is illegal for multiple edges to exist between the same
+// pair of blocks.
+//
+// Each BasicBlock is also a node in the dominator tree of the CFG.
+// The tree may be navigated using ImmediateDominator()/Dominees() and queried using
+// Dominates().
+//
+// The order of Predecessors and Successors is significant (to Phi and If
+// instructions, respectively).
+
+type BasicBlock struct {
+	Index   int    // index of this block within Parent().Blocks
+	comment string // optional label; no semantic significance
+
+	// RangeIndexLoop marks the loop header of a range over an array, a pointer to one or a slice, the
+	// block go/ir labels "rangeindex.loop", which a reader recognizes that lowering by. A field rather
+	// than the label, so no reader compares a string to find it.
+	RangeIndexLoop bool
+
+	parent                   *Function      // parent function
+	Instructions             []Instruction  // instructions in order
+	Predecessors, Successors []*BasicBlock  // predecessors and successors
+	Scc                      *Scc           // strongly connected component
+	successorsSpace          [2]*BasicBlock // initial space for Successors
+	dom                      domInfo        // dominator tree info
+	gaps                     int            // number of nil Instructions (transient)
+}
+
+// ImmediateDominator returns the block that immediately dominates b:
+// its parent in the dominator tree, if any.
+// Neither the entry node (b.Index==0) nor recover node
+// (b==b.Parent().Recover()) have a parent.
+func (block *BasicBlock) ImmediateDominator() *BasicBlock { return block.dom.idom }
+
+// Dominees returns the list of blocks that b immediately dominates:
+// its children in the dominator tree.
+func (block *BasicBlock) Dominees() []*BasicBlock { return block.dom.children }
+
+// Dominates reports whether b dominates `basicBlock`.
+func (block *BasicBlock) Dominates(basicBlock *BasicBlock) bool {
+	return block.dom.pre <= basicBlock.dom.pre && basicBlock.dom.post <= block.dom.post
+}
+
 // This file implements the BasicBlock type.
 
 // addEdge adds a control-flow graph edge from from to to.
@@ -46,17 +99,6 @@ func (block *BasicBlock) emit(instruction Instruction, source ast.Node) Value {
 	block.Instructions = append(block.Instructions, instruction)
 	value, _ := instruction.(Value)
 	return value
-}
-
-// predecessorIndex returns the i such that b.Predecessors[i] == `basicBlock` or panics if
-// there is none.
-func (block *BasicBlock) predecessorIndex(basicBlock *BasicBlock) int {
-	for index, pred := range block.Predecessors {
-		if pred == basicBlock {
-			return index
-		}
-	}
-	panic(fmt.Sprintf("no edge %s -> %s", basicBlock, block))
 }
 
 // hasPhi returns true if b.Instructions contains φ-nodes.
