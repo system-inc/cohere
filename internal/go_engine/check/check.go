@@ -229,16 +229,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, errors.New("running the rules beside the load: the findings cache's store restores packages the " +
 			"load never checks and analyzes in waves, so a run with it waits for the load")
 	}
-	// Dependents hands each dispatcher the rules of this run that require it on a package, so it calls only their
-	// listeners, never those of a rule the run left out that registered on it all the same. Failed and Tolerant let a
-	// dispatcher run past a listener's requirement failing on a package, so only that listener's rule fails there, as
-	// it did walking by itself, never every rule on the dispatcher. ForDependents keeps a dispatcher's requirement
-	// for its listeners only where a rule of this run requires it too, so what only a left-out rule reads never runs.
-	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions := &checker.Options{Sequential: options.SingleThreaded, ReadFile: options.ReadFile,
-		Dependents: rule.Dependents, Failed: rule.Failed, Tolerant: dispatch.IsDispatcher,
-		ForDependents: dispatch.ListenerRequirement, Ready: options.Ready, Abandon: options.Abandon,
-		Timing: options.Timing, Timed: rule.Timed}
+		Ready: options.Ready, Abandon: options.Abandon}
+	SetDispatchOptions(checkerOptions)
+	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
+	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
@@ -387,6 +382,21 @@ func abandoned(abandon <-chan struct{}) bool {
 	default:
 		return false
 	}
+}
+
+// SetDispatchOptions sets on options what the engine's dispatchers read of the checker, as every run of the rules
+// sets it, Run's and the parity harness's alike, so a port's tests run its rule as the engine does. Dependents hands
+// each dispatcher the rules of this run that require it on a package, so it calls only their listeners, never those of
+// a rule the run left out that registered on it all the same, and the engine's own representation records the
+// expression map only where a rule that reads it runs. Failed and Tolerant let a dispatcher run past a listener's
+// requirement failing on a package, so only that listener's rule fails there, as it did walking by itself, never every
+// rule on the dispatcher. ForDependents keeps a dispatcher's requirement for its listeners only where a rule of this
+// run requires it too, so what only a left-out rule reads never runs.
+func SetDispatchOptions(options *checker.Options) {
+	options.Dependents = rule.Dependents
+	options.Failed = rule.Failed
+	options.Tolerant = dispatch.IsDispatcher
+	options.ForDependents = dispatch.ListenerRequirement
 }
 
 // actionFindings is what action found, as newFinding makes it.
