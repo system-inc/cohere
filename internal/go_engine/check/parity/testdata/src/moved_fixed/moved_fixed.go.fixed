@@ -1,0 +1,11 @@
+// Package moved_fixed holds a call both sides find, recorded as moved, beside its fixed file, this file as the port's
+// fix leaves it, byte for byte.
+package moved_fixed
+
+func shared() {}
+func fixed()  {}
+
+func calls() {
+	// Both find the call; the port's span and fix are ruled right, and the original's fix wrong.
+	fixed() // port moves: call to shared
+}

@@ -141,3 +141,123 @@ func TestRequirePortWhereOriginalPanicsHoldsTheFixesOfItsFindings(test *testing.
 			"panicking/panicking.go:14, which the fixture does not record",
 	)
 }
+
+// A fix with no edits on a finding of the port's fails there as it fails in RequireOnlyAdjudicated, since no record
+// can stand for it.
+func TestRequirePortWhereOriginalPanicsFailsAFixWithNoEdits(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
+			calling(portMessages, fixingWithNoEdits("change nothing")), analysistest.TestData(), "panicking")
+	}),
+		`the port alone fixes its finding at panicking/panicking.go:13 with "change nothing", a fix with no edits`,
+		`the port alone fixes its finding at panicking/panicking.go:14 with "change nothing", a fix with no edits`,
+	)
+}
+
+// foundWherePanicking is a record given beside the call for panicking_silent, a file with no record in it, as one
+// copied byte for byte is: the port finds the call the original panics on.
+var foundWherePanicking = Record{
+	File:   "panicking_silent/panicking_silent.go",
+	Line:   8,
+	Text:   "finds: call to panics",
+	Reason: "the port rightly finds the call the original panics on",
+}
+
+// A record given beside the call is held as one written as a comment is, by the package's function and by a target's
+// alike: met, it passes, and given with no reason, it fails, named by file and line, though it is met.
+func TestRequirePortWhereOriginalPanicsHoldsRecordsGivenBesideTheCall(test *testing.T) {
+	test.Parallel()
+	unreasoned := foundWherePanicking
+	unreasoned.Reason = " "
+	for _, require := range []func(
+		test testing.TB,
+		original *analysis.Analyzer,
+		port *analysis.Analyzer,
+		testdata string,
+		fixture string,
+		given ...Record,
+	){RequirePortWhereOriginalPanics, on386.RequirePortWhereOriginalPanics} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			require(recording, panicking(originalMessages), calling(map[string]string{"panics": "call to panics"}),
+				analysistest.TestData(), "panicking_silent", foundWherePanicking)
+		}))
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			require(recording, panicking(originalMessages), calling(map[string]string{"panics": "call to panics"}),
+				analysistest.TestData(), "panicking_silent", unreasoned)
+		}), "panicking_silent/panicking_silent.go:8 is given beside the call a record with no reason: write why in "+
+			"its Reason")
+	}
+}
+
+// A fixture where the port rightly finds nothing says so with one record, `// port finds nothing`, and passes where
+// the original panics and the port finds nothing at all.
+func TestRequirePortWhereOriginalPanicsPassesAFixtureWhereThePortFindsNothing(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages), port, analysistest.TestData(),
+			"panicking_nothing")
+	}))
+}
+
+// A port that finds anything where the fixture records that it finds nothing fails on each finding, named whole.
+func TestRequirePortWhereOriginalPanicsFailsAFindingWhereThePortFindsNothing(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
+			calling(map[string]string{"panics": "call to panics"}), analysistest.TestData(), "panicking_nothing")
+	}), "the port found panicking_nothing/panicking_nothing.go:9:2: call to panics, where the fixture records that "+
+		"it finds nothing")
+}
+
+// A record that the port finds nothing gives its reason as any other does, and with none fails, named by file and
+// line.
+func TestRequirePortWhereOriginalPanicsFailsAFindsNothingWithNoReason(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages), port, analysistest.TestData(),
+			"panicking_nothing_unreasoned")
+	}), "panicking_nothing_unreasoned/panicking_nothing_unreasoned.go:8 holds a record with no reason")
+}
+
+// A record that the port finds nothing beside records of what it finds contradicts them, and fails, comparing
+// nothing.
+func TestRequirePortWhereOriginalPanicsRefusesFindsNothingBesideFinds(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages), port, analysistest.TestData(),
+			"panicking", Record{File: "panicking/panicking.go", Line: 12, Text: "finds nothing", Reason: "planted"})
+	}), "panicking/panicking.go:12 records that the port finds nothing, beside 2 records of what it finds")
+}
+
+// Where the original runs, a record that the port finds nothing has nothing to hold, so RequireOnlyAdjudicated
+// refuses it.
+func TestRequireOnlyAdjudicatedRefusesFindsNothing(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "adjudicated",
+			Record{File: "adjudicated/adjudicated.go", Line: 11, Text: "finds nothing", Reason: "planted"})
+	}), "adjudicated/adjudicated.go:11 records `finds nothing`, which holds only where the original panics: call "+
+		"RequirePortWhereOriginalPanics")
+}
+
+// Where the original panics, a `finds:` record's column is held as in RequireOnlyAdjudicated.
+func TestRequirePortWhereOriginalPanicsHoldsAFindsRecordsColumn(test *testing.T) {
+	test.Parallel()
+	placed := Record{
+		File:   "panicking_silent/panicking_silent.go",
+		Line:   8,
+		Text:   "finds at column 2: call to panics",
+		Reason: "the port rightly finds the call the original panics on, at the call",
+	}
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
+			calling(map[string]string{"panics": "call to panics"}), analysistest.TestData(), "panicking_silent", placed)
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
+			calling(map[string]string{"panics": "call to panics"}, startingLater(1)), analysistest.TestData(),
+			"panicking_silent", placed)
+	}), "the fixture records that the port finds panicking_silent/panicking_silent.go:8:2: call to panics, and no "+
+		"finding of the port's there starts at column 2")
+}

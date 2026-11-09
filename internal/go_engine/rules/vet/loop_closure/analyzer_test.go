@@ -171,24 +171,6 @@ func TestPortJudgesAPackageByItsPathAsTheOriginalDoes(test *testing.T) {
 	}
 }
 
-// errgroupWithVariadicGoSource is a package at errgroup's path whose Group's Go takes any number of functions, called
-// with none as a loop's last statement.
-const errgroupWithVariadicGoSource = `//go:build go1.21
-
-package errgroup
-
-type Group struct{}
-
-func (*Group) Go(functions ...func() error) {}
-
-func launch(values []int, group *Group) {
-	for _, value := range values {
-		print(value)
-		group.Go()
-	}
-}
-`
-
 // testingWithBareRunSource is a package at testing's path whose T's Run takes a function of no parameters, called
 // with a literal in a loop's body.
 const testingWithBareRunSource = `//go:build go1.21
@@ -211,42 +193,36 @@ func runs(values []int, test *T) {
 // The original indexes a call's first argument and a literal's first parameter where a package at errgroup's or
 // testing's path, but not the real one, may have neither, and panics there, while the port reads nothing. A Go given
 // no function launches nothing, and a Run's literal with no parameter has no *testing.T to call Parallel on, so
-// nothing in either can outlive its iteration and the port, finding nothing, is right. A panic in the checker takes the
-// whole test binary down, so the original runs on a hand-built pass under a recover, which pins its crash, and the
-// port runs on another over the same file. The harness's RequirePortWhereOriginalPanics cannot take either case: it
-// holds the port to the fixture's `finds:` records and fails a fixture that records none, where in errgroup's case the
-// port rightly finds nothing, and testing's case needs a package at the standard library's path testing, which go
-// list, the harness's only loader, refuses as ambiguous. So this tier keeps its own passes.
+// nothing in either can outlive its iteration and the port, finding nothing, is right. errgroup's case is the fixture
+// module errgroup_crash, a package at errgroup's path, held by RequirePortWhereOriginalPanics to its `// port finds
+// nothing` record. testing's case needs a package at the standard library's path testing, which go list, the harness's
+// only loader, refuses as ambiguous, so it keeps its own passes: the original on a hand-built pass under a recover,
+// which pins its crash, and the port on another over the same file, where it must find nothing.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
-	cases := []struct {
-		name        string
-		packagePath string
-		source      string
-	}{
-		{"errgroup's Go with no argument", "golang.org/x/sync/errgroup", errgroupWithVariadicGoSource},
-		{"testing's Run with a literal of no parameter", "testing", testingWithBareRunSource},
-	}
-	for _, judged := range cases {
-		test.Run(judged.name, func(subtest *testing.T) {
-			subtest.Parallel()
-			checked := checkedByHand(subtest, judged.packagePath, "crash.go", judged.source)
-			crashed := func() (recovered any) {
-				defer func() {
-					recovered = recover()
-				}()
-				runByHand(subtest, loopclosure.Analyzer, checked)
-				return nil
+	test.Run("errgroup's Go with no argument", func(subtest *testing.T) {
+		subtest.Parallel()
+		parity.RequirePortWhereOriginalPanics(subtest, loopclosure.Analyzer, Analyzer, analysistest.TestData(),
+			"errgroup_crash")
+	})
+	test.Run("testing's Run with a literal of no parameter", func(subtest *testing.T) {
+		subtest.Parallel()
+		checked := checkedByHand(subtest, "testing", "crash.go", testingWithBareRunSource)
+		crashed := func() (recovered any) {
+			defer func() {
+				recovered = recover()
 			}()
-			if crashed == nil {
-				subtest.Error("the original did not crash, so the case no longer pins what it was written for")
-			}
-			subtest.Logf("the original crashed: %v", crashed)
-			if port := runByHand(subtest, Analyzer, checked); len(port) > 0 {
-				subtest.Errorf("the port found %v, and nothing here can outlive its iteration", port)
-			}
-		})
-	}
+			runByHand(subtest, loopclosure.Analyzer, checked)
+			return nil
+		}()
+		if crashed == nil {
+			subtest.Error("the original did not crash, so the case no longer pins what it was written for")
+		}
+		subtest.Logf("the original crashed: %v", crashed)
+		if port := runByHand(subtest, Analyzer, checked); len(port) > 0 {
+			subtest.Errorf("the port found %v, and nothing here can outlive its iteration", port)
+		}
+	})
 }
 
 // handChecked is one file type-checked by hand, as a package of its own.

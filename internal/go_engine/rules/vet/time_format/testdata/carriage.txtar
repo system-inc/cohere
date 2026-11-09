@@ -1,7 +1,7 @@
 -- src/carriage/carriage.go --
 // Package carriage holds raw literals with carriage returns before the mistake or inside it, which the scanner drops
 // from the literal's text and its value while its positions still count them. gofmt drops them too, so the file lives
-// in this archive, which the test extracts as it is.
+// in this archive, which the test extracts as it is, beside carriage.go.fixed, the file as the port's fixes leave it.
 package carriage
 
 import "time"
@@ -9,9 +9,26 @@ import "time"
 // Each carriage return before the mistake lands the original one byte early, and one inside it covers one byte too few.
 func carried(moment time.Time) {
 	// One carriage return before the mistake.
-	_ = moment.Format(`Mon 2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02
+	_ = moment.Format(`Mon 2006-02-01`) // port moves at column 26 to 36 with "Replace 2006-02-01 with 2006-01-02": 2006-02-01 should be 2006-01-02
 	// Two carriage returns before it, so the original lands two bytes early.
-	_ = moment.Format(`2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02
+	_ = moment.Format(`2006-02-01`) // port moves at column 23 to 33 with "Replace 2006-02-01 with 2006-01-02": 2006-02-01 should be 2006-01-02
 	// One carriage return inside it.
-	_ = moment.Format(`2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02
+	_ = moment.Format(`2006-02-01`) // port moves at column 21 to 32 with "Replace 2006-02-01 with 2006-01-02": 2006-02-01 should be 2006-01-02
+}
+-- src/carriage/carriage.go.fixed --
+// Package carriage holds raw literals with carriage returns before the mistake or inside it, which the scanner drops
+// from the literal's text and its value while its positions still count them. gofmt drops them too, so the file lives
+// in this archive, which the test extracts as it is, beside carriage.go.fixed, the file as the port's fixes leave it.
+package carriage
+
+import "time"
+
+// Each carriage return before the mistake lands the original one byte early, and one inside it covers one byte too few.
+func carried(moment time.Time) {
+	// One carriage return before the mistake.
+	_ = moment.Format(`Mon 2006-01-02`) // port moves at column 26 to 36 with "Replace 2006-02-01 with 2006-01-02": 2006-02-01 should be 2006-01-02
+	// Two carriage returns before it, so the original lands two bytes early.
+	_ = moment.Format(`2006-01-02`) // port moves at column 23 to 33 with "Replace 2006-02-01 with 2006-01-02": 2006-02-01 should be 2006-01-02
+	// One carriage return inside it.
+	_ = moment.Format(`2006-01-02`) // port moves at column 21 to 32 with "Replace 2006-02-01 with 2006-01-02": 2006-02-01 should be 2006-01-02
 }

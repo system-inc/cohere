@@ -1,7 +1,6 @@
 package asm_decl
 
 import (
-	"cmp"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -72,7 +71,7 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 	for _, target := range upstreamTargets {
 		// Not parallel: onTarget sets the target in go/build's default context and the environment, the process's own.
 		test.Run(target, func(subtest *testing.T) {
-			onTarget(subtest, target, "")
+			onTarget(subtest, target)
 			parity.RequireUpstreamWants(subtest, Analyzer, analysistest.TestData(), "a")
 		})
 	}
@@ -87,45 +86,62 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	for _, target := range architectureTargets {
 		// Not parallel: onTarget sets the target in go/build's default context and the environment, the process's own.
 		test.Run(target, func(subtest *testing.T) {
-			onTarget(subtest, target, "")
+			onTarget(subtest, target)
 			parity.RequireIdentical(subtest, asmdecl.Analyzer, Analyzer, analysistest.TestData(), fixturePackages...)
 		})
 	}
 }
 
-// When go/build's default context names an architecture the pass does not know, a file whose name and build lines
-// name none cannot be judged, and both leave it whole, the original after logging that it cannot tell the file's
-// architecture, while both still judge the files that name theirs. The load is for linux/amd64, and the default
-// context says sparc64, which no Go release builds for. It reads the findings through the harness's Findings rather
-// than RequireIdentical, since it judges the port's findings further, and compares them as RequireIdentical does.
-//
-// Not parallel: the target is set in go/build's default context and the environment, which are the process's own.
-func TestNeitherJudgesAFileOfAnUnknownArchitecture(test *testing.T) {
-	onTarget(test, "linux/amd64", "sparc64")
-	original, port := parity.Findings(test, asmdecl.Analyzer, Analyzer, analysistest.TestData(), fixturePackages...)
-	test.Logf("with an unknown default architecture, the original found %d, the port %d", len(original), len(port))
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range parity.Difference(original, port) {
-		test.Errorf("the original found %s, and the port did not", missing)
-	}
-	for _, extra := range parity.Difference(port, original) {
-		test.Errorf("the port found %s, and the original did not", extra)
-	}
-	// These files name no architecture of their own, and each holds findings on every target that judges it.
-	unjudged := []string{"parity.s", "parity_terms.s", "parity_go_build.s"}
-	for _, found := range port {
-		if slices.Contains(unjudged, found.File) {
-			test.Errorf("the port judged %s, whose architecture it cannot tell: %s", found.File, found)
-		}
-	}
+// unknownArchitectureFiles are the fixture files whose architecture the pass cannot tell when the default context
+// names one it does not know: each names none of its own, in its name or in a build line the pass reads, and each holds
+// findings on every target that judges it.
+var unknownArchitectureFiles = []string{
+	"parity/parity.s",
+	"parity/parity_terms.s",
+	"parity/parity_go_build.s",
+	"parity/nested/nested.s",
 }
 
-// differencesDirectory is the differences fixture, whose declarations crash the original. Its records sit on the
-// findings' own lines in an assembly file, where the harness reads records from .go files alone, and its
-// RequirePortWhereOriginalPanics takes none given beside the call, so this tier keeps its own pass, recover and
-// reader, and compares through the harness's Finding and Difference.
+// When go/build's default context names an architecture the pass does not know, a file whose name and build lines
+// name none cannot be judged, and both leave it whole, the original after logging that it cannot tell the file's
+// architecture, while both still judge the files that name theirs, each finding the same in every field. The load is
+// for linux/amd64 and the default context says sparc64, which no Go release builds for, so the load hands over
+// parity_go_build.s, built for amd64 by a `//go:build` line the pass does not read, beside the files that name no
+// architecture at all (see unknownArchitectureFiles).
+//
+// Leaving those files alone proves only that nothing was found there, so the tier pins why beside it: the same load
+// judged as amd64, the default context naming the load's own target, where both sides find the same in every field and
+// each of those files holds findings of each side's, as parity_go_build.s holds `[amd64] quads: wrong argument size
+// 28; expected $...-32` at its `TEXT` line and `invalid MOVW of x+0(FP); int64 is 8-byte value` at line 8. So the
+// sparc64 half is green because the architecture is unknown, and a sparc64 half that went on judging as amd64 fails.
+//
+// Not parallel: the differences and shape tiers run asmdecl by hand, outside the harness, where it reads go/build's
+// default context, which this call sets.
+func TestNeitherJudgesAFileOfAnUnknownArchitecture(test *testing.T) {
+	onAmd64 := parity.On("GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0")
+	// Not parallel: the subtests are this tier's two halves, each a harness call that sets the default context, run
+	// one after the other for the reason the tier itself is not parallel.
+	test.Run("judged as amd64", func(subtest *testing.T) {
+		onAmd64.RequireIdentical(subtest, asmdecl.Analyzer, Analyzer, analysistest.TestData(), fixturePackages...)
+		original, port := onAmd64.Findings(subtest, asmdecl.Analyzer, Analyzer, analysistest.TestData(),
+			fixturePackages...)
+		for _, file := range unknownArchitectureFiles {
+			isIn := func(found parity.Finding) bool { return found.File == file }
+			if !slices.ContainsFunc(original, isIn) || !slices.ContainsFunc(port, isIn) {
+				subtest.Errorf("judged as amd64, %s holds no finding of one side's, so leaving it alone where the "+
+					"architecture is unknown says nothing of the architecture", file)
+			}
+		}
+	})
+	// Not parallel: it sets the default context, after the amd64 half has run.
+	test.Run("judged as sparc64", func(subtest *testing.T) {
+		onAmd64.JudgingBy("GOARCH=sparc64").RequireIdenticalLeavingAlone(subtest, asmdecl.Analyzer, Analyzer,
+			analysistest.TestData(), unknownArchitectureFiles, fixturePackages...)
+	})
+}
+
+// differencesDirectory is the differences fixture, whose declarations crash the original, and whose assembly file the
+// shape tier hands the original beside each shape.
 var differencesDirectory = filepath.Join(analysistest.TestData(), "src", "differences")
 
 // The original lays out every bodiless declaration's frame before it reads a line of assembly, and crashes in
@@ -133,31 +149,15 @@ var differencesDirectory = filepath.Join(analysistest.TestData(), "src", "differ
 // go/types/gcsizes.go:54 fails, and the panic recovered names the result check at line 17 that runs after it): a
 // method of a generic type taking a T, a [2]T or a struct of T, or returning a T. The port judges nothing of such a
 // function, since without its frame nothing true can be said of its assembly, and goes on judging the rest of the
-// package. The original runs on a hand-built pass under a recover, which pins its crash, and the port runs alone on
-// another over the same files, where it must report exactly the `port finds:` records of differences_amd64.s: none
-// in the functions it cannot measure, and every finding of the measured ones beside and after them.
+// package. Loaded for linux/amd64, the original must panic on the differences fixture, and the port must report there
+// exactly the `port finds:` records of differences_amd64.s, each reasoned on the line above it: none in the functions
+// it cannot measure, and every finding of the measured ones beside and after them.
+//
+// Not parallel: the shape tier runs the original by hand, outside the harness, where it reads go/build's default
+// context, which this call sets.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
-	test.Parallel()
-	checked := checkedByHand(test, filepath.Join(differencesDirectory, "differences.go"), "")
-	assemblyFilename := filepath.Join(differencesDirectory, "differences_amd64.s")
-	crashed := originalCrashes(test, checked, assemblyFilename)
-	if crashed == nil {
-		test.Fatal("the original did not crash, so the fixture no longer pins what it was written for")
-	}
-	test.Logf("the original crashed: %v", crashed)
-
-	port := runByHand(test, Analyzer, checked, assemblyFilename)
-	recorded := portFindsRecords(test, assemblyFilename)
-	test.Logf("the port found %d, and differences_amd64.s records %d", len(port), len(recorded))
-	if len(recorded) == 0 {
-		test.Fatal("differences_amd64.s records no finding, so the comparison proves nothing")
-	}
-	for _, missing := range parity.Difference(recorded, port) {
-		test.Errorf("differences_amd64.s records %s, and the port did not find it", missing)
-	}
-	for _, extra := range parity.Difference(port, recorded) {
-		test.Errorf("the port found %s, which differences_amd64.s does not record", extra)
-	}
+	parity.On("GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0").RequirePortWhereOriginalPanics(test, asmdecl.Analyzer,
+		Analyzer, analysistest.TestData(), "differences")
 }
 
 // Each shape the port leaves unjudged crashes the original on its own, and each shape that holds a type parameter
@@ -207,14 +207,31 @@ func TestPortLeavesUnjudgedExactlyTheFramesTheOriginalCrashesOn(test *testing.T)
 	}
 }
 
-// originalCrashes runs x/tools' asmdecl by hand over checked and the assembly file named assemblyFilename, and
-// returns what it panicked with, or nil when it did not.
+// originalCrashes runs x/tools' asmdecl by hand on a pass over the Go file checked holds and the assembly file named
+// assemblyFilename, and returns what it panicked with, or nil when it did not. What it reports is not read: a shape is
+// a frame, and the question is whether laying it out crashes.
 func originalCrashes(test *testing.T, checked handChecked, assemblyFilename string) (recovered any) {
 	test.Helper()
 	defer func() {
 		recovered = recover()
 	}()
-	runByHand(test, asmdecl.Analyzer, checked, assemblyFilename)
+	pass := &analysis.Pass{
+		Analyzer:   asmdecl.Analyzer,
+		Fset:       checked.fileSet,
+		Files:      []*ast.File{checked.file},
+		OtherFiles: []string{assemblyFilename},
+		Pkg:        checked.typesPackage,
+		TypesInfo:  checked.information,
+		TypesSizes: types.SizesFor("gc", "amd64"),
+		ResultOf:   map[*analysis.Analyzer]any{},
+		ReadFile:   os.ReadFile,
+		Report: func(analysis.Diagnostic) {
+			// What the original reports is not read: the question is whether laying out the frame crashes.
+		},
+	}
+	if _, runError := asmdecl.Analyzer.Run(pass); runError != nil {
+		test.Fatalf("running %s: %v", asmdecl.Analyzer.Name, runError)
+	}
 	return nil
 }
 
@@ -256,78 +273,17 @@ func checkedByHand(test *testing.T, filename string, source string) handChecked 
 	return handChecked{fileSet: fileSet, file: file, typesPackage: checked, information: information}
 }
 
-// runByHand runs analyzer's Run on a pass over the Go file checked holds and the assembly file named
-// assemblyFilename, and returns what it reports, each finding in its file's base name, with its end when it has one.
-func runByHand(
-	test *testing.T,
-	analyzer *analysis.Analyzer,
-	checked handChecked,
-	assemblyFilename string,
-) []parity.Finding {
-	test.Helper()
-	found := []parity.Finding{}
-	pass := &analysis.Pass{
-		Analyzer:   analyzer,
-		Fset:       checked.fileSet,
-		Files:      []*ast.File{checked.file},
-		OtherFiles: []string{assemblyFilename},
-		Pkg:        checked.typesPackage,
-		TypesInfo:  checked.information,
-		TypesSizes: types.SizesFor("gc", "amd64"),
-		ResultOf:   map[*analysis.Analyzer]any{},
-		ReadFile:   os.ReadFile,
-		Report: func(diagnostic analysis.Diagnostic) {
-			position := checked.fileSet.Position(diagnostic.Pos)
-			reported := parity.Finding{
-				File: filepath.Base(position.Filename), Line: position.Line, Column: position.Column,
-				Message: diagnostic.Message,
-			}
-			if diagnostic.End.IsValid() {
-				end := checked.fileSet.Position(diagnostic.End)
-				reported.EndLine, reported.EndColumn = end.Line, end.Column
-			}
-			found = append(found, reported)
-		},
-	}
-	if _, runError := analyzer.Run(pass); runError != nil {
-		test.Fatalf("running %s: %v", analyzer.Name, runError)
-	}
-	return found
-}
-
-// portFindsRecords is every `// port finds: <message>` record in the assembly file named filename, each a finding
-// at the start of its line with no end, as the pass places every finding.
-func portFindsRecords(test *testing.T, filename string) []parity.Finding {
-	test.Helper()
-	content, readError := os.ReadFile(filename)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	const marker = "// port finds: "
-	recorded := []parity.Finding{}
-	for index, line := range strings.Split(string(content), "\n") {
-		records := strings.Split(line, marker)
-		for _, message := range records[1:] {
-			recorded = append(recorded, parity.Finding{
-				File: filepath.Base(filename), Line: index + 1, Column: 1, Message: strings.TrimSpace(message),
-			})
-		}
-	}
-	return recorded
-}
-
 // onTarget makes test run as on a machine building for target, `GOOS/GOARCH`: go/build's default context, which
 // the original and the port read the architecture from, and the environment, which the load runs go list under, so
-// a package holds the files it holds there. A defaultArchitecture other than empty is put in the default context in
-// place of target's. Both are put back when test ends. Setenv also refuses a parallel test, and none may run beside
-// this one, since the default context is the process's own.
-func onTarget(test *testing.T, target string, defaultArchitecture string) {
+// a package holds the files it holds there. Both are put back when test ends. Setenv also refuses a parallel test, and
+// none may run beside this one, since the default context is the process's own.
+func onTarget(test *testing.T, target string) {
 	test.Helper()
 	operatingSystem, architectureName, _ := strings.Cut(target, "/")
 	test.Setenv("GOOS", operatingSystem)
 	test.Setenv("GOARCH", architectureName)
 	savedOperatingSystem, savedArchitecture := build.Default.GOOS, build.Default.GOARCH
-	build.Default.GOOS, build.Default.GOARCH = operatingSystem, cmp.Or(defaultArchitecture, architectureName)
+	build.Default.GOOS, build.Default.GOARCH = operatingSystem, architectureName
 	test.Cleanup(func() {
 		build.Default.GOOS, build.Default.GOARCH = savedOperatingSystem, savedArchitecture
 	})

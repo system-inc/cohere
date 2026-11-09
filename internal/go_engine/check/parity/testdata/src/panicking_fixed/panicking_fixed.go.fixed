@@ -1,0 +1,14 @@
+// Package panicking_fixed holds a call the planted original panics on and one only the port finds, fixed by the
+// port, beside its fixed file, this file as the port's fix leaves it, byte for byte.
+package panicking_fixed
+
+func panics() {}
+func gained() {}
+func fixed()  {}
+
+// calls holds the planted records, each ruled in this doc comment: the port rightly finds gained, and rightly fixes
+// it by writing fixed() in its place.
+func calls() {
+	panics()
+	fixed() // port finds: call to gained // port fixes: fixed()
+}

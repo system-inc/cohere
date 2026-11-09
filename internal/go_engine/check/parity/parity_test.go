@@ -90,6 +90,13 @@ func writing(text string) shape {
 	}
 }
 
+// fixingWithNoEdits suggests a fix of message with no edits, which writes nothing anywhere.
+func fixingWithNoEdits(message string) shape {
+	return func(_ *ast.CallExpr, diagnostic *analysis.Diagnostic) {
+		diagnostic.SuggestedFixes = append(diagnostic.SuggestedFixes, analysis.SuggestedFix{Message: message})
+	}
+}
+
 // originalMessages are the calls the original finds: to shared and lost, and to renamed in its words. portMessages
 // are the port's: to shared and gained, and to renamed in other words.
 var (
@@ -630,6 +637,22 @@ func TestRequireOnlyAdjudicatedFailsARecordedFixNotOffered(test *testing.T) {
 	)
 }
 
+// A fix with no edits writes no text anywhere, so no `fixes:` record can stand for it, and one the port offers on its
+// lone finding fails, named by the finding and the fix's message, where the same finding with no fix passes. Both
+// sides offer it on the call both find, so only the found call's differs.
+func TestRequireOnlyAdjudicatedFailsAFixWithNoEdits(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(originalMessages, fixingWithNoEdits("change nothing")),
+			calling(portMessages, fixingWithNoEdits("change nothing")), analysistest.TestData(), "adjudicated")
+	}), `the port alone fixes its finding at adjudicated/adjudicated.go:12 with "change nothing", a fix with no `+
+		"edits, which no `fixes:` record can stand for")
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(originalMessages), calling(portMessages), analysistest.TestData(),
+			"adjudicated")
+	}))
+}
+
 // A `fixes:` record neither on the line of a `finds:` record nor on the line after one names no finding's fix, and
 // fails, named by its own file and line.
 func TestRequireOnlyAdjudicatedFailsAFixesRecordThatFollowsNoFinds(test *testing.T) {
@@ -781,4 +804,246 @@ func TestRequireOnlyAdjudicatedHoldsFixesGivenBesideTheCall(test *testing.T) {
 		`the fixture records that the port alone fixes its finding at same/same.go:8 writing "other()" at `+
 			"same/same.go:8, and it does not",
 	)
+}
+
+// assembling is calling, and also reports each line of a package's assembly files that calls a function messages
+// names, as `CALL ·gained(SB)`, at the line's start, as asmdecl reports its findings, so a finding sits in assembly.
+func assembling(messages map[string]string) *analysis.Analyzer {
+	inGo := calling(messages)
+	return &analysis.Analyzer{
+		Name: "calling",
+		Doc:  "calling reports each call to a function it names, in Go and in assembly.",
+		Run: func(pass *analysis.Pass) (any, error) {
+			for _, name := range pass.OtherFiles {
+				if !strings.HasSuffix(name, ".s") {
+					continue
+				}
+				content, readError := pass.ReadFile(name)
+				if readError != nil {
+					return nil, readError
+				}
+				file := pass.Fset.AddFile(name, -1, len(content))
+				file.SetLinesForContent(content)
+				for index, line := range strings.Split(string(content), "\n") {
+					for called, message := range messages {
+						if strings.Contains(line, "CALL ·"+called+"(SB)") {
+							pass.Reportf(file.LineStart(index+1), "%s", message)
+						}
+					}
+				}
+			}
+			return inGo.Run(pass)
+		},
+	}
+}
+
+// A record in an assembly file is read as one in Go is, on its own line: the port's lone call to gained in assembled.s
+// is met by the record there, beside the one in assembled.go.
+func TestRequireOnlyAdjudicatedReadsRecordsInAssembly(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, assembling(originalMessages), assembling(portMessages),
+			analysistest.TestData(), "assembled")
+	}))
+}
+
+// The same fixture with the record in its assembly removed fails on the finding there, named by its file and line.
+func TestRequireOnlyAdjudicatedFailsAnUnrecordedFindingInAssembly(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, assembling(originalMessages), assembling(portMessages),
+			analysistest.TestData(), "assembled_unrecorded")
+	}), "the port alone found assembled_unrecorded/assembled_unrecorded.s:4:0: call to gained, which the fixture does "+
+		"not record")
+}
+
+// An assembly file has no declarations, so a record there with no comment on the line directly above it has no
+// reason, and fails, named by file and line.
+func TestRequireOnlyAdjudicatedFailsARecordInAssemblyWithNoReasonAbove(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, assembling(originalMessages), assembling(portMessages),
+			analysistest.TestData(), "assembled_unreasoned")
+	}), "assembled_unreasoned/assembled_unreasoned.s:4 holds a record with no reason: write why on the line directly "+
+		"above it, since a file with no declarations has no doc comment to give it")
+}
+
+// startingLater starts the diagnostic later along its line than the call, by laterBy bytes.
+func startingLater(laterBy token.Pos) shape {
+	return func(call *ast.CallExpr, diagnostic *analysis.Diagnostic) {
+		diagnostic.Pos = call.Pos() + laterBy
+	}
+}
+
+// A `finds:` record that names a column is met only by a finding that starts there, and one that names none by a
+// finding anywhere on its line: the port's calls found at the call pass, and found one byte later fail on each record
+// with a column, named with it, while the record with none is still met.
+func TestRequireOnlyAdjudicatedHoldsAFindsRecordsColumn(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages), analysistest.TestData(),
+			"found_at_column")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, startingLater(1)),
+			analysistest.TestData(), "found_at_column")
+	}),
+		"the fixture records that the port alone finds found_at_column/found_at_column.go:9:2: call to gained, and "+
+			"no finding of the port's there starts at column 2",
+		"the fixture records that the port alone finds found_at_column/found_at_column.go:10:6: call to gained, and "+
+			"no finding of the port's there starts at column 6",
+	)
+}
+
+// A column given beside the call is held as one written as a comment is.
+func TestRequireOnlyAdjudicatedHoldsAColumnGivenBesideTheCall(test *testing.T) {
+	test.Parallel()
+	for _, column := range []string{"2", "3"} {
+		failures := failuresOf(test, func(recording testing.TB) {
+			RequireOnlyAdjudicated(recording, calling(nil), calling(sharedMessages), analysistest.TestData(), "same",
+				Record{File: "same/same.go", Line: 7, Text: "finds at column " + column + ": call to shared",
+					Reason: "the first call is ruled found, at the call"},
+				Record{File: "same/same.go", Line: 8, Text: "finds: call to shared", Reason: "the second call too"})
+		})
+		if column == "2" {
+			requireFailures(test, failures)
+			continue
+		}
+		requireFailures(test, failures, "the fixture records that the port alone finds same/same.go:7:3: call to "+
+			"shared, and no finding of the port's there starts at column 3")
+	}
+}
+
+// A `finds at column` record that names an end is met only by a finding that starts and ends where it says, the end a
+// column on the record's own line or a line and a column: the port's calls found over the whole call pass, and found
+// ending one byte short, or with no end, fail on each record, named with where it says the finding ends.
+func TestRequireOnlyAdjudicatedHoldsAFindsRecordsEnd(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, endingShort(0)),
+			analysistest.TestData(), "found_spanning")
+	}))
+	for _, shapes := range [][]shape{{endingShort(1)}, nil} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, shapes...),
+				analysistest.TestData(), "found_spanning")
+		}),
+			"the fixture records that the port alone finds found_spanning/found_spanning.go:9:2-9:10: call to gained, "+
+				"and no finding of the port's there starts at column 2 and ends at line 9, column 10",
+			"the fixture records that the port alone finds found_spanning/found_spanning.go:10:2-10:10: call to "+
+				"gained, and no finding of the port's there starts at column 2 and ends at line 10, column 10",
+		)
+	}
+}
+
+// A `finds at column` record that says its finding has no end is met only by one with none: the port's calls found
+// with no end pass, and found with an end fail, named so.
+func TestRequireOnlyAdjudicatedHoldsAFindsRecordsNoEnd(test *testing.T) {
+	test.Parallel()
+	noEnd := []Record{
+		{File: "same/same.go", Line: 7, Text: "finds at column 2, no end: call to shared", Reason: "found at the call"},
+		{File: "same/same.go", Line: 8, Text: "finds: call to shared", Reason: "the second call too"},
+	}
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(nil), calling(sharedMessages), analysistest.TestData(), "same",
+			noEnd...)
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(nil), calling(sharedMessages, endingShort(0)),
+			analysistest.TestData(), "same", noEnd...)
+	}), "the fixture records that the port alone finds same/same.go:7:2: call to shared, and no finding of the "+
+		"port's there starts at column 2 and has no end")
+}
+
+// fixingWith suggests replacing the call with text, under message.
+func fixingWith(message string, text string) shape {
+	return func(call *ast.CallExpr, diagnostic *analysis.Diagnostic) {
+		diagnostic.SuggestedFixes = append(diagnostic.SuggestedFixes, analysis.SuggestedFix{
+			Message:   message,
+			TextEdits: []analysis.TextEdit{{Pos: call.Pos(), End: call.End(), NewText: []byte(text)}},
+		})
+	}
+}
+
+// A `fixes:` record that names its fix's message, `fixes with "<message>":`, is met only by an edit of a fix with that
+// message, and one that names none by an edit of any: the port's fixes under "write fixed()" pass, and the same edits
+// under another message fail on the record that names it, named with the message, its edit left unrecorded, while the
+// record with none is still met.
+func TestRequireOnlyAdjudicatedHoldsAFixesRecordsMessage(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, writing("fixed()")),
+			analysistest.TestData(), "fixes_messaged")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages),
+			calling(gainedMessages, fixingWith("replace the call", "fixed()")), analysistest.TestData(),
+			"fixes_messaged")
+	}),
+		`the port alone fixes its finding at fixes_messaged/fixes_messaged.go:10 writing "fixed()" at `+
+			"fixes_messaged/fixes_messaged.go:10, which the fixture does not record",
+		`the fixture records that the port alone fixes its finding at fixes_messaged/fixes_messaged.go:10 with `+
+			`"write fixed()" writing "fixed()" at fixes_messaged/fixes_messaged.go:10, and it does not`,
+	)
+}
+
+// A `moves:` record that places the port's finding, or names the message of its fix, holds it on the port's side, as
+// a `finds:` record holds its own, and one that does neither pairs as before: the port's calls found ending a byte
+// short of the original's and fixed under "write fixed()" pass, and found ending two bytes short and fixed under
+// another message fail on each record that says otherwise, named, while the one that only places the start is met.
+func TestRequireOnlyAdjudicatedHoldsWhereAMoveSitsAndItsFix(test *testing.T) {
+	test.Parallel()
+	original := calling(sharedMessages, endingShort(0))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, calling(sharedMessages, endingShort(1), writing("fixed()")),
+			analysistest.TestData(), "moved_placed")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original,
+			calling(sharedMessages, endingShort(2), fixingWith("replace the call", "fixed()")),
+			analysistest.TestData(), "moved_placed")
+	}),
+		"the fixture records that the port's moved finding at moved_placed/moved_placed.go:9 starts at column 2 and "+
+			"ends at line 9, column 9, and it does not",
+		`the fixture records that the port's moved finding at moved_placed/moved_placed.go:9 offers a fix "write `+
+			`fixed()", and it does not`,
+		`the fixture records that the port's moved finding at moved_placed/moved_placed.go:11 offers a fix "write `+
+			`fixed()", and it does not`,
+	)
+}
+
+// A move given beside the call that says the port's finding has no end is met only by one with none.
+func TestRequireOnlyAdjudicatedHoldsAMoveWithNoEnd(test *testing.T) {
+	test.Parallel()
+	given := []Record{
+		{File: "same/same.go", Line: 7, Text: "moves at column 2, no end: call to shared", Reason: "the port's span"},
+		{File: "same/same.go", Line: 8, Text: "moves: call to shared", Reason: "the port's span too"},
+	}
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, endingShort(0)), calling(sharedMessages),
+			analysistest.TestData(), "same", given...)
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, endingShort(0)),
+			calling(sharedMessages, endingShort(1)), analysistest.TestData(), "same", given...)
+	}), "the fixture records that the port's moved finding at same/same.go:7 starts at column 2 and has no end, and "+
+		"it does not")
+}
+
+// Columns and lines count from 1, so a record that names a column, an end line or an end column of 0, a slip or a
+// number past an int's range, is refused where it is read, named, rather than failing later against the port.
+func TestAdjudicatedRefusesAPositionOfZero(test *testing.T) {
+	test.Parallel()
+	for _, text := range []string{
+		"finds at column 0: call to shared",
+		"finds at column 2 to 0: call to shared",
+		"finds at column 2 to 0:9: call to shared",
+		"moves at column 99999999999999999999: call to shared",
+	} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			RequireOnlyAdjudicated(recording, calling(nil), calling(sharedMessages), analysistest.TestData(), "same",
+				Record{File: "same/same.go", Line: 7, Text: text, Reason: "planted"})
+		}), "same/same.go:7 holds a record that places a finding at 0, where lines and columns count from 1: "+
+			fmt.Sprintf("%q", text))
+	}
 }

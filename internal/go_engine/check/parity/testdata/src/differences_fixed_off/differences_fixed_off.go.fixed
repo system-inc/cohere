@@ -1,0 +1,14 @@
+// Package differences_fixed_off holds a call only the port finds and one both find, each fixed by the port, beside a
+// fixed file one byte off what the port's fixes leave.
+package differences_fixed_off
+
+func shared() {}
+func gained() {}
+func fixed()  {}
+
+// calls holds the planted records, each ruled in this doc comment: the port rightly finds gained, and rightly fixes
+// it by writing fixed() in its place.
+func calls() {
+	fixed() // port finds: call to gained // port fixes: fixed()
+	fixeD()
+}

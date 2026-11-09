@@ -43,6 +43,7 @@ func requireStaticcheckGolden(
 	patterns ...string,
 ) {
 	test.Helper()
+	defer target.held(test)()
 	suggested := 0
 	held := 0
 	for _, fixtures := range loadFixtures(test, target, testdata, patterns, nil) {
@@ -153,21 +154,9 @@ func requireGolden(test testing.TB, golden goldenFile, editsByMessage map[string
 // and whether it could be: edits that overlap, or that make source gofmt cannot format, fail the test.
 func applied(test testing.TB, golden goldenFile, source []byte, edits []Edit) ([]byte, bool) {
 	test.Helper()
-	ordered := slices.Clone(edits)
-	// Applied from the last to the first, each edit's offsets still name the bytes they were read against, and of two
-	// at one offset the one that replaces comes first, so an insertion there lands before what replaced the rest, as
-	// testutil applies them from the first.
-	slices.SortFunc(ordered, func(first Edit, second Edit) int {
-		return cmp.Or(cmp.Compare(second.Start, first.Start), cmp.Compare(second.End, first.End))
-	})
-	fixed := slices.Clone(source)
-	for index, edit := range ordered {
-		if index > 0 && edit.End > ordered[index-1].Start {
-			test.Errorf("the port's fixes in %s overlap at offset %d of the fixture file of %s", golden.packageName,
-				edit.Start, golden.name)
-			return nil, false
-		}
-		fixed = slices.Concat(fixed[:edit.Start], []byte(edit.NewText), fixed[edit.End:])
+	fixed, isFixed := appliedExactly(test, golden, source, edits)
+	if !isFixed {
+		return nil, false
 	}
 	formatted, formatError := format.Source(fixed)
 	if formatError != nil {
@@ -176,6 +165,39 @@ func applied(test testing.TB, golden goldenFile, source []byte, edits []Edit) ([
 		return nil, false
 	}
 	return formatted, true
+}
+
+// appliedExactly is source, the fixture file of golden, with edits applied and nothing more, and whether it could be:
+// edits that overlap fail the test.
+func appliedExactly(test testing.TB, golden goldenFile, source []byte, edits []Edit) ([]byte, bool) {
+	test.Helper()
+	fixed, overlapsAt, isApplied := editsApplied(source, edits)
+	if !isApplied {
+		test.Errorf("the port's fixes in %s overlap at offset %d of the fixture file of %s", golden.packageName,
+			overlapsAt, golden.name)
+		return nil, false
+	}
+	return fixed, true
+}
+
+// editsApplied is source with edits applied and nothing more, or, where two overlap, the offset the later starts at
+// and false.
+func editsApplied(source []byte, edits []Edit) (fixed []byte, overlapsAt int, isApplied bool) {
+	ordered := slices.Clone(edits)
+	// Applied from the last to the first, each edit's offsets still name the bytes they were read against, and of two
+	// at one offset the one that replaces comes first, so an insertion there lands before what replaced the rest, as
+	// testutil applies them from the first.
+	slices.SortFunc(ordered, func(first Edit, second Edit) int {
+		return cmp.Or(cmp.Compare(second.Start, first.Start), cmp.Compare(second.End, first.End))
+	})
+	fixed = slices.Clone(source)
+	for index, edit := range ordered {
+		if index > 0 && edit.End > ordered[index-1].Start {
+			return nil, edit.Start, false
+		}
+		fixed = slices.Concat(fixed[:edit.Start], []byte(edit.NewText), fixed[edit.End:])
+	}
+	return fixed, 0, true
 }
 
 // compareGolden fails the test unless fixed, the port's fixes applied, is expected, what the golden file's part named
