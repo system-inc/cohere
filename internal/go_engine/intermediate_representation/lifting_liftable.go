@@ -95,6 +95,7 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int) bo
 				hasUnliftable = true
 			}
 		case *Load:
+		case *debugReference:
 		case *Phi:
 			inHead = true
 			hasUnliftable = true
@@ -129,6 +130,8 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int) bo
 		case *Load:
 			description.hasLiftableLoad = true
 			hasLiftable = true
+		case *debugReference:
+			description.hasLiftableOther = true
 		}
 		if hasLiftable && int(referrer.Id()) > description.lastLiftable {
 			description.lastLiftable = int(referrer.Id())

@@ -42,7 +42,10 @@ func (packageBuilder *builder) localValueSpec(function *Function, spec *ast.Valu
 		// Locals are implicitly zero-initialized.
 		for _, id := range spec.Names {
 			if !isBlankIdent(id) {
-				emitLocalVariable(function, identVariable(function, id), id)
+				local := emitLocalVariable(function, identVariable(function, id), id)
+				if function.debugInformation() {
+					emitDebugReference(function, id, local, true)
+				}
 			}
 		}
 
@@ -100,6 +103,7 @@ func (packageBuilder *builder) assignStmt(function *Function, lhss, rhss []ast.E
 	} else {
 		// e.g. x, y = pos()
 		tuple := packageBuilder.exprN(function, rhss[0])
+		emitDebugReference(function, rhss[0], tuple, false)
 		for index, lval := range lvals {
 			lval.store(function, emitExtract(function, tuple, index, source), source)
 		}
@@ -542,6 +546,9 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 	// First evaluate all channels in all cases, and find
 	// the directions of each state.
 	var states []*SelectState
+	// receives are each state's receive expression, nil for a send, for the debug references a package built
+	// with SetDebugMode records. go/ir keeps it on the state as DebugNode.
+	var receives []*ast.UnaryExpr
 	blocking := true
 	for _, clause := range stmt.Body.List {
 		var st *SelectState
@@ -569,6 +576,7 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 					channelType.Elem(), comm),
 				Position: comm.Arrow,
 			}
+			receives = append(receives, nil)
 
 		case *ast.AssignStmt: // x := <-ch
 			recv, isUnary := ast.Unparen(comm.Rhs[0]).(*ast.UnaryExpr)
@@ -581,6 +589,7 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 				Channel:   packageBuilder.expr(function, recv.X),
 				Position:  recv.OpPos,
 			}
+			receives = append(receives, recv)
 
 		case *ast.ExprStmt: // <-ch
 			recv, isUnary := ast.Unparen(comm.X).(*ast.UnaryExpr)
@@ -593,6 +602,7 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 				Channel:   packageBuilder.expr(function, recv.X),
 				Position:  recv.OpPos,
 			}
+			receives = append(receives, recv)
 		}
 		states = append(states, st)
 	}
@@ -667,6 +677,10 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 		}
 		switch comm := clause.Comm.(type) {
 		case *ast.ExprStmt: // <-ch
+			if function.debugInformation() {
+				value := emitExtract(function, sel, receivedValueIndex, comm)
+				emitDebugReference(function, receives[state], value, false)
+			}
 			receivedValueIndex++
 
 		case *ast.AssignStmt: // x := <-states[state].Channel
@@ -680,6 +694,9 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 			}
 			x := packageBuilder.addr(function, comm.Lhs[0], false) // non-escaping
 			value := emitExtract(function, sel, receivedValueIndex, comm)
+			if function.debugInformation() {
+				emitDebugReference(function, receives[state], value, false)
+			}
 			x.store(function, value, comm)
 
 			if len(comm.Lhs) == 2 { // x, ok := ...

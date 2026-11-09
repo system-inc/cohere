@@ -261,6 +261,10 @@ type Function struct {
 
 	buildshared *task // wait for a shared function to be done building (may be nil if <=1 builder ever needs to wait)
 
+	// expressionValues is the expression map ValueForExpression reads, recorded only in a package built with
+	// SetDebugMode.
+	expressionValues map[ast.Expr]expressionValue
+
 	// These fields are populated only when the function body is built:
 
 	Parameters         []*Parameter    // function parameters; for methods, includes receiver
@@ -922,6 +926,9 @@ func (function *Function) finishBody() {
 
 	// Lifting, where go/ir lifts (#ee33njz): through the shared core, in lifting.go.
 	liftFunction(function)
+
+	// The debug references become the expression map, as go/ir turns them into its exprToValue here.
+	function.recordExpressions()
 
 	// clear remaining builder state
 	function.results = nil    // (used by lifting)

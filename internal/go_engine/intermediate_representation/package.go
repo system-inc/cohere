@@ -25,6 +25,9 @@ type Package struct {
 	init   *Function // Function("init"); the package's init function
 	syntax bool      // package was loaded from syntax
 
+	// debug is whether the package's functions record the expression map ValueForExpression reads (SetDebugMode).
+	debug bool
+
 	// The following fields are set transiently, then cleared
 	// after building.
 	buildOnce sync.Once   // ensures package building occurs once
@@ -34,6 +37,16 @@ type Package struct {
 	// members created as a result of building this package (includes declared functions, wrappers)
 	created     []*Function
 	initVersion map[ast.Expr]string // goversion to use for each global var init expr
+}
+
+// SetDebugMode sets whether irPackage's functions record the expression map, the value each expression in their
+// syntax lowers to, which ValueForExpression reads. Off by default. Set it before the package builds: the builder
+// records the map as it lowers, as go/ir's GlobalDebug does, and a function built without it has none.
+//
+// The map costs a debug reference per expression while a function builds, and an entry per expression after, so
+// a package no reader asks of (a dependency, built for facts) leaves it off.
+func (irPackage *Package) SetDebugMode(debug bool) {
+	irPackage.debug = debug
 }
 
 // Function returns the package-level function of the specified name,
