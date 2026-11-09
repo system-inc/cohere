@@ -245,16 +245,6 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		checkerOptions.Finished = record.take
 	}
 	session := options.Cache
-	if session != nil {
-		// The resolver reads answers of the packages the session restored, and keeps those it computes for the store.
-		// Under a run beside the load the packages' types are not final yet, so only each restored package is known,
-		// once an action on it restores it, and no store answers a package the run learns, which has none there.
-		resolver := fact_resolver.New(session)
-		checkerOptions.Resolver, session.resolver = resolver, resolver
-		if options.Ready == nil {
-			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
-		}
-	}
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.
 		return nil, fmt.Errorf("running report %s: the findings cache was opened without it", options.Report.Name)
@@ -266,6 +256,15 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			var reachable []*packages.Package
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
 			session.Restore(load.LoaderSource, reachable, analyzed)
+		}
+		// The resolver reads answers of the packages the session restored, and keeps those it computes for the store.
+		// It is made once the session has restored, which lets go of the last run's. Under a run beside the load the
+		// packages' types are not final yet, so only each restored package is known, once an action on it restores
+		// it, and no store answers a package the run learns, which has none there.
+		resolver := fact_resolver.New(session)
+		checkerOptions.Resolver, session.resolver = resolver, resolver
+		if options.Ready == nil {
+			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
 		}
 		checkerOptions.Restored, checkerOptions.Restore = session.restoredInWave, session.restore
 		firstGraph, waveError := session.firstWave(roots, checkerOptions, options.Withheld)

@@ -233,7 +233,9 @@ func (session *CacheSession) Restore(
 	for _, analyzedPackage := range analyzed {
 		session.given[analyzedPackage] = true
 	}
-	// The packages questions reach are this load's; the reloads pending stay, for every load of the run.
+	// The packages questions reach are this load's; the reloads pending stay, for every load of the run. The last run's
+	// resolver, its syntax and program of every package it learned, is let go before this load parses anything.
+	session.resolver = nil
 	session.answering.lock.Lock()
 	session.answering.byTypes = nil
 	session.answering.lock.Unlock()

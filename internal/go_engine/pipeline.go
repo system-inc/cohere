@@ -205,7 +205,9 @@ func (engine *pipeline) run() int {
 		loaded, loadError = nil, nil
 	}
 	engine.runTypes(loaded, loadError)
-	engine.runLint(loaded, loadError, linted)
+	// The inputs are those of the load the lint ran over, the final round's when a reload ran it again, and the first
+	// load is let go before a reload loads again.
+	loaded = engine.runLint(loaded, loadError, linted)
 	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
 	engine.writeDuplicates()
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
