@@ -428,7 +428,7 @@ func (packageBuilder *builder) buildPackageInit(init *Function) {
 
 	// Call the init() function of each package we import.
 	for _, importsPackage := range irPackage.Types.Imports() {
-		prereq := irPackage.Program.packages[importsPackage]
+		prereq := irPackage.Program.Package(importsPackage)
 		if prereq == nil {
 			// Invariant: Package.Build requires, as its doc says, that CreatePackage was called for every direct
 			// import, so each has a package here.

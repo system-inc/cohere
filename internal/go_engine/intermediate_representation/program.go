@@ -18,6 +18,11 @@ type Program struct {
 	packages   map[*types.Package]*Package // all created Packages
 	MethodSets typeutil.MethodSetCache     // cache of type-checker's method-sets
 
+	// packagesMutex guards packages and imported, so a package can be created while another builds: a program one
+	// resolver shares across a run's packages creates each as a question first reaches it, beside the builds of those
+	// already created (see fact_resolver). go/ir creates every package before any builds.
+	packagesMutex sync.RWMutex
+
 	canon *canonizer     // type canonicalization map
 	ctxt  *types.Context // cache for type checking instantiations
 
@@ -37,7 +42,7 @@ type Program struct {
 // Build is idempotent and thread-safe.
 func (prog *Program) Build() {
 	var waitGroup sync.WaitGroup
-	for _, value := range prog.packages {
+	for _, value := range prog.AllPackages() {
 		waitGroup.Add(1)
 		cpuLimit <- unit{} // acquire a token
 		go func(irPackage *Package) {
@@ -132,6 +137,8 @@ func (prog *Program) CreatePackage(
 	}
 	irPackage.Members[initguard.Name()] = initguard
 
+	prog.packagesMutex.Lock()
+	defer prog.packagesMutex.Unlock()
 	if importable {
 		prog.imported[irPackage.Types.Path()] = irPackage
 	}
@@ -143,6 +150,8 @@ func (prog *Program) CreatePackage(
 // AllPackages returns a new slice containing all packages created by
 // prog.CreatePackage in unspecified order.
 func (prog *Program) AllPackages() []*Package {
+	prog.packagesMutex.RLock()
+	defer prog.packagesMutex.RUnlock()
 	pkgs := make([]*Package, 0, len(prog.packages))
 	for _, irPackage := range prog.packages {
 		pkgs = append(pkgs, irPackage)
@@ -168,6 +177,8 @@ func (prog *Program) AllPackages() []*Package {
 // (e.g. "p" vs "p as compiled for q.test"), and each has a different
 // view of its dependencies.
 func (prog *Program) ImportedPackage(path string) *Package {
+	prog.packagesMutex.RLock()
+	defer prog.packagesMutex.RUnlock()
 	return prog.imported[path]
 }
 
@@ -180,6 +191,15 @@ func (prog *Program) ImportedPackage(path string) *Package {
 // [golang.org/x/tools/go/analysis/passes/ctrlflow].
 func (prog *Program) SetNoReturn(predicate func(*types.Func) bool) {
 	prog.noReturn = predicate
+}
+
+// noReturnFor is the no-return predicate function is built with: its package's, where Package.SetNoReturn set one,
+// else the program's, nil when neither is set.
+func (prog *Program) noReturnFor(function *Function) func(*types.Func) bool {
+	if function.Package != nil && function.Package.noReturn != nil {
+		return function.Package.noReturn
+	}
+	return prog.noReturn
 }
 
 // NewFunction returns a new synthetic Function instance belonging to
@@ -204,6 +224,8 @@ func (prog *Program) NewFunction(name string, sig *types.Signature, provenance s
 // type-checker package object.
 // It returns nil if no such IR package has been created.
 func (prog *Program) Package(object *types.Package) *Package {
+	prog.packagesMutex.RLock()
+	defer prog.packagesMutex.RUnlock()
 	return prog.packages[object]
 }
 
@@ -215,7 +237,7 @@ func (prog *Program) Package(object *types.Package) *Package {
 // It returns nil if the object belongs to a package that has not been
 // created by prog.CreatePackage.
 func (prog *Program) packageLevelMember(object types.Object) Member {
-	if irPackage, ok := prog.packages[object.Pkg()]; ok {
+	if irPackage := prog.Package(object.Pkg()); irPackage != nil {
 		return irPackage.values[object]
 	}
 	return nil
