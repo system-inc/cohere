@@ -300,6 +300,12 @@ func TestABrokenGoTimingRecordIsRefused(test *testing.T) {
 	}{
 		{"the control: the record where it belongs, in a run that asked", true, lines, ""},
 		{"in a run that did not ask", false, lines, "a timing record in a run that did not ask for one with --timing"},
+		{
+			"missing, in a run that asked",
+			true,
+			slices.Delete(slices.Clone(lines), timing, timing+1),
+			"a summary with no timing record, in a run that asked for one with --timing",
+		},
 		{"twice", true, slices.Insert(slices.Clone(lines), timing, lines[timing]), "a second timing record"},
 		{
 			"after the inputs record",

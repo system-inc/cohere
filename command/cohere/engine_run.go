@@ -1248,6 +1248,12 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 		// one the reporter forgot.
 		return fmt.Errorf("a summary with no record for phase %s", phaseOrder[run.nextPhase])
 	}
+	// A run that asked for `--timing` and got no record would print nothing about its CPU and read as a run that
+	// measured what was asked, so the stream is refused (#3apgjer): the Go engine writes the record on every check run
+	// that asks.
+	if run.timingRequested && !run.timingReceived {
+		return fmt.Errorf("a summary with no timing record, in a run that asked for one with --timing")
+	}
 	if *record.Findings != run.findings {
 		return fmt.Errorf(
 			"the summary counts %d findings and %d finding records arrived",
