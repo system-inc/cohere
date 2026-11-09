@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -260,6 +261,10 @@ type Function struct {
 	Program *Program  // enclosing program
 
 	buildshared *task // wait for a shared function to be done building (may be nil if <=1 builder ever needs to wait)
+
+	// buildOnce runs the function's build exactly once, whichever builder or caller of Build reaches it first; the
+	// others wait for it (function_build.go).
+	buildOnce sync.Once
 
 	// expressionValues is the expression map ValueForExpression reads, recorded only in a package built with
 	// SetDebugMode.

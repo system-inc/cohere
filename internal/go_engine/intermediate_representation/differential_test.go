@@ -124,6 +124,9 @@ type differentialTally struct {
 	// instructions are the instructions in the identical functions, each compared field by field.
 	instructions int
 	differences  []differentialDifference
+
+	// aliasSpelledInstances are the instantiation wrappers go/ir named through an alias, compared unaliased.
+	aliasSpelledInstances int
 }
 
 // differentialMerge is what tally and other found together.
@@ -135,6 +138,8 @@ func differentialMerge(tally differentialTally, other differentialTally) differe
 		identical:    tally.identical + other.identical,
 		instructions: tally.instructions + other.instructions,
 		differences:  append(slices.Clone(tally.differences), other.differences...),
+
+		aliasSpelledInstances: tally.aliasSpelledInstances + other.aliasSpelledInstances,
 	}
 }
 
@@ -484,6 +489,7 @@ func differentialCompareUnit(test *testing.T, unit differentialUnit,
 	}
 
 	theirFunctions := differentialTheirSourceFunctions(theirPackage)
+	tally.aliasSpelledInstances = differentialAliasSpelledInstances(theirFunctions)
 	ourFunctions := differentialOurSourceFunctions(ourPackage)
 	if len(theirFunctions) != len(ourFunctions) {
 		tally.differences = append(tally.differences, differentialDifference{cause: "source function count",
@@ -704,9 +710,9 @@ func differentialReport(test *testing.T, corpus string, tally differentialTally,
 	}
 	peak := differentialPeakResident()
 	test.Logf("corpus %s: %d packages compared, %d skipped for load errors, %d functions, %d identical "+
-		"(%d instructions), %d differ; %s, peak resident %s", corpusName, tally.packages, len(tally.skipped),
-		tally.functions, tally.identical, tally.instructions, len(tally.differences),
-		elapsed.Round(time.Millisecond), peak)
+		"(%d instructions), %d differ, %d go/ir instance names spelled through an alias; %s, peak resident %s",
+		corpusName, tally.packages, len(tally.skipped), tally.functions, tally.identical, tally.instructions,
+		len(tally.differences), tally.aliasSpelledInstances, elapsed.Round(time.Millisecond), peak)
 	if len(tally.skipped) > 0 {
 		test.Logf("skipped: %s", strings.Join(tally.skipped, " "))
 	}

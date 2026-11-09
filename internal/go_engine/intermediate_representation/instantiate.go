@@ -88,7 +88,10 @@ func createInstance(function *Function, rtargs, targs []types.Type) *Function {
 
 	name := function.Name()
 	if len(targs) > 0 {
-		name = fmt.Sprintf("%s%s", name, targstr(targs)) // may not be unique
+		// Named from its type arguments unaliased (unalias.go), so the name doesn't depend on which call, spelling
+		// them through an alias or not, created the instance first. go/ir names it from that first call's
+		// spelling, which follows its build order (#6pt3bt8).
+		name = fmt.Sprintf("%s%s", name, targstr(unaliasEach(targs))) // may not be unique
 	}
 
 	/* generic instance or instantiation wrapper */
