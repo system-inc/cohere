@@ -229,7 +229,7 @@ is an engine check, so it is configurable without being an entry in `cohere --ru
 | `--json`                | print newline-delimited JSON for a program to read instead of the human view (see [Output](#output))                                                                           |
 | `--coverage`            | name every rule under the coverage fact that describes it, not only count them                                                                                                 |
 | `--adamic-readiness`    | say what share of the files are Adamic-ready, in the footer and in `--json` (see [Output](#output))                                                                            |
-| `--timing`              | report what building the graph cost and the CPU each rule cost, most expensive rule first                                                                                      |
+| `--timing`              | report what building the graph cost and the CPU each rule cost, most expensive rule first, for TypeScript and Go                                                               |
 | `--single-threaded`     | use one type checker instead of several                                                                                                                                        |
 | `--profile FILE`        | write a Go CPU profile of the run to FILE                                                                                                                                      |
 | `--cache-dump`          | print what this project's cache holds, and exit                                                                                                                                |
@@ -324,7 +324,9 @@ the time a format was running and 🪄 the rest of the fix phase, and together t
 
 `--timing` is separate and still prints what each rule cost, as CPU read from each walk thread's own
 clock, so a rule that waits or is descheduled costs nothing. Reading that clock around every call adds
-overhead; the phase times are free.
+overhead; the phase times are free. A Go run prints the same table from each analyzer's thread clock, with
+the intermediate representation builds and the load's phases as rows of their own, and a run under
+`--timing` is never replayed from the cache or recorded in it.
 
 `--verbose` prints everything a run can say: each phase and why any did not run, the coverage summary,
 overrides, skips, notes, memory and the total. Its footer adds the syntax nodes the run walked, and

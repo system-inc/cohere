@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 )
 
 func TestJsonLines(test *testing.T) {
@@ -145,6 +147,10 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 			*summary.Properties["gaps"].Properties["withheldInDependencyCgo"].Items,
 			withheldCgoFile{},
 		},
+		"timing":        {schema.Defs["timing"], timingJson{}},
+		"timing.load":   {schema.Defs["timing"].Properties["load"], contract.LoadTiming{}},
+		"timing.rules":  {*schema.Defs["timing"].Properties["rules"].Items, contract.RuleTiming{}},
+		"timing.shared": {*schema.Defs["timing"].Properties["shared"].Items, contract.SharedTiming{}},
 	} {
 		fields, required := jsonFields(reflect.TypeOf(check.value))
 		if got := schemaPropertyNames(check.object.Properties); strings.Join(got, ",") != strings.Join(fields, ",") {

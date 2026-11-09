@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/streams"
 )
@@ -279,6 +280,11 @@ type engineRun struct {
 	// inputs is what the engine said the run read, nil until its inputs record arrives. See goRunCacheProof.
 	inputs *engineInputsRecord
 
+	// timingRequested is `--timing` on a Go run, which the engine answers with one timing record. A run that did not
+	// ask is sent none, so a timing record there is a broken stream. timingReceived says the one record came.
+	timingRequested bool
+	timingReceived  bool
+
 	// filesRewritten is how many files the fix phase wrote, so a run that rewrote the tree it checked is never
 	// recorded as a verdict about that tree.
 	filesRewritten int
@@ -387,6 +393,8 @@ func (run *engineRun) accept(line []byte) error {
 		return decodeRecord(line, &engineUnusedCoverageRecord{}, run.acceptUnusedCoverage)
 	case "inputs":
 		return decodeRecord(line, &engineInputsRecord{}, run.acceptInputs)
+	case "timing":
+		return decodeRecord(line, &contract.TimingRecord{}, run.acceptTiming)
 	case "summary":
 		return decodeRecord(line, &engineSummaryRecord{}, run.acceptSummary)
 	default:
@@ -1184,6 +1192,47 @@ func (run *engineRun) acceptInputs(record *engineInputsRecord) error {
 		}
 	}
 	run.inputs = record
+	return nil
+}
+
+// acceptTiming prints what a Go run's CPU went to, once, under `--timing` (#3apgjer): as a table in the human views,
+// under the lint line it arrives after, and written through as a `timing` line under `--json`. The record is the
+// engine's own type rather than a copy of it, since only the Go engine writes one.
+//
+// Refused in a run that did not ask, a second time, after the inputs record the contract places it before, with a
+// list missing where the contract writes `[]`, and with a shared row of a kind this front door cannot label, each
+// for the reason accept refuses an unknown record: a figure nobody can vouch for, or one printed under the wrong
+// name, is worse than none.
+func (run *engineRun) acceptTiming(record *contract.TimingRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a timing record in a %s run", run.mode)
+	}
+	if !run.timingRequested {
+		return fmt.Errorf("a timing record in a run that did not ask for one with --timing")
+	}
+	if run.timingReceived {
+		return fmt.Errorf("a second timing record")
+	}
+	if run.inputs != nil {
+		return fmt.Errorf("a timing record after the inputs record, and the contract places it before")
+	}
+	if record.Rules == nil || record.Shared == nil {
+		return fmt.Errorf("a timing record missing its rules or shared list, which the contract writes [] when empty")
+	}
+	for _, row := range record.Shared {
+		switch row.Kind {
+		case contract.SharedIntermediateRepresentation, contract.SharedDispatcher, contract.SharedAnalyzer:
+		default:
+			return fmt.Errorf("a timing record's shared row %s of unknown kind %q", row.Name, row.Kind)
+		}
+	}
+	run.timingReceived = true
+	if activeOutput.Mode == outputJson {
+		writeJsonLine(run.out, timingAsJson(*record))
+	} else {
+		printEngineTimings(run.out, record)
+	}
+	streams.Show(run.out)
 	return nil
 }
 

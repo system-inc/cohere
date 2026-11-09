@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 )
@@ -67,6 +68,22 @@ func changedFilesAsJson(files []changedFile) []changedFileJson {
 		}
 	}
 	return lines
+}
+
+// timingJson is a Go run's timing record under `--timing`, written through as the engine wrote it, its kind beside
+// its fields.
+type timingJson struct {
+	Kind string `json:"kind"`
+	timingFields
+}
+
+// timingFields is contract.TimingRecord's fields without its methods. Embedded with its MarshalJSON, the record would
+// be encoded by it alone and the kind beside it dropped. Its lists are never nil here, since a record without them is
+// refused (engineRun.acceptTiming), so each is written `[]` when empty as the contract writes it.
+type timingFields contract.TimingRecord
+
+func timingAsJson(record contract.TimingRecord) timingJson {
+	return timingJson{Kind: "timing", timingFields: timingFields(record)}
 }
 
 // summaryJson is runSummary as the last line. Durations are seconds, as a reader would compare them.
