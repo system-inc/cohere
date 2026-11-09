@@ -61,7 +61,7 @@ type Context struct {
 	// file is the file the syntax walk is calling the check on, from FileEnter through FileExit, and nil outside one,
 	// and fileStates is each file's FileState, by file.
 	file *token.File
-	//cohere:ignore consistency-no-any each check chooses its own state type, read back through FileState's type parameter
+	//cohere:ignore consistency-no-any each check chooses its own state type, read back through FileState's type
 	fileStates map[*token.File]any
 }
 
@@ -184,8 +184,6 @@ func (context *Context) EnterNode(cursor inspector.Cursor) {
 // EnterFile is called by the syntax dispatcher as it enters file, before FileEnter, and with nil once FileExit has
 // returned, so FileState reads the slot of the file the call is on and panics outside one. Only the dispatcher calls
 // it.
-//
-// Mutates: context's file, the file FileState keys its slot by until the next call
 func (context *Context) EnterFile(file *token.File) {
 	context.file = file
 }
@@ -211,7 +209,6 @@ func FileState[Kind any](context *Context) *Kind {
 		panic(fmt.Sprintf("rule %s reads FileState outside the syntax walk's calls on a file", context.ruleName))
 	}
 	if context.fileStates == nil {
-		//cohere:ignore consistency-no-any each check chooses its own state type, read back through the type parameter
 		context.fileStates = map[*token.File]any{}
 	}
 	if context.fileStates[context.file] == nil {

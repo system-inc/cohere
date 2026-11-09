@@ -269,7 +269,7 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			name: "a file-local listener with PackageExit",
 			rule: listening(Listener{
 				FileLocal:   true,
-				FileEnter:   func(*Context, *ast.File) {},
+				FileEnter:   plantedFile,
 				PackageExit: plantedPackageExit,
 			}),
 			saying: "is marked FileLocal and declares PackageExit",

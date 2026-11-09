@@ -67,8 +67,10 @@ func TestAFileLocalListenerHearsEachFileOnceAcrossShards(test *testing.T) {
 		dispatcher.shardBytes = shardBytes
 		local := &heardFiles{contexts: map[*rule.Context]bool{}}
 		whole := &heardFiles{contexts: map[*rule.Context]bool{}}
-		localAnalyzer := dispatcher.RuleAnalyzer(rule.Namespace+"local", "local", "hears some files", local.listen(true))
-		wholeAnalyzer := dispatcher.RuleAnalyzer(rule.Namespace+"whole", "whole", "hears every file", whole.listen(false))
+		localAnalyzer := dispatcher.RuleAnalyzer(rule.Namespace+"local", "local", "hears some files",
+			local.listen(true))
+		wholeAnalyzer := dispatcher.RuleAnalyzer(rule.Namespace+"whole", "whole", "hears every file",
+			whole.listen(false))
 		findings := []string{}
 		for _, action := range analyzeFixture(test, "walked", localAnalyzer, wholeAnalyzer).Roots {
 			if action.Err != nil {
@@ -161,14 +163,15 @@ func TestAFileLocalOwnListenerHearsEachFunctionOnceAcrossShards(test *testing.T)
 	dispatcher := NewIntermediateRepresentation()
 	dispatcher.shardBytes = 1
 	listen := func(heard *heardFunctions, fileLocal bool) *rule.Listener {
-		return &rule.Listener{FileLocal: fileLocal, IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+		own := &rule.IntermediateRepresentationListener{
 			Function: func(context *rule.Context, function *intermediate_representation.Function) {
 				heard.mutex.Lock()
 				defer heard.mutex.Unlock()
 				heard.functions = append(heard.functions, function.String())
 				heard.contexts[context] = true
 			},
-		}}
+		}
+		return &rule.Listener{FileLocal: fileLocal, IntermediateRepresentation: own}
 	}
 	local := &heardFunctions{contexts: map[*rule.Context]bool{}}
 	whole := &heardFunctions{contexts: map[*rule.Context]bool{}}

@@ -40,8 +40,9 @@ type Listener struct {
 	PackageExit func(context *Context)
 
 	// FileLocal marks a listener that judges each file on its own: it keeps nothing across a package's files, so it
-	// reads no State, though it may read FileState, and declares no PackageExit. A dispatcher may then hand a large package's files to several runs
-	// of it at once, each over some of the files, so the package that ends a cold run walks on several cores (#0jnq91n).
+	// reads no State, though it may read FileState, and declares no PackageExit. A dispatcher may then hand a large
+	// package's files to several runs of it at once, each over some of the files, so the package that ends a cold run
+	// walks on several cores (#0jnq91n).
 	// Unmarked, a listener hears every file of the package in one run, as it always has. A wrong mark fails loud,
 	// never quietly: Validate refuses it beside PackageExit, and State panics in a file-local run, which the dispatcher
 	// makes the rule's crash.

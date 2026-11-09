@@ -70,8 +70,8 @@ type fileState struct {
 // enterFile reads whether file is a _test.go file.
 func enterFile(context *rule.Context, file *ast.File) {
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-	rule.FileState[fileState](context).isTest = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename,
-		"_test.go")
+	rule.FileState[fileState](context).isTest = strings.HasSuffix(
+		context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
 }
 
 // judgeFunction reports node when it is a test in a _test.go file that cannot fail on a wrong result.

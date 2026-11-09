@@ -2,7 +2,6 @@ package dispatch
 
 import (
 	"go/token"
-	"runtime"
 	"sync"
 
 	"golang.org/x/tools/go/analysis"
@@ -13,22 +12,6 @@ import (
 // ends no run, walks in one run as before and pays for no goroutine. Measured on cohere's root, cold, interleaved:
 // see the commit that set it.
 const defaultShardBytes = 256 << 10
-
-// shardsOf is how many shards pass's package splits into: one per shardBytes of its source, at most one per core, and
-// 1, no split, below two.
-func (listeners *listeners) shardsOf(pass *analysis.Pass) int {
-	size := 0
-	for _, file := range pass.Files {
-		if tokenFile := pass.Fset.File(file.Pos()); tokenFile != nil {
-			size += tokenFile.Size()
-		}
-	}
-	shards := min(size/listeners.shardBytes, runtime.GOMAXPROCS(0))
-	if shards < 2 {
-		return 1
-	}
-	return shards
-}
 
 // shardOfFile is the shard of each of pass's files, keyed by its token file, cut into shards runs of consecutive files
 // holding about as much source each, so every file is one shard's and each shard's files keep the pass's order.

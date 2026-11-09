@@ -3,6 +3,7 @@ package dispatch
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -218,23 +219,6 @@ func (listeners *listeners) register(
 	})
 }
 
-// startedRuns is the listeners a dispatcher calls over one package, each ready with a context of its own.
-type startedRuns struct {
-	// runs is each started listener, in the order its rule was registered.
-	runs []*listenerRun
-	// byKind is, for each kind a started listener lists, the started listeners that list it, in runs' order, so a
-	// node or an instruction reaches only the listeners declaring its kind, at the cost of one lookup.
-	byKind map[reflect.Type][]*listenerRun
-	// notStarted is the outcome of each rule of the run whose listener was not started because something it
-	// requires failed on the package.
-	notStarted Result
-	// timing is the run's collector under `--timing`, which the checker hands the pass under rule.Timed, nil
-	// otherwise, and dispatcher is the name of the dispatcher's own analyzer, whose row finish takes the listeners'
-	// calls out of.
-	timing     *timing.Collector
-	dispatcher string
-}
-
 // start is the listeners to call over pass's package, each ready with a context of its own, all judging the package's
 // generated files by one reading of staticcheck's generated pass. They are those of the rules whose analyzers require
 // the dispatcher on this package in this run, the set the engine's checker hands the pass under rule.Dependents, so a
@@ -305,14 +289,6 @@ func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns
 		whole.add(newListenerRun(registered, pass, isGenerated, collector, false))
 	}
 	return whole, parts, nil
-}
-
-// add makes run one of the listeners started, heard for every kind its listener lists.
-func (started *startedRuns) add(run *listenerRun) {
-	started.runs = append(started.runs, run)
-	for _, kind := range run.registered.kinds {
-		started.byKind[kind] = append(started.byKind[kind], run)
-	}
 }
 
 // walkFailed is the error that ends a pass for which something the walk itself reads failed on the package, among
@@ -401,4 +377,20 @@ func finishShards(whole *startedRuns, parts []*startedRuns) Result {
 		}
 	}
 	return result
+}
+
+// shardsOf is how many shards pass's package splits into: one per shardBytes of its source, at most one per core, and
+// 1, no split, below two.
+func (listeners *listeners) shardsOf(pass *analysis.Pass) int {
+	size := 0
+	for _, file := range pass.Files {
+		if tokenFile := pass.Fset.File(file.Pos()); tokenFile != nil {
+			size += tokenFile.Size()
+		}
+	}
+	shards := min(size/listeners.shardBytes, runtime.GOMAXPROCS(0))
+	if shards < 2 {
+		return 1
+	}
+	return shards
 }
