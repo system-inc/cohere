@@ -3,9 +3,11 @@ package staticcheck_code
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -48,4 +50,35 @@ func CallName(context *rule.Context, call *ast.CallExpr) string {
 	default:
 		return ""
 	}
+}
+
+// CallIndex is which of names CallName(context, call) is, the first in their order, or -1 when it is none of them.
+// It compares a function's full name in place (function_name), never building it, since a rule asks it of every
+// call it hears and most are not the function it wants (#p92j24d); a builtin's name and the empty name of a call
+// CallName can't name are compared as CallName gives them.
+func CallIndex(context *rule.Context, call *ast.CallExpr, names ...string) int {
+	callee := ast.Unparen(call.Fun)
+	// CallName's reading of the callee, case for case.
+	switch instantiation := callee.(type) {
+	case *ast.IndexExpr:
+		callee = instantiation.X
+	case *ast.IndexListExpr:
+		callee = instantiation.X
+	}
+	switch callee := callee.(type) {
+	case *ast.SelectorExpr:
+		function, isFunction := context.TypesInfo.ObjectOf(callee.Sel).(*types.Func)
+		if !isFunction {
+			return slices.Index(names, "")
+		}
+		return function_name.Index(function, names...)
+	case *ast.Ident:
+		switch object := context.TypesInfo.ObjectOf(callee).(type) {
+		case *types.Func:
+			return function_name.Index(object, names...)
+		case *types.Builtin:
+			return slices.Index(names, object.Name())
+		}
+	}
+	return slices.Index(names, "")
 }

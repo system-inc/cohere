@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/types"
 	"reflect"
+	"slices"
+	"strconv"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -44,6 +46,13 @@ func compareCallName(pass *analysis.Pass, context *rule.Context) []question {
 			questions = append(questions, ask("CallName", pass.Fset.Position(call.Pos()),
 				callNameLabel(pass, call, upstream),
 				func() string { return upstream }, func() string { return staticcheck_code.CallName(context, call) }))
+			// CallIndex must place staticcheck's name among names a step from it, the empty one among them, as
+			// slices.Index places it.
+			probes := []string{upstream + "s", "", "fmt.Println", upstream, "(*bytes.Buffer).Write", "len"}
+			questions = append(questions, ask("CallIndex", pass.Fset.Position(call.Pos()),
+				callNameLabel(pass, call, upstream),
+				func() string { return strconv.Itoa(slices.Index(probes, upstream)) },
+				func() string { return strconv.Itoa(staticcheck_code.CallIndex(context, call, probes...)) }))
 			return true
 		})
 	}
