@@ -563,9 +563,12 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 	}
 	old := []string{}
 	for index := 0; index < 10; index++ {
-		old = append(old, put(fmt.Sprintf("%02xaa-d", index), 3*time.Hour+time.Duration(index)*time.Minute))
+		old = append(
+			old,
+			put(fmt.Sprintf("%02x%s-d", index, strings.Repeat("a", 62)), 3*time.Hour+time.Duration(index)*time.Minute),
+		)
 	}
-	fresh := put("a0aa-a", time.Minute)
+	fresh := put("a0"+strings.Repeat("a", 62)+"-a", time.Minute)
 	// A cap of 6 KB, so the trim brings 11 KB down to three quarters of it.
 	capGigabytes := strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64)
 	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
@@ -709,7 +712,11 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 		test.Fatal(writeError)
 	}
 	for index := 0; index < 10; index++ {
-		path := filepath.Join(cache, fmt.Sprintf("%02x", index), fmt.Sprintf("%02xaa-d", index))
+		path := filepath.Join(
+			cache,
+			fmt.Sprintf("%02x", index),
+			fmt.Sprintf("%02x%s-d", index, strings.Repeat("a", 62)),
+		)
 		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
