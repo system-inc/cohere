@@ -465,6 +465,11 @@ func negativeDescriptorIn(arguments string) bool {
 //   - adamic-synthetic.txt is adamic's syntheticTrace, 200 lines of its mix.
 //   - edge-cases.txt is written by hand: every pid form, splits across pids, escapes, descriptors,
 //     results of each kind, cut strings and garbage.
+//
+// The traces taken from real machines name a home directory and cgroup sessions, which this public
+// repository doesn't publish, so each is replaced with a stand-in of the same length: the home is
+// /home/user and the sessions are session-1000 and session-2000. Same length keeps every column and
+// every cut string where strace put it, so each line still reads as it did.
 func inRepositoryCorpus(test testing.TB) map[string]string {
 	test.Helper()
 	corpus := map[string]string{}
