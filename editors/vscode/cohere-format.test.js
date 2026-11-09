@@ -6,6 +6,7 @@
 const NodeAssert = require('node:assert/strict');
 const NodeChildProcess = require('node:child_process');
 const NodeFileSystem = require('node:fs');
+const NodeModule = require('node:module');
 const NodeOs = require('node:os');
 const NodePath = require('node:path');
 const NodeTest = require('node:test');
@@ -16,6 +17,7 @@ const {
     installCommand,
     resolveCohereBinary,
     saveArguments,
+    saveSettings,
 } = require('./cohere-format.js');
 
 function temporaryDirectory() {
@@ -109,6 +111,92 @@ NodeTest.test(
         NodeFileSystem.writeFileSync(failing, '#!/bin/sh\necho "formatter broke" >&2\nexit 1\n', { mode: 0o755 });
         const result = await formatWithCohere(failing, NodePath.join(root, 'Probe.ts'), 'x\n');
         NodeAssert.deepEqual(result, { error: 'formatter broke' });
+    },
+);
+
+NodeTest.test('the formatter is registered for what cohere formats through stdin, and not for Go', function() {
+    // extension.js activated against a stand-in for the vscode module, which only VS Code provides, to
+    // read the document selector it registers its formatter with.
+    const selectors = [];
+    const vscode = {
+        languages: {
+            registerDocumentFormattingEditProvider(selector) {
+                selectors.push(selector);
+                return { dispose() {} };
+            },
+        },
+    };
+    const load = NodeModule._load;
+    NodeModule._load = function(request, ...rest) {
+        return request === 'vscode' ? vscode : load.call(this, request, ...rest);
+    };
+    try {
+        require('./extension.js').activate({ subscriptions: [] });
+    }
+    finally {
+        NodeModule._load = load;
+    }
+
+    NodeAssert.equal(selectors.length, 1);
+    const selector = selectors[0];
+    NodeAssert.equal(selector.scheme, 'file');
+    function selected(filePath) {
+        return typeof selector.pattern === 'string' && NodePath.matchesGlob(filePath, selector.pattern);
+    }
+    for(const extension of saveSettings.extensions) {
+        NodeAssert.ok(selected(`/work/project/Probe${extension}`), `${extension} is not formatted on save`);
+    }
+    for(const fileName of ['main.go', 'go.mod', 'Package.swift', 'Notes.txt']) {
+        NodeAssert.ok(!selected(`/work/project/${fileName}`), `${fileName} is handed to cohere on save`);
+    }
+    // Go is not in the list until cohere formats it through stdin (#qtna8m4).
+    NodeAssert.ok(!saveSettings.extensions.includes('.go'));
+});
+
+NodeTest.test(
+    'a project cohere has no stdin path for saves as typed, and other refusals are errors',
+    { skip: process.platform === 'win32' },
+    async function() {
+        const root = temporaryDirectory();
+        const refusing = NodePath.join(root, 'cohere');
+        // The sentence cohere's front door prints for a file in a Go module, as the release build says it.
+        NodeFileSystem.writeFileSync(
+            refusing,
+            '#!/bin/sh\ncat > /dev/null\necho "cohere: --stdin-filepath is not implemented for Go yet, so the run was refused rather than run without it, and nothing was checked." >&2\nexit 1\n',
+            { mode: 0o755 },
+        );
+        const buffer = 'export const value   = 1\n';
+        NodeAssert.deepEqual(await formatWithCohere(refusing, NodePath.join(root, 'Probe.ts'), buffer), {
+            text: buffer,
+        });
+
+        // Any other flag refused is not a decline: it says the save's own arguments are wrong.
+        const refusingFix = NodePath.join(root, 'cohere-fix');
+        NodeFileSystem.writeFileSync(
+            refusingFix,
+            '#!/bin/sh\ncat > /dev/null\necho "cohere: --fix is not implemented for Go yet" >&2\nexit 1\n',
+            { mode: 0o755 },
+        );
+        NodeAssert.deepEqual(await formatWithCohere(refusingFix, NodePath.join(root, 'Probe.ts'), buffer), {
+            error: 'cohere: --fix is not implemented for Go yet',
+        });
+    },
+);
+
+NodeTest.test(
+    'a save in a Go module leaves the buffer as typed, with no error',
+    { skip: process.env.COHERE_BINARY === undefined },
+    async function() {
+        const binary = process.env.COHERE_BINARY;
+        const root = temporaryDirectory();
+        NodeFileSystem.writeFileSync(NodePath.join(root, 'go.mod'), 'module example.com/probe\n\ngo 1.22\n');
+        for(const [fileName, buffer] of [
+            ['main.go', 'package probe\nfunc  Value( ) int { return 1 }\n'],
+            ['Probe.ts', 'export const value   = 1\n'],
+        ]) {
+            const saved = await formatWithCohere(binary, NodePath.join(root, fileName), buffer);
+            NodeAssert.deepEqual(saved, { text: buffer }, fileName);
+        }
     },
 );
 

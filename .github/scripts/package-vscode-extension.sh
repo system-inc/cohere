@@ -46,7 +46,8 @@ if [ "$packaged" != "$version" ]; then
     exit 1
 fi
 listing=$(unzip -l "$vsix")
-for required in extension/extension.js extension/cohere-format.js extension/icon.png extension/readme.md extension/license.md \
+for required in extension/extension.js extension/cohere-format.js extension/cohere-save.json extension/icon.png \
+    extension/readme.md extension/license.md \
     extension/LICENSE-MIT extension/LICENSE-APACHE extension/NOTICE extension/THIRD_PARTY_NOTICES.md; do
     if ! grep -qi " $required\$" <<< "$listing"; then
         echo "the .vsix holds no $required"

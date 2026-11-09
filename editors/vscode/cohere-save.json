@@ -1,0 +1,20 @@
+{
+    "about": "What a save hands cohere, read by cohere-format.js and held to the binary by TestTheEditorSavesWhatStdinFormats in command/cohere. extensions are the file types `cohere --fix --format --stdin-filepath` formats: cohere decides by the file name's extension, lowercased, which its own printers register (internal/format/native, Register), and the formatter is registered for these alone. Go is not among them: cohere has no stdin path for Go until front door task #qtna8m4 implements one, and .go joins this list then, with the test widened to read it. refusal begins what cohere says, exiting 1, when the project a file is in (a Go module, a Swift package) has no stdin path at all, which a save takes as a decline and saves the buffer as typed.",
+    "extensions": [
+        ".a",
+        ".cjs",
+        ".css",
+        ".gql",
+        ".graphql",
+        ".js",
+        ".json",
+        ".jsx",
+        ".md",
+        ".mjs",
+        ".ts",
+        ".tsx",
+        ".yaml",
+        ".yml"
+    ],
+    "refusal": "--stdin-filepath is not implemented for "
+}

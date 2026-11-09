@@ -26,6 +26,24 @@ const installCommand = 'pnpm add -D @system-inc/cohere';
 // cohere's default is.
 const saveArguments = ['--fix', '--format'];
 
+// What a save hands cohere: the file types it formats through stdin, and the start of its refusal for a
+// project with no stdin path. Kept as JSON so cohere's own test reads the same list (see its about).
+const saveSettings = require('./cohere-save.json');
+
+/*
+ * The documents a save formats: files whose extension is one cohere formats through stdin, which is how
+ * cohere decides too, by the name's extension. Any other file never reaches cohere, so saving a Go file,
+ * which cohere has no stdin path for yet (#qtna8m4), runs nothing and says nothing.
+ */
+const saveDocumentSelector = {
+    scheme: 'file',
+    pattern: `**/*.{${saveSettings.extensions
+        .map(function(extension) {
+            return extension.slice(1);
+        })
+        .join(',')}}`,
+};
+
 /*
  * Finds the cohere binary for a project, or returns undefined having found nothing.
  *
@@ -139,7 +157,8 @@ function environmentWithoutCohereOverride(environment = process.env) {
  * Runs one save: `cohere --fix --format --stdin-filepath <file>` with the buffer on stdin.
  *
  * Resolves to { text } on success, which is the buffer unchanged when cohere declines the file (no
- * printer for its type, outside the format scope, source that does not parse), or to { error } when
+ * printer for its type, outside the format scope, source that does not parse, or a project with no
+ * stdin path, such as a Go module, which cohere refuses by name and exits 1), or to { error } when
  * cohere failed: a broken formatter, a project it cannot load, a binary that would not start. The
  * caller shows the error and saves the buffer as typed.
  *
@@ -169,7 +188,14 @@ function formatWithCohere(binary, filePath, text, cancellation) {
                 return;
             }
             if(code !== 0) {
-                resolve({ error: Buffer.concat(stderr).toString('utf8').trim() || `cohere exited ${code}` });
+                const said = Buffer.concat(stderr).toString('utf8').trim();
+                if(said.includes(saveSettings.refusal)) {
+                    // The project this file is in has no stdin path, which cohere says before reading
+                    // anything: a decline, like a file with no printer, so the buffer saves as typed.
+                    resolve({ text });
+                    return;
+                }
+                resolve({ error: said || `cohere exited ${code}` });
                 return;
             }
             resolve({ text: Buffer.concat(stdout).toString('utf8') });
@@ -193,4 +219,6 @@ module.exports = {
     installCommand,
     resolveCohereBinary,
     saveArguments,
+    saveDocumentSelector,
+    saveSettings,
 };

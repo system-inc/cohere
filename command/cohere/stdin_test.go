@@ -2,10 +2,15 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/format/native"
 )
 
 // runCohereWithStdin runs the binary from a directory with text on stdin, and returns stdout, stderr
@@ -137,6 +142,63 @@ func TestStdinNeedsFix(test *testing.T) {
 			arguments...,
 		); code == 0 || saved != "" || stderr == "" {
 			test.Errorf("%v: exit %d, wanted a refusal on stderr and nothing on stdout:\n%s", arguments, code, stderr)
+		}
+	}
+}
+
+// TestTheEditorSavesWhatStdinFormats holds the VS Code extension's list (editors/vscode/cohere-save.json) to
+// this binary, so the two cannot drift. The extension registers its formatter for the extensions listed,
+// and they must be exactly the ones the stdin mode formats: it decides by the file name's extension, through
+// native's printers, and a file type left off would never format on save while one added that cohere does
+// not format would be handed to it for nothing. Go is not among them until #qtna8m4 gives it a stdin path,
+// and this test is widened then to read Go's.
+//
+// The refusal is the start of what the front door says when the project a file is in has no stdin path,
+// which the extension takes as a decline rather than an error, so it must begin the sentence every engine
+// without one prints.
+//
+// Read from Go, not from node: native's registry is the set, and reading it here needs nothing but the file.
+func TestTheEditorSavesWhatStdinFormats(test *testing.T) {
+	test.Parallel()
+	contents, readError := os.ReadFile(filepath.Join("..", "..", "editors", "vscode", "cohere-save.json"))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	var save struct {
+		Extensions []string `json:"extensions"`
+		Refusal    string   `json:"refusal"`
+	}
+	if unmarshalError := json.Unmarshal(contents, &save); unmarshalError != nil {
+		test.Fatal(unmarshalError)
+	}
+
+	if formatted := native.Extensions(); !slices.Equal(save.Extensions, formatted) {
+		test.Errorf("editors/vscode/cohere-save.json lists %q, and --stdin-filepath formats %q",
+			save.Extensions, formatted)
+	}
+
+	if save.Refusal == "" {
+		test.Fatal("editors/vscode/cohere-save.json names no refusal")
+	}
+	given := map[string]bool{"fix": true, "format": true, "stdin-filepath": true}
+	value := func(name string) string {
+		if name == "stdin-filepath" {
+			return "/work/project/Probe.ts"
+		}
+		return "true"
+	}
+	for _, engine := range []struct {
+		language engineLanguage
+		flags    engineFlags
+	}{
+		{goLanguage("module"), goFlags},
+		{swiftLanguage, swiftFlags},
+	} {
+		location := projectLocation{Root: "/work/project", ArgumentBase: "/work/project"}
+		_, _, engineArgumentsError := engineArguments(engine.language, engine.flags, location, given, value, nil)
+		if engineArgumentsError == nil || !strings.HasPrefix(engineArgumentsError.Error(), save.Refusal) {
+			test.Errorf("%s's refusal of a save does not begin %q: %v",
+				engine.language.Name, save.Refusal, engineArgumentsError)
 		}
 	}
 }

@@ -13,6 +13,9 @@
 //   present  in <project folder>, where cohere is found: a save must write what the gate writes.
 //   absent   in an empty directory, with PATH reduced to the system's and no COHERE_BINARY: the save
 //            must leave the file as typed.
+//   go       in a Go module, where cohere has no stdin path yet (#qtna8m4), with cohere reached through a
+//            stand-in that logs each command line: a Go file's save must never reach cohere, and a
+//            TypeScript file's, which cohere refuses there, must leave the file as typed.
 //   schema   when the fourth argument is given, a project with @system-inc/cohere installed from its npm
 //            package: a CohereSettings.json naming the installed schema must have a misspelled key flagged.
 //
@@ -128,7 +131,29 @@ const withoutCohere = {
     COHERE_GATE_PROBE: 'Probe.ts',
 };
 
+// The stand-in sits outside the module, so nothing in the module but what the suite saves.
+const recorderDirectory = NodeFileSystem.realpathSync(
+    NodeFileSystem.mkdtempSync(NodePath.join(NodeOs.tmpdir(), 'cohere-vscode-recorder-')),
+);
+const recorder = NodePath.join(recorderDirectory, 'cohere');
+NodeFileSystem.writeFileSync(
+    recorder,
+    '#!/bin/sh\nprintf "%s\\n" "$*" >> "$COHERE_GATE_LOG"\nexec "$COHERE_GATE_BINARY" "$@"\n',
+    { mode: 0o755 },
+);
+const goModule = NodeFileSystem.realpathSync(
+    NodeFileSystem.mkdtempSync(NodePath.join(NodeOs.tmpdir(), 'cohere-vscode-go-')),
+);
+NodeFileSystem.writeFileSync(NodePath.join(goModule, 'go.mod'), 'module example.com/probe\n\ngo 1.22\n');
+const withRecorder = {
+    ...withCohere,
+    COHERE_BINARY: recorder,
+    COHERE_GATE_LOG: NodePath.join(recorderDirectory, 'saves.log'),
+    COHERE_GATE_PROBE: 'Probe.ts',
+};
+
 const present = runCase('present', projectFolder, withCohere);
 const absent = runCase('absent', empty, withoutCohere);
+const go = runCase('go', goModule, withRecorder);
 const schema = installedProject === undefined ? true : runCase('schema', installedProject, withoutCohere);
-process.exit(present && absent && schema ? 0 : 1);
+process.exit(present && absent && go && schema ? 0 : 1);
