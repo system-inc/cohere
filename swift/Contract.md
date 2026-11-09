@@ -827,7 +827,15 @@ A standard-library package whose key matches is restored from the binary, in a c
 mismatch computes it. `"standardLibraryFromBinary":258` counts those packages, which are neither
 `hit` nor `missed`, and is written only when it is not 0, so a build that carries none, as every
 build but a release does, writes the field as it always has. Under `--no-cache` it, and
-`factsSkipped` of what it restored, are the only counts that can be other than 0.
+`factsSkipped` of what it restored, are the only counts that can be other than 0, with `reloads`.
+
+A few facts are computed only when a rule asks of a function (#w7zmvat), from the function's
+package's syntax, which a restored package does not have. Each answer computed is kept in the
+package's entry, under its key, and the binary's entries hold every answer of their package. A
+question of a restored package that nothing holds an answer to is never answered "no fact": the
+run loads that package again from source, never restoring it, and runs again, and the first pass
+is dropped unwritten. `"reloads":2` counts the packages so loaded, and is written only when it is
+not 0. A package loaded again that still cannot answer is a crash naming it, never a quiet answer.
 
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
 which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive

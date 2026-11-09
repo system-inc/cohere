@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,6 +72,9 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		// phases still follow one another as they read.
 		started = time.Now()
 	}
+	// The load the pass ran over: loaded, or the last a reload loaded again (reloadedPass).
+	reloaded, lintedLoad := engine.reloadedPass(*pass, loaded)
+	pass = &reloaded
 	if pass.checkError != nil {
 		engine.note("the rules could not run: %v", pass.checkError)
 		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0,
@@ -80,7 +84,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	result, outcome := pass.result, pass.outcome
 	var verdict *buildsVerdict
 	if engine.request.switches["other-builds"] {
-		if runs := engine.otherBuilds(loaded, pass); len(runs) > 0 {
+		if runs := engine.otherBuilds(lintedLoad, pass); len(runs) > 0 {
 			ran := make([]string, 0, len(pass.enabled))
 			for _, enabledRule := range pass.enabled {
 				ran = append(ran, enabledRule.Name)
@@ -146,6 +150,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		FactsDropped: result.Cache.FactsDropped,
 		FactsSkipped: result.Cache.FactsSkipped,
 		Waves:        result.Cache.Waves,
+		Reloads:      result.Cache.Reloads,
 	}
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)
@@ -220,6 +225,39 @@ func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check
 		outcome:   engine.suppress(ran, engine.inScope(result.Findings), engine.described.readable()),
 		elapsed:   time.Since(started),
 	}
+}
+
+// reloadedPass is pass over loaded, or, when a question of a fact computed on demand reached a package the findings
+// cache restored and no store answered it, the pass over a load that checks each such package from source, so the
+// question is answered as a run without the cache answers it, again for as long as a pass asks of another such package
+// (#w7zmvat wave 3). A pass that asked is no result: the questions failed, and their passes with them. Each round only
+// adds packages to load from source, so it ends; one whose every reload was loaded from source already stands, its
+// crashes naming the reload that failed. The load returned is the one the pass ran over.
+func (engine *pipeline) reloadedPass(pass lintPass, loaded *load.Loaded) (lintPass, *load.Loaded) {
+	current, currentLoad := pass, loaded
+	for current.checkError == nil && len(current.result.Reloads) > 0 && engine.session != nil &&
+		engine.session.Reload(current.result.Reloads) {
+		reloads := strings.Join(current.result.Reloads, ", ")
+		var loadError error
+		currentLoad, loadError = engine.loadWorkspace(true)
+		switch {
+		case loadError != nil:
+			engine.abandonSpeculation()
+			current = lintPass{checkError: fmt.Errorf("loading again to check %s from source: %w", reloads,
+				loadError)}
+		case len(currentLoad.Diagnostics) > 0:
+			engine.abandonSpeculation()
+			current = lintPass{checkError: fmt.Errorf("loading again to check %s from source found %d type errors "+
+				"the first load did not", reloads, len(currentLoad.Diagnostics))}
+		case engine.speculation != nil:
+			current = engine.speculativePass()
+		default:
+			current = engine.lint(currentLoad)
+		}
+	}
+	// Every round ran after the phase's clock started, which counts it: the pass keeps the time it had.
+	current.elapsed = pass.elapsed
+	return current, currentLoad
 }
 
 // inScope are the findings in a file in scope, in order.
