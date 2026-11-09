@@ -273,13 +273,15 @@ func compareIdentical(test testing.TB, originalFindings []Finding, portFindings 
 // entry the original's finding carries there and the port's leaves out; or `fixes:` and the text one edit of a fix
 // writes, on a finding a `finds:` record covers, on that record's line or the line after it (see fixesText), the edit
 // starting on the finding's own line, or `fixes at <file>:<line>:` for one that starts elsewhere, the file named as
-// findings name theirs, below the fixtures' root; or `finds nothing`, with no message, where the original panics on
-// the fixture and the port rightly finds nothing in it at all, which only RequirePortWhereOriginalPanics holds. Each
-// record's reason is in the comment above it, or for any but a drop in the doc comment of the declaration it is in, and
-// each but `finds nothing` matches one finding on its own line, a `fixes:` record its `finds:` record's.
+// findings name theirs, below the fixtures' root, and either written `fixes with "<message>"`, before any `at`, for an
+// edit whose fix must bear that message, the message a Go string literal; or `finds nothing`, with no message, where
+// the original panics on the fixture and the port rightly finds nothing in it at all, which only
+// RequirePortWhereOriginalPanics holds. Each record's reason is in the comment above it, or for any but a drop in the
+// doc comment of the declaration it is in, and each but `finds nothing` matches one finding on its own line, a
+// `fixes:` record its `finds:` record's.
 var adjudicatedPattern = regexp.MustCompile(
 	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?)|` +
-		`fixes(?: at (\S+?):(\d+))?: (.+?)|(finds nothing)|` +
+		`fixes(?: with ("(?:[^"\\]|\\.)*"))?(?: at (\S+?):(\d+))?: (.+?)|(finds nothing)|` +
 		`finds at column (\d+)(?:(, no end)| to (?:(\d+):)?(\d+))?: (.+?))\s*$`,
 )
 
@@ -313,7 +315,8 @@ func fixesText(written string) (string, bool) {
 // A finding the port alone makes, recorded as found, offers fixes only as the fixture records them: each edit of each
 // fix is a `fixes:` record of where it lands and its new text, on the `finds:` record's line or the line after it, and
 // every `fixes:` record is met by an edit of a finding that record covers, both ways as a multiset by the file and line
-// the edit starts on and its text, so a fix the port offers there unrecorded fails, and so does one recorded that it
+// the edit starts on and its text, and by its fix's message where the record names one, `fixes with "<message>":`, so
+// a fix the port offers there unrecorded fails, and so does one recorded that it
 // does not offer, or offers elsewhere, and one with no edits, which no record can stand for. No original's edit is
 // compared with a lone finding's, so the record holds where it lands as well as what it writes.
 // Every record must give its reason, a drop on the line directly above it and any other there or in the doc comment
@@ -442,13 +445,16 @@ type records struct {
 
 // recordedFix is one edit of a fix on a finding the port alone makes, as a `fixes:` record names it and as the port
 // offers it: the finding's file and line, the file and line the edit starts on, each file named as findings name
-// theirs, and the text it writes.
+// theirs, the text it writes, and, where holdsMessage, the message of its fix, as the port always offers one and a
+// record names one only when written.
 type recordedFix struct {
-	findingFile string
-	findingLine int
-	editFile    string
-	editLine    int
-	text        string
+	findingFile  string
+	findingLine  int
+	editFile     string
+	editLine     int
+	text         string
+	message      string
+	holdsMessage bool
 }
 
 // editLines is the line an edit starts on, read from the files of the packages loads loaded, each by the name findings
@@ -509,20 +515,40 @@ func requireRecordedFixes(
 					continue
 				}
 				offered = append(offered, recordedFix{
-					findingFile: finding.File,
-					findingLine: finding.Line,
-					editFile:    edit.File,
-					editLine:    line,
-					text:        edit.NewText,
+					findingFile:  finding.File,
+					findingLine:  finding.Line,
+					editFile:     edit.File,
+					editLine:     line,
+					text:         edit.NewText,
+					message:      fix.Message,
+					holdsMessage: true,
 				})
 			}
 		}
 	}
-	for _, unrecorded := range countedWithout(offered, recorded.fixed) {
+	// The records that name a message are met first, by edits whole, and the rest by edits with their messages set
+	// aside, so a record with none never takes the edit one with a message needs.
+	messaged := slices.DeleteFunc(slices.Clone(recorded.fixed), func(record recordedFix) bool {
+		return !record.holdsMessage
+	})
+	unmessaged := slices.DeleteFunc(slices.Clone(recorded.fixed), func(record recordedFix) bool {
+		return record.holdsMessage
+	})
+	notMessaged := []recordedFix{}
+	for _, edit := range countedWithout(offered, messaged) {
+		edit.message, edit.holdsMessage = "", false
+		notMessaged = append(notMessaged, edit)
+	}
+	for _, unrecorded := range countedWithout(notMessaged, unmessaged) {
 		test.Errorf("the port alone fixes its finding at %s:%d writing %q at %s:%d, which the fixture does not record",
 			unrecorded.findingFile, unrecorded.findingLine, unrecorded.text, unrecorded.editFile, unrecorded.editLine)
 	}
-	for _, unmatched := range countedWithout(recorded.fixed, offered) {
+	for _, unmatched := range countedWithout(messaged, offered) {
+		test.Errorf("the fixture records that the port alone fixes its finding at %s:%d with %q writing %q at %s:%d, "+
+			"and it does not", unmatched.findingFile, unmatched.findingLine, unmatched.message, unmatched.text,
+			unmatched.editFile, unmatched.editLine)
+	}
+	for _, unmatched := range countedWithout(unmessaged, notMessaged) {
 		test.Errorf("the fixture records that the port alone fixes its finding at %s:%d writing %q at %s:%d, and it "+
 			"does not", unmatched.findingFile, unmatched.findingLine, unmatched.text, unmatched.editFile,
 			unmatched.editLine)
@@ -707,10 +733,13 @@ func readRecord(written string) (match []string, text string, isReadable bool) {
 	if match == nil {
 		return nil, "", false
 	}
-	if match[10] == "" {
+	if _, unquoteError := strconv.Unquote(match[8]); match[8] != "" && unquoteError != nil {
+		return nil, "", false
+	}
+	if match[11] == "" {
 		return match, "", true
 	}
-	text, isReadable = fixesText(match[10])
+	text, isReadable = fixesText(match[11])
 	return match, text, isReadable
 }
 
@@ -735,29 +764,34 @@ func withRecord(recorded records, at Finding, match []string, text string) recor
 	case match[7] != "":
 		at.Message = match[7]
 		recorded.omitted = append(recorded.omitted, at)
-	case match[10] != "":
+	case match[11] != "":
 		fix := recordedFix{findingFile: at.File, findingLine: at.Line, text: text}
 		if match[8] != "" {
+			// Ignored: readRecord refuses a record whose literal does not unquote, so this one does.
+			fix.message, _ = strconv.Unquote(match[8])
+			fix.holdsMessage = true
+		}
+		if match[9] != "" {
 			// The pattern holds the line to digits, so only a line past an int's range fails to convert, and none
 			// that long is a file's.
-			fix.editFile, fix.editLine = match[8], atoiOrZero(match[9])
+			fix.editFile, fix.editLine = match[9], atoiOrZero(match[10])
 		}
 		recorded.fixed = append(recorded.fixed, fix)
-	case match[11] != "":
+	case match[12] != "":
 		recorded.findsNothing = append(recorded.findsNothing, at)
-	case match[16] != "":
-		at.Message = match[16]
+	case match[17] != "":
+		at.Message = match[17]
 		recorded.portAlone = append(recorded.portAlone, at)
 		recorded.found = append(recorded.found, at)
 		// The pattern holds the column and the end to digits, so only one past an int's range fails to convert, and
 		// that one, read as 0, matches no finding.
-		placed := placedFind{at: at, holdsEnd: match[13] != "" || match[15] != ""}
-		placed.at.Column = atoiOrZero(match[12])
-		if match[15] != "" {
-			placed.at.EndLine, placed.at.EndColumn = at.Line, atoiOrZero(match[15])
+		placed := placedFind{at: at, holdsEnd: match[14] != "" || match[16] != ""}
+		placed.at.Column = atoiOrZero(match[13])
+		if match[16] != "" {
+			placed.at.EndLine, placed.at.EndColumn = at.Line, atoiOrZero(match[16])
 		}
-		if match[14] != "" {
-			placed.at.EndLine = atoiOrZero(match[14])
+		if match[15] != "" {
+			placed.at.EndLine = atoiOrZero(match[15])
 		}
 		recorded.placed = append(recorded.placed, placed)
 	default:

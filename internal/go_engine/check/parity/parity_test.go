@@ -954,3 +954,35 @@ func TestRequireOnlyAdjudicatedHoldsAFindsRecordsNoEnd(test *testing.T) {
 	}), "the fixture records that the port alone finds same/same.go:7:2: call to shared, and no finding of the "+
 		"port's there starts at column 2 and has no end")
 }
+
+// fixingWith suggests replacing the call with text, under message.
+func fixingWith(message string, text string) shape {
+	return func(call *ast.CallExpr, diagnostic *analysis.Diagnostic) {
+		diagnostic.SuggestedFixes = append(diagnostic.SuggestedFixes, analysis.SuggestedFix{
+			Message:   message,
+			TextEdits: []analysis.TextEdit{{Pos: call.Pos(), End: call.End(), NewText: []byte(text)}},
+		})
+	}
+}
+
+// A `fixes:` record that names its fix's message, `fixes with "<message>":`, is met only by an edit of a fix with that
+// message, and one that names none by an edit of any: the port's fixes under "write fixed()" pass, and the same edits
+// under another message fail on the record that names it, named with the message, its edit left unrecorded, while the
+// record with none is still met.
+func TestRequireOnlyAdjudicatedHoldsAFixesRecordsMessage(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, writing("fixed()")),
+			analysistest.TestData(), "fixes_messaged")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages),
+			calling(gainedMessages, fixingWith("replace the call", "fixed()")), analysistest.TestData(),
+			"fixes_messaged")
+	}),
+		`the port alone fixes its finding at fixes_messaged/fixes_messaged.go:10 writing "fixed()" at `+
+			"fixes_messaged/fixes_messaged.go:10, which the fixture does not record",
+		`the fixture records that the port alone fixes its finding at fixes_messaged/fixes_messaged.go:10 with `+
+			`"write fixed()" writing "fixed()" at fixes_messaged/fixes_messaged.go:10, and it does not`,
+	)
+}
