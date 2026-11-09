@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/release/packaging"
@@ -321,6 +322,16 @@ type engineRun struct {
 	unusedHeadingPrinted bool
 	unusedPending        []engineUnusedRecord
 	unusedCoverage       int
+
+	// duplicatesRequested is `--duplicates`, which only the Go engine takes, and duplicatesWritten whether its one
+	// duplicates record came: a run that asked and ended without it is refused, as a report that never ran must not
+	// read as one that found nothing.
+	duplicatesRequested bool
+	duplicatesWritten   bool
+
+	// duplicatesUnanswered is why an engine with no duplicates report did not run one under `--duplicates`, printed
+	// as a report that did not run before the run's end, and empty otherwise.
+	duplicatesUnanswered string
 }
 
 // newEngineRun starts rendering one engine's run, naming the step nothing can skip by what the engine
@@ -391,6 +402,8 @@ func (run *engineRun) accept(line []byte) error {
 		return decodeRecord(line, &engineUnusedRecord{}, run.acceptUnused)
 	case "unusedCoverage":
 		return decodeRecord(line, &engineUnusedCoverageRecord{}, run.acceptUnusedCoverage)
+	case "duplicates":
+		return decodeRecord(line, &duplicate_functions.Report{}, run.acceptDuplicates)
 	case "inputs":
 		return decodeRecord(line, &engineInputsRecord{}, run.acceptInputs)
 	case "timing":
@@ -1170,6 +1183,24 @@ func (run *engineRun) acceptRule(record *engineRuleRecord) error {
 	return nil
 }
 
+// acceptDuplicates prints the duplicates report, which comes once, after every phase, and only when it was asked for.
+// It is never a finding: no count moves and the exit code stays the engine's.
+func (run *engineRun) acceptDuplicates(record *duplicate_functions.Report) error {
+	if !run.duplicatesRequested {
+		return fmt.Errorf("a duplicates record in a run that did not ask for --duplicates")
+	}
+	if run.duplicatesWritten {
+		return fmt.Errorf("a second duplicates record")
+	}
+	if run.nextPhase < len(phaseOrder) {
+		return fmt.Errorf("a duplicates record before the %s phase, and it comes after every phase",
+			phaseOrder[run.nextPhase])
+	}
+	run.duplicatesWritten = true
+	writeDuplicatesReport(run.out, *record)
+	return nil
+}
+
 // acceptInputs keeps what a check run read, once. Every path must be absolute: the front door stats them from a
 // working directory that need not be the engine's, so a relative one would prove a different file unchanged. And a
 // record naming no file is refused, since a check run reads at least the file its project is defined by, a go.mod or
@@ -1254,6 +1285,9 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	if run.timingRequested && !run.timingReceived {
 		return fmt.Errorf("a summary with no timing record, in a run that asked for one with --timing")
 	}
+	if run.duplicatesRequested && !run.duplicatesWritten {
+		return fmt.Errorf("a summary with no duplicates record, which --duplicates asked for")
+	}
 	if *record.Findings != run.findings {
 		return fmt.Errorf(
 			"the summary counts %d findings and %d finding records arrived",
@@ -1304,6 +1338,10 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	run.writeExcluded()
 	if run.project == nil {
 		run.report.graphNotBuilt = true
+	}
+	if run.duplicatesUnanswered != "" {
+		writeDuplicatesReport(run.out, duplicate_functions.Report{Floor: duplicate_functions.Floor,
+			NotRun: run.duplicatesUnanswered})
 	}
 	writeRunEnd(run.report, run.out)
 	return nil

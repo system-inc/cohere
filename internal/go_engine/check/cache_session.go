@@ -163,9 +163,10 @@ type CacheSession struct {
 	problemsLock sync.Mutex
 }
 
-// NewCacheSession is a session for the rules a run will run. An analyzer the cache cannot tell from another leaves
-// the cache out of the run, which reads and writes nothing then, with the reason among the counts' problems.
-func NewCacheSession(caching *Caching, rules []rule.Rule) *CacheSession {
+// NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
+// Options.Report), which a package's entry must hold to be restored. An analyzer the cache cannot tell from another
+// leaves the cache out of the run, which reads and writes nothing then, with the reason among the counts' problems.
+func NewCacheSession(caching *Caching, rules []rule.Rule, reports ...*analysis.Analyzer) *CacheSession {
 	session := &CacheSession{
 		caching: caching,
 		ruleOf:  map[*analysis.Analyzer]rule.Rule{},
@@ -176,7 +177,7 @@ func NewCacheSession(caching *Caching, rules []rule.Rule) *CacheSession {
 		session.ruleOf[enabled.Analyzer] = enabled
 		analyzers = append(analyzers, enabled.Analyzer)
 	}
-	known, knownError := newCacheAnalyzers(session.ruleOf, analyzers)
+	known, knownError := newCacheAnalyzers(session.ruleOf, analyzers, reports)
 	if knownError != nil {
 		session.problem(knownError.Error())
 		return session
@@ -496,6 +497,19 @@ func (session *CacheSession) findingsOf(
 		return nil, false
 	}
 	return restored.analyses[analyzer].findings, true
+}
+
+// reportOf is a report analyzer's result on a restored package, from its entry, and false for a package that missed or
+// a run without the cache.
+func (session *CacheSession) reportOf(analyzer *analysis.Analyzer, analyzedPackage *packages.Package) (any, bool) {
+	if session == nil {
+		return nil, false
+	}
+	restored, hit := session.hits[analyzedPackage]
+	if !hit {
+		return nil, false
+	}
+	return restored.analyses[analyzer].report, true
 }
 
 // filesOf is the stored walk of a restored package Analyze was given, or of one the first wave analyzed, whose

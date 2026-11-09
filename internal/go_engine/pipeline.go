@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -85,6 +86,11 @@ type pipeline struct {
 	// timing collects what the run's CPU goes to under `--timing`, for the timing record, and is nil otherwise, which
 	// every measurement reads as a run that did not ask (#3apgjer).
 	timing *timing.Collector
+
+	// duplicates is the duplicates report the lint phase built, nil until it has, and duplicatesNotRun why it never
+	// did, under `--duplicates` (see pipeline_duplicates.go).
+	duplicates       *duplicate_functions.Report
+	duplicatesNotRun string
 }
 
 func newPipeline(
@@ -203,6 +209,7 @@ func (engine *pipeline) run() int {
 	engine.runTypes(loaded, loadError)
 	engine.runLint(loaded, loadError, linted)
 	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
+	engine.writeDuplicates()
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
 	if engine.timing != nil {
 		engine.write(engine.timing.Record(timingKinds(engine.registered)))
@@ -247,6 +254,10 @@ func (engine *pipeline) phase(
 ) {
 	if outcome == contract.OutcomeNotReached {
 		engine.incomplete = true
+	}
+	// The duplicates report reads the lint phase's pass, so a lint phase that did not run says why the report did not.
+	if name == contract.PhaseLint && outcome != contract.OutcomeRan {
+		engine.duplicatesNotRun = "the lint phase did not run (" + detail + "), and the report reads its pass"
 	}
 	engine.write(contract.PhaseRecord{
 		Name: name, Outcome: outcome, ElapsedMilliseconds: int(elapsed.Milliseconds()), Detail: detail,

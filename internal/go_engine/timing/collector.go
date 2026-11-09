@@ -89,8 +89,8 @@ func (collector *Collector) Analyzer(name string, cpu time.Duration) {
 }
 
 // Shared adds cpu to the analyzer named name's row without counting a package, for work the analyzer's result does
-// for it after its action has finished: the engine's own intermediate representation, which builds each function as
-// a dispatcher's walk first reads it, a part of one package's build each time.
+// for it after its action has finished: the engine's own intermediate representation, which builds its package on the
+// first read, inside the action of the dispatcher whose walk reads it first.
 func (collector *Collector) Shared(name string, cpu time.Duration) {
 	collector.add(func() { collector.analyzers.add(name, cpu, 0) })
 }

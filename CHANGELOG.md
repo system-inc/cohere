@@ -42,6 +42,14 @@ changed in cohere outside the sets is written under the same heading.
 
 ### Added
 
+- `--duplicates`, a report beside `--unused` of functions that compute the same thing, written more than once
+  (#jfvhbj7). Each function's canonical IR is hashed (TypeScript through the high-level IR, Go through the IR the
+  live rules read), and functions with one digest at size 11 and up are grouped, every member named file:line.
+  Functions the IR can't read faithfully are refused by name and counted, with `--verbose` listing each. A port
+  kept in upstream's shape says so with a suppression naming `nexus/consistency-no-duplicate-function` or
+  `cohere-go/consistency-no-duplicate-function` and its reason, and one that keeps nothing is listed. It is never
+  a finding and never moves the exit code. `--json` writes `duplicate`, `duplicateRefused` and
+  `duplicateCoverage` lines. A Swift project's run says its report did not run, since its engine has none.
 - Go. A directory with a `go.work` or a `go.mod` is a Go project, checked by the Go engine, which is
   `cohere` itself run as a child of itself (`cohere go-engine`), so there is nothing more to install. A
   repository holding TypeScript, Swift and Go gets one report and one footer, counting each engine's

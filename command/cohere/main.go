@@ -485,7 +485,7 @@ func run() error {
 	if locateError == nil && location.Engine == engineFormat {
 		*fixOnly = false
 		*formatOnly = true
-		*unusedReport, *unusedAll, *unusedDeep = false, false, false
+		*unusedReport, *unusedAll, *unusedDeep, *duplicatesRequested = false, false, false, false
 		activeSummary.FormatProject = true
 	}
 
@@ -1405,6 +1405,7 @@ func run() error {
 			if adamicReadinessRequested {
 				activeSummary.Adamic = notMeasured("types bailed")
 			}
+			writeDuplicatesNotRun(fmt.Sprintf("types bailed with %d type diagnostics", sourceDiagnostics))
 			writeRunEnd(report, streams.Output)
 			finishRunCache(1)
 		}
@@ -1582,6 +1583,7 @@ func run() error {
 		// read.
 		report.record(phaseUnused, outcomeRan, unusedDuration, "")
 	}
+	writeTypeScriptDuplicates(backgroundContext, graph, projectFiles, lintConfiguration, location)
 
 	// The phase line prints on every run, success included. A run that checked nothing must not be
 	// able to print like a run that checked everything and found it clean, and a phase summary that
@@ -1628,7 +1630,7 @@ func rebuildGraph(
 	}
 	rebuilt.LintConfiguration = lintConfiguration
 	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfiguration, directory))
-	rebuilt.RegisteredRuleNames = registry.Names()
+	rebuilt.RegisteredRuleNames = directiveRuleNames()
 	rebuilt.Readiness = requestedReadiness()
 	return rebuilt, time.Since(start), nil
 }
@@ -1705,7 +1707,7 @@ func configureLint(
 		graph.RuleOptions = registry.OptionsAt(base)
 	}
 	graph.LintConfiguration = lintConfiguration
-	graph.RegisteredRuleNames = registry.Names()
+	graph.RegisteredRuleNames = directiveRuleNames()
 	graph.Readiness = requestedReadiness()
 	return lintConfiguration, nil
 }

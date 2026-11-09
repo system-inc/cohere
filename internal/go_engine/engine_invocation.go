@@ -19,9 +19,13 @@ import (
 // engine alone, and off changes nothing.
 //
 // `timing` measures what the run's CPU goes to and writes it as the timing record (pipeline.timing, #3apgjer).
+//
+// `duplicates` asks for the duplicates report (#jfvhbj7): the lint pass hashes every function beside the rules, and
+// one duplicates record after the unused phase's says what it grouped. Additive within contract 3, and this engine's
+// alone: the Swift engine refuses it as a flag it does not know.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing",
+	"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing", "duplicates",
 }
 
 // notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a

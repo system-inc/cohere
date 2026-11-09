@@ -11,6 +11,7 @@ package intermediate_representation
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/system-inc/cohere/static_single_assignment"
 )
@@ -23,17 +24,38 @@ type liftingPlace struct {
 	identifier static_single_assignment.IdentifierId
 }
 
-// liftingSlot is the one place a lifted Allocation, Store or Load has.
+// liftingSlot is the one place a lifted Allocation, Store, Load or debug reference has, kept by the instruction's
+// index in its block. isPlace says whether the instruction has one: the zero slot has none, kept apart from role,
+// since the core's Use is its Role's zero value.
 type liftingSlot struct {
-	place liftingPlace
-	role  static_single_assignment.Role
+	place   liftingPlace
+	role    static_single_assignment.Role
+	isPlace bool
+
+	// deleted is whether the round drops the instruction once lifted.
+	deleted bool
+
+	// isCell is whether the instruction is a lifted Allocation, the cell a declaration names.
+	isCell bool
 }
 
-// liftingBlock is one block as the core sees it: the block, and the phis the core places in it until lifting
-// turns them into *Phi instructions.
+// liftingBlock is one block as the core sees it: the block, the phis the core places in it until lifting turns
+// them into *Phi instructions, and its instructions' places by index, nil when none of them has one.
 type liftingBlock struct {
 	block *BasicBlock
 	phis  []*static_single_assignment.Phi[liftingPlace]
+	slots []liftingSlot
+
+	// newPhis are the *Phi instructions the resolve made of the core's phis here, to prepend.
+	newPhis []*Phi
+
+	// placed is the block as the core sees it: the indices of its instructions that have a place, in order
+	// (#beapx0q). InstructionCount is its length and each per-index callback maps through it, so the core's walk
+	// visits only these, never the instructions with nothing to rename. It must be complete, not a hint: an
+	// instruction with a place left out of it is one the core never renames, and its definition or use is lost.
+	// liftingPlacedProblems holds it to the Go IR's own rule for which instructions have a place.
+	// liftingCarvePlaced sets it, int32 by the bound it gives.
+	placed []int32
 }
 
 // liftingFunction is one function as the core sees it for one round of lifting.
@@ -46,9 +68,6 @@ type liftingFunction struct {
 	// order is the blocks in reverse postorder from the entry over Successors, then those the entry doesn't
 	// reach (the Recover block), in index order. Braun's construction walks it.
 	order []*liftingBlock
-
-	// slots are the places of the lifted instructions.
-	slots map[Instruction]*liftingSlot
 
 	// declarations are each identifier's declaration, by identifier: the first len(allocations) are the
 	// declarations' own, and Mint appends.
@@ -134,15 +153,17 @@ func (liftingGraph) EndsInReturn(block *liftingBlock) bool {
 	return isReturn
 }
 
+// InstructionCount is how many of block's instructions have a place: the core sees the block as those alone
+// (placed). It reads an index only to call back here, and the verifier compares positions only against each other,
+// so leaving out the placeless instructions changes nothing it decides.
 func (liftingGraph) InstructionCount(_ *liftingFunction, block *liftingBlock) int {
-	return len(block.block.Instructions)
+	return len(block.placed)
 }
 
 func (liftingGraph) EachInstructionPlace(lifting *liftingFunction, block *liftingBlock, index int,
 	visit func(*liftingPlace, static_single_assignment.Role)) {
-	if slot, isLifted := lifting.slots[block.block.Instructions[index]]; isLifted {
-		visit(&slot.place, slot.role)
-	}
+	slot := &block.slots[block.placed[index]]
+	visit(&slot.place, slot.role)
 }
 
 func (liftingGraph) IsContextStore(*liftingFunction, *liftingBlock, int) bool { return false }
@@ -203,4 +224,42 @@ func (liftingGraph) IdentifierOf(place liftingPlace) static_single_assignment.Id
 
 func (liftingGraph) WithIdentifier(_ liftingPlace, identifier static_single_assignment.IdentifierId) liftingPlace {
 	return liftingPlace{identifier: identifier}
+}
+
+// liftingPlacedProblems holds each block's placed view to the Go IR's own rule for which instructions have a place,
+// decided afresh for every instruction of every block, never by asking the slots the view was made from: a lifted
+// Allocation, a Store to one, a Load from one, and a debug reference to a lifted variable's address. Each such
+// instruction must be in its block's view, in order, and nothing else may be. It returns what breaks that, empty
+// when the view is complete, and how many instructions have a place, so a check that found nothing can tell it
+// looked. The verify-lifting seam runs it on every round.
+func liftingPlacedProblems(lifting *liftingFunction) (problems []string, places int) {
+	lifted := make(map[Value]bool, len(lifting.allocations))
+	for _, allocation := range lifting.allocations {
+		lifted[allocation] = true
+	}
+	for _, block := range lifting.blocks {
+		var want []int32
+		for index, instruction := range block.block.Instructions {
+			hasPlace := false
+			switch instruction := instruction.(type) {
+			case *Allocation:
+				hasPlace = lifted[instruction]
+			case *Store:
+				hasPlace = lifted[instruction.Address]
+			case *Load:
+				hasPlace = lifted[instruction.X]
+			case *debugReference:
+				hasPlace = instruction.IsAddress && lifted[instruction.X]
+			}
+			if hasPlace {
+				want = append(want, int32(index))
+			}
+		}
+		places += len(want)
+		if !slices.Equal(want, block.placed) {
+			problems = append(problems, fmt.Sprintf("%s block %d: the placed view is %v, the instructions with a "+
+				"place are %v", lifting.function.RelativeString(nil), block.block.Index, block.placed, want))
+		}
+	}
+	return problems, places
 }

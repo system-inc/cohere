@@ -3,6 +3,7 @@ package build_intermediate_representation
 import (
 	"fmt"
 	"iter"
+	"sync"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -10,11 +11,26 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
-// Result is one package in our intermediate representation, created and not built.
+// Result is one package in our intermediate representation for the readers that walk it, created by Analyzer and
+// built whole on the first read of it, through Package or SourceFunctions, as buildir built its package before any
+// check ran. A reader assumes that: one that follows StaticCallee into a function of the same package declared after
+// the one it is reading finds that function's blocks, where a package built one function at a time, as each is
+// read, would hand it a callee nobody had read yet, with none (staticcheck's SA2002 missed 3 of 21 findings that
+// way, #dz6qbwm). Inside the workspace building per function bought nothing, since the readers walk every function.
+// A callee in another package is created from types alone and has no blocks, as buildir left it. Building one
+// function at a time stays for the facts, which don't read through this result (#w7zmvat).
 type Result struct {
-	// Package is the pass's package. Its functions are built when first read, by Function.Build or through
-	// SourceFunctions, never all at once.
-	Package *intermediate_representation.Package
+	// irPackage is the pass's package, unbuilt until the first read of the result builds all of it.
+	irPackage *intermediate_representation.Package
+	// buildOnce builds irPackage on the first read. Package.Build is safe from many goroutines and waits on each
+	// function's own build, so a reader on another goroutine finds every function built once it returns.
+	buildOnce sync.Once
+}
+
+// Package is the pass's package, every function in it built.
+func (result *Result) Package() *intermediate_representation.Package {
+	result.buildOnce.Do(result.irPackage.Build)
+	return result.irPackage
 }
 
 // ResultOf is Analyzer's result over pass's package, for an analyzer that requires Analyzer, or an error naming what
@@ -28,35 +44,34 @@ func ResultOf(pass *analysis.Pass) (*Result, error) {
 	return result, nil
 }
 
-// SourceFunctions is every source function of the package, in the order buildir's SrcFuncs lists them: the
+// SourceFunctions is every source function of the package, built, in the order buildir's SrcFuncs lists them: the
 // package's functions and methods as declared, the synthetic package initializer first, then each one's anonymous
-// functions, depth first, in the order they were declared in it. Each package function is built as it is read, which
-// builds the anonymous functions it holds with it, so a reader that stops early leaves the rest unbuilt, and the
-// anonymous functions, which only a build finds, come once every package function has been read.
+// functions, depth first, in the order they were declared in it.
 //
-// Under `--timing`, collector is the run's, and each build is measured, billed to Analyzer's row, since it is this
-// pass's build done late, and taken out of the row of within, the analyzer whose action reads the functions, so a
-// dispatcher's row is its walk alone (#3apgjer). A build a reader's own call reaches first, Function.Build or Origin
-// called on a function read, is inside that call and billed with it. collector is nil otherwise, and each function is
-// built as it always was.
+// Under `--timing`, collector is the run's and within is the analyzer whose action reads the functions. When this read
+// is the one that builds the package, the build is measured, billed to Analyzer's row, since it is this pass's build
+// done late, and taken out of within's, so a dispatcher's row is its walk alone (#3apgjer). A build another reader
+// reached first is inside that reader's own measurement and billed with it, so each build is billed once. collector
+// is nil otherwise, and the package is built as Package builds it.
 func (result *Result) SourceFunctions(
 	collector *timing.Collector,
 	within string,
 ) iter.Seq[*intermediate_representation.Function] {
 	return func(yield func(*intermediate_representation.Function) bool) {
-		for _, function := range result.Package.Functions {
-			if collector != nil {
-				cpu := collector.Measure(function.Build)
+		if collector != nil {
+			result.buildOnce.Do(func() {
+				cpu := collector.Measure(result.irPackage.Build)
 				collector.Shared(Analyzer.Name, cpu)
 				collector.Nested(within, cpu, 1)
-			} else {
-				function.Build()
-			}
+			})
+		}
+		built := result.Package()
+		for _, function := range built.Functions {
 			if !yield(function) {
 				return
 			}
 		}
-		for _, function := range result.Package.Functions {
+		for _, function := range built.Functions {
 			if !yieldAnonymous(function, yield) {
 				return
 			}

@@ -49,7 +49,7 @@ func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError
 var goFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-		"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing",
+		"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing", "duplicates",
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open",
@@ -98,6 +98,7 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.requested = engineRequestedPhases(given, flagValue)
 	run.timingRequested = given["timing"] && flagValue("timing") == "true"
+	run.duplicatesRequested = given["duplicates"] && flagValue("duplicates") == "true"
 	run.engineEnvironment = []string{goEngineChildVariable + "=1"}
 	// os.Stderr is read here, after the run cache began, so the engine writes into the recording's tee.
 	exitCode, runError := runEngineBinary(executable, append([]string{goEngineVerb}, arguments...), run, os.Stderr)

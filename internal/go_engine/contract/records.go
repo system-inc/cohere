@@ -38,6 +38,8 @@ const (
 	KindInputs Kind = "inputs"
 	// KindTiming says what a check run's CPU went to, under `--timing`, after the lint record.
 	KindTiming Kind = "timing"
+	// KindDuplicates is the duplicates report under `--duplicates`, after the unused phase's record.
+	KindDuplicates Kind = "duplicates"
 	// KindSummary closes every checking stream.
 	KindSummary Kind = "summary"
 )

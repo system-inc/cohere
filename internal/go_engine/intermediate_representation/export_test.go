@@ -19,8 +19,18 @@ func BuildUnliftedForTest(test testing.TB, program *Program) {
 // VerifyLiftingForTest hands verify the core's verdict on every round of lifting each of program's functions,
 // until test ends.
 func VerifyLiftingForTest(test testing.TB, program *Program,
-	verify func(function *Function, violations []static_single_assignment.StaticSingleAssignmentViolation)) {
+	verify func(function *Function, violations []static_single_assignment.StaticSingleAssignmentViolation,
+		incomplete []string, places int)) {
 	liftingStoreForTest(test, program, liftingOptions{verify: verify})
+}
+
+// DropStoresFromPlacedViewForTest plants a mutant in program's lifting until test ends: each block's placed view
+// leaves out its Stores, which the core then never sees define. verify is handed what VerifyLiftingForTest hands
+// it.
+func DropStoresFromPlacedViewForTest(test testing.TB, program *Program,
+	verify func(function *Function, violations []static_single_assignment.StaticSingleAssignmentViolation,
+		incomplete []string, places int)) {
+	liftingStoreForTest(test, program, liftingOptions{verify: verify, placedDropsStores: true})
 }
 
 // SkipStoreDefinitionForTest plants a mutant in program's lifting until test ends: in each round, the first Store

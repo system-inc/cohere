@@ -102,8 +102,8 @@ func TestADispatchedListenersCpuIsBilledToItsRuleNotToTheDispatcher(test *testin
 		dispatcherRow.CpuMicroseconds)
 }
 
-// heavyStatements is how many statements the lazily built function holds, enough that its build is milliseconds of
-// CPU, far above the walk that reaches it.
+// heavyStatements is how many statements the heavy function holds, enough that its package's build is milliseconds
+// of CPU, far above the walk that reads it.
 const heavyStatements = 400
 
 // loadHeavyModule writes a module of one package holding one long function and loads it.
@@ -132,11 +132,11 @@ func loadHeavyModule(test *testing.T) []*packages.Package {
 	return loaded.Roots
 }
 
-// Under --timing a function the walk over the engine's own intermediate representation builds as it reaches it is
+// Under --timing the package the walk over the engine's own intermediate representation builds on its first read is
 // billed to the representation's build, build_intermediate_representation, never to the dispatcher: the build's row
 // holds the long function's build and still counts the one package its analyzer ran on, and the dispatcher's own row,
 // its walk alone, holds almost none of it. The dispatcher is a NewIntermediateRepresentation of the test's own.
-func TestALazilyBuiltFunctionIsBilledToTheBuildNotToTheDispatcher(test *testing.T) {
+func TestThePackageBuildOnFirstReadIsBilledToTheBuildNotToTheDispatcher(test *testing.T) {
 	test.Parallel()
 	timing_testing.RequireThreadClock(test)
 	dispatcher := NewIntermediateRepresentation()
@@ -159,7 +159,7 @@ func TestALazilyBuiltFunctionIsBilledToTheBuildNotToTheDispatcher(test *testing.
 		}
 	}
 	if functions == 0 {
-		test.Fatal("the walk handed the listener no function, so nothing was built lazily")
+		test.Fatal("the walk handed the listener no function, so nothing was built on its read")
 	}
 	rows := map[string]contract.SharedTiming{}
 	for _, row := range collector.Record(func(string) (string, contract.SharedKind) {

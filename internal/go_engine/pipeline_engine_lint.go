@@ -10,7 +10,9 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/canonical_function_hash"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -159,6 +161,9 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.incomplete = true
 	}
 	elapsed := pass.elapsed + time.Since(started)
+	if engine.duplicatesRequested() {
+		engine.duplicates = engine.duplicatesReport(result)
+	}
 	record.ElapsedMilliseconds = int(elapsed.Milliseconds())
 	engine.write(record)
 	engine.phase(contract.PhaseLint, contract.OutcomeRan, elapsed, "")
@@ -197,6 +202,9 @@ func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check
 	options.ReleaseAnalyzed = true
 	options.ReadFile = engine.sourceReader(nil)
 	options.Timing = engine.timing
+	if engine.duplicatesRequested() {
+		options.Report = canonical_function_hash.Analyzer
+	}
 	result, checkError := check.Run(analyzed, enabled, options)
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}
@@ -258,6 +266,9 @@ func (engine *pipeline) cacheSession(environment []string, files cache.FileDiges
 		return nil
 	}
 	caching.Files = files
+	if engine.duplicatesRequested() {
+		return check.NewCacheSession(caching, enabled, canonical_function_hash.Analyzer)
+	}
 	return check.NewCacheSession(caching, enabled)
 }
 
@@ -290,7 +301,11 @@ func (engine *pipeline) suppress(ran []string, inScope []check.Finding, files []
 	for _, found := range inScope {
 		located = append(located, suppression.Finding{Rule: found.Rule, File: found.File, Line: found.Line})
 	}
-	applied := suppression.Apply(knownRuleNames(engine.registered), ran, indexes, located)
+	// The duplicates report's name is known, so a suppression keeping a function in its shape is never an unknown
+	// rule, and never ran here, so lint neither applies nor dead-checks it: the report does both
+	// (pipeline_duplicates.go).
+	known := append(knownRuleNames(engine.registered), duplicate_functions.GoRuleName)
+	applied := suppression.Apply(known, ran, indexes, located)
 
 	// Kept holds the located findings no directive covered, in the order given. Whether one is withheld depends
 	// only on its rule, file and line, so two findings alike in those are kept or withheld together, and walking

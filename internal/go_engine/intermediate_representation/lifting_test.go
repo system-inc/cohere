@@ -225,8 +225,8 @@ func TestLiftingLeavesNothingLiftableAndPassesTheVerifier(test *testing.T) {
 	}
 }
 
-// liftingBuild type-checks source and builds it lifted, the verifier on, returning the package, the verifier's
-// violations, and how many rounds of lifting ran.
+// liftingBuild type-checks source and builds it lifted, the verifier and the placed-view guard on, returning the
+// package, what either found, and how many rounds of lifting ran.
 func liftingBuild(test *testing.T, source string) (*intermediate_representation.Package, []string, int) {
 	test.Helper()
 	unit := differentialCheck(test, "form", source)
@@ -235,13 +235,14 @@ func liftingBuild(test *testing.T, source string) (*intermediate_representation.
 	var violations []string
 	rounds := 0
 	intermediate_representation.VerifyLiftingForTest(test, program, func(function *intermediate_representation.Function,
-		found []static_single_assignment.StaticSingleAssignmentViolation) {
+		found []static_single_assignment.StaticSingleAssignmentViolation, incomplete []string, _ int) {
 		guard.Lock()
 		defer guard.Unlock()
 		rounds++
 		for _, violation := range found {
 			violations = append(violations, fmt.Sprintf("%s: %s", function.RelativeString(nil), violation.Detail))
 		}
+		violations = append(violations, incomplete...)
 	})
 	for _, imported := range unit.types.Imports() {
 		program.CreatePackage(imported, nil, nil, true)
@@ -299,4 +300,67 @@ func TestLiftingIsTheDefault(test *testing.T) {
 	if phis != 1 {
 		test.Errorf("f holds %d phis, want the one that merges the two arms", phis)
 	}
+}
+
+// TestPlacedViewIsComplete builds the ordinary corpus lifted, the every-form fixture among it, and holds each
+// round's placed view, the instructions the core sees, to the Go IR's own rule for which instructions have a place,
+// decided over every instruction of every block (liftingPlacedProblems): each one with a place is in its block's
+// view, in order, and nothing else is.
+func TestPlacedViewIsComplete(test *testing.T) {
+	test.Parallel()
+	rounds, places, everyFormPlaces := 0, 0, 0
+	for _, unit := range differentialCorpusUnits(test, "") {
+		problems, unitRounds, unitPlaces := placedViewBuild(test, unit, false)
+		for _, problem := range problems {
+			test.Errorf("%s: %s", unit.path, problem)
+		}
+		rounds += unitRounds
+		places += unitPlaces
+		if unit.path == "everyform" {
+			everyFormPlaces = unitPlaces
+		}
+	}
+	if everyFormPlaces == 0 {
+		test.Error("no instruction of the every-form fixture had a place, so the guard checked none there")
+	}
+	test.Logf("%d rounds of lifting, %d instructions with a place, all in their placed views", rounds, places)
+}
+
+// TestPlacedViewGuardFailsOnDroppedStores plants a mutant through the test seam: each block's placed view leaves
+// out its Stores. The guard, which decides which instructions have a place without asking the view, goes red.
+func TestPlacedViewGuardFailsOnDroppedStores(test *testing.T) {
+	test.Parallel()
+	unit := differentialCheck(test, "everyform", differentialEveryForm)
+	problems, _, _ := placedViewBuild(test, unit, true)
+	if len(problems) == 0 {
+		test.Fatal("the guard found nothing in the mutant")
+	}
+	test.Logf("the guard reports %d blocks, the first: %s", len(problems), problems[0])
+}
+
+// placedViewBuild builds unit lifted, each block's placed view leaving out its Stores when dropStores is set, and
+// returns what the placed-view guard found, the rounds of lifting, and the instructions with a place in them.
+func placedViewBuild(test *testing.T, unit differentialUnit, dropStores bool) (problems []string, rounds int,
+	places int) {
+	test.Helper()
+	program := intermediate_representation.NewProgram(unit.fileSet)
+	var guard sync.Mutex
+	verify := func(function *intermediate_representation.Function,
+		_ []static_single_assignment.StaticSingleAssignmentViolation, incomplete []string, roundPlaces int) {
+		guard.Lock()
+		defer guard.Unlock()
+		rounds++
+		places += roundPlaces
+		problems = append(problems, incomplete...)
+	}
+	if dropStores {
+		intermediate_representation.DropStoresFromPlacedViewForTest(test, program, verify)
+	} else {
+		intermediate_representation.VerifyLiftingForTest(test, program, verify)
+	}
+	for _, imported := range unit.types.Imports() {
+		program.CreatePackage(imported, nil, nil, true)
+	}
+	program.CreatePackage(unit.types, unit.files, unit.typeInfo, false).Build()
+	return problems, rounds, places
 }
