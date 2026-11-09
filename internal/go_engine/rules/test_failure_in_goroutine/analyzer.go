@@ -63,12 +63,6 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 				continue
 			}
 			started := startedFunction(goStatement)
-			if started != nil {
-				// Our representation builds a function when it is first read, where staticcheck's built the package
-				// whole before any check ran, so a function declared after this one is unbuilt yet. Building it reads
-				// what staticcheck's held: its body, or none for a function of another package.
-				started.Build()
-			}
 			if started == nil || started.Blocks == nil {
 				// A function called through an interface or a value has no body to read here, nor has one declared
 				// in another package, whose body staticcheck does not build.
