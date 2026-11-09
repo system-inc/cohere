@@ -21,7 +21,7 @@ var representationReader = &analysis.Analyzer{
 		if readError != nil {
 			return nil, readError
 		}
-		for range built.SourceFunctionsReadBy(pass) {
+		for range built.SourceFunctions() {
 		}
 		return nil, nil
 	},

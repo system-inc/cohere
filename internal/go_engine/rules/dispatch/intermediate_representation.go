@@ -18,7 +18,7 @@ import (
 // Instructions list its kind, then every FunctionExit; and once the functions are walked, every PackageExit.
 // Listeners are called in the order they were registered.
 //
-// The package is built whole as the walk starts, and a pass that starts no listener reads none of it, so builds none.
+// The package is built whole by build_intermediate_representation, an action the walk requires, before it starts.
 type IntermediateRepresentation struct {
 	*listeners
 }
@@ -83,12 +83,11 @@ func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, err
 	if readError != nil {
 		return nil, readError
 	}
-	// With no started listener the functions are not read, so the package is not built.
+	// With no started listener there is nothing to walk.
 	if len(whole.runs) == 0 && (len(parts) == 0 || len(parts[0].runs) == 0) {
 		return finishShards(whole, parts), nil
 	}
-	// Under --timing the build is billed to the representation's build, not to this walk.
-	functions := slices.Collect(built.SourceFunctions(whole.timing, whole.dispatcher))
+	functions := slices.Collect(built.SourceFunctions())
 	if len(parts) == 0 {
 		walkFunctions(whole, functions)
 		return finish(whole), nil

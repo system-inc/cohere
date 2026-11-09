@@ -132,11 +132,11 @@ func loadHeavyModule(test *testing.T) []*packages.Package {
 	return loaded.Roots
 }
 
-// Under --timing the package the walk over the engine's own intermediate representation builds on its first read is
-// billed to the representation's build, build_intermediate_representation, never to the dispatcher: the build's row
-// holds the long function's build and still counts the one package its analyzer ran on, and the dispatcher's own row,
-// its walk alone, holds almost none of it. The dispatcher is a NewIntermediateRepresentation of the test's own.
-func TestThePackageBuildOnFirstReadIsBilledToTheBuildNotToTheDispatcher(test *testing.T) {
+// Under --timing the package the walk over the engine's own intermediate representation reads is billed to the
+// representation's build, build_intermediate_representation, never to the dispatcher: the build's row holds the long
+// function's build and counts the one package its analyzer ran on, and the dispatcher's own row, its walk alone, holds
+// almost none of it. The dispatcher is a NewIntermediateRepresentation of the test's own.
+func TestThePackageBuildIsBilledToTheBuildNotToTheDispatcher(test *testing.T) {
 	test.Parallel()
 	timing_testing.RequireThreadClock(test)
 	dispatcher := NewIntermediateRepresentation()
@@ -159,7 +159,7 @@ func TestThePackageBuildOnFirstReadIsBilledToTheBuildNotToTheDispatcher(test *te
 		}
 	}
 	if functions == 0 {
-		test.Fatal("the walk handed the listener no function, so nothing was built on its read")
+		test.Fatal("the walk handed the listener no function, so it read no build")
 	}
 	rows := map[string]contract.SharedTiming{}
 	for _, row := range collector.Record(func(string) (string, contract.SharedKind) {
@@ -176,8 +176,8 @@ func TestThePackageBuildOnFirstReadIsBilledToTheBuildNotToTheDispatcher(test *te
 		test.Fatalf("the build's row is %dµs, too little to tell a build from a walk", buildRow.CpuMicroseconds)
 	}
 	if dispatcherRow.CpuMicroseconds > buildRow.CpuMicroseconds/4 {
-		test.Errorf("the dispatcher's own row is %dµs beside the build's %dµs, so the lazy build was not taken out "+
-			"of it", dispatcherRow.CpuMicroseconds, buildRow.CpuMicroseconds)
+		test.Errorf("the dispatcher's own row is %dµs beside the build's %dµs, so the build was billed "+
+			"to it", dispatcherRow.CpuMicroseconds, buildRow.CpuMicroseconds)
 	}
 	test.Logf("the build billed %dµs; the dispatcher's walk %dµs over %d functions", buildRow.CpuMicroseconds,
 		dispatcherRow.CpuMicroseconds, functions)
