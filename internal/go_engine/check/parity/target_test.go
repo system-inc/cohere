@@ -247,3 +247,50 @@ func TestTargetCallsRunBesidePlainCalls(test *testing.T) {
 		}
 	}
 }
+
+// JudgingBy sets go/build's default context apart from the load: loaded for 386, targeted hands over narrow.go, which
+// only 386 builds, while the check reads amd64, and the call holds the context to write as one that sets it by On does.
+// The zero Target judging by amd64 loads for the machine's own, handing over wide.go.
+func TestJudgingBySetsTheDefaultContextApartFromTheLoad(test *testing.T) {
+	test.Parallel()
+	originalFindings, portFindings := on386.JudgingBy("GOARCH=amd64").Findings(test, judging(true), judging(true),
+		analysistest.TestData(), "targeted")
+	wanted := []Finding{
+		{File: "targeted/narrow.go", Line: 3, Column: 9, Message: "judged for linux/amd64"},
+		{File: "targeted/targeted.go", Line: 4, Column: 9, Message: "judged for linux/amd64"},
+	}
+	if !reflect.DeepEqual(originalFindings, wanted) || !reflect.DeepEqual(portFindings, wanted) {
+		test.Errorf("the original found %v and the port %v, want %v from each", originalFindings, portFindings,
+			wanted)
+	}
+	originalFindings, portFindings = Target{}.JudgingBy("GOOS=plan9", "GOARCH=sparc64").Findings(test,
+		judging(true), judging(true), analysistest.TestData(), "targeted")
+	wanted = []Finding{
+		{File: "targeted/targeted.go", Line: 4, Column: 9, Message: "judged for plan9/sparc64"},
+		{File: "targeted/wide.go", Line: 3, Column: 9, Message: "judged for plan9/sparc64"},
+	}
+	if !reflect.DeepEqual(originalFindings, wanted) || !reflect.DeepEqual(portFindings, wanted) {
+		test.Errorf("on the machine's own the original found %v and the port %v, want %v from each",
+			originalFindings, portFindings, wanted)
+	}
+}
+
+// JudgingBy is refused what On is, a variable with no value, named twice or empty, and any variable but `GOOS` and
+// `GOARCH`, which the default context holds no other of for a check.
+func TestJudgingByRefusesWhatTheDefaultContextCannotTake(test *testing.T) {
+	test.Parallel()
+	for _, refused := range []struct {
+		variables []string
+		failure   string
+	}{
+		{[]string{"GOARCH"}, `the target's "GOARCH" names no value`},
+		{[]string{"GOARCH=amd64", "GOARCH=arm64"}, `the target names GOARCH twice`},
+		{[]string{"GOARCH="}, "the target's GOARCH is empty"},
+		{[]string{"CGO_ENABLED=0"}, "the target judges by CGO_ENABLED, and go/build's default context holds only " +
+			"GOOS and GOARCH for a check to read"},
+	} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			on386.JudgingBy(refused.variables...).Findings(recording, original, port, analysistest.TestData(), "same")
+		}), refused.failure)
+	}
+}

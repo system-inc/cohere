@@ -26,8 +26,9 @@
 // loads that folder as a module (see fixtureLoad). Each loads for the machine's own target, and a port whose check
 // judges another calls the same on the target it judges, as `parity.On("GOOS=linux", "GOARCH=386",
 // "CGO_ENABLED=0").RequireIdentical(...)`, which sets the `GOOS` and `GOARCH` it names in go/build's default context as
-// well for the call, where asmdecl and framepointer read their target (see Target). The census command,
-// command/cohere-parity, runs Analyze over a real tree.
+// well for the call, where asmdecl and framepointer read their target (see Target), and `.JudgingBy("GOARCH=sparc64")`
+// sets them there apart from the load, for a file the load hands over whose architecture the check must not be able to
+// name. The census command, command/cohere-parity, runs Analyze over a real tree.
 package parity
 
 import (

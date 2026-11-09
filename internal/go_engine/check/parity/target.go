@@ -33,6 +33,10 @@ import (
 type Target struct {
 	// environment is the variables the caller named, each `NAME=value`, appended after the fixture load's own.
 	environment []string
+
+	// judgedBy is the `GOOS` and `GOARCH` the caller named for build.Default alone, each `NAME=value`, over the
+	// environment's (see JudgingBy).
+	judgedBy []string
 }
 
 // On is the target environment names, each variable written `NAME=value`, as `On("GOOS=linux", "GOARCH=386",
@@ -43,6 +47,20 @@ type Target struct {
 // parallel with none of them (see Target).
 func On(environment ...string) Target {
 	return Target{environment: slices.Clone(environment)}
+}
+
+// JudgingBy is target with the `GOOS` and `GOARCH` variables names set in build.Default alone, over any target names
+// for the load, each written `NAME=value`, so the load hands the check files of one target while it judges as on
+// another. A test wants it for a file the load hands over whose architecture the check must not be able to name, as
+// `On("GOOS=linux", "GOARCH=amd64").JudgingBy("GOARCH=sparc64")` hands asmdecl parity_go_build.s, built for amd64 by
+// a `//go:build` line the pass does not read, while the default context names an architecture it does not know, so
+// the pass can tell none for the file. go list loads no file for a target it cannot build, so only this hands such a
+// file over. Its call holds the default context to write and puts it back as one on a target setting it by On does,
+// and is refused what On is, a variable with no value, named twice among these, or empty, and any but `GOOS` and
+// `GOARCH`.
+func (target Target) JudgingBy(variables ...string) Target {
+	target.judgedBy = slices.Concat(target.judgedBy, variables)
+	return target
 }
 
 // Findings is the package's Findings with the fixtures loaded for target.
@@ -157,12 +175,13 @@ var contextFields = map[string]func(context *build.Context) *string{
 var defaultContext sync.RWMutex
 
 // held is target held for one call's load and run, and what lets it go, which the call defers, so a call that fails
-// lets go too. A target that names `GOOS` or `GOARCH` sets each in build.Default and holds defaultContext to write,
-// and letting go puts back what it set; any other target holds it to read, since the load copies build.Default and a
-// check may read it. So a call reads build.Default only as its own target set it or as the process began, and no call
-// sets it while another reads it. A variable named with no value, a variable named twice, since which value counts
-// would be the order's accident, and an empty `GOOS` or `GOARCH`, a target build.Default cannot judge by, each fail
-// the test before anything is held. sync.RWMutex is not reentrant, so a call holds it once, at its start, and nothing
+// lets go too. A target that names `GOOS` or `GOARCH`, by On or by JudgingBy, whose value wins, sets each in
+// build.Default and holds defaultContext to write, and letting go puts back what it set; any other target holds it to
+// read, since the load copies build.Default and a check may read it. So a call reads build.Default only as its own
+// target set it or as the process began, and no call sets it while another reads it. A variable named with no value,
+// a variable named twice among On's or among JudgingBy's (see namedOnce), an empty `GOOS` or `GOARCH`, a target
+// build.Default cannot judge by, and a JudgingBy variable other than those two each fail the test before anything is
+// held. sync.RWMutex is not reentrant, so a call holds it once, at its start, and nothing
 // it runs while holding it calls the harness again: a hold taken beneath one to write waits forever, and one beneath
 // one to read waits forever behind a call waiting to write. So every Require function and Findings holds it in its
 // own require or findings function, which no other holds beneath it, findingsOver and loadFixtures hold nothing,
@@ -170,25 +189,18 @@ var defaultContext sync.RWMutex
 // after its hold lets go.
 func (target Target) held(test testing.TB) (release func()) {
 	test.Helper()
-	named := map[string]string{}
 	judged := map[string]string{}
-	for _, variable := range target.environment {
-		name, value, hasValue := strings.Cut(variable, "=")
-		if !hasValue {
-			test.Fatalf("the target's %q names no value: write it NAME=value", variable)
+	for _, variable := range namedOnce(test, target.environment) {
+		if _, isContextField := contextFields[variable.name]; isContextField {
+			judged[variable.name] = nonEmpty(test, variable)
 		}
-		if earlier, isNamed := named[name]; isNamed {
-			test.Fatalf("the target names %s twice, as %q and %q, so which it is for is the order's accident: name "+
-				"it once", name, earlier, variable)
+	}
+	for _, variable := range namedOnce(test, target.judgedBy) {
+		if _, isContextField := contextFields[variable.name]; !isContextField {
+			test.Fatalf("the target judges by %s, and go/build's default context holds only GOOS and GOARCH for a "+
+				"check to read", variable.name)
 		}
-		named[name] = variable
-		if _, isContextField := contextFields[name]; !isContextField {
-			continue
-		}
-		if value == "" {
-			test.Fatalf("the target's %s is empty, and go/build's default context judges by no empty target", name)
-		}
-		judged[name] = value
+		judged[variable.name] = nonEmpty(test, variable)
 	}
 	if len(judged) == 0 {
 		defaultContext.RLock()
@@ -206,6 +218,43 @@ func (target Target) held(test testing.TB) (release func()) {
 		}
 		defaultContext.Unlock()
 	}
+}
+
+// namedVariable is one variable a target names, its name, its value and how it was written.
+type namedVariable struct {
+	name    string
+	value   string
+	written string
+}
+
+// namedOnce is variables read, each written `NAME=value`, in order. One with no value fails the test, and so does one
+// named twice, since which value counts would be the order's accident.
+func namedOnce(test testing.TB, variables []string) []namedVariable {
+	test.Helper()
+	read := []namedVariable{}
+	for _, written := range variables {
+		name, value, hasValue := strings.Cut(written, "=")
+		if !hasValue {
+			test.Fatalf("the target's %q names no value: write it NAME=value", written)
+		}
+		isEarlier := func(earlier namedVariable) bool { return earlier.name == name }
+		if index := slices.IndexFunc(read, isEarlier); index >= 0 {
+			test.Fatalf("the target names %s twice, as %q and %q, so which it is for is the order's accident: name "+
+				"it once", name, read[index].written, written)
+		}
+		read = append(read, namedVariable{name: name, value: value, written: written})
+	}
+	return read
+}
+
+// nonEmpty is variable's value, for a variable build.Default takes, failing the test where it is empty.
+func nonEmpty(test testing.TB, variable namedVariable) string {
+	test.Helper()
+	if variable.value == "" {
+		test.Fatalf("the target's %s is empty, and go/build's default context judges by no empty target",
+			variable.name)
+	}
+	return variable.value
 }
 
 // environmentOf is the environment fixtures load under for target: the fixture load's own, then target's. A variable
