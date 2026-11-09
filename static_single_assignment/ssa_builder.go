@@ -1,27 +1,33 @@
 package static_single_assignment
 
+import "math"
+
 type ssaBuilder[G Graph[F, B, P], F any, B comparable, P any] struct {
 	graph    G
 	function F
 
-	states map[BlockId]*ssaState[P]
+	// states, unsealedPreds and visited are by BlockId, dense: a block id indexes them directly, where a map
+	// would hash it on every lookup Braun's walk makes (#beapx0q). They hold BlockBound entries, and grow if
+	// an id past it ever comes, so no id is out of reach. A nil state is a block not yet touched.
+	states []*ssaState[P]
 
 	// unsealedPreds counts, per block, how many predecessors have not yet been processed. A block
 	// whose count reaches zero is sealed and its incomplete phis can be filled.
 	//
-	// Absent from the map means "not yet decremented", which is not the same as zero; the read sites
+	// unseenPredecessors means "not yet decremented", which is not the same as zero; the read sites
 	// initialise from the predecessor count on first touch for exactly that reason.
-	unsealedPreds map[BlockId]int
+	unsealedPreds []int
 
 	// unknown holds bindings a lookup walked off the entry block without finding. In cohere they are
 	// globals, or captures from an enclosing function; in Adamic, which keeps both out of its graph, a
 	// variable read before anything defines it. They are left un-renamed: there is no definition in
-	// this function to merge, so a phi over them would be an invention.
+	// this function to merge, so a phi over them would be an invention. Made on its first entry, since most
+	// functions have none.
 	unknown map[DeclarationId]bool
 
 	// visited records blocks already processed, so sealing only fills phis for a block whose body
 	// has actually been walked.
-	visited map[BlockId]bool
+	visited []bool
 
 	// walking, walkingBlock and walkingContextStore are where run's walk is, read by visitPlace.
 	walking             walking
@@ -29,8 +35,59 @@ type ssaBuilder[G Graph[F, B, P], F any, B comparable, P any] struct {
 	walkingContextStore bool
 }
 
+// unseenPredecessors marks a block's unsealedPreds entry as not yet touched. It is no count a decrement can reach,
+// so a block decremented past zero still reads as touched, as an entry in the map it replaces did.
+const unseenPredecessors = math.MinInt
+
+// makeDenseState sizes the builder's per-block state to count blocks, every block untouched.
+func (builder *ssaBuilder[G, F, B, P]) makeDenseState(count int) {
+	builder.states = make([]*ssaState[P], count)
+	builder.visited = make([]bool, count)
+	builder.unsealedPreds = make([]int, count)
+	for index := range builder.unsealedPreds {
+		builder.unsealedPreds[index] = unseenPredecessors
+	}
+}
+
+// reach grows the builder's per-block state to hold blockId, when an id at or past the bound Graph.BlockBound
+// gave comes; the new blocks are untouched.
+func (builder *ssaBuilder[G, F, B, P]) reach(blockId BlockId) {
+	for int(blockId) >= len(builder.states) {
+		builder.states = append(builder.states, nil)
+		builder.visited = append(builder.visited, false)
+		builder.unsealedPreds = append(builder.unsealedPreds, unseenPredecessors)
+	}
+}
+
+// stateAt is blockId's state, made on its first need.
+func (builder *ssaBuilder[G, F, B, P]) stateAt(blockId BlockId) *ssaState[P] {
+	builder.reach(blockId)
+	if builder.states[blockId] == nil {
+		builder.states[blockId] = newSsaState[P]()
+	}
+	return builder.states[blockId]
+}
+
+// existingState is blockId's state, and false when nothing has touched the block yet.
+func (builder *ssaBuilder[G, F, B, P]) existingState(blockId BlockId) (*ssaState[P], bool) {
+	if int(blockId) >= len(builder.states) || builder.states[blockId] == nil {
+		return nil, false
+	}
+	return builder.states[blockId], true
+}
+
+// remainingPredecessors is how many of blockId's predecessors are unprocessed, reading count, the block's
+// predecessor total, when nothing has decremented it yet.
+func (builder *ssaBuilder[G, F, B, P]) remainingPredecessors(blockId BlockId, count int) int {
+	builder.reach(blockId)
+	if remaining := builder.unsealedPreds[blockId]; remaining != unseenPredecessors {
+		return remaining
+	}
+	return count
+}
+
 func (builder *ssaBuilder[G, F, B, P]) run() {
-	builder.visited = map[BlockId]bool{}
+	builder.makeDenseState(builder.graph.BlockBound(builder.function))
 
 	// Parameters are definitions in the entry block. Renaming them is what makes a reassigned
 	// parameter behave like any other binding rather than like a global.
@@ -38,6 +95,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 	if _, ok := builder.graph.Block(builder.function, entryId); !ok {
 		return
 	}
+	builder.reach(entryId)
 	builder.states[entryId] = newSsaState[P]()
 	parameters := builder.graph.Parameters(builder.function)
 	for index := range parameters {
@@ -55,9 +113,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 	for _, block := range builder.graph.Blocks(builder.function) {
 		blockId := builder.graph.Id(block)
 		builder.walkingBlock = blockId
-		if _, exists := builder.states[blockId]; !exists {
-			builder.states[blockId] = newSsaState[P]()
-		}
+		builder.stateAt(blockId)
 		builder.visited[blockId] = true
 
 		count := builder.graph.InstructionCount(builder.function, block)
@@ -87,10 +143,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 			if !ok {
 				continue
 			}
-			remaining, seen := builder.unsealedPreds[edge.successor]
-			if !seen {
-				remaining = len(builder.graph.Predecessors(successor))
-			}
+			remaining := builder.remainingPredecessors(edge.successor, len(builder.graph.Predecessors(successor)))
 			remaining--
 			builder.unsealedPreds[edge.successor] = remaining
 			if remaining == 0 && builder.visited[edge.successor] {
@@ -170,13 +223,13 @@ func (builder *ssaBuilder[G, F, B, P]) defineInMaybeContext(blockId BlockId, pla
 	// too, which is a real duplicate definition -- measured on
 	// `let n = 1; const g = () => n; n = 2`.
 	if contextStore && builder.graph.Contextual(builder.function, binding) {
-		if existing, defined := builder.states[blockId].defs[binding]; defined {
+		if existing, defined := builder.stateAt(blockId).defs[binding]; defined {
 			*place = builder.graph.WithIdentifier(*place, existing)
 			return
 		}
 	}
 	renamed := builder.graph.Mint(builder.function, builder.graph.IdentifierOf(*place))
-	builder.states[blockId].defs[binding] = renamed
+	builder.stateAt(blockId).defs[binding] = renamed
 	*place = builder.graph.WithIdentifier(*place, renamed)
 }
 
@@ -207,11 +260,7 @@ func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) Identif
 		return original
 	}
 
-	state, ok := builder.states[blockId]
-	if !ok {
-		state = newSsaState[P]()
-		builder.states[blockId] = state
-	}
+	state := builder.stateAt(blockId)
 	if renamed, defined := state.defs[binding]; defined {
 		return renamed
 	}
@@ -223,14 +272,14 @@ func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) Identif
 
 	predecessors := builder.graph.Predecessors(block)
 	if len(predecessors) == 0 {
+		if builder.unknown == nil {
+			builder.unknown = map[DeclarationId]bool{}
+		}
 		builder.unknown[binding] = true
 		return original
 	}
 
-	remaining, seen := builder.unsealedPreds[blockId]
-	if !seen {
-		remaining = len(predecessors)
-	}
+	remaining := builder.remainingPredecessors(blockId, len(predecessors))
 	if remaining > 0 {
 		renamed := builder.graph.Mint(builder.function, original)
 		state.defs[binding] = renamed
@@ -292,7 +341,7 @@ func (builder *ssaBuilder[G, F, B, P]) addPhi(blockId BlockId, original P, renam
 
 // fixIncompletePhis fills in the operands of every phi minted before this block was sealed.
 func (builder *ssaBuilder[G, F, B, P]) fixIncompletePhis(blockId BlockId) {
-	state, ok := builder.states[blockId]
+	state, ok := builder.existingState(blockId)
 	if !ok {
 		return
 	}
@@ -321,7 +370,7 @@ func (builder *ssaBuilder[G, F, B, P]) renameReturns() {
 		if !builder.graph.EndsInReturn(block) {
 			continue
 		}
-		if state, ok := builder.states[builder.graph.Id(block)]; ok {
+		if state, ok := builder.existingState(builder.graph.Id(block)); ok {
 			if renamed, defined := state.defs[binding]; defined {
 				*returns = builder.graph.WithIdentifier(*returns, renamed)
 				return

@@ -13,6 +13,8 @@ type testFunction struct {
 	contextual  map[ssa.DeclarationId]bool
 	// variables maps a name to its declaration, for building.
 	variables map[string]ssa.DeclarationId
+	// boundUnderReported makes BlockBound answer zero, as a graph that hands out block ids lazily might.
+	boundUnderReported bool
 }
 
 func (function *testFunction) block() *testBlock {
