@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/cpu_clock"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -44,7 +45,7 @@ func (meter *workerMeter) finish() {
 	if meter == nil {
 		return
 	}
-	end, _ := threadCpu()
+	end, _ := cpu_clock.Thread()
 	runtime.UnlockOSThread()
 
 	total := end - meter.start
@@ -58,14 +59,14 @@ func (meter *workerMeter) finish() {
 // open begins a frame.
 func (meter *workerMeter) open() frame {
 	meter.depth++
-	now, _ := threadCpu()
+	now, _ := cpu_clock.Thread()
 	return frame{start: now, nestedBefore: meter.nested}
 }
 
 // close ends a frame and returns its own CPU: its delta, less the frames nested inside it and less what
 // measuring it cost. Never negative: a frame cheaper than the measurement's average cost is billed zero.
 func (meter *workerMeter) close(opened frame) time.Duration {
-	now, _ := threadCpu()
+	now, _ := cpu_clock.Thread()
 	delta := now - opened.start
 	inside := meter.nested - opened.nestedBefore
 

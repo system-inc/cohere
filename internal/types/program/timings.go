@@ -5,6 +5,8 @@ import (
 	"slices"
 	"sort"
 	"time"
+
+	"github.com/system-inc/cohere/internal/cpu_clock"
 )
 
 // Timings collects per-rule cost across a run.
@@ -180,7 +182,7 @@ func (timings *Timings) closeAccount(processStart time.Duration, processKnown bo
 		timings.Account.Unavailable = "the process's CPU could not be read"
 		return
 	}
-	processEnd, known := processCpu()
+	processEnd, known := cpu_clock.Process()
 	if !known {
 		timings.Account.Unavailable = "the process's CPU could not be read"
 		return
@@ -206,14 +208,14 @@ func startWorkerMeter(timings *Timings) *workerMeter {
 	if timings == nil {
 		return nil
 	}
-	if _, known := threadCpu(); !known {
+	if _, known := cpu_clock.Thread(); !known {
 		timings.Account.Unavailable = "this platform has no thread CPU clock to read"
 		return nil
 	}
 	runtime.LockOSThread()
 	meter := &workerMeter{timings: timings, frameCost: calibrateFrame()}
 	timings.meter = meter
-	meter.start, _ = threadCpu()
+	meter.start, _ = cpu_clock.Thread()
 	return meter
 }
 

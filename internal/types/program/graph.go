@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/cpu_clock"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -613,7 +614,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 	var processStart time.Duration
 	var processKnown bool
 	if timings != nil {
-		processStart, processKnown = processCpu()
+		processStart, processKnown = cpu_clock.Process()
 	}
 
 	var waitGroup sync.WaitGroup
