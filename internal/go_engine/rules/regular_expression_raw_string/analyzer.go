@@ -19,6 +19,7 @@ import (
 	"go/types"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
@@ -86,6 +87,9 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		staticcheck_report.FilterGenerated())
 }
 
+// compileFunctionNames are the two functions the pattern's Or names, by the full names the finding reports.
+var compileFunctionNames = []string{"regexp.MustCompile", "regexp.Compile"}
+
 // compileFunctionName is the name function calls by, regexp.MustCompile or regexp.Compile, as the pattern's
 // `fn@(Symbol (Or "regexp.MustCompile" "regexp.Compile"))` binds it, and empty for any other callee. Symbol matches an
 // identifier or a selector, parenthesized or not and instantiated or not, and binds the full name of the function it
@@ -109,8 +113,8 @@ func compileFunctionName(context *rule.Context, function ast.Expr) string {
 	default:
 		return ""
 	}
-	// FullName spells a method with its receiver, `(T).Compile`, and a function by its package's path, which is regexp
-	// for the standard library's regexp alone.
+	// The full name Index compares spells a method with its receiver, `(T).Compile`, and a function by its package's
+	// path, which is regexp for the standard library's regexp alone.
 	compile, isFunction := object.(*types.Func)
 	if !isFunction {
 		return ""
@@ -120,12 +124,11 @@ func compileFunctionName(context *rule.Context, function ast.Expr) string {
 	if compile.Pkg() == context.Package {
 		return ""
 	}
-	switch compile.FullName() {
-	case "regexp.MustCompile", "regexp.Compile":
-		return compile.FullName()
-	default:
+	index := function_name.Index(compile, compileFunctionNames...)
+	if index < 0 {
 		return ""
 	}
+	return compileFunctionNames[index]
 }
 
 // escapesOnlyBackslashes is whether every backslash of value, a string literal as written, opens an escaped backslash,
