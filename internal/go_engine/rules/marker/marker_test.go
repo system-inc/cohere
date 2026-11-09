@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -118,6 +120,108 @@ func TestIndexReadsTheFilesOwnLines(test *testing.T) {
 	index, node := parseTarget(test, "// Checked: why.\n//line renumbered.go:1\ntarget()")
 	if found := index.ExcuseFor(node, checkedMarker); found != marker.WithReason {
 		test.Errorf("ExcuseFor under a //line directive is %d, expected WithReason", found)
+	}
+}
+
+// boundaryFiles put comments and nodes at a line's edges: a node ending on its line's last byte before a comment of
+// its own lines, a node starting on its line's first byte under one, a comment ending the file's last line with no
+// newline after it, and one ending it with one; and a comment with code on both sides of it.
+var boundaryFiles = map[string]string{
+	"edges.go":    "package edges\n\n// Checked: why.\nvar First = 1\nvar Second = 2\n/* Checked: why. */\nvar Third = 3\n",
+	"unended.go":  "package edges\n\nvar Unended = 3 // Checked: why.",
+	"ended.go":    "package edges\n\nvar Ended = 3 // Checked: why.\n",
+	"block.go":    "package edges\n\nvar Block = []int{\n\t1,\n} /* Checked: why.\n */\nvar After = 4",
+	"both.go":     "package edges\n\nvar Both = 1 /* Checked: why. */ + 2\nvar Below = 3\n",
+	"carriage.go": "package edges\r\n\r\n// Checked: why.\r\nvar Carried = 5\r\n",
+}
+
+// boundaryExcused is whether a marker excuses each of the boundary files' variables.
+var boundaryExcused = map[string]bool{
+	"First": true, "Second": false, "Third": true, "Unended": true, "Ended": true, "Block": true, "After": false,
+	"Carried": true, "Both": false, "Below": false,
+}
+
+// The index reads lines from its file's view of the table, and finds for every node of real files and of the boundary
+// shapes the comments an index finds that reads every line from the FileSet, as it did before the view: a table that
+// holds no file reads each position from the FileSet.
+func TestIndexFindsWhatAnIndexReadingTheFileSetFinds(test *testing.T) {
+	test.Parallel()
+	fileSet := token.NewFileSet()
+	var syntax []*ast.File
+	for _, directory := range []string{".", filepath.Join("..", "positions"), filepath.Join("..", "..", "check")} {
+		names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
+		if globError != nil || len(names) == 0 {
+			test.Fatalf("finding the Go files of %s: %v, %d found", directory, globError, len(names))
+		}
+		for _, name := range names {
+			file, parseError := parser.ParseFile(fileSet, name, nil, parser.ParseComments)
+			if parseError != nil {
+				test.Fatalf("parsing %s: %v", name, parseError)
+			}
+			syntax = append(syntax, file)
+		}
+	}
+	for name, source := range boundaryFiles {
+		file, parseError := parser.ParseFile(fileSet, name, source, parser.ParseComments)
+		if parseError != nil {
+			test.Fatalf("parsing %s: %v", name, parseError)
+		}
+		syntax = append(syntax, file)
+	}
+	table := positions.New(fileSet, syntax)
+	fromFileSet := positions.New(fileSet, nil)
+	compared, found := 0, 0
+	for _, file := range syntax {
+		index, reference := marker.NewIndex(table, file), marker.NewIndex(fromFileSet, file)
+		ast.Inspect(file, func(node ast.Node) bool {
+			if node == nil {
+				return true
+			}
+			want, got := reference.Above(node), index.Above(node)
+			if got != want {
+				test.Fatalf("%s: Above the node is %s, want %s",
+					fileSet.Position(node.Pos()), groupText(got), groupText(want))
+			}
+			wantTrailing, gotTrailing := reference.Trailing(node), index.Trailing(node)
+			if !slices.Equal(gotTrailing, wantTrailing) {
+				test.Fatalf("%s: Trailing finds %d groups, want %d",
+					fileSet.Position(node.Pos()), len(gotTrailing), len(wantTrailing))
+			}
+			if want != nil || len(wantTrailing) > 0 {
+				found++
+			}
+			compared++
+			return true
+		})
+	}
+	// Comparing nodes that no comment speaks for would pass for the wrong reason.
+	if compared < 50000 || found < 1000 {
+		test.Fatalf("compared %d nodes, %d with comments, want more than 50,000 and 1,000", compared, found)
+	}
+	// Each boundary shape's marker is found where it speaks, by an index on the table and by one on a table that does
+	// not hold the file.
+	for _, file := range syntax {
+		name := filepath.Base(fileSet.File(file.FileStart).Name())
+		if _, isBoundary := boundaryFiles[name]; !isBoundary {
+			continue
+		}
+		for _, index := range []*marker.Index{marker.NewIndex(table, file), marker.NewIndex(fromFileSet, file)} {
+			ast.Inspect(file, func(node ast.Node) bool {
+				declaration, isDeclaration := node.(*ast.GenDecl)
+				if !isDeclaration {
+					return true
+				}
+				specification, isValue := declaration.Specs[0].(*ast.ValueSpec)
+				if !isValue {
+					return false
+				}
+				excused := index.ExcuseFor(declaration, checkedMarker) == marker.WithReason
+				if expected := boundaryExcused[specification.Names[0].Name]; excused != expected {
+					test.Errorf("%s: %s excused: %v, expected %v", name, specification.Names[0].Name, excused, expected)
+				}
+				return false
+			})
+		}
 	}
 }
 
