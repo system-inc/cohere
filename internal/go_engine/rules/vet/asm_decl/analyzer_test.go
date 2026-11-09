@@ -140,10 +140,8 @@ func TestNeitherJudgesAFileOfAnUnknownArchitecture(test *testing.T) {
 	})
 }
 
-// differencesDirectory is the differences fixture, whose declarations crash the original. Its records sit on the
-// findings' own lines in an assembly file, where the harness reads records from .go files alone, and its
-// RequirePortWhereOriginalPanics takes none given beside the call, so this tier keeps its own pass, recover and
-// reader, and compares through the harness's Finding and Difference.
+// differencesDirectory is the differences fixture, whose declarations crash the original, and whose assembly file the
+// shape tier hands the original beside each shape.
 var differencesDirectory = filepath.Join(analysistest.TestData(), "src", "differences")
 
 // The original lays out every bodiless declaration's frame before it reads a line of assembly, and crashes in
@@ -151,31 +149,15 @@ var differencesDirectory = filepath.Join(analysistest.TestData(), "src", "differ
 // go/types/gcsizes.go:54 fails, and the panic recovered names the result check at line 17 that runs after it): a
 // method of a generic type taking a T, a [2]T or a struct of T, or returning a T. The port judges nothing of such a
 // function, since without its frame nothing true can be said of its assembly, and goes on judging the rest of the
-// package. The original runs on a hand-built pass under a recover, which pins its crash, and the port runs alone on
-// another over the same files, where it must report exactly the `port finds:` records of differences_amd64.s: none
-// in the functions it cannot measure, and every finding of the measured ones beside and after them.
+// package. Loaded for linux/amd64, the original must panic on the differences fixture, and the port must report there
+// exactly the `port finds:` records of differences_amd64.s, each reasoned on the line above it: none in the functions
+// it cannot measure, and every finding of the measured ones beside and after them.
+//
+// Not parallel: the shape tier runs the original by hand, outside the harness, where it reads go/build's default
+// context, which this call sets.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
-	test.Parallel()
-	checked := checkedByHand(test, filepath.Join(differencesDirectory, "differences.go"), "")
-	assemblyFilename := filepath.Join(differencesDirectory, "differences_amd64.s")
-	crashed := originalCrashes(test, checked, assemblyFilename)
-	if crashed == nil {
-		test.Fatal("the original did not crash, so the fixture no longer pins what it was written for")
-	}
-	test.Logf("the original crashed: %v", crashed)
-
-	port := runByHand(test, Analyzer, checked, assemblyFilename)
-	recorded := portFindsRecords(test, assemblyFilename)
-	test.Logf("the port found %d, and differences_amd64.s records %d", len(port), len(recorded))
-	if len(recorded) == 0 {
-		test.Fatal("differences_amd64.s records no finding, so the comparison proves nothing")
-	}
-	for _, missing := range parity.Difference(recorded, port) {
-		test.Errorf("differences_amd64.s records %s, and the port did not find it", missing)
-	}
-	for _, extra := range parity.Difference(port, recorded) {
-		test.Errorf("the port found %s, which differences_amd64.s does not record", extra)
-	}
+	parity.On("GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0").RequirePortWhereOriginalPanics(test, asmdecl.Analyzer,
+		Analyzer, analysistest.TestData(), "differences")
 }
 
 // Each shape the port leaves unjudged crashes the original on its own, and each shape that holds a type parameter
@@ -225,14 +207,31 @@ func TestPortLeavesUnjudgedExactlyTheFramesTheOriginalCrashesOn(test *testing.T)
 	}
 }
 
-// originalCrashes runs x/tools' asmdecl by hand over checked and the assembly file named assemblyFilename, and
-// returns what it panicked with, or nil when it did not.
+// originalCrashes runs x/tools' asmdecl by hand on a pass over the Go file checked holds and the assembly file named
+// assemblyFilename, and returns what it panicked with, or nil when it did not. What it reports is not read: a shape is
+// a frame, and the question is whether laying it out crashes.
 func originalCrashes(test *testing.T, checked handChecked, assemblyFilename string) (recovered any) {
 	test.Helper()
 	defer func() {
 		recovered = recover()
 	}()
-	runByHand(test, asmdecl.Analyzer, checked, assemblyFilename)
+	pass := &analysis.Pass{
+		Analyzer:   asmdecl.Analyzer,
+		Fset:       checked.fileSet,
+		Files:      []*ast.File{checked.file},
+		OtherFiles: []string{assemblyFilename},
+		Pkg:        checked.typesPackage,
+		TypesInfo:  checked.information,
+		TypesSizes: types.SizesFor("gc", "amd64"),
+		ResultOf:   map[*analysis.Analyzer]any{},
+		ReadFile:   os.ReadFile,
+		Report: func(analysis.Diagnostic) {
+			// What the original reports is not read: the question is whether laying out the frame crashes.
+		},
+	}
+	if _, runError := asmdecl.Analyzer.Run(pass); runError != nil {
+		test.Fatalf("running %s: %v", asmdecl.Analyzer.Name, runError)
+	}
 	return nil
 }
 
@@ -272,66 +271,6 @@ func checkedByHand(test *testing.T, filename string, source string) handChecked 
 		test.Fatal(checkError)
 	}
 	return handChecked{fileSet: fileSet, file: file, typesPackage: checked, information: information}
-}
-
-// runByHand runs analyzer's Run on a pass over the Go file checked holds and the assembly file named
-// assemblyFilename, and returns what it reports, each finding in its file's base name, with its end when it has one.
-func runByHand(
-	test *testing.T,
-	analyzer *analysis.Analyzer,
-	checked handChecked,
-	assemblyFilename string,
-) []parity.Finding {
-	test.Helper()
-	found := []parity.Finding{}
-	pass := &analysis.Pass{
-		Analyzer:   analyzer,
-		Fset:       checked.fileSet,
-		Files:      []*ast.File{checked.file},
-		OtherFiles: []string{assemblyFilename},
-		Pkg:        checked.typesPackage,
-		TypesInfo:  checked.information,
-		TypesSizes: types.SizesFor("gc", "amd64"),
-		ResultOf:   map[*analysis.Analyzer]any{},
-		ReadFile:   os.ReadFile,
-		Report: func(diagnostic analysis.Diagnostic) {
-			position := checked.fileSet.Position(diagnostic.Pos)
-			reported := parity.Finding{
-				File: filepath.Base(position.Filename), Line: position.Line, Column: position.Column,
-				Message: diagnostic.Message,
-			}
-			if diagnostic.End.IsValid() {
-				end := checked.fileSet.Position(diagnostic.End)
-				reported.EndLine, reported.EndColumn = end.Line, end.Column
-			}
-			found = append(found, reported)
-		},
-	}
-	if _, runError := analyzer.Run(pass); runError != nil {
-		test.Fatalf("running %s: %v", analyzer.Name, runError)
-	}
-	return found
-}
-
-// portFindsRecords is every `// port finds: <message>` record in the assembly file named filename, each a finding
-// at the start of its line with no end, as the pass places every finding.
-func portFindsRecords(test *testing.T, filename string) []parity.Finding {
-	test.Helper()
-	content, readError := os.ReadFile(filename)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	const marker = "// port finds: "
-	recorded := []parity.Finding{}
-	for index, line := range strings.Split(string(content), "\n") {
-		records := strings.Split(line, marker)
-		for _, message := range records[1:] {
-			recorded = append(recorded, parity.Finding{
-				File: filepath.Base(filename), Line: index + 1, Column: 1, Message: strings.TrimSpace(message),
-			})
-		}
-	}
-	return recorded
 }
 
 // onTarget makes test run as on a machine building for target, `GOOS/GOARCH`: go/build's default context, which
