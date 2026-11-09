@@ -12,9 +12,9 @@ import "go/token"
 type BinaryOperation struct {
 	register
 	// One of:
-	// ADD SUB MUL QUO REM          + - * / %
-	// AND OR XOR SHL SHR AND_NOT   & | ^ << >> &^
-	// EQL NEQ LSS LEQ GTR GEQ      == != < <= < >=
+	// `ADD` `SUB` `MUL` `QUO` `REM`              + - * / %
+	// `AND` `OR` `XOR` `SHL` `SHR` `AND_NOT`     & | ^ << >> &^
+	// `EQL` `NEQ` `LSS` `LEQ` `GTR` `GEQ`        == != < <= > >=
 	Operator token.Token
 	X, Y     Value
 }

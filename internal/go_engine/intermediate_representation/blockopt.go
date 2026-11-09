@@ -6,20 +6,12 @@ package intermediate_representation
 
 // Simple block optimizations to simplify the control flow graph.
 
-// TODO(adonovan): opt: instead of creating several "unreachable" blocks
-// per function in the Builder, reuse a single one (e.g. at Blocks[1])
-// to reduce garbage.
+// The builder creates several "unreachable" blocks per function where a
+// single one (at Blocks[1], say) would do with less garbage.
 
-import (
-	"fmt"
-	"os"
-)
-
-// If true, show progress at each successive iteration of
-// optimizeBlocks.  Very verbose.
-const debugBlockOpt = false
-
-// markReachable sets Index=-1 for all blocks reachable from `block`.
+// markReachable sets gaps=-1 for all blocks reachable from `block`.
+//
+// Mutates: block and every block reachable from it take the reachable mark in gaps
 func markReachable(block *BasicBlock) {
 	block.gaps = -1
 	for _, succ := range block.Successors {
@@ -32,7 +24,8 @@ func markReachable(block *BasicBlock) {
 // deleteUnreachableBlocks marks all reachable blocks of `function` and
 // eliminates (nils) all others, including possibly cyclic subgraphs.
 func deleteUnreachableBlocks(function *Function) {
-	const white, black = 0, -1
+	const white = 0
+	const black = -1
 	// We borrow b.gaps temporarily as the mark bit.
 	for _, block := range function.Blocks {
 		block.gaps = white
@@ -47,9 +40,6 @@ func deleteUnreachableBlocks(function *Function) {
 				if successor.gaps == black {
 					successor.removePredecessor(block) // delete white->black edge
 				}
-			}
-			if debugBlockOpt {
-				fmt.Fprintln(os.Stderr, "unreachable", block)
 			}
 			function.Blocks[index] = nil // delete b
 		}
@@ -96,16 +86,10 @@ func jumpThreading(function *Function, block *BasicBlock) bool {
 			predecessor.Instructions[len(predecessor.Instructions)-1] = jump
 			predecessor.Successors = predecessor.Successors[:1]
 			successor.removePredecessor(block)
+		} else if index == 0 {
+			successor.replacePredecessor(block, predecessor)
 		} else {
-			if index == 0 {
-				successor.replacePredecessor(block, predecessor)
-			} else {
-				successor.Predecessors = append(successor.Predecessors, predecessor)
-			}
-		}
-
-		if debugBlockOpt {
-			fmt.Fprintln(os.Stderr, "jumpThreading", predecessor, block, successor)
+			successor.Predecessors = append(successor.Predecessors, predecessor)
 		}
 	}
 	function.Blocks[block.Index] = nil // delete b
@@ -115,6 +99,9 @@ func jumpThreading(function *Function, block *BasicBlock) bool {
 // fuseBlocks attempts to apply the block fusion optimization to block
 // a, in which a->b becomes ab if len(a.Successors)==len(b.Predecessors)==1.
 // The result is true if the optimization was applied.
+//
+// Mutates: block takes its successor's instructions and successors
+// Mutates: function loses the fused successor from its blocks
 func fuseBlocks(function *Function, block *BasicBlock) bool {
 	if len(block.Successors) != 1 {
 		return false
@@ -147,10 +134,6 @@ func fuseBlocks(function *Function, block *BasicBlock) bool {
 	// Fix up Predecessors links of all successors of B.
 	for _, inheritedSuccessor := range successor.Successors {
 		inheritedSuccessor.replacePredecessor(successor, block)
-	}
-
-	if debugBlockOpt {
-		fmt.Fprintln(os.Stderr, "fuseBlocks", block, successor)
 	}
 
 	function.Blocks[successor.Index] = nil // delete b

@@ -31,7 +31,7 @@ type Member interface {
 	RelativeString(*types.Package) string // like String, but relative refs are unqualified
 	Object() types.Object                 // typechecker's object for this member, if any
 	Type() types.Type                     // type of the package member
-	Token() token.Token                   // token.{VAR,FUNC,CONST,TYPE}
+	Token() token.Token                   // `token.VAR`, `token.FUNC`, `token.CONST` or `token.TYPE`
 }
 
 // A Value is an IR value that can be referenced by an instruction.
@@ -270,23 +270,35 @@ type Function struct {
 	Recover            *BasicBlock     // optional; control transfers here after recovered panic
 	AnonymousFunctions []*Function     // anonymous functions (from FuncLit, RangeStmt) directly beneath this one
 	referrers          []Instruction   // referring instructions (iff Parent() != nil)
-	anonIndex          int32           // position of a nested function in parent's AnonymousFunctions. fn.Parent()!=nil => fn.Parent().AnonymousFunctions[fn.anonIndex] == fn.
+	// position of a nested function in parent's AnonymousFunctions.
+	// fn.Parent()!=nil => fn.Parent().AnonymousFunctions[fn.anonIndex] == fn.
+	anonIndex int32
 
-	Sccs []*Scc // SCC DAG in reverse topological order
+	Sccs []*Scc // strongly connected components, a directed acyclic graph in reverse topological order
 
-	recvtypeparams *types.TypeParamList // receiver type parameters of this function. recvtypeparams.Len() > 0 => method on generic or instance of generic type
-	recvtypeargs   []types.Type         // type arguments that instantiated recvtypeparams. len(recvtypeargs) > 0 => method on instance of generic type
-	typeparams     *types.TypeParamList // type parameters of this function. typeparams.Len() > 0 => generic or instance of generic function or method
-	typeargs       []types.Type         // type arguments that instantiated typeparams. len(typeargs) > 0 => instance of generic function or method
-	topLevelOrigin *Function            // the origin function if this is an instance of a source function. nil if Parent()!=nil.
-	generic        *generic             // instances of this function, if generic
+	// receiver type parameters of this function.
+	// recvtypeparams.Len() > 0 => method on generic or instance of generic type
+	recvtypeparams *types.TypeParamList
+	// type arguments that instantiated recvtypeparams.
+	// len(recvtypeargs) > 0 => method on instance of generic type
+	recvtypeargs []types.Type
+	// type parameters of this function.
+	// typeparams.Len() > 0 => generic or instance of generic function or method
+	typeparams *types.TypeParamList
+	// type arguments that instantiated typeparams.
+	// len(typeargs) > 0 => instance of generic function or method
+	typeargs []types.Type
+	// the origin function if this is an instance of a source function. nil if Parent()!=nil.
+	topLevelOrigin *Function
+	generic        *generic // instances of this function, if generic
 
 	// The following fields are cleared after building.
-	build           buildFunc                // algorithm to build function body (nil => built)
-	currentBlock    *BasicBlock              // where to emit code
-	vars            map[*types.Var]Value     // addresses of local variables
-	results         []*Allocation            // result allocations of the current function
-	returnVariables []*types.Var             // variables for a return statement. Either results or for range-over-func a parent's results
+	build        buildFunc            // algorithm to build function body (nil => built)
+	currentBlock *BasicBlock          // where to emit code
+	vars         map[*types.Var]Value // addresses of local variables
+	results      []*Allocation        // result allocations of the current function
+	// variables for a return statement. Either results or for range-over-func a parent's results
+	returnVariables []*types.Var
 	targets         *targets                 // linked stack of branch targets
 	lblocks         map[*types.Label]*lblock // labelled blocks
 	jump            *types.Var               // synthetic variable for the yield state (non-nil => range-over-func)
@@ -313,7 +325,7 @@ type SelectState struct {
 	Direction types.ChanDir // direction of case (SendOnly or RecvOnly)
 	Channel   Value         // channel to use (for send or receive)
 	Send      Value         // value to send (for send)
-	Position  token.Pos     // position of token.ARROW
+	Position  token.Pos     // position of `token.ARROW`
 }
 
 // Instructions executed for effect.  They do not yield a value. --------------------
@@ -438,11 +450,17 @@ func consTypeParamLists(first, second *types.TypeParamList) *types.TypeParamList
 	// approved (see go.dev/issue/79603).
 	listType := reflect.TypeFor[types.TypeParamList]()
 	if listType.NumField() != 1 {
+		// Invariant: go/types defines TypeParamList as a struct whose one field is a []*TypeParam, the layout
+		// the conversion below relies on.
 		panic("TypeParamList has unexpected fields")
 	}
 	if field := listType.Field(0); field.Offset != 0 || field.Type != reflect.TypeFor[[]*types.TypeParam]() {
+		// Invariant: go/types defines TypeParamList as a struct whose one field is a []*TypeParam, the layout
+		// the conversion below relies on.
 		panic("TypeParamList field is not []*TypeParam")
 	}
+	// Unsafe: the checks above prove TypeParamList is a struct whose only field, at offset zero, is a
+	// []*TypeParam, so a pointer to tpars points at a value with TypeParamList's layout.
 	return (*types.TypeParamList)(unsafe.Pointer(&tpars))
 }
 
@@ -467,8 +485,8 @@ func (function *Function) TypeArguments() []types.Type {
 // or nil if fn is not an instantiation.
 func (function *Function) Origin() *Function {
 	if function.parent != nil && function.parent.hasTypeArguments() {
-		// Nested functions are BUILT at a different time than their instances.
-		// Build declared package if not yet BUILT. This is not an expected use
+		// Nested functions are built at a different time than their instances.
+		// Build declared package if not yet built. This is not an expected use
 		// case, but is simple and robust.
 		function.declaredPackage().Build()
 	}
@@ -537,6 +555,8 @@ func (function *Function) objectOf(id *ast.Ident) types.Object {
 	if object := function.info.ObjectOf(id); object != nil {
 		return object
 	}
+	// Invariant: callers pass identifiers that declare or use an object in syntax go/types checked, and go/types
+	// records the object of each such identifier in Defs or Uses.
 	panic(fmt.Sprintf("no types.Object for ast.Ident %s @ %s",
 		id.Name, function.Program.FileSet.Position(id.Pos())))
 }
@@ -547,6 +567,8 @@ func (function *Function) typeOf(expr ast.Expr) types.Type {
 	if resolvedType := function.info.TypeOf(expr); resolvedType != nil {
 		return function.typ(resolvedType)
 	}
+	// Invariant: callers pass expressions of syntax go/types checked, and go/types records the type of each such
+	// expression in Types, or for an identifier in Defs or Uses.
 	panic(fmt.Sprintf("no type for %T @ %s", expr, function.Program.FileSet.Position(expr.Pos())))
 }
 
@@ -582,7 +604,12 @@ func (function *Function) selection(selector *ast.SelectorExpr) *selection {
 			object, index, indirect := types.LookupFieldOrMethod(recv, true, goPackage, sel.Obj().Name())
 
 			// sig replaces sel.Type(). See (types.Selection).Typ() for details.
-			sig := object.Type().(*types.Signature)
+			sig, isSignature := object.Type().(*types.Signature)
+			if !isSignature {
+				// Invariant: the selection is a method, so looking its name up on the receiver finds a *types.Func,
+				// and go/types gives every *types.Func a *types.Signature type.
+				panic(fmt.Sprintf("selection: method %s has type %s, not a signature", object, object.Type()))
+			}
 			sig = changeRecv(sig, newVariable(sig.Recv().Name(), recv))
 			if sel.Kind() == types.MethodExpr {
 				sig = recvAsFirstArgument(sig)
@@ -627,7 +654,14 @@ type lblock struct {
 //
 // label should be a non-blank identifier (label.Name != "_").
 func (function *Function) label(label *ast.Ident) *types.Label {
-	return function.objectOf(label).(*types.Label)
+	object := function.objectOf(label)
+	resolvedLabel, isLabel := object.(*types.Label)
+	if !isLabel {
+		// Invariant: callers pass the label of a labelled or branch statement, and go/types resolves each to a
+		// *types.Label.
+		panic(fmt.Sprintf("label: %s denotes %s, not a label", label.Name, object))
+	}
+	return resolvedLabel
 }
 
 // lblockOf returns the branch target associated with the
@@ -962,6 +996,8 @@ func (function *Function) lookup(object *types.Var, escaping bool) Value {
 	// Definition must be in an enclosing function;
 	// plumb it through intervening closures.
 	if function.parent == nil {
+		// Invariant: callers look up only function-local variables that go/types resolved in scope here, so one
+		// missing from this function's vars is declared in an enclosing function, and this function has a parent.
 		panic("no ir.Value for " + object.String())
 	}
 	outer := function.parent.lookup(object, true) // escaping
@@ -1092,12 +1128,21 @@ func (function *Function) Syntax() ast.Node { return function.syntax }
 
 // identVariable returns the variable defined by id.
 func identVariable(function *Function, id *ast.Ident) *types.Var {
-	return function.info.Defs[id].(*types.Var)
+	object := function.info.Defs[id]
+	variable, isVariable := object.(*types.Var)
+	if !isVariable {
+		// Invariant: callers pass identifiers that a receiver, parameter, result, var spec, short variable
+		// declaration or range clause defines, and go/types records a *types.Var in Defs for each of those.
+		panic(fmt.Sprintf("identVariable: %s defines %v, not a variable", id.Name, object))
+	}
+	return variable
 }
 
 // unique returns a unique positive int within the source tree of `function`.
 // The source tree of `function` includes all of `function`'s ancestors by parent and all
 // of the AnonymousFunctions contained within these.
+//
+// Mutates: function advances its unique counter
 func unique(function *Function) int64 {
 	function.uniq++
 	return function.uniq
@@ -1133,6 +1178,8 @@ func storeVariable(function *Function, x *types.Var, value Value, source ast.Nod
 }
 
 // labelExit creates a new exit to a yield fn to exit the function using a label.
+//
+// Mutates: function gains the exit among those to resolve
 func labelExit(function *Function, label *types.Label, source ast.Node) *exit {
 	exit := &exit{
 		id:     unique(function),
@@ -1146,6 +1193,8 @@ func labelExit(function *Function, label *types.Label, source ast.Node) *exit {
 }
 
 // blockExit creates a new exit to a yield fn that jumps to a basic block.
+//
+// Mutates: function gains the exit among those to resolve
 func blockExit(function *Function, block *BasicBlock, source ast.Node) *exit {
 	exit := &exit{
 		id:     unique(function),
@@ -1159,6 +1208,8 @@ func blockExit(function *Function, block *BasicBlock, source ast.Node) *exit {
 }
 
 // returnExit creates a new exit to a yield fn that returns to the source function.
+//
+// Mutates: function gains the exit among those to resolve
 func returnExit(function *Function, source ast.Node) *exit {
 	exit := &exit{
 		id:     unique(function),

@@ -4,7 +4,7 @@
 
 package intermediate_representation
 
-// This file implements the CREATE phase of IR construction.
+// This file implements the create phase of IR construction.
 // See builder.go for explanation.
 
 import (
@@ -44,11 +44,15 @@ func NewProgram(fset *token.FileSet) *Program {
 // For objects from Go source code, syntax is the associated syntax tree
 // (for funcs and vars only) and goversion defines the appropriate
 // interpretation; they will be used during the build phase.
+//
+// Mutates: goEnginePackage gains the member, its value and, for a function, its created and Functions entries
 func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.Node, goversion string) {
 	name := object.Name()
 	switch typedObject := object.(type) {
 	case *types.Builtin:
 		if goEnginePackage.Types != types.Unsafe {
+			// Invariant: go/types declares builtins only in the universe scope and in package unsafe's scope, and
+			// the objects given here come from a package's own declarations or scope.
 			panic("unexpected builtin object: " + typedObject.String())
 		}
 
@@ -85,7 +89,12 @@ func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.
 		}
 
 	case *types.Func:
-		sig := typedObject.Type().(*types.Signature)
+		sig, isSignature := typedObject.Type().(*types.Signature)
+		if !isSignature {
+			// Invariant: go/types gives every *types.Func a *types.Signature type.
+			panic(fmt.Sprintf(
+				"memberFromObject: func %s has type %s, not a signature", typedObject, typedObject.Type()))
+		}
 		if sig.Recv() == nil && name == "init" {
 			goEnginePackage.ninit++
 			name = fmt.Sprintf("init#%d", goEnginePackage.ninit)
@@ -100,6 +109,8 @@ func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.
 		}
 
 	default: // (incl. *types.Package)
+		// Invariant: a package's scope and the definitions of its package-level declarations hold only constants,
+		// variables, type names and functions, and builtins in package unsafe, each a case above.
 		panic("unexpected Object type: " + typedObject.String())
 	}
 }
@@ -115,7 +126,11 @@ func createFunction(
 	info *types.Info,
 	goversion string,
 ) *Function {
-	sig := object.Type().(*types.Signature)
+	sig, isSignature := object.Type().(*types.Signature)
+	if !isSignature {
+		// Invariant: go/types gives every *types.Func a *types.Signature type.
+		panic(fmt.Sprintf("createFunction: func %s has type %s, not a signature", object, object.Type()))
+	}
 
 	/* declared function/method (from syntax or export data) */
 	function := &Function{
@@ -151,24 +166,39 @@ func membersFromDecl(goEnginePackage *Package, decl ast.Decl, goversion string) 
 		switch decl.Tok {
 		case token.CONST:
 			for _, spec := range decl.Specs {
-				for _, id := range spec.(*ast.ValueSpec).Names {
+				valueSpec, isValueSpec := spec.(*ast.ValueSpec)
+				if !isValueSpec {
+					// Invariant: go/ast holds a *ast.ValueSpec for each spec of a const declaration.
+					panic(fmt.Sprintf("membersFromDecl: const declaration holds %T, not a value spec", spec))
+				}
+				for _, id := range valueSpec.Names {
 					memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], nil, "")
 				}
 			}
 
 		case token.VAR:
 			for _, spec := range decl.Specs {
-				for _, rhs := range spec.(*ast.ValueSpec).Values {
+				valueSpec, isValueSpec := spec.(*ast.ValueSpec)
+				if !isValueSpec {
+					// Invariant: go/ast holds a *ast.ValueSpec for each spec of a var declaration.
+					panic(fmt.Sprintf("membersFromDecl: var declaration holds %T, not a value spec", spec))
+				}
+				for _, rhs := range valueSpec.Values {
 					goEnginePackage.initVersion[rhs] = goversion
 				}
-				for _, id := range spec.(*ast.ValueSpec).Names {
+				for _, id := range valueSpec.Names {
 					memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], spec, goversion)
 				}
 			}
 
 		case token.TYPE:
 			for _, spec := range decl.Specs {
-				id := spec.(*ast.TypeSpec).Name
+				typeSpec, isTypeSpec := spec.(*ast.TypeSpec)
+				if !isTypeSpec {
+					// Invariant: go/ast holds a *ast.TypeSpec for each spec of a type declaration.
+					panic(fmt.Sprintf("membersFromDecl: type declaration holds %T, not a type spec", spec))
+				}
+				id := typeSpec.Name
 				memberFromObject(goEnginePackage, goEnginePackage.info.Defs[id], nil, "")
 			}
 		}
