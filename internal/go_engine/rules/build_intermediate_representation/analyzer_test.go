@@ -1,6 +1,7 @@
 package build_intermediate_representation
 
 import (
+	"fmt"
 	"go/ast"
 	"reflect"
 	"slices"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
@@ -72,41 +74,41 @@ func TestSourceFunctionsReadInBuildirsOrder(test *testing.T) {
 	}
 }
 
-// Analyzer builds nothing, and SourceFunctions builds a function only as it is read: a reader that stops after the
-// first function leaves every other one without blocks, and one that reads them all finds each built.
-func TestFunctionsBuildOnlyWhenRead(test *testing.T) {
+// Analyzer builds nothing as it runs, and the first read of its result builds the whole package, as buildir built it
+// before any check ran: a reader that stops after the first function still leaves every function built, anonymous
+// ones included. Building one function at a time, as each is read, is the intermediate representation package's own
+// laziness, held there (TestBuildingOneFunctionBuildsOnlyIt), and not what a reader of this result gets.
+func TestTheReadersResultIsWhole(test *testing.T) {
 	test.Parallel()
 	type reading struct {
-		unbuiltBefore int
-		unbuiltAfter  int
 		functions     int
-		emptied       []string
+		unbuiltBefore int
+		unbuiltAfter  []string
 	}
 	probe := &analysis.Analyzer{
 		Name:       "build_probe",
-		Doc:        "counts the functions built before and after reading one, then all",
+		Doc:        "counts the functions built before any read and after reading one",
 		Requires:   []*analysis.Analyzer{Analyzer},
 		ResultType: reflect.TypeFor[reading](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			result := mustResultOf(pass)
-			read := reading{functions: len(result.Package.Functions)}
-			unbuilt := func() int {
-				count := 0
-				for _, function := range result.Package.Functions {
-					if len(function.Blocks) == 0 {
-						count++
-					}
+			read := reading{functions: len(result.irPackage.Functions)}
+			for _, function := range result.irPackage.Functions {
+				if len(function.Blocks) == 0 {
+					read.unbuiltBefore++
 				}
-				return count
 			}
-			read.unbuiltBefore = unbuilt()
 			for range result.SourceFunctions() {
 				break
 			}
-			read.unbuiltAfter = unbuilt()
-			for function := range result.SourceFunctions() {
+			// Read off the package itself, not through another walk of the result, which would build what it reached.
+			unbuilt := slices.Clone(result.irPackage.Functions)
+			for _, function := range result.irPackage.Functions {
+				unbuilt = append(unbuilt, function.AnonymousFunctions...)
+			}
+			for _, function := range unbuilt {
 				if len(function.Blocks) == 0 {
-					read.emptied = append(read.emptied, function.RelativeString(nil))
+					read.unbuiltAfter = append(read.unbuiltAfter, function.RelativeString(nil))
 				}
 			}
 			return read, nil
@@ -116,13 +118,50 @@ func TestFunctionsBuildOnlyWhenRead(test *testing.T) {
 	if !isReading {
 		test.Fatal("the probe returned no reading")
 	}
-	if read.functions < 8 || read.unbuiltBefore != read.functions || read.unbuiltAfter != read.functions-1 {
-		test.Errorf("of %d package functions, %d were unbuilt before any was read and %d after the first was, "+
-			"where all of them and all but one were expected", read.functions, read.unbuiltBefore, read.unbuiltAfter)
+	if read.functions < 8 || read.unbuiltBefore != read.functions {
+		test.Errorf("of %d package functions, %d were unbuilt before the result was read, where all were expected",
+			read.functions, read.unbuiltBefore)
 	}
-	if len(read.emptied) != 0 {
-		test.Errorf("read through SourceFunctions, %q had no blocks, where each was built as it was read",
-			read.emptied)
+	if len(read.unbuiltAfter) != 0 {
+		test.Errorf("after one function was read, %q had no blocks, where the whole package was expected built",
+			read.unbuiltAfter)
+	}
+}
+
+// A reader that follows StaticCallee from a function into one of the same package declared after it finds the callee
+// built, as staticcheck's SA2002 needs, though the walk hasn't reached the callee yet. The fixture's caller is
+// declared before its callee, and the probe reads the callee's blocks at the call, in the walk's order.
+func TestALaterCalleeIsBuiltWhenItsCallerIsRead(test *testing.T) {
+	test.Parallel()
+	probe := &analysis.Analyzer{
+		Name:       "callee_probe",
+		Doc:        "names each same-package callee and whether it had blocks when its call was read",
+		Requires:   []*analysis.Analyzer{Analyzer},
+		ResultType: reflect.TypeFor[[]string](),
+		Run: func(pass *analysis.Pass) (any, error) {
+			reached := []string{}
+			for function := range mustResultOf(pass).SourceFunctions() {
+				if function.Name() != "caller" {
+					continue
+				}
+				for _, block := range function.Blocks {
+					for _, instruction := range block.Instructions {
+						call, isCall := instruction.(*intermediate_representation.Call)
+						if !isCall {
+							continue
+						}
+						if callee := call.Call.StaticCallee(); callee != nil && callee.Package == function.Package {
+							reached = append(reached, fmt.Sprintf("%s built %t", callee.Name(), len(callee.Blocks) > 0))
+						}
+					}
+				}
+			}
+			return reached, nil
+		},
+	}
+	reached, isReached := rootResults(test, &checker.Options{}, probe)[probe].([]string)
+	if !isReached || !slices.Equal(reached, []string{"callee built true"}) {
+		test.Errorf("the caller reached %q, where its later callee, built, was expected", reached)
 	}
 }
 

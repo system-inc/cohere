@@ -2,8 +2,8 @@
 // one in internal/go_engine/intermediate_representation, for the readers that move onto it from staticcheck's
 // (#g0rwdw1). It stands where staticcheck's buildir stands for go/ir: the program and package are created from the
 // pass's types and syntax with the no-return predicate buildir gives go/ir, and Result lists the source functions in
-// buildir's order. Unlike buildir it builds nothing itself. Each function is built when a reader first reads it, so a
-// package nobody reads costs only its creation.
+// buildir's order. Unlike buildir it builds nothing as it runs: Result builds the whole package on its first read, so
+// a package nobody reads costs only its creation.
 //
 // It is named for what it does, as buildir and x/tools' buildssa are, rather than go_ir: every comment in this tree
 // says go/ir for staticcheck's package, which this replaces.
@@ -21,13 +21,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
-// Analyzer creates the pass's package in our intermediate representation, its functions built as they are read.
+// Analyzer creates the pass's package in our intermediate representation, built whole when its result is first read.
 // It requires ctrlflow, as buildir does, for the same no-return predicate, so where both run the two representations
 // end the same calls in the same `Panic`.
 var Analyzer = &analysis.Analyzer{
 	Name: "build_intermediate_representation",
-	Doc: "creates the package's functions in the engine's own intermediate representation, each built when a " +
-		"reader first reads it, for the readers that later passes are",
+	Doc: "creates the package in the engine's own intermediate representation, built whole when a reader first " +
+		"reads it, for the readers that later passes are",
 	Run:        run,
 	ResultType: reflect.TypeFor[*Result](),
 	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
@@ -72,7 +72,7 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	created := program.CreatePackage(pass.Pkg, pass.Files, pass.TypesInfo, false)
 	created.SetDebugMode(readsExpressions(pass))
-	return &Result{Package: created}, nil
+	return &Result{irPackage: created}, nil
 }
 
 // readsExpressions is whether an analyzer that reads the expression map requires Analyzer on the pass's package, or
