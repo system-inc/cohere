@@ -1151,7 +1151,8 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // reads the reasoned marker comments, inert_value judges a value that cannot carry syntax, marker_type judges a sum
 // type's variant whose methods only mark it, served finds the types a file serves for the two rules that count them,
 // positions is the line table rules read a node's position from without the FileSet's lock, function_purity judges
-// which functions are pure for the rules asking which calls have side effects, staticcheck_ir hands the ported passes
+// which functions are pure for the rules asking which calls have side effects, return_nilness judges whether each
+// function's results may be nil for the rule asking what a call returns, staticcheck_ir hands the ported passes
 // the functions of staticcheck's intermediate representation, and the four kits the ports of staticcheck's checks share
 // (#d8s4rsy) are staticcheck_report, where they report, staticcheck_code, the helpers they call, staticcheck_call, the
 // walk of call arguments, and staticcheck_wants, the reader of staticcheck's own fixtures, and dispatch walks a package
@@ -1166,6 +1167,7 @@ var sharedReaders = []string{
 	"marker",
 	"marker_type",
 	"positions",
+	"return_nilness",
 	"served",
 	"staticcheck_call",
 	"staticcheck_code",

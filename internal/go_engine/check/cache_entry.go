@@ -196,8 +196,8 @@ func encodeEntry(
 				// marks as a wrapper in `fail := func(format string, arguments ...any)`, which exportedFrom passes
 				// since it cannot tell a local from a parameter. Its fact reaches an importer by two roads only.
 				// ImportObjectFact needs the object, which the importer never holds. AllObjectFacts returns only the
-				// calling analyzer's own fact type, and among our analyzers only function_purity, staticcheck's
-				// nilness and deprecated call it: function_purity and nilness hold facts only on functions, which are
+				// calling analyzer's own fact type, and among our analyzers only function_purity, return_nilness and
+				// deprecated call it: function_purity and return_nilness hold facts only on functions, which are
 				// package-level and have a path, and deprecated keys by the declared objects an importer meets. So
 				// leaving the fact out changes no finding. A new caller of AllObjectFacts is a reason to look at this
 				// again.
