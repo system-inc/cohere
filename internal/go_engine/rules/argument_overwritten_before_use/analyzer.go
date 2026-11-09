@@ -1,6 +1,5 @@
 // Package argument_overwritten_before_use is staticcheck's SA4009, a parameter assigned in its function's body before
-// anything reads the value the caller passed, ported onto staticcheck's intermediate representation as a
-// rule.FunctionCheck.
+// anything reads the value the caller passed, ported onto the engine's own intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4009/sa4009.go, whose logic it keeps and
 // whose messages it reports word for word: the finding from the start to the end of the parameter's name, and beside
@@ -23,14 +22,15 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, each judged on its own.
+var Listener = rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -38,8 +38,8 @@ var Listener = rule.Listener{Function: Check}
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4009",
 	"SA4009",
-	"Flags a function argument overwritten before its first use: staticcheck's SA4009, ported onto its "+
-		"intermediate representation.",
+	"Flags a function argument overwritten before its first use: staticcheck's SA4009, ported onto the "+
+		"engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -47,7 +47,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 // it, so the value the caller passed is lost unread. The intermediate representation lifts a parameter into the
 // values it flows to, so one with no readers is one whose passed value nothing reads, not even a closure capturing it
 // or a pointer taken to it, which would read it into memory.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	source := function.Source()
 	if source == nil {
 		// A function with no syntax, a wrapper or a synthesized init, holds no parameter to judge.
@@ -101,8 +101,11 @@ func Check(context *rule.Context, function *ir.Function) {
 }
 
 // parameterOf is the parameter of function declared as object, or nil when function has none.
-func parameterOf(function *ir.Function, object types.Object) *ir.Parameter {
-	for _, parameter := range function.Params {
+func parameterOf(
+	function *intermediate_representation.Function,
+	object types.Object,
+) *intermediate_representation.Parameter {
+	for _, parameter := range function.Parameters {
 		if parameter.Object() == object {
 			return parameter
 		}
