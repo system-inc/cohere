@@ -114,11 +114,13 @@ func runWithStandardLibrary(
 	memory *contract.Memory,
 	builtIn builtInStandardLibrary,
 ) int {
-	return runOverlapping(arguments, standardOutput, standardError, registered, memory, builtIn, true)
+	return runOverlapping(arguments, standardOutput, standardError, registered, memory, builtIn, true, nil)
 }
 
 // runOverlapping is runWithStandardLibrary, with overlaps saying whether a run whose findings cache has no store may
-// lint beside its load, which only a test turns off, to hold a run that does to the records of one that does not.
+// lint beside its load, which only a test turns off, to hold a run that does to the records of one that does not, and
+// answersInPart the packages, by import path, whose entries the run writes with only the answers its questions
+// computed (see check.Caching's AnswersInPart), which only a test names.
 func runOverlapping(
 	arguments []string,
 	standardOutput io.Writer,
@@ -127,12 +129,14 @@ func runOverlapping(
 	memory *contract.Memory,
 	builtIn builtInStandardLibrary,
 	overlaps bool,
+	answersInPart map[string]bool,
 ) int {
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
 		return refuse(standardError, parseError)
 	}
 	request.standardLibrary = builtIn
+	request.answersInPart = answersInPart
 	switch request.mode() {
 	case modeVersion:
 		return writeVersion(standardOutput, standardError)

@@ -25,6 +25,10 @@ type invocation struct {
 	// standardLibrary is the standard library's entries the run may read from the binary (see lintCache), never
 	// read from the command line.
 	standardLibrary builtInStandardLibrary
+
+	// answersInPart is check.Caching's AnswersInPart, the packages whose entries the run writes with only the answers
+	// its questions computed, for a test of the reload such an entry makes, never read from the command line.
+	answersInPart map[string]bool
 }
 
 // check refuses what each flag allows alone but the command line does not allow as a whole.

@@ -69,14 +69,17 @@ func answerModule(test *testing.T, directory string, topBody string) []*packages
 }
 
 // answeredRun is a run over the module with top calling bottom.Double, after a cold run over it with top calling
-// nothing, so bottom's entry holds no answer of Double, with bottom marked for reload before the restore when before
-// is set, and after it otherwise, as a load that did not check it from source leaves it.
+// nothing that writes bottom's entry with only the answers asked (see Caching's AnswersInPart), so it holds no answer
+// of Double, with bottom marked for reload before the restore when before is set, and after it otherwise, as a load
+// that did not check it from source leaves it.
 func answeredRun(test *testing.T, before bool) *Result {
 	test.Helper()
 	directory := test.TempDir()
 	rules := []rule.Rule{houseRule(purityProbe)}
 	caching := testCaching(test, rules)
+	caching.AnswersInPart = map[string]bool{"example.com/answers/bottom": true}
 	runCached(test, answerModule(test, directory, "var Limit = 3\n\nvar _ = bottom.Double\n"), caching, rules)
+	caching.AnswersInPart = nil
 	analyzed := answerModule(test, directory, "func Use() int {\n\treturn bottom.Double(2)\n}\n")
 	var reachable []*packages.Package
 	packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })

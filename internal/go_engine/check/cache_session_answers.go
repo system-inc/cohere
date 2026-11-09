@@ -224,16 +224,16 @@ type entryDemand struct {
 }
 
 // demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are every answer of its
-// package, computed whole, for a standard-library package (see Caching's Goroot) or one the run collects for the
-// binary's table, when the resolver can compute them all without a reload; otherwise those held before, the entry's
-// before a reload or the first wave's (held), with every answer the run computed in it. Its reads
-// are those held before with every read the run's analysis of it made.
+// package, computed whole, as the binary's table holds them, so a later run that restores it never reloads it to
+// answer a question, when the resolver can compute them all without a reload and Caching's AnswersInPart does not
+// name it; otherwise those held before, the entry's before a reload or the first wave's (held), with every answer the
+// run computed in it. Its reads are those held before with every read the run's analysis of it made.
 func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand) entryDemand {
 	if session.resolver == nil || saved.Types == nil {
 		return held
 	}
 	demanded := entryDemand{}
-	if session.collects(saved) || session.standard[saved] {
+	if !session.caching.AnswersInPart[saved.PkgPath] {
 		if home := session.resolver.Package(saved.Types); home != nil {
 			if whole, complete := session.resolver.WholeIfComplete(home); complete {
 				demanded.answers = sortedAnswers(whole, true)

@@ -329,9 +329,9 @@ var (
 )
 
 // Register adds kind to the kinds Whole computes and Probe asks: whole computes every answer of kind in a package,
-// each answer of no fact left out, as Ask's compute would answer it, for the standard library's table, and compute
-// is the kind's own judgment of one object of home, as the compute it hands Ask. A kind registers as its package
-// initializes.
+// each answer of no fact left out, as Ask's compute would answer it, for every entry a run writes and the standard
+// library's table, and compute is the kind's own judgment of one object of home, as the compute it hands Ask. A kind
+// registers as its package initializes.
 func Register[Value any](
 	kind *Kind,
 	whole func(resolver *Resolver, home *Package) map[types.Object]Value,

@@ -36,6 +36,12 @@ type Caching struct {
 	// entry the run writes with every answer of the fact kinds computed on demand, computed whole, as the binary's
 	// table holds them, so a question of the standard library never reloads it. Empty, no entry is written so.
 	Goroot string
+
+	// AnswersInPart names, by import path, the packages whose entry the run writes with only the answers its
+	// questions computed in them, never whole, as an entry from a build before format 10 holds them: an entry a later
+	// run's question can find no answer in, so that run reloads the package (see Reload). Only a test of the reload
+	// sets it.
+	AnswersInPart map[string]bool
 }
 
 // StandardLibraryCaching is the standard library's entries as a run reads them from the binary: the table, and what
@@ -582,8 +588,8 @@ func (session *CacheSession) filesOf(analyzedPackage *packages.Package) ([]store
 	return restored.files, true
 }
 
-// save writes the entry of every miss no wave has saved yet, from the last wave's graph, with every answer the run's
-// resolver computed in it, writes again each entry the first wave saved whose answers grew since, and counts every
+// save writes the entry of every miss no wave has saved yet, from the last wave's graph, with every answer of its
+// package (see demandOf), writes again each entry the first wave saved whose answers grew since, and counts every
 // package the load reached as a hit, from the store or the binary, or a miss. A session without a store writes nothing
 // and counts only what it restored and reloaded.
 func (session *CacheSession) save(

@@ -28,8 +28,9 @@ import (
 // can match, and would only be a miss read the long way. At 6, an analysis holds its report analyzer's result
 // (#jfvhbj7). At 7, an entry holds the answers a standard-library package was computed whole in (#w7zmvat wave 3).
 // At 8, it holds the answers its package's analysis read of other packages (#w7zmvat wave 3b). At 9, a standard-library
-// package's entry holds every answer of its package whenever a run writes it, so an entry of 8 may hold only some.
-const CacheFormatVersion = "go-engine-cache-9"
+// package's entry holds every answer of its package whenever a run writes it, so an entry of 8 may hold only some. At
+// 10, every package's entry does, so an entry of 9 may hold only some for a package outside the standard library.
+const CacheFormatVersion = "go-engine-cache-10"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.
@@ -58,10 +59,10 @@ type cacheEntry struct {
 	// that holds no facts, which therefore cannot say what an importer would inherit.
 	Output []byte
 
-	// Answers are the answers of the fact kinds computed on demand (#w7zmvat wave 3) that the runs which checked the
-	// package from source computed in it, which a run that restores it reads in place of a build; for a
-	// standard-library package a run collects for the binary's table, every answer, computed whole (see answersOf).
-	// They depend only on the package's key, as everything else here does.
+	// Answers are the answers of the fact kinds computed on demand (#w7zmvat wave 3) of the package, which a run that
+	// restores it reads in place of a build: every answer, computed whole, whenever the run that wrote it could
+	// compute them all without a reload, and otherwise those the runs which checked the package from source computed
+	// in it (see demandOf). They depend only on the package's key, as everything else here does.
 	Answers []kindAnswers
 
 	// Reads are the answers of the fact kinds computed on demand that the package's analysis took from other packages,

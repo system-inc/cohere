@@ -119,15 +119,6 @@ func restoreBinaryEntry(
 	return restored, nil
 }
 
-// collects reports whether the run collects saved's entry for the binary's table (see collect).
-func (session *CacheSession) collects(saved *packages.Package) bool {
-	if session.caching.StandardLibrary == nil || session.caching.StandardLibrary.Collected == nil {
-		return false
-	}
-	_, standard := session.standardLibraryKeys[saved]
-	return standard
-}
-
 // collect adds a standard-library package the run just encoded to the entries the run collects, when it collects
 // any (see StandardLibraryCaching's Collected). The caller holds the lock the save counts under.
 func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry) {
