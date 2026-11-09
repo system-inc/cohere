@@ -19,10 +19,13 @@ import (
 // read, would hand it a callee nobody had read yet, with none (staticcheck's SA2002 missed 3 of 21 findings that
 // way, #dz6qbwm). Inside the workspace building per function bought nothing, since the readers walk every function.
 // A callee in another package is created from types alone and has no blocks, as buildir left it. The fact passes
-// read through this result too, on every package, as staticcheck's did through buildir; computing a dependency's
-// facts one function at a time, only where asked, is #w7zmvat's second unit, which builds outside this result.
+// read through this result too, on every package, as staticcheck's did through buildir. The run's fact resolver,
+// which computes a fact one function at a time, only where asked (#w7zmvat), builds a dependency's functions in a
+// program of its own, and a package this result is made for in this result's own (see Sharer), so a root is built
+// once in a run, by whichever of the two reaches each function first (#wt5vaft).
 type Result struct {
-	// irPackage is the pass's package, unbuilt until the first read of the result builds all of it.
+	// irPackage is the pass's package, unbuilt, or built in part by the resolver's questions, until the first read of
+	// the result builds all of it.
 	irPackage *intermediate_representation.Package
 	// buildOnce builds irPackage on the first read. Package.Build is safe from many goroutines and waits on each
 	// function's own build, so a reader on another goroutine finds every function built once it returns.

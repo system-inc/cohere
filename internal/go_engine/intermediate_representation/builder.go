@@ -170,6 +170,7 @@ func (packageBuilder *builder) buildFunction(function *Function) {
 
 			function.build(packageBuilder, function)
 			function.done()
+			countBuild(function)
 		}
 	})
 }

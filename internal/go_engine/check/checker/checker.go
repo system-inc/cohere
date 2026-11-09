@@ -951,6 +951,24 @@ func (act *Action) RanPast(dep *Action) bool {
 	return dep.Err != nil && act.tolerant() && dep.Package == act.Package
 }
 
+// cohere: PackageActions is every action of act's graph on act's package,
+// act among them, in the order the scheduler starts them. A Resolver told of
+// one action reads it to learn what else runs on the package: the fact
+// resolver, whether a root's representation is built for the readers, which
+// it then shares rather than build its own (#wt5vaft). Analyze sets it before
+// any action runs, and nothing changes it after.
+func (act *Action) PackageActions() []*Action {
+	return act.syntax.actions
+}
+
+// cohere: Dependents is the set act's pass holds under Options.Dependents,
+// the analyzers of the actions on its package that read its Result, and
+// whether Options.Dependents is set, without which no pass holds one. Like
+// PackageActions it is set before any action runs.
+func (act *Action) Dependents() (map[*analysis.Analyzer]bool, bool) {
+	return act.dependents, act.opts.Dependents != nil
+}
+
 // inheritFacts populates act.facts with
 // those it obtains from its dependency, dep.
 func inheritFacts(act, dep *Action) {

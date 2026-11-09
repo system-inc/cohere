@@ -53,6 +53,11 @@ func (irPackage *Package) SetDebugMode(debug bool) {
 	irPackage.debug = debug
 }
 
+// RecordsExpressions is whether irPackage's functions record the expression map, as SetDebugMode set it.
+func (irPackage *Package) RecordsExpressions() bool {
+	return irPackage.debug
+}
+
 // SetNoReturn sets the no-return predicate irPackage's functions are built with, its anonymous ones included, in
 // place of the program's (Program.SetNoReturn). Set it before any of them builds. A program whose packages each
 // answer from their own control-flow facts, as ctrlflow's are per package, sets one on each, so every function
