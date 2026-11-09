@@ -32,11 +32,6 @@ type Caching struct {
 	StandardLibrary *StandardLibraryCaching
 	Files           cache.FileDigests
 
-	// Goroot is the run's `GOROOT`, below which a package is the standard library's (cache.StandardPackages), whose
-	// entry the run writes with every answer of the fact kinds computed on demand, computed whole, as the binary's
-	// table holds them, so a question of the standard library never reloads it. Empty, no entry is written so.
-	Goroot string
-
 	// AnswersInPart names, by import path, the packages whose entry the run writes with only the answers its
 	// questions computed in them, never whole, as an entry from a build before format 10 holds them: an entry a later
 	// run's question can find no answer in, so that run reloads the package (see Reload). Only a test of the reload
@@ -191,9 +186,6 @@ type CacheSession struct {
 	// cache_session_reads.go), and byIdentifier every package the load reached, by ID, which a read names its owner by.
 	trusted      map[*packages.Package]bool
 	byIdentifier map[string]*packages.Package
-
-	// standard are the standard library's packages among those the load reached (see Caching's Goroot).
-	standard map[*packages.Package]bool
 }
 
 // NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
@@ -279,14 +271,6 @@ func (session *CacheSession) Restore(
 		}
 		session.keys, session.own, hashed = keyed.Keys, keyed.Own, keyed.Files
 		session.files = keyed.Files
-	}
-	session.standard = nil
-	if session.caching.Goroot != "" {
-		standard, standardError := cache.StandardPackages(reachable, session.caching.Goroot)
-		if standardError != nil {
-			session.problem(fmt.Sprintf("judging the standard library: %v", standardError))
-		}
-		session.standard = standard
 	}
 	session.restoreFromBinary(loader, reachable, hashed)
 	session.readHits(reachable)

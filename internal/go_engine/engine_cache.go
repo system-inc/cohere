@@ -80,7 +80,6 @@ func lintCache(
 		return nil, fmt.Errorf("identifying the engine: %w", identityError)
 	}
 	return &check.Caching{
-		Goroot:      values["GOROOT"],
 		Store:       cache.Open(workspace.Root),
 		ExtraInputs: newStaticcheckConfigurationInputs().inputs,
 		Context: cache.Context{

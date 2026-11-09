@@ -104,33 +104,6 @@ func StandardLibraryKeys(
 	return computing.keys, nil
 }
 
-// StandardPackages is every package among reachable that is the standard library's, as StandardLibraryKeys judges
-// one: in no module, every file below goroot, and every package it imports the standard library's. A run keys the
-// standard library by it only when it reads the binary's table; any run that writes the store reads it to know which
-// entries hold every answer of their package (#w7zmvat).
-func StandardPackages(reachable []*packages.Package, goroot string) (map[*packages.Package]bool, error) {
-	if !filepath.IsAbs(goroot) {
-		return nil, fmt.Errorf("judging the standard library: GOROOT %q is not absolute", goroot)
-	}
-	judging := &standardLibraryKeyer{
-		goroot:       goroot,
-		rootRelative: map[string]string{},
-		standard:     map[*packages.Package]bool{},
-		visiting:     map[*packages.Package]bool{},
-	}
-	standard := map[*packages.Package]bool{}
-	for _, candidate := range reachable {
-		isStandard, judgeError := judging.isStandard(candidate)
-		if judgeError != nil {
-			return nil, judgeError
-		}
-		if isStandard {
-			standard[candidate] = true
-		}
-	}
-	return standard, nil
-}
-
 // standardLibraryContextDigest is the run's StandardLibraryContext hashed once, in the key's order: a marker that sets
 // these keys apart from Keys', the format version, the release stamp, the fact analyzers, the build. The loader and
 // Goroot are not in it, since neither belongs in every package's key.
