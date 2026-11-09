@@ -25,6 +25,8 @@ package intermediate_representation
 // and it is not ("it breaks field tracking in U1000"), so buildir never runs it and neither does ours.
 
 import (
+	"fmt"
+	"math"
 	"slices"
 	"sync"
 
@@ -300,19 +302,51 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 			}
 		}
 	}
-	for _, block := range lifting.blocks {
-		for index, slot := range block.slots {
-			if !slot.isPlace {
-				continue
-			}
-			if _, isStore := block.block.Instructions[index].(*Store); isStore && options.placedDropsStores {
-				continue
-			}
-			block.placed = append(block.placed, index)
-		}
-	}
+	liftingCarvePlaced(lifting, options)
 	lifting.order = liftingReversePostorder(lifting)
 	return lifting
+}
+
+// liftingCarvePlaced sets each block's placed view, every view carved from one backing array for the round, sized
+// by counting the places first: one allocation a round, where a slice grown per block allocates and copies as it
+// goes (#beapx0q).
+//
+// An index is int32, which holds any index a block can have: a block's instructions are a slice of interfaces, 16
+// bytes each, so a block past math.MaxInt32 of them would hold 32 GiB in that slice alone. The check makes the
+// bound loud should it ever be crossed, rather than wrapping.
+//
+// Mutates: lifting its blocks' placed views are set
+func liftingCarvePlaced(lifting *liftingFunction, options liftingOptions) {
+	inView := func(block *liftingBlock, index int) bool {
+		if !block.slots[index].isPlace {
+			return false
+		}
+		_, isStore := block.block.Instructions[index].(*Store)
+		return !isStore || !options.placedDropsStores
+	}
+	places := 0
+	for _, block := range lifting.blocks {
+		if len(block.slots) > math.MaxInt32 {
+			// Invariant: a block past math.MaxInt32 instructions would hold 32 GiB in its slice of them alone.
+			panic(fmt.Sprintf("lifting %s: block %d holds %d instructions, past an int32 index",
+				lifting.function.RelativeString(nil), block.block.Index, len(block.slots)))
+		}
+		for index := range block.slots {
+			if inView(block, index) {
+				places++
+			}
+		}
+	}
+	backing := make([]int32, 0, places)
+	for _, block := range lifting.blocks {
+		start := len(backing)
+		for index := range block.slots {
+			if inView(block, index) {
+				backing = append(backing, int32(index))
+			}
+		}
+		block.placed = backing[start:len(backing):len(backing)]
+	}
 }
 
 // liftingCellSlot is the slot of the lifted Allocation value is, or nil when value is no lifted Allocation of the

@@ -54,7 +54,8 @@ type liftingBlock struct {
 	// visits only these, never the instructions with nothing to rename. It must be complete, not a hint: an
 	// instruction with a place left out of it is one the core never renames, and its definition or use is lost.
 	// liftingPlacedProblems holds it to the Go IR's own rule for which instructions have a place.
-	placed []int
+	// liftingCarvePlaced sets it, int32 by the bound it gives.
+	placed []int32
 }
 
 // liftingFunction is one function as the core sees it for one round of lifting.
@@ -237,7 +238,7 @@ func liftingPlacedProblems(lifting *liftingFunction) (problems []string, places 
 		lifted[allocation] = true
 	}
 	for _, block := range lifting.blocks {
-		var want []int
+		var want []int32
 		for index, instruction := range block.block.Instructions {
 			hasPlace := false
 			switch instruction := instruction.(type) {
@@ -251,7 +252,7 @@ func liftingPlacedProblems(lifting *liftingFunction) (problems []string, places 
 				hasPlace = instruction.IsAddress && lifted[instruction.X]
 			}
 			if hasPlace {
-				want = append(want, index)
+				want = append(want, int32(index))
 			}
 		}
 		places += len(want)
