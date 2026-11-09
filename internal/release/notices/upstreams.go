@@ -67,7 +67,7 @@ var Upstreams = []Upstream{
 		Url:         "https://pkg.go.dev/honnef.co/go/tools@v0.8.1/go/ir",
 		License:     "MIT AND BSD-3-Clause",
 		Version:     "v0.8.1",
-		Carries:     "The Go IR builder in internal/go_engine/intermediate_representation, copied from go/ir and renamed to cohere's words: builder.go, emit.go, func.go, ssa.go, const.go, lvalue.go, util.go, blockopt.go, dom.go, create.go, methods.go, wrappers.go, typeset.go, block.go, scc.go, source.go, task.go and instantiate.go, with the parts of lift.go and print.go the builder needs, and x/tools' internal typesinternal.ZeroString as go/ir vendors it.",
+		Carries:     "The Go IR builder in internal/go_engine/intermediate_representation, copied from go/ir and renamed to cohere's words: builder.go, emit.go, func.go, ssa.go, const.go, lvalue.go, util.go, blockopt.go, dom.go, create.go, methods.go, wrappers.go, typeset.go, block.go, scc.go, source.go, task.go and instantiate.go, with the parts of lift.go and print.go the builder needs, x/tools' internal typesinternal.ZeroString as go/ir vendors it, and go/ir's builder tests that need neither lifting nor printing, with their fixed-bug programs in testdata.",
 		Reach:       Compiled,
 		LicenseFile: "staticcheck-go-ir.txt",
 	},

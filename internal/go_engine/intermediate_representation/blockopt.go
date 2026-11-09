@@ -22,7 +22,7 @@ const debugBlockOpt = false
 // markReachable sets Index=-1 for all blocks reachable from b.
 func markReachable(b *BasicBlock) {
 	b.gaps = -1
-	for _, succ := range b.Succs {
+	for _, succ := range b.Successors {
 		if succ.gaps == 0 {
 			markReachable(succ)
 		}
@@ -43,9 +43,9 @@ func deleteUnreachableBlocks(f *Function) {
 	}
 	for i, b := range f.Blocks {
 		if b.gaps == white {
-			for _, c := range b.Succs {
+			for _, c := range b.Successors {
 				if c.gaps == black {
-					c.removePred(b) // delete white->black edge
+					c.removePredecessor(b) // delete white->black edge
 				}
 			}
 			if debugBlockOpt {
@@ -64,41 +64,41 @@ func jumpThreading(f *Function, b *BasicBlock) bool {
 	if b.Index == 0 {
 		return false // don't apply to entry block
 	}
-	if len(b.Instrs) == 0 {
+	if len(b.Instructions) == 0 {
 		return false
 	}
-	for _, pred := range b.Preds {
+	for _, pred := range b.Predecessors {
 		switch pred.Control().(type) {
 		case *ConstantSwitch:
 			// don't optimize away the head blocks of switch statements
 			return false
 		}
 	}
-	if _, ok := b.Instrs[0].(*Jump); !ok {
+	if _, ok := b.Instructions[0].(*Jump); !ok {
 		return false // not just a jump
 	}
-	c := b.Succs[0]
+	c := b.Successors[0]
 	if c == b {
 		return false // don't apply to degenerate jump-to-self.
 	}
 	if c.hasPhi() {
 		return false // not sound without more effort
 	}
-	for j, a := range b.Preds {
-		a.replaceSucc(b, c)
+	for j, a := range b.Predecessors {
+		a.replaceSuccessor(b, c)
 
 		// If a now has two edges to c, replace its degenerate If by Jump.
-		if len(a.Succs) == 2 && a.Succs[0] == c && a.Succs[1] == c {
+		if len(a.Successors) == 2 && a.Successors[0] == c && a.Successors[1] == c {
 			jump := new(Jump)
 			jump.setBlock(a)
-			a.Instrs[len(a.Instrs)-1] = jump
-			a.Succs = a.Succs[:1]
-			c.removePred(b)
+			a.Instructions[len(a.Instructions)-1] = jump
+			a.Successors = a.Successors[:1]
+			c.removePredecessor(b)
 		} else {
 			if j == 0 {
-				c.replacePred(b, a)
+				c.replacePredecessor(b, a)
 			} else {
-				c.Preds = append(c.Preds, a)
+				c.Predecessors = append(c.Predecessors, a)
 			}
 		}
 
@@ -114,14 +114,14 @@ func jumpThreading(f *Function, b *BasicBlock) bool {
 // a, in which a->b becomes ab if len(a.Succs)==len(b.Preds)==1.
 // The result is true if the optimization was applied.
 func fuseBlocks(f *Function, a *BasicBlock) bool {
-	if len(a.Succs) != 1 {
+	if len(a.Successors) != 1 {
 		return false
 	}
-	b := a.Succs[0]
-	if len(b.Preds) != 1 {
+	b := a.Successors[0]
+	if len(b.Predecessors) != 1 {
 		return false
 	}
-	if _, ok := a.Instrs[len(a.Instrs)-1].(*Panic); ok {
+	if _, ok := a.Instructions[len(a.Instructions)-1].(*Panic); ok {
 		// panics aren't simple jumps, they have side effects.
 		return false
 	}
@@ -134,17 +134,17 @@ func fuseBlocks(f *Function, a *BasicBlock) bool {
 	}
 
 	// Eliminate jump at end of A, then copy all of B across.
-	a.Instrs = append(a.Instrs[:len(a.Instrs)-1], b.Instrs...)
-	for _, instr := range b.Instrs {
+	a.Instructions = append(a.Instructions[:len(a.Instructions)-1], b.Instructions...)
+	for _, instr := range b.Instructions {
 		instr.setBlock(a)
 	}
 
 	// A inherits B's successors
-	a.Succs = append(a.succs2[:0], b.Succs...)
+	a.Successors = append(a.successorsSpace[:0], b.Successors...)
 
 	// Fix up Preds links of all successors of B.
-	for _, c := range b.Succs {
-		c.replacePred(b, a)
+	for _, c := range b.Successors {
+		c.replacePredecessor(b, a)
 	}
 
 	if debugBlockOpt {

@@ -83,9 +83,9 @@ func findEnclosingPackageLevelFunction(pkg *Package, path []ast.Node) *Function 
 			if decl.Recv == nil && decl.Name.Name == "init" {
 				// Explicit init() function.
 				for _, b := range pkg.init.Blocks {
-					for _, instr := range b.Instrs {
+					for _, instr := range b.Instructions {
 						if instr, ok := instr.(*Call); ok {
-							if callee, ok := instr.Call.Value.(*Function); ok && callee.Pkg == pkg && callee.Pos() == decl.Name.NamePos {
+							if callee, ok := instr.Call.Value.(*Function); ok && callee.Package == pkg && callee.Pos() == decl.Name.NamePos {
 								return callee
 							}
 						}
@@ -114,7 +114,7 @@ func findNamedFunc(pkg *Package, pos token.Pos) *Function {
 				return mem
 			}
 		case *Type:
-			mset := pkg.Prog.MethodSets.MethodSet(types.NewPointer(mem.Type()))
+			mset := pkg.Program.MethodSets.MethodSet(types.NewPointer(mem.Type()))
 			for i, n := 0, mset.Len(); i < n; i++ {
 				// Don't call Program.Method: avoid creating wrappers.
 				obj := mset.At(i).Obj().(*types.Func)
@@ -156,24 +156,24 @@ func (prog *Program) packageLevelMember(obj types.Object) Member {
 // denoted by the specified func symbol. It returns nil if the symbol
 // denotes an interface method, or belongs to a package that was not
 // created by prog.CreatePackage.
-func (prog *Program) FuncValue(obj *types.Func) *Function {
+func (prog *Program) FunctionValue(obj *types.Func) *Function {
 	fn, _ := prog.packageLevelMember(obj).(*Function)
 	return fn
 }
 
 // ConstValue returns the IR Value denoted by the source-level named
 // constant obj.
-func (prog *Program) ConstValue(obj *types.Const) *Const {
+func (prog *Program) ConstValue(obj *types.Const) *Constant {
 	// TODO(adonovan): opt: share (don't reallocate)
 	// Consts for const objects and constant ast.Exprs.
 
 	// Universal constant? {true,false,nil}
 	if obj.Parent() == types.Universe {
-		return NewConst(obj.Val(), obj.Type(), nil)
+		return NewConstant(obj.Val(), obj.Type(), nil)
 	}
 	// Package-level named constant?
 	if v := prog.packageLevelMember(obj); v != nil {
 		return v.(*NamedConst).Value
 	}
-	return NewConst(obj.Val(), obj.Type(), nil)
+	return NewConstant(obj.Val(), obj.Type(), nil)
 }

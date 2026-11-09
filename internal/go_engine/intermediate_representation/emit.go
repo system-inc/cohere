@@ -27,8 +27,8 @@ import (
 // These Allocs are removed from f.Locals at the end.
 //
 // The builder should generally call one of the emit{New,Local,LocalVar} wrappers instead.
-func emitAlloc(f *Function, typ types.Type, source ast.Node, comment string) *Alloc {
-	v := &Alloc{}
+func emitAllocation(f *Function, typ types.Type, source ast.Node, comment string) *Allocation {
+	v := &Allocation{}
 	v.comment = comment
 	v.setType(types.NewPointer(typ))
 	f.emit(v, source)
@@ -37,8 +37,8 @@ func emitAlloc(f *Function, typ types.Type, source ast.Node, comment string) *Al
 
 // emitNew emits to f a new Alloc instruction heap-allocating a
 // variable of type typ.
-func emitNew(f *Function, typ types.Type, source ast.Node, comment string) *Alloc {
-	alloc := emitAlloc(f, typ, source, comment)
+func emitNew(f *Function, typ types.Type, source ast.Node, comment string) *Allocation {
+	alloc := emitAllocation(f, typ, source, comment)
 	alloc.Heap = true
 	return alloc
 }
@@ -48,8 +48,8 @@ func emitNew(f *Function, typ types.Type, source ast.Node, comment string) *Allo
 //
 // (Use this function or emitNew for synthetic variables;
 // for source-level variables in the same function, use emitLocalVar.)
-func emitLocal(f *Function, t types.Type, source ast.Node, comment string) *Alloc {
-	local := emitAlloc(f, t, source, comment)
+func emitLocal(f *Function, t types.Type, source ast.Node, comment string) *Allocation {
+	local := emitAllocation(f, t, source, comment)
 	f.Locals = append(f.Locals, local)
 	return local
 }
@@ -57,7 +57,7 @@ func emitLocal(f *Function, t types.Type, source ast.Node, comment string) *Allo
 // emitLocalVar creates a local var for v and emits an Alloc instruction for it.
 // Subsequent calls to f.lookup(v) return it.
 // It applies the appropriate generic instantiation to the type.
-func emitLocalVar(f *Function, v *types.Var, source ast.Node) *Alloc {
+func emitLocalVar(f *Function, v *types.Var, source ast.Node) *Allocation {
 	alloc := emitLocal(f, f.typ(v.Type()), source, v.Name())
 	f.vars[v] = alloc
 	return alloc
@@ -72,9 +72,9 @@ func emitLoad(f *Function, addr Value, source ast.Node) *Load {
 	return v
 }
 
-func emitRecv(f *Function, ch Value, commaOk bool, typ types.Type, source ast.Node) Value {
-	recv := &Recv{
-		Chan:    ch,
+func emitReceive(f *Function, ch Value, commaOk bool, typ types.Type, source ast.Node) Value {
+	recv := &Receive{
+		Channel: ch,
 		CommaOk: commaOk,
 	}
 	recv.setType(typ)
@@ -108,10 +108,10 @@ func emitArith(f *Function, op token.Token, x, y Value, t types.Type, source ast
 		panic("illegal op in emitArith: " + op.String())
 
 	}
-	v := &BinOp{
-		Op: op,
-		X:  x,
-		Y:  y,
+	v := &BinaryOperation{
+		Operator: op,
+		X:        x,
+		Y:        y,
 	}
 	v.setType(t)
 	return f.emit(v, source)
@@ -130,7 +130,7 @@ func emitCompare(f *Function, op token.Token, x, y Value, source ast.Node) Value
 	//   if e==true { ... }
 	// even in the case when e's type is an interface.
 	// TODO(adonovan): opt: generalise to x==true, false!=y, etc.
-	if x, ok := x.(*Const); ok && op == token.EQL && x.Value != nil && x.Value.Kind() == constant.Bool && constant.BoolVal(x.Value) {
+	if x, ok := x.(*Constant); ok && op == token.EQL && x.Value != nil && x.Value.Kind() == constant.Bool && constant.BoolVal(x.Value) {
 		if yt, ok := yt.(*types.Basic); ok && yt.Info()&types.IsBoolean != 0 {
 			return y
 		}
@@ -142,19 +142,19 @@ func emitCompare(f *Function, op token.Token, x, y Value, source ast.Node) Value
 		y = emitConv(f, y, x.Type(), source)
 	} else if _, ok := yt.(*types.Interface); ok && !typeparams.IsTypeParam(y.Type()) {
 		x = emitConv(f, x, y.Type(), source)
-	} else if _, ok := x.(*Const); ok {
+	} else if _, ok := x.(*Constant); ok {
 		x = emitConv(f, x, y.Type(), source)
-	} else if _, ok := y.(*Const); ok {
+	} else if _, ok := y.(*Constant); ok {
 		y = emitConv(f, y, x.Type(), source)
 		//lint:ignore SA9003 no-op
 	} else {
 		// other cases, e.g. channels.  No-op.
 	}
 
-	v := &BinOp{
-		Op: op,
-		X:  x,
-		Y:  y,
+	v := &BinaryOperation{
+		Operator: op,
+		X:        x,
+		Y:        y,
 	}
 	v.setType(tBool)
 	return f.emit(v, source)
@@ -216,7 +216,7 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 
 		// Untyped nil constant?  Return interface-typed nil constant.
 		if ut_src == tUntypedNil {
-			return zeroConst(t_dst, source)
+			return zeroConstant(t_dst, source)
 		}
 
 		// Convert (non-nil) "untyped" literals to their default type.
@@ -299,7 +299,7 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 	}
 
 	// Conversion of a compile-time constant value?
-	if c, ok := val.(*Const); ok {
+	if c, ok := val.(*Constant); ok {
 		// Conversion to a basic type?
 		if isBasic(ut_dst) {
 			// Conversion of a compile-time constant to
@@ -307,12 +307,12 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 			// constant of the destination type and
 			// (initially) the same abstract value.
 			// We don't truncate the value yet.
-			return NewConst(c.Value, t_dst, source)
+			return NewConstant(c.Value, t_dst, source)
 		}
 		// Can we always convert from zero value without panicking?
 		const mayPanic = sliceToArray | sliceToArrayPtr
 		if c.Value == nil && classifications&mayPanic == 0 {
-			return NewConst(nil, t_dst, source)
+			return NewConstant(nil, t_dst, source)
 		}
 
 		// We're converting from constant to non-constant type,
@@ -336,7 +336,7 @@ func emitConv(f *Function, val Value, t_dst types.Type, source ast.Node) Value {
 		return f.emit(p, source)
 
 	case sliceTo0Array: // slice to zero-length arrays (constant)
-		return zeroConst(t_dst, source)
+		return zeroConstant(t_dst, source)
 
 	case convert: // representation-changing conversion
 		c := &Convert{X: val}
@@ -382,8 +382,8 @@ func emitTypeCoercion(f *Function, v Value, typ types.Type, source ast.Node) Val
 func emitStore(f *Function, addr, val Value, source ast.Node) *Store {
 	typ := deref(addr.Type())
 	s := &Store{
-		Addr: addr,
-		Val:  emitConv(f, val, typ, source),
+		Address: addr,
+		Value:   emitConv(f, val, typ, source),
 	}
 	f.emit(s, source)
 	return s
@@ -405,7 +405,7 @@ func emitJump(f *Function, target *BasicBlock, source ast.Node) *Jump {
 // Postcondition: f.currentBlock is nil.
 func emitIf(f *Function, cond Value, tblock, fblock *BasicBlock, source ast.Node) *If {
 	b := f.currentBlock
-	stmt := &If{Cond: cond}
+	stmt := &If{Condition: cond}
 	b.emit(stmt, source)
 	addEdge(b, tblock)
 	addEdge(b, fblock)
@@ -487,8 +487,8 @@ func emitCall(fn *Function, call *Call, source ast.Node) Value {
 	callee := call.Call.StaticCallee()
 	if callee != nil &&
 		callee.object != nil &&
-		fn.Prog.noReturn != nil &&
-		fn.Prog.noReturn(callee.object) {
+		fn.Program.noReturn != nil &&
+		fn.Program.noReturn(callee.object) {
 		// Call doesn't return normally. Either it doesn't return at all
 		// (infinitely blocked or exitting the process), or it unwinds the stack
 		// (panic, runtime.Goexit). Model this as a panic.
@@ -515,7 +515,7 @@ func emitImplicitSelections(f *Function, v Value, indices []int, source ast.Node
 		// dereferenced implicitly before we get here.
 		if isPointerCore(v.Type()) {
 			fld := fieldOf(deref(v.Type()), index)
-			instr := &FieldAddr{
+			instr := &FieldAddress{
 				X:     v,
 				Field: index,
 			}
@@ -547,7 +547,7 @@ func emitImplicitSelections(f *Function, v Value, indices []int, source ast.Node
 func emitFieldSelection(f *Function, v Value, index int, wantAddr bool, id *ast.Ident) Value {
 	if isPointerCore(v.Type()) {
 		fld := fieldOf(deref(v.Type()), index)
-		instr := &FieldAddr{
+		instr := &FieldAddress{
 			X:     v,
 			Field: index,
 		}

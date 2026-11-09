@@ -31,7 +31,7 @@ import (
 // See the Example tests for simple examples.
 func NewProgram(fset *token.FileSet) *Program {
 	return &Program{
-		Fset:     fset,
+		FileSet:  fset,
 		imported: make(map[string]*Package),
 		packages: make(map[*types.Package]*Package),
 		canon:    newCanonizer(),
@@ -49,7 +49,7 @@ func memberFromObject(pkg *Package, obj types.Object, syntax ast.Node, goversion
 	name := obj.Name()
 	switch obj := obj.(type) {
 	case *types.Builtin:
-		if pkg.Pkg != types.Unsafe {
+		if pkg.Types != types.Unsafe {
 			panic("unexpected builtin object: " + obj.String())
 		}
 
@@ -64,7 +64,7 @@ func memberFromObject(pkg *Package, obj types.Object, syntax ast.Node, goversion
 	case *types.Const:
 		c := &NamedConst{
 			object: obj,
-			Value:  NewConst(obj.Val(), obj.Type(), syntax),
+			Value:  NewConstant(obj.Val(), obj.Type(), syntax),
 			pkg:    pkg,
 		}
 		pkg.values[obj] = c
@@ -74,10 +74,10 @@ func memberFromObject(pkg *Package, obj types.Object, syntax ast.Node, goversion
 
 	case *types.Var:
 		g := &Global{
-			Pkg:    pkg,
-			name:   name,
-			object: obj,
-			typ:    types.NewPointer(obj.Type()), // address
+			Package: pkg,
+			name:    name,
+			object:  obj,
+			typ:     types.NewPointer(obj.Type()), // address
 		}
 		g.source = syntax
 		pkg.values[obj] = g
@@ -91,8 +91,8 @@ func memberFromObject(pkg *Package, obj types.Object, syntax ast.Node, goversion
 			pkg.ninit++
 			name = fmt.Sprintf("init#%d", pkg.ninit)
 		}
-		fn := createFunction(pkg.Prog, obj, name, syntax, pkg.info, goversion)
-		fn.Pkg = pkg
+		fn := createFunction(pkg.Program, obj, name, syntax, pkg.info, goversion)
+		fn.Package = pkg
 		pkg.created = append(pkg.created, fn)
 		pkg.values[obj] = fn
 		pkg.Functions = append(pkg.Functions, fn)
@@ -121,8 +121,8 @@ func createFunction(prog *Program, obj *types.Func, name string, syntax ast.Node
 		goversion:      goversion,
 		pos:            obj.Pos(),
 		syntax:         syntax,
-		Pkg:            nil, // may be set by caller
-		Prog:           prog,
+		Package:        nil, // may be set by caller
+		Program:        prog,
 		recvtypeparams: sig.RecvTypeParams(),
 		typeparams:     sig.TypeParams(),
 	}
@@ -187,10 +187,10 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*ast.File, info *
 		panic("nil pkg") // otherwise pkg.Scope below returns types.Universe!
 	}
 	p := &Package{
-		Prog:    prog,
+		Program: prog,
 		Members: make(map[string]Member),
 		values:  make(map[types.Object]Member),
-		Pkg:     pkg,
+		Types:   pkg,
 		syntax:  info != nil,
 		// transient values (cleared after Package.Build)
 		info:        info,
@@ -203,8 +203,8 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*ast.File, info *
 		name:      "init",
 		Signature: new(types.Signature),
 		Synthetic: "package initializer",
-		Pkg:       p,
-		Prog:      prog,
+		Package:   p,
+		Program:   prog,
 		build:     (*builder).buildPackageInit,
 		info:      p.info,
 		goversion: "", // See Package.build for details.
@@ -226,7 +226,7 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*ast.File, info *
 		// GC-compiled binary package (or "unsafe")
 		// No code.
 		// No position information.
-		scope := p.Pkg.Scope()
+		scope := p.Types.Scope()
 		for _, name := range scope.Names() {
 			obj := scope.Lookup(name)
 			memberFromObject(p, obj, nil, "")
@@ -243,16 +243,16 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*ast.File, info *
 
 	// Add initializer guard variable.
 	initguard := &Global{
-		Pkg:  p,
-		name: "init$guard",
-		typ:  types.NewPointer(tBool),
+		Package: p,
+		name:    "init$guard",
+		typ:     types.NewPointer(tBool),
 	}
 	p.Members[initguard.Name()] = initguard
 
 	if importable {
-		prog.imported[p.Pkg.Path()] = p
+		prog.imported[p.Types.Path()] = p
 	}
-	prog.packages[p.Pkg] = p
+	prog.packages[p.Types] = p
 
 	return p
 }

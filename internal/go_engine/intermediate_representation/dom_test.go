@@ -1,0 +1,36 @@
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+package intermediate_representation_test
+
+import (
+	"fmt"
+	"testing"
+)
+
+// TestDominatorOrder is go/ir's, building the package in memory where go/ir's loads it with go/packages.
+func TestDominatorOrder(t *testing.T) {
+	const src = `package p
+
+func f(cond bool) {
+	// (Print operands match BasicBlock IDs.)
+	print(0)
+	if cond {
+		print(1)
+	} else {
+		print(2)
+	}
+	print(3)
+}
+`
+	p, _ := buildPackage(t, src, nil)
+	f := p.Func("f")
+
+	if got, want := fmt.Sprint(f.DominatorPreorder()), "[0 1 2 3]"; got != want {
+		t.Errorf("DominatorPreorder: got %v, want %s", got, want)
+	}
+	if got, want := fmt.Sprint(f.DominatorPostorder()), "[1 2 3 0]"; got != want {
+		t.Errorf("DominatorPostorder: got %v, want %s", got, want)
+	}
+}

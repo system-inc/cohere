@@ -25,7 +25,7 @@ type generic struct {
 //
 // Acquires fn.generic.instancesMu.
 func (fn *Function) instance(rtargs, targs []types.Type, b *builder) *Function {
-	key := fn.Prog.canon.List(slices.Concat(rtargs, targs))
+	key := fn.Program.canon.List(slices.Concat(rtargs, targs))
 
 	gen := fn.generic
 
@@ -53,7 +53,7 @@ func (fn *Function) instance(rtargs, targs []types.Type, b *builder) *Function {
 //
 // Requires fn.generic.instancesMu.
 func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
-	prog := fn.Prog
+	prog := fn.Program
 
 	// Compute signature.
 	var sig *types.Signature
@@ -123,8 +123,8 @@ func createInstance(fn *Function, rtargs, targs []types.Type) *Function {
 		build:          build,
 		topLevelOrigin: fn,
 		pos:            obj.Pos(),
-		Pkg:            nil,
-		Prog:           fn.Prog,
+		Package:        nil,
+		Program:        fn.Program,
 		recvtypeparams: fn.recvtypeparams, // share with origin
 		recvtypeargs:   rtargs,
 		typeparams:     fn.typeparams, // share with origin

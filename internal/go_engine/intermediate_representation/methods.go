@@ -30,7 +30,7 @@ func (prog *Program) objectMethod(obj *types.Func, targs []types.Type, b *builde
 	}
 
 	// Belongs to a created package?
-	if fn := prog.FuncValue(obj); fn != nil {
+	if fn := prog.FunctionValue(obj); fn != nil {
 		return fn
 	}
 

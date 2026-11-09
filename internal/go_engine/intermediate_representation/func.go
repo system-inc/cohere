@@ -22,14 +22,14 @@ func (f *Function) objectOf(id *ast.Ident) types.Object {
 		return o
 	}
 	panic(fmt.Sprintf("no types.Object for ast.Ident %s @ %s",
-		id.Name, f.Prog.Fset.Position(id.Pos())))
+		id.Name, f.Program.FileSet.Position(id.Pos())))
 }
 
 // instrs returns an iterator that returns each reachable instruction of the SSA function.
-func (f *Function) instrs() iter.Seq[Instruction] {
+func (f *Function) instructions() iter.Seq[Instruction] {
 	return func(yield func(i Instruction) bool) {
 		for _, block := range f.Blocks {
-			for _, instr := range block.Instrs {
+			for _, instr := range block.Instructions {
 				if !yield(instr) {
 					return
 				}
@@ -44,7 +44,7 @@ func (f *Function) typeOf(e ast.Expr) types.Type {
 	if T := f.info.TypeOf(e); T != nil {
 		return f.typ(T)
 	}
-	panic(fmt.Sprintf("no type for %T @ %s", e, f.Prog.Fset.Position(e.Pos())))
+	panic(fmt.Sprintf("no type for %T @ %s", e, f.Program.FileSet.Position(e.Pos())))
 }
 
 // typ is the locally instantiated type of T. go/ir substitutes type arguments here when it builds an
@@ -75,7 +75,7 @@ func (f *Function) selection(selector *ast.SelectorExpr) *selection {
 	case types.MethodExpr, types.MethodVal:
 		if recv := f.typ(sel.Recv()); recv != sel.Recv() {
 			// recv changed during type substitution.
-			pkg := f.declaredPackage().Pkg
+			pkg := f.declaredPackage().Types
 			obj, index, indirect := types.LookupFieldOrMethod(recv, true, pkg, sel.Obj().Name())
 
 			// sig replaces sel.Type(). See (types.Selection).Typ() for details.
@@ -212,12 +212,12 @@ func (f *Function) addResultVar(v *types.Var, source ast.Node) {
 func (f *Function) addParamVar(v *types.Var, source ast.Node) *Parameter {
 	name := v.Name()
 	if name == "" {
-		name = fmt.Sprintf("arg%d", len(f.Params))
+		name = fmt.Sprintf("arg%d", len(f.Parameters))
 	}
 	param := &Parameter{name: name, typ: f.typ(v.Type()), parent: f}
 	param.setSource(source)
 	param.object = v
-	f.Params = append(f.Params, param)
+	f.Parameters = append(f.Parameters, param)
 	return param
 }
 
@@ -277,14 +277,14 @@ func (f *Function) createSyntacticParams(recv *ast.FieldList, functype *ast.Func
 
 	// Parameters.
 	if functype.Params != nil {
-		n := len(f.Params) // 1 if has recv, 0 otherwise
+		n := len(f.Parameters) // 1 if has recv, 0 otherwise
 		for _, field := range functype.Params.List {
 			for _, n := range field.Names {
 				f.addSpilledParam(identVar(f, n), n)
 			}
 			// Anonymous parameter?  No need to spill.
 			if field.Names == nil {
-				f.addParamVar(f.Signature.Params().At(len(f.Params)-n), field)
+				f.addParamVar(f.Signature.Params().At(len(f.Parameters)-n), field)
 			}
 		}
 	}
@@ -322,7 +322,7 @@ func (fn *Function) createDeferStack() {
 func numberNodes(f *Function) {
 	var base ID
 	for _, b := range f.Blocks {
-		for _, instr := range b.Instrs {
+		for _, instr := range b.Instructions {
 			if instr == nil {
 				continue
 			}
@@ -361,7 +361,7 @@ func buildReferrers(f *Function) {
 	var rands []*Value
 
 	for _, b := range f.Blocks {
-		for _, instr := range b.Instrs {
+		for _, instr := range b.Instructions {
 			rands = instr.Operands(rands[:0]) // recycle storage
 			updateOperandsReferrers(instr, rands)
 		}
@@ -395,11 +395,11 @@ func (f *Function) finishBody() {
 
 	optimizeBlocks(f)
 	buildReferrers(f)
-	buildDomTree(f)
+	buildDominatorTree(f)
 	buildSCCs(f)
 
 	// Lifting goes here (#ee33njz). go/ir lifts in this spot, then simplifies constant composite values, unless
-	// its NaiveForm mode is set. Ours is always NaiveForm until then: locals stay Alloc, Load and Store, and
+	// its NaiveForm mode is set. Ours is always NaiveForm until then: locals stay Allocation, Load and Store, and
 	// what readers see matches go/ir built with NaiveForm. The expression map go/ir builds next from its
 	// debug references comes with lifting too.
 
@@ -458,11 +458,11 @@ func (f *Function) lookup(obj *types.Var, escaping bool) Value {
 	if v, ok := f.vars[obj]; ok {
 		if escaping {
 			switch v := v.(type) {
-			case *Alloc:
+			case *Allocation:
 				v.Heap = true
 			case *Phi:
 				for _, edge := range v.Edges {
-					if alloc, ok := edge.(*Alloc); ok {
+					if alloc, ok := edge.(*Allocation); ok {
 						alloc.Heap = true
 					}
 				}
@@ -477,14 +477,14 @@ func (f *Function) lookup(obj *types.Var, escaping bool) Value {
 		panic("no ir.Value for " + obj.String())
 	}
 	outer := f.parent.lookup(obj, true) // escaping
-	v := &FreeVar{
+	v := &FreeVariable{
 		name:   obj.Name(),
 		typ:    outer.Type(),
 		outer:  outer,
 		parent: f,
 	}
 	f.vars[obj] = v
-	f.FreeVars = append(f.FreeVars, v)
+	f.FreeVariables = append(f.FreeVariables, v)
 	return v
 }
 
@@ -516,12 +516,12 @@ func (f *Function) emit(instr Instruction, source ast.Node) Value {
 // (But two methods may have the same name "(T).f" if one is a synthetic
 // wrapper promoting a non-exported method "f" from another package; in
 // that case, the strings are equal but the identifiers "f" are distinct.)
-func (f *Function) RelString(from *types.Package) string {
+func (f *Function) RelativeString(from *types.Package) string {
 	// Anonymous?
 	if f.parent != nil {
 		// An anonymous function's Name() looks like "parentName$1",
 		// but its String() should include the type/package/etc.
-		parent := f.parent.RelString(from)
+		parent := f.parent.RelativeString(from)
 		for i, anon := range f.parent.AnonFuncs {
 			if anon == f {
 				return fmt.Sprintf("%s$%d", parent, 1+i)
@@ -533,22 +533,22 @@ func (f *Function) RelString(from *types.Package) string {
 
 	// Method (declared or wrapper)?
 	if recv := f.Signature.Recv(); recv != nil {
-		return f.relMethod(from, recv.Type())
+		return f.relativeMethod(from, recv.Type())
 	}
 
 	// Thunk?
 	if f.method != nil {
-		return f.relMethod(from, f.method.recv)
+		return f.relativeMethod(from, f.method.recv)
 	}
 
 	// Bound?
-	if len(f.FreeVars) == 1 && strings.HasSuffix(f.name, "$bound") {
-		return f.relMethod(from, f.FreeVars[0].Type())
+	if len(f.FreeVariables) == 1 && strings.HasSuffix(f.name, "$bound") {
+		return f.relativeMethod(from, f.FreeVariables[0].Type())
 	}
 
 	// Package-level function?
 	// Prefix with package name for cross-package references only.
-	if p := f.relPkg(); p != nil && p != from {
+	if p := f.relativePackage(); p != nil && p != from {
 		return fmt.Sprintf("%s.%s", p.Path(), f.name)
 	}
 
@@ -556,18 +556,18 @@ func (f *Function) RelString(from *types.Package) string {
 	return f.name
 }
 
-func (f *Function) relMethod(from *types.Package, recv types.Type) string {
-	return fmt.Sprintf("(%s).%s", relType(recv, from), f.name)
+func (f *Function) relativeMethod(from *types.Package, recv types.Type) string {
+	return fmt.Sprintf("(%s).%s", relativeType(recv, from), f.name)
 }
 
 // declaredPackage returns the package fn is declared in or nil if the
 // function is not declared in a package.
 func (fn *Function) declaredPackage() *Package {
 	switch {
-	case fn.Pkg != nil:
-		return fn.Pkg // non-generic function  (does that follow??)
+	case fn.Package != nil:
+		return fn.Package // non-generic function  (does that follow??)
 	case fn.topLevelOrigin != nil:
-		return fn.topLevelOrigin.Pkg // instance of a named generic function
+		return fn.topLevelOrigin.Package // instance of a named generic function
 	case fn.parent != nil:
 		return fn.parent.declaredPackage() // instance of an anonymous [generic] function
 	default:
@@ -576,9 +576,9 @@ func (fn *Function) declaredPackage() *Package {
 }
 
 // relPkg returns types.Package fn is printed in relationship to.
-func (fn *Function) relPkg() *types.Package {
+func (fn *Function) relativePackage() *types.Package {
 	if p := fn.declaredPackage(); p != nil {
-		return p.Pkg
+		return p.Types
 	}
 	return nil
 }
@@ -589,10 +589,10 @@ func (fn *Function) relPkg() *types.Package {
 func (f *Function) newBasicBlock(comment string) *BasicBlock {
 	b := &BasicBlock{
 		Index:   len(f.Blocks),
-		Comment: comment,
+		comment: comment,
 		parent:  f,
 	}
-	b.Succs = b.succs2[:0]
+	b.Successors = b.successorsSpace[:0]
 	f.Blocks = append(f.Blocks, b)
 	return b
 }
@@ -612,7 +612,7 @@ func (f *Function) newBasicBlock(comment string) *BasicBlock {
 //
 // TODO(adonovan): think harder about the API here.
 func (prog *Program) NewFunction(name string, sig *types.Signature, provenance string) *Function {
-	return &Function{Prog: prog, name: name, Signature: sig, Synthetic: provenance}
+	return &Function{Program: prog, name: name, Signature: sig, Synthetic: provenance}
 }
 
 //lint:ignore U1000 we may make use of this for functions loaded from export data

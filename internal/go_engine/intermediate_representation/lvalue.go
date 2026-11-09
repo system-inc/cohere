@@ -136,7 +136,7 @@ func (bl blank) load(fn *Function, source ast.Node) Value {
 
 func (bl blank) store(fn *Function, v Value, source ast.Node) {
 	s := &BlankStore{
-		Val: v,
+		Value: v,
 	}
 	fn.emit(s, source)
 }

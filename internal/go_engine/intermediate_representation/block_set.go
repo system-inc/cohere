@@ -8,7 +8,7 @@ package intermediate_representation
 // BlockSet, which Function.blockset hands out, and removeInstr, which edits a referrer list.
 // The rest of lift.go comes with lifting (#ee33njz).
 
-func removeInstr(refs []Instruction, instr Instruction) []Instruction {
+func removeInstruction(refs []Instruction, instr Instruction) []Instruction {
 	s := refs
 	i := -1
 	for j := range s {

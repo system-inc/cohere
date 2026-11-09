@@ -59,7 +59,7 @@ func createWrapper(prog *Program, sel *selection, targs []types.Type) *Function 
 		object:    obj,
 		Signature: sig,
 		Synthetic: description,
-		Prog:      prog,
+		Program:   prog,
 		pos:       obj.Pos(),
 		typeargs:  targs,
 		// wrappers have no syntax
@@ -112,10 +112,10 @@ func (b *builder) buildWrapper(fn *Function) {
 				name: "ssa:wrapnilchk",
 				sig:  types.NewSignatureType(nil, nil, nil, types.NewTuple(anonVar(fn.method.recv), anonVar(tString), anonVar(tString)), types.NewTuple(anonVar(fn.method.recv)), false),
 			}
-			c.Call.Args = []Value{
+			c.Call.Arguments = []Value{
 				v,
-				stringConst(deref(fn.method.recv).String(), nil),
-				stringConst(fn.method.obj.Name(), nil),
+				stringConstant(deref(fn.method.recv).String(), nil),
+				stringConstant(fn.method.obj.Name(), nil),
 			}
 			c.setType(v.Type())
 			v = fn.emit(&c, nil)
@@ -141,14 +141,14 @@ func (b *builder) buildWrapper(fn *Function) {
 		if !isPointer(r) {
 			v = emitLoad(fn, v, nil)
 		}
-		c.Call.Value = fn.Prog.objectMethod(fn.object, fn.typeargs, b)
-		c.Call.Args = append(c.Call.Args, v)
+		c.Call.Value = fn.Program.objectMethod(fn.object, fn.typeargs, b)
+		c.Call.Arguments = append(c.Call.Arguments, v)
 	} else {
 		c.Call.Method = fn.object
 		c.Call.Value = emitLoad(fn, v, nil) // interface (possibly a typeparam)
 	}
-	for _, arg := range fn.Params[1:] {
-		c.Call.Args = append(c.Call.Args, arg)
+	for _, arg := range fn.Parameters[1:] {
+		c.Call.Arguments = append(c.Call.Arguments, arg)
 	}
 	emitTailCall(fn, &c, nil)
 	fn.finishBody()
@@ -198,7 +198,7 @@ func createBound(prog *Program, obj *types.Func, targs []types.Type) *Function {
 		object:    obj,
 		Signature: changeRecv(sig, nil), // drop receiver
 		Synthetic: description,
-		Prog:      prog,
+		Program:   prog,
 		pos:       obj.Pos(),
 		typeargs:  targs,
 		// wrappers have no syntax
@@ -206,7 +206,7 @@ func createBound(prog *Program, obj *types.Func, targs []types.Type) *Function {
 		info:      nil,
 		goversion: "",
 	}
-	fn.FreeVars = []*FreeVar{{name: "recv", typ: recvType(obj), parent: fn}} // (cyclic)
+	fn.FreeVariables = []*FreeVariable{{name: "recv", typ: recvType(obj), parent: fn}} // (cyclic)
 	return fn
 }
 
@@ -216,16 +216,16 @@ func (b *builder) buildBound(fn *Function) {
 	createParams(fn, 0)
 	var c Call
 
-	recv := fn.FreeVars[0]
+	recv := fn.FreeVariables[0]
 	if !types.IsInterface(recvType(fn.object)) { // concrete
-		c.Call.Value = fn.Prog.objectMethod(fn.object, fn.typeargs, b)
-		c.Call.Args = []Value{recv}
+		c.Call.Value = fn.Program.objectMethod(fn.object, fn.typeargs, b)
+		c.Call.Arguments = []Value{recv}
 	} else {
 		c.Call.Method = fn.object
 		c.Call.Value = recv // interface (possibly a typeparam)
 	}
-	for _, arg := range fn.Params {
-		c.Call.Args = append(c.Call.Args, arg)
+	for _, arg := range fn.Parameters {
+		c.Call.Arguments = append(c.Call.Arguments, arg)
 	}
 	emitTailCall(fn, &c, nil)
 	fn.finishBody()
@@ -316,7 +316,7 @@ func (b *builder) buildInstantiationWrapper(fn *Function) {
 	// parameter of instance becomes an argument to the call
 	// to the original generic function.
 	argOffset := 0
-	for i, arg := range fn.Params {
+	for i, arg := range fn.Parameters {
 		var typ types.Type
 		if i == 0 && sig.Recv() != nil {
 			typ = orig.Signature.Recv().Type()
@@ -324,7 +324,7 @@ func (b *builder) buildInstantiationWrapper(fn *Function) {
 		} else {
 			typ = orig.Signature.Params().At(i - argOffset).Type()
 		}
-		c.Call.Args = append(c.Call.Args, emitTypeCoercion(fn, arg, typ, nil))
+		c.Call.Arguments = append(c.Call.Arguments, emitTypeCoercion(fn, arg, typ, nil))
 	}
 
 	results := fn.emit(&c, nil)

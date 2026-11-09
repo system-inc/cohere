@@ -4,7 +4,7 @@
 
 package intermediate_representation
 
-// This file carries x/tools' internal typesinternal.ZeroString, which go/ir's Const.RelString calls
+// This file carries x/tools' internal typesinternal.ZeroString, which Constant.RelativeString (go/ir's Const.RelString) calls
 // to print a zero constant and a module outside x/tools can't import.
 
 import (

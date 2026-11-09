@@ -39,7 +39,7 @@ func (b *BasicBlock) Dominates(c *BasicBlock) bool {
 
 // DomPreorder returns a new slice containing the blocks of f
 // in a preorder traversal of the dominator tree.
-func (f *Function) DomPreorder() []*BasicBlock {
+func (f *Function) DominatorPreorder() []*BasicBlock {
 	slice := slices.Clone(f.Blocks)
 	sort.Slice(slice, func(i, j int) bool {
 		return slice[i].dom.pre < slice[j].dom.pre
@@ -50,7 +50,7 @@ func (f *Function) DomPreorder() []*BasicBlock {
 // DomPostorder returns a new slice containing the blocks of f
 // in a postorder traversal of the dominator tree.
 // (This is not the same as a postdominance order.)
-func (f *Function) DomPostorder() []*BasicBlock {
+func (f *Function) DominatorPostorder() []*BasicBlock {
 	slice := slices.Clone(f.Blocks)
 	sort.Slice(slice, func(i, j int) bool {
 		return slice[i].dom.post < slice[j].dom.post
@@ -81,7 +81,7 @@ func (lt *ltState) dfs(v *BasicBlock, i int32, preorder []*BasicBlock) int32 {
 	i++
 	lt.sdom[v.Index] = v
 	lt.link(nil, v)
-	for _, w := range v.Succs {
+	for _, w := range v.Successors {
 		if lt.sdom[w.Index] == nil {
 			lt.parent[w.Index] = v
 			i = lt.dfs(w, i, preorder)
@@ -109,7 +109,7 @@ func (lt *ltState) link(v, w *BasicBlock) {
 
 // buildDomTree computes the dominator tree of f using the LT algorithm.
 // Precondition: all blocks are reachable (e.g. optimizeBlocks has been run).
-func buildDomTree(fn *Function) {
+func buildDominatorTree(fn *Function) {
 	// The step numbers refer to the original LT paper; the
 	// reordering is due to Georgiadis.
 
@@ -156,7 +156,7 @@ func buildDomTree(fn *Function) {
 
 		// Step 2. Compute the semidominators of all nodes.
 		lt.sdom[w.Index] = lt.parent[w.Index]
-		for _, v := range w.Preds {
+		for _, v := range w.Predecessors {
 			u := lt.eval(v)
 			if lt.sdom[u.Index].dom.pre < lt.sdom[w.Index].dom.pre {
 				lt.sdom[w.Index] = lt.sdom[u.Index]
@@ -192,20 +192,20 @@ func buildDomTree(fn *Function) {
 		}
 	}
 
-	pre, post := numberDomTree(root, 0, 0)
+	pre, post := numberDominatorTree(root, 0, 0)
 	if recover != nil {
-		numberDomTree(recover, pre, post)
+		numberDominatorTree(recover, pre, post)
 	}
 }
 
 // numberDomTree sets the pre- and post-order numbers of a depth-first
 // traversal of the dominator tree rooted at v.  These are used to
 // answer dominance queries in constant time.
-func numberDomTree(v *BasicBlock, pre, post int32) (int32, int32) {
+func numberDominatorTree(v *BasicBlock, pre, post int32) (int32, int32) {
 	v.dom.pre = pre
 	pre++
 	for _, child := range v.dom.children {
-		pre, post = numberDomTree(child, pre, post)
+		pre, post = numberDominatorTree(child, pre, post)
 	}
 	v.dom.post = post
 	post++

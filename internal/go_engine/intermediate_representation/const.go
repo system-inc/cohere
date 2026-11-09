@@ -44,7 +44,7 @@ func soleTypeKind(typ types.Type) types.BasicInfo {
 
 // NewConst returns a new constant of the specified value and type.
 // val must be valid according to the specification of Const.Value.
-func NewConst(val constant.Value, typ types.Type, source ast.Node) *Const {
+func NewConstant(val constant.Value, typ types.Type, source ast.Node) *Constant {
 	if val == nil {
 		switch soleTypeKind(typ) {
 		case types.IsBoolean:
@@ -55,7 +55,7 @@ func NewConst(val constant.Value, typ types.Type, source ast.Node) *Const {
 			val = constant.MakeString("")
 		}
 	}
-	c := &Const{
+	c := &Constant{
 		typ:   typ,
 		Value: val,
 	}
@@ -65,27 +65,27 @@ func NewConst(val constant.Value, typ types.Type, source ast.Node) *Const {
 
 // intConst returns an 'int' constant that evaluates to i.
 // (i is an int64 in case the host is narrower than the target.)
-func intConst(i int64, source ast.Node) *Const {
-	return NewConst(constant.MakeInt64(i), tInt, source)
+func intConstant(i int64, source ast.Node) *Constant {
+	return NewConstant(constant.MakeInt64(i), tInt, source)
 }
 
 // nilConst returns a nil constant of the specified type, which may
 // be any reference type, including interfaces.
-func nilConst(typ types.Type, source ast.Node) *Const {
-	return NewConst(nil, typ, source)
+func nilConstant(typ types.Type, source ast.Node) *Constant {
+	return NewConstant(nil, typ, source)
 }
 
 // stringConst returns a 'string' constant that evaluates to s.
-func stringConst(s string, source ast.Node) *Const {
-	return NewConst(constant.MakeString(s), tString, source)
+func stringConstant(s string, source ast.Node) *Constant {
+	return NewConstant(constant.MakeString(s), tString, source)
 }
 
 // zeroConst returns a new "zero" constant of the specified type.
-func zeroConst(t types.Type, source ast.Node) *Const {
-	return NewConst(nil, t, source)
+func zeroConstant(t types.Type, source ast.Node) *Constant {
+	return NewConstant(nil, t, source)
 }
 
-func (c *Const) RelString(from *types.Package) string {
+func (c *Constant) RelativeString(from *types.Package) string {
 	var p string
 	if c.Value == nil {
 		switch c.typ.(type) {
@@ -112,29 +112,29 @@ func (c *Const) RelString(from *types.Package) string {
 	} else {
 		p = c.Value.String()
 	}
-	return p + ":" + relType(c.Type(), from)
+	return p + ":" + relativeType(c.Type(), from)
 }
 
-func (c *Const) Name() string {
-	return c.RelString(nil)
+func (c *Constant) Name() string {
+	return c.RelativeString(nil)
 }
 
-func (c *Const) String() string {
-	return c.RelString(nil)
+func (c *Constant) String() string {
+	return c.RelativeString(nil)
 }
 
-func (c *Const) Type() types.Type {
+func (c *Constant) Type() types.Type {
 	return c.typ
 }
 
-func (c *Const) Referrers() *[]Instruction {
+func (c *Constant) Referrers() *[]Instruction {
 	return nil
 }
 
-func (c *Const) Parent() *Function { return nil }
+func (c *Constant) Parent() *Function { return nil }
 
 // IsNil returns true if this constant represents a typed or untyped nil value.
-func (c *Const) IsNil() bool {
+func (c *Constant) IsNil() bool {
 	return c.Value == nil && nillable(c.typ)
 }
 
@@ -160,7 +160,7 @@ func nillable(t types.Type) bool {
 
 // Int64 returns the numeric value of this constant truncated to fit
 // a signed 64-bit integer.
-func (c *Const) Int64() int64 {
+func (c *Constant) Int64() int64 {
 	switch x := constant.ToInt(c.Value); x.Kind() {
 	case constant.Int:
 		if i, ok := constant.Int64Val(x); ok {
@@ -176,7 +176,7 @@ func (c *Const) Int64() int64 {
 
 // Uint64 returns the numeric value of this constant truncated to fit
 // an unsigned 64-bit integer.
-func (c *Const) Uint64() uint64 {
+func (c *Constant) Uint64() uint64 {
 	switch x := constant.ToInt(c.Value); x.Kind() {
 	case constant.Int:
 		if u, ok := constant.Uint64Val(x); ok {
@@ -192,7 +192,7 @@ func (c *Const) Uint64() uint64 {
 
 // Float64 returns the numeric value of this constant truncated to fit
 // a float64.
-func (c *Const) Float64() float64 {
+func (c *Constant) Float64() float64 {
 	x := constant.ToFloat(c.Value) // (c.Value == nil) => x.Kind() == Unknown
 	f, _ := constant.Float64Val(x)
 	return f
@@ -200,7 +200,7 @@ func (c *Const) Float64() float64 {
 
 // Complex128 returns the complex value of this constant truncated to
 // fit a complex128.
-func (c *Const) Complex128() complex128 {
+func (c *Constant) Complex128() complex128 {
 	x := constant.ToComplex(c.Value) // (c.Value == nil) => x.Kind() == Unknown
 	re, _ := constant.Float64Val(constant.Real(x))
 	im, _ := constant.Float64Val(constant.Imag(x))

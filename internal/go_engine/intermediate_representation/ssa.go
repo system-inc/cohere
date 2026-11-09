@@ -28,7 +28,7 @@ type ID int
 
 // A Program is a partial or complete Go program converted to IR form.
 type Program struct {
-	Fset       *token.FileSet              // position information for the files of this Program
+	FileSet    *token.FileSet              // position information for the files of this Program
 	imported   map[string]*Package         // all importable Packages, keyed by import path
 	packages   map[*types.Package]*Package // all created Packages
 	MethodSets typeutil.MethodSetCache     // cache of type-checker's method-sets
@@ -53,8 +53,8 @@ type Program struct {
 // initializer) and "init#%d", the nth declared init function,
 // and unspecified other things too.
 type Package struct {
-	Prog      *Program                // the owning program
-	Pkg       *types.Package          // the corresponding go/types.Package
+	Program   *Program                // the owning program
+	Types     *types.Package          // the corresponding go/types.Package
 	Members   map[string]Member       // all package members keyed by name (incl. init and init#%d)
 	Functions []*Function             // all functions, excluding anonymous ones
 	values    map[types.Object]Member // mapping of package objects to members (incl. methods). Contains *NamedConst, *Global, *Function (values but not types)
@@ -75,13 +75,12 @@ type Package struct {
 // *Global, *Function, or *Type; they are created by package-level
 // const, var, func and type declarations respectively.
 type Member interface {
-	Name() string                    // declared name of the package member
-	String() string                  // package-qualified name of the package member
-	RelString(*types.Package) string // like String, but relative refs are unqualified
-	Object() types.Object            // typechecker's object for this member, if any
-	Type() types.Type                // type of the package member
-	Token() token.Token              // token.{VAR,FUNC,CONST,TYPE}
-	Package() *Package               // the containing package
+	Name() string                         // declared name of the package member
+	String() string                       // package-qualified name of the package member
+	RelativeString(*types.Package) string // like String, but relative refs are unqualified
+	Object() types.Object                 // typechecker's object for this member, if any
+	Type() types.Type                     // type of the package member
+	Token() token.Token                   // token.{VAR,FUNC,CONST,TYPE}
 }
 
 // A Type is a Member of a Package representing a package-level named type.
@@ -100,7 +99,7 @@ type Type struct {
 // it augments with the name and position of its 'const' declaration.
 type NamedConst struct {
 	object *types.Const
-	Value  *Const
+	Value  *Constant
 	pkg    *Package
 }
 
@@ -325,22 +324,22 @@ type Function struct {
 	info      *types.Info // type annotations (if syntax != nil)
 	goversion string      // Go version of syntax (NB: init is special)
 
-	parent *Function // enclosing function if anon; nil if global
-	Pkg    *Package  // enclosing package; nil for shared funcs (wrappers and error.Error)
-	Prog   *Program  // enclosing program
+	parent  *Function // enclosing function if anon; nil if global
+	Package *Package  // enclosing package; nil for shared funcs (wrappers and error.Error)
+	Program *Program  // enclosing program
 
 	buildshared *task // wait for a shared function to be done building (may be nil if <=1 builder ever needs to wait)
 
 	// These fields are populated only when the function body is built:
 
-	Params    []*Parameter  // function parameters; for methods, includes receiver
-	FreeVars  []*FreeVar    // free variables whose values must be supplied by closure
-	Locals    []*Alloc      // frame-allocated variables of this function
-	Blocks    []*BasicBlock // basic blocks of the function; nil => external
-	Recover   *BasicBlock   // optional; control transfers here after recovered panic
-	AnonFuncs []*Function   // anonymous functions (from FuncLit, RangeStmt) directly beneath this one
-	referrers []Instruction // referring instructions (iff Parent() != nil)
-	anonIdx   int32         // position of a nested function in parent's AnonFuncs. fn.Parent()!=nil => fn.Parent().AnonFunc[fn.anonIdx] == fn.
+	Parameters    []*Parameter    // function parameters; for methods, includes receiver
+	FreeVariables []*FreeVariable // free variables whose values must be supplied by closure
+	Locals        []*Allocation   // frame-allocated variables of this function
+	Blocks        []*BasicBlock   // basic blocks of the function; nil => external
+	Recover       *BasicBlock     // optional; control transfers here after recovered panic
+	AnonFuncs     []*Function     // anonymous functions (from FuncLit, RangeStmt) directly beneath this one
+	referrers     []Instruction   // referring instructions (iff Parent() != nil)
+	anonIdx       int32           // position of a nested function in parent's AnonFuncs. fn.Parent()!=nil => fn.Parent().AnonFunc[fn.anonIdx] == fn.
 
 	SCCs []*SCC // SCC DAG in reverse topological order
 
@@ -355,7 +354,7 @@ type Function struct {
 	build        buildFunc                // algorithm to build function body (nil => built)
 	currentBlock *BasicBlock              // where to emit code
 	vars         map[*types.Var]Value     // addresses of local variables
-	results      []*Alloc                 // result allocations of the current function
+	results      []*Allocation            // result allocations of the current function
 	returnVars   []*types.Var             // variables for a return statement. Either results or for range-over-func a parent's results
 	targets      *targets                 // linked stack of branch targets
 	lblocks      map[*types.Label]*lblock // labelled blocks
@@ -388,23 +387,29 @@ type Function struct {
 // The order of Preds and Succs is significant (to Phi and If
 // instructions, respectively).
 type BasicBlock struct {
-	Index        int            // index of this block within Parent().Blocks
-	Comment      string         // optional label; no semantic significance
-	parent       *Function      // parent function
-	Instrs       []Instruction  // instructions in order
-	Preds, Succs []*BasicBlock  // predecessors and successors
-	SCC          *SCC           // strongly connected component
-	succs2       [2]*BasicBlock // initial space for Succs
-	dom          domInfo        // dominator tree info
-	gaps         int            // number of nil Instrs (transient)
-	rundefers    int            // number of rundefers (transient)
+	Index   int    // index of this block within Parent().Blocks
+	comment string // optional label; no semantic significance
+
+	// RangeIndexLoop marks the loop header of a range over an array, a pointer to one or a slice, the
+	// block go/ir labels "rangeindex.loop", which a reader recognizes that lowering by. A field rather
+	// than the label, so no reader compares a string to find it.
+	RangeIndexLoop bool
+
+	parent                   *Function      // parent function
+	Instructions             []Instruction  // instructions in order
+	Predecessors, Successors []*BasicBlock  // predecessors and successors
+	SCC                      *SCC           // strongly connected component
+	successorsSpace          [2]*BasicBlock // initial space for Succs
+	dom                      domInfo        // dominator tree info
+	gaps                     int            // number of nil Instrs (transient)
+	rundefers                int            // number of rundefers (transient)
 }
 
 type SCC struct {
-	Index        int
-	Blocks       []*BasicBlock
-	Preds, Succs []*SCC
-	reachable    big.Int
+	Index                    int
+	Blocks                   []*BasicBlock
+	Predecessors, Successors []*SCC
+	reachable                big.Int
 }
 
 // Pure values ----------------------------------------
@@ -424,7 +429,7 @@ type SCC struct {
 //
 // Pos() returns the position of the value that was captured, which
 // belongs to an enclosing function.
-type FreeVar struct {
+type FreeVariable struct {
 	node
 
 	name      string
@@ -467,7 +472,7 @@ type Parameter struct {
 //	struct{x string}{}:struct{x string}
 //	0:interface{int|int64}
 //	nil:interface{bool|int} // no go/constant representation
-type Const struct {
+type Constant struct {
 	node
 
 	typ   types.Type
@@ -481,7 +486,7 @@ type CompositeValue struct {
 	Bitmap big.Int
 	// The number of bits set in Bitmap
 	// TODO(dh): remove NumSet. we can just query the bitmap.
-	NumSet int
+	ExplicitCount int
 	// Dense list of values in the composite literal. Omitted elements are filled in with zero values.
 	Values []Value
 }
@@ -498,7 +503,7 @@ type Global struct {
 	object types.Object // a *types.Var; may be nil for synthetics e.g. init$guard
 	typ    types.Type
 
-	Pkg *Package
+	Package *Package
 }
 
 // A Builtin represents a specific use of a built-in function, e.g. len.
@@ -559,7 +564,7 @@ type Builtin struct {
 //
 //	t0 = local int
 //	t1 = new int
-type Alloc struct {
+type Allocation struct {
 	register
 	Heap  bool
 	index int // dense numbering; for lifting
@@ -611,14 +616,14 @@ type Call struct {
 // Example printed form:
 //
 //	t1 = t0 + 1:int
-type BinOp struct {
+type BinaryOperation struct {
 	register
 	// One of:
 	// ADD SUB MUL QUO REM          + - * / %
 	// AND OR XOR SHL SHR AND_NOT   & | ^ << >> &^
 	// EQL NEQ LSS LEQ GTR GEQ      == != < <= < >=
-	Op   token.Token
-	X, Y Value
+	Operator token.Token
+	X, Y     Value
 }
 
 // The UnOp instruction yields the result of Op X.
@@ -629,10 +634,10 @@ type BinOp struct {
 // Example printed form:
 //
 //	t0 = ^x
-type UnOp struct {
+type UnaryOperation struct {
 	register
-	Op token.Token // One of: NOT SUB XOR ! - ^
-	X  Value
+	Operator token.Token // One of: NOT SUB XOR ! - ^
+	X        Value
 }
 
 // The Load instruction loads a value from a memory address.
@@ -822,7 +827,7 @@ type MakeInterface struct {
 //	t1 = make closure bound$(main.I).add [i]
 type MakeClosure struct {
 	register
-	Fn       Value   // always a *Function
+	Function Value   // always a *Function
 	Bindings []Value // values for each free variable in Fn.FreeVars
 }
 
@@ -855,7 +860,7 @@ type MakeMap struct {
 //
 //	t1 = make chan int t0
 //	t1 = make IntChan t0
-type MakeChan struct {
+type MakeChannel struct {
 	register
 	Size Value // int; size of buffer; zero => synchronous.
 }
@@ -901,8 +906,8 @@ type MakeSlice struct {
 //	t2 = slice t0[t1:]
 type Slice struct {
 	register
-	X              Value // slice, string, or *array
-	Low, High, Max Value // each may be nil
+	X                  Value // slice, string, or *array
+	Low, High, Maximum Value // each may be nil
 }
 
 // The FieldAddr instruction yields the address of Field of *struct X.
@@ -924,7 +929,7 @@ type Slice struct {
 // Example printed form:
 //
 //	t1 = &t0.name [#1]
-type FieldAddr struct {
+type FieldAddress struct {
 	register
 	X     Value // *struct
 	Field int   // index into CoreType(CoreType(X.Type()).(*types.Pointer).Elem()).(*types.Struct).Fields
@@ -966,7 +971,7 @@ type Field struct {
 // Example printed form:
 //
 //	t2 = &t0[t1]
-type IndexAddr struct {
+type IndexAddress struct {
 	register
 	X     Value // *array, slice or type parameter with types array, *array, or slice.
 	Index Value // numeric index
@@ -1025,10 +1030,10 @@ type StringLookup struct {
 // SelectState is a helper for Select.
 // It represents one goal state and its corresponding communication.
 type SelectState struct {
-	Dir  types.ChanDir // direction of case (SendOnly or RecvOnly)
-	Chan Value         // channel to use (for send or receive)
-	Send Value         // value to send (for send)
-	Pos  token.Pos     // position of token.ARROW
+	Dir     types.ChanDir // direction of case (SendOnly or RecvOnly)
+	Channel Value         // channel to use (for send or receive)
+	Send    Value         // value to send (for send)
+	Pos     token.Pos     // position of token.ARROW
 }
 
 // The Select instruction tests whether (or blocks until) one
@@ -1220,7 +1225,7 @@ type Unreachable struct {
 //	if t0 goto done else body
 type If struct {
 	anInstruction
-	Cond Value
+	Condition Value
 }
 
 type ConstantSwitch struct {
@@ -1228,13 +1233,13 @@ type ConstantSwitch struct {
 	Tag Value
 	// Constant branch conditions. A nil Value denotes the (implicit
 	// or explicit) default branch.
-	Conds []Value
+	Conditions []Value
 }
 
 type TypeSwitch struct {
 	register
-	Tag   Value
-	Conds []types.Type
+	Tag        Value
+	Conditions []types.Type
 }
 
 // The Return instruction returns values and control back to the calling
@@ -1349,7 +1354,7 @@ type Defer struct {
 //	send t0 <- t1
 type Send struct {
 	anInstruction
-	Chan, X Value
+	Channel, X Value
 }
 
 // The Recv instruction receives from channel Chan.
@@ -1366,9 +1371,9 @@ type Send struct {
 //
 //	t2 = Recv <int> t1
 //	t3 = Recv <(int, bool)> t1
-type Recv struct {
+type Receive struct {
 	register
-	Chan    Value
+	Channel Value
 	CommaOk bool
 }
 
@@ -1385,8 +1390,8 @@ type Recv struct {
 //	*x = y
 type Store struct {
 	anInstruction
-	Addr Value
-	Val  Value
+	Address Value
+	Value   Value
 }
 
 // The BlankStore instruction is emitted for assignments to the blank
@@ -1401,7 +1406,7 @@ type Store struct {
 //	BlankStore t1
 type BlankStore struct {
 	anInstruction
-	Val Value
+	Value Value
 }
 
 // The MapUpdate instruction updates the association of Map[Key] to
@@ -1526,9 +1531,9 @@ func (instr anInstruction) Comment() string {
 // For all calls to variadic functions (Signature().Variadic()),
 // the last element of Args is a slice.
 type CallCommon struct {
-	Value  Value       // receiver (invoke mode) or func value (call mode)
-	Method *types.Func // interface method (invoke mode)
-	Args   []Value     // actual parameters (in static method call, includes receiver)
+	Value     Value       // receiver (invoke mode) or func value (call mode)
+	Method    *types.Func // interface method (invoke mode)
+	Arguments []Value     // actual parameters (in static method call, includes receiver)
 
 	source ast.Node
 }
@@ -1566,7 +1571,7 @@ func (c *CallCommon) StaticCallee() *Function {
 	case *Function:
 		return fn
 	case *MakeClosure:
-		return fn.Fn.(*Function)
+		return fn.Function.(*Function)
 	}
 	return nil
 }
@@ -1619,20 +1624,21 @@ func (v *Builtin) Pos() token.Pos          { return token.NoPos }
 func (v *Builtin) Object() types.Object    { return types.Universe.Lookup(v.name) }
 func (v *Builtin) Parent() *Function       { return nil }
 
-func (v *FreeVar) Type() types.Type          { return v.typ }
-func (v *FreeVar) Name() string              { return v.name }
-func (v *FreeVar) Referrers() *[]Instruction { return &v.referrers }
-func (v *FreeVar) Parent() *Function         { return v.parent }
+func (v *FreeVariable) Type() types.Type          { return v.typ }
+func (v *FreeVariable) Name() string              { return v.name }
+func (v *FreeVariable) Referrers() *[]Instruction { return &v.referrers }
+func (v *FreeVariable) Parent() *Function         { return v.parent }
 
-func (v *Global) Type() types.Type                     { return v.typ }
-func (v *Global) Name() string                         { return v.name }
-func (v *Global) Parent() *Function                    { return nil }
-func (v *Global) Referrers() *[]Instruction            { return nil }
-func (v *Global) Token() token.Token                   { return token.VAR }
-func (v *Global) Object() types.Object                 { return v.object }
-func (v *Global) String() string                       { return v.RelString(nil) }
-func (v *Global) Package() *Package                    { return v.Pkg }
-func (v *Global) RelString(from *types.Package) string { return relString(v, from) }
+func (v *Global) Type() types.Type          { return v.typ }
+func (v *Global) Name() string              { return v.name }
+func (v *Global) Parent() *Function         { return nil }
+func (v *Global) Referrers() *[]Instruction { return nil }
+func (v *Global) Token() token.Token        { return token.VAR }
+func (v *Global) Object() types.Object      { return v.object }
+func (v *Global) String() string            { return v.RelativeString(nil) }
+func (v *Global) RelativeString(from *types.Package) string {
+	return relativeString(v, v.Package, from)
+}
 
 func (v *Function) Name() string       { return v.name }
 func (v *Function) Type() types.Type   { return v.Signature }
@@ -1643,8 +1649,7 @@ func (v *Function) Object() types.Object {
 	}
 	return nil
 }
-func (v *Function) String() string    { return v.RelString(nil) }
-func (v *Function) Package() *Package { return v.Pkg }
+func (v *Function) String() string    { return v.RelativeString(nil) }
 func (v *Function) Parent() *Function { return v.parent }
 func (v *Function) Referrers() *[]Instruction {
 	if v.parent != nil {
@@ -1670,7 +1675,7 @@ func (v *Function) Returns() iter.Seq[*BasicBlock] {
 func (v *Function) Exits() iter.Seq[*BasicBlock] {
 	return func(yield func(*BasicBlock) bool) {
 		for _, b := range v.Blocks {
-			if len(b.Succs) == 0 {
+			if len(b.Successors) == 0 {
 				if !yield(b) {
 					return
 				}
@@ -1696,7 +1701,7 @@ func (v *Function) NumNodes() int { return len(v.Blocks) }
 // Out returns an iterator over the successor block indices of a given node.
 func (v *Function) Out(node int) iter.Seq[int] {
 	return func(yield func(int) bool) {
-		for _, succ := range v.Blocks[node].Succs {
+		for _, succ := range v.Blocks[node].Successors {
 			if !yield(succ.Index) {
 				return
 			}
@@ -1835,8 +1840,8 @@ func origin(fn *Function) *Function {
 	return fn.topLevelOrigin
 }
 
-func (v *Alloc) Type() types.Type          { return v.typ }
-func (v *Alloc) Referrers() *[]Instruction { return &v.referrers }
+func (v *Allocation) Type() types.Type          { return v.typ }
+func (v *Allocation) Referrers() *[]Instruction { return &v.referrers }
 
 func (v *register) Type() types.Type          { return v.typ }
 func (v *register) setType(typ types.Type)    { v.typ = typ }
@@ -1848,23 +1853,25 @@ func (v *anInstruction) Block() *BasicBlock         { return v.block }
 func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
 func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 
-func (t *Type) Name() string                         { return t.object.Name() }
-func (t *Type) Pos() token.Pos                       { return t.object.Pos() }
-func (t *Type) Type() types.Type                     { return t.object.Type() }
-func (t *Type) Token() token.Token                   { return token.TYPE }
-func (t *Type) Object() types.Object                 { return t.object }
-func (t *Type) String() string                       { return t.RelString(nil) }
-func (t *Type) Package() *Package                    { return t.pkg }
-func (t *Type) RelString(from *types.Package) string { return relString(t, from) }
+func (t *Type) Name() string                              { return t.object.Name() }
+func (t *Type) Pos() token.Pos                            { return t.object.Pos() }
+func (t *Type) Type() types.Type                          { return t.object.Type() }
+func (t *Type) Token() token.Token                        { return token.TYPE }
+func (t *Type) Object() types.Object                      { return t.object }
+func (t *Type) String() string                            { return t.RelativeString(nil) }
+func (t *Type) Package() *Package                         { return t.pkg }
+func (t *Type) RelativeString(from *types.Package) string { return relativeString(t, t.pkg, from) }
 
-func (c *NamedConst) Name() string                         { return c.object.Name() }
-func (c *NamedConst) Pos() token.Pos                       { return c.object.Pos() }
-func (c *NamedConst) String() string                       { return c.RelString(nil) }
-func (c *NamedConst) Type() types.Type                     { return c.object.Type() }
-func (c *NamedConst) Token() token.Token                   { return token.CONST }
-func (c *NamedConst) Object() types.Object                 { return c.object }
-func (c *NamedConst) Package() *Package                    { return c.pkg }
-func (c *NamedConst) RelString(from *types.Package) string { return relString(c, from) }
+func (c *NamedConst) Name() string         { return c.object.Name() }
+func (c *NamedConst) Pos() token.Pos       { return c.object.Pos() }
+func (c *NamedConst) String() string       { return c.RelativeString(nil) }
+func (c *NamedConst) Type() types.Type     { return c.object.Type() }
+func (c *NamedConst) Token() token.Token   { return token.CONST }
+func (c *NamedConst) Object() types.Object { return c.object }
+func (c *NamedConst) Package() *Package    { return c.pkg }
+func (c *NamedConst) RelativeString(from *types.Package) string {
+	return relativeString(c, c.pkg, from)
+}
 
 func (v *Function) Pos() token.Pos   { return v.pos }
 func (v *Function) Source() ast.Node { return v.syntax }
@@ -1899,18 +1906,18 @@ func (p *Package) Type(name string) (t *Type) {
 
 // Operands.
 
-func (v *Alloc) Operands(rands []*Value) []*Value {
+func (v *Allocation) Operands(rands []*Value) []*Value {
 	return rands
 }
 
-func (v *BinOp) Operands(rands []*Value) []*Value {
+func (v *BinaryOperation) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X, &v.Y)
 }
 
 func (c *CallCommon) Operands(rands []*Value) []*Value {
 	rands = append(rands, &c.Value)
-	for i := range c.Args {
-		rands = append(rands, &c.Args[i])
+	for i := range c.Arguments {
+		rands = append(rands, &c.Arguments[i])
 	}
 	return rands
 }
@@ -1959,18 +1966,18 @@ func (v *Field) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X)
 }
 
-func (v *FieldAddr) Operands(rands []*Value) []*Value {
+func (v *FieldAddress) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X)
 }
 
 func (s *If) Operands(rands []*Value) []*Value {
-	return append(rands, &s.Cond)
+	return append(rands, &s.Condition)
 }
 
 func (s *ConstantSwitch) Operands(rands []*Value) []*Value {
 	rands = append(rands, &s.Tag)
-	for i := range s.Conds {
-		rands = append(rands, &s.Conds[i])
+	for i := range s.Conditions {
+		rands = append(rands, &s.Conditions[i])
 	}
 	return rands
 }
@@ -1984,7 +1991,7 @@ func (v *Index) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X, &v.Index)
 }
 
-func (v *IndexAddr) Operands(rands []*Value) []*Value {
+func (v *IndexAddress) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X, &v.Index)
 }
 
@@ -2004,12 +2011,12 @@ func (v *StringLookup) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X, &v.Index)
 }
 
-func (v *MakeChan) Operands(rands []*Value) []*Value {
+func (v *MakeChannel) Operands(rands []*Value) []*Value {
 	return append(rands, &v.Size)
 }
 
 func (v *MakeClosure) Operands(rands []*Value) []*Value {
-	rands = append(rands, &v.Fn)
+	rands = append(rands, &v.Function)
 	for i := range v.Bindings {
 		rands = append(rands, &v.Bindings[i])
 	}
@@ -2064,36 +2071,36 @@ func (*RunDefers) Operands(rands []*Value) []*Value {
 
 func (v *Select) Operands(rands []*Value) []*Value {
 	for i := range v.States {
-		rands = append(rands, &v.States[i].Chan, &v.States[i].Send)
+		rands = append(rands, &v.States[i].Channel, &v.States[i].Send)
 	}
 	return rands
 }
 
 func (s *Send) Operands(rands []*Value) []*Value {
-	return append(rands, &s.Chan, &s.X)
+	return append(rands, &s.Channel, &s.X)
 }
 
-func (recv *Recv) Operands(rands []*Value) []*Value {
-	return append(rands, &recv.Chan)
+func (recv *Receive) Operands(rands []*Value) []*Value {
+	return append(rands, &recv.Channel)
 }
 
 func (v *Slice) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X, &v.Low, &v.High, &v.Max)
+	return append(rands, &v.X, &v.Low, &v.High, &v.Maximum)
 }
 
 func (s *Store) Operands(rands []*Value) []*Value {
-	return append(rands, &s.Addr, &s.Val)
+	return append(rands, &s.Address, &s.Value)
 }
 
 func (s *BlankStore) Operands(rands []*Value) []*Value {
-	return append(rands, &s.Val)
+	return append(rands, &s.Value)
 }
 
 func (v *TypeAssert) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X)
 }
 
-func (v *UnOp) Operands(rands []*Value) []*Value {
+func (v *UnaryOperation) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X)
 }
 
@@ -2109,9 +2116,9 @@ func (v *CompositeValue) Operands(rands []*Value) []*Value {
 }
 
 // Non-Instruction Values:
-func (v *Builtin) Operands(rands []*Value) []*Value   { return rands }
-func (v *FreeVar) Operands(rands []*Value) []*Value   { return rands }
-func (v *Const) Operands(rands []*Value) []*Value     { return rands }
-func (v *Function) Operands(rands []*Value) []*Value  { return rands }
-func (v *Global) Operands(rands []*Value) []*Value    { return rands }
-func (v *Parameter) Operands(rands []*Value) []*Value { return rands }
+func (v *Builtin) Operands(rands []*Value) []*Value      { return rands }
+func (v *FreeVariable) Operands(rands []*Value) []*Value { return rands }
+func (v *Constant) Operands(rands []*Value) []*Value     { return rands }
+func (v *Function) Operands(rands []*Value) []*Value     { return rands }
+func (v *Global) Operands(rands []*Value) []*Value       { return rands }
+func (v *Parameter) Operands(rands []*Value) []*Value    { return rands }
