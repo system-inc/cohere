@@ -55,7 +55,7 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	hasher := newPackageHasher()
 	result := &PackageFunctions{}
-	for function := range built.SourceFunctionsReadBy(pass) {
+	for function := range built.SourceFunctions() {
 		// A wrapper, a thunk or the package's init is the compiler's, not a function anyone wrote.
 		if function.Synthetic != "" {
 			continue

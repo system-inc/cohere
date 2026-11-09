@@ -58,7 +58,7 @@ func functionCheckAnalyzer(
 			if contextError != nil {
 				return nil, contextError
 			}
-			for function := range built.SourceFunctions(nil, "") {
+			for function := range built.SourceFunctions() {
 				check(context, function)
 			}
 			return nil, nil

@@ -60,7 +60,7 @@ func TestTheOwnWalkCallsEachListenerForWhatItDeclaresInOrder(test *testing.T) {
 			if readError != nil {
 				return nil, readError
 			}
-			functions = slices.Collect(built.SourceFunctions(nil, ""))
+			functions = slices.Collect(built.SourceFunctions())
 			return nil, nil
 		},
 	}

@@ -41,7 +41,7 @@ var rangeStringRunesAnalyzer = &analysis.Analyzer{
 		if contextError != nil {
 			return nil, contextError
 		}
-		for function := range built.SourceFunctions(nil, "") {
+		for function := range built.SourceFunctions() {
 			staticcheck_code.RangeStringRunes(context, function)
 		}
 		return nil, nil

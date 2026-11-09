@@ -91,7 +91,7 @@ type Resolver struct {
 // The resolver's two rows under `--timing`, shared rows as the representation's build is: building functions in the
 // resolver's program, and everything else a question does, judging above all. Each CPU-s is billed once: a question's
 // whole cost is taken out of the asking rule's row and added to JudgeRow, and each build inside it is taken out of
-// JudgeRow and added to BuildRow, as SourceFunctions bills the representation's build.
+// JudgeRow and added to BuildRow, as the representation's build has a row of its own.
 const (
 	BuildRow = "fact_resolver_build"
 	JudgeRow = "fact_resolver_judge"
