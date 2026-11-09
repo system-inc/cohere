@@ -3,14 +3,8 @@
 package rules
 
 import (
-	"slices"
-
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/suite/vet"
-	"honnef.co/go/tools/analysis/lint"
-	"honnef.co/go/tools/simple"
-	"honnef.co/go/tools/staticcheck"
-	"honnef.co/go/tools/stylecheck"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/address_compared_to_nil"
@@ -324,8 +318,10 @@ var duplicatesOfVet = map[string]string{
 // (#z2x1c7g) or a staticcheck check's code (#d8s4rsy), which never collide. A port enters this table only in its own
 // landing, once it matches its original finding for finding, and All then runs it in the original's place: under the
 // original's name and in the original's order, so `cohere-go/<name>`, its settings and every `//cohere:ignore`
-// naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
-// and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
+// naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests.
+// The loops below walk staticcheck's checks through the registry's own tables of them (staticcheckChecks), held to
+// the suites by a test, so a check is chosen, left off or ruled on exactly as before it was ported, and the binary
+// links none of the originals.
 // A port that listens on a dispatcher carries its listener beside its analyzer, so its rule registers with it, and is
 // validated and held to its dispatcher as every dispatched rule is.
 var ports = map[string]port{
@@ -534,7 +530,7 @@ type port struct {
 	listener *rule.Listener
 }
 
-// portOrOriginal is what All runs for one borrowed check: its port when table holds one, and the original, which
+// portOrOriginal is what All runs for one of vet's passes: its port when table holds one, and the original, which
 // listens on no dispatcher, otherwise.
 func portOrOriginal(original *analysis.Analyzer, table map[string]port) port {
 	if ported, held := table[original.Name]; held {
@@ -550,16 +546,8 @@ func All() []rule.Rule {
 	}
 	registered = append(registered, dispatchedRule(nil_ness.Analyzer, &nil_ness.Listener, rule.OriginTools))
 	registered = append(registered, dispatchedRule(unused_write.Analyzer, &unused_write.Listener, rule.OriginTools))
-	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
-		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
-			continue
-		}
-		registered = append(registered, staticcheckRule(wrapped, portOrOriginal(wrapped.Analyzer, ports)))
-	}
-	for _, wrapped := range stylecheck.Analyzers {
-		if stylecheckRuledOn[wrapped.Analyzer.Name] {
-			registered = append(registered, staticcheckRule(wrapped, portOrOriginal(wrapped.Analyzer, ports)))
-		}
+	for _, check := range registeredStaticcheckChecks() {
+		registered = append(registered, staticcheckRule(check, portOf(check)))
 	}
 	registered = append(registered, rule.Rule{
 		Name:         rule.Namespace + unused_code.Analyzer.Name,
@@ -642,11 +630,41 @@ func dispatchedRule(analyzer *analysis.Analyzer, listener *rule.Listener, origin
 	return borrowedRule(port{analyzer: analyzer, listener: listener}, origin)
 }
 
-// staticcheckRule is the rule that runs chosen, the port of staticcheck's check wrapped or wrapped itself, merged
-// across builds as wrapped's documentation says, so a port merges as its original does.
-func staticcheckRule(wrapped *lint.Analyzer, chosen port) rule.Rule {
+// registeredStaticcheckChecks is staticcheck's checks All registers, in its order: every SA and S check staticcheck
+// runs by default that judges what no registered vet pass already judges, and then the ST checks ruled on.
+func registeredStaticcheckChecks() []staticcheckCheck {
+	registered := []staticcheckCheck{}
+	for _, check := range staticcheckChecks {
+		if !check.nonDefault && duplicatesOfVet[check.name] == "" {
+			registered = append(registered, check)
+		}
+	}
+	for _, check := range stylecheckChecks {
+		if stylecheckRuledOn[check.name] {
+			registered = append(registered, check)
+		}
+	}
+	return registered
+}
+
+// portOf is the port All runs for check, one of staticcheck's checks it registers.
+func portOf(check staticcheckCheck) port {
+	ported, held := ports[check.name]
+	if !held {
+		// Invariant: the registry links none of staticcheck's originals, so it runs a check only through its port,
+		// and TestEveryRegisteredStaticcheckCheckHasAPort holds that every check it registers has one. A check
+		// without one is a mistake in building the registry, never in a package, and panicking as All runs fails
+		// every test before any rule does.
+		panic("staticcheck's " + check.name + " is registered with no port, and the registry runs no original")
+	}
+	return ported
+}
+
+// staticcheckRule is the rule that runs chosen, the port of staticcheck's check, merged across builds as the check's
+// documentation says, so a port merges as its original does.
+func staticcheckRule(check staticcheckCheck, chosen port) rule.Rule {
 	registered := borrowedRule(chosen, rule.OriginStaticcheck)
-	registered.MergeIfAll = wrapped.Doc != nil && wrapped.Doc.MergeIf == lint.MergeIfAll
+	registered.MergeIfAll = check.mergeIfAll
 	return registered
 }
 
