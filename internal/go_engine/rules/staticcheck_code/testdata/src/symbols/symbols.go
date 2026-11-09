@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"unsafe"
 )
 
 type record struct {
@@ -98,6 +99,8 @@ func typesAndAliases(parameter int) {
 	_ = waitGroup{}
 	_ = slice{}
 	_ = int(parameter)
+	_ = unsafe.Pointer(&parameter)
+	_ = string(rune(parameter))
 	_ = List[int]{}
 	_ = (*List[int])(nil)
 	_ = pair[int, string]{}
