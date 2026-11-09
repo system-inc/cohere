@@ -24,6 +24,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/edit"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
@@ -158,7 +159,8 @@ func isFunction(context *rule.Context, function ast.Expr, fullName string) bool 
 	default:
 		return false
 	}
-	// FullName spells a method with its receiver, `(time.Time).Sub`, and a function by its package's path.
+	// The full name Matches compares spells a method with its receiver, `(time.Time).Sub`, and a function by its
+	// package's path.
 	named, isFunction := object.(*types.Func)
-	return isFunction && named.FullName() == fullName
+	return isFunction && function_name.Matches(named, fullName)
 }
