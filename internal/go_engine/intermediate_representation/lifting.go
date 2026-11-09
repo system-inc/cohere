@@ -37,8 +37,13 @@ type liftingOptions struct {
 	unlifted bool
 
 	// verify, when set, is handed the core's verdict on each round of each function, right after construction,
-	// while the values still carry the core's names.
-	verify func(function *Function, violations []static_single_assignment.StaticSingleAssignmentViolation)
+	// while the values still carry the core's names, and what liftingPlacedProblems finds of the core's view: where
+	// it is incomplete, and how many instructions have a place.
+	verify func(function *Function, violations []static_single_assignment.StaticSingleAssignmentViolation,
+		incomplete []string, places int)
+
+	// placedDropsStores plants a mutant: each block's placed view leaves out its Stores.
+	placedDropsStores bool
 
 	// skipStoreDefinition plants a mutant: the first Store a round would lift defines nothing.
 	skipStoreDefinition bool
@@ -129,7 +134,9 @@ func liftingRound(function *Function, options liftingOptions) bool {
 		lifting = liftingPrepare(function, allocations, options)
 		static_single_assignment.Construct(liftingGraph{}, lifting)
 		if options.verify != nil {
-			options.verify(function, static_single_assignment.VerifyStaticSingleAssignment(liftingGraph{}, lifting))
+			incomplete, places := liftingPlacedProblems(lifting)
+			options.verify(function, static_single_assignment.VerifyStaticSingleAssignment(liftingGraph{}, lifting),
+				incomplete, places)
 		}
 		liftingResolve(lifting)
 		// A lifted Allocation leaves Locals with the ones no block holds.
@@ -291,6 +298,17 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 					liftingDeleteAt(lifted, index)
 				}
 			}
+		}
+	}
+	for _, block := range lifting.blocks {
+		for index, slot := range block.slots {
+			if !slot.isPlace {
+				continue
+			}
+			if _, isStore := block.block.Instructions[index].(*Store); isStore && options.placedDropsStores {
+				continue
+			}
+			block.placed = append(block.placed, index)
 		}
 	}
 	lifting.order = liftingReversePostorder(lifting)
