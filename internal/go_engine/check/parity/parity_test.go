@@ -805,3 +805,65 @@ func TestRequireOnlyAdjudicatedHoldsFixesGivenBesideTheCall(test *testing.T) {
 			"same/same.go:8, and it does not",
 	)
 }
+
+// assembling is calling, and also reports each line of a package's assembly files that calls a function messages
+// names, as `CALL ·gained(SB)`, at the line's start, as asmdecl reports its findings, so a finding sits in assembly.
+func assembling(messages map[string]string) *analysis.Analyzer {
+	inGo := calling(messages)
+	return &analysis.Analyzer{
+		Name: "calling",
+		Doc:  "calling reports each call to a function it names, in Go and in assembly.",
+		Run: func(pass *analysis.Pass) (any, error) {
+			for _, name := range pass.OtherFiles {
+				if !strings.HasSuffix(name, ".s") {
+					continue
+				}
+				content, readError := pass.ReadFile(name)
+				if readError != nil {
+					return nil, readError
+				}
+				file := pass.Fset.AddFile(name, -1, len(content))
+				file.SetLinesForContent(content)
+				for index, line := range strings.Split(string(content), "\n") {
+					for called, message := range messages {
+						if strings.Contains(line, "CALL ·"+called+"(SB)") {
+							pass.Reportf(file.LineStart(index+1), "%s", message)
+						}
+					}
+				}
+			}
+			return inGo.Run(pass)
+		},
+	}
+}
+
+// A record in an assembly file is read as one in Go is, on its own line: the port's lone call to gained in assembled.s
+// is met by the record there, beside the one in assembled.go.
+func TestRequireOnlyAdjudicatedReadsRecordsInAssembly(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, assembling(originalMessages), assembling(portMessages),
+			analysistest.TestData(), "assembled")
+	}))
+}
+
+// The same fixture with the record in its assembly removed fails on the finding there, named by its file and line.
+func TestRequireOnlyAdjudicatedFailsAnUnrecordedFindingInAssembly(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, assembling(originalMessages), assembling(portMessages),
+			analysistest.TestData(), "assembled_unrecorded")
+	}), "the port alone found assembled_unrecorded/assembled_unrecorded.s:4:0: call to gained, which the fixture does "+
+		"not record")
+}
+
+// An assembly file has no declarations, so a record there with no comment on the line directly above it has no
+// reason, and fails, named by file and line.
+func TestRequireOnlyAdjudicatedFailsARecordInAssemblyWithNoReasonAbove(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, assembling(originalMessages), assembling(portMessages),
+			analysistest.TestData(), "assembled_unreasoned")
+	}), "assembled_unreasoned/assembled_unreasoned.s:4 holds a record with no reason: write why on the line directly "+
+		"above it, since a file with no declarations has no doc comment to give it")
+}

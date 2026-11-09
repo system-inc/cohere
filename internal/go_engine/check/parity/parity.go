@@ -5,8 +5,10 @@
 // both make that differs in span, fixes or related entries is paired only by a record that it moves, that the port
 // withholds the one fix of the original's it leaves out, or that it omits the one related entry. A finding the port
 // alone makes is recorded with the text each of its fixes writes, so no fix of the port's goes unread, and one it
-// offers with no edits, which no record can stand for, fails. Every record gives its reason: a drop on the line
-// directly above it, and any other there or in the doc comment of the declaration it is in.
+// offers with no edits, which no record can stand for, fails. Records are comments of the fixture's Go files and its
+// assembly files, and every record gives its reason: a drop on the line directly above it, any other in a Go file
+// there or in the doc comment of the declaration it is in, and any in an assembly file, which has no declarations,
+// on the line directly above it too.
 //
 // A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: the
 // port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
@@ -30,6 +32,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -281,7 +284,8 @@ func fixesText(written string) (string, bool) {
 // does not offer, or offers elsewhere, and one with no edits, which no record can stand for. No original's edit is
 // compared with a lone finding's, so the record holds where it lands as well as what it writes.
 // Every record must give its reason, a drop on the line directly above it and any other there or in the doc comment
-// of the declaration it is in, and one with none fails, named by file and line. A `// port ` comment it cannot read
+// of the declaration it is in, but in an assembly file, which has no declarations, on the line directly above it
+// alone, and one with none fails, named by file and line. A `// port ` comment it cannot read
 // fails, and so does a fixture that records nothing. The census has no fixture, so no record covers anything there.
 //
 // A file that cannot carry a comment, as x/tools' fixtures copied byte for byte cannot, takes its records beside the
@@ -293,8 +297,9 @@ func fixesText(written string) (string, bool) {
 // A `moves:` record pairs by line and message only, so the port's own tests must hold its fix there, with a golden file
 // or by applying the edit and checking the result. It reads the one package directory fixture names, not the packages
 // nested below it, so a fixture tree with nested packages takes one call for each. It loads for the machine's own
-// target, and Target.RequireOnlyAdjudicated for another, and reads the records of every file of that directory,
-// whichever target builds it, so a record in a file the target does not build fails unmatched.
+// target, and Target.RequireOnlyAdjudicated for another, and reads the records of every Go and assembly file of that
+// directory (see recordFiles), whichever target builds it, so a record in a file the target does not build fails
+// unmatched.
 func RequireOnlyAdjudicated(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -571,46 +576,49 @@ func pairMoved(
 	return remainingOriginal, remainingPort
 }
 
-// adjudicated reads every `// port ` comment of the .go files in directory, each record on the comment's line, its
-// file named by fileName as the findings name it, and fails each record that gives no reason (see reasonedLines), and
-// then the records given beside the call, each failed that gives no Reason. A `fixes:` record is put on the line of
-// the `finds:` record it follows, on its own line or the line above, written as a comment or given, and one that
-// follows none fails. It reads comments as the parser finds them, so a `// port ` inside a string is no record. It
-// reads that one directory, not those below it.
+// recordFiles are the files of a differences fixture's folder that can hold its records, by pattern: its Go files, and
+// its assembly files, the Go assembler's, whose line comments open with `//` as Go's do.
+var recordFiles = []string{"*.go", "*.s"}
+
+// adjudicated reads every `// port ` comment of the Go and assembly files in directory (see recordFiles), each record
+// on the comment's line, its file named by fileName as the findings name it, and fails each record that gives no
+// reason (see lineReasons), and then the records given beside the call, each failed that gives no Reason. A `fixes:`
+// record is put on the line of the `finds:` record it follows, on its own line or the line above, written as a comment
+// or given, and one that follows none fails. It reads a Go file's comments as the parser finds them and an assembly
+// file's as the assembler lexes them, so a `// port ` inside a string is no record. It reads that one directory, not
+// those below it.
 func adjudicated(test testing.TB, directory string, fileName func(string) string, given []Record) records {
 	test.Helper()
-	names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
-	if globError != nil {
-		test.Fatalf("listing the differences fixture %s: %v", directory, globError)
-	}
 	recorded := records{}
 	fileSet := token.NewFileSet()
-	for _, name := range names {
-		file, parseError := parser.ParseFile(fileSet, name, nil, parser.ParseComments|parser.SkipObjectResolution)
-		if parseError != nil {
-			test.Fatalf("parsing the differences fixture: %v", parseError)
+	for _, pattern := range recordFiles {
+		names, globError := filepath.Glob(filepath.Join(directory, pattern))
+		if globError != nil {
+			test.Fatalf("listing the differences fixture %s: %v", directory, globError)
 		}
-		reasoned := reasonedLines(fileSet, file)
-		for _, group := range file.Comments {
-			for _, comment := range group.List {
-				line := fileSet.Position(comment.Slash).Line
-				for _, record := range strings.Split(comment.Text, "// port ")[1:] {
+		for _, name := range names {
+			comments, reasoned := fixtureComments(test, fileSet, name)
+			for _, comment := range comments {
+				for _, record := range strings.Split(comment.text, "// port ")[1:] {
 					match, text, isReadable := readRecord(record)
-					at := Finding{File: fileName(name), Line: line}
+					at := Finding{File: fileName(name), Line: comment.line}
 					switch {
-					case !isReadable || reasoned.above(line):
+					case !isReadable || reasoned.above(comment.line):
 						// Unreadable, which fails below, or reasoned on the line above, as any record may be.
 					case match[4] != "":
 						// A drop is ruled with its own finding in hand, so a declaration's doc, which often rules a
 						// whole group of records, rules no drop.
 						test.Errorf("%s:%d holds a drop with no reason: write why on the line directly above it, "+
-							"since a doc comment rules no drop", at.File, line)
-					case !reasoned.isDocumented(line):
+							"since a doc comment rules no drop", at.File, at.Line)
+					case reasoned.isDocumented == nil:
+						test.Errorf("%s:%d holds a record with no reason: write why on the line directly above it, "+
+							"since a file with no declarations has no doc comment to give it", at.File, at.Line)
+					case !reasoned.isDocumented(comment.line):
 						test.Errorf("%s:%d holds a record with no reason: write why on the line above it, or in "+
-							"the doc comment of the declaration it is in", at.File, line)
+							"the doc comment of the declaration it is in", at.File, at.Line)
 					}
 					if !isReadable {
-						test.Fatalf("%s:%d holds a comment the harness cannot read: %q", at.File, line, record)
+						test.Fatalf("%s:%d holds a comment the harness cannot read: %q", at.File, at.Line, record)
 					}
 					recorded = withRecord(recorded, at, match, text)
 				}
@@ -732,25 +740,68 @@ var directivePrefixes = []string{"//go:", "//line ", "//cohere:"}
 // comment that is neither a record nor a directive ends on the line directly above line, the one reason a drop
 // takes, and isDocumented whether line is in a declaration with a doc comment, the top-level one or the one in a
 // group, a reason for every record but a drop. Wave 1's fixtures give their reasons as the doc comment of the function
-// the records are in.
+// the records are in. isDocumented is nil for a file with no declarations, as an assembly file, so every record there
+// takes its reason from the line directly above it, as a drop does.
 type lineReasons struct {
 	above        func(line int) bool
 	isDocumented func(line int) bool
 }
 
-// reasonedLines is where file gives its records' reasons.
-func reasonedLines(fileSet *token.FileSet, file *ast.File) lineReasons {
-	reasonEndsOn := map[int]bool{}
+// fixtureComments are the comments of the differences fixture's file named name, and where it gives its records'
+// reasons: a Go file's comments as the parser finds them, and an assembly file's as the assembler lexes them (see
+// assemblyComments), with no declaration to document a record.
+func fixtureComments(test testing.TB, fileSet *token.FileSet, name string) ([]fixtureComment, lineReasons) {
+	test.Helper()
+	if filepath.Ext(name) == ".s" {
+		content, readError := os.ReadFile(name)
+		if readError != nil {
+			test.Fatalf("reading the differences fixture: %v", readError)
+		}
+		comments, lexError := assemblyComments(name, content)
+		if lexError != nil {
+			test.Fatalf("reading the differences fixture: %v", lexError)
+		}
+		return comments, lineReasons{above: reasonedAbove(comments)}
+	}
+	file, parseError := parser.ParseFile(fileSet, name, nil, parser.ParseComments|parser.SkipObjectResolution)
+	if parseError != nil {
+		test.Fatalf("parsing the differences fixture: %v", parseError)
+	}
+	return goComments(fileSet, file), reasonedLines(fileSet, file)
+}
+
+// goComments are file's comments, in the order the parser found them.
+func goComments(fileSet *token.FileSet, file *ast.File) []fixtureComment {
+	comments := []fixtureComment{}
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
-			isDirective := slices.ContainsFunc(directivePrefixes, func(prefix string) bool {
-				return strings.HasPrefix(comment.Text, prefix)
+			comments = append(comments, fixtureComment{
+				line:    fileSet.Position(comment.Slash).Line,
+				endLine: fileSet.Position(comment.End()).Line,
+				text:    comment.Text,
 			})
-			if !isDirective && !strings.Contains(comment.Text, "// port ") {
-				reasonEndsOn[fileSet.Position(comment.End()).Line] = true
-			}
 		}
 	}
+	return comments
+}
+
+// reasonedAbove is lineReasons.above over comments: whether one that is neither a record nor a directive ends on the
+// line directly above line.
+func reasonedAbove(comments []fixtureComment) func(line int) bool {
+	reasonEndsOn := map[int]bool{}
+	for _, comment := range comments {
+		isDirective := slices.ContainsFunc(directivePrefixes, func(prefix string) bool {
+			return strings.HasPrefix(comment.text, prefix)
+		})
+		if !isDirective && !strings.Contains(comment.text, "// port ") {
+			reasonEndsOn[comment.endLine] = true
+		}
+	}
+	return func(line int) bool { return reasonEndsOn[line-1] }
+}
+
+// reasonedLines is where the Go file file gives its records' reasons.
+func reasonedLines(fileSet *token.FileSet, file *ast.File) lineReasons {
 	// documented is the line span of each declaration with a doc comment.
 	type span struct{ first, last int }
 	documented := []span{}
@@ -783,7 +834,7 @@ func reasonedLines(fileSet *token.FileSet, file *ast.File) lineReasons {
 		}
 	}
 	return lineReasons{
-		above: func(line int) bool { return reasonEndsOn[line-1] },
+		above: reasonedAbove(goComments(fileSet, file)),
 		isDocumented: func(line int) bool {
 			for _, each := range documented {
 				if each.first <= line && line <= each.last {
