@@ -60,7 +60,9 @@ func (dominance *Dominance) ImmediateDominator(block BlockId) (BlockId, bool) {
 //
 // None for a block the real edges don't reach, which is in no tree, and for a block the function does
 // not hold. The slice shares the tree's array, capped so an append copies rather than overwriting a
-// sibling's children, and is the caller's to read, not to change.
+// sibling's children, and is the caller's to read, not to change: writing an element, or sorting the
+// slice in place, rewrites the tree every later caller reads. A reader that wants another order sorts
+// a copy.
 func (dominance *Dominance) Children(block BlockId) []BlockId {
 	index, ok := dominance.position[block]
 	if !ok || dominance.childrenStart == nil {
