@@ -6,7 +6,7 @@ import (
 	"go/types"
 	"strings"
 
-	"honnef.co/go/tools/go/ir"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
 // typeString names a type by its full package paths, so two packages' `Config` never read alike. Signatures and
@@ -52,15 +52,20 @@ var pureBuiltins = map[string]bool{
 
 // isEffect says whether an instruction takes a place in its block's effect chain: it writes, reads state a write
 // could change while advancing it, allocates an object whose identity matters, or leaves the function.
-func isEffect(instruction ir.Instruction) bool {
+func isEffect(instruction intermediate_representation.Instruction) bool {
 	switch typed := instruction.(type) {
-	case *ir.Call:
-		if builtin, isBuiltin := typed.Call.Value.(*ir.Builtin); isBuiltin && pureBuiltins[builtin.Name()] {
+	case *intermediate_representation.Call:
+		builtin, isBuiltin := typed.Call.Value.(*intermediate_representation.Builtin)
+		if isBuiltin && pureBuiltins[builtin.Name()] {
 			return false
 		}
 		return true
-	case *ir.Go, *ir.Defer, *ir.Store, *ir.MapUpdate, *ir.Send, *ir.Recv, *ir.Select, *ir.Next, *ir.Range,
-		*ir.Alloc, *ir.MakeSlice, *ir.MakeMap, *ir.MakeChan, *ir.Panic, *ir.Return, *ir.RunDefers:
+	case *intermediate_representation.Go, *intermediate_representation.Defer, *intermediate_representation.Store,
+		*intermediate_representation.MapUpdate, *intermediate_representation.Send, *intermediate_representation.Receive,
+		*intermediate_representation.Select, *intermediate_representation.Next, *intermediate_representation.Range,
+		*intermediate_representation.Allocation, *intermediate_representation.MakeSlice,
+		*intermediate_representation.MakeMap, *intermediate_representation.MakeChannel,
+		*intermediate_representation.Panic, *intermediate_representation.Return, *intermediate_representation.RunDefers:
 		return true
 	}
 	return false
@@ -68,9 +73,9 @@ func isEffect(instruction ir.Instruction) bool {
 
 // readsMemory says whether a value reads memory a write could change; it hashes with the chain before it, so it
 // floats among other reads but never across a write.
-func readsMemory(value ir.Value) bool {
+func readsMemory(value intermediate_representation.Value) bool {
 	switch value.(type) {
-	case *ir.Load, *ir.MapLookup:
+	case *intermediate_representation.Load, *intermediate_representation.MapLookup:
 		return true
 	}
 	return false
@@ -78,8 +83,8 @@ func readsMemory(value ir.Value) bool {
 
 // isCommutative says whether a binary operator sorts its operand digests: equality always, and arithmetic and
 // bitwise operators only on numbers, since string concatenation is not commutative.
-func isCommutative(binary *ir.BinOp) bool {
-	switch binary.Op {
+func isCommutative(binary *intermediate_representation.BinaryOperation) bool {
+	switch binary.Operator {
 	case token.EQL, token.NEQ:
 		return true
 	case token.MUL, token.AND, token.OR, token.XOR, token.ADD:
@@ -112,12 +117,12 @@ func fieldName(typ types.Type, index int, throughPointer bool) string {
 
 // functionSize counts the instructions that compute something: every one but a Jump or a BlankStore, which only route
 // control or mark a discard.
-func functionSize(function *ir.Function) int {
+func functionSize(function *intermediate_representation.Function) int {
 	size := 0
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
+		for _, instruction := range block.Instructions {
 			switch instruction.(type) {
-			case *ir.Jump, *ir.BlankStore:
+			case *intermediate_representation.Jump, *intermediate_representation.BlankStore:
 				continue
 			}
 			size++
@@ -129,11 +134,11 @@ func functionSize(function *ir.Function) int {
 // canonicalBlockOrder is a depth-first preorder from the entry, following successors in their semantic order (an
 // If's true successor first), then the recover block, then anything unreached by index. Not the dominator tree's
 // preorder: its children come in the order of the builder's block indices, which follow source layout.
-func canonicalBlockOrder(function *ir.Function) []*ir.BasicBlock {
-	visited := map[*ir.BasicBlock]bool{}
-	var order []*ir.BasicBlock
-	visit := func(block *ir.BasicBlock) {
-		stack := []*ir.BasicBlock{block}
+func canonicalBlockOrder(function *intermediate_representation.Function) []*intermediate_representation.BasicBlock {
+	visited := map[*intermediate_representation.BasicBlock]bool{}
+	var order []*intermediate_representation.BasicBlock
+	visit := func(block *intermediate_representation.BasicBlock) {
+		stack := []*intermediate_representation.BasicBlock{block}
 		for len(stack) > 0 {
 			current := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
@@ -142,9 +147,9 @@ func canonicalBlockOrder(function *ir.Function) []*ir.BasicBlock {
 			}
 			visited[current] = true
 			order = append(order, current)
-			for index := len(current.Succs) - 1; index >= 0; index-- {
-				if !visited[current.Succs[index]] {
-					stack = append(stack, current.Succs[index])
+			for index := len(current.Successors) - 1; index >= 0; index-- {
+				if !visited[current.Successors[index]] {
+					stack = append(stack, current.Successors[index])
 				}
 			}
 		}

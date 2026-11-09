@@ -26,8 +26,8 @@ var (
 	fixture     hashedFixture
 )
 
-// hashFixture runs the analyzer, through buildir as the engine runs it, over the fixture's packages and their test
-// variants, once for every test in the package.
+// hashFixture runs the analyzer, through our intermediate representation as the engine runs it, over the fixture's
+// packages and their test variants, once for every test in the package.
 func hashFixture(test *testing.T) hashedFixture {
 	test.Helper()
 	fixtureOnce.Do(func() {
@@ -76,8 +76,8 @@ func digestOf(test *testing.T, hashed hashedFixture, name string) (duplicate_fun
 }
 
 // Each pair is the one a normalization decides, so switching the normalization off turns exactly its pair red. The
-// prototype's fixture on #6rj7jw7 is the start, its tables both ways, run here on buildir's IR, built in debug
-// mode with no-return calls marked, which the prototype never built.
+// prototype's fixture on #6rj7jw7 is the start, its tables both ways, run here on our intermediate representation,
+// built in debug mode with no-return calls marked, which the prototype never built.
 var samePairs = []struct{ normalization, left, right string }{
 	{"values are named by structure, never by source name", "shapes.SameNamesA", "shapes.SameNamesB"},
 	{"independent statements float free of source order", "shapes.SameOrderA", "shapes.SameOrderB"},
@@ -131,8 +131,8 @@ func TestPairsThatComputeDifferentThingsHashApart(test *testing.T) {
 	}
 }
 
-// Nothing in the fixture holds an instruction the hash does not model: on buildir's IR, debug references included,
-// every function with a body in a file of ours is hashed.
+// Nothing in the fixture holds an instruction the hash does not model: on our intermediate representation, built in
+// debug mode as analysistest builds it, every function with a body in a file of ours is hashed.
 func TestEveryFixtureFunctionIsHashed(test *testing.T) {
 	test.Parallel()
 	hashed := hashFixture(test)
