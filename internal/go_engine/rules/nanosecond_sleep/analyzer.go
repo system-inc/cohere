@@ -25,6 +25,7 @@ import (
 
 	"honnef.co/go/tools/analysis/edit"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
@@ -123,7 +124,8 @@ func isTimeSleep(context *rule.Context, function ast.Expr) bool {
 	default:
 		return false
 	}
-	// FullName spells a method with its receiver, `(T).Sleep`, and a function by its package's path.
+	// The full name Matches compares spells a method with its receiver, `(T).Sleep`, and a function by its package's
+	// path.
 	sleep, isFunction := object.(*types.Func)
-	return isFunction && sleep.FullName() == "time.Sleep"
+	return isFunction && function_name.Matches(sleep, "time.Sleep")
 }
