@@ -90,6 +90,7 @@ func liftingRound(function *Function, options liftingOptions) bool {
 	heads := liftingNumber(function)
 
 	runDefers := make([]int, len(function.Blocks))
+	var scratch liftingLiftableScratch
 	var allocations []*Allocation
 	inBlocks := map[*Allocation]bool{}
 	for _, block := range function.Blocks {
@@ -97,7 +98,7 @@ func liftingRound(function *Function, options liftingOptions) bool {
 			switch instruction := instruction.(type) {
 			case *Allocation:
 				inBlocks[instruction] = true
-				if liftingLiftable(instruction, work, heads) {
+				if liftingLiftable(instruction, work, heads, &scratch) {
 					allocations = append(allocations, instruction)
 				}
 			case *Defer:

@@ -27,6 +27,27 @@ type liftingRename struct {
 	startingAt int
 }
 
+// liftingLiftableScratch is liftable's working memory, kept across one round's Allocations so each reuses the
+// last one's slices rather than making its own (#beapx0q): go/ir reuses its liftableBlockMap the same way.
+type liftingLiftableScratch struct {
+	descriptions        []liftingBlockDescription
+	seen                []bool
+	predecessorHasStore []bool
+
+	// pending are the blocks still to mark unliftable, a stack in place of go/ir's recursion.
+	pending []*BasicBlock
+}
+
+// liftingCleared is buffer at length, every element zero, reusing its array when it is long enough.
+func liftingCleared[Element any](buffer []Element, length int) []Element {
+	if cap(buffer) < length {
+		return make([]Element, length)
+	}
+	cleared := buffer[:length]
+	clear(cleared)
+	return cleared
+}
+
 // liftingBlockDescription is what liftable learns of one block for one Allocation.
 type liftingBlockDescription struct {
 	// isUnliftable is whether the block is (partially) unliftable, because it holds an unliftable use or an
@@ -68,7 +89,9 @@ type liftingBlockDescription struct {
 //	                             }
 //	                             println(x_)
 //	                         }
-func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int) bool {
+//
+// Mutates: scratch its slices are reused across the round's Allocations, as go/ir reuses its liftableBlockMap
+func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int, scratch *liftingLiftableScratch) bool {
 	function := allocation.block.parent
 
 	// Don't lift result values in functions that defer calls that may recover from panic: the Recover block
@@ -77,7 +100,8 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int) bo
 		return false
 	}
 
-	descriptions := make([]liftingBlockDescription, len(function.Blocks))
+	scratch.descriptions = liftingCleared(scratch.descriptions, len(function.Blocks))
+	descriptions := scratch.descriptions
 	for _, block := range function.Blocks {
 		descriptions[block.Index].lastLiftable = -1
 		descriptions[block.Index].firstUnliftable = len(block.Instructions) + 1
@@ -151,30 +175,31 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int) bo
 
 	// A block a (partially) unliftable block reaches is unliftable whole, and its stores go in its
 	// predecessors.
-	seen := make([]bool, len(function.Blocks))
-	var markReachable func(block *BasicBlock)
-	markReachable = func(block *BasicBlock) {
-		if seen[block.Index] {
-			return
-		}
-		seen[block.Index] = true
-		description := &descriptions[block.Index]
-		description.hasLiftableLoad = false
-		description.hasLiftableOther = false
-		description.isUnliftable = true
-		description.firstUnliftable = 0
-		description.storeInPredecessors = true
-		for _, successor := range block.Successors {
-			markReachable(successor)
-		}
-	}
+	scratch.seen = liftingCleared(scratch.seen, len(function.Blocks))
+	seen := scratch.seen
+	pending := scratch.pending[:0]
 	for _, block := range function.Blocks {
-		if descriptions[block.Index].isUnliftable {
-			for _, successor := range block.Successors {
-				markReachable(successor)
+		if !descriptions[block.Index].isUnliftable {
+			continue
+		}
+		pending = append(pending, block.Successors...)
+		for len(pending) > 0 {
+			reached := pending[len(pending)-1]
+			pending = pending[:len(pending)-1]
+			if seen[reached.Index] {
+				continue
 			}
+			seen[reached.Index] = true
+			description := &descriptions[reached.Index]
+			description.hasLiftableLoad = false
+			description.hasLiftableOther = false
+			description.isUnliftable = true
+			description.firstUnliftable = 0
+			description.storeInPredecessors = true
+			pending = append(pending, reached.Successors...)
 		}
 	}
+	scratch.pending = pending
 
 	hasLiftableLoad := false
 	hasLiftableOther := false
@@ -208,7 +233,8 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int) bo
 	work[allocation.block.Index].insertInstructions[allocation] = append(
 		work[allocation.block.Index].insertInstructions[allocation], split)
 
-	predecessorHasStore := make([]bool, len(function.Blocks))
+	scratch.predecessorHasStore = liftingCleared(scratch.predecessorHasStore, len(function.Blocks))
+	predecessorHasStore := scratch.predecessorHasStore
 	for _, block := range function.Blocks {
 		description := &descriptions[block.Index]
 		if !description.isUnliftable {
