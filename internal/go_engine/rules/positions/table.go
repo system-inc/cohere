@@ -77,17 +77,12 @@ func (table *Table) Position(position token.Pos) token.Position {
 	if !position.IsValid() {
 		return token.Position{}
 	}
-	at := int(position)
-	// The last file whose base is at or before the position; a file's span runs from its base to base+size, both
-	// ends included, since its end of file is a position too.
-	index := sort.Search(len(table.files), func(each int) bool { return table.files[each].base > at }) - 1
-	if index < 0 || at > table.files[index].base+table.files[index].size {
+	held := table.holding(int(position))
+	if held == nil {
 		return table.fileSet.PositionFor(position, false)
 	}
-	held := table.files[index]
-	offset := at - held.base
-	// The line is the count of lines that start at or before offset, as token.File's own search finds it.
-	line := sort.Search(len(held.lineOffsets), func(each int) bool { return held.lineOffsets[each] > offset })
+	offset := int(position) - held.base
+	line := lineOf(held.lineOffsets, offset)
 	return token.Position{
 		Filename: held.name,
 		Offset:   offset,
@@ -99,4 +94,31 @@ func (table *Table) Position(position token.Pos) token.Position {
 // Line is position's line in its file as written, or 0 for token.NoPos.
 func (table *Table) Line(position token.Pos) int {
 	return table.Position(position).Line
+}
+
+// holding is the file whose span holds at, or nil when the table holds no such file. A file's span runs from its base
+// to base+size, both ends included, since its end of file is a position too, and no two files of a FileSet share a
+// position, so at most one span holds it.
+func (table *Table) holding(at int) *fileLines {
+	// The last file whose base is at or before the position.
+	index := sort.Search(len(table.files), func(each int) bool { return table.files[each].base > at }) - 1
+	if index < 0 || at > table.files[index].base+table.files[index].size {
+		return nil
+	}
+	return &table.files[index]
+}
+
+// lineOf is the line offset is on, among lines starting at lineOffsets: the count of lines that start at or before it,
+// as token.File's own search finds it.
+func lineOf(lineOffsets []int, offset int) int {
+	return sort.Search(len(lineOffsets), func(each int) bool { return lineOffsets[each] > offset })
+}
+
+// Lines is the view of file. A file the table does not hold gives a view that reads every position from the table.
+func (table *Table) Lines(file *ast.File) Lines {
+	held := table.holding(int(file.FileStart))
+	if held != nil && held.base != int(file.FileStart) {
+		held = nil
+	}
+	return Lines{table: table, held: held}
 }

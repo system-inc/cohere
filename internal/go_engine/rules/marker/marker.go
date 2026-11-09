@@ -79,6 +79,11 @@ func NewIndex(table *positions.Table, file *ast.File) *Index {
 	// statement's start, so these bound the code on a line.
 	firstCode := map[int]token.Pos{}
 	lastCode := map[int]token.Pos{}
+	// The walk reads its lines from the file's own, trying first the line the last node started on: the walk meets
+	// nodes in the order they start, so the next one mostly starts on it too, and a node mostly ends on the line it
+	// starts on.
+	lines := table.Lines(file)
+	startLine := 0
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch node.(type) {
 		case nil:
@@ -86,12 +91,15 @@ func NewIndex(table *positions.Table, file *ast.File) *Index {
 		case *ast.Comment, *ast.CommentGroup:
 			return false
 		}
-		for _, position := range []token.Pos{node.Pos(), node.End()} {
+		for each, position := range []token.Pos{node.Pos(), node.End()} {
 			// An empty field list or another implicit part of the tree has no position, and stands on no line.
 			if !position.IsValid() {
 				continue
 			}
-			line := index.line(position)
+			line := lines.LineNear(position, startLine)
+			if each == 0 {
+				startLine = line
+			}
 			if earliest, seen := firstCode[line]; !seen || position < earliest {
 				firstCode[line] = position
 			}

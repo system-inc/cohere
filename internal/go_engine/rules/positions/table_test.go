@@ -148,3 +148,83 @@ func TestTheAnalyzersResultIsTheTableOfThePassesFiles(test *testing.T) {
 		test.Fatalf("want %+v, got %+v", want, got)
 	}
 }
+
+// A file's view reads every position as the table's Line does, whatever line it is told to try first: the position's
+// own, the lines either side of it, the file's last, and lines the file does not have. It is asked of every offset of
+// each file, so a line's first byte, its last, the newline that ends it and a last line with no newline after it, and
+// every node's start and end; the positions just past each file, which the next file or no file holds; and no
+// position. So the view reads some on the line it tried and some off it, some from its own file and some, past its
+// end, from the table, and the test counts those in files and those past them.
+func TestAFilesViewReadsEveryPositionAsLineDoes(test *testing.T) {
+	test.Parallel()
+
+	fileSet, syntax := parsed(test, filepath.Join("..", "..", "check"))
+	table := positions.New(fileSet, syntax)
+	inFile, pastFile := 0, 0
+	for _, file := range syntax {
+		lines := table.Lines(file)
+		tokenFile := fileSet.File(file.FileStart)
+		compare := func(position token.Pos) {
+			test.Helper()
+			want := table.Line(position)
+			tried := []int{want, want - 1, want + 1, 0, -1, tokenFile.LineCount(), tokenFile.LineCount() + 1}
+			for _, near := range tried {
+				if got := lines.LineNear(position, near); got != want {
+					test.Fatalf("%s, position %d (offset %d), tried on line %d: Line reads line %d, the view line %d",
+						tokenFile.Name(), position, int(position)-tokenFile.Base(), near, want, got)
+				}
+			}
+		}
+		for offset := 0; offset <= tokenFile.Size(); offset++ {
+			compare(token.Pos(tokenFile.Base() + offset))
+			inFile++
+		}
+		ast.Inspect(file, func(node ast.Node) bool {
+			if node != nil {
+				compare(node.Pos())
+				compare(node.End())
+			}
+			return true
+		})
+		for _, past := range []int{-1, tokenFile.Size() + 1, tokenFile.Size() + 2} {
+			compare(token.Pos(tokenFile.Base() + past))
+			pastFile++
+		}
+		compare(token.NoPos)
+	}
+	// A comparison that ran over nothing, or never left a file, would pass for the wrong reason.
+	if inFile < 300000 || pastFile < 3*len(syntax) {
+		test.Fatalf("compared %d positions in files and %d past them, want the check package's 300,000 and more",
+			inFile, pastFile)
+	}
+}
+
+// A position just past a file's end is the next file's first, on its line 1, and the view of the earlier file reads
+// it so, never as its own last line; the view of a file the table does not hold reads every position as the FileSet
+// does.
+func TestAFilesViewLeavesWhatIsNotItsFileToTheTable(test *testing.T) {
+	test.Parallel()
+
+	fileSet, syntax := parsed(test, filepath.Join("..", "..", "check"))
+	table := positions.New(fileSet, syntax)
+	first := fileSet.File(syntax[0].FileStart)
+	next := token.Pos(first.Base() + first.Size() + 1)
+	if fileSet.File(next) == nil || fileSet.File(next) == first {
+		test.Fatalf("the position past %s is in no other file, so this checks nothing", first.Name())
+	}
+	if got := table.Lines(syntax[0]).LineNear(next, first.LineCount()); got != 1 {
+		test.Fatalf("the view of %s reads the next file's first position on line %d, want 1", first.Name(), got)
+	}
+	outside := positions.New(fileSet, syntax[:1]).Lines(syntax[len(syntax)-1])
+	ast.Inspect(syntax[len(syntax)-1], func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+		for _, position := range []token.Pos{node.Pos(), node.End()} {
+			if want, got := fileSet.PositionFor(position, false).Line, outside.LineNear(position, 1); got != want {
+				test.Fatalf("position %d of a file the table does not hold: want line %d, got %d", position, want, got)
+			}
+		}
+		return true
+	})
+}
