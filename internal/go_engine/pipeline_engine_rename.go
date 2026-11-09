@@ -26,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_rename/global_rename"
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // renamingRules are the rules whose findings ask for a rename the engine applies after the load: each attaches one
@@ -279,7 +280,7 @@ func (engine *pipeline) writeRenamed(
 	}
 	if writeError != nil {
 		reason := refusedUnwritable
-		var outside *format.OutsideRootError
+		var outside *write_root.OutsideRootError
 		if errors.As(writeError, &outside) {
 			reason = refusedOutsideRoot
 			engine.withhold(outside.File, outside.RealPath)

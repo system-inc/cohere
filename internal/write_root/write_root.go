@@ -1,4 +1,9 @@
-package format
+// Package write_root is where a fix may write: the run's root, judged by real paths, every symbolic link resolved. Each
+// engine that writes a project's files asks it before it writes one, so a file reached through a link to somewhere
+// outside the root, a linked vendor or shared directory, is read and checked as any other and never written, and a
+// fix of one project never rewrites another (#hwz114g: a linked `TypeScript` led a Go fix to rewrite a shared
+// checkout).
+package write_root
 
 import (
 	"fmt"
@@ -8,10 +13,8 @@ import (
 	"sync"
 )
 
-// WriteRoot is the directory a run may write under: every write the engine makes of a project file is of a file whose
-// real path, every symbolic link resolved, is the root or under it. A file reached through a link to somewhere
-// outside, a linked vendor or shared directory, is read and checked as any other, and never written, so a fix of one
-// project never rewrites another (#hwz114g: a linked `TypeScript` led a fix to rewrite a shared checkout).
+// WriteRoot is the directory a run may write under: a file may be written only when its real path is the root or
+// under it.
 //
 // The zero WriteRoot refuses every write, so a caller that never said where the run may write writes nothing.
 type WriteRoot struct {
@@ -29,9 +32,9 @@ type resolvedDirectories struct {
 	known map[string]string
 }
 
-// NewWriteRoot is the WriteRoot of root, made absolute and resolved through every symbolic link, so a file is
-// judged by where it really is against where the root really is.
-func NewWriteRoot(root string) (WriteRoot, error) {
+// New is the WriteRoot of root, made absolute and resolved through every symbolic link, so a file is judged by where
+// it really is against where the root really is.
+func New(root string) (WriteRoot, error) {
 	absolute, absoluteError := filepath.Abs(root)
 	if absoluteError != nil {
 		return WriteRoot{}, fmt.Errorf("resolving the root %s: %w", root, absoluteError)
@@ -45,7 +48,7 @@ func NewWriteRoot(root string) (WriteRoot, error) {
 
 // Inside is file's real path, every symbolic link resolved, and whether that is the root or under it. A file that is
 // itself a link is resolved on its own, and every other file through its directory, whose real path is kept, since a
-// rename asks this of every file a plan reads. A file that cannot be resolved is an error, and never inside.
+// caller may ask this of every file a run reads. A file that cannot be resolved is an error, and never inside.
 func (writeRoot WriteRoot) Inside(file string) (realPath string, inside bool, resolveError error) {
 	information, statError := os.Lstat(file)
 	if statError != nil {
@@ -56,14 +59,30 @@ func (writeRoot WriteRoot) Inside(file string) (realPath string, inside bool, re
 		if resolveError != nil {
 			return "", false, fmt.Errorf("resolving %s: %w", file, resolveError)
 		}
-		return realPath, writeRoot.holds(realPath), nil
+		return realPath, writeRoot.Holds(realPath), nil
 	}
 	directory, resolveError := writeRoot.realDirectory(filepath.Dir(file))
 	if resolveError != nil {
 		return "", false, resolveError
 	}
 	realPath = filepath.Join(directory, filepath.Base(file))
-	return realPath, writeRoot.holds(realPath), nil
+	return realPath, writeRoot.Holds(realPath), nil
+}
+
+// Holds is whether realPath, a path the caller already resolved through every symbolic link, is the root or under
+// it, by its path relative to the root rather than by a prefix of its spelling, since `/a/bc` is not under `/a/b`. A
+// writer that resolves its target anyway asks this rather than Inside, and pays nothing more. The zero WriteRoot
+// holds nothing.
+func (writeRoot WriteRoot) Holds(realPath string) bool {
+	if writeRoot.resolved == "" {
+		return false
+	}
+	relative, relativeError := filepath.Rel(writeRoot.resolved, realPath)
+	if relativeError != nil {
+		return false
+	}
+	first, _, _ := strings.Cut(filepath.ToSlash(relative), "/")
+	return first != ".." && !filepath.IsAbs(relative)
 }
 
 // realDirectory is directory's real path, resolved once for the WriteRoot and its copies.
@@ -91,18 +110,4 @@ func resolveDirectory(directory string) (string, error) {
 		return "", fmt.Errorf("resolving %s: %w", directory, resolveError)
 	}
 	return resolved, nil
-}
-
-// holds is whether realPath, already resolved, is the root or under it, by its path relative to the root rather
-// than by a prefix of its spelling, since `/a/bc` is not under `/a/b`. The zero WriteRoot holds nothing.
-func (writeRoot WriteRoot) holds(realPath string) bool {
-	if writeRoot.resolved == "" {
-		return false
-	}
-	relative, relativeError := filepath.Rel(writeRoot.resolved, realPath)
-	if relativeError != nil {
-		return false
-	}
-	first, _, _ := strings.Cut(filepath.ToSlash(relative), "/")
-	return first != ".." && !filepath.IsAbs(relative)
 }

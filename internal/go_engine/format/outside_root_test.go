@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"sync/atomic"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // linkedTree is a project directory and, beside it, a shared directory the project reaches through links, both in
@@ -126,8 +128,9 @@ func TestTheZeroWriteRootRefusesEveryWrite(test *testing.T) {
 		result.Changed[0].Written {
 		test.Fatalf("want the file withheld and not written, got %+v", result)
 	}
-	var outside *OutsideRootError
-	if writeError := WriteAtomically(WriteRoot{}, file, []byte(formattedSource)); !errors.As(writeError, &outside) {
+	var outside *write_root.OutsideRootError
+	writeError := WriteAtomically(write_root.WriteRoot{}, file, []byte(formattedSource))
+	if !errors.As(writeError, &outside) {
 		test.Fatalf("want an OutsideRootError, got %v", writeError)
 	}
 	requireContents(test, file, unformattedSource)
@@ -143,7 +146,7 @@ func TestASetWithAFileOutsideTheRootWritesNone(test *testing.T) {
 	outside := filepath.Join(tree.project, "shared", "unformatted.go")
 	partlyWritten, writeError := WriteAllAtomically(rootOf(test, tree.project),
 		map[string][]byte{inside: []byte(formattedSource), outside: []byte(formattedSource)})
-	var refused *OutsideRootError
+	var refused *write_root.OutsideRootError
 	if !errors.As(writeError, &refused) || refused.RealPath != filepath.Join(tree.shared, "unformatted.go") ||
 		len(partlyWritten) != 0 {
 		test.Fatalf("want the set refused for the shared file, got %v, partly written %v", writeError, partlyWritten)
@@ -160,51 +163,5 @@ func TestASetWithAFileOutsideTheRootWritesNone(test *testing.T) {
 				test.Errorf("the refused set left %s in %s", entry.Name(), directory)
 			}
 		}
-	}
-}
-
-// Inside judges a file by its path relative to the root, never by a prefix of its spelling: a sibling directory whose
-// name starts with the root's is outside, the root's own files and those under it are inside, as is a file reached
-// through a link that stays inside, and a file that does not exist is an error.
-func TestInsideJudgesByTheRealPathRelativeToTheRoot(test *testing.T) {
-	test.Parallel()
-
-	tree := newLinkedTree(test)
-	sibling := tree.project + "s"
-	if makeError := os.MkdirAll(sibling, 0o755); makeError != nil {
-		test.Fatal(makeError)
-	}
-	siblingFile := filepath.Join(sibling, "file.go")
-	if writeError := os.WriteFile(siblingFile, []byte(formattedSource), 0o644); writeError != nil {
-		test.Fatal(writeError)
-	}
-	root := rootOf(test, tree.project)
-	for _, testCase := range []struct {
-		file     string
-		realPath string
-		inside   bool
-	}{
-		{siblingFile, siblingFile, false},
-		{filepath.Join(tree.project, "inner", "unformatted.go"),
-			filepath.Join(tree.project, "real", "unformatted.go"), true},
-		{filepath.Join(tree.project, "real", "unformatted.go"),
-			filepath.Join(tree.project, "real", "unformatted.go"), true},
-		{filepath.Join(tree.project, "shared", "long.go"), filepath.Join(tree.shared, "long.go"), false},
-		{filepath.Join(tree.project, "linked.go"), filepath.Join(tree.shared, "alone.go"), false},
-	} {
-		realPath, inside, resolveError := root.Inside(testCase.file)
-		if resolveError != nil || realPath != testCase.realPath || inside != testCase.inside {
-			test.Errorf("%s: got %s, inside %t (%v), want %s, inside %t", testCase.file, realPath, inside,
-				resolveError, testCase.realPath, testCase.inside)
-		}
-	}
-	if _, inside, resolveError := root.Inside(filepath.Join(tree.project, "missing.go")); resolveError == nil ||
-		inside {
-		test.Errorf("a missing file was resolved, inside %t", inside)
-	}
-	zeroRealPath, zeroInside, zeroError := (WriteRoot{}).Inside(filepath.Join(tree.project, "real", "unformatted.go"))
-	if zeroError != nil || zeroInside || zeroRealPath != filepath.Join(tree.project, "real", "unformatted.go") {
-		test.Errorf("the zero WriteRoot resolved the file to %s, inside %t (%v), want it resolved and outside",
-			zeroRealPath, zeroInside, zeroError)
 	}
 }

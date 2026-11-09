@@ -23,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // detailNotRequested is the one skip detail that means nobody asked for the phase, which is not a gap.
@@ -71,7 +72,7 @@ type pipeline struct {
 
 	// writeRoot is where the fix phase may write: the root the run was given, resolved once by runFix in a run that
 	// writes, and the zero WriteRoot, which refuses every write, in one that does not (#hwz114g).
-	writeRoot format.WriteRoot
+	writeRoot write_root.WriteRoot
 
 	// withheld are the files gofmt, the wrap or a rename would have written and did not, since each is reached
 	// through a link to a real path outside the root, by file with that real path. writeFix names them on the fix
@@ -438,8 +439,8 @@ func (engine *pipeline) writeFix() {
 
 // resolveWriteRoot is the WriteRoot of the root the run was given. A root that cannot be resolved, which the run has
 // already read, leaves the zero WriteRoot, so every write is withheld and named rather than made blind.
-func (engine *pipeline) resolveWriteRoot() format.WriteRoot {
-	writeRoot, rootError := format.NewWriteRoot(engine.described.workspace.Root)
+func (engine *pipeline) resolveWriteRoot() write_root.WriteRoot {
+	writeRoot, rootError := write_root.New(engine.described.workspace.Root)
 	if rootError != nil {
 		engine.note("the root could not be resolved, so no fix is written: %v", rootError)
 	}

@@ -6,6 +6,8 @@ import (
 	"maps"
 	"os"
 	"slices"
+
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // WriteAllAtomically replaces each file of files with its contents as one set, for files that only make sense
@@ -15,8 +17,8 @@ import (
 // nothing. A rename into place that fails once others are in place, which a temporary file beside its target leaves
 // unlikely, puts the files already replaced back as they were, and partlyWritten names any it could not put back, the
 // only case that leaves the set half written. A file outside root is refused as WriteAtomically refuses it, with its
-// *OutsideRootError, before any file is placed, so the set is not written.
-func WriteAllAtomically(root WriteRoot, files map[string][]byte) (partlyWritten []string, writeError error) {
+// *write_root.OutsideRootError, before any file is placed, so the set is not written.
+func WriteAllAtomically(root write_root.WriteRoot, files map[string][]byte) (partlyWritten []string, writeError error) {
 	return writeAllAtomically(root, files, putInPlace)
 }
 
@@ -24,7 +26,7 @@ func WriteAllAtomically(root WriteRoot, files map[string][]byte) (partlyWritten 
 // fail a placement after others have succeeded, the one failure a real file system leaves too rare to stage, and see
 // the files already placed put back.
 func writeAllAtomically(
-	root WriteRoot,
+	root write_root.WriteRoot,
 	files map[string][]byte,
 	place func(stagedFile) error,
 ) (partlyWritten []string, writeError error) {

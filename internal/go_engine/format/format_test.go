@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 const formattedSource = "package fixture\n\nvar Count = 1\n"
@@ -105,9 +107,9 @@ func fixturePath(name string) string {
 }
 
 // rootOf is the WriteRoot of directory, which a test's writes go under.
-func rootOf(test *testing.T, directory string) WriteRoot {
+func rootOf(test *testing.T, directory string) write_root.WriteRoot {
 	test.Helper()
-	root, rootError := NewWriteRoot(directory)
+	root, rootError := write_root.New(directory)
 	if rootError != nil {
 		test.Fatal(rootError)
 	}
@@ -115,7 +117,7 @@ func rootOf(test *testing.T, directory string) WriteRoot {
 }
 
 // fixtureRoot is the WriteRoot of fixtureDirectory, under which every fixture the package's tests write is.
-func fixtureRoot(test *testing.T) WriteRoot {
+func fixtureRoot(test *testing.T) write_root.WriteRoot {
 	test.Helper()
 	return rootOf(test, fixtureDirectory)
 }
