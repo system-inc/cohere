@@ -1197,3 +1197,42 @@ func TestVerifierCatchesPredecessorsTheEdgesDontGive(test *testing.T) {
 	}
 }
 
+// TestAppendingToChildrenLeavesTheNextBlocksChildren: Children's slice shares the tree's array, capped, so a
+// caller's append copies rather than writing over the next block's children there.
+func TestAppendingToChildrenLeavesTheNextBlocksChildren(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, left, right := function.block(), function.block(), function.block()
+	leftChild, rightChild := function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, left, right)
+	goTo(left, leftChild)
+	goTo(right, rightChild)
+	finalize(function)
+	dominance := ssa.ComputeDominance(testGraph{}, function)
+
+	before := map[ssa.BlockId][]ssa.BlockId{}
+	for _, block := range function.blocks {
+		before[block.id] = slices.Clone(dominance.Children(block.id))
+	}
+	parents := 0
+	for _, block := range function.blocks {
+		children := dominance.Children(block.id)
+		if len(children) == 0 {
+			continue
+		}
+		parents++
+		_ = append(children, 999)
+		for _, other := range function.blocks {
+			if got := dominance.Children(other.id); !slices.Equal(got, before[other.id]) {
+				test.Errorf("after appending to bb%d's children, bb%d's are %v, want %v",
+					block.id, other.id, got, before[other.id])
+			}
+		}
+	}
+	if parents < 3 {
+		test.Fatalf("%d blocks have children, want the entry and both arms, so an append has a sibling to reach",
+			parents)
+	}
+}
+
