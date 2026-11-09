@@ -44,3 +44,24 @@ func (state *verdicts) fallBack(resolver *fact_resolver.Resolver, home *fact_res
 	}
 	state.fellBack = true
 }
+
+// whole is every function of home pure, computed whole the push's way, each with its answer, true, for the standard
+// library's table, where a function absent is not pure.
+func whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object]bool {
+	home.Lock()
+	defer home.Unlock()
+	state := fact_resolver.StateOf[verdicts](home, Kind)
+	if state.pure == nil {
+		state.pure = map[*types.Func]bool{}
+	}
+	if !state.fellBack {
+		state.fallBack(resolver, home)
+	}
+	answers := map[types.Object]bool{}
+	for function, pure := range state.pure {
+		if pure {
+			answers[function] = true
+		}
+	}
+	return answers
+}

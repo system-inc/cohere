@@ -13,6 +13,11 @@
 // computes there under the package's lock, asking across a package edge only through Visible, which passes what the
 // checker's inheritFacts would have carried. Locks are taken only downward along imports, so they never wait in a
 // circle.
+//
+// A kind asks through Ask, which reads the run's store first: answers earlier runs computed, by the package's cache
+// key, and the standard library's, computed whole, from the binary's table. A package the run restored has no syntax
+// here, so a question there that the store cannot answer has the run load the package from source and run again
+// (resolver_store.go, #w7zmvat wave 3).
 package fact_resolver
 
 import (
@@ -23,6 +28,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
+	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
@@ -53,6 +59,21 @@ type Resolver struct {
 
 	// counts is each kind's counts, by kind.
 	counts sync.Map
+
+	// store is where answers are read for packages the run restored, and kept for the next run, or nil for a run
+	// that restored nothing (see Ask, in resolver_store.go). answers memoizes every answer by answerKey,
+	// storedAnswers each package's read of the store, and reloads the packages a question reached restored and
+	// unanswered.
+	store         Store
+	answers       sync.Map
+	storedAnswers sync.Map
+	reloads       sync.Map
+	storeHits     atomic.Int64
+
+	// recorded is every answer computed in a package learned, by kind's name and objectpath, as JSON, for the store,
+	// under recordedLock.
+	recordedLock sync.Mutex
+	recorded     map[*types.Package]map[string]map[objectpath.Path][]byte
 }
 
 // Kind is one fact a resolver computes, as purity is: it keys the fact's state in each package and its counts.
@@ -75,9 +96,10 @@ type Counts struct {
 	Contradicted atomic.Int64
 }
 
-// New is an empty resolver, which learns each package as the checker tells it ctrlflow has finished there.
-func New() *Resolver {
-	return &Resolver{}
+// New is an empty resolver, which learns each package as the checker tells it ctrlflow has finished there, and reads
+// and keeps answers in store, or in none when store is nil, for a run that restores nothing.
+func New(store Store) *Resolver {
+	return &Resolver{store: store, recorded: map[*types.Package]map[string]map[objectpath.Path][]byte{}}
 }
 
 // Of is the resolver the checker hands pass, or an error naming what pass held instead, for a driver that set no
@@ -142,10 +164,10 @@ func (resolver *Resolver) Package(packageTypes *types.Package) *Package {
 // Owner is the package that declares object, where a fact on object is computed, or nil for an object of no package,
 // as the error interface's Error is, which no package's facts ever held.
 //
-// It panics for a package the resolver never learned. On a cold run every package below one a question comes from was
-// learned first, since ctrlflow ran there first; one never learned is a package the findings cache restored, with no
-// syntax to build and, until #w7zmvat wave 3, no stored facts to read. Answering not pure there would silently drop
-// findings, so the question fails loudly instead, the reading rule's crash on its package.
+// It panics for a package the resolver never learned, which Ask asks it only in a run with no store. There every
+// package below one a question comes from was learned first, since ctrlflow ran there first; one never learned is a
+// package something restored all the same, with no syntax to build and no store to read. Answering not pure there
+// would silently drop findings, so the question fails loudly instead, the reading rule's crash on its package.
 func (resolver *Resolver) Owner(object types.Object) *Package {
 	if object.Pkg() == nil {
 		return nil
@@ -153,10 +175,10 @@ func (resolver *Resolver) Owner(object types.Object) *Package {
 	owner := resolver.Package(object.Pkg())
 	if owner == nil {
 		// Invariant: with no package restored, ctrlflow learns every package below a question before the question is
-		// asked. A package the findings cache restored breaks this until #w7zmvat wave 3 stores its facts, and the
-		// branch wants that loud, never a silent not pure.
-		panic(fmt.Sprintf("fact_resolver: asked about %s of %s, which it never learned: restored package, fact "+
-			"store not built yet (#w7zmvat wave 3)", objectName(object), object.Pkg().Path()))
+		// asked. A package restored in a run with no store breaks this, and the branch wants that loud, never a
+		// silent not pure.
+		panic(fmt.Sprintf("fact_resolver: asked about %s of %s, which it never learned: a restored package, in a "+
+			"run with no store of answers", objectName(object), object.Pkg().Path()))
 	}
 	return owner
 }

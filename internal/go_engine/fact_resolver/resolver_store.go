@@ -1,0 +1,267 @@
+package fact_resolver
+
+import (
+	"encoding/json"
+	"fmt"
+	"go/types"
+	"maps"
+	"sync"
+
+	"golang.org/x/tools/go/types/objectpath"
+)
+
+// Store is where a run reads the answers earlier runs computed, and the answers the binary's standard-library table
+// holds, for the packages it restored, which it holds no syntax of and cannot compute in (#w7zmvat wave 3). A package's
+// answers depend only on its cache key, a digest of its files and of every key below it, so an answer stored under a
+// package's key holds for any run in which the package has that key.
+type Store interface {
+	// Answers is what the store holds of the package whose types are packageTypes, or nil for none.
+	Answers(packageTypes *types.Package) *Answers
+
+	// Reloaded reports whether the run loaded the package whose types are packageTypes from source because an
+	// earlier pass asked of it, restored, what no store answered. A question that reaches such a package unlearned
+	// is a reload that failed.
+	Reloaded(packageTypes *types.Package) bool
+}
+
+// Answers is what a store holds of one package: by kind's name, each answer by its object's objectpath, as JSON, and
+// the kinds the package was computed whole in, the push's way, in which an object with no answer has no fact.
+type Answers struct {
+	Values   map[string]map[objectpath.Path][]byte
+	Complete map[string]bool
+}
+
+// answerKey is one memoized answer: a kind's, about one object.
+type answerKey struct {
+	kind   *Kind
+	object types.Object
+}
+
+// Ask is kind's answer about object, as the package that declares object holds it, which a fact on object would say:
+// the zero Value for no fact. An object of no package, as the error interface's Error, and an instance's object, which
+// no package declares, have none. Otherwise the answer is the store's when it holds one, the zero Value when the store
+// holds the package computed whole and no answer for object, and else compute's, which runs in the package, learned,
+// and is kept for the store. A package the run restored, with no answer for object in the store, is never answered
+// no fact: the question fails, and the run loads the package from source and runs again (see Reloads).
+//
+// compute is the kind's own judgment in home, which takes home's lock itself. Each answer is asked of compute or the
+// store once in a run, and memoized.
+func Ask[Value any](resolver *Resolver, kind *Kind, object types.Object, compute func(home *Package) Value) Value {
+	var zero Value
+	if object.Pkg() == nil || !isOrigin(object) {
+		return zero
+	}
+	key := answerKey{kind: kind, object: object}
+	if memoized, held := resolver.answers.Load(key); held {
+		answer, isValue := memoized.(Value)
+		if !isValue {
+			// Invariant: a kind asks with one Value type, which is what this function stores below.
+			panic(fmt.Sprintf("fact_resolver: %s's answer about %s is a %T", kind.Name, objectName(object), memoized))
+		}
+		return answer
+	}
+	home := resolver.Package(object.Pkg())
+	if resolver.store == nil {
+		// A run with no store restored nothing, so every package below a question was learned; Owner fails loudly
+		// on one that was not.
+		home = resolver.Owner(object)
+	}
+	path, pathError := objectpath.For(object)
+	if pathError == nil && resolver.store != nil {
+		if stored, held := resolver.stored(kind, object.Pkg(), path); held {
+			var answer Value
+			if len(stored) > 0 {
+				if decodeError := json.Unmarshal(stored, &answer); decodeError != nil {
+					// Invariant: the store holds what Ask encoded with the same Value type; bytes it cannot read
+					// are a mistake in the store, never an answer of no fact.
+					panic(fmt.Sprintf("fact_resolver: the stored %s answer about %s does not decode: %v",
+						kind.Name, objectName(object), decodeError))
+				}
+			}
+			resolver.storeHits.Add(1)
+			resolver.answers.Store(key, answer)
+			return answer
+		}
+	}
+	if home == nil {
+		resolver.reload(kind, object)
+	}
+	answer := compute(home)
+	if pathError == nil && resolver.store != nil {
+		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
+	}
+	resolver.answers.Store(key, answer)
+	return answer
+}
+
+// isOrigin reports whether object is its own origin, as a declared function or parameter is, and an instance's never.
+func isOrigin(object types.Object) bool {
+	switch object := object.(type) {
+	case *types.Func:
+		return object.Origin() == object
+	case *types.Var:
+		return object.Origin() == object
+	default:
+		return true
+	}
+}
+
+// stored is the store's answer of kind at path in packageTypes, read through the store once per package: its JSON, or
+// nothing, for no fact, where the package was computed whole in kind and holds no answer at path.
+func (resolver *Resolver) stored(kind *Kind, packageTypes *types.Package, path objectpath.Path) ([]byte, bool) {
+	read, _ := resolver.storedAnswers.LoadOrStore(packageTypes, &storedRead{})
+	held, isRead := read.(*storedRead)
+	if !isRead {
+		// Invariant: the map holds only what LoadOrStore stored above.
+		panic(fmt.Sprintf("fact_resolver: %s's stored answers are a %T", packageTypes.Path(), read))
+	}
+	held.once.Do(func() { held.answers = resolver.store.Answers(packageTypes) })
+	if held.answers == nil {
+		return nil, false
+	}
+	if value, answered := held.answers.Values[kind.Name][path]; answered {
+		return value, true
+	}
+	return nil, held.answers.Complete[kind.Name]
+}
+
+// storedRead is one package's answers as the store gave them, read once.
+type storedRead struct {
+	once    sync.Once
+	answers *Answers
+}
+
+// record keeps encoded, the answer of kind at path in packageTypes, for the store.
+func (resolver *Resolver) record(kind *Kind, packageTypes *types.Package, path objectpath.Path, encoded []byte) {
+	resolver.recordedLock.Lock()
+	defer resolver.recordedLock.Unlock()
+	if resolver.recorded[packageTypes] == nil {
+		resolver.recorded[packageTypes] = map[string]map[objectpath.Path][]byte{}
+	}
+	if resolver.recorded[packageTypes][kind.Name] == nil {
+		resolver.recorded[packageTypes][kind.Name] = map[objectpath.Path][]byte{}
+	}
+	resolver.recorded[packageTypes][kind.Name][path] = encoded
+}
+
+// reload ends the question about object, of kind, in a package the run restored and no store answered: the package is
+// among Reloads, so the run loads it from source and runs again, and the pass that asked fails, so nothing it found is
+// kept or reported. A package the run already loaded from source for this, and still never learned, is a reload that
+// failed, and the pass's failure names it.
+func (resolver *Resolver) reload(kind *Kind, object types.Object) {
+	if resolver.store.Reloaded(object.Pkg()) {
+		// Invariant: a kind's question returns no error, so one that has no answer ends the pass that asked it, which
+		// the engine's recovering run turns into that pass's error (check's recoveringRun), never into an answer.
+		panic(fmt.Sprintf("fact_resolver: asked %s of %s, of %s, which the run loaded from source to answer it and "+
+			"still never learned, so it has no answer", kind.Name, objectName(object), object.Pkg().Path()))
+	}
+	resolver.reloads.Store(object.Pkg(), true)
+	// Invariant: as above, the pass that asked ends here, and the run drops it once it has loaded the package from
+	// source; nothing between recovers the panic as an answer.
+	panic(fmt.Sprintf("fact_resolver: asked %s of %s, of %s, which the run restored and no store answers, so the "+
+		"run loads it from source and runs again", kind.Name, objectName(object), object.Pkg().Path()))
+}
+
+// Reloads is every package a question reached restored, with no answer in the store, which the run must load from
+// source and run again.
+func (resolver *Resolver) Reloads() []*types.Package {
+	var reloads []*types.Package
+	resolver.reloads.Range(func(packageTypes any, _ any) bool {
+		if reloaded, isPackage := packageTypes.(*types.Package); isPackage {
+			reloads = append(reloads, reloaded)
+		}
+		return true
+	})
+	return reloads
+}
+
+// Recorded is every answer the run computed in the package whose types are packageTypes, and the store did not give
+// it, by kind's name and objectpath, as JSON, for the store to keep under the package's key: a copy, which a question
+// asked after does not change.
+func (resolver *Resolver) Recorded(packageTypes *types.Package) map[string]map[objectpath.Path][]byte {
+	resolver.recordedLock.Lock()
+	defer resolver.recordedLock.Unlock()
+	recorded := make(map[string]map[objectpath.Path][]byte, len(resolver.recorded[packageTypes]))
+	for kind, answers := range resolver.recorded[packageTypes] {
+		recorded[kind] = maps.Clone(answers)
+	}
+	return recorded
+}
+
+// StoreHits counts the answers the store gave the run, each computed in an earlier one.
+func (resolver *Resolver) StoreHits() int64 {
+	return resolver.storeHits.Load()
+}
+
+// Whole is every answer of every kind registered in home, computed whole, the push's way, as the kind's whole computes
+// it (see Register), by kind's name and objectpath, as JSON, each answer of no fact left out: the answers a store holds
+// of a package complete in those kinds. An answer whose object has no objectpath is left out too, since no other
+// package can ask of it, and so is one about another package's object, or an instance's, which Ask never reads from a
+// store.
+func (resolver *Resolver) Whole(home *Package) map[string]map[objectpath.Path][]byte {
+	whole := map[string]map[objectpath.Path][]byte{}
+	for _, registered := range registeredKinds() {
+		answers := map[objectpath.Path][]byte{}
+		for object, encoded := range registered.whole(resolver, home) {
+			if object.Pkg() != home.Types || !isOrigin(object) {
+				continue
+			}
+			if path, pathError := objectpath.For(object); pathError == nil {
+				answers[path] = encoded
+			}
+		}
+		whole[registered.kind.Name] = answers
+	}
+	return whole
+}
+
+// registeredKind is one kind as it registered: the kind, and its whole, each answer encoded as Ask encodes it.
+type registeredKind struct {
+	kind  *Kind
+	whole func(resolver *Resolver, home *Package) map[types.Object][]byte
+}
+
+// registered is every kind registered, in the order each registered, under registeredLock.
+var (
+	registeredLock sync.Mutex
+	registered     []registeredKind
+)
+
+// Register adds kind to the kinds Whole computes, with whole, which computes every answer of kind in a package, each
+// answer of no fact left out, as Ask's compute would answer it, for the standard library's table. A kind registers as
+// its package initializes.
+func Register[Value any](kind *Kind, whole func(resolver *Resolver, home *Package) map[types.Object]Value) {
+	registeredLock.Lock()
+	defer registeredLock.Unlock()
+	registered = append(registered, registeredKind{
+		kind: kind,
+		whole: func(resolver *Resolver, home *Package) map[types.Object][]byte {
+			answers := whole(resolver, home)
+			encoded := make(map[types.Object][]byte, len(answers))
+			for object, answer := range answers {
+				encoded[object] = encodeAnswer(kind, object, answer)
+			}
+			return encoded
+		},
+	})
+}
+
+// registeredKinds is every kind registered.
+func registeredKinds() []registeredKind {
+	registeredLock.Lock()
+	defer registeredLock.Unlock()
+	return append([]registeredKind{}, registered...)
+}
+
+// encodeAnswer is answer, of kind about object, as JSON, which is the same bytes in any process, so a table holding it
+// is written the same however many processes computed it.
+func encodeAnswer[Value any](kind *Kind, object types.Object, answer Value) []byte {
+	encoded, encodeError := json.Marshal(answer)
+	if encodeError != nil {
+		// Invariant: a kind's Value is plain data, a boolean or a slice of structs of integers, which JSON always
+		// encodes.
+		panic(fmt.Sprintf("fact_resolver: %s's answer about %s does not encode: %v", kind.Name, objectName(object),
+			encodeError))
+	}
+	return encoded
+}

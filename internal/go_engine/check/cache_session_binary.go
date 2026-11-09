@@ -18,7 +18,8 @@ import (
 // an entry for that decodes whole, its Withheld and export data renamed from goRootMarker to the run's own `GOROOT`.
 // The renames are done here, before the load, as many at once as there are cores, so a package whose export data does
 // not rename is a miss, analyzed as any other, rather than a hit whose types the load checks from source. A package
-// Analyze was given is never restored from the table, which holds no findings, and neither is one with a list error. A
+// Analyze was given is never restored from the table, which holds no findings, and neither is one with a list error,
+// nor one the run reloads to answer a question (see Reload). A
 // table that does not parse, or keys that cannot be computed, are a problem, and every standard-library package is
 // then computed.
 func (session *CacheSession) restoreFromBinary(
@@ -44,7 +45,7 @@ func (session *CacheSession) restoreFromBinary(
 	}
 	held := map[*packages.Package]cache.StandardLibraryEntry{}
 	for keyed, key := range keys {
-		if session.given[keyed] || len(keyed.Errors) > 0 {
+		if session.given[keyed] || len(keyed.Errors) > 0 || session.reloading(keyed) {
 			continue
 		}
 		if entry, found := standardLibrary.Table.Lookup(key); found {
@@ -116,6 +117,15 @@ func restoreBinaryEntry(
 	}
 	restored.types.Withheld = withheld
 	return restored, nil
+}
+
+// collects reports whether the run collects saved's entry for the binary's table (see collect).
+func (session *CacheSession) collects(saved *packages.Package) bool {
+	if session.caching.StandardLibrary == nil || session.caching.StandardLibrary.Collected == nil {
+		return false
+	}
+	_, standard := session.standardLibraryKeys[saved]
+	return standard
 }
 
 // collect adds a standard-library package the run just encoded to the entries the run collects, when it collects

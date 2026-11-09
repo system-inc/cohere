@@ -11,6 +11,10 @@ import (
 // Kind keys nilness's verdicts in each package the resolver holds, and its counts.
 var Kind = &fact_resolver.Kind{Name: "return_nil_ness"}
 
+func init() {
+	fact_resolver.Register(Kind, whole)
+}
+
 // Result is one package's nilness of results, as its readers ask it.
 type Result struct {
 	resolver *fact_resolver.Resolver
@@ -33,17 +37,30 @@ func (judged *Result) Nilness(function *types.Func, result int) ValueNilness {
 }
 
 // ask is the nilness of function's results and whether a reader in reader holds them as the push did, as a fact: the
-// fact crossed here (fact_resolver.Visible) and says more than the defaults. The function is judged in its own
-// package, under that package's lock, once, and each answer after is the verdict kept.
+// fact crossed here (fact_resolver.Visible) and says more than the defaults. Its package's answer comes through
+// fact_resolver.Ask, the results of a fact, nil for none: the store's, or judged in its own package, under that
+// package's lock, once, and each answer after is the verdict kept.
 func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, function *types.Func) ([]ValueNilness, bool) {
 	if !fact_resolver.Visible(reader, function) {
 		return nil, false
 	}
-	home := resolver.Owner(function)
-	if home == nil {
-		// A function of no package, an interface's of the universe, which the push never judged.
-		return nil, false
-	}
+	results := fact_resolver.Ask(resolver, Kind, function, func(home *fact_resolver.Package) []ValueNilness {
+		judged, holds := judgeIn(resolver, home, function)
+		if !holds {
+			return nil
+		}
+		return judged
+	})
+	return results, results != nil
+}
+
+// judgeIn is the nilness of function's results, of home, and whether they say more than the defaults, judged there
+// under home's lock, or the verdict kept.
+func judgeIn(
+	resolver *fact_resolver.Resolver,
+	home *fact_resolver.Package,
+	function *types.Func,
+) ([]ValueNilness, bool) {
 	home.Lock()
 	defer home.Unlock()
 	state := fact_resolver.StateOf[verdicts](home, Kind)

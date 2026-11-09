@@ -49,3 +49,24 @@ func (state *verdicts) fallBack(resolver *fact_resolver.Resolver, home *fact_res
 	}
 	state.fellBack = true
 }
+
+// whole is the nilness of every function of home whose results say more than the defaults, computed whole the push's
+// way, for the standard library's table, where a function absent holds no fact.
+func whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object][]ValueNilness {
+	home.Lock()
+	defer home.Unlock()
+	state := fact_resolver.StateOf[verdicts](home, Kind)
+	if state.results == nil {
+		state.results = map[*types.Func][]ValueNilness{}
+	}
+	if !state.fellBack {
+		state.fallBack(resolver, home)
+	}
+	answers := map[types.Object][]ValueNilness{}
+	for function, results := range state.results {
+		if interesting(function.Signature(), results) {
+			answers[function] = results
+		}
+	}
+	return answers
+}

@@ -11,6 +11,10 @@ import (
 // Kind keys SA5012's marks in each package the resolver holds, and its counts.
 var Kind = &fact_resolver.Kind{Name: "odd_slice_argument"}
 
+func init() {
+	fact_resolver.Register(Kind, whole)
+}
+
 // marks is SA5012's state in one package: the parameters of each function judged that it marks, by the function,
 // each function's parameters by their objects, and, once the package was computed whole the push's way, every mark it
 // made.
@@ -29,16 +33,19 @@ type parameterOwner struct {
 }
 
 // ask is whether parameter is marked as a reader in reader holds it: the mark crossed here (fact_resolver.Visible), and
-// parameter's function marks it. The function is judged in its own package, under that package's lock, once, and each
-// answer after is the verdict kept.
+// parameter's function marks it. Its package's answer comes through fact_resolver.Ask: the store's, or the function
+// judged in its own package, under that package's lock, once, and each answer after is the verdict kept.
 func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, parameter *types.Var) bool {
 	if !fact_resolver.Visible(reader, parameter) {
 		return false
 	}
-	home := resolver.Owner(parameter)
-	if home == nil {
-		return false
-	}
+	return fact_resolver.Ask(resolver, Kind, parameter, func(home *fact_resolver.Package) bool {
+		return judgeIn(resolver, home, parameter)
+	})
+}
+
+// judgeIn is whether parameter, of home, is marked, judged there under home's lock, or the verdict kept.
+func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, parameter *types.Var) bool {
 	home.Lock()
 	defer home.Unlock()
 	state := fact_resolver.StateOf[marks](home, Kind)
@@ -174,6 +181,24 @@ func (state *marks) fallBack(resolver *fact_resolver.Resolver, home *fact_resolv
 	state.fellBack = true
 	state.recorded = recorded.recorded
 	state.functions = nil
+}
+
+// whole is every parameter of home marked, computed whole the push's way, each with its answer, true, for the standard
+// library's table, where a parameter absent is not marked.
+func whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object]bool {
+	home.Lock()
+	defer home.Unlock()
+	state := fact_resolver.StateOf[marks](home, Kind)
+	if !state.fellBack {
+		state.fallBack(resolver, home)
+	}
+	answers := map[types.Object]bool{}
+	for parameter, marked := range state.recorded {
+		if marked {
+			answers[parameter] = true
+		}
+	}
+	return answers
 }
 
 // sourceFunctions is every source function of home, built, in the order buildir's SrcFuncs lists them: the package's

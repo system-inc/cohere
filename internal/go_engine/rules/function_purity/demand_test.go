@@ -72,9 +72,9 @@ func TestDemandAnswersAsThePushOnTheFixture(test *testing.T) {
 	})
 }
 
-// A question that reaches a package the findings cache restored, which the resolver never learned and cannot build,
-// fails loudly, naming the package, rather than answer not pure and drop the finding it would have made. Here bottom is
-// restored, so middle.Middle, which calls bottom.Pure, cannot be judged.
+// A question that reaches a package something restored in a run with no store of answers, which the resolver never
+// learned and cannot build, fails loudly, naming the package, rather than answer not pure and drop the finding it would
+// have made. Here bottom is restored, so middle.Middle, which calls bottom.Pure, cannot be judged.
 func TestARestoredPackageFailsLoudly(test *testing.T) {
 	test.Parallel()
 	directory := analysistest.TestData()
@@ -104,7 +104,7 @@ func TestARestoredPackageFailsLoudly(test *testing.T) {
 	options := check.DispatchOptions()
 	options.Restored = func(restored *packages.Package) bool { return restored.PkgPath == "demand/hops/bottom" }
 	options.Restore = func(*checker.Action) error {
-		// The restore gives no facts: what a cache entry holds is wave 3's.
+		// The restore gives no facts, and the resolver no store.
 		return nil
 	}
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{probe}, loaded.Roots, options)
@@ -117,7 +117,7 @@ func TestARestoredPackageFailsLoudly(test *testing.T) {
 			test.Fatalf("probing %s: %v", action.Package.ID, action.Err)
 		}
 		const want = "fact_resolver: asked about demand/hops/bottom.Pure of demand/hops/bottom, which it never " +
-			"learned: restored package, fact store not built yet (#w7zmvat wave 3)"
+			"learned: a restored package, in a run with no store of answers"
 		if panicked != want {
 			test.Errorf("asking middle.Middle over a restored bottom panicked with %q, want %q", panicked, want)
 		}

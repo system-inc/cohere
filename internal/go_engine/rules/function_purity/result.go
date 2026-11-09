@@ -10,6 +10,10 @@ import (
 // Kind keys purity's verdicts in each package the resolver holds, and its counts.
 var Kind = &fact_resolver.Kind{Name: "function_purity"}
 
+func init() {
+	fact_resolver.Register(Kind, whole)
+}
+
 // Result is one package's purity, as its readers ask it.
 type Result struct {
 	resolver *fact_resolver.Resolver
@@ -22,17 +26,19 @@ func (result *Result) IsPure(function *types.Func) bool {
 	return ask(result.resolver, result.reader, function)
 }
 
-// ask is whether function is pure as a reader in reader holds it. The function is judged in its own package, under
-// that package's lock, once, and each answer after is the verdict kept.
+// ask is whether function is pure as a reader in reader holds it, its package's answer through fact_resolver.Ask: the
+// store's, or judged in its own package, under that package's lock, once, and each answer after is the verdict kept.
 func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, function *types.Func) bool {
 	if !fact_resolver.Visible(reader, function) {
 		return false
 	}
-	home := resolver.Owner(function)
-	if home == nil {
-		// A function of no package, an interface's of the universe, which the push never judged.
-		return false
-	}
+	return fact_resolver.Ask(resolver, Kind, function, func(home *fact_resolver.Package) bool {
+		return judgeIn(resolver, home, function)
+	})
+}
+
+// judgeIn is whether function, of home, is pure, judged there under home's lock, or the verdict kept.
+func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, function *types.Func) bool {
 	home.Lock()
 	defer home.Unlock()
 	state := fact_resolver.StateOf[verdicts](home, Kind)

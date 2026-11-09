@@ -14,6 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -95,6 +96,10 @@ type CacheCounts struct {
 	// WriteFailed is the misses whose entry could not be written, the first reason among Problems.
 	WriteFailed int
 
+	// Reloads is the packages the run loaded from source, though the cache held them, because a question of a fact
+	// computed on demand reached one restored and no store answered it (#w7zmvat wave 3), over every load of the run.
+	Reloads int
+
 	// Problems are what kept the cache from being read or written: keys that could not be computed, which leaves
 	// every package a miss and none written, an entry that could not be encoded, and the first write that failed.
 	// A problem never changes a finding.
@@ -161,6 +166,13 @@ type CacheSession struct {
 
 	// problemsLock guards counts.Problems, which the load's goroutines never write but Run's may.
 	problemsLock sync.Mutex
+
+	// answering is what the resolver's questions read of the session (see cache_session_answers.go), and resolver
+	// the last run's, whose answers each entry written keeps. previous are the answers of each package loaded from
+	// source to answer a question, from its entry under its own key, which the run did not restore.
+	answering answering
+	resolver  *fact_resolver.Resolver
+	previous  map[*packages.Package][]kindAnswers
 }
 
 // NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
@@ -193,7 +205,8 @@ func NewCacheSession(caching *Caching, rules []rule.Rule, reports ...*analysis.A
 // analyzers a package can be asked for depends on what misses: a package to analyze is asked for its rules'
 // findings, and any package a missed package to analyze imports, directly or not, is asked for its facts, since a
 // fact analyzer on that importer runs on everything it imports. So a hit that falls short becomes a miss, which can
-// ask more of the rest, until nothing changes.
+// ask more of the rest, until nothing changes. A package the run reloads to answer a question (see Reload) is never
+// restored, from the store or the table.
 func (session *CacheSession) Restore(
 	loader string,
 	reachable []*packages.Package,
@@ -218,6 +231,15 @@ func (session *CacheSession) Restore(
 	for _, analyzedPackage := range analyzed {
 		session.given[analyzedPackage] = true
 	}
+	// The packages questions reach are this load's; the reloads pending stay, for every load of the run.
+	session.answering.lock.Lock()
+	session.answering.byTypes = nil
+	session.answering.lock.Unlock()
+	// The counts are of the run over this load, the one whose result stands, which is the last: a load again to check
+	// a package from source to answer a question drops the pass before it (see Reload), and its packages that pass
+	// saved are this one's hits. The problems stay, since every one of them was met.
+	session.counts = CacheCounts{On: session.counts.On, Problems: session.counts.Problems}
+	session.factsSkipped.Store(0)
 	if session.known == nil {
 		return nil
 	}
@@ -237,6 +259,7 @@ func (session *CacheSession) Restore(
 	}
 	session.restoreFromBinary(loader, reachable, hashed)
 	session.readHits(reachable)
+	session.readPrevious(reachable)
 	// Each pass makes a hit that falls short a miss, which can only ask more of the rest.
 	dropping := true
 	for dropping {
@@ -290,9 +313,10 @@ func (session *CacheSession) KeyFor(label string) [sha256.Size]byte {
 	return [sha256.Size]byte(digest.Sum(nil))
 }
 
-// readHits makes a hit, as hitAt would, of every package among reachable that has a key, no list error, and no entry
-// from the binary, when the store holds a whole entry of it. The entries are read and decoded as many at once as there
-// are cores, since on a warm run of cohere's own root reading 1,167 of them one at a time was 119ms of a 268ms
+// readHits makes a hit, as hitAt would, of every package among reachable that has a key, no list error, no entry from
+// the binary, and no reload pending (see Reload), when the store holds a whole entry of it. The entries are read and
+// decoded as many at once as there are cores, since on a warm run of cohere's own root reading 1,167 of them one at a
+// time was 119ms of a 268ms
 // restore. A worker writes only its own slot of what it read: what it calls reads files, the session's analyzers and
 // its store, none of which a restore writes, so the session's maps are written here alone, once every worker is done,
 // in reachable's order.
@@ -301,7 +325,7 @@ func (session *CacheSession) readHits(reachable []*packages.Package) {
 	var keys []cache.Key
 	for _, restoring := range reachable {
 		key, hasKey := session.keys[restoring]
-		if !hasKey || len(restoring.Errors) > 0 || session.fromBinary[restoring] {
+		if !hasKey || len(restoring.Errors) > 0 || session.fromBinary[restoring] || session.reloading(restoring) {
 			continue
 		}
 		reading = append(reading, restoring)
@@ -469,6 +493,9 @@ func (session *CacheSession) restore(action *checker.Action) error {
 		return fmt.Errorf("restoring %s on %s: the load gave the package no types", action.Analyzer.Name,
 			action.Package.ID)
 	}
+	// A question of a fact computed on demand reaches a restored package only once an action on it has restored it,
+	// so the resolver's store knows the package by its types by then, the run beside the load's included.
+	session.know(action.Package)
 	for _, objectFact := range restored.objectFacts {
 		object, objectError := objectpath.Object(action.Package.Types, objectFact.path)
 		if objectError != nil {
@@ -529,9 +556,10 @@ func (session *CacheSession) filesOf(analyzedPackage *packages.Package) ([]store
 	return restored.files, true
 }
 
-// save writes the entry of every miss no wave has saved yet, from the last wave's graph, and counts every package the
-// load reached as a hit, from the store or the binary, or a miss. A session without a store writes nothing and counts
-// only what it restored.
+// save writes the entry of every miss no wave has saved yet, from the last wave's graph, with every answer the run's
+// resolver computed in it, writes again each entry the first wave saved whose answers grew since, and counts every
+// package the load reached as a hit, from the store or the binary, or a miss. A session without a store writes nothing
+// and counts only what it restored and reloaded.
 func (session *CacheSession) save(
 	graph *checker.Graph,
 	withheld map[*packages.Package]load.PackageWithheld,
@@ -539,9 +567,13 @@ func (session *CacheSession) save(
 ) {
 	session.counts.FactsSkipped = int(session.factsSkipped.Load())
 	session.counts.FromBinary = len(session.fromBinary)
+	session.answering.lock.Lock()
+	session.counts.Reloads = len(session.answering.reloaded)
+	session.answering.lock.Unlock()
 	if session.caching.Store == nil {
 		return
 	}
+	session.rewriteEarlier()
 	var missed []*packages.Package
 	for keyed := range session.keys {
 		if !session.restored(keyed) {
@@ -596,8 +628,9 @@ func (session *CacheSession) saveMisses(
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
+			answers := session.answersOf(saved)
 			entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-				withheld[saved], files[saved], knownFiles)
+				withheld[saved], answers, files[saved], knownFiles)
 			var putError error
 			// The export data goes first, so an entry is never in the store before what it needs to be read.
 			if encodeError == nil && entry.exportData != nil {

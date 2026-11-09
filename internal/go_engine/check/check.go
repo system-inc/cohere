@@ -180,6 +180,12 @@ type Result struct {
 	// ReportsRestored is how many of Reports came from the findings cache rather than from an analysis this run.
 	ReportsRestored int
 
+	// Reloads are the IDs of the packages a question of a fact computed on demand reached restored, with no answer
+	// stored, sorted (#w7zmvat wave 3). Each question failed, and its pass with it, so the result is not the run's: the
+	// caller has the session reload them (CacheSession.Reload) and loads and runs again, unless no reload is new, when
+	// the failures stand as the crashes that name them.
+	Reloads []string
+
 	Elapsed time.Duration
 }
 
@@ -239,6 +245,16 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		checkerOptions.Finished = record.take
 	}
 	session := options.Cache
+	if session != nil {
+		// The resolver reads answers of the packages the session restored, and keeps those it computes for the store.
+		// Under a run beside the load the packages' types are not final yet, so only each restored package is known,
+		// once an action on it restores it, and no store answers a package the run learns, which has none there.
+		resolver := fact_resolver.New(session)
+		checkerOptions.Resolver, session.resolver = resolver, resolver
+		if options.Ready == nil {
+			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
+		}
+	}
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.
 		return nil, fmt.Errorf("running report %s: the findings cache was opened without it", options.Report.Name)
@@ -368,6 +384,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	slices.Sort(result.CrashedRules)
 	result.FilesWalked, result.NodesVisited = walk(files)
 	if session != nil {
+		result.Reloads = session.reloadsOf(session.resolver)
 		session.save(graph, options.Withheld, files)
 		result.Cache = session.counts
 	}
@@ -393,14 +410,15 @@ func abandoned(abandon <-chan struct{}) bool {
 // requirement failing on a package, so only that listener's rule fails there, as it did walking by itself, never every
 // rule on the dispatcher. ForDependents keeps a dispatcher's requirement for its listeners only where a rule of this
 // run requires it too, so what only a left-out rule reads never runs. Resolver is a new fact resolver, one for the run
-// the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat).
+// the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat), with no
+// store, which Run gives the resolver of a run with the findings cache.
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
 		Failed:        rule.Failed,
 		Tolerant:      dispatch.IsDispatcher,
 		ForDependents: dispatch.ListenerRequirement,
-		Resolver:      fact_resolver.New(),
+		Resolver:      fact_resolver.New(nil),
 		Resolved:      fact_resolver.Resolved,
 	}
 }
