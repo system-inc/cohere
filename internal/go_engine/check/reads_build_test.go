@@ -39,7 +39,8 @@ var verdictFiles = map[string]string{
 		"type Handle struct{ current *state }\n\n" +
 		"type Shared struct{ Value int }\n\n" +
 		"type Closer interface{ Close() error }\n\n" +
-		"func Identity[Value any](value Value) Value { return value }\n",
+		"func Identity[Value any](value Value) Value { return value }\n\n" +
+		"type Box[Value any] struct{ Held Value }\n",
 	"platform/platform_darwin.go": "package platform\n\n" +
 		"const Name = \"darwin\"\n\n" +
 		"type state struct{ descriptor int }\n\n" +
@@ -301,20 +302,20 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 	}
 	for _, step := range []struct {
 		name   string
-		lookup func(host verdictWorld) build_reads.Lookup
+		lookup func(test *testing.T, host verdictWorld) build_reads.Lookup
 		facts  map[string]analysis.Fact
 		want   string
 	}{
 		{
 			name: "a scope lookup both builds answer alike",
-			lookup: func(host verdictWorld) build_reads.Lookup {
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryScope, Path: verdictPlatform, Name: "Stable",
 					Found: true, Answer: host.platform.Scope().Lookup("Stable")}
 			},
 		},
 		{
 			name: "a scope lookup absent in the build",
-			lookup: func(host verdictWorld) build_reads.Lookup {
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryScope, Path: verdictPlatform, Name: "OnlyDarwin",
 					Found: true, Answer: host.platform.Scope().Lookup("OnlyDarwin")}
 			},
@@ -322,14 +323,14 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 		},
 		{
 			name: "a scope miss the build answers",
-			lookup: func(verdictWorld) build_reads.Lookup {
+			lookup: func(*testing.T, verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryScope, Path: verdictPlatform, Name: "Flusher"}
 			},
 			want: "L lookup Scope " + verdictPlatform + ".Flusher: found false on the host, true in the build",
 		},
 		{
 			name: "the closure's interface",
-			lookup: func(host verdictWorld) build_reads.Lookup {
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
 				_, declared := build_reads.ClosureInterface(host.user.Imports(), verdictPlatform, "Closer")
 				return build_reads.Lookup{Query: build_reads.QueryClosure, Path: verdictPlatform, Name: "Closer",
 					Found: declared != nil, Answer: declared}
@@ -337,20 +338,20 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 		},
 		{
 			name: "a package name of the closure",
-			lookup: func(verdictWorld) build_reads.Lookup {
+			lookup: func(*testing.T, verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryPackageName, Name: "platform", Found: true}
 			},
 		},
 		{
 			name: "a package name the closure lacks",
-			lookup: func(verdictWorld) build_reads.Lookup {
+			lookup: func(*testing.T, verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryPackageName, Name: "elsewhere", Found: true}
 			},
 			want: "L lookup PackageName elsewhere: found true on the host, false in the build",
 		},
 		{
 			name: "an interface method whose candidates are the same",
-			lookup: func(host verdictWorld) build_reads.Lookup {
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Close",
 					Subject: methodOf(host.user, "Mine", "Close"), Found: true,
 					Answer: host.platform.Scope().Lookup("Closer")}
@@ -358,7 +359,7 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 		},
 		{
 			name: "a method a type of the build alone declares",
-			lookup: func(host verdictWorld) build_reads.Lookup {
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Flush",
 					Subject: methodOf(host.user, "Mine", "Flush")}
 			},
@@ -366,7 +367,7 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 		},
 		{
 			name: "a deprecation with the same message",
-			lookup: func(host verdictWorld) build_reads.Lookup {
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryDeprecated, Path: verdictPlatform,
 					Subject: host.platform.Scope().Lookup("Stable"), Found: true, Text: "use Other"}
 			},
@@ -374,7 +375,7 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 		},
 		{
 			name: "a deprecation with another message",
-			lookup: func(host verdictWorld) build_reads.Lookup {
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryDeprecated, Path: verdictPlatform,
 					Subject: host.platform.Scope().Lookup("Stable"), Found: true, Text: "use Other"}
 			},
@@ -382,8 +383,23 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 			want:  "D lookup Deprecated " + verdictPlatform + " of " + verdictPlatform + ".Stable: its message differs",
 		},
 		{
+			name: "no deprecation of an instance's field, which has no objectpath",
+			lookup: func(test *testing.T, host verdictWorld) build_reads.Lookup {
+				return build_reads.Lookup{Query: build_reads.QueryDeprecated, Path: verdictPlatform,
+					Subject: boxIntField(test, host)}
+			},
+		},
+		{
+			name: "a deprecation of an instance's field, which no build can hold",
+			lookup: func(test *testing.T, host verdictWorld) build_reads.Lookup {
+				return build_reads.Lookup{Query: build_reads.QueryDeprecated, Path: verdictPlatform,
+					Subject: boxIntField(test, host), Found: true, Text: "use Other"}
+			},
+			want: "D lookup Deprecated " + verdictPlatform + ": the subject has no objectpath",
+		},
+		{
 			name: "a lookup of a kind the verdict does not know",
-			lookup: func(verdictWorld) build_reads.Lookup {
+			lookup: func(*testing.T, verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: "Planted", Name: "Anything"}
 			},
 			want: "L lookup Planted Anything: a lookup of this kind cannot be asked again",
@@ -393,13 +409,30 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 			test.Parallel()
 
 			restoring, host := hostReads(test, "stable")
-			restoring.Reads.AddLookup(step.lookup(host))
+			restoring.Reads.AddLookup(step.lookup(test, host))
 			holds, why := holdsIn(restoring, NewReadsBuild(), linuxBuild(test, step.facts))
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
 			}
 		})
 	}
+}
+
+// boxIntField is the field Held of platform's Box instantiated with int, a field of an instance, which has no
+// objectpath, as a key of a composite literal of the instance names it.
+func boxIntField(test *testing.T, host verdictWorld) types.Object {
+	test.Helper()
+
+	instance, instanceError := types.Instantiate(nil, host.platform.Scope().Lookup("Box").Type(),
+		[]types.Type{types.Typ[types.Int]}, true)
+	if instanceError != nil {
+		test.Fatal(instanceError)
+	}
+	structure, isStruct := instance.Underlying().(*types.Struct)
+	if !isStruct {
+		test.Fatalf("Box[int] is a %T, want a struct", instance.Underlying())
+	}
+	return structure.Field(0)
 }
 
 // methodOf is the method named method of the type named typeName in declaring.

@@ -437,7 +437,7 @@ func (session *CacheSession) keepForBuilds(
 			defer group.Done()
 			defer func() { <-slots }()
 			entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved], withheld[saved],
-				session.demandOf(saved, session.previous[saved]), files[saved], knownFiles)
+				session.recordedDemandOf(saved), files[saved], knownFiles)
 			lock.Lock()
 			defer lock.Unlock()
 			if encodeError != nil {
@@ -453,5 +453,28 @@ func (session *CacheSession) keepForBuilds(
 		}()
 	}
 	group.Wait()
+	// What the analysis built to answer questions, every package's intermediate representation, syntax and type maps,
+	// is the session's to keep only for its next save; a run under `--no-cache` has none, and the extra builds that run
+	// next read only the entries, so it goes now rather than outlive the host's pass through every build (#b2t9xmf).
+	if session.caching.Store == nil {
+		session.resolver = nil
+		session.answering.lock.Lock()
+		session.answering.byTypes = nil
+		session.answering.lock.Unlock()
+	}
 	return host
+}
+
+// recordedDemandOf is what an entry kept for the extra builds holds of the fact kinds computed on demand: the answers
+// the run's analysis computed in saved, not every answer of it, which would build the whole of every package's
+// intermediate representation for answers the builds mostly never ask, and the reads its analysis made of other
+// packages. An extra build that asks one it does not hold reloads the package, as a run restoring a partial entry does
+// (see Reload).
+func (session *CacheSession) recordedDemandOf(saved *packages.Package) entryDemand {
+	if session.resolver == nil || saved.Types == nil {
+		return entryDemand{}
+	}
+	demanded := entryDemand{answers: sortedAnswers(session.resolver.Recorded(saved.Types), false)}
+	demanded.reads, demanded.readsIncomplete = session.readsOf(saved, entryDemand{})
+	return demanded
 }

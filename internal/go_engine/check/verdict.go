@@ -218,6 +218,14 @@ func (judged verdict) deprecationHolds(lookup build_reads.Lookup) (bool, string)
 	var path objectpath.Path
 	if lookup.Subject != nil {
 		subjectPath, hasPath := judged.host.pathOf(lookup.Subject)
+		// A field of an instance, as a key of `Box[int]{Value: 1}` names, has no objectpath, and no fact ever attaches
+		// to it in any build: the deprecated facts' result holds the objects their packages declare, the generic's
+		// field and not its instances'. So the rule's answer for it is no deprecation everywhere, and holds when the
+		// host's was too.
+		if variable, isVariable := lookup.Subject.(*types.Var); !hasPath && isVariable &&
+			variable.Origin() != variable && !lookup.Found {
+			return true, ""
+		}
 		if !hasPath {
 			return false, name + ": the subject has no objectpath"
 		}
