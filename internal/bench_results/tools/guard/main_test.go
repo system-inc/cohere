@@ -254,7 +254,8 @@ func TestANarrowedRecordIsNeverABaseline(test *testing.T) {
 				test.Errorf("the state directory holds %v (%v)", entries, readError)
 			}
 			wholeState := test.TempDir()
-			if exit, _, said := runGuard(append([]string{"-state", wholeState}, want.arguments(wholePath)...)...); exit != 0 {
+			wholeArguments := append([]string{"-state", wholeState}, want.arguments(wholePath)...)
+			if exit, _, said := runGuard(wholeArguments...); exit != 0 {
 				test.Fatalf("a whole-root record exited %d:\n%s", exit, said)
 			}
 			if _, statError := os.Stat(filepath.Join(wholeState, "baseline-ahra.json")); statError != nil {
