@@ -2,6 +2,6 @@
     "ignorePatterns": ["TypeScript/**", "internal/format/prettier/bundles/**"],
     "go": {
         "rules": {},
-        "targets": ["freebsd/amd64", "freebsd/arm64"]
+        "targets": ["freebsd/arm64"]
     }
 }
