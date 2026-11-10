@@ -21,7 +21,7 @@ type FreeVariable struct {
 	node
 
 	name      string
-	typ       types.Type
+	valueType types.Type
 	parent    *Function
 	referrers []Instruction
 
@@ -29,7 +29,7 @@ type FreeVariable struct {
 	outer Value // the Value captured from the enclosing context.
 }
 
-func (variable *FreeVariable) Type() types.Type { return variable.typ }
+func (variable *FreeVariable) Type() types.Type { return variable.valueType }
 
 func (variable *FreeVariable) Name() string { return variable.name }
 

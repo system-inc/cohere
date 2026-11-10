@@ -20,6 +20,6 @@ type Receive struct {
 	CommaOk bool
 }
 
-func (recv *Receive) Operands(rands []*Value) []*Value {
-	return append(rands, &recv.Channel)
+func (receive *Receive) Operands(rands []*Value) []*Value {
+	return append(rands, &receive.Channel)
 }

@@ -96,14 +96,14 @@ package main
 		test.Run(testCase.desc, func(test *testing.T) {
 			test.Parallel()
 			irPackage, file := buildPackage(test, testCase.input, nil)
-			fset := irPackage.Program.FileSet
+			fileSet := irPackage.Program.FileSet
 
 			// Find [start,end) positions of the first occurrence of substr in file.
 			index := strings.Index(testCase.input, testCase.substr)
 			if index < 0 {
 				test.Fatalf("%q is not a substring of input", testCase.substr)
 			}
-			tokenFile := fset.File(file.Package)
+			tokenFile := fileSet.File(file.Package)
 			start, end := tokenFile.Pos(index), tokenFile.Pos(index+len(testCase.substr))
 
 			path, exact := astutil.PathEnclosingInterval(file, start, end)

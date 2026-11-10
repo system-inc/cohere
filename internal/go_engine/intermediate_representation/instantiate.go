@@ -23,23 +23,23 @@ type generic struct {
 //
 // Requires fn.generic.instancesMu.
 func createInstance(function *Function, rtargs, targs []types.Type) *Function {
-	prog := function.Program
+	program := function.Program
 
 	// Compute signature.
 	var sig *types.Signature
 	var object *types.Func
-	if recv := function.Signature.Recv(); recv != nil {
+	if receiver := function.Signature.Recv(); receiver != nil {
 		// method, len(rtargs) > 0 || len(targs) > 0
 		if len(rtargs) > 0 {
 			// possibly generic method on generic type
-			object = prog.canon.instantiateMethod(function.object, rtargs, prog.ctxt)
+			object = program.canon.instantiateMethod(function.object, rtargs, program.ctxt)
 		} else {
 			// generic method on non-generic type
 			object = function.object // instantiation does not exist yet
 		}
 		if len(targs) > 0 {
 			// generic method
-			instSig, instantiateError := types.Instantiate(prog.ctxt, object.Signature(), targs, false)
+			instSig, instantiateError := types.Instantiate(program.ctxt, object.Signature(), targs, false)
 			if instantiateError != nil {
 				// Invariant: types.Instantiate returns an error only when it validates, and this call does not.
 				panic(instantiateError)
@@ -60,7 +60,7 @@ func createInstance(function *Function, rtargs, targs []types.Type) *Function {
 		}
 	} else {
 		// function, len(rtargs) == 0 && len(targs) > 0
-		instSig, instantiateError := types.Instantiate(prog.ctxt, function.Signature, targs, false)
+		instSig, instantiateError := types.Instantiate(program.ctxt, function.Signature, targs, false)
 		if instantiateError != nil {
 			// Invariant: types.Instantiate returns an error only when it validates, and this call does not.
 			panic(instantiateError)
@@ -71,7 +71,7 @@ func createInstance(function *Function, rtargs, targs []types.Type) *Function {
 			panic("Instantiate of a Signature returned a non-signature")
 		}
 		object = function.object // instantiation does not exist yet
-		canonical, isSignature := prog.canon.Type(instance).(*types.Signature)
+		canonical, isSignature := program.canon.Type(instance).(*types.Signature)
 		if !isSignature {
 			// Invariant: the canonizer returns the type it was given or one identical to it, and only a
 			// *types.Signature is identical to a *types.Signature.

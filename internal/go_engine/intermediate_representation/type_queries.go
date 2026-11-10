@@ -50,9 +50,9 @@ func is[T any](x types.Type) bool {
 	return ok
 }
 
-// deref returns a pointer's element type; otherwise it returns typ.
-func deref(typ types.Type) types.Type {
-	resolvedType := types.Unalias(typ)
+// dereference returns a pointer's element type; otherwise it returns `goType`.
+func dereference(goType types.Type) types.Type {
+	resolvedType := types.Unalias(goType)
 
 	if parameter, ok := resolvedType.(*types.TypeParam); ok {
 		if ctyp := core_type.Of(parameter); ctyp != nil {
@@ -64,13 +64,13 @@ func deref(typ types.Type) types.Type {
 	if pointer, ok := resolvedType.Underlying().(*types.Pointer); ok {
 		return pointer.Elem()
 	}
-	return typ
+	return goType
 }
 
 // fieldOf returns the index'th field of the (core type of) a struct type;
 // otherwise returns nil.
-func fieldOf(typ types.Type, index int) *types.Var {
-	if st, ok := core_type.Of(typ).(*types.Struct); ok {
+func fieldOf(goType types.Type, index int) *types.Var {
+	if st, ok := core_type.Of(goType).(*types.Struct); ok {
 		if 0 <= index && index < st.NumFields() {
 			return st.Field(index)
 		}
@@ -78,10 +78,10 @@ func fieldOf(typ types.Type, index int) *types.Var {
 	return nil
 }
 
-// isUntyped reports whether typ is the type of an untyped constant.
-func isUntyped(typ types.Type) bool {
+// isUntyped reports whether `goType` is the type of an untyped constant.
+func isUntyped(goType types.Type) bool {
 	// No Underlying/Unalias: untyped constant types cannot be Named or Alias.
-	basic, ok := typ.(*types.Basic)
+	basic, ok := goType.(*types.Basic)
 	return ok && basic.Info()&types.IsUntyped != 0
 }
 

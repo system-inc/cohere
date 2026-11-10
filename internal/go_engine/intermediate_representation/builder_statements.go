@@ -15,10 +15,10 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )
 
-// stmtList emits to fn code for all statements in list.
-func (packageBuilder *builder) stmtList(function *Function, list []ast.Stmt) {
-	for _, stmt := range list {
-		packageBuilder.stmt(function, stmt)
+// statementList emits to fn code for all statements in list.
+func (packageBuilder *builder) statementList(function *Function, list []ast.Stmt) {
+	for _, statement := range list {
+		packageBuilder.statement(function, statement)
 	}
 }
 
@@ -33,7 +33,7 @@ func (packageBuilder *builder) localValueSpec(function *Function, spec *ast.Valu
 			if !isBlankIdent(id) {
 				emitLocalVariable(function, identVariable(function, id), id)
 			}
-			lval := packageBuilder.addr(function, id, false) // non-escaping
+			lval := packageBuilder.address(function, id, false) // non-escaping
 			packageBuilder.assign(function, lval, spec.Values[index], true, nil, spec)
 		}
 
@@ -51,22 +51,22 @@ func (packageBuilder *builder) localValueSpec(function *Function, spec *ast.Valu
 
 	default:
 		// e.g. var x, y = pos()
-		tuple := packageBuilder.exprN(function, spec.Values[0])
+		tuple := packageBuilder.expressionN(function, spec.Values[0])
 		for index, id := range spec.Names {
 			if !isBlankIdent(id) {
 				emitLocalVariable(function, identVariable(function, id), id)
-				lhs := packageBuilder.addr(function, id, false) // non-escaping
+				lhs := packageBuilder.address(function, id, false) // non-escaping
 				lhs.store(function, emitExtract(function, tuple, index, id), id)
 			}
 		}
 	}
 }
 
-// assignStmt emits code to fn for a parallel assignment of rhss to lhss.
+// assignStatement emits code to fn for a parallel assignment of rhss to lhss.
 // isDef is true if this is a short variable declaration (:=).
 //
 // Note the similarity with localValueSpec.
-func (packageBuilder *builder) assignStmt(function *Function, lhss, rhss []ast.Expr, isDef bool, source ast.Node) {
+func (packageBuilder *builder) assignStatement(function *Function, lhss, rhss []ast.Expr, isDef bool, source ast.Node) {
 	// Side effects of all LHSs and RHSs must occur in left-to-right order.
 	lvals := make([]lvalue, len(lhss))
 	isZero := make([]bool, len(lhss))
@@ -84,7 +84,7 @@ func (packageBuilder *builder) assignStmt(function *Function, lhss, rhss []ast.E
 					isZero[index] = true
 				}
 			}
-			lval = packageBuilder.addr(function, lhs, false) // non-escaping
+			lval = packageBuilder.address(function, lhs, false) // non-escaping
 		}
 		lvals[index] = lval
 	}
@@ -102,7 +102,7 @@ func (packageBuilder *builder) assignStmt(function *Function, lhss, rhss []ast.E
 		stores.emit(function)
 	} else {
 		// e.g. x, y = pos()
-		tuple := packageBuilder.exprN(function, rhss[0])
+		tuple := packageBuilder.expressionN(function, rhss[0])
 		emitDebugReference(function, rhss[0], tuple, false)
 		for index, lval := range lvals {
 			lval.store(function, emitExtract(function, tuple, index, source), source)
@@ -110,25 +110,25 @@ func (packageBuilder *builder) assignStmt(function *Function, lhss, rhss []ast.E
 	}
 }
 
-// switchStmt emits to fn code for the switch statement `switchStmt`, optionally
+// switchStatement emits to fn code for the switch statement `switchStatement`, optionally
 // labelled by label. A switch whose cases are all constant becomes a ConstantSwitch.
 //
 // Mutates: function gains the blocks of the switch, and its targets and current block follow them
 // Mutates: label takes the switch's done block as its break target
-func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.SwitchStmt, label *lblock) {
-	if switchStmt.Tag == nil {
-		packageBuilder.switchStmtDynamic(function, switchStmt, label)
+func (packageBuilder *builder) switchStatement(function *Function, switchStatement *ast.SwitchStmt, label *lblock) {
+	if switchStatement.Tag == nil {
+		packageBuilder.switchStatementDynamic(function, switchStatement, label)
 		return
 	}
 	dynamic := false
-	for _, iclause := range switchStmt.Body.List {
+	for _, iclause := range switchStatement.Body.List {
 		clause, isCaseClause := iclause.(*ast.CaseClause)
 		if !isCaseClause {
 			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
 			panic(fmt.Sprintf("switch body holds %T, not a case clause", iclause))
 		}
-		for _, cond := range clause.List {
-			if function.info.Types[ast.Unparen(cond)].Value == nil {
+		for _, condition := range clause.List {
+			if function.info.Types[ast.Unparen(condition)].Value == nil {
 				dynamic = true
 				break
 			}
@@ -136,58 +136,58 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 	}
 
 	if dynamic {
-		packageBuilder.switchStmtDynamic(function, switchStmt, label)
+		packageBuilder.switchStatementDynamic(function, switchStatement, label)
 		return
 	}
 
-	if switchStmt.Init != nil {
-		packageBuilder.stmt(function, switchStmt.Init)
+	if switchStatement.Init != nil {
+		packageBuilder.statement(function, switchStatement.Init)
 	}
 
 	entry := function.currentBlock
-	tag := packageBuilder.expr(function, switchStmt.Tag)
+	tag := packageBuilder.expression(function, switchStatement.Tag)
 
-	heads := make([]*BasicBlock, 0, len(switchStmt.Body.List))
-	bodies := make([]*BasicBlock, len(switchStmt.Body.List))
-	conds := make([]Value, 0, len(switchStmt.Body.List))
+	heads := make([]*BasicBlock, 0, len(switchStatement.Body.List))
+	bodies := make([]*BasicBlock, len(switchStatement.Body.List))
+	conditions := make([]Value, 0, len(switchStatement.Body.List))
 
 	hasDefault := false
 	done := function.newBasicBlock("switch.done")
 	if label != nil {
 		label._break = done
 	}
-	for caseIndex, stmt := range switchStmt.Body.List {
+	for caseIndex, statement := range switchStatement.Body.List {
 		body := function.newBasicBlock(fmt.Sprintf("switch.body.%d", caseIndex))
 		bodies[caseIndex] = body
-		cas, isCaseClause := stmt.(*ast.CaseClause)
+		cas, isCaseClause := statement.(*ast.CaseClause)
 		if !isCaseClause {
 			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
-			panic(fmt.Sprintf("switch body holds %T, not a case clause", stmt))
+			panic(fmt.Sprintf("switch body holds %T, not a case clause", statement))
 		}
 		if cas.List == nil {
 			// default branch
 			hasDefault = true
 			head := function.newBasicBlock(fmt.Sprintf("switch.head.%d", caseIndex))
-			conds = append(conds, nil)
+			conditions = append(conditions, nil)
 			heads = append(heads, head)
 			function.currentBlock = head
 			emitJump(function, body, cas)
 		}
-		for conditionIndex, cond := range cas.List {
+		for conditionIndex, condition := range cas.List {
 			function.currentBlock = entry
 			head := function.newBasicBlock(fmt.Sprintf("switch.head.%d.%d", caseIndex, conditionIndex))
-			conds = append(conds, packageBuilder.expr(function, cond))
+			conditions = append(conditions, packageBuilder.expression(function, condition))
 			heads = append(heads, head)
 			function.currentBlock = head
-			emitJump(function, body, cond)
+			emitJump(function, body, condition)
 		}
 	}
 
-	for index, stmt := range switchStmt.Body.List {
-		clause, isCaseClause := stmt.(*ast.CaseClause)
+	for index, statement := range switchStatement.Body.List {
+		clause, isCaseClause := statement.(*ast.CaseClause)
 		if !isCaseClause {
 			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
-			panic(fmt.Sprintf("switch body holds %T, not a case clause", stmt))
+			panic(fmt.Sprintf("switch body holds %T, not a case clause", statement))
 		}
 		body := bodies[index]
 		function.currentBlock = body
@@ -200,25 +200,25 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 			_break:       done,
 			_fallthrough: fallthru,
 		}
-		packageBuilder.stmtList(function, clause.Body)
+		packageBuilder.statementList(function, clause.Body)
 		function.targets = function.targets.tail
-		emitJump(function, done, stmt)
+		emitJump(function, done, statement)
 	}
 
 	if !hasDefault {
 		head := function.newBasicBlock("switch.head.implicit-default")
 		body := function.newBasicBlock("switch.body.implicit-default")
 		function.currentBlock = head
-		emitJump(function, body, switchStmt)
+		emitJump(function, body, switchStatement)
 		function.currentBlock = body
-		emitJump(function, done, switchStmt)
+		emitJump(function, done, switchStatement)
 		heads = append(heads, head)
-		conds = append(conds, nil)
+		conditions = append(conditions, nil)
 	}
 
-	if len(heads) != len(conds) {
+	if len(heads) != len(conditions) {
 		// Invariant: every head appended above comes with exactly one condition.
-		panic(fmt.Sprintf("internal error: %d heads for %d conds", len(heads), len(conds)))
+		panic(fmt.Sprintf("internal error: %d heads for %d conds", len(heads), len(conditions)))
 	}
 	for _, head := range heads {
 		addEdge(entry, head)
@@ -226,27 +226,27 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 	function.currentBlock = entry
 	entry.emit(&ConstantSwitch{
 		Tag:        tag,
-		Conditions: conds,
-	}, switchStmt)
+		Conditions: conditions,
+	}, switchStatement)
 	function.currentBlock = done
 }
 
-// switchStmt emits to fn code for the switch statement `stmt`, optionally
+// switchStatementDynamic emits to fn code for the switch statement `statement`, optionally
 // labelled by label.
 //
 // Mutates: function gains the blocks of the switch, and its targets and current block follow them
 // Mutates: label takes the switch's done block as its break target
-func (packageBuilder *builder) switchStmtDynamic(function *Function, stmt *ast.SwitchStmt, label *lblock) {
+func (packageBuilder *builder) switchStatementDynamic(function *Function, statement *ast.SwitchStmt, label *lblock) {
 	// We treat SwitchStmt like a sequential if-else chain.
 	// Multiway dispatch can be recovered later by irutil.Switches()
 	// to those cases that are free of side effects.
-	if stmt.Init != nil {
-		packageBuilder.stmt(function, stmt.Init)
+	if statement.Init != nil {
+		packageBuilder.statement(function, statement.Init)
 	}
 	var tag Value = vTrue
 
-	if stmt.Tag != nil {
-		tag = packageBuilder.expr(function, stmt.Tag)
+	if statement.Tag != nil {
+		tag = packageBuilder.expression(function, statement.Tag)
 	}
 
 	done := function.newBasicBlock("switch.done")
@@ -262,8 +262,8 @@ func (packageBuilder *builder) switchStmtDynamic(function *Function, stmt *ast.S
 	var dfltFallthrough *BasicBlock
 	var fallthru *BasicBlock
 	var dfltBlock *BasicBlock
-	ncases := len(stmt.Body.List)
-	for index, clause := range stmt.Body.List {
+	ncases := len(statement.Body.List)
+	for index, clause := range statement.Body.List {
 		body := fallthru
 		if body == nil {
 			body = function.newBasicBlock("switch.body") // first case only
@@ -288,19 +288,25 @@ func (packageBuilder *builder) switchStmtDynamic(function *Function, stmt *ast.S
 			continue
 		}
 
-		var nextCond *BasicBlock
-		for _, cond := range cc.List {
-			nextCond = function.newBasicBlock("switch.next")
+		var nextCondition *BasicBlock
+		for _, caseExpression := range cc.List {
+			nextCondition = function.newBasicBlock("switch.next")
 			// For boolean switches, emit short-circuit control flow,
 			// just like an if/else-chain.
-			if tag == vTrue && !isNonTypeParamInterface(function.info.Types[cond].Type) {
-				packageBuilder.cond(function, cond, body, nextCond)
+			if tag == vTrue && !isNonTypeParamInterface(function.info.Types[caseExpression].Type) {
+				packageBuilder.condition(function, caseExpression, body, nextCondition)
 			} else {
-				cond := emitCompare(function, token.EQL, tag, packageBuilder.expr(function, cond), cond)
-				emitIf(function, cond, body, nextCond, cond.Source())
+				comparison := emitCompare(
+					function,
+					token.EQL,
+					tag,
+					packageBuilder.expression(function, caseExpression),
+					caseExpression,
+				)
+				emitIf(function, comparison, body, nextCondition, comparison.Source())
 			}
 
-			function.currentBlock = nextCond
+			function.currentBlock = nextCondition
 		}
 		function.currentBlock = body
 		function.targets = &targets{
@@ -308,62 +314,62 @@ func (packageBuilder *builder) switchStmtDynamic(function *Function, stmt *ast.S
 			_break:       done,
 			_fallthrough: fallthru,
 		}
-		packageBuilder.stmtList(function, cc.Body)
+		packageBuilder.statementList(function, cc.Body)
 		function.targets = function.targets.tail
-		emitJump(function, done, stmt)
-		function.currentBlock = nextCond
+		emitJump(function, done, statement)
+		function.currentBlock = nextCondition
 	}
 	if dfltBlock != nil {
 		// The lack of a Source for the jump doesn't matter, block
 		// fusing will get rid of the jump later.
 
-		emitJump(function, dfltBlock, stmt)
+		emitJump(function, dfltBlock, statement)
 		function.currentBlock = dfltBlock
 		function.targets = &targets{
 			tail:         function.targets,
 			_break:       done,
 			_fallthrough: dfltFallthrough,
 		}
-		packageBuilder.stmtList(function, *dfltBody)
+		packageBuilder.statementList(function, *dfltBody)
 		function.targets = function.targets.tail
 	}
-	emitJump(function, done, stmt)
+	emitJump(function, done, statement)
 	function.currentBlock = done
 }
 
-// typeSwitchStmt emits to fn code for the type switch statement `stmt`, optionally
+// typeSwitchStatement emits to fn code for the type switch statement `statement`, optionally
 // labelled by label.
 //
 // Mutates: function gains the blocks of the type switch, and its targets and current block follow them
 // Mutates: label takes the type switch's done block as its break target
-func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.TypeSwitchStmt, label *lblock) {
-	if stmt.Init != nil {
-		packageBuilder.stmt(function, stmt.Init)
+func (packageBuilder *builder) typeSwitchStatement(function *Function, statement *ast.TypeSwitchStmt, label *lblock) {
+	if statement.Init != nil {
+		packageBuilder.statement(function, statement.Init)
 	}
 
 	var tag Value
-	switch typed := stmt.Assign.(type) {
+	switch typed := statement.Assign.(type) {
 	case *ast.ExprStmt: // x.(type)
 		guard, isTypeAssert := ast.Unparen(typed.X).(*ast.TypeAssertExpr)
 		if !isTypeAssert {
 			// Invariant: the parser accepts only x.(type) as a type switch's guard.
 			panic(fmt.Sprintf("type switch guard %T is not a type assertion", typed.X))
 		}
-		tag = packageBuilder.expr(function, guard.X)
+		tag = packageBuilder.expression(function, guard.X)
 	case *ast.AssignStmt: // y := x.(type)
 		guard, isTypeAssert := ast.Unparen(typed.Rhs[0]).(*ast.TypeAssertExpr)
 		if !isTypeAssert {
 			// Invariant: the parser accepts only y := x.(type) as a type switch's assigning guard.
 			panic(fmt.Sprintf("type switch guard %T is not a type assertion", typed.Rhs[0]))
 		}
-		tag = packageBuilder.expr(function, guard.X)
+		tag = packageBuilder.expression(function, guard.X)
 	default:
 		// Invariant: go/ast documents a type switch's Assign as x.(type) or y := x.(type), each handled above.
 		panic("unreachable")
 	}
 
 	// +1 in case there's no explicit default case
-	heads := make([]*BasicBlock, 0, len(stmt.Body.List)+1)
+	heads := make([]*BasicBlock, 0, len(statement.Body.List)+1)
 
 	entry := function.currentBlock
 	done := function.newBasicBlock("typeswitch.done")
@@ -374,16 +380,16 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 	// set up type switch and constant switch, populate their conditions
 	tswtch := &TypeSwitch{
 		Tag:        tag,
-		Conditions: make([]types.Type, 0, len(stmt.Body.List)+1),
+		Conditions: make([]types.Type, 0, len(statement.Body.List)+1),
 	}
 	cswtch := &ConstantSwitch{
-		Conditions: make([]Value, 0, len(stmt.Body.List)+1),
+		Conditions: make([]Value, 0, len(statement.Body.List)+1),
 	}
 
-	rets := make([]types.Type, 0, len(stmt.Body.List)+1)
+	rets := make([]types.Type, 0, len(statement.Body.List)+1)
 	index := 0
 	var default_ *ast.CaseClause
-	for _, clause := range stmt.Body.List {
+	for _, clause := range statement.Body.List {
 		cc, isCaseClause := clause.(*ast.CaseClause)
 		if !isCaseClause {
 			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
@@ -396,9 +402,9 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 			// default case
 			default_ = cc
 		} else {
-			for _, expr := range cc.List {
-				tswtch.Conditions = append(tswtch.Conditions, function.typeOf(expr))
-				cswtch.Conditions = append(cswtch.Conditions, intConstant(int64(index), expr))
+			for _, expression := range cc.List {
+				tswtch.Conditions = append(tswtch.Conditions, function.typeOf(expression))
+				cswtch.Conditions = append(cswtch.Conditions, intConstant(int64(index), expression))
 				index++
 			}
 			if len(cc.List) == 1 {
@@ -416,20 +422,20 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 
 	var vars []*types.Var
 	vars = append(vars, varIndex)
-	for _, typ := range rets {
-		vars = append(vars, anonVariable(typ))
+	for _, caseType := range rets {
+		vars = append(vars, anonymousVariable(caseType))
 	}
 	tswtch.setType(types.NewTuple(vars...))
 	// default branch
 	function.currentBlock = entry
-	function.emit(tswtch, stmt)
+	function.emit(tswtch, statement)
 	cswtch.Conditions = append(cswtch.Conditions, intConstant(int64(-1), nil))
-	cswtch.Tag = emitExtract(function, tswtch, 0, stmt)
-	function.emit(cswtch, stmt)
+	cswtch.Tag = emitExtract(function, tswtch, 0, statement)
+	function.emit(cswtch, statement)
 
 	// build heads and bodies
 	index = 0
-	for _, clause := range stmt.Body.List {
+	for _, clause := range statement.Body.List {
 		cc, isCaseClause := clause.(*ast.CaseClause)
 		if !isCaseClause {
 			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
@@ -440,7 +446,7 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 		}
 
 		body := function.newBasicBlock("typeswitch.body")
-		for _, expr := range cc.List {
+		for _, expression := range cc.List {
 			head := function.newBasicBlock("typeswitch.head")
 			heads = append(heads, head)
 			function.currentBlock = head
@@ -454,14 +460,14 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 
 				variable := function.vars[object]
 				if rets[index] == tUntypedNil {
-					emitStore(function, variable, nilConstant(tswtch.Tag.Type(), nil), stmt.Assign)
+					emitStore(function, variable, nilConstant(tswtch.Tag.Type(), nil), statement.Assign)
 				} else {
-					x := emitExtract(function, tswtch, index+1, stmt.Assign)
+					x := emitExtract(function, tswtch, index+1, statement.Assign)
 					emitStore(function, variable, x, nil)
 				}
 			}
 
-			emitJump(function, body, expr)
+			emitJump(function, body, expression)
 			index++
 		}
 		function.currentBlock = body
@@ -469,7 +475,7 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 			tail:   function.targets,
 			_break: done,
 		}
-		packageBuilder.stmtList(function, cc.Body)
+		packageBuilder.statementList(function, cc.Body)
 		function.targets = function.targets.tail
 		emitJump(function, done, clause)
 	}
@@ -487,12 +493,12 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 		}
 		if object, ok := function.info.Implicits[default_].(*types.Var); ok {
 			variable := function.vars[object]
-			x := emitExtract(function, tswtch, index+1, stmt.Assign)
-			emitStore(function, variable, x, stmt)
+			x := emitExtract(function, tswtch, index+1, statement.Assign)
+			emitStore(function, variable, x, statement)
 		}
-		packageBuilder.stmtList(function, default_.Body)
+		packageBuilder.statementList(function, default_.Body)
 		function.targets = function.targets.tail
-		emitJump(function, done, stmt)
+		emitJump(function, done, statement)
 	}
 
 	function.currentBlock = entry
@@ -502,31 +508,35 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 	function.currentBlock = done
 }
 
-// selectStmt emits to fn code for the select statement `stmt`, optionally
+// selectStatement emits to fn code for the select statement `statement`, optionally
 // labelled by label.
 //
 // Mutates: function gains the blocks of the select, and its targets and current block follow them
 // Mutates: label takes the select's done block as its break target
-func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectStmt, label *lblock) (noreturn bool) {
-	if len(stmt.Body.List) == 0 {
-		instr := &Select{Blocking: true}
-		instr.setType(types.NewTuple(varIndex, varOk))
-		function.emit(instr, stmt)
-		function.emit(new(Unreachable), stmt)
+func (packageBuilder *builder) selectStatement(
+	function *Function,
+	statement *ast.SelectStmt,
+	label *lblock,
+) (noreturn bool) {
+	if len(statement.Body.List) == 0 {
+		instruction := &Select{Blocking: true}
+		instruction.setType(types.NewTuple(varIndex, varOk))
+		function.emit(instruction, statement)
+		function.emit(new(Unreachable), statement)
 		return true
 	}
 
 	// A blocking select of a single case degenerates to a
 	// simple send or receive.
 	// Whether this optimization is worth its weight has not been measured.
-	if len(stmt.Body.List) == 1 {
-		clause, isCommClause := stmt.Body.List[0].(*ast.CommClause)
+	if len(statement.Body.List) == 1 {
+		clause, isCommClause := statement.Body.List[0].(*ast.CommClause)
 		if !isCommClause {
 			// Invariant: go/ast holds only comm clauses in the body of a select.
-			panic(fmt.Sprintf("select body holds %T, not a comm clause", stmt.Body.List[0]))
+			panic(fmt.Sprintf("select body holds %T, not a comm clause", statement.Body.List[0]))
 		}
 		if clause.Comm != nil {
-			packageBuilder.stmt(function, clause.Comm)
+			packageBuilder.statement(function, clause.Comm)
 			done := function.newBasicBlock("select.done")
 			if label != nil {
 				label._break = done
@@ -535,7 +545,7 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 				tail:   function.targets,
 				_break: done,
 			}
-			packageBuilder.stmtList(function, clause.Body)
+			packageBuilder.statementList(function, clause.Body)
 			function.targets = function.targets.tail
 			emitJump(function, done, clause)
 			function.currentBlock = done
@@ -550,7 +560,7 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 	// with SetDebugMode records. go/ir keeps it on the state as DebugNode.
 	var receives []*ast.UnaryExpr
 	blocking := true
-	for _, clause := range stmt.Body.List {
+	for _, clause := range statement.Body.List {
 		var st *SelectState
 		commClause, isCommClause := clause.(*ast.CommClause)
 		if !isCommClause {
@@ -563,8 +573,8 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 			continue
 
 		case *ast.SendStmt: // ch<- i
-			channel := packageBuilder.expr(function, comm.Chan)
-			channelType, isChannel := core_type.Of(function.typ(channel.Type())).(*types.Chan)
+			channel := packageBuilder.expression(function, comm.Chan)
+			channelType, isChannel := core_type.Of(function.instantiatedType(channel.Type())).(*types.Chan)
 			if !isChannel {
 				// Invariant: go/types accepts a send only on an operand whose core type is a channel.
 				panic(fmt.Sprintf("send on %s, which has no channel core type", channel.Type()))
@@ -572,64 +582,64 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 			st = &SelectState{
 				Direction: types.SendOnly,
 				Channel:   channel,
-				Send: emitConv(function, packageBuilder.expr(function, comm.Value),
+				Send: emitConv(function, packageBuilder.expression(function, comm.Value),
 					channelType.Elem(), comm),
 				Position: comm.Arrow,
 			}
 			receives = append(receives, nil)
 
 		case *ast.AssignStmt: // x := <-ch
-			recv, isUnary := ast.Unparen(comm.Rhs[0]).(*ast.UnaryExpr)
+			receive, isUnary := ast.Unparen(comm.Rhs[0]).(*ast.UnaryExpr)
 			if !isUnary {
 				// Invariant: the parser accepts an assignment as a select case only when it receives, <-ch.
 				panic(fmt.Sprintf("select case assigns %T, not a receive", comm.Rhs[0]))
 			}
 			st = &SelectState{
 				Direction: types.RecvOnly,
-				Channel:   packageBuilder.expr(function, recv.X),
-				Position:  recv.OpPos,
+				Channel:   packageBuilder.expression(function, receive.X),
+				Position:  receive.OpPos,
 			}
-			receives = append(receives, recv)
+			receives = append(receives, receive)
 
 		case *ast.ExprStmt: // <-ch
-			recv, isUnary := ast.Unparen(comm.X).(*ast.UnaryExpr)
+			receive, isUnary := ast.Unparen(comm.X).(*ast.UnaryExpr)
 			if !isUnary {
 				// Invariant: the parser accepts an expression as a select case only when it receives, <-ch.
 				panic(fmt.Sprintf("select case evaluates %T, not a receive", comm.X))
 			}
 			st = &SelectState{
 				Direction: types.RecvOnly,
-				Channel:   packageBuilder.expr(function, recv.X),
-				Position:  recv.OpPos,
+				Channel:   packageBuilder.expression(function, receive.X),
+				Position:  receive.OpPos,
 			}
-			receives = append(receives, recv)
+			receives = append(receives, receive)
 		}
 		states = append(states, st)
 	}
 
 	// We dispatch on the (fair) result of Select using a
 	// switch on the returned index.
-	sel := &Select{
+	selectInstruction := &Select{
 		States:   states,
 		Blocking: blocking,
 	}
-	sel.source = stmt
+	selectInstruction.source = statement
 	var vars []*types.Var
 	vars = append(vars, varIndex, varOk)
 	for _, st := range states {
 		if st.Direction == types.RecvOnly {
-			channelType, isChannel := core_type.Of(function.typ(st.Channel.Type())).(*types.Chan)
+			channelType, isChannel := core_type.Of(function.instantiatedType(st.Channel.Type())).(*types.Chan)
 			if !isChannel {
 				// Invariant: go/types accepts a receive only from an operand whose core type is a channel.
 				panic(fmt.Sprintf("receive from %s, which has no channel core type", st.Channel.Type()))
 			}
 			tElem := channelType.Elem()
-			vars = append(vars, anonVariable(tElem))
+			vars = append(vars, anonymousVariable(tElem))
 		}
 	}
-	sel.setType(types.NewTuple(vars...))
-	function.emit(sel, stmt)
-	index := emitExtract(function, sel, 0, stmt)
+	selectInstruction.setType(types.NewTuple(vars...))
+	function.emit(selectInstruction, statement)
+	index := emitExtract(function, selectInstruction, 0, statement)
 
 	done := function.newBasicBlock("select.done")
 	if label != nil {
@@ -640,14 +650,14 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 	swtch := &ConstantSwitch{
 		Tag: index,
 		// one condition per case
-		Conditions: make([]Value, 0, len(stmt.Body.List)+1),
+		Conditions: make([]Value, 0, len(statement.Body.List)+1),
 	}
 	// note that we don't need heads; a select case can only have a single condition
 	var bodies []*BasicBlock
 
 	state := 0
 	receivedValueIndex := 2 // index in 'sel' tuple of value; increments if st.Direction==types.RecvOnly
-	for _, cc := range stmt.Body.List {
+	for _, cc := range statement.Body.List {
 		clause, isCommClause := cc.(*ast.CommClause)
 		if !isCommClause {
 			// Invariant: go/ast holds only comm clauses in the body of a select.
@@ -661,8 +671,8 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 				tail:   function.targets,
 				_break: done,
 			}
-			packageBuilder.stmtList(function, clause.Body)
-			emitJump(function, done, stmt)
+			packageBuilder.statementList(function, clause.Body)
+			emitJump(function, done, statement)
 			function.targets = function.targets.tail
 			swtch.Conditions = append(swtch.Conditions, intConstant(-1, nil))
 			continue
@@ -678,7 +688,7 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 		switch comm := clause.Comm.(type) {
 		case *ast.ExprStmt: // <-ch
 			if function.debugInformation() {
-				value := emitExtract(function, sel, receivedValueIndex, comm)
+				value := emitExtract(function, selectInstruction, receivedValueIndex, comm)
 				emitDebugReference(function, receives[state], value, false)
 			}
 			receivedValueIndex++
@@ -692,8 +702,8 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 				}
 				emitLocalVariable(function, identVariable(function, id), id)
 			}
-			x := packageBuilder.addr(function, comm.Lhs[0], false) // non-escaping
-			value := emitExtract(function, sel, receivedValueIndex, comm)
+			x := packageBuilder.address(function, comm.Lhs[0], false) // non-escaping
+			value := emitExtract(function, selectInstruction, receivedValueIndex, comm)
 			if function.debugInformation() {
 				emitDebugReference(function, receives[state], value, false)
 			}
@@ -708,18 +718,18 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 					}
 					emitLocalVariable(function, identVariable(function, id), id)
 				}
-				ok := packageBuilder.addr(function, comm.Lhs[1], false) // non-escaping
-				ok.store(function, emitExtract(function, sel, 1, comm), comm)
+				ok := packageBuilder.address(function, comm.Lhs[1], false) // non-escaping
+				ok.store(function, emitExtract(function, selectInstruction, 1, comm), comm)
 			}
 			receivedValueIndex++
 		}
-		packageBuilder.stmtList(function, clause.Body)
+		packageBuilder.statementList(function, clause.Body)
 		function.targets = function.targets.tail
-		emitJump(function, done, stmt)
+		emitJump(function, done, statement)
 		state++
 	}
 	function.currentBlock = entry
-	function.emit(swtch, stmt)
+	function.emit(swtch, statement)
 	for _, body := range bodies {
 		addEdge(entry, body)
 	}
@@ -727,17 +737,17 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 	return false
 }
 
-// forStmt emits to fn code for the for statement `stmt`, optionally
+// forStatement emits to fn code for the for statement `statement`, optionally
 // labelled by label.
 //
 // Mutates: function gains the blocks of the loop, and its targets and current block follow them
 // Mutates: label takes the loop's done and continue blocks as its break and continue targets
-func (packageBuilder *builder) forStmt(function *Function, stmt *ast.ForStmt, label *lblock) {
+func (packageBuilder *builder) forStatement(function *Function, statement *ast.ForStmt, label *lblock) {
 	// Use forStmtGo122 instead if it applies.
-	if stmt.Init != nil {
-		if assign, ok := stmt.Init.(*ast.AssignStmt); ok && assign.Tok == token.DEFINE {
+	if statement.Init != nil {
+		if assign, ok := statement.Init.(*ast.AssignStmt); ok && assign.Tok == token.DEFINE {
 			if goVersionAtLeast(function.goversion, "go1.22") {
-				packageBuilder.forStmtGo122(function, stmt, label)
+				packageBuilder.forStatementGo122(function, statement, label)
 				return
 			}
 		}
@@ -754,27 +764,27 @@ func (packageBuilder *builder) forStmt(function *Function, stmt *ast.ForStmt, la
 	//     ...post...
 	//     jump loop
 	// done:                                 (target of break)
-	if stmt.Init != nil {
-		packageBuilder.stmt(function, stmt.Init)
+	if statement.Init != nil {
+		packageBuilder.statement(function, statement.Init)
 	}
 	body := function.newBasicBlock("for.body")
 	done := function.newBasicBlock("for.done") // target of 'break'
 	loop := body                               // target of back-edge
-	if stmt.Cond != nil {
+	if statement.Cond != nil {
 		loop = function.newBasicBlock("for.loop")
 	}
 	cont := loop // target of 'continue'
-	if stmt.Post != nil {
+	if statement.Post != nil {
 		cont = function.newBasicBlock("for.post")
 	}
 	if label != nil {
 		label._break = done
 		label._continue = cont
 	}
-	emitJump(function, loop, stmt)
+	emitJump(function, loop, statement)
 	function.currentBlock = loop
 	if loop != body {
-		packageBuilder.cond(function, stmt.Cond, body, done)
+		packageBuilder.condition(function, statement.Cond, body, done)
 		function.currentBlock = body
 	}
 	function.targets = &targets{
@@ -782,27 +792,27 @@ func (packageBuilder *builder) forStmt(function *Function, stmt *ast.ForStmt, la
 		_break:    done,
 		_continue: cont,
 	}
-	packageBuilder.stmt(function, stmt.Body)
+	packageBuilder.statement(function, statement.Body)
 	function.targets = function.targets.tail
-	emitJump(function, cont, stmt)
+	emitJump(function, cont, statement)
 
-	if stmt.Post != nil {
+	if statement.Post != nil {
 		function.currentBlock = cont
-		packageBuilder.stmt(function, stmt.Post)
-		emitJump(function, loop, stmt) // back-edge
+		packageBuilder.statement(function, statement.Post)
+		emitJump(function, loop, statement) // back-edge
 	}
 	function.currentBlock = done
 }
 
-// forStmtGo122 emits to fn code for the for statement `stmt`, optionally
-// labelled by label. `stmt` must define its variables.
+// forStatementGo122 emits to fn code for the for statement `statement`, optionally
+// labelled by label. `statement` must define its variables.
 //
 // This allocates once per loop iteration. This is only correct in
 // GoVersions >= go1.22.
 //
 // Mutates: function gains the blocks of the loop, and its variables, targets and current block follow them
 // Mutates: label takes the loop's done and post blocks as its break and continue targets
-func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStmt, label *lblock) {
+func (packageBuilder *builder) forStatementGo122(function *Function, statement *ast.ForStmt, label *lblock) {
 	//     i_outer = alloc[T]
 	//     *i_outer = ...init...        // under objects[i] = i_outer
 	//     jump loop
@@ -821,10 +831,10 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 	//     goto loop
 	// done:
 
-	init, isAssign := stmt.Init.(*ast.AssignStmt)
+	init, isAssign := statement.Init.(*ast.AssignStmt)
 	if !isAssign {
 		// Invariant: forStmt calls forStmtGo122 only when the loop's init is a := assignment.
-		panic(fmt.Sprintf("for loop init %T is not an assignment", stmt.Init))
+		panic(fmt.Sprintf("for loop init %T is not an assignment", statement.Init))
 	}
 	startingBlocks := len(function.Blocks)
 
@@ -853,23 +863,23 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 			panic(fmt.Sprintf("short variable declaration of %T, not an identifier", lhs))
 		}
 		variable := identVariable(function, id)
-		typ := function.typ(variable.Type())
+		variableType := function.instantiatedType(variable.Type())
 
 		function.currentBlock = pre
-		outer := emitLocal(function, typ, lhs, variable.Name())
+		outer := emitLocal(function, variableType, lhs, variable.Name())
 
 		function.currentBlock = loop
 		phi := &Phi{}
 		phi.comment = variable.Name()
-		phi.typ = outer.Type()
+		phi.valueType = outer.Type()
 		function.emit(phi, lhs)
 
 		function.currentBlock = post
 		// If next is local, it reuses the address and zeroes the old value so
 		// load before allocating next.
 		load := emitLoad(function, phi, init)
-		next := emitLocal(function, typ, lhs, variable.Name())
-		store := emitStore(function, next, load, stmt)
+		next := emitLocal(function, variableType, lhs, variable.Name())
+		store := emitStore(function, next, load, statement)
 
 		phi.Edges = []Value{outer, next} // pre edge is emitted before post edge.
 		vars[index] = loopVariable{variable, outer, phi, load, next, store}
@@ -881,22 +891,22 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 		function.vars[variable.object] = variable.outer
 	}
 	const isDef = false // assign to already-allocated outers
-	packageBuilder.assignStmt(function, init.Lhs, init.Rhs, isDef, init)
+	packageBuilder.assignStatement(function, init.Lhs, init.Rhs, isDef, init)
 	if label != nil {
 		label._break = done
 		label._continue = post
 	}
-	emitJump(function, loop, stmt)
+	emitJump(function, loop, statement)
 
 	// ...cond... under fn.objects[v] = i
 	function.currentBlock = loop
 	for _, variable := range vars {
 		function.vars[variable.object] = variable.phi
 	}
-	if stmt.Cond != nil {
-		packageBuilder.cond(function, stmt.Cond, body, done)
+	if statement.Cond != nil {
+		packageBuilder.condition(function, statement.Cond, body, done)
 	} else {
-		emitJump(function, body, stmt)
+		emitJump(function, body, statement)
 	}
 
 	// ...body... under fn.objects[v] = i
@@ -906,19 +916,19 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 		_break:    done,
 		_continue: post,
 	}
-	packageBuilder.stmt(function, stmt.Body)
+	packageBuilder.statement(function, statement.Body)
 	function.targets = function.targets.tail
-	emitJump(function, post, stmt)
+	emitJump(function, post, statement)
 
 	// ...post... under fn.objects[v] = i_next
 	for _, variable := range vars {
 		function.vars[variable.object] = variable.next
 	}
 	function.currentBlock = post
-	if stmt.Post != nil {
-		packageBuilder.stmt(function, stmt.Post)
+	if statement.Post != nil {
+		packageBuilder.statement(function, statement.Post)
 	}
-	emitJump(function, loop, stmt) // back-edge
+	emitJump(function, loop, statement) // back-edge
 	function.currentBlock = done
 
 	// For each loop variable that does not escape,
@@ -952,12 +962,12 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 		// We need only look within the blocks added by the loop.
 		var operands []*Value // recycle storage
 		for _, block := range function.Blocks[startingBlocks:] {
-			for _, instr := range block.Instructions {
-				operands = instr.Operands(operands[:0])
-				for _, ptr := range operands {
-					operand := *ptr
+			for _, instruction := range block.Instructions {
+				operands = instruction.Operands(operands[:0])
+				for _, pointer := range operands {
+					operand := *pointer
 					if replacement := replace[operand]; replacement != nil {
-						*ptr = replacement
+						*pointer = replacement
 					}
 				}
 			}
@@ -971,14 +981,14 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 	}
 }
 
-// stmt lowers statement s to IR form, emitting code to fn.
+// statement lowers statement s to IR form, emitting code to fn.
 //
 // Mutates: function gains the blocks and instructions for the statement
-func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
+func (packageBuilder *builder) statement(function *Function, statement ast.Stmt) {
 	// The label of the current statement.  If non-nil, its _goto
 	// target is always set; its _break and _continue are set only
 	// within the body of switch/typeswitch/select/for/range.
-	// It is effectively an additional default-nil parameter of stmt().
+	// It is effectively an additional default-nil parameter of statement().
 	var label *lblock
 	// current is the statement being lowered: each label in front of it is peeled first, outermost first. A named
 	// label becomes the current label, its goto block entered by a jump, and a blank one keeps the label before it,
@@ -1017,7 +1027,7 @@ func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
 		}
 
 	case *ast.ExprStmt:
-		packageBuilder.expr(function, typed.X)
+		packageBuilder.expression(function, typed.X)
 
 	case *ast.SendStmt:
 		channelType, isChannel := core_type.Of(function.typeOf(typed.Chan)).(*types.Chan)
@@ -1025,33 +1035,39 @@ func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
 			// Invariant: go/types accepts a send only on an operand whose core type is a channel.
 			panic(fmt.Sprintf("send on %s, which has no channel core type", function.typeOf(typed.Chan)))
 		}
-		instr := &Send{
-			Channel: packageBuilder.expr(function, typed.Chan),
-			X: emitConv(function, packageBuilder.expr(function, typed.Value),
+		instruction := &Send{
+			Channel: packageBuilder.expression(function, typed.Chan),
+			X: emitConv(function, packageBuilder.expression(function, typed.Value),
 				channelType.Elem(), typed),
 		}
-		function.emit(instr, typed)
+		function.emit(instruction, typed)
 
 	case *ast.IncDecStmt:
-		op := token.ADD
+		operator := token.ADD
 		if typed.Tok == token.DEC {
-			op = token.SUB
+			operator = token.SUB
 		}
-		loc := packageBuilder.addr(function, typed.X, false)
-		packageBuilder.assignOp(function, loc, NewConstant(constant.MakeInt64(1), loc.typ(), typed), op, typed)
+		loc := packageBuilder.address(function, typed.X, false)
+		packageBuilder.assignOperation(
+			function,
+			loc,
+			NewConstant(constant.MakeInt64(1), loc.storedType(), typed),
+			operator,
+			typed,
+		)
 
 	case *ast.AssignStmt:
 		switch typed.Tok {
 		case token.ASSIGN, token.DEFINE:
-			packageBuilder.assignStmt(function, typed.Lhs, typed.Rhs, typed.Tok == token.DEFINE, current)
+			packageBuilder.assignStatement(function, typed.Lhs, typed.Rhs, typed.Tok == token.DEFINE, current)
 
 		default: // +=, etc.
-			op := typed.Tok + token.ADD - token.ADD_ASSIGN
-			packageBuilder.assignOp(
+			operator := typed.Tok + token.ADD - token.ADD_ASSIGN
+			packageBuilder.assignOperation(
 				function,
-				packageBuilder.addr(function, typed.Lhs[0], false),
-				packageBuilder.expr(function, typed.Rhs[0]),
-				op,
+				packageBuilder.address(function, typed.Lhs[0], false),
+				packageBuilder.expression(function, typed.Rhs[0]),
+				operator,
 				typed,
 			)
 		}
@@ -1076,17 +1092,17 @@ func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
 		createRecoverBlock(function.source)
 
 	case *ast.ReturnStmt:
-		packageBuilder.returnStmt(function, typed)
+		packageBuilder.returnStatement(function, typed)
 
 	case *ast.BranchStmt:
-		packageBuilder.branchStmt(function, typed)
+		packageBuilder.branchStatement(function, typed)
 
 	case *ast.BlockStmt:
-		packageBuilder.stmtList(function, typed.List)
+		packageBuilder.statementList(function, typed.List)
 
 	case *ast.IfStmt:
 		if typed.Init != nil {
-			packageBuilder.stmt(function, typed.Init)
+			packageBuilder.statement(function, typed.Init)
 		}
 		then := function.newBasicBlock("if.then")
 		done := function.newBasicBlock("if.done")
@@ -1094,37 +1110,37 @@ func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
 		if typed.Else != nil {
 			els = function.newBasicBlock("if.else")
 		}
-		instr := packageBuilder.cond(function, typed.Cond, then, els)
-		instr.source = typed
+		instruction := packageBuilder.condition(function, typed.Cond, then, els)
+		instruction.source = typed
 		function.currentBlock = then
-		packageBuilder.stmt(function, typed.Body)
+		packageBuilder.statement(function, typed.Body)
 		emitJump(function, done, typed)
 
 		if typed.Else != nil {
 			function.currentBlock = els
-			packageBuilder.stmt(function, typed.Else)
+			packageBuilder.statement(function, typed.Else)
 			emitJump(function, done, typed)
 		}
 
 		function.currentBlock = done
 
 	case *ast.SwitchStmt:
-		packageBuilder.switchStmt(function, typed, label)
+		packageBuilder.switchStatement(function, typed, label)
 
 	case *ast.TypeSwitchStmt:
-		packageBuilder.typeSwitchStmt(function, typed, label)
+		packageBuilder.typeSwitchStatement(function, typed, label)
 
 	case *ast.SelectStmt:
-		if packageBuilder.selectStmt(function, typed, label) {
+		if packageBuilder.selectStatement(function, typed, label) {
 			// the select has no cases, it blocks forever
 			function.currentBlock = function.newBasicBlock("unreachable")
 		}
 
 	case *ast.ForStmt:
-		packageBuilder.forStmt(function, typed, label)
+		packageBuilder.forStatement(function, typed, label)
 
 	case *ast.RangeStmt:
-		packageBuilder.rangeStmt(function, typed, label, typed)
+		packageBuilder.rangeStatement(function, typed, label, typed)
 
 	default:
 		// Invariant: the cases above cover every statement go/ast has but BadStmt, which go/types rejects, and the
@@ -1133,16 +1149,16 @@ func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
 	}
 }
 
-// branchStmt emits to fn the jump for the break, continue, goto or fallthrough statement `stmt`.
+// branchStatement emits to fn the jump for the break, continue, goto or fallthrough statement `statement`.
 //
 // Mutates: function moves on to an unreachable block after the jump
-func (packageBuilder *builder) branchStmt(function *Function, stmt *ast.BranchStmt) {
+func (packageBuilder *builder) branchStatement(function *Function, statement *ast.BranchStmt) {
 	var block *BasicBlock
-	if stmt.Label == nil {
-		block = targetedBlock(function, stmt.Tok)
+	if statement.Label == nil {
+		block = targetedBlock(function, statement.Tok)
 	} else {
-		target := function.label(stmt.Label)
-		block = labelledBlock(function, target, stmt.Tok)
+		target := function.label(statement.Label)
+		block = labelledBlock(function, target, statement.Tok)
 		if block == nil { // forward goto
 			lb := function.lblockOf(target)
 			block = lb._goto // jump to lb._goto
@@ -1150,29 +1166,29 @@ func (packageBuilder *builder) branchStmt(function *Function, stmt *ast.BranchSt
 				// fn is a range-over-func and the goto may exit fn.
 				// Create an exit and resolve it at the end of
 				// builder.buildYieldFunc.
-				labelExit(function, target, stmt)
+				labelExit(function, target, statement)
 			}
 		}
 	}
 	to := block.parent
 
 	if to == function {
-		emitJump(function, block, stmt)
+		emitJump(function, block, statement)
 	} else { // break outside of fn.
 		// fn must be a range-over-func
-		exit := blockExit(function, block, stmt)
-		id := intConstant(exit.id, stmt)
-		storeVariable(function, function.jump, id, stmt)
-		vFalse := NewConstant(constant.MakeBool(false), tBool, stmt)
+		exit := blockExit(function, block, statement)
+		id := intConstant(exit.id, statement)
+		storeVariable(function, function.jump, id, statement)
+		vFalse := NewConstant(constant.MakeBool(false), tBool, statement)
 		function.emit(&Return{Results: []Value{vFalse}}, exit.source)
 	}
 	function.currentBlock = function.newBasicBlock("unreachable")
 }
 
-// returnStmt emits to fn code for the return statement `stmt`.
+// returnStatement emits to fn code for the return statement `statement`.
 //
 // Mutates: function moves on to an unreachable block after the return
-func (packageBuilder *builder) returnStmt(function *Function, stmt *ast.ReturnStmt) {
+func (packageBuilder *builder) returnStatement(function *Function, statement *ast.ReturnStmt) {
 	// Each stored result takes the position of the whole return
 	// statement, not that of its own returned expression.
 
@@ -1181,23 +1197,28 @@ func (packageBuilder *builder) returnStmt(function *Function, stmt *ast.ReturnSt
 	sig := function.source.Signature // signature of the enclosing source function
 
 	// Convert return operands to result type.
-	if len(stmt.Results) == 1 && sig.Results().Len() > 1 {
+	if len(statement.Results) == 1 && sig.Results().Len() > 1 {
 		// Return of one expression in a multi-valued function.
-		tuple := packageBuilder.exprN(function, stmt.Results[0])
+		tuple := packageBuilder.expressionN(function, statement.Results[0])
 		ttuple, isTuple := tuple.Type().(*types.Tuple)
 		if !isTuple {
-			// Invariant: exprN returns a value whose type is a tuple.
+			// Invariant: expressionN returns a value whose type is a tuple.
 			panic(fmt.Sprintf("returned %s has type %s, not a tuple", tuple, tuple.Type()))
 		}
 		for index, length := 0, ttuple.Len(); index < length; index++ {
 			results = append(results,
-				emitConv(function, emitExtract(function, tuple, index, stmt),
-					sig.Results().At(index).Type(), stmt))
+				emitConv(function, emitExtract(function, tuple, index, statement),
+					sig.Results().At(index).Type(), statement))
 		}
 	} else {
 		// 1:1 return, or no-arg return in non-void function.
-		for index, result := range stmt.Results {
-			value := emitConv(function, packageBuilder.expr(function, result), sig.Results().At(index).Type(), stmt)
+		for index, result := range statement.Results {
+			value := emitConv(
+				function,
+				packageBuilder.expression(function, result),
+				sig.Results().At(index).Type(),
+				statement,
+			)
 			results = append(results, value)
 		}
 	}
@@ -1210,14 +1231,14 @@ func (packageBuilder *builder) returnStmt(function *Function, stmt *ast.ReturnSt
 		} else { // lookup needed?
 			result = function.lookup(function.returnVariables[index], false)
 		}
-		emitStore(function, result, value, stmt)
+		emitStore(function, result, value, statement)
 	}
 
 	if function.jump != nil {
 		// Return from body of a range-over-func.
 		// The return statement is syntactically within the loop,
 		// but the generated code is in the 'switch jump {...}' after it.
-		exit := returnExit(function, stmt)
+		exit := returnExit(function, statement)
 		id := intConstant(exit.id, exit.source)
 		storeVariable(function, function.jump, id, exit.source)
 		vFalse := NewConstant(constant.MakeBool(false), tBool, exit.source)
@@ -1228,13 +1249,13 @@ func (packageBuilder *builder) returnStmt(function *Function, stmt *ast.ReturnSt
 
 	// Run function calls deferred in this
 	// function when explicitly returning from it.
-	function.emit(new(RunDefers), stmt)
+	function.emit(new(RunDefers), statement)
 	// Reload (potentially) named result variables to form the result tuple.
 	results = results[:0]
 	for _, nr := range function.results {
-		results = append(results, emitLoad(function, nr, stmt))
+		results = append(results, emitLoad(function, nr, statement))
 	}
 
-	function.emit(&Return{Results: results}, stmt)
+	function.emit(&Return{Results: results}, statement)
 	function.currentBlock = function.newBasicBlock("unreachable")
 }

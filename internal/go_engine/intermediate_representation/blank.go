@@ -26,7 +26,7 @@ func (blank blank) address(function *Function) Value {
 	panic("blank var is not addressable")
 }
 
-func (blank blank) typ() types.Type {
+func (blank blank) storedType() types.Type {
 	// This should be the type of the blank Ident; the typechecker
 	// doesn't provide this yet, but fortunately, we don't need it
 	// yet either.

@@ -39,21 +39,25 @@ import (
 //   - optional method type arguments
 //   - meth.Obj() may denote a concrete or an interface method
 //   - the result may be a thunk or a wrapper.
-func createWrapper(prog *Program, sel *selection, targs []types.Type) *Function {
-	object, isFunc := sel.object.(*types.Func) // the declared function
-	if !isFunc {
+func createWrapper(program *Program, selection *selection, targs []types.Type) *Function {
+	object, isFunction := selection.object.(*types.Func) // the declared function
+	if !isFunction {
 		// Invariant: createThunk is the only caller and passes only a method expression, which selects a method.
-		panic(fmt.Sprintf("createWrapper: selection of %s is not a method", sel.object))
+		panic(fmt.Sprintf("createWrapper: selection of %s is not a method", selection.object))
 	}
-	selectionSignature, isSignature := sel.typ.(*types.Signature)
+	selectionSignature, isSignature := selection.selectionType.(*types.Signature)
 	if !isSignature {
 		// Invariant: the type of a method expression is a function signature, the receiver its first parameter.
-		panic(fmt.Sprintf("createWrapper: method expression %s has type %s, not a signature", object, sel.typ))
+		panic(fmt.Sprintf(
+			"createWrapper: method expression %s has type %s, not a signature",
+			object,
+			selection.selectionType,
+		))
 	}
-	name, sig := maybeInstance(prog, object.Name(), selectionSignature, targs)
+	name, sig := maybeInstance(program, object.Name(), selectionSignature, targs)
 
 	var description string
-	if sel.kind == types.MethodExpr {
+	if selection.kind == types.MethodExpr {
 		name += "$thunk"
 		description = "thunk"
 	} else {
@@ -64,11 +68,11 @@ func createWrapper(prog *Program, sel *selection, targs []types.Type) *Function 
 	/* method wrapper */
 	return &Function{
 		name:      name,
-		method:    sel,
+		method:    selection,
 		object:    object,
 		Signature: sig,
 		Synthetic: description,
-		Program:   prog,
+		Program:   program,
 		position:  object.Pos(),
 		typeargs:  targs,
 		// wrappers have no syntax
@@ -79,16 +83,16 @@ func createWrapper(prog *Program, sel *selection, targs []types.Type) *Function 
 }
 
 // maybeInstance returns name and sig instantiated to reflect any type arguments in targs.
-func maybeInstance(prog *Program, name string, sig *types.Signature, targs []types.Type) (string, *types.Signature) {
+func maybeInstance(program *Program, name string, sig *types.Signature, targs []types.Type) (string, *types.Signature) {
 	instanceName, instanceSignature := name, sig
 	if len(targs) > 0 {
 		instanceName = fmt.Sprintf("%s%s", name, targstr(targs))
-		instSig, instantiateError := types.Instantiate(prog.ctxt, sig, targs, false)
+		instSig, instantiateError := types.Instantiate(program.ctxt, sig, targs, false)
 		if instantiateError != nil {
 			// Invariant: with validate false, go/types documents that Instantiate never returns an error.
 			panic(instantiateError)
 		}
-		canonicalSignature, isSignature := prog.canon.Type(instSig).(*types.Signature)
+		canonicalSignature, isSignature := program.canon.Type(instSig).(*types.Signature)
 		if !isSignature {
 			// Invariant: an instance of a signature is a signature, and the canonizer returns a type identical to
 			// the one it is given.
@@ -133,22 +137,22 @@ func createParameters(function *Function, start int) {
 // Unlike createWrapper, createBound need perform no indirection or field
 // selections because that can be done before the closure is
 // constructed.
-func createBound(prog *Program, object *types.Func, targs []types.Type) *Function {
+func createBound(program *Program, object *types.Func, targs []types.Type) *Function {
 	description := fmt.Sprintf("bound method wrapper for %s", object)
 	methodSignature, isSignature := object.Type().(*types.Signature)
 	if !isSignature {
 		// Invariant: go/types gives every *types.Func a *types.Signature as its type.
 		panic(fmt.Sprintf("createBound: method %s has type %s, not a signature", object, object.Type()))
 	}
-	name, sig := maybeInstance(prog, object.Name(), methodSignature, targs)
+	name, sig := maybeInstance(program, object.Name(), methodSignature, targs)
 
 	/* bound method wrapper */
 	function := &Function{
 		name:      name + "$bound",
 		object:    object,
-		Signature: changeRecv(sig, nil), // drop receiver
+		Signature: changeReceiver(sig, nil), // drop receiver
 		Synthetic: description,
-		Program:   prog,
+		Program:   program,
 		position:  object.Pos(),
 		typeargs:  targs,
 		// wrappers have no syntax
@@ -156,18 +160,20 @@ func createBound(prog *Program, object *types.Func, targs []types.Type) *Functio
 		info:      nil,
 		goversion: "",
 	}
-	function.FreeVariables = []*FreeVariable{{name: "recv", typ: recvType(object), parent: function}} // (cyclic)
+	function.FreeVariables = []*FreeVariable{
+		{name: "recv", valueType: methodReceiverType(object), parent: function},
+	} // (cyclic)
 	return function
 }
 
 // -- thunks -----------------------------------------------------------
 
 // createThunk returns a thunk, a synthetic function that delegates to a
-// concrete or interface method denoted by sel.obj.  The resulting
+// concrete or interface method denoted by selection.object.  The resulting
 // function has no receiver, but has an additional (first) regular
 // parameter.
 //
-// Precondition: sel.kind == types.MethodExpr.
+// Precondition: selection.kind == types.MethodExpr.
 //
 //	type T int          or:  type T interface { meth() }
 //	func (t T) meth()
@@ -178,13 +184,13 @@ func createBound(prog *Program, object *types.Func, targs []types.Type) *Functio
 // f is a synthetic wrapper defined as if by:
 //
 //	f := func(t T) { return t.meth() }
-func createThunk(prog *Program, sel *selection, targs []types.Type) *Function {
-	if sel.kind != types.MethodExpr {
+func createThunk(program *Program, selection *selection, targs []types.Type) *Function {
+	if selection.kind != types.MethodExpr {
 		// Invariant: the builder calls createThunk only in its case for a method expression selection.
-		panic(sel)
+		panic(selection)
 	}
 
-	function := createWrapper(prog, sel, targs)
+	function := createWrapper(program, selection, targs)
 	if function.Signature.Recv() != nil {
 		// Invariant: a method expression's signature takes its receiver as the first parameter and has none of its
 		// own, and instantiating it keeps that.
@@ -193,29 +199,29 @@ func createThunk(prog *Program, sel *selection, targs []types.Type) *Function {
 	return function
 }
 
-func changeRecv(signature *types.Signature, recv *types.Var) *types.Signature {
-	return types.NewSignatureType(recv, nil, nil, signature.Params(), signature.Results(), signature.Variadic())
+func changeReceiver(signature *types.Signature, receiver *types.Var) *types.Signature {
+	return types.NewSignatureType(receiver, nil, nil, signature.Params(), signature.Results(), signature.Variadic())
 }
 
 // A local version of *types.Selection.
 // Needed for some additional control, such as creating a MethodExpr for an instantiation.
 type selection struct {
-	kind     types.SelectionKind
-	recv     types.Type
-	typ      types.Type
-	object   types.Object
-	index    []int
-	indirect bool
+	kind          types.SelectionKind
+	receiverType  types.Type
+	selectionType types.Type
+	object        types.Object
+	index         []int
+	indirect      bool
 }
 
-func toSelection(sel *types.Selection) *selection {
+func toSelection(typesSelection *types.Selection) *selection {
 	return &selection{
-		kind:     sel.Kind(),
-		recv:     sel.Recv(),
-		typ:      sel.Type(),
-		object:   sel.Obj(),
-		index:    sel.Index(),
-		indirect: sel.Indirect(),
+		kind:          typesSelection.Kind(),
+		receiverType:  typesSelection.Recv(),
+		selectionType: typesSelection.Type(),
+		object:        typesSelection.Obj(),
+		index:         typesSelection.Index(),
+		indirect:      typesSelection.Indirect(),
 	}
 }
 

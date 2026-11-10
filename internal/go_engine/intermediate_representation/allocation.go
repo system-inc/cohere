@@ -34,7 +34,7 @@ type Allocation struct {
 	Heap bool
 }
 
-func (allocation *Allocation) Type() types.Type { return allocation.typ }
+func (allocation *Allocation) Type() types.Type { return allocation.valueType }
 
 func (allocation *Allocation) Referrers() *[]Instruction { return &allocation.referrers }
 

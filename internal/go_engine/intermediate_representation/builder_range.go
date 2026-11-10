@@ -43,7 +43,7 @@ func (packageBuilder *builder) rangeIndexed(
 
 	// Determine number of iterations.
 	var length Value
-	dt := deref(x.Type())
+	dt := dereference(x.Type())
 	if array, ok := core_type.Of(dt).(*types.Array); ok {
 		// For array or *array, the number of iterations is
 		// known statically thanks to the type.  We avoid a
@@ -86,15 +86,15 @@ func (packageBuilder *builder) rangeIndexed(
 	if tv != nil {
 		switch typed := core_type.Of(x.Type()).(type) {
 		case *types.Array:
-			instr := &Index{
+			instruction := &Index{
 				X:     x,
 				Index: key,
 			}
-			instr.setType(typed.Elem())
-			value = function.emit(instr, source)
+			instruction.setType(typed.Elem())
+			value = function.emit(instruction, source)
 
 		case *types.Pointer: // *array
-			instr := &IndexAddress{
+			instruction := &IndexAddress{
 				X:     x,
 				Index: key,
 			}
@@ -103,16 +103,16 @@ func (packageBuilder *builder) rangeIndexed(
 				// Invariant: go/types accepts ranging over a pointer only when it points to an array.
 				panic("rangeIndexed over a pointer to " + typed.Elem().String() + ", not to an array")
 			}
-			instr.setType(types.NewPointer(array.Elem()))
-			value = emitLoad(function, function.emit(instr, source), source)
+			instruction.setType(types.NewPointer(array.Elem()))
+			value = emitLoad(function, function.emit(instruction, source), source)
 
 		case *types.Slice:
-			instr := &IndexAddress{
+			instruction := &IndexAddress{
 				X:     x,
 				Index: key,
 			}
-			instr.setType(types.NewPointer(typed.Elem()))
-			value = emitLoad(function, function.emit(instr, source), source)
+			instruction.setType(types.NewPointer(typed.Elem()))
+			value = emitLoad(function, function.emit(instruction, source), source)
 
 		default:
 			// Invariant: rangeStmt calls rangeIndexed only for slice, array and pointer core types.
@@ -180,10 +180,10 @@ func (packageBuilder *builder) rangeIter(
 		Iterator: it,
 		IsString: isString,
 	}
-	iterator, isIterator := rng.typ.(*typeutil.Iterator)
+	iterator, isIterator := rng.valueType.(*typeutil.Iterator)
 	if !isIterator {
 		// Invariant: rng's type was set to an Iterator above.
-		panic(fmt.Sprintf("range has type %s, not an iterator", rng.typ))
+		panic(fmt.Sprintf("range has type %s, not an iterator", rng.valueType))
 	}
 	okv.setType(iterator.Elem())
 	function.emit(okv, source)
@@ -321,19 +321,24 @@ func (packageBuilder *builder) rangeInt(
 	return
 }
 
-// rangeStmt emits to fn code for the range statement `stmt`, optionally
+// rangeStatement emits to fn code for the range statement `statement`, optionally
 // labelled by label.
 //
 // Mutates: function gains the blocks of the loop, and its targets and current block follow them
 // Mutates: label takes the loop's done and loop blocks as its break and continue targets
-func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt, label *lblock, source ast.Node) {
+func (packageBuilder *builder) rangeStatement(
+	function *Function,
+	statement *ast.RangeStmt,
+	label *lblock,
+	source ast.Node,
+) {
 	var tk types.Type
 	var tv types.Type
-	if stmt.Key != nil && !isBlankIdent(stmt.Key) {
-		tk = function.typeOf(stmt.Key)
+	if statement.Key != nil && !isBlankIdent(statement.Key) {
+		tk = function.typeOf(statement.Key)
 	}
-	if stmt.Value != nil && !isBlankIdent(stmt.Value) {
-		tv = function.typeOf(stmt.Value)
+	if statement.Value != nil && !isBlankIdent(statement.Value) {
+		tv = function.typeOf(statement.Value)
 	}
 
 	// create locals for s.Key and s.Value
@@ -342,33 +347,33 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 		// using := never redeclares an existing variable; it
 		// always creates a new one.
 		if tk != nil {
-			id, isIdent := stmt.Key.(*ast.Ident)
+			id, isIdent := statement.Key.(*ast.Ident)
 			if !isIdent {
 				// Invariant: createVariables runs only for a range clause with :=, and go/types accepts only
 				// identifiers on its left.
-				panic(fmt.Sprintf("range key %T is not an identifier", stmt.Key))
+				panic(fmt.Sprintf("range key %T is not an identifier", statement.Key))
 			}
 			emitLocalVariable(function, identVariable(function, id), id)
 		}
 		if tv != nil {
-			id, isIdent := stmt.Value.(*ast.Ident)
+			id, isIdent := statement.Value.(*ast.Ident)
 			if !isIdent {
 				// Invariant: createVariables runs only for a range clause with :=, and go/types accepts only
 				// identifiers on its left.
-				panic(fmt.Sprintf("range value %T is not an identifier", stmt.Value))
+				panic(fmt.Sprintf("range value %T is not an identifier", statement.Value))
 			}
 			emitLocalVariable(function, identVariable(function, id), id)
 		}
 	}
 
 	afterGo122 := goVersionAtLeast(function.goversion, "go1.22")
-	if stmt.Tok == token.DEFINE && !afterGo122 {
+	if statement.Tok == token.DEFINE && !afterGo122 {
 		// pre-go1.22: If iteration variables are defined (:=), this
 		// occurs once outside the loop.
 		createVariables()
 	}
 
-	x := packageBuilder.expr(function, stmt.X)
+	x := packageBuilder.expression(function, statement.X)
 
 	var key Value
 	var value Value
@@ -402,7 +407,7 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 		//      for x := range f { ... }
 		// into
 		//      f(func(x T) bool { ... })
-		packageBuilder.rangeFunc(function, x, stmt, label)
+		packageBuilder.rangeFunction(function, x, statement, label)
 		return
 
 	default:
@@ -411,7 +416,7 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 		panic("Cannot range over: " + rt.String())
 	}
 
-	if stmt.Tok == token.DEFINE && afterGo122 {
+	if statement.Tok == token.DEFINE && afterGo122 {
 		// go1.22: If iteration variables are defined (:=), this occurs inside the loop.
 		createVariables()
 	}
@@ -420,16 +425,16 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 	var kl lvalue
 	var vl lvalue
 	if tk != nil {
-		kl = packageBuilder.addr(function, stmt.Key, false) // non-escaping
+		kl = packageBuilder.address(function, statement.Key, false) // non-escaping
 	}
 	if tv != nil {
-		vl = packageBuilder.addr(function, stmt.Value, false) // non-escaping
+		vl = packageBuilder.address(function, statement.Value, false) // non-escaping
 	}
 	if tk != nil {
-		kl.store(function, key, stmt)
+		kl.store(function, key, statement)
 	}
 	if tv != nil {
-		vl.store(function, value, stmt)
+		vl.store(function, value, statement)
 	}
 
 	if label != nil {
@@ -442,20 +447,20 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 		_break:    done,
 		_continue: loop,
 	}
-	packageBuilder.stmt(function, stmt.Body)
+	packageBuilder.statement(function, statement.Body)
 	function.targets = function.targets.tail
 	emitJump(function, loop, source) // back-edge
 	function.currentBlock = done
 }
 
-// rangeFunc emits to fn code for the range-over-func rng.Body of the iterator
+// rangeFunction emits to fn code for the range-over-func rng.Body of the iterator
 // function x, optionally labelled by label. It creates a new anonymous function
 // yield for rng and builds the function.
 //
 // Mutates: function gains the loop's blocks and its yield function, and its targets, unique values and current
 // block follow them
 // Mutates: label takes the loop's done block as its break target
-func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.RangeStmt, label *lblock) {
+func (packageBuilder *builder) rangeFunction(function *Function, x Value, rng *ast.RangeStmt, label *lblock) {
 	// Consider the SSA code for the outermost range-over-func in fn:
 	//
 	//   func fn(...) (ret R) {
@@ -568,9 +573,9 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 	// loop:
 	//     jump := jReady
 
-	anonIndex := len(function.AnonymousFunctions)
+	anonymousIndex := len(function.AnonymousFunctions)
 
-	jump := newVariable(fmt.Sprintf("jump$%d", anonIndex+1), tInt)
+	jump := newVariable(fmt.Sprintf("jump$%d", anonymousIndex+1), tInt)
 	emitLocalVariable(function, jump, nil) // zero value is jReady
 
 	xsig, isSignature := core_type.Of(x.Type()).(*types.Signature)
@@ -586,17 +591,17 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 
 	/* synthetic yield function for body of range-over-func loop */
 	y := &Function{
-		name:           fmt.Sprintf("%s$%d", function.Name(), anonIndex+1),
+		name:           fmt.Sprintf("%s$%d", function.Name(), anonymousIndex+1),
 		Signature:      ysig,
 		Synthetic:      "range-over-func yield",
 		position:       rng.Range,
 		parent:         function,
-		anonIndex:      int32(len(function.AnonymousFunctions)),
+		anonymousIndex: int32(len(function.AnonymousFunctions)),
 		Package:        function.Package,
 		Program:        function.Program,
 		syntax:         rng,
 		info:           function.info,
-		build:          (*builder).buildYieldFunc,
+		build:          (*builder).buildYieldFunction,
 		topLevelOrigin: nil,
 		typeparams:     function.typeparams,
 		typeargs:       function.typeargs,
@@ -670,9 +675,9 @@ func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.
 	bodies[0] = function.newBasicBlock("rangefunc.resume.busy")
 	bodies[1] = function.newBasicBlock("rangefunc.resume.ready")
 
-	conds := make([]Value, 2, 2+len(exits))
-	conds[0] = jBusy
-	conds[1] = jReady
+	conditions := make([]Value, 2, 2+len(exits))
+	conditions[0] = jBusy
+	conditions[1] = jReady
 
 	function.currentBlock = bodies[0]
 	function.emit(
@@ -690,7 +695,7 @@ func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.
 		body := function.newBasicBlock(fmt.Sprintf("rangefunc.resume.exit.%d", exit.id))
 		bodies = append(bodies, body)
 		id := intConstant(exit.id, nil)
-		conds = append(conds, id)
+		conditions = append(conditions, id)
 
 		function.currentBlock = body
 		switch {
@@ -740,7 +745,7 @@ func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.
 	// possible values and we can avoid the impossible branch.
 	swtch := &ConstantSwitch{
 		Tag:        load,
-		Conditions: conds,
+		Conditions: conditions,
 	}
 	function.emit(swtch, nil)
 	for _, body := range bodies {

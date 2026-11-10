@@ -17,6 +17,6 @@ type If struct {
 	Condition Value
 }
 
-func (instr *If) Operands(rands []*Value) []*Value {
-	return append(rands, &instr.Condition)
+func (instruction *If) Operands(rands []*Value) []*Value {
+	return append(rands, &instruction.Condition)
 }

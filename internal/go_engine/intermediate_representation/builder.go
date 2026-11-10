@@ -93,7 +93,7 @@ var (
 
 	vDeferStack = &Builtin{
 		name: "ssa:deferstack",
-		sig:  types.NewSignatureType(nil, nil, nil, nil, types.NewTuple(anonVariable(tDeferStack)), false),
+		sig:  types.NewSignatureType(nil, nil, nil, nil, types.NewTuple(anonymousVariable(tDeferStack)), false),
 	}
 )
 
@@ -143,8 +143,8 @@ func (packageBuilder *builder) waitForSharedFunction(function *Function) {
 	}
 }
 
-// A buildFunc is a strategy for building the SSA body for a function.
-type buildFunc = func(*builder, *Function)
+// A buildFunction is a strategy for building the SSA body for a function.
+type buildFunction = func(*builder, *Function)
 
 // iterate causes all created but unbuilt functions to be built. As
 // this may create new methods, the process is iterated until it
@@ -181,9 +181,9 @@ func (packageBuilder *builder) buildParamsOnly(function *Function) {
 	// For external (C, asm) functions or functions loaded from
 	// export data, we must set fn.Parameters even though there is no
 	// body code to reference them.
-	if recv := function.Signature.Recv(); recv != nil {
+	if receiver := function.Signature.Recv(); receiver != nil {
 		// The parameter has no syntax node, so it carries no position.
-		function.addParamVariable(recv, nil)
+		function.addParamVariable(receiver, nil)
 	}
 	parameters := function.Signature.Params()
 	for index, length := 0, parameters.Len(); index < length; index++ {
@@ -196,13 +196,13 @@ func (packageBuilder *builder) buildParamsOnly(function *Function) {
 //
 // Mutates: function gains its body, built from its syntax
 func (packageBuilder *builder) buildFromSyntax(function *Function) {
-	var recvField *ast.FieldList
+	var receiverField *ast.FieldList
 	var body *ast.BlockStmt
 	var functype *ast.FuncType
 	switch syntax := function.syntax.(type) {
 	case *ast.FuncDecl:
 		functype = syntax.Type
-		recvField = syntax.Recv
+		receiverField = syntax.Recv
 		body = syntax.Body
 		if body == nil {
 			packageBuilder.buildParamsOnly(function) // no body (non-Go function)
@@ -217,14 +217,14 @@ func (packageBuilder *builder) buildFromSyntax(function *Function) {
 		panic("no syntax")
 	default:
 		// Invariant: the syntax of a function built from syntax is the FuncDecl createFunction was given or the
-		// FuncLit expr0 found.
+		// FuncLit expression0 found.
 		panic(syntax) // unexpected syntax
 	}
 	function.source = function
 	function.startBody()
-	function.createSyntacticParameters(recvField, functype)
+	function.createSyntacticParameters(receiverField, functype)
 	function.createDeferStack()
-	packageBuilder.stmt(function, body)
+	packageBuilder.statement(function, body)
 	if cb := function.currentBlock; cb != nil &&
 		(cb == function.Blocks[0] || cb == function.Recover || cb.Predecessors != nil) {
 		// Control fell off the end of the function's body block.
@@ -240,11 +240,11 @@ func (packageBuilder *builder) buildFromSyntax(function *Function) {
 	function.finishBody()
 }
 
-// buildYieldFunc builds the body of the yield function created
+// buildYieldFunction builds the body of the yield function created
 // from a range-over-func *ast.RangeStmt.
 //
 // Mutates: function gains its body, built from the range statement, and its source and targets
-func (packageBuilder *builder) buildYieldFunc(function *Function) {
+func (packageBuilder *builder) buildYieldFunction(function *Function) {
 	// See builder.rangeFunc for detailed documentation on how fn is set up.
 	//
 	// In pseudo-Go this roughly builds:
@@ -257,7 +257,7 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	//     jump = jReady
 	//     return true
 	// }
-	stmt, isRange := function.syntax.(*ast.RangeStmt)
+	statement, isRange := function.syntax.(*ast.RangeStmt)
 	if !isRange {
 		// Invariant: buildYieldFunc is the build strategy only of yield functions, which rangeFunc creates with
 		// their range statement as syntax.
@@ -293,7 +293,7 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	//   return true
 	saved := function.currentBlock
 	function.currentBlock = ycont
-	storeVariable(function, function.jump, jReady, stmt.Body)
+	storeVariable(function, function.jump, jReady, statement.Body)
 	// A yield function's own deferstack is always empty, so rundefers is not needed.
 	function.emit(&Return{Results: []Value{vTrue}}, nil)
 
@@ -317,33 +317,33 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	)
 
 	function.currentBlock = yloop
-	storeVariable(function, function.jump, jBusy, stmt.Body)
+	storeVariable(function, function.jump, jBusy, statement.Body)
 
 	// Initialize k and v from params.
 	var tk types.Type
 	var tv types.Type
-	if stmt.Key != nil && !isBlankIdent(stmt.Key) {
-		tk = function.typeOf(stmt.Key) // fn.parent.typeOf is identical
+	if statement.Key != nil && !isBlankIdent(statement.Key) {
+		tk = function.typeOf(statement.Key) // fn.parent.typeOf is identical
 	}
-	if stmt.Value != nil && !isBlankIdent(stmt.Value) {
-		tv = function.typeOf(stmt.Value)
+	if statement.Value != nil && !isBlankIdent(statement.Value) {
+		tv = function.typeOf(statement.Value)
 	}
-	if stmt.Tok == token.DEFINE {
+	if statement.Tok == token.DEFINE {
 		if tk != nil {
-			id, isIdent := stmt.Key.(*ast.Ident)
+			id, isIdent := statement.Key.(*ast.Ident)
 			if !isIdent {
 				// Invariant: go/types accepts only identifiers on the left of a range clause's :=.
-				panic(fmt.Sprintf("range key %T is not an identifier", stmt.Key))
+				panic(fmt.Sprintf("range key %T is not an identifier", statement.Key))
 			}
-			emitLocalVariable(function, identVariable(function, id), stmt.Key)
+			emitLocalVariable(function, identVariable(function, id), statement.Key)
 		}
 		if tv != nil {
-			id, isIdent := stmt.Value.(*ast.Ident)
+			id, isIdent := statement.Value.(*ast.Ident)
 			if !isIdent {
 				// Invariant: go/types accepts only identifiers on the left of a range clause's :=.
-				panic(fmt.Sprintf("range value %T is not an identifier", stmt.Value))
+				panic(fmt.Sprintf("range value %T is not an identifier", statement.Value))
 			}
-			emitLocalVariable(function, identVariable(function, id), stmt.Value)
+			emitLocalVariable(function, identVariable(function, id), statement.Value)
 		}
 	}
 	var key Value
@@ -357,20 +357,20 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	var kl lvalue
 	var vl lvalue
 	if tk != nil {
-		kl = packageBuilder.addr(function, stmt.Key, false) // non-escaping
+		kl = packageBuilder.address(function, statement.Key, false) // non-escaping
 	}
 	if tv != nil {
-		vl = packageBuilder.addr(function, stmt.Value, false) // non-escaping
+		vl = packageBuilder.address(function, statement.Value, false) // non-escaping
 	}
 	if tk != nil {
-		kl.store(function, key, stmt.Key)
+		kl.store(function, key, statement.Key)
 	}
 	if tv != nil {
-		vl.store(function, value, stmt.Value)
+		vl.store(function, value, statement.Value)
 	}
 
 	// Build the body of the range loop.
-	packageBuilder.stmt(function, stmt.Body)
+	packageBuilder.statement(function, statement.Body)
 	if cb := function.currentBlock; cb != nil &&
 		(cb == function.Blocks[0] || cb == function.Recover || cb.Predecessors != nil) {
 		// Control fell off the end of the function's body block.
@@ -473,7 +473,7 @@ func (packageBuilder *builder) buildPackageInit(init *Function) {
 						irPackage.values[variable],
 					))
 				}
-				lval = &address{addr: global}
+				lval = &address{pointer: global}
 			} else {
 				lval = blank{}
 			}
@@ -481,7 +481,7 @@ func (packageBuilder *builder) buildPackageInit(init *Function) {
 			packageBuilder.assign(init, lval, varinit.Rhs, true, nil, nil)
 		} else {
 			// n:1 initialization: var x, y :=  f()
-			tuple := packageBuilder.exprN(init, varinit.Rhs)
+			tuple := packageBuilder.expressionN(init, varinit.Rhs)
 			for index, variable := range varinit.Lhs {
 				if variable.Name() == "_" {
 					continue

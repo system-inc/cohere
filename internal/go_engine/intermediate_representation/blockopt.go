@@ -14,9 +14,9 @@ package intermediate_representation
 // Mutates: block and every block reachable from it take the reachable mark in gaps
 func markReachable(block *BasicBlock) {
 	block.gaps = -1
-	for _, succ := range block.Successors {
-		if succ.gaps == 0 {
-			markReachable(succ)
+	for _, successor := range block.Successors {
+		if successor.gaps == 0 {
+			markReachable(successor)
 		}
 	}
 }
@@ -57,8 +57,8 @@ func jumpThreading(function *Function, block *BasicBlock) bool {
 	if len(block.Instructions) == 0 {
 		return false
 	}
-	for _, pred := range block.Predecessors {
-		switch pred.Control().(type) {
+	for _, predecessor := range block.Predecessors {
+		switch predecessor.Control().(type) {
 		case *ConstantSwitch:
 			// don't optimize away the head blocks of switch statements
 			return false
@@ -124,8 +124,8 @@ func fuseBlocks(function *Function, block *BasicBlock) bool {
 
 	// Eliminate jump at end of A, then copy all of B across.
 	block.Instructions = append(block.Instructions[:len(block.Instructions)-1], successor.Instructions...)
-	for _, instr := range successor.Instructions {
-		instr.setBlock(block)
+	for _, instruction := range successor.Instructions {
+		instruction.setBlock(block)
 	}
 
 	// A inherits B's successors

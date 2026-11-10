@@ -13,14 +13,14 @@ import (
 type Global struct {
 	node
 
-	name   string
-	object types.Object // a *types.Var; may be nil for synthetics e.g. init$guard
-	typ    types.Type
+	name      string
+	object    types.Object // a *types.Var; may be nil for synthetics e.g. init$guard
+	valueType types.Type
 
 	Package *Package
 }
 
-func (global *Global) Type() types.Type { return global.typ }
+func (global *Global) Type() types.Type { return global.valueType }
 
 func (global *Global) Name() string { return global.name }
 

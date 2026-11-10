@@ -38,6 +38,6 @@ func (element *element) address(function *Function) Value {
 	panic("map elements are not addressable")
 }
 
-func (element *element) typ() types.Type {
+func (element *element) storedType() types.Type {
 	return element.elementType
 }

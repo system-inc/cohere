@@ -49,12 +49,12 @@ func buildPackage(
 	importer types.Importer,
 ) (*intermediate_representation.Package, *ast.File) {
 	test.Helper()
-	fset := token.NewFileSet()
-	file, parseError := parser.ParseFile(fset, "input.go", input, parser.ParseComments)
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "input.go", input, parser.ParseComments)
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
-	irPackage, buildError := buildFiles(fset, file.Name.Name, []*ast.File{file}, importer)
+	irPackage, buildError := buildFiles(fileSet, file.Name.Name, []*ast.File{file}, importer)
 	if buildError != nil {
 		test.Fatal(buildError)
 	}
@@ -64,32 +64,32 @@ func buildPackage(
 // buildFiles is irutil.BuildPackage: type-check files as the package at path, create its imports
 // transitively from type information, and create and build it from syntax.
 func buildFiles(
-	fset *token.FileSet,
+	fileSet *token.FileSet,
 	path string,
 	files []*ast.File,
 	importer types.Importer,
 ) (*intermediate_representation.Package, error) {
 	info := newInfo()
 	goPackage := types.NewPackage(path, "")
-	if checkError := types.NewChecker(&types.Config{Importer: importer}, fset, goPackage, info).Files(
+	if checkError := types.NewChecker(&types.Config{Importer: importer}, fileSet, goPackage, info).Files(
 		files,
 	); checkError != nil {
 		return nil, checkError
 	}
-	prog := intermediate_representation.NewProgram(fset)
+	program := intermediate_representation.NewProgram(fileSet)
 	created := make(map[*types.Package]bool)
 	var createAll func(pkgs []*types.Package)
 	createAll = func(pkgs []*types.Package) {
 		for _, typesPackage := range pkgs {
 			if !created[typesPackage] {
 				created[typesPackage] = true
-				prog.CreatePackage(typesPackage, nil, nil, true)
+				program.CreatePackage(typesPackage, nil, nil, true)
 				createAll(typesPackage.Imports())
 			}
 		}
 	}
 	createAll(goPackage.Imports())
-	irpkg := prog.CreatePackage(goPackage, files, info, false)
+	irpkg := program.CreatePackage(goPackage, files, info, false)
 	irpkg.Build()
 	return irpkg, nil
 }
@@ -110,7 +110,7 @@ func newInfo() *types.Info {
 // sourcePackages type-checks each package of sources, keyed by import path, in the order given, each
 // importing those before it. It stands in for go/ir's go/packages loads of a module.
 type sourcePackages struct {
-	fset     *token.FileSet
+	fileSet  *token.FileSet
 	packages map[string]*types.Package
 	files    map[string][]*ast.File
 	infos    map[string]*types.Info
@@ -118,21 +118,21 @@ type sourcePackages struct {
 
 func checkSources(test testing.TB, order []string, sources map[string]string) *sourcePackages {
 	test.Helper()
-	loaded := &sourcePackages{fset: token.NewFileSet(), packages: map[string]*types.Package{},
+	loaded := &sourcePackages{fileSet: token.NewFileSet(), packages: map[string]*types.Package{},
 		files: map[string][]*ast.File{}, infos: map[string]*types.Info{}}
 	for _, path := range order {
-		file, parseError := parser.ParseFile(loaded.fset, path+"/source.go", sources[path], 0)
+		file, parseError := parser.ParseFile(loaded.fileSet, path+"/source.go", sources[path], 0)
 		if parseError != nil {
 			test.Fatal(parseError)
 		}
 		info := newInfo()
-		configuration := &types.Config{Importer: importerFunc(func(imported string) (*types.Package, error) {
+		configuration := &types.Config{Importer: importerFunction(func(imported string) (*types.Package, error) {
 			if goPackage, ok := loaded.packages[imported]; ok {
 				return goPackage, nil
 			}
 			return nil, fmt.Errorf("no package %q among the sources", imported)
 		})}
-		goPackage, checkError := configuration.Check(path, loaded.fset, []*ast.File{file}, info)
+		goPackage, checkError := configuration.Check(path, loaded.fileSet, []*ast.File{file}, info)
 		if checkError != nil {
 			test.Fatal(checkError)
 		}
@@ -143,10 +143,10 @@ func checkSources(test testing.TB, order []string, sources map[string]string) *s
 	return loaded
 }
 
-type importerFunc func(path string) (*types.Package, error)
+type importerFunction func(path string) (*types.Package, error)
 
-func (importerFunc importerFunc) Import(path string) (*types.Package, error) {
-	return importerFunc(path)
+func (importerFunction importerFunction) Import(path string) (*types.Package, error) {
+	return importerFunction(path)
 }
 
 func isEmpty(function *intermediate_representation.Function) bool { return function.Blocks == nil }
@@ -157,8 +157,8 @@ func isEmpty(function *intermediate_representation.Function) bool { return funct
 func callsOf(function *intermediate_representation.Function) []*intermediate_representation.CallCommon {
 	var calls []*intermediate_representation.CallCommon
 	for _, block := range function.Blocks {
-		for _, instr := range block.Instructions {
-			if call, ok := instr.(intermediate_representation.CallInstruction); ok {
+		for _, instruction := range block.Instructions {
+			if call, ok := instruction.(intermediate_representation.CallInstruction); ok {
 				if _, isBuiltin := call.Common().Value.(*intermediate_representation.Builtin); !isBuiltin {
 					calls = append(calls, call.Common())
 				}
@@ -208,8 +208,8 @@ func main() {
 		"sync", "unicode", "time",
 	}
 
-	prog := mainPackage.Program
-	all := prog.AllPackages()
+	program := mainPackage.Program
+	all := program.AllPackages()
 	if len(all) <= len(deps) {
 		// go/ir prints the packages with %q through Package.String, which ours doesn't carry.
 		var paths []string
@@ -219,7 +219,7 @@ func main() {
 		test.Errorf("unexpected set of loaded packages: %q", paths)
 	}
 	for _, path := range deps {
-		irPackage := prog.ImportedPackage(path)
+		irPackage := program.ImportedPackage(path)
 		if irPackage == nil {
 			test.Errorf("package not loaded: %q", path)
 			continue
@@ -308,10 +308,10 @@ func (C) F() {}
 	packageA := loaded.packages["testdata/a"]
 
 	// Create a from syntax, its direct deps b from types, but not indirect deps c.
-	prog := intermediate_representation.NewProgram(loaded.fset)
-	aSsa := prog.CreatePackage(packageA, loaded.files["testdata/a"], loaded.infos["testdata/a"], false)
+	program := intermediate_representation.NewProgram(loaded.fileSet)
+	aSsa := program.CreatePackage(packageA, loaded.files["testdata/a"], loaded.infos["testdata/a"], false)
 	for _, importedPackage := range packageA.Imports() {
-		prog.CreatePackage(importedPackage, nil, nil, true)
+		program.CreatePackage(importedPackage, nil, nil, true)
 	}
 
 	// Build SSA for package a.
@@ -325,8 +325,8 @@ func (C) F() {}
 		test.Fatalf("member A of package a is %T, want a function", aSsa.Members()["A"])
 	}
 	var got string
-	for _, instr := range functionA.Blocks[0].Instructions {
-		if call, ok := instr.(*intermediate_representation.Call); ok {
+	for _, instruction := range functionA.Blocks[0].Instructions {
+		if call, ok := instruction.(*intermediate_representation.Call); ok {
 			function, isFunction := call.Call.Value.(*intermediate_representation.Function)
 			if !isFunction {
 				continue
@@ -397,11 +397,11 @@ func TestGenericFunctionSelector(test *testing.T) {
 		"example.com/a": `package a; func F[T any](){}; func G[S, T any](){}; func H[T any](a T){} `,
 	})
 
-	prog := intermediate_representation.NewProgram(loaded.fset)
+	program := intermediate_representation.NewProgram(loaded.fileSet)
 	for _, path := range []string{"example.com/a", "example.com"} {
-		prog.CreatePackage(loaded.packages[path], loaded.files[path], loaded.infos[path], true)
+		program.CreatePackage(loaded.packages[path], loaded.files[path], loaded.infos[path], true)
 	}
-	mainPackage := prog.Package(loaded.packages["example.com"])
+	mainPackage := program.Package(loaded.packages["example.com"])
 	mainPackage.Build()
 
 	if mainPackage.Types.Name() != "main" {
@@ -476,12 +476,12 @@ func TestFixedBugs(test *testing.T) {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			path := filepath.Join("testdata", "fixedbugs", name+".go")
-			fset := token.NewFileSet()
-			file, parseFileError := parser.ParseFile(fset, path, nil, parser.ParseComments)
+			fileSet := token.NewFileSet()
+			file, parseFileError := parser.ParseFile(fileSet, path, nil, parser.ParseComments)
 			if parseFileError != nil {
 				test.Fatal(parseFileError)
 			}
-			if _, buildFilesError := buildFiles(fset, name, []*ast.File{file}, nil); buildFilesError != nil {
+			if _, buildFilesError := buildFiles(fileSet, name, []*ast.File{file}, nil); buildFilesError != nil {
 				test.Error(buildFilesError)
 			}
 		})
@@ -604,8 +604,11 @@ func f(s []int, a [3]int, m map[int]int) (n int) {
 			// Lifted, the header merges the index and n in two phis, increments the index and branches on it
 			// against the length.
 			var kinds []string
-			for _, instr := range block.Instructions {
-				kinds = append(kinds, strings.TrimPrefix(fmt.Sprintf("%T", instr), "*intermediate_representation."))
+			for _, instruction := range block.Instructions {
+				kinds = append(
+					kinds,
+					strings.TrimPrefix(fmt.Sprintf("%T", instruction), "*intermediate_representation."),
+				)
 			}
 			marked = append(marked, strings.Join(kinds, " "))
 		}

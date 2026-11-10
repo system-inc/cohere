@@ -8,9 +8,9 @@ package intermediate_representation
 
 import "go/ast"
 
-// isBlankIdent returns true iff `expr` is an Ident with name "_".
+// isBlankIdent returns true iff `expression` is an Ident with name "_".
 // They have no associated types.Object, and thus no type.
-func isBlankIdent(expr ast.Expr) bool {
-	id, ok := expr.(*ast.Ident)
+func isBlankIdent(expression ast.Expr) bool {
+	id, ok := expression.(*ast.Ident)
 	return ok && id.Name == "_"
 }

@@ -19,5 +19,5 @@ type lvalue interface {
 	store(function *Function, value Value, source ast.Node) // stores v into the location
 	load(function *Function, source ast.Node) Value         // loads the contents of the location
 	address(function *Function) Value                       // address of the location
-	typ() types.Type                                        // returns the type of the location
+	storedType() types.Type                                 // returns the type of the location
 }

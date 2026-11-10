@@ -4,28 +4,28 @@ import "go/types"
 
 // buildWrapper builds fn.Body for a method wrapper.
 func (packageBuilder *builder) buildWrapper(function *Function) {
-	var recv *types.Var // wrapper's receiver or thunk's params[0]
-	var start int       // first regular param
+	var receiver *types.Var // wrapper's receiver or thunk's params[0]
+	var start int           // first regular param
 	if function.method.kind == types.MethodExpr {
-		recv = function.Signature.Params().At(0)
+		receiver = function.Signature.Params().At(0)
 		start = 1
 	} else {
-		recv = function.Signature.Recv()
+		receiver = function.Signature.Recv()
 	}
 
 	function.startBody()
-	function.addSpilledParameter(recv, nil)
+	function.addSpilledParameter(receiver, nil)
 	createParameters(function, start)
 
 	indices := function.method.index
 
 	var local Value = function.Locals[0] // spilled receiver
-	if isPointer(function.method.recv) {
+	if isPointer(function.method.receiverType) {
 		local = emitLoad(function, local, nil)
 
 		// For simple indirection wrappers, perform an informative nil-check:
 		// "value method (T).f called using nil *T pointer"
-		if len(indices) == 1 && !isPointer(recvType(function.object)) {
+		if len(indices) == 1 && !isPointer(methodReceiverType(function.object)) {
 			var call Call
 			call.Call.Value = &Builtin{
 				name: "ssa:wrapnilchk",
@@ -33,14 +33,18 @@ func (packageBuilder *builder) buildWrapper(function *Function) {
 					nil,
 					nil,
 					nil,
-					types.NewTuple(anonVariable(function.method.recv), anonVariable(tString), anonVariable(tString)),
-					types.NewTuple(anonVariable(function.method.recv)),
+					types.NewTuple(
+						anonymousVariable(function.method.receiverType),
+						anonymousVariable(tString),
+						anonymousVariable(tString),
+					),
+					types.NewTuple(anonymousVariable(function.method.receiverType)),
 					false,
 				),
 			}
 			call.Call.Arguments = []Value{
 				local,
-				stringConstant(deref(function.method.recv).String(), nil),
+				stringConstant(dereference(function.method.receiverType).String(), nil),
 				stringConstant(function.method.object.Name(), nil),
 			}
 			call.setType(local.Type())
@@ -63,7 +67,7 @@ func (packageBuilder *builder) buildWrapper(function *Function) {
 	// address of implicit  C field.
 
 	var call Call
-	if resolvedType := recvType(function.object); !types.IsInterface(resolvedType) { // concrete method
+	if resolvedType := methodReceiverType(function.object); !types.IsInterface(resolvedType) { // concrete method
 		if !isPointer(resolvedType) {
 			local = emitLoad(function, local, nil)
 		}
@@ -86,13 +90,13 @@ func (packageBuilder *builder) buildBound(function *Function) {
 	createParameters(function, 0)
 	var call Call
 
-	recv := function.FreeVariables[0]
-	if !types.IsInterface(recvType(function.object)) { // concrete
+	receiver := function.FreeVariables[0]
+	if !types.IsInterface(methodReceiverType(function.object)) { // concrete
 		call.Call.Value = function.Program.objectMethod(function.object, function.typeargs, packageBuilder)
-		call.Call.Arguments = []Value{recv}
+		call.Call.Arguments = []Value{receiver}
 	} else {
 		call.Call.Method = function.object
-		call.Call.Value = recv // interface (possibly a typeparam)
+		call.Call.Value = receiver // interface (possibly a typeparam)
 	}
 	for _, argument := range function.Parameters {
 		call.Call.Arguments = append(call.Call.Arguments, argument)
@@ -122,23 +126,23 @@ func (packageBuilder *builder) buildInstantiationWrapper(function *Function) {
 	var call Call
 	call.Call.Value = orig
 	if resultTypes := orig.Signature.Results(); resultTypes.Len() == 1 {
-		call.typ = resultTypes.At(0).Type()
+		call.valueType = resultTypes.At(0).Type()
 	} else {
-		call.typ = resultTypes
+		call.valueType = resultTypes
 	}
 
 	// parameter of instance becomes an argument to the call
 	// to the original generic function.
 	argumentOffset := 0
 	for index, argument := range function.Parameters {
-		var typ types.Type
+		var parameterType types.Type
 		if index == 0 && sig.Recv() != nil {
-			typ = orig.Signature.Recv().Type()
+			parameterType = orig.Signature.Recv().Type()
 			argumentOffset = 1
 		} else {
-			typ = orig.Signature.Params().At(index - argumentOffset).Type()
+			parameterType = orig.Signature.Params().At(index - argumentOffset).Type()
 		}
-		call.Call.Arguments = append(call.Call.Arguments, emitTypeCoercion(function, argument, typ, nil))
+		call.Call.Arguments = append(call.Call.Arguments, emitTypeCoercion(function, argument, parameterType, nil))
 	}
 
 	results := function.emit(&call, nil)
