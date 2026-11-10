@@ -10,11 +10,12 @@ import (
 // defaultShardBytes is how much source a dispatcher hands one shard of a package whose file-local listeners walk on
 // several cores (#0jnq91n). A package splits only when it holds at least two shards' worth, so only a package large
 // enough to end a cold run splits, and into few shards: each shard costs CPU the walk never had, in cores contending
-// for what the package shares, such as its file set's lock. At cohere's root only internal/lint/rules/core's test
-// variant, 14 MB of source, splits, into 3 shards, which bought more wall than 256 KB shards did, splitting 24
-// packages, for under a fifth of the CPU they added. Measured on cohere's root, cold, interleaved: see the commit that
-// set it.
-const defaultShardBytes = 4 << 20
+// for what the package shares, such as its file set's lock. At cohere's root two test variants split:
+// internal/lint/rules/core's, 14.3 MB of source, into 4 shards, and internal/lint/rules/typescript's, 5.8 MB, into 2,
+// which at 4 MiB sat under the split and ended the run's half-idle tail (#3ddm7fm). 256 KB shards, splitting 24
+// packages, bought less wall for five times the CPU, and shards small enough to split react's 5.2 MB test variant too
+// bought nothing more. Measured on cohere's root, cold, bare and interleaved: see the commit that set it.
+const defaultShardBytes = 11 << 18
 
 // shardOfFile is the shard of each of pass's files, keyed by its token file, cut into shards runs of consecutive files
 // holding about as much source each, so every file is one shard's and each shard's files keep the pass's order.
