@@ -233,6 +233,9 @@ func TestAPlatformProofLeavesTheStoredFingerprintAsItWas(test *testing.T) {
 // platform the plan did not read is loaded before the rewrite too, as it always was.
 func TestAPlatformProofWithTheStoredFingerprintLoadsOnlyTheRewrite(test *testing.T) {
 	test.Parallel()
+	if checkDifference != nil {
+		test.Skip("a rename_differential build loads every stored proof's before side too, to check it")
+	}
 	fixture := platformFixture(test, "package b\n\nfunc windowsOnly() string { return FormatURL() }\n")
 	loaded := fixture.load(test)
 	var lock sync.Mutex

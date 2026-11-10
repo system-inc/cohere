@@ -513,6 +513,16 @@ func verifyPlatform(
 	return len(verification.Mismatches), nil
 }
 
+// checkDifference is nil, and a build with the rename_differential tag sets it (platform_differential.go) to check
+// each proof's expectation from a stored difference against one from the platform's before side loaded fresh. It is
+// a function a tagged file sets, never code the untagged build carries, so a proof there pays one nil check.
+var checkDifference func(
+	loadPlatform func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error),
+	platform workspace.Platform,
+	difference platformDifference,
+	fromDifference *Expectation,
+)
+
 // provePlatform proves the rewrite under one platform: it loads the tree as the platform builds it, before and with
 // the rewrite in memory, and requires every package that type-checked before to type-check after, and every
 // identifier in it to resolve to the same declaration, under its expected name. Nothing reads the load before once
@@ -530,6 +540,9 @@ func provePlatform(
 	var before *Expectation
 	if stored != nil {
 		before = expectedFrom(*stored, host)
+		if checkDifference != nil {
+			checkDifference(loadPlatform, platform, *stored, before)
+		}
 	} else {
 		beforeLoad, beforeError := loadPlatform(platform, nil)
 		if beforeError != nil {
