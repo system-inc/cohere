@@ -354,3 +354,40 @@ func TestTheDigestReadsAWalksListingFromEveryWorker(test *testing.T) {
 		test.Errorf("a matcher reading a walk's listing digests %s, and one reading the disk %s", listed, read)
 	}
 }
+
+// TestAWorktreeReadsItsRepositorysSharedExclude: a worktree's `.git` is a file, and git reads the exclude file its
+// common directory shares with the main checkout (#vdbcswp). A path only that file lists reads ignored by the line git
+// check-ignore names, by the same absolute path, and `git add -f` of it moves the digest. Its untracked neighbor is
+// not ignored, so the case is the one file.
+func TestAWorktreeReadsItsRepositorysSharedExclude(test *testing.T) {
+	test.Parallel()
+	repository := newDigestRepository(test)
+	worktree := filepath.Join(filepath.Dir(repository.root), filepath.Base(repository.root)+"-worktree")
+	repository.git("worktree", "add", "--quiet", worktree)
+	writeTree(test, repository.root, map[string]string{".git/info/exclude": "# shared\nsecret.go\n"})
+	writeTree(test, worktree, map[string]string{"secret.go": "package main\n", "plain.go": "package main\n"})
+	inWorktree := &digestRepository{test: test, root: worktree}
+
+	matcher, newError := New(worktree)
+	if newError != nil {
+		test.Fatal(newError)
+	}
+	shared := filepath.ToSlash(filepath.Join(repository.root, ".git", "info", "exclude"))
+	ignored, source := matcher.Ignored("secret.go", false)
+	if want := shared + ":2:secret.go"; !ignored || source.String() != want {
+		test.Errorf("secret.go reads ignored %v by %q, want ignored by %q", ignored, source.String(), want)
+	}
+	if verbose := strings.TrimSpace(inWorktree.git("check-ignore", "-v", "secret.go")); !strings.HasPrefix(verbose,
+		source.String()+"\t") {
+		test.Errorf("git check-ignore names %q, and the matcher %q", verbose, source.String())
+	}
+	if ignored, _ := matcher.Ignored("plain.go", false); ignored {
+		test.Error("plain.go, which nothing lists, reads ignored")
+	}
+
+	before := inWorktree.digest()
+	inWorktree.git("add", "-f", "secret.go")
+	if inWorktree.digest() == before {
+		test.Error("tracking a file only the shared exclude lists keeps the worktree's digest")
+	}
+}

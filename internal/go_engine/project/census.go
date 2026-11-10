@@ -235,7 +235,11 @@ func repositoryRelative(repositoryRoot string, entryPath string) (string, error)
 // sourceFromRoot is the ignore rule that decided, as `path:line` with its file relative to the workspace's root
 // rather than the repository's, which a root below the repository's makes `../.gitignore:1`.
 func sourceFromRoot(workspaceRoot string, repositoryRoot string, source gitignore.Source) (string, error) {
-	ignoreFile := filepath.Join(repositoryRoot, filepath.FromSlash(source.File))
+	ignoreFile := filepath.FromSlash(source.File)
+	// A worktree's shared info/exclude is named by its absolute path, as git names it (gitignore.ExcludeFileOf).
+	if !filepath.IsAbs(ignoreFile) {
+		ignoreFile = filepath.Join(repositoryRoot, ignoreFile)
+	}
 	relative, relativeError := filepath.Rel(workspaceRoot, ignoreFile)
 	if relativeError != nil {
 		return "", fmt.Errorf("placing %s from the root at %s: %w", ignoreFile, workspaceRoot, relativeError)

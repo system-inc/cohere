@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -669,6 +670,37 @@ func TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor(test *testing.T) {
 	}
 	if strings.Join(got, " ") != strings.Join(want, " ") {
 		test.Errorf("IgnoreFiles %v, want %v", got, want)
+	}
+}
+
+// TestAWorktreeWalkReadsAndNamesTheSharedExclude: a worktree's `.git` is a file pointing into its main checkout's git
+// directory, whose common directory holds the info/exclude git reads for it (#vdbcswp). The walk skips what that file
+// lists, and names the file among IgnoreFiles by its path in the common directory, so a replay sees an edit to it.
+func TestAWorktreeWalkReadsAndNamesTheSharedExclude(test *testing.T) {
+	test.Parallel()
+	main := writeTree(test, map[string]string{
+		".git/info/exclude":             "secret.ts\n",
+		".git/worktrees/tree/commondir": "../..\n",
+	})
+	gitDirectory := filepath.Join(main, ".git", "worktrees", "tree")
+	root := settingsTree(test, `[]`, `[]`, map[string]string{
+		".git":      "gitdir: " + gitDirectory + "\n",
+		"a.ts":      "export const a = 1;\n",
+		"secret.ts": "export const secret = 1;\n",
+	})
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
+	}
+	shared := filepath.Join(main, ".git", "info", "exclude")
+	if !slices.Contains(enumeration.IgnoreFiles, shared) {
+		test.Errorf("IgnoreFiles %v does not name the shared exclude %s", enumeration.IgnoreFiles, shared)
+	}
+	if slices.Contains(enumeration.Files, filepath.Join(root, "secret.ts")) {
+		test.Errorf("the walk offered secret.ts, which the shared exclude lists: %v", enumeration.Files)
+	}
+	if !slices.Contains(enumeration.Files, filepath.Join(root, "a.ts")) {
+		test.Errorf("the walk did not offer a.ts, so the case proves nothing: %v", enumeration.Files)
 	}
 }
 

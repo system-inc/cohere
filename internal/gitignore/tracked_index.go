@@ -156,14 +156,7 @@ func readRepositoryIndex(marker string, isDirectory bool) (*trackedIndex, string
 // checksum are sized by: SHA-1's unless the repository's config sets extensions.objectFormat. The config is the
 // common directory's, which a worktree's git directory names in its `commondir` file.
 func objectFormatOf(gitDirectory string) (int, error) {
-	commonDirectory := gitDirectory
-	if pointer, readError := os.ReadFile(filepath.Join(gitDirectory, "commondir")); readError == nil {
-		commonDirectory = strings.TrimSpace(string(pointer))
-		if !filepath.IsAbs(commonDirectory) {
-			commonDirectory = filepath.Join(gitDirectory, commonDirectory)
-		}
-	}
-	configurationPath := filepath.Join(commonDirectory, "config")
+	configurationPath := filepath.Join(commonDirectoryOf(gitDirectory), "config")
 	configuration, readError := os.ReadFile(configurationPath)
 	if errors.Is(readError, fs.ErrNotExist) {
 		return sha1.Size, nil
@@ -181,6 +174,21 @@ func objectFormatOf(gitDirectory string) (int, error) {
 		return 0, fmt.Errorf("%w: %s names the object format %q, which git writes no index in", ErrNoIndex,
 			configurationPath, format)
 	}
+}
+
+// commonDirectoryOf is the directory a git directory shares with its repository's other worktrees, where the config
+// and info/exclude live: the one its `commondir` file names, relative to it or absolute, and the git directory itself
+// when it has none, as a clone's and a submodule's have none.
+func commonDirectoryOf(gitDirectory string) string {
+	pointer, readError := os.ReadFile(filepath.Join(gitDirectory, "commondir"))
+	if readError != nil {
+		return gitDirectory
+	}
+	commonDirectory := strings.TrimSpace(string(pointer))
+	if !filepath.IsAbs(commonDirectory) {
+		commonDirectory = filepath.Join(gitDirectory, commonDirectory)
+	}
+	return filepath.Clean(commonDirectory)
 }
 
 // configurationObjectFormat is the value of extensions.objectFormat in a git config file, "" when it sets none.

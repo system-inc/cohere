@@ -18,12 +18,13 @@ import (
 // be read (named as a file, so a replay that cannot read it either runs cold), and what the census reads git's
 // ignore rules from: the nearest repository at or above the root, so each directory above the root and below it
 // has no `.git`; that repository's `.git` when it is a file, a worktree's or a submodule's pointer to its git
-// directory; its info/exclude when its `.git` is a directory; and a `.gitignore` in each directory from the
-// repository down to the root and in each directory the load names inside the repository. git's global excludes file
-// is not one: the census never reads it (see package gitignore). The census also reads the repository's index, since
-// a path git tracks is never ignored, and at a go.work root for its gitlinks too, so the index is named, there or
-// absent, and when there, named again under TrackedIgnored with the repository and the root below it, so the front
-// door keys it on what it decides for the census rather than on bytes git rewrites on every `git status` (#m1daxxk).
+// directory; its info/exclude, a worktree's being the one in the common directory it shares; and a `.gitignore` in
+// each directory from the repository down to the root and in each directory the load names inside the repository.
+// git's global excludes file is not one: the census never reads it (see package gitignore). The census also reads
+// the repository's index, since a path git tracks is never ignored, and at a go.work root for its gitlinks too, so
+// the index is named, there or absent, and when there, named again under TrackedIgnored with the repository and the
+// root below it, so the front door keys it on what it decides for the census rather than on bytes git rewrites on
+// every `git status` (#m1daxxk).
 //
 // The rules read more: staticcheck's config analyzer reads a staticcheck.conf in each analyzed package's directory
 // and every directory above it, to the filesystem's root, so each is named, there or absent.
@@ -76,10 +77,11 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 		information, statError := os.Lstat(marker)
 		if statError == nil {
 			repository = directory
-			if information.IsDir() {
-				fileOrAbsent(filepath.Join(directory, filepath.FromSlash(gitignore.ExcludeFile)))
-			} else {
+			if !information.IsDir() {
 				files[marker] = true
+			}
+			if excludePath, _ := gitignore.ExcludeFileOf(marker, information.IsDir()); excludePath != "" {
+				fileOrAbsent(excludePath)
 			}
 			index := filepath.Clean(gitignore.IndexFile(marker, information.IsDir()))
 			fileOrAbsent(index)

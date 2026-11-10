@@ -131,3 +131,41 @@ func TestTheInputsRecordNamesNoTrackedIgnoredIndexThatIsNotThere(test *testing.T
 		test.Errorf("a repository with no index names one to key on: %+v", record.TrackedIgnored)
 	}
 }
+
+// TestTheInputsRecordNamesAWorktreesSharedExclude: a root whose `.git` is a worktree's file names the info/exclude in
+// the common directory its git directory shares, there or absent, since the census reads it (#vdbcswp).
+func TestTheInputsRecordNamesAWorktreesSharedExclude(test *testing.T) {
+	test.Parallel()
+	base, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatal(resolveError)
+	}
+	main, root := filepath.Join(base, "main"), filepath.Join(base, "tree")
+	gitDirectory := filepath.Join(main, ".git", "worktrees", "tree")
+	for _, directory := range []string{gitDirectory, root} {
+		if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+	}
+	for file, contents := range map[string]string{
+		filepath.Join(root, ".git"):              "gitdir: " + gitDirectory + "\n",
+		filepath.Join(gitDirectory, "commondir"): "../..\n",
+	} {
+		if writeError := os.WriteFile(file, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	engine := &pipeline{
+		request:   invocation{root: root},
+		described: &describedProject{workspace: project.Workspace{Root: root}},
+	}
+	record := engine.inputsRecord(&load.Loaded{})
+	shared := filepath.Join(main, ".git", "info", "exclude")
+	if !slices.Contains(record.Absent, shared) {
+		test.Errorf("the absent paths do not name the shared exclude %s: %q", shared, record.Absent)
+	}
+	if worktreeOwn := filepath.Join(root, ".git", "info", "exclude"); slices.Contains(record.Absent, worktreeOwn) ||
+		slices.Contains(record.Files, worktreeOwn) {
+		test.Errorf("the record names %s, below a `.git` that is a file", worktreeOwn)
+	}
+}
