@@ -443,6 +443,10 @@ func cacheFitsMode(run Run) error {
 	return nil
 }
 
+// encodedFileName names a record to the formatter, which chooses its printer by the extension alone. FileName is
+// not used: it slices fields Validate does not hold to a length, and a record it cannot name must still encode.
+const encodedFileName = "record.json"
+
 // Encode is a record as it is committed: validated, and in the house format the format check at cohere's root reads
 // every file in, so a record the benchmark writes lands with nothing to fix (#rqmykvm, #4wjhppw).
 func Encode(record Record) ([]byte, error) {
@@ -456,9 +460,6 @@ func Encode(record Record) ([]byte, error) {
 	return native.FormatHouse(encodedFileName, encoded)
 }
 
-// encodedFileName names a record to the formatter, which chooses its printer by the extension alone. FileName is
-// not used: it slices fields Validate does not hold to a length, and a record it cannot name must still encode.
-const encodedFileName = "record.json"
 
 // FileName is the record's file name: its date, the engine's commit and the machine's model, and for a run
 // narrowed to one engine that engine, so it never takes the name of the same day's whole-root record.
