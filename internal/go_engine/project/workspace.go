@@ -19,6 +19,8 @@ import (
 	"strings"
 
 	"golang.org/x/mod/modfile"
+
+	"github.com/system-inc/cohere/internal/gitignore"
 )
 
 // Module is one module a workspace owns: where it is, relative to the root and slash separated, and its
@@ -73,7 +75,7 @@ func ReadWorkspace(root string) (Workspace, error) {
 	// there is one is decided by a `.git` at or above the root, never by reading git's error, so a repository
 	// git cannot read still fails here.
 	var links []string
-	if nearestRepository(absoluteRoot) != "" {
+	if gitignore.RepositoryOf(absoluteRoot) != "" {
 		indexLinks, linksError := gitlinks(absoluteRoot)
 		if linksError != nil {
 			return Workspace{}, linksError

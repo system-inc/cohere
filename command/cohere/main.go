@@ -1198,6 +1198,7 @@ func run() error {
 					nested := answer.check
 					for _, walk := range nested.Walks {
 						declareFormatWalk(walk)
+						noteFormatWalkGaps(walk)
 					}
 					for _, note := range nested.Notes {
 						fmt.Fprintln(accountOutput(streams.Errors), note)

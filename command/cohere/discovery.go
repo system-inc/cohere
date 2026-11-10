@@ -14,6 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/native"
+	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -215,47 +216,6 @@ func enclosingRepository(start string) string {
 	}
 }
 
-// nestedRepository is what kind of repository, if any, a directory is the root of.
-type nestedRepository int
-
-const (
-	noRepository nestedRepository = iota
-
-	// cloneRepository has a .git directory: an independent repository with its own gate.
-	cloneRepository
-
-	// linkedRepository has a .git file pointing elsewhere: a submodule, or a worktree.
-	linkedRepository
-)
-
-// nearestRepository is the nearest directory at or above start that is a repository's root of either kind,
-// a clone or a submodule, whose ignore files are the ones that govern start, or "" when there is none.
-func nearestRepository(start string) string {
-	directory := filepath.Clean(start)
-	for {
-		if repositoryKind(directory) != noRepository {
-			return directory
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			return ""
-		}
-		directory = parent
-	}
-}
-
-func repositoryKind(directory string) nestedRepository {
-	information, statError := os.Lstat(filepath.Join(directory, ".git"))
-	switch {
-	case statError != nil:
-		return noRepository
-	case information.IsDir():
-		return cloneRepository
-	default:
-		return linkedRepository
-	}
-}
-
 // discoverProjects walks root and returns every project it finds. ignorePatterns are the root's, as lint
 // globs relative to root.
 func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
@@ -269,7 +229,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 
 	// The matcher is the repository's, a submodule's own when the root is inside one, so the .gitignore
 	// files between its root and this one apply too.
-	repository := nearestRepository(root)
+	repository := gitignore.RepositoryOf(root)
 	if repository == "" {
 		repository = root
 	}

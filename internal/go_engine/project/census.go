@@ -52,7 +52,7 @@ type Exclusion struct {
 // files are counted as ours here: the format and lint phases decide about those.
 func TakeCensus(workspace Workspace) (Census, error) {
 	var census Census
-	repositoryRoot := nearestRepository(workspace.Root)
+	repositoryRoot := gitignore.RepositoryOf(workspace.Root)
 	var rootMatcher *gitignore.Matcher
 	if repositoryRoot != "" {
 		matcher, matcherError := gitignore.New(repositoryRoot)
@@ -254,21 +254,4 @@ func parentOf(relative string) string {
 		return ""
 	}
 	return relative[:index]
-}
-
-// nearestRepository is the nearest directory at or above start holding a `.git`, a clone's directory or a
-// worktree's or submodule's file, whose ignore files are the ones that govern start, or "" when there is
-// none.
-func nearestRepository(start string) string {
-	directory := filepath.Clean(start)
-	for {
-		if _, statError := os.Lstat(filepath.Join(directory, ".git")); statError == nil {
-			return directory
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			return ""
-		}
-		directory = parent
-	}
 }
