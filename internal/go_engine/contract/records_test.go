@@ -352,9 +352,10 @@ func populatedRecords() []Record {
 			Cache:               duplicate_functions.CacheUse{Unit: "packages", Read: 1, Hashed: 1},
 		}},
 		InputsRecord{
-			Files:       []string{"/project/a.go", "/project/go.mod"},
-			Directories: []string{"/project"},
-			Absent:      []string{"/go.work"},
+			Files:          []string{"/.git/index", "/project/a.go", "/project/go.mod"},
+			Directories:    []string{"/project"},
+			Absent:         []string{"/go.work"},
+			TrackedIgnored: []TrackedIgnoredScope{{Index: "/.git/index", Root: "/", Scope: "project"}},
 		},
 		TimingRecord{
 			Unavailable:            "this platform has no per-thread CPU clock",
@@ -629,7 +630,7 @@ func TestInputsRecordWritesEmptyListsAsLists(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	for _, field := range []string{`"files":[]`, `"directories":[]`, `"absent":[]`} {
+	for _, field := range []string{`"files":[]`, `"directories":[]`, `"absent":[]`, `"trackedIgnored":[]`} {
 		if !strings.Contains(output.String(), field) {
 			test.Errorf("an empty inputs record wrote %s, want %s in it", output.String(), field)
 		}
@@ -644,6 +645,9 @@ func TestInputsRecordRoundTrips(test *testing.T) {
 		Files:       []string{"/goroot/VERSION", "/project/a.go", "/project/go.mod"},
 		Directories: []string{"/project", "/project/nested"},
 		Absent:      []string{"/go.work", "/project/go.sum"},
+		TrackedIgnored: []TrackedIgnoredScope{
+			{Index: "/repository/.git/index", Root: "/repository", Scope: "project"},
+		},
 	}
 	var first bytes.Buffer
 	writer := NewWriter(&first)

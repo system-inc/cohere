@@ -212,6 +212,17 @@ type engineInputsRecord struct {
 	Files       []string `json:"files"`
 	Directories []string `json:"directories"`
 	Absent      []string `json:"absent"`
+	// TrackedIgnored is each git index among Files the engine read only for what it decides of a walk, which the run
+	// cache keys on that rather than on the index's bytes (#m1daxxk). Absent from a record of an engine before it.
+	TrackedIgnored []engineTrackedIgnored `json:"trackedIgnored"`
+}
+
+// engineTrackedIgnored is one index an engine read for a walk: the index, the root of its repository, and the
+// directory walked relative to that root, slash separated, "" for the root.
+type engineTrackedIgnored struct {
+	Index string `json:"index"`
+	Root  string `json:"root"`
+	Scope string `json:"scope"`
 }
 
 type engineSummaryRecord struct {

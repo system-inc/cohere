@@ -120,31 +120,42 @@ func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
 		} else if _, statError := os.Lstat(filepath.Join(childDirectory, ".git")); statError == nil {
 			return nil, fmt.Errorf("gitignore: %s %w", childDirectory, ErrNestedRepository)
 		}
-		entered.directory = child
-		if entered.excludedBy != nil {
-			continue
+		if stepError := entered.step(child); stepError != nil {
+			return nil, stepError
 		}
-		if decided := entered.decide(
-			child,
-			path.Base(child),
-			true,
-			len(entered.files),
-		); decided != nil && !decided.negated {
-			entered.excludedBy = decided
-			continue
-		}
-		if matcher.listedAbsent(childDirectory, IgnoreFileName) {
-			// No `.gitignore`, which readTreeFile reads as no rules.
-			entered.files = append(entered.files, nil)
-			continue
-		}
-		rules, readTreeFileError := readTreeFile(matcher.root, child)
-		if readTreeFileError != nil {
-			return nil, readTreeFileError
-		}
-		entered.files = append(entered.files, rules)
 	}
 	return &entered, nil
+}
+
+// step moves the matcher into child, a directory of its own directory relative to the root, reading child's ignore
+// file unless a rule excludes child, or a directory above it, as git stops reading there. Enter takes it for each
+// directory it passes through; TrackedIgnoredDigest takes it alone, for directories it never asks to be walkable. It
+// moves the matcher itself, appending child's rules to its files, so a caller steps a copy whose files are capped.
+func (matcher *Matcher) step(child string) error {
+	matcher.directory = child
+	if matcher.excludedBy != nil {
+		return nil
+	}
+	if decided := matcher.decide(
+		child,
+		path.Base(child),
+		true,
+		len(matcher.files),
+	); decided != nil && !decided.negated {
+		matcher.excludedBy = decided
+		return nil
+	}
+	if matcher.listedAbsent(filepath.Join(matcher.root, filepath.FromSlash(child)), IgnoreFileName) {
+		// No `.gitignore`, which readTreeFile reads as no rules.
+		matcher.files = append(matcher.files, nil)
+		return nil
+	}
+	rules, readTreeFileError := readTreeFile(matcher.root, child)
+	if readTreeFileError != nil {
+		return readTreeFileError
+	}
+	matcher.files = append(matcher.files, rules)
+	return nil
 }
 
 // Ignored reports whether relativePath, an entry of this matcher's directory given relative to the root,

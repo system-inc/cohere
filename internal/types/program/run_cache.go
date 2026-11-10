@@ -179,7 +179,7 @@ func RecordRunCache(
 	exitCode int,
 	readSince time.Time,
 ) (*RunCache, error) {
-	return RecordRunCacheWithin(nil, key, files, extraDirectories, absent, probed, output, exitCode, readSince)
+	return RecordRunCacheWithin(nil, key, files, extraDirectories, absent, probed, output, exitCode, readSince, nil)
 }
 
 // RecordRunCacheWithin is RecordRunCache recording the directory holding a file only when that directory is one of
@@ -195,6 +195,13 @@ func RecordRunCache(
 // Such a run's extraDirectories are listings it read, each deciding which files exist, so each is held to readSince
 // as a file is, whether or not it holds a file the run read: a package directory created under one mid-run moved its
 // listing after the run read it, and recorded with its new signature it would replay a verdict that never saw it.
+//
+// trackedIgnored keys each git index it names, by its path among files, on what the index decides for the run rather
+// than on its bytes (RunCacheInput.TrackedIgnored, #m1daxxk). Each digest must be one taken before this call, of the
+// index the run read: the record refuses a run whose index changed after readSince, so the bytes it records are the
+// bytes the digest read, and a match on either is a match on what the run saw. Such an index's holding directory is
+// not recorded for it: that is the git directory, which every git command writes a lock file into, and nothing added
+// beside the index changes what the index decides. An index named but absent, or a directory, takes no key.
 func RecordRunCacheWithin(
 	roots []string,
 	key string,
@@ -205,6 +212,7 @@ func RecordRunCacheWithin(
 	output []byte,
 	exitCode int,
 	readSince time.Time,
+	trackedIgnored map[string]TrackedIgnoredKey,
 ) (*RunCache, error) {
 	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
 
@@ -235,8 +243,15 @@ func RecordRunCacheWithin(
 	for _, root := range roots {
 		rootSet[filepath.Clean(root)] = true
 	}
-	for _, input := range inputs {
-		if !input.Directory && (roots == nil || withinAny(filepath.Dir(input.Path), rootSet)) {
+	for index, input := range inputs {
+		if input.Directory {
+			continue
+		}
+		if trackedIgnoredKey, keyed := trackedIgnored[input.Path]; keyed {
+			inputs[index].TrackedIgnored = &trackedIgnoredKey
+			continue
+		}
+		if roots == nil || withinAny(filepath.Dir(input.Path), rootSet) {
 			directorySet[filepath.Dir(input.Path)] = struct{}{}
 		}
 	}

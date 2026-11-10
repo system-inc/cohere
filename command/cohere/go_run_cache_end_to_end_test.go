@@ -883,8 +883,8 @@ func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
 // TestAGoWorkspaceInAWorktreeReplaysOverItsGitDirectory: a go.work root checked out as a git worktree, whose record
 // names the index in the main repository's git directory, the file its gitlinks are read from. A file created
 // beside that index, as every git command in the worktree creates a lock file there, leaves the next run a replay,
-// since only the index decides the verdict and the directory holding it is outside the roots the run walked. The
-// index itself changing still misses.
+// since only the index decides the verdict and the directory holding it is outside the roots the run walked. The index
+// is keyed on what it decides (#m1daxxk): a mode staged for a source file replays, and a gitlink appearing misses.
 func TestAGoWorkspaceInAWorktreeReplaysOverItsGitDirectory(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -929,10 +929,23 @@ func TestAGoWorkspaceInAWorktreeReplaysOverItsGitDirectory(test *testing.T) {
 			replayed.stdout, replayed.stderr)
 	}
 
-	// The index alone: a mode staged for a file the working tree leaves as it is.
+	// The index's bytes alone: a mode staged for a file no ignore rule excludes decides nothing for the run, whose
+	// verdict reads that file's bytes, so the index keyed on what it decides still replays (#m1daxxk).
 	git(worktree, "update-index", "--chmod=+x", filepath.Join("module", "a.go"))
+	if replayed := fixture.run(true, arguments...); !isGoReplay(replayed) {
+		test.Fatalf("a mode staged in the worktree's index, which decides nothing, kept the run from replaying:\n%s%s",
+			replayed.stdout, replayed.stderr)
+	}
+
+	// What the index decides: a gitlink, which a go.work root reads its submodules from, misses.
+	head, headError := exec.Command("git", "-C", worktree, "rev-parse", "HEAD").Output()
+	if headError != nil {
+		test.Fatal(headError)
+	}
+	git(worktree, "update-index", "--add", "--cacheinfo",
+		"160000,"+strings.TrimSpace(string(head))+","+filepath.ToSlash(filepath.Join("module", "linked")))
 	if changed := fixture.run(true, arguments...); isGoReplay(changed) {
-		test.Fatalf("the worktree's index changed and the run replayed:\n%s", changed.stdout)
+		test.Fatalf("a gitlink appeared in the worktree's index and the run replayed:\n%s", changed.stdout)
 	}
 }
 

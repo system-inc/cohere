@@ -98,4 +98,36 @@ func TestTheInputsRecordNamesWhatDescribingTheProjectRead(test *testing.T) {
 	if !slices.IsSorted(record.Files) || !slices.IsSorted(record.Absent) {
 		test.Errorf("the lists are not sorted: %q, %q", record.Files, record.Absent)
 	}
+	// The index is named again with what the census read it for, the walk of the root below its repository, so the
+	// front door keys it on that rather than on its bytes (#m1daxxk).
+	wantTracked := []contract.TrackedIgnoredScope{
+		{Index: filepath.Join(repository, ".git", "index"), Root: repository, Scope: "project"},
+	}
+	if !slices.Equal(record.TrackedIgnored, wantTracked) {
+		test.Errorf("the record's trackedIgnored is %+v, want %+v", record.TrackedIgnored, wantTracked)
+	}
+}
+
+// TestTheInputsRecordNamesNoTrackedIgnoredIndexThatIsNotThere: a repository with no index yet has nothing to key, so
+// its index is named absent and never under trackedIgnored.
+func TestTheInputsRecordNamesNoTrackedIgnoredIndexThatIsNotThere(test *testing.T) {
+	test.Parallel()
+	root, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatal(resolveError)
+	}
+	if makeError := os.MkdirAll(filepath.Join(root, ".git"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	engine := &pipeline{
+		request:   invocation{root: root},
+		described: &describedProject{workspace: project.Workspace{Root: root}},
+	}
+	record := engine.inputsRecord(&load.Loaded{})
+	if !slices.Contains(record.Absent, filepath.Join(root, ".git", "index")) {
+		test.Errorf("the absent paths do not name the missing index: %q", record.Absent)
+	}
+	if len(record.TrackedIgnored) != 0 {
+		test.Errorf("a repository with no index names one to key on: %+v", record.TrackedIgnored)
+	}
 }

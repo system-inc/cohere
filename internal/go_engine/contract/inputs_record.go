@@ -18,6 +18,19 @@ type InputsRecord struct {
 	Directories []string `json:"directories"`
 	// Absent are the paths whose absence the run depends on: a file that, once there, would change the load.
 	Absent []string `json:"absent"`
+	// TrackedIgnored names each git index among Files that the run read only for what it decides of a walk: which
+	// paths its ignore rules exclude are tracked, and which are gitlinks. The front door keys such an index on
+	// gitignore.TrackedIgnoredDigest over the walk rather than on its bytes, which git rewrites on a `git status`
+	// (#m1daxxk). An index not named here is keyed on its bytes.
+	TrackedIgnored []TrackedIgnoredScope `json:"trackedIgnored"`
+}
+
+// TrackedIgnoredScope is one index the run read for a walk: the index file, the root of the repository it belongs to,
+// both absolute, and the directory walked, relative to that root and slash separated, "" for the root itself.
+type TrackedIgnoredScope struct {
+	Index string `json:"index"`
+	Root  string `json:"root"`
+	Scope string `json:"scope"`
 }
 
 func (InputsRecord) kind() Kind { return KindInputs }
@@ -36,6 +49,9 @@ func (record InputsRecord) MarshalJSON() ([]byte, error) {
 	}
 	if declared.Absent == nil {
 		declared.Absent = []string{}
+	}
+	if declared.TrackedIgnored == nil {
+		declared.TrackedIgnored = []TrackedIgnoredScope{}
 	}
 	return encodeWithoutHtmlEscaping(declared)
 }
