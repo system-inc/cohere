@@ -93,6 +93,40 @@ func TestAWordWithSeveralMeaningsIsNeverRenamed(test *testing.T) {
 	}
 }
 
+// The abbreviations go/ast, go/types and go/ir taught Go code are the house's words to spell out (#r0fa8pa,
+// #2xt6v5r), judged only where the word ends: treewords.go declares `expr`, `condExpression`, `fset` and
+// `visitorFunc`, each renamed to its one spelling, `typ`, whose expansion is Go's keyword, and `recv` and `op`, which
+// mean more than one thing, beside a struct of full words that open with the same letters (`Condition`, `Channel`,
+// `Function`, `Selection`, `Typical`, `Optional`) and carry no want, so a vocabulary that read `Cond` inside
+// `Condition` fails on a finding no want expects. The renames are read as well, so `typ`, `recv` and `op` offering
+// one fails too.
+func TestTheSyntaxTreeWordsAreJudgedWhereTheWordEnds(test *testing.T) {
+	test.Parallel()
+	results := analysistest.RunWithSuggestedFixes(
+		errorsOnly{test},
+		analysistest.TestData(),
+		consistency_no_abbreviated_identifier.Analyzer,
+		"treewords",
+	)
+	var renames []string
+	for _, result := range results {
+		for _, diagnostic := range result.Diagnostics {
+			for _, fix := range diagnostic.SuggestedFixes {
+				renames = append(renames, fix.Message)
+			}
+		}
+	}
+	want := []string{
+		`Rename "expr" to "expression" at its declaration and at every reference.`,
+		`Rename "condExpression" to "conditionExpression" at its declaration and at every reference.`,
+		`Rename "fset" to "fileSet" at its declaration and at every reference.`,
+		`Rename "visitorFunc" to "visitorFunction" at its declaration and at every reference.`,
+	}
+	if !slices.Equal(renames, want) {
+		test.Errorf("renames %q, want %q", renames, want)
+	}
+}
+
 // JavaScript's var keyword is a word, not short for "variable", so a Go name holding one of policy/KeywordTerms.json's
 // spellings for it reads clean, as the TypeScript and Swift rules read it (#hvyvfr5). keywordterms.go declares them
 // beside a bare `Var`, a spelling run on into a longer word, and a keyword term next to another abbreviation or a bare

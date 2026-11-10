@@ -174,6 +174,14 @@ changed in cohere outside the sets is written under the same heading.
   no longer renames them. `Var` and `Vars` can mean JavaScript's var keyword, so they say what to write for a
   variable and ask for a name saying it means the keyword otherwise. The same names are found as before. A
   local error from a call whose name holds one of the words, as `os.ReadDir`'s, is no longer named for it.
+- The abbreviation rule knows the words go/ast, go/types and go/ir taught Go code. `instr`, `instrs`, `succ`,
+  `succs`, `pred`, `preds`, `prog`, `alloc`, `addr`, `cond`, `conds`, `chan`, `expr`, `func`, `fset`, `stmt`,
+  `ptr`, `typ`, `anon` and `deref` each name their one spelling, and `recv` (receiver or receive), `op`
+  (operation, operator or operand) and `sel` (selection, selector or select) name every meaning. Each is judged
+  only where its word ends, so `Condition`, `Change`, `Open`, `Function`, `Progress`, `Select` and `Type` never
+  read as one. A name or file name holding one is a new finding in every engine. A whole `typ` asks Go for a
+  descriptive name ending in `Type`, as `err` does, and a whole `func` asks for a name for its role, since
+  `function` is reserved in TypeScript.
 
 ## 0.1.1 (2026-11-03)
 

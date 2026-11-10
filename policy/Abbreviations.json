@@ -357,6 +357,191 @@
             "whole": { "style": "advice" },
             "prefix": { "phase": "late", "style": "advice" },
             "segment": { "style": "advice" }
+        },
+        {
+            "abbreviation": "instrs",
+            "expansions": ["instructions"],
+            "reason": "This word and the ones after it, to `deref`, are the abbreviations go/ast, go/types and go/ir taught Go code, added for every engine by #r0fa8pa and #2xt6v5r after a census of every consumer, each with the forms the thirteen Go words carry: the whole name, a prefix followed by a capital, and a segment. Every form needs a word boundary after the abbreviation, so `Instruction`, `Successor`, `Program`, `Condition`, `Change`, `Expression`, `Function`, `Open`, `Operation`, `Select`, `Self`, `Type` and `Typical` never read as one. `instrs` is go/ir's list of a block's instructions, kept though the census found none on the Mac, and precedes `instr` as `vars` precedes `var`.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "instr",
+            "expansions": ["instruction"],
+            "reason": "The census found it meaning an instruction in all 30 of its findings, the IR's and api's chat instructions alike.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "succs",
+            "expansions": ["successors"],
+            "reason": "go/ir's list of a block's successors, kept beside `succ` though the census found none on the Mac.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "succ",
+            "expansions": ["successor"],
+            "reason": "The census found it naming a block's successor in all 5 of its findings. `Success` and `Succeed` never read as it.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "preds",
+            "expansions": ["predecessors"],
+            "reason": "go/ir's list of a block's predecessors, which the census found in a static single assignment builder too.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "pred",
+            "expansions": ["predecessor"],
+            "reason": "The census found it naming a block's predecessor in all 5 of its findings. `Predicate` and `Predict` never read as it.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "prog",
+            "expansions": ["program"],
+            "reason": "The census found it naming the IR's Program in all 22 of its findings. `Progress` never reads as it.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "alloc",
+            "expansions": ["allocation"],
+            "reason": "The census found it naming the IR's Allocation in all 4 of its findings, never the verb. `Allocate` and `Allocator` never read as it.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "addr",
+            "expansions": ["address"],
+            "reason": "The census found it meaning an address in all 24 of its findings: a shipping address, an IP range's address, and the IR's addresses.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "conds",
+            "expansions": ["conditions"],
+            "reason": "Before `cond`, so the longer word wins. The census found it naming the IR's branch conditions.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "cond",
+            "expansions": ["condition"],
+            "reason": "The census found it meaning a condition in all 22 of its findings: the IR's branch conditions and ESLint's no-cond-assign, whose Go names spell the rule.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "chan",
+            "expansions": ["channel"],
+            "reason": "go/ir's spelling for a channel, kept as #r0fa8pa names it though the census found none on the Mac. `Change` and `Channel` never read as it.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "expr",
+            "expansions": ["expression"],
+            "reason": "The census found it meaning an expression in all 62 of its findings: go/ast's in the IR, SQL's in api's Drizzle adapters, TypeScript's in a GraphQL document pass.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "func",
+            "expansions": ["function"],
+            "advice": "Use a name for its role, as \"callback\", \"handler\" or \"factory\", or a more descriptive name ending in \"Function\".",
+            "reason": "The census found it meaning a function in all 290 of its findings, Go's `XxxFunc` function types and ESLint's func-name-matching, no-func-assign, no-loop-func and no-new-func among them. The whole word gives advice rather than the bare expansion, since `function` is reserved in TypeScript, as `arguments` is for `args`, and a bare `func` is a keyword in Go and Swift.",
+            "whole": { "style": "advice" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "fset",
+            "expansions": ["fileSet"],
+            "reason": "The census found it naming a token.FileSet in all 9 of its findings.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "recv",
+            "expansions": ["receiver", "receive"],
+            "reason": "It has two meanings, so every message names both: the census found it naming a method's receiver in most of its 25 findings, and a receive in the rest, a select case's `<-ch` and the IR's Receive instruction.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "op",
+            "expansions": ["operation", "operator", "operand"],
+            "reason": "It has three meanings, so every message names them all: the census found an operation (api's batch operations, ahra's diff operations, a no-op), an operator (a finance rule's match operator, the IR's token) and an operand (the IR's `for _, op := range ops`). `BinOp` and `UnOp` read as `Op` and get the same message. `ops` is no entry: the census found it naming the Ops portal, a product area and its `/ops` route in four apps, in most of its 618 findings, and the IR's operands in one, so the name is the product's to decide rather than this vocabulary's.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "stmt",
+            "expansions": ["statement"],
+            "reason": "The census found it meaning a statement in all 38 of its findings: go/ast's in the IR and SQL's in a migration runner.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "ptr",
+            "expansions": ["pointer"],
+            "reason": "The census found it meaning a pointer in all 12 of its findings, a DNS PTR record's among them, which is a pointer record.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "typ",
+            "expansions": ["type"],
+            "reason": "Go's habit for a value of types.Type, since `type` is Go's keyword: the census found it meaning a type in all 82 of its findings. In Go the whole word asks for a descriptive name ending in \"Type\", as `err` and `ctx` do, since the bare expansion is Go's already. A JSON Web Token's `typ` header is the RFC's own spelling, and the census found it in each consumer's copy of JsonWebToken.ts.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "sel",
+            "expansions": ["selection", "selector", "select"],
+            "reason": "It has three meanings, so every message names them all: the census found it naming a types.Selection in the IR, and once a select statement, while go/ast's `Sel` is a selector.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "anon",
+            "expansions": ["anonymous"],
+            "reason": "The census found it naming the IR's anonymous functions and variables in all 5 of its findings.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "deref",
+            "expansions": ["dereference"],
+            "reason": "The census found it once, the IR's function that dereferences a pointer type. \"Dereference\" is the verb and the noun both.",
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "segment": {}
         }
     ],
     "allowedNames": [{ "name": "URLSearchParams", "reason": "A Web API, and not ours to rename." }],

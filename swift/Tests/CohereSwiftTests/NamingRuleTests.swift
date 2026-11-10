@@ -48,6 +48,8 @@ struct NamingRuleTests {
             vocabulary.segments.map(\.abbreviation) == [
                 "cwd", "dir", "env", "cli", "len", "seq", "db", "tx", "vars", "var",
                 "buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
+                "instrs", "instr", "succs", "succ", "preds", "pred", "prog", "alloc", "addr", "conds", "cond", "chan",
+                "expr", "func", "fset", "recv", "op", "stmt", "ptr", "typ", "sel", "anon", "deref",
             ]
         )
         #expect(vocabulary.suffixes.map(\.abbreviation).prefix(5) == ["prop", "props", "param", "params", "ms"])
@@ -55,7 +57,7 @@ struct NamingRuleTests {
         #expect(vocabulary.allowedSegments == ["InnoDb"])
     }
 
-    /* The Go test's count: every form of every entry judged once, 131 in all. */
+    /* The Go test's count: every form of every entry judged once, 200 in all. */
     @Test func everyFormIsJudged() throws {
         let vocabulary = try Self.vocabulary()
         var judged = 0
@@ -87,7 +89,7 @@ struct NamingRuleTests {
             )
             judged += 1
         }
-        #expect(judged == 131)
+        #expect(judged == 200)
     }
 
     @Test(arguments: [
@@ -228,6 +230,36 @@ struct NamingRuleTests {
         let finding = try #require(try Self.vocabulary().find(name))
         #expect(finding.form == form)
         #expect(finding.message == want + " " + Self.reasoning)
+    }
+
+    /*
+     The words go/ast, go/types and go/ir taught are judged only where the word ends, since each opens real words:
+     Go's `TestAbbreviationSegmentsJudgeOnlyTheWholeWord`. `Cond` reads in `nextCond` and never in `Condition`.
+     */
+    @Test(arguments: [
+        ("cond", #"Identifier "cond" should not be abbreviated. Use "condition" or a more descriptive name."#),
+        ("nextCond", #"Identifier "nextCond" abbreviates "Cond". Use "nextCondition"."#),
+        ("exprText", #"Identifier "exprText" should not be abbreviated. Use "expressionText"."#),
+        (
+            "BinOp",
+            #"Identifier "BinOp" abbreviates "Op". Use "BinOperation", "BinOperator" or "BinOperand", whichever it means."#,
+        ),
+        (
+            "recvType",
+            #"Identifier "recvType" should not be abbreviated. Use "receiverType" or "receiveType", whichever it means."#,
+        ),
+    ])
+    func aSyntaxTreeWordIsJudgedWhereItEnds(name: String, want: String) throws {
+        let finding = try #require(try Self.vocabulary().find(name))
+        #expect(finding.message == want + " " + Self.reasoning)
+    }
+
+    @Test(arguments: [
+        "Condition", "readCondition", "ChangeSet", "widgetChannel", "OpenFile", "isOptional", "FunctionName",
+        "ProgressBar", "SelectAll", "SelfReference", "TypeName", "isTypical", "AddressLine", "PredicateList",
+    ])
+    func aFullWordOpeningWithASyntaxTreeWordIsNone(name: String) throws {
+        #expect(try Self.vocabulary().find(name) == nil, "\(name)")
     }
 
     @Test func allowedNamesAndSegmentsAreNotJudged() throws {
