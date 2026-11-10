@@ -212,6 +212,17 @@ type engineInputsRecord struct {
 	Files       []string `json:"files"`
 	Directories []string `json:"directories"`
 	Absent      []string `json:"absent"`
+	// TrackedIgnored is each git index among Files the engine read only for what it decides of a walk, which the run
+	// cache keys on that rather than on the index's bytes (#m1daxxk). Absent from a record of an engine before it.
+	TrackedIgnored []engineTrackedIgnored `json:"trackedIgnored"`
+}
+
+// engineTrackedIgnored is one index an engine read for a walk: the index, the root of its repository, and the
+// directory walked relative to that root, slash separated, "" for the root.
+type engineTrackedIgnored struct {
+	Index string `json:"index"`
+	Root  string `json:"root"`
+	Scope string `json:"scope"`
 }
 
 type engineSummaryRecord struct {
@@ -1408,8 +1419,9 @@ func (run *engineRun) finish(engineExit int, ended string) (int, error) {
 // the project record excluded, by its reason and the rule that decided it, and the files of ours a narrowing left
 // out of scope. A file the run of a project below this one accounts for is that run's, as writeExcluded leaves it,
 // and a file that was never a source to check, a Swift package's manifest, is no reason (NotSourceReasons).
-// A run that checked something keeps no reasons, and a project with no file of its language has none to keep, so
-// both read as they did (#08cv2mp).
+// The package's files, filesInPackage, are the fact the run fails on, and a file of them no reason counts is named as
+// unrecorded. A run that checked something keeps no reasons, and a project with no file of its language has none to
+// keep, so both read as they did (#08cv2mp).
 func (run *engineRun) countExcludedWhenNothingChecked() {
 	if !activeSummary.Gaps.NothingToCheck || run.project == nil {
 		return
@@ -1426,6 +1438,8 @@ func (run *engineRun) countExcludedWhenNothingChecked() {
 	if outOfScope := run.project.FilesOurs - run.project.FilesInScope; outOfScope > 0 {
 		activeSummary.Gaps.addExcluded(outsideNamedPaths, "", outOfScope)
 	}
+	activeSummary.Gaps.SourceFiles = run.project.FilesInPackage
+	activeSummary.Gaps.countUnrecorded()
 }
 
 // writeUnfinished prints the phase line for a run that stopped early, every phase the engine never

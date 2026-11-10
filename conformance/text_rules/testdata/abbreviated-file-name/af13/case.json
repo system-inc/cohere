@@ -1,0 +1,11 @@
+{
+    "why": "af13: a word of capitals alone is an initialism or a code, read as the identifier rule reads `FlagCH`, so Switzerland's flag passes where `FlagCh` would hold the word `ch`",
+    "expect": [],
+    "options": {},
+    "path": "FlagCH",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

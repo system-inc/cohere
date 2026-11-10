@@ -215,8 +215,7 @@ type renameRound struct {
 // and what they ask next is the next round, so a name that needs two renames gets both. Every round's bytes are
 // written together, once, as one set (see writeRenamed), and the last round's proof is the load of what is on disk.
 func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
-	current, loadError := load.Packages(engine.described.workspace.Root, engine.described.workspace.Patterns(),
-		engine.described.workspace.Environment(), engine.described.readableOurs)
+	current, loadError := engine.loadPackages(loadRequest{environment: engine.described.workspace.Environment()})
 	if loadError == nil && len(current.Diagnostics) > 0 {
 		loadError = fmt.Errorf("it found %d errors the first load did not", len(current.Diagnostics))
 	}
@@ -566,9 +565,9 @@ func (engine *pipeline) prove(
 			declined[file] = reason
 		}
 	}
-	proof, proofError := load.PackagesWithOverlay(engine.described.workspace.Root,
-		engine.described.workspace.Patterns(), engine.described.workspace.Environment(), engine.described.readableOurs,
-		next)
+	proof, proofError := engine.loadPackages(loadRequest{
+		environment: engine.described.workspace.Environment(), overlay: next, withOverlay: true,
+	})
 	if proofError != nil {
 		return rewriteProof{failures: everyRename("the load of the rewrite failed: " + oneLine(proofError))}
 	}
@@ -641,8 +640,9 @@ func (engine *pipeline) platformLoad(
 		maps.Copy(merged, overlay)
 		environment := append(slices.Clone(engine.described.workspace.Environment()),
 			"GOOS="+platform.OperatingSystem, "GOARCH="+platform.Architecture, "CGO_ENABLED=0")
-		loaded, loadError := load.PackagesWithOverlay(engine.described.workspace.Root,
-			engine.described.workspace.Patterns(), environment, engine.described.readableOurs, merged)
+		loaded, loadError := engine.loadPackages(loadRequest{
+			environment: environment, overlay: merged, withOverlay: true,
+		})
 		if loadError != nil {
 			return nil, fmt.Errorf("loading as %s: %w", platform, loadError)
 		}

@@ -231,7 +231,7 @@ A rule's value is a severity, or `[severity, ...options]` for a rule that takes 
 
 ## Rules
 
-cohere implements 501 rules. `cohere --rules` lists them for your project's language, and
+cohere implements 503 rules. `cohere --rules` lists them for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on. A name cohere does not implement is accepted:
 it records a decision about a rule, and is reported as unported rather than refused.
 
@@ -606,13 +606,14 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 </details>
 
-<details><summary><code>nexus</code>, 56 rules</summary>
+<details><summary><code>nexus</code>, 58 rules</summary>
 
 - `nexus/boundary-no-internal-import`
 - `nexus/boundary-no-nexus-outside-import`
 - `nexus/boundary-no-project-import`
 - `nexus/concurrency-no-check-then-write`
 - `nexus/concurrency-no-lost-update`
+- `nexus/consistency-no-abbreviated-file-name`
 - `nexus/consistency-no-abbreviated-identifier`
 - `nexus/consistency-no-ambiguous-identifier`
 - `nexus/consistency-no-boolean-outcome`
@@ -629,6 +630,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `nexus/consistency-no-shouting`
 - `nexus/consistency-no-single-line-jsdoc`
 - `nexus/consistency-no-stuttering-name`
+- `nexus/consistency-no-utils-file-name`
 - `nexus/consistency-no-utils-folder`
 - `nexus/consistency-no-warning-comment`
 - `nexus/consistency-require-constant-casing`

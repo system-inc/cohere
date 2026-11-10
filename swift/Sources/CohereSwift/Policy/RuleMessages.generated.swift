@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "29d0d17465be2420e828e0a7b4bb24158becfc87742941a7cf3db80ed5360e88"
+    static let sourceDigest = "bd219abfc0f352ad4665c3b5df59e55282af5596fcac79ab16c5c92e85b7a48c"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
@@ -20,6 +20,8 @@ enum RuleMessages {
         "ConcurrencyNoCheckThenWrite.checkThenWrite",
         "ConcurrencyNoLostUpdate.lostUpdate",
         "ConcurrencyRequireEscapeHatchReason.escapeHatchWithoutReason",
+        "ConsistencyNoAbbreviatedFileName.abbreviatedFileName",
+        "ConsistencyNoAbbreviatedFileName.abbreviatedFileNameAdvice",
         "ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier",
         "ConsistencyNoAbbreviatedIdentifier.abbreviatedSuffix",
         "ConsistencyNoAbbreviatedIdentifier.abbreviatedWordSegment",
@@ -37,6 +39,7 @@ enum RuleMessages {
         "ConsistencyNoPropertyAlias.noPropertyAlias",
         "ConsistencyNoShouting.shoutingInComment",
         "ConsistencyNoStutteringName.stutteringName",
+        "ConsistencyNoUtilsFileName.utilsFileName",
         "ConsistencyNoUtilsFolder.noUnderscoreUtils",
         "ConsistencyNoUtilsFolder.noUtils",
         "ConsistencyRequireMatchingFileName.extensionOutsideItsFile",
@@ -127,6 +130,25 @@ enum RuleMessages {
                 id: "escapeHatchWithoutReason",
                 text:
                     #"\#(spelling) tells the compiler to trust this code instead of checking it. Say why that is safe in a comment directly above the declaration, so the next reader can check the reasoning the compiler no longer does."#,
+            )
+        }
+    }
+
+    /* cohere-swift/consistency-no-abbreviated-file-name */
+    enum ConsistencyNoAbbreviatedFileName {
+        static func abbreviatedFileName(fileName: String, word: String, expansions: String) -> Message {
+            Message(
+                id: "abbreviatedFileName",
+                text:
+                    #"File name "\#(fileName)" abbreviates "\#(word)". Spell it out as \#(expansions). A file's name is read on every path and every import, so the letters saved when it was named are paid back by every reader who has to expand the word themselves and hope they expanded it the way the author meant."#,
+            )
+        }
+
+        static func abbreviatedFileNameAdvice(fileName: String, word: String, advice: String) -> Message {
+            Message(
+                id: "abbreviatedFileNameAdvice",
+                text:
+                    #"File name "\#(fileName)" abbreviates "\#(word)". \#(advice) A file's name is read on every path and every import, so the letters saved when it was named are paid back by every reader who has to expand the word themselves and hope they expanded it the way the author meant."#,
             )
         }
     }
@@ -323,6 +345,17 @@ enum RuleMessages {
                 id: "stutteringName",
                 text:
                     #""\#(name).\#(name)" stutters, which means the name is carrying nothing: it repeats the field instead of saying which \#(name) this is. Rename the value for what it holds, the type it came back as or whatever distinguishes it from another \#(name) in this scope, so a reader forty lines down does not have to find the declaration."#,
+            )
+        }
+    }
+
+    /* cohere-swift/consistency-no-utils-file-name */
+    enum ConsistencyNoUtilsFileName {
+        static func utilsFileName(fileName: String, word: String, replacement: String) -> Message {
+            Message(
+                id: "utilsFileName",
+                text:
+                    #"File name "\#(fileName)" holds "\#(word)", which names nothing in particular, so the file collects whatever has no other home. Name the file for what it holds, or at the least spell the word "\#(replacement)", as the house spells it in a folder's name."#,
             )
         }
     }

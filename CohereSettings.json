@@ -7,5 +7,11 @@
             "reason": "Somebody else's code, vendored whole and kept as its authors released it, so the copy's diff against its release is only what its README.cohere.md names.",
             "kind": "thirdParty"
         }
-    ]
+    ],
+    "go": {
+        "rules": {
+            "cohere-go/consistency-no-abbreviated-file-name": "off",
+            "cohere-go/consistency-no-utils-file-name": "off"
+        }
+    }
 }

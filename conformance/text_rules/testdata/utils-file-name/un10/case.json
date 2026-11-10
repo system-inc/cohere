@@ -1,0 +1,11 @@
+{
+    "why": "un10: a file under a third_party folder is someone else's, kept under the name its authors gave it, and is not judged",
+    "expect": [],
+    "options": {},
+    "path": "third_party/util",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

@@ -14,9 +14,12 @@ import (
 )
 
 // runStdin is the editor's save (#qtna8m4): what a run with `--fix` would write for the one file `--stdin-filepath`
-// names, computed from the buffer on standard input, written to output whole, with nothing written to disk. It is the
-// fix phase of run over a scope of that one file, whose bytes are the buffer everywhere the run reads them
-// (invocation.read), and no other phase, so no record is written:
+// names once the rest of the workspace type-checks, computed from the buffer on standard input, written to output
+// whole, with nothing written to disk. A save loads its file's package and what it imports, never the rest
+// (stdinPackage), so where another package holds a type error, a run holds the long-line wrap and the save makes it:
+// the save is ahead of the gate there, never against it. It is the fix phase of run over a scope of that one file,
+// whose bytes are the buffer everywhere the run reads them (invocation.read), and no other phase, so no record is
+// written:
 //
 //   - gofmt, in memory (format.Options.KeepOutput).
 //   - the long-line wrap, in memory, over a load of the formatted buffer, and held as run holds it when the load

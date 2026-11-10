@@ -232,3 +232,25 @@ func TestAGoSaveLoadsNoPackageThatImportsIt(test *testing.T) {
 			"stderr:\n%s", code, wrapped, saved, stderr)
 	}
 }
+
+// A save writes what a run would write for its file once the rest of the workspace type-checks: a sound package beside
+// one with a type error, which neither imports the other, wraps its long line on save, where a run over the
+// workspace holds the wrap for the other package's error. The save is ahead of the gate there, never against it.
+func TestAGoSaveWrapsBesideABrokenPackage(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, goSaveFiles)
+	writeTree(test, root, map[string]string{
+		"a/a.go":           "package a\n",
+		"broken/broken.go": "package broken\n\n// Broken is no int.\nvar Broken int = \"text\"\n",
+	})
+	buffer := strings.Replace(goLongLineBuffer, "package probe", "package a", 1)
+
+	saved, stderr, code := goSave(test, binary, root, "a/a.go", buffer)
+	wrapped := "\treport(\n\t\t\"context\",\n"
+	if code != 0 || !strings.Contains(saved, wrapped) {
+		test.Fatalf("exit %d, want the long call wrapped (%q) beside broken's type error, in:\n%s\nstderr:\n%s",
+			code, wrapped, saved, stderr)
+	}
+}

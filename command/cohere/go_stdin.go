@@ -7,10 +7,11 @@ import (
 )
 
 // runGoStdin is the editor's save in a Go module or workspace, `cohere --fix [--format] --stdin-filepath <path>` with
-// the buffer on input: what `--fix` would write for that file, computed by the Go engine from the buffer and written to
-// output, with nothing written to disk (go_engine's pipeline.runStdin). The outcomes are runStdin's for TypeScript, for
-// the save hook to act on: the file's text, or the buffer unchanged for a file the engine declines, on output with
-// exit 0; or nothing on output and a non-zero exit, with why on stderr, for an engine or formatter that broke.
+// the buffer on input: what `--fix` would write for that file once the rest of the workspace type-checks, computed by
+// the Go engine from the buffer and written to output, with nothing written to disk (go_engine's pipeline.runStdin).
+// The outcomes are runStdin's for TypeScript, for the save hook to act on: the file's text, or the buffer unchanged for
+// a file the engine declines, on output with exit 0; or nothing on output and a non-zero exit, with why on stderr, for
+// an engine or formatter that broke.
 //
 // The engine's output is its text rather than records, so it is read whole and passed through, never rendered. And it
 // is held to one promise before it is: exit 0 with no text for a buffer that had some would empty the file, so it is a

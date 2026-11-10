@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/docs"
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/docs_data/capture"
 	goenginerules "github.com/system-inc/cohere/internal/go_engine/rules"
@@ -58,6 +59,33 @@ func TestTheRenderedFilesAreCurrent(test *testing.T) {
 	test.Parallel()
 	if stale := staleAgainstCommitted(test, built(test, sourceInputs(test))); len(stale) > 0 {
 		test.Errorf("stale: %v; run go run ./internal/docs_data/tools/generate", stale)
+	}
+}
+
+// TestTheDocsPackageReadsTheRenderedRuleNames: package docs embeds data/rules.json for the Go engine's file-name rule,
+// which reads every engine's rule names from it because the Go engine can't link the TypeScript registry (#2xt6v5r).
+// The embedded names are the ones Build renders now, so the freshness this file guards for docs/data reaches the copy
+// a binary carries too, and a registry change the generator has not been run for fails here as well as above.
+func TestTheDocsPackageReadsTheRenderedRuleNames(test *testing.T) {
+	test.Parallel()
+	var rendered struct {
+		Rules []struct {
+			Name string `json:"name"`
+		} `json:"rules"`
+	}
+	if decodeError := json.Unmarshal(built(test, sourceInputs(test))[RulesPath], &rendered); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	names := make([]string, 0, len(rendered.Rules))
+	for _, entry := range rendered.Rules {
+		names = append(names, entry.Name)
+	}
+	if embedded := docs.RuleNames(); !slices.Equal(embedded, names) {
+		test.Errorf(
+			"docs.RuleNames holds %d names and Build renders %d; run go run ./internal/docs_data/tools/generate",
+			len(embedded),
+			len(names),
+		)
 	}
 }
 

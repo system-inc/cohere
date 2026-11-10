@@ -1,0 +1,11 @@
+{
+    "why": "af16: a rule named in one word, `boundaries/dependencies`, is never set aside, so `dependencies_ref_current` is judged whole and passes as `dependenciesRefCurrent` does, where judging `ref current` alone would report `ref`",
+    "expect": [],
+    "options": {},
+    "path": "dependencies_ref_current",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

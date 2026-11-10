@@ -17,6 +17,8 @@ changed in cohere outside the sets is written under the same heading.
 - On: `nexus/consistency-no-label (error)`
 - On: `nexus/consistency-no-warning-comment (error)`
 - On: `nexus/consistency-require-separated-folder-words (error)`
+- Off: `nexus/consistency-no-abbreviated-file-name`
+- Off: `nexus/consistency-no-utils-file-name`
 - Off: `no-labels`
 - Off: `no-warning-comments`
 - Setting changed: `reasons`
@@ -96,6 +98,31 @@ changed in cohere outside the sets is written under the same heading.
   still told to write `Variable` or say they mean the keyword. A name holding a keyword term and another
   abbreviation still reports the other. The list is decided once for every engine, and is never a project's
   `allowedSegments` entry.
+- A file's name is judged as a folder's is, in every engine, by two rules each with its corpus family
+  (#2xt6v5r): `consistency-no-utils-file-name` refuses `util` or `utils` as a word of the name (`util.go`,
+  `stringUtils.ts`, `ViewUtil.swift`, `util_test.go`), and `consistency-no-abbreviated-file-name` judges the
+  name's words by `policy/Abbreviations.json`, read as the identifier they spell (`cfg.go`, `msgPrinter.ts`).
+  A word in capitals alone is an initialism or a code (`FlagCH.tsx`), and `utils` right after `no` names a ban
+  on it (`consistency_no_utils_folder.go`), so neither is reported. A run of words that spells a registered
+  rule's name, upstream's for a port, is the rule's and is set aside, and only the words beside it are judged:
+  `max_lines.go` and `MaxClassesPerFileRule.ts` pass, `no_var_cfg.go` reports `cfg`. Only a name of two
+  words or more does: `config.ts` is judged though `react-hooks/config` is registered. TypeScript reads its
+  registry, Swift its own, and Go every engine's names from `docs/data/rules.json`, since a Go file in cohere is
+  named for the TypeScript rule it ports.
+  A name's words are cut at underscores, hyphens, dots, a Swift `+` and case, with what a tool reads set
+  aside (`_test`, `_linux`, `_amd64`, `.test`, `.d`, `.config`), and a generated file, a name a tool requires
+  (`doc.go`, `Package.swift`, Next.js's `page.tsx` and `next-env.d.ts`) and a file under `node_modules`,
+  `vendor`, `third_party` or `testdata` are never judged. `internal/file_name_words` is the one judgment the
+  TypeScript and Go rules read, and Swift ports it. Both are off in `cohere:style`, and the Go pair in cohere's
+  own settings, until their census is routed.
+- An editor's save of a `.go` file: `cohere --fix [--format] --stdin-filepath <path>` in a Go module or
+  workspace reads the buffer on stdin and prints what a run with `--fix` would write for that file once the
+  rest of the workspace type-checks, writing nothing to disk (#qtna8m4). gofmt and the long-line wrap apply;
+  a rename spans files, so it is never made, and each one asked of the file is named on stderr, "left for a
+  run over the module". A save loads only the file's package and what it imports, so where another package
+  holds a type error, a run holds the wrap and the save makes it, ahead of the gate and never against it. An
+  ignored file, one no package holds, and a buffer that does not parse come back as typed, the reason on
+  stderr. The VS Code extension now formats `.go` on save.
 
 ### Changed
 
@@ -103,10 +130,13 @@ changed in cohere outside the sets is written under the same heading.
   a warning. Its footer says how many files and why, quoting the rule that decided, as
   `no files checked: 1 file excluded, ignored by git (.gitignore:1)`, and `--json` reads `"verdict": "fail"` with
   each reason under `gaps.excluded`. A project with no file of its language at all keeps the warning and passes.
+  The failure rests on the files having been there, `gaps.sourceFiles`, never on a reason having been counted: a
+  file kept out for a reason cohere did not count is named as such, a cohere bug to report, and the run still fails.
 - A file git tracks is never ignored, as `git check-ignore` decides it: a file added with `git add -f` under a
   pattern that matches it is checked and formatted like any other, where it read "ignored by git". cohere reads the
   repository's index itself, and a run whose index can't be read, a split or sparse one, decides by the ignore files
-  alone and says so.
+  alone and says so. The run cache keys the index on what it decides, the tracked paths the ignore rules exclude and
+  the gitlinks, so a `git status` or a `git add` of an ordinary file still replays, and a `git add -f` doesn't.
 - The footer's checked count is the files a phase examined, never the files in scope. A Swift project whose
   files had no compiler record, with lint not run, read
   `1 type error (13 checked) • ⚠ 13 files nothing checked`, and now reads no checked count beside the gap, which

@@ -3,6 +3,7 @@ package gitignore
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/binary"
@@ -56,9 +57,21 @@ const (
 // indexModeDirectory is a sparse directory entry's object type, a tree's, in the mode's top four bits.
 const indexModeDirectory = 0o040000
 
-// trackedIndex is every path a repository's index tracks, sorted as the index sorts them, by bytes, each once.
+// trackedIndex is every path a repository's index tracks, sorted as the index sorts them, by bytes, each once, and
+// every entry it holds with its mode, which TrackedIgnoredDigest reads.
 type trackedIndex struct {
 	paths []string
+
+	// entries is every entry of the index, each stage of a conflict its own, sorted by path and then mode, so two
+	// indexes that track the same paths at the same modes hold the same entries whatever order git wrote them in.
+	entries []indexEntry
+}
+
+// indexEntry is one entry of an index: its path and its mode, which says whether it is a file, an executable, a
+// symbolic link or a gitlink, a submodule's commit.
+type indexEntry struct {
+	path string
+	mode uint32
 }
 
 // tracks reports whether relativePath is tracked, or is a directory holding a tracked path, which is what git's
@@ -132,11 +145,11 @@ func readRepositoryIndex(marker string, isDirectory bool) (*trackedIndex, string
 	if readError != nil {
 		return nil, indexPath, fmt.Errorf("%w: reading %s: %w", ErrNoIndex, indexPath, readError)
 	}
-	paths, parseError := parseIndex(contents, hashSize)
+	index, parseError := parseIndex(contents, hashSize)
 	if parseError != nil {
 		return nil, indexPath, fmt.Errorf("gitignore: %s %w", indexPath, parseError)
 	}
-	return &trackedIndex{paths: paths}, indexPath, nil
+	return index, indexPath, nil
 }
 
 // objectFormatOf is the size of the repository's object names, in bytes, which every index entry and the index's
@@ -220,10 +233,10 @@ func configurationValue(raw string) string {
 	return strings.TrimSpace(value.String())
 }
 
-// parseIndex reads an index of version 2, 3 or 4 whose object names are hashSize bytes, and returns every path it
-// tracks, each once, sorted by bytes. Every entry is a tracked path whatever its flags say: each stage of a conflict,
-// a skip-worktree entry and an intent-to-add entry alike, as git's check-ignore reads them.
-func parseIndex(contents []byte, hashSize int) ([]string, error) {
+// parseIndex reads an index of version 2, 3 or 4 whose object names are hashSize bytes: every path it tracks, each
+// once, sorted by bytes, and every entry with its mode. Every entry is a tracked path whatever its flags say: each
+// stage of a conflict, a skip-worktree entry and an intent-to-add entry alike, as git's check-ignore reads them.
+func parseIndex(contents []byte, hashSize int) (*trackedIndex, error) {
 	if len(contents) < 12+hashSize || !bytes.Equal(contents[:4], indexSignature) {
 		return nil, fmt.Errorf("%w: it does not open with git's DIRC signature", ErrMalformedIndex)
 	}
@@ -241,6 +254,7 @@ func parseIndex(contents []byte, hashSize int) ([]string, error) {
 	// one allocation for its names rather than one per entry. Version 4's are rebuilt from the previous path.
 	text := string(body)
 	paths := make([]string, 0, entryCount)
+	entries := make([]indexEntry, 0, entryCount)
 	offset := 12
 	previous := ""
 	for entry := uint32(0); entry < entryCount; entry++ {
@@ -299,6 +313,7 @@ func parseIndex(contents []byte, hashSize int) ([]string, error) {
 		if strings.HasSuffix(name, "/") {
 			return nil, ErrSparseIndex
 		}
+		entries = append(entries, indexEntry{path: name, mode: mode})
 		// The stages of one conflicted path sit together; the path is tracked once.
 		if len(paths) == 0 || paths[len(paths)-1] != name {
 			paths = append(paths, name)
@@ -314,7 +329,13 @@ func parseIndex(contents []byte, hashSize int) ([]string, error) {
 		slices.Sort(paths)
 		paths = slices.Compact(paths)
 	}
-	return paths, nil
+	slices.SortStableFunc(entries, func(left indexEntry, right indexEntry) int {
+		if order := strings.Compare(left.path, right.path); order != 0 {
+			return order
+		}
+		return cmp.Compare(left.mode, right.mode)
+	})
+	return &trackedIndex{paths: paths, entries: entries}, nil
 }
 
 // verifyIndexChecksum holds the index to its trailing checksum, which git writes over everything before it. One that

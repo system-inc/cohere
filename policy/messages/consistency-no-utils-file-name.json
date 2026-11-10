@@ -1,0 +1,12 @@
+{
+    "rules": {
+        "TypeScript": "nexus/consistency-no-utils-file-name",
+        "Swift": "cohere-swift/consistency-no-utils-file-name",
+        "Go": "cohere-go/consistency-no-utils-file-name"
+    },
+    "messages": {
+        "utilsFileName": {
+            "text": "File name \"{{fileName}}\" holds \"{{word}}\", which names nothing in particular, so the file collects whatever has no other home. Name the file for what it holds, or at the least spell the word \"{{replacement}}\", as the house spells it in a folder's name."
+        }
+    }
+}

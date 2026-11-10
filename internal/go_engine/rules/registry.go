@@ -20,6 +20,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_buffered_wait_delay"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_kill_by_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_require_escape_hatch_reason"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_file_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_ambiguous_identifier"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_any"
@@ -44,6 +45,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_uppercase_initialism"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_use_before_define"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_useless_concatenation"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_utils_file_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_utils_folder"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_warning_comment"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_default_last"
@@ -571,6 +573,7 @@ func House() []rule.Rule {
 		concurrency_no_buffered_wait_delay.Rule,
 		concurrency_no_kill_by_name.Rule,
 		concurrency_require_escape_hatch_reason.Rule,
+		consistency_no_abbreviated_file_name.Rule,
 		consistency_no_abbreviated_identifier.Rule,
 		consistency_no_ambiguous_identifier.Rule,
 		consistency_no_any.Rule,
@@ -595,6 +598,7 @@ func House() []rule.Rule {
 		consistency_no_uppercase_initialism.Rule,
 		consistency_no_use_before_define.Rule,
 		consistency_no_useless_concatenation.Rule,
+		consistency_no_utils_file_name.Rule,
 		consistency_no_utils_folder.Rule,
 		consistency_no_warning_comment.Rule,
 		consistency_require_default_last.Rule,

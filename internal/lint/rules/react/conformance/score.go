@@ -13,7 +13,7 @@ import (
 // distinguish a right answer from a wrong one. Nothing implements it yet, which is the point: the
 // instrument goes down before the thing it measures.
 //
-// An implementation that cannot handle a fixture returns ErrUnsupported rather than an empty
+// An implementation that cannot handle a fixture returns UnsupportedError rather than an empty
 // result. An empty result is a claim ("I found no errors here"), and for a corpus where every
 // fixture expects at least one error, that claim is a wrong answer. Declining is a different fact
 // and gets counted in a different column.
@@ -145,7 +145,7 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 
 		result, analyzeError := implementation.Analyze(fixture)
 		if analyzeError != nil {
-			var unsupported *ErrUnsupported
+			var unsupported *UnsupportedError
 			if asUnsupported(analyzeError, &unsupported) {
 				score.Declined++
 				score.Fixtures = append(score.Fixtures, FixtureScore{
@@ -176,13 +176,13 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 	return score, nil
 }
 
-// asUnsupported reports whether an *ErrUnsupported is in the chain err unwraps to.
+// asUnsupported reports whether an *UnsupportedError is in the chain err unwraps to.
 //
-// Mutates: target receives the *ErrUnsupported found, as errors.As fills its target
-func asUnsupported(candidateError error, target **ErrUnsupported) bool {
+// Mutates: target receives the *UnsupportedError found, as errors.As fills its target
+func asUnsupported(candidateError error, target **UnsupportedError) bool {
 	current := candidateError
 	for current != nil {
-		if unsupported, ok := current.(*ErrUnsupported); ok {
+		if unsupported, ok := current.(*UnsupportedError); ok {
 			*target = unsupported
 			return true
 		}

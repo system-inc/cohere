@@ -1,0 +1,13 @@
+{
+    "why": "af05: a Go test file's `_test` is set aside, so the word the name ends on is its own, and `error_msg_test` is reported by the suffix form. Go form only",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "error_msg_test",
+    "languages": [
+        "go"
+    ]
+}

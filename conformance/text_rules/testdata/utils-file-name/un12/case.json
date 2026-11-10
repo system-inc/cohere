@@ -1,0 +1,10 @@
+{
+    "why": "un12: a generated file's name is its generator's, and is not judged: the `.generated` marker in TypeScript and Swift",
+    "expect": [],
+    "options": {},
+    "path": "Util.generated",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

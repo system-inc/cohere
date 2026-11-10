@@ -1,0 +1,13 @@
+{
+    "why": "af01: `msg` opening a camelCase name is reported, read as the identifier `msgPrinter` is",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "msgPrinter",
+    "languages": [
+        "typescript"
+    ]
+}
