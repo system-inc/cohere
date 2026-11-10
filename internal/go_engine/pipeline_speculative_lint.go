@@ -18,7 +18,8 @@ import (
 // A run that fixes keeps the pass while its fixes leave the load standing. The long-line wrap runs beside it and
 // stops it only when it writes a file (wrapAfterLoad), before rereading what it wrote, since the pass reads the held
 // bytes and is of a tree no longer on disk; the load after the write starts a pass of its own. The rename takes the
-// pass as the lint over the first load it decides from (runRename), and a rename that writes lints its proof after.
+// pass as the lint over the first load it decides from (runRename), and a rename that writes lints a load of what
+// it wrote after.
 //
 // It has two known costs. A run whose load ends with any diagnostic is slower than one that lints after the load,
 // since the rules ran beside the load on every package it made final and all of that work is dropped: measured, a

@@ -64,6 +64,8 @@ func (engine *pipeline) runStdin(output io.Writer) int {
 	// When the wrap changed the buffer and the renames are named, this is a load of the wrapped buffer, so a name is
 	// spelled from the bytes its finding's position is in.
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, names)
+	// Ignored: a save's rename only names what it leaves, and the error it returns is the load's, which the load
+	// said on stderr already; the save answers with its buffer either way.
 	engine.runRename(loaded, loadError)
 	if engine.fix.known != nil {
 		// A save looks up one file's verdict, and the record keeps only what a run read or learned, so kept as it is it
