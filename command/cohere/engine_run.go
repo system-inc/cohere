@@ -192,6 +192,10 @@ type engineLintRecord struct {
 	// Builds is every build the Go engine checked when it checked more than one, the host's first, additive within
 	// contract 3. A run of one build and a Swift engine send none, which decodes as nil and prints nothing.
 	Builds []checkedBuild `json:"builds"`
+	// OffReasons is why the settings turn each rule off, for each off the Go engine's settings explain, additive
+	// within contract 3 (#v11k0g2). Nil from an engine that never explains its offs, a Swift engine's, so only an
+	// engine that sends it can say a rule is off with no reason given.
+	OffReasons map[string]string `json:"offReasons"`
 }
 
 type enginePhaseRecord struct {
@@ -1021,6 +1025,12 @@ func classifyEngineCoverage(record *engineLintRecord, language engineLanguage) (
 		case record.RulesScopedOff[name] > 0:
 			entry.Category = coverageOffByTheConfiguration
 			entry.Details = []string{fmt.Sprintf("%d files", record.RulesScopedOff[name])}
+			// Why it is off, from the settings that said so, as a TypeScript run prints it.
+			if reason := record.OffReasons[name]; reason != "" {
+				entry.Details = append(entry.Details, "off because "+reason)
+			} else if record.OffReasons != nil {
+				entry.OffWithoutReason = true
+			}
 		default:
 			entry.Category = coverageListenedToNothing
 		}

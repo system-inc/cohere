@@ -44,6 +44,10 @@ changed in cohere outside the sets is written under the same heading.
 
 ### Added
 
+- A settings file's go block takes reasons, why each rule it turns off is off, in a sentence, as the TypeScript
+  block's reasons say it. Coverage prints the reason beside the rule. In a root that governs a module of ours, one
+  whose path is under github.com/system-inc/, an off with no reason is refused at load, and outside our tiers an off
+  is the project's to make, marked in coverage as off with no reason given.
 - `--duplicates`, a report beside `--unused` of functions that compute the same thing, written more than once
   (#jfvhbj7). Each function's canonical IR is hashed (TypeScript through the high-level IR, Go through the IR the
   live rules read), and functions with one digest at size 11 and up are grouped, every member named file:line.

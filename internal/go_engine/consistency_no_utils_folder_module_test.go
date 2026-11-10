@@ -24,7 +24,7 @@ import (
 func utilsModuleFindings(test *testing.T, directory string) []string {
 	test.Helper()
 	rulesForModule := []rule.Rule{consistency_no_utils_folder.Rule}
-	ruleSettings, settingsError := settings.Load(directory, "", knownRuleNames(rulesForModule))
+	ruleSettings, settingsError := settings.Load(directory, "", knownRuleNames(rulesForModule), nil)
 	if settingsError != nil {
 		test.Fatalf("the module's settings are refused: %v", settingsError)
 	}

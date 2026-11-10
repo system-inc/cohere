@@ -851,6 +851,14 @@ kept: the package rules, a typed verdict sourcekitd answered, a typed verdict fo
 described, a verdict holding a rule's failure, and a file whose text moved during the run. Under
 `--no-cache` nothing is read or kept, and the count is 0.
 
+The Go engine's lint record carries `offReasons` (#v11k0g2), additive within contract 3 and the Go
+engine's alone: for each rule the settings' go block turns off and explains under its `reasons`, the
+reason, as `"offReasons":{"cohere-go/consistency-no-utils-file-name":"Off until ..."}`. It is always
+written, `{}` when no off is explained, so a front door tells an engine that explains its offs from one
+that never does: it prints a reason beside its rule in the coverage, as `off because ...`, and marks a
+rule off with no reason given, which only a project outside our tiers can have. A Swift engine writes
+none, and its offs are marked neither way.
+
 The Go engine's lint record carries one more field, additive within contract 3 as the types record's
 are, so a front door that does not read it yet loses only what it counts:
 `"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1,"factsSkipped":0,"waves":1}`.

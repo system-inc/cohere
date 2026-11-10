@@ -12,6 +12,10 @@
         "rules": {
             "cohere-go/consistency-no-abbreviated-file-name": "off",
             "cohere-go/consistency-no-utils-file-name": "off"
+        },
+        "reasons": {
+            "cohere-go/consistency-no-abbreviated-file-name": "Off until #2xt6v5r's step 3 renames the files it names, the intermediate representation's util.go among them, and turns it back on.",
+            "cohere-go/consistency-no-utils-file-name": "Off until #2xt6v5r's step 3 splits the intermediate representation's util.go by what each part holds, and turns it back on."
         }
     }
 }

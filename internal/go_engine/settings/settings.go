@@ -17,6 +17,19 @@
 // Which options loosen a rule is the rule's to say, so this layer holds a departure to naming a known rule with a
 // reason that isn't blank, and the engine refuses a loosening option without one, and one that loosens nothing.
 //
+// And reasons, why the block turns each of its offs off, in a sentence, as the TypeScript block's `reasons` says it:
+//
+//	{ "go": {
+//		"rules": { "cohere-go/consistency-no-utils-file-name": "off" },
+//		"reasons": { "cohere-go/consistency-no-utils-file-name": "The IR's util.go splits in #2xt6v5r's step 3." }
+//	} }
+//
+// Inside our tiers every off owes its reason, and a block that turns a rule off without one is refused at load. A Go
+// root is inside them when a module it governs is ours by its path (internal/our_tiers): Go has no set to extend, so
+// it is the module that says whose code it is (#v11k0g2). Outside them an off is the project's to make, with or
+// without a reason. Either way coverage prints the reason beside the rule, and an entry that explains nothing, blank,
+// for a rule the block does not turn off, or beside a departure for the same rule, is refused.
+//
 // When the root has no config, every house rule runs at error. That is not the permissive default the
 // TypeScript loader refuses, because every rule runs, and the note says so on every run, so a missing
 // config never reads as a configured clean tree. A config that exists and cannot be read is an error, never
@@ -34,6 +47,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/our_tiers"
 )
 
 // Severity is how strongly a rule's findings count, spelled as the contract prints it.
@@ -74,6 +89,9 @@ type Settings struct {
 	// go block's departures, and is empty when it gives none.
 	Departures map[string]string
 
+	// OffReasons maps each rule the go block turns off to why, from its reasons, and is empty when it gives none.
+	OffReasons map[string]string
+
 	// Note is empty when a go block was read. Otherwise it is the sentence the lint record carries as
 	// `configNote`, naming the defaults in force and where a config would go.
 	Note string
@@ -93,8 +111,9 @@ func Path(root string, explicitPath string) string {
 }
 
 // Load reads the settings for the engine rooted at root, from the file Path names. knownRules is every rule name
-// the engine runs, and a key outside it is refused.
-func Load(root string, explicitPath string, knownRules []string) (Settings, error) {
+// the engine runs, and a key outside it is refused. modulePaths are the modules the root governs
+// (project.ModulePaths): when one is ours, every off the block makes must say why.
+func Load(root string, explicitPath string, knownRules []string, modulePaths []string) (Settings, error) {
 	path := Path(root, explicitPath)
 	contents, readError := os.ReadFile(path)
 	if errors.Is(readError, fs.ErrNotExist) {
@@ -108,7 +127,7 @@ func Load(root string, explicitPath string, knownRules []string) (Settings, erro
 	if readError != nil {
 		return Settings{}, fmt.Errorf("reading %s: %w", path, readError)
 	}
-	return parse(contents, path, knownRules)
+	return parse(contents, path, knownRules, modulePaths)
 }
 
 // rootManifest is the file that makes root a Go root, so the note says where a config would sit: go.work for
@@ -135,7 +154,7 @@ func defaults(knownRules []string, note string) Settings {
 // Each level decodes into a map of raw values first, the way the TypeScript loader checks its keys, because
 // `encoding/json` drops a key a struct does not name without a word, and a dropped key is a setting that
 // looks chosen and does nothing.
-func parse(contents []byte, path string, knownRules []string) (Settings, error) {
+func parse(contents []byte, path string, knownRules []string, modulePaths []string) (Settings, error) {
 	var document map[string]json.RawMessage
 	if decodeError := json.Unmarshal(contents, &document); decodeError != nil {
 		var typeError *json.UnmarshalTypeError
@@ -164,14 +183,14 @@ func parse(contents []byte, path string, knownRules []string) (Settings, error) 
 	}
 	var unknownKeys []string
 	for key := range block {
-		if key != "rules" && key != "departures" {
+		if key != "rules" && key != "departures" && key != "reasons" {
 			unknownKeys = append(unknownKeys, fmt.Sprintf("%q", key))
 		}
 	}
 	if len(unknownKeys) > 0 {
 		sort.Strings(unknownKeys)
 		return Settings{}, fmt.Errorf("reading %s: the go block declares %s, which the Go engine does not read, so "+
-			"the key would configure nothing. The go block takes \"rules\" and \"departures\"", path,
+			"the key would configure nothing. The go block takes \"rules\", \"departures\" and \"reasons\"", path,
 			strings.Join(unknownKeys, ", "))
 	}
 	rawRules, hasRules := block["rules"]
@@ -207,16 +226,98 @@ func parse(contents []byte, path string, knownRules []string) (Settings, error) 
 		settings.Rules[name] = setting
 	}
 
-	rawDepartures, hasDepartures := block["departures"]
-	if !hasDepartures {
-		return settings, nil
+	if rawDepartures, hasDepartures := block["departures"]; hasDepartures {
+		departures, departuresError := parseDepartures(rawDepartures, known)
+		if departuresError != nil {
+			return Settings{}, fmt.Errorf("reading %s: %w", path, departuresError)
+		}
+		settings.Departures = departures
 	}
-	departures, departuresError := parseDepartures(rawDepartures, known)
-	if departuresError != nil {
-		return Settings{}, fmt.Errorf("reading %s: %w", path, departuresError)
+	if rawReasons, hasReasons := block["reasons"]; hasReasons {
+		offReasons, reasonsError := parseOffReasons(rawReasons, known, settings)
+		if reasonsError != nil {
+			return Settings{}, fmt.Errorf("reading %s: %w", path, reasonsError)
+		}
+		settings.OffReasons = offReasons
 	}
-	settings.Departures = departures
+	if unreasonedError := refuseUnreasonedOffs(settings, names, modulePaths); unreasonedError != nil {
+		return Settings{}, fmt.Errorf("reading %s: %w", path, unreasonedError)
+	}
 	return settings, nil
+}
+
+// parseOffReasons reads the go block's reasons, each a rule the block turns off and why, in a sentence. An entry that
+// explains nothing is refused, so the list cannot rot: one for a rule the engine does not know, one whose reason is
+// blank or not a string, one for a rule the block does not turn off in its own rules, and one beside a departure for
+// the same rule, which already says why. settings holds the block's rules and departures, read already.
+func parseOffReasons(value json.RawMessage, known map[string]bool, settings Settings) (map[string]string, error) {
+	entries, isObject := decodeObject(value)
+	if !isObject {
+		return nil, fmt.Errorf("the go block's reasons is %s, which is not an object of each off's reason", value)
+	}
+	// Sorted, so a file with two bad entries names the same one on every run.
+	names := make([]string, 0, len(entries))
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	offReasons := make(map[string]string, len(entries))
+	for _, name := range names {
+		if !known[name] {
+			return nil, fmt.Errorf("the go block's reasons name %q, which is not a rule the Go engine knows, so the "+
+				"reason would explain nothing", name)
+		}
+		var reason string
+		if jsonKind(entries[name]) != '"' || json.Unmarshal(entries[name], &reason) != nil {
+			return nil, fmt.Errorf("the reason for %q is %s, which is not a sentence written as a string", name,
+				entries[name])
+		}
+		if strings.TrimSpace(reason) == "" {
+			return nil, fmt.Errorf("the go block's reasons name %q and give no reason: say why the rule is off, in "+
+				"a sentence", name)
+		}
+		if settings.Rules[name].Severity != SeverityOff {
+			return nil, fmt.Errorf("the go block's reasons name %q, which its rules do not turn off: a reason "+
+				"belongs to the off it explains, so remove the entry", name)
+		}
+		if _, departs := settings.Departures[name]; departs {
+			return nil, fmt.Errorf("the go block names %q under both \"reasons\" and \"departures\": the "+
+				"departure's reason already says why, so remove the \"reasons\" entry", name)
+		}
+		offReasons[name] = reason
+	}
+	return offReasons, nil
+}
+
+// refuseUnreasonedOffs refuses a block that turns a rule off with no reason, when a module the root governs is ours
+// (internal/our_tiers). An off with no reason reads as a decision while recording none, and inside our tiers every
+// off owes its why, as the TypeScript loader holds it (#v11k0g2). written are the rules the block names, sorted.
+func refuseUnreasonedOffs(settings Settings, written []string, modulePaths []string) error {
+	ours := ""
+	for _, modulePath := range modulePaths {
+		if our_tiers.OwnsModule(modulePath) {
+			ours = modulePath
+			break
+		}
+	}
+	if ours == "" {
+		return nil
+	}
+	var unreasoned []string
+	for _, name := range written {
+		if settings.Rules[name].Severity != SeverityOff {
+			continue
+		}
+		if _, reasoned := settings.OffReasons[name]; !reasoned {
+			unreasoned = append(unreasoned, fmt.Sprintf("%q", name))
+		}
+	}
+	if len(unreasoned) == 0 {
+		return nil
+	}
+	return fmt.Errorf("the go block turns off %s with no reason, and %s is one of our modules (%s), where every off "+
+		"says why: add a sentence for each under the go block's \"reasons\"", strings.Join(unreasoned, ", "), ours,
+		our_tiers.ModulePrefix)
 }
 
 // parseDepartures reads the go block's departures, each a known rule and the reason the project loosens it. A

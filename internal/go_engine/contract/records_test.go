@@ -39,7 +39,7 @@ var fieldsNotWritten = map[Kind][]string{
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
 	KindFix:   {"notWritten"},
-	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds"},
+	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds", "offReasons"},
 	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation"},
 }
 
@@ -52,6 +52,7 @@ var dictionaryFields = map[string]bool{
 	"rulesScopedOff":        true,
 	"filesNotChecked":       true,
 	"skipped":               true,
+	"offReasons":            true,
 	"withheldBySuppression": true,
 	"withheldAsGenerated":   true,
 	"withheldAsCopied":      true,
@@ -334,6 +335,7 @@ func populatedRecords() []Record {
 				{Target: "darwin/arm64 cgo", Host: true, CompiledFiles: 2, AnalyzedPackages: 1},
 				{Target: "windows/arm64", CompiledFiles: 2, AnalyzedPackages: 1, FindingsAdded: 1},
 			},
+			OffReasons: map[string]string{"cohere-go/printf": "a reason"},
 		},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
 		RuleRecord{Name: "cohere-go/printf", Severity: "error"},

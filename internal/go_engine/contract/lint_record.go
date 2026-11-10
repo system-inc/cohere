@@ -40,6 +40,11 @@ type LintRecord struct {
 	// Builds is additive within contract 3: every build a run checked when it checked more than one, the host's first
 	// (#72n9mq0). It is absent for a run of one build, so such a run writes the record it always has.
 	Builds []BuildRecord `json:"builds,omitempty"`
+	// OffReasons is additive within contract 3, and the Go engine's alone: why the settings turn each rule off, for
+	// every off the go block's reasons explain (#v11k0g2), which the front door prints beside the rule in coverage.
+	// Always written, `{}` when no off is explained, so a reader tells an engine that explains its offs, where a rule
+	// off and not named here has no reason, from one that never does, a Swift engine's.
+	OffReasons map[string]string `json:"offReasons"`
 }
 
 // BuildRecord is what one build of a run covered, and what the merge of every build's findings kept of it.
@@ -107,6 +112,9 @@ func (record LintRecord) MarshalJSON() ([]byte, error) {
 	}
 	if counted.WithheldAsCopied == nil {
 		counted.WithheldAsCopied = map[string]int{}
+	}
+	if counted.OffReasons == nil {
+		counted.OffReasons = map[string]string{}
 	}
 	return encodeWithoutHtmlEscaping(counted)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -827,4 +828,43 @@ func TestARuleThatSkippedSomeFilesStillNeedsActionForTheRest(test *testing.T) {
 		"  skipped: "+ruleName+": skipped on 1 file, strictNullChecks is off\n",
 		"  no listener: rule "+ruleName+" was offered 3 files and registered no listener on any",
 	)
+}
+
+// TestAGoOffReadsItsReasonInCoverage: a rule the Go settings turn off reads in coverage with the reason its go block
+// gave, as a TypeScript off does, and one turned off with no reason is marked so, which only a project outside our
+// tiers can have (#v11k0g2). A record with no offReasons, a Swift engine's, marks neither: it never explains its offs.
+func TestAGoOffReadsItsReasonInCoverage(test *testing.T) {
+	test.Parallel()
+	entryOf := func(record *engineLintRecord, name string) ruleCoverageEntry {
+		test.Helper()
+		summary, classifyError := classifyEngineCoverage(record, goLanguage("module"))
+		if classifyError != nil {
+			test.Fatal(classifyError)
+		}
+		for _, entry := range summary.Entries {
+			if entry.Name == name {
+				return entry
+			}
+		}
+		test.Fatalf("no coverage entry for %s in %+v", name, summary.Entries)
+		return ruleCoverageEntry{}
+	}
+	offRecord := func(offReasons map[string]string) *engineLintRecord {
+		return &engineLintRecord{
+			RulesRun: 2, RulesSilent: []string{"reasoned", "unreasoned"},
+			RulesScopedOff: map[string]int{"reasoned": 4, "unreasoned": 4}, OffReasons: offReasons,
+		}
+	}
+
+	explained := offRecord(map[string]string{"reasoned": "The parser tables are one unit."})
+	reasoned := entryOf(explained, "reasoned")
+	if !slices.Contains(reasoned.Details, "off because The parser tables are one unit.") || reasoned.OffWithoutReason {
+		test.Errorf("the reasoned off reads %+v, want its reason beside it", reasoned)
+	}
+	if unreasoned := entryOf(explained, "unreasoned"); !unreasoned.OffWithoutReason {
+		test.Errorf("an off with no reason from an engine that explains its offs is not marked: %+v", unreasoned)
+	}
+	if swift := entryOf(offRecord(nil), "unreasoned"); swift.OffWithoutReason {
+		test.Errorf("an off from an engine that never explains its offs is marked as having no reason: %+v", swift)
+	}
 }
