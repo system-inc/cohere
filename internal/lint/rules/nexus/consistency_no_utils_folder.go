@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -31,6 +32,8 @@ func messageUtilsFolder(folder string) rule.Message {
 // ConsistencyNoUtilsFolder bans a folder named `util` or `utils` inside the project, in any casing and
 // with any leading underscores: a folder's name is judged lowercased with its leading underscores
 // removed, the verdict every engine gives in the text rules corpus (#4b337jk, family `utils-folder`).
+// The reading is file_name_words.IsUtils, which nexus/consistency-no-utils-file-name reads too, so a
+// folder and a file are refused the same word.
 //
 // The abbreviation is the smaller half of the problem. A folder named for nothing in particular
 // collects everything, and "utilities" is not meaningfully better at that, but the spelling is what
@@ -84,24 +87,11 @@ func outermostUtilsFolder(projectRoot string, fileName string) (string, bool) {
 		return "", false
 	}
 	for _, folder := range folders {
-		if isUtilsFolder(folder) {
+		if file_name_words.IsUtils(folder) {
 			return folder, true
 		}
 	}
 	return "", false
-}
-
-// isUtilsFolder reports whether a folder's name, lowercased with its leading underscores removed, is
-// `util` or `utils`.
-//
-// The name is matched whole: `utilities`, `myutils` and `utilsomething` pass, since a rule that fires on
-// the spelling it is asking for is worse than no rule.
-func isUtilsFolder(folder string) bool {
-	switch strings.ToLower(strings.TrimLeft(folder, "_")) {
-	case "util", "utils":
-		return true
-	}
-	return false
 }
 
 // utilsFolderReplacement is the name to use instead of a banned folder: the same leading underscores, then

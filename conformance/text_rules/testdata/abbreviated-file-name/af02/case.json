@@ -1,0 +1,13 @@
+{
+    "why": "af02: `msg` opening a snake_case name is reported, the name read as the identifier `msgPrinter`",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "msg_printer",
+    "languages": [
+        "go"
+    ]
+}

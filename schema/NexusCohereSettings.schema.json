@@ -629,6 +629,9 @@
                 "nexus/concurrency-no-lost-update": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/consistency-no-abbreviated-file-name": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/consistency-no-abbreviated-identifier": {
                     "$ref": "#/$defs/ruleSetting"
                 },
@@ -675,6 +678,9 @@
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "nexus/consistency-no-stuttering-name": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "nexus/consistency-no-utils-file-name": {
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "nexus/consistency-no-utils-folder": {

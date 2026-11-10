@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/go_engine/rules)"
     },
-    "count": 789,
+    "count": 795,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -6414,6 +6414,14 @@
             "typeAware": true
         },
         {
+            "name": "cohere-go/consistency-no-abbreviated-file-name",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
             "name": "cohere-go/consistency-no-abbreviated-identifier",
             "language": "Go",
             "namespace": "cohere-go",
@@ -6602,6 +6610,14 @@
         },
         {
             "name": "cohere-go/consistency-no-useless-concatenation",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-utils-file-name",
             "language": "Go",
             "namespace": "cohere-go",
             "origin": "house",
@@ -7103,6 +7119,15 @@
             "typeAware": false
         },
         {
+            "name": "cohere-swift/consistency-no-abbreviated-file-name",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": ["nexus/consistency-no-abbreviated-file-name"]
+        },
+        {
             "name": "cohere-swift/consistency-no-abbreviated-identifier",
             "language": "Swift",
             "namespace": "cohere-swift",
@@ -7200,6 +7225,15 @@
             "category": "consistency",
             "typeAware": false,
             "typeScriptRules": ["nexus/consistency-no-stuttering-name"]
+        },
+        {
+            "name": "cohere-swift/consistency-no-utils-file-name",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": ["nexus/consistency-no-utils-file-name"]
         },
         {
             "name": "cohere-swift/consistency-no-utils-folder",
@@ -8301,6 +8335,23 @@
             }
         },
         {
+            "name": "nexus/consistency-no-abbreviated-file-name",
+            "language": "TypeScript",
+            "namespace": "nexus",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "options": {
+                "elements": "one",
+                "anchorsPaths": true
+            },
+            "messageIds": ["abbreviatedFileName", "abbreviatedFileNameAdvice"],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-no-abbreviated-file-name"
+            }
+        },
+        {
             "name": "nexus/consistency-no-abbreviated-identifier",
             "language": "TypeScript",
             "namespace": "nexus",
@@ -8979,6 +9030,23 @@
             "swift": {
                 "verdict": "Ported",
                 "swiftRule": "cohere-swift/consistency-no-stuttering-name"
+            }
+        },
+        {
+            "name": "nexus/consistency-no-utils-file-name",
+            "language": "TypeScript",
+            "namespace": "nexus",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "options": {
+                "elements": "one",
+                "anchorsPaths": true
+            },
+            "messageIds": ["utilsFileName"],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-no-utils-file-name"
             }
         },
         {

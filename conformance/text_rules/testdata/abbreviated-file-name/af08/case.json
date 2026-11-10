@@ -1,0 +1,9 @@
+{
+    "why": "af08: `next-env.d.ts` is the file Next.js writes at the project root under its own name, so it is not judged, where `nextEnv` would hold the word `Env`. TypeScript form only",
+    "expect": [],
+    "options": {},
+    "path": "next-env.d",
+    "languages": [
+        "typescript"
+    ]
+}

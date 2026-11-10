@@ -68,6 +68,14 @@ var allowedRuleImports = map[string]bool{
 	// Measured on 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a
 	// load average of about 24 to 34: 0.24 to 0.26s, and `go build -v` shows it is the only package rebuilt.
 	"github.com/system-inc/cohere/internal/folder_words": true,
+	// The file-name judgment nexus/consistency-no-utils-file-name and nexus/consistency-no-abbreviated-file-name share
+	// with their Go engine twins: a file name's words, and what the utils word and the abbreviation vocabulary make
+	// of them (#2xt6v5r). It imports only the standard library, internal/folder_words and
+	// internal/naming/abbreviation, both on this list, so it is a leaf by its imports, and it changes only when the
+	// shared judgment does. Measured on 2026-11-09, three rounds of `go build -v ./internal/lint/registry` after a
+	// one-comment edit, under a load average of about 39: `go build -v` names it as the only package rebuilt each
+	// time, and the build itself took 0.49s to under a second once cohere-dev's queue for a token was taken out.
+	"github.com/system-inc/cohere/internal/file_name_words": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.

@@ -1,0 +1,13 @@
+{
+    "why": "un04: a Go test file's `_test` is go test's, and the name before it is the author's, so `util_test.go` is reported. Go form only: no other language marks a test so",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "util_test",
+    "languages": [
+        "go"
+    ]
+}

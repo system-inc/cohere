@@ -1,0 +1,11 @@
+{
+    "why": "un08: a file named for what it holds passes",
+    "expect": [],
+    "options": {},
+    "path": "formatting",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

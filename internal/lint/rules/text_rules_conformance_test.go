@@ -25,11 +25,14 @@ var textRulesHouseSets = []string{configuration.TypeScriptSetName, configuration
 // sets leave them off: `nexus/consistency-no-abbreviated-identifier` and
 // `nexus/consistency-require-identifier-casing` live in `cohere:system-inc/base` and
 // `cohere:system-inc/structure`, and `base/consistency-no-console` in `cohere:system-inc/base` alone. The
-// adapter turns them on the same way, with a bare severity.
+// adapter turns them on the same way, with a bare severity. The two file-name rules are off in
+// `cohere:style` until their census is routed (#2xt6v5r), and run here as they will once turned on.
 var textRulesProbeRules = map[string]string{
 	"nexus/consistency-no-abbreviated-identifier": "error",
 	"nexus/consistency-require-identifier-casing": "error",
 	"base/consistency-no-console":                 "error",
+	"nexus/consistency-no-utils-file-name":        "error",
+	"nexus/consistency-no-abbreviated-file-name":  "error",
 }
 
 // textRulesHouse is the house configuration loaded once per test, which each case's own file resolves through.

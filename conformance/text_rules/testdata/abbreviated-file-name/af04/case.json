@@ -1,0 +1,13 @@
+{
+    "why": "af04: a TypeScript role marker, `.test`, is set aside, so the word the name ends on is its own, and `errorMsg.test` is reported by the suffix form. TypeScript form only",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "errorMsg.test",
+    "languages": [
+        "typescript"
+    ]
+}

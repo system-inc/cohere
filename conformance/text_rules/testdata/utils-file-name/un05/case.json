@@ -1,0 +1,14 @@
+{
+    "why": "un05: a name's leading underscore separates no word, so `_utils` is reported. Go has no form: the go tool ignores a file whose name starts with `_`",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "_utils",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

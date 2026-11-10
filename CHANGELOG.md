@@ -17,6 +17,8 @@ changed in cohere outside the sets is written under the same heading.
 - On: `nexus/consistency-no-label (error)`
 - On: `nexus/consistency-no-warning-comment (error)`
 - On: `nexus/consistency-require-separated-folder-words (error)`
+- Off: `nexus/consistency-no-abbreviated-file-name`
+- Off: `nexus/consistency-no-utils-file-name`
 - Off: `no-labels`
 - Off: `no-warning-comments`
 - Setting changed: `reasons`
@@ -96,6 +98,23 @@ changed in cohere outside the sets is written under the same heading.
   still told to write `Variable` or say they mean the keyword. A name holding a keyword term and another
   abbreviation still reports the other. The list is decided once for every engine, and is never a project's
   `allowedSegments` entry.
+- A file's name is judged as a folder's is, in every engine, by two rules each with its corpus family
+  (#2xt6v5r): `consistency-no-utils-file-name` refuses `util` or `utils` as a word of the name (`util.go`,
+  `stringUtils.ts`, `ViewUtil.swift`, `util_test.go`), and `consistency-no-abbreviated-file-name` judges the
+  name's words by `policy/Abbreviations.json`, read as the identifier they spell (`cfg.go`, `msgPrinter.ts`).
+  A word in capitals alone is an initialism or a code (`FlagCH.tsx`), and `utils` right after `no` names a ban
+  on it (`consistency_no_utils_folder.go`), so neither is reported. A run of words that spells a registered
+  rule's name, upstream's for a port, is the rule's and is set aside, and only the words beside it are judged:
+  `max_lines.go` and `MaxClassesPerFileRule.ts` pass, `no_var_cfg.go` reports `cfg`. Only a name of two
+  words or more does: `config.ts` is judged though `react-hooks/config` is registered. TypeScript reads its
+  registry, Swift its own, and Go every engine's names from `docs/data/rules.json`, since a Go file in cohere is
+  named for the TypeScript rule it ports.
+  A name's words are cut at underscores, hyphens, dots, a Swift `+` and case, with what a tool reads set
+  aside (`_test`, `_linux`, `_amd64`, `.test`, `.d`, `.config`), and a generated file, a name a tool requires
+  (`doc.go`, `Package.swift`, Next.js's `page.tsx` and `next-env.d.ts`) and a file under `node_modules`,
+  `vendor`, `third_party` or `testdata` are never judged. `internal/file_name_words` is the one judgment the
+  TypeScript and Go rules read, and Swift ports it. Both are off in `cohere:style`, and the Go pair in cohere's
+  own settings, until their census is routed.
 
 ### Changed
 

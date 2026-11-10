@@ -1,0 +1,13 @@
+{
+    "why": "un02: `utils` as a word of a snake_case name is reported: an underscore separates two words",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "string_utils",
+    "languages": [
+        "go"
+    ]
+}

@@ -1,0 +1,15 @@
+{
+    "why": "un03: `Util` as the last word of a PascalCase name is reported, in any language that writes one",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "ViewUtil",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

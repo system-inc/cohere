@@ -1,0 +1,9 @@
+{
+    "why": "af07: a tool's `.config` marker is set aside, so `next.config` passes, where `nextConfig` would end on the word. TypeScript form only",
+    "expect": [],
+    "options": {},
+    "path": "next.config",
+    "languages": [
+        "typescript"
+    ]
+}

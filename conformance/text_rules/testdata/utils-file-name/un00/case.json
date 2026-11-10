@@ -1,0 +1,16 @@
+{
+    "why": "un00: the control, a file named `util` is reported once, at the file's start, in every language",
+    "control": true,
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "util",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

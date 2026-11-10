@@ -21,6 +21,11 @@
         "typeAware": false
     },
     {
+        "name": "cohere-swift/consistency-no-abbreviated-file-name",
+        "origin": "house",
+        "typeAware": false
+    },
+    {
         "name": "cohere-swift/consistency-no-abbreviated-identifier",
         "origin": "house",
         "typeAware": false
@@ -72,6 +77,11 @@
     },
     {
         "name": "cohere-swift/consistency-no-stuttering-name",
+        "origin": "house",
+        "typeAware": false
+    },
+    {
+        "name": "cohere-swift/consistency-no-utils-file-name",
         "origin": "house",
         "typeAware": false
     },

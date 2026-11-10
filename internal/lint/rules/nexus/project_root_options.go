@@ -11,7 +11,8 @@ import (
 // ProjectRootOptions is never written in a config, since the folder rules that take it take no options and its
 // decoder refuses any. It carries the project root the run discovered, the one place a rule learns it, so only the
 // folders inside the project are judged. nexus/consistency-no-utils-folder and
-// nexus/consistency-require-separated-folder-words both read it.
+// nexus/consistency-require-separated-folder-words read it, and so do nexus/consistency-no-utils-file-name and
+// nexus/consistency-no-abbreviated-file-name, to tell a folder of someone else's inside the project.
 type ProjectRootOptions struct {
 	// ProjectRoot is the project's absolute root, spelled as tspath spells a file name.
 	ProjectRoot string `json:"-"`

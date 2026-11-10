@@ -1,0 +1,10 @@
+{
+    "why": "af12: a file under a testdata folder is a test's input, and is not judged. Go has no form: the go tool never loads testdata",
+    "expect": [],
+    "options": {},
+    "path": "testdata/cfg",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

@@ -1,0 +1,10 @@
+{
+    "why": "af14: a file named for a registered rule holds the rule's name, upstream's for a port, so `max_lines`, ESLint's max-lines, passes where `maxLines` would open on the word `max`. Swift has no form: its engine reads its own registry, which holds no rule of that name",
+    "expect": [],
+    "options": {},
+    "path": "max_lines",
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}
