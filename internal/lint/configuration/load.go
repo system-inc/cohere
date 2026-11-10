@@ -310,8 +310,8 @@ func loadLayers(layers []configurationLayer, root string, registeredNames []stri
 		if checkReasonsError := checkReasons(layer); checkReasonsError != nil {
 			return nil, checkReasonsError
 		}
-		if refuseKeysReachingNoRuleError := refuseKeysReachingNoRule(layer, reach); refuseKeysReachingNoRuleError != nil {
-			return nil, refuseKeysReachingNoRuleError
+		if refuseError := refuseKeysReachingNoRule(layer, reach); refuseError != nil {
+			return nil, refuseError
 		}
 		for name, value := range layer.raw.Rules {
 			setting, parseRuleSettingError := parseRuleSetting(value)

@@ -26,7 +26,8 @@ func TestARuleKeyThatReachesNoRuleIsRefused(test *testing.T) {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			directory := writeConfigs(test, map[string]string{"CohereSettings.json": contents})
-			if _, loadForError := LoadFor(filepath.Join(directory, "CohereSettings.json"), registered); loadForError != nil {
+			settingsPath := filepath.Join(directory, "CohereSettings.json")
+			if _, loadForError := LoadFor(settingsPath, registered); loadForError != nil {
 				test.Fatalf("a key that reaches a rule was refused: %v", loadForError)
 			}
 		})
