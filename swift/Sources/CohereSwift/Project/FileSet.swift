@@ -54,7 +54,7 @@ public struct FileSet: Equatable, Sendable {
     /*
      The git index the set was decided with, read whole, and the directory of the repository its answers were asked
      for, which the inputs record names under `trackedIgnored` (`IgnoreRules.trackedIgnored`). Nil outside a
-     repository, and wherever the index stays keyed on its bytes.
+     repository, and when the index was not read whole, which then stays keyed on its bytes.
      */
     var trackedIgnored: InputsRecord.TrackedIgnored?
     /*
