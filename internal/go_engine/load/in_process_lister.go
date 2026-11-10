@@ -32,8 +32,11 @@ import (
 // It answers only what it can answer exactly. Anything go list would report as an error, a missing or ambiguous
 // import, a cycle, an internal package used from outside, an embed pattern that matches nothing, a file that does
 // not parse to its imports, and anything whose rules it does not carry, vendoring, a go.mod ignore directive, a
-// `GODEBUG` setting, a flag in `GOFLAGS` that changes what is listed, another target or another toolchain, is a
-// doubt, and a doubt is answered by go list itself, so a listing is never this lister's guess (see listInProcess).
+// `GODEBUG` setting, a flag in `GOFLAGS` that changes what is listed, a target whose commands link externally, another
+// compiler or another toolchain, is a doubt, and a doubt is answered by go list itself, so a listing is never this
+// lister's guess (see listInProcess). Every other target the toolchain builds for it answers, the host's and the
+// extra builds' alike (#37vy8cm): go/build matches each file to the target as go list does, and what the linker adds
+// to a command is the one other thing a target changes in the walk (linkerDependencies).
 type inProcessLister struct {
 	workspace   string
 	environment []string
@@ -590,8 +593,10 @@ func (lister *inProcessLister) readFrom(
 		}
 	}
 	if built.Name == "main" {
-		// The linker's one implicit dependency on the targets the lister answers for, with no flag that adds more.
-		addImport("runtime")
+		// The linker's implicit dependencies on the target, with no flag that adds more.
+		for _, each := range linkerDependencies(lister.context.GOARCH) {
+			addImport(each)
+		}
 	}
 	if len(written) > 0 {
 		listed.Imports = make([]string, len(written))
