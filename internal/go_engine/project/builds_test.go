@@ -504,6 +504,65 @@ func TestBuildsForSetsATagThatAloneCompilesNoProgram(test *testing.T) {
 	requireEachCompiledOnce(test, census, builds, unbuilt)
 }
 
+// adamic's oracles import cohere's internal packages, so only a build inside cohere's module compiles them, and no
+// build of adamic's ever can (#pwnv9qe): each, beside the tests and alone, is unbuilt for that import, named, at no
+// load's cost. An oracle importing only what its module may import keeps the reason it had, and one importing its own
+// module's internal package is no exception either.
+func TestBuildsForNamesAnInternalImportNoBuildOfTheModuleMayMake(test *testing.T) {
+	test.Parallel()
+	oracle := "//go:build lintoracle\n\npackage main\n\nimport (\n\t\"fmt\"\n\t\"example.com/cohere/internal/lint/rule\"\n)\n"
+	census := censusOf(test, map[string]string{
+		"rules/beside/build_test.go": "package assertions\n",
+		"rules/beside/oracle.go":     oracle,
+		"rules/alone/oracle.go":      oracle,
+		"rules/plain/build_test.go":  "package assertions\n",
+		"rules/plain/oracle.go": "//go:build lintoracle\n\npackage main\n\n" +
+			"import \"example.com/adamic/internal/shared\"\n",
+	})
+	census.Modules = []Module{{Directory: ".", Path: "example.com/adamic"}}
+	_, unbuilt := buildsFor(test, census, testHost, testPorts)
+	forbidden := "it imports example.com/cohere/internal/lint/rule, which only a build under example.com/cohere may " +
+		"import, so no build of this module compiles it"
+	want := map[string]string{
+		"rules/alone/oracle.go":  forbidden,
+		"rules/beside/oracle.go": forbidden,
+		"rules/plain/oracle.go": "a program of its own, package main beside package assertions, so no build of its " +
+			"directory's package compiles it",
+	}
+	got := map[string]string{}
+	for _, each := range unbuilt {
+		relative, relativeError := filepath.Rel(census.Root, each.File)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		got[filepath.ToSlash(relative)] = each.Reason
+	}
+	if !maps.Equal(got, want) {
+		test.Errorf("unbuilt are %v, want %v", got, want)
+	}
+}
+
+// go's internal rule is the final `internal` element's parent, and the standard library's own has none.
+func TestInternalParentIsTheFinalInternalElementsParent(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		importPath string
+		parent     string
+		isInternal bool
+	}{
+		{"example.com/cohere/internal/lint/rule", "example.com/cohere", true},
+		{"example.com/a/internal/b/internal/c", "example.com/a/internal/b", true},
+		{"internal/abi", "", true},
+		{"example.com/internalized/rule", "", false},
+	} {
+		parent, isInternal := internalParent(testCase.importPath)
+		if parent != testCase.parent || isInternal != testCase.isInternal {
+			test.Errorf("%s reads %q, %t, want %q, %t", testCase.importPath, parent, isInternal, testCase.parent,
+				testCase.isInternal)
+		}
+	}
+}
+
 // adamic's shape on a box (#h7m6zyp): a darwin-only file beside two tags, each named in a package of its own, as
 // stage3_split_metrics names a lone program and census_overlay an external test. darwin's build carries the host's
 // tags alone, so neither tag's type errors can cost it its linting, and each tag gets a build of its own on the host's

@@ -1,6 +1,8 @@
 package project
 
 import (
+	"go/parser"
+	"go/token"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -82,8 +84,12 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 		ignored := readingOf(read, nil).ignore
 		if name != "" && len(directoryPackages) > 0 && !directoryPackages[name] && !ignored {
 			besides := strings.Join(sortedKeys(directoryPackages), " and ")
-			unbuilt = append(unbuilt, Unbuilt{File: read.file, Reason: "a program of its own, package " + name +
-				" beside package " + besides + ", so no build of its directory's package compiles it"})
+			reason := "a program of its own, package " + name + " beside package " + besides + ", so no build of " +
+				"its directory's package compiles it"
+			if forbidden, found := forbiddenImport(read, census); found {
+				reason = forbidden
+			}
+			unbuilt = append(unbuilt, Unbuilt{File: read.file, Reason: reason})
 			programs = append(programs, program{read: read, name: name, besides: besides})
 			continue
 		}
@@ -182,7 +188,7 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 	builds = append(builds, sortedBuilds(chosen, host, platforms)...)
 	for index, read := range uncompiled {
 		if !coverable.has(index) {
-			reason, reasonError := unbuiltReason(read, host, ports, targets, programs, census.Root)
+			reason, reasonError := unbuiltReason(read, host, ports, targets, programs, census)
 			if reasonError != nil {
 				return nil, nil, reasonError
 			}
@@ -208,6 +214,76 @@ func listedBuilds(host Build, extraTargets []Port) []Build {
 		}
 	}
 	return listed
+}
+
+// forbiddenImport is why a file no build compiles could never be compiled in its module at all, when it imports an
+// internal package its own import path is outside the tree of: adamic's oracles import
+// github.com/system-inc/cohere/internal/lint/rule, so they are built only inside cohere's module, under an overlay
+// (adamic's docs/lint-registration.md), and no build of adamic's own compiles them (#pwnv9qe). go's rule is the
+// final `internal` element's parent: only a package at or under it may import. It reads the file's imports alone,
+// so it costs no load, and finds nothing for a file outside every module of the census.
+func forbiddenImport(read source, census Census) (string, bool) {
+	importer, inModule := importPathOf(filepath.Dir(read.file), census)
+	if !inModule {
+		return "", false
+	}
+	// Ignored: a header that does not parse yields the imports read before the error, and the load reports the error.
+	header, _ := parser.ParseFile(token.NewFileSet(), read.file, read.contents, parser.ImportsOnly)
+	if header == nil {
+		return "", false
+	}
+	for _, imported := range header.Imports {
+		importPath, unquoteError := strconv.Unquote(imported.Path.Value)
+		if unquoteError != nil {
+			continue
+		}
+		parent, isInternal := internalParent(importPath)
+		allowed := parent != "" && (importer == parent || strings.HasPrefix(importer, parent+"/"))
+		if !isInternal || allowed {
+			continue
+		}
+		under := "a build under " + parent
+		if parent == "" {
+			under = "the standard library"
+		}
+		return "it imports " + importPath + ", which only " + under + " may import, so no build of this module " +
+			"compiles it", true
+	}
+	return "", false
+}
+
+// internalParent is the import path whose tree may import importPath, the part before its final `internal` element,
+// empty for the standard library's own, and whether it has one at all.
+func internalParent(importPath string) (string, bool) {
+	elements := strings.Split(importPath, "/")
+	for index := len(elements) - 1; index >= 0; index-- {
+		if elements[index] == "internal" {
+			return strings.Join(elements[:index], "/"), true
+		}
+	}
+	return "", false
+}
+
+// importPathOf is the import path of the package in directory, by the census module whose directory holds it most
+// nearly, and whether one does.
+func importPathOf(directory string, census Census) (string, bool) {
+	best, bestLength := "", -1
+	for _, module := range census.Modules {
+		moduleDirectory := filepath.Join(census.Root, filepath.FromSlash(module.Directory))
+		relative, relativeError := filepath.Rel(moduleDirectory, directory)
+		if relativeError != nil || relative == ".." || strings.HasPrefix(relative, "../") || module.Path == "" {
+			continue
+		}
+		if len(moduleDirectory) <= bestLength {
+			continue
+		}
+		bestLength = len(moduleDirectory)
+		best = module.Path
+		if relative != "." {
+			best += "/" + filepath.ToSlash(relative)
+		}
+	}
+	return best, bestLength >= 0
 }
 
 // program is a file of a package other than the one its directory compiles (see BuildsFor): its package's name,
@@ -554,7 +630,7 @@ func unbuiltReason(
 	ports []Port,
 	targets []Port,
 	programs []program,
-	root string,
+	census Census,
 ) (string, error) {
 	fileReading := readingOf(read, unixOperatingSystems(ports))
 	// The targets are tried on the host's architecture first, so a file cgo on another `GOOS` builds is named for
@@ -595,7 +671,10 @@ func unbuiltReason(
 					return "", breaksError
 				}
 				if len(broken) > 0 {
-					return breakingReason(tried, host, broken, root), nil
+					if forbidden, found := forbiddenImport(read, census); found {
+						return forbidden, nil
+					}
+					return breakingReason(tried, host, broken, census.Root), nil
 				}
 				if port.Architecture == host.Architecture && !slices.Contains(targets, port) {
 					// A platform the project never named builds it, as a constraint that only rules platforms out

@@ -156,3 +156,59 @@ func TestAWalkReadFromListingsIsTheWalkOfTheDisk(test *testing.T) {
 		}
 	}
 }
+
+// A walk read from listings skips a Go module's vendor directory as the walk of the disk does (#366nf1f), every
+// listing held or none. The listing is read rather than the disk asked: a go.mod or go.work dropped from its
+// directory's listing enters the vendor beside it, so one fewer vendor directory is counted skipped.
+func TestAListedWalkSkipsAGoModulesVendorDirectoryAsTheDiskDoes(test *testing.T) {
+	test.Parallel()
+	for _, goVendorCase := range goVendorCases {
+		root := writeTree(test, goVendorCase.files)
+		disk, enumerateError := Enumerate(root, handlesEveryLanguage)
+		if enumerateError != nil {
+			test.Fatal(enumerateError)
+		}
+		listings := diskListings(test, root)
+		for name, listing := range map[string]map[string][]os.DirEntry{
+			"every directory listed": listings,
+			"none listed":            {},
+		} {
+			listed, enumerateListedError := EnumerateListed(root, handlesEveryLanguage, listingOf(listing))
+			if enumerateListedError != nil {
+				test.Fatalf("%s, %s: %v", goVendorCase.name, name, enumerateListedError)
+			}
+			if !reflect.DeepEqual(listed, disk) {
+				test.Errorf(
+					"%s, %s: the listed walk differs from the walk of the disk\nlisted: %+v\ndisk:   %+v",
+					goVendorCase.name,
+					name,
+					listed,
+					disk,
+				)
+			}
+		}
+		for file := range goVendorCase.files {
+			if filepath.Base(file) != "go.mod" && filepath.Base(file) != "go.work" {
+				continue
+			}
+			directory := filepath.Join(root, filepath.Dir(file))
+			if _, statError := os.Stat(filepath.Join(directory, "vendor")); statError != nil {
+				continue
+			}
+			mutant := without(listings, directory, filepath.Base(file))
+			listed, enumerateListedError := EnumerateListed(root, handlesEveryLanguage, listingOf(mutant))
+			if enumerateListedError != nil {
+				test.Fatalf("%s, %s dropped: %v", goVendorCase.name, file, enumerateListedError)
+			}
+			if listed.IgnoredByLayer[GoVendoredLayer] != disk.IgnoredByLayer[GoVendoredLayer]-1 {
+				test.Errorf(
+					"%s: %s dropped and the listed walk counted %d vendor directories skipped, want %d",
+					goVendorCase.name,
+					file,
+					listed.IgnoredByLayer[GoVendoredLayer],
+					disk.IgnoredByLayer[GoVendoredLayer]-1,
+				)
+			}
+		}
+	}
+}

@@ -102,6 +102,7 @@ const (
 	IgnorePatternsLayer = "ignorePatterns"
 	FixturesLayer       = "testdata"
 	VendoredLayer       = "Vendor"
+	GoVendoredLayer     = "vendor"
 )
 
 // NeverEntered are the directory names no walk of cohere's enters, whatever any ignore file says: discovery's and the
@@ -318,6 +319,15 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 				enumeration.IgnoredByLayer[VendoredLayer]++
 				return filepath.SkipDir
 			}
+			// A vendor directory beside a go.mod or go.work is what `go mod vendor` or `go work vendor` copied in
+			// byte for byte, third-party code the Go engine never checks, so the walk never formats it either: Loom's
+			// run read vendor/golang.org/x/sys/unix/README.md as a file --fix would rewrite (#366nf1f). A vendor
+			// directory with no Go module beside it is entered, since a JavaScript project may keep its own code
+			// in one.
+			if info.Name() == GoVendoredLayer && holdsGoModuleListed(filepath.Dir(path), listing) {
+				enumeration.IgnoredByLayer[GoVendoredLayer]++
+				return filepath.SkipDir
+			}
 			entered, enterError := scope.Enter(inRepository(relative))
 			if enterError != nil {
 				return enterError
@@ -492,6 +502,32 @@ func hasOwnRepositoryListed(directory string, listing gitignore.Listing) bool {
 		}
 	}
 	return HasOwnRepository(directory)
+}
+
+// holdsGoModuleListed reports whether directory holds a go.mod or a go.work, which makes a vendor directory beside
+// them the Go tool's copy of its dependencies. A listing of directory that names neither answers false, as the stat
+// would then fail; one that names either, or a directory the listing does not hold, is asked of the disk.
+func holdsGoModuleListed(directory string, listing gitignore.Listing) bool {
+	if listing != nil {
+		if entries, listed := listing(directory); listed {
+			present := false
+			for _, entry := range entries {
+				if entry.Name() == "go.mod" || entry.Name() == "go.work" {
+					present = true
+					break
+				}
+			}
+			if !present {
+				return false
+			}
+		}
+	}
+	for _, name := range []string{"go.mod", "go.work"} {
+		if information, statError := os.Stat(filepath.Join(directory, name)); statError == nil && !information.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 // repositoryBoundaryBetween reports whether a repository of its own begins at root or between root and
