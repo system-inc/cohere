@@ -37,8 +37,8 @@ const searchBudget = 1 << 20
 // (#h7m6zyp, adamic's darwin, whose 168 packages went unlinted under three folded tags). The files only a custom tag
 // compiles get builds of their own, one tag component at a time (tagComponents: the tags one package's files name
 // share a build, and no other component's ride with them), on the host's platform, or on a platform where a file of
-// the component names that platform and the tag together. A tag a program of its own names is never set: setting it
-// puts that program beside its directory's package (poisonedTags).
+// the component names that platform and the tag together. No build sets tags that compile a program of its own,
+// which would put it beside its directory's package (breaks).
 func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]Build, []Unbuilt, error) {
 	var candidatesUncompiled []source
 	var unbuilt []Unbuilt
@@ -97,7 +97,6 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 		return builds, unbuilt, nil
 	}
 
-	poisoned := poisonedTags(census.Root, programs, unix)
 	targets := targetPorts(host, ports, sortedSet(named), extraTargets)
 	platforms := platformsFor(host, targets, dimensionsOf(uncompiled, ports).Cgo)
 	// First the platforms, each under the host's tags, the fewest of them that compile what any of them does.
@@ -124,14 +123,14 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 	for _, index := range tagged {
 		taggedFiles = append(taggedFiles, uncompiled[index])
 	}
-	components := newTagComponents(taggedFiles, unix, poisoned)
+	components := newTagComponents(taggedFiles, unix)
 	for component := range components.tags {
 		componentFiles := make([]source, 0, len(components.files[component]))
 		for _, file := range components.files[component] {
 			componentFiles = append(componentFiles, taggedFiles[file])
 		}
 		componentBuilds, covered, componentError := buildsByComponent(componentFiles, host,
-			platformsNamedBy(componentFiles, host, platforms), unix, poisoned)
+			platformsNamedBy(componentFiles, host, platforms), unix, programs)
 		if componentError != nil {
 			return nil, nil, componentError
 		}
@@ -145,7 +144,7 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 	builds = append(builds, sortedBuilds(chosen, host, platforms)...)
 	for index, read := range uncompiled {
 		if !coverable.has(index) {
-			reason, reasonError := unbuiltReason(read, host, ports, targets, poisoned)
+			reason, reasonError := unbuiltReason(read, host, ports, targets, programs, census.Root)
 			if reasonError != nil {
 				return nil, nil, reasonError
 			}
@@ -164,51 +163,62 @@ type program struct {
 	besides string
 }
 
-// poisonedTags are the custom tags each program of its own names outside a negation, each with why no build sets
-// it, naming the first such program's directory relative to root and how many others it would break: setting
-// lintoracle for adamic's 76 oracles alone in their directories compiles the 4 beside package assertions too, so
-// every build that set it loaded with 4 package errors (#h7m6zyp). A file that needs one is unbuilt for it.
-func poisonedTags(root string, programs []program, unix []string) map[string]string {
-	broken := map[string][]program{}
+// breaks is the programs of their own a build compiles that its platform under the host's tags does not, sorted by
+// file: setting the build's tags is what would put each beside its directory's package. lintoracle compiles all 4 of
+// adamic's oracles beside package assertions, so no build sets it (#h7m6zyp), while a tag that only turns a program
+// off, or one a program needs only beside another, never compiles one alone and is set as any other.
+func breaks(target Build, host Build, programs []program) ([]program, error) {
+	hostTagged := target
+	hostTagged.Tags = host.Tags
+	var broken []program
 	for _, each := range programs {
-		for _, tag := range positiveCustomTags(each.read, unix) {
-			broken[tag] = append(broken[tag], each)
+		compiled, compileError := compiles(target, each.read)
+		if compileError != nil {
+			return nil, compileError
+		}
+		if !compiled {
+			continue
+		}
+		compiledUnderHost, hostError := compiles(hostTagged, each.read)
+		if hostError != nil {
+			return nil, hostError
+		}
+		if !compiledUnderHost {
+			broken = append(broken, each)
 		}
 	}
-	poisoned := map[string]string{}
-	for tag, breaking := range broken {
-		slices.SortFunc(breaking, func(left program, right program) int {
-			return strings.Compare(left.read.file, right.read.file)
-		})
-		directory := filepath.Dir(breaking[0].read.file)
-		if relative, relativeError := filepath.Rel(root, directory); relativeError == nil && root != "" {
-			directory = filepath.ToSlash(relative)
-		}
-		reason := "its tag " + tag + " is never set: setting it puts package " + breaking[0].name + " beside package " +
-			breaking[0].besides + " in " + directory
-		directories := map[string]bool{}
-		for _, each := range breaking {
-			directories[filepath.Dir(each.read.file)] = true
-		}
-		if others := len(directories) - 1; others == 1 {
-			reason += " and 1 other directory"
-		} else if others > 1 {
-			reason += " and " + strconv.Itoa(others) + " other directories"
-		}
-		poisoned[tag] = reason
-	}
-	return poisoned
+	return broken, nil
 }
 
-// positiveCustomTags are the custom tags a file's constraint names outside a negation (see tagReading).
-func positiveCustomTags(read source, unix []string) []string {
-	var fileReading reading
-	for _, expression := range constraintsOf(read) {
-		for _, tag := range positiveTags(expression, false, nil) {
-			tagReading(tag, unix, &fileReading)
+// breakingReason is why no build sets the tags tried takes beyond the host's: the first program they compile, its
+// directory relative to root, and how many other directories they would break.
+func breakingReason(tried Build, host Build, broken []program, root string) string {
+	var changed []string
+	for _, tag := range tried.Tags {
+		if !slices.Contains(host.Tags, tag) {
+			changed = append(changed, tag)
 		}
 	}
-	return sortedSet(fileReading.tags)
+	directory := filepath.Dir(broken[0].read.file)
+	if relative, relativeError := filepath.Rel(root, directory); relativeError == nil && root != "" {
+		directory = filepath.ToSlash(relative)
+	}
+	reason := "its tag " + changed[0] + " is never set: setting it puts package "
+	if len(changed) > 1 {
+		reason = "its tags " + strings.Join(changed[:len(changed)-1], ", ") + " and " + changed[len(changed)-1] +
+			" are never set together: setting them puts package "
+	}
+	reason += broken[0].name + " beside package " + broken[0].besides + " in " + directory
+	directories := map[string]bool{}
+	for _, each := range broken {
+		directories[filepath.Dir(each.read.file)] = true
+	}
+	if others := len(directories) - 1; others == 1 {
+		reason += " and 1 other directory"
+	} else if others > 1 {
+		reason += " and " + strconv.Itoa(others) + " other directories"
+	}
+	return reason
 }
 
 // platformsNamedBy are the platforms a tag component's builds may take: the host's, and each a file of the component
@@ -480,17 +490,18 @@ func greedyCovering(candidates []candidate, want coverage) []int {
 	return chosen
 }
 
-// unbuiltReason is why no extra build compiles a file: it needs a tag no build sets (poisoned); only another
+// unbuiltReason is why no extra build compiles a file: it needs tags no build sets (breaks); only another
 // architecture does, which is the layout blind spot; only a tag on a platform no file names beside it does; only cgo
 // on another `GOOS` does; or no target of ports does, with whatever its constraint names that says why.
-func unbuiltReason(read source, host Build, ports []Port, targets []Port, poisoned map[string]string) (string, error) {
-	unix := unixOperatingSystems(ports)
-	for _, tag := range positiveCustomTags(read, unix) {
-		if reason, found := poisoned[tag]; found {
-			return reason, nil
-		}
-	}
-	fileReading := readingOf(read, unix)
+func unbuiltReason(
+	read source,
+	host Build,
+	ports []Port,
+	targets []Port,
+	programs []program,
+	root string,
+) (string, error) {
+	fileReading := readingOf(read, unixOperatingSystems(ports))
 	// The targets are tried on the host's architecture first, so a file cgo on another `GOOS` builds is named for
 	// that, then in the order an extra build prefers them, so the reason never turns on the order go tool dist list
 	// prints, and with the tags a candidate takes.
@@ -523,6 +534,13 @@ func unbuiltReason(read source, host Build, ports []Port, targets []Port, poison
 				}
 				if !compiled {
 					continue
+				}
+				broken, breaksError := breaks(tried, host, programs)
+				if breaksError != nil {
+					return "", breaksError
+				}
+				if len(broken) > 0 {
+					return breakingReason(tried, host, broken, root), nil
 				}
 				if port.Architecture == host.Architecture && !slices.Contains(targets, port) {
 					// A platform the project never named builds it, as a constraint that only rules platforms out

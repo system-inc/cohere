@@ -22,9 +22,8 @@ type tagComponents struct {
 	files [][]int
 }
 
-// newTagComponents reads each file's custom tags, but the poisoned ones no build sets (poisonedTags), and groups
-// them into components.
-func newTagComponents(uncompiled []source, unix []string, poisoned map[string]string) tagComponents {
+// newTagComponents reads each file's custom tags and groups them into components.
+func newTagComponents(uncompiled []source, unix []string) tagComponents {
 	components := tagComponents{
 		fileTags:      make([][]string, len(uncompiled)),
 		fileComponent: make([]int, len(uncompiled)),
@@ -44,10 +43,7 @@ func newTagComponents(uncompiled []source, unix []string, poisoned map[string]st
 	// build together (std's crypto/internal/fips140test, #zzs7jm5).
 	inDirectory := map[string][]string{}
 	for index, read := range uncompiled {
-		tags := slices.DeleteFunc(readingOf(read, unix).tags, func(tag string) bool {
-			_, never := poisoned[tag]
-			return never
-		})
+		tags := readingOf(read, unix).tags
 		components.fileTags[index] = tags
 		directory := filepath.Dir(read.file)
 		inDirectory[directory] = append(inDirectory[directory], tags...)
@@ -109,15 +105,15 @@ type componentChoice struct {
 // the combinations, and two tags one package keeps apart, a version each, never ride one build (std's
 // crypto/internal/fips140test, #zzs7jm5). Rounds end when no platform compiles one more file, and every file some
 // platform compiles under some setting of its own tags is compiled by then: its least setting alone would have
-// compiled it.
+// compiled it. No setting that compiles a program of its own is weighed (breaks).
 func buildsByComponent(
 	uncompiled []source,
 	host Build,
 	platforms []Build,
 	unix []string,
-	poisoned map[string]string,
+	programs []program,
 ) ([]Build, coverage, error) {
-	components := newTagComponents(uncompiled, unix, poisoned)
+	components := newTagComponents(uncompiled, unix)
 	wanted := newCoverage(len(uncompiled))
 	for index := range uncompiled {
 		wanted.set(index)
@@ -127,7 +123,7 @@ func buildsByComponent(
 	for {
 		var best componentChoice
 		for _, platform := range platforms {
-			choice, choiceError := bestOnPlatform(uncompiled, host, platform, components, wanted)
+			choice, choiceError := bestOnPlatform(uncompiled, host, platform, components, wanted, programs)
 			if choiceError != nil {
 				return nil, coverage{}, choiceError
 			}
@@ -175,6 +171,7 @@ func bestOnPlatform(
 	platform Build,
 	components tagComponents,
 	wanted coverage,
+	programs []program,
 ) (componentChoice, error) {
 	var named []string
 	for _, tags := range components.tags {
@@ -254,14 +251,23 @@ func bestOnPlatform(
 			// Each setting is told by the tags it changes from the host's. Only the settings no other compiling one
 			// changes a strict part of are weighed, so a file that compiles with either of two tags offers each alone
 			// and never both: `fips140v1.0 || fips140v1.26` would otherwise turn on two versions std keeps apart.
+			// A setting that compiles a program of its own is never weighed (breaks), so a file that only such a
+			// setting compiles is left unbuilt.
 			var changes []int
 			for mask := range 1 << len(own) {
-				compiled, compileError := compiles(under(component, withOwnTags(hostAssignments[component], own, mask)),
-					uncompiled[file])
+				target := under(component, withOwnTags(hostAssignments[component], own, mask))
+				compiled, compileError := compiles(target, uncompiled[file])
 				if compileError != nil {
 					return componentChoice{}, compileError
 				}
-				if compiled {
+				if !compiled {
+					continue
+				}
+				broken, breaksError := breaks(target, host, programs)
+				if breaksError != nil {
+					return componentChoice{}, breaksError
+				}
+				if len(broken) == 0 {
 					changes = append(changes, mask^hostMask)
 				}
 			}

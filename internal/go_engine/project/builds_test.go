@@ -463,6 +463,47 @@ func TestBuildsForNeverSetsATagAProgramOfItsOwnNames(test *testing.T) {
 	}
 }
 
+// A tag a program of its own needs only beside another, or names only to turn itself off, compiles no program when
+// set alone, so it is set as any other tag (#h7m6zyp, the Square's two shoulds). The program here needs lintoracle
+// and extra together and is off under quiet: extra and quiet each get a build, and so does a lone oracle behind
+// lintoracle alone, since lintoracle alone never compiles the program. Only a file needing lintoracle and extra
+// together is unbuilt, since setting both compiles the program, named for both tags.
+func TestBuildsForSetsATagThatAloneCompilesNoProgram(test *testing.T) {
+	test.Parallel()
+	census := censusOf(test, map[string]string{
+		"rules/beside/build_test.go": "package assertions\n",
+		"rules/beside/oracle.go":     "//go:build lintoracle && extra && !quiet\n\npackage main\n",
+		"rules/alone/oracle.go":      "//go:build lintoracle\n\npackage main\n",
+		"extra/extra.go":             "//go:build extra\n\npackage extra\n",
+		"quiet/quiet.go":             "//go:build quiet\n\npackage quiet\n",
+		"both/both.go":               "//go:build lintoracle && extra\n\npackage both\n",
+	})
+	builds, unbuilt := buildsFor(test, census, testHost, testPorts)
+	want := []string{"darwin/arm64 cgo", "darwin/arm64 cgo tags extra", "darwin/arm64 cgo tags lintoracle",
+		"darwin/arm64 cgo tags quiet"}
+	if got := labels(builds); !slices.Equal(got, want) {
+		test.Errorf("the builds are %v, want %v: a tag that alone compiles no program is set", got, want)
+	}
+	got := map[string]string{}
+	for _, each := range unbuilt {
+		relative, relativeError := filepath.Rel(census.Root, each.File)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		got[filepath.ToSlash(relative)] = each.Reason
+	}
+	wantUnbuilt := map[string]string{
+		"both/both.go": "its tags extra and lintoracle are never set together: setting them puts package main " +
+			"beside package assertions in rules/beside",
+		"rules/beside/oracle.go": "a program of its own, package main beside package assertions, so no build of " +
+			"its directory's package compiles it",
+	}
+	if !maps.Equal(got, wantUnbuilt) {
+		test.Errorf("unbuilt are %v, want %v", got, wantUnbuilt)
+	}
+	requireEachCompiledOnce(test, census, builds, unbuilt)
+}
+
 // adamic's shape on a box (#h7m6zyp): a darwin-only file beside two tags, each named in a package of its own, as
 // stage3_split_metrics names a lone program and census_overlay an external test. darwin's build carries the host's
 // tags alone, so neither tag's type errors can cost it its linting, and each tag gets a build of its own on the host's
