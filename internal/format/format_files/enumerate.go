@@ -69,6 +69,13 @@ type Enumeration struct {
 	// read, and not listed.
 	IgnoreFiles []string
 
+	// Index is the repository's index among IgnoreFiles, when the root holds a `.git` and the walk read the index
+	// whole, and IndexRoot the root its matcher read it from, absolute: a run cache keys the index on
+	// gitignore.TrackedIgnoredDigest over the root rather than on its bytes, which git rewrites on a `git status`
+	// (#m1daxxk). Both are "" when the walk read no index whole, and the index is then keyed on its bytes.
+	Index     string
+	IndexRoot string
+
 	// Files is what survived, absolute paths.
 	Files []string
 
@@ -166,6 +173,9 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 	}
 	if matcher.IndexFile() != "" {
 		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, matcher.IndexFile())
+		if matcher.IndexFallback() == nil {
+			enumeration.Index, enumeration.IndexRoot = matcher.IndexFile(), matcher.Root()
+		}
 	}
 	enumeration.IgnoredByLayer[GitignoreLayer] = 0
 	var layers []ignoreLayer

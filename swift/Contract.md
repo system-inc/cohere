@@ -627,7 +627,8 @@ otherwise; a run that asked and ends without one is refused. When the lint phase
         "<goroot>/src/fmt/print.go"
     ],
     "directories": ["/…", "/…/p"],
-    "absent": ["/…/CohereSettings.json", "/…/staticcheck.conf", "/go.work"]
+    "absent": ["/…/CohereSettings.json", "/…/staticcheck.conf", "/go.work"],
+    "trackedIgnored": [{ "index": "/…/.git/index", "root": "/…", "scope": "" }]
 }
 ```
 
@@ -676,6 +677,15 @@ record lists every directory whose listing it read, so the front door records no
 those: a git config in `.git`, or a toolchain's binary, is decided by its own signature, never by a directory every
 git command or install moves. Which toolchain xcrun would pick, and how the engine was chosen, are keyed rather than
 named (command/cohere/swift_run_cache.go), since a replay asks neither.
+
+`trackedIgnored` (#m1daxxk) names each git index among `files` that the run read only for what it decides of a walk:
+which paths its ignore rules exclude are tracked, and which are gitlinks. Each entry is the index, the root of the
+repository it belongs to, and the directory the run walked, relative to that root and slash separated, `""` for the
+root. The Go engine names its census's index, scoped to the root below the repository. The front door keys such an
+index on `gitignore.TrackedIgnoredDigest` over that scope rather than on its bytes, which git rewrites on a
+`git status` and on every `git add`, so a replay survives what decides nothing. An index the reader cannot read
+whole, a split or sparse one among them, is keyed on its bytes as an index not named here is. A reader before it
+ignores the field, and keys every index on its bytes.
 
 Every path is absolute and cleaned, each list is sorted, without duplicates, and `[]` when empty, and two runs over
 an unchanged tree write the same record. A superset only costs a miss, and a path left out is a replay that goes

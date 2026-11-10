@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -50,6 +51,12 @@ type runCacheSession struct {
 	// extraAbsent is every file a format walk looked for and did not find, an ignore file a directory
 	// does not have, so one appearing moves an input. See declareFormatWalk.
 	extraAbsent []string
+
+	// trackedIgnored is each git index among the inputs that the run read only for what it decides of a walk, the
+	// format walk's or an engine's census. record keys each on gitignore.TrackedIgnoredDigest rather than on its
+	// bytes, which git rewrites on a `git status` and on every `git add`, so a run over a tree nothing changed in
+	// replays (#m1daxxk). An index the reader cannot read whole keeps its bytes as its key.
+	trackedIgnored []trackedIgnoredIndex
 
 	// projectRoots is the root, as given and resolved, of a run whose engine declares its inputs, a Go run's; nil
 	// for a TypeScript run, whose recorder observes its reads.
@@ -98,9 +105,12 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	present, absent, probed := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
 	absent = append(absent, session.extraAbsent...)
+	// Taken before the record, which refuses a run whose index changed after readSince, so each digest is of the
+	// bytes the run read and the record holds.
+	trackedIgnored := session.trackedIgnoredKeys()
 	cache, recordRunCacheError := program.RecordRunCacheWithin(session.recordedWithin, session.key, files,
 		session.extraDirectories, absent, probed, recordedOutput(session.stdout.buffer.Bytes(), session.anchor),
-		exitCode, session.readSince)
+		exitCode, session.readSince, trackedIgnored)
 	if recordRunCacheError != nil {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is
 		// a saving that quietly never appears.
@@ -112,6 +122,36 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	cache.RecordedUnixNanoseconds = time.Now().UnixNano()
 	cache.Summary = recordedOutput(session.summary, session.anchor)
 	return cache
+}
+
+// trackedIgnoredIndex is one git index the run read for a walk: the index, its repository's root, and the directory
+// walked, relative to that root and slash separated, "" for the root.
+type trackedIgnoredIndex struct {
+	index string
+	root  string
+	scope string
+}
+
+// trackedIgnoredKeys is the key each of the run's trackedIgnored indexes is recorded under, by its path. An index
+// gitignore.New no longer reads from the same file, or whose digest cannot be taken (an index the reader cannot read
+// whole, an ignore file it cannot), takes none, and is keyed on its bytes as before the digest.
+func (session *runCacheSession) trackedIgnoredKeys() map[string]program.TrackedIgnoredKey {
+	keys := map[string]program.TrackedIgnoredKey{}
+	for _, named := range session.trackedIgnored {
+		if _, keyed := keys[named.index]; keyed {
+			continue
+		}
+		matcher, newError := gitignore.New(named.root)
+		if newError != nil || matcher.IndexFile() != named.index {
+			continue
+		}
+		digest, digestError := matcher.TrackedIgnoredDigest(named.scope)
+		if digestError != nil {
+			continue
+		}
+		keys[named.index] = program.TrackedIgnoredKey{Root: named.root, Scope: named.scope, Digest: digest}
+	}
+	return keys
 }
 
 // write puts this run's record, findings, shapes and types into the table, each into its own file, once.
