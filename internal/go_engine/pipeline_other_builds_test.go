@@ -9,6 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -560,5 +561,110 @@ func TestAnOtherBuildsTypeErrorIsCountedInTheLintRecord(test *testing.T) {
 	if lint.TypeErrors != compilerRecords || lint.Findings != ruleRecords {
 		test.Errorf("the lint record counts %d findings and %d type errors, and the phase wrote %d rule findings and "+
 			"%d compiler findings", lint.Findings, lint.TypeErrors, ruleRecords, compilerRecords)
+	}
+}
+
+// Each build's record says what it alone covered, and what it compiled that no rule ran on (#ytnvt8k). Over the
+// other-builds fixture the windows build alone compiles separator_windows.go and lints it. With a windows-only type
+// error beside it, the windows build analyzes no package, so it lints nothing alone, and both windows-only files
+// are named as compiled and not linted, with the type error as why.
+func TestEachBuildSaysWhatItAloneCoveredAndWhatNoRuleRanOn(test *testing.T) {
+	test.Parallel()
+	windowsRecord := func(root string, wantExit int) contract.BuildRecord {
+		test.Helper()
+		_, stream := runOverRaw(test, root, wantExit, "--no-cache", "--other-builds")
+		for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+			var lint contract.LintRecord
+			if !strings.HasPrefix(line, `{"kind":"lint"`) {
+				continue
+			}
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			for _, build := range lint.Builds {
+				if strings.HasPrefix(build.Target, "windows/") {
+					return build
+				}
+			}
+		}
+		test.Fatalf("no lint record names a windows build:\n%s", stream)
+		return contract.BuildRecord{}
+	}
+
+	clean := windowsRecord(copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
+	if clean.FilesAlone != 1 || len(clean.NotLinted) != 0 {
+		test.Errorf("the windows build alone linted %d files and left %v unlinted, want 1 and none", clean.FilesAlone,
+			clean.NotLinted)
+	}
+
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	broken := filepath.Join(root, "internal", "separator", "broken_windows.go")
+	if writeError := os.WriteFile(broken, []byte("//go:build windows\n\npackage separator\n\n"+
+		"// Broken names a constant no build declares.\nconst Broken = Missing\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	failed := windowsRecord(root, exitFindings)
+	var names []string
+	for _, file := range failed.NotLinted {
+		names = append(names, filepath.Base(file))
+	}
+	if failed.FilesAlone != 0 || !slices.Equal(names, []string{"broken_windows.go", "separator_windows.go"}) ||
+		!strings.Contains(failed.NotLintedReason, "found a type error, so it analyzed no package") {
+		test.Errorf("the windows build alone linted %d files and left %v unlinted for %q, want 0 and both its files "+
+			"for its type error", failed.FilesAlone, names, failed.NotLintedReason)
+	}
+}
+
+// A file two extra builds compile is linted when either analyzes it, so it is never named not linted because the
+// first of them is broken (#ytnvt8k). Beside the other-builds fixture: a file every platform but the host's compiles,
+// a type error only the first extra build compiles, so that build analyzes no package, and a file only the second
+// compiles, so both builds run. The shared file is linted by the second; only the first build's own file is named.
+func TestAFileTwoBuildsCompileIsLintedWhenEitherAnalyzesIt(test *testing.T) {
+	test.Parallel()
+	var others []string
+	for _, operatingSystem := range []string{"linux", "windows", "darwin", "freebsd"} {
+		if operatingSystem != runtime.GOOS {
+			others = append(others, operatingSystem)
+		}
+	}
+	first, second := others[0], others[1]
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	files := map[string]string{
+		"shared.go": "// Package shared is compiled beside the fixture's.\npackage shared\n",
+		"shared_elsewhere.go": "//go:build !" + runtime.GOOS +
+			"\n\npackage shared\n\n// Elsewhere is one.\nconst Elsewhere = 1\n",
+		"broken_first.go": "//go:build " + first +
+			"\n\npackage shared\n\n// Broken is undeclared.\nconst Broken = Missing\n",
+		"only_second.go": "//go:build " + second + "\n\npackage shared\n\n// Second is two.\nconst Second = 2\n",
+	}
+	for name, contents := range files {
+		path := filepath.Join(root, "internal", "shared", name)
+		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	var lint contract.LintRecord
+	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+		if strings.HasPrefix(line, `{"kind":"lint"`) {
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+		}
+	}
+	notLinted := map[string]string{}
+	for _, build := range lint.Builds {
+		for _, file := range build.NotLinted {
+			notLinted[filepath.Base(file)] = build.Target
+		}
+	}
+	if target, named := notLinted["shared_elsewhere.go"]; named {
+		test.Errorf("shared_elsewhere.go, which the %s build lints, is named not linted under %s", second, target)
+	}
+	if target := notLinted["broken_first.go"]; !strings.HasPrefix(target, first+"/") {
+		test.Errorf("broken_first.go is named not linted under %q, want the %s build's: %v", target, first, notLinted)
 	}
 }

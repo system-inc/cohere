@@ -586,6 +586,19 @@
                             "findingsDropped": {
                                 "type": "integer",
                                 "description": "Findings this build reported that the merge left out, since their rule keeps only what every build with a say on the file reports."
+                            },
+                            "filesAlone": {
+                                "type": "integer",
+                                "description": "Files of ours in scope that only this build compiles and that a rule ran on: the coverage it buys. Absent when 0."
+                            },
+                            "notLinted": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Files of ours in scope the host's build leaves out that this build, the first to compile them, compiled and no build analyzed, absolute and sorted. Each is also in gaps.unchecked, as not linted. Absent when none."
+                            },
+                            "notLintedReason": {
+                                "type": "string",
+                                "description": "Why no rule ran on notLinted: a build whose load found a type error analyzes no package. Absent when notLinted is."
                             }
                         }
                     }

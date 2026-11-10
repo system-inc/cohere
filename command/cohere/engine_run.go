@@ -313,6 +313,10 @@ type engineRun struct {
 	// memoryReceived is set by the memory record, which comes once (acceptMemory).
 	memoryReceived bool
 
+	// notLinted is each file a Go build compiled that no rule ran on, by path, with why (checkedBuild.NotLinted), from
+	// the lint record, so writeExcluded names it as not checked rather than as checked by that build (#ytnvt8k).
+	notLinted map[string]string
+
 	// filesRewritten is how many files the fix phase wrote, so a run that rewrote the tree it checked is never
 	// recorded as a verdict about that tree.
 	filesRewritten int
@@ -969,6 +973,14 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 		printProvenance(accountOutput(run.out), "  lint: %s\n", build.line())
 	}
 	activeSummary.Builds = record.Builds
+	for _, build := range record.Builds {
+		for _, file := range build.NotLinted {
+			if run.notLinted == nil {
+				run.notLinted = map[string]string{}
+			}
+			run.notLinted[file] = build.NotLintedReason
+		}
+	}
 	activeSummary.Rules = record.RulesRun
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesWalked, record.FilesWalked
 	activeSummary.Nodes = record.NodesVisited
@@ -1128,11 +1140,17 @@ func (run *engineRun) writeExcluded() {
 		if len(run.yieldedDirectories) > 0 && yieldsFile(run.yieldedDirectories, resolvedPath(excluded.File)) {
 			continue
 		}
-		add(excluded.File, excluded.Reason)
-		if run.language.ExpectedExclusionReasons != nil && !run.language.expectsExcluded(excluded.Reason) {
-			gap = append(gap,
-				uncheckedEngineFile{File: excluded.File, Reason: excluded.Reason, Language: run.language.Name})
-			gapReasons[excluded.Reason] = true
+		reason := excluded.Reason
+		why, compiledUnlinted := run.notLinted[excluded.File]
+		if compiledUnlinted && run.language.checkedElsewhere(reason) {
+			// The project record said another build checks it before any build ran; the lint record says no rule
+			// ran on it, so it is a file not checked, with why.
+			reason = "not linted: " + why
+		}
+		add(excluded.File, reason)
+		if run.language.ExpectedExclusionReasons != nil && !run.language.expectsExcluded(reason) {
+			gap = append(gap, uncheckedEngineFile{File: excluded.File, Reason: reason, Language: run.language.Name})
+			gapReasons[reason] = true
 		}
 	}
 	activeSummary.Gaps.Unchecked = gap
