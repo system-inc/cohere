@@ -460,7 +460,6 @@ func Encode(record Record) ([]byte, error) {
 	return native.FormatHouse(encodedFileName, encoded)
 }
 
-
 // FileName is the record's file name: its date, the engine's commit and the machine's model, and for a run
 // narrowed to one engine that engine, so it never takes the name of the same day's whole-root record.
 func FileName(record Record) string {
