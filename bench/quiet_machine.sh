@@ -31,8 +31,9 @@
 #           that took nothing from the cache (#547dhjz), or a warm run that is not a whole replay
 #   warm    `cohere` again on the unchanged tree: the replay
 #   edit    one line added to one function body, `cohere`, then the file's original bytes put back
-#   cold    `cohere --no-cache`: every phase from source, nothing read or written
-#   idle    `cohere --no-cache` after the machine has sat idle for --idle-seconds: cold as a developer who
+#   cold    `cohere --no-cache`: every phase from source, nothing read or written; narrowed by --engine Go,
+#           `cohere --no-fix --no-cache`, a checking run, as #pff7xhr's bar is (cold_arguments.zsh)
+#   idle    cold's command after the machine has sat idle for --idle-seconds: cold as a developer who
 #           pauses between saves mostly meets it, since the slow mode below follows idleness
 #   first   `cohere` in a fresh copy of the tree with no cache of any kind: what a developer's first run
 #           pays, cache writes and incremental build info included. Measured beside cold, because a first
@@ -79,6 +80,20 @@
 # samples the fast mode more often than a developer who saves and checks after half a minute of thought, and
 # its median is the better case. The idle mode measures the other one.
 #
+# A run may check one engine's project alone, with --engine: every run, primes and first runs too, is
+# `cohere --directory <its copy>` with `COHERE_PROJECT_ENGINE` set to that engine, the way the front door runs
+# a project it discovered, so its --json summary is that project's alone. On cohere's own root a whole-root
+# cold run times the Go project beside a Swift run of about 25 seconds on the same cores, and #pff7xhr's bar
+# is the Go engine's own cold seconds (#09g6mad). Go is the only engine it takes until another is needed. The
+# record names the engine, and is named for it, so it never stands for the root or the nightly guard's
+# baseline. A `COHERE_PROJECT_ENGINE` already in the environment refuses to start, since every whole-root run
+# would inherit it.
+#
+# Any `GODEBUG` in the environment refuses to start too: it sends the Go engine's in-process lister to
+# `go list`, about 600 ms of every run that checks Go (#9wfsmqv). `GOGC`, `GOMEMLIMIT` and `GOMAXPROCS` move
+# the Go engine's seconds as well, and are printed in the header and kept in the record as the benchmark saw
+# them, empty when unset.
+#
 # usage: quiet_machine.sh [options]
 #   --project DIR        the project to copy (default ~/Projects/ahra)
 #   --commit REF         the project's commit to copy, so an older tree is measured on today's machine; its
@@ -94,6 +109,8 @@
 #   --edit PATH          the file the edit run changes, relative to the project
 #                        (default modules/tasks/TasksSearchQuery.ts)
 #   --cohere PATH        the cohere launcher, or an engine binary, to run (default: `cohere` on PATH)
+#   --engine NAME        check only this engine's project at the copy's root, as COHERE_PROJECT_ENGINE
+#                        names it: Go (default: the whole root, every project discovery finds)
 #   --generate COMMAND   the project's own generator, run in the copy once, with no network, before its
 #                        tree is hashed, so the copy holds what a checkout's generators wrote, as ahra's route
 #                        types: `NEXT_TELEMETRY_DISABLED=1 node_modules/.bin/next typegen` (see run_generator)
@@ -114,6 +131,7 @@
 set -u
 name=quiet_machine
 source ${0:A:h}/pinned.zsh
+source ${0:A:h}/cold_arguments.zsh
 
 project=$HOME/Projects/ahra
 modes_asked=cold
@@ -130,6 +148,7 @@ commit=
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
 record_directory=
+project_engine=
 
 while (( $# > 0 )); do
   case $1 in
@@ -142,6 +161,7 @@ while (( $# > 0 )); do
     --idle-seconds) idle_seconds=$2; shift 2 ;;
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
+    --engine) project_engine=$2; shift 2 ;;
     --generate) generate=$2; shift 2 ;;
     --commit) commit=$2; shift 2 ;;
     --link) links+=($2); shift 2 ;;
@@ -153,6 +173,13 @@ while (( $# > 0 )); do
   esac
 done
 (( runs >= 1 )) || fail "--runs must be at least 1"
+[[ -z $project_engine || $project_engine == Go ]] || fail "--engine: no engine $project_engine (Go)"
+(( ${+GODEBUG} )) &&
+  fail "GODEBUG is set ($GODEBUG), which sends the Go engine's in-process lister to \`go list\` (#9wfsmqv); unset it and run again"
+(( ${+COHERE_PROJECT_ENGINE} )) &&
+  fail "COHERE_PROJECT_ENGINE is set ($COHERE_PROJECT_ENGINE), which every run would inherit; unset it, and name an engine with --engine"
+# The cold and idle runs' arguments, and the record's noFix, which reads them rather than the engine.
+cold=(${(f)"$(cold_arguments $project_engine)"})
 modes=(${(s:,:)modes_asked})
 (( ${#modes} > 0 )) || fail "--modes names no mode"
 for mode in $modes; do
@@ -207,12 +234,20 @@ print "# modes    ${(j:, :)modes}; at most $runs rounds, stopping once quiet run
 print "# quiet    at least $idle_floor% of all cores idle over 2s before and 1s after a run, settling up to ${settle}s"
 measuring edit && print "# edit     $edit"
 measuring idle && print "# idle     each idle run after ${idle_seconds}s of the machine sitting idle"
+[[ -n $project_engine ]] && print "# engine   $project_engine alone (COHERE_PROJECT_ENGINE), with --directory at each run's copy"
+(measuring cold || measuring idle) && print "# cold     cohere ${cold}"
+print "# go       GOGC ${GOGC-(unset)}, GOMEMLIMIT ${GOMEMLIMIT-(unset)}, GOMAXPROCS ${GOMAXPROCS-(unset)}"
 print
 
-# run_cohere runs the pinned engine in the copy; see run_timed.
+# run_cohere runs the pinned engine in the copy; see run_timed. Narrowed to one engine, it names the copy
+# the run is in, which a first run sets to its own clone, and the engine for that run alone.
 run_cohere() {
   local log=$1; shift
-  run_timed $log $engine --json "$@"
+  if [[ -n $project_engine ]]; then
+    COHERE_PROJECT_ENGINE=$project_engine run_timed $log $engine --json --directory $copy "$@"
+  else
+    run_timed $log $engine --json "$@"
+  fi
 }
 
 at_floor() { awk -v idle=$1 -v floor=$idle_floor 'BEGIN { exit !(idle >= floor) }'; }
@@ -307,11 +342,11 @@ for round in $(seq 1 $runs); do
     [[ $(shasum -a 256 < $copy/$edit) == $original_hash ]] || fail "$edit did not go back to its original bytes"
   fi
 
-  measuring cold && measure cold $round --no-cache
+  measuring cold && measure cold $round $cold
 
   if measuring idle; then
     sleep $idle_seconds
-    measure idle $round --no-cache
+    measure idle $round $cold
   fi
 
   if measuring first; then
@@ -395,6 +430,9 @@ if [[ $record == true ]]; then
   record_flags=(-modes ${(j:,:)${(C)record_modes}} -band $band)
   [[ $stopped_early == true ]] && record_flags+=(-stopped-early)
   measuring edit && record_flags+=(-edit $edit)
+  [[ -n $project_engine ]] && record_flags+=(-project-engine $project_engine)
+  (( ${cold[(Ie)--no-fix]} )) && record_flags+=(-no-fix)
+  record_flags+=(-gogc=${GOGC-} -gomemlimit=${GOMEMLIMIT-} -gomaxprocs=${GOMAXPROCS-})
   (cd ${0:A:h:h} && go run ./internal/bench_results/tools/record -runs $runs_table -engine $engine \
     -project ${project:t} -project-commit $project_commit -idle-floor $idle_floor -settle $settle \
     -rounds $rounds_taken -out ${record_directory:-bench/results} $record_flags) ||

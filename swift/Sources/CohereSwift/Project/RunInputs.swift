@@ -30,9 +30,7 @@ import Foundation
    asked: the nearest directory holding the walk's start and every target source, `""` when they lie in different
    subtrees of the repository. A scope too wide only costs a miss, one too narrow is a stale replay, so it is never
    narrower than what was asked. The file set reads the rules the digest reads, the repository's alone and case
-   sensitively (#jgk8ppa), but for a worktree's shared `info/exclude`, which the digest does not read yet
-   (#vdbcswp): a run that excluded a path by it keeps the index keyed on its bytes, as an index read with a fallback
-   does;
+   sensitively (#jgk8ppa), a worktree's shared `info/exclude` among them;
  - every Swift file no target compiles that the walk read to tell whether it is a script (`FileSet.filesRead`), a file
    of declarations among them, since an edit can make it one. At a scripts-only root, where no root is walked, these,
    the scripts and the walk's listings are the whole of what decides which files it checks and what it finds there;

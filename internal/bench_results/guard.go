@@ -43,9 +43,11 @@ type GuardResult struct {
 // never last night's, so a creep of a few percent a night still trips once it adds up past the threshold.
 //
 // Records of different projects or machines are refused, since their numbers measure different work or
-// different hardware. A baseline with no quiet cold number, or from a modified engine, is refused too: a
-// baseline is a number someone can reproduce. A tonight with neither is Unmeasured, not an error, because a
-// loaded night is the machine's doing, not the record's, and the guard must still say the night was lost.
+// different hardware, and so are a record of the whole root and one narrowed to one engine's project
+// (Record.Engine), which measure different work on the same project. A baseline with no quiet cold number, or
+// from a modified engine, is refused too: a baseline is a number someone can reproduce. A tonight with neither
+// is Unmeasured, not an error, because a loaded night is the machine's doing, not the record's, and the guard
+// must still say the night was lost.
 func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, error) {
 	// A NaN threshold compares false with everything, so every night would pass; refuse it with the negatives.
 	if !(threshold >= 0) {
@@ -56,6 +58,20 @@ func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, err
 			"the baseline measured %q and tonight measured %q, and different projects are never compared",
 			baseline.Project.Name,
 			tonight.Project.Name,
+		)
+	}
+	if baseline.Engine != tonight.Engine {
+		return GuardResult{}, fmt.Errorf(
+			"the baseline checked %s and tonight checked %s, and runs of different scope are never compared",
+			checkedScope(baseline.Engine),
+			checkedScope(tonight.Engine),
+		)
+	}
+	if baseline.NoFix != tonight.NoFix {
+		return GuardResult{}, fmt.Errorf(
+			"the baseline's cold runs %s and tonight's %s, and a fixing run is never compared with a checking one",
+			coldKind(baseline.NoFix),
+			coldKind(tonight.NoFix),
 		)
 	}
 	if baseline.Machine.Model != tonight.Machine.Model || baseline.Machine.Cores != tonight.Machine.Cores {
@@ -119,6 +135,23 @@ func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, err
 		result.Verdict = GuardVerdictPass
 	}
 	return result, nil
+}
+
+// coldKind says whether a record's cold runs fixed or only checked, for a refusal to name.
+func coldKind(noFix bool) string {
+	if noFix {
+		return "checked without fixing"
+	}
+	return "fixed"
+}
+
+// checkedScope says what a record with engine checked, for a refusal to name: the whole root, or one
+// engine's project alone.
+func checkedScope(engine Engine) string {
+	if engine == "" {
+		return "the whole root"
+	}
+	return fmt.Sprintf("the %s project alone", engine)
 }
 
 // UnmeasuredStreak is how many of the newest verdicts, newest last, are Unmeasured in a row: the nights the

@@ -141,6 +141,10 @@ changed in cohere outside the sets is written under the same heading.
   repository's index itself, and a run whose index can't be read, a split or sparse one, decides by the ignore files
   alone and says so. The run cache keys the index on what it decides, the tracked paths the ignore rules exclude and
   the gitlinks, so a `git status` or a `git add` of an ordinary file still replays, and a `git add -f` doesn't.
+- A project below its repository's root is formatted by the repository's ignore files and index, as `git
+check-ignore` decides from there: a `.gitignore` above the project applies, and a file git tracks under a pattern
+  that matches it is formatted. A walk that can't read the index, a split or sparse one, says why under `--verbose`
+  and in `--json`'s `gaps.indexFallback`, since a tracked file then reads ignored.
 - A git worktree reads the `info/exclude` it shares with its main checkout, as git does, where it read none: a file
   only that exclude lists is ignored, named by the file's path as `git check-ignore -v` names it.
 - The footer's checked count is the files a phase examined, never the files in scope. A Swift project whose
@@ -182,6 +186,11 @@ changed in cohere outside the sets is written under the same heading.
   read as one. A name or file name holding one is a new finding in every engine. A whole `typ` asks Go for a
   descriptive name ending in `Type`, as `err` does, and a whole `func` asks for a name for its role, since
   `function` is reserved in TypeScript.
+- A rule key in `CohereSettings.json` that names no rule cohere has, at the top level or in an override, in the
+  project's own file or any file it extends, is refused at load: the run exits 1 naming the key and the file, and
+  checks nothing. A typo or a rule from a newer cohere loaded, applied to nothing and read green, and only
+  `--verbose` said so, as `config: key "..." matches no registered rule`, a line that is gone. `unused-disable`
+  is a setting and still loads. `--format-only` reads no rules, so it is unchanged.
 
 ## 0.1.1 (2026-11-03)
 

@@ -67,6 +67,7 @@ func (engine *pipeline) abandonSpeculation() {
 	close(engine.speculation.abandon)
 	<-engine.speculation.finished
 	engine.speculation = nil
+	engine.watch(preludeLintAbandoned)
 }
 
 // speculativePass is the pass beside the load, once it has finished, for a clean load, whose lint phase is that

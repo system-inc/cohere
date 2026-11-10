@@ -4,7 +4,12 @@
 //
 //	go run ./internal/bench_results/tools/record -runs <runs.tsv> -engine <engine> -project <name> \
 //	  -project-commit <sha> -idle-floor <percent> -settle <seconds> -rounds <n> -modes <Cold,Warm,...> \
-//	  -band <percent> [-stopped-early] [-edit <path>]
+//	  -band <percent> [-stopped-early] [-edit <path>] [-project-engine Go] [-no-fix] \
+//	  -gogc <value> -gomemlimit <value> -gomaxprocs <value>
+//
+// The Go settings are what the benchmark saw in its environment, each empty when unset, and -project-engine
+// names the one engine whose project every run checked alone, absent for a run of the whole root. -no-fix says the
+// cold and idle runs checked without fixing.
 //
 // The engine's commit and whether its tree was modified come from the binary's own build info, not from
 // its --version prose, so a binary that names no commit is refused rather than recorded as clean.
@@ -37,6 +42,12 @@ func main() {
 	band := flag.Float64("band", 0, "the early stop's agreement band, in percent")
 	stoppedEarly := flag.Bool("stopped-early", false, "the run stopped early because its quiet runs agreed")
 	edit := flag.String("edit", "", "the file the Edit runs changed, when Edit was measured")
+	projectEngine := flag.String("project-engine", "", "the engine whose project every run checked alone, if one")
+	noFix := flag.Bool("no-fix", false, "the cold and idle runs checked without fixing")
+	goEnvironment := bench_results.GoEnvironment{}
+	flag.StringVar(&goEnvironment.Gogc, "gogc", "", "GOGC in the benchmark's environment, empty when unset")
+	flag.StringVar(&goEnvironment.Gomemlimit, "gomemlimit", "", "GOMEMLIMIT in the environment, empty when unset")
+	flag.StringVar(&goEnvironment.Gomaxprocs, "gomaxprocs", "", "GOMAXPROCS in the environment, empty when unset")
 	out := flag.String("out", bench_results.Directory, "the directory to write the record to")
 	flag.Parse()
 
@@ -56,6 +67,9 @@ func main() {
 		*band,
 		*stoppedEarly,
 		*edit,
+		bench_results.Engine(*projectEngine),
+		*noFix,
+		&goEnvironment,
 		*out,
 	)
 	if recordError != nil {
@@ -74,7 +88,11 @@ func record(
 	measured []bench_results.Mode,
 	band float64,
 	stoppedEarly bool,
-	edit, out string,
+	edit string,
+	projectEngine bench_results.Engine,
+	noFix bool,
+	goEnvironment *bench_results.GoEnvironment,
+	out string,
 ) (string, error) {
 	cohere, engineProvenanceError := engineProvenance(engine)
 	if engineProvenanceError != nil {
@@ -101,6 +119,9 @@ func record(
 		Band:          band,
 		StoppedEarly:  stoppedEarly,
 		Edit:          edit,
+		Engine:        projectEngine,
+		NoFix:         noFix,
+		GoEnvironment: goEnvironment,
 		Runs:          runs,
 		Modes:         bench_results.Summarize(measured, runs),
 	}

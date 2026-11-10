@@ -1,0 +1,52 @@
+package bench_results
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+)
+
+// coldArgumentsScript is bench/cold_arguments.zsh, which quiet_machine.sh sources for its cold and idle runs'
+// arguments, relative to this package.
+var coldArgumentsScript = filepath.Join("..", "..", "bench", "cold_arguments.zsh")
+
+// coldArguments runs bench/cold_arguments.zsh's cold_arguments for engine, empty for the whole root, as
+// quiet_machine.sh does, and gives the arguments it printed. The script is read here, through os, and its bytes
+// handed to zsh, rather than zsh opening it: go test's cache keys a test on the files the test process opens, and
+// one only zsh opened would let an edit to the script replay a cached pass.
+func coldArguments(test *testing.T, engine string) []string {
+	test.Helper()
+	zsh, lookError := exec.LookPath("zsh")
+	if lookError != nil {
+		test.Fatalf("the benchmark is a zsh script, and zsh is not on the path: %v", lookError)
+	}
+	script, readError := os.ReadFile(coldArgumentsScript)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	printed, runError := exec.Command(zsh, "-c", string(script)+"\ncold_arguments \"$1\"", "zsh", engine).Output()
+	if runError != nil {
+		test.Fatalf("cold_arguments %q: %v", engine, runError)
+	}
+	return strings.Fields(string(printed))
+}
+
+// A cold run narrowed to the Go engine checks without fixing, since #pff7xhr's bar is a checking run's seconds
+// (#jp0cqkk), and reads no cache; a whole-root cold run reads no cache and fixes, as the baselines it is held to did.
+func TestTheGoEnginesColdRunChecksWithoutFixing(test *testing.T) {
+	test.Parallel()
+	for engine, want := range map[string][]string{
+		string(EngineGo): {"--no-cache", "--no-fix"},
+		"":               {"--no-cache"},
+	} {
+		test.Run("engine "+engine, func(test *testing.T) {
+			test.Parallel()
+			if arguments := coldArguments(test, engine); !slices.Equal(arguments, want) {
+				test.Errorf("cold_arguments %q printed %q, want %q", engine, arguments, want)
+			}
+		})
+	}
+}

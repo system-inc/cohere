@@ -143,6 +143,10 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 	test.Parallel()
 	otherCores := guardRecord("ahra", "Mac16,5", 10, true)
 	otherCores.Machine.Cores = 12
+	goAlone := guardRecord("cohere", "Mac16,5", 1.9, true)
+	goAlone.Engine = EngineGo
+	goAloneChecking := goAlone
+	goAloneChecking.NoFix = true
 	for name, want := range map[string]struct {
 		baseline Record
 		tonight  Record
@@ -163,6 +167,28 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 			tonight:  otherCores,
 			refusal:  "different machines are never compared",
 		},
+		// A narrowed run is never the whole root's baseline, nor judged against it, either way round.
+		"a Go project alone against the whole root": {
+			baseline: guardRecord("cohere", "Mac16,5", 10, true),
+			tonight:  goAlone,
+			refusal:  "checked the whole root and tonight checked the Go project alone",
+		},
+		"the whole root against a Go project alone": {
+			baseline: goAlone,
+			tonight:  guardRecord("cohere", "Mac16,5", 10, true),
+			refusal:  "checked the Go project alone and tonight checked the whole root",
+		},
+		// A checking run is never judged against a fixing one, either way round, on the same project and engine.
+		"a checking night against a fixing baseline": {
+			baseline: goAlone,
+			tonight:  goAloneChecking,
+			refusal:  "the baseline's cold runs fixed and tonight's checked without fixing",
+		},
+		"a fixing night against a checking baseline": {
+			baseline: goAloneChecking,
+			tonight:  goAlone,
+			refusal:  "the baseline's cold runs checked without fixing and tonight's fixed",
+		},
 		"loaded baseline": {
 			baseline: guardRecord("ahra", "Mac16,5", 10, false),
 			tonight:  guardRecord("ahra", "Mac16,5", 10, true),
@@ -179,6 +205,23 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 				test.Errorf("the refusal %q does not say %q", guardError, want.refusal)
 			}
 		})
+	}
+}
+
+// Two runs narrowed to the same engine compare as two whole-root runs do: the engine bounds what is
+// compared, and changes nothing else about the verdict.
+func TestGuardComparesRunsOfTheSameEngine(test *testing.T) {
+	test.Parallel()
+	baseline := guardRecord("cohere", "Mac16,5", 2, true)
+	baseline.Engine = EngineGo
+	tonight := guardRecord("cohere", "Mac16,5", 2.5, true)
+	tonight.Engine = EngineGo
+	result, guardError := Guard(baseline, tonight, 0.10)
+	if guardError != nil {
+		test.Fatal(guardError)
+	}
+	if result.Verdict != GuardVerdictRegressed || result.Ratio != 1.25 {
+		test.Fatalf("read %s at ratio %g, want %s at 1.25", result.Verdict, result.Ratio, GuardVerdictRegressed)
 	}
 }
 

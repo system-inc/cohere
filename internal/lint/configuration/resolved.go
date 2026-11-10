@@ -223,10 +223,10 @@ func (resolved Resolved) RuleAliases(registeredNames []string) map[string]string
 //
 // One direction only. `nexus/consistency-no-enum` reaches a rule registered as
 // `consistency-no-enum`, but a bare `no-unused-vars` does not reach a rule registered as
-// `@typescript-eslint/no-unused-vars`. It is exported so the orphaned-key report asks the same
-// question: that report once tested the reverse direction, so after the 2026-10-02 rename it called
-// phi api's bare keys resolving while this function left all three rules unconfigured, and 152
-// findings disappeared with no warning.
+// `@typescript-eslint/no-unused-vars`. The load's refusal of a key that reaches no rule asks this same
+// question (refuseKeysReachingNoRule): the report that came before it once tested the reverse direction,
+// so after the 2026-10-02 rename it called phi api's bare keys resolving while this function left all
+// three rules unconfigured, and 152 findings disappeared with no warning.
 //
 // It is asked for every configured key against every rule not named exactly, for every file, so it
 // allocates nothing: building "/"+ruleName for each comparison was about 0.2s of CPU in a cold ahra run

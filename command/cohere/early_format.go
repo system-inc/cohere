@@ -138,6 +138,7 @@ func (early *earlyFormat) formatScopeOf() (formatScope, []string) {
 		}, nil
 	}
 	declareFormatWalk(early.universe.root)
+	noteFormatWalkGaps(early.universe.root)
 	return early.scope, early.universe.files
 }
 

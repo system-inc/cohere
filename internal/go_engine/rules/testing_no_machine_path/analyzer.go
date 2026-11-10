@@ -107,6 +107,9 @@ func judgeLiteral(context *rule.Context, node ast.Node, stack []ast.Node) {
 	if !state.isTest || !isLiteral || literal.Kind != token.STRING || len(stack) == 0 {
 		return
 	}
+	if !mayNameHomeDirectory(literal.Value) {
+		return
+	}
 	// A literal the parser accepted always unquotes; one that does not is left alone rather than guessed at.
 	value, unquoteError := strconv.Unquote(literal.Value)
 	if unquoteError != nil || !homeDirectory.MatchString(value) {
@@ -139,6 +142,18 @@ func judgeLiteral(context *rule.Context, node ast.Node, stack []ast.Node) {
 		Category: message.Id,
 		Message:  message.Render(map[string]string{}),
 	})
+}
+
+// mayNameHomeDirectory is whether a string literal, as its source spells it, could name a home directory once
+// unquoted, read without unquoting it, since nearly no literal does and unquoting allocates. A match of homeDirectory
+// holds /Users/ or /home/ as written. Unquoting changes the text only through an escape, which starts with a
+// backslash, or, in a raw string, by dropping a carriage return, so a literal holding neither is its own value and
+// holds those words only if its source does. One holding either is unquoted and matched as before.
+func mayNameHomeDirectory(source string) bool {
+	if strings.ContainsAny(source, "\\\r") {
+		return true
+	}
+	return strings.Contains(source, "/Users/") || strings.Contains(source, "/home/")
 }
 
 // linesCoveredAbove is the excuse each line of file takes from a marker directly above a node: every line of each node

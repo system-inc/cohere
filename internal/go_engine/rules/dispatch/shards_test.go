@@ -296,3 +296,31 @@ func TestAFileLocalListenerReadingFileStateJudgesEachFileAlone(test *testing.T) 
 			strings.Join(whole, "\n"), strings.Join(split, "\n"), strings.Join(expected, "\n"))
 	}
 }
+
+// TestTheDefaultShardSplitsWhatEndsACohereRun pins defaultShardBytes by the packages it was set for (#3ddm7fm), each
+// by its size in source bytes at cohere's root: internal/lint/rules/core's test variant splits, and so does
+// internal/lint/rules/typescript's, which a 4 MiB shard left whole at the end of the cold run; react's test variant and
+// command/cohere stay whole, since splitting them bought no wall.
+func TestTheDefaultShardSplitsWhatEndsACohereRun(test *testing.T) {
+	test.Parallel()
+	requireSplitting(test)
+	dispatcher := NewSyntax()
+	for _, testCase := range []struct {
+		name  string
+		bytes int
+		split bool
+	}{
+		{name: "internal/lint/rules/core's test variant", bytes: 14_259_553, split: true},
+		{name: "internal/lint/rules/typescript's test variant", bytes: 5_775_349, split: true},
+		{name: "internal/lint/rules/react's test variant", bytes: 5_182_045, split: false},
+		{name: "command/cohere", bytes: 2_098_452, split: false},
+	} {
+		fileSet := token.NewFileSet()
+		tokenFile := fileSet.AddFile("", -1, testCase.bytes)
+		pass := &analysis.Pass{Fset: fileSet, Files: []*ast.File{{Package: token.Pos(tokenFile.Base())}}}
+		if split := dispatcher.shardsOf(pass) > 1; split != testCase.split {
+			test.Errorf("%s, %d bytes, splits %v at the default shard of %d bytes, want %v", testCase.name,
+				testCase.bytes, split, defaultShardBytes, testCase.split)
+		}
+	}
+}

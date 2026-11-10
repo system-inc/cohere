@@ -522,22 +522,10 @@ final class IgnoreRules {
     /* `info/exclude`, consulted after every `.gitignore`. Empty when there is no git directory to hold one. */
     private let excludePatterns: [Pattern]
     /*
-     A worktree's shared `info/exclude`, absolute, which Go's matcher (`gitignore.New`), and so the front door's digest,
-     does not read yet (#vdbcswp): it reads `.git/info/exclude` only through a `.git` directory. Nil wherever the two
-     read the same file. See `excludedBeyondTheDigest`.
-     */
-    private let excludeTheDigestCannotRead: String?
-    /*
      The directory holding every path whose listing this was asked, relative to the root, as its components: nil before
      any was asked. See `trackedIgnored`.
      */
     private var consultedScope: [Substring]?
-    /*
-     Whether any path was excluded by a line of `excludeTheDigestCannotRead`. The digest the front door keys an index on
-     covers the tracked paths its own rules exclude, so tracking such a path would move no digest, and the index is
-     then keyed on its bytes (`trackedIgnored`). Gone once Go reads a worktree's shared `info/exclude` (#vdbcswp).
-     */
-    private var excludedBeyondTheDigest = false
     /* Each directory's own `.gitignore`, by its path relative to the root ("" for the root), read once. */
     private var directoryPatterns: [String: [Pattern]] = [:]
     /*
@@ -563,15 +551,9 @@ final class IgnoreRules {
             let exclude = commonDirectory.appendingPathComponent("info/exclude").path
             consulted.insert(exclude)
             excludePatterns = Self.patterns(inFile: exclude)
-            /* Go reads `.git/info/exclude` only through a `.git` directory, which is the common directory here. */
-            let marker = repository.root.appendingPathComponent(".git")
-            let digestReadsIt =
-                Self.isDirectory(marker) && commonDirectory.standardizedFileURL.path == marker.standardizedFileURL.path
-            excludeTheDigestCannotRead = digestReadsIt ? nil : exclude
         }
         else {
             excludePatterns = []
-            excludeTheDigestCannotRead = nil
         }
 
         /* The object format is the repository's alone: git honours `extensions` in no other config file. */
@@ -608,11 +590,10 @@ final class IgnoreRules {
      `""` for the root, so the run's inputs record can name it under `trackedIgnored` (#jem2gsa). The scope is the
      nearest directory holding every path whose listing was asked, the walk's start and each target source alike: an
      answer below it depends only on index entries below it, since a directory above is entered for its tracked files
-     only when one below it is tracked. Nil when the index was not read whole, and when a path was excluded by a file
-     the front door's digest does not read (`excludedBeyondTheDigest`): either way the index stays keyed on its bytes.
+     only when one below it is tracked. Nil when the index was not read whole, which then stays keyed on its bytes.
      */
     var trackedIgnored: (index: String, scope: String)? {
-        guard indexFallbackReason == nil, !excludedBeyondTheDigest, let indexFile else { return nil }
+        guard indexFallbackReason == nil, let indexFile else { return nil }
         return (index: indexFile, scope: (consultedScope ?? []).joined(separator: "/"))
     }
 
@@ -820,10 +801,6 @@ final class IgnoreRules {
         }
         else if let line = ignoringLine(relative: relative, parent: parent, name: name, isDirectory: isDirectory) {
             excludedBy = line
-            /* Every `.gitignore` is asked before `info/exclude`, so a line of it decides only where none did. */
-            if line.file == excludeTheDigestCannotRead {
-                excludedBeyondTheDigest = true
-            }
         }
         else {
             return .admitted

@@ -23,8 +23,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/format/native"
 )
 
 // SchemaVersion is the version of the record's shape that is written. A reader accepts it and
@@ -81,9 +84,42 @@ type Record struct {
 	StoppedEarly bool `json:"stoppedEarly,omitempty"`
 	// Edit is the file the Edit runs changed, relative to the project, when Edit was measured.
 	Edit string `json:"edit,omitempty"`
+	// Engine is the one engine whose project every run checked alone, as `cohere --directory` with
+	// `COHERE_PROJECT_ENGINE` set checks it, and is absent for a run of the project's whole root. A number for
+	// one engine is not a number for the root, so its file is named apart (FileName) and Guard never compares
+	// it with a whole-root one.
+	Engine Engine `json:"engine,omitempty"`
+	// GoEnvironment is the Go runtime's settings in the benchmark's environment, which every run inherited.
+	// It is absent from a record written before the benchmark kept them.
+	GoEnvironment *GoEnvironment `json:"goEnvironment,omitempty"`
+	// NoFix is whether the Cold and Idle runs checked without fixing, `cohere --no-fix --no-cache`, as a run narrowed
+	// to the Go engine does: #pff7xhr's bar is a checking run's seconds, and a fixing run formats first (#jp0cqkk).
+	// Absent, they fixed, as every record before it did, so Guard never compares a fixing number with a checking one.
+	NoFix bool `json:"noFix,omitempty"`
 
 	Runs  []Run                `json:"runs"`
 	Modes map[Mode]ModeSummary `json:"modes"`
+}
+
+// Engine is one engine of cohere's, named as `COHERE_PROJECT_ENGINE` names it (command/cohere/root.go's
+// projectEngine), whose project a record's runs checked alone.
+type Engine string
+
+// EngineGo is the Go engine, the only one a run is narrowed to so far: #pff7xhr's bar is its cold seconds on
+// cohere's own root, which a whole-root run measures beside a Swift run on the same cores.
+const EngineGo Engine = "Go"
+
+// Engines are every engine a record can be narrowed to.
+var Engines = []Engine{EngineGo}
+
+// GoEnvironment is the Go runtime's settings as the benchmark saw them in its environment, each empty when it
+// was unset. Any of them moves the Go engine's seconds, so the record keeps them beside its numbers. `GODEBUG`
+// is not among them, since the benchmark refuses to start with it set (#9wfsmqv: any `GODEBUG` sends the Go
+// engine's in-process lister to `go list`, about 600 ms).
+type GoEnvironment struct {
+	Gogc       string `json:"GOGC"`
+	Gomemlimit string `json:"GOMEMLIMIT"`
+	Gomaxprocs string `json:"GOMAXPROCS"`
 }
 
 // Cohere is the engine every run used.
@@ -204,7 +240,8 @@ func MeasuredModesOf(record Record) []Mode {
 // summary that is not what the quiet runs give, including one on a mode with no quiet run; a measured mode
 // with a run count other than the rounds, or a run of a mode it did not measure; a run whose cache use its
 // mode cannot have, which means the run was not what its mode says, or the instrument read nothing; an early
-// stop its quiet runs do not justify. A dirty engine is refused too, since no commit reproduces its numbers.
+// stop its quiet runs do not justify; an engine no run is narrowed to. A dirty engine is refused too, since no
+// commit reproduces its numbers.
 func Validate(record Record) error {
 	if record.Schema != SchemaVersion && record.Schema != loadSchemaVersion {
 		return fmt.Errorf("schema %d, want %d or %d", record.Schema, SchemaVersion, loadSchemaVersion)
@@ -228,6 +265,9 @@ func Validate(record Record) error {
 	}
 	if !byLoad && (record.IdleFloor <= 0 || record.IdleFloor > 100) {
 		return fmt.Errorf("an idle floor of %g%% is not a share of the cores", record.IdleFloor)
+	}
+	if record.Engine != "" && !slices.Contains(Engines, record.Engine) {
+		return fmt.Errorf("the record names engine %q, and a run is narrowed only to one of %v", record.Engine, Engines)
 	}
 	measured := MeasuredModesOf(record)
 	if knownModesError := knownModes(measured); knownModesError != nil {
@@ -403,19 +443,25 @@ func cacheFitsMode(run Run) error {
 	return nil
 }
 
-// Encode is a record as it is committed: validated, indented, with a final newline.
+// encodedFileName names a record to the formatter, which chooses its printer by the extension alone. FileName is
+// not used: it slices fields Validate does not hold to a length, and a record it cannot name must still encode.
+const encodedFileName = "record.json"
+
+// Encode is a record as it is committed: validated, and in the house format the format check at cohere's root reads
+// every file in, so a record the benchmark writes lands with nothing to fix (#rqmykvm, #4wjhppw).
 func Encode(record Record) ([]byte, error) {
 	if validateError := Validate(record); validateError != nil {
 		return nil, validateError
 	}
-	encoded, encodeError := json.MarshalIndent(record, "", "  ")
+	encoded, encodeError := json.Marshal(record)
 	if encodeError != nil {
 		return nil, encodeError
 	}
-	return append(encoded, '\n'), nil
+	return native.FormatHouse(encodedFileName, encoded)
 }
 
-// FileName is the record's file name: its date, the engine's commit and the machine's model.
+// FileName is the record's file name: its date, the engine's commit and the machine's model, and for a run
+// narrowed to one engine that engine, so it never takes the name of the same day's whole-root record.
 func FileName(record Record) string {
 	model := strings.Map(func(character rune) rune {
 		switch {
@@ -426,7 +472,11 @@ func FileName(record Record) string {
 		}
 		return '-'
 	}, record.Machine.Model)
-	return fmt.Sprintf("%s-%s-%s.json", record.RecordedAt[:10], record.Cohere.Commit[:12], model)
+	name := fmt.Sprintf("%s-%s-%s", record.RecordedAt[:10], record.Cohere.Commit[:12], model)
+	if record.Engine != "" {
+		name += "-" + strings.ToLower(string(record.Engine))
+	}
+	return name + ".json"
 }
 
 // Read reads every record in directory, sorted by file name, and refuses the first that does not

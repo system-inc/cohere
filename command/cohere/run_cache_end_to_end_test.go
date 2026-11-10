@@ -249,7 +249,7 @@ func TestRunCacheEndToEnd(test *testing.T) {
 		{"a base the lint config extends changed, on a config read ahead of the build", false,
 			func(fixture *runCacheFixture) {
 				// A base beside a set may configure only rules no set in the chain does, so it holds one of its own.
-				fixture.write("lint/base.json", `{"rules":{"no-console":"off"}}`)
+				fixture.write("lint/base.json", `{"rules":{"base/consistency-no-console":"off"}}`)
 				fixture.write(
 					"CohereSettings.json",
 					`{"extends":["cohere:react","./lint/base.json"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`,
@@ -257,7 +257,7 @@ func TestRunCacheEndToEnd(test *testing.T) {
 				fixture.requireConfigReadAhead()
 			},
 			func(fixture *runCacheFixture) {
-				fixture.write("lint/base.json", `{"rules":{"no-console":"error"}}`)
+				fixture.write("lint/base.json", `{"rules":{"base/consistency-no-console":"error"}}`)
 			}},
 		{"the tsconfig changed", false, nil,
 			func(fixture *runCacheFixture) {

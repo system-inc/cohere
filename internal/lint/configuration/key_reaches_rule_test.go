@@ -5,9 +5,10 @@ import (
 	"testing"
 )
 
-// TestKeyReachesRuleRunsOneWay pins the direction the resolver and the orphaned-key report share. The
-// report once tested the reverse, so a bare key against a prefixed registry name read as resolving
-// while the resolver left the rule unconfigured (#7ya3xwe follow-up, 2026-10-02).
+// TestKeyReachesRuleRunsOneWay pins the direction the resolver and the load's refusal of a key that reaches no
+// rule share. The report that came before the refusal once tested the reverse, so a bare key against a
+// prefixed registry name read as resolving while the resolver left the rule unconfigured (#7ya3xwe follow-up,
+// 2026-10-02).
 func TestKeyReachesRuleRunsOneWay(test *testing.T) {
 	test.Parallel()
 	cases := []struct {

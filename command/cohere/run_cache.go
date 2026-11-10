@@ -606,6 +606,15 @@ func declareLintConfigInputs(path string) {
 	}
 }
 
+// noteFormatWalkGaps says, in the run's gaps, what a format walk the run used could not decide: a repository's index
+// it fell back from (#14skmqy). Every walk a run uses is declared (declareFormatWalk), and this is called beside it,
+// whether or not the run is recorded.
+func noteFormatWalkGaps(enumeration format_files.Enumeration) {
+	if enumeration.IndexFallback != "" && activeSummary.Gaps.IndexFallback == "" {
+		activeSummary.Gaps.IndexFallback = enumeration.IndexFallback
+	}
+}
+
 // declareFormatWalk adds what one format walk depends on to this run's inputs, so a run that checks
 // formatting can be replayed (#13a63n3).
 //
@@ -636,7 +645,7 @@ func declareFormatWalk(enumeration format_files.Enumeration) {
 	}
 	if enumeration.Index != "" {
 		session.trackedIgnored = append(session.trackedIgnored,
-			trackedIgnoredIndex{index: enumeration.Index, root: enumeration.IndexRoot})
+			trackedIgnoredIndex{index: enumeration.Index, root: enumeration.IndexRoot, scope: enumeration.IndexScope})
 	}
 	read := []string{
 		filepath.Join(enumeration.Root, ".gitmodules"),
