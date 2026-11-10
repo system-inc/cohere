@@ -276,6 +276,10 @@ pin_swift_engine() {
     return 0
   fi
   cp $swift_source $swift_engine
+  # Launched once here, so macOS's scan of a new executable on its first launch (about 8ms a MB, about 260ms for
+  # cohere-swift) is paid before round 1 rather than inside it, as the engine's own `--version` above pays its
+  # scan (#4b87w3r). A copy that cannot say its version would fail every Swift run, so it stops the bench here.
+  $swift_engine --version > /dev/null 2>&1 || fail "the pinned Swift engine $swift_engine does not run"
   export COHERE_SWIFT_ENGINE=$swift_engine
 }
 
