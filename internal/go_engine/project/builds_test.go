@@ -392,3 +392,29 @@ func hostAt(test *testing.T, root string) Build {
 	}
 	return HostBuild(&buildContext, goFlags)
 }
+
+// A file whose package is not the one its directory compiles is a program of its own, run by itself (#rkw4xcn):
+// adamic's `package main` oracle behind lintoracle, beside a package's tests. No build of the directory's package
+// compiles it, so its tag is never set for it, and it is unbuilt with that reason. An external test behind a tag
+// tests the package it sits in, and a tagged file of the package itself is that package's, so both still get the
+// build their tag needs.
+func TestBuildsForNeverFoldsAProgramOfItsOwnIntoItsDirectorysPackage(test *testing.T) {
+	test.Parallel()
+	census := censusOf(test, map[string]string{
+		"rules/rule/build_test.go": "package assertions\n",
+		"rules/rule/oracle.go":     "//go:build lintoracle\n\npackage main\n",
+		"probe/probe.go":           "package probe\n",
+		"probe/external_test.go":   "//go:build probetag\n\npackage probe_test\n",
+		"probe/tagged.go":          "//go:build probetag\n\npackage probe\n",
+	})
+	builds, unbuilt := buildsFor(test, census, testHost, testPorts)
+	if got := labels(builds); !slices.Equal(got, []string{"darwin/arm64 cgo", "darwin/arm64 cgo tags probetag"}) {
+		test.Errorf("the builds are %v, want the host's and probetag's alone: lintoracle is never set", got)
+	}
+	if len(unbuilt) != 1 || filepath.Base(unbuilt[0].File) != "oracle.go" ||
+		unbuilt[0].Reason != "a program of its own, package main beside package assertions, so no build of its "+
+			"directory's package compiles it" {
+		test.Errorf("unbuilt %+v, want oracle.go alone, named as a program of its own", unbuilt)
+	}
+	requireEachCompiledOnce(test, census, builds, unbuilt)
+}

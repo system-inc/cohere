@@ -1,6 +1,7 @@
 package project
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -42,8 +43,10 @@ const enumerationBudget = 1 << 16
 // are too many to weigh one by one (enumerationBudget), the builds are chosen tag component by tag component instead
 // (buildsByComponent), still compiling every file some build on the host's architecture compiles.
 func BuildsFor(census Census, host Build, ports []Port) ([]Build, []Unbuilt, error) {
-	var uncompiled []source
+	var candidatesUncompiled []source
 	var unbuilt []Unbuilt
+	// compiledPackages are the packages the host's build compiles in each directory, by name as packageOf reads it.
+	compiledPackages := map[string]map[string]bool{}
 	for _, file := range census.Ours {
 		read, readError := readSource(file)
 		if readError != nil {
@@ -56,11 +59,38 @@ func BuildsFor(census Census, host Build, ports []Port) ([]Build, []Unbuilt, err
 			return nil, nil, compileError
 		}
 		if !compiled {
-			uncompiled = append(uncompiled, read)
+			candidatesUncompiled = append(candidatesUncompiled, read)
+			continue
 		}
+		if name := packageOf(read); name != "" {
+			directory := filepath.Dir(read.file)
+			if compiledPackages[directory] == nil {
+				compiledPackages[directory] = map[string]bool{}
+			}
+			compiledPackages[directory][name] = true
+		}
+	}
+	// A file whose package is not the one its directory compiles is a program of its own, run by itself, such as a
+	// `package main` oracle beside a package's tests behind a tag of its own (adamic's lintoracle, #rkw4xcn): no build
+	// of the directory's package compiles it, so setting its tag only breaks that package, and it is unbuilt, named.
+	var uncompiled []source
+	for _, read := range candidatesUncompiled {
+		name, directoryPackages := packageOf(read), compiledPackages[filepath.Dir(read.file)]
+		// A file behind `ignore` is no build's at all, which its own reason says better (unbuiltReason).
+		ignored := readingOf(read, nil).ignore
+		if name != "" && len(directoryPackages) > 0 && !directoryPackages[name] && !ignored {
+			unbuilt = append(unbuilt, Unbuilt{File: read.file, Reason: "a program of its own, package " + name +
+				" beside package " + strings.Join(sortedKeys(directoryPackages), " and ") + ", so no build of its " +
+				"directory's package compiles it"})
+			continue
+		}
+		uncompiled = append(uncompiled, read)
 	}
 	builds := []Build{host}
 	if len(uncompiled) == 0 {
+		slices.SortFunc(unbuilt, func(left Unbuilt, right Unbuilt) int {
+			return strings.Compare(left.File, right.File)
+		})
 		return builds, unbuilt, nil
 	}
 
