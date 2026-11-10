@@ -486,6 +486,12 @@
                         }
                     }
                 },
+                "memoryRaisedToBytes": {
+                    "type": "array",
+                    "items": { "type": "integer", "minimum": 1 },
+                    "minItems": 1,
+                    "description": "Each limit a Go run raised its heap to after its load, in bytes and in the order raised. Absent when it raised none, from a replay, which started no engine, and for every other run."
+                },
                 "packageCache": {
                     "type": "object",
                     "description": "What the Go engine's per-package findings cache did in the lint phase, by package. Present only for a Go run that linted, and absent from a replay, which started no engine.",

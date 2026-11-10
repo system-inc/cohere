@@ -103,6 +103,9 @@ type summaryJson struct {
 
 	// PackageCache is what the Go engine's per-package findings cache did, absent for every other run.
 	PackageCache *packageCacheUse `json:"packageCache,omitempty"`
+	// MemoryRaisedToBytes is each limit a Go run raised its heap to after its load, absent when it raised none, for
+	// a replay, and for every other run.
+	MemoryRaisedToBytes []int64 `json:"memoryRaisedToBytes,omitempty"`
 	// Builds is every build a Go run checked when it checked more than one, the host's first, absent for a run of
 	// one build and every other run.
 	Builds []checkedBuild `json:"builds,omitempty"`
@@ -173,33 +176,34 @@ func summaryAsJson(summary runSummary) summaryJson {
 		})
 	}
 	return summaryJson{
-		Kind:              "summary",
-		SchemaVersion:     outputSchemaVersion,
-		Label:             summary.Label,
-		Verdict:           verdict,
-		Seconds:           summary.Total.Seconds(),
-		GraphSeconds:      summary.Graph.Seconds(),
-		Rules:             summary.Rules,
-		Phases:            phases,
-		FormattingSeconds: summary.Formatting.Seconds(),
-		Cache:             summary.Cache,
-		PackageCache:      summary.PackageCache,
-		Builds:            summary.Builds,
-		TypeErrors:        summary.TypeErrors,
-		Findings:          summary.Findings,
-		FilesFixed:        summary.filesFixed(),
-		FilesFormatted:    summary.filesFormatted(),
-		WouldChange:       summary.WouldChange,
-		Cohered:           summary.cohered(),
-		FilesInScope:      summary.FilesInScope,
-		Checked:           summary.FilesChecked,
-		Cached:            summary.FilesCached,
-		TypesOnly:         summary.FilesTypesOnly,
-		Nodes:             summary.Nodes,
-		Gaps:              summary.Gaps,
-		Swift:             summary.Swift,
-		Adamic:            adamic,
-		IgnorePatterns:    summary.IgnorePatterns,
+		Kind:                "summary",
+		SchemaVersion:       outputSchemaVersion,
+		Label:               summary.Label,
+		Verdict:             verdict,
+		Seconds:             summary.Total.Seconds(),
+		GraphSeconds:        summary.Graph.Seconds(),
+		Rules:               summary.Rules,
+		Phases:              phases,
+		FormattingSeconds:   summary.Formatting.Seconds(),
+		Cache:               summary.Cache,
+		PackageCache:        summary.PackageCache,
+		MemoryRaisedToBytes: summary.MemoryRaisedToBytes,
+		Builds:              summary.Builds,
+		TypeErrors:          summary.TypeErrors,
+		Findings:            summary.Findings,
+		FilesFixed:          summary.filesFixed(),
+		FilesFormatted:      summary.filesFormatted(),
+		WouldChange:         summary.WouldChange,
+		Cohered:             summary.cohered(),
+		FilesInScope:        summary.FilesInScope,
+		Checked:             summary.FilesChecked,
+		Cached:              summary.FilesCached,
+		TypesOnly:           summary.FilesTypesOnly,
+		Nodes:               summary.Nodes,
+		Gaps:                summary.Gaps,
+		Swift:               summary.Swift,
+		Adamic:              adamic,
+		IgnorePatterns:      summary.IgnorePatterns,
 	}
 }
 

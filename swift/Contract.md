@@ -721,6 +721,11 @@ nothing raised, never left out and never `null`. The record is written once, in 
 `inputs` is: after the last phase record, and after `duplicates` and `timing` when they were asked for, and just
 before `inputs`. A check run whose load failed, or that asked for no load, writes none. The Swift engine writes none.
 
+The front door accepts one, in that place, and refuses a second, one before a phase's record or after `inputs`, and
+one with no `raisedToBytes`, as a broken stream. A raise is said under `--verbose`, below the types phase's `memory:`
+line, as `memory: raised to 9.7 GB after the load` (each raise in order, joined by `then`), and under `--json` as the
+summary's `memoryRaisedToBytes`. Neither is in the footer, and a replay says neither, since it raised nothing.
+
 ### `inputs`, just before `summary`
 
 ```json

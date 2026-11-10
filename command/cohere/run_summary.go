@@ -48,6 +48,9 @@ type runSummary struct {
 	Cache cacheUse
 	// PackageCache is what the Go engine's per-package findings cache did, nil for every other run.
 	PackageCache *packageCacheUse
+	// MemoryRaisedToBytes is each limit a Go run raised its heap to after its load, in order, nil when it raised
+	// none and for every other run (#5shepvt). A replay raised nothing, so it carries none.
+	MemoryRaisedToBytes []int64
 	// Builds is every build a Go run checked when it checked more than one, the host's first, nil for a run of one
 	// build and every other run. A replay keeps them, since the verdict it repeats was merged from them.
 	Builds []checkedBuild
