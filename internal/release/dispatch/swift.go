@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -236,8 +237,9 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 // stderr before starting, whatever the verbosity: a command that is silent for three minutes reads as
 // hung. SwiftPM's progress goes to stderr too, because this process's stdout is the report.
 //
-// Copied rather than linked, because the next build replaces the product in place, and a link would
-// turn every hash-named binary into whichever engine was built last.
+// Copied rather than linked to SwiftPM's product, because the next build replaces the product in place,
+// and a link would turn every hash-named binary into whichever engine was built last. The copy is
+// installed without replacing a binary already at binaryPath, for the reason copyExecutable gives.
 func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory string, binaryPath string) error {
 	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
@@ -296,6 +298,13 @@ func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory stri
 
 // copyExecutable copies a file to a new path through a temporary name in the same directory, so a
 // concurrent run never sees, and execs, a half-written binary.
+//
+// It never replaces a file already at destination. The temporary file is hard-linked into place, which
+// fails atomically when the name exists, and a binary already there is kept. Two processes can both find
+// the engine missing and both build it; with a rename the second install replaced the first one's binary
+// under a run already reading it, and that run, seeing an input change, refused its record (#p5ndwqa).
+// Keeping the first is safe because the name is swiftEngineHash's digest of everything that decides the
+// binary, so whatever is already there is the same engine.
 func copyExecutable(source string, destination string) error {
 	input, openError := os.Open(source)
 	if openError != nil {
@@ -307,10 +316,10 @@ func copyExecutable(source string, destination string) error {
 	if temporaryFileError != nil {
 		return temporaryFileError
 	}
-	// Removed on every failure path below. After the rename the name no longer exists and the call
-	// does nothing.
-	// Ignored: after the rename it fails by design, and on a failure path the error returned is the one that says
-	// what went wrong.
+	// Removed on every path below: once linked, the destination holds its own name for the same file, and
+	// otherwise the partial file is left over.
+	// Ignored: on a failure path the error returned is the one that says what went wrong, and a leftover
+	// partial file is never read, only its destination.
 	defer os.Remove(temporary.Name())
 
 	if _, copyError := io.Copy(temporary, input); copyError != nil {
@@ -326,5 +335,10 @@ func copyExecutable(source string, destination string) error {
 	if closeError := temporary.Close(); closeError != nil {
 		return closeError
 	}
-	return os.Rename(temporary.Name(), destination)
+	linkError := os.Link(temporary.Name(), destination)
+	if errors.Is(linkError, fs.ErrExist) {
+		// Another process installed the same engine first, and a run may already be reading it.
+		return nil
+	}
+	return linkError
 }
