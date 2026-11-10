@@ -272,6 +272,7 @@ func goSummaryVerdict(test *testing.T, output string) map[string]json.RawMessage
 	}
 	for _, invocation := range []string{
 		"seconds", "graphSeconds", "formattingSeconds", "phases", "cache", "packageCache", "checked", "cached", "nodes",
+		"memoryRaisedToBytes",
 	} {
 		delete(summary, invocation)
 	}
@@ -338,9 +339,12 @@ func TestAGoReplayIsTheColdRunsVerdict(test *testing.T) {
 				if replayLines != coldLines {
 					test.Fatalf("the replay's records differ:\n--- replay\n%s\n--- cold\n%s", replayLines, coldLines)
 				}
-				// A replay started no engine, so it says nothing of the engine's package cache.
-				if strings.Contains(summaryJsonOf(test, replayed.stdout), `"packageCache"`) {
-					test.Errorf("the replay's summary claims the engine's package cache:\n%s", replayed.stdout)
+				// A replay started no engine, so it says nothing of the engine's package cache, nor of a memory raise
+				// (#5shepvt).
+				for _, invocationOnly := range []string{`"packageCache"`, `"memoryRaisedToBytes"`} {
+					if strings.Contains(summaryJsonOf(test, replayed.stdout), invocationOnly) {
+						test.Errorf("the replay's summary claims the engine's %s:\n%s", invocationOnly, replayed.stdout)
+					}
 				}
 				replaySummary := jsonText(test, goSummaryVerdict(test, replayed.stdout))
 				coldSummary := jsonText(test, goSummaryVerdict(test, cold.stdout))

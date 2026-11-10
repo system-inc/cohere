@@ -639,6 +639,112 @@ Exactly one comes, after the `unused` phase record and before `inputs`, when `--
 otherwise; a run that asked and ends without one is refused. When the lint phase did not run, `ran` is false and
 `notRun` says why, since the report reads the lint phase's pass.
 
+### `timing`, after `lint`, only under `--timing`
+
+```json
+{
+    "kind": "timing",
+    "processCpuMicroseconds": 80000,
+    "load": {
+        "listCpuMicroseconds": 2000,
+        "listChildrenCpuMicroseconds": 150000,
+        "parseCpuMicroseconds": 4000,
+        "parsedFiles": 24,
+        "typeCheckCpuMicroseconds": 12000,
+        "typeCheckedPackages": 3,
+        "exportDataCpuMicroseconds": 6000,
+        "exportDataPackages": 37
+    },
+    "rules": [{ "name": "cohere-go/consistency-no-shouting", "cpuMicroseconds": 2500, "packages": 3, "calls": 640 }],
+    "shared": [
+        {
+            "name": "build_intermediate_representation",
+            "kind": "intermediateRepresentation",
+            "cpuMicroseconds": 8000,
+            "packages": 40
+        },
+        { "name": "syntax_dispatcher", "kind": "dispatcher", "cpuMicroseconds": 1500, "packages": 3 }
+    ],
+    "measuredCalls": 2300,
+    "measuringCpuMicroseconds": 230
+}
+```
+
+Additive within contract 3, and the Go engine's alone: under `--timing` it says what the run's CPU went to, so a Go
+rule is timed before it lands as a TypeScript one is (#3apgjer). It is written once, after the lint record and before
+`inputs` and the summary, and never in a run that did not ask, which the front door refuses as a broken stream, as it
+does a second one. The Swift engine refuses `--timing` and writes none.
+
+Every CPU figure is microseconds of the kernel's thread clock, read on a thread held for the work, so a rule that
+waits, sleeps or is descheduled costs nothing and none is wall time. Each figure has the measuring's own cost taken
+out, said once in `measuringCpuMicroseconds` beside `measuredCalls`, the pieces of work measured.
+
+- `rules` holds one entry for each rule that ran, most expensive first, summed over every package and build:
+  `packages` is how many its analyzer ran on, dependencies analyzed for facts included, and `calls` how many times a
+  dispatcher called its listener, 0 for a rule that walks on its own.
+- `shared` holds the analyzers no single rule owns, most expensive first, each with its `kind`:
+  `intermediateRepresentation` for the engine's intermediate representation build; `dispatcher` for a dispatcher's
+  walk less its calls into the listeners, which are billed to their rules; and `analyzer` for any other several rules
+  read, such as `inspect`. A kind the front door does not know is refused.
+- `load` is the load's phases, each summed across the goroutines that ran it, so each runs past the load's wall.
+  `listChildrenCpuMicroseconds` is the CPU of the go commands the listing ran, which no thread of this process spent.
+- `processCpuMicroseconds` is every CPU microsecond the process spent up to the record. The rows (rules, shared, the
+  load's own phases and measuring) are said against it, and what they leave is printed as its own line, what no row
+  measures, never spread over the rows.
+
+`rules` and `shared` are `[]` when empty, never left out, and the front door refuses a record missing either. When
+the thread clock cannot be read, `unavailable` says why, every CPU figure is 0 and means nothing, and the counts are
+still real; the front door then leaves the CPU columns out rather than print zeros:
+
+```json
+{
+    "kind": "timing",
+    "unavailable": "this platform has no per-thread CPU clock",
+    "processCpuMicroseconds": 0,
+    "load": {
+        "listCpuMicroseconds": 0,
+        "listChildrenCpuMicroseconds": 0,
+        "parseCpuMicroseconds": 0,
+        "parsedFiles": 24,
+        "typeCheckCpuMicroseconds": 0,
+        "typeCheckedPackages": 3,
+        "exportDataCpuMicroseconds": 0,
+        "exportDataPackages": 37
+    },
+    "rules": [{ "name": "cohere-go/consistency-no-shouting", "cpuMicroseconds": 0, "packages": 3, "calls": 640 }],
+    "shared": [],
+    "measuredCalls": 0,
+    "measuringCpuMicroseconds": 0
+}
+```
+
+The front door prints the record as TypeScript's timing table under the lint line, and under `--json` writes it
+through as a `timing` line before the summary (schema/CohereOutput.schema.json). A run under `--timing` is a
+measurement, so the run cache never replays it and never records it.
+
+### `memory`, the Go engine's, just before `inputs`
+
+```json
+{ "kind": "memory", "raisedToBytes": [9663676416] }
+```
+
+Additive within contract 3, and the Go engine's alone (#5shepvt): the memory limits the run raised its heap to.
+Every load runs under the limit the types record's `memory` names, and when that limit is the engine's cap, once a
+load ends with no collection in flight the engine may raise it once, by at most 1 GiB, until the next load starts
+(#44n0vap). A fixing run loads up to six times. The types record is written after the first load, before any raise
+lands, so its `memory` stays the limit the run started under, and this record says each limit the run went above it
+to.
+
+`raisedToBytes` holds one entry for each raise that landed, the limit it set, in the order raised. It is `[]` when
+nothing raised, never left out and never `null`. The record is written once, in every check run whose load ran, as
+`inputs` is: after the last phase record, and after `duplicates` and `timing` when they were asked for, and just
+before `inputs`. A check run whose load failed, or that asked for no load, writes none. The Swift engine writes none.
+
+The front door accepts one, in that place, and refuses a second, one before a phase's record or after `inputs`, and
+one with no `raisedToBytes`, as a broken stream. A raise is said under `--verbose`, below the types phase's `memory:`
+line, as `memory: raised to 9.7 GB after the load` (each raise in order, joined by `then`), and under `--json` as the
+summary's `memoryRaisedToBytes`. Neither is in the footer, and a replay says neither, since it raised nothing.
+
 ### `inputs`, just before `summary`
 
 ```json
@@ -724,89 +830,6 @@ an unchanged tree write the same record. A superset only costs a miss, and a pat
 stale, so whatever the load, or a later cache of the engine's, reads to decide a verdict must be named here. A
 check run whose load failed, or that asked for no load, writes none, nor does a Swift run that could not describe its
 project, and the front door records nothing for either.
-
-### `timing`, after `lint`, only under `--timing`
-
-```json
-{
-    "kind": "timing",
-    "processCpuMicroseconds": 80000,
-    "load": {
-        "listCpuMicroseconds": 2000,
-        "listChildrenCpuMicroseconds": 150000,
-        "parseCpuMicroseconds": 4000,
-        "parsedFiles": 24,
-        "typeCheckCpuMicroseconds": 12000,
-        "typeCheckedPackages": 3,
-        "exportDataCpuMicroseconds": 6000,
-        "exportDataPackages": 37
-    },
-    "rules": [{ "name": "cohere-go/consistency-no-shouting", "cpuMicroseconds": 2500, "packages": 3, "calls": 640 }],
-    "shared": [
-        {
-            "name": "build_intermediate_representation",
-            "kind": "intermediateRepresentation",
-            "cpuMicroseconds": 8000,
-            "packages": 40
-        },
-        { "name": "syntax_dispatcher", "kind": "dispatcher", "cpuMicroseconds": 1500, "packages": 3 }
-    ],
-    "measuredCalls": 2300,
-    "measuringCpuMicroseconds": 230
-}
-```
-
-Additive within contract 3, and the Go engine's alone: under `--timing` it says what the run's CPU went to, so a Go
-rule is timed before it lands as a TypeScript one is (#3apgjer). It is written once, after the lint record and before
-`inputs` and the summary, and never in a run that did not ask, which the front door refuses as a broken stream, as it
-does a second one. The Swift engine refuses `--timing` and writes none.
-
-Every CPU figure is microseconds of the kernel's thread clock, read on a thread held for the work, so a rule that
-waits, sleeps or is descheduled costs nothing and none is wall time. Each figure has the measuring's own cost taken
-out, said once in `measuringCpuMicroseconds` beside `measuredCalls`, the pieces of work measured.
-
-- `rules` holds one entry for each rule that ran, most expensive first, summed over every package and build:
-  `packages` is how many its analyzer ran on, dependencies analyzed for facts included, and `calls` how many times a
-  dispatcher called its listener, 0 for a rule that walks on its own.
-- `shared` holds the analyzers no single rule owns, most expensive first, each with its `kind`:
-  `intermediateRepresentation` for the engine's intermediate representation build; `dispatcher` for a dispatcher's
-  walk less its calls into the listeners, which are billed to their rules; and `analyzer` for any other several rules
-  read, such as `inspect`. A kind the front door does not know is refused.
-- `load` is the load's phases, each summed across the goroutines that ran it, so each runs past the load's wall.
-  `listChildrenCpuMicroseconds` is the CPU of the go commands the listing ran, which no thread of this process spent.
-- `processCpuMicroseconds` is every CPU microsecond the process spent up to the record. The rows (rules, shared, the
-  load's own phases and measuring) are said against it, and what they leave is printed as its own line, what no row
-  measures, never spread over the rows.
-
-`rules` and `shared` are `[]` when empty, never left out, and the front door refuses a record missing either. When
-the thread clock cannot be read, `unavailable` says why, every CPU figure is 0 and means nothing, and the counts are
-still real; the front door then leaves the CPU columns out rather than print zeros:
-
-```json
-{
-    "kind": "timing",
-    "unavailable": "this platform has no per-thread CPU clock",
-    "processCpuMicroseconds": 0,
-    "load": {
-        "listCpuMicroseconds": 0,
-        "listChildrenCpuMicroseconds": 0,
-        "parseCpuMicroseconds": 0,
-        "parsedFiles": 24,
-        "typeCheckCpuMicroseconds": 0,
-        "typeCheckedPackages": 3,
-        "exportDataCpuMicroseconds": 0,
-        "exportDataPackages": 37
-    },
-    "rules": [{ "name": "cohere-go/consistency-no-shouting", "cpuMicroseconds": 0, "packages": 3, "calls": 640 }],
-    "shared": [],
-    "measuredCalls": 0,
-    "measuringCpuMicroseconds": 0
-}
-```
-
-The front door prints the record as TypeScript's timing table under the lint line, and under `--json` writes it
-through as a `timing` line before the summary (schema/CohereOutput.schema.json). A run under `--timing` is a
-measurement, so the run cache never replays it and never records it.
 
 ### `lint`
 

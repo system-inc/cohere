@@ -355,6 +355,7 @@ func populatedRecords() []Record {
 			ElapsedMilliseconds: 7,
 			Cache:               duplicate_functions.CacheUse{Unit: "packages", Read: 1, Hashed: 1},
 		}},
+		MemoryRecord{RaisedToBytes: []int64{9663676416}},
 		InputsRecord{
 			Files:          []string{"/.git/index", "/project/a.go", "/project/go.mod"},
 			Directories:    []string{"/project"},
@@ -479,6 +480,7 @@ func TestFixtureRecordsReencodeToTheSameJson(test *testing.T) {
 		KindLint:       func() Record { return &LintRecord{} },
 		KindPhase:      func() Record { return &PhaseRecord{} },
 		KindRule:       func() Record { return &RuleRecord{} },
+		KindMemory:     func() Record { return &MemoryRecord{} },
 		KindInputs:     func() Record { return &InputsRecord{} },
 		KindTiming:     func() Record { return &TimingRecord{} },
 		KindSummary:    func() Record { return &SummaryRecord{} },
@@ -684,5 +686,60 @@ func TestInputsRecordRoundTrips(test *testing.T) {
 	}
 	if second.String() != first.String() {
 		test.Errorf("the decoded record wrote\n%s\nwant\n%s", second.String(), first.String())
+	}
+}
+
+// TestMemoryRecordWritesNoRaisesAsAnEmptyList keeps a run that raised nothing from writing null, which would read as
+// "not recorded" rather than "nothing raised".
+func TestMemoryRecordWritesNoRaisesAsAnEmptyList(test *testing.T) {
+	test.Parallel()
+	var output bytes.Buffer
+	writer := NewWriter(&output)
+	for _, record := range []Record{ProvenanceRecord{Contract: Version}, MemoryRecord{}} {
+		if writeError := writer.Write(record); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	if want := `{"kind":"memory","raisedToBytes":[]}` + "\n"; !strings.HasSuffix(output.String(), want) {
+		test.Errorf("a memory record with no raises wrote %s, want it to end %s", output.String(), want)
+	}
+}
+
+// TestMemoryRecordRoundTrips decodes a written memory record and writes it again, so the front door, which decodes the
+// line into its own type, reads back every limit the run raised to, in order, and an empty list as an empty list.
+func TestMemoryRecordRoundTrips(test *testing.T) {
+	test.Parallel()
+	for _, written := range []MemoryRecord{
+		{RaisedToBytes: []int64{9663676416, 9663676416}},
+		{RaisedToBytes: []int64{}},
+	} {
+		var first bytes.Buffer
+		writer := NewWriter(&first)
+		for _, record := range []Record{ProvenanceRecord{Contract: Version}, written} {
+			if writeError := writer.Write(record); writeError != nil {
+				test.Fatal(writeError)
+			}
+		}
+		lines := strings.Split(strings.TrimSuffix(first.String(), "\n"), "\n")
+		if len(lines) != 2 || !strings.HasPrefix(lines[1], `{"kind":"memory","raisedToBytes":[`) {
+			test.Fatalf("want a provenance line and a memory line, got:\n%s", first.String())
+		}
+		var decoded MemoryRecord
+		if decodeError := json.Unmarshal([]byte(lines[1]), &decoded); decodeError != nil {
+			test.Fatal(decodeError)
+		}
+		if !reflect.DeepEqual(decoded, written) {
+			test.Errorf("decoded %+v, want %+v", decoded, written)
+		}
+		var second bytes.Buffer
+		rewriter := NewWriter(&second)
+		for _, record := range []Record{ProvenanceRecord{Contract: Version}, decoded} {
+			if writeError := rewriter.Write(record); writeError != nil {
+				test.Fatal(writeError)
+			}
+		}
+		if second.String() != first.String() {
+			test.Errorf("the decoded record wrote\n%s\nwant\n%s", second.String(), first.String())
+		}
 	}
 }

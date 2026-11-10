@@ -307,6 +307,8 @@ type engineRun struct {
 	// ask is sent none, so a timing record there is a broken stream. timingReceived says the one record came.
 	timingRequested bool
 	timingReceived  bool
+	// memoryReceived is set by the memory record, which comes once (acceptMemory).
+	memoryReceived bool
 
 	// filesRewritten is how many files the fix phase wrote, so a run that rewrote the tree it checked is never
 	// recorded as a verdict about that tree.
@@ -434,6 +436,8 @@ func (run *engineRun) accept(line []byte) error {
 		return decodeRecord(line, &engineInputsRecord{}, run.acceptInputs)
 	case "timing":
 		return decodeRecord(line, &contract.TimingRecord{}, run.acceptTiming)
+	case "memory":
+		return decodeRecord(line, &contract.MemoryRecord{}, run.acceptMemory)
 	case "summary":
 		return decodeRecord(line, &engineSummaryRecord{}, run.acceptSummary)
 	default:
@@ -1304,6 +1308,46 @@ func (run *engineRun) acceptTiming(record *contract.TimingRecord) error {
 	} else {
 		printEngineTimings(run.out, record)
 	}
+	streams.Show(run.out)
+	return nil
+}
+
+// acceptMemory reads the memory limits a Go run raised its heap to (#5shepvt), once, after its last phase and before
+// its inputs, as the contract places it. A run that raised says so in the account `--verbose` prints, beside the
+// types phase's `memory:` line that stated the limit it began under, and under `--json` in the summary's
+// `memoryRaisedToBytes`. Both are the invocation's: a replay started no engine and raised nothing, so its account
+// prints no raise and its summary carries none (replayedSummary). A record that is a second one, arrives out of its
+// place, or holds no list where the contract writes `[]` is refused, for the reason accept refuses an unknown record.
+func (run *engineRun) acceptMemory(record *contract.MemoryRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a memory record in a %s run", run.mode)
+	}
+	if run.memoryReceived {
+		return fmt.Errorf("a second memory record")
+	}
+	if run.inputs != nil {
+		return fmt.Errorf("a memory record after the inputs record, and the contract places it before")
+	}
+	if run.nextPhase < len(phaseOrder) {
+		return fmt.Errorf("a memory record before the %s phase, and it comes after every phase",
+			phaseOrder[run.nextPhase])
+	}
+	if run.duplicatesRequested && !run.duplicatesWritten {
+		return fmt.Errorf("a memory record before the duplicates record, and the contract places it after")
+	}
+	if record.RaisedToBytes == nil {
+		return fmt.Errorf("a memory record with no raisedToBytes, which the contract writes [] when nothing raised")
+	}
+	run.memoryReceived = true
+	if len(record.RaisedToBytes) == 0 {
+		return nil
+	}
+	activeSummary.MemoryRaisedToBytes = record.RaisedToBytes
+	raises := make([]string, 0, len(record.RaisedToBytes))
+	for _, limit := range record.RaisedToBytes {
+		raises = append(raises, gigabytes(uint64(max(limit, 0))))
+	}
+	printInvocation(accountOutput(run.out), "  memory: raised to %s after the load\n", strings.Join(raises, ", then "))
 	streams.Show(run.out)
 	return nil
 }
