@@ -208,3 +208,27 @@ func TestAGoSaveKeepsNothingUnderTheFileOnDisk(test *testing.T) {
 			code, output)
 	}
 }
+
+// A save loads its file's package and what that imports, never a package that imports it: here b imports a and holds a
+// type error, and a save of a's file with a long line comes back wrapped. A load of the whole module would find b's
+// error and hold the wrap, as a run over the module does, and type-check every importer of the buffer again on each
+// edit, for a save that judges one file.
+func TestAGoSaveLoadsNoPackageThatImportsIt(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, goSaveFiles)
+	writeTree(test, root, map[string]string{
+		"a/a.go": "package a\n",
+		"b/b.go": "package b\n\nimport \"example.com/probe/a\"\n\nvar _ = a.Report\n\n// Broken is no int.\n" +
+			"var Broken int = \"text\"\n",
+	})
+	buffer := strings.Replace(goLongLineBuffer, "package probe", "package a", 1)
+
+	saved, stderr, code := goSave(test, binary, root, "a/a.go", buffer)
+	wrapped := "\treport(\n\t\t\"context\",\n"
+	if code != 0 || !strings.Contains(saved, wrapped) {
+		test.Fatalf("exit %d, want the long call wrapped (%q), which only b's type error would hold, in:\n%s\n"+
+			"stderr:\n%s", code, wrapped, saved, stderr)
+	}
+}

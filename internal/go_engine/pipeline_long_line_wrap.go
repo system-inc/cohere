@@ -18,7 +18,7 @@ import (
 // the disk's after every write the fix phase made. When a phase reads the types it says on stderr that the load
 // failed; a load made for the wrap alone leaves that to the wrap's own held note, since that run asked for no
 // type-check or lint to miss. A package with no file in scope is loaded for what imports it and never analyzed
-// (hasFileInScope).
+// (hasFileInScope). The editor's save loads its file's package alone, with what it imports (stdinPackage).
 func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	workspace := engine.described.workspace
 	caching := load.Caching{
@@ -36,8 +36,11 @@ func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	if engine.lintOverlaps() {
 		caching.Begin = engine.beginSpeculativeLint
 	}
-	loaded, loadError := load.PackagesCached(workspace.Root, workspace.Patterns(), workspace.Environment(),
-		engine.described.readableOurs, caching)
+	patterns, census := workspace.Patterns(), engine.described.readableOurs
+	if engine.request.stdinPath != "" {
+		patterns, census = engine.stdinPackage()
+	}
+	loaded, loadError := load.PackagesCached(workspace.Root, patterns, workspace.Environment(), census, caching)
 	if loadError != nil && typesRead {
 		engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
 	}

@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"path/filepath"
 	"slices"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
@@ -63,6 +64,33 @@ func (engine *pipeline) runStdin(output io.Writer) int {
 	engine.runRename(loaded, loadError)
 	engine.keepKnownFiles(engine.fix.known)
 	return writeStdin(output, engine.described.contents[path], engine.standardError)
+}
+
+// stdinPackage is what the editor's save loads: the pattern of its file's directory, `./sub` from the root, which
+// names that one package with its tests' variants, as a load of the whole workspace names each package, and the
+// census's files in that directory, which the load accounts for. A save judges its one file, so it never loads a
+// package that imports it: each would key apart from its cache entry on the buffer's every edit and be type-checked
+// again for nothing, which on a widely imported file is most of the workspace. Its imports are restored as a load of
+// the workspace restores them.
+//
+// So the wrap's hold differs from a run's on purpose: a run holds the wrap when its load finds a type error anywhere in
+// the workspace, and a save only when the error is in its file's package or what that imports. A save judges its file,
+// and the gate, which loads the workspace, still holds the wrap over an error in an importer.
+func (engine *pipeline) stdinPackage() ([]string, []string) {
+	directory := filepath.Dir(engine.request.stdinPath)
+	// Ignored: both paths are absolute, so Rel cannot fail, and a file in scope is below the root.
+	relative, _ := filepath.Rel(engine.described.workspace.Root, directory)
+	pattern := "."
+	if relative != "." {
+		pattern = "./" + filepath.ToSlash(relative)
+	}
+	var census []string
+	for _, file := range engine.described.readableOurs {
+		if filepath.Dir(file) == directory {
+			census = append(census, file)
+		}
+	}
+	return []string{pattern}, census
 }
 
 // stdinDeclined is why the editor's save holds nothing for its file: the reason the project record gives for leaving
