@@ -103,6 +103,8 @@ changed in cohere outside the sets is written under the same heading.
   a warning. Its footer says how many files and why, quoting the rule that decided, as
   `no files checked: 1 file excluded, ignored by git (.gitignore:1)`, and `--json` reads `"verdict": "fail"` with
   each reason under `gaps.excluded`. A project with no file of its language at all keeps the warning and passes.
+  The failure rests on the files having been there, `gaps.sourceFiles`, never on a reason having been counted: a
+  file kept out for a reason cohere did not count is named as such, a cohere bug to report, and the run still fails.
 - A file git tracks is never ignored, as `git check-ignore` decides it: a file added with `git add -f` under a
   pattern that matches it is checked and formatted like any other, where it read "ignored by git". cohere reads the
   repository's index itself, and a run whose index can't be read, a split or sparse one, decides by the ignore files
