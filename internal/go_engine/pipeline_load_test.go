@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -95,6 +96,7 @@ func importedAs(file *ast.File, path string) string {
 type memoryWatch struct {
 	lock    sync.Mutex
 	current int64
+	set     []int64
 	// raised is whether a raise has lifted the limit past the cap, and endedUnder the limit at each load's end.
 	raised     bool
 	endedUnder []int64
@@ -105,10 +107,18 @@ func (watch *memoryWatch) setMemoryLimit(limit int64) int64 {
 	defer watch.lock.Unlock()
 	previous := watch.current
 	watch.current = limit
+	watch.set = append(watch.set, limit)
 	if limit > engineMemoryCap {
 		watch.raised = true
 	}
 	return previous
+}
+
+// setLimits is every limit set, in order.
+func (watch *memoryWatch) setLimits() []int64 {
+	watch.lock.Lock()
+	defer watch.lock.Unlock()
+	return slices.Clone(watch.set)
 }
 
 // collecting is read at each load's end, and says no collection is in flight, so each raise lands at once.
@@ -130,14 +140,7 @@ func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
 		test.Fatalf("reading %s: %v", file, readError)
 	}
 	watch := &memoryWatch{current: engineMemoryCap}
-	memory := &engineMemory{
-		record: contract.Memory{
-			LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap, Source: contract.MemorySourceCap,
-		},
-		inheritedBytes: 32 << 30,
-		setMemoryLimit: watch.setMemoryLimit,
-		collecting:     watch.collecting,
-	}
+	memory := capMemoryWatched(watch, watch.collecting)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 
@@ -171,23 +174,16 @@ func TestALastLoadsRaiseLiftsNothingDuringTheNext(test *testing.T) {
 	previousPercent := debug.SetGCPercent(-1)
 	test.Cleanup(func() { debug.SetGCPercent(previousPercent) })
 	watch := &memoryWatch{current: engineMemoryCap}
-	engine := &pipeline{memory: &engineMemory{
-		record: contract.Memory{
-			LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap, Source: contract.MemorySourceCap,
-		},
-		inheritedBytes: 32 << 30,
-		setMemoryLimit: watch.setMemoryLimit,
-		// Every load ends with a collection in flight, so each raise waits on its sentinel's finalizer.
-		collecting: func() bool { return true },
-	}}
-	engine.beginLoad()
-	first := engine.lateRaise
+	// Every load ends with a collection in flight, so each raise waits on its sentinel's finalizer.
+	loads := newLoadMemory(capMemoryWatched(watch, func() bool { return true }), false)
+	loads.begin()
+	first := loads.current
 	if first == nil {
 		test.Fatal("the first load armed no raise")
 	}
-	first.endLoad()
+	loads.end()
 
-	engine.beginLoad()
+	loads.begin()
 	runtime.GC()
 	waitFor(test, "the first load's sentinel", func() bool { return first.collections.Load() >= 1 })
 

@@ -42,9 +42,9 @@ type pipeline struct {
 	standardError io.Writer
 
 	// memory is what Main decided about the process's memory limit, its record written on the types record, nil in a
-	// test; lateRaise is the last load's raise, nil before the first load and in a run that raises nothing.
-	memory    *engineMemory
-	lateRaise *lateRaise
+	// test; loads is the limit across the run's loads, nil in a run that raises nothing (loadMemory).
+	memory *engineMemory
+	loads  *loadMemory
 
 	// writeError is the first record that could not be written. Every write after it is skipped, and the run
 	// ends as a broken stream.
@@ -111,6 +111,7 @@ func newPipeline(
 		writer:        contract.NewWriter(standardOutput),
 		standardError: standardError,
 		memory:        memory,
+		loads:         newLoadMemory(memory, request.switches["single-threaded"]),
 		overlaps:      true,
 		timing:        newTiming(request),
 	}

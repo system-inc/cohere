@@ -9,7 +9,7 @@ import (
 
 // lateRaise raises the memory limit once, at the first moment after its load's end with no collection in flight: at
 // the load's end itself when none is, or just after the collection in flight then completes. Each load has its own,
-// armed before it starts and retired when the next load starts (pipeline.loadPackages). A collection in flight at
+// armed before it starts and retired when the next load starts (loadMemory). A collection in flight at
 // the load's end is the second of the three, which the raise must follow rather than lift: measured, one was in flight
 // in 14 of 20 runs, and a raise during it lets that collection run on a higher goal, so the peak grows.
 //
@@ -76,12 +76,12 @@ func (raise *lateRaise) collected() {
 }
 
 // endLoad is its load's end: the raise lands now when no collection is in flight, and otherwise after the one in
-// flight completes (collected). Only the first call counts. It does nothing on a nil raise, a run that raises nothing.
+// flight completes (collected). Only the first call counts.
 //
 // The load's end is marked before the collector is read, so a collection completing between the two raises in
 // collected and this call's raise finds it done.
 func (raise *lateRaise) endLoad() {
-	if raise == nil || raise.loadEnded.Swap(true) {
+	if raise.loadEnded.Swap(true) {
 		return
 	}
 	if !raise.collecting() {
@@ -100,10 +100,17 @@ func (raise *lateRaise) raise() {
 	raise.setMemoryLimit(raise.limit)
 }
 
+// raisedLimit is the limit the raise set, and whether it has set one.
+func (raise *lateRaise) raisedLimit() (int64, bool) {
+	raise.lock.Lock()
+	defer raise.lock.Unlock()
+	return raise.limit, raise.raised
+}
+
 // retire ends the raise before a later load starts: from its return the raise sets nothing, so a sentinel of its that
 // a collection frees during the later load does nothing, and the later load's own raise is the only one that can lift
 // the limit. A raise that had begun has set its limit before retire returns, so the later load's return to the cap is
-// the last word. It does nothing on a nil raise.
+// the last word. It does nothing on a nil raise, as before a run's first load.
 func (raise *lateRaise) retire() {
 	if raise == nil {
 		return
@@ -113,10 +120,20 @@ func (raise *lateRaise) retire() {
 	raise.retired = true
 }
 
-// collectorMarking is whether a collection is marking now. Each collection stops the world twice, at its start (sweep
-// termination) and at its end (mark termination), and the runtime counts both in `/sched/pauses/total/gc:seconds` as
-// the world restarts, so an odd count is a collection between the two. A runtime without the metric reads as one in
-// flight, which only waits for a collection to complete before raising.
+// collectorMarking is whether a collection is marking now, read from the parity of the collector's pauses. A collection
+// stops the world at its start (sweep termination) and at its end (mark termination), and the runtime counts each
+// pause in `/sched/pauses/total/gc:seconds` as the world restarts, so an odd count is a collection between the two.
+//
+// Not every pause is half a collection. Mark termination can stop the world, find work a write barrier left, and start
+// the world again to mark it before stopping once more (golang/go#27993, gcMarkDone), and that restart is counted as a
+// pause too, which flips the parity for the rest of the process; so does the goroutine leak detector's, when it runs.
+// Both readings it can cause are bounded. Read as marking when no collection is, the raise waits for the next
+// collection to complete, which is no worse than not raising until then. Read as idle while one is marking, the raise
+// lifts that collection's goal, measured at about 0.3 GB of peak on cohere's root, within the allowance. Measured,
+// the parity never disagreed with gctrace's count of collections: 295 collections over 53 runs on cohere's own tree,
+// 166 of them in one fixing run of deeafbf4 whose live heap stayed above the limit.
+//
+// A runtime without the metric reads as one in flight, which only waits for a collection to complete before raising.
 func collectorMarking() bool {
 	samples := []metrics.Sample{{Name: "/sched/pauses/total/gc:seconds"}}
 	metrics.Read(samples)

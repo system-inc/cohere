@@ -15,12 +15,12 @@ type loadRequest struct {
 }
 
 // loadPackages is every load of the workspace the engine makes, the only caller of package load's loads in it (a test
-// holds it to that), so the memory limit is the same story for each: the last load's late raise is retired, the limit
-// goes back to the cap, and this load's raise is armed before it starts, then told its end after it (#44n0vap). Every
-// load, the first, the long-line wrap's, the rename's and its proofs, a lint reload and an extra build's, runs under
-// the cap, and the raise may lift the limit at most once after each.
+// holds it to that), so the memory limit is the same story for each (loadMemory): the last load's late raise is
+// retired, the limit goes back to the cap, and this load's raise is armed before it starts, then told its end after
+// it (#44n0vap). Every load, the first, the long-line wrap's, the rename's and its proofs, a lint reload and an extra
+// build's, runs under the cap, and the raise may lift the limit at most once after each.
 func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) {
-	engine.beginLoad()
+	engine.loads.begin()
 	workspace := engine.described.workspace
 	var loaded *load.Loaded
 	var loadError error
@@ -35,13 +35,6 @@ func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) 
 		loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), request.environment,
 			engine.described.readableOurs)
 	}
-	engine.lateRaise.endLoad()
+	engine.loads.end()
 	return loaded, loadError
-}
-
-// beginLoad is a load's start, for the memory limit: the last load's raise is retired first, so none of its sentinels
-// can lift the limit during this load, then armLateRaise sets the limit back to the cap and arms this load's raise.
-func (engine *pipeline) beginLoad() {
-	engine.lateRaise.retire()
-	engine.lateRaise = engine.armLateRaise()
 }
