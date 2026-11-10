@@ -115,6 +115,7 @@
             "toolbar",
             "top"
         ],
+        "nexus/consistency-no-abbreviated-file-name": "error",
         "nexus/consistency-no-abbreviated-identifier": [
             "error",
             {
