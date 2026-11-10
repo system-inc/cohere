@@ -81,12 +81,16 @@ func TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce(test *testin
 				return output
 			}
 
-			if recorded := run(); !strings.Contains(recorded, "Scratch.swift (ignored by git)") {
+			recorded := run()
+			if !strings.Contains(recorded, "Scratch.swift (ignored by git)") {
 				test.Fatalf("the first run did not leave out Scratch.swift as ignored, so nothing below proves "+
 					"anything:\n%s", recorded)
 			}
 			if replayed := run(); !strings.HasPrefix(replayed, "cached: ") {
-				test.Fatalf("an unchanged package did not replay, so nothing below proves anything:\n%s", replayed)
+				// The first run's output too, since a run left unrecorded says why only there, in a note on its
+				// stderr.
+				test.Fatalf("an unchanged package did not replay, so nothing below proves anything:\n%s\nThe run "+
+					"before it:\n%s", replayed, recorded)
 			}
 
 			before, readError := os.ReadFile(index)
@@ -196,12 +200,15 @@ func TestASwiftRunInAWorktreeMissesOnAGitAddForceOfAFileOnlyItsSharedExcludeIgno
 		return output
 	}
 
-	if recorded := run(); !strings.Contains(recorded, "Scratch.swift (ignored by git)") {
+	recorded := run()
+	if !strings.Contains(recorded, "Scratch.swift (ignored by git)") {
 		test.Fatalf("the first run did not leave out Scratch.swift as ignored, so nothing below proves anything:\n%s",
 			recorded)
 	}
 	if replayed := run(); !strings.HasPrefix(replayed, "cached: ") {
-		test.Fatalf("an unchanged package did not replay, so nothing below proves anything:\n%s", replayed)
+		// The first run's output too, since a run left unrecorded says why only there, in a note on its stderr.
+		test.Fatalf("an unchanged package did not replay, so nothing below proves anything:\n%s\nThe run before "+
+			"it:\n%s", replayed, recorded)
 	}
 
 	before, readError := os.ReadFile(index)
