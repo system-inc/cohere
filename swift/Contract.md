@@ -817,13 +817,11 @@ root. The Go engine names its census's index, scoped to the root below the repos
 index its file set read whole (#jem2gsa), scoped to the nearest directory holding every path the file set asked it
 about, the package's root and each target source, local and path packages' among them, so `""` when they lie in
 different subtrees of the repository: a scope too wide only costs a miss, and one too narrow is a stale replay. Both
-read the repository's rules alone, case sensitively (#jgk8ppa), but the digest does not read a worktree's shared
-`info/exclude` yet (#vdbcswp), so a Swift run that excluded a path by it names no index here, since tracking that
-path would move no digest. The front door
-keys such an index on `gitignore.TrackedIgnoredDigest` over that scope rather than on its bytes, which git rewrites
-on a `git status` and on every `git add`, so a replay survives what decides nothing. An index the reader cannot read
-whole, a split or sparse one among them, is keyed on its bytes as an index not named here is. A reader before it
-ignores the field, and keys every index on its bytes.
+read the repository's rules alone, case sensitively (#jgk8ppa), a worktree's shared `info/exclude` among them, as
+the digest reads them. The front door keys such an index on `gitignore.TrackedIgnoredDigest` over that scope rather
+than on its bytes, which git rewrites on a `git status` and on every `git add`, so a replay survives what decides
+nothing. An index the reader cannot read whole, a split or sparse one among them, is keyed on its bytes as an index
+not named here is. A reader before it ignores the field, and keys every index on its bytes.
 
 Every path is absolute and cleaned, each list is sorted, without duplicates, and `[]` when empty, and two runs over
 an unchanged tree write the same record. A superset only costs a miss, and a path left out is a replay that goes

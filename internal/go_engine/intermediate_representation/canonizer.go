@@ -97,3 +97,11 @@ func (canonizer *canonizer) instantiateMethod(
 	}
 	return method
 }
+
+func newCanonizer() *canonizer {
+	canonizer := &canonizer{}
+	hasher := typeutil.MakeHasher()
+	canonizer.types.SetHasher(hasher)
+	canonizer.lists.hasher = hasher
+	return canonizer
+}

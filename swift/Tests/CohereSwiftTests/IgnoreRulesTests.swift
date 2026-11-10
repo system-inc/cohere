@@ -400,11 +400,11 @@ struct IgnoreRulesTests {
 
     /*
      A worktree's shared `info/exclude`, in its common directory, is the repository's own and excludes, named absolute
-     as a file outside the work tree. The front door's digest does not read it yet (#vdbcswp), so a path it excluded
-     leaves the index unnamed under `trackedIgnored`, keyed on its bytes. A path a `.gitignore` excluded, or a `.git`
-     directory's `info/exclude`, which the digest reads, leaves it named.
+     as a file outside the work tree. The front door's digest reads it as well (`gitignore.ExcludeFileOf`), so a path it
+     excluded leaves the worktree's own index named under `trackedIgnored`, where a `git add -f` of that path moves the
+     digest, as a path a `.gitignore` excluded does.
      */
-    @Test func aWorktreesSharedExcludeKeepsItsIndexOnItsBytes() throws {
+    @Test func aWorktreesSharedExcludeNamesItsIndexUnderTrackedIgnored() throws {
         let main = try Fixture(
             files: [:],
             gitDirectory: [
@@ -414,32 +414,20 @@ struct IgnoreRulesTests {
             ],
         )
         let worktree = main.root.deletingLastPathComponent().appendingPathComponent("feature", isDirectory: true)
-        try Fixture.write(
-            [".git": "gitdir: \(main.root.path)/.git/worktrees/feature\n", ".gitignore": "Ignored.swift\n"],
-            under: worktree,
-        )
-        try GitIndexTests.indexBytes(paths: [".gitignore"])
-            .write(to: main.root.appendingPathComponent(".git/worktrees/feature/index"))
+        try Fixture.write([".git": "gitdir: \(main.root.path)/.git/worktrees/feature\n"], under: worktree)
+        let worktreeIndex = main.root.appendingPathComponent(".git/worktrees/feature/index")
+        try GitIndexTests.indexBytes(paths: ["Sources/Kept.swift"]).write(to: worktreeIndex)
         let repository = try #require(IgnoreRules.Repository.containing(worktree))
         let sources = repository.root.path + "/Sources/"
 
-        let byGitignore = IgnoreRules(repository: repository)
-        #expect(
-            byGitignore.listing(of: sources + "Ignored.swift")
-                == .excluded(by: .init(file: repository.root.path + "/.gitignore", line: 1))
-        )
-        #expect(byGitignore.trackedIgnored?.scope == "Sources")
-
-        let byShared = IgnoreRules(repository: repository)
+        let rules = IgnoreRules(repository: repository)
         let sharedExclude = try #require(repository.commonDirectory?.appendingPathComponent("info/exclude").path)
         let line = IgnoreRules.Pattern.Source(file: sharedExclude, line: 1)
-        #expect(byShared.listing(of: sources + "Excluded.swift") == .excluded(by: line))
-        #expect(byShared.describe(line, relativeTo: repository.root.path) == sharedExclude + ":1")
-        #expect(byShared.trackedIgnored == nil)
-
-        let inMain = try main.rules()
-        #expect(!inMain.isVisible(inMain.repository.root.path + "/Excluded.swift"))
-        #expect(inMain.trackedIgnored?.scope == "")
+        #expect(rules.listing(of: sources + "Excluded.swift") == .excluded(by: line))
+        #expect(rules.describe(line, relativeTo: repository.root.path) == sharedExclude + ":1")
+        let named = try #require(rules.trackedIgnored)
+        #expect(named.index == worktreeIndex.standardizedFileURL.path)
+        #expect(named.scope == "Sources")
     }
 
     /*
