@@ -436,7 +436,7 @@ func fromSource(
 	distinct := map[string]bool{}
 	for _, current := range reachable {
 		owned := PackageWithheld{Errors: withheld.ownedBy(current.loaded), Declarations: declarations[current.loaded]}
-		if restored, held := typeChecker.restored[current.loaded]; held {
+		if restored, held := typeChecker.restored[current.loaded]; held && !typeChecker.declined[current.loaded] {
 			owned.Declarations = restored.Withheld.Declarations
 		}
 		for _, position := range owned.Declarations {

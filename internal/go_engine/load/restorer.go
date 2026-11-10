@@ -1,6 +1,10 @@
 package load
 
-import "golang.org/x/tools/go/packages"
+import (
+	"go/types"
+
+	"golang.org/x/tools/go/packages"
+)
 
 // The loaders a Restorer is told ran, which the findings cache keys every package on, since each gives a package
 // with cgo files other files: the load that translates nothing, its package "C" faked, and the load of a project
@@ -32,6 +36,19 @@ type Restored struct {
 
 	// Withheld is what the load withheld of the package when it last type-checked it.
 	Withheld PackageWithheld
+
+	// Holds, nil for a package the findings cache holds under this build's own key, decides late whether the
+	// package's types may be read from this export data at all, as an extra build restoring a package from the host's
+	// run decides by what the package read of its imports there (#b2t9xmf). The load asks it once the package's imports
+	// are done, before reading anything, with closure, every package the package reaches by path, as their types are
+	// in this load; it reads them during the call only. A package with Holds is always decided, so the load checks
+	// its imports even when nothing checked from source imports it.
+	Holds func(closure map[string]*types.Package) bool
+
+	// Declined, nil but beside Holds, is called once, from the load's goroutine for the package, when the package is
+	// checked from source after all: Holds said no, or its export data did not read. Its findings and facts are then
+	// the run's own, never the restored ones.
+	Declined func()
 }
 
 // PackageWithheld is what the load withheld of one package outside the workspace with cgo files (see Withheld and
