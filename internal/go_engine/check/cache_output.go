@@ -81,32 +81,47 @@ func compareFactDigests(left factDigest, right factDigest) int {
 	return cmp.Or(cmp.Compare(left.typeName, right.typeName), bytes.Compare(left.value[:], right.value[:]))
 }
 
-// positionDependent reports whether a finding of saved can change with a line of another package: its message names
-// a file the load holds that is not one of saved's own, by its absolute path or by its path relative to the finding's
-// own directory, as structtag writes it, a trailing `:line` or `:line:column` aside; or one of its fixes edits a
-// file that is not saved's own. Such a package is analyzed again whenever anything below it changes, as without the
-// early cutoff, since its importers' outputs say nothing about where their declarations are.
+// positionDependent reports whether a finding of saved can change with a line of another package, by naming a file of
+// it (see namesForeignFile). Such a package is analyzed again whenever anything below it changes, as without the early
+// cutoff, since its importers' outputs say nothing about where their declarations are.
 func positionDependent(saved *packages.Package, analyses map[string]storedAnalysis, knownFiles map[string]bool) bool {
+	own := ownFiles(saved)
+	for _, stored := range analyses {
+		for _, finding := range stored.Findings {
+			if namesForeignFile(finding, own, knownFiles) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ownFiles is every file of owner's, of each kind the load lists.
+func ownFiles(owner *packages.Package) map[string]bool {
 	own := map[string]bool{}
-	for _, files := range [][]string{saved.GoFiles, saved.CompiledGoFiles, saved.OtherFiles, saved.EmbedFiles,
-		saved.IgnoredFiles} {
+	for _, files := range [][]string{owner.GoFiles, owner.CompiledGoFiles, owner.OtherFiles, owner.EmbedFiles,
+		owner.IgnoredFiles} {
 		for _, file := range files {
 			own[file] = true
 		}
 	}
-	for _, stored := range analyses {
-		for _, finding := range stored.Findings {
-			for _, named := range namedFiles(finding) {
-				if knownFiles[named] && !own[named] {
-					return true
-				}
-			}
-			for _, suggestion := range finding.Suggestions {
-				for _, edit := range suggestion.Edits {
-					if !own[edit.File] {
-						return true
-					}
-				}
+	return own
+}
+
+// namesForeignFile reports whether finding names a file that is not one of own, its package's: its message names a
+// file of knownFiles, those the load holds, by its absolute path or by its path relative to the finding's own
+// directory, as structtag writes it, a trailing `:line` or `:line:column` aside; or one of its fixes edits any file
+// not of own.
+func namesForeignFile(finding Finding, own map[string]bool, knownFiles map[string]bool) bool {
+	for _, named := range namedFiles(finding) {
+		if knownFiles[named] && !own[named] {
+			return true
+		}
+	}
+	for _, suggestion := range finding.Suggestions {
+		for _, edit := range suggestion.Edits {
+			if !own[edit.File] {
+				return true
 			}
 		}
 	}

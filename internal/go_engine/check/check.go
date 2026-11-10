@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -78,6 +80,12 @@ type Options struct {
 	// `--duplicates` it is the duplicates report's hasher (#jfvhbj7). Its ResultType must be a pointer to a type gob
 	// can encode.
 	Report *analysis.Analyzer
+
+	// Reads, when not nil, is the load's Loaded.Reads, or Overlap.Reads for a run beside the load: each package's reads
+	// of other packages, which the rules' fact reads join (see checker.Options.Reads), for an extra build to restore
+	// the package by (#b2t9xmf). The run marks the packages it cannot vouch for, and hands them all back in
+	// Result.Reads. The findings are the same either way.
+	Reads map[*packages.Package]*build_reads.Reads
 }
 
 // ErrAbandoned is Run's error when Options.Abandon closed before every rule had run, so the result would be partial.
@@ -197,6 +205,11 @@ type Result struct {
 	// package, every kind's (fact_resolver.Counts' Fallbacks), with the cache or without.
 	Replays int
 
+	// Reads is Options.Reads, each package's type reads from the load and fact reads from the rules in one, a package
+	// marked never when a finding on it names a file not its own, which can change with a line of another package, or
+	// when the findings cache restored it, so its rules read nothing this run. Nil when Options.Reads is.
+	Reads map[*packages.Package]*build_reads.Reads
+
 	Elapsed time.Duration
 }
 
@@ -252,6 +265,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Ready, checkerOptions.Abandon = options.Ready, options.Abandon
 	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
+	checkerOptions.Reads = options.Reads
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
@@ -327,6 +341,16 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 	files := analyzedFiles(analyzed, session, record)
 	generated, copies := withheldFiles(files)
+	// knownFiles is every file of the load, which a finding's message is read for (see namesForeignFile), made only
+	// once a package whose reads are recorded has a finding.
+	var loadedFiles map[string]bool
+	knownFiles := func() map[string]bool {
+		if loadedFiles == nil {
+			loadedFiles = map[string]bool{}
+			packages.Visit(analyzed, nil, func(visited *packages.Package) { maps.Copy(loadedFiles, ownFiles(visited)) })
+		}
+		return loadedFiles
+	}
 	seenFindings := map[findingKey]bool{}
 	seenCrashes := map[Crash]bool{}
 	// In the order of graph.Roots, each analyzer over each package, so of two findings alike the one kept is the
@@ -353,6 +377,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 					continue
 				}
 				found = actionFindings(analyzerRule, action)
+			}
+			if reads := options.Reads[analyzedPackage]; reads != nil && len(found) > 0 {
+				markForeignFindings(reads, analyzedPackage, found, knownFiles)
 			}
 			for _, finding := range found {
 				key := findingKey{finding.Rule, finding.File, finding.Line, finding.Column, finding.Message}
@@ -411,12 +438,43 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	slices.Sort(result.CrashedRules)
 	result.FilesWalked, result.NodesVisited = walk(files, options.Counted)
 	result.Replays = int(resolver.Fallbacks())
+	if options.Reads != nil {
+		for recorded, reads := range options.Reads {
+			// A package an earlier wave of this run analyzed recorded its reads then; one the cache restored ran
+			// nothing.
+			if session != nil && session.restored(recorded) {
+				reads.MarkNever("the findings cache restored it, so its rules read nothing this run")
+			}
+		}
+		result.Reads = options.Reads
+	}
 	if session != nil {
 		session.save(graph, options.Withheld, files)
 		result.Cache = session.counts
 	}
 	result.Elapsed = time.Since(started)
 	return result, nil
+}
+
+// markForeignFindings marks reads never when a finding of analyzedPackage names a file that is not the package's own:
+// the file it is in, a file its message names or one its fix edits (see namesForeignFile). Such a finding can change
+// with a line of another package, which no read records. knownFiles gives every file of the load.
+func markForeignFindings(
+	reads *build_reads.Reads,
+	analyzedPackage *packages.Package,
+	found []Finding,
+	knownFiles func() map[string]bool,
+) {
+	if reads.Never() != "" {
+		return
+	}
+	own := ownFiles(analyzedPackage)
+	for _, finding := range found {
+		if !own[finding.File] || namesForeignFile(finding, own, knownFiles()) {
+			reads.MarkNever(fmt.Sprintf("a finding of %s names a file of another package", finding.Rule))
+			return
+		}
+	}
 }
 
 // abandoned is whether abandon is closed, never for a nil one.

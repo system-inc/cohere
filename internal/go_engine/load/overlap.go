@@ -2,6 +2,8 @@ package load
 
 import (
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
 // Overlap is a load's graph as it stands before any package is type-checked, every package's imports known (see
@@ -10,6 +12,11 @@ import (
 type Overlap struct {
 	// Packages are the ones to analyze, as Loaded.Packages will hold them.
 	Packages []*packages.Package
+
+	// Reads are every package's reads of other packages as the load records them, for check.Run beside the load (see
+	// Loaded.Reads). The map never changes; a package's entry gains its type reads by the time Ready closes for it,
+	// and is empty for one whose types come from export data.
+	Reads map[*packages.Package]*build_reads.Reads
 
 	nodes map[*packages.Package]*node
 

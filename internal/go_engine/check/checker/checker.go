@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are twelve.
+// The changes are thirteen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -179,6 +179,16 @@
 // whether its readers ask for the expression map, so it shares that
 // package with them and builds a root once (#wt5vaft).
 //
+// The thirteenth is Options.Reads, the seam an extra build's restore
+// records through (#b2t9xmf). An extra build restores a package from the
+// host's run only when everything it read of other packages is the same
+// there, and a fact of another package is such a read. So when Reads
+// holds the action's package, ObjectFact and PackageFact add each fact
+// asked of another package's object or of another package to it, a miss
+// as much as a hit, since a build where the fact is there would analyze
+// the package differently. Unset, nothing is recorded and both are
+// upstream's.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -247,7 +257,9 @@ import (
 	// import x/tools' internal packages.
 	"github.com/system-inc/cohere/internal/go_engine/check/checker/driverutil"
 	"github.com/system-inc/cohere/internal/go_engine/check/internal"
-	// cohere: the collector Options.Timing measures into.
+	// cohere: the reads Options.Reads records into, and the collector
+	// Options.Timing measures into.
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -339,6 +351,13 @@ type Options struct {
 	// ResultOf holds no resolver.
 	Resolver Resolver
 	Resolved *analysis.Analyzer
+
+	// cohere: Reads, when set, holds the reads of each package whose
+	// fact reads are recorded: every ObjectFact and PackageFact an action
+	// on such a package asks of another package's object, or of another
+	// package, is added to them, found or not. A package it does not hold,
+	// and every package while it is nil, records nothing.
+	Reads map[*packages.Package]*build_reads.Reads
 
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once
@@ -1113,8 +1132,12 @@ func (act *Action) ObjectFact(obj types.Object, ptr analysis.Fact) bool {
 	key := objectFactKey{obj, factType(ptr)}
 	if v, ok := act.objectFacts[key]; ok {
 		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v).Elem())
+		// cohere: a read of another package's fact (see Options.Reads).
+		act.readFact(obj, obj.Pkg(), key.typ, v)
 		return true
 	}
+	// cohere: a miss is a read too (see Options.Reads).
+	act.readFact(obj, obj.Pkg(), key.typ, nil)
 	return false
 }
 
@@ -1193,9 +1216,26 @@ func (act *Action) PackageFact(pkg *types.Package, ptr analysis.Fact) bool {
 	key := packageFactKey{pkg, factType(ptr)}
 	if v, ok := act.packageFacts[key]; ok {
 		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v).Elem())
+		// cohere: a read of another package's fact (see Options.Reads).
+		act.readFact(nil, pkg, key.typ, v)
 		return true
 	}
+	// cohere: a miss is a read too (see Options.Reads).
+	act.readFact(nil, pkg, key.typ, nil)
 	return false
+}
+
+// cohere: readFact adds a fact act asked of obj, or of pkg itself when obj
+// is nil, to the reads of act's package under Options.Reads, when pkg is
+// another package: found is the fact, nil on a miss. A fact of act's own
+// package is no read of another, and an object of no package, the
+// universe's, holds no fact in any build.
+func (act *Action) readFact(obj types.Object, pkg *types.Package, typ reflect.Type, found analysis.Fact) {
+	reads := act.opts.Reads[act.Package]
+	if reads == nil || pkg == nil || pkg == act.Package.Types {
+		return
+	}
+	reads.AddFact(build_reads.Fact{Object: obj, Package: pkg, FactType: typ, Found: found != nil, Value: found})
 }
 
 // exportPackageFact implements Pass.ExportPackageFact.

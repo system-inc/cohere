@@ -31,6 +31,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -110,6 +111,12 @@ type Loaded struct {
 
 	// Inputs are what the load read to decide what it returned, for the inputs record (see inputs.go).
 	Inputs Inputs
+
+	// Reads are, by package, what each package the load checked from source read of other packages, for an extra
+	// build to restore it by (see build_reads): the type reads its check recorded, or why it never can be. A package
+	// whose types came from export data was not checked here and is not among them. The rules add their fact reads
+	// when check.Run is handed the same map.
+	Reads map[*packages.Package]*build_reads.Reads
 
 	// testFunctions is each test variant to analyze's refused test functions, judged as it was checked, for the
 	// diagnostics, one Caching.Analyzes turned down included, since go test refuses them all the same.
@@ -373,6 +380,12 @@ func fromSource(
 			return !caching.Analyzes(root)
 		})
 	}
+	// Made for every reachable package before any is checked, the restored ones too, whose export data may not read,
+	// so the map a run beside the load is handed (Overlap.Reads) never changes once it starts.
+	typeChecker.reads = make(map[*packages.Package]*build_reads.Reads, len(reachable))
+	for _, current := range reachable {
+		typeChecker.reads[current.loaded] = &build_reads.Reads{}
+	}
 	if caching.Restorer != nil {
 		loaderName := LoaderSource
 		if compiled != nil {
@@ -385,7 +398,7 @@ func fromSource(
 		for _, current := range reachable {
 			nodes[current.loaded] = current
 		}
-		caching.Begin(&Overlap{Packages: analyzedPackages, nodes: nodes, ended: ended})
+		caching.Begin(&Overlap{Packages: analyzedPackages, Reads: typeChecker.reads, nodes: nodes, ended: ended})
 	}
 	typeChecker.load(reachable)
 
@@ -416,6 +429,10 @@ func fromSource(
 			byPackage[current.loaded] = owned
 		}
 	}
+	reads := make(map[*packages.Package]*build_reads.Reads, len(typeChecker.checked))
+	for checked := range typeChecker.checked {
+		reads[checked] = typeChecker.reads[checked]
+	}
 	return roots, &Loaded{
 		Packages:                          analyzedPackages,
 		PackagesInWorkspace:               len(toAnalyze),
@@ -424,6 +441,7 @@ func fromSource(
 		Withheld:                          byPackage,
 		FilesParsed:                       int(typeChecker.filesParsed.Load()),
 		PackagesFromExportData:            int(typeChecker.fromExportData.Load()),
+		Reads:                             reads,
 		testFunctions:                     typeChecker.testFunctions,
 	}, nil
 }
