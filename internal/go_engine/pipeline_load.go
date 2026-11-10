@@ -30,11 +30,28 @@ func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) 
 			engine.described.readableOurs, request.overlay)
 	case request.caching != nil:
 		loaded, loadError = load.PackagesCached(workspace.Root, workspace.Patterns(), request.environment,
-			engine.described.readableOurs, *request.caching)
+			engine.described.readableOurs, engine.watchedCaching(*request.caching))
 	default:
 		loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), request.environment,
 			engine.described.readableOurs)
 	}
 	engine.loads.end()
 	return loaded, loadError
+}
+
+// watchedCaching is caching as it is, unless a test watches inside its loads (engineMemory.duringLoad): then its held
+// reader calls the watch before each lookup, which is during the load.
+func (engine *pipeline) watchedCaching(caching load.Caching) load.Caching {
+	if engine.memory == nil || engine.memory.duringLoad == nil {
+		return caching
+	}
+	held, during := caching.Held, engine.memory.duringLoad
+	caching.Held = func(file string) ([]byte, bool) {
+		during()
+		if held == nil {
+			return nil, false
+		}
+		return held(file)
+	}
+	return caching
 }

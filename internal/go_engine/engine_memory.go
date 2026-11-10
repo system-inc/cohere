@@ -126,6 +126,9 @@ type engineMemory struct {
 	// setMemoryLimit is debug.SetMemoryLimit and collecting collectorMarking outside a test, which watches them.
 	setMemoryLimit func(int64) int64
 	collecting     func() bool
+	// duringLoad is a test's look inside a load, nil outside a test: called each time package load asks for the bytes
+	// the run holds for a file, on a load that reads them (loadPackages), so the test reads the limit mid-load.
+	duringLoad func()
 }
 
 // lateMemoryAllowance is how far the late raise lifts the limit above the cap: 1 GiB.

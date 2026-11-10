@@ -100,6 +100,17 @@ type memoryWatch struct {
 	// raised is whether a raise has lifted the limit past the cap, and endedUnder the limit at each load's end.
 	raised     bool
 	endedUnder []int64
+	// duringAfterRaise is the limit at each look inside a load that came after a raise: inside a reload.
+	duringAfterRaise []int64
+}
+
+// duringLoad is called inside a load, as package load reads a file the run holds.
+func (watch *memoryWatch) duringLoad() {
+	watch.lock.Lock()
+	defer watch.lock.Unlock()
+	if watch.raised {
+		watch.duringAfterRaise = append(watch.duringAfterRaise, watch.current)
+	}
 }
 
 func (watch *memoryWatch) setMemoryLimit(limit int64) int64 {
@@ -130,7 +141,8 @@ func (watch *memoryWatch) collecting() bool {
 }
 
 // A run whose long-line wrap writes loads again, and the reload runs under the cap: the first load's raise lifted the
-// limit, and the reload set it back before it started, so it ended under the cap as the first load did.
+// limit, and the reload set it back before it started, so the limit read inside the reload, as package load asks for a
+// file's held bytes, is the cap, as it is at every load's end.
 func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "long-lines"))
@@ -141,6 +153,7 @@ func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
 	}
 	watch := &memoryWatch{current: engineMemoryCap}
 	memory := capMemoryWatched(watch, watch.collecting)
+	memory.duringLoad = watch.duringLoad
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 
@@ -164,6 +177,14 @@ func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
 		if limit != engineMemoryCap {
 			test.Errorf("load %d of %d ended under a limit of %d, want the cap, %d", index+1, len(watch.endedUnder),
 				limit, engineMemoryCap)
+		}
+	}
+	if len(watch.duringAfterRaise) == 0 {
+		test.Fatal("no look inside a load came after the raise, so the reload's limit went unread")
+	}
+	for _, limit := range watch.duringAfterRaise {
+		if limit != engineMemoryCap {
+			test.Fatalf("a reload ran under a limit of %d, want the cap, %d, from its start", limit, engineMemoryCap)
 		}
 	}
 }
