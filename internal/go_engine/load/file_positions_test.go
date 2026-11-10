@@ -162,8 +162,8 @@ func TestATestVariantKeepsItsPackagesOrderWhicheverClaimsFirst(test *testing.T) 
 			firstClaim := typeChecker.claim(first.loaded.CompiledGoFiles)
 			secondClaim := typeChecker.claim(second.loaded.CompiledGoFiles)
 			var parsing sync.WaitGroup
-			parsing.Go(func() { second.loaded.Syntax, _ = typeChecker.parseClaimed(secondClaim) })
-			first.loaded.Syntax, _ = typeChecker.parseClaimed(firstClaim)
+			parsing.Go(func() { second.loaded.Syntax, _ = typeChecker.parseClaimed(secondClaim, second) })
+			first.loaded.Syntax, _ = typeChecker.parseClaimed(firstClaim, first)
 			parsing.Wait()
 			for _, current := range []*node{alone, withTests} {
 				names, bases := basesOf(typeChecker.fileSet, current)
