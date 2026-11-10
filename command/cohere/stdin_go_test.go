@@ -2,6 +2,7 @@ package main
 
 import (
 	goformat "go/format"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -230,6 +231,45 @@ func TestAGoSaveLoadsNoPackageThatImportsIt(test *testing.T) {
 	if code != 0 || !strings.Contains(saved, wrapped) {
 		test.Fatalf("exit %d, want the long call wrapped (%q), which only b's type error would hold, in:\n%s\n"+
 			"stderr:\n%s", code, wrapped, saved, stderr)
+	}
+}
+
+// A save writes no file by design, so the save's refusal decides before the root's check (#hwz114g): a file reached
+// through a link outside the root is answered on stdout like any other, gofmt's text at exit 0, and never named as a
+// file not written, which only a run that would write it can be short of. The file outside is the same after.
+func TestAGoSaveThroughALinkOutsideTheRootAnswers(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	base, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatal(resolveError)
+	}
+	root, shared := filepath.Join(base, "project"), filepath.Join(base, "shared")
+	writeTree(test, root, map[string]string{
+		"go.work":   "go 1.24\n\nuse (\n\t.\n\t./shared/module\n)\n",
+		"go.mod":    "module example.com/project\n\ngo 1.24\n",
+		"inside.go": "package project\n\n// Count is how many there are.\nvar Count = 1\n",
+	})
+	unformatted := "package shared\n\n// Total is how many there are.\nvar  Total = 2\n"
+	writeTree(test, shared, map[string]string{
+		"module/go.mod":         "module example.com/shared\n\ngo 1.24\n",
+		"module/unformatted.go": unformatted,
+	})
+	if linkError := os.Symlink(shared, filepath.Join(root, "shared")); linkError != nil {
+		test.Fatal(linkError)
+	}
+
+	saved, stderr, code := runCohereWithStdin(test, binary, root, unformatted, "--stdin-filepath",
+		"shared/module/unformatted.go", "--fix", "--format")
+	formatted := "package shared\n\n// Total is how many there are.\nvar Total = 2\n"
+	if code != 0 || saved != formatted {
+		test.Fatalf("exit %d, want gofmt's text at exit 0:\n%s\ngot:\n%s\nstderr:\n%s", code, formatted, saved, stderr)
+	}
+	if strings.Contains(stderr, "not written") {
+		test.Errorf("a save named a file not written, though it writes none:\n%s", stderr)
+	}
+	if outside := readForTest(test, filepath.Join(shared, "module", "unformatted.go")); outside != unformatted {
+		test.Errorf("the file outside the root changed under a save:\n%s", outside)
 	}
 }
 

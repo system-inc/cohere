@@ -52,6 +52,12 @@ public struct FileSet: Equatable, Sendable {
     public var ignoreFilesConsulted: [String] = []
     public var directoriesListed: [String] = []
     /*
+     The git index the set was decided with, read whole, and the directory of the repository its answers were asked
+     for, which the inputs record names under `trackedIgnored` (`IgnoreRules.trackedIgnored`). Nil outside a
+     repository, and wherever the index stays keyed on its bytes.
+     */
+    var trackedIgnored: InputsRecord.TrackedIgnored?
+    /*
      Every Swift file no target compiles that the walk read to tell whether it is a script, a file of declarations among
      them, since an edit that gives one top-level code makes it a script the next run checks.
      */
@@ -236,6 +242,9 @@ public struct FileSet: Equatable, Sendable {
         var fileSet = FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
         fileSet.ignoreFilesConsulted = walkRules.filesConsulted.sorted()
         fileSet.directoriesListed = walkRules.directoriesListed
+        fileSet.trackedIgnored = walkRules.trackedIgnored.map {
+            InputsRecord.TrackedIgnored(index: $0.index, root: walkRules.repository.root.path, scope: $0.scope)
+        }
         fileSet.filesRead = filesRead
         return fileSet
     }

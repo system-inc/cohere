@@ -48,15 +48,17 @@ struct ContractFixtureTests {
      */
     @Test func theInputsRecordRoundTrips() throws {
         let line =
-            #"{"kind":"inputs","files":["/p/Package.swift"],"directories":["/p"],"absent":["/p/CohereSettings.json"]}"#
+            #"{"kind":"inputs","files":["/p/.git/index","/p/Package.swift"],"directories":["/p"],"#
+            + #""absent":["/p/CohereSettings.json"],"#
+            + #""trackedIgnored":[{"index":"/p/.git/index","root":"/p","scope":""}]}"#
         let original = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? NSDictionary
         let reparsed = try JSONSerialization.jsonObject(with: Self.roundTrip(line, kind: "inputs")) as? NSDictionary
         #expect(reparsed == original)
-        let empty = try JSONEncoder().encode(InputsRecord(files: [], directories: [], absent: []))
-        #expect(
-            String(decoding: empty, as: UTF8.self).contains(#""absent":[]"#),
-            "an empty list must be written [], never left out",
-        )
+        let encoded = try JSONEncoder().encode(InputsRecord(files: [], directories: [], absent: []))
+        let empty = String(decoding: encoded, as: UTF8.self)
+        for list in ["absent", "trackedIgnored"] {
+            #expect(empty.contains(#""\#(list)":[]"#), "an empty \(list) must be written [], never left out")
+        }
     }
 
     static func lines(of fixture: String) throws -> [String] {

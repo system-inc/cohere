@@ -62,6 +62,11 @@ type runGaps struct {
 	// (#72n9mq0). A gap, not a failure.
 	// Each is named, never only counted: a gap nobody can find is half a gap.
 	Unchecked []uncheckedEngineFile `json:"unchecked,omitempty"`
+	// NotWritten is the files an engine's fix phase would have written and did not, since each is reached through a
+	// symbolic link to a real path outside the root (#hwz114g). Each was checked, its findings stand, and its fixes
+	// were withheld, so a fix of this project never writes another's files. A gap that makes the run incomplete, named
+	// with where each file really is.
+	NotWritten []notWrittenFile `json:"notWritten,omitempty"`
 	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,
 	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the engine sends
 	// them. A gap, not a failure: they are a dependency's, not the project's to fix. Each is named, never only
