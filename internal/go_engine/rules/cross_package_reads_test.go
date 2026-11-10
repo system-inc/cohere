@@ -67,13 +67,9 @@ var listedCrossPackageReads = map[string]listedRead{
 		class:  readRecorded,
 		reason: "fix records each question it asks of the closure",
 	},
-	"correctness_no_caller_data_mutation/analyzer.go:findIoReaderType": {
+	"correctness_no_caller_data_mutation/analyzer.go:findIoReader": {
 		class:  readRecorded,
-		reason: "findIoReader records what it found",
-	},
-	"correctness_require_handled_error/analyzer.go:findHashType": {
-		class:  readRecorded,
-		reason: "findHashInterface records what it found",
+		reason: "hands the judged package's imports to build_reads.ClosureInterface and records what it found",
 	},
 	"staticcheck_code/is_main_like.go:IsMainLike": {class: readDirectImports},
 	"unused_code/graph_entry.go:(*graph).entry": {

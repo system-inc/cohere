@@ -75,44 +75,15 @@ func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
 	judgeWrites(context, function.Body, parameters)
 }
 
-// findIoReader is io.Reader's interface, found by walking the imports of analyzed and of each package they reach to
-// the package whose path is io, or nil when none of them is. What it found, or that it found nothing, is recorded in
-// reads, since it is an answer of the import closure no type read of analyzed holds (#b2t9xmf).
+// findIoReader is io.Reader's interface, found among the imports of analyzed and each package they reach, or nil when
+// none of them is io. What it found, or that it found nothing, is recorded in reads, since it is an answer of the
+// import closure no type read of analyzed holds, and the search is the one the restore asks again in another build
+// (build_reads.ClosureInterface, #b2t9xmf).
 func findIoReader(analyzed *types.Package, reads *build_reads.Reads) *types.Interface {
-	reader, declared := findIoReaderType(analyzed)
+	reader, declared := build_reads.ClosureInterface(analyzed.Imports(), "io", "Reader")
 	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryClosure, Path: "io", Name: "Reader",
 		Found: declared != nil, Answer: declared})
 	return reader
-}
-
-// findIoReaderType is findIoReader's walk: io.Reader's interface and the type name that declares it, both nil when
-// the walk finds no io, or an io whose Reader is no interface.
-func findIoReaderType(analyzed *types.Package) (*types.Interface, *types.TypeName) {
-	visited := map[*types.Package]bool{analyzed: true}
-	pending := []*types.Package{analyzed}
-	for len(pending) > 0 {
-		current := pending[len(pending)-1]
-		pending = pending[:len(pending)-1]
-		for _, imported := range current.Imports() {
-			if visited[imported] {
-				continue
-			}
-			visited[imported] = true
-			if imported.Path() == "io" {
-				typeName, isTypeName := imported.Scope().Lookup("Reader").(*types.TypeName)
-				if !isTypeName {
-					return nil, nil
-				}
-				reader, isInterface := typeName.Type().Underlying().(*types.Interface)
-				if !isInterface {
-					return nil, nil
-				}
-				return reader, typeName
-			}
-			pending = append(pending, imported)
-		}
-	}
-	return nil, nil
 }
 
 // judgedParameters is every named parameter of function the rule judges: not the receiver, which is the type's API,

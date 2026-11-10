@@ -31,6 +31,11 @@ type Keyed struct {
 	// key joins with what its dependencies' analyses came out as rather than with what went into them.
 	Own map[*packages.Package]Key
 
+	// Portable is each package's own digest but for the context: its files with their contents, module, import map by
+	// ID and extra inputs. The context holds `GOOS`, cgo and the flags, so an own digest never matches across builds,
+	// while a package of an extra build whose portable digest is the host's read the same inputs there (#b2t9xmf).
+	Portable map[*packages.Package]Key
+
 	// Files are the digests of every file Keys keyed, those it was given included, which StandardLibraryKeys reads
 	// rather than hashing the standard library's files again in the same run, and an extra build's Keys under
 	// `--other-builds` reads rather than hashing again the files the host's build shares with it.
@@ -49,7 +54,8 @@ type Keyed struct {
 // ID, PkgPath and Name; its Module's path, version and go version, and its replacement's; each of its GoFiles,
 // CompiledGoFiles, OtherFiles, EmbedFiles and IgnoredFiles as its path and the sha256 of its bytes; its import map,
 // path to ID, sorted by path; and its extra inputs. Since a package's key holds its dependencies' keys, a change
-// anywhere below it changes it, and a change in it leaves them alone.
+// anywhere below it changes it, and a change in it leaves them alone. The portable digest is a sha256 over the own
+// digest's parts after the context, alone.
 func Keys(
 	given []*packages.Package,
 	shared Context,
@@ -71,6 +77,7 @@ func Keys(
 		fileDigests: digests,
 		keys:        make(map[*packages.Package]Key, len(reachable)),
 		own:         make(map[*packages.Package]Key, len(reachable)),
+		portable:    make(map[*packages.Package]Key, len(reachable)),
 		visiting:    map[*packages.Package]bool{},
 	}
 	for _, root := range given {
@@ -78,7 +85,8 @@ func Keys(
 			return nil, keyError
 		}
 	}
-	return &Keyed{Keys: computing.keys, Own: computing.own, Files: FileDigests{byPath: digests}}, nil
+	return &Keyed{Keys: computing.keys, Own: computing.own, Portable: computing.portable,
+		Files: FileDigests{byPath: digests}}, nil
 }
 
 // contextDigest is the run's Context hashed once, in the key's order: format version, engine identity, rule set,

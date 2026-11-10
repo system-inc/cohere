@@ -360,8 +360,9 @@ func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 	if keysError != nil {
 		test.Fatal(keysError)
 	}
-	before, ownBefore := keysById(keyed.Keys), keysById(keyed.Own)
-	// A file's own package changes its own digest, and only it: an importer's key changes, its own digest does not.
+	before, ownBefore, portableBefore := keysById(keyed.Keys), keysById(keyed.Own), keysById(keyed.Portable)
+	// A file's own package changes its own digest and its portable digest, and only its: an importer's key changes,
+	// its own digests do not.
 	for _, step := range []struct {
 		file    string
 		want    []string
@@ -388,10 +389,50 @@ func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 		if keysError != nil {
 			test.Fatal(keysError)
 		}
-		after, ownAfter := keysById(keyed.Keys), keysById(keyed.Own)
+		after, ownAfter, portableAfter := keysById(keyed.Keys), keysById(keyed.Own), keysById(keyed.Portable)
 		expectChanged(test, "a byte of "+step.file, before, after, step.want...)
 		expectChanged(test, "the own digests on a byte of "+step.file, ownBefore, ownAfter, step.wantOwn...)
-		before, ownBefore = after, ownAfter
+		expectChanged(test, "the portable digests on a byte of "+step.file, portableBefore, portableAfter,
+			step.wantOwn...)
+		before, ownBefore, portableBefore = after, ownAfter, portableAfter
+	}
+}
+
+// A package another build reads the same files of, under the same import map, has the same portable digest there,
+// while its own digest differs by the build's context: the chain's packages hold no file of one target, so each is
+// portable between linux and windows, and runtime, whose files differ by target, is not (#b2t9xmf).
+func TestThePortableDigestIsTheSameInAnotherBuildOfTheSameFiles(test *testing.T) {
+	test.Parallel()
+
+	builds := map[string]map[string]Key{}
+	owns := map[string]map[string]Key{}
+	for _, goos := range []string{"linux", "windows"} {
+		loaded, loadError := load.Packages(chainDirectory(), []string{"./..."},
+			append(slices.Clone(fixtureEnvironment), "GOOS="+goos, "GOARCH=amd64"), nil)
+		if loadError != nil {
+			test.Fatalf("loading the chain for %s: %v", goos, loadError)
+		}
+		if len(loaded.Diagnostics) > 0 {
+			test.Fatalf("loading the chain for %s: %+v", goos, loaded.Diagnostics)
+		}
+		built := fixtureContext
+		built.Build = []string{"GOOS=" + goos, "GOARCH=amd64", "loader=source"}
+		keyed, keysError := Keys(loaded.Packages, built, nil, FileDigests{}, nil)
+		if keysError != nil {
+			test.Fatalf("keying the chain for %s: %v", goos, keysError)
+		}
+		builds[goos], owns[goos] = keysById(keyed.Portable), keysById(keyed.Own)
+	}
+	for _, id := range []string{bottomId, middleId, topId, topExternalId, "unsafe"} {
+		if builds["linux"][id] != builds["windows"][id] {
+			test.Errorf("%s's portable digest differs between linux and windows, though its files do not", id)
+		}
+		if owns["linux"][id] == owns["windows"][id] {
+			test.Errorf("%s's own digest is the same in linux and windows, though their contexts differ", id)
+		}
+	}
+	if builds["linux"]["runtime"] == builds["windows"]["runtime"] {
+		test.Error("runtime's portable digest is the same in linux and windows, though its files differ")
 	}
 }
 

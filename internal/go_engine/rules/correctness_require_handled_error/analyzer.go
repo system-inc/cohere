@@ -202,40 +202,13 @@ func isExemptWriterType(candidate types.Type) bool {
 
 // findHashInterface is hash.Hash's interface from the import graph under analyzed, analyzed included, or nil when
 // hash is not in it. What it found, or that it found nothing, is recorded in reads, since it is an answer of the
-// import closure no type read of analyzed holds (#b2t9xmf).
+// import closure no type read of analyzed holds, and the search is the one the restore asks again in another build
+// (build_reads.ClosureInterface, #b2t9xmf).
 func findHashInterface(analyzed *types.Package, reads *build_reads.Reads) *types.Interface {
-	hashInterface, declared := findHashType(analyzed)
+	hashInterface, declared := build_reads.ClosureInterface([]*types.Package{analyzed}, hashPackagePath, "Hash")
 	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryClosure, Path: hashPackagePath, Name: "Hash",
 		Found: declared != nil, Answer: declared})
 	return hashInterface
-}
-
-// findHashType is findHashInterface's walk: hash.Hash's interface and the type name that declares it, both nil when
-// the walk finds no hash, or a hash whose Hash is no interface.
-func findHashType(analyzed *types.Package) (*types.Interface, *types.TypeName) {
-	seen := map[*types.Package]bool{}
-	pending := []*types.Package{analyzed}
-	for len(pending) > 0 {
-		current := pending[len(pending)-1]
-		pending = pending[:len(pending)-1]
-		if seen[current] {
-			continue
-		}
-		seen[current] = true
-		if current.Path() == hashPackagePath {
-			typeName, isTypeName := current.Scope().Lookup("Hash").(*types.TypeName)
-			if !isTypeName {
-				return nil, nil
-			}
-			hashInterface, isInterface := typeName.Type().Underlying().(*types.Interface)
-			if !isInterface {
-				return nil, nil
-			}
-			return hashInterface, typeName
-		}
-		pending = append(pending, current.Imports()...)
-	}
-	return nil, nil
 }
 
 // isBlank is whether name is the blank identifier, which keeps nothing it is given.
