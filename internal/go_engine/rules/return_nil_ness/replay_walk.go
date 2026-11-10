@@ -69,6 +69,13 @@ func (walk *replayWalk) returns(function *intermediate_representation.Function) 
 		// The push answers such a function the defaults of its signature, whatever its body, and leaves it seen,
 		// which nothing reads of it: judged, imported and markSeen read seen only of a function with a result that
 		// may be nil. So it is answered unbuilt, where imported, through home.Function, and then Build built it.
+		//
+		// The condition names home's functions, though dropping it changes nothing a run can see: a replay reaches
+		// another package's function only through a call its judgment transfers, and transferReturnValue asks a
+		// callee only about a result that may be nil, so such a function always has one. Asked of one without, the
+		// replay would skip ask, and the read the store keeps for it with it, which is why the condition stays.
+		// A scratch panic in its place never fired over the nilness differential on cohere's root, the standard
+		// library, loom and deeafbf4, and fired as soon as a judgment asked a callee of every result (#efs50c3).
 		return defaultNilnessForSignature(function.Signature)
 	}
 	if results, holds := walk.imported(declared); holds {
