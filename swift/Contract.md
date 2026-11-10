@@ -957,7 +957,11 @@ and analyzed its package reports it, but for a rule whose findings stand only wh
 (U1000, and each staticcheck check whose documentation says so), and a `//cohere:ignore` is unused only if it is
 unused in every such build. `findingsAdded` counts the findings that stand which this build reported and the host's
 did not, and `findingsDropped` those it reported that the merge left out. A run of one build writes no `builds`, so
-its record reads as it always has. A file no build compiles stays a named gap, in the summary's `gaps.unchecked`.
+its record reads as it always has. A file no build compiles stays a named gap, in the summary's `gaps.unchecked`,
+and its exclusion reason in the project record says why no build compiles it rather than which constraint the
+host's build fails: `no target platform compiles it: !linux && !darwin` for a file whose constraint only rules out
+the platforms the project's files name, which a target in the settings' go block can check (#ntamp9e), `only
+another architecture than the host's ...`, or `a program of its own, ...` (#rkw4xcn).
 
 A type error only another build finds is a finding of that build, so the lint phase writes it as a compiler finding
 record, after the types phase has ended, and the lint record counts it in `typeErrors` (#rw6tg3a), additive within

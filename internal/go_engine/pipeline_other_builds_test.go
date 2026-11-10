@@ -172,8 +172,8 @@ func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 // and names each file the host's build constraints leave out and an extra build compiles as checked by that build, in
 // the build's own words, which the front door counts as checked (#72n9mq0): the windows file by windows's build, the
 // tagged file by the cohere_extra one, each the build the lint phase ran. A file no build compiles, one whose
-// constraint names `ignore`, keeps the constraint's reason and stays a gap, and adds no build. Without the switch
-// every one of the three keeps the constraint's reason.
+// constraint names `ignore`, stays a gap for the selection's reason, that no build sets `ignore` (#ntamp9e), and adds
+// no build. Without the switch every one of the three keeps the constraint's reason.
 func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 	test.Parallel()
 	const constraintPrefix = "excluded by build constraints on "
@@ -231,9 +231,10 @@ func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 			test.Errorf("under the switch %s is left out for %q, want %q", file, onReasons[file], want)
 		}
 	}
-	if !strings.HasPrefix(onReasons[ignoredFile], constraintPrefix) {
-		test.Errorf("under the switch %s, which no build compiles, is left out for %q, want the constraint's reason",
-			ignoredFile, onReasons[ignoredFile])
+	// Why no build compiles it, from the selection, which says more than the host's constraint (#ntamp9e).
+	if want := "its constraint names `ignore`, which no build sets"; onReasons[ignoredFile] != want {
+		test.Errorf("under the switch %s, which no build compiles, is left out for %q, want %q", ignoredFile,
+			onReasons[ignoredFile], want)
 	}
 }
 
@@ -666,5 +667,33 @@ func TestAFileTwoBuildsCompileIsLintedWhenEitherAnalyzesIt(test *testing.T) {
 	}
 	if target := notLinted["broken_first.go"]; !strings.HasPrefix(target, first+"/") {
 		test.Errorf("broken_first.go is named not linted under %q, want the %s build's: %v", target, first, notLinted)
+	}
+}
+
+// A target the settings name that go tool dist list does not is refused when the project is described, before any
+// record, since the settings asked for a check that can never be made (#ntamp9e), and one it does target is
+// accepted.
+func TestATargetTheToolchainDoesNotListIsRefusedAtLoad(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	describe := func(targets []string) (*describedProject, error) {
+		test.Helper()
+		request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root,
+			"--no-cache", "--other-builds"})
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		request.targets = targets
+		return describeProject(request)
+	}
+	if _, refused := describe([]string{"plan9/arm64"}); refused == nil ||
+		!strings.Contains(refused.Error(), "the go block's targets name plan9/arm64, which go tool dist list does "+
+			"not target") {
+		test.Errorf("an unknown target described as %v, want it refused by name", refused)
+	}
+	// A target the toolchain lists is accepted. It widens what selection may choose and forces no build: this
+	// fixture holds no file only wasm compiles, so selection still needs none there.
+	if _, describeError := describe([]string{"wasip1/wasm"}); describeError != nil {
+		test.Errorf("a target the toolchain lists was refused: %v", describeError)
 	}
 }

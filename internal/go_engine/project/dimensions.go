@@ -361,3 +361,49 @@ func sortedKeys(set map[string]bool) []string {
 	slices.Sort(keys)
 	return keys
 }
+
+// positiveOperatingSystems is every `GOOS` a file names as one it is built for: its name's suffix's, and each its
+// constraint names outside a negation (#ntamp9e). `unix` names a family and no one platform, so it adds none, and a
+// `GOOS` named only under a negation, as `!windows`, is one the file rules out.
+func positiveOperatingSystems(read source) []string {
+	operatingSystems, _ := namedBySuffix(filepath.Base(read.file))
+	for _, expression := range constraintsOf(read) {
+		for _, tag := range positiveTags(expression, false, nil) {
+			if knownAs(tag) == knownOperatingSystem {
+				operatingSystems = append(operatingSystems, tag)
+			}
+		}
+	}
+	return sortedSet(operatingSystems)
+}
+
+// positiveTags is every tag an expression names outside a negation, appended to tags, negated saying whether the
+// expression itself sits under an odd number of them.
+func positiveTags(expression constraint.Expr, negated bool, tags []string) []string {
+	switch typed := expression.(type) {
+	case *constraint.TagExpr:
+		if !negated {
+			return append(tags, typed.Tag)
+		}
+	case *constraint.NotExpr:
+		return positiveTags(typed.X, !negated, tags)
+	case *constraint.AndExpr:
+		return positiveTags(typed.Y, negated, positiveTags(typed.X, negated, tags))
+	case *constraint.OrExpr:
+		return positiveTags(typed.Y, negated, positiveTags(typed.X, negated, tags))
+	}
+	return tags
+}
+
+// constraintText is a file's constraint as its `//go:build` line spells it, its lines joined by ` && ` when it has
+// several, or its name when only its suffix constrains it.
+func constraintText(read source) string {
+	var spelled []string
+	for _, expression := range constraintsOf(read) {
+		spelled = append(spelled, expression.String())
+	}
+	if len(spelled) == 0 {
+		return "its name, " + filepath.Base(read.file)
+	}
+	return strings.Join(spelled, " && ")
+}

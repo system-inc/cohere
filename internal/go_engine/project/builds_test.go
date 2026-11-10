@@ -55,7 +55,7 @@ func censusOf(test *testing.T, files map[string]string) Census {
 // on an architecture other than the host's: the guard every test of the builds holds.
 func buildsFor(test *testing.T, census Census, host Build, ports []Port) ([]Build, []Unbuilt) {
 	test.Helper()
-	builds, unbuilt, buildsError := BuildsFor(census, host, ports)
+	builds, unbuilt, buildsError := BuildsFor(census, host, ports, nil)
 	if buildsError != nil {
 		test.Fatal(buildsError)
 	}
@@ -417,4 +417,65 @@ func TestBuildsForNeverFoldsAProgramOfItsOwnIntoItsDirectorysPackage(test *testi
 		test.Errorf("unbuilt %+v, want oracle.go alone, named as a program of its own", unbuilt)
 	}
 	requireEachCompiledOnce(test, census, builds, unbuilt)
+}
+
+// Target platforms are the ones the files name and the host's (#ntamp9e, Kirk's ruling, Nov 10). adamic's shape: a
+// linux file, a darwin file, and a fallback whose constraint only rules those two out, meant for wasm. With no
+// settings, the targets are darwin and linux, so the fallback is no target's, named as a gap, and windows, which the
+// fallback's constraint lets in, is never chosen for it. With wasip1/wasm among the settings' targets, a build on it
+// checks the fallback.
+func TestBuildsForSatisfiesANegationOnlyConstraintFromTheTargets(test *testing.T) {
+	test.Parallel()
+	ports := append(slices.Clone(testPorts), Port{OperatingSystem: "wasip1", Architecture: "wasm"})
+	census := censusOf(test, map[string]string{
+		"native_linux.go":   "package native\n",
+		"native_darwin.go":  "package native\n",
+		"fallback_other.go": "//go:build !linux && !darwin\n\npackage native\n",
+	})
+
+	builds, unbuilt, buildsError := BuildsFor(census, testHost, ports, nil)
+	if buildsError != nil {
+		test.Fatal(buildsError)
+	}
+	if got := labels(builds); !slices.Equal(got, []string{"darwin/arm64 cgo", "linux/arm64"}) {
+		test.Errorf("with no targets set, the builds are %v, want the host's and linux's: no platform the files never "+
+			"name is chosen", got)
+	}
+	if len(unbuilt) != 1 || filepath.Base(unbuilt[0].File) != "fallback_other.go" ||
+		unbuilt[0].Reason != "no target platform compiles it: !linux && !darwin" {
+		test.Errorf("unbuilt %+v, want fallback_other.go named as no target's", unbuilt)
+	}
+
+	wasm := Port{OperatingSystem: "wasip1", Architecture: "wasm"}
+	builds, unbuilt, buildsError = BuildsFor(census, testHost, ports, []Port{wasm})
+	if buildsError != nil {
+		test.Fatal(buildsError)
+	}
+	if got := labels(builds); !slices.Equal(got, []string{"darwin/arm64 cgo", "linux/arm64", "wasip1/wasm"}) ||
+		len(unbuilt) != 0 {
+		test.Errorf("with wasip1/wasm a target, the builds are %v and %+v unbuilt, want wasip1/wasm checking the "+
+			"fallback", got, unbuilt)
+	}
+}
+
+// A `GOOS` a file names only under a negation is one it rules out, and `unix` names a family and no one platform, so
+// neither makes a target; a suffix and a constraint outside a negation each do (positiveOperatingSystems).
+func TestPositiveOperatingSystemsAreTheOnesAFileIsBuiltFor(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		name     string
+		contents string
+		want     []string
+	}{
+		{"plain_windows.go", "package p\n", []string{"windows"}},
+		{"ruled_out.go", "//go:build !linux && !darwin\n\npackage p\n", nil},
+		{"family.go", "//go:build unix\n\npackage p\n", nil},
+		{"either.go", "//go:build linux || (freebsd && !cgo)\n\npackage p\n", []string{"freebsd", "linux"}},
+		{"double.go", "//go:build !(!plan9)\n\npackage p\n", []string{"plan9"}},
+	} {
+		read := source{file: filepath.Join(test.TempDir(), testCase.name), contents: []byte(testCase.contents)}
+		if got := positiveOperatingSystems(read); !slices.Equal(got, testCase.want) {
+			test.Errorf("%s names %v as built for, want %v", testCase.name, got, testCase.want)
+		}
+	}
 }

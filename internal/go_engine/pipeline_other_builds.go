@@ -73,25 +73,49 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 	return engine.described.builds[0], engine.described.builds[1:], nil
 }
 
-// readBuilds is the host's build, as go env's answer reads it, then the extra builds the census needs beside it, on
-// the host's `GOARCH` (project.BuildsFor), with the targets the toolchain lists. Each file no build compiles is left
-// to the types phase, which names it as a gap, and keeps its constraint reason in the project record.
-func readBuilds(workspace project.Workspace, census project.Census, goEnvironment *load.GoEnvironment) (
-	[]project.Build,
-	error,
-) {
+// readBuilds is the host's build, as go env's answer reads it, then the extra builds the census needs beside it
+// (project.BuildsFor), with the targets the toolchain lists, and why each file no build compiles is left so, by path.
+// targets are the settings' `targets`, each `GOOS/GOARCH` a port the toolchain lists or the run is refused: a
+// target named and never checked would read as checked (#ntamp9e). Each file no build compiles is left to the types
+// phase, which names it as a gap with that reason.
+func readBuilds(
+	workspace project.Workspace,
+	census project.Census,
+	goEnvironment *load.GoEnvironment,
+	targets []string,
+) ([]project.Build, map[string]string, error) {
 	buildContext, goFlags := goEnvironment.Target()
 	host := project.HostBuild(buildContext, goFlags)
 	ports, portsError := project.ReadPorts(workspace.Root, workspace.Environment())
 	if portsError != nil {
-		return nil, portsError
+		return nil, nil, portsError
 	}
-	builds, _, buildsError := project.BuildsFor(census, host, ports)
+	var extraTargets []project.Port
+	for _, target := range targets {
+		operatingSystem, architecture, _ := strings.Cut(target, "/")
+		index := slices.IndexFunc(ports, func(port project.Port) bool {
+			return port.OperatingSystem == operatingSystem && port.Architecture == architecture
+		})
+		if index < 0 {
+			return nil, nil, refusedTarget{fmt.Errorf("the go block's targets name %s, which go tool dist list does "+
+				"not target, so it could never be checked", target)}
+		}
+		extraTargets = append(extraTargets, ports[index])
+	}
+	builds, unbuilt, buildsError := project.BuildsFor(census, host, ports, extraTargets)
 	if buildsError != nil {
-		return nil, buildsError
+		return nil, nil, buildsError
 	}
-	return builds, nil
+	unbuiltReasons := make(map[string]string, len(unbuilt))
+	for _, each := range unbuilt {
+		unbuiltReasons[each.File] = each.Reason
+	}
+	return builds, unbuiltReasons, nil
 }
+
+// refusedTarget is a target the settings name that no port of the toolchain is, which refuses the run before its
+// first record rather than leaving it incomplete, since the settings asked for a check that cannot be made.
+type refusedTarget struct{ error }
 
 // checkingBuild is the first extra build of builds, the host's first, that compiles file, read from contents, which
 // the project record names it checked by. It reports false when none does: no build was read, or the file is one

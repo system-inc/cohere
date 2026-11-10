@@ -277,8 +277,8 @@ func ignoreEntryShape() *schemaNode {
 }
 
 // goShape is the Go engine's block, as internal/go_engine/settings reads it: rules, each a severity or
-// [severity] or [severity, options object], departures, each rule's reason for loosening it past the house, and
-// reasons, why each off is off.
+// [severity] or [severity, options object], departures, each rule's reason for loosening it past the house,
+// reasons, why each off is off, and targets, the platforms checked beside the ones the files name.
 // Its severities are that loader's own list, exact, so the schema never allows what the engine refuses. Rule
 // names are left open, in rules, departures and reasons alike, since the Go engine's registry is not the TypeScript
 // one this package lists; the engine refuses a name it does not know. Which options loosen a rule is the rule's to
@@ -327,6 +327,16 @@ func goShape() *schemaNode {
 				AdditionalProperties: &additionalProperties{
 					schema: &schemaNode{Type: "string", Pattern: goReasonPattern},
 				},
+			},
+			"targets": {
+				Type: "array",
+				Description: "Platforms, each GOOS/GOARCH as go tool dist list spells it, checked beside the ones " +
+					"the project's files name in their build constraints and suffixes and the host's. They only " +
+					"add: a " +
+					"file whose constraint only rules platforms out, as !linux && !darwin, is checked under a target " +
+					"that compiles it, and with none it is named as a gap. A pair the toolchain does not target is " +
+					"refused at load.",
+				Items: &schemaNode{Type: "string", Pattern: settings.TargetPattern},
 			},
 		},
 	}
