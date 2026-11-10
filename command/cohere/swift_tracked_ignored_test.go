@@ -156,10 +156,10 @@ func TestASwiftRunInAWorktreeMissesOnAGitAddForceOfAFileOnlyItsSharedExcludeIgno
 		dispatch.SwiftEngineOverrideVariable + "=" + builtSwiftEngine(test),
 		"PATH=" + toolsWithoutGit(test),
 	}
-	temporary, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
-	if resolveSymlinksError != nil {
-		test.Fatal(resolveSymlinksError)
-	}
+	// Left as the temp directory spells it, as a developer's shell does. On macOS it reaches /private through a link,
+	// so git, which writes the worktree's pointer by its real path, and the engine, given the link, spell the index
+	// two ways, and the front door keys it on its digest only by comparing real paths (#ny1mv0y).
+	temporary := test.TempDir()
 	checkout := filepath.Join(temporary, "checkout")
 	worktree := filepath.Join(temporary, "feature")
 	writeTree(test, checkout, map[string]string{
@@ -181,9 +181,7 @@ func TestASwiftRunInAWorktreeMissesOnAGitAddForceOfAFileOnlyItsSharedExcludeIgno
 	git(checkout, "init", "--quiet")
 	git(checkout, "add", ".")
 	git(checkout, "commit", "--quiet", "-m", "package")
-	// Relative, since git spells an absolute pointer by its real path, `/private/tmp`, where the engine's record spells
-	// the index as Foundation does, `/tmp`, and the front door keys an index on its digest only when the two agree.
-	git(checkout, "worktree", "add", "--quiet", "--relative-paths", worktree)
+	git(checkout, "worktree", "add", "--quiet", worktree)
 	sharedExclude := filepath.Join(checkout, ".git", "info", "exclude")
 	if writeError := os.WriteFile(sharedExclude, []byte("Sources/App/Scratch.swift\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
