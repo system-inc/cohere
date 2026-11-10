@@ -90,16 +90,21 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 		uncompiled = append(uncompiled, read)
 	}
 	builds := []Build{host}
+	targets := targetPorts(host, ports, sortedSet(named), extraTargets)
+	platforms := platformsFor(host, targets, dimensionsOf(uncompiled, ports).Cgo)
+	// Each target the settings list is built, whether or not a file is its alone, so the code every platform shares
+	// is type-checked for it too (#14vweg1, Kirk's ruling, Nov 10). The targets the files name stay as needed.
+	listed := listedBuilds(host, extraTargets)
 	if len(uncompiled) == 0 {
+		builds = append(builds, sortedBuilds(listed, host, platforms)...)
 		slices.SortFunc(unbuilt, func(left Unbuilt, right Unbuilt) int {
 			return strings.Compare(left.File, right.File)
 		})
 		return builds, unbuilt, nil
 	}
 
-	targets := targetPorts(host, ports, sortedSet(named), extraTargets)
-	platforms := platformsFor(host, targets, dimensionsOf(uncompiled, ports).Cgo)
-	// First the platforms, each under the host's tags, the fewest of them that compile what any of them does.
+	// First the platforms, each under the host's tags: the listed ones, then the fewest others that compile what any
+	// platform does and no listed one does.
 	candidates, candidatesError := candidatesFor(uncompiled, host, platforms)
 	if candidatesError != nil {
 		return nil, nil, candidatesError
@@ -108,9 +113,42 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 	for _, each := range candidates {
 		coverable.add(each.coverage)
 	}
-	var chosen []Build
-	for _, index := range fewestCovering(candidates, coverable) {
-		chosen = append(chosen, candidates[index].build)
+	chosen := slices.Clone(listed)
+	// What the listed builds compile is read under them, never from the candidates, which leave out a listed platform
+	// an earlier one compiles everything of (withoutDominated).
+	listedCoverage := newCoverage(len(uncompiled))
+	for _, each := range listed {
+		for index, read := range uncompiled {
+			compiled, compileError := compiles(each, read)
+			if compileError != nil {
+				return nil, nil, compileError
+			}
+			if compiled {
+				listedCoverage.set(index)
+			}
+		}
+	}
+	var unlisted []candidate
+	wanted := newCoverage(len(uncompiled))
+	for _, each := range candidates {
+		if slices.ContainsFunc(listed, each.build.sameAs) {
+			continue
+		}
+		// Invariant: a file a listed build compiles is never wanted again, and every other is compiled by an unlisted
+		// candidate, since a listed one compiles only what its listed build does.
+		remaining := newCoverage(len(uncompiled))
+		for index := range uncompiled {
+			if each.coverage.has(index) && !listedCoverage.has(index) {
+				remaining.set(index)
+			}
+		}
+		if !remaining.empty() {
+			unlisted = append(unlisted, candidate{build: each.build, coverage: remaining})
+			wanted.add(remaining)
+		}
+	}
+	for _, index := range fewestCovering(unlisted, wanted) {
+		chosen = append(chosen, unlisted[index].build)
 	}
 	// Then the files only a tag compiles, each tag component's on the platforms its files name beside its tags.
 	var tagged []int
@@ -153,6 +191,23 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 	}
 	slices.SortFunc(unbuilt, func(left Unbuilt, right Unbuilt) int { return strings.Compare(left.File, right.File) })
 	return builds, unbuilt, nil
+}
+
+// listedBuilds is a build under the host's tags on each target the settings list (extraTargets), but the host's own
+// platform, which the host's build is: cgo off, as on any platform other than the host's, each once, in their order.
+func listedBuilds(host Build, extraTargets []Port) []Build {
+	var listed []Build
+	for _, port := range extraTargets {
+		if port.OperatingSystem == host.OperatingSystem && port.Architecture == host.Architecture {
+			continue
+		}
+		build := Build{OperatingSystem: port.OperatingSystem, Architecture: port.Architecture,
+			Tags: slices.Clone(host.Tags), Flags: slices.Clone(host.Flags)}
+		if !slices.ContainsFunc(listed, build.sameAs) {
+			listed = append(listed, build)
+		}
+	}
+	return listed
 }
 
 // program is a file of a package other than the one its directory compiles (see BuildsFor): its package's name,

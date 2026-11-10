@@ -577,6 +577,41 @@ func TestBuildsForSatisfiesANegationOnlyConstraintFromTheTargets(test *testing.T
 	}
 }
 
+// A target the settings list is always built, whether or not a file is its alone (#14vweg1, Kirk's ruling, Nov 10):
+// windows/amd64 listed over a module whose files every platform compiles is a build of its own, so the shared code is
+// type-checked for it, on its own architecture, with cgo off. The host's own platform listed adds nothing, the host's
+// build being it. The targets the files name stay as needed: a linux file still gets linux's build, and a listed
+// target that compiles a file spares the build the files would otherwise need.
+func TestBuildsForAlwaysBuildsAListedTarget(test *testing.T) {
+	test.Parallel()
+	windows := Port{OperatingSystem: "windows", Architecture: "amd64", CgoSupported: true}
+	host := Port{OperatingSystem: "darwin", Architecture: "arm64", CgoSupported: true}
+	plain := censusOf(test, map[string]string{"main.go": "package p\n"})
+	builds, unbuilt, buildsError := BuildsFor(plain, testHost, testPorts, []Port{windows, host})
+	if buildsError != nil {
+		test.Fatal(buildsError)
+	}
+	if got := labels(builds); !slices.Equal(got, []string{"darwin/arm64 cgo", "windows/amd64"}) || len(unbuilt) != 0 {
+		test.Errorf("with windows/amd64 listed and no file its alone, the builds are %v, want the host's and "+
+			"windows/amd64's", got)
+	}
+
+	named := censusOf(test, map[string]string{
+		"main.go":            "package p\n",
+		"epoll_linux.go":     "package p\n",
+		"console_windows.go": "package p\n",
+	})
+	builds, unbuilt, buildsError = BuildsFor(named, testHost, testPorts, []Port{windows})
+	if buildsError != nil {
+		test.Fatal(buildsError)
+	}
+	if got := labels(builds); !slices.Equal(got, []string{"darwin/arm64 cgo", "linux/arm64", "windows/amd64"}) ||
+		len(unbuilt) != 0 {
+		test.Errorf("with windows/amd64 listed beside a linux and a windows file, the builds are %v and %+v unbuilt, "+
+			"want linux/arm64 for the linux file and the listed windows/amd64 for the windows one", got, unbuilt)
+	}
+}
+
 // A `GOOS` a file names only under a negation is one it rules out, and `unix` names a family and no one platform, so
 // neither makes a target; a suffix and a constraint outside a negation each do (positiveOperatingSystems).
 func TestPositiveOperatingSystemsAreTheOnesAFileIsBuiltFor(test *testing.T) {
