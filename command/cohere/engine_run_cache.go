@@ -53,6 +53,10 @@ func declareEngineRunCacheInputs(run *engineRun, exitCode int, settingsFile stri
 	declareRunCacheInputs(run.inputs.Files...)
 	session.extraDirectories = append(session.extraDirectories, run.inputs.Directories...)
 	session.extraAbsent = append(session.extraAbsent, run.inputs.Absent...)
+	for _, named := range run.inputs.TrackedIgnored {
+		session.trackedIgnored = append(session.trackedIgnored,
+			trackedIgnoredIndex{index: named.Index, root: named.Root, scope: named.Scope})
+	}
 	declareFileOrAbsent(settingsFile)
 	return true
 }

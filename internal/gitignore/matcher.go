@@ -20,8 +20,16 @@ type Matcher struct {
 	files   [][]rule
 	exclude []rule
 
-	// excludedBy is the rule that excluded this directory or one above it. It decides every path below.
+	// excludedBy is the rule that excluded this directory or one above it. It decides every path below that the
+	// index does not track.
 	excludedBy *rule
+
+	// index is every path the repository's index tracks, shared by every matcher Enter makes, and nil when it was
+	// not read. indexFile is the index read or looked for, "" for a root with no `.git`, and indexFallback is why
+	// no tracked path was read from it, nil when they were.
+	index         *trackedIndex
+	indexFile     string
+	indexFallback error
 
 	// listing, when set, answers Enter's questions about a `.git` or a `.gitignore` a directory does not
 	// hold, from a listing already read. See WithListing.
@@ -61,8 +69,19 @@ func (matcher *Matcher) Root() string { return matcher.root }
 // Directory is the directory this matcher answers for, relative to the root, "" for the root itself.
 func (matcher *Matcher) Directory() string { return matcher.directory }
 
+// IndexFile is the repository's index the matcher read or looked for, so a cache can name it as an input: an
+// index appearing or changing changes what is tracked, and so what is ignored. It is "" for a root holding no
+// `.git`, whose matcher never looks for one.
+func (matcher *Matcher) IndexFile() string { return matcher.indexFile }
+
+// IndexFallback is why the matcher read no tracked paths from the repository's index, wrapping ErrNoIndex,
+// ErrSplitIndex, ErrSparseIndex or ErrMalformedIndex, and nil when it read them. A matcher that fell back decides by
+// the ignore files alone, so a file git tracks under a pattern that matches it reads ignored.
+func (matcher *Matcher) IndexFallback() error { return matcher.indexFallback }
+
 // Excluded reports whether this directory, or one above it, is excluded, and by which rule. A walk that
-// entered one anyway gets the same answer for everything inside.
+// entered one anyway gets the same answer for everything inside that the index does not track: Ignored
+// answers false for a tracked path, and for a directory holding one, whatever excluded the directory above.
 func (matcher *Matcher) Excluded() (bool, Source) {
 	if matcher.excludedBy == nil {
 		return false, Source{}
@@ -101,35 +120,51 @@ func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
 		} else if _, statError := os.Lstat(filepath.Join(childDirectory, ".git")); statError == nil {
 			return nil, fmt.Errorf("gitignore: %s %w", childDirectory, ErrNestedRepository)
 		}
-		entered.directory = child
-		if entered.excludedBy != nil {
-			continue
+		if stepError := entered.step(child); stepError != nil {
+			return nil, stepError
 		}
-		if decided := entered.decide(
-			child,
-			path.Base(child),
-			true,
-			len(entered.files),
-		); decided != nil && !decided.negated {
-			entered.excludedBy = decided
-			continue
-		}
-		if matcher.listedAbsent(childDirectory, IgnoreFileName) {
-			// No `.gitignore`, which readTreeFile reads as no rules.
-			entered.files = append(entered.files, nil)
-			continue
-		}
-		rules, readTreeFileError := readTreeFile(matcher.root, child)
-		if readTreeFileError != nil {
-			return nil, readTreeFileError
-		}
-		entered.files = append(entered.files, rules)
 	}
 	return &entered, nil
 }
 
+// step moves the matcher into child, a directory of its own directory relative to the root, reading child's ignore
+// file unless a rule excludes child, or a directory above it, as git stops reading there. Enter takes it for each
+// directory it passes through; TrackedIgnoredDigest takes it alone, for directories it never asks to be walkable. It
+// moves the matcher itself, appending child's rules to its files, so a caller steps a copy whose files are capped.
+func (matcher *Matcher) step(child string) error {
+	matcher.directory = child
+	if matcher.excludedBy != nil {
+		return nil
+	}
+	if decided := matcher.decide(
+		child,
+		path.Base(child),
+		true,
+		len(matcher.files),
+	); decided != nil && !decided.negated {
+		matcher.excludedBy = decided
+		return nil
+	}
+	if matcher.listedAbsent(filepath.Join(matcher.root, filepath.FromSlash(child)), IgnoreFileName) {
+		// No `.gitignore`, which readTreeFile reads as no rules.
+		matcher.files = append(matcher.files, nil)
+		return nil
+	}
+	rules, readTreeFileError := readTreeFile(matcher.root, child)
+	if readTreeFileError != nil {
+		return readTreeFileError
+	}
+	matcher.files = append(matcher.files, rules)
+	return nil
+}
+
 // Ignored reports whether relativePath, an entry of this matcher's directory given relative to the root,
 // is excluded, and the rule that decided. A rule that re-included the path is reported with false.
+//
+// A path the index tracks, or a directory holding one, is not ignored and no rule decided it, which is git
+// check-ignore's answer for it (`::` in its verbose form). A walk that prunes what Ignored excludes therefore
+// enters such a directory even when a rule excludes it, and asks about each entry there: the tracked ones read
+// not ignored, and the rest read ignored by the rule that excluded the directory, as before.
 //
 // isDirectory says whether the path is a directory, which is what a pattern with a trailing `/` asks; a
 // symbolic link to a directory is not one, as git does not follow it. Asking about a path outside this
@@ -146,6 +181,9 @@ func (matcher *Matcher) Ignored(relativePath string, isDirectory bool) (bool, So
 		// mismatch is a caller's bug, and answering anyway would leave out the ignore files between the two.
 		panic(fmt.Sprintf("gitignore: asked about %s through the matcher for %s; Enter its directory first",
 			cleanedPath, displayDirectory(matcher.directory)))
+	}
+	if matcher.index.tracks(cleanedPath) {
+		return false, Source{}
 	}
 	if matcher.excludedBy != nil {
 		return true, matcher.excludedBy.source

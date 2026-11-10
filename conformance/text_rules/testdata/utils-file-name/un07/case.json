@@ -1,0 +1,11 @@
+{
+    "why": "un07: a word is matched whole, so `stringutils`, one run-together word, passes, as a folder named `myutils` does",
+    "expect": [],
+    "options": {},
+    "path": "stringutils",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

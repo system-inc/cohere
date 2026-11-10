@@ -3,9 +3,11 @@ package build_intermediate_representation
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -111,9 +113,14 @@ func buildirsRun(pass *analysis.Pass) []*ir.Function {
 // result at all, so no reader builds the package inside its own action while another waits on that build. Building
 // one function at a time, as each is read, is the intermediate representation package's own laziness, held there
 // (TestBuildingOneFunctionBuildsOnlyIt), and the fact resolver's, and not what a reader of this result gets.
+//
+// It holds on both of run's paths: the package run creates alone, under a driver with no resolver, and the package the
+// run's resolver shares, which the resolver creates unbuilt when no question of its own reached the package first, so
+// run must build it as surely as one it created.
 func TestEveryFunctionIsBuiltBeforeAReaderStarts(test *testing.T) {
 	test.Parallel()
 	type reading struct {
+		shared    bool
 		functions int
 		unbuilt   []string
 	}
@@ -124,10 +131,14 @@ func TestEveryFunctionIsBuiltBeforeAReaderStarts(test *testing.T) {
 		ResultType: reflect.TypeFor[reading](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			result := mustResultOf(pass)
+			resolver, isSharing := pass.ResultOf[rule.Resolved].(*sharingResolver)
 			// Read off the package itself, not through Package or SourceFunctions, so a build either did would not
 			// count.
 			every := withAnonymous(result.irPackage.Functions)
-			read := reading{functions: len(every)}
+			read := reading{
+				shared:    isSharing && result.irPackage == resolver.handedOut(pass.Pkg),
+				functions: len(every),
+			}
 			for _, function := range every {
 				if len(function.Blocks) == 0 {
 					read.unbuilt = append(read.unbuilt, function.RelativeString(nil))
@@ -136,17 +147,87 @@ func TestEveryFunctionIsBuiltBeforeAReaderStarts(test *testing.T) {
 			return read, nil
 		},
 	}
-	read, isReading := rootResults(test, &checker.Options{}, probe)[probe].(reading)
-	if !isReading {
-		test.Fatal("the probe returned no reading")
+	cases := []struct {
+		name    string
+		options *checker.Options
+		shared  bool
+	}{
+		{"created alone", &checker.Options{}, false},
+		{"shared by the resolver", &checker.Options{Resolver: newSharingResolver(), Resolved: rule.Resolved}, true},
 	}
-	if read.functions < 8 {
-		test.Fatalf("the fixture held %d functions, where at least 8 were expected", read.functions)
+	for _, testCase := range cases {
+		read, isReading := rootResults(test, testCase.options, probe)[probe].(reading)
+		if !isReading {
+			test.Fatalf("%s, the probe returned no reading", testCase.name)
+		}
+		if read.shared != testCase.shared {
+			test.Errorf("%s, the reader's package was the one the resolver handed out %t, where %t was expected",
+				testCase.name, read.shared, testCase.shared)
+		}
+		if read.functions < 8 {
+			test.Fatalf("%s, the fixture held %d functions, where at least 8 were expected", testCase.name,
+				read.functions)
+		}
+		if len(read.unbuilt) != 0 {
+			test.Errorf("%s, as the reader started, %q of %d functions had no blocks, where the whole package was "+
+				"expected built by %s's own action", testCase.name, read.unbuilt, read.functions, Analyzer.Name)
+		}
 	}
-	if len(read.unbuilt) != 0 {
-		test.Errorf("as the reader started, %q of %d functions had no blocks, where the whole package was expected "+
-			"built by %s's own action", read.unbuilt, read.functions, Analyzer.Name)
+}
+
+// sharingResolver stands in for the run's fact resolver, which this package's tests cannot import, since it imports
+// this package. As the resolver does, it learns a package when ctrlflow finishes there and, where Analyzer runs too,
+// creates the package the readers walk as NewPackage creates it, unbuilt, as the resolver's is when no question of its
+// own reached it first. It keeps each package ReadersPackage handed out, so a test can tell run took the shared path.
+type sharingResolver struct {
+	mutex   sync.Mutex
+	created map[*types.Package]*intermediate_representation.Package
+	handed  map[*types.Package]*intermediate_representation.Package
+}
+
+// newSharingResolver is a resolver that has learned no package yet.
+func newSharingResolver() *sharingResolver {
+	return &sharingResolver{
+		created: map[*types.Package]*intermediate_representation.Package{},
+		handed:  map[*types.Package]*intermediate_representation.Package{},
 	}
+}
+
+// Finished creates action's package for the readers when action is ctrlflow's and Analyzer runs on the package, with
+// the expression map its readers ask for, as the resolver's Finished learns it.
+func (resolver *sharingResolver) Finished(action *checker.Action) {
+	graphs, isGraphs := action.Result.(*ctrlflow.CFGs)
+	if action.Analyzer != ctrlflow.Analyzer || !isGraphs {
+		return
+	}
+	for _, sibling := range action.PackageActions() {
+		if sibling.Analyzer != Analyzer {
+			continue
+		}
+		created := NewPackage(action.Package.Fset, action.Package.Types, action.Package.Syntax,
+			action.Package.TypesInfo, graphs.NoReturn, ReadsExpressions(sibling.Dependents()))
+		resolver.mutex.Lock()
+		resolver.created[action.Package.Types] = created
+		resolver.mutex.Unlock()
+	}
+}
+
+// ReadersPackage is the package Finished created for packageTypes, kept as handed out, or nil where it created none.
+func (resolver *sharingResolver) ReadersPackage(packageTypes *types.Package) *intermediate_representation.Package {
+	resolver.mutex.Lock()
+	defer resolver.mutex.Unlock()
+	created := resolver.created[packageTypes]
+	if created != nil {
+		resolver.handed[packageTypes] = created
+	}
+	return created
+}
+
+// handedOut is the package ReadersPackage handed out for packageTypes, or nil when it was never asked or had none.
+func (resolver *sharingResolver) handedOut(packageTypes *types.Package) *intermediate_representation.Package {
+	resolver.mutex.Lock()
+	defer resolver.mutex.Unlock()
+	return resolver.handed[packageTypes]
 }
 
 // withAnonymous is functions and every anonymous function each holds, however deep.

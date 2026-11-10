@@ -1,0 +1,15 @@
+{
+    "why": "af03: `Msg` opening a PascalCase name is reported, in any language that writes one",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "MsgPrinter",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

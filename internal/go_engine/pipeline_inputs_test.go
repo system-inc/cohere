@@ -15,9 +15,10 @@ import (
 
 // The inputs record adds what describing the project read to the load's: the ignore files of the nearest repository
 // above the root, there or absent from the repository down to the root, and there in a directory the load names; no
-// `.git` between the root and the repository; the repository's info/exclude, and its index at a go.work root; the
-// settings file; a file of ours nobody could read; and a staticcheck.conf in an analyzed package's directory and every
-// one above it. Nothing is said of the ignore files above the repository, which git never reads.
+// `.git` between the root and the repository; the repository's info/exclude, and its index, which the census reads at
+// any root since a tracked path is never ignored; the settings file; a file of ours nobody could read; and a
+// staticcheck.conf in an analyzed package's directory and every one above it. Nothing is said of the ignore files above
+// the repository, which git never reads.
 func TestTheInputsRecordNamesWhatDescribingTheProjectRead(test *testing.T) {
 	test.Parallel()
 
@@ -47,7 +48,7 @@ func TestTheInputsRecordNamesWhatDescribingTheProjectRead(test *testing.T) {
 	engine := &pipeline{
 		request: invocation{root: root},
 		described: &describedProject{
-			workspace:  project.Workspace{Root: root, FromWorkspace: true},
+			workspace:  project.Workspace{Root: root},
 			unreadable: []contract.UnreadableRecord{{File: unreadable, Error: "permission denied"}},
 		},
 	}
@@ -97,36 +98,36 @@ func TestTheInputsRecordNamesWhatDescribingTheProjectRead(test *testing.T) {
 	if !slices.IsSorted(record.Files) || !slices.IsSorted(record.Absent) {
 		test.Errorf("the lists are not sorted: %q, %q", record.Files, record.Absent)
 	}
+	// The index is named again with what the census read it for, the walk of the root below its repository, so the
+	// front door keys it on that rather than on its bytes (#m1daxxk).
+	wantTracked := []contract.TrackedIgnoredScope{
+		{Index: filepath.Join(repository, ".git", "index"), Root: repository, Scope: "project"},
+	}
+	if !slices.Equal(record.TrackedIgnored, wantTracked) {
+		test.Errorf("the record's trackedIgnored is %+v, want %+v", record.TrackedIgnored, wantTracked)
+	}
 }
 
-// A `.git` that is a file, as a worktree's or a submodule's, points to the git directory whose index git reads,
-// relative to the file's directory or absolute; a `.git` directory holds its own.
-func TestGitIndexFollowsAGitFileToItsGitDirectory(test *testing.T) {
+// TestTheInputsRecordNamesNoTrackedIgnoredIndexThatIsNotThere: a repository with no index yet has nothing to key, so
+// its index is named absent and never under trackedIgnored.
+func TestTheInputsRecordNamesNoTrackedIgnoredIndexThatIsNotThere(test *testing.T) {
 	test.Parallel()
-
-	base, resolveError := filepath.EvalSymlinks(test.TempDir())
+	root, resolveError := filepath.EvalSymlinks(test.TempDir())
 	if resolveError != nil {
 		test.Fatal(resolveError)
 	}
-	worktree := filepath.Join(base, "worktree")
-	if makeError := os.MkdirAll(worktree, 0o755); makeError != nil {
+	if makeError := os.MkdirAll(filepath.Join(root, ".git"), 0o755); makeError != nil {
 		test.Fatal(makeError)
 	}
-	relativeGitDirectory := filepath.Join(base, "main", ".git", "worktrees", "worktree")
-	absoluteGitDirectory := filepath.Join(base, "elsewhere")
-	for contents, want := range map[string]string{
-		"gitdir: ../main/.git/worktrees/worktree\n": filepath.Join(relativeGitDirectory, "index"),
-		"gitdir: " + absoluteGitDirectory + "\n":    filepath.Join(absoluteGitDirectory, "index"),
-	} {
-		marker := filepath.Join(worktree, ".git")
-		if writeError := os.WriteFile(marker, []byte(contents), 0o644); writeError != nil {
-			test.Fatal(writeError)
-		}
-		if got := gitIndex(marker, false); got != want {
-			test.Errorf("a .git file reading %q gives the index %s, want %s", contents, got, want)
-		}
+	engine := &pipeline{
+		request:   invocation{root: root},
+		described: &describedProject{workspace: project.Workspace{Root: root}},
 	}
-	if got, want := gitIndex(filepath.Join(base, ".git"), true), filepath.Join(base, ".git", "index"); got != want {
-		test.Errorf("a .git directory gives the index %s, want %s", got, want)
+	record := engine.inputsRecord(&load.Loaded{})
+	if !slices.Contains(record.Absent, filepath.Join(root, ".git", "index")) {
+		test.Errorf("the absent paths do not name the missing index: %q", record.Absent)
+	}
+	if len(record.TrackedIgnored) != 0 {
+		test.Errorf("a repository with no index names one to key on: %+v", record.TrackedIgnored)
 	}
 }

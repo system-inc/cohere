@@ -62,11 +62,19 @@ type Enumeration struct {
 	Directories []string
 
 	// IgnoreFiles is every git ignore file the walk read or looked for, absolute paths, present or not:
-	// the `.gitignore` of the root and of each directory it entered, and `.git/info/exclude` when `.git`
-	// is a directory. An edit to one changes what the walk skips without moving any directory's
+	// the `.gitignore` of the root and of each directory it entered, `.git/info/exclude` when `.git`
+	// is a directory, and the repository's index when the root holds a `.git`, since a path the index
+	// tracks is never ignored. An edit to one changes what the walk skips without moving any directory's
 	// modification time, so a cache replaying the walk reads them too. A pruned directory's file is not
 	// read, and not listed.
 	IgnoreFiles []string
+
+	// Index is the repository's index among IgnoreFiles, when the root holds a `.git` and the walk read the index
+	// whole, and IndexRoot the root its matcher read it from, absolute: a run cache keys the index on
+	// gitignore.TrackedIgnoredDigest over the root rather than on its bytes, which git rewrites on a `git status`
+	// (#m1daxxk). Both are "" when the walk read no index whole, and the index is then keyed on its bytes.
+	Index     string
+	IndexRoot string
 
 	// Files is what survived, absolute paths.
 	Files []string
@@ -162,6 +170,12 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 			enumeration.IgnoreFiles,
 			filepath.Join(root, filepath.FromSlash(gitignore.ExcludeFile)),
 		)
+	}
+	if matcher.IndexFile() != "" {
+		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, matcher.IndexFile())
+		if matcher.IndexFallback() == nil {
+			enumeration.Index, enumeration.IndexRoot = matcher.IndexFile(), matcher.Root()
+		}
 	}
 	enumeration.IgnoredByLayer[GitignoreLayer] = 0
 	var layers []ignoreLayer

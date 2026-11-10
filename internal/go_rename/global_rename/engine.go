@@ -74,6 +74,10 @@ type Rejection struct {
 	Rename
 	Class  string
 	Reason string
+
+	// File is the file that may not be edited, for a rejection of class "file": the declaration's or a use's, so a
+	// caller can tell why that file is not its to write. Empty for every other class.
+	File string
 }
 
 // EncodedField is a proposed field an encoder or reflection can read, and what the guard decided.
@@ -425,6 +429,11 @@ func (engine *engine) indexSites() {
 // reject refuses a candidate with a reason, and everything that must move with it: a type and the embedded
 // fields it names.
 func (engine *engine) reject(key Key, class string, reason string) {
+	engine.rejectFor(key, class, "", reason)
+}
+
+// rejectFor is reject naming file, the file that may not be edited, on the rejection and on every one it implies.
+func (engine *engine) rejectFor(key Key, class string, file string, reason string) {
 	candidate, known := engine.candidates[key]
 	if !known {
 		return
@@ -435,16 +444,17 @@ func (engine *engine) reject(key Key, class string, reason string) {
 	delete(engine.accepted, key)
 	engine.result.Rejections = append(
 		engine.result.Rejections,
-		Rejection{Rename: candidate.Rename, Class: class, Reason: reason},
+		Rejection{Rename: candidate.Rename, Class: class, Reason: reason, File: file},
 	)
 	if candidate.impliedBy != nil {
 		relation := "embedded as the field"
 		if candidate.Kind == KindMethod {
 			relation = "implemented by the method"
 		}
-		engine.reject(
+		engine.rejectFor(
 			*candidate.impliedBy,
 			class,
+			file,
 			fmt.Sprintf("%s at %s, which was refused: %s", relation, candidate.Position, reason),
 		)
 	}
@@ -857,6 +867,7 @@ func (engine *engine) readPlatforms(reached map[string]map[Key]bool) *platformRe
 	engine.unbuiltFiles = map[string][]unbuiltFile{}
 	engine.platformFailures = map[workspace.Platform]platformFailure{}
 	engine.result.platformKeys = map[workspace.Platform]map[Key]bool{}
+	engine.result.platformFingerprints = map[workspace.Platform]unrenamedFingerprint{}
 	hostBuilt := map[string]bool{}
 	for _, rootsPackage := range engine.roots {
 		for _, list := range [][]string{rootsPackage.GoFiles, rootsPackage.CompiledGoFiles, rootsPackage.OtherFiles} {
@@ -919,6 +930,9 @@ func (engine *engine) readPlatforms(reached map[string]map[Key]bool) *platformRe
 		}
 		reading.loaded = append(reading.loaded, platform)
 		reading.read(engine, load, hostBuilt)
+		// The proof's load before the rewrite is this one, so its fingerprint is taken while the plan holds it, and
+		// nothing need keep the load for the proof.
+		engine.result.platformFingerprints[platform] = fingerprintBefore(load.Clean)
 		failure := platformFailure{packages: map[string]string{}}
 		for id, reason := range load.Failed {
 			if directory := engine.packageDirectory(id); directory != "" {

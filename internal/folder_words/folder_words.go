@@ -30,7 +30,7 @@ type Spelling struct {
 	// Joiner joins the pieces of a split when the name separates no two parts already. Where it does, the split
 	// takes the name's own first separator between two parts, so a name keeps one way of separating its words.
 	Joiner string
-	// CaseSeparates says a case boundary ends a part, as a separator does (isCaseBoundary), so serviceTypes is
+	// CaseSeparates says a case boundary ends a part, as a separator does (IsCaseBoundary), so serviceTypes is
 	// service and Types, ProfileImages is Profile and Images, and URLSession is URL and Session, words a reader sees
 	// apart. Its
 	// parts keep the name's case, and a split that is spelled by case is spelled by case too: Typesprofileimages
@@ -136,7 +136,7 @@ func Separated(name string, spelling Spelling) (string, bool) {
 }
 
 // splitParts is name cut at each of the spelling's separators, and where its case separates, at each case boundary
-// (isCaseBoundary): the parts and, between each two, the separator that stood there, empty for a case boundary. A
+// (IsCaseBoundary): the parts and, between each two, the separator that stood there, empty for a case boundary. A
 // part is empty where two separators meet or one leads or ends the name.
 func splitParts(name string, spelling Spelling) ([]string, []string) {
 	parts := []string{}
@@ -149,7 +149,7 @@ func splitParts(name string, spelling Spelling) ([]string, []string) {
 			start = index + 1
 			continue
 		}
-		if spelling.CaseSeparates && index > start && isCaseBoundary(name, index) {
+		if spelling.CaseSeparates && index > start && IsCaseBoundary(name, index) {
 			parts = append(parts, name[start:index])
 			between = append(between, "")
 			start = index
@@ -158,12 +158,14 @@ func splitParts(name string, spelling Spelling) ([]string, []string) {
 	return append(parts, name[start:]), between
 }
 
-// isCaseBoundary reports whether a part ends before name[index]: a capital after a lowercase letter, so serviceTypes
+// IsCaseBoundary reports whether a part ends before name[index]: a capital after a lowercase letter, so serviceTypes
 // is service and Types, or the last capital of a run of them that a lowercase letter follows, so an acronym is kept
 // whole before the word after it and URLSession is URL and Session. Swift's
 // cohere-swift/consistency-require-separated-folder-words cuts its parts at the same two boundaries (#2fnqe2h), so a
-// capitalized name reads the same in both engines, and the corpus holds them to it (fw16 to fw20).
-func isCaseBoundary(name string, index int) bool {
+// capitalized name reads the same in both engines, and the corpus holds them to it (fw16 to fw20). It is exported for
+// internal/file_name_words, which cuts a file name's words at the same two boundaries, so a folder and a file named
+// alike are read alike.
+func IsCaseBoundary(name string, index int) bool {
 	if !isUppercase(name[index]) {
 		return false
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -49,56 +50,6 @@ func messageRequireMatchingFileName(componentName string, fileName string, fileB
 		Description: consistencyRequireMatchingFileNameText.Render(values, alternative),
 	}
 }
-
-// nextJsConventionFileBaseNames are the base names Next.js reads from the filesystem by name.
-//
-// This is the framework's grammar, not an allowance. Next resolves a route segment by finding a file
-// literally called `page` or `layout`, so the file's name is fixed before anyone writes the component
-// in it, and there is no rename that would satisfy this rule without breaking the route. The
-// component name in these files is free to carry what the path cannot, and it does: measured on the
-// ahra tree on 2026-10-01, 77 of 80 `page.tsx` files default-export a `<Route>PageRoute` and every
-// layout a `<Segment>Layout`. That is a naming convention of its own, and enforcing it would be a
-// separate rule rather than a reading of this one.
-//
-// The list is Next 16.3.1's own, read from the installed build rather than from memory:
-// `FILE_TYPES` and `HTTP_ACCESS_FALLBACKS` in `next/dist/build/webpack/loaders/next-app-loader`
-// (layout, template, error, loading, global-error, global-not-found, not-found, forbidden,
-// unauthorized), plus page, route and default, plus `mdx-components`, which Next resolves at the
-// project root. The metadata image conventions are below, because they take a numeric suffix.
-//
-// It is wider than `FileContext.IsSpecialNextJsFile`, which names six of these plus route. Widening
-// that one would move every rule reading it, `react-component-require-named-export` among them, and
-// whether `template.tsx` should be exempt from those is their question rather than this rule's.
-//
-// The base name alone decides, as it does in `FileContextFor`, so a `page.tsx` outside an app
-// directory is exempt too. Measured, there is none in the ahra tree, and such a file's name is
-// lowercase, which no component name can match anyway.
-var nextJsConventionFileBaseNames = map[string]bool{
-	"page":             true,
-	"layout":           true,
-	"template":         true,
-	"loading":          true,
-	"error":            true,
-	"global-error":     true,
-	"not-found":        true,
-	"global-not-found": true,
-	"forbidden":        true,
-	"unauthorized":     true,
-	"default":          true,
-	"route":            true,
-	"mdx-components":   true,
-
-	// The metadata routes that are plain functions rather than images. They are `.ts` in practice
-	// and listed for the `.tsx` spelling Next also accepts.
-	"sitemap":  true,
-	"robots":   true,
-	"manifest": true,
-}
-
-// nextJsMetadataImageBaseNames are the generated-image conventions, which Next also matches with a
-// single trailing digit: `icon1.tsx` and `opengraph-image2.tsx` are routes. The pattern is
-// `<name>\d?` in `next/dist/lib/metadata/is-metadata-route.js`.
-var nextJsMetadataImageBaseNames = []string{"icon", "apple-icon", "opengraph-image", "twitter-image"}
 
 // companionFileSuffixes mark a file that is about a component rather than the component's home.
 //
@@ -172,7 +123,7 @@ var companionFileSuffixes = []string{".test", ".spec", ".stories", ".story"}
 //	two or more components        react/no-multi-comp reports every one after the first, and this
 //	                              rule waits until the split makes the question answerable
 //	an anonymous component        react/display-name reports it; once named, this rule compares
-//	a Next.js convention file     the framework owns the name; see nextJsConventionFileBaseNames
+//	a Next.js convention file     the framework owns the name; see nextjs.IsConventionFile
 //	a test or stories file        see companionFileSuffixes
 //	a .ts or .js file             a component file is a .tsx or .jsx file
 //
@@ -201,7 +152,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule[rule.NoOptions]{
 		// and a mutation deleting the fold survived a fixture written to catch it.
 		fileName := path.Base(ruleContext.SourceFile.FileName().AsString())
 		fileBaseName, isComponentFile := componentFileBaseName(fileName)
-		if !isComponentFile || isNextJsConventionFile(fileBaseName) || isCompanionFile(fileBaseName) {
+		if !isComponentFile || nextjs.IsConventionFile(fileBaseName) || isCompanionFile(fileBaseName) {
 			return nil
 		}
 
@@ -232,26 +183,6 @@ func componentFileBaseName(fileName string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// isNextJsConventionFile reports a base name Next.js reads by name.
-func isNextJsConventionFile(fileBaseName string) bool {
-	if nextJsConventionFileBaseNames[fileBaseName] {
-		return true
-	}
-	for _, imageBaseName := range nextJsMetadataImageBaseNames {
-		if fileBaseName == imageBaseName {
-			return true
-		}
-		// One digit and only one, matching Next's `\d?`. `icon12.tsx` is not a route.
-		if len(fileBaseName) == len(imageBaseName)+1 && strings.HasPrefix(fileBaseName, imageBaseName) {
-			last := fileBaseName[len(fileBaseName)-1]
-			if last >= '0' && last <= '9' {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // isCompanionFile reports a test or stories file.

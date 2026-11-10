@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -36,8 +37,8 @@ import (
 // Loaded is one load of a workspace.
 type Loaded struct {
 	// Packages are the ones to analyze: each package with its in-package tests ("p [p.test]") in place of the
-	// package alone, each external test package ("p_test [p.test]"), and never go test's synthesized main.
-	// Their Imports reach the whole graph, as go/packages would have loaded it.
+	// package alone, each external test package ("p_test [p.test]"), and never go test's synthesized main, less any
+	// Caching.Analyzes turned down. Their Imports reach the whole graph, as go/packages would have loaded it.
 	Packages []*packages.Package
 
 	// Roots are what go/packages would return with Tests set: each package the patterns matched, and each test variant
@@ -100,11 +101,9 @@ type Loaded struct {
 	CgoTranslatedPackages int
 	CgoTranslationElapsed time.Duration
 
-	// PackagesInWorkspace counts Packages.
+	// PackagesInWorkspace counts the packages to analyze, each type-checked, those Caching.Analyzes turned down
+	// included.
 	PackagesInWorkspace int
-
-	// FilesTypeChecked counts the distinct workspace .go files Packages type-checked.
-	FilesTypeChecked int
 
 	// Elapsed is how long the whole load took.
 	Elapsed time.Duration
@@ -112,8 +111,8 @@ type Loaded struct {
 	// Inputs are what the load read to decide what it returned, for the inputs record (see inputs.go).
 	Inputs Inputs
 
-	// testFunctions is each analyzed test variant's refused test functions, judged as it was checked, for the
-	// diagnostics.
+	// testFunctions is each test variant to analyze's refused test functions, judged as it was checked, for the
+	// diagnostics, one Caching.Analyzes turned down included, since go test refuses them all the same.
 	testFunctions map[*packages.Package][]Diagnostic
 }
 
@@ -138,6 +137,24 @@ func PackagesWithOverlay(
 	overlay map[string][]byte,
 ) (*Loaded, error) {
 	return loadWorkspace(directory, patterns, environment, census, true, Caching{}, overlay)
+}
+
+// PackagesWithRootSyntax is PackagesWithOverlay keeping syntax and type information for the roots alone, for a
+// reader of Roots and Packages that reads a dependency's types and never its syntax, as the rename does. A dependency,
+// any package not among Roots, is type-checked into a types.Info with no maps, so the checker records nothing of it,
+// and leaves the load with no Syntax and that empty TypesInfo; its Types, Errors, Imports and the rest are as
+// PackagesWithOverlay gives them. One that withholds what reaches its cgo files keeps both until its errors are
+// judged and its declarations withheld (see withholdCgoDeclarations), so what the load withholds is the same. A
+// dependency's syntax and maps are most of a load's memory once the standard library is in it: its maps are never
+// made, and its syntax goes when the load returns.
+func PackagesWithRootSyntax(
+	directory string,
+	patterns []string,
+	environment []string,
+	census []string,
+	overlay map[string][]byte,
+) (*Loaded, error) {
+	return loadWorkspace(directory, patterns, environment, census, true, Caching{rootSyntaxOnly: true}, overlay)
 }
 
 // Caching is what the findings cache gives a load: a Restorer, whose packages the load parses and type-checks none
@@ -165,6 +182,17 @@ type Caching struct {
 	// Timing is the run's collector under `--timing`, which the load adds its phases to: the listing, each file's read
 	// and parse, each package's type check and each read of export data. Nil measures nothing (#3apgjer).
 	Timing *timing.Collector
+
+	// Analyzes, when set, says which of the packages to analyze the caller's rules analyze, from each one's ID and
+	// files, before any is type-checked. One it turns down is still loaded and type-checked, for what imports it,
+	// its errors are still diagnostics and it counts in PackagesInWorkspace, and it is left out of Packages and of
+	// what the Restorer and Begin are given as the packages to analyze. The engine turns down a package with no file
+	// in scope, so a package every file of which git ignores is never linted. Nil analyzes every one.
+	Analyzes func(root *packages.Package) bool
+
+	// rootSyntaxOnly has every dependency type-checked with no type maps and left without its syntax (see
+	// PackagesWithRootSyntax).
+	rootSyntaxOnly bool
 }
 
 // PackagesCached is Packages with the findings cache.
@@ -277,10 +305,8 @@ func loadWorkspace(
 	loaded.ListedInProcess = listed.inProcess
 	loaded.GoListReason = listed.goListReason
 	loaded.Roots = roots
-	loaded.PackagesInWorkspace = len(loaded.Packages)
-	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages, loaded.testFunctions)
+	loaded.Diagnostics = diagnostics(workspace, roots, loaded.testFunctions)
 	packages.Visit(roots, nil, func(*packages.Package) { loaded.PackagesLoaded++ })
-	loaded.FilesTypeChecked = filesTypeChecked(workspace, loaded.Packages)
 	excluded, unseen, excludedError := excludedAndUnseen(workspace, buildContext, roots, census)
 	if excludedError != nil {
 		return nil, excludedError
@@ -327,16 +353,32 @@ func fromSource(
 	withheld := newWithheldErrors()
 	typeChecker := newLoader(built, sizes, withheld, overlay, caching.Held, caching.Timing)
 	reachable := typeChecker.connect()
-	analyzedPackages := analyzedOfGraph(built)
+	if caching.rootSyntaxOnly {
+		for _, current := range reachable {
+			typeChecker.typesOnly[current.loaded] = true
+		}
+		for _, root := range built.roots {
+			delete(typeChecker.typesOnly, root.loaded)
+		}
+	}
+	toAnalyze := analyzedOfGraph(built)
+	// Every package to analyze has its test functions judged, one the caller's rules leave alone too: go test refuses
+	// a wrongly signed test whoever reads the package.
+	for _, analyzedPackage := range toAnalyze {
+		typeChecker.analyzed[analyzedPackage] = true
+	}
+	analyzedPackages := toAnalyze
+	if caching.Analyzes != nil {
+		analyzedPackages = slices.DeleteFunc(slices.Clone(toAnalyze), func(root *packages.Package) bool {
+			return !caching.Analyzes(root)
+		})
+	}
 	if caching.Restorer != nil {
 		loaderName := LoaderSource
 		if compiled != nil {
 			loaderName = LoaderCgoTranslated
 		}
 		typeChecker.restored = caching.Restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
-	}
-	for _, analyzedPackage := range analyzedPackages {
-		typeChecker.analyzed[analyzedPackage] = true
 	}
 	if caching.Begin != nil {
 		nodes := make(map[*packages.Package]*node, len(reachable))
@@ -352,6 +394,14 @@ func fromSource(
 		roots = append(roots, root.loaded)
 	}
 	declarations := withholdCgoDeclarations(typeChecker.fileSet, reachable)
+	// Only now is a dependency that withholds done with its syntax and type maps; one that withholds nothing was
+	// checked without maps, and its syntax goes with the rest.
+	for _, current := range reachable {
+		if typeChecker.typesOnly[current.loaded] {
+			current.loaded.Syntax = nil
+			current.loaded.TypesInfo = &types.Info{}
+		}
+	}
 	byPackage := map[*packages.Package]PackageWithheld{}
 	distinct := map[string]bool{}
 	for _, current := range reachable {
@@ -368,6 +418,7 @@ func fromSource(
 	}
 	return roots, &Loaded{
 		Packages:                          analyzedPackages,
+		PackagesInWorkspace:               len(toAnalyze),
 		WithheldInDependencyCgo:           withheld.sorted(),
 		WithheldDependencyCgoDeclarations: len(distinct),
 		Withheld:                          byPackage,
@@ -392,21 +443,6 @@ func analyzedOfGraph(built *graph) []*packages.Package {
 		chosen = append(chosen, root.loaded)
 	}
 	return chosen
-}
-
-// filesTypeChecked counts the distinct .go files inside workspace that the analyzed packages hold. It reads
-// GoFiles, the files as written, since a translated cgo package's CompiledGoFiles are generated files in the build
-// cache.
-func filesTypeChecked(workspace string, analyzedPackages []*packages.Package) int {
-	seen := map[string]bool{}
-	for _, analyzedPackage := range analyzedPackages {
-		for _, file := range analyzedPackage.GoFiles {
-			if inside(workspace, file) {
-				seen[file] = true
-			}
-		}
-	}
-	return len(seen)
 }
 
 // sourceEnvironment is the whole environment every go command of the load runs with in workspace but go list

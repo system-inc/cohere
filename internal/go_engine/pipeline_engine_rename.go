@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"go/token"
 	"go/types"
@@ -25,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_rename/global_rename"
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // renamingRules are the rules whose findings ask for a rename the engine applies after the load: each attaches one
@@ -41,6 +43,7 @@ const renameRounds = 3
 // note on stderr names the rename and the whole reason.
 const (
 	refusedUnwritable    = "a reference in a file this run can't write"
+	refusedOutsideRoot   = "a reference in a file reached through a link outside the root"
 	refusedExported      = "an exported name in an importable package, which renameExports allows"
 	refusedPlatform      = "a package it reaches doesn't load or type-check under another platform"
 	refusedUnproven      = "not proven by a load of the rewrite"
@@ -193,9 +196,12 @@ type renameRound struct {
 // renameOnce). After a proven round the naming rules run over its load, which is from source and holds the rewrite,
 // and what they ask next is the next round, so a name that needs two renames gets both. Every round's bytes are
 // written together, once, as one set (see writeRenamed), and the last round's proof is the load of what is on disk.
+// The plan reads only the roots' syntax and type maps, so the load to plan over keeps no dependency's
+// (load.PackagesWithRootSyntax).
 func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
-	current, loadError := load.Packages(engine.described.workspace.Root, engine.described.workspace.Patterns(),
-		engine.described.workspace.Environment(), engine.described.readableOurs)
+	current, loadError := engine.loadPackages(loadRequest{
+		environment: engine.described.workspace.Environment(), rootSyntaxOnly: true,
+	})
 	if loadError == nil && len(current.Diagnostics) > 0 {
 		loadError = fmt.Errorf("it found %d errors the first load did not", len(current.Diagnostics))
 	}
@@ -265,17 +271,25 @@ func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
 // lines on disk. When the set is written it adds the files to the fix record: once each, merged with the entry the fix
 // phase made for a file gofmt or the wrap wrote, the identifiers renamed counted under the rule that asked for them
 // and the lines the wrap cured under the long-line rule. When it is not, nothing was written, every rename applied is
-// refused as unwritable and its finding stands, and it returns false. A set it could not put back is a gap, named.
+// refused as unwritable and its finding stands, and it returns false. A set it could not put back is a gap, named. A
+// set holding a file outside the root, which renameOnce's writable keeps out of every plan, is refused as such and the
+// file withheld, should one reach here.
 func (engine *pipeline) writeRenamed(
 	overlay map[string][]byte, fixedBy map[string]map[string]int, wrapped map[string]int, applied []askedProposal,
 ) bool {
-	partlyWritten, writeError := format.WriteAllAtomically(overlay)
+	partlyWritten, writeError := format.WriteAllAtomically(engine.writeRoot, overlay)
 	for _, file := range slices.Sorted(maps.Keys(overlay)) {
 		engine.reread(file)
 	}
 	if writeError != nil {
+		reason := refusedUnwritable
+		var outside *write_root.OutsideRootError
+		if errors.As(writeError, &outside) {
+			reason = refusedOutsideRoot
+			engine.withhold(outside.File, outside.RealPath)
+		}
 		for _, renamed := range applied {
-			engine.refuseRename(renamed.rename, renamed.oldName, refusedUnwritable, "the files it rewrites could not "+
+			engine.refuseRename(renamed.rename, renamed.oldName, reason, "the files it rewrites could not "+
 				"all be written, so none was: "+oneLine(writeError))
 		}
 		if len(partlyWritten) > 0 {
@@ -324,9 +338,14 @@ func (engine *pipeline) writeRenamed(
 // the proven rewrite, or refused with its reason. Its proof is nil when nothing was proven.
 func (engine *pipeline) renameOnce(current *load.Loaded, overlay map[string][]byte, asked []nameRename) renameRound {
 	// A file in scope, or one the build constraints leave out here inside the scope's paths, which a rename proven
-	// under the platform that builds it may write.
+	// under the platform that builds it may write, and only when its real path is inside the root: a plan never
+	// reaches a file through a link to somewhere else, and refuseRejected names the file it would have edited.
 	writable := func(filename string) bool {
-		return engine.described.inScopeSet[filename] || engine.described.constrainedInScope[filename]
+		if !engine.described.inScopeSet[filename] && !engine.described.constrainedInScope[filename] {
+			return false
+		}
+		_, inside, resolveError := engine.writeRoot.Inside(filename)
+		return resolveError == nil && inside
 	}
 	space := workspace.FromLoaded(engine.described.workspace.Root, current.Roots, current.Packages, writable)
 	proposals, askedBy := engine.proposals(current, asked)
@@ -545,9 +564,12 @@ func (engine *pipeline) prove(
 			declined[file] = reason
 		}
 	}
-	proof, proofError := load.PackagesWithOverlay(engine.described.workspace.Root,
-		engine.described.workspace.Patterns(), engine.described.workspace.Environment(), engine.described.readableOurs,
-		next)
+	// The proof keeps every dependency's syntax, as the plan's loads do not: the last round's proof is the load the
+	// lint phase lints once the rename is written, with no findings cache, and the checker hands every fact action its
+	// package's syntax, a dependency's included.
+	proof, proofError := engine.loadPackages(loadRequest{
+		environment: engine.described.workspace.Environment(), overlay: next, withOverlay: true,
+	})
 	if proofError != nil {
 		return rewriteProof{failures: everyRename("the load of the rewrite failed: " + oneLine(proofError))}
 	}
@@ -605,31 +627,27 @@ func (engine *pipeline) prove(
 // source, with `GOOS` and `GOARCH` set and cgo off, its root packages sorted into what type-checks there and what
 // does not (workspace.PlatformLoadOf), with space's judgment of which files may be written. It reads base, the
 // round's rewrite so far, in place of the disk, as the host's load of the round does, and each call's overlay over
-// that. The load of base alone is the plan's reading and every proof's load before its rewrite, the same bytes each
-// time, so it is made once per platform and kept for the round.
+// that. It keeps nothing between calls: the plan reads each platform's load of base once and keeps the fingerprint the
+// proof compares against, so the proof loads only its rewrite. A load kept for the round held every platform's whole
+// load live beside the proof's, about 1.5 GB each on cohere at deeafbf4, and ran the collector without letting up
+// (#djk8cfd). A round that plans again after a failed proof loads each platform again. Neither the plan nor the proof
+// reads a dependency's syntax there, so the load keeps none (load.PackagesWithRootSyntax).
 func (engine *pipeline) platformLoad(
 	space *workspace.Workspace, base map[string][]byte,
 ) func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
-	kept := map[workspace.Platform]*workspace.PlatformLoad{}
 	return func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
-		if held, known := kept[platform]; known && len(overlay) == 0 {
-			return held, nil
-		}
 		merged := map[string][]byte{}
 		maps.Copy(merged, base)
 		maps.Copy(merged, overlay)
 		environment := append(slices.Clone(engine.described.workspace.Environment()),
 			"GOOS="+platform.OperatingSystem, "GOARCH="+platform.Architecture, "CGO_ENABLED=0")
-		loaded, loadError := load.PackagesWithOverlay(engine.described.workspace.Root,
-			engine.described.workspace.Patterns(), environment, engine.described.readableOurs, merged)
+		loaded, loadError := engine.loadPackages(loadRequest{
+			environment: environment, overlay: merged, withOverlay: true, rootSyntaxOnly: true,
+		})
 		if loadError != nil {
 			return nil, fmt.Errorf("loading as %s: %w", platform, loadError)
 		}
-		sorted := space.PlatformLoadOf(platform, loaded.Roots)
-		if len(overlay) == 0 {
-			kept[platform] = sorted
-		}
-		return sorted, nil
+		return space.PlatformLoadOf(platform, loaded.Roots), nil
 	}
 }
 
@@ -738,7 +756,8 @@ func acceptedAsked(result *global_rename.Result, askedBy []askedProposal) []aske
 }
 
 // refuseRejected refuses each rename asked for that the plan rejected, matched by where its declaration stands, with
-// the plan's reason, under the reason the fix record counts it by.
+// the plan's reason, under the reason the fix record counts it by. A file the plan may not edit because its real path
+// is outside the root is refused as such, and withheld, so writeFix names it.
 func (engine *pipeline) refuseRejected(result *global_rename.Result, askedBy []askedProposal) {
 	for _, rejection := range result.Rejections {
 		for _, asked := range askedBy {
@@ -749,12 +768,26 @@ func (engine *pipeline) refuseRejected(result *global_rename.Result, askedBy []a
 			switch rejection.Class {
 			case "file":
 				reason = refusedUnwritable
+				if realPath, outside := engine.outsideRoot(rejection.File); outside {
+					reason = refusedOutsideRoot
+					engine.withhold(rejection.File, realPath)
+				}
 			case "platform":
 				reason = refusedPlatform
 			}
 			engine.refuseRename(asked.rename, asked.oldName, reason, rejection.Reason)
 		}
 	}
+}
+
+// outsideRoot is file's real path, and whether it is outside the root: false for no file, and for one that cannot be
+// resolved, which is refused as unwritable and never named as reached through a link.
+func (engine *pipeline) outsideRoot(file string) (string, bool) {
+	if file == "" {
+		return "", false
+	}
+	realPath, inside, resolveError := engine.writeRoot.Inside(file)
+	return realPath, resolveError == nil && !inside
 }
 
 // refuseRename counts one rename as refused in the fix record, under reason, and says on stderr which and why. oldName

@@ -14,7 +14,7 @@ import (
 type declineEverything struct{ reason string }
 
 func (everything declineEverything) Analyze(Fixture) (Result, error) {
-	return Result{}, &ErrUnsupported{Reason: everything.reason}
+	return Result{}, &UnsupportedError{Reason: everything.reason}
 }
 
 // TestAggregatedScoreAgainstReactsOwnFixtures is the number this package exists to produce.
@@ -228,7 +228,7 @@ func TestEveryCategoryIsReachable(test *testing.T) {
 		{
 			Name:    "not scored: the implementation declined",
 			Fixture: globalsFixture,
-			Error:   &ErrUnsupported{Reason: "no rule engine was run"},
+			Error:   &UnsupportedError{Reason: "no rule engine was run"},
 			Want:    VerdictNotScored,
 		},
 		{

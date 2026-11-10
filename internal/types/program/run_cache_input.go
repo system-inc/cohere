@@ -34,6 +34,13 @@ type RunCacheInput struct {
 	// the like change many times a second: checked at full signature, they cost a replay on a tree nothing
 	// had touched (#q51f02a). A package.json or node_modules appearing in one is its own absent input.
 	ExistenceOnly bool
+
+	// TrackedIgnored, set on a repository's index, keys the input on what the index decides for the run rather than
+	// on its bytes (#m1daxxk). git rewrites the index on a `git status` and on every `git add`, and what the run
+	// read from it is narrow: which paths the ignore rules exclude are tracked, and which are gitlinks. So an index
+	// whose signature moved still matches when gitignore.TrackedIgnoredDigest reads the digest recorded here. Nil
+	// for every other input, and for an index the reader could not read whole, which is keyed on its bytes.
+	TrackedIgnored *TrackedIgnoredKey
 }
 
 // stillMatches compares one input against the filesystem now, noting what the stat found in snapshot, matching or
@@ -66,6 +73,18 @@ func (input RunCacheInput) stillMatches(snapshot *StatSnapshot) error {
 		}
 		return nil
 	}
+	if signatureError := input.signatureMatches(information); signatureError != nil {
+		// An index whose bytes moved is read anew, and matches while it decides what it decided.
+		if input.TrackedIgnored != nil && !input.Directory {
+			return input.TrackedIgnored.stillDecides(input.Path)
+		}
+		return signatureError
+	}
+	return nil
+}
+
+// signatureMatches compares the stat of a present input against its recorded signature.
+func (input RunCacheInput) signatureMatches(information os.FileInfo) error {
 	// A directory's size is filesystem bookkeeping and moves with its entries on some filesystems,
 	// so only its modification time decides. A file needs both.
 	if !input.Directory && information.Size() != input.Size {

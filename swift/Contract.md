@@ -141,7 +141,7 @@ nothing else.
     "filesInScope": 149,
     "scopeDescription": "",
     "targets": [{ "name": "AhraOsCore", "kind": "library", "files": 14, "languageMode": "6" }],
-    "excluded": [{ "file": "/…/Scratch.swift", "reason": "ignored by git" }]
+    "excluded": [{ "file": "/…/Scratch.swift", "reason": "ignored by git", "source": ".gitignore:3" }]
 }
 ```
 
@@ -161,6 +161,15 @@ nothing else.
   `a script whose imports do not settle its platform: it imports AppKit for macOS and UIKit for iOS, so neither SDK was guessed at`.
   Outside a git repository, a `git archive` copy say, "git would list" reads the package's own ignore files as git
   would were its root a repository's, so a script there is checked and every other such file named, as in a checkout.
+- An excluded entry's `source` names the rule that excluded the file, as `path:line` with the line counted from 1:
+  the ignore file's line that decided, or the line that excluded a directory above the file. The path is relative to
+  the project's root (`.gitignore:3`, `Sources/.gitignore:1`, `../.gitignore:2` for a repository whose root is above
+  the package's), or absolute for an ignore file outside the work tree, as the global excludes file and a worktree's
+  shared `info/exclude` are. It is absent where no rule is the cause: a package manifest, a vendored file, a file no
+  target compiles, a file inside another repository. The Swift engine has no `ignorePatterns`, so no Swift source
+  names `CohereSettings.json`. A narrowing excludes no file here; the front door counts what it left out from
+  `filesInScope`. Additive within contract 3 (#08cv2mp): the front door quotes it when every file was excluded,
+  `no files checked: 1 file excluded, ignored by git (.gitignore:3)`, and a reader before it ignores it.
 - `filesInScope` equals `filesOurs` on a whole-package run. A run narrowed by named paths sets it
   lower and describes the request in `scopeDescription`, which the front door prints in the
   parenthesis of `N in scope (…)`.
@@ -188,6 +197,17 @@ package described in 412ms: 152 Swift files in the package, 149 of them ours, 3 
 Excluded files print as coverage notes under the lint line, grouped by reason. Up to five files of a
 reason are named, `  not checked: <file> (<reason>)`; more are counted, `  not checked: <n> files
 (<reason>)`, because 107 vendored files named one per line buried the verdict on the first real run.
+
+The Go engine writes an excluded entry's `source` as the Swift engine does (see the bullet above): for a file git
+ignores, the ignore file's line that decided, relative to `root`, `../.gitignore:4` for one above it. A file the
+build constraints leave out has none, since no line of a file decided it.
+
+```json
+{
+    "kind": "project",
+    "excluded": [{ "file": "/…/scratch.go", "reason": "ignored by git", "source": ".gitignore:1" }]
+}
+```
 
 ### `unreadable`, between `project` and the first `phase`
 
@@ -371,8 +391,16 @@ count or a verdict. The counts stay what the verdict reads, and the list never c
 engine from before the field writes no `changedFiles` at all. The front door reads that as _not listed_,
 never as _no files changed_, and renders the counts alone. `Clean.jsonl` is such a stream.
 
-`notWritten` names every file the phase would have written and did not, since its real path, every link resolved,
-lies outside the run's root (#723rzxm, the rule #hwz114g gives all three engines), sorted by file:
+The Go engine's fix record carries `notWritten`, additive within contract 3 as `changedFiles` is: every file the
+phase would have written and did not, since it is reached through a symbolic link to a real path outside the root
+(#hwz114g), as `{"file":"<root>/shared/sum.go","realPath":"<elsewhere>/shared/sum.go"}`, sorted by file, and `[]`
+when there were none. A fix never writes such a file: it is checked, its findings stand, and the run is incomplete.
+The front door names each file with its real path and counts them in the footer, and reads a stream without the
+field, from an engine before it, as naming none.
+
+This engine writes `notWritten` too. It names every file the phase would have written and did not, since its real
+path, every link resolved, lies outside the run's root (#723rzxm, the rule #hwz114g gives all three engines), sorted
+by file:
 `"notWritten":[{"file":"/…/Linked/Outside.swift","realPath":"/elsewhere/Outside.swift"}]`, `file` as the run reached
 it and `realPath` where it is. Such a file is checked, read only, as `--no-fix` checks it: none of its fixes lands, lint
 walks the text on disk, so what they would have fixed is reported, and when the formatter would change that text it
@@ -623,7 +651,8 @@ otherwise; a run that asked and ends without one is refused. When the lint phase
         "<goroot>/src/fmt/print.go"
     ],
     "directories": ["/…", "/…/p"],
-    "absent": ["/…/CohereSettings.json", "/…/staticcheck.conf", "/go.work"]
+    "absent": ["/…/CohereSettings.json", "/…/staticcheck.conf", "/go.work"],
+    "trackedIgnored": [{ "index": "/…/.git/index", "root": "/…", "scope": "" }]
 }
 ```
 
@@ -654,8 +683,8 @@ The Swift engine's record (`RunInputs.swift` says why each is enough) names:
   Xcode root each package its project links, walked as the build-input snapshot walks them: no directory whose name
   starts with `.` is entered, so neither `.git`, `.build` nor cohere's `.cache` is, and everything else is, ignored by
   git or not, with the hidden files in each walked directory but `.DS_Store`. Beside them, every target's sources,
-  each package's `Package.swift` and `Package.resolved`, the ignore files and git config files the file set
-  consulted, a `.git` file a worktree points through, the settings file, and the toolchain's files: the `swift`,
+  each package's `Package.swift` and `Package.resolved`, the ignore files, git config files and git index the file
+  set consulted, a `.git` file a worktree points through, the settings file, and the toolchain's files: the `swift`,
   `xcrun` and `xcodebuild` PATH finds (and `xcodegen` at a spec's root), the `swift` xcrun names with
   `swift-frontend`, `swift-build` and `swift-package` beside it, the toolchain's `ToolchainInfo.plist`, its Xcode's
   `version.plist`, and each SDK's `SDKSettings.json`. A remote dependency's checkout lives in the engine's scratch and
@@ -672,6 +701,21 @@ record lists every directory whose listing it read, so the front door records no
 those: a git config in `.git`, or a toolchain's binary, is decided by its own signature, never by a directory every
 git command or install moves. Which toolchain xcrun would pick, and how the engine was chosen, are keyed rather than
 named (command/cohere/swift_run_cache.go), since a replay asks neither.
+
+`trackedIgnored` (#m1daxxk) names each git index among `files` that the run read only for what it decides of a walk:
+which paths its ignore rules exclude are tracked, and which are gitlinks. Each entry is the index, the root of the
+repository it belongs to, and the directory the run walked, relative to that root and slash separated, `""` for the
+root. The Go engine names its census's index, scoped to the root below the repository. The Swift engine names the
+index its file set read whole (#jem2gsa), scoped to the nearest directory holding every path the file set asked it
+about, the package's root and each target source, local and path packages' among them, so `""` when they lie in
+different subtrees of the repository: a scope too wide only costs a miss, and one too narrow is a stale replay. The
+digest reads only the repository's `.gitignore` files and a `.git` directory's `info/exclude`, case sensitively, so a
+Swift run that excluded a path by anything else, the global excludes file, a worktree's shared `info/exclude` or
+`core.ignorecase`'s folding, names no index here, since tracking that path would move no digest. The front door
+keys such an index on `gitignore.TrackedIgnoredDigest` over that scope rather than on its bytes, which git rewrites
+on a `git status` and on every `git add`, so a replay survives what decides nothing. An index the reader cannot read
+whole, a split or sparse one among them, is keyed on its bytes as an index not named here is. A reader before it
+ignores the field, and keys every index on its bytes.
 
 Every path is absolute and cleaned, each list is sorted, without duplicates, and `[]` when empty, and two runs over
 an unchanged tree write the same record. A superset only costs a miss, and a path left out is a replay that goes

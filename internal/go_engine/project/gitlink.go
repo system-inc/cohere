@@ -19,6 +19,10 @@ type Gitlink struct {
 // It reads git's -z listing, so a path holding a tab, a newline or two spaces in a row is the path. A
 // worktree mid-merge still reads: a path a merge left in conflict is a gitlink when any side lists it as
 // one, listed once, pinned at the side its stage ranks first by stagePreference.
+//
+// A check reads only the paths (gitlinks below). The run cache keys the index on gitignore.TrackedIgnoredDigest,
+// which digests each gitlink by path and mode and not by its pinned commit (#m1daxxk), so a check that comes to read
+// Pin needs the digest to take the object too, or a replay serves a verdict over another pin.
 func GitlinksOf(worktree string) ([]Gitlink, error) {
 	listing, gitError := gitOutput(worktree, "ls-files", "--stage", "-z")
 	if gitError != nil {

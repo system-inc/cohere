@@ -66,6 +66,12 @@ type Options struct {
 	// which measures nothing (#3apgjer). The findings are the same either way.
 	Timing *timing.Collector
 
+	// Counted, when not nil, is which files FilesWalked and NodesVisited count, of those the rules were given; nil
+	// counts every one. The engine leaves out its project's files outside the scope, since a package's file the run
+	// excludes is still the package's and read with it, and is not one the run checked. The findings, and the walks
+	// the findings cache keeps, are the same either way.
+	Counted func(file string) bool
+
 	// Report, when not nil, is an analyzer that is no rule, run beside the rules on every package to analyze: it
 	// reports nothing, and its result on each package is in Result.Reports. The findings cache keeps that result with
 	// the package, so a package it restores still has one, and an entry written without it is a miss. Under
@@ -142,7 +148,8 @@ type Result struct {
 
 	RulesRun int
 
-	// FilesWalked is the distinct Go files of the analyzed packages, the files the rules were given.
+	// FilesWalked is the distinct Go files of the analyzed packages, the files the rules were given, those
+	// Options.Counted keeps.
 	FilesWalked int
 
 	// NodesVisited is the nodes of one ast.Inspect over those files.
@@ -402,7 +409,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return cmp.Or(cmp.Compare(left.File, right.File), cmp.Compare(left.Error, right.Error))
 	})
 	slices.Sort(result.CrashedRules)
-	result.FilesWalked, result.NodesVisited = walk(files)
+	result.FilesWalked, result.NodesVisited = walk(files, options.Counted)
 	result.Replays = int(resolver.Fallbacks())
 	if session != nil {
 		session.save(graph, options.Withheld, files)
@@ -580,12 +587,12 @@ func withheldFiles(files map[*packages.Package][]storedFile) (generated map[stri
 }
 
 // walk counts the distinct files the rules were given, the syntax trees go/packages parsed from each package's
-// CompiledGoFiles, and the nodes of one ast.Inspect over them.
-func walk(files map[*packages.Package][]storedFile) (filesWalked int, nodes int) {
+// CompiledGoFiles, and the nodes of one ast.Inspect over them, of the files counted keeps, or of all when it is nil.
+func walk(files map[*packages.Package][]storedFile, counted func(file string) bool) (filesWalked int, nodes int) {
 	seen := map[string]bool{}
 	for _, packageFiles := range files {
 		for _, file := range packageFiles {
-			if seen[file.Name] {
+			if seen[file.Name] || (counted != nil && !counted(file.Name)) {
 				continue
 			}
 			seen[file.Name] = true

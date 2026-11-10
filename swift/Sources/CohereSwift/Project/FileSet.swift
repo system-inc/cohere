@@ -6,9 +6,10 @@ import Foundation
  A file is ours when a target of the package, or of a local package inside it that is not vendored,
  compiles it, and git does not ignore it. A generated file is ours too: Kirk's convention (2026-10-03,
  shared with TypeScript) names it `*.generated.swift` and gives it every rule and the formatter, exempting
- it only from file-length, by that name. What git ignores is read from the ignore files themselves
- (`IgnoreRules`), with no git process, and it includes untracked files that are not ignored. A new file someone is still writing is exactly the one a gate must see, and TypeScript's program
- already includes it, because a tsconfig reads the disk rather than the index.
+ it only from file-length, by that name. What git ignores is read from the ignore files and the index themselves
+ (`IgnoreRules`, `GitIndex`), with no git process: a tracked file is never ignored, and an untracked file that is
+ not ignored is ours too. A new file someone is still writing is exactly the one a gate must see, and TypeScript's
+ program already includes it, because a tsconfig reads the disk rather than the index.
 
  Every file a target compiles and this run does not check is listed with a reason, so the coverage line
  can say what was left out rather than letting a smaller number pass for a complete one.
@@ -38,7 +39,10 @@ public struct FileSet: Equatable, Sendable {
     public var filesInPackage: [URL]
     public var owned: [OwnedFile]
     public var excluded: [ProjectRecord.ExcludedFile]
-    /* Empty inside a git repository. Otherwise why every target source was treated as ours. */
+    /*
+     Empty inside a git repository whose index was read. Outside one, why every target source was treated as ours;
+     inside one whose index was not, why, and that a tracked file an ignore pattern matches was taken as ignored.
+     */
     public var note: String
     /*
      What deciding the set read beyond the targets' files, for the run's inputs record (`RunInputs`): every ignore file
@@ -47,6 +51,12 @@ public struct FileSet: Equatable, Sendable {
      */
     public var ignoreFilesConsulted: [String] = []
     public var directoriesListed: [String] = []
+    /*
+     The git index the set was decided with, read whole, and the directory of the repository its answers were asked
+     for, which the inputs record names under `trackedIgnored` (`IgnoreRules.trackedIgnored`). Nil outside a
+     repository, and wherever the index stays keyed on its bytes.
+     */
+    var trackedIgnored: InputsRecord.TrackedIgnored?
     /*
      Every Swift file no target compiles that the walk read to tell whether it is a script, a file of declarations among
      them, since an edit that gives one top-level code makes it a script the next run checks.
@@ -91,8 +101,18 @@ public struct FileSet: Equatable, Sendable {
                         continue
                     }
                     /* Resolved, as the repository root is: a root reached through a symlink (`/tmp` is `/private/tmp`) would otherwise sit outside the repository and exclude everything. */
-                    if let ignoreRules, !ignoreRules.isVisible(source.resolvingSymlinksInPath().path) {
-                        excluded.append(.init(file: source.path, reason: "ignored by git"))
+                    if let ignoreRules,
+                        case .excluded(let line) = ignoreRules.listing(of: source.resolvingSymlinksInPath().path)
+                    {
+                        excluded.append(
+                            .init(
+                                file: source.path,
+                                reason: "ignored by git",
+                                source: line.map {
+                                    ignoreRules.describe($0, relativeTo: package.root.resolvingSymlinksInPath().path)
+                                },
+                            )
+                        )
                         continue
                     }
                     owned.append(
@@ -207,13 +227,24 @@ public struct FileSet: Equatable, Sendable {
             }
         }
 
-        let note =
-            ignoreRules == nil
-            ? "not a git repository, so every file a target compiles was treated as ours, and the Swift files no target compiles were found by the package's own ignore files"
-            : ""
+        let note: String
+        if let ignoreRules {
+            note =
+                ignoreRules.indexFallbackReason.map {
+                    "git's index was not read, since \($0), "
+                        + "so a tracked file an ignore pattern matches was taken as ignored by git"
+                } ?? ""
+        }
+        else {
+            note =
+                "not a git repository, so every file a target compiles was treated as ours, and the Swift files no target compiles were found by the package's own ignore files"
+        }
         var fileSet = FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
         fileSet.ignoreFilesConsulted = walkRules.filesConsulted.sorted()
         fileSet.directoriesListed = walkRules.directoriesListed
+        fileSet.trackedIgnored = walkRules.trackedIgnored.map {
+            InputsRecord.TrackedIgnored(index: $0.index, root: walkRules.repository.root.path, scope: $0.scope)
+        }
         fileSet.filesRead = filesRead
         return fileSet
     }

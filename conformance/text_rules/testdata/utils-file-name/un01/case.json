@@ -1,0 +1,13 @@
+{
+    "why": "un01: `utils` as the last word of a camelCase name is reported: a case boundary separates two words",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "source/stringUtils",
+    "languages": [
+        "typescript"
+    ]
+}

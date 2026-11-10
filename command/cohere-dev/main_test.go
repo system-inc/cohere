@@ -514,12 +514,13 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 	}
 }
 
-// The cache trim keeps the builds out rather than guessing which entries they read (#jc6ca7r): over its cap
-// it waits for every token, so it does not touch the cache while a run holds one, then trims the least
-// recently used entries to three quarters of the cap, sparing what was just written, gives the tokens back,
-// and says what it did in cohere-dev status. A cache under the cap costs no token. Looks are rationed to one
-// every ten minutes.
-func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
+// The cache trim runs beside a busy pool (#fdxencw): over its cap it takes one free token, as any heavy job does,
+// and trims the least recently used entries to three quarters of the cap while another run holds a token, never
+// removing an entry used within go_cache's two-hour floor, the one written a minute ago or the one ninety minutes
+// ago. Then it says what it did in cohere-dev status. Before, it waited for an empty pool, which a busy day never
+// gave it, and the cap never trimmed. A cache under the cap costs no token. Looks are rationed to one every ten
+// minutes.
+func TestTheCacheTrimRunsBesideABusyPoolAndKeepsTheFloor(test *testing.T) {
 	test.Parallel()
 	if runtime.GOOS == "windows" {
 		test.Skip("the trim holds tokens, a Unix lock")
@@ -570,35 +571,32 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 		)
 	}
 	fresh := put("a0"+strings.Repeat("a", 62)+"-a", time.Minute)
-	// A cap of 6 KB, so the trim brings 11 KB down to three quarters of it.
+	// Used ninety minutes ago: inside the floor, though a build has had time to stop reading it.
+	insideFloor := put("b0"+strings.Repeat("b", 62)+"-a", 90*time.Minute)
+	// A cap of 6 KB, so the trim brings 12 KB down to three quarters of it.
 	capGigabytes := strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64)
 	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
 		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+capGigabytes)
 
-	// A run holds a token, so the trim must wait for it before it touches the cache.
+	// A run holds a token the whole time, and the trim runs beside it on the other.
 	held, takeSlotError := takeSlot(slots, 2, "a run that holds a token")
 	if takeSlotError != nil || held == nil || held.number != 1 {
 		test.Fatalf("taking a token for the test: %v", takeSlotError)
 	}
+	defer held.release()
 	trim := exec.Command(wrapper, trimCacheVerb)
 	trim.Env = environment
-	if startError := trim.Start(); startError != nil {
-		test.Fatal(startError)
-	}
-	time.Sleep(2 * time.Second)
-	if remaining := cacheSize(test, cache); remaining != 11*1024 {
-		held.release()
-		test.Fatalf("the trim removed entries while a run held a token: %d bytes left", remaining)
-	}
-	held.release()
-	if waitError := trim.Wait(); waitError != nil {
-		test.Fatalf("the trim failed: %v", waitError)
+	if output, trimError := trim.CombinedOutput(); trimError != nil {
+		test.Fatalf("the trim failed with a token held elsewhere: %v\n%s", trimError, output)
 	}
 	if remaining := cacheSize(test, cache); remaining > 6*1024/4*3 {
 		test.Errorf("the trim left %d bytes, over three quarters of the 6 KB cap", remaining)
 	}
 	if _, statError := os.Stat(fresh); statError != nil {
 		test.Error("the entry written a minute ago was trimmed")
+	}
+	if _, statError := os.Stat(insideFloor); statError != nil {
+		test.Error("the entry used ninety minutes ago, inside the floor, was trimmed")
 	}
 	if _, statError := os.Stat(old[9]); statError == nil {
 		test.Error("the oldest entry survived the trim")
@@ -681,11 +679,10 @@ func privatePool(test *testing.T) string {
 	return home
 }
 
-// The trim never keeps a token idle while another runs: with a long job holding token 2, it holds nothing,
-// so token 1 stays free for anyone, and it trims once the job ends. Taking tokens one at a time and
-// waiting for each, it held token 1 idle for the whole job, half the pool behind a land gate for minutes
-// (2026-10-05 15:55, #jc6ca7r).
-func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
+// With every token held, the trim waits its turn in line like any heavy job, touching nothing, and trims once a
+// token is free (#fdxencw). It takes one token, so it never holds one idle while it waits, as the old whole-pool
+// trim once held half the pool behind a land gate (2026-10-05 15:55, #jc6ca7r).
+func TestTheCacheTrimWaitsItsTurnWhenEveryTokenIsHeld(test *testing.T) {
 	test.Parallel()
 	if runtime.GOOS == "windows" {
 		test.Skip("the trim holds tokens, a Unix lock")
@@ -705,6 +702,7 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
+	// Go's marker, without which go_cache refuses to read a directory as a cache.
 	if writeError := os.WriteFile(
 		filepath.Join(cache, "README"),
 		[]byte("This directory holds cached build artifacts from the Go build system.\n"),
@@ -729,57 +727,36 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 			test.Fatal(changeTimesError)
 		}
 	}
-
-	// The long job holds token 2: take token 1 for a moment to reach it, then give token 1 back.
-	first, takeSlotError := takeSlot(slots, 2, "reaching token 2")
-	if takeSlotError != nil || first == nil || first.number != 1 {
+	first, takeSlotError := takeSlot(slots, 2, "a land gate")
+	if takeSlotError != nil || first == nil {
 		test.Fatalf("taking token 1: %v", takeSlotError)
 	}
-	job, takeSlotError := takeSlot(slots, 2, "a long land gate")
-	if takeSlotError != nil || job == nil || job.number != 2 {
+	second, takeSlotError := takeSlot(slots, 2, "another land gate")
+	if takeSlotError != nil || second == nil {
+		first.release()
 		test.Fatalf("taking token 2: %v", takeSlotError)
 	}
-	first.release()
-
 	trim := exec.Command(wrapper, trimCacheVerb)
 	trim.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
 		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
 	if startError := trim.Start(); startError != nil {
+		first.release()
+		second.release()
 		test.Fatal(startError)
 	}
-
-	// Through three seconds of the job, token 1 must be free whenever the test looks: anyone may take it.
-	// A hold counts once two looks in a row find it: the trim's own look takes token 1 for microseconds
-	// before it finds token 2 busy and lets go, and a look landing in that instant is not idle time.
-	idle := time.Duration(0)
-	const step = 20 * time.Millisecond
-	wasHeld := false
-	for end := time.Now().Add(3 * time.Second); time.Now().Before(end); time.Sleep(step) {
-		lock, openError := os.OpenFile(lockPath(slots, 1), os.O_CREATE|os.O_RDWR, 0o644)
-		if openError != nil {
-			test.Fatal(openError)
-		}
-		taken, tryLockFileError := tryLockFile(lock)
-		if tryLockFileError != nil {
-			test.Fatalf("testing token 1's lock: %v", tryLockFileError)
-		}
-		if taken {
-			unlockFile(lock)
-		} else if wasHeld {
-			idle += step
-		}
-		wasHeld = !taken
-		_ = lock.Close() // Ignored: opened only to test its lock, and never written.
+	// Measuring 10 KB takes milliseconds; two seconds puts the trim well into its wait for a token.
+	time.Sleep(2 * time.Second)
+	if remaining := cacheSize(test, cache); remaining != 10*1024 {
+		test.Errorf("the trim removed entries with every token held: %d bytes left of 10 KB", remaining)
 	}
-	job.release()
-	if waitError := trim.Wait(); waitError != nil {
+	second.release()
+	waitError := trim.Wait()
+	first.release()
+	if waitError != nil {
 		test.Fatalf("the trim failed: %v", waitError)
-	}
-	if idle > 0 {
-		test.Errorf("the trim held token 1 idle for about %s while the job held token 2", idle)
 	}
 	status := readMaybeMissing(test, filepath.Join(slots, "gocache.status"))
 	if !strings.Contains(string(status), "trimmed from") {
-		test.Errorf("the trim did not trim once the job ended: %q", status)
+		test.Errorf("the trim did not trim once a token was free: %q", status)
 	}
 }

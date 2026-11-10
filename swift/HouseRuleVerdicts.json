@@ -126,6 +126,12 @@
         "reason": null
     },
     {
+        "typeScriptRule": "nexus/consistency-no-abbreviated-file-name",
+        "verdict": "Ported",
+        "swiftRule": "cohere-swift/consistency-no-abbreviated-file-name",
+        "reason": null
+    },
+    {
         "typeScriptRule": "nexus/consistency-no-abbreviated-identifier",
         "verdict": "Ported",
         "swiftRule": "cohere-swift/consistency-no-abbreviated-identifier",
@@ -219,6 +225,12 @@
         "typeScriptRule": "nexus/consistency-no-stuttering-name",
         "verdict": "Ported",
         "swiftRule": "cohere-swift/consistency-no-stuttering-name",
+        "reason": null
+    },
+    {
+        "typeScriptRule": "nexus/consistency-no-utils-file-name",
+        "verdict": "Ported",
+        "swiftRule": "cohere-swift/consistency-no-utils-file-name",
         "reason": null
     },
     {

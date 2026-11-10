@@ -1,0 +1,15 @@
+{
+    "why": "af17: `config` alone is judged, though `react-hooks/config` is a registered rule: a one-word rule name is an ordinary word, and a file spelling it is named for what it holds",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "config",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

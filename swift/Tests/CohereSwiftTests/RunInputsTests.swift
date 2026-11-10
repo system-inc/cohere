@@ -91,8 +91,14 @@ struct RunInputsTests {
             }
         }
 
-        /* The package as SwiftPM describes it: one target of two files, and the path dependency beside it, loaded. */
-        func package(projectKind: PackageModel.ProjectKind = .swiftPackage) throws -> PackageModel {
+        /*
+         The package as SwiftPM describes it: one target of two files, and the path dependency beside it, loaded unless
+         `withShared` is false.
+         */
+        func package(
+            projectKind: PackageModel.ProjectKind = .swiftPackage,
+            withShared: Bool = true,
+        ) throws -> PackageModel {
             let dump = #"{"toolsVersion":{"_version":"6.2.0"},"swiftLanguageVersions":null,"targets":[]}"#
             var model = try PackageModel(
                 root: root,
@@ -110,14 +116,17 @@ struct RunInputsTests {
                 ),
                 dumpPackageJson: Data(dump.utf8),
             )
-            model.localPackages = [sharedModel]
+            model.localPackages = withShared ? [sharedModel] : []
             model.projectKind = projectKind
             return model
         }
 
         /* The record a run over the package would write now. */
-        func record(projectKind: PackageModel.ProjectKind = .swiftPackage) throws -> InputsRecord {
-            let package = try package(projectKind: projectKind)
+        func record(
+            projectKind: PackageModel.ProjectKind = .swiftPackage,
+            withShared: Bool = true,
+        ) throws -> InputsRecord {
+            let package = try package(projectKind: projectKind, withShared: withShared)
             let fileSet = try FileSet.build(package: package, environment: ["HOME": home.path])
             return RunInputs.record(
                 package: package,
@@ -303,6 +312,84 @@ struct RunInputsTests {
         )
     }
 
+    /* `git add -f` moves only the index, and the file it tracks is ours from then on, whatever the ignore files say. */
+    @Test func aChangedIndexIsNoticed() throws {
+        let project = try Project()
+        defer { project.remove() }
+        let index = project.repository.appendingPathComponent(".git/index")
+        #expect(
+            try Self.moved(in: project) { try GitIndexTests.indexBytes(paths: ["Ignored.swift"]).write(to: index) }
+                .holds(index)
+        )
+    }
+
+    /*
+     The index the file set read whole is named under `trackedIgnored` too (#jem2gsa), so the front door keys it on what
+     it decides rather than on bytes every `git status` rewrites: with the repository's root, and the directory the
+     file set asked about, the package's own below the root, the root itself for a package at the root, and the root
+     again when a path dependency beside the package was asked about too, since a narrower scope would replay stale.
+     */
+    @Test func theIndexIsNamedWithTheScopeItsAnswersWereAskedFor() throws {
+        let project = try Project()
+        defer { project.remove() }
+        let repository = project.repository.resolvingSymlinksInPath()
+        try GitIndexTests.indexBytes(paths: ["package/Package.swift"])
+            .write(to: project.repository.appendingPathComponent(".git/index"))
+        func named(_ repository: URL, scope: String) -> [InputsRecord.TrackedIgnored] {
+            let index = RunInputs.path(repository.appendingPathComponent(".git/index"))
+            return [InputsRecord.TrackedIgnored(index: index, root: RunInputs.path(repository), scope: scope)]
+        }
+
+        let below = try project.record(withShared: false)
+        #expect(below.trackedIgnored == named(repository, scope: "package"))
+        #expect(below.files.contains(RunInputs.path(repository.appendingPathComponent(".git/index"))))
+        #expect(try project.record().trackedIgnored == named(repository, scope: ""))
+
+        /* A repository of the package's own: its index is read, and the path dependency, outside it, asks nothing. */
+        try Project.write([".git/info/exclude": ""], under: project.root)
+        try GitIndexTests.indexBytes(paths: ["Package.swift"])
+            .write(to: project.root.appendingPathComponent(".git/index"))
+        #expect(try project.record().trackedIgnored == named(project.root.resolvingSymlinksInPath(), scope: ""))
+    }
+
+    /* An index the reader fell back from stays keyed on its bytes, a plain file among the inputs, as it was. */
+    @Test func anIndexReadWithAFallbackIsNotNamedForItsDigest() throws {
+        let project = try Project()
+        defer { project.remove() }
+        let index = project.repository.appendingPathComponent(".git/index")
+        try Data("not an index".utf8).write(to: index)
+        let record = try project.record(withShared: false)
+        #expect(record.trackedIgnored.isEmpty)
+        #expect(record.files.contains(RunInputs.path(index.resolvingSymlinksInPath())))
+    }
+
+    /*
+     The front door's digest reads the repository's `.gitignore` files and a `.git` directory's `info/exclude`, case
+     sensitively, so a path excluded by anything else, here the global excludes file or `core.ignorecase`'s folding,
+     is one whose tracking no digest would see: the index stays keyed on its bytes. Excluded by a line the digest
+     reads, it is named, `core.ignorecase` set or not.
+     */
+    @Test func anExclusionTheDigestCannotSeeKeepsTheIndexOnItsBytes() throws {
+        let project = try Project()
+        defer { project.remove() }
+        try GitIndexTests.indexBytes(paths: ["package/Package.swift"])
+            .write(to: project.repository.appendingPathComponent(".git/index"))
+        try Project.write(["Sources/App/Scratch.swift": "struct Scratch {}\n"], under: project.root)
+        #expect(try project.record(withShared: false).trackedIgnored.count == 1, "the control: nothing is excluded")
+
+        try Project.write([".config/git/ignore": "Scratch.swift\n"], under: project.home)
+        #expect(try project.record(withShared: false).trackedIgnored.isEmpty, "the global excludes file excluded it")
+        try FileManager.default.removeItem(at: project.home.appendingPathComponent(".config/git/ignore"))
+
+        try Project.write(
+            [".git/config": "[core]\n\tignorecase = true\n", ".gitignore": "Ignored.swift\nscratch.swift\n"],
+            under: project.repository,
+        )
+        #expect(try project.record(withShared: false).trackedIgnored.isEmpty, "only a folded match excluded it")
+        try Project.write([".gitignore": "Ignored.swift\nScratch.swift\n"], under: project.repository)
+        #expect(try project.record(withShared: false).trackedIgnored.count == 1, "the repository's line excluded it")
+    }
+
     /* The path dependency sits outside the package's root, so only its own walk sees a file added to it. */
     @Test func aLocalPackagesSourceIsNoticed() throws {
         let project = try Project()
@@ -442,9 +529,9 @@ struct RunInputsTests {
     }
 
     /*
-     What a walk must not name: a git directory, which moves with every git command (only its `info/exclude` and config
-     are named, as files the ignore rules read), cohere's own cache, which the run writes after its record is taken,
-     and Finder's notes.
+     What a walk must not name: a git directory, which moves with every git command (only its `info/exclude`, config and
+     index are named, as files the ignore rules read), cohere's own cache, which the run writes after its record is
+     taken, and Finder's notes.
      */
     @Test func theWalkLeavesOutWhatMovesOnItsOwn() throws {
         let project = try Project()
@@ -459,7 +546,7 @@ struct RunInputsTests {
             #expect(!path.hasSuffix("/.DS_Store"), "the record named \(path)")
             if path.hasPrefix(gitDirectory) {
                 #expect(
-                    ["info/exclude", "config"].contains(String(path.dropFirst(gitDirectory.count))),
+                    ["info/exclude", "config", "index"].contains(String(path.dropFirst(gitDirectory.count))),
                     "the record named \(path), in the git directory",
                 )
             }

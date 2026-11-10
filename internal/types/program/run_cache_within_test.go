@@ -67,7 +67,7 @@ func TestRecordRunCacheWithinKeepsNoDirectoryOutsideTheRoots(test *testing.T) {
 	tree := newWithinTree(test)
 	files := []string{tree.source, tree.staticcheckConfiguration, tree.gitIndex}
 	within, withinError := program.RecordRunCacheWithin([]string{tree.root}, "key", files, []string{tree.listed},
-		nil, nil, nil, 0, time.Time{})
+		nil, nil, nil, 0, time.Time{}, nil)
 	if withinError != nil {
 		test.Fatal(withinError)
 	}
@@ -113,7 +113,7 @@ func TestRecordRunCacheWithinHoldsEveryListingToTheClock(test *testing.T) {
 		test.Fatal(createDirectoryError)
 	}
 	_, withinError := program.RecordRunCacheWithin([]string{tree.root}, "key", []string{tree.source},
-		[]string{tree.listed}, nil, nil, nil, 0, readSince)
+		[]string{tree.listed}, nil, nil, nil, 0, readSince, nil)
 	if withinError == nil || !strings.Contains(withinError.Error(), tree.listed) {
 		test.Fatalf("a listing changed after the clock was recorded: %v", withinError)
 	}

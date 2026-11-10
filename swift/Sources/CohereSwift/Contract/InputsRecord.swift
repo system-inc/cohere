@@ -17,10 +17,38 @@ public struct InputsRecord: Codable, Equatable, Sendable {
     public var directories: [String]
     /* The paths whose absence the verdict depends on: a file that, once there, would change the run. */
     public var absent: [String]
+    /*
+     Each git index among `files` the run read only for what it decides of its walk, which tracked paths the ignore
+     rules exclude, so the front door keys it on `gitignore.TrackedIgnoredDigest` over `scope` rather than on bytes
+     git rewrites on every `git status` (#jem2gsa). An index not named here is keyed on its bytes.
+     */
+    public var trackedIgnored: [TrackedIgnored]
 
-    public init(files: [String], directories: [String], absent: [String]) {
+    /*
+     One index the run read for a walk: the index file and the root of its repository, both absolute, and the
+     directory holding every path whose answer the run used, relative to that root and slash separated, `""` for the
+     root itself.
+     */
+    public struct TrackedIgnored: Codable, Comparable, Sendable {
+        public var index: String
+        public var root: String
+        public var scope: String
+
+        public init(index: String, root: String, scope: String) {
+            self.index = index
+            self.root = root
+            self.scope = scope
+        }
+
+        public static func < (left: TrackedIgnored, right: TrackedIgnored) -> Bool {
+            (left.index, left.root, left.scope) < (right.index, right.root, right.scope)
+        }
+    }
+
+    public init(files: [String], directories: [String], absent: [String], trackedIgnored: [TrackedIgnored] = []) {
         self.files = files
         self.directories = directories
         self.absent = absent
+        self.trackedIgnored = trackedIgnored
     }
 }

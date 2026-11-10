@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -450,5 +451,108 @@ func TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds(test *testing.T) {
 		if !named || !strings.HasPrefix(file.Reason, reason) || file.Language != "Go" {
 			test.Errorf("under --json the gap names %+v, want one of %v as a Go file", file, wantReasons)
 		}
+	}
+}
+
+// An engine run whose project record excludes the module's only file, and whose summary calls the run clean, fails
+// through the front door: exit 1 where the engine said 0, the summary's reasons naming the file's reason and the rule
+// that decided it, and the footer saying so. The control, the same stream with the file in scope, keeps the engine's
+// exit 0 (#08cv2mp).
+//
+// Not parallel: it drives check runs through engineRun, whose record acceptors set the package-level activeSummary.
+func TestAGoRunThatExcludedEveryFileFails(test *testing.T) {
+	stream := func(filesOurs int, excluded string) string {
+		return strings.Join([]string{
+			`{"kind":"provenance","contract":3,"engine":"cohere-go","version":"0.1.0","commit":"dev",` +
+				`"sourceTreeModified":false,"toolchain":"go1.27.0 darwin/arm64"}`,
+			fmt.Sprintf(`{"kind":"project","root":"/project","package":"example.com/project",`+
+				`"elapsedMilliseconds":1,"filesInPackage":1,"filesOurs":%d,"filesInScope":%d,"scopeDescription":"",`+
+				`"targets":[],"excluded":[%s]}`, filesOurs, filesOurs, excluded),
+			`{"kind":"fix","filesConsidered":0,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,` +
+				`"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},` +
+				`"formatScope":"every Go file in the module"}`,
+			`{"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":0,"detail":""}`,
+			`{"kind":"types","diagnostics":0,"files":0,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"test"}`,
+			`{"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":0,"detail":""}`,
+			`{"kind":"lint","findings":0,"rulesRun":5,"filesWalked":0,"nodesVisited":0,"elapsedMilliseconds":0,` +
+				`"rulesSilent":[],"rulesWatchedAndQuiet":5,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],` +
+				`"configNote":""}`,
+			`{"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":0,"detail":""}`,
+			`{"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}`,
+			`{"kind":"summary","findings":0,"complete":true,"exitCode":0}`,
+		}, "\n")
+	}
+	printed := func(records string) string {
+		return "cat <<'RECORDS'\n" + records + "\nRECORDS"
+	}
+
+	// Not parallel: it drives a check run through engineRun, which sets the package-level activeSummary.
+	test.Run("every file ignored by git", func(test *testing.T) {
+		// A process runs once, so nothing resets the summary between two runs in one test binary.
+		activeSummary = runSummary{}
+		out, exitCode, runError := runFakeGoEngine(test, printed(stream(0,
+			`{"file":"/project/value.go","reason":"ignored by git","source":".gitignore:1"}`)))
+		if runError != nil || exitCode != 1 {
+			test.Fatalf("a run that checked nothing exited %d, err %v, want 1\n%s", exitCode, runError, out)
+		}
+		want := []excludedReason{{Reason: "ignored by git", Count: 1, Source: ".gitignore:1"}}
+		if !slices.Equal(activeSummary.Gaps.Excluded, want) || !activeSummary.failed() {
+			test.Errorf("the summary's reasons are %+v and failed %t, want %+v and a failure",
+				activeSummary.Gaps.Excluded, activeSummary.failed(), want)
+		}
+		if got := footer(activeSummary, plain, footerOptions{}); !strings.Contains(got,
+			"no files checked: 1 file excluded, ignored by git (.gitignore:1)") {
+			test.Errorf("the footer does not say why nothing was checked: %q", got)
+		}
+	})
+
+	// Not parallel: it drives a check run through engineRun, which sets the package-level activeSummary.
+	test.Run("the control: the file in scope", func(test *testing.T) {
+		activeSummary = runSummary{}
+		out, exitCode, runError := runFakeGoEngine(test, printed(stream(1, "")))
+		if runError != nil || exitCode != 0 || len(activeSummary.Gaps.Excluded) != 0 {
+			test.Fatalf("a run with its file in scope exited %d, err %v, reasons %+v, want 0 and none\n%s",
+				exitCode, runError, activeSummary.Gaps.Excluded, out)
+		}
+	})
+}
+
+// A Swift package's manifest was never a source to check, so a run that checked nothing counts only its sources in
+// its reasons: an all-ignored package names the ignored file alone, and a package whose only file is its manifest has
+// no reason at all, a project with none of its language's files, which passes with the warning (#08cv2mp).
+//
+// Not parallel: it reads and sets the package-level activeSummary, as countExcludedWhenNothingChecked does.
+func TestAManifestIsNoReasonANothingCheckedRunCounts(test *testing.T) {
+	type excludedEntry = struct {
+		File   string `json:"file"`
+		Reason string `json:"reason"`
+		Source string `json:"source"`
+	}
+	manifest := excludedEntry{File: "/package/Package.swift", Reason: "a package manifest"}
+	ignored := excludedEntry{File: "/package/Sources/Lib/Value.swift", Reason: "ignored by git", Source: ".gitignore:2"}
+	for _, testCase := range []struct {
+		name     string
+		excluded []excludedEntry
+		want     []excludedReason
+	}{
+		{"an all-ignored package", []excludedEntry{manifest, ignored},
+			[]excludedReason{{Reason: "ignored by git", Count: 1, Source: ".gitignore:2"}}},
+		{"a package of its manifest alone", []excludedEntry{manifest}, nil},
+	} {
+		// Not parallel: it reads and sets the package-level activeSummary.
+		test.Run(testCase.name, func(test *testing.T) {
+			activeSummary = runSummary{}
+			activeSummary.Gaps.NothingToCheck = true
+			run := newEngineRun(bufio.NewWriter(&bytes.Buffer{}), engineModeCheck, swiftLanguage, "", time.Now())
+			run.project = &engineProjectRecord{Excluded: testCase.excluded}
+			run.countExcludedWhenNothingChecked()
+			if !slices.Equal(activeSummary.Gaps.Excluded, testCase.want) {
+				test.Errorf("the reasons are %+v, want %+v", activeSummary.Gaps.Excluded, testCase.want)
+			}
+			if activeSummary.Gaps.nothingChecked() != (testCase.want != nil) {
+				test.Errorf("nothingChecked is %t with reasons %+v", activeSummary.Gaps.nothingChecked(),
+					activeSummary.Gaps.Excluded)
+			}
+		})
 	}
 }

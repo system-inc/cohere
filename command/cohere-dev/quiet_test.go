@@ -202,8 +202,8 @@ func TestAQuietWindowSwitchesTheTrimOff(test *testing.T) {
 	}
 }
 
-// A window opened while the trim waits for an empty pool holds too: the trim has already measured, and
-// it looks again once it holds every token, before it removes anything.
+// A window opened while the trim waits for its token holds too: the trim has already measured, and it looks
+// again once it holds its token, before it removes anything.
 func TestAQuietWindowOpenedWhileTheTrimWaitsHoldsToo(test *testing.T) {
 	test.Parallel()
 	if runtime.GOOS == "windows" {
@@ -211,20 +211,28 @@ func TestAQuietWindowOpenedWhileTheTrimWaitsHoldsToo(test *testing.T) {
 	}
 	trimCase := newQuietTrimCase(test)
 
+	// Both tokens held, so the trim waits its turn for one.
 	held, takeSlotError := takeSlot(trimCase.slots, 2, "a run that holds a token")
 	if takeSlotError != nil || held == nil {
 		test.Fatalf("taking a token for the test: %v", takeSlotError)
+	}
+	other, takeSlotError := takeSlot(trimCase.slots, 2, "another run that holds a token")
+	if takeSlotError != nil || other == nil {
+		held.release()
+		test.Fatalf("taking the other token for the test: %v", takeSlotError)
 	}
 	trim := exec.Command(trimCase.wrapper, trimCacheVerb)
 	trim.Env = trimCase.environment
 	if startError := trim.Start(); startError != nil {
 		held.release()
+		other.release()
 		test.Fatal(startError)
 	}
-	// Measuring 10 KB takes milliseconds; two seconds puts the trim well into its wait for the pool.
+	// Measuring 10 KB takes milliseconds; two seconds puts the trim well into its wait for a token.
 	time.Sleep(2 * time.Second)
 	trimCase.run(test, "quiet", "on", "--for", "10m", "lint_rules' pairs")
 	held.release()
+	other.release()
 	if waitError := trim.Wait(); waitError != nil {
 		test.Fatalf("the trim failed: %v", waitError)
 	}
@@ -234,12 +242,12 @@ func TestAQuietWindowOpenedWhileTheTrimWaitsHoldsToo(test *testing.T) {
 	log := trimCase.log(test)
 	if strings.Contains(log, "not looked at") {
 		test.Fatalf(
-			"the trim had not reached its wait for the pool in two seconds, so this run tells nothing:\n%s",
+			"the trim had not reached its wait for a token in two seconds, so this run tells nothing:\n%s",
 			log,
 		)
 	}
 	if !strings.Contains(log, "cap, not trimmed: a quiet window holds until") ||
 		!strings.Contains(log, "lint_rules' pairs") {
-		test.Errorf("the trim's log does not say the window stopped it after it held the pool:\n%s", log)
+		test.Errorf("the trim's log does not say the window stopped it after it took its token:\n%s", log)
 	}
 }

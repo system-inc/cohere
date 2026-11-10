@@ -84,7 +84,7 @@ func describeProject(request invocation) (*describedProject, error) {
 	}
 	for _, exclusion := range census.Excluded {
 		described.record.Excluded = append(described.record.Excluded,
-			contract.ExcludedFile{File: exclusion.File, Reason: exclusion.Reason})
+			contract.ExcludedFile{File: exclusion.File, Reason: exclusion.Reason, Source: exclusion.Source})
 	}
 
 	contents := map[string][]byte{}

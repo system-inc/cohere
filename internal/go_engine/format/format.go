@@ -4,7 +4,8 @@
 // rewrites may also wrap each file's long lines once the load has found the types sound, through RunWrap and
 // Options.Wrap, keeping the wrap only when it is provably the same program and gofmt leaves it as it is. The engine's
 // rename, which runs after the wrap, wraps the files it rewrote in memory through WrapSource and writes them through
-// WriteAtomically, the same steps.
+// WriteAllAtomically, the same steps. Every write is of a file inside the run's root (write_root.WriteRoot): one
+// reached through a link to somewhere outside it is checked and never written, and named in Result.Withheld.
 //
 // A formatter that formatted nothing must never read like one that found everything already correct, so
 // every file a run is handed comes back accounted for: already formatted, changed, not formatted with its
@@ -28,6 +29,7 @@ import (
 	"sync"
 
 	"github.com/system-inc/cohere/internal/line_wrap"
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // Options says what a run does with the files gofmt would change.
@@ -35,6 +37,10 @@ type Options struct {
 	// Write rewrites each file gofmt would change. Unset, the run is the check `--no-fix` asks for: it reports
 	// every file gofmt would change and writes nothing, so the zero value never touches a project.
 	Write bool
+
+	// Root is where Write may write: a file whose real path is outside it is left as it was and named in
+	// Result.Withheld. The zero WriteRoot refuses every write. A check never asks it.
+	Root write_root.WriteRoot
 
 	// SingleThreaded formats one file at a time, for `--single-threaded`.
 	SingleThreaded bool
@@ -99,6 +105,13 @@ type WrapDeclinedFile struct {
 	Reason string
 }
 
+// WithheldFile is a file the run would have written and did not, since its real path, RealPath, is outside the run's
+// root (write_root.OutsideRootError). It holds what it held before the run.
+type WithheldFile struct {
+	File     string
+	RealPath string
+}
+
 // NotFormattedFile is a file the run could not format, and why: it could not be read, it does not parse, or
 // the formatted result could not be written. The file is left as it was.
 type NotFormattedFile struct {
@@ -110,7 +123,8 @@ type NotFormattedFile struct {
 // whatever order the files finished in.
 type Result struct {
 	// FilesConsidered is every file the run was handed. Each is in exactly one of Changed, NotFormatted, Generated
-	// and WrapDeclined, or none of them when the run would leave it as it is.
+	// and WrapDeclined, or none of them when the run would leave it as it is, but a file Withheld: Run names it in
+	// Changed too, not Written, as a check would, and RunWrap in Withheld alone.
 	FilesConsidered int
 
 	Changed      []ChangedFile
@@ -118,6 +132,9 @@ type Result struct {
 
 	// WrapDeclined is the files whose wrap RunWrap did not keep, each holding gofmt's output.
 	WrapDeclined []WrapDeclinedFile
+
+	// Withheld is the files a run that writes would have written and did not, since each is outside Options.Root.
+	Withheld []WithheldFile
 
 	// Generated is the files skipped as generated, by the rule go/ast.IsGenerated reads: a comment line
 	// `// Code generated ... DO NOT EDIT.` before the package clause. Their output is their generator's, so
@@ -130,12 +147,13 @@ type Result struct {
 }
 
 // outcome is what a run did with one file: at most one of changed, notFormatted, generated and wrapDeclined is set,
-// and none for a file the run would leave as it is.
+// and none for a file the run would leave as it is. withheld is set beside changed by Run, and alone by RunWrap.
 type outcome struct {
 	changed      *ChangedFile
 	notFormatted *NotFormattedFile
 	generated    bool
 	wrapDeclined *WrapDeclinedFile
+	withheld     *WithheldFile
 
 	// known is a file answered from Options.Known.
 	known bool
@@ -201,6 +219,9 @@ func collect(files []string, outcomes []outcome) Result {
 		if outcomes[index].wrapDeclined != nil {
 			result.WrapDeclined = append(result.WrapDeclined, *outcomes[index].wrapDeclined)
 		}
+		if outcomes[index].withheld != nil {
+			result.Withheld = append(result.Withheld, *outcomes[index].withheld)
+		}
 		switch {
 		case outcomes[index].changed != nil:
 			result.Changed = append(result.Changed, *outcomes[index].changed)
@@ -214,7 +235,9 @@ func collect(files []string, outcomes []outcome) Result {
 }
 
 // formatFile formats one file, writing the result under options.Write, unless options.Known says what the run made
-// of the same bytes before. A check reads the file from options.Held when that holds it.
+// of the same bytes before. A check reads the file from options.Held when that holds it. A write options.Root refuses
+// leaves the file changed and not written, as a check reports it, and withheld; it is never known, since gofmt would
+// change it.
 func formatFile(file string, options Options) outcome {
 	original, readError := readOriginal(file, options)
 	if readError != nil {
@@ -255,7 +278,12 @@ func formatFile(file string, options Options) outcome {
 	}
 	changed := &ChangedFile{File: file, Formatted: true, FirstDifferingLine: firstDifferingLine(original, formatted)}
 	if options.Write {
-		if writeError := WriteAtomically(file, formatted); writeError != nil {
+		writeError := WriteAtomically(options.Root, file, formatted)
+		var outside *write_root.OutsideRootError
+		if errors.As(writeError, &outside) {
+			return outcome{changed: changed, withheld: &WithheldFile{File: file, RealPath: outside.RealPath}}
+		}
+		if writeError != nil {
 			return notFormatted(file, fmt.Sprintf("it cannot be written: %v", writeError))
 		}
 		changed.Written = true
@@ -276,7 +304,9 @@ func readOriginal(file string, options Options) ([]byte, error) {
 
 // wrapFile wraps one file gofmt formatted and writes the wrap WrapSource keeps, unless options.Known holds the same
 // bytes as a file the wrap leaves as it is. A file whose wrap is declined, or cannot be written, keeps gofmt's output
-// and is named with why; it is never known, so the next run tries it again and says again why it was not kept.
+// and is named with why; it is never known, so the next run tries it again and says again why it was not kept. A
+// write options.Root refuses is withheld, neither changed nor declined: the wrap was kept, and the file is not this
+// run's to write.
 func wrapFile(source Source, options Options) outcome {
 	var digest [sha256.Size]byte
 	if options.Known != nil {
@@ -295,7 +325,12 @@ func wrapFile(source Source, options Options) outcome {
 		}
 		return outcome{}
 	}
-	if writeError := WriteAtomically(source.File, output); writeError != nil {
+	writeError := WriteAtomically(options.Root, source.File, output)
+	var outside *write_root.OutsideRootError
+	if errors.As(writeError, &outside) {
+		return outcome{withheld: &WithheldFile{File: source.File, RealPath: outside.RealPath}}
+	}
+	if writeError != nil {
 		return outcome{wrapDeclined: &WrapDeclinedFile{File: source.File,
 			Reason: fmt.Sprintf("the wrap could not be written: %v", writeError)}}
 	}
@@ -370,12 +405,13 @@ func firstDifferingLine(original, formatted []byte) int {
 
 // WriteAtomically replaces file with contents through a temporary file beside it and a rename, so an interrupted
 // run leaves the old file or the new one, never half of either. The temporary file takes the file's permissions
-// before the rename makes it the file. A symbolic link is written through to its target, and stays a link.
+// before the rename makes it the file. A symbolic link is written through to its target, and stays a link, but only
+// to a target inside root: one outside it is refused with a *write_root.OutsideRootError, and nothing is written.
 //
 // Nothing is synced to disk: the rename already guards against the run being stopped, and a sync per file
 // would cost every run to guard against the machine losing power mid-write.
-func WriteAtomically(file string, contents []byte) error {
-	staged, stageError := stage(file, contents)
+func WriteAtomically(root write_root.WriteRoot, file string, contents []byte) error {
+	staged, stageError := stage(root, file, contents)
 	if stageError != nil {
 		return stageError
 	}
@@ -390,11 +426,15 @@ type stagedFile struct {
 }
 
 // stage writes contents to a temporary file beside file, through any symbolic link, with the file's permissions,
-// and removes it again when it cannot be filled.
-func stage(file string, contents []byte) (stagedFile, error) {
+// and removes it again when it cannot be filled. It is the one step every write of a project file passes through, so
+// it is where a file outside root is refused, once its link is resolved and before anything is created beside it.
+func stage(root write_root.WriteRoot, file string, contents []byte) (stagedFile, error) {
 	target, resolveError := filepath.EvalSymlinks(file)
 	if resolveError != nil {
 		return stagedFile{}, fmt.Errorf("resolving %s: %w", file, resolveError)
+	}
+	if !root.Holds(target) {
+		return stagedFile{}, &write_root.OutsideRootError{File: file, RealPath: target}
 	}
 	information, statError := os.Stat(target)
 	if statError != nil {

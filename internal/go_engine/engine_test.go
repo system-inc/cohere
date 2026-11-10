@@ -1020,6 +1020,7 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 			Findings           int               `json:"findings"`
 			FilesRewritten     int               `json:"filesRewritten"`
 			ChangedFiles       []json.RawMessage `json:"changedFiles"`
+			NotWritten         []json.RawMessage `json:"notWritten"`
 			FilesWithoutRecord []string          `json:"filesWithoutRecord"`
 			Crashes            []json.RawMessage `json:"crashes"`
 			Complete           bool              `json:"complete"`
@@ -1046,6 +1047,7 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 			findingsInPhase++
 		case "fix":
 			filesRewritten, changedFiles = record.FilesRewritten, len(record.ChangedFiles)
+			gap = gap || len(record.NotWritten) > 0
 		case "types":
 			gap = gap || len(record.FilesWithoutRecord) > 0
 			if record.Diagnostics != findingsInPhase {

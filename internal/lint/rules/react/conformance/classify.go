@@ -463,7 +463,7 @@ func Classify(fixture Fixture, result Result, candidateError error) FixtureVerdi
 	}
 
 	if candidateError != nil {
-		var unsupported *ErrUnsupported
+		var unsupported *UnsupportedError
 		if asUnsupported(candidateError, &unsupported) {
 			// A decline from the implementation on a fixture a shipped rule owns is a statement
 			// about the run, not about the fixture. Naming it `unreachable` would assert the

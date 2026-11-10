@@ -135,15 +135,15 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 		}
 		session = engine.cacheSession(environment, hostFiles)
 	}
-	caching := load.Caching{Held: engine.held, Timing: engine.timing}
+	// As the host's load does (loadWorkspace), a package with no file in scope is loaded and never analyzed.
+	caching := load.Caching{Held: engine.held, Timing: engine.timing, Analyzes: engine.described.hasFileInScope}
 	if session != nil {
 		caching.Restorer = session
 		if session.HasStore() {
 			caching.Listings = session
 		}
 	}
-	loaded, loadError := load.PackagesCached(engine.described.workspace.Root, engine.described.workspace.Patterns(),
-		environment, engine.described.readableOurs, caching)
+	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 	if loadError != nil {
 		return buildRun{}, fmt.Errorf("loading the build %s: %w", extra, loadError)
 	}
@@ -183,8 +183,7 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 	// stored, has the build loaded again with that package checked from source, until none does.
 	for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
 		reloads := strings.Join(result.Reloads, ", ")
-		loaded, loadError = load.PackagesCached(engine.described.workspace.Root,
-			engine.described.workspace.Patterns(), environment, engine.described.readableOurs, caching)
+		loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 		if loadError != nil {
 			return buildRun{}, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
 				loadError)

@@ -62,6 +62,10 @@ type ProjectTarget struct {
 type ExcludedFile struct {
 	File   string `json:"file"`
 	Reason string `json:"reason"`
+
+	// Source is additive within contract 3 (swift/Contract.md): the rule that decided, as `path:line` relative to
+	// the root, such as `.gitignore:1`, and left out where no rule of a file and line decided.
+	Source string `json:"source,omitempty"`
 }
 
 // Source is which part of the engine produced a finding.
@@ -106,6 +110,13 @@ type ChangedFile struct {
 	File      string         `json:"file"`
 	FixedBy   map[string]int `json:"fixedBy"`
 	Formatted bool           `json:"formatted"`
+}
+
+// NotWrittenFile is one file the fix phase would have written and did not: the file as the run reached it, and its
+// real path, outside the run's root, every symbolic link resolved.
+type NotWrittenFile struct {
+	File     string `json:"file"`
+	RealPath string `json:"realPath"`
 }
 
 // Crash is a rule that failed on a file, which makes the run incomplete.

@@ -175,11 +175,13 @@ public struct Pipeline {
         /*
          The abbreviation vocabulary, loaded before anything is checked. A compiled-in copy that would not load
          refuses the run with exit 2: a naming rule with no words to judge would report nothing and read as a
-         clean tree, the silent green this tool exists to stop. A run with the rule turned off loads nothing,
-         and its rule list holds an empty vocabulary that is never consulted.
+         clean tree, the silent green this tool exists to stop. The identifier rule and the file-name rule read it,
+         and a run with both turned off loads nothing, and its rule list holds an empty vocabulary that is never
+         consulted.
          */
         var vocabulary = AbbreviationVocabulary()
-        if configuration.severity(of: ConsistencyNoAbbreviatedIdentifier.ruleName) != .off
+        if (configuration.severity(of: ConsistencyNoAbbreviatedIdentifier.ruleName) != .off
+            || configuration.severity(of: ConsistencyNoAbbreviatedFileName.ruleName) != .off)
             && (options.proposeFixes || options.runLint)
         {
             do {

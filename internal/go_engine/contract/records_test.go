@@ -38,6 +38,7 @@ var fieldsNotWritten = map[Kind][]string{
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
+	KindFix:   {"notWritten"},
 	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds"},
 	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation"},
 }
@@ -269,6 +270,7 @@ func populatedRecords() []Record {
 			},
 			Excluded: []ExcludedFile{
 				{File: "/project/b_windows.go", Reason: "excluded by build constraints on darwin/arm64"},
+				{File: "/project/scratch.go", Reason: "ignored by git", Source: ".gitignore:1"},
 			},
 		},
 		UnreadableRecord{File: "/project/c.go", Error: "it could not be opened"},
@@ -299,6 +301,7 @@ func populatedRecords() []Record {
 			ChangedFiles: []ChangedFile{
 				{File: "/project/a.go", FixedBy: map[string]int{"cohere-go/printf": 1}, Formatted: true},
 			},
+			NotWritten: []NotWrittenFile{{File: "/project/shared/b.go", RealPath: "/elsewhere/shared/b.go"}},
 		},
 		TypesRecord{
 			Diagnostics:         1,
@@ -351,9 +354,10 @@ func populatedRecords() []Record {
 			Cache:               duplicate_functions.CacheUse{Unit: "packages", Read: 1, Hashed: 1},
 		}},
 		InputsRecord{
-			Files:       []string{"/project/a.go", "/project/go.mod"},
-			Directories: []string{"/project"},
-			Absent:      []string{"/go.work"},
+			Files:          []string{"/.git/index", "/project/a.go", "/project/go.mod"},
+			Directories:    []string{"/project"},
+			Absent:         []string{"/go.work"},
+			TrackedIgnored: []TrackedIgnoredScope{{Index: "/.git/index", Root: "/", Scope: "project"}},
 		},
 		TimingRecord{
 			Unavailable:            "this platform has no per-thread CPU clock",
@@ -628,7 +632,7 @@ func TestInputsRecordWritesEmptyListsAsLists(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	for _, field := range []string{`"files":[]`, `"directories":[]`, `"absent":[]`} {
+	for _, field := range []string{`"files":[]`, `"directories":[]`, `"absent":[]`, `"trackedIgnored":[]`} {
 		if !strings.Contains(output.String(), field) {
 			test.Errorf("an empty inputs record wrote %s, want %s in it", output.String(), field)
 		}
@@ -643,6 +647,9 @@ func TestInputsRecordRoundTrips(test *testing.T) {
 		Files:       []string{"/goroot/VERSION", "/project/a.go", "/project/go.mod"},
 		Directories: []string{"/project", "/project/nested"},
 		Absent:      []string{"/go.work", "/project/go.sum"},
+		TrackedIgnored: []TrackedIgnoredScope{
+			{Index: "/repository/.git/index", Root: "/repository", Scope: "project"},
+		},
 	}
 	var first bytes.Buffer
 	writer := NewWriter(&first)

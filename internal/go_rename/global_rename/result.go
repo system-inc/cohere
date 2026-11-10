@@ -32,6 +32,9 @@ type Result struct {
 	platforms []workspace.Platform
 	// platformKeys are, by platform, the candidates that reach a package holding a file only that platform builds.
 	platformKeys map[workspace.Platform]map[Key]bool
+	// platformFingerprints are, by platform, the fingerprint of each platform's load the plan read, taken before any
+	// rename, which the platform's proof reads in place of loading the platform again (ProvePlatform).
+	platformFingerprints map[workspace.Platform]unrenamedFingerprint
 }
 
 // Platforms are the platforms the plan read files under, in order, each of which the rewrite must be proven under

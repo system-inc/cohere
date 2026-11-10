@@ -283,6 +283,12 @@ public struct AbbreviationVocabulary: Sendable {
         return "Use \(quoted(candidates)), whichever it means."
     }
 
+    /* The entry for an abbreviation a finding names, whichever form it matched in: the file-name rule reads its expansions and advice, as Go's reads the finding's entry. */
+    func entry(for abbreviation: String) -> Entry? {
+        wholeByName[abbreviation]
+            ?? (earlyPrefixes + suffixes + latePrefixes + segments).first { $0.abbreviation == abbreviation }
+    }
+
     /* What the vocabulary reports for a name, if anything, in the order the Go rule has always used. */
     public func find(_ name: String) -> Finding? {
         if allowedNames.contains(name) {

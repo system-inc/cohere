@@ -41,21 +41,20 @@ type Diagnostic struct {
 }
 
 // diagnostics is every error in the graph the roots reach, and every test function go test would refuse in
-// the analyzed test variants, each once, sorted. The same error is often reported by both p and
+// the test variants to analyze, each once, sorted. The same error is often reported by both p and
 // "p [p.test]", and go list names the first wrongly signed test function on go test's main as well, with the
 // position in its message, so a diagnostic is one per file, position and message whatever its kind; the
-// signature check goes first so its kind is the one kept. testFunctions is each analyzed test variant's refused
-// test functions, judged as it was type-checked (testFunctionDiagnostics), since by the load's end an analysis
-// beside it may have let the variant's syntax go.
+// signature check goes first so its kind is the one kept. testFunctions is each test variant to analyze's refused
+// test functions, by root, judged as it was type-checked (testFunctionDiagnostics), since by the load's end an
+// analysis beside it may have let the variant's syntax go.
 func diagnostics(
 	workspace string,
 	roots []*packages.Package,
-	analyzedPackages []*packages.Package,
 	testFunctions map[*packages.Package][]Diagnostic,
 ) []Diagnostic {
 	var found []Diagnostic
-	for _, analyzedPackage := range analyzedPackages {
-		found = append(found, testFunctions[analyzedPackage]...)
+	for _, root := range roots {
+		found = append(found, testFunctions[root]...)
 	}
 	packages.Visit(roots, nil, func(visited *packages.Package) {
 		for _, packageError := range visited.Errors {

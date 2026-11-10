@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -21,8 +20,10 @@ import (
 // has no `.git`; that repository's `.git` when it is a file, a worktree's or a submodule's pointer to its git
 // directory; its info/exclude when its `.git` is a directory; and a `.gitignore` in each directory from the
 // repository down to the root and in each directory the load names inside the repository. git's global excludes file
-// is not one: the census never reads it (see package gitignore). At a go.work root the census also reads the
-// repository's index for its gitlinks, so the index is named, which costs a miss whenever git rewrites it.
+// is not one: the census never reads it (see package gitignore). The census also reads the repository's index, since
+// a path git tracks is never ignored, and at a go.work root for its gitlinks too, so the index is named, there or
+// absent, and when there, named again under TrackedIgnored with the repository and the root below it, so the front
+// door keys it on what it decides for the census rather than on bytes git rewrites on every `git status` (#m1daxxk).
 //
 // The rules read more: staticcheck's config analyzer reads a staticcheck.conf in each analyzed package's directory
 // and every directory above it, to the filesystem's root, so each is named, there or absent.
@@ -68,6 +69,7 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 	// The directories the census's ignore rules are read down through, from the root up to the repository's.
 	var above []string
 	repository := ""
+	var trackedIgnored []contract.TrackedIgnoredScope
 	for directory := filepath.Clean(root); ; directory = filepath.Dir(directory) {
 		above = append(above, directory)
 		marker := filepath.Join(directory, ".git")
@@ -79,8 +81,17 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 			} else {
 				files[marker] = true
 			}
-			if engine.described.workspace.FromWorkspace {
-				fileOrAbsent(gitIndex(marker, information.IsDir()))
+			index := filepath.Clean(gitignore.IndexFile(marker, information.IsDir()))
+			fileOrAbsent(index)
+			// The census asks the index only which of the files below the root the ignore rules exclude are tracked,
+			// and a go.work root which of its paths are gitlinks, so the index is keyed on that, below the root.
+			scope, relativeError := filepath.Rel(directory, filepath.Clean(root))
+			if files[index] && relativeError == nil {
+				if scope == "." {
+					scope = ""
+				}
+				trackedIgnored = append(trackedIgnored,
+					contract.TrackedIgnoredScope{Index: index, Root: directory, Scope: filepath.ToSlash(scope)})
 			}
 			break
 		}
@@ -129,9 +140,10 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 	}
 
 	return contract.InputsRecord{
-		Files:       slices.Sorted(maps.Keys(files)),
-		Directories: slices.Sorted(maps.Keys(directories)),
-		Absent:      slices.Sorted(maps.Keys(absent)),
+		Files:          slices.Sorted(maps.Keys(files)),
+		Directories:    slices.Sorted(maps.Keys(directories)),
+		Absent:         slices.Sorted(maps.Keys(absent)),
+		TrackedIgnored: trackedIgnored,
 	}
 }
 
@@ -147,27 +159,4 @@ func (engine *pipeline) buildInputs() []load.Inputs {
 		inputs = append(inputs, run.inputs)
 	}
 	return inputs
-}
-
-// gitIndex is the index git reads for the repository whose `.git` is marker: `.git/index` when it is a directory, and
-// the index in the git directory a `.git` file points to, a worktree's or a submodule's, when it is a file. A pointer
-// that cannot be read gives `.git/index` below the file, which is never there; git cannot read such a repository
-// either, so the census refuses the run and no record is written.
-func gitIndex(marker string, isDirectory bool) string {
-	if isDirectory {
-		return filepath.Join(marker, "index")
-	}
-	contents, readError := os.ReadFile(marker)
-	if readError != nil {
-		return filepath.Join(marker, "index")
-	}
-	gitDirectory, found := strings.CutPrefix(strings.TrimSpace(string(contents)), "gitdir:")
-	if !found {
-		return filepath.Join(marker, "index")
-	}
-	gitDirectory = strings.TrimSpace(gitDirectory)
-	if !filepath.IsAbs(gitDirectory) {
-		gitDirectory = filepath.Join(filepath.Dir(marker), gitDirectory)
-	}
-	return filepath.Join(filepath.Clean(gitDirectory), "index")
 }

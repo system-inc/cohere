@@ -1,0 +1,11 @@
+{
+    "why": "af11: a file under a third_party folder is someone else's, and is not judged",
+    "expect": [],
+    "options": {},
+    "path": "third_party/cfg",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

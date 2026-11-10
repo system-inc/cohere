@@ -4,12 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
@@ -201,6 +207,47 @@ func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
 	}
 }
 
+// A platform's load of the round's base is made afresh for every call and kept by nothing once its reader lets go: the
+// plan reads it once and keeps its fingerprint, and a load kept for the round held each platform's whole load live
+// beside the proof's (#djk8cfd).
+func TestAPlatformLoadIsMadeForEachCallAndKeptByNone(test *testing.T) {
+	test.Parallel()
+
+	engine, loaded := renamingPipelineOver(test, "rename-platforms")
+	space := workspace.FromLoaded(engine.described.workspace.Root, loaded.Roots, loaded.Packages, nil)
+	loadPlatform := engine.platformLoad(space, nil)
+	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
+	first, firstError := loadPlatform(windows, nil)
+	if firstError != nil {
+		test.Fatal(firstError)
+	}
+	second, secondError := loadPlatform(windows, nil)
+	if secondError != nil {
+		test.Fatal(secondError)
+	}
+	if first == second {
+		test.Fatal("the second load of windows/amd64's base was the first's, so the round keeps platform loads")
+	}
+
+	freed := make(chan struct{})
+	runtime.AddCleanup(first, func(done chan struct{}) { close(done) }, freed)
+	first = nil
+	deadline := time.Now().Add(10 * time.Second)
+	for waiting := true; waiting; {
+		runtime.GC()
+		select {
+		case <-freed:
+			waiting = false
+		case <-time.After(10 * time.Millisecond):
+			if time.Now().After(deadline) {
+				test.Fatal("a platform load its reader let go was still reachable after 10s of collections")
+			}
+		}
+	}
+	runtime.KeepAlive(loadPlatform)
+	runtime.KeepAlive(second)
+}
+
 // A platform's proof requires every identifier of a file only it builds to resolve to the declaration it did, not only
 // that the platform still type-checks it. The rewrite here renames maxBytes in limits.go and, as a twin edit, in the
 // file only windows builds, where a local already holds the new name: the use becomes the local's, windows still
@@ -314,5 +361,58 @@ func TestANamingRuleLearningFactsThroughItsRequirementsGetsOneRound(test *testin
 		"asked for again after a round"
 	if !strings.Contains(standardError.String(), note) {
 		test.Fatalf("want stderr to say %q, got:\n%s", note, standardError.String())
+	}
+}
+
+// The rename's loads to plan over keep no dependency's syntax or type maps, which the plan never reads and which are
+// most of a load's memory: the first load to plan over (rename) and every platform's (platformLoad, which each
+// platform's proof loads through too). The host's proof (prove) keeps them, since the last round's proof is the load
+// the lint phase lints after the rename writes. Read from the rename's source, each function by the loads it asks of
+// loadPackages, the engine's one caller of package load's loads, and whether each asks for the roots' syntax alone.
+func TestTheRenamesPlanLoadsKeepOnlyTheRootsSyntax(test *testing.T) {
+	test.Parallel()
+
+	fileSet := token.NewFileSet()
+	parsed, parseError := parser.ParseFile(fileSet, "pipeline_engine_rename.go", nil, parser.SkipObjectResolution)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	loadsBy := map[string][]string{}
+	for _, declaration := range parsed.Decls {
+		function, isFunction := declaration.(*ast.FuncDecl)
+		if !isFunction {
+			continue
+		}
+		ast.Inspect(function, func(node ast.Node) bool {
+			literal, isLiteral := node.(*ast.CompositeLit)
+			if !isLiteral {
+				return true
+			}
+			if typeName, isIdentifier := literal.Type.(*ast.Ident); !isIdentifier || typeName.Name != "loadRequest" {
+				return true
+			}
+			syntax := "whole"
+			for _, element := range literal.Elts {
+				field, isField := element.(*ast.KeyValueExpr)
+				if !isField {
+					continue
+				}
+				key, keyIsIdentifier := field.Key.(*ast.Ident)
+				value, valueIsIdentifier := field.Value.(*ast.Ident)
+				if keyIsIdentifier && key.Name == "rootSyntaxOnly" && valueIsIdentifier && value.Name == "true" {
+					syntax = "roots only"
+				}
+			}
+			loadsBy[function.Name.Name] = append(loadsBy[function.Name.Name], syntax)
+			return true
+		})
+	}
+	want := map[string][]string{
+		"rename":       {"roots only"},
+		"platformLoad": {"roots only"},
+		"prove":        {"whole"},
+	}
+	if !maps.EqualFunc(loadsBy, want, slices.Equal) {
+		test.Fatalf("want the rename's loads %v, got %v", want, loadsBy)
 	}
 }

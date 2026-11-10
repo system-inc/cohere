@@ -9,7 +9,7 @@ import (
 // engineImplementation runs whichever wired rule owns a fixture, and declines the rest.
 //
 // This is the `react_conformance.Implementation` the harness was written against and never had. A
-// fixture whose attributed rule has no wired entry returns ErrUnsupported rather than an empty
+// fixture whose attributed rule has no wired entry returns UnsupportedError rather than an empty
 // Result, which is the whole distinction `score.go` draws: an empty Result claims "I looked and
 // found nothing", and on a corpus where every fixture expects at least one error that claim is a
 // wrong answer rather than an absent one.
@@ -20,7 +20,7 @@ func (implementation engineImplementation) Analyze(
 ) (react_conformance.Result, error) {
 	rules, complete := fixture.Rules()
 	if !complete {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
 			Reason: "not every diagnostic could be attributed to an upstream rule",
 		}
 	}
@@ -29,13 +29,13 @@ func (implementation engineImplementation) Analyze(
 	// rule. A mixed fixture would be judged against one rule while expecting another's findings,
 	// which manufactures a failure neither rule earned.
 	if len(rules) != 1 {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
 			Reason: "fixture spans more than one upstream rule, so no single rule can be scored against it",
 		}
 	}
 	subject, wired := Rules[rules[0]]
 	if !wired {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
 			Reason: "no rule engine wired for upstream rule " + rules[0],
 		}
 	}

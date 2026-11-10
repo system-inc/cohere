@@ -1,6 +1,6 @@
 {"kind":"provenance","contract":3,"engine":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
 {"kind":"project","root":"/project","package":"example.com/options","elapsedMilliseconds":0,"filesInPackage":1,"filesOurs":1,"filesInScope":1,"scopeDescription":"","targets":[{"name":"example.com/options","kind":"module","files":1,"languageMode":"1.24"}],"excluded":[]}
-{"kind":"fix","filesConsidered":1,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every Go file in the module","changedFiles":[]}
+{"kind":"fix","filesConsidered":1,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every Go file in the module","changedFiles":[],"notWritten":[]}
 {"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"types","diagnostics":0,"files":1,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"go list -deps with go test's variants built here, each package type-checked from source unless the findings cache holds its export data: N packages, 1 in the workspace","withheldInDependencyCgo":[],"withheldDependencyCgoDeclarations":0,"cgoTranslation":{"packages":0,"milliseconds":0}}
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":0,"detail":""}
@@ -8,5 +8,5 @@
 {"kind":"lint","findings":1,"rulesRun":4,"filesWalked":1,"nodesVisited":10,"elapsedMilliseconds":0,"reusedFrom":"","rulesSilent":["cohere-go/correctness-require-package-option"],"rulesWatchedAndQuiet":2,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":["cohere-go/correctness-require-package-option"],"configNote":"","withheldBySuppression":{},"withheldAsGenerated":{},"withheldAsCopied":{},"cache":{"on":true,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,"factsSkipped":0,"waves":0}}
 {"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
-{"kind":"inputs","files":["/project/.git/info/exclude","/project/CohereSettings.json","/project/go.mod","/project/options.go"],"directories":["/project"],"absent":["/project/.gitignore","/project/go.sum","/project/go.work","/project/staticcheck.conf","/project/vendor/modules.txt"]}
+{"kind":"inputs","files":["/project/.git/info/exclude","/project/CohereSettings.json","/project/go.mod","/project/options.go"],"directories":["/project"],"absent":["/project/.git/index","/project/.gitignore","/project/go.sum","/project/go.work","/project/staticcheck.conf","/project/vendor/modules.txt"],"trackedIgnored":[]}
 {"kind":"summary","findings":1,"complete":true,"exitCode":1}

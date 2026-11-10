@@ -291,7 +291,7 @@ const tsConfigText = `{
 // Analyze runs one cohere rule over one fixture and returns what it found, in the shape the
 // conformance comparison expects.
 //
-// It returns `ErrUnsupported` rather than an empty Result for anything that stopped the rule from
+// It returns `UnsupportedError` rather than an empty Result for anything that stopped the rule from
 // being asked at all: a parse failure, a missing checker. An empty Result is the claim "this rule
 // found nothing here", which on this corpus is a wrong answer rather than an absent one, and the
 // two have to stay in different columns.
@@ -336,14 +336,14 @@ func Analyze(
 		SingleThreaded:   true,
 	})
 	if buildError != nil {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
 			Reason: "the fixture does not parse: " + buildError.Error(),
 		}
 	}
 
 	projectFiles := graph.ProjectFiles()
 	if len(projectFiles) == 0 {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
 			Reason: "the fixture produced no project files",
 		}
 	}
@@ -356,7 +356,7 @@ func Analyze(
 		}
 	}
 	if sourceFile == nil {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
 			Reason: "the fixture is not in the built program",
 		}
 	}
@@ -373,7 +373,8 @@ func Analyze(
 		// with an empty Result therefore survives the suite, because nothing can reach it. Kept
 		// rather than deleted: the cost is one comparison and the branch is what stands between a
 		// future construction that can produce a nil checker and a silent wrong answer.
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "no type checker for the fixture"}
+		return react_conformance.Result{},
+			&react_conformance.UnsupportedError{Reason: "no type checker for the fixture"}
 	}
 
 	var diagnostics []rule.Diagnostic
@@ -450,7 +451,7 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 		SingleThreaded:   true,
 	})
 	if buildError != nil {
-		return nil, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + buildError.Error()}
+		return nil, &react_conformance.UnsupportedError{Reason: "the fixture does not parse: " + buildError.Error()}
 	}
 
 	var sourceFile *ast.SourceFile
@@ -461,7 +462,7 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 		}
 	}
 	if sourceFile == nil {
-		return nil, &react_conformance.ErrUnsupported{Reason: "the fixture is not in the built program"}
+		return nil, &react_conformance.UnsupportedError{Reason: "the fixture is not in the built program"}
 	}
 
 	fileChecker, release := graph.CheckerForFile(context.Background(), sourceFile)
