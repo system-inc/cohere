@@ -358,12 +358,12 @@ var SwitchExhaustivenessCheck = rule.Rule[SwitchExhaustivenessCheckOptions]{
 					return
 				}
 
-				stmt := node.AsSwitchStatement()
+				statement := node.AsSwitchStatement()
 
-				metadata := getSwitchMetadata(stmt)
-				checkSwitchExhaustive(stmt, metadata)
+				metadata := getSwitchMetadata(statement)
+				checkSwitchExhaustive(statement, metadata)
 				checkSwitchUnnecessaryDefaultCase(metadata)
-				checkSwitchNoUnionDefaultCase(stmt, metadata)
+				checkSwitchNoUnionDefaultCase(statement, metadata)
 			},
 		}
 	},

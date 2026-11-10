@@ -41,7 +41,7 @@ func (builder *Builder[E]) patternReads(node *ast.Node) {
 
 	default:
 		// A member target such as `obj.x` or `obj[k]` evaluates its receiver.
-		builder.expr(node)
+		builder.expression(node)
 	}
 }
 
@@ -117,7 +117,7 @@ func (builder *Builder[E]) patternBind(node *ast.Node) {
 				continue
 			}
 			if binding.PropertyName != nil && binding.PropertyName.Kind == ast.KindComputedPropertyName {
-				builder.expr(binding.PropertyName.AsComputedPropertyName().Expression)
+				builder.expression(binding.PropertyName.AsComputedPropertyName().Expression)
 			}
 			builder.bindWithDefault(binding.Name(), binding.Initializer)
 		}
@@ -128,7 +128,7 @@ func (builder *Builder[E]) patternBind(node *ast.Node) {
 			case ast.KindPropertyAssignment:
 				assignment := property.AsPropertyAssignment()
 				if name := assignment.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
-					builder.expr(name.AsComputedPropertyName().Expression)
+					builder.expression(name.AsComputedPropertyName().Expression)
 				}
 				builder.patternBind(assignment.Initializer)
 			case ast.KindShorthandPropertyAssignment:
@@ -153,11 +153,11 @@ func (builder *Builder[E]) patternBind(node *ast.Node) {
 			builder.bindWithDefault(binary.Left, binary.Right)
 			return
 		}
-		builder.expr(node)
+		builder.expression(node)
 
 	default:
 		// A member target such as `obj.x` or `obj[k]` evaluates its receiver.
-		builder.expr(node)
+		builder.expression(node)
 	}
 }
 
@@ -172,7 +172,7 @@ func (builder *Builder[E]) bindWithDefault(target *ast.Node, fallback *ast.Node)
 		builder.link(builder.current, withFallback)
 
 		builder.enter(withFallback)
-		builder.expr(fallback)
+		builder.expression(fallback)
 		builder.link(builder.current, join)
 
 		builder.enter(join)

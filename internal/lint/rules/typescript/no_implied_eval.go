@@ -225,9 +225,9 @@ var NoImpliedEval = rule.Rule[rule.NoOptions]{
 						return node.Name().AsIdentifier().Text
 					}
 				} else if ast.IsElementAccessExpression(node) {
-					expr := node.AsElementAccessExpression()
-					if ast.IsStringLiteral(expr.ArgumentExpression) {
-						return expr.ArgumentExpression.AsStringLiteral().Text
+					expression := node.AsElementAccessExpression()
+					if ast.IsStringLiteral(expression.ArgumentExpression) {
+						return expression.ArgumentExpression.AsStringLiteral().Text
 					}
 				}
 			}

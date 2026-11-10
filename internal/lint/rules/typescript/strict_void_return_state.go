@@ -246,14 +246,14 @@ func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	isMethod := node.Kind == ast.KindMethodDeclaration || node.Kind == ast.KindGetAccessor
 	if !isArrow && !isFunctionExpression && !isMethod {
 		// Not a function literal, so there is nothing to point inside. Upstream reports the node.
-		state.ruleContext.ReportNode(node, strictVoidReturnNonVoidFuncMessage())
+		state.ruleContext.ReportNode(node, strictVoidReturnNonVoidFunctionMessage())
 		return
 	}
 
 	if strictVoidReturnIsGenerator(node) {
 		state.ruleContext.ReportRange(
 			strictVoidReturnHeadRange(state.ruleContext, node),
-			strictVoidReturnNonVoidFuncMessage(),
+			strictVoidReturnNonVoidFunctionMessage(),
 		)
 		return
 	}
@@ -261,7 +261,7 @@ func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	if strictVoidReturnIsAsync(node) {
 		state.ruleContext.ReportRange(
 			strictVoidReturnHeadRange(state.ruleContext, node),
-			strictVoidReturnAsyncFuncMessage(),
+			strictVoidReturnAsyncFunctionMessage(),
 		)
 		return
 	}
@@ -286,7 +286,7 @@ func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	// function.
 	if annotation := strictVoidReturnTypeAnnotation(node); annotation != nil {
 		if annotation.Kind != ast.KindVoidKeyword {
-			state.ruleContext.ReportNode(annotation, strictVoidReturnNonVoidFuncMessage())
+			state.ruleContext.ReportNode(annotation, strictVoidReturnNonVoidFunctionMessage())
 			return
 		}
 	}

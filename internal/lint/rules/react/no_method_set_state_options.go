@@ -17,9 +17,9 @@ import (
 // `{"mode": "disallow-in-func"}`, and accepted oxc's `"allowed"`; no ESLint version accepts any of
 // those, and all of them are now refused.
 type NoMethodSetStateOptions struct {
-	// DisallowInFunc also reports a `setState` written inside a function nested in the lifecycle
+	// DisallowInFunction also reports a `setState` written inside a function nested in the lifecycle
 	// method, rather than only one written directly in its body. Off by default.
-	DisallowInFunc bool
+	DisallowInFunction bool
 }
 
 // DecodeNoMethodSetStateOptions reads the option all three rules share.
@@ -40,6 +40,6 @@ func DecodeNoMethodSetStateOptions(raw []byte) (NoMethodSetStateOptions, error) 
 	if mode != "disallow-in-func" {
 		return options, fmt.Errorf(`mode %q is not "disallow-in-func", the only value upstream accepts`, mode)
 	}
-	options.DisallowInFunc = true
+	options.DisallowInFunction = true
 	return options, nil
 }

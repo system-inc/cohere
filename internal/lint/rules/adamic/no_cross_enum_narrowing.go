@@ -44,8 +44,8 @@ var NoCrossEnumNarrowing = rule.Rule[rule.NoOptions]{
 				}
 				declaredTypes := crossEnumDeclaredTypes(ruleContext.TypeChecker, sides[1])
 				var declared []crossEnumMember
-				for _, typ := range declaredTypes {
-					declared = append(declared, crossEnumMembers(ruleContext.TypeChecker, typ)...)
+				for _, declaredType := range declaredTypes {
+					declared = append(declared, crossEnumMembers(ruleContext.TypeChecker, declaredType)...)
 				}
 				for _, other := range compared {
 					if !crossEnumHasNarrowingConstituent(other, declaredTypes, declared) {
@@ -62,8 +62,8 @@ var NoCrossEnumNarrowing = rule.Rule[rule.NoOptions]{
 						ruleContext.ReportNode(node, rule.Message{
 							Id: "crossEnumNarrowing",
 							Description: crossEnumNarrowingText.Render(map[string]string{
-								"other":  type_checking.StableTypeText(ruleContext.TypeChecker, other.typ),
-								"member": type_checking.StableTypeText(ruleContext.TypeChecker, member.typ),
+								"other":  type_checking.StableTypeText(ruleContext.TypeChecker, other.literalType),
+								"member": type_checking.StableTypeText(ruleContext.TypeChecker, member.literalType),
 								"value":  value,
 							}),
 						})
@@ -102,17 +102,17 @@ var NoCrossEnumNarrowing = rule.Rule[rule.NoOptions]{
 // (TypeScript's SyntaxKind, typescript-eslint's AST_NODE_TYPES) decomposes hundreds of members, and
 // printing each one cost ahra's cold run two minutes of CPU.
 type crossEnumMember struct {
-	enum  *ast.Symbol
-	value any
-	typ   *checker.Type
+	enum        *ast.Symbol
+	value       any
+	literalType *checker.Type
 }
 
-func crossEnumMembers(tc *checker.Checker, typ *checker.Type) []crossEnumMember {
+func crossEnumMembers(tc *checker.Checker, declaredType *checker.Type) []crossEnumMember {
 	var result []crossEnumMember
-	if typ == nil {
+	if declaredType == nil {
 		return result
 	}
-	for _, part := range type_checking.UnionTypeParts(typ) {
+	for _, part := range type_checking.UnionTypeParts(declaredType) {
 		if part.Flags()&checker.TypeFlagsEnumLiteral == 0 ||
 			part.Flags()&(checker.TypeFlagsNumberLiteral|checker.TypeFlagsStringLiteral) == 0 {
 			continue
@@ -121,7 +121,7 @@ func crossEnumMembers(tc *checker.Checker, typ *checker.Type) []crossEnumMember 
 		if owner == nil {
 			continue
 		}
-		result = append(result, crossEnumMember{enum: owner, value: part.AsLiteralType().Value(), typ: part})
+		result = append(result, crossEnumMember{enum: owner, value: part.AsLiteralType().Value(), literalType: part})
 	}
 	return result
 }
@@ -135,13 +135,15 @@ func crossEnumHasNarrowingConstituent(other crossEnumMember, types []*checker.Ty
 			return true
 		}
 	}
-	for _, typ := range types {
-		for _, part := range type_checking.UnionTypeParts(typ) {
+	for _, declaredType := range types {
+		for _, part := range type_checking.UnionTypeParts(declaredType) {
 			if part.Flags()&checker.TypeFlagsUnknown != 0 {
 				return true
 			}
-			if part.Flags()&checker.TypeFlagsNumber != 0 && other.typ.Flags()&checker.TypeFlagsNumberLiteral != 0 ||
-				part.Flags()&checker.TypeFlagsString != 0 && other.typ.Flags()&checker.TypeFlagsStringLiteral != 0 {
+			if part.Flags()&checker.TypeFlagsNumber != 0 &&
+				other.literalType.Flags()&checker.TypeFlagsNumberLiteral != 0 ||
+				part.Flags()&checker.TypeFlagsString != 0 &&
+					other.literalType.Flags()&checker.TypeFlagsStringLiteral != 0 {
 				return true
 			}
 		}
@@ -165,10 +167,10 @@ func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type
 		receiver, key = access.Expression, access.Name().Text()
 	case ast.KindElementAccessExpression:
 		access := unwrapped.AsElementAccessExpression()
-		typ := tc.GetTypeAtLocation(access.ArgumentExpression)
-		if typ != nil && typ.Flags()&checker.TypeFlagsStringLiteral != 0 {
+		argumentType := tc.GetTypeAtLocation(access.ArgumentExpression)
+		if argumentType != nil && argumentType.Flags()&checker.TypeFlagsStringLiteral != 0 {
 			// A string literal type's value is a string; on a miss the receiver stays nil and nothing is recovered
-			if value, isString := typ.AsLiteralType().Value().(string); isString {
+			if value, isString := argumentType.AsLiteralType().Value().(string); isString {
 				receiver, key = access.Expression, value
 			}
 		}
@@ -179,8 +181,8 @@ func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type
 		// node.parent.type expands every member's parent into every member again.
 		var slots []*checker.Type
 		seen := map[*checker.Type]bool{}
-		for _, typ := range crossEnumDeclaredTypes(tc, receiver) {
-			for _, part := range type_checking.UnionTypeParts(typ) {
+		for _, receiverType := range crossEnumDeclaredTypes(tc, receiver) {
+			for _, part := range type_checking.UnionTypeParts(receiverType) {
 				if property := checker.Checker_getPropertyOfType(tc, part, key); property != nil {
 					slot := checker.Checker_getTypeOfSymbol(tc, property)
 					if !seen[slot] {
@@ -202,11 +204,11 @@ func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type
 
 // Unknown computed members still have an enum identity. They cannot supply a
 // known runtime value, but must not hide the known members of their enum.
-func crossEnumOwner(tc *checker.Checker, typ *checker.Type) *ast.Symbol {
-	if typ == nil {
+func crossEnumOwner(tc *checker.Checker, literalType *checker.Type) *ast.Symbol {
+	if literalType == nil {
 		return nil
 	}
-	symbol := checker.Type_symbol(typ)
+	symbol := checker.Type_symbol(literalType)
 	if symbol == nil || symbol.Flags&ast.SymbolFlagsEnumMember == 0 {
 		return nil
 	}

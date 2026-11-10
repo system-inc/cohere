@@ -489,15 +489,15 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 
 			// First, check expressions whose resulting types may not be promise-like
 			if ast.IsCommaExpression(node) {
-				expr := node.AsBinaryExpression()
+				expression := node.AsBinaryExpression()
 				// Any child in a comma expression could return a potentially unhandled
 				// promise, so we check them all regardless of whether the final returned
 				// value is promise-like.
-				isUnhandled, nonFunctionHandler, promiseArray := isUnhandledPromise(expr.Left)
+				isUnhandled, nonFunctionHandler, promiseArray := isUnhandledPromise(expression.Left)
 				if isUnhandled {
 					return isUnhandled, nonFunctionHandler, promiseArray
 				}
-				return isUnhandledPromise(expr.Right)
+				return isUnhandledPromise(expression.Right)
 			}
 
 			if !*settings.IgnoreVoid && ast.IsVoidExpression(node) {
@@ -530,8 +530,8 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 				// If the outer expression is a call, a `.catch()` or `.then()` with
 				// rejection handler handles the promise.
 
-				callExpr := node.AsCallExpression()
-				callee := callExpr.Expression
+				callExpression := node.AsCallExpression()
+				callee := callExpression.Expression
 				if ast.IsAccessExpression(callee) {
 					// Upstream reads the name with `getStaticMemberAccessValue`. This port reads it with
 					// `Checker_getAccessedPropertyName`, which the Go port it came from called an enhancement
@@ -539,14 +539,14 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 					// pins it.
 					methodName, _ := checker.Checker_getAccessedPropertyName(ruleContext.TypeChecker, callee)
 
-					if methodName == "catch" && len(callExpr.Arguments.Nodes) >= 1 {
-						if isValidRejectionHandler(callExpr.Arguments.Nodes[0]) {
+					if methodName == "catch" && len(callExpression.Arguments.Nodes) >= 1 {
+						if isValidRejectionHandler(callExpression.Arguments.Nodes[0]) {
 							return false, false, false
 						}
 						return true, true, false
 					}
-					if methodName == "then" && len(callExpr.Arguments.Nodes) >= 2 {
-						if isValidRejectionHandler(callExpr.Arguments.Nodes[1]) {
+					if methodName == "then" && len(callExpression.Arguments.Nodes) >= 2 {
+						if isValidRejectionHandler(callExpression.Arguments.Nodes[1]) {
 							return false, false, false
 						}
 						return true, true, false
@@ -563,23 +563,23 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 			}
 
 			if node.Kind == ast.KindConditionalExpression {
-				expr := node.AsConditionalExpression()
+				expression := node.AsConditionalExpression()
 				// We must be getting the promise-like value from one of the branches of the
 				// ternary. Check them directly.
-				isUnhandled, nonFunctionHandler, promiseArray := isUnhandledPromise(expr.WhenFalse)
+				isUnhandled, nonFunctionHandler, promiseArray := isUnhandledPromise(expression.WhenFalse)
 				if isUnhandled {
 					return isUnhandled, nonFunctionHandler, promiseArray
 				}
-				return isUnhandledPromise(expr.WhenTrue)
+				return isUnhandledPromise(expression.WhenTrue)
 			}
 
 			if ast.IsLogicalOrCoalescingBinaryExpression(node) {
-				expr := node.AsBinaryExpression()
-				isUnhandled, nonFunctionHandler, promiseArray := isUnhandledPromise(expr.Left)
+				expression := node.AsBinaryExpression()
+				isUnhandled, nonFunctionHandler, promiseArray := isUnhandledPromise(expression.Left)
 				if isUnhandled {
 					return isUnhandled, nonFunctionHandler, promiseArray
 				}
-				return isUnhandledPromise(expr.Right)
+				return isUnhandledPromise(expression.Right)
 			}
 
 			// Anything else is unhandled.
@@ -592,13 +592,13 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 					return
 				}
 
-				exprStatement := node.AsExpressionStatement()
+				expressionStatement := node.AsExpressionStatement()
 
-				if *settings.IgnoreIife && isAsyncIife(exprStatement) {
+				if *settings.IgnoreIife && isAsyncIife(expressionStatement) {
 					return
 				}
 
-				expression := ast.SkipParentheses(exprStatement.Expression)
+				expression := ast.SkipParentheses(expressionStatement.Expression)
 
 				if isKnownSafePromiseReturn(expression) {
 					return
@@ -628,7 +628,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 					ruleContext.ReportNodeWithSuggestions(node, message, rule.Suggestion{
 						Message: buildFloatingFixVoidMessage(),
 						Fixes: (func() []rule.Fix {
-							if isHigherPrecedenceThanUnary(exprStatement.Expression) {
+							if isHigherPrecedenceThanUnary(expressionStatement.Expression) {
 								return []rule.Fix{ruleContext.InsertBefore(node, "void ")}
 							}
 							return []rule.Fix{
@@ -638,7 +638,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 						})(),
 					}, rule.Suggestion{
 						Message: buildFloatingFixAwaitMessage(),
-						Fixes:   addAwait(expression, exprStatement),
+						Fixes:   addAwait(expression, expressionStatement),
 					})
 				} else {
 					var message rule.Message
@@ -649,7 +649,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 					}
 					ruleContext.ReportNodeWithSuggestions(node, message, rule.Suggestion{
 						Message: buildFloatingFixAwaitMessage(),
-						Fixes:   addAwait(expression, exprStatement),
+						Fixes:   addAwait(expression, expressionStatement),
 					})
 				}
 			},

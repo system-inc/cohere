@@ -10,8 +10,8 @@ func (builder *Builder[E]) statements(list *ast.NodeList) {
 	if list == nil {
 		return
 	}
-	for _, stmt := range list.Nodes {
-		builder.statement(stmt)
+	for _, statement := range list.Nodes {
+		builder.statement(statement)
 	}
 }
 
@@ -29,7 +29,7 @@ func (builder *Builder[E]) statement(node *ast.Node) {
 		builder.variableDeclarationList(node.AsVariableStatement().DeclarationList)
 
 	case ast.KindExpressionStatement:
-		builder.expr(node.AsExpressionStatement().Expression)
+		builder.expression(node.AsExpressionStatement().Expression)
 
 	case ast.KindIfStatement:
 		builder.ifStatement(node)
@@ -56,11 +56,11 @@ func (builder *Builder[E]) statement(node *ast.Node) {
 		builder.labeledStatement(node)
 
 	case ast.KindReturnStatement:
-		builder.expr(node.AsReturnStatement().Expression)
+		builder.expression(node.AsReturnStatement().Expression)
 		builder.makeReturn()
 
 	case ast.KindThrowStatement:
-		builder.expr(node.AsThrowStatement().Expression)
+		builder.expression(node.AsThrowStatement().Expression)
 		builder.makeThrow()
 
 	case ast.KindBreakStatement:
@@ -71,7 +71,7 @@ func (builder *Builder[E]) statement(node *ast.Node) {
 
 	case ast.KindWithStatement:
 		with := node.AsWithStatement()
-		builder.expr(with.Expression)
+		builder.expression(with.Expression)
 		builder.statement(with.Statement)
 
 	case ast.KindEmptyStatement, ast.KindDebuggerStatement,
@@ -84,7 +84,7 @@ func (builder *Builder[E]) statement(node *ast.Node) {
 		builder.classLike(node)
 
 	case ast.KindExportAssignment:
-		builder.expr(node.AsExportAssignment().Expression)
+		builder.expression(node.AsExportAssignment().Expression)
 
 	case ast.KindExportDeclaration:
 		// Export bindings are resolved statically; nothing is evaluated.
@@ -120,12 +120,12 @@ func (builder *Builder[E]) variableDeclaration(node *ast.Node) {
 	}
 	// A `typeof x` inside the annotation references the variable, so the
 	// annotation is walked even though nothing in it runs.
-	builder.expr(decl.Type)
+	builder.expression(decl.Type)
 	name := decl.Name()
 	if name != nil && (name.Kind == ast.KindObjectBindingPattern || name.Kind == ast.KindArrayBindingPattern) {
 		// Run-time evaluation order: the initializer produces the value
 		// first, then the pattern binds element by element.
-		builder.expr(decl.Initializer)
+		builder.expression(decl.Initializer)
 		builder.patternBind(name)
 		return
 	}
@@ -135,27 +135,27 @@ func (builder *Builder[E]) variableDeclaration(node *ast.Node) {
 		return
 	}
 	builder.patternReads(name)
-	builder.expr(decl.Initializer)
+	builder.expression(decl.Initializer)
 	builder.patternWrites(name)
 }
 
 func (builder *Builder[E]) ifStatement(node *ast.Node) {
-	stmt := node.AsIfStatement()
+	statement := node.AsIfStatement()
 	after := builder.newBlock()
 	thenEntry := builder.newBlock()
 	elseEntry := after
-	if stmt.ElseStatement != nil {
+	if statement.ElseStatement != nil {
 		elseEntry = builder.newBlock()
 	}
-	builder.condition(stmt.Expression, thenEntry, elseEntry)
+	builder.condition(statement.Expression, thenEntry, elseEntry)
 
 	builder.enter(thenEntry)
-	builder.statement(stmt.ThenStatement)
+	builder.statement(statement.ThenStatement)
 	builder.link(builder.current, after)
 
-	if stmt.ElseStatement != nil {
+	if statement.ElseStatement != nil {
 		builder.enter(elseEntry)
-		builder.statement(stmt.ElseStatement)
+		builder.statement(statement.ElseStatement)
 		builder.link(builder.current, after)
 	}
 
@@ -163,21 +163,21 @@ func (builder *Builder[E]) ifStatement(node *ast.Node) {
 }
 
 func (builder *Builder[E]) whileStatement(node *ast.Node) {
-	stmt := node.AsWhileStatement()
+	statement := node.AsWhileStatement()
 	test := builder.newBlock()
 	builder.link(builder.current, test)
 	builder.enter(test)
 	after := builder.newBlock()
 	body := builder.newBlock()
 	falseEntry := after
-	if isAlwaysTruthyTest(stmt.Expression) {
+	if isAlwaysTruthyTest(statement.Expression) {
 		falseEntry = nil
 	}
-	builder.condition(stmt.Expression, body, falseEntry)
+	builder.condition(statement.Expression, body, falseEntry)
 
 	builder.pushJump(node, after, test, node)
 	builder.enter(body)
-	builder.statement(stmt.Statement)
+	builder.statement(statement.Statement)
 	builder.loop(node)
 	builder.link(builder.current, test)
 	builder.popJump()
@@ -186,7 +186,7 @@ func (builder *Builder[E]) whileStatement(node *ast.Node) {
 }
 
 func (builder *Builder[E]) doStatement(node *ast.Node) {
-	stmt := node.AsDoStatement()
+	statement := node.AsDoStatement()
 	body := builder.newBlock()
 	builder.link(builder.current, body)
 	test := builder.newBlock()
@@ -196,15 +196,15 @@ func (builder *Builder[E]) doStatement(node *ast.Node) {
 	// is not what starts another iteration: the test passing is.
 	builder.pushJump(node, after, test, nil)
 	builder.enter(body)
-	builder.statement(stmt.Statement)
+	builder.statement(statement.Statement)
 	builder.link(builder.current, test)
 	builder.popJump()
 
 	builder.enter(test)
-	builder.expr(stmt.Expression)
+	builder.expression(statement.Expression)
 	builder.loop(node)
 	builder.link(builder.current, body)
-	if !isAlwaysTruthyTest(stmt.Expression) {
+	if !isAlwaysTruthyTest(statement.Expression) {
 		builder.link(builder.current, after)
 	}
 
@@ -212,15 +212,15 @@ func (builder *Builder[E]) doStatement(node *ast.Node) {
 }
 
 func (builder *Builder[E]) forStatement(node *ast.Node) {
-	stmt := node.AsForStatement()
-	if stmt.Initializer != nil {
-		if stmt.Initializer.Kind == ast.KindVariableDeclarationList {
-			builder.variableDeclarationList(stmt.Initializer)
+	statement := node.AsForStatement()
+	if statement.Initializer != nil {
+		if statement.Initializer.Kind == ast.KindVariableDeclarationList {
+			builder.variableDeclarationList(statement.Initializer)
 		} else {
-			builder.expr(stmt.Initializer)
+			builder.expression(statement.Initializer)
 		}
 	}
-	if stmt.Condition == nil && stmt.Incrementor == nil {
+	if statement.Condition == nil && statement.Incrementor == nil {
 		// ESLint keeps the body of `for (;;) { ... }` on the loop-header
 		// segment itself. Model that shape as one self-looping block: events at
 		// the top of the body stay on the repeated header, while a branch in the
@@ -230,7 +230,7 @@ func (builder *Builder[E]) forStatement(node *ast.Node) {
 		after := builder.newBlock()
 		builder.pushJump(node, after, body, node)
 		builder.enter(body)
-		builder.statement(stmt.Statement)
+		builder.statement(statement.Statement)
 		builder.loop(node)
 		builder.link(builder.current, body)
 		builder.popJump()
@@ -244,25 +244,25 @@ func (builder *Builder[E]) forStatement(node *ast.Node) {
 	after := builder.newBlock()
 	body := builder.newBlock()
 	falseEntry := after
-	if stmt.Condition == nil || isAlwaysTruthyTest(stmt.Condition) {
+	if statement.Condition == nil || isAlwaysTruthyTest(statement.Condition) {
 		falseEntry = nil
 	}
-	builder.condition(stmt.Condition, body, falseEntry)
+	builder.condition(statement.Condition, body, falseEntry)
 
 	// The incrementor runs after the body and is laid out before it, so a body
 	// that always leaves abruptly does not make it unreachable and lose the
 	// fork a throwable node in it makes.
 	update := test
-	if stmt.Incrementor != nil {
+	if statement.Incrementor != nil {
 		update = builder.newBlock()
 		builder.enterDisconnected(update)
-		builder.expr(stmt.Incrementor)
+		builder.expression(statement.Incrementor)
 		builder.link(builder.current, test)
 	}
 
 	builder.pushJump(node, after, update, node)
 	builder.enter(body)
-	builder.statement(stmt.Statement)
+	builder.statement(statement.Statement)
 	builder.loop(node)
 	builder.link(builder.current, update)
 	builder.popJump()
@@ -271,8 +271,8 @@ func (builder *Builder[E]) forStatement(node *ast.Node) {
 }
 
 func (builder *Builder[E]) forInOfStatement(node *ast.Node) {
-	stmt := node.AsForInOrOfStatement()
-	builder.expr(stmt.Expression)
+	statement := node.AsForInOrOfStatement()
+	builder.expression(statement.Expression)
 
 	head := builder.newBlock()
 	builder.link(builder.current, head)
@@ -285,22 +285,22 @@ func (builder *Builder[E]) forInOfStatement(node *ast.Node) {
 
 	builder.pushJump(node, after, head, node)
 	builder.enter(body)
-	if stmt.Initializer != nil {
+	if statement.Initializer != nil {
 		// The loop variable takes its value from the iteration, so it binds
 		// with no expression of its own; its computed keys and destructuring
 		// defaults evaluate once per iteration.
-		if stmt.Initializer.Kind == ast.KindVariableDeclarationList {
-			declList := stmt.Initializer.AsVariableDeclarationList()
+		if statement.Initializer.Kind == ast.KindVariableDeclarationList {
+			declList := statement.Initializer.AsVariableDeclarationList()
 			if declList != nil && declList.Declarations != nil {
 				for _, decl := range declList.Declarations.Nodes {
 					builder.patternBind(decl.Name())
 				}
 			}
 		} else {
-			builder.patternBind(stmt.Initializer)
+			builder.patternBind(statement.Initializer)
 		}
 	}
-	builder.statement(stmt.Statement)
+	builder.statement(statement.Statement)
 	builder.loop(node)
 	builder.link(builder.current, head)
 	builder.popJump()
@@ -309,13 +309,13 @@ func (builder *Builder[E]) forInOfStatement(node *ast.Node) {
 }
 
 func (builder *Builder[E]) switchStatement(node *ast.Node) {
-	stmt := node.AsSwitchStatement()
-	builder.expr(stmt.Expression)
+	statement := node.AsSwitchStatement()
+	builder.expression(statement.Expression)
 
 	after := builder.newBlock()
 	var clauses []*ast.Node
-	if stmt.CaseBlock != nil {
-		if caseBlock := stmt.CaseBlock.AsCaseBlock(); caseBlock != nil && caseBlock.Clauses != nil {
+	if statement.CaseBlock != nil {
+		if caseBlock := statement.CaseBlock.AsCaseBlock(); caseBlock != nil && caseBlock.Clauses != nil {
 			clauses = caseBlock.Clauses.Nodes
 		}
 	}
@@ -347,7 +347,7 @@ func (builder *Builder[E]) switchStatement(node *ast.Node) {
 			firstCaseIndex = index
 		}
 		builder.current = testCur
-		builder.expr(clause.AsCaseOrDefaultClause().Expression)
+		builder.expression(clause.AsCaseOrDefaultClause().Expression)
 		dispatchFrom[index] = builder.current
 		dispatchEdge[index] = builder.linkWithCycleBarrier(builder.current, bodies[index], false)
 		nextTest := builder.newBlock()
@@ -387,9 +387,9 @@ func (builder *Builder[E]) switchStatement(node *ast.Node) {
 }
 
 func (builder *Builder[E]) tryStatement(node *ast.Node) {
-	stmt := node.AsTryStatement()
-	hasCatch := stmt.CatchClause != nil
-	hasFinally := stmt.FinallyBlock != nil
+	statement := node.AsTryStatement()
+	hasCatch := statement.CatchClause != nil
+	hasFinally := statement.FinallyBlock != nil
 
 	frame := &tryFrame[E]{position: positionTry, hasFinally: hasFinally}
 	if hasCatch {
@@ -400,7 +400,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 	}
 	builder.tryStack = append(builder.tryStack, frame)
 
-	builder.statement(stmt.TryBlock)
+	builder.statement(statement.TryBlock)
 
 	// The normal completion of a `try` statement carries on from the end of its
 	// `try` block and from the end of its `catch` block, whether or not either
@@ -414,7 +414,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 		frame.position = positionCatch
 		frame.thrownForked = false
 		builder.enter(frame.catchEntry)
-		catchClause := stmt.CatchClause.AsCatchClause()
+		catchClause := statement.CatchClause.AsCatchClause()
 		if catchClause.VariableDeclaration != nil {
 			builder.patternBind(catchClause.VariableDeclaration.Name())
 		}
@@ -442,7 +442,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 		builder.link(source, normalEntry)
 	}
 	builder.enter(normalEntry)
-	builder.statement(stmt.FinallyBlock)
+	builder.statement(statement.FinallyBlock)
 	builder.link(builder.current, after)
 
 	if frame.finallyEntry.hasIncoming {
@@ -451,7 +451,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 		// frames lets that copy fork at the same node the first copy did.
 		builder.restoreForks(snapshot)
 		builder.enter(frame.finallyEntry)
-		builder.statement(stmt.FinallyBlock)
+		builder.statement(statement.FinallyBlock)
 		if builder.current.Reachable {
 			// A `return` inside this `try`/`catch` still needs to run every
 			// enclosing `finally` on its way out, not just this one. So this
@@ -481,16 +481,16 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 }
 
 func (builder *Builder[E]) labeledStatement(node *ast.Node) {
-	stmt := node.AsLabeledStatement()
-	if isBreakableStatement(stmt.Statement) {
+	statement := node.AsLabeledStatement()
+	if isBreakableStatement(statement.Statement) {
 		// The label belongs to the loop or switch itself; pushJump reads it
 		// back off the parent chain.
-		builder.statement(stmt.Statement)
+		builder.statement(statement.Statement)
 		return
 	}
 	after := builder.newBlock()
-	builder.jumps = append(builder.jumps, jumpTarget[E]{labels: []string{stmt.Label.Text()}, breakTo: after})
-	builder.statement(stmt.Statement)
+	builder.jumps = append(builder.jumps, jumpTarget[E]{labels: []string{statement.Label.Text()}, breakTo: after})
+	builder.statement(statement.Statement)
 	builder.popJump()
 	builder.link(builder.current, after)
 	builder.enter(after)

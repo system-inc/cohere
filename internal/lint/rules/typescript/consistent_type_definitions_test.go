@@ -60,8 +60,8 @@ func runConsistentTypeDefinitions(
 // 21 fixable rows agree with the annotated `output` in the corpus file, and the 2 rows carrying
 // `output: null` were confirmed to be genuine declines rather than fixers that happen to fail.
 func consistentTypeDefinitionsCases() []consistentTypeDefinitionsCase {
-	ptr := consistentTypeDefinitionsPointer
-	_ = ptr
+	pointer := consistentTypeDefinitionsPointer
+	_ = pointer
 	return []consistentTypeDefinitionsCase{
 		{"var foo = {};", "interface", []string{}, nil},
 		{"interface A {}", "interface", []string{}, nil},

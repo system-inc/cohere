@@ -30,7 +30,7 @@ const didMountFile = "/repository/source/DidMount.tsx"
 // files rather than by assuming the totals lined up.
 //
 // The second block is the same rule under `["disallow-in-func"]`, which decodes to
-// `DisallowInFunc: true`. Three of its four failing cases are byte-identical to cases that pass in
+// `DisallowInFunction: true`. Three of its four failing cases are byte-identical to cases that pass in
 // the first block, which is the single most useful thing the corpus says about this rule: the
 // option is not an edge refinement, it is the switch that moves half the passing set into the
 // failing one.
@@ -46,9 +46,9 @@ func TestNoDidMountSetStateFires(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		name           string
-		sourceText     string
-		disallowInFunc bool
+		name               string
+		sourceText         string
+		disallowInFunction bool
 	}{
 		{"createReactClass componentDidMount", `
         var Hello = createReactClass({
@@ -159,7 +159,7 @@ func TestNoDidMountSetStateFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, testCase.sourceText,
-				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
+				NoMethodSetStateOptions{DisallowInFunction: testCase.disallowInFunction})
 			rule_testing.ExpectFindings(test, result, "noDidMountSetState")
 		})
 	}
@@ -176,9 +176,9 @@ func TestNoDidMountSetStateStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		name           string
-		sourceText     string
-		disallowInFunc bool
+		name               string
+		sourceText         string
+		disallowInFunction bool
 	}{
 		{"render only, no lifecycle", `
         var Hello = createReactClass({
@@ -294,7 +294,7 @@ func TestNoDidMountSetStateStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, testCase.sourceText,
-				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
+				NoMethodSetStateOptions{DisallowInFunction: testCase.disallowInFunction})
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -312,11 +312,11 @@ func TestNoDidMountSetStateOwnCases(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		name           string
-		sourceText     string
-		fileName       string
-		disallowInFunc bool
-		findings       []string
+		name               string
+		sourceText         string
+		fileName           string
+		disallowInFunction bool
+		findings           []string
 	}{
 		// The object gate. oxc requires the member expression's object to be the `this` keyword
 		// itself, and nothing in the corpus writes anything else, so every one of these is a branch
@@ -712,7 +712,7 @@ class Hello extends React.Component {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(test, NoDidMountSetState, testCase.fileName, testCase.sourceText,
-				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
+				NoMethodSetStateOptions{DisallowInFunction: testCase.disallowInFunction})
 			if len(testCase.findings) == 0 {
 				rule_testing.ExpectClean(test, result)
 				return

@@ -133,7 +133,7 @@ var NoDidMountSetState = rule.Rule[NoMethodSetStateOptions]{
 
 				// One means written directly in the lifecycle body. Anything higher crossed a
 				// function scope on the way out, which is the option's subject.
-				if functionsCrossed > 1 && !settings.DisallowInFunc {
+				if functionsCrossed > 1 && !settings.DisallowInFunction {
 					return
 				}
 
