@@ -485,6 +485,23 @@ const goBuildsJson = goBuildsObject
 const goCleanLintLine = "lint: 0 findings \u2014 5 rules over 3 files, 1408 nodes visited, walked by the fix phase " +
 	"(nothing was rewritten, so its findings still hold)\n"
 
+// measuredTotalLine stands for the account's total line, whose total is how long the render took, so it and the
+// remainder against the 354ms the module and the phases account for move with the machine's load: a loaded run read
+// `total 1ms` and failed (#wq0c0sv). What the code guarantees is the module's 96ms and the line's two shapes, the
+// phases overlapping the total while it is under 354ms and the rest outside any phase once it is over, so the test
+// pins those and never the time it measured.
+const measuredTotalLine = "  total (measured): module 96ms"
+
+// measuredTotal reads the account's total line in either shape, so pinMeasuredTotal can write it as measuredTotalLine.
+var measuredTotal = regexp.MustCompile(`(?m)^  total [0-9][0-9.hmsµ]*: module 96ms` +
+	`(?: plus phases, overlapping by [0-9][0-9.hmsµ]*|, phases 258ms, [0-9][0-9.hmsµ]* outside any phase)$`)
+
+// pinMeasuredTotal is an account with its total line written as measuredTotalLine, and the account as it was when the
+// line holds anything but the module's 96ms in one of its two shapes, so a wrong line still differs from the want.
+func pinMeasuredTotal(account string) string {
+	return measuredTotal.ReplaceAllLiteralString(account, measuredTotalLine)
+}
+
 // goCleanAccount is the --verbose account of the Go contract's clean stream, its footer aside, as it read before the
 // lint record's `builds` was read, written out so anything added to it shows here.
 const goCleanAccount = "module described in 96ms: 4 Go files in the module, 3 of them ours\n" +
@@ -497,8 +514,33 @@ const goCleanAccount = "module described in 96ms: 4 Go files in the module, 3 of
 	"  not checked: /project/internal/schema/schema_generated.go (ignored by git)\n" +
 	"phases: fix ran in 18ms \u00b7 types ran in 240ms \u00b7 " +
 	"lint reused the fix phase's walk (nothing was rewritten) \u00b7 unused skipped (not requested)\n" +
-	"  total 0s: module 96ms plus phases, overlapping by 354ms\n" +
+	measuredTotalLine + "\n" +
 	"  memory: the collector runs at Go's default, since this is a test binary\n"
+
+// TestTheMeasuredTotalLineIsPinnedByItsShape: either shape the total line takes, by how long the render took, reads
+// as measuredTotalLine, and a line naming another module time is left as it was, so it still differs from the want.
+func TestTheMeasuredTotalLineIsPinnedByItsShape(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		line   string
+		pinned bool
+	}{
+		{line: "  total 0s: module 96ms plus phases, overlapping by 354ms", pinned: true},
+		{line: "  total 1ms: module 96ms plus phases, overlapping by 353ms", pinned: true},
+		{line: "  total 1.204s: module 96ms, phases 258ms, 850ms outside any phase", pinned: true},
+		{line: "  total 1ms: module 97ms plus phases, overlapping by 353ms", pinned: false},
+		{line: "  total 1.204s: module 96ms, phases 259ms, 849ms outside any phase", pinned: false},
+	} {
+		account := "before\n" + testCase.line + "\nafter\n"
+		want := account
+		if testCase.pinned {
+			want = "before\n" + measuredTotalLine + "\nafter\n"
+		}
+		if got := pinMeasuredTotal(account); got != want {
+			test.Errorf("%q pins to\n%s\nwant\n%s", testCase.line, got, want)
+		}
+	}
+}
 
 // goCleanSummaryJson is the `--json` summary of the Go contract's clean stream with its seconds set to 0, as it read
 // before the lint record's `builds` was read, written out so a field added to it shows here.
@@ -517,7 +559,7 @@ const goCleanSummaryJson = `{"kind":"summary","schemaVersion":1,"verdict":"pass"
 // package, which the front door does not read. A record without it, as a run of one build's is, prints none of them,
 // and its account, footer and summary are byte for byte what they were before the field was read (#72n9mq0). The
 // time a render took is the one thing that moves, so the footer is read off the summary with no time, and the
-// summary's seconds are set to 0.
+// summary's seconds are set to 0, and the account's total line is pinned by its shape (pinMeasuredTotal).
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestAGoRunSaysWhichBuildsItChecked(test *testing.T) {
 	savedOutput, savedSummary := activeOutput, activeSummary
@@ -551,7 +593,7 @@ func TestAGoRunSaysWhichBuildsItChecked(test *testing.T) {
 		},
 	} {
 		verbose, summary := renderGoStreamAs(test, outputVerbose, testCase.lines)
-		if account := footerLine.ReplaceAllString(verbose, ""); account != testCase.account {
+		if account := pinMeasuredTotal(footerLine.ReplaceAllString(verbose, "")); account != testCase.account {
 			test.Errorf("%s: the account is\n%s\nwant\n%s", testCase.name, account, testCase.account)
 		}
 		summary.Total = 0
