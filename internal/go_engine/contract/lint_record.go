@@ -2,7 +2,12 @@ package contract
 
 // LintRecord summarizes the lint phase, for the lint line and its coverage notes.
 type LintRecord struct {
-	Findings            int `json:"findings"`
+	Findings int `json:"findings"`
+	// TypeErrors is additive within contract 3, and the Go engine's alone: the type errors of the run's other builds
+	// (`--other-builds`), which the lint phase writes as compiler finding records beside the Findings it counts, since
+	// only the merge of every build's verdict knows them (#rw6tg3a). The finding records of the phase are Findings
+	// plus TypeErrors. Absent for a run of one build, so such a run writes the record it always has.
+	TypeErrors          int `json:"typeErrors,omitempty"`
 	RulesRun            int `json:"rulesRun"`
 	FilesWalked         int `json:"filesWalked"`
 	NodesVisited        int `json:"nodesVisited"`
