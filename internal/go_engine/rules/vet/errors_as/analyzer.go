@@ -101,7 +101,7 @@ func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 	if gate.skipped {
 		return
 	}
-	if !callsErrorsAs(context.TypesInfo, call) {
+	if !callsErrorsAs(context, call) {
 		return
 	}
 	if len(call.Args) < 2 {
@@ -118,14 +118,14 @@ func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 // callsErrorsAs reports whether call calls the standard library's errors.As, through a qualified identifier, a dot
 // import or parentheses, and not through a variable holding it. x/tools' typeindex Index.Calls of
 // Index.Object("errors", "As"): the callee typeutil.Callee resolves is the object package errors declares as As in
-// its scope.
-func callsErrorsAs(information *types.Info, call *ast.CallExpr) bool {
-	callee := typeutil.Callee(information, call)
+// its scope, a look recorded in the context's reads (#b2t9xmf).
+func callsErrorsAs(context *rule.Context, call *ast.CallExpr) bool {
+	callee := typeutil.Callee(context.TypesInfo, call)
 	// A builtin's object has no package, and a conversion has no callee.
 	if callee == nil || callee.Pkg() == nil || callee.Pkg().Path() != "errors" {
 		return false
 	}
-	return callee.Pkg().Scope().Lookup("As") == callee
+	return context.LookupIn(callee.Pkg(), "As") == callee
 }
 
 // targetProblem is the original's message for target, the second argument to errors.As, and empty when target is

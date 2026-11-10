@@ -10,6 +10,8 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
 // Context is what a check reads beyond what it is called with, and where it reports. Each rule has its own over each
@@ -126,6 +128,19 @@ func (context *Context) Reportf(position token.Pos, format string, arguments ...
 // the diagnostic analysis.Pass's ReportRangef builds, for Reportf's reason. An ast.Node is a range.
 func (context *Context) ReportRangef(node analysis.Range, format string, arguments ...any) {
 	context.Report(analysis.Diagnostic{Pos: node.Pos(), End: node.End(), Message: fmt.Sprintf(format, arguments...)})
+}
+
+// Reads is the reads of the context's package the checker handed the dispatcher's pass under Recorded, nil when the
+// run records none, which every recording method takes as recording nothing.
+func (context *Context) Reads() *build_reads.Reads {
+	reads, _ := context.resultOf[Recorded].(*build_reads.Reads)
+	return reads
+}
+
+// LookupIn is what declaring declares as name, nil when it declares nothing so, the question recorded in the
+// context's reads when declaring is another package (see build_reads.Reads.ScopeLookup).
+func (context *Context) LookupIn(declaring *types.Package, name string) types.Object {
+	return context.Reads().ScopeLookup(context.Package, declaring, name)
 }
 
 // RuleName is the name the check was registered under, its row's name under `--timing`.

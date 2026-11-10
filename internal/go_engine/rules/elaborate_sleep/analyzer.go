@@ -160,7 +160,7 @@ func sleepFunction(context *rule.Context, selectStatement *ast.SelectStmt, after
 			return nil, false
 		}
 		_, sleep := scope.LookupParent("Sleep", selectStatement.Pos())
-		if sleep != nil && sleep == after.Pkg().Scope().Lookup("Sleep") {
+		if sleep != nil && sleep == context.LookupIn(after.Pkg(), "Sleep") {
 			return &ast.Ident{Name: "Sleep"}, true
 		}
 	}

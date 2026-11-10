@@ -95,7 +95,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 	state := rule.State[packageState](context)
 	if state.directed == nil {
 		state.directed = directedObjects(context)
-		state.interfaces = &foreignInterfaces{current: context.Package}
+		state.interfaces = &foreignInterfaces{current: context.Package, reads: context.Reads()}
 	}
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds examples.
 	state.isTestFile = strings.HasSuffix(context.FileSet.PositionFor(file.Package, false).Filename, "_test.go")

@@ -428,18 +428,19 @@ func isLowerWord(segment string) bool {
 
 // isMemberOf is whether member is the exact name of a method or field of the type named typeName in the package under
 // test: this package, or for an external test package the package it tests. An example names it as go doc reads it,
-// ExampleResource_URL, whatever its case.
+// ExampleResource_URL, whatever its case. A look into the tested package is recorded in the context's reads, its answer
+// a type whose fields and methods the answer's own rendering holds (#b2t9xmf).
 func isMemberOf(context *rule.Context, typeName string, member string) bool {
-	scopes := []*types.Scope{context.Package.Scope()}
+	declaring := []*types.Package{context.Package}
 	if tested, isExternal := strings.CutSuffix(context.Package.Path(), "_test"); isExternal {
 		for _, imported := range context.Package.Imports() {
 			if imported.Path() == tested {
-				scopes = append(scopes, imported.Scope())
+				declaring = append(declaring, imported)
 			}
 		}
 	}
-	for _, scope := range scopes {
-		named, isTypeName := scope.Lookup(typeName).(*types.TypeName)
+	for _, underTest := range declaring {
+		named, isTypeName := context.LookupIn(underTest, typeName).(*types.TypeName)
 		if !isTypeName {
 			continue
 		}

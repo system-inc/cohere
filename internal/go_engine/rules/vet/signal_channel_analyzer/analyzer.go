@@ -107,7 +107,7 @@ func gather(context *rule.Context, node ast.Node, _ []ast.Node) {
 		// Without this the judgment would find nothing there either, so it saves the work and changes no finding.
 		signalPackage := importedPackage(context.Package, signalPackagePath)
 		if signalPackage != nil {
-			notify, isFunction := signalPackage.Scope().Lookup("Notify").(*types.Func)
+			notify, isFunction := context.LookupIn(signalPackage, "Notify").(*types.Func)
 			if !isFunction {
 				// Invariant: os/signal declares Notify, a function, in every release the type checker can load.
 				panic("signal_channel_analyzer: os/signal declares no function Notify")

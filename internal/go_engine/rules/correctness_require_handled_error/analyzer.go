@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
@@ -140,7 +141,10 @@ func enterFile(context *rule.Context, file *ast.File) {
 			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}
 		state.indexes = indexes
-		state.checker = checker{context: context, hashInterface: findHashInterface(context.Package)}
+		state.checker = checker{
+			context:       context,
+			hashInterface: findHashInterface(context.Package, context.Reads()),
+		}
 	}
 	state.comments = state.indexes.ForFile(file)
 }
@@ -197,8 +201,18 @@ func isExemptWriterType(candidate types.Type) bool {
 }
 
 // findHashInterface is hash.Hash's interface from the import graph under analyzed, analyzed included, or nil when
-// hash is not in it.
-func findHashInterface(analyzed *types.Package) *types.Interface {
+// hash is not in it. What it found, or that it found nothing, is recorded in reads, since it is an answer of the
+// import closure no type read of analyzed holds (#b2t9xmf).
+func findHashInterface(analyzed *types.Package, reads *build_reads.Reads) *types.Interface {
+	hashInterface, declared := findHashType(analyzed)
+	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryClosure, Path: hashPackagePath, Name: "Hash",
+		Found: declared != nil, Answer: declared})
+	return hashInterface
+}
+
+// findHashType is findHashInterface's walk: hash.Hash's interface and the type name that declares it, both nil when
+// the walk finds no hash, or a hash whose Hash is no interface.
+func findHashType(analyzed *types.Package) (*types.Interface, *types.TypeName) {
 	seen := map[*types.Package]bool{}
 	pending := []*types.Package{analyzed}
 	for len(pending) > 0 {
@@ -211,17 +225,17 @@ func findHashInterface(analyzed *types.Package) *types.Interface {
 		if current.Path() == hashPackagePath {
 			typeName, isTypeName := current.Scope().Lookup("Hash").(*types.TypeName)
 			if !isTypeName {
-				return nil
+				return nil, nil
 			}
 			hashInterface, isInterface := typeName.Type().Underlying().(*types.Interface)
 			if !isInterface {
-				return nil
+				return nil, nil
 			}
-			return hashInterface
+			return hashInterface, typeName
 		}
 		pending = append(pending, current.Imports()...)
 	}
-	return nil
+	return nil, nil
 }
 
 // isBlank is whether name is the blank identifier, which keeps nothing it is given.

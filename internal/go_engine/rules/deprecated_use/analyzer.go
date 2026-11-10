@@ -35,6 +35,7 @@ import (
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/knowledge"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
@@ -129,7 +130,7 @@ func checkSelector(context *rule.Context, deprecations deprecated.Result, select
 	if context.TypesInfo.Types[selector.X].IsType() {
 		reported = selector.Sel
 	}
-	if deprecation, isDeprecated := deprecations.Objects[object]; isDeprecated {
+	if deprecation, isDeprecated := deprecationOf(context, deprecations, object); isDeprecated {
 		judge(context, deprecations, deprecation, reported, staticcheck_code.SelectorName(context, selector),
 			object.Pkg().Path(), enclosing)
 	}
@@ -182,7 +183,7 @@ func checkImport(
 	}
 	quoted := specification.Path.Value
 	path := quoted[1 : len(quoted)-1]
-	deprecation, isDeprecated := deprecations.Packages[packageName.Imported()]
+	deprecation, isDeprecated := packageDeprecationOf(context, deprecations, packageName.Imported())
 	if !isDeprecated {
 		return
 	}
@@ -197,6 +198,47 @@ func checkImport(
 		return
 	}
 	judge(context, deprecations, deprecation, specification.Path, path, path, nil)
+}
+
+// deprecationOf is the deprecation of object, another package's, in deprecations, and whether it is deprecated. The
+// question and its answer, the deprecation's message or none, are recorded in the context's reads: the deprecated
+// facts' result gathers every fact of the import closure, which no fact read of the package records (#b2t9xmf).
+func deprecationOf(
+	context *rule.Context,
+	deprecations deprecated.Result,
+	object types.Object,
+) (*deprecated.IsDeprecated, bool) {
+	deprecation, isDeprecated := deprecations.Objects[object]
+	recordDeprecation(context, object, object.Pkg(), deprecation, isDeprecated)
+	return deprecation, isDeprecated
+}
+
+// packageDeprecationOf is deprecationOf for an imported package itself.
+func packageDeprecationOf(
+	context *rule.Context,
+	deprecations deprecated.Result,
+	imported *types.Package,
+) (*deprecated.IsDeprecated, bool) {
+	deprecation, isDeprecated := deprecations.Packages[imported]
+	recordDeprecation(context, nil, imported, deprecation, isDeprecated)
+	return deprecation, isDeprecated
+}
+
+// recordDeprecation records in the context's reads whether subject, an object of owner, or owner itself when subject
+// is nil, is deprecated, and with what message.
+func recordDeprecation(
+	context *rule.Context,
+	subject types.Object,
+	owner *types.Package,
+	deprecation *deprecated.IsDeprecated,
+	isDeprecated bool,
+) {
+	lookup := build_reads.Lookup{Query: build_reads.QueryDeprecated, Path: owner.Path(), Subject: subject,
+		Found: isDeprecated}
+	if isDeprecated {
+		lookup.Text = deprecation.Msg
+	}
+	context.Reads().AddLookup(lookup)
 }
 
 // isOwnTests is whether the package at packagePath may use what the package at usedPath declares as its own: foo's
@@ -231,7 +273,8 @@ func judge(
 		version.Compare(staticcheck_report.StandardLibraryVersion(context, node), standard.DeprecatedSince) == -1 {
 		return
 	}
-	// A deprecated function may use deprecated objects.
+	// A deprecated function may use deprecated objects. Whether enclosing, the package's own, is deprecated is read off
+	// the package's own syntax, so it is no read of another package.
 	if enclosing != nil {
 		if _, isDeprecated := deprecations.Objects[enclosing]; isDeprecated {
 			return

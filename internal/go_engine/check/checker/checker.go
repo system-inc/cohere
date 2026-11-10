@@ -186,8 +186,10 @@
 // holds the action's package, ObjectFact and PackageFact add each fact
 // asked of another package's object or of another package to it, a miss
 // as much as a hit, since a build where the fact is there would analyze
-// the package differently. Unset, nothing is recorded and both are
-// upstream's.
+// the package differently. Options.Recorded keys the package's reads in
+// every pass's ResultOf, as Options.Resolved keys the resolver, so a rule
+// records there what else it asks of other packages. Unset, nothing is
+// recorded and both are upstream's.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -358,6 +360,12 @@ type Options struct {
 	// package, is added to them, found or not. A package it does not hold,
 	// and every package while it is nil, records nothing.
 	Reads map[*packages.Package]*build_reads.Reads
+
+	// cohere: Recorded, when Reads is set too, keys in every pass's
+	// ResultOf the reads Reads holds of the pass's package, nil for a
+	// package it does not hold, a key never run, as Dependents is. Unset,
+	// ResultOf holds no reads.
+	Recorded *analysis.Analyzer
 
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once
@@ -754,6 +762,10 @@ func (act *Action) execOnce() {
 	// cohere: Options.Resolved, the resolver under Options.Resolver.
 	if act.opts.Resolved != nil && act.opts.Resolver != nil {
 		inputs[act.opts.Resolved] = act.opts.Resolver
+	}
+	// cohere: Options.Recorded, the package's reads under Options.Reads.
+	if act.opts.Recorded != nil && act.opts.Reads != nil {
+		inputs[act.opts.Recorded] = act.opts.Reads[act.Package]
 	}
 
 	// cohere: a restored package's own facts come from the cache, in

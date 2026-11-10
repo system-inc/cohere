@@ -215,7 +215,7 @@ func sameShape(left *types.Signature, right *types.Signature) bool {
 // buildForeignMethods indexes the methods of every package reachable through current's imports, current's own
 // excepted: a method declared here is ours, and is judged with the rest of this package.
 func buildForeignMethods(current *types.Package) *foreignMethods {
-	foreign := &foreignMethods{byName: map[string][]*types.Signature{}, genericByName: map[string][]*types.Signature{}}
+	foreign := &foreignMethods{byName: map[string][]*types.Func{}, genericByName: map[string][]*types.Func{}}
 	visited := map[*types.Package]bool{current: true}
 	pending := []*types.Package{current}
 	for len(pending) > 0 {

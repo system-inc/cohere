@@ -166,7 +166,7 @@ func standardStreamWrite(context *rule.Context, call *ast.CallExpr) (string, boo
 		return "", false
 	}
 	// Only the package's own variable is the process's stream, never a field or local that shares its name.
-	if variable.Pkg().Scope().Lookup(variable.Name()) != variable {
+	if context.LookupIn(variable.Pkg(), variable.Name()) != variable {
 		return "", false
 	}
 	return "fmt." + function.Name() + "(os." + variable.Name() + ", ...)", true

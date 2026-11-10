@@ -2,7 +2,8 @@
 // (linux, windows, freebsd) can restore the package from the host's results when everything it read is the same
 // there (#b2t9xmf). The load records the foreign objects a package's type check reached and the type arguments of
 // every instance of a foreign generic in it, the checker records each fact an analyzer on it asked of another
-// package, hit or miss, and either marks a package that can never be restored, with the first reason. Exactness rests
+// package, hit or miss, the rules record each question they ask of other packages past the syntax (a lookup), and any
+// of them marks a package that can never be restored, with the first reason. Exactness rests
 // on recording every read, so what cannot be recorded marks the package, never passes silently.
 //
 // Recording collects pointers and renders nothing: rendering and comparing the reads are the restore's.
@@ -34,6 +35,10 @@ type Reads struct {
 	// another package is inherited before any pass runs, so a second read of it reads the same.
 	facts map[factKey]Fact
 
+	// lookups are the rules' questions of other packages, each once, the first answer kept: what a package declares
+	// does not change during a run, so a second ask answers the same.
+	lookups map[lookupKey]Lookup
+
 	// never is the first reason the package can never be restored, empty while it can.
 	never string
 }
@@ -53,6 +58,56 @@ type Fact struct {
 	FactType reflect.Type
 	Found    bool
 	Value    analysis.Fact
+}
+
+// The questions a Lookup asks, by its Query.
+const (
+	// QueryScope asks the package at Path for what it declares as Name.
+	QueryScope = "Scope"
+
+	// QueryClosure asks the package's import closure for the package at Path, and that package for what it declares
+	// as Name, as a rule finds io.Reader without importing io.
+	QueryClosure = "Closure"
+
+	// QueryInterface asks the import closure for an interface, of another package or the universe, that names
+	// Subject, a method of the package, and that the method's receiver implements: Answer is the interface's type
+	// name.
+	QueryInterface = "Interface"
+
+	// QueryMethod asks the import closure for a method of another package that Subject, a method of the package, has
+	// to match, by the asking rule's measure (its name and signature, and what its receiver implements): Answer is
+	// the method found, as its package declares it.
+	QueryMethod = "Method"
+
+	// QueryPackageName asks whether a package of the import closure is named Name.
+	QueryPackageName = "PackageName"
+
+	// QueryDeprecated asks whether Subject, an object of the package at Path, or that package itself when Subject is
+	// nil, is deprecated: Text is the deprecation's message.
+	QueryDeprecated = "Deprecated"
+)
+
+// Lookup is one question a rule asked of other packages past its package's syntax, and its answer. A miss is a read
+// too, since a build where the answer is there would analyze the package differently. Query is which question (see
+// QueryScope and the rest), Path the package asked of, by path, Name the name asked for, and Subject the object asked
+// about, each empty where the question has none. Found says whether there was an answer: Answer is the object found,
+// nil on a miss or when the answer is text, which Text holds.
+type Lookup struct {
+	Query   string
+	Path    string
+	Name    string
+	Subject types.Object
+	Found   bool
+	Answer  types.Object
+	Text    string
+}
+
+// lookupKey is what makes two lookups the same question.
+type lookupKey struct {
+	query   string
+	path    string
+	name    string
+	subject types.Object
 }
 
 // factKey is what makes two fact reads the same read.
@@ -100,6 +155,40 @@ func (reads *Reads) AddFact(fact Fact) {
 	if _, recorded := reads.facts[key]; !recorded {
 		reads.facts[key] = fact
 	}
+}
+
+// AddLookup records one question a rule asked of other packages, keeping the first of questions alike. Nil reads, as
+// a run that records nothing hands a rule, record nothing.
+func (reads *Reads) AddLookup(lookup Lookup) {
+	if reads == nil {
+		return
+	}
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	if reads.lookups == nil {
+		reads.lookups = map[lookupKey]Lookup{}
+	}
+	// A miss has no answer: a caller handing its typed nil, a (*types.TypeName)(nil), would otherwise leave Answer an
+	// interface that is not nil.
+	if !lookup.Found {
+		lookup.Answer = nil
+	}
+	key := lookupKey{query: lookup.Query, path: lookup.Path, name: lookup.Name, subject: lookup.Subject}
+	if _, recorded := reads.lookups[key]; !recorded {
+		reads.lookups[key] = lookup
+	}
+}
+
+// ScopeLookup is what declaring declares as name, nil when it declares nothing so, as declaring.Scope().Lookup(name)
+// answers, the question recorded when declaring is another package than own. It is how a rule looks into another
+// package's scope by name.
+func (reads *Reads) ScopeLookup(own *types.Package, declaring *types.Package, name string) types.Object {
+	found := declaring.Scope().Lookup(name)
+	if declaring != own {
+		reads.AddLookup(Lookup{Query: QueryScope, Path: declaring.Path(), Name: name, Found: found != nil,
+			Answer: found})
+	}
+	return found
 }
 
 // MarkNever records that the package can never be restored, and why, unless a reason is recorded already.
@@ -185,6 +274,32 @@ func (reads *Reads) Facts() []Fact {
 		}
 	})
 	return facts
+}
+
+// Lookups are the rules' questions of other packages, sorted by question, package, name and subject.
+func (reads *Reads) Lookups() []Lookup {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	lookups := make([]Lookup, 0, len(reads.lookups))
+	for _, lookup := range reads.lookups {
+		lookups = append(lookups, lookup)
+	}
+	slices.SortFunc(lookups, func(left, right Lookup) int {
+		if order := cmp.Or(cmp.Compare(left.Query, right.Query), cmp.Compare(left.Path, right.Path),
+			cmp.Compare(left.Name, right.Name)); order != 0 {
+			return order
+		}
+		switch {
+		case left.Subject == nil && right.Subject == nil:
+			return 0
+		case left.Subject == nil:
+			return -1
+		case right.Subject == nil:
+			return 1
+		}
+		return compareObjects(left.Subject, right.Subject)
+	})
+	return lookups
 }
 
 // compareObjects orders two objects by their package's path, then their name, then how go/types writes them, which

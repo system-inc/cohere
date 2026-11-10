@@ -22,6 +22,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
@@ -75,8 +76,18 @@ func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
 }
 
 // findIoReader is io.Reader's interface, found by walking the imports of analyzed and of each package they reach to
-// the package whose path is io, or nil when none of them is.
-func findIoReader(analyzed *types.Package) *types.Interface {
+// the package whose path is io, or nil when none of them is. What it found, or that it found nothing, is recorded in
+// reads, since it is an answer of the import closure no type read of analyzed holds (#b2t9xmf).
+func findIoReader(analyzed *types.Package, reads *build_reads.Reads) *types.Interface {
+	reader, declared := findIoReaderType(analyzed)
+	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryClosure, Path: "io", Name: "Reader",
+		Found: declared != nil, Answer: declared})
+	return reader
+}
+
+// findIoReaderType is findIoReader's walk: io.Reader's interface and the type name that declares it, both nil when
+// the walk finds no io, or an io whose Reader is no interface.
+func findIoReaderType(analyzed *types.Package) (*types.Interface, *types.TypeName) {
 	visited := map[*types.Package]bool{analyzed: true}
 	pending := []*types.Package{analyzed}
 	for len(pending) > 0 {
@@ -90,18 +101,18 @@ func findIoReader(analyzed *types.Package) *types.Interface {
 			if imported.Path() == "io" {
 				typeName, isTypeName := imported.Scope().Lookup("Reader").(*types.TypeName)
 				if !isTypeName {
-					return nil
+					return nil, nil
 				}
 				reader, isInterface := typeName.Type().Underlying().(*types.Interface)
 				if !isInterface {
-					return nil
+					return nil, nil
 				}
-				return reader
+				return reader, typeName
 			}
 			pending = append(pending, imported)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // judgedParameters is every named parameter of function the rule judges: not the receiver, which is the type's API,

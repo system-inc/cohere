@@ -135,7 +135,7 @@ func untilFunction(context *rule.Context, call *ast.CallExpr, nowFunction ast.Ex
 			return nil, false
 		}
 		_, until := scope.LookupParent("Until", call.Pos())
-		if until != nil && until == now.Pkg().Scope().Lookup("Until") {
+		if until != nil && until == context.LookupIn(now.Pkg(), "Until") {
 			return &ast.Ident{Name: "Until"}, true
 		}
 	}

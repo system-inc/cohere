@@ -27,6 +27,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/naming/abbreviation"
@@ -125,6 +126,9 @@ type reach struct {
 	declared []map[string][]foreignMethod
 	// packageNames are those packages' names, which a whole-word suggestion must not take.
 	packageNames map[string]bool
+	// reads is the reads of the package, which each question isTakenInGo asks of packageNames is recorded in, nil
+	// when the run records none (#b2t9xmf).
+	reads *build_reads.Reads
 }
 
 // methodsNamed are the methods named name that the reachable packages declare, in no order the rule depends on: a
@@ -156,7 +160,7 @@ func enterFile(context *rule.Context, _ *ast.File) {
 	if state.writes != nil {
 		return
 	}
-	state.reachable = reachOf(declarationsOf(context.FileSet), context.Package)
+	state.reachable = reachOf(declarationsOf(context.FileSet), context.Package, context.Reads())
 	state.writes = sync.OnceValue(func() map[*types.Var]*variableWrites { return writesOf(context) })
 }
 
@@ -216,10 +220,26 @@ func isOurs(context *rule.Context, reachable reach, object types.Object) bool {
 // A method of a generic foreign type is compared through the instance our method would have to match, its type
 // arguments read off our signature, so `func (reader) Src() int` is checked against `Source[int]` as any other.
 func fixedByAnotherPackage(context *rule.Context, reachable reach, method *types.Func) bool {
-	receiver := method.Signature().Recv()
-	if receiver == nil {
+	if method.Signature().Recv() == nil {
 		return false
 	}
+	// The answer depends on every method of the import closure, which no type read of the package holds, so the
+	// question and the method that answers it, or none, are recorded in the context's reads (#b2t9xmf).
+	fixing := fixingMethod(reachable, method)
+	context.Reads().AddLookup(build_reads.Lookup{
+		Query:   build_reads.QueryMethod,
+		Name:    method.Name(),
+		Subject: method,
+		Found:   fixing != nil,
+		Answer:  fixing,
+	})
+	return fixing != nil
+}
+
+// fixingMethod is the method of another package, as it declares it, that fixes method's name (see
+// fixedByAnotherPackage), nil when none does. method has a receiver.
+func fixingMethod(reachable reach, method *types.Func) *types.Func {
+	receiver := method.Signature().Recv()
 	isInterfaceMethod := types.IsInterface(receiver.Type())
 	named := receiverNamed(receiver.Type())
 	for candidate := range methodsNamed(reachable, method.Name()) {
@@ -234,7 +254,7 @@ func fixedByAnotherPackage(context *rule.Context, reachable reach, method *types
 				// that shape matches, and only for a method a foreign interface could fix.
 				if (isInterfaceMethod || candidate.owner != nil) &&
 					haveSameShape(candidate.method.Signature(), method.Signature()) {
-					return true
+					return candidate.method
 				}
 				continue
 			}
@@ -248,19 +268,19 @@ func fixedByAnotherPackage(context *rule.Context, reachable reach, method *types
 			continue
 		}
 		if isInterfaceMethod {
-			return true
+			return candidate.method
 		}
 		if foreign.owner == nil {
 			continue
 		}
 		if named == nil || named.TypeParams().Len() > 0 {
-			return true
+			return candidate.method
 		}
 		if types.Implements(named, foreign.owner) || types.Implements(types.NewPointer(named), foreign.owner) {
-			return true
+			return candidate.method
 		}
 	}
-	return false
+	return nil
 }
 
 // receiverNamed is the named type a method's receiver is, through its pointer, or nil when there is none.
@@ -349,8 +369,8 @@ func haveSameShape(left *types.Signature, right *types.Signature) bool {
 
 // reachOf walks every package this one reaches through its imports, once per package, and gathers what the rule
 // asks of them, each package's methods from what the load has already read of it.
-func reachOf(declarations *loadDeclarations, current *types.Package) reach {
-	reachable := reach{packageNames: map[string]bool{}}
+func reachOf(declarations *loadDeclarations, current *types.Package, reads *build_reads.Reads) reach {
+	reachable := reach{packageNames: map[string]bool{}, reads: reads}
 	visited := map[*types.Package]bool{current: true}
 	pending := append([]*types.Package{}, current.Imports()...)
 	for len(pending) > 0 {
@@ -473,7 +493,13 @@ func oneSpelling(reachable reach, finding abbreviation.Finding, name string) (st
 }
 
 // isTakenInGo is whether a name is a keyword, a predeclared identifier, or the name of a package this one reaches, so
-// declaring it would be illegal or would shadow what a reader expects it to mean.
+// declaring it would be illegal or would shadow what a reader expects it to mean. Whether a reached package is so
+// named is recorded in the reachable packages' reads.
 func isTakenInGo(reachable reach, name string) bool {
-	return token.IsKeyword(name) || types.Universe.Lookup(name) != nil || reachable.packageNames[name]
+	if token.IsKeyword(name) || types.Universe.Lookup(name) != nil {
+		return true
+	}
+	taken := reachable.packageNames[name]
+	reachable.reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryPackageName, Name: name, Found: taken})
+	return taken
 }

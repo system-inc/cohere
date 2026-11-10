@@ -268,7 +268,7 @@ func gather(context *rule.Context, node ast.Node, stack []ast.Node) {
 				continue
 			}
 			field, isVariable := context.TypesInfo.Uses[key].(*types.Var)
-			if !isVariable || !isCommandField(field) {
+			if !isVariable || !isCommandField(context, field) {
 				continue
 			}
 			switch field.Name() {
@@ -477,12 +477,12 @@ func isNamed(candidate types.Type, packagePath string, name string) bool {
 }
 
 // isCommandField says field is one of exec.Cmd's own fields, by identity, so a struct of some other type with a field
-// named WaitDelay is never mistaken for it.
-func isCommandField(field *types.Var) bool {
+// named WaitDelay is never mistaken for it. The look into os/exec is recorded in the context's reads (#b2t9xmf).
+func isCommandField(context *rule.Context, field *types.Var) bool {
 	if !field.IsField() || field.Pkg() == nil || field.Pkg().Path() != "os/exec" {
 		return false
 	}
-	object := field.Pkg().Scope().Lookup("Cmd")
+	object := context.LookupIn(field.Pkg(), "Cmd")
 	if object == nil {
 		return false
 	}
@@ -505,7 +505,7 @@ func commandField(context *rule.Context, selector *ast.SelectorExpr) string {
 		return ""
 	}
 	field, isVariable := selection.Obj().(*types.Var)
-	if !isVariable || !isCommandField(field) {
+	if !isVariable || !isCommandField(context, field) {
 		return ""
 	}
 	return field.Name()

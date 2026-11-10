@@ -496,7 +496,8 @@ func abandoned(abandon <-chan struct{}) bool {
 // rule on the dispatcher. ForDependents keeps a dispatcher's requirement for its listeners only where a rule of this
 // run requires it too, so what only a left-out rule reads never runs. Resolver is a new fact resolver, one for the run
 // the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat), with no
-// store, which Run gives the resolver of a run with the findings cache.
+// store, which Run gives the resolver of a run with the findings cache. Recorded hands each rule its package's reads,
+// to record its lookups of other packages in, once Run sets Reads (#b2t9xmf).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
@@ -505,6 +506,7 @@ func DispatchOptions() *checker.Options {
 		ForDependents: dispatch.ListenerRequirement,
 		Resolver:      fact_resolver.New(nil),
 		Resolved:      rule.Resolved,
+		Recorded:      rule.Recorded,
 	}
 }
 

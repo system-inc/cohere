@@ -139,7 +139,7 @@ func checkNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 		key := tooNewKey{typesPackage: used.Pkg(), fileVersion: state.fileVersion}
 		disallowed, computed := state.tooNew[key]
 		if !computed {
-			disallowed = tooNewSymbols(used.Pkg(), state.fileVersion)
+			disallowed = tooNewSymbols(context, used.Pkg(), state.fileVersion)
 			state.tooNew[key] = disallowed
 		}
 		standard, isTooNew := disallowed[origin(used)]
@@ -159,8 +159,9 @@ func checkNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 
 // tooNewSymbols is the objects of the exported symbols of a standard-library package that are not yet available at
 // fileVersion, each with its symbol. A package outside the standard library has none. typesPackage may hold type
-// errors. x/tools' typesinternal.TooNewStdSymbols.
-func tooNewSymbols(typesPackage *types.Package, fileVersion string) map[types.Object]symbol {
+// errors. x/tools' typesinternal.TooNewStdSymbols. Each look into typesPackage's scope is recorded in the context's
+// reads, an answer that is a type holding its fields and methods in its own rendering (#b2t9xmf).
+func tooNewSymbols(context *rule.Context, typesPackage *types.Package, fileVersion string) map[types.Object]symbol {
 	disallowed := map[types.Object]symbol{}
 	// These packages' symbols are available before their release under build tags this pass cannot see, so they are
 	// not judged there: testing/synctest from go1.24 with goexperiment.synctest, and json v2 from go1.25 with
@@ -181,7 +182,7 @@ func tooNewSymbols(typesPackage *types.Package, fileVersion string) map[types.Ob
 		}
 		// A symbol this build of the package lacks, one for another platform, has no object, and no identifier can
 		// use it. The original keeps it under a nil key, which no use ever looks up.
-		if object := typesPackage.Scope().Lookup(standard.name); object != nil {
+		if object := context.LookupIn(typesPackage, standard.name); object != nil {
 			disallowed[object] = standard
 		}
 	}
@@ -200,12 +201,12 @@ func tooNewSymbols(typesPackage *types.Package, fileVersion string) map[types.Ob
 		var indices []int
 		if receiver, methodName, isMethod := splitMethod(standard.name); isMethod {
 			pointer := strings.HasPrefix(receiver, "*")
-			typeName := typesPackage.Scope().Lookup(strings.TrimPrefix(receiver, "*"))
+			typeName := context.LookupIn(typesPackage, strings.TrimPrefix(receiver, "*"))
 			if _, typeIsTooNew := disallowed[typeName]; typeName != nil && !typeIsTooNew {
 				object, indices, _ = types.LookupFieldOrMethod(typeName.Type(), pointer, typesPackage, methodName)
 			}
 		} else if typeNameText, fieldName, isField := strings.Cut(standard.name, "."); isField {
-			typeName := typesPackage.Scope().Lookup(typeNameText)
+			typeName := context.LookupIn(typesPackage, typeNameText)
 			if _, typeIsTooNew := disallowed[typeName]; typeName != nil && !typeIsTooNew {
 				object, indices, _ = types.LookupFieldOrMethod(typeName.Type(), false, typesPackage, fieldName)
 			}
