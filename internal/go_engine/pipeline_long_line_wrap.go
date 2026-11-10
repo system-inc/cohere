@@ -36,8 +36,7 @@ func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	if engine.lintOverlaps() {
 		caching.Begin = engine.beginSpeculativeLint
 	}
-	loaded, loadError := load.PackagesCached(workspace.Root, workspace.Patterns(), workspace.Environment(),
-		engine.described.readableOurs, caching)
+	loaded, loadError := engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})
 	if loadError != nil && typesRead {
 		engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
 	}

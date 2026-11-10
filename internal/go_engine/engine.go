@@ -19,7 +19,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
@@ -77,8 +76,15 @@ func Main(arguments []string, availableMemoryBytes uint64, standardOutput io.Wri
 		return refuse(standardError, errors.New("refusing a second engine run in one process, since the first run's "+
 			"rule options are still set on the analyzers; start a new engine process for each project"))
 	}
-	// Here rather than in run, so a test running the engine in process never changes its own memory limit.
-	memory := capMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes)
+	// Here rather than in run, so a test running the engine in process never changes its own memory limit. The limit
+	// the front door's policy set is read before capMemory lowers it, since a late raise never passes it (lateLimit).
+	inheritedBytes := debug.SetMemoryLimit(-1)
+	memory := engineMemory{
+		record:         capMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes),
+		inheritedBytes: inheritedBytes,
+		setMemoryLimit: debug.SetMemoryLimit,
+		collecting:     collectorMarking,
+	}
 	if isStandardLibraryVerb(arguments) {
 		generator, generatorError := binaryGenerator()
 		if generatorError != nil {
@@ -92,13 +98,13 @@ func Main(arguments []string, availableMemoryBytes uint64, standardOutput io.Wri
 
 // run is Main with the analyzer rules handed in, so a test can run the engine with a rule planted in place of
 // the registry's, such as one that panics. memory is what Main decided about the memory limit, nil in a test,
-// which decides nothing. It reads the standard library's entries the binary carries.
+// which decides nothing and never raises the limit. It reads the standard library's entries the binary carries.
 func run(
 	arguments []string,
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *contract.Memory,
+	memory *engineMemory,
 ) int {
 	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, memory,
 		embeddedStandardLibrary)
@@ -111,7 +117,7 @@ func runWithStandardLibrary(
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *contract.Memory,
+	memory *engineMemory,
 	builtIn builtInStandardLibrary,
 ) int {
 	return runOverlapping(arguments, standardOutput, standardError, registered, memory, builtIn, true, nil)
@@ -126,7 +132,7 @@ func runOverlapping(
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *contract.Memory,
+	memory *engineMemory,
 	builtIn builtInStandardLibrary,
 	overlaps bool,
 	answersInPart map[string]bool,
