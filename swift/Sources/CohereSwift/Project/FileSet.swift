@@ -76,15 +76,9 @@ public struct FileSet: Equatable, Sendable {
         self.note = note
     }
 
-    /* `environment` is where the global git config and excludes file are found; tests pass their own. */
-    public static func build(
-        package: PackageModel,
-        environment: [String: String] = ProcessInfo.processInfo.environment,
-    ) throws -> FileSet {
+    public static func build(package: PackageModel) throws -> FileSet {
         /* Nil outside a git repository, which is an answer ("there are no ignore rules to apply") rather than an empty set. */
-        let ignoreRules = IgnoreRules.Repository.containing(package.root).map {
-            IgnoreRules(repository: $0, environment: environment)
-        }
+        let ignoreRules = IgnoreRules.Repository.containing(package.root).map { IgnoreRules(repository: $0) }
         var filesInPackage: [URL] = []
         var owned: [OwnedFile] = []
         var excluded: [ProjectRecord.ExcludedFile] = []
@@ -138,8 +132,7 @@ public struct FileSet: Equatable, Sendable {
         let walkRules =
             ignoreRules
             ?? IgnoreRules(
-                repository: IgnoreRules.Repository(root: package.root.resolvingSymlinksInPath(), commonDirectory: nil),
-                environment: environment,
+                repository: IgnoreRules.Repository(root: package.root.resolvingSymlinksInPath(), commonDirectory: nil)
             )
         var filesRead: [String] = []
         do {
