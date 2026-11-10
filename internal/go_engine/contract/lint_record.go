@@ -67,6 +67,15 @@ type BuildRecord struct {
 	// on the file reports.
 	FindingsAdded   int `json:"findingsAdded"`
 	FindingsDropped int `json:"findingsDropped"`
+	// FilesAlone, additive within contract 3 (#ytnvt8k), counts the files of ours in scope that this build alone
+	// compiles and a rule ran on: the coverage it buys. NotLinted are the files of ours in scope the host's build
+	// leaves out that no build analyzed, absolute and sorted, each under the first build that compiles it, and
+	// NotLintedReason says why, as a build whose load found a type error analyzes no package. Such a file was compiled
+	// and no rule ran on it, so the front door names it as not checked rather than as checked by this build. All three
+	// are absent when there is nothing to count.
+	FilesAlone      int      `json:"filesAlone,omitempty"`
+	NotLinted       []string `json:"notLinted,omitempty"`
+	NotLintedReason string   `json:"notLintedReason,omitempty"`
 }
 
 // LintCache counts, by package, what the per-package findings cache did: every package the load reached was hit,

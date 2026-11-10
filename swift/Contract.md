@@ -964,6 +964,15 @@ record, after the types phase has ended, and the lint record counts it in `typeE
 contract 3 and written only when it is not 0. The phase's finding records are `findings` plus `typeErrors`, and the
 front door refuses a lint record whose two counts do not add up to the records that came with it.
 
+Each build's entry says what it covered that no other build did, additive within contract 3 (#ytnvt8k), each field
+absent when there is nothing to count. `filesAlone` counts the files of ours in scope that only this build compiles
+and that a rule ran on. `notLinted` lists the files of ours in scope that the host's build leaves out and no build
+analyzed, absolute and sorted, each under the first build that compiles it, and `notLintedReason` says why: a build
+whose load found a type error analyzes no package (`"the windows/arm64 build compiles it, and its load found a type
+error, so it analyzed no package"`). The project record names such a file `checked by` its build, since it is written
+before any build runs, so the front door reads `notLinted` and names those files as not checked, `not linted: ` and
+the reason, in the summary's `gaps.unchecked` and the footer's count, rather than as checked by the build.
+
 ### `phase`
 
 ```json

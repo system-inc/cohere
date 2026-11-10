@@ -256,5 +256,53 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 		}
 		verdict.records = append(verdict.records, record)
 	}
+	engine.recordBuildCoverage(runs, verdict.records)
 	return verdict
+}
+
+// recordBuildCoverage counts, into each build's record, what it alone covered and what it compiled that no rule ran
+// on (#ytnvt8k). A file of ours in scope that only one build compiles is that build's alone, counted when a rule ran
+// on it. A file the host's build leaves out that no build analyzed was compiled and never linted, as a build whose
+// load found a type error analyzes no package, so it is named under the first build that compiles it, with why,
+// and the front door names it as not checked rather than as checked by that build.
+//
+// Mutates: records gain each build's FilesAlone, NotLinted and NotLintedReason
+func (engine *pipeline) recordBuildCoverage(runs []buildRun, records []contract.BuildRecord) {
+	inScope := func(file string) bool {
+		return engine.described.inScopeSet[file] || engine.described.constrainedInScope[file]
+	}
+	compiledBy := map[string][]int{}
+	for index, run := range runs {
+		for file := range run.compiled {
+			if inScope(file) {
+				compiledBy[file] = append(compiledBy[file], index)
+			}
+		}
+	}
+	for file, builds := range compiledBy {
+		slices.Sort(builds)
+		linted := slices.ContainsFunc(builds, func(index int) bool { return runs[index].said[file] })
+		if len(builds) == 1 && linted {
+			records[builds[0]].FilesAlone++
+		}
+		if !linted && engine.described.constrainedInScope[file] {
+			records[builds[0]].NotLinted = append(records[builds[0]].NotLinted, file)
+		}
+	}
+	for index := range records {
+		if len(records[index].NotLinted) == 0 {
+			continue
+		}
+		slices.Sort(records[index].NotLinted)
+		reason := "no build that compiles it analyzed its package"
+		if len(runs[index].analyzed) == 0 && len(runs[index].typeErrors) > 0 {
+			found := "a type error"
+			if len(runs[index].typeErrors) > 1 {
+				found = fmt.Sprintf("%d type errors", len(runs[index].typeErrors))
+			}
+			reason = "the " + runs[index].build.String() + " build compiles it, and its load found " + found +
+				", so it analyzed no package"
+		}
+		records[index].NotLintedReason = reason
+	}
 }
