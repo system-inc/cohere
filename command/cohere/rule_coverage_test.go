@@ -412,21 +412,6 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 	})
 
 	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
-	test.Run("config keys that match no rule", func(test *testing.T) {
-		lintConfiguration := &configuration.Configuration{Rules: map[string]configuration.RuleSetting{
-			"quiet-rule":   {Severity: configuration.SeverityError},
-			"no-dupe-keys": {Severity: configuration.SeverityOff},
-		}}
-		output := renderLintReport(lintReport{
-			Result:            program.Result{Coverage: cleanCoverage()},
-			Rules:             rules,
-			LintConfiguration: lintConfiguration,
-			WalkCost:          "in 1s",
-		})
-		requireLines(test, output, `  config: key "no-dupe-keys" matches no registered rule, so its off never applies`)
-	})
-
-	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	test.Run("a rule offered files that registered nothing when it should have", func(test *testing.T) {
 		// Three rules with the same numbers: offered 40 files, listened to none, reported nothing. Only
 		// the one declaring no reason is dead, and only it prints by default (#j69gvka). Before the

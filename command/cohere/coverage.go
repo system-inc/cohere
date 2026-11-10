@@ -630,7 +630,6 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	fmt.Fprintln(account, summary.coverageCountedLine())
 	fmt.Fprintln(account, summary.coverageFilesLine(report.Details))
 	writeParityCoverage(account, report.Rules, report.LintConfiguration)
-	writeOrphanedConfigKeys(account, report.Rules, report.LintConfiguration)
 	writeDepartures(account, report.LintConfiguration)
 	writeOverrideReasons(account, report.LintConfiguration)
 	writeCoverageNotes(account, summary, report.Details)

@@ -178,6 +178,11 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   no longer renames them. `Var` and `Vars` can mean JavaScript's var keyword, so they say what to write for a
   variable and ask for a name saying it means the keyword otherwise. The same names are found as before. A
   local error from a call whose name holds one of the words, as `os.ReadDir`'s, is no longer named for it.
+- A rule key in `CohereSettings.json` that names no rule cohere has, at the top level or in an override, in the
+  project's own file or any file it extends, is refused at load: the run exits 1 naming the key and the file, and
+  checks nothing. A typo or a rule from a newer cohere loaded, applied to nothing and read green, and only
+  `--verbose` said so, as `config: key "..." matches no registered rule`, a line that is gone. `unused-disable`
+  is a setting and still loads. `--format-only` reads no rules, so it is unchanged.
 
 ## 0.1.1 (2026-11-03)
 

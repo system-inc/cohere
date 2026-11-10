@@ -1829,65 +1829,6 @@ func lintConfigSources(path string) []string {
 	return sources
 }
 
-// writeOrphanedConfigKeys says which config entries name a rule that does not exist. Printed in full
-// by default, because a decision that silently stopped applying needs action.
-//
-// This is the inverse of the not-configured count, and it is the failure the rename of every
-// rule to its upstream spelling introduced. The resolver matches a config key exactly, or trims a
-// prefix off it on a `/` boundary, so a key that is longer than the rule name resolves and a key
-// that is shorter never can. `typescript/no-base-to-string` cannot reach a rule registered as
-// `@typescript-eslint/no-base-to-string`: there is no prefix to trim, only one to add.
-//
-// Left silent, this reads as the opposite of what happened. The rule reports "nobody has said
-// whether it should run" while someone did say, in the config, in a key sitting three lines above
-// one that works. A deliberate `off` that stops applying is worse than one that was never written,
-// because the config still shows the decision and the run no longer honors it.
-//
-// Keys naming a rule cohere has not ported yet are the expected case and not an error: a decision
-// recorded ahead of the rule is how this migration is supposed to work. They are counted and named
-// separately so the two are never confused.
-func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Configuration) {
-	if lintConfiguration == nil {
-		return
-	}
-
-	registered := make(map[string]bool, len(rules))
-	for _, registeredRule := range rules {
-		registered[registeredRule.Name] = true
-	}
-
-	// A key resolves if some registered rule matches it exactly, or ends with it on a `/` boundary.
-	// This mirrors settingFor rather than reimplementing it loosely, because a check that disagreed
-	// with the resolver would report keys that work and miss keys that do not.
-	resolves := func(key string) bool {
-		if key == configuration.UnusedDisable {
-			return true
-		}
-		for name := range registered {
-			if configuration.KeyReachesRule(key, name) {
-				return true
-			}
-		}
-		return false
-	}
-
-	orphaned := make([]string, 0)
-	for key := range lintConfiguration.Rules {
-		if !resolves(key) {
-			orphaned = append(orphaned, key)
-		}
-	}
-	sort.Strings(orphaned)
-
-	for _, key := range orphaned {
-		setting := lintConfiguration.Rules[key]
-		fmt.Fprintf(out,
-			"  config: key %q matches no registered rule, so its %s never applies: either the rule is not ported yet, or the key is spelled for an older name\n",
-			key, setting.Severity,
-		)
-	}
-}
-
 // round trims a duration to milliseconds, which is the resolution any of these numbers means
 // anything at.
 func round(duration time.Duration) time.Duration {
