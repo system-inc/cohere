@@ -249,6 +249,9 @@ func firstNight(state string, tonight bench_results.Record) (bench_results.Guard
 		TonightCohereCommit:  tonight.Cohere.Commit,
 		TonightProjectCommit: tonight.Project.Commit,
 	}
+	if narrowedError := refuseNarrowedBaseline(tonight); narrowedError != nil {
+		return result, narrowedError
+	}
 	tonightQuiet := tonight.Modes[bench_results.ModeCold].Quiet
 	switch {
 	case tonight.Cohere.Dirty:
@@ -294,6 +297,9 @@ func acceptBaseline(state string, recordPath string, because string) error {
 	if projectNameError := plainProjectName(record.Project.Name); projectNameError != nil {
 		return projectNameError
 	}
+	if narrowedError := refuseNarrowedBaseline(record); narrowedError != nil {
+		return fmt.Errorf("%s: %w", recordPath, narrowedError)
+	}
 	if record.Modes[bench_results.ModeCold].Quiet == nil {
 		return fmt.Errorf(
 			"%s has no quiet %s run, and a baseline must be a quiet number",
@@ -305,6 +311,21 @@ func acceptBaseline(state string, recordPath string, because string) error {
 		return createDirectoryError
 	}
 	return writeBaseline(state, record, because)
+}
+
+// refuseNarrowedBaseline refuses a record narrowed to one engine's project (bench_results.Record.Engine) as a
+// baseline, on both paths that make one: the first night and -accept. The nightly guard times whole roots, and
+// bench_results.Guard refuses to compare a narrowed record with a whole-root one, so a narrowed baseline would
+// turn every later night into a refusal that points at the baseline rather than at the record that caused it.
+func refuseNarrowedBaseline(record bench_results.Record) error {
+	if record.Engine == "" {
+		return nil
+	}
+	return fmt.Errorf(
+		"the record checked the %s project alone (engine %s), and a baseline is a record of the whole root",
+		record.Engine,
+		record.Engine,
+	)
 }
 
 // writeBaseline writes record as its project's baseline and appends the move, with because, to the baselines
