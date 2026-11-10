@@ -1,8 +1,5 @@
 {
-    "ignorePatterns": [
-        "TypeScript/**",
-        "internal/format/prettier/bundles/**"
-    ],
+    "ignorePatterns": ["TypeScript/**", "internal/format/prettier/bundles/**"],
     "go": {
         "rules": {
             "cohere-go/consistency-no-abbreviated-file-name": "off",

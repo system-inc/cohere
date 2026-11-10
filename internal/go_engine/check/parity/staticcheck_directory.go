@@ -9,20 +9,6 @@ import (
 	"testing"
 )
 
-// StaticcheckDirectory is the directory of honnef.co/go/tools, staticcheck's module, as this module resolves it: the
-// module cache's copy of the release go.mod requires, where a port's test reads staticcheck's own fixtures. The module
-// cache is read-only, so a test that writes beside a fixture copies it into a directory of its own first. It asks the
-// go command, run in the calling test's package directory, which lies in this module, and fails the test with the
-// command's own error when it cannot answer, or with why when it answers with no directory.
-func StaticcheckDirectory(test *testing.T) string {
-	test.Helper()
-	directory, listError := staticcheckDirectory()
-	if listError != nil {
-		test.Fatal(listError)
-	}
-	return directory
-}
-
 // staticcheckDirectory is the go command's answer, asked once per test binary, since every package's tests read the
 // same module.
 var staticcheckDirectory = sync.OnceValues(func() (string, error) {
@@ -41,3 +27,17 @@ var staticcheckDirectory = sync.OnceValues(func() (string, error) {
 	}
 	return directory, nil
 })
+
+// StaticcheckDirectory is the directory of honnef.co/go/tools, staticcheck's module, as this module resolves it: the
+// module cache's copy of the release go.mod requires, where a port's test reads staticcheck's own fixtures. The module
+// cache is read-only, so a test that writes beside a fixture copies it into a directory of its own first. It asks the
+// go command, run in the calling test's package directory, which lies in this module, and fails the test with the
+// command's own error when it cannot answer, or with why when it answers with no directory.
+func StaticcheckDirectory(test *testing.T) string {
+	test.Helper()
+	directory, listError := staticcheckDirectory()
+	if listError != nil {
+		test.Fatal(listError)
+	}
+	return directory
+}

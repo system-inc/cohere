@@ -1,3 +1,5 @@
+//cohere:file-ignore consistency-require-separated-folder-words staticcheck's name, a project's own spelling
+
 package staticcheck_wants_test
 
 import (
