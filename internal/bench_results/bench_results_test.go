@@ -1,10 +1,13 @@
 package bench_results
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/format/native"
 )
 
 // Every committed record is the honest account of its own runs, and is named for itself.
@@ -254,6 +257,29 @@ func TestARecordNarrowedToOneEngineIsNamedApart(test *testing.T) {
 	}
 	if strings.Contains(string(encoded), `"engine"`) {
 		test.Errorf("the whole-root record names an engine:\n%s", encoded)
+	}
+}
+
+// A record is encoded in the house format, so the format check at cohere's root leaves a fresh record exactly as
+// the benchmark wrote it, and it lands with nothing to fix (#rqmykvm): a whole-root record and a narrowed one,
+// each formatted again under its own file name, read byte-identical.
+func TestAnEncodedRecordIsInTheHouseFormat(test *testing.T) {
+	test.Parallel()
+	narrowed := honestRecord()
+	narrowed.Engine = EngineGo
+	narrowed.GoEnvironment = &GoEnvironment{Gogc: "200"}
+	for _, record := range []Record{honestRecord(), narrowed} {
+		encoded, encodeError := Encode(record)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		formatted, formatError := native.FormatHouse(FileName(record), encoded)
+		if formatError != nil {
+			test.Fatal(formatError)
+		}
+		if !bytes.Equal(formatted, encoded) {
+			test.Errorf("the house format would rewrite %s:\n%s", FileName(record), formatted)
+		}
 	}
 }
 
