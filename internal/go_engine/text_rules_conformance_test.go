@@ -236,7 +236,7 @@ func runTextRulesCase(
 	source := testCase.Sources[text_rules.EngineGo]
 	casePath := writeTextRulesFile(test, directory, testCase.FileName(text_rules.EngineGo), []byte(source))
 
-	ruleSettings, settingsError := settings.Load(directory, "", knownRuleNames(rulesForCase))
+	ruleSettings, settingsError := settings.Load(directory, "", knownRuleNames(rulesForCase), nil)
 	if settingsError != nil {
 		test.Fatalf("the adapter's own settings for %s are refused: %v", testCase.Id(), settingsError)
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/our_tiers"
 )
 
 // The files Build produces, relative to the module root.
@@ -276,11 +277,13 @@ func ignoreEntryShape() *schemaNode {
 }
 
 // goShape is the Go engine's block, as internal/go_engine/settings reads it: rules, each a severity or
-// [severity] or [severity, options object], and departures, each rule's reason for loosening it past the house.
+// [severity] or [severity, options object], departures, each rule's reason for loosening it past the house, and
+// reasons, why each off is off.
 // Its severities are that loader's own list, exact, so the schema never allows what the engine refuses. Rule
-// names are left open, in rules and departures alike, since the Go engine's registry is not the TypeScript one
-// this package lists; the engine refuses a name it does not know. Which options loosen a rule is the rule's to
-// say, so a departure excusing nothing is the engine's refusal, at configuration, and not the schema's.
+// names are left open, in rules, departures and reasons alike, since the Go engine's registry is not the TypeScript
+// one this package lists; the engine refuses a name it does not know. Which options loosen a rule is the rule's to
+// say, so a departure excusing nothing is the engine's refusal, at configuration, and not the schema's, and so is a
+// reason for a rule the block does not turn off, and an off with no reason inside our tiers.
 func goShape() *schemaNode {
 	severity := &schemaNode{Type: "string", Enum: settings.SeveritySpellings}
 	setting := &schemaNode{
@@ -311,6 +314,16 @@ func goShape() *schemaNode {
 				Description: "For each cohere-go/<rule> whose options loosen it past the house's value, why, in a " +
 					"sentence. The engine refuses a loosening option with no departure, and a departure for a rule " +
 					"whose options loosen nothing.",
+				AdditionalProperties: &additionalProperties{
+					schema: &schemaNode{Type: "string", Pattern: goReasonPattern},
+				},
+			},
+			"reasons": {
+				Type: "object",
+				Description: "For each cohere-go/<rule> this block turns off, why, in a sentence. Required in a " +
+					"module of ours, whose path is under " + our_tiers.ModulePrefix +
+					", and optional outside it. Coverage " +
+					"prints the reason beside the rule. An entry for a rule the block does not turn off is refused.",
 				AdditionalProperties: &additionalProperties{
 					schema: &schemaNode{Type: "string", Pattern: goReasonPattern},
 				},

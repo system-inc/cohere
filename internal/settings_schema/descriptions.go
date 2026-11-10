@@ -1,6 +1,9 @@
 package settings_schema
 
-import "github.com/system-inc/cohere/internal/format/format_options"
+import (
+	"github.com/system-inc/cohere/internal/format/format_options"
+	"github.com/system-inc/cohere/internal/our_tiers"
+)
 
 // The prose a person reads about each key. The keys themselves come from the loader; the test refuses a
 // key here the loader does not accept, and a key the loader accepts that is not here.
@@ -56,8 +59,12 @@ var topLevelDescriptions = map[string]string{
 		"exactly as written) or [severity, options] with one options object. Its departures state why a rule is " +
 		"loosened past the house: an option looser than the house's value, as a cohere-go/consistency-no-long-file " +
 		"max above 2,000, runs only beside a departure for its rule with a reason, and a departure for a rule whose " +
-		"options loosen nothing is refused. With no go block, every Go rule runs at error and every run says so. A " +
-		"rule name the engine does not know, any key besides rules and departures, and a format key are refused: " +
+		"options loosen nothing is refused. Its reasons say why each rule it turns off is off, in a sentence: " +
+		"required when a module the root governs is ours, its path under " + our_tiers.ModulePrefix +
+		", and optional " +
+		"outside, and coverage prints each beside its rule. With no go block, every Go rule runs at error and every " +
+		"run says so. A rule name the engine does not know, any key besides rules, departures and reasons, and a " +
+		"format key are refused: " +
 		"gofmt is the house format for Go and is not configured. The TypeScript linter leaves this block alone.",
 
 	"output": "How a run prints, for this repository. phases: true puts where the time went (graph, fix, format, " +

@@ -173,7 +173,7 @@ func TestTheGoExampleLoadsInTheGoEngine(test *testing.T) {
 	test.Parallel()
 	path := writeSettings(test, keyFixtures["go"])
 	knownRules := []string{"cohere-go/performance-require-parallel-test"}
-	if _, loadError := settings.Load(filepath.Dir(path), path, knownRules); loadError != nil {
+	if _, loadError := settings.Load(filepath.Dir(path), path, knownRules, nil); loadError != nil {
 		test.Errorf("the reference's go example is refused by the Go engine: %v", loadError)
 	}
 }
@@ -244,7 +244,7 @@ func TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts(test *testing.T) {
 	goSchema := compiledGoSchema(test)
 	for _, block := range goBlocks {
 		path := writeSettings(test, map[string]string{"CohereSettings.json": `{"go": ` + block + `}`})
-		_, engineError := settings.Load(filepath.Dir(path), path, []string{goBlockRule})
+		_, engineError := settings.Load(filepath.Dir(path), path, []string{goBlockRule}, nil)
 		schemaError := goSchema.Validate([]json.RawMessage{json.RawMessage(block)})
 		switch {
 		case engineError != nil && schemaError == nil:

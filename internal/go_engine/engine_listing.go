@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 	"github.com/system-inc/cohere/internal/release/packaging"
@@ -70,9 +71,10 @@ func writeRules(request invocation, registered []rule.Rule, standardOutput io.Wr
 }
 
 // loadSettings reads which rules run, and how strictly, from the file `--lint-config` names or the one beside
-// the root.
+// the root, holding every off to a reason when a module the root governs is ours (project.ModulePaths).
 func loadSettings(request invocation, registered []rule.Rule) (settings.Settings, error) {
-	return settings.Load(request.root, request.lintConfiguration, knownRuleNames(registered))
+	return settings.Load(request.root, request.lintConfiguration, knownRuleNames(registered),
+		project.ModulePaths(request.root))
 }
 
 // broken says the stream could not be written, and returns the exit the front door reads as a crash.

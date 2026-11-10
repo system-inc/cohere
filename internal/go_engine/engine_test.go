@@ -750,7 +750,7 @@ func withOwnAnalyzer(registered rule.Rule, analyzer *analysis.Analyzer) rule.Rul
 // then records the leak. Such a case registers the rule with an analyzer of its own (withOwnAnalyzer).
 func refuseSharedOptions(test *testing.T, root string, registered []rule.Rule) {
 	test.Helper()
-	ruleSettings, loadError := settings.Load(root, "", knownRuleNames(registered))
+	ruleSettings, loadError := settings.Load(root, "", knownRuleNames(registered), nil)
 	if loadError != nil {
 		// Ignored: a case whose settings are refused is testing that refusal, and the engine configures nothing
 		// before it, so no option can be set on any analyzer.

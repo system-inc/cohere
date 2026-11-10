@@ -73,7 +73,28 @@ var fileFixtures = map[string]string{
 	"departures-null":        `{"go": {"rules": {}, "departures": null}}`,
 	"departure-blank-reason": `{"go": {"rules": {}, "departures": {"` + parallelRule + `": " \t "}}}`,
 	"departure-empty-reason": `{"go": {"rules": {}, "departures": {"` + parallelRule + `": ""}}}`,
-	"departure-not-string":   `{"go": {"rules": {}, "departures": {"` + parallelRule + `": 2}}}`,
+
+	// An off and its reason, and an off with none (#v11k0g2).
+	"off-with-reason": `{"go": {
+		"rules": {"` + parallelRule + `": "off"},
+		"reasons": {"` + parallelRule + `": "Our suites share one database."}
+	}}`,
+	"off-without-reason": `{"go": {"rules": {"` + parallelRule + `": "off"}}}`,
+
+	"reasons-not-object":  `{"go": {"rules": {}, "reasons": ["` + parallelRule + `"]}}`,
+	"reason-unknown-rule": `{"go": {"rules": {}, "reasons": {"cohere-go/performance-require-paralel-test": "Why."}}}`,
+	"reason-blank": `{"go": {"rules": {"` + parallelRule + `": "off"},
+		"reasons": {"` + parallelRule + `": " "}}}`,
+	"reason-not-string": `{"go": {"rules": {"` + parallelRule + `": "off"},
+		"reasons": {"` + parallelRule + `": 2}}}`,
+	"reason-for-a-rule-on": `{"go": {"rules": {"` + parallelRule + `": "warn"},
+		"reasons": {"` + parallelRule + `": "Why."}}}`,
+	"reason-beside-departure": `{"go": {
+		"rules": {"` + parallelRule + `": "off"},
+		"departures": {"` + parallelRule + `": "Why."},
+		"reasons": {"` + parallelRule + `": "Why."}
+	}}`,
+	"departure-not-string": `{"go": {"rules": {}, "departures": {"` + parallelRule + `": 2}}}`,
 	"departure-unknown-rule": `{"go": {"rules": {},
 		"departures": {"cohere-go/performance-require-paralel-test": "x"}}}`,
 }
@@ -156,7 +177,7 @@ func TestNoConfigRunsEveryRuleAtErrorAndSaysWhere(test *testing.T) {
 		test.Run(testCase.root, func(test *testing.T) {
 			test.Parallel()
 			root := filepath.Join(fixtureRoot, testCase.root)
-			loaded, loadError := Load(root, "", knownRules)
+			loaded, loadError := Load(root, "", knownRules, nil)
 			if loadError != nil {
 				test.Fatalf("loading with no config: %v", loadError)
 			}
@@ -174,7 +195,7 @@ func TestNoConfigRunsEveryRuleAtErrorAndSaysWhere(test *testing.T) {
 // carries no note.
 func TestTheConfigBesideTheRootIsRead(test *testing.T) {
 	test.Parallel()
-	loaded, loadError := Load(filepath.Join(fixtureRoot, "configured"), "", knownRules)
+	loaded, loadError := Load(filepath.Join(fixtureRoot, "configured"), "", knownRules, nil)
 	if loadError != nil {
 		test.Fatalf("loading the root's config: %v", loadError)
 	}
@@ -197,7 +218,7 @@ func TestAnExplicitPathWinsAndIsNeverReplacedByTheDefaults(test *testing.T) {
 	root := filepath.Join(fixtureRoot, "configured")
 
 	named := filePath("no-go-block")
-	loaded, loadError := Load(root, named, knownRules)
+	loaded, loadError := Load(root, named, knownRules, nil)
 	if loadError != nil {
 		test.Fatalf("loading the named config: %v", loadError)
 	}
@@ -206,7 +227,7 @@ func TestAnExplicitPathWinsAndIsNeverReplacedByTheDefaults(test *testing.T) {
 	}
 
 	missing := filePath("absent")
-	if _, missingError := Load(root, missing, knownRules); missingError == nil {
+	if _, missingError := Load(root, missing, knownRules, nil); missingError == nil {
 		test.Errorf("a named config that does not exist loaded, so the run would go on at the defaults")
 	} else if !strings.Contains(missingError.Error(), missing) ||
 		!strings.Contains(missingError.Error(), "never replaced by the defaults") {
@@ -219,7 +240,7 @@ func TestAnExplicitPathWinsAndIsNeverReplacedByTheDefaults(test *testing.T) {
 func TestAFileWithNoGoBlockRunsEveryRuleAtError(test *testing.T) {
 	test.Parallel()
 	path := filePath("no-go-block")
-	loaded, loadError := Load(fixtureRoot, path, knownRules)
+	loaded, loadError := Load(fixtureRoot, path, knownRules, nil)
 	if loadError != nil {
 		test.Fatalf("a file with the TypeScript engine's keys and no go block was refused: %v", loadError)
 	}
@@ -234,7 +255,7 @@ func TestAFileWithNoGoBlockRunsEveryRuleAtError(test *testing.T) {
 // whose bytes reach the rule as written. An empty rules object is a config read, so it carries no note.
 func TestEveryAcceptedShapeLoads(test *testing.T) {
 	test.Parallel()
-	loaded, loadError := Load(fixtureRoot, filePath("every-shape"), knownRules)
+	loaded, loadError := Load(fixtureRoot, filePath("every-shape"), knownRules, nil)
 	if loadError != nil {
 		test.Fatalf("loading every accepted shape: %v", loadError)
 	}
@@ -255,7 +276,7 @@ func TestEveryAcceptedShapeLoads(test *testing.T) {
 		test.Errorf("note is %q, want none when a go block was read", loaded.Note)
 	}
 
-	empty, emptyError := Load(fixtureRoot, filePath("empty-rules"), knownRules)
+	empty, emptyError := Load(fixtureRoot, filePath("empty-rules"), knownRules, nil)
 	if emptyError != nil {
 		test.Fatalf("loading an empty rules object: %v", emptyError)
 	}
@@ -279,7 +300,7 @@ func TestEveryAcceptedShapeLoads(test *testing.T) {
 // file that gives none carries none.
 func TestADeparturesObjectLoads(test *testing.T) {
 	test.Parallel()
-	loaded, loadError := Load(fixtureRoot, filePath("departures"), knownRules)
+	loaded, loadError := Load(fixtureRoot, filePath("departures"), knownRules, nil)
 	if loadError != nil {
 		test.Fatalf("loading a departures object: %v", loadError)
 	}
@@ -289,7 +310,7 @@ func TestADeparturesObjectLoads(test *testing.T) {
 	if loaded.Rules[parallelRule].Severity != SeverityError {
 		test.Errorf("%s is %+v, want error beside its departure", parallelRule, loaded.Rules[parallelRule])
 	}
-	none, noneError := Load(fixtureRoot, filePath("every-shape"), knownRules)
+	none, noneError := Load(fixtureRoot, filePath("every-shape"), knownRules, nil)
 	if noneError != nil {
 		test.Fatalf("loading a file with no departures: %v", noneError)
 	}
@@ -344,11 +365,18 @@ func TestEveryBadShapeIsRefusedByName(test *testing.T) {
 		"departure-blank-reason": {parallelRule, "blank reason"},
 		"departure-empty-reason": {parallelRule, "blank reason"},
 		"departure-not-string":   {parallelRule, "is 2", "not a reason written as a string"},
+
+		"reasons-not-object":      {"reasons is", "not an object"},
+		"reason-unknown-rule":     {`"cohere-go/performance-require-paralel-test"`, "not a rule the Go engine knows"},
+		"reason-blank":            {parallelRule, "give no reason"},
+		"reason-not-string":       {parallelRule, "is 2", "not a sentence written as a string"},
+		"reason-for-a-rule-on":    {parallelRule, "do not turn off"},
+		"reason-beside-departure": {parallelRule, `both "reasons" and "departures"`},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			path := filePath(name)
-			_, loadError := Load(fixtureRoot, path, knownRules)
+			_, loadError := Load(fixtureRoot, path, knownRules, nil)
 			if loadError == nil {
 				test.Fatalf("%s loaded, and it should be refused", fileFixtures[name])
 			}
@@ -356,6 +384,63 @@ func TestEveryBadShapeIsRefusedByName(test *testing.T) {
 				if !strings.Contains(loadError.Error(), fragment) {
 					test.Errorf("the refusal %q does not say %q", loadError, fragment)
 				}
+			}
+		})
+	}
+}
+
+// ourModule and outsideModule are module paths on either side of our_tiers.ModulePrefix.
+const (
+	ourModule     = "github.com/system-inc/example"
+	outsideModule = "example.com/outside"
+)
+
+// TestAnOffSaysWhyInsideOurTiers: in a root governing a module of ours, an off with no reason is refused, naming the
+// rule and the module that made the root ours, and an off with its reason loads, the reason keyed by its rule. Outside
+// our tiers the same unexplained off loads, with no reason held (#v11k0g2). In a workspace of two modules, one ours,
+// the block governs both, so the module of ours holds its every off to a reason.
+func TestAnOffSaysWhyInsideOurTiers(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		name        string
+		fixture     string
+		modulePaths []string
+		refused     bool
+	}{
+		{name: "ours, no reason", fixture: "off-without-reason", modulePaths: []string{ourModule}, refused: true},
+		{name: "ours, a reason", fixture: "off-with-reason", modulePaths: []string{ourModule}},
+		{name: "outside, no reason", fixture: "off-without-reason", modulePaths: []string{outsideModule}},
+		{name: "outside, a reason", fixture: "off-with-reason", modulePaths: []string{outsideModule}},
+		{name: "no module read, no reason", fixture: "off-without-reason"},
+		{name: "a workspace with one of ours, no reason", fixture: "off-without-reason",
+			modulePaths: []string{outsideModule, ourModule}, refused: true},
+	} {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			loaded, loadError := Load(fixtureRoot, filePath(testCase.fixture), knownRules, testCase.modulePaths)
+			if testCase.refused {
+				if loadError == nil {
+					test.Fatalf("an off with no reason loaded in a root governing %v", testCase.modulePaths)
+				}
+				for _, fragment := range []string{parallelRule, ourModule, `"reasons"`} {
+					if !strings.Contains(loadError.Error(), fragment) {
+						test.Errorf("the refusal %q does not say %q", loadError, fragment)
+					}
+				}
+				return
+			}
+			if loadError != nil {
+				test.Fatalf("loading: %v", loadError)
+			}
+			if loaded.Rules[parallelRule].Severity != SeverityOff {
+				test.Errorf("%s is %+v, want off", parallelRule, loaded.Rules[parallelRule])
+			}
+			want := ""
+			if testCase.fixture == "off-with-reason" {
+				want = "Our suites share one database."
+			}
+			if got := loaded.OffReasons[parallelRule]; got != want {
+				test.Errorf("the reason held for %s is %q, want %q", parallelRule, got, want)
 			}
 		})
 	}

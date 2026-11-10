@@ -484,6 +484,7 @@ func (engine *pipeline) lintCoverage(
 		RulesScopedOff:     map[string]int{},
 		RulesNotConfigured: unconfigured,
 		ConfigNote:         engine.settings.Note,
+		OffReasons:         engine.settings.OffReasons,
 	}
 	// A rule that crashed on a package did not watch all of it, so its silence there is not quiet.
 	for _, name := range ranNames {
