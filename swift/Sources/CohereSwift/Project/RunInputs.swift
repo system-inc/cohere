@@ -24,6 +24,15 @@ import Foundation
    file added to the index, moves files in or out of the run. A `.git` in each directory from a package up to its
    repository is named absent, since one appearing moves the repository's boundary, and a `.git` file a worktree
    points through is named as a file;
+ - the index again, under `trackedIgnored`, when the file set read it whole (#jem2gsa). What the walk asked of it is
+   narrow, which of the paths the ignore rules exclude are tracked, and git rewrites it on every `git status`, so the
+   front door keys it on `gitignore.TrackedIgnoredDigest` rather than on its bytes, over the scope the file set
+   asked: the nearest directory holding the walk's start and every target source, `""` when they lie in different
+   subtrees of the repository. A scope too wide only costs a miss, one too narrow is a stale replay, so it is never
+   narrower than what was asked. The digest reads only the repository's `.gitignore` files and a `.git` directory's
+   `info/exclude`, matched case sensitively, so a run that excluded a path by anything else, the global excludes
+   file, a worktree's shared `info/exclude` or `core.ignorecase`'s folding, keeps the index keyed on its bytes, as an
+   index read with a fallback does;
  - every Swift file no target compiles that the walk read to tell whether it is a script (`FileSet.filesRead`), a file
    of declarations among them, since an edit can make it one. At a scripts-only root, where no root is walked, these,
    the scripts and the walk's listings are the whole of what decides which files it checks and what it finds there;
@@ -98,6 +107,20 @@ struct RunInputs {
         for consulted in fileSet.ignoreFilesConsulted {
             inputs.fileOrAbsent(URL(fileURLWithPath: consulted))
         }
+        /* Named only beside the index's own name among the files: the front door keys an input it records. */
+        var trackedIgnored: [InputsRecord.TrackedIgnored] = []
+        if let named = fileSet.trackedIgnored {
+            let index = Self.path(URL(fileURLWithPath: named.index))
+            if inputs.files.contains(index) {
+                trackedIgnored.append(
+                    InputsRecord.TrackedIgnored(
+                        index: index,
+                        root: Self.path(URL(fileURLWithPath: named.root)),
+                        scope: named.scope,
+                    )
+                )
+            }
+        }
         inputs.formatConfigurations(above: fileSet.owned.map(\.url), boundary: boundary)
         inputs.fileOrAbsent(settingsFile)
         if let toolchainExecutable {
@@ -116,6 +139,7 @@ struct RunInputs {
             files: inputs.files.sorted(),
             directories: inputs.directories.sorted(),
             absent: inputs.absent.sorted(),
+            trackedIgnored: trackedIgnored.sorted(),
         )
     }
 
