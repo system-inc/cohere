@@ -30,8 +30,9 @@ type flowAnalysis struct {
 	foreign     *foreignMethods
 }
 
-// record notes every place node hands a value on.
-func (flows *flowAnalysis) record(node ast.Node, stack []ast.Node) {
+// record notes every place node hands a value on. enclosing is the signature of the function a return statement is
+// in, read where the walk met it.
+func (flows *flowAnalysis) record(node ast.Node, enclosing *types.Signature) {
 	switch handing := node.(type) {
 	case *ast.CallExpr:
 		flows.recordCall(handing)
@@ -40,7 +41,7 @@ func (flows *flowAnalysis) record(node ast.Node, stack []ast.Node) {
 	case *ast.ValueSpec:
 		flows.recordValueSpec(handing)
 	case *ast.ReturnStmt:
-		flows.recordReturn(handing, flows.enclosingSignature(stack))
+		flows.recordReturn(handing, enclosing)
 	case *ast.CompositeLit:
 		flows.recordCompositeLiteral(handing)
 	case *ast.SendStmt:
@@ -410,8 +411,9 @@ func (flows *flowAnalysis) candidateAt(node ast.Node, stack []ast.Node) (candida
 	spelling := ""
 	switch written := node.(type) {
 	case *ast.Ident:
-		// The predeclared any by its object, so a local type named any, or a parameter named any, is not it.
-		if flows.context.TypesInfo.Uses[written] != types.Universe.Lookup("any") {
+		// The predeclared any by its object, so a local type named any, or a parameter named any, is not it. Only a
+		// name spelled any can use it, so any other name is set aside before the lookup.
+		if written.Name != "any" || flows.context.TypesInfo.Uses[written] != types.Universe.Lookup("any") {
 			return candidate{}, false
 		}
 		spelling = "any"

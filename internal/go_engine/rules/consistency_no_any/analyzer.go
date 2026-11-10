@@ -64,6 +64,17 @@ type packageState struct {
 	flows *flowAnalysis
 	// candidates are the any and interface{} words written in a declaration's type, in the order the walk met them.
 	candidates []candidate
+	// handings are the nodes that hand a value on, in the order the walk met them, recorded into flows only once the
+	// package is walked and only when it holds a candidate: the flows decide nothing else, and most packages write
+	// no any at all.
+	handings []handing
+}
+
+// handing is a node that hands a value on, with the signature of the function it is in when it is a return
+// statement, read from the walk's stack where the node was met, since the stack is gone by the time it is recorded.
+type handing struct {
+	node      ast.Node
+	signature *types.Signature
 }
 
 // enterFile makes the package's flow analysis, the first time the walk enters one of its files.
@@ -82,25 +93,35 @@ func enterFile(context *rule.Context, _ *ast.File) {
 	state.candidates = []candidate{}
 }
 
-// judgeNode notes every place node hands a value on, and keeps node as a candidate when it is any or an empty
+// judgeNode keeps every node that hands a value on, and keeps node as a candidate when it is any or an empty
 // interface written in a declaration's type, its ancestors in stack.
 func judgeNode(context *rule.Context, node ast.Node, stack []ast.Node) {
 	state := rule.State[packageState](context)
 	if state.flows == nil {
 		return
 	}
-	state.flows.record(node, stack)
+	switch node.(type) {
+	case *ast.CallExpr, *ast.AssignStmt, *ast.ValueSpec, *ast.CompositeLit, *ast.SendStmt:
+		state.handings = append(state.handings, handing{node: node})
+		return
+	case *ast.ReturnStmt:
+		state.handings = append(state.handings, handing{node: node, signature: state.flows.enclosingSignature(stack)})
+		return
+	}
 	if found, isCandidate := state.flows.candidateAt(node, stack); isCandidate {
 		state.candidates = append(state.candidates, found)
 	}
 }
 
-// exitPackage settles the package's flows and reports each candidate none of whose declarations has its type fixed
-// elsewhere.
+// exitPackage records the package's flows and settles them when it holds a candidate, and reports each candidate none
+// of whose declarations has its type fixed elsewhere.
 func exitPackage(context *rule.Context) {
 	state := rule.State[packageState](context)
-	if state.flows == nil {
+	if state.flows == nil || len(state.candidates) == 0 {
 		return
+	}
+	for _, each := range state.handings {
+		state.flows.record(each.node, each.signature)
 	}
 	state.flows.settle(state.candidates)
 	for _, found := range state.candidates {
