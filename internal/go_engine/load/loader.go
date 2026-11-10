@@ -30,8 +30,18 @@ type loader struct {
 	fileSet *token.FileSet
 	sizes   types.Sizes
 
-	// slots holds one token per core; a parse or a type check holds one while it runs and never waits on another.
-	slots chan struct{}
+	// slots holds one slot per core; a read, a parse, a type check or a read of export data holds one while it runs
+	// and never waits on anything else, so nothing waits on a slot forever. They are granted longest path first, by
+	// priorities.
+	slots *prioritySlots
+
+	// priorities is each reachable package's longest path to the end of the graph (see prioritize), which every slot
+	// taken for its work carries. It is written before any work starts and only read after.
+	priorities map[*node]int
+
+	// observeGrant, nil outside tests, is told of every slot granted, while it is held: the ID of the package the
+	// work is for, and the kind of work.
+	observeGrant func(identifier string, work slotWork)
 
 	// parsed is each file parsed once, by path: a package and its test variant hold the same syntax, as under
 	// go/packages. Its lock is also held while a package reserves its files' ranges in fileSet, so no other package's
@@ -158,6 +168,7 @@ func identifiersOf(stack []*node) string {
 // imports it, directly or through other packages the cache holds, and are never read otherwise (see needed).
 func (loader *loader) load(reachable []*node) {
 	needed := loader.needed(reachable)
+	loader.priorities = loader.prioritize(reachable)
 	// Every package checked from source claims its files before any parse starts, in reachable's order, which connect
 	// fixes, so which package parses a file two packages share, as p and "p [p.test]" do, is the same every run.
 	claims := map[*node]*claim{}
@@ -183,19 +194,19 @@ func (loader *loader) load(reachable []*node) {
 				for _, imported := range current.loaded.Imports {
 					<-loader.graph.nodes[imported.ID].done
 				}
-				loader.slots <- struct{}{}
+				loader.acquire(current, slotWorkExportData)
 				readError := loader.readExportData(current, restored)
-				<-loader.slots
+				loader.slots.release()
 				if readError == nil {
 					return
 				}
 				// Export data that does not read is a package checked from source after all, its imports done. It
 				// claims its files only now, after every package checked from source, so it waits only on claims
 				// made before its own.
-				syntax, parseErrors := loader.parseClaimed(loader.claim(current.loaded.CompiledGoFiles))
-				loader.slots <- struct{}{}
+				syntax, parseErrors := loader.parseClaimed(loader.claim(current.loaded.CompiledGoFiles), current)
+				loader.acquire(current, slotWorkCheck)
 				loader.check(current, syntax, parseErrors)
-				<-loader.slots
+				loader.slots.release()
 			}()
 			continue
 		}
@@ -203,13 +214,13 @@ func (loader *loader) load(reachable []*node) {
 		go func() {
 			defer group.Done()
 			defer close(current.done)
-			syntax, parseErrors := loader.parseClaimed(claims[current])
+			syntax, parseErrors := loader.parseClaimed(claims[current], current)
 			for _, imported := range current.loaded.Imports {
 				<-loader.graph.nodes[imported.ID].done
 			}
-			loader.slots <- struct{}{}
+			loader.acquire(current, slotWorkCheck)
 			loader.check(current, syntax, parseErrors)
-			<-loader.slots
+			loader.slots.release()
 		}()
 	}
 	group.Wait()
@@ -235,6 +246,39 @@ func (loader *loader) needed(reachable []*node) map[*node]bool {
 		}
 	}
 	return needed
+}
+
+// prioritize is each reachable package's priority: its cost plus the largest priority of the packages that import it,
+// so a slot goes first to the work the longest chain of what is still to load waits behind. reachable is connect's
+// postorder, every importer after what it imports, so walked backwards each package's importers are done before it.
+// A package's cost is the files it parses when checked from source, and 1 when its types are read from export data,
+// which stands for how long its work holds slots without a stat of every file, which would sit on the very path this
+// shortens. A restored package whose export data does not read is checked at its restored priority.
+func (loader *loader) prioritize(reachable []*node) map[*node]int {
+	priorities := make(map[*node]int, len(reachable))
+	// longestAfter is the largest priority among each package's importers seen so far.
+	longestAfter := make(map[*node]int, len(reachable))
+	for index := len(reachable) - 1; index >= 0; index-- {
+		current := reachable[index]
+		cost := len(current.loaded.CompiledGoFiles)
+		if _, held := loader.restored[current.loaded]; held {
+			cost = 1
+		}
+		priorities[current] = cost + longestAfter[current]
+		for _, imported := range current.loaded.Imports {
+			importedNode := loader.graph.nodes[imported.ID]
+			longestAfter[importedNode] = max(longestAfter[importedNode], priorities[current])
+		}
+	}
+	return priorities
+}
+
+// acquire takes a slot for work on current's behalf, at its priority, and tells observeGrant once it holds it.
+func (loader *loader) acquire(current *node, work slotWork) {
+	loader.slots.acquire(loader.priorities[current])
+	if loader.observeGrant != nil {
+		loader.observeGrant(current.loaded.ID, work)
+	}
 }
 
 // readExportData sets a package's types from the export data the findings cache holds, against the types its
@@ -314,16 +358,16 @@ func (loader *loader) claim(files []string) *claim {
 	return taken
 }
 
-// parseClaimed parses the files a claim took, each file once however many packages hold it, and returns the syntax
-// of the claim's files that parsed at all, in order, and every error. The parser goes as far as it can, so a file
-// with errors still gives its syntax.
+// parseClaimed parses the files a claim took for current, each file once however many packages hold it, and returns
+// the syntax of the claim's files that parsed at all, in order, and every error. Each read and parse takes its slot at
+// current's priority. The parser goes as far as it can, so a file with errors still gives its syntax.
 //
 // A file's base in the file set is fixed when its range is added, and a check that compares positions across a
 // package's files, or orders findings by position, reads which file sorts first from the bases. So the claimed files
 // are read in parallel, then their ranges reserved in the package's order once every file of the claim another
 // package took has its own, and only then parsed, in parallel, each into the range reserved for it. Their bases then
 // follow the claim's order, and the files others took come first, whatever order the reads and parses finish in.
-func (loader *loader) parseClaimed(taken *claim) ([]*ast.File, []error) {
+func (loader *loader) parseClaimed(taken *claim, current *node) ([]*ast.File, []error) {
 	contents := make([][]byte, len(taken.files))
 	readErrors := make([]error, len(taken.files))
 	var reads sync.WaitGroup
@@ -333,8 +377,8 @@ func (loader *loader) parseClaimed(taken *claim) ([]*ast.File, []error) {
 		}
 		loader.filesParsed.Add(1)
 		reads.Go(func() {
-			loader.slots <- struct{}{}
-			defer func() { <-loader.slots }()
+			loader.acquire(current, slotWorkRead)
+			defer loader.slots.release()
 			// The file is counted here, once, as filesParsed counts it, and its parse below adds CPU alone.
 			loader.timing.Parse(loader.timing.Measure(func() {
 				contents[index], readErrors[index] = loader.readFile(file)
@@ -367,8 +411,8 @@ func (loader *loader) parseClaimed(taken *claim) ([]*ast.File, []error) {
 		}
 		go func() {
 			defer close(parse.done)
-			loader.slots <- struct{}{}
-			defer func() { <-loader.slots }()
+			loader.acquire(current, slotWorkParse)
+			defer loader.slots.release()
 			loader.timing.Parse(loader.timing.Measure(func() {
 				parse.file, parse.parseError = loader.parseInto(
 					taken.files[index],
@@ -600,7 +644,7 @@ func newLoader(
 		graph:         built,
 		fileSet:       token.NewFileSet(),
 		sizes:         sizes,
-		slots:         make(chan struct{}, runtime.GOMAXPROCS(0)),
+		slots:         newPrioritySlots(runtime.GOMAXPROCS(0)),
 		parsed:        map[string]*parsedFile{},
 		withheld:      withheld,
 		overlay:       overlay,
