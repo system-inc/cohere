@@ -11,9 +11,11 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
@@ -203,6 +205,47 @@ func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
 	if !failed || !strings.Contains(reason, "windows/amd64") {
 		test.Fatalf("want maxBytes's rename failed under windows/amd64, got %v", failures)
 	}
+}
+
+// A platform's load of the round's base is made afresh for every call and kept by nothing once its reader lets go: the
+// plan reads it once and keeps its fingerprint, and a load kept for the round held each platform's whole load live
+// beside the proof's (#djk8cfd).
+func TestAPlatformLoadIsMadeForEachCallAndKeptByNone(test *testing.T) {
+	test.Parallel()
+
+	engine, loaded := renamingPipelineOver(test, "rename-platforms")
+	space := workspace.FromLoaded(engine.described.workspace.Root, loaded.Roots, loaded.Packages, nil)
+	loadPlatform := engine.platformLoad(space, nil)
+	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
+	first, firstError := loadPlatform(windows, nil)
+	if firstError != nil {
+		test.Fatal(firstError)
+	}
+	second, secondError := loadPlatform(windows, nil)
+	if secondError != nil {
+		test.Fatal(secondError)
+	}
+	if first == second {
+		test.Fatal("the second load of windows/amd64's base was the first's, so the round keeps platform loads")
+	}
+
+	freed := make(chan struct{})
+	runtime.AddCleanup(first, func(done chan struct{}) { close(done) }, freed)
+	first = nil
+	deadline := time.Now().Add(10 * time.Second)
+	for waiting := true; waiting; {
+		runtime.GC()
+		select {
+		case <-freed:
+			waiting = false
+		case <-time.After(10 * time.Millisecond):
+			if time.Now().After(deadline) {
+				test.Fatal("a platform load its reader let go was still reachable after 10s of collections")
+			}
+		}
+	}
+	runtime.KeepAlive(loadPlatform)
+	runtime.KeepAlive(second)
 }
 
 // A platform's proof requires every identifier of a file only it builds to resolve to the declaration it did, not only

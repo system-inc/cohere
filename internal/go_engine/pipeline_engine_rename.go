@@ -627,17 +627,15 @@ func (engine *pipeline) prove(
 // source, with `GOOS` and `GOARCH` set and cgo off, its root packages sorted into what type-checks there and what
 // does not (workspace.PlatformLoadOf), with space's judgment of which files may be written. It reads base, the
 // round's rewrite so far, in place of the disk, as the host's load of the round does, and each call's overlay over
-// that. The load of base alone is the plan's reading and every proof's load before its rewrite, the same bytes each
-// time, so it is made once per platform and kept for the round. Neither the plan nor the proof reads a dependency's
-// syntax there, so the load keeps none (load.PackagesWithRootSyntax).
+// that. It keeps nothing between calls: the plan reads each platform's load of base once and keeps the fingerprint the
+// proof compares against, so the proof loads only its rewrite. A load kept for the round held every platform's whole
+// load live beside the proof's, about 1.5 GB each on cohere at deeafbf4, and ran the collector without letting up
+// (#djk8cfd). A round that plans again after a failed proof loads each platform again. Neither the plan nor the proof
+// reads a dependency's syntax there, so the load keeps none (load.PackagesWithRootSyntax).
 func (engine *pipeline) platformLoad(
 	space *workspace.Workspace, base map[string][]byte,
 ) func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
-	kept := map[workspace.Platform]*workspace.PlatformLoad{}
 	return func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
-		if held, known := kept[platform]; known && len(overlay) == 0 {
-			return held, nil
-		}
 		merged := map[string][]byte{}
 		maps.Copy(merged, base)
 		maps.Copy(merged, overlay)
@@ -649,11 +647,7 @@ func (engine *pipeline) platformLoad(
 		if loadError != nil {
 			return nil, fmt.Errorf("loading as %s: %w", platform, loadError)
 		}
-		sorted := space.PlatformLoadOf(platform, loaded.Roots)
-		if len(overlay) == 0 {
-			kept[platform] = sorted
-		}
-		return sorted, nil
+		return space.PlatformLoadOf(platform, loaded.Roots), nil
 	}
 }
 
