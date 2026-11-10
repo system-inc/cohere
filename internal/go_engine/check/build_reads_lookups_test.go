@@ -92,6 +92,8 @@ func TestARulesLookupsOfOtherPackagesAreRecordedHitAndMiss(test *testing.T) {
 	if runError != nil {
 		test.Fatal(runError)
 	}
+	// The type-read walks run past Run, so the reads are whole only once they end.
+	result.ReadWalks.Wait()
 	if len(result.Crashes) > 0 {
 		test.Fatalf("the rules crashed: %+v", result.Crashes)
 	}

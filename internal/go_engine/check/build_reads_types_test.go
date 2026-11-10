@@ -65,6 +65,8 @@ func TestAPackagesTypeReadsAreEveryForeignObjectItReached(test *testing.T) {
 	if runError != nil {
 		test.Fatal(runError)
 	}
+	// The type-read walks run past Run, so the reads are whole only once they end.
+	result.ReadWalks.Wait()
 	reads := readsOfPath(test, result.Reads, "example.com/reads/user")
 	if restorable, why := reads.Restorable(); !restorable {
 		test.Fatalf("user is not restorable: %s", why)
@@ -118,6 +120,8 @@ func TestEveryPackageEndsItsRunRecordedOrNever(test *testing.T) {
 		if runError != nil {
 			test.Fatal(runError)
 		}
+		// The type-read walks run past Run, so the reads are whole only once they end.
+		result.ReadWalks.Wait()
 		if unknown, missing := unsettledReads(loaded, result.Reads); len(unknown)+len(missing) > 0 {
 			test.Errorf("running %s, want every package recorded or never, got unknown %q and missing %q",
 				enabled[0].Name, unknown, missing)
@@ -139,6 +143,8 @@ func TestEveryPackageEndsItsRunRecordedOrNever(test *testing.T) {
 		if runError != nil {
 			test.Fatal(runError)
 		}
+		// The type-read walks run past Run, so the reads are whole only once they end.
+		result.ReadWalks.Wait()
 		if unknown, missing := unsettledReads(loaded, result.Reads); len(unknown)+len(missing) > 0 {
 			test.Errorf("%s, want every package recorded or never, got unknown %q and missing %q", run, unknown,
 				missing)
@@ -147,5 +153,34 @@ func TestEveryPackageEndsItsRunRecordedOrNever(test *testing.T) {
 			never != build_reads.RestoredFromCache {
 			test.Errorf("warm, want user restored from the findings cache and marked so, got %q", never)
 		}
+	}
+}
+
+// The type-read walks run past Run's return, so Result.Reads read before ReadWalks.Wait can be partial: with user's
+// walk held, user reads unknown, and once the walk is let go and waited for, recorded.
+func TestTheReadsAreWholeOnlyOnceTheWalksAreWaitedFor(test *testing.T) {
+	test.Parallel()
+
+	_, loaded := loadedTypeReads(test)
+	hold := make(chan struct{})
+	options := Options{Reads: loaded.Reads, holdWalk: func(owner *packages.Package) {
+		if owner.PkgPath == "example.com/reads/user" && owner.ForTest == "" {
+			<-hold
+		}
+	}}
+	result, runError := Run(loaded.Packages, []rule.Rule{houseRule(quietAnalyzer)}, options)
+	if runError != nil {
+		close(hold)
+		test.Fatal(runError)
+	}
+	user := readsOfPath(test, result.Reads, "example.com/reads/user")
+	if restorable, _ := user.Restorable(); restorable || user.Recorded() {
+		close(hold)
+		test.Fatal("user's reads read whole while its walk was held")
+	}
+	close(hold)
+	result.ReadWalks.Wait()
+	if restorable, why := user.Restorable(); !restorable {
+		test.Fatalf("user's reads, waited for, are not restorable: %s", why)
 	}
 }

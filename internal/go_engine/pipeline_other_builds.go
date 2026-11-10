@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -31,6 +32,8 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	if len(extras) == 0 {
 		return nil
 	}
+	// Before any build decides anything, the host's reads are whole.
+	hostReads := wholeReads(pass.result)
 	ours := engine.oursSet()
 	analyzed := map[string]bool{}
 	for _, each := range loaded.Packages {
@@ -44,6 +47,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		result:     pass.result,
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
+		reads:      hostReads,
 	}}
 	if engine.session != nil {
 		runs[0].files = engine.session.Files()
@@ -202,6 +206,13 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 	}
 	run.result = result
 	return run, nil
+}
+
+// wholeReads is result's reads once every type-read walk the run left running has ended (check.Result.ReadWalks):
+// read any earlier, a package whose walk is still running reads as unknown.
+func wholeReads(result *check.Result) map[*packages.Package]*build_reads.Reads {
+	result.ReadWalks.Wait()
+	return result.Reads
 }
 
 // otherBuildsFailed notes why the builds beside the host's were not checked, which leaves the run incomplete: it

@@ -12,6 +12,7 @@ package build_reads
 import (
 	"cmp"
 	"go/types"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -33,7 +34,9 @@ const RestoredFromCache = "restored from the findings cache; its reads are not s
 type Reads struct {
 	lock sync.Mutex
 
-	// recorded is set once the package's type reads have been walked.
+	// claimed is set once a walk of the package's type reads has been taken (Claim), and recorded once it has
+	// published them.
+	claimed  bool
 	recorded bool
 
 	// objects are the foreign objects the package's type check reached, each once.
@@ -202,19 +205,62 @@ func (reads *Reads) ScopeLookup(own *types.Package, declaring *types.Package, na
 	return found
 }
 
-// RecordTypes walks own's type information, info, for every object of another package it reaches (see
-// recordTypeReads), once, and marks the reads recorded. A package already marked never is not walked, nor one already
-// recorded.
+// RecordTypes claims and runs the walk of own's type information, info, at once (see Claim and Record). A package
+// already marked never is not walked, nor one whose walk another has claimed.
 func (reads *Reads) RecordTypes(own *types.Package, info *types.Info) {
-	reads.lock.Lock()
-	settled := reads.recorded || reads.never != ""
-	reads.lock.Unlock()
-	if settled {
-		return
+	if reads.Claim() {
+		reads.Record(own, info)
 	}
-	recordTypeReads(reads, own, info)
+}
+
+// Claim takes the walk of the package's type reads for its caller, and reports whether it did: never when the reads
+// are marked never, nor when another has taken the walk already. A caller that runs the walk later, on another
+// goroutine, claims it first, so no other walks the package meanwhile, and nothing reads its type information while
+// the walk's goroutine lets it go.
+func (reads *Reads) Claim() bool {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
+	if reads.claimed || reads.never != "" {
+		return false
+	}
+	reads.claimed = true
+	return true
+}
+
+// Claimed reports whether the walk is taken already, or the reads are marked never, so there is nothing to walk.
+func (reads *Reads) Claimed() bool {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	return reads.claimed || reads.never != ""
+}
+
+// Record walks own's type information, info, for every object of another package it reaches (see collectTypeReads),
+// and publishes what it collected, marking the reads recorded. The caller holds the walk's claim (Claim).
+func (reads *Reads) Record(own *types.Package, info *types.Info) {
+	reads.publishTypes(collectTypeReads(own, info))
+}
+
+// publishTypes adds collected to the reads under one hold of the lock, and marks them recorded.
+func (reads *Reads) publishTypes(collected typeReads) {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	if reads.objects == nil {
+		reads.objects = collected.objects
+	} else {
+		maps.Copy(reads.objects, collected.objects)
+	}
+	for generic, lists := range collected.instances {
+		for _, typeArguments := range lists {
+			if !slices.ContainsFunc(reads.instances[generic], func(recorded *types.TypeList) bool {
+				return identicalLists(recorded, typeArguments)
+			}) {
+				if reads.instances == nil {
+					reads.instances = map[types.Object][]*types.TypeList{}
+				}
+				reads.instances[generic] = append(reads.instances[generic], typeArguments)
+			}
+		}
+	}
 	reads.recorded = true
 }
 

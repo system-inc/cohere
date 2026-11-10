@@ -189,10 +189,11 @@
 // the package differently. Options.Recorded keys the package's reads in
 // every pass's ResultOf, as Options.Resolved keys the resolver, so a rule
 // records there what else it asks of other packages. And releaseSyntax,
-// once the last action on a package has finished and before its type
-// information goes, walks the package's type reads into them, so the
-// walk runs beside the rules rather than on the load's chain. Unset,
-// nothing is recorded and both are upstream's.
+// once the last action on a package has finished, walks the package's
+// type reads into them before its type information goes, on a goroutine
+// of Options.Walks when it is set, which lets the package go once the
+// walk ends, so neither the load's chain nor the rules' waits on it.
+// Unset, nothing is recorded and both are upstream's.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -365,6 +366,13 @@ type Options struct {
 	// releaseSyntax). A package it does not hold, and every package while
 	// it is nil, records nothing.
 	Reads map[*packages.Package]*build_reads.Reads
+
+	// cohere: Walks, when set, runs each type-read walk under Reads on a
+	// goroutine of its own, and the package's syntax and type information
+	// are let go of only once its walk ends, which Analyze does not wait
+	// for: a reader of the reads waits on Walks. Unset, the walk runs
+	// inline, as the last action on the package finishes.
+	Walks *build_reads.Walks
 
 	// cohere: Recorded, when Reads is set too, keys in every pass's
 	// ResultOf the reads Reads holds of the pass's package, nil for a
@@ -919,18 +927,37 @@ func (act *Action) releaseSyntax() {
 	if act.syntax.unfinished.Add(-1) != 0 {
 		return
 	}
-	// cohere: under Options.Reads, the package's type reads, walked once,
-	// here, while its type information is whole, a given package's too,
-	// whether or not it is let go of below.
-	if reads := act.opts.Reads[act.Package]; reads != nil && act.Package.TypesInfo != nil {
-		reads.RecordTypes(act.Package.Types, act.Package.TypesInfo)
-	}
-	if act.syntax.given {
-		if act.syntax.finished == nil {
-			return
-		}
+	keeps := act.syntax.given && act.syntax.finished == nil
+	if act.syntax.given && !keeps {
 		act.syntax.finished(act.Package)
 	}
+	// cohere: under Options.Reads, the package's type reads, walked once,
+	// while its type information is whole, a given package's too, and
+	// only then let go of (see Options.Walks).
+	letGo := func() {
+		if !keeps {
+			act.letGoOfSyntax()
+		}
+	}
+	reads := act.opts.Reads[act.Package]
+	if reads == nil || act.Package.TypesInfo == nil || !reads.Claim() {
+		letGo()
+		return
+	}
+	if act.opts.Walks == nil {
+		reads.Record(act.Package.Types, act.Package.TypesInfo)
+		letGo()
+		return
+	}
+	act.opts.Walks.Go(act.Package, nil, func() {
+		reads.Record(act.Package.Types, act.Package.TypesInfo)
+		letGo()
+	})
+}
+
+// cohere: letGoOfSyntax clears act's package's syntax and type
+// information, and every action's pass on it, which holds them too.
+func (act *Action) letGoOfSyntax() {
 	for _, finished := range act.syntax.actions {
 		if finished.pass != nil {
 			finished.pass.Files = nil

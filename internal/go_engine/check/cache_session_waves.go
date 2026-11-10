@@ -108,6 +108,9 @@ func (session *CacheSession) firstWave(
 		}
 		graphs = append(graphs, graph)
 	}
+	// The first wave's walks let go of the packages they walked as each ends, which must not overlap the second wave's
+	// actions on the same packages, so this wave's walks end here, on a run with the store alone.
+	options.Walks.Wait()
 	files := map[*packages.Package][]storedFile{}
 	for _, analyzedPackage := range firstGiven {
 		files[analyzedPackage] = storedFiles(analyzedPackage)

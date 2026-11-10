@@ -15,7 +15,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/tools/go/analysis"
@@ -88,6 +87,10 @@ type Options struct {
 	// the package by (#b2t9xmf). The run marks the packages it cannot vouch for, and hands them all back in
 	// Result.Reads. The findings are the same either way.
 	Reads map[*packages.Package]*build_reads.Reads
+
+	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
+	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
+	holdWalk func(owner *packages.Package)
 }
 
 // ErrAbandoned is Run's error when Options.Abandon closed before every rule had run, so the result would be partial.
@@ -209,8 +212,13 @@ type Result struct {
 
 	// Reads is Options.Reads, each package's type reads from the load and fact reads from the rules in one, a package
 	// marked never when a finding on it names a file not its own, which can change with a line of another package, or
-	// when the findings cache restored it, so its rules read nothing this run. Nil when Options.Reads is.
+	// when the findings cache restored it, so its rules read nothing this run. Nil when Options.Reads is. The type
+	// reads are walked beside the run, and Run returns without waiting for them, so Reads is whole only once
+	// ReadWalks.Wait has returned: every reader of Reads waits first.
 	Reads map[*packages.Package]*build_reads.Reads
+
+	// ReadWalks are the type-read walks Run left running, nil when Options.Reads is (see Reads).
+	ReadWalks *build_reads.Walks
 
 	Elapsed time.Duration
 }
@@ -268,6 +276,13 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
 	checkerOptions.Reads = options.Reads
+	// The walks run beside the rules, and on past Run's return, so no package's walk sits at the end of the run's
+	// chain; whoever reads the reads waits for them (Result.ReadWalks).
+	var walks *build_reads.Walks
+	if options.Reads != nil {
+		walks = build_reads.NewWalks(runtime.GOMAXPROCS(0), options.holdWalk, nil)
+		checkerOptions.Walks = walks
+	}
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
@@ -319,7 +334,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, ErrAbandoned
 	}
 	graphs = append(graphs, graph)
-	recordUnreachedTypes(options.Reads, options.Ready)
+	recordUnreachedTypes(options.Reads, options.Ready, walks)
 	type rootKey struct {
 		analyzer        *analysis.Analyzer
 		analyzedPackage *packages.Package
@@ -334,6 +349,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 
 	result := &Result{
+		ReadWalks:           walks,
 		RulesRun:            len(rules),
 		FindingsByRule:      make(map[string]int, len(rules)),
 		WithheldAsGenerated: map[string]int{},
@@ -459,13 +475,13 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	return result, nil
 }
 
-// recordUnreachedTypes walks the type reads of each package of reads that no action reached, so nothing walked them as
-// its last action finished (checker.Options.Reads): a dependency no analyzer that learns facts runs on, or a root the
-// run does not analyze. Its type information is still whole, since only the checker lets it go, and only for a
-// package it ran on. A package already recorded or marked never is passed over, and one with no type information,
-// whose types came from export data, is marked never by the load. The walks run as many at once as there are cores,
-// each into its own package's reads. Beside the load, ready is Options.Ready: a package no action reached may still be
-// in its check, as a root the run does not analyze can be, so each is read only once it is final.
+// recordUnreachedTypes starts, on walks, the walk of the type reads of each package of reads that no action reached,
+// so nothing walked them as its last action finished (checker.Options.Reads): a dependency no analyzer that learns
+// facts runs on, or a root the run does not analyze. Its type information is still whole, since only the checker
+// lets it go, and only for a package it ran on. A package whose walk is claimed already, or marked never, is passed
+// over, and one with no type information, whose types came from export data, is left to the load, which marks it
+// never. Beside the load, ready is Options.Ready: a package no action reached may still be in its check, as a root the
+// run does not analyze can be, so each is read only once it is final.
 //
 // Every package then ends its run in one of three ways. One checked from source and reached by an action is walked
 // by the checker; one checked from source and reached by none, here; one the load knows can never be restored (types
@@ -473,26 +489,23 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 func recordUnreachedTypes(
 	reads map[*packages.Package]*build_reads.Reads,
 	ready func(*packages.Package) <-chan struct{},
+	walks *build_reads.Walks,
 ) {
-	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
-	var group sync.WaitGroup
 	for unreached, packageReads := range reads {
-		if packageReads.Recorded() || packageReads.Never() != "" {
+		if packageReads.Claimed() {
 			continue
 		}
-		group.Go(func() {
-			if ready != nil {
-				<-ready(unreached)
-			}
-			if unreached.TypesInfo == nil {
+		var final <-chan struct{}
+		if ready != nil {
+			final = ready(unreached)
+		}
+		walks.Go(unreached, final, func() {
+			if !packageReads.Claim() || unreached.TypesInfo == nil {
 				return
 			}
-			slots <- struct{}{}
-			defer func() { <-slots }()
-			packageReads.RecordTypes(unreached.Types, unreached.TypesInfo)
+			packageReads.Record(unreached.Types, unreached.TypesInfo)
 		})
 	}
-	group.Wait()
 }
 
 // markForeignFindings marks reads never when a finding of analyzedPackage names a file that is not the package's own:

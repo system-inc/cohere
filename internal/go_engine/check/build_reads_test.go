@@ -85,6 +85,8 @@ func TestARulesFactReadsOfAnotherPackageAreRecordedHitAndMiss(test *testing.T) {
 	if runError != nil {
 		test.Fatal(runError)
 	}
+	// The type-read walks run past Run, so the reads are whole only once they end.
+	result.ReadWalks.Wait()
 	if len(result.Crashes) > 0 || len(result.Findings) > 0 {
 		test.Fatalf("want a clean run, got crashes %+v and findings %+v", result.Crashes, result.Findings)
 	}
@@ -131,6 +133,8 @@ func TestAFindingNamingAnotherPackagesFileMarksItsPackageNever(test *testing.T) 
 	if runError != nil {
 		test.Fatal(runError)
 	}
+	// The type-read walks run past Run, so the reads are whole only once they end.
+	result.ReadWalks.Wait()
 	want := "a finding of " + rule.Namespace + "test-declaredAt names a file of another package"
 	if never := result.Reads[byPath["example.com/reads/user"]].Never(); never != want {
 		test.Fatalf("want user marked never\n%s\ngot\n%s", want, never)
