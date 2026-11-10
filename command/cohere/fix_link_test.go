@@ -98,6 +98,44 @@ func TestAFixRunNeverWritesThroughALinkOutsideTheRoot(test *testing.T) {
 	}
 }
 
+// oneNamePerRealFile keeps the name that is not itself a link, the real file a person opened, wherever it sorts:
+// `LinkedIn.ts` sorts before `real/Inside.ts`, and `zlink.ts` after `real/Other.ts`, and each pair keeps the real
+// file. A name of its own is kept, and the order of what is kept is the order given. Fails if the tie-break is
+// dropped (the first in order wins) or turned around (the link wins).
+func TestOneNamePerRealFileKeepsTheNameThatIsNotALink(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		"real/Inside.ts": "export const inside = 1;\n",
+		"real/Other.ts":  "export const other = 1;\n",
+		"Plain.ts":       "export const plain = 1;\n",
+	})
+	for name, target := range map[string]string{
+		"LinkedIn.ts": filepath.Join("real", "Inside.ts"),
+		"zlink.ts":    filepath.Join("real", "Other.ts"),
+	} {
+		if linkError := os.Symlink(target, filepath.Join(root, name)); linkError != nil {
+			test.Fatal(linkError)
+		}
+	}
+	given := []string{
+		filepath.Join(root, "LinkedIn.ts"),
+		filepath.Join(root, "Plain.ts"),
+		filepath.Join(root, "real", "Inside.ts"),
+		filepath.Join(root, "real", "Other.ts"),
+		filepath.Join(root, "zlink.ts"),
+	}
+	kept := oneNamePerRealFile(given, writeRootOf(test, root))
+	want := []string{
+		filepath.Join(root, "real", "Inside.ts"),
+		filepath.Join(root, "Plain.ts"),
+		filepath.Join(root, "real", "Other.ts"),
+	}
+	if strings.Join(kept, "\n") != strings.Join(want, "\n") {
+		test.Fatalf("kept:\n%s\nwant:\n%s", strings.Join(kept, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 // realPathIn is name's real path under base, every link resolved, as the run names it.
 func realPathIn(test *testing.T, base string, name string) string {
 	test.Helper()
