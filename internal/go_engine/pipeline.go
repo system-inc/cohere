@@ -230,8 +230,10 @@ func (engine *pipeline) run() int {
 	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
-	// read is not known.
+	// read is not known. The memory record comes just before them, under the same condition, once every load has
+	// ended, so it names each raise that landed.
 	if loaded != nil {
+		engine.write(engine.raisesRecord())
 		engine.write(engine.inputsRecord(loaded))
 	}
 

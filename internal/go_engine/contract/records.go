@@ -34,6 +34,8 @@ const (
 	KindPhase Kind = "phase"
 	// KindRule is one rule, under `--rules` and `--rules-enabled`.
 	KindRule Kind = "rule"
+	// KindMemory names the memory limits a check run raised its heap to, just before its inputs.
+	KindMemory Kind = "memory"
 	// KindInputs names what a check run read, just before its summary, for the front door's replay.
 	KindInputs Kind = "inputs"
 	// KindTiming says what a check run's CPU went to, under `--timing`, after the lint record.
