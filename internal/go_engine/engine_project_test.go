@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -157,6 +158,53 @@ func TestDescribeProjectHoldsTheEditorsBufferForItsSave(test *testing.T) {
 	}
 	if !bytes.Equal(described.contents[saved], request.buffer) {
 		test.Errorf("the save's file holds %q, want the buffer %q", described.contents[saved], request.buffer)
+	}
+	if !slices.Equal(described.readableOurs, files) {
+		test.Errorf("readable files\n got %v\nwant %v", described.readableOurs, files)
+	}
+}
+
+// TestDescribeProjectUnderSingleThreadedReadsOneFileAtATime describes a project of many files under
+// `--single-threaded`, holding the first file's read until another read starts beside it, which only a run reading
+// more than one file at once ever starts, and finds no two reads in flight at once. A run that reads one at a time
+// starts no other, and its first read is let go after a second.
+func TestDescribeProjectUnderSingleThreadedReadsOneFileAtATime(test *testing.T) {
+	test.Parallel()
+	root, files := manyFileProject(test, 32)
+	request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root,
+		"--no-fix", "--single-threaded"})
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	var inFlight atomic.Int64
+	var mostInFlight atomic.Int64
+	anotherStarted := make(chan struct{})
+	var anotherOnce sync.Once
+	request.readFromDisk = func(file string) ([]byte, error) {
+		now := inFlight.Add(1)
+		defer inFlight.Add(-1)
+		for {
+			most := mostInFlight.Load()
+			if now <= most || mostInFlight.CompareAndSwap(most, now) {
+				break
+			}
+		}
+		if file == files[0] {
+			select {
+			case <-anotherStarted:
+			case <-time.After(time.Second):
+			}
+		} else {
+			anotherOnce.Do(func() { close(anotherStarted) })
+		}
+		return os.ReadFile(file)
+	}
+	described, describeError := describeProject(request)
+	if describeError != nil {
+		test.Fatal(describeError)
+	}
+	if most := mostInFlight.Load(); most > 1 {
+		test.Errorf("%d reads were in flight at once under --single-threaded, want one", most)
 	}
 	if !slices.Equal(described.readableOurs, files) {
 		test.Errorf("readable files\n got %v\nwant %v", described.readableOurs, files)
