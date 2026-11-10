@@ -6,6 +6,7 @@ import (
 	"go/build/constraint"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"go/version"
 	"io"
 	"os"
@@ -24,8 +25,8 @@ type Dimensions struct {
 	// unix, sorted.
 	OperatingSystems []string
 
-	// Architectures are every `GOARCH` the files name, sorted. The builds stay on the host's architecture (see
-	// BuildsFor), so a file only one of these builds is a layout blind spot, never a build.
+	// Architectures are every `GOARCH` the files name, gccgo's among them, sorted. The builds stay on the host's
+	// architecture (see BuildsFor), so a file only one of these builds is a layout blind spot, never a build.
 	Architectures []string
 
 	// Tags are the custom tags the files name, sorted: every tag that is no `GOOS`, `GOARCH`, `unix`, `cgo`,
@@ -219,7 +220,11 @@ func tagReading(tag string, unix []string, fileReading *reading) {
 		fileReading.operatingSystems = append(fileReading.operatingSystems, tag)
 		return
 	}
-	if architecture, _, _ := strings.Cut(tag, "."); knownAs(architecture) == knownArchitecture {
+	if architecture, _, _ := strings.Cut(tag, "."); knownAs(architecture) == knownArchitecture ||
+		types.SizesFor("gccgo", architecture) != nil {
+		// gccgo targets architectures go/build does not know, `m68k` and `shbe` among them, and std's constraints
+		// name them beside gc's (encoding/binary's big-endian file). The toolchain's own table of them is the sizes
+		// go/types holds for gccgo, so such a name is read as the architecture it is, never as a tag a build may set.
 		fileReading.architectures = append(fileReading.architectures, architecture)
 		return
 	}

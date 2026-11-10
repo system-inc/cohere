@@ -372,10 +372,11 @@ func unbuiltReason(read source, host Build, ports []Port) (string, error) {
 	targeted := map[string]bool{}
 	for _, port := range ports {
 		targeted[port.OperatingSystem] = true
+		targeted[port.Architecture] = true
 	}
-	for _, operatingSystem := range fileReading.operatingSystems {
-		if !targeted[operatingSystem] {
-			return "it names " + operatingSystem + ", which go tool dist list does not target", nil
+	for _, named := range slices.Concat(fileReading.operatingSystems, fileReading.architectures) {
+		if !targeted[named] {
+			return "it names " + named + ", which go tool dist list does not target", nil
 		}
 	}
 	return "no target go tool dist list names builds it, with or without the tags it names", nil

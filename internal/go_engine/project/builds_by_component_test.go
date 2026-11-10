@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -14,17 +15,23 @@ import (
 const selectionDeadline = 30 * time.Second
 
 // manyTagsFiles are files that name more tags than any set of them can be weighed one by one: 40 tags each named by
-// one linux file and one windows file, two linux files that want two other tags in opposite ways, so linux needs
-// two builds, and a file only another architecture compiles.
+// one linux file and one windows file of a package of its own, two linux files that want two other tags in opposite
+// ways, so linux needs two builds, a package that keeps two versions apart in a file each, one whose file compiles
+// under either of two tags it keeps apart elsewhere, and a file only another architecture compiles.
 func manyTagsFiles() map[string]string {
 	files := map[string]string{}
 	for index := range 40 {
-		files[fmt.Sprintf("linux_%02d.go", index)] = fmt.Sprintf("//go:build linux && tag%02d\n\npackage p\n", index)
-		files[fmt.Sprintf("windows_%02d.go", index)] =
+		files[fmt.Sprintf("tag%02d/linux.go", index)] = fmt.Sprintf("//go:build linux && tag%02d\n\npackage p\n", index)
+		files[fmt.Sprintf("tag%02d/windows.go", index)] =
 			fmt.Sprintf("//go:build windows && tag%02d\n\npackage p\n", index)
 	}
-	files["conflict_x.go"] = "//go:build linux && tagx && !tagy\n\npackage p\n"
-	files["conflict_y.go"] = "//go:build linux && tagy && !tagx\n\npackage p\n"
+	files["conflict/x.go"] = "//go:build linux && tagx && !tagy\n\npackage conflict\n"
+	files["conflict/y.go"] = "//go:build linux && tagy && !tagx\n\npackage conflict\n"
+	files["versions/version_a.go"] = "//go:build linux && versiona\n\npackage versions\n"
+	files["versions/version_b.go"] = "//go:build linux && versionb\n\npackage versions\n"
+	files["either/either.go"] = "//go:build linux && (eithera || eitherb)\n\npackage either\n"
+	files["either/a.go"] = "//go:build linux && eithera\n\npackage either\n"
+	files["either/b.go"] = "//go:build linux && eitherb\n\npackage either\n"
 	files["elsewhere.go"] = "//go:build amd64\n\npackage p\n"
 	files["host.go"] = "package p\n"
 	return files
@@ -33,8 +40,9 @@ func manyTagsFiles() map[string]string {
 // With 42 tags the sets are too many to weigh, so the builds are chosen tag component by tag component, in time
 // bounded by the files (selectionDeadline): every file some build of the host's architecture compiles under some
 // setting of its own tags is compiled, each tag that only ever turns a file on is folded into one build per
-// platform, the two linux files that want opposite tags get a linux build each, and only the file no build on the
-// host's architecture compiles is unbuilt.
+// platform, the two linux files that want opposite tags get a linux build each, two tags one package keeps apart
+// never ride one build, even where a file compiles under either, and only the file no build on the host's
+// architecture compiles is unbuilt.
 func TestBuildsForChoosesByTagComponentWhenTheTagsAreTooMany(test *testing.T) {
 	test.Parallel()
 	census := censusOf(test, manyTagsFiles())
@@ -65,8 +73,8 @@ func TestBuildsForChoosesByTagComponentWhenTheTagsAreTooMany(test *testing.T) {
 	want := []string{
 		"darwin/arm64 cgo",
 		Build{OperatingSystem: "linux", Architecture: "arm64", Tags: sortedSet(append(slices.Clone(allTags),
-			"tagx"))}.String(),
-		"linux/arm64 tags tagy",
+			"eithera", "tagx", "versiona"))}.String(),
+		"linux/arm64 tags eitherb,tagy,versionb",
 		Build{OperatingSystem: "windows", Architecture: "arm64", Tags: allTags}.String(),
 	}
 	if got := labels(chosen.builds); !slices.Equal(got, want) {
@@ -97,5 +105,30 @@ func TestEnumerationCostDecidesTheWalk(test *testing.T) {
 	// So many tags that a shift would overflow is past it too.
 	if cost := enumerationCost(1, 64, 1); cost <= enumerationBudget {
 		test.Errorf("64 tags cost %d, within the budget %d", cost, enumerationBudget)
+	}
+}
+
+// gccgo's architectures are architectures, never tags: encoding/binary's big-endian file names `m68k` beside gc's
+// big-endian targets, and setting `m68k` as a tag on arm64 would compile it beside the little-endian file. Such a file
+// is unbuilt, named for the architecture no target of ours is, and no build sets the name.
+func TestBuildsForReadsGccgosArchitecturesAsArchitectures(test *testing.T) {
+	test.Parallel()
+	census := censusOf(test, map[string]string{
+		"native_big.go":    "//go:build armbe || arm64be || m68k || shbe\n\npackage p\n",
+		"native_little.go": "//go:build 386 || amd64 || arm || arm64\n\npackage p\n",
+		"only_m68k.go":     "//go:build m68k\n\npackage p\n",
+	})
+	builds, unbuilt := buildsFor(test, census, testHost, testPorts)
+	if got := labels(builds); !slices.Equal(got, []string{"darwin/arm64 cgo"}) {
+		test.Errorf("the builds are %v, want the host's alone: no build sets m68k as a tag", got)
+	}
+	reasons := map[string]string{}
+	for _, each := range unbuilt {
+		reasons[filepath.Base(each.File)] = each.Reason
+	}
+	for _, file := range []string{"native_big.go", "only_m68k.go"} {
+		if reason, found := reasons[file]; !found || !strings.Contains(reason, "go tool dist list does not target") {
+			test.Errorf("%s is unbuilt for %q, want it named for an architecture no target is", file, reason)
+		}
 	}
 }

@@ -1,13 +1,14 @@
 package project
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 )
 
-// tagComponents are the custom tags the uncompiled files name, grouped so that tags named together in some file are
-// in one component, joined across files. A file's constraint reads only the custom tags it names, so setting a tag
-// never changes whether a file naming none of its component's tags compiles.
+// tagComponents are the custom tags the uncompiled files name, grouped so that tags named in one package's
+// directory are in one component, joined across packages. A file's constraint reads only the custom tags it names,
+// so setting a tag never changes whether a file naming none of its component's tags compiles.
 type tagComponents struct {
 	// tags are each component's tags, sorted, the components by their first tag.
 	tags [][]string
@@ -35,9 +36,18 @@ func newTagComponents(uncompiled []source, unix []string) tagComponents {
 		parent[tag] = root(parent[tag])
 		return parent[tag]
 	}
+	// A build sets a tag for every package it compiles, so tags named anywhere in one package's directory are joined
+	// as if one file named them all: a component's assignment is one file's own setting with the rest of its
+	// package's tags at the host's, and two tags a package keeps in separate files, a version each, never ride one
+	// build together (std's crypto/internal/fips140test, #zzs7jm5).
+	inDirectory := map[string][]string{}
 	for index, read := range uncompiled {
 		tags := readingOf(read, unix).tags
 		components.fileTags[index] = tags
+		directory := filepath.Dir(read.file)
+		inDirectory[directory] = append(inDirectory[directory], tags...)
+	}
+	for _, tags := range inDirectory {
 		for _, tag := range tags {
 			if _, seen := parent[tag]; !seen {
 				parent[tag] = tag
@@ -90,10 +100,10 @@ type componentChoice struct {
 // Each round, every platform takes, component by component, the assignment compiling the most files still wanted,
 // then the one changing the fewest tags from the host's, then the first by its tags, and the platform whose build
 // compiles the most wins, the earliest on a tie. The assignments a component weighs are the host's and, for each of
-// its files still wanted, each setting of that file's own tags that compiles it on the platform, so a round costs
-// each file's own settings and a compile of each wanted file under each distinct assignment, never a walk of the
-// combinations. Rounds end when no platform compiles one more file, and every file some platform compiles under
-// some setting of its own tags is compiled by then: that setting alone would have compiled it.
+// its files still wanted, each least setting of that file's own tags that compiles it on the platform, so a round
+// costs each file's own settings and a compile of each wanted file under each distinct assignment, never a walk of
+// the combinations. Rounds end when no platform compiles one more file, and every file some platform compiles under
+// some setting of its own tags is compiled by then: its least setting alone would have compiled it.
 func buildsByComponent(uncompiled []source, host Build, platforms []Build, unix []string) ([]Build, coverage, error) {
 	components := newTagComponents(uncompiled, unix)
 	wanted := newCoverage(len(uncompiled))
@@ -238,17 +248,35 @@ func bestOnPlatform(
 			}
 			wantedFiles = append(wantedFiles, file)
 			own := components.fileTags[file]
-			for mask := range 1 << len(own) {
-				assignment := withOwnTags(hostAssignments[component], own, mask)
-				key := strings.Join(assignment, ",")
-				if seen[key] {
-					continue
+			hostMask := 0
+			for index, tag := range own {
+				if slices.Contains(hostAssignments[component], tag) {
+					hostMask |= 1 << index
 				}
-				compiled, compileError := compiles(under(component, assignment), uncompiled[file])
+			}
+			// Each setting is told by the tags it changes from the host's. Only the settings no other compiling one
+			// changes a strict part of are weighed, so a file that compiles with either of two tags offers each alone
+			// and never both: `fips140v1.0 || fips140v1.26` would otherwise turn on two versions std keeps apart.
+			var changes []int
+			for mask := range 1 << len(own) {
+				compiled, compileError := compiles(under(component, withOwnTags(hostAssignments[component], own, mask)),
+					uncompiled[file])
 				if compileError != nil {
 					return componentChoice{}, compileError
 				}
 				if compiled {
+					changes = append(changes, mask^hostMask)
+				}
+			}
+			for _, changed := range changes {
+				smaller := slices.ContainsFunc(changes, func(other int) bool {
+					return other != changed && other&changed == other
+				})
+				if smaller {
+					continue
+				}
+				assignment := withOwnTags(hostAssignments[component], own, changed^hostMask)
+				if key := strings.Join(assignment, ","); !seen[key] {
 					seen[key] = true
 					assignments = append(assignments, assignment)
 				}
