@@ -17,14 +17,13 @@ struct RunInputsTests {
     /*
      A package inside a repository at `repository/package`, so a `.gitignore` above the package is the repository's
      and not walked, with a path dependency beside it at `repository/Shared`, outside the package's root, and a toolchain
-     laid out as an Xcode lays one out. The global git settings are read from a `home` of the fixture's own.
+     laid out as an Xcode lays one out.
      */
     struct Project {
         var base: URL
         var repository: URL
         var root: URL
         var shared: URL
-        var home: URL
         var developer: URL
         var toolchainExecutable: URL
         var pathDirectory: URL
@@ -38,7 +37,6 @@ struct RunInputsTests {
             repository = base.appendingPathComponent("repository", isDirectory: true)
             root = repository.appendingPathComponent("package", isDirectory: true)
             shared = repository.appendingPathComponent("Shared", isDirectory: true)
-            home = base.appendingPathComponent("home", isDirectory: true)
             developer = base.appendingPathComponent("Xcode.app/Contents/Developer", isDirectory: true)
             toolchainExecutable = developer.appendingPathComponent(
                 "Toolchains/XcodeDefault.xctoolchain/usr/bin/swift"
@@ -62,7 +60,6 @@ struct RunInputsTests {
                 ],
                 under: repository,
             )
-            try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
             try Self.write(
                 [
                     "Toolchains/XcodeDefault.xctoolchain/usr/bin/swift": "#!/bin/sh\n",
@@ -127,7 +124,7 @@ struct RunInputsTests {
             withShared: Bool = true,
         ) throws -> InputsRecord {
             let package = try package(projectKind: projectKind, withShared: withShared)
-            let fileSet = try FileSet.build(package: package, environment: ["HOME": home.path])
+            let fileSet = try FileSet.build(package: package)
             return RunInputs.record(
                 package: package,
                 fileSet: fileSet,
@@ -361,33 +358,6 @@ struct RunInputsTests {
         let record = try project.record(withShared: false)
         #expect(record.trackedIgnored.isEmpty)
         #expect(record.files.contains(RunInputs.path(index.resolvingSymlinksInPath())))
-    }
-
-    /*
-     The front door's digest reads the repository's `.gitignore` files and a `.git` directory's `info/exclude`, case
-     sensitively, so a path excluded by anything else, here the global excludes file or `core.ignorecase`'s folding,
-     is one whose tracking no digest would see: the index stays keyed on its bytes. Excluded by a line the digest
-     reads, it is named, `core.ignorecase` set or not.
-     */
-    @Test func anExclusionTheDigestCannotSeeKeepsTheIndexOnItsBytes() throws {
-        let project = try Project()
-        defer { project.remove() }
-        try GitIndexTests.indexBytes(paths: ["package/Package.swift"])
-            .write(to: project.repository.appendingPathComponent(".git/index"))
-        try Project.write(["Sources/App/Scratch.swift": "struct Scratch {}\n"], under: project.root)
-        #expect(try project.record(withShared: false).trackedIgnored.count == 1, "the control: nothing is excluded")
-
-        try Project.write([".config/git/ignore": "Scratch.swift\n"], under: project.home)
-        #expect(try project.record(withShared: false).trackedIgnored.isEmpty, "the global excludes file excluded it")
-        try FileManager.default.removeItem(at: project.home.appendingPathComponent(".config/git/ignore"))
-
-        try Project.write(
-            [".git/config": "[core]\n\tignorecase = true\n", ".gitignore": "Ignored.swift\nscratch.swift\n"],
-            under: project.repository,
-        )
-        #expect(try project.record(withShared: false).trackedIgnored.isEmpty, "only a folded match excluded it")
-        try Project.write([".gitignore": "Ignored.swift\nScratch.swift\n"], under: project.repository)
-        #expect(try project.record(withShared: false).trackedIgnored.count == 1, "the repository's line excluded it")
     }
 
     /* The path dependency sits outside the package's root, so only its own walk sees a file added to it. */

@@ -7,6 +7,13 @@
 // read it would pass on one machine and fail on another. Matching is case sensitive, as git's is unless
 // core.ignorecase is set, which is likewise a property of a clone rather than of the repository.
 //
+// That is the house rule for all three engines, Go and TypeScript through this package and Swift through its
+// IgnoreRules (#jgk8ppa): the repository's rules alone, every `.gitignore` plus info/exclude, a worktree's in its
+// common directory, matched case sensitively, never the global excludes file or core.ignorecase. A verdict belongs
+// to the repository, never the machine, so one tree checks the same files on Kirk's Mac and on a Linux box. Where
+// that differs from git on a case-insensitive Mac, it checks more, the safe side, and a tracked file is never
+// ignored. A new engine reads the same rules.
+//
 // The semantics are gitignore(5)'s:
 //
 //   - Precedence, highest first: a `.gitignore` in the path's own directory, then each parent's up to the

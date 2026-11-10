@@ -4,21 +4,20 @@ import Testing
 @testable import CohereSwift
 
 /*
- What git would list, read from the ignore files and the index with no git process. Each repository here is a
- directory holding a `.git`, and each run gets a home of its own, so this machine's global ignore file cannot decide
- what a test proves. Each has an index tracking nothing unless a test names what it tracks, or that it has none.
+ What git would list, read from the repository's ignore files and its index with no git process. Each repository
+ here is a directory holding a `.git`, and nothing of this machine's is read (#jgk8ppa), so its global ignore file
+ cannot decide what a test proves. Each has an index tracking nothing unless a test names what it tracks, or that it
+ has none.
  */
 struct IgnoreRulesTests {
-    /* A repository on disk: its root, a home for the global config, and the rules read from both. */
+    /* A repository on disk: its root, and the rules read from it. */
     struct Fixture {
         var root: URL
-        var home: URL
 
         /* `index` is what `.git/index` tracks, written as git writes one (`GitIndexTests.indexBytes`); nil, none. */
         init(
             files: [String: String],
             gitDirectory: [String: String] = [:],
-            home homeFiles: [String: String] = [:],
             index: [String]? = [],
         ) throws {
             let base = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -26,15 +25,12 @@ struct IgnoreRulesTests {
                 isDirectory: true,
             )
             root = base.appendingPathComponent("repository", isDirectory: true)
-            home = base.appendingPathComponent("home", isDirectory: true)
             try FileManager.default.createDirectory(
                 at: root.appendingPathComponent(".git", isDirectory: true),
                 withIntermediateDirectories: true,
             )
-            try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
             try Self.write(files, under: root)
             try Self.write(gitDirectory, under: root.appendingPathComponent(".git", isDirectory: true))
-            try Self.write(homeFiles, under: home)
             if let index {
                 try GitIndexTests.indexBytes(paths: index).write(to: root.appendingPathComponent(".git/index"))
             }
@@ -51,12 +47,9 @@ struct IgnoreRulesTests {
             }
         }
 
-        /* No `PATH` at all, so no git could be found were one asked for: everything here is read from disk. */
-        var environment: [String: String] { ["HOME": home.path, "PATH": ""] }
-
         func rules() throws -> IgnoreRules {
             let repository = try #require(IgnoreRules.Repository.containing(root))
-            return IgnoreRules(repository: repository, environment: environment)
+            return IgnoreRules(repository: repository)
         }
 
         /* The files git would list, relative to the root, sorted. */
@@ -89,7 +82,7 @@ struct IgnoreRulesTests {
             describeJson: Data(describe.utf8),
             dumpPackageJson: Data(dump.utf8),
         )
-        let fileSet = try FileSet.build(package: package, environment: fixture.environment)
+        let fileSet = try FileSet.build(package: package)
         #expect(fileSet.owned.map(\.url.lastPathComponent) == ["A.swift"])
         let reasons = Dictionary(
             uniqueKeysWithValues: fileSet.excluded.map { (URL(fileURLWithPath: $0.file).lastPathComponent, $0.reason) }
@@ -120,7 +113,7 @@ struct IgnoreRulesTests {
             describeJson: Data(describe.utf8),
             dumpPackageJson: Data(dump.utf8),
         )
-        let fileSet = try FileSet.build(package: package, environment: fixture.environment)
+        let fileSet = try FileSet.build(package: package)
         #expect(fileSet.owned.map(\.url.lastPathComponent) == ["A.swift", "Schema.generated.swift"])
     }
 
@@ -137,7 +130,7 @@ struct IgnoreRulesTests {
             describeJson: Data(describe.utf8),
             dumpPackageJson: Data(dump.utf8),
         )
-        let fileSet = try FileSet.build(package: package, environment: fixture.environment)
+        let fileSet = try FileSet.build(package: package)
         #expect(fileSet.owned.map(\.url.lastPathComponent) == ["A.swift"])
         let rootPath = fixture.root.resolvingSymlinksInPath().path + "/"
         return Dictionary(
@@ -318,32 +311,49 @@ struct IgnoreRulesTests {
         #expect(try fixture.visible() == [".gitignore", "Casea.swift", "FileA.swift", "Sources/AB/X.swift"])
     }
 
-    @Test func ignoreCaseFoldsWhenTheRepositorySaysSo() throws {
-        let files = [".gitignore": "generated.swift\n", "Generated.swift": ""]
-        #expect(try Fixture(files: files).visible() == [".gitignore", "Generated.swift"])
-        #expect(
-            try Fixture(files: files, gitDirectory: ["config": "[core]\n\tignorecase = true\n"]).visible() == [
-                ".gitignore"
-            ]
-        )
-    }
-
-    @Test func infoExcludeAndTheGlobalExcludesFileApply() throws {
-        let files = [".gitignore": "", "Local.swift": "", "Global.swift": "", "Custom.swift": "", "Kept.swift": ""]
-        let fromDefaultPlace = try Fixture(
-            files: files,
-            gitDirectory: ["info/exclude": "Local.swift\n"],
-            home: [".config/git/ignore": "Global.swift\n"],
-        )
-        #expect(try fromDefaultPlace.visible() == [".gitignore", "Custom.swift", "Kept.swift"])
-        let configured = try Fixture(
-            files: files,
-            home: [
-                ".gitconfig": "[user]\n\tname = x\n[core]\n\texcludesFile = \"~/custom ignore\" ; why\n",
-                "custom ignore": "Custom.swift\n", ".config/git/ignore": "Global.swift\n",
+    /*
+     The repository's rules alone decide, case sensitively (#jgk8ppa): `info/exclude` excludes, and a file only the
+     global excludes file lists, or only a case-folded line matches, is ours and checked by Swift, though git would
+     skip both here. The repository's own config names that file and sets `core.ignorecase`, as git reads them, and
+     nothing outside the repository is consulted, so neither `HOME` nor `XDG_CONFIG_HOME` reaches the verdict.
+     */
+    @Test func aFileOnlyTheGlobalExcludesFileListsIsCheckedBySwift() throws {
+        let fixture = try Fixture(files: [
+            ".gitignore": "folded.swift\n", "Package.swift": "", "Sources/A/A.swift": "", "Sources/A/Local.swift": "",
+            "Sources/A/Global.swift": "", "Sources/A/Folded.swift": "",
+        ])
+        let globalExcludes = fixture.root.deletingLastPathComponent().appendingPathComponent("global ignore")
+        try "Global.swift\n".write(to: globalExcludes, atomically: true, encoding: .utf8)
+        try Fixture.write(
+            [
+                "info/exclude": "Local.swift\n",
+                "config": "[core]\n\tignorecase = true\n\texcludesFile = \"\(globalExcludes.path)\"\n",
             ],
+            under: fixture.root.appendingPathComponent(".git", isDirectory: true),
         )
-        #expect(try configured.visible() == [".gitignore", "Global.swift", "Kept.swift", "Local.swift"])
+        let describe =
+            #"{"name":"Example","targets":[{"name":"A","type":"library","path":"Sources/A","sources":["#
+            + #""A.swift","Local.swift","Global.swift","Folded.swift"]}]}"#
+        let dump = #"{"toolsVersion":{"_version":"6.4.0"},"swiftLanguageVersions":null,"targets":[]}"#
+        let package = try PackageModel(
+            root: fixture.root,
+            describeJson: Data(describe.utf8),
+            dumpPackageJson: Data(dump.utf8),
+        )
+        let fileSet = try FileSet.build(package: package)
+        #expect(fileSet.owned.map(\.url.lastPathComponent).sorted() == ["A.swift", "Folded.swift", "Global.swift"])
+        #expect(
+            fileSet.excluded.map { "\(URL(fileURLWithPath: $0.file).lastPathComponent): \($0.source ?? "")" }.sorted()
+                == ["Local.swift: .git/info/exclude:1", "Package.swift: "]
+        )
+
+        let rules = try fixture.rules()
+        let rootPath = rules.repository.root.path + "/"
+        #expect(rules.isVisible(rootPath + "Sources/A/Global.swift"))
+        #expect(rules.isVisible(rootPath + "Sources/A/Folded.swift"))
+        for consulted in rules.filesConsulted {
+            #expect(consulted.hasPrefix(rootPath), "\(consulted) is outside the repository")
+        }
     }
 
     @Test func anotherRepositoryInsideIsNotEntered() throws {
@@ -383,9 +393,53 @@ struct IgnoreRulesTests {
             repository.commonDirectory?.resolvingSymlinksInPath().path
                 == main.root.appendingPathComponent(".git").resolvingSymlinksInPath().path
         )
-        let rules = IgnoreRules(repository: repository, environment: main.environment)
+        let rules = IgnoreRules(repository: repository)
         #expect(rules.isVisible(repository.root.appendingPathComponent("Sources/Kept.swift").path))
         #expect(!rules.isVisible(repository.root.appendingPathComponent("Sources/Excluded.swift").path))
+    }
+
+    /*
+     A worktree's shared `info/exclude`, in its common directory, is the repository's own and excludes, named absolute
+     as a file outside the work tree. The front door's digest does not read it yet (#vdbcswp), so a path it excluded
+     leaves the index unnamed under `trackedIgnored`, keyed on its bytes. A path a `.gitignore` excluded, or a `.git`
+     directory's `info/exclude`, which the digest reads, leaves it named.
+     */
+    @Test func aWorktreesSharedExcludeKeepsItsIndexOnItsBytes() throws {
+        let main = try Fixture(
+            files: [:],
+            gitDirectory: [
+                "info/exclude": "Excluded.swift\n",
+                "worktrees/feature/commondir": "../..\n",
+                "worktrees/feature/HEAD": "",
+            ],
+        )
+        let worktree = main.root.deletingLastPathComponent().appendingPathComponent("feature", isDirectory: true)
+        try Fixture.write(
+            [".git": "gitdir: \(main.root.path)/.git/worktrees/feature\n", ".gitignore": "Ignored.swift\n"],
+            under: worktree,
+        )
+        try GitIndexTests.indexBytes(paths: [".gitignore"])
+            .write(to: main.root.appendingPathComponent(".git/worktrees/feature/index"))
+        let repository = try #require(IgnoreRules.Repository.containing(worktree))
+        let sources = repository.root.path + "/Sources/"
+
+        let byGitignore = IgnoreRules(repository: repository)
+        #expect(
+            byGitignore.listing(of: sources + "Ignored.swift")
+                == .excluded(by: .init(file: repository.root.path + "/.gitignore", line: 1))
+        )
+        #expect(byGitignore.trackedIgnored?.scope == "Sources")
+
+        let byShared = IgnoreRules(repository: repository)
+        let sharedExclude = try #require(repository.commonDirectory?.appendingPathComponent("info/exclude").path)
+        let line = IgnoreRules.Pattern.Source(file: sharedExclude, line: 1)
+        #expect(byShared.listing(of: sources + "Excluded.swift") == .excluded(by: line))
+        #expect(byShared.describe(line, relativeTo: repository.root.path) == sharedExclude + ":1")
+        #expect(byShared.trackedIgnored == nil)
+
+        let inMain = try main.rules()
+        #expect(!inMain.isVisible(inMain.repository.root.path + "/Excluded.swift"))
+        #expect(inMain.trackedIgnored?.scope == "")
     }
 
     /*
@@ -446,7 +500,7 @@ struct IgnoreRulesTests {
             describeJson: Data(describe.utf8),
             dumpPackageJson: Data(dump.utf8),
         )
-        let fileSet = try FileSet.build(package: package, environment: fixture.environment)
+        let fileSet = try FileSet.build(package: package)
         #expect(fileSet.owned.map(\.url.lastPathComponent) == ["A.swift"])
         #expect(fileSet.excluded.map { URL(fileURLWithPath: $0.file).lastPathComponent } == ["Untracked.swift"])
         #expect(fileSet.note.isEmpty)
@@ -519,7 +573,7 @@ struct IgnoreRulesTests {
             describeJson: Data(describe.utf8),
             dumpPackageJson: Data(dump.utf8),
         )
-        return try FileSet.build(package: package, environment: fixture.environment).note
+        return try FileSet.build(package: package).note
     }
 
     /* A worktree's index is its own, in its own git directory: what the main checkout tracks decides nothing there. */
@@ -545,7 +599,7 @@ struct IgnoreRulesTests {
             repository.gitDirectory?.resolvingSymlinksInPath().path
                 == main.root.appendingPathComponent(".git/worktrees/feature").resolvingSymlinksInPath().path
         )
-        let rules = IgnoreRules(repository: repository, environment: main.environment)
+        let rules = IgnoreRules(repository: repository)
         let rootPath = repository.root.path + "/"
         #expect(
             rules.visibleFiles(under: repository.root.path).map { String($0.dropFirst(rootPath.count)) }.sorted() == [
@@ -571,7 +625,7 @@ struct IgnoreRulesTests {
             + quoted + "]}]}"
         let dump = #"{"toolsVersion":{"_version":"6.4.0"},"swiftLanguageVersions":null,"targets":[]}"#
         let package = try PackageModel(root: root, describeJson: Data(describe.utf8), dumpPackageJson: Data(dump.utf8))
-        let fileSet = try FileSet.build(package: package, environment: fixture.environment)
+        let fileSet = try FileSet.build(package: package)
         let rootPath = root.resolvingSymlinksInPath().path + "/"
         return Dictionary(
             uniqueKeysWithValues: fileSet.excluded.map {
@@ -582,9 +636,9 @@ struct IgnoreRulesTests {
 
     /*
      Each file git ignores is excluded with the line that decided (#08cv2mp), counted from 1 past comments and blank
-     lines, so the front door can quote it: the nearest `.gitignore`'s, `info/exclude`'s, the global file's (absolute,
-     outside the work tree), and for a file inside an ignored directory, the directory's. A file a `!` line re-includes
-     is ours, and a reason no rule decided, a package manifest, has no source.
+     lines, so the front door can quote it: the nearest `.gitignore`'s, `info/exclude`'s, and for a file inside an
+     ignored directory, the directory's. A file a `!` line re-includes is ours, and a reason no rule decided, a package
+     manifest, has no source.
      */
     @Test func anIgnoredFileNamesTheLineThatIgnoredIt() throws {
         let fixture = try Fixture(
@@ -593,16 +647,15 @@ struct IgnoreRulesTests {
                 "Sources/A/.gitignore": "Nearer.swift\n", "Package.swift": "",
                 "Sources/A/A.swift": "", "Sources/A/Generated.swift": "", "Sources/A/Nearer.swift": "",
                 "Sources/A/Output/Built.swift": "", "Sources/A/Mine.local.swift": "", "Sources/A/Kept.local.swift": "",
-                "Sources/A/Local.swift": "", "Sources/A/Global.swift": "",
+                "Sources/A/Local.swift": "",
             ],
             gitDirectory: ["info/exclude": "# mine\nLocal.swift\n"],
-            home: [".config/git/ignore": "Global.swift\n"],
         )
         let exclusions = try Self.exclusions(
             of: fixture,
             sources: [
                 "A.swift", "Generated.swift", "Nearer.swift", "Output/Built.swift", "Mine.local.swift",
-                "Kept.local.swift", "Local.swift", "Global.swift",
+                "Kept.local.swift", "Local.swift",
             ],
         )
         #expect(
@@ -612,7 +665,6 @@ struct IgnoreRulesTests {
                 "Sources/A/Output/Built.swift": ".gitignore:4",
                 "Sources/A/Mine.local.swift": ".gitignore:5",
                 "Sources/A/Local.swift": ".git/info/exclude:2",
-                "Sources/A/Global.swift": fixture.home.path + "/.config/git/ignore:1",
                 "Package.swift": nil,
             ]
         )
