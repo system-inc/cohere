@@ -2,6 +2,100 @@
     "sourceNote": "Each record is one bench/quiet_machine.sh --record run, read and validated by internal/bench_results. A mode's quiet summary is present only when at least one of its runs was quiet, and it is taken from those runs alone: in a schema 2 record, a run whose cores were idle at or over the idle floor just before and just after it; in a schema 1 record, one that started and ended at or under the load ceiling. A mode without one has no number to report, only its loaded runs, which are shown and never reported as the number.",
     "records": [
         {
+            "schema": 2,
+            "recordedAt": "2026-11-10T12:04:39Z",
+            "cohere": {
+                "commit": "4987b84100e7c2a5801c9f0c4e713071a58e6473",
+                "version": "cohere dev",
+                "dirty": false
+            },
+            "project": {
+                "name": "cohere",
+                "commit": "4987b84100e7c2a5801c9f0c4e713071a58e6473"
+            },
+            "machine": {
+                "model": "Mac16,5",
+                "processor": "Apple M4 Max",
+                "cores": 16,
+                "memoryBytes": 137438953472,
+                "os": "macOS 27.2"
+            },
+            "idleFloor": 90,
+            "settleSeconds": 60,
+            "rounds": 3,
+            "measuredModes": ["Cold"],
+            "band": 10,
+            "stoppedEarly": true,
+            "engine": "Go",
+            "goEnvironment": {
+                "GOGC": "",
+                "GOMEMLIMIT": "",
+                "GOMAXPROCS": ""
+            },
+            "noFix": true,
+            "runs": [
+                {
+                    "mode": "Cold",
+                    "round": 1,
+                    "verdictSeconds": 1.859,
+                    "settledSeconds": 1.86,
+                    "engineSeconds": 1.792,
+                    "loadBefore": 7.48,
+                    "loadAfter": 8.48,
+                    "idleBefore": 91,
+                    "idleAfter": 90,
+                    "quiet": true,
+                    "findings": 0,
+                    "cache": "off",
+                    "exit": 0,
+                    "primes": 0
+                },
+                {
+                    "mode": "Cold",
+                    "round": 2,
+                    "verdictSeconds": 1.979,
+                    "settledSeconds": 1.98,
+                    "engineSeconds": 1.908,
+                    "loadBefore": 6.82,
+                    "loadAfter": 6.82,
+                    "idleBefore": 90,
+                    "idleAfter": 91,
+                    "quiet": true,
+                    "findings": 0,
+                    "cache": "off",
+                    "exit": 0,
+                    "primes": 0
+                },
+                {
+                    "mode": "Cold",
+                    "round": 3,
+                    "verdictSeconds": 1.82,
+                    "settledSeconds": 1.821,
+                    "engineSeconds": 1.755,
+                    "loadBefore": 6.28,
+                    "loadAfter": 6.28,
+                    "idleBefore": 90,
+                    "idleAfter": 94,
+                    "quiet": true,
+                    "findings": 0,
+                    "cache": "off",
+                    "exit": 0,
+                    "primes": 0
+                }
+            ],
+            "modes": {
+                "Cold": {
+                    "quiet": {
+                        "count": 3,
+                        "best": 1.82,
+                        "median": 1.859,
+                        "worst": 1.979
+                    },
+                    "loadedVerdictSeconds": []
+                }
+            }
+        },
+        {
             "schema": 1,
             "recordedAt": "2026-10-05T12:19:31Z",
             "cohere": {
