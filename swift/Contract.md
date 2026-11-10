@@ -688,9 +688,15 @@ named (command/cohere/swift_run_cache.go), since a replay asks neither.
 `trackedIgnored` (#m1daxxk) names each git index among `files` that the run read only for what it decides of a walk:
 which paths its ignore rules exclude are tracked, and which are gitlinks. Each entry is the index, the root of the
 repository it belongs to, and the directory the run walked, relative to that root and slash separated, `""` for the
-root. The Go engine names its census's index, scoped to the root below the repository. The front door keys such an
-index on `gitignore.TrackedIgnoredDigest` over that scope rather than on its bytes, which git rewrites on a
-`git status` and on every `git add`, so a replay survives what decides nothing. An index the reader cannot read
+root. The Go engine names its census's index, scoped to the root below the repository. The Swift engine names the
+index its file set read whole (#jem2gsa), scoped to the nearest directory holding every path the file set asked it
+about, the package's root and each target source, local and path packages' among them, so `""` when they lie in
+different subtrees of the repository: a scope too wide only costs a miss, and one too narrow is a stale replay. The
+digest reads only the repository's `.gitignore` files and a `.git` directory's `info/exclude`, case sensitively, so a
+Swift run that excluded a path by anything else, the global excludes file, a worktree's shared `info/exclude` or
+`core.ignorecase`'s folding, names no index here, since tracking that path would move no digest. The front door
+keys such an index on `gitignore.TrackedIgnoredDigest` over that scope rather than on its bytes, which git rewrites
+on a `git status` and on every `git add`, so a replay survives what decides nothing. An index the reader cannot read
 whole, a split or sparse one among them, is keyed on its bytes as an index not named here is. A reader before it
 ignores the field, and keys every index on its bytes.
 

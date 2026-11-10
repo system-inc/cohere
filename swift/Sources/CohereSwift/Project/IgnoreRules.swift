@@ -524,8 +524,28 @@ final class IgnoreRules {
     private let index: GitIndex
     /* Why the index was not read, for the file set's note, or nil when it was. */
     let indexFallbackReason: String?
+    /* The index read or looked for, absolute, nil when no git directory was found to hold one. */
+    private let indexFile: String?
     /* `info/exclude`, then the global excludes file: consulted after every `.gitignore`, in that order. */
     private let repositoryWidePatterns: [[Pattern]]
+    /*
+     What the front door's matcher (Go's `gitignore.New`) reads beside each `.gitignore`: `.git/info/exclude` when
+     `.git` is a directory, and nothing else, since it reads no global excludes file and no worktree's shared
+     `info/exclude`. It matches case sensitively too. See `decidedBeyondSharedRules`.
+     */
+    private let sharedRepositoryWidePatterns: [[Pattern]]
+    /*
+     The directory holding every path whose listing this was asked, relative to the root, as its components: nil before
+     any was asked. See `trackedIgnored`.
+     */
+    private var consultedScope: [Substring]?
+    /*
+     Whether any path was excluded by a rule the front door's matcher does not read or reads otherwise: a line of the
+     global excludes file, of a worktree's shared `info/exclude`, or one that matched only with `core.ignorecase`'s
+     folding. The digest the front door keys an index on covers the tracked paths its own rules exclude, so tracking
+     such a path would move no digest, and the index is then keyed on its bytes (`trackedIgnored`).
+     */
+    private var decidedBeyondSharedRules = false
     /* Each directory's own `.gitignore`, by its path relative to the root ("" for the root), read once. */
     private var directoryPatterns: [String: [Pattern]] = [:]
     /*
@@ -580,18 +600,27 @@ final class IgnoreRules {
             globalExcludes = configurationDirectory + "/ignore"
         }
         var repositoryWide: [[Pattern]] = []
+        var sharedRepositoryWide: [[Pattern]] = []
         if let commonDirectory = repository.commonDirectory {
             let exclude = commonDirectory.appendingPathComponent("info/exclude").path
             consulted.insert(exclude)
-            repositoryWide.append(Self.patterns(inFile: exclude))
+            let excludePatterns = Self.patterns(inFile: exclude)
+            repositoryWide.append(excludePatterns)
+            /* Go reads `.git/info/exclude` only through a `.git` directory, which is the common directory here. */
+            let marker = repository.root.appendingPathComponent(".git")
+            if Self.isDirectory(marker) && commonDirectory.standardizedFileURL.path == marker.standardizedFileURL.path {
+                sharedRepositoryWide.append(excludePatterns)
+            }
         }
         consulted.insert(globalExcludes)
         repositoryWide.append(Self.patterns(inFile: globalExcludes))
         repositoryWidePatterns = repositoryWide
+        sharedRepositoryWidePatterns = sharedRepositoryWide
 
         /* The object format is the repository's alone: git honours `extensions` in no other config file. */
         if let gitDirectory = repository.gitDirectory {
             let indexFile = gitDirectory.appendingPathComponent("index")
+            self.indexFile = indexFile.path
             consulted.insert(indexFile.path)
             let objectFormat =
                 repository.commonDirectory
@@ -612,8 +641,32 @@ final class IgnoreRules {
         else {
             index = .empty
             indexFallbackReason = "no git directory was found for \(repository.root.path)"
+            indexFile = nil
         }
         filesConsulted = consulted
+    }
+
+    /*
+     The index this read whole and the directory its answers were asked for, relative to the root and slash separated,
+     `""` for the root, so the run's inputs record can name it under `trackedIgnored` (#jem2gsa). The scope is the
+     nearest directory holding every path whose listing was asked, the walk's start and each target source alike: an
+     answer below it depends only on index entries below it, since a directory above is entered for its tracked files
+     only when one below it is tracked. Nil when the index was not read whole, and when a path was excluded by a rule
+     the front door's digest does not read (`decidedBeyondSharedRules`): either way the index stays keyed on its bytes.
+     */
+    var trackedIgnored: (index: String, scope: String)? {
+        guard indexFallbackReason == nil, !decidedBeyondSharedRules, let indexFile else { return nil }
+        return (index: indexFile, scope: (consultedScope ?? []).joined(separator: "/"))
+    }
+
+    /* Widens `consultedScope` to hold `relativeDirectory`, a directory relative to the root, "" for the root. */
+    private func consult(_ relativeDirectory: Substring) {
+        let components = relativeDirectory.split(separator: "/")
+        guard let consulted = consultedScope else {
+            consultedScope = components
+            return
+        }
+        consultedScope = Array(zip(consulted, components).prefix { $0 == $1 }.map(\.0))
     }
 
     /*
@@ -657,7 +710,11 @@ final class IgnoreRules {
     private func admission(of path: String, isDirectory: Bool) -> Admission {
         let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
         guard path.hasPrefix(prefix) else { return .refused(excludedBy: nil) }
-        let components = path.dropFirst(prefix.count).split(separator: "/").map(String.init)
+        let relativePath = path.dropFirst(prefix.count)
+        /* A file's answer turns on its own entry and its directories', so the directory holding it is the scope. */
+        let holding = relativePath.lastIndex(of: "/") ?? relativePath.startIndex
+        consult(isDirectory ? relativePath : relativePath[..<holding])
+        let components = relativePath.split(separator: "/").map(String.init)
         var parent = ""
         var admission = Admission.admitted
         for (position, name) in components.enumerated() {
@@ -714,6 +771,7 @@ final class IgnoreRules {
             return []
         }
         let relative = directory == rootPath ? "" : String(directory.dropFirst(rootPath.count + 1))
+        consult(relative[...])
         var files: [String] = []
         collect(
             relativeDirectory: relative,
@@ -803,8 +861,25 @@ final class IgnoreRules {
         if case .trackedOnly(let directoryLine) = enclosing {
             excludedBy = directoryLine
         }
-        else if let line = ignoringLine(relative: relative, parent: parent, name: name, isDirectory: isDirectory) {
+        else if let line = ignoringLine(
+            relative: relative,
+            parent: parent,
+            name: name,
+            isDirectory: isDirectory,
+            foldCase: foldCase,
+            repositoryWide: repositoryWidePatterns,
+        ) {
             excludedBy = line
+            if ignoringLine(
+                relative: relative,
+                parent: parent,
+                name: name,
+                isDirectory: isDirectory,
+                foldCase: false,
+                repositoryWide: sharedRepositoryWidePatterns,
+            ) == nil {
+                decidedBeyondSharedRules = true
+            }
         }
         else {
             return .admitted
@@ -818,9 +893,16 @@ final class IgnoreRules {
 
     /*
      The line that ignores an entry, nil when none does: the deepest `.gitignore` with a matching line decides, then
-     `info/exclude`, then the global file, and a deciding `!` line re-includes.
+     each of `repositoryWide` in order (`info/exclude`, then the global file), and a deciding `!` line re-includes.
      */
-    private func ignoringLine(relative: String, parent: String, name: String, isDirectory: Bool) -> Pattern.Source? {
+    private func ignoringLine(
+        relative: String,
+        parent: String,
+        name: String,
+        isDirectory: Bool,
+        foldCase: Bool,
+        repositoryWide: [[Pattern]],
+    ) -> Pattern.Source? {
         let path = Array(relative.utf8)
         let nameBytes = path[(path.count - name.utf8.count)...]
         var directory: String? = parent
@@ -838,7 +920,7 @@ final class IgnoreRules {
             }
             directory = current.isEmpty ? nil : String(current[..<(current.lastIndex(of: "/") ?? current.startIndex)])
         }
-        for patterns in repositoryWidePatterns {
+        for patterns in repositoryWide {
             if let decision = Self.decision(
                 patterns,
                 path: path[...],
