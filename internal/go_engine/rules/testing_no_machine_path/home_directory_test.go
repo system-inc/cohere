@@ -11,6 +11,7 @@ import (
 // what makes it cheaper than unquoting every literal.
 func TestMayNameHomeDirectoryKeepsEveryLiteralThatNamesOne(test *testing.T) {
 	test.Parallel()
+	// Not a machine path: planted literals, the inputs the check is held to, never read from disk.
 	for _, literal := range []struct {
 		source   string
 		setAside bool

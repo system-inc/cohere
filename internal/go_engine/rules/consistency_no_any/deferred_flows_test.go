@@ -38,8 +38,8 @@ func flowSource(withAny bool) string {
 }
 
 // walkedState runs the rule's listener over source as the syntax dispatcher would, every node with its ancestors, and
-// returns what the rule gathered.
-func walkedState(test *testing.T, source string) *packageState {
+// returns what the rule gathered and the findings it reported.
+func walkedState(test *testing.T, source string) (*packageState, []analysis.Diagnostic) {
 	test.Helper()
 	fileSet := token.NewFileSet()
 	file, parseError := parser.ParseFile(fileSet, "flows.go", source, parser.ParseComments)
@@ -66,8 +66,9 @@ func walkedState(test *testing.T, source string) *packageState {
 		TypesInfo: information,
 		ResultOf:  map[*analysis.Analyzer]any{},
 	}
+	reported := []analysis.Diagnostic{}
 	context := rule.NewContext(Name, pass, nil, flag.NewFlagSet(Name, flag.ContinueOnError), nil,
-		func(string, analysis.Diagnostic) {})
+		func(_ string, diagnostic analysis.Diagnostic) { reported = append(reported, diagnostic) })
 	enterFile(context, file)
 	stack := []ast.Node{}
 	ast.Inspect(file, func(node ast.Node) bool {
@@ -80,15 +81,16 @@ func walkedState(test *testing.T, source string) *packageState {
 		return true
 	})
 	exitPackage(context)
-	return rule.State[packageState](context)
+	return rule.State[packageState](context), reported
 }
 
 // A package that writes no any and no empty interface records none of the values it hands on, since only a candidate
 // is ever judged by them: its flows stay empty however many values it hands on, which is what spares nearly every
-// package the cost. The same package with one any written in a parameter's type records them all.
+// package the cost, and it reports nothing. The same package with one any written in a parameter's type records them
+// all, and reports that any, since nothing fixes the parameter's type.
 func TestFlowsAreRecordedOnlyForAPackageWithACandidate(test *testing.T) {
 	test.Parallel()
-	without := walkedState(test, flowSource(false))
+	without, reportedWithout := walkedState(test, flowSource(false))
 	if len(without.handings) == 0 {
 		test.Fatal("the package hands values on, yet the walk kept no node that does")
 	}
@@ -96,12 +98,18 @@ func TestFlowsAreRecordedOnlyForAPackageWithACandidate(test *testing.T) {
 		len(without.flows.sourceFixed); recorded != 0 {
 		test.Errorf("a package with no candidate recorded %d flows", recorded)
 	}
-	with := walkedState(test, flowSource(true))
+	if len(reportedWithout) != 0 {
+		test.Errorf("a package with no candidate reported %d findings", len(reportedWithout))
+	}
+	with, reportedWith := walkedState(test, flowSource(true))
 	if len(with.candidates) != 1 {
 		test.Fatalf("want the one any as the candidate, got %d", len(with.candidates))
 	}
 	if len(with.flows.sinkFixed) == 0 || len(with.flows.feeds) == 0 || len(with.flows.definedFrom) == 0 {
 		test.Errorf("a package with a candidate recorded too little: %d sinks, %d feeds, %d definitions",
 			len(with.flows.sinkFixed), len(with.flows.feeds), len(with.flows.definedFrom))
+	}
+	if len(reportedWith) != 1 {
+		test.Errorf("want the one any reported, got %d findings", len(reportedWith))
 	}
 }

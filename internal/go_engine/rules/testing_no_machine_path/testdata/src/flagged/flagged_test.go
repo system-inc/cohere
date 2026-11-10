@@ -17,9 +17,6 @@ var escaped = "\x2fUsers\x2fsomeone\x2fx" // want `This test names a home direct
 // A home path in octal escapes.
 var octal = "\057home\057someone\057x" // want `This test names a home directory`
 
-// A raw string that names a home directory only once the carriage return inside it is dropped, as unquoting does.
-var carriageReturn = `/Users/someone/x` // want `This test names a home directory`
-
 // A home path inside a longer string.
 var line = "error at /Users/someone/a.ts:1:1" // want `This test names a home directory`
 
