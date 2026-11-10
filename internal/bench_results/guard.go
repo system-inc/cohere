@@ -67,6 +67,13 @@ func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, err
 			checkedScope(tonight.Engine),
 		)
 	}
+	if baseline.NoFix != tonight.NoFix {
+		return GuardResult{}, fmt.Errorf(
+			"the baseline's cold runs %s and tonight's %s, and a fixing run is never compared with a checking one",
+			coldKind(baseline.NoFix),
+			coldKind(tonight.NoFix),
+		)
+	}
 	if baseline.Machine.Model != tonight.Machine.Model || baseline.Machine.Cores != tonight.Machine.Cores {
 		return GuardResult{}, fmt.Errorf(
 			"the baseline ran on a %s with %d cores and tonight on a %s with %d, and different machines are never compared",
@@ -128,6 +135,14 @@ func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, err
 		result.Verdict = GuardVerdictPass
 	}
 	return result, nil
+}
+
+// coldKind says whether a record's cold runs fixed or only checked, for a refusal to name.
+func coldKind(noFix bool) string {
+	if noFix {
+		return "checked without fixing"
+	}
+	return "fixed"
 }
 
 // checkedScope says what a record with engine checked, for a refusal to name: the whole root, or one

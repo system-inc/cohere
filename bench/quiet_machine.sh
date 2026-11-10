@@ -31,8 +31,9 @@
 #           that took nothing from the cache (#547dhjz), or a warm run that is not a whole replay
 #   warm    `cohere` again on the unchanged tree: the replay
 #   edit    one line added to one function body, `cohere`, then the file's original bytes put back
-#   cold    `cohere --no-cache`: every phase from source, nothing read or written
-#   idle    `cohere --no-cache` after the machine has sat idle for --idle-seconds: cold as a developer who
+#   cold    `cohere --no-cache`: every phase from source, nothing read or written; narrowed by --engine Go,
+#           `cohere --no-fix --no-cache`, a checking run, as #pff7xhr's bar is (cold_arguments.zsh)
+#   idle    cold's command after the machine has sat idle for --idle-seconds: cold as a developer who
 #           pauses between saves mostly meets it, since the slow mode below follows idleness
 #   first   `cohere` in a fresh copy of the tree with no cache of any kind: what a developer's first run
 #           pays, cache writes and incremental build info included. Measured beside cold, because a first
@@ -130,6 +131,7 @@
 set -u
 name=quiet_machine
 source ${0:A:h}/pinned.zsh
+source ${0:A:h}/cold_arguments.zsh
 
 project=$HOME/Projects/ahra
 modes_asked=cold
@@ -176,6 +178,8 @@ done
   fail "GODEBUG is set ($GODEBUG), which sends the Go engine's in-process lister to \`go list\` (#9wfsmqv); unset it and run again"
 (( ${+COHERE_PROJECT_ENGINE} )) &&
   fail "COHERE_PROJECT_ENGINE is set ($COHERE_PROJECT_ENGINE), which every run would inherit; unset it, and name an engine with --engine"
+# The cold and idle runs' arguments, and the record's noFix, which reads them rather than the engine.
+cold=(${(f)"$(cold_arguments $project_engine)"})
 modes=(${(s:,:)modes_asked})
 (( ${#modes} > 0 )) || fail "--modes names no mode"
 for mode in $modes; do
@@ -231,6 +235,7 @@ print "# quiet    at least $idle_floor% of all cores idle over 2s before and 1s 
 measuring edit && print "# edit     $edit"
 measuring idle && print "# idle     each idle run after ${idle_seconds}s of the machine sitting idle"
 [[ -n $project_engine ]] && print "# engine   $project_engine alone (COHERE_PROJECT_ENGINE), with --directory at each run's copy"
+(measuring cold || measuring idle) && print "# cold     cohere ${cold}"
 print "# go       GOGC ${GOGC-(unset)}, GOMEMLIMIT ${GOMEMLIMIT-(unset)}, GOMAXPROCS ${GOMAXPROCS-(unset)}"
 print
 
@@ -337,11 +342,11 @@ for round in $(seq 1 $runs); do
     [[ $(shasum -a 256 < $copy/$edit) == $original_hash ]] || fail "$edit did not go back to its original bytes"
   fi
 
-  measuring cold && measure cold $round --no-cache
+  measuring cold && measure cold $round $cold
 
   if measuring idle; then
     sleep $idle_seconds
-    measure idle $round --no-cache
+    measure idle $round $cold
   fi
 
   if measuring first; then
@@ -426,6 +431,7 @@ if [[ $record == true ]]; then
   [[ $stopped_early == true ]] && record_flags+=(-stopped-early)
   measuring edit && record_flags+=(-edit $edit)
   [[ -n $project_engine ]] && record_flags+=(-project-engine $project_engine)
+  (( ${cold[(Ie)--no-fix]} )) && record_flags+=(-no-fix)
   record_flags+=(-gogc=${GOGC-} -gomemlimit=${GOMEMLIMIT-} -gomaxprocs=${GOMAXPROCS-})
   (cd ${0:A:h:h} && go run ./internal/bench_results/tools/record -runs $runs_table -engine $engine \
     -project ${project:t} -project-commit $project_commit -idle-floor $idle_floor -settle $settle \
