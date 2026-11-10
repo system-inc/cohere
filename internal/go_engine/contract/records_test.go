@@ -422,16 +422,20 @@ func TestEveryRecordWritesTheContractsFields(test *testing.T) {
 		written[record.kind()] = true
 		ours := shapeOf(test, "", object)
 		delete(ours, "kind")
-		for _, additive := range additiveFields[record.kind()] {
-			if _, present := ours[additive]; !present {
-				test.Errorf("%s does not write its additive field %s", record.kind(), additive)
-			}
-			delete(ours, additive)
-		}
 		theirs, inContract := shapes[record.kind()]
 		if !inContract {
 			test.Errorf("%s is written and the contract shows no such record", record.kind())
 			continue
+		}
+		// An additive field the contract does not show yet is left out of the comparison. One it shows, as the Swift
+		// engine's NotWritten.jsonl shows `notWritten`, is compared like any other (#723rzxm).
+		for _, additive := range additiveFields[record.kind()] {
+			if _, present := ours[additive]; !present {
+				test.Errorf("%s does not write its additive field %s", record.kind(), additive)
+			}
+			if _, documented := theirs[additive]; !documented {
+				delete(ours, additive)
+			}
 		}
 		for _, problem := range compareShapes(
 			string(record.kind()),
