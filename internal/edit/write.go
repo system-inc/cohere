@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/replace"
 	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // Parses reports whether text parses cleanly as the script kind implied by its file name.
@@ -175,17 +176,33 @@ func guardScriptKind(fileName string) core.ScriptKind {
 //
 // The original file's permission bits are preserved, because a fresh temp file is created at 0600
 // and renaming it over a source file would quietly change its mode.
-func WriteAtomically(fileName string, text string) error {
-	directory := filepath.Dir(fileName)
-
-	mode := os.FileMode(0o644)
-	if info, statError := os.Stat(fileName); statError == nil {
-		mode = info.Mode().Perm()
+//
+// The file is written where it really is, every symbolic link resolved (#td3zta2). A rename over the
+// name as given replaced a linked file with a plain one, so the link was gone and its target never
+// changed; and a name reached through a linked directory put the rename wherever the link pointed, which
+// rewrote 693 files of a shared checkout on 2026-11-09. So the temp file is created beside the real path
+// and renamed over it: a link inside root stays a link, and its target takes the new text. A real path
+// outside root is refused with a *write_root.OutsideRootError before anything is created, and the file
+// holds what it held. A file that cannot be resolved, a missing one included, is an error, never a new
+// file: the engine only rewrites files it has just read.
+func WriteAtomically(root write_root.WriteRoot, fileName string, text string) error {
+	realPath, inside, resolveError := root.Inside(fileName)
+	if resolveError != nil {
+		return resolveError
+	}
+	if !inside {
+		return &write_root.OutsideRootError{File: fileName, RealPath: realPath}
 	}
 
-	temporary, temporaryFileError := os.CreateTemp(directory, "."+filepath.Base(fileName)+".cohere-*")
+	information, statError := os.Stat(realPath)
+	if statError != nil {
+		return fmt.Errorf("reading the mode of %s: %w", realPath, statError)
+	}
+	mode := information.Mode().Perm()
+
+	temporary, temporaryFileError := os.CreateTemp(filepath.Dir(realPath), "."+filepath.Base(realPath)+".cohere-*")
 	if temporaryFileError != nil {
-		return fmt.Errorf("creating a temp file beside %s: %w", fileName, temporaryFileError)
+		return fmt.Errorf("creating a temp file beside %s: %w", realPath, temporaryFileError)
 	}
 	temporaryName := temporary.Name()
 
@@ -228,10 +245,10 @@ func WriteAtomically(fileName string, text string) error {
 	}
 	// replace.File rather than os.Rename: on Windows a rename over a file another process is reading is
 	// refused for as long as the read takes, and is retried through that.
-	if fileError := replace.File(temporaryName, fileName); fileError != nil {
+	if fileError := replace.File(temporaryName, realPath); fileError != nil {
 		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
-		return fmt.Errorf("renaming %s over %s: %w", temporaryName, fileName, fileError)
+		return fmt.Errorf("renaming %s over %s: %w", temporaryName, realPath, fileError)
 	}
 
 	return nil

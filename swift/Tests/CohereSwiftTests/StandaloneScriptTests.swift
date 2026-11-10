@@ -136,7 +136,7 @@ struct StandaloneScriptTests {
         let dump = #"{"toolsVersion":{"_version":"6.2.0"},"swiftLanguageVersions":null,"targets":[]}"#
         let package = try PackageModel(root: root, describeJson: Data(describe.utf8), dumpPackageJson: Data(dump.utf8))
 
-        let fileSet = try FileSet.build(package: package, environment: ["HOME": root.path])
+        let fileSet = try FileSet.build(package: package)
 
         #expect(
             fileSet.scripts.map { "\(CheckFixture.relative($0.url.path, to: root)):\($0.targetName)" }.sorted() == [

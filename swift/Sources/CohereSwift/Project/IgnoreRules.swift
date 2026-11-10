@@ -6,15 +6,22 @@ import Foundation
  Kirk's ruling (#67vevpz): cohere runs no git at all. The file set used to ask `git ls-files` which files
  git does not ignore, and the format phase asked `git rev-parse` where the repository starts. Both answers
  are on disk: the repository starts at the nearest `.git`, what it tracks is its index (`GitIndex`), and what
- it ignores is every `.gitignore` from its root down, `info/exclude` in its git directory, and the global
- excludes file. Reading them costs no process launch and does not depend on whichever git is first on PATH.
+ it ignores is every `.gitignore` from its root down and `info/exclude` in its git directory, a worktree's in the
+ common one. Reading them costs no process launch and does not depend on whichever git is first on PATH.
+
+ The repository's rules alone, matched case sensitively, by the ruling on #jem2gsa (#jgk8ppa), not by git's
+ behaviour: git also reads the global excludes file (`core.excludesFile`, else `git/ignore` under `XDG_CONFIG_HOME`
+ or `~/.config`) and folds case under `core.ignorecase`, and this reads neither. Both are one machine's
+ configuration, so a verdict that read them would check other files on Kirk's Mac than on a Linux box over the
+ same commit. Every engine reads the same rules (Go's `internal/gitignore` says so for all three). Where this
+ differs from git on a case-insensitive Mac it checks more, never less, and a tracked file is never ignored.
 
  The rules are git's own (`dir.c` and `wildmatch.c`), ported rather than approximated, because a matcher
  that is nearly right drops a file silently, which is the failure the coverage line exists to prevent:
  - Blank lines and `#` comments are skipped. `\#` and `\!` begin a pattern with that character.
  - Trailing spaces are trimmed unless escaped with `\`.
  - `!` negates, and the last matching line wins. Files are consulted from the deepest `.gitignore` up to
-   the root's, then `info/exclude`, then the global file, and the first file with a matching line decides.
+   the root's, then `info/exclude`, and the first file with a matching line decides.
  - A trailing `/` matches directories only.
  - A pattern with a slash before its end is anchored to its file's directory. One without matches a name
    at any depth below that directory.
@@ -28,7 +35,6 @@ import Foundation
    ignore files alone decide, and `indexFallbackReason` says why.
  - A directory holding its own `.git` is another repository and nothing inside it is listed, the boundary
    Go's `format_files.HasOwnRepository` draws with the same check.
- - `core.ignorecase` folds ASCII case, as git does on macOS's default filesystem.
 
  Go's `format_files.matchesIgnore` is a deliberate subset (no negation, no anchoring rule), sized for the
  format walk's pruning. This is all of git's rules, because here it replaces git's answer outright.
@@ -36,7 +42,6 @@ import Foundation
  One difference from `git ls-files --cached`, by construction: a tracked file deleted from the working tree is
  still listed by git, and is not here, since this lists what is on disk. The file set used to name such a file as
  one no target compiles.
- Also not read: the system config file and `include` directives, when looking for `core.excludesFile`.
  */
 final class IgnoreRules {
     /* The repository holding a directory: the nearest directory above it with a `.git`, and its git directories. */
@@ -140,14 +145,14 @@ final class IgnoreRules {
         }
 
         /* `path` is relative to the ignore file's directory, and `name` is its last component. */
-        func matches(path: [UInt8], name: [UInt8], isDirectory: Bool, foldCase: Bool) -> Bool {
+        func matches(path: [UInt8], name: [UInt8], isDirectory: Bool) -> Bool {
             if directoriesOnly && !isDirectory {
                 return false
             }
             if matchesNameAnywhere {
-                return Wildcard(pattern: glob, text: name, slashIsSpecial: false, foldCase: foldCase).matches()
+                return Wildcard(pattern: glob, text: name, slashIsSpecial: false).matches()
             }
-            return Wildcard(pattern: glob, text: path, slashIsSpecial: true, foldCase: foldCase).matches()
+            return Wildcard(pattern: glob, text: path, slashIsSpecial: true).matches()
         }
 
         /* Every pattern in ignore file `file`'s bytes, in order, as git's `add_patterns_from_buffer` reads them. */
@@ -221,7 +226,8 @@ final class IgnoreRules {
     /*
      git's `wildmatch`, ported line for line over bytes. `slashIsSpecial` is its `WM_PATHNAME`: `*`, `?` and a
      bracket never match `/`, and `**` crosses directories only as a whole segment. The two abort outcomes
-     are how git stops a doomed backtrack early, and they are kept so the answers stay git's.
+     are how git stops a doomed backtrack early, and they are kept so the answers stay git's. Its `WM_CASEFOLD`
+     is left out, since the rules match case sensitively (#jgk8ppa).
      */
     struct Wildcard {
         enum Outcome {
@@ -234,7 +240,6 @@ final class IgnoreRules {
         var pattern: [UInt8]
         var text: [UInt8]
         var slashIsSpecial: Bool
-        var foldCase: Bool
 
         func matches() -> Bool {
             match(patternFrom: 0, textFrom: 0) == .match
@@ -249,20 +254,15 @@ final class IgnoreRules {
             index < text.count ? text[index] : 0
         }
 
-        private func folded(_ byte: UInt8) -> UInt8 {
-            foldCase && Self.isUpper(byte) ? byte + 32 : byte
-        }
-
         private func match(patternFrom patternStart: Int, textFrom textStart: Int) -> Outcome {
             var patternIndex = patternStart
             var textIndex = textStart
             while patternIndex < pattern.count {
-                var patternCharacter = folded(pattern[patternIndex])
+                var patternCharacter = pattern[patternIndex]
                 var textCharacter = textByte(textIndex)
                 if textIndex >= text.count && patternCharacter != Byte.asterisk {
                     return .abortAll
                 }
-                textCharacter = folded(textCharacter)
                 switch patternCharacter {
                     case Byte.backslash:
                         /* Literal match with the next byte. A pattern ending in `\` reads 0 here and matches nothing. */
@@ -330,9 +330,9 @@ final class IgnoreRules {
                             let next = pattern[patternIndex]
                             if !Self.isGlobSpecial(next) {
                                 /* A literal after the asterisk: skip ahead to where it occurs, since everything before it belongs to the asterisk. */
-                                let literal = folded(next)
+                                let literal = next
                                 while textIndex < text.count {
-                                    textCharacter = folded(text[textIndex])
+                                    textCharacter = text[textIndex]
                                     if (!crossesSlashes && textCharacter == Byte.slash) || textCharacter == literal {
                                         break
                                     }
@@ -425,12 +425,6 @@ final class IgnoreRules {
                     if textCharacter <= classCharacter && textCharacter >= previous {
                         matched = true
                     }
-                    else if foldCase && Self.isLower(textCharacter) {
-                        let upper = textCharacter - 32
-                        if upper <= classCharacter && upper >= previous {
-                            matched = true
-                        }
-                    }
                     classCharacter = 0
                 }
                 else if classCharacter == Byte.openBracket && patternByte(patternIndex + 1) == Byte.colon {
@@ -453,7 +447,7 @@ final class IgnoreRules {
                     }
                     else {
                         let name = String(decoding: pattern[nameStart..<(nameStart + nameLength)], as: UTF8.self)
-                        guard let member = Self.isInNamedClass(name, textCharacter, foldCase: foldCase) else {
+                        guard let member = Self.isInNamedClass(name, textCharacter) else {
                             return nil
                         }
                         if member {
@@ -473,7 +467,7 @@ final class IgnoreRules {
         }
 
         /* `[:name:]` inside a class. Nil for a name git does not know, which aborts the match as git does. */
-        static func isInNamedClass(_ name: String, _ byte: UInt8, foldCase: Bool) -> Bool? {
+        static func isInNamedClass(_ name: String, _ byte: UInt8) -> Bool? {
             switch name {
                 case "alnum": isAlpha(byte) || isDigit(byte)
                 case "alpha": isAlpha(byte)
@@ -487,7 +481,7 @@ final class IgnoreRules {
                 /* git's own `isspace`: no vertical tab or form feed. */
                 case "space":
                     byte == Byte.space || byte == Byte.tab || byte == Byte.newline || byte == Byte.carriageReturn
-                case "upper": isUpper(byte) || (foldCase && isLower(byte))
+                case "upper": isUpper(byte)
                 case "xdigit":
                     isDigit(byte) || (byte >= UInt8(ascii: "a") && byte <= UInt8(ascii: "f"))
                         || (byte >= UInt8(ascii: "A") && byte <= UInt8(ascii: "F"))
@@ -519,103 +513,66 @@ final class IgnoreRules {
     let repository: Repository
     /* The repository root as a path, symlinks resolved, every path below it is measured from. */
     private let rootPath: String
-    private let foldCase: Bool
     /* What the index tracks, which no ignore pattern excludes. Empty when it was not read. */
     private let index: GitIndex
     /* Why the index was not read, for the file set's note, or nil when it was. */
     let indexFallbackReason: String?
     /* The index read or looked for, absolute, nil when no git directory was found to hold one. */
     private let indexFile: String?
-    /* `info/exclude`, then the global excludes file: consulted after every `.gitignore`, in that order. */
-    private let repositoryWidePatterns: [[Pattern]]
+    /* `info/exclude`, consulted after every `.gitignore`. Empty when there is no git directory to hold one. */
+    private let excludePatterns: [Pattern]
     /*
-     What the front door's matcher (Go's `gitignore.New`) reads beside each `.gitignore`: `.git/info/exclude` when
-     `.git` is a directory, and nothing else, since it reads no global excludes file and no worktree's shared
-     `info/exclude`. It matches case sensitively too. See `decidedBeyondSharedRules`.
+     A worktree's shared `info/exclude`, absolute, which Go's matcher (`gitignore.New`), and so the front door's digest,
+     does not read yet (#vdbcswp): it reads `.git/info/exclude` only through a `.git` directory. Nil wherever the two
+     read the same file. See `excludedBeyondTheDigest`.
      */
-    private let sharedRepositoryWidePatterns: [[Pattern]]
+    private let excludeTheDigestCannotRead: String?
     /*
      The directory holding every path whose listing this was asked, relative to the root, as its components: nil before
      any was asked. See `trackedIgnored`.
      */
     private var consultedScope: [Substring]?
     /*
-     Whether any path was excluded by a rule the front door's matcher does not read or reads otherwise: a line of the
-     global excludes file, of a worktree's shared `info/exclude`, or one that matched only with `core.ignorecase`'s
-     folding. The digest the front door keys an index on covers the tracked paths its own rules exclude, so tracking
-     such a path would move no digest, and the index is then keyed on its bytes (`trackedIgnored`).
+     Whether any path was excluded by a line of `excludeTheDigestCannotRead`. The digest the front door keys an index on
+     covers the tracked paths its own rules exclude, so tracking such a path would move no digest, and the index is
+     then keyed on its bytes (`trackedIgnored`). Gone once Go reads a worktree's shared `info/exclude` (#vdbcswp).
      */
-    private var decidedBeyondSharedRules = false
+    private var excludedBeyondTheDigest = false
     /* Each directory's own `.gitignore`, by its path relative to the root ("" for the root), read once. */
     private var directoryPatterns: [String: [Pattern]] = [:]
     /*
-     Every file this read or looked for to decide what git ignores, there or not: the git config files, the index,
-     `info/exclude`, the global excludes file and each `.gitignore` consulted. The run's inputs record names each
-     (`RunInputs`), since a line added to any of them, or a file added to the index, changes which files are ours.
+     Every file this read or looked for to decide what git ignores, there or not: the repository's config, which names
+     the index's object format, the index, `info/exclude` and each `.gitignore` consulted. The run's inputs record
+     names each (`RunInputs`), since a line added to any of them, or a file added to the index, changes which files
+     are ours.
      */
     private(set) var filesConsulted: Set<String> = []
     /* Every directory `visibleFiles` listed, absolute, so the inputs record can name each listing the walk read. */
     private(set) var directoriesListed: [String] = []
 
     /*
-     `environment` supplies `HOME` and `XDG_CONFIG_HOME`, where the global config and excludes file live.
-     Tests pass their own, so a machine's global ignore cannot leak into what they prove.
+     Reads nothing of the machine's: no global or user config, no global excludes file, no `core.ignorecase`
+     (#jgk8ppa, the header says why), so no `HOME` or `XDG_CONFIG_HOME` reaches what it decides.
      */
-    init(repository: Repository, environment: [String: String] = ProcessInfo.processInfo.environment) {
+    init(repository: Repository) {
         self.repository = repository
         rootPath = repository.root.path
-        let home = environment["HOME"].flatMap { $0.isEmpty ? nil : $0 } ?? NSHomeDirectory()
-        let configurationDirectory =
-            environment["XDG_CONFIG_HOME"].flatMap { $0.isEmpty ? nil : $0 + "/git" } ?? home + "/.config/git"
-
-        /* git's order: the XDG file, then `~/.gitconfig`, then the repository's own; the last one setting a key wins. */
-        var configurationFiles = [configurationDirectory + "/config", home + "/.gitconfig"]
+        var consulted: Set<String> = []
         if let commonDirectory = repository.commonDirectory {
-            configurationFiles.append(commonDirectory.appendingPathComponent("config").path)
-        }
-        var settings: [String: String] = [:]
-        var consulted = Set(configurationFiles)
-        for file in configurationFiles {
-            guard let contents = FileManager.default.contents(atPath: file) else { continue }
-            for entry in Self.settings(in: String(decoding: contents, as: UTF8.self), section: "core") {
-                settings[entry.key] = entry.value
-            }
-        }
-        foldCase = settings["ignorecase"].map(Self.isTrue) ?? false
-
-        let globalExcludes: String
-        if let configured = settings["excludesfile"], !configured.isEmpty {
-            if configured.hasPrefix("~/") {
-                globalExcludes = home + configured.dropFirst(1)
-            }
-            else if configured.hasPrefix("/") {
-                globalExcludes = configured
-            }
-            else {
-                /* git reads it from the top of the work tree, where it runs. */
-                globalExcludes = repository.root.appendingPathComponent(configured).path
-            }
-        }
-        else {
-            globalExcludes = configurationDirectory + "/ignore"
-        }
-        var repositoryWide: [[Pattern]] = []
-        var sharedRepositoryWide: [[Pattern]] = []
-        if let commonDirectory = repository.commonDirectory {
+            consulted.insert(commonDirectory.appendingPathComponent("config").path)
             let exclude = commonDirectory.appendingPathComponent("info/exclude").path
             consulted.insert(exclude)
-            let excludePatterns = Self.patterns(inFile: exclude)
-            repositoryWide.append(excludePatterns)
+            excludePatterns = Self.patterns(inFile: exclude)
             /* Go reads `.git/info/exclude` only through a `.git` directory, which is the common directory here. */
             let marker = repository.root.appendingPathComponent(".git")
-            if Self.isDirectory(marker) && commonDirectory.standardizedFileURL.path == marker.standardizedFileURL.path {
-                sharedRepositoryWide.append(excludePatterns)
-            }
+            let digestReadsIt =
+                Self.isDirectory(marker) && commonDirectory.standardizedFileURL.path == marker.standardizedFileURL.path
+            excludeTheDigestCannotRead = digestReadsIt ? nil : exclude
         }
-        consulted.insert(globalExcludes)
-        repositoryWide.append(Self.patterns(inFile: globalExcludes))
-        repositoryWidePatterns = repositoryWide
-        sharedRepositoryWidePatterns = sharedRepositoryWide
+        else {
+            excludePatterns = []
+            excludeTheDigestCannotRead = nil
+        }
 
         /* The object format is the repository's alone: git honours `extensions` in no other config file. */
         if let gitDirectory = repository.gitDirectory {
@@ -651,11 +608,11 @@ final class IgnoreRules {
      `""` for the root, so the run's inputs record can name it under `trackedIgnored` (#jem2gsa). The scope is the
      nearest directory holding every path whose listing was asked, the walk's start and each target source alike: an
      answer below it depends only on index entries below it, since a directory above is entered for its tracked files
-     only when one below it is tracked. Nil when the index was not read whole, and when a path was excluded by a rule
-     the front door's digest does not read (`decidedBeyondSharedRules`): either way the index stays keyed on its bytes.
+     only when one below it is tracked. Nil when the index was not read whole, and when a path was excluded by a file
+     the front door's digest does not read (`excludedBeyondTheDigest`): either way the index stays keyed on its bytes.
      */
     var trackedIgnored: (index: String, scope: String)? {
-        guard indexFallbackReason == nil, !decidedBeyondSharedRules, let indexFile else { return nil }
+        guard indexFallbackReason == nil, !excludedBeyondTheDigest, let indexFile else { return nil }
         return (index: indexFile, scope: (consultedScope ?? []).joined(separator: "/"))
     }
 
@@ -737,7 +694,7 @@ final class IgnoreRules {
     /*
      A pattern's file and line as a run names it (`.gitignore:3`): relative to `directory` (absolute, symlinks
      resolved) when the file lies in this repository's work tree, climbing with `..` to the root when it must, and
-     absolute otherwise, as the global excludes file and a worktree's shared `info/exclude` are.
+     absolute otherwise, as a worktree's shared `info/exclude` is.
      */
     func describe(_ source: Pattern.Source, relativeTo directory: String) -> String {
         let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
@@ -861,24 +818,11 @@ final class IgnoreRules {
         if case .trackedOnly(let directoryLine) = enclosing {
             excludedBy = directoryLine
         }
-        else if let line = ignoringLine(
-            relative: relative,
-            parent: parent,
-            name: name,
-            isDirectory: isDirectory,
-            foldCase: foldCase,
-            repositoryWide: repositoryWidePatterns,
-        ) {
+        else if let line = ignoringLine(relative: relative, parent: parent, name: name, isDirectory: isDirectory) {
             excludedBy = line
-            if ignoringLine(
-                relative: relative,
-                parent: parent,
-                name: name,
-                isDirectory: isDirectory,
-                foldCase: false,
-                repositoryWide: sharedRepositoryWidePatterns,
-            ) == nil {
-                decidedBeyondSharedRules = true
+            /* Every `.gitignore` is asked before `info/exclude`, so a line of it decides only where none did. */
+            if line.file == excludeTheDigestCannotRead {
+                excludedBeyondTheDigest = true
             }
         }
         else {
@@ -893,43 +837,22 @@ final class IgnoreRules {
 
     /*
      The line that ignores an entry, nil when none does: the deepest `.gitignore` with a matching line decides, then
-     each of `repositoryWide` in order (`info/exclude`, then the global file), and a deciding `!` line re-includes.
+     `info/exclude`, and a deciding `!` line re-includes.
      */
-    private func ignoringLine(
-        relative: String,
-        parent: String,
-        name: String,
-        isDirectory: Bool,
-        foldCase: Bool,
-        repositoryWide: [[Pattern]],
-    ) -> Pattern.Source? {
+    private func ignoringLine(relative: String, parent: String, name: String, isDirectory: Bool) -> Pattern.Source? {
         let path = Array(relative.utf8)
         let nameBytes = path[(path.count - name.utf8.count)...]
         var directory: String? = parent
         while let current = directory {
             let patterns = patterns(ownedBy: current)
             let below = current.isEmpty ? path[...] : path[(current.utf8.count + 1)...]
-            if let decision = Self.decision(
-                patterns,
-                path: below,
-                name: nameBytes,
-                isDirectory: isDirectory,
-                foldCase: foldCase,
-            ) {
+            if let decision = Self.decision(patterns, path: below, name: nameBytes, isDirectory: isDirectory) {
                 return decision.negated ? nil : decision.source
             }
             directory = current.isEmpty ? nil : String(current[..<(current.lastIndex(of: "/") ?? current.startIndex)])
         }
-        for patterns in repositoryWide {
-            if let decision = Self.decision(
-                patterns,
-                path: path[...],
-                name: nameBytes,
-                isDirectory: isDirectory,
-                foldCase: foldCase,
-            ) {
-                return decision.negated ? nil : decision.source
-            }
+        if let decision = Self.decision(excludePatterns, path: path[...], name: nameBytes, isDirectory: isDirectory) {
+            return decision.negated ? nil : decision.source
         }
         return nil
     }
@@ -940,12 +863,11 @@ final class IgnoreRules {
         path: ArraySlice<UInt8>,
         name: ArraySlice<UInt8>,
         isDirectory: Bool,
-        foldCase: Bool,
     ) -> Pattern? {
         guard !patterns.isEmpty else { return nil }
         let path = Array(path)
         let name = Array(name)
-        return patterns.last { $0.matches(path: path, name: name, isDirectory: isDirectory, foldCase: foldCase) }
+        return patterns.last { $0.matches(path: path, name: name, isDirectory: isDirectory) }
     }
 
     private func patterns(ownedBy relativeDirectory: String) -> [Pattern] {
@@ -967,9 +889,9 @@ final class IgnoreRules {
     }
 
     /*
-     One section's keys from a git config file, lowercased, in file order: `core` or `extensions`. Enough of git's
-     config grammar for the three keys read here: sections, `key = value`, a bare key meaning true, quotes, escapes
-     and trailing comments.
+     One section's keys from a git config file, lowercased, in file order. Enough of git's config grammar for the one
+     key read here, `extensions.objectformat`: sections, `key = value`, a bare key meaning true, quotes, escapes and
+     trailing comments.
      */
     static func settings(in contents: String, section: String) -> [(key: String, value: String)] {
         var inSection = false
@@ -1030,10 +952,6 @@ final class IgnoreRules {
             }
         }
         return value
-    }
-
-    static func isTrue(_ value: String) -> Bool {
-        ["true", "yes", "on", "1"].contains(value.lowercased())
     }
 
     static func isDirectory(_ url: URL) -> Bool {

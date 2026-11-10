@@ -75,7 +75,11 @@ func TestConcurrentReadersNeverSeeAPartialFile(test *testing.T) {
 		if round%2 == 1 {
 			body = oldBody
 		}
-		if writeAtomicallyError := WriteAtomically(fileName, body); writeAtomicallyError != nil {
+		if writeAtomicallyError := WriteAtomically(
+			rootOf(test, fileName),
+			fileName,
+			body,
+		); writeAtomicallyError != nil {
 			close(stop)
 			waitGroup.Wait()
 			test.Fatalf("write failed on round %d: %v", round, writeAtomicallyError)
@@ -159,12 +163,20 @@ func TestTemporaryFileIsCreatedBesideTheTarget(test *testing.T) {
 	}()
 
 	for range 200 {
-		if writeAtomicallyError := WriteAtomically(fileName, "const a = 2;\n"); writeAtomicallyError != nil {
+		if writeAtomicallyError := WriteAtomically(
+			rootOf(test, fileName),
+			fileName,
+			"const a = 2;\n",
+		); writeAtomicallyError != nil {
 			close(stop)
 			<-done
 			test.Fatal(writeAtomicallyError)
 		}
-		if writeAtomicallyError := WriteAtomically(fileName, "const a = 1;\n"); writeAtomicallyError != nil {
+		if writeAtomicallyError := WriteAtomically(
+			rootOf(test, fileName),
+			fileName,
+			"const a = 1;\n",
+		); writeAtomicallyError != nil {
 			close(stop)
 			<-done
 			test.Fatal(writeAtomicallyError)
@@ -210,7 +222,11 @@ func keysOf(set map[string]bool) []string {
 func TestWriteIntoAMissingDirectoryFails(test *testing.T) {
 	test.Parallel()
 	missing := filepath.Join(test.TempDir(), "absent", "target.ts")
-	if writeAtomicallyError := WriteAtomically(missing, "const a = 1;\n"); writeAtomicallyError == nil {
+	if writeAtomicallyError := WriteAtomically(
+		rootOf(test, filepath.Dir(missing)),
+		missing,
+		"const a = 1;\n",
+	); writeAtomicallyError == nil {
 		test.Fatalf("expected an error writing into a directory that does not exist")
 	}
 }

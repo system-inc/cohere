@@ -146,7 +146,9 @@ nothing else.
 
 - `filesInPackage` is every `.swift` file in a root target, and every standalone script the run checks.
   `filesOurs` is the subset that is not ignored by git and not excluded. Dependencies, including local ones
-  like `Vendor/SwiftTerm`, are never counted, because they are not root targets.
+  like `Vendor/SwiftTerm`, are never counted, because they are not root targets. Ignored by git means by the
+  repository's rules alone, every `.gitignore` and `info/exclude`, matched case sensitively, never the machine's
+  global excludes file or `core.ignorecase` (#jgk8ppa), so one tree counts the same files on every machine.
 - A standalone script (#13nbb1s) is a file of ours: a `.swift` file git would list that no target compiles,
   with a `#!` line or a statement at its top level, the code `swift <file>` runs, whose nearest project (a
   `Package.swift`, a `project.yml` or one `.xcodeproj`) is the root or a local package the run covers. It is
@@ -160,14 +162,14 @@ nothing else.
   `a script whose imports do not settle its platform: it imports AppKit for macOS and UIKit for iOS, so neither SDK was guessed at`.
   Outside a git repository, a `git archive` copy say, "git would list" reads the package's own ignore files as git
   would were its root a repository's, so a script there is checked and every other such file named, as in a checkout.
-- An excluded entry's `source` names the rule that excluded the file, as `path:line` with the line counted from 1:
-  the ignore file's line that decided, or the line that excluded a directory above the file. The path is relative to
-  the project's root (`.gitignore:3`, `Sources/.gitignore:1`, `../.gitignore:2` for a repository whose root is above
-  the package's), or absolute for an ignore file outside the work tree, as the global excludes file and a worktree's
-  shared `info/exclude` are. It is absent where no rule is the cause: a package manifest, a vendored file, a file no
-  target compiles, a file inside another repository. The Swift engine has no `ignorePatterns`, so no Swift source
-  names `CohereSettings.json`. A narrowing excludes no file here; the front door counts what it left out from
-  `filesInScope`. Additive within contract 3 (#08cv2mp): the front door quotes it when every file was excluded,
+- An excluded entry's `source` names the rule that excluded the file, as `path:line` with the line counted from 1: the
+  ignore file's line that decided, or the line that excluded a directory above the file. The path is relative to the
+  project's root (`.gitignore:3`, `Sources/.gitignore:1`, `../.gitignore:2` for a repository whose root is above the
+  package's), or absolute for an ignore file outside the work tree, as a worktree's shared `info/exclude` is. It is
+  absent where no rule is the cause: a package manifest, a vendored file, a file no target compiles, a file inside
+  another repository. The Swift engine has no `ignorePatterns`, so no Swift source names `CohereSettings.json`. A
+  narrowing excludes no file here; the front door counts what it left out from `filesInScope`. Additive within contract
+  3 (#08cv2mp): the front door quotes it when every file was excluded,
   `no files checked: 1 file excluded, ignored by git (.gitignore:3)`, and a reader before it ignores it.
 - `filesInScope` equals `filesOurs` on a whole-package run. A run narrowed by named paths sets it
   lower and describes the request in `scopeDescription`, which the front door prints in the
@@ -772,12 +774,12 @@ The Swift engine's record (`RunInputs.swift` says why each is enough) names:
   Xcode root each package its project links, walked as the build-input snapshot walks them: no directory whose name
   starts with `.` is entered, so neither `.git`, `.build` nor cohere's `.cache` is, and everything else is, ignored by
   git or not, with the hidden files in each walked directory but `.DS_Store`. Beside them, every target's sources,
-  each package's `Package.swift` and `Package.resolved`, the ignore files, git config files and git index the file
-  set consulted, a `.git` file a worktree points through, the settings file, and the toolchain's files: the `swift`,
-  `xcrun` and `xcodebuild` PATH finds (and `xcodegen` at a spec's root), the `swift` xcrun names with
-  `swift-frontend`, `swift-build` and `swift-package` beside it, the toolchain's `ToolchainInfo.plist`, its Xcode's
-  `version.plist`, and each SDK's `SDKSettings.json`. A remote dependency's checkout lives in the engine's scratch and
-  is pinned by the resolved file.
+  each package's `Package.swift` and `Package.resolved`, the ignore files, the repository's git config and the git
+  index the file set consulted, a `.git` file a worktree points through, the settings file, and the toolchain's
+  files: the `swift`, `xcrun` and `xcodebuild` PATH finds (and `xcodegen` at a spec's root), the `swift` xcrun names
+  with `swift-frontend`, `swift-build` and `swift-package` beside it, the toolchain's `ToolchainInfo.plist`, its
+  Xcode's `version.plist`, and each SDK's `SDKSettings.json`. A remote dependency's checkout lives in the engine's
+  scratch and is pinned by the resolved file.
 - `directories`: every directory those walks listed, every directory the file set's walk listed (a hidden one it
   entered among them), and the directory holding each target source. None is in cohere's cache directory, which
   the file set's walk no longer enters, since the front door writes its table there after every run.
@@ -797,10 +799,10 @@ repository it belongs to, and the directory the run walked, relative to that roo
 root. The Go engine names its census's index, scoped to the root below the repository. The Swift engine names the
 index its file set read whole (#jem2gsa), scoped to the nearest directory holding every path the file set asked it
 about, the package's root and each target source, local and path packages' among them, so `""` when they lie in
-different subtrees of the repository: a scope too wide only costs a miss, and one too narrow is a stale replay. The
-digest reads only the repository's `.gitignore` files and a `.git` directory's `info/exclude`, case sensitively, so a
-Swift run that excluded a path by anything else, the global excludes file, a worktree's shared `info/exclude` or
-`core.ignorecase`'s folding, names no index here, since tracking that path would move no digest. The front door
+different subtrees of the repository: a scope too wide only costs a miss, and one too narrow is a stale replay. Both
+read the repository's rules alone, case sensitively (#jgk8ppa), but the digest does not read a worktree's shared
+`info/exclude` yet (#vdbcswp), so a Swift run that excluded a path by it names no index here, since tracking that
+path would move no digest. The front door
 keys such an index on `gitignore.TrackedIgnoredDigest` over that scope rather than on its bytes, which git rewrites
 on a `git status` and on every `git add`, so a replay survives what decides nothing. An index the reader cannot read
 whole, a split or sparse one among them, is keyed on its bytes as an index not named here is. A reader before it
