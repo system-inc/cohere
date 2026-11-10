@@ -6,9 +6,10 @@ import (
 	"strings"
 )
 
-// tagComponents are the custom tags the uncompiled files name, grouped so that tags named in one package's
-// directory are in one component, joined across packages. A file's constraint reads only the custom tags it names,
-// so setting a tag never changes whether a file naming none of its component's tags compiles.
+// tagComponents are the custom tags the files name, grouped so that tags named in one package's directory are in
+// one component, joined across packages. A file's constraint reads only the custom tags it names, so setting a tag
+// never changes whether a file naming none of its component's tags compiles. Each component's tags share builds of
+// their own, and no build sets two components' tags (BuildsFor).
 type tagComponents struct {
 	// tags are each component's tags, sorted, the components by their first tag.
 	tags [][]string
@@ -84,17 +85,16 @@ func newTagComponents(uncompiled []source, unix []string) tagComponents {
 	return components
 }
 
-// componentChoice is a platform's best build in a round of buildsByComponent: how many files still wanted it
-// compiles, and how many of the named tags it sets otherwise than the host.
+// componentChoice is a platform's best build in a round of buildsByComponent, and how many files still wanted it
+// compiles.
 type componentChoice struct {
 	build Build
 	gain  int
-	cost  int
 }
 
-// buildsByComponent chooses the extra builds when the named tags are too many for candidatesFor to weigh every set
-// of them (enumerationBudget), from what the files' constraints distinguish rather than from every combination. It
-// returns the builds, in the order candidatesFor would list them, and the files they compile.
+// buildsByComponent chooses the extra builds for the files of one tag component (BuildsFor), from what the files'
+// constraints distinguish rather than from every combination of the tags. It returns the builds, in the order they
+// were chosen, and the files they compile.
 //
 // A build's tags are an assignment of each tag component (tagComponents), and the builds are chosen one at a time.
 // Each round, every platform takes, component by component, the assignment compiling the most files still wanted,
@@ -102,9 +102,17 @@ type componentChoice struct {
 // compiles the most wins, the earliest on a tie. The assignments a component weighs are the host's and, for each of
 // its files still wanted, each least setting of that file's own tags that compiles it on the platform, so a round
 // costs each file's own settings and a compile of each wanted file under each distinct assignment, never a walk of
-// the combinations. Rounds end when no platform compiles one more file, and every file some platform compiles under
-// some setting of its own tags is compiled by then: its least setting alone would have compiled it.
-func buildsByComponent(uncompiled []source, host Build, platforms []Build, unix []string) ([]Build, coverage, error) {
+// the combinations, and two tags one package keeps apart, a version each, never ride one build (std's
+// crypto/internal/fips140test, #zzs7jm5). Rounds end when no platform compiles one more file, and every file some
+// platform compiles under some setting of its own tags is compiled by then: its least setting alone would have
+// compiled it. No setting that compiles a program of its own is weighed (breaks).
+func buildsByComponent(
+	uncompiled []source,
+	host Build,
+	platforms []Build,
+	unix []string,
+	programs []program,
+) ([]Build, coverage, error) {
 	components := newTagComponents(uncompiled, unix)
 	wanted := newCoverage(len(uncompiled))
 	for index := range uncompiled {
@@ -115,7 +123,7 @@ func buildsByComponent(uncompiled []source, host Build, platforms []Build, unix 
 	for {
 		var best componentChoice
 		for _, platform := range platforms {
-			choice, choiceError := bestOnPlatform(uncompiled, host, platform, components, wanted)
+			choice, choiceError := bestOnPlatform(uncompiled, host, platform, components, wanted, programs)
 			if choiceError != nil {
 				return nil, coverage{}, choiceError
 			}
@@ -148,21 +156,6 @@ func buildsByComponent(uncompiled []source, host Build, platforms []Build, unix 
 		chosen = append(chosen, best)
 	}
 
-	// The order candidatesFor lists builds in: by platform, then the more tags changed first, then by tags.
-	platformOf := func(target Build) int {
-		return slices.IndexFunc(platforms, func(each Build) bool {
-			return each.OperatingSystem == target.OperatingSystem && each.CgoEnabled == target.CgoEnabled
-		})
-	}
-	slices.SortStableFunc(chosen, func(left componentChoice, right componentChoice) int {
-		if order := platformOf(left.build) - platformOf(right.build); order != 0 {
-			return order
-		}
-		if left.cost != right.cost {
-			return right.cost - left.cost
-		}
-		return slices.Compare(left.build.Tags, right.build.Tags)
-	})
 	builds := make([]Build, 0, len(chosen))
 	for _, each := range chosen {
 		builds = append(builds, each.build)
@@ -178,6 +171,7 @@ func bestOnPlatform(
 	platform Build,
 	components tagComponents,
 	wanted coverage,
+	programs []program,
 ) (componentChoice, error) {
 	var named []string
 	for _, tags := range components.tags {
@@ -257,14 +251,23 @@ func bestOnPlatform(
 			// Each setting is told by the tags it changes from the host's. Only the settings no other compiling one
 			// changes a strict part of are weighed, so a file that compiles with either of two tags offers each alone
 			// and never both: `fips140v1.0 || fips140v1.26` would otherwise turn on two versions std keeps apart.
+			// A setting that compiles a program of its own is never weighed (breaks), so a file that only such a
+			// setting compiles is left unbuilt.
 			var changes []int
 			for mask := range 1 << len(own) {
-				compiled, compileError := compiles(under(component, withOwnTags(hostAssignments[component], own, mask)),
-					uncompiled[file])
+				target := under(component, withOwnTags(hostAssignments[component], own, mask))
+				compiled, compileError := compiles(target, uncompiled[file])
 				if compileError != nil {
 					return componentChoice{}, compileError
 				}
-				if compiled {
+				if !compiled {
+					continue
+				}
+				broken, breaksError := breaks(target, host, programs)
+				if breaksError != nil {
+					return componentChoice{}, breaksError
+				}
+				if len(broken) == 0 {
 					changes = append(changes, mask^hostMask)
 				}
 			}
@@ -297,7 +300,6 @@ func bestOnPlatform(
 		}
 		tags = append(tags, bestAssignment...)
 		choice.gain += bestGain
-		choice.cost += bestCost
 	}
 	choice.build = platform
 	choice.build.Tags = sortedSet(tags)
