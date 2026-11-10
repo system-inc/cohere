@@ -90,6 +90,10 @@ type Record struct {
 	// GoEnvironment is the Go runtime's settings in the benchmark's environment, which every run inherited.
 	// It is absent from a record written before the benchmark kept them.
 	GoEnvironment *GoEnvironment `json:"goEnvironment,omitempty"`
+	// NoFix is whether the Cold and Idle runs checked without fixing, `cohere --no-fix --no-cache`, as a run narrowed
+	// to the Go engine does: #pff7xhr's bar is a checking run's seconds, and a fixing run formats first (#jp0cqkk).
+	// Absent, they fixed, as every record before it did, so Guard never compares a fixing number with a checking one.
+	NoFix bool `json:"noFix,omitempty"`
 
 	Runs  []Run                `json:"runs"`
 	Modes map[Mode]ModeSummary `json:"modes"`

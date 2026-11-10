@@ -145,6 +145,8 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 	otherCores.Machine.Cores = 12
 	goAlone := guardRecord("cohere", "Mac16,5", 1.9, true)
 	goAlone.Engine = EngineGo
+	goAloneChecking := goAlone
+	goAloneChecking.NoFix = true
 	for name, want := range map[string]struct {
 		baseline Record
 		tonight  Record
@@ -175,6 +177,17 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 			baseline: goAlone,
 			tonight:  guardRecord("cohere", "Mac16,5", 10, true),
 			refusal:  "checked the Go project alone and tonight checked the whole root",
+		},
+		// A checking run is never judged against a fixing one, either way round, on the same project and engine.
+		"a checking night against a fixing baseline": {
+			baseline: goAlone,
+			tonight:  goAloneChecking,
+			refusal:  "the baseline's cold runs fixed and tonight's checked without fixing",
+		},
+		"a fixing night against a checking baseline": {
+			baseline: goAloneChecking,
+			tonight:  goAlone,
+			refusal:  "the baseline's cold runs checked without fixing and tonight's fixed",
 		},
 		"loaded baseline": {
 			baseline: guardRecord("ahra", "Mac16,5", 10, false),
