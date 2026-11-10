@@ -7,5 +7,6 @@
 {"kind":"lint","findings":0,"rulesRun":235,"filesWalked":1,"nodesVisited":39,"elapsedMilliseconds":0,"reusedFrom":"","rulesSilent":["cohere-go/concurrency-no-buffered-wait-delay","cohere-go/correctness-require-declared-walk"],"rulesWatchedAndQuiet":233,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":["cohere-go/concurrency-no-buffered-wait-delay","cohere-go/correctness-require-declared-walk"],"configNote":"","withheldBySuppression":{},"withheldAsGenerated":{},"withheldAsCopied":{},"cache":{"on":true,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,"factsSkipped":0,"waves":0}}
 {"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
+{"kind":"memory","raisedToBytes":[]}
 {"kind":"inputs","files":["/project/.git/info/exclude","/project/CohereSettings.json","/project/crowded.go","/project/go.mod"],"directories":["/project"],"absent":["/project/.git/index","/project/.gitignore","/project/go.sum","/project/go.work","/project/staticcheck.conf","/project/vendor/modules.txt"],"trackedIgnored":[]}
 {"kind":"summary","findings":0,"complete":true,"exitCode":0}

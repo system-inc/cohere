@@ -7,5 +7,6 @@
 {"kind":"lint","findings":0,"rulesRun":3,"filesWalked":2,"nodesVisited":55,"elapsedMilliseconds":0,"reusedFrom":"","rulesSilent":[],"rulesWatchedAndQuiet":2,"crashes":[{"file":"/project/clean.go","error":"cohere-go/correctness-always-panics: running analyzer alwayspanics on example.com/clean: it panicked with planted, at <frames>"}],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":"config: no CohereSettings.json beside go.mod, so every house rule ran at error; put one at /project/CohereSettings.json to change that","withheldBySuppression":{},"withheldAsGenerated":{},"withheldAsCopied":{},"cache":{"on":true,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,"factsSkipped":0,"waves":0}}
 {"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
+{"kind":"memory","raisedToBytes":[]}
 {"kind":"inputs","files":["/project/.git/info/exclude","/project/clean.go","/project/clean_test.go","/project/go.mod"],"directories":["/project"],"absent":["/project/.git/index","/project/.gitignore","/project/CohereSettings.json","/project/go.sum","/project/go.work","/project/staticcheck.conf","/project/vendor/modules.txt"],"trackedIgnored":[]}
 {"kind":"summary","findings":0,"complete":false,"exitCode":1}
