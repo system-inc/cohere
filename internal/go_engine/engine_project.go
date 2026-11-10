@@ -7,8 +7,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/mod/modfile"
@@ -93,23 +95,21 @@ func describeProject(request invocation) (*describedProject, error) {
 			contract.ExcludedFile{File: exclusion.File, Reason: exclusion.Reason, Source: exclusion.Source})
 	}
 
-	contents := map[string][]byte{}
-	var readable []string
-	for _, file := range census.Ours {
-		fileContents, readError := request.read(file)
-		if readError != nil {
-			// A file nothing could read is ours until something says otherwise; inside the scope it is a gap
-			// the run names, and outside it the load says what it makes of the file.
-			if insideScope(file, scope) {
-				described.unreadable = append(described.unreadable,
-					contract.UnreadableRecord{File: file, Error: unreadableSentence(readError)})
-				described.inScope = append(described.inScope, file)
-			}
-			described.record.FilesOurs++
-			continue
+	// One file at a time under `--single-threaded`, as gofmt's check reads them.
+	slots := runtime.GOMAXPROCS(0)
+	if request.switches["single-threaded"] {
+		slots = 1
+	}
+	readable, contents, unread := readOurs(census.Ours, request.read, slots)
+	for _, failed := range unread {
+		// A file nothing could read is ours until something says otherwise; inside the scope it is a gap the run
+		// names, and outside it the load says what it makes of the file.
+		if insideScope(failed.file, scope) {
+			described.unreadable = append(described.unreadable,
+				contract.UnreadableRecord{File: failed.file, Error: unreadableSentence(failed.readError)})
+			described.inScope = append(described.inScope, failed.file)
 		}
-		contents[file] = fileContents
-		readable = append(readable, file)
+		described.record.FilesOurs++
 	}
 	described.readableOurs = readable
 	// Only the files read are judged, from the bytes just read, every readable file and not only those in scope, so
@@ -172,6 +172,46 @@ func describeProject(request invocation) (*describedProject, error) {
 	described.record.FilesInScope = len(described.inScope)
 	described.record.ElapsedMilliseconds = int(time.Since(started).Milliseconds())
 	return described, nil
+}
+
+// unreadFile is a file of ours nothing could read, and why.
+type unreadFile struct {
+	file      string
+	readError error
+}
+
+// readOurs reads each of files through read, as many at once as slots allows, and returns those it read, in files'
+// order, with their bytes, and those it could not, in files' order too. Each read lands in its own file's place, so
+// what the run names and in what order is the same whichever read finishes first.
+func readOurs(
+	files []string, read func(file string) ([]byte, error), slots int,
+) ([]string, map[string][]byte, []unreadFile) {
+	reads := make([]struct {
+		contents  []byte
+		readError error
+	}, len(files))
+	taken := make(chan struct{}, max(slots, 1))
+	var group sync.WaitGroup
+	for index, file := range files {
+		taken <- struct{}{}
+		group.Go(func() {
+			defer func() { <-taken }()
+			reads[index].contents, reads[index].readError = read(file)
+		})
+	}
+	group.Wait()
+	var readable []string
+	contents := make(map[string][]byte, len(files))
+	var unread []unreadFile
+	for index, file := range files {
+		if reads[index].readError != nil {
+			unread = append(unread, unreadFile{file: file, readError: reads[index].readError})
+			continue
+		}
+		readable = append(readable, file)
+		contents[file] = reads[index].contents
+	}
+	return readable, contents, unread
 }
 
 // describeModules reads each owned module's go.mod for the name and the go version the project record gives it.
