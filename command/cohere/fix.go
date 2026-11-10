@@ -173,6 +173,9 @@ func applyProposedFixes(
 	// reported; only the write is withheld, and counted per repository so the run says what it did not
 	// apply. A run that names a path has asked for it, and its stated scope admits the file as before.
 	byFileName := map[string][]edit.Proposal{}
+	// measuredOn is each file's digest of the text the walk read, which its proposals carry, so the engine
+	// refuses them against any other text (#bxmcf34). Hashed once per file with proposals.
+	measuredOn := map[string]edit.Digest{}
 	withheld := map[string]struct{}{}
 	inNestedRepository := map[string]int{}
 	for _, diagnostic := range result.Diagnostics {
@@ -202,10 +205,16 @@ func applyProposedFixes(
 				continue
 			}
 		}
+		digest, hashed := measuredOn[fileName]
+		if !hashed {
+			digest = edit.DigestOf(diagnostic.SourceFile.Text())
+			measuredOn[fileName] = digest
+		}
 		for _, proposed := range diagnostic.Fixes {
 			byFileName[fileName] = append(byFileName[fileName], edit.Proposal{
-				RuleName: diagnostic.RuleName,
-				Fix:      proposed,
+				RuleName:   diagnostic.RuleName,
+				Fix:        proposed,
+				MeasuredOn: digest,
 			})
 		}
 	}
@@ -371,6 +380,7 @@ func applyProposedFixes(
 
 	summary := edit.Summarize(results)
 	reportNotWritten(accountOutput(streams.Errors), summary.NotWritten)
+	reportChangedDuringRun(accountOutput(streams.Errors), summary.ChangedDuringRun)
 	showWarning()
 	summary.Checked = !write
 	return summary, result, lineEndings, nil
@@ -600,7 +610,15 @@ func isLink(fileName string) bool {
 // recordFixedFiles keeps the fix phase's account in the run's summary: on a run that writes, the files it rewrote,
 // printed in the views that list them, and the files it would have rewritten and did not, since a link leads each
 // outside the root (#td3zta2). Those are the run's gap, in the footer and in --json, as the Go engine's are.
+//
+// A file that changed between the walk and the fix is the run's gap whether it writes or not, since its findings
+// describe bytes that are gone either way (#bxmcf34).
 func recordFixedFiles(summary edit.Summary, root string, write bool) {
+	activeSummary.Gaps.ChangedDuringRun = append(activeSummary.Gaps.ChangedDuringRun, summary.ChangedDuringRun...)
+	if len(summary.ChangedDuringRun) > 0 {
+		// What this run reports of those files is of text they no longer hold, so it is never replayed.
+		declineRunCache("a file changed during the run")
+	}
 	if !write {
 		return
 	}
@@ -618,6 +636,16 @@ func recordFixedFiles(summary edit.Summary, root string, write bool) {
 func reportNotWritten(out *bufio.Writer, notWritten []edit.NotWrittenFile) {
 	for _, file := range notWritten {
 		fmt.Fprintf(out, "  not written: %s → %s\n", file.FileName, file.RealPath)
+	}
+}
+
+// reportChangedDuringRun names each file whose text changed between the walk and the fix: its walk's fixes were
+// refused, since their offsets point into bytes it no longer holds, and asked for again against the text in hand
+// (#bxmcf34). Its findings above describe the text the walk read.
+func reportChangedDuringRun(out *bufio.Writer, changed []string) {
+	for _, fileName := range changed {
+		fmt.Fprintf(out, "  changed during the run: %s, so its findings describe the text the walk read, and its "+
+			"fixes were measured again against the text it holds now\n", fileName)
 	}
 }
 

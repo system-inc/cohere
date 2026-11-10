@@ -67,6 +67,11 @@ type runGaps struct {
 	// were withheld, so a fix of this project never writes another's files. A gap that makes the run incomplete, named
 	// with where each file really is.
 	NotWritten []notWrittenFile `json:"notWritten,omitempty"`
+	// ChangedDuringRun is the files whose text changed between the fix phase's walk and its fix, under another agent
+	// or an editor's save (#bxmcf34). The walk's fixes for each were refused, since their offsets point into bytes the
+	// file no longer holds, and asked for again against the text it holds; its findings describe the text the walk
+	// read. A gap that makes the run incomplete, named by file.
+	ChangedDuringRun []string `json:"changedDuringRun,omitempty"`
 	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,
 	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the engine sends
 	// them. A gap, not a failure: they are a dependency's, not the project's to fix. Each is named, never only
@@ -131,3 +136,7 @@ func (gaps *runGaps) addExcluded(reason string, source string, files int) {
 // each reached through a link outside the root. TypeScript's run and an engine's say it in the same words.
 const notWrittenSentence = "the notes above name the files whose fixes were not written, each reached through a link " +
 	"outside the root"
+
+// changedDuringRunSentence is the run's account when every phase ran and a file changed under it.
+const changedDuringRunSentence = "the notes above name the files that changed during the run, whose findings " +
+	"describe text they no longer hold"

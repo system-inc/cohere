@@ -77,6 +77,13 @@ type FileResult struct {
 	// TransformSkipReason is why, in the transform's own words. Empty when it did not say.
 	TransformSkipReason string
 
+	// ChangedDuringRun is whether a proposal arrived measured against text other than the file's when the
+	// engine read it: the file changed between the walk and the fix (#bxmcf34). Those proposals were
+	// refused and the fixes asked for again against the text in hand, so what was written is right for
+	// the bytes it was written over, but the walk's findings for the file, and any fix only the walk could
+	// make, describe bytes that are gone.
+	ChangedDuringRun bool
+
 	// NotWritten is the file's real path when a run that writes left it as it was because that path,
 	// every symbolic link resolved, is outside the run's root (#td3zta2). The fixes and the format were
 	// computed and checked as for any file, and Changed is false, since nothing reached the disk. Empty
@@ -177,6 +184,28 @@ func fixText(
 			result.Converged = true
 			break
 		}
+
+		// A proposal measured against other text is refused before anything else looks at it: its
+		// offsets point into bytes the file no longer holds (#bxmcf34). Every one goes; if none is left,
+		// the pass is spent and the next asks again, against the text in hand, which is the re-walk.
+		// Refusing only the stale ones and applying the rest would be right too, but a walk's proposals
+		// for one file are all measured against one read, so in practice it is all or none.
+		measured := proposals[:0:0]
+		for _, proposal := range proposals {
+			if measuredOnOtherText(proposal, current) {
+				result.ChangedDuringRun = true
+				result.Rejected = append(
+					result.Rejected,
+					Rejection{Proposal: proposal, Reason: ReasonChangedSinceMeasured},
+				)
+				continue
+			}
+			measured = append(measured, proposal)
+		}
+		if len(measured) == 0 {
+			continue
+		}
+		proposals = measured
 
 		plan := resolveOverlaps(proposals)
 		rewritten, plan := applyToText(current, plan)
@@ -729,6 +758,9 @@ func Summarize(results []FileResult) Summary {
 		summary.FixesRefused += len(result.Rejected)
 		summary.FilesByPasses[result.Passes]++
 
+		if result.ChangedDuringRun {
+			summary.ChangedDuringRun = append(summary.ChangedDuringRun, result.FileName)
+		}
 		if result.NotWritten != "" {
 			summary.NotWritten = append(
 				summary.NotWritten,
@@ -788,6 +820,7 @@ func Summarize(results []FileResult) Summary {
 		return summary.FilesRefused[first].FileName < summary.FilesRefused[second].FileName
 	})
 	sort.Strings(summary.FilesFailed)
+	sort.Strings(summary.ChangedDuringRun)
 	sort.Slice(summary.NotWritten, func(first, second int) bool {
 		return summary.NotWritten[first].FileName < summary.NotWritten[second].FileName
 	})
@@ -808,6 +841,7 @@ func reasonKey(reason string) string {
 		ReasonInvalidRange,
 		ReasonNoProgress,
 		ReasonPassesReached,
+		ReasonChangedSinceMeasured,
 		ReasonFormatFixUnsettled,
 		ReasonTransformFailed,
 	} {

@@ -273,6 +273,10 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ not written: "+counted(len(gaps.NotWritten),
 			"file reached through a link outside the root", "files reached through a link outside the root"))
 	}
+	if len(gaps.ChangedDuringRun) > 0 {
+		markers = append(markers, "⚠ changed during the run: "+counted(len(gaps.ChangedDuringRun),
+			"file, its findings stale", "files, their findings stale"))
+	}
 	if marker := withheldCgoMarker(gaps.WithheldInDependencyCgo, gaps.WithheldDependencyCgoDeclarations); marker != "" {
 		markers = append(markers, marker)
 	}

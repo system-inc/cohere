@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/write_root"
 )
 
@@ -186,4 +190,91 @@ func realPathIn(test *testing.T, base string, name string) string {
 		test.Fatal(resolveError)
 	}
 	return resolved
+}
+
+// A file another agent rewrites after the program read it and before the fix phase writes it (#bxmcf34). The walk's
+// fixes were measured against the text the program read, so the fix phase refuses them, re-lints the text the file
+// holds, and names it as changed during the run.
+//
+// object-shorthand fixes without the type checker, so the re-lint makes its fix again where the text now has it. The
+// walk measured `{ beta: beta }` at the bytes another agent's new line now fills with `{ zeta: beta }`, and applying
+// the walk's offsets there writes `{ beta }` into delta: it parses and type-checks, and renames a property nobody
+// asked for. prefer-const needs the type checker, which the re-lint does not have, so its fix is refused and not
+// made again: the file is left as it is, and named, never written from stale offsets.
+func TestAFileChangedDuringTheRunIsFixedFromTheTextItHolds(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		name, rule, read, changed, want string
+	}{
+		{
+			name:    "a fix the re-lint makes again",
+			rule:    "object-shorthand",
+			read:    "const beta = 1;\nexport const gamma = { beta: beta };\n",
+			changed: "const beta = 1;\nexport const delta = { zeta: beta };\nexport const gamma = { beta: beta };\n",
+			want:    "const beta = 1;\nexport const delta = { zeta: beta };\nexport const gamma = { beta };\n",
+		},
+		{
+			name:    "a fix only the walk could make",
+			rule:    "prefer-const",
+			read:    "let alpha = 1;\nexport { alpha };\n",
+			changed: "var other = 2;\nlet alpha = 1;\nexport { alpha, other };\n",
+			want:    "var other = 2;\nlet alpha = 1;\nexport { alpha, other };\n",
+		},
+	} {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			graph, directory := buildNarrowFixtureGraph(test, map[string]string{
+				"CohereSettings.json": `{"rules":{"` + testCase.rule + `":"error"}}` + "\n",
+				"Racing.ts":           testCase.read,
+			})
+			location := projectLocation{
+				Root:               directory,
+				ConfigFileName:     filepath.Join(directory, "tsconfig.json"),
+				LintConfigFileName: filepath.Join(directory, "CohereSettings.json"),
+			}
+			if _, configureLintError := configureLint(graph, location, nil); configureLintError != nil {
+				test.Fatal(configureLintError)
+			}
+			racing := filepath.Join(directory, "Racing.ts")
+			if writeError := os.WriteFile(racing, []byte(testCase.changed), 0o644); writeError != nil {
+				test.Fatal(writeError)
+			}
+
+			summary, _, _, fixError := applyProposedFixes(
+				context.Background(),
+				graph,
+				graph.ProjectFiles(),
+				registry.All(),
+				func() (edit.Transform, []string) { return nil, nil },
+				wholeTreeScope(),
+				directory,
+				writeRootOf(test, directory),
+				0,
+				true,
+				nil,
+			)
+			if fixError != nil {
+				test.Fatal(fixError)
+			}
+			written, readError := os.ReadFile(racing)
+			if readError != nil {
+				test.Fatal(readError)
+			}
+			if string(written) != testCase.want {
+				test.Fatalf("Racing.ts holds:\n%s\nwant:\n%s\n%s", written, testCase.want, summary.String())
+			}
+			if len(summary.ChangedDuringRun) != 1 || filepath.Base(summary.ChangedDuringRun[0]) != "Racing.ts" {
+				test.Fatalf("the summary names %v as changed during the run, want Racing.ts", summary.ChangedDuringRun)
+			}
+		})
+	}
+}
+
+// A file that changed during the run is the footer's gap, named by count, as a file not written is (#bxmcf34).
+func TestTheFooterNamesFilesChangedDuringTheRun(test *testing.T) {
+	test.Parallel()
+	markers := uncheckedMarkers(runSummary{Gaps: runGaps{ChangedDuringRun: []string{"/root/a.ts", "/root/b.ts"}}})
+	if !slices.Contains(markers, "⚠ changed during the run: 2 files, their findings stale") {
+		test.Fatalf("the footer's markers are %v", markers)
+	}
 }
