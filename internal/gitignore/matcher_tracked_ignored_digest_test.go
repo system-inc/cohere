@@ -306,3 +306,51 @@ func TestTheDigestCoversOnlyItsScope(test *testing.T) {
 		test.Error("an ignored file tracked inside the scope kept the scope's digest")
 	}
 }
+
+// TestTheDigestReadsAWalksListingFromEveryWorker: a matcher a walk made WithListing, as the format walk makes one,
+// takes the same digest as one that reads the disk, while its workers step sibling directories at once through the
+// one listing and the one index they share. Run under -race, it is what says those shared reads are safe.
+func TestTheDigestReadsAWalksListingFromEveryWorker(test *testing.T) {
+	test.Parallel()
+	repository := newDigestRepository(test)
+	tree := map[string]string{".gitignore": "*.log\nbuild/\n"}
+	for directory := range 24 {
+		name := "package" + strconv.Itoa(directory)
+		tree[name+"/source.go"] = "package " + name + "\n"
+		tree[name+"/trace.log"] = "trace\n"
+		tree[name+"/nested/.gitignore"] = "!keep.log\n"
+		tree[name+"/nested/keep.log"] = "kept\n"
+	}
+	writeTree(test, repository.root, tree)
+	repository.git("add", "-A")
+	repository.git("add", "-f", "package3/trace.log", "package17/trace.log")
+	listings := map[string][]os.DirEntry{}
+	walkError := filepath.WalkDir(repository.root, func(visited string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || !entry.IsDir() {
+			return pathError
+		}
+		if entry.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		entries, readError := os.ReadDir(visited)
+		listings[visited] = entries
+		return readError
+	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
+	matcher, newError := New(repository.root)
+	if newError != nil {
+		test.Fatal(newError)
+	}
+	listed, listedError := matcher.WithListing(func(directory string) ([]os.DirEntry, bool) {
+		entries, found := listings[directory]
+		return entries, found
+	}).TrackedIgnoredDigest("")
+	if listedError != nil {
+		test.Fatal(listedError)
+	}
+	if read := repository.digest(); listed != read {
+		test.Errorf("a matcher reading a walk's listing digests %s, and one reading the disk %s", listed, read)
+	}
+}
