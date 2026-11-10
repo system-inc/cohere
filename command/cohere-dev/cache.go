@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,16 +23,17 @@ import (
 // trim beside running builds cannot tell an entry a build is reading from one nobody wants. Removing one a
 // build was reading failed it with "could not import ... no such file" (#3sgjy0h).
 //
-// So this trim keeps the builds out instead. When a token's run ends, at most once every ten minutes for
-// the machine, cohere-dev starts a trim in the background. It measures the cache, and only when it is over
-// the cap does it take every token in the pool, so no build that goes through cohere-dev is running, and
-// trim the least recently used entries down to three quarters of the cap, sparing the last cacheTrimSpare,
-// the shortest go_cache takes. Then it gives the tokens back.
-// It waits for the pool to be empty holding nothing, and takes every token in one step only then, so it
-// never keeps a token idle while another runs: taken one at a time with a wait for each, it held half the
-// pool idle for minutes behind a land gate (2026-10-05 15:55). The trim itself takes seconds. A pool that
-// is never empty for cacheTrimPatience is left alone, and the next look tries again. A quiet window, opened
-// with `cohere-dev quiet on`, switches the trim off while it holds (quiet.go).
+// When a token's run ends, at most once every ten minutes for the machine, cohere-dev starts a trim in the
+// background. It measures the cache, and only when it is over the cap does it take one token, in arrival order
+// like any heavy job, so it doesn't fight the gates for cores, and trim the least recently used entries down to
+// three quarters of the cap through go_cache, sparing the last cacheTrimSpare. Then it gives the token back.
+//
+// It used to wait for an empty pool and take every token, to keep every build that goes through cohere-dev out
+// while it removed entries. On a busy day the pool was never empty for five minutes, so the cap never trimmed:
+// 82.6 GB over a 64 GB cap on 2026-11-09, the disk losing about 30 GB an hour (#fdxencw). go_cache's floor made
+// the hold unnecessary: it removes no entry used within MinimumSpare, which protects any build inside a lock or
+// outside it, and Remove looks at each entry again before removing it, leaving one whose time moved. A quiet
+// window, opened with `cohere-dev quiet on`, switches the trim off while it holds (quiet.go).
 
 // cacheCapVariable sets the Go build cache's cap, in gigabytes, a fraction allowed.
 const cacheCapVariable = "COHERE_DEV_CACHE_GB"
@@ -52,26 +52,16 @@ const cacheTargetQuartersOfCap = 3
 // cacheTrimInterval is how often the machine's cache is looked at, at most.
 const cacheTrimInterval = 10 * time.Minute
 
-// cacheTrimSpare is how recently used an entry may be and never be trimmed, while the pool is held:
-// go_cache's floor, two hours, Go's one-hour lag in marking an entry used and an hour of margin. Holding the
-// pool keeps out only the builds that go through it. A build outside it (a plain go test, gopls, a Loom
-// build on this cache) may be reading an entry it used a moment ago whose time Go left almost an hour old,
-// and the floor keeps every entry any build used within the last hour. Removing one such a build still
-// needs fails it with a missing file, which costs more than the disk, so the cap is set above what the
-// spare keeps (defaultCacheGigabytes).
+// cacheTrimSpare is how recently used an entry may be and never be trimmed: go_cache's floor, two hours, Go's
+// one-hour lag in marking an entry used and an hour of margin. Any build, through the pool or not (a plain go
+// test, gopls, a Loom build on this cache), may be reading an entry it used a moment ago whose time Go left
+// almost an hour old, and the floor keeps every entry any build used within the last hour. Removing one such a
+// build still needs fails it with a missing file, which costs more than the disk, so the cap is set above what
+// the spare keeps (defaultCacheGigabytes).
 const cacheTrimSpare = go_cache.MinimumSpare
-
-// cacheTrimPatience is how long the trim waits for an empty pool before it leaves this look to the next.
-const cacheTrimPatience = 5 * time.Minute
-
-// cacheTrimPoll is how often the trim looks for an empty pool while it waits.
-const cacheTrimPoll = 250 * time.Millisecond
 
 // trimCacheVerb runs cohere-dev as the background trim. It is what startCacheTrim starts.
 const trimCacheVerb = "trim-cache"
-
-// errorPoolNeverEmpty is holdThePool's answer when every look found a token in use.
-var errorPoolNeverEmpty = errors.New("the pool was never empty")
 
 func cacheCapBytes() (int64, error) {
 	value := os.Getenv(cacheCapVariable)
@@ -131,7 +121,7 @@ func outsideAToken(environment []string) []string {
 	return kept
 }
 
-// trimCache is the background trim's whole run: measure, and when over the cap, hold the pool and trim.
+// trimCache is the background trim's whole run: measure, and when over the cap, take a token and trim.
 func trimCache() int {
 	directory, poolDirectoryError := poolDirectory()
 	if poolDirectoryError != nil {
@@ -190,25 +180,23 @@ func trimCache() int {
 		recordCacheLook(directory, readPoolShapeError.Error())
 		return 2
 	}
-	release, holdThePoolError := holdThePool(
+	waitingSince := time.Now()
+	// Its output goes nowhere (startCacheTrim), so nothing is said while it waits; its holder line says why.
+	held, waitInLineError := waitInLine(
 		directory,
 		shape.tokens,
-		fmt.Sprintf("trimming the Go build cache, %s over the %s cap",
-			gigabytes(measured), gigabytes(capBytes)),
-		cacheTrimPatience,
+		fmt.Sprintf("trimming the Go build cache, %s over the %s cap", gigabytes(measured), gigabytes(capBytes)),
+		"token",
+		func() { /* The trim's output goes nowhere, so there is no one to explain the wait to. */ },
 	)
-	if errors.Is(holdThePoolError, errorPoolNeverEmpty) {
-		recordCacheLook(directory, fmt.Sprintf("%s over the %s cap, not trimmed: the pool was never empty for %s, "+
-			"and the next look tries again", gigabytes(measured), gigabytes(capBytes), cacheTrimPatience))
-		return 0
-	}
-	if holdThePoolError != nil {
-		recordCacheLook(directory, "holding the pool to trim: "+holdThePoolError.Error())
+	if waitInLineError != nil {
+		recordCacheLook(directory, "taking a token to trim: "+waitInLineError.Error())
 		return 1
 	}
-	// A window opened while the trim waited for an empty pool holds too: the wait can be minutes.
+	waited := time.Since(waitingSince)
+	// A window opened while the trim waited for its token holds too: the wait can be minutes.
 	if holds, quietLine := quietHolds(directory, time.Now()); holds {
-		release()
+		held.release()
 		recordCacheLook(directory, fmt.Sprintf(
 			"%s over the %s cap, not trimmed: %s",
 			gigabytes(measured),
@@ -223,7 +211,7 @@ func trimCache() int {
 		go_cache.Limit{Cap: capBytes, Target: capBytes / 4 * cacheTargetQuartersOfCap, Spare: cacheTrimSpare},
 		started,
 	)
-	release()
+	held.release()
 	if trimError != nil {
 		recordCacheLook(directory, trimError.Error())
 		return 1
@@ -232,84 +220,24 @@ func trimCache() int {
 		directory,
 		fmt.Sprintf(
 			"trimmed from %s to %s, %d entries removed, %s used in the last %s kept; "+
-				"the pool was held %s",
+				"a token was held %s, after waiting %s for it",
 			gigabytes(trimmed.Before),
 			gigabytes(trimmed.After),
 			trimmed.Removed,
 			gigabytes(trimmed.InUse),
 			cacheTrimSpare,
 			time.Since(started).Round(time.Millisecond),
+			waited.Round(time.Millisecond),
 		),
 	)
 	return 0
 }
 
-// holdThePool takes every token in one step, once none is in use, and returns what gives them back. While
-// any token is in use it holds none, so it never keeps a token idle while another runs; it looks again every
-// cacheTrimPoll, for up to patience. Its holder lines say why, so a run waiting behind it knows.
-func holdThePool(directory string, tokens int, why string, patience time.Duration) (func(), error) {
-	deadline := time.Now().Add(patience)
-	for {
-		held, takeEveryTokenError := takeEveryToken(directory, tokens)
-		if takeEveryTokenError != nil {
-			return nil, takeEveryTokenError
-		}
-		if held != nil {
-			line := fmt.Sprintf("pid %d since %s: %s", os.Getpid(), time.Now().Format("15:04:05"), why)
-			for token := 1; token <= tokens; token++ {
-				// Ignored: the line only tells a waiting run why it waits; the tokens are held by their locks,
-				// and a token without its line reads as held by a run that has not named itself.
-				_ = os.WriteFile(holderPath(directory, token), []byte(line+"\n"), 0o644)
-			}
-			return func() {
-				for index, lock := range held {
-					// Ignored: a holder line left behind names no one, since heldBy reads the lock first.
-					_ = os.Remove(holderPath(directory, index+1))
-					unlockFile(lock)
-					_ = lock.Close() // Ignored: never written, and its lock goes with the descriptor.
-				}
-			}, nil
-		}
-		if time.Now().After(deadline) {
-			return nil, errorPoolNeverEmpty
-		}
-		time.Sleep(cacheTrimPoll)
-	}
-}
-
-// takeEveryToken takes every token, or none: a token found in use gives back the ones already taken at once,
-// and it returns nil.
-func takeEveryToken(directory string, tokens int) ([]*os.File, error) {
-	held := []*os.File{}
-	letGo := func() {
-		for _, lock := range held {
-			unlockFile(lock)
-			_ = lock.Close() // Ignored: never written, and its lock goes with the descriptor.
-		}
-	}
-	for token := 1; token <= tokens; token++ {
-		lock, openError := os.OpenFile(lockPath(directory, token), os.O_CREATE|os.O_RDWR, 0o644)
-		if openError != nil {
-			letGo()
-			return nil, openError
-		}
-		taken, tryLockFileError := tryLockFile(lock)
-		if tryLockFileError != nil || !taken {
-			_ = lock.Close() // Ignored: never written, and the lock's error, if any, is the one returned.
-			letGo()
-			return nil, tryLockFileError
-		}
-		held = append(held, lock)
-	}
-	return held, nil
-}
-
-// poolGuards refuses a cache outside the user cache directory the pool lives in. Holding the pool keeps out
-// the builds that draw from it, and those are the builds whose cache sits beside it: Go puts its default
-// cache in the same user cache directory. A run with `HOME` pointed at a scratch directory and the live
-// `GOCACHE` passed through held a scratch pool, empty, at once, and trimmed the live cache from 112.9 GB to
-// 30 GB under every real gate, its log in the scratch home (2026-10-06 04:44, #d0x1fhp). The pool no longer
-// follows `HOME` (poolHome), and this is the guard behind that.
+// poolGuards refuses a cache outside the user cache directory the pool lives in, the cache this pool's runs draw
+// from: Go puts its default cache in the same user cache directory. A run with `HOME` pointed at a scratch
+// directory and the live `GOCACHE` passed through held a scratch pool, empty, at once, and trimmed the live cache
+// from 112.9 GB to 30 GB under every real gate, its log in the scratch home (2026-10-06 04:44, #d0x1fhp). The pool
+// no longer follows `HOME` (poolHome), and this is the guard behind that.
 func poolGuards(cache string) error {
 	home, poolHomeError := poolHome()
 	if poolHomeError != nil {
@@ -329,7 +257,7 @@ func poolGuards(cache string) error {
 	}
 	return fmt.Errorf(
 		"not trimmed: the Go build cache %s is outside %s, the user cache directory this pool lives in, "+
-			"so holding this pool would not keep out the builds reading that cache; trim it from a run whose home holds it",
+			"so it is not this pool's cache to trim; trim it from a run whose home holds it",
 		cache,
 		root,
 	)
