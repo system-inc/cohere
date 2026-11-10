@@ -337,3 +337,27 @@ func sortedSet(values []string) []string {
 	slices.Sort(values)
 	return slices.Compact(values)
 }
+
+// packageOf is the package a file's clause names, an external test's `_test` suffix trimmed so it reads as the
+// package it tests, or empty when the clause does not parse.
+func packageOf(read source) string {
+	// Ignored: a clause that does not parse names no package, and the load reports the error itself.
+	header, _ := parser.ParseFile(token.NewFileSet(), read.file, read.contents, parser.PackageClauseOnly)
+	if header == nil || header.Name == nil {
+		return ""
+	}
+	if strings.HasSuffix(read.file, "_test.go") {
+		return strings.TrimSuffix(header.Name.Name, "_test")
+	}
+	return header.Name.Name
+}
+
+// sortedKeys is a set's members, sorted.
+func sortedKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
+}
