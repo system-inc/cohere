@@ -20,6 +20,12 @@ var preferredOperatingSystems = []string{"linux", "windows", "darwin", "freebsd"
 // answer instead: a census whose constraints vary on enough at once would otherwise weigh combinations without end.
 const searchBudget = 1 << 20
 
+// enumerationBudget is how many compiles candidatesFor may make, every platform's every set of the named tags
+// against every uncompiled file. Past it the sets are too many to weigh one by one (std's root names 23 tags on
+// 1,455 files its host does not compile, which is 2^23 sets a platform, #zzs7jm5), and BuildsFor chooses tag
+// component by tag component instead (buildsByComponent). cohere, loom and adamic each weigh a few thousand.
+const enumerationBudget = 1 << 16
+
 // BuildsFor is the builds every file of the census that is ours compiles under at least once: the host first,
 // then the fewest extra builds that compile what it does not, sorted as they are preferred, and each file no
 // target of ports compiles as Unbuilt, sorted by file. ports are what go tool dist list says the toolchain targets
@@ -32,7 +38,9 @@ const searchBudget = 1 << 20
 // host's cgo, or the other where a file names `cgo` or imports "C". Tags fold into a build: candidates take each
 // set of the custom tags the uncompiled files name, the host's own tags kept where none names them, and among the
 // fewest builds the ones that change the fewest tags from the host's win, then the most preferred, so tags ride on
-// an extra build another `GOOS` needs, or on the host's platform when nothing else needs one.
+// an extra build another `GOOS` needs, or on the host's platform when nothing else needs one. When the sets of tags
+// are too many to weigh one by one (enumerationBudget), the builds are chosen tag component by tag component instead
+// (buildsByComponent), still compiling every file some build on the host's architecture compiles.
 func BuildsFor(census Census, host Build, ports []Port) ([]Build, []Unbuilt, error) {
 	var uncompiled []source
 	var unbuilt []Unbuilt
@@ -56,17 +64,30 @@ func BuildsFor(census Census, host Build, ports []Port) ([]Build, []Unbuilt, err
 		return builds, unbuilt, nil
 	}
 
-	candidates, candidatesError := candidatesFor(uncompiled, host, ports)
-	if candidatesError != nil {
-		return nil, nil, candidatesError
+	dimensions := dimensionsOf(uncompiled, ports)
+	platforms := platformsFor(host, ports, dimensions.Cgo)
+	var chosen []Build
+	var coverable coverage
+	if enumerationCost(len(platforms), len(dimensions.Tags), len(uncompiled)) > enumerationBudget {
+		var chooseError error
+		chosen, coverable, chooseError = buildsByComponent(uncompiled, host, platforms, unixOperatingSystems(ports))
+		if chooseError != nil {
+			return nil, nil, chooseError
+		}
+	} else {
+		candidates, candidatesError := candidatesFor(uncompiled, host, platforms, dimensions.Tags)
+		if candidatesError != nil {
+			return nil, nil, candidatesError
+		}
+		coverable = newCoverage(len(uncompiled))
+		for _, each := range candidates {
+			coverable.add(each.coverage)
+		}
+		for _, index := range fewestCovering(candidates, coverable) {
+			chosen = append(chosen, candidates[index].build)
+		}
 	}
-	coverable := newCoverage(len(uncompiled))
-	for _, each := range candidates {
-		coverable.add(each.coverage)
-	}
-	for _, index := range fewestCovering(candidates, coverable) {
-		builds = append(builds, candidates[index].build)
-	}
+	builds = append(builds, chosen...)
 	for index, read := range uncompiled {
 		if !coverable.has(index) {
 			reason, reasonError := unbuiltReason(read, host, ports)
@@ -88,12 +109,20 @@ type candidate struct {
 	coverage coverage
 }
 
-// candidatesFor is every extra build on the host's architecture that compiles at least one of the uncompiled
-// files, in the order they are preferred: by `GOOS` (see compareOperatingSystems), the host's cgo before the
-// other, then by tagChoices. Each that an earlier one changing no more tags compiles everything of is left out
-// (withoutDominated).
-func candidatesFor(uncompiled []source, host Build, ports []Port) ([]candidate, error) {
-	dimensions := dimensionsOf(uncompiled, ports)
+// enumerationCost is how many compiles candidatesFor makes for that many platforms, named tags and uncompiled
+// files, held at enumerationBudget's next value once it passes it, so no count of tags overflows it.
+func enumerationCost(platforms int, tags int, files int) int {
+	if tags >= 30 {
+		return enumerationBudget + 1
+	}
+	return min(platforms*(1<<tags)*files, enumerationBudget+1)
+}
+
+// platformsFor is each platform an extra build may take, a build with no tags of its own yet, in the order they
+// are preferred: on the host's architecture, by `GOOS` (see compareOperatingSystems), the host's cgo before the
+// other. A platform other than the host's has cgo off; the host's takes the other cgo setting too when a file
+// names `cgo` or imports "C", where the platform supports it.
+func platformsFor(host Build, ports []Port, cgo bool) []Build {
 	var onArchitecture []Port
 	for _, port := range ports {
 		if port.Architecture == host.Architecture &&
@@ -104,36 +133,48 @@ func candidatesFor(uncompiled []source, host Build, ports []Port) ([]candidate, 
 	slices.SortFunc(onArchitecture, func(left Port, right Port) int {
 		return compareOperatingSystems(left.OperatingSystem, right.OperatingSystem, host.OperatingSystem)
 	})
-
-	var candidates []candidate
+	var platforms []Build
 	for _, port := range onArchitecture {
 		cgoSettings := []bool{false}
 		if port.OperatingSystem == host.OperatingSystem {
 			cgoSettings = []bool{host.CgoEnabled}
-			if dimensions.Cgo && (host.CgoEnabled || port.CgoSupported) {
+			if cgo && (host.CgoEnabled || port.CgoSupported) {
 				cgoSettings = append(cgoSettings, !host.CgoEnabled)
 			}
 		}
 		for _, cgoEnabled := range cgoSettings {
-			for _, set := range tagChoices(host.Tags, dimensions.Tags) {
-				extra := Build{OperatingSystem: port.OperatingSystem, Architecture: port.Architecture,
-					CgoEnabled: cgoEnabled, Tags: set.tags, Flags: slices.Clone(host.Flags)}
-				if extra.sameAs(host) {
-					continue
+			platforms = append(platforms, Build{OperatingSystem: port.OperatingSystem, Architecture: port.Architecture,
+				CgoEnabled: cgoEnabled, Flags: slices.Clone(host.Flags)})
+		}
+	}
+	return platforms
+}
+
+// candidatesFor is every extra build of platforms, under each of tagChoices for the named tags, that compiles at
+// least one of the uncompiled files, in the order they are preferred: by platform, then by tagChoices. Each that an
+// earlier one changing no more tags compiles everything of is left out (withoutDominated).
+func candidatesFor(uncompiled []source, host Build, platforms []Build, named []string) ([]candidate, error) {
+	var candidates []candidate
+	for _, platform := range platforms {
+		for _, set := range tagChoices(host.Tags, named) {
+			extra := platform
+			extra.Tags = set.tags
+			extra.Flags = slices.Clone(platform.Flags)
+			if extra.sameAs(host) {
+				continue
+			}
+			covered := newCoverage(len(uncompiled))
+			for index, read := range uncompiled {
+				compiled, compileError := compiles(extra, read)
+				if compileError != nil {
+					return nil, compileError
 				}
-				covered := newCoverage(len(uncompiled))
-				for index, read := range uncompiled {
-					compiled, compileError := compiles(extra, read)
-					if compileError != nil {
-						return nil, compileError
-					}
-					if compiled {
-						covered.set(index)
-					}
+				if compiled {
+					covered.set(index)
 				}
-				if !covered.empty() {
-					candidates = append(candidates, candidate{build: extra, tagCost: set.cost, coverage: covered})
-				}
+			}
+			if !covered.empty() {
+				candidates = append(candidates, candidate{build: extra, tagCost: set.cost, coverage: covered})
 			}
 		}
 	}
@@ -331,10 +372,11 @@ func unbuiltReason(read source, host Build, ports []Port) (string, error) {
 	targeted := map[string]bool{}
 	for _, port := range ports {
 		targeted[port.OperatingSystem] = true
+		targeted[port.Architecture] = true
 	}
-	for _, operatingSystem := range fileReading.operatingSystems {
-		if !targeted[operatingSystem] {
-			return "it names " + operatingSystem + ", which go tool dist list does not target", nil
+	for _, named := range slices.Concat(fileReading.operatingSystems, fileReading.architectures) {
+		if !targeted[named] {
+			return "it names " + named + ", which go tool dist list does not target", nil
 		}
 	}
 	return "no target go tool dist list names builds it, with or without the tags it names", nil
