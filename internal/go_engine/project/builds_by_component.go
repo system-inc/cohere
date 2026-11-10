@@ -22,7 +22,10 @@ type tagComponents struct {
 
 // newTagComponents reads each file's custom tags and groups them into components.
 func newTagComponents(uncompiled []source, unix []string) tagComponents {
-	components := tagComponents{fileTags: make([][]string, len(uncompiled)), fileComponent: make([]int, len(uncompiled))}
+	components := tagComponents{
+		fileTags:      make([][]string, len(uncompiled)),
+		fileComponent: make([]int, len(uncompiled)),
+	}
 	parent := map[string]string{}
 	var root func(tag string) string
 	root = func(tag string) string {

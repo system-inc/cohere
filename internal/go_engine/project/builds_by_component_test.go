@@ -20,7 +20,8 @@ func manyTagsFiles() map[string]string {
 	files := map[string]string{}
 	for index := range 40 {
 		files[fmt.Sprintf("linux_%02d.go", index)] = fmt.Sprintf("//go:build linux && tag%02d\n\npackage p\n", index)
-		files[fmt.Sprintf("windows_%02d.go", index)] = fmt.Sprintf("//go:build windows && tag%02d\n\npackage p\n", index)
+		files[fmt.Sprintf("windows_%02d.go", index)] =
+			fmt.Sprintf("//go:build windows && tag%02d\n\npackage p\n", index)
 	}
 	files["conflict_x.go"] = "//go:build linux && tagx && !tagy\n\npackage p\n"
 	files["conflict_y.go"] = "//go:build linux && tagy && !tagx\n\npackage p\n"

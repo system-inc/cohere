@@ -20,6 +20,12 @@ var preferredOperatingSystems = []string{"linux", "windows", "darwin", "freebsd"
 // answer instead: a census whose constraints vary on enough at once would otherwise weigh combinations without end.
 const searchBudget = 1 << 20
 
+// enumerationBudget is how many compiles candidatesFor may make, every platform's every set of the named tags
+// against every uncompiled file. Past it the sets are too many to weigh one by one (std's root names 23 tags on
+// 1,455 files its host does not compile, which is 2^23 sets a platform, #zzs7jm5), and BuildsFor chooses tag
+// component by tag component instead (buildsByComponent). cohere, loom and adamic each weigh a few thousand.
+const enumerationBudget = 1 << 16
+
 // BuildsFor is the builds every file of the census that is ours compiles under at least once: the host first,
 // then the fewest extra builds that compile what it does not, sorted as they are preferred, and each file no
 // target of ports compiles as Unbuilt, sorted by file. ports are what go tool dist list says the toolchain targets
@@ -102,12 +108,6 @@ type candidate struct {
 	tagCost  int
 	coverage coverage
 }
-
-// enumerationBudget is how many compiles candidatesFor may make, every platform's every set of the named tags
-// against every uncompiled file. Past it the sets are too many to weigh one by one (std's root names 23 tags on
-// 1,455 files its host does not compile, which is 2^23 sets a platform, #zzs7jm5), and BuildsFor chooses tag
-// component by tag component instead (buildsByComponent). cohere, loom and adamic each weigh a few thousand.
-const enumerationBudget = 1 << 16
 
 // enumerationCost is how many compiles candidatesFor makes for that many platforms, named tags and uncompiled
 // files, held at enumerationBudget's next value once it passes it, so no count of tags overflows it.
