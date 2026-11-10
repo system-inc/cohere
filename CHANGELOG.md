@@ -127,7 +127,8 @@ changed in cohere outside the sets is written under the same heading.
 - A file git tracks is never ignored, as `git check-ignore` decides it: a file added with `git add -f` under a
   pattern that matches it is checked and formatted like any other, where it read "ignored by git". cohere reads the
   repository's index itself, and a run whose index can't be read, a split or sparse one, decides by the ignore files
-  alone and says so.
+  alone and says so. The run cache keys the index on what it decides, the tracked paths the ignore rules exclude and
+  the gitlinks, so a `git status` or a `git add` of an ordinary file still replays, and a `git add -f` doesn't.
 - The footer's checked count is the files a phase examined, never the files in scope. A Swift project whose
   files had no compiler record, with lint not run, read
   `1 type error (13 checked) • ⚠ 13 files nothing checked`, and now reads no checked count beside the gap, which

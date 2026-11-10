@@ -94,13 +94,13 @@ func TestTheIndexReaderYieldsEveryTrackedPathAtEachVersion(test *testing.T) {
 		if got := binary.BigEndian.Uint32(contents[4:8]); got != uint32(version) {
 			test.Fatalf("%s.index is version %d, so it proves nothing of version %d", name, got, version)
 		}
-		paths, parseError := parseIndex(contents, sha1.Size)
+		index, parseError := parseIndex(contents, sha1.Size)
 		if parseError != nil {
 			test.Fatalf("%s.index: %v", name, parseError)
 		}
 		want := strings.Split(strings.TrimSuffix(string(listed), "\n"), "\n")
-		if !slices.Equal(paths, want) {
-			test.Errorf("%s.index yields %q, want %q", name, paths, want)
+		if !slices.Equal(index.paths, want) {
+			test.Errorf("%s.index yields %q, want %q", name, index.paths, want)
 		}
 	}
 }
