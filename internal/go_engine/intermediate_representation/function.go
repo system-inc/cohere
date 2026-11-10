@@ -266,9 +266,9 @@ type Function struct {
 	// others wait for it (function_build.go).
 	buildOnce sync.Once
 
-	// expressionValues is the expression map ValueForExpression reads, recorded only in a package built with
-	// SetDebugMode.
-	expressionValues map[ast.Expr]expressionValue
+	// expressionValues is the expression map ValueForExpression reads, sorted by position, recorded only in a package
+	// built with SetDebugMode.
+	expressionValues []expressionValue
 
 	// These fields are populated only when the function body is built:
 

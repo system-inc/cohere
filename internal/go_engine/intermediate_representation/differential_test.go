@@ -244,6 +244,20 @@ func sequence(limit int) iter.Seq[int] {
 	}
 }
 
+// pointees lifts in two rounds: the first lifts the pointer, which leaves its pointee liftable for the second. The
+// pointee is stored to often enough that the second round reads an identifier the first resolved, the two sharing
+// lifting's reused tables, so a table a round reuses without clearing hands it the first round's value.
+func pointees() int {
+	value := 1
+	pointer := &value
+	*pointer = 2
+	*pointer = 3
+	*pointer = 4
+	*pointer = 5
+	*pointer = 6
+	return *pointer
+}
+
 func forms(
 	values []int,
 	table map[string]int,

@@ -56,6 +56,10 @@ type liftingBlock struct {
 	// liftingPlacedProblems holds it to the Go IR's own rule for which instructions have a place.
 	// liftingCarvePlaced sets it, int32 by the bound it gives.
 	placed []int32
+
+	// vacantSlots are the block's share of the round's slot array, one zero slot per instruction, which slots takes
+	// on the block's first place or deletion (#npb86tz).
+	vacantSlots []liftingSlot
 }
 
 // liftingFunction is one function as the core sees it for one round of lifting.
