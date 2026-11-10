@@ -130,6 +130,10 @@ type engineFixRecord struct {
 	// ChangedFiles is every file the phase wrote, once each. Additive within contract 3: an engine from
 	// before it sends none, which is "not listed", never "no files changed", so it is a pointer.
 	ChangedFiles *[]engineChangedFile `json:"changedFiles"`
+	// NotWritten is every file the phase would have written and did not, since it is reached through a link to a real
+	// path outside the root. Additive within contract 3: an engine from before it sends none, and a pointer, as
+	// ChangedFiles is, keeps that apart from a list that is empty.
+	NotWritten *[]notWrittenFile `json:"notWritten"`
 }
 
 // engineChangedFile is one file the fix phase wrote: its fixes by the rule that made them, and whether the
@@ -321,6 +325,10 @@ type engineRun struct {
 	filesWithoutRecord int
 	crashes            int
 	unreadable         []engineUnreadableRecord
+
+	// notWritten are the files the fix record names as not written, each reached through a link outside the root:
+	// already printed as notes, and a gap that makes the run incomplete.
+	notWritten []notWrittenFile
 
 	// What the types records say a Go run withheld because no cgo tool ran, already printed as notes and held
 	// for the summary's gaps. Neither makes the run incomplete: what was withheld is a dependency's, not the
@@ -743,6 +751,14 @@ func (run *engineRun) acceptFix(record *engineFixRecord) error {
 	printProvenance(accountOutput(run.out), "%s\n", summary.String())
 	printProvenance(accountOutput(run.out), "format scope: %s\n", record.FormatScope)
 	run.filesRewritten += record.FilesRewritten
+	// Each by name with where it really is, as the files nothing checked are named, since a gap nobody can find is
+	// half a gap. The footer counts them.
+	if record.NotWritten != nil {
+		for _, file := range *record.NotWritten {
+			fmt.Fprintf(accountOutput(run.out), "  not written: %s → %s\n", file.File, file.RealPath)
+		}
+		run.notWritten = append(run.notWritten, *record.NotWritten...)
+	}
 
 	// An engine from before the list sends none, and the run then states the counts alone: the footer
 	// leaves out a cohered count it was not given, rather than print a zero it does not know.
@@ -1315,7 +1331,9 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	// and the summary claims none, the engine is printing green over work it did not do, which is the
 	// failure this tool exists to stop, and the run is refused. The other direction is allowed: an engine
 	// that says it fell short is believed, even where no record shows the gap.
-	namedGaps := run.filesWithoutRecord > 0 || run.crashes > 0 || len(run.unreadable) > 0
+	// A file not written was checked, and its fixes withheld, so it is named apart from the files nothing checked.
+	uncheckedGaps := run.filesWithoutRecord > 0 || run.crashes > 0 || len(run.unreadable) > 0
+	namedGaps := uncheckedGaps || len(run.notWritten) > 0
 	// Judged by the phases the caller asked for: `complete` means every requested phase ran, so `--lint`
 	// with fix and types skipped as not requested is complete. Any other skip is still a gap.
 	gapInRecords := !run.report.checkedEveryRequestedPhase() || namedGaps
@@ -1328,14 +1346,19 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 		activeSummary.Gaps.Unread = engineUncheckedFiles(run.filesWithoutRecord, len(run.unreadable))
 	}
 	if !*record.Complete && run.report.checkedEveryRequestedPhase() {
-		if namedGaps {
+		switch {
+		case uncheckedGaps:
 			run.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
-		} else {
+		case namedGaps:
+			run.report.incompleteBeyondPhases = "the notes above name the files whose fixes were not written, each " +
+				"reached through a link outside the root"
+		default:
 			run.report.incompleteBeyondPhases = run.language.theEngine() +
 				" reported that it fell short without a record saying where"
 			activeSummary.Gaps.Unread = run.language.theEngine() + " fell short without saying where"
 		}
 	}
+	activeSummary.Gaps.NotWritten = run.notWritten
 	// Whatever the run's completeness, which they never move: the engine calls a run that withheld them complete.
 	activeSummary.Gaps.WithheldInDependencyCgo = run.withheldInDependencyCgo
 	activeSummary.Gaps.WithheldDependencyCgoDeclarations = run.withheldDependencyCgoDeclarations

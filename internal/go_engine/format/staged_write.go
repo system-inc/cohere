@@ -6,6 +6,8 @@ import (
 	"maps"
 	"os"
 	"slices"
+
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // WriteAllAtomically replaces each file of files with its contents as one set, for files that only make sense
@@ -14,15 +16,17 @@ import (
 // order of their names. A file that cannot be read, staged or written removes every temporary file and writes
 // nothing. A rename into place that fails once others are in place, which a temporary file beside its target leaves
 // unlikely, puts the files already replaced back as they were, and partlyWritten names any it could not put back, the
-// only case that leaves the set half written.
-func WriteAllAtomically(files map[string][]byte) (partlyWritten []string, writeError error) {
-	return writeAllAtomically(files, putInPlace)
+// only case that leaves the set half written. A file outside root is refused as WriteAtomically refuses it, with its
+// *write_root.OutsideRootError, before any file is placed, so the set is not written.
+func WriteAllAtomically(root write_root.WriteRoot, files map[string][]byte) (partlyWritten []string, writeError error) {
+	return writeAllAtomically(root, files, putInPlace)
 }
 
 // writeAllAtomically is WriteAllAtomically with the step that renames a staged file into place given, so a test can
 // fail a placement after others have succeeded, the one failure a real file system leaves too rare to stage, and see
 // the files already placed put back.
 func writeAllAtomically(
+	root write_root.WriteRoot,
 	files map[string][]byte,
 	place func(stagedFile) error,
 ) (partlyWritten []string, writeError error) {
@@ -42,7 +46,7 @@ func writeAllAtomically(
 			return nil, fmt.Errorf("reading %s before writing the set: %w", file, readError)
 		}
 		originals[file] = original
-		each, stageError := stage(file, files[file])
+		each, stageError := stage(root, file, files[file])
 		if stageError != nil {
 			removeStaged(0)
 			return nil, stageError
@@ -56,7 +60,7 @@ func writeAllAtomically(
 		}
 		removeStaged(index + 1)
 		for _, placed := range names[:index] {
-			if restoreError := WriteAtomically(placed, originals[placed]); restoreError != nil {
+			if restoreError := WriteAtomically(root, placed, originals[placed]); restoreError != nil {
 				partlyWritten = append(partlyWritten, placed)
 				renameError = errors.Join(renameError, restoreError)
 			}

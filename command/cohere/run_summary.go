@@ -197,6 +197,14 @@ type uncheckedEngineFile struct {
 	Language string `json:"language"`
 }
 
+// notWrittenFile is one file a fix phase did not write: the file as the engine reached it, and its real path, outside
+// the root. The same fields the Go engine's fix record writes (internal/go_engine/contract.NotWrittenFile), so the
+// record decodes into it and `--json` writes it as is.
+type notWrittenFile struct {
+	File     string `json:"file"`
+	RealPath string `json:"realPath"`
+}
+
 // withheldCgoFile is one file of a dependency with cgo files whose type errors a Go run withheld: its package,
 // the file as the engine names it, and how many errors it held. The same fields the Go engine's types record
 // writes (internal/go_engine/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.

@@ -56,15 +56,16 @@ func (engine *engine) refuseUpfront() {
 			continue
 		}
 		if !engine.editableFiles[candidate.Position.Filename] {
-			engine.reject(
+			engine.rejectFor(
 				key,
 				"file",
+				candidate.Position.Filename,
 				"declared in a file that may not be edited (generated, skipped or outside the root)",
 			)
 			continue
 		}
 		if file := engine.uneditableSite(key); file != "" {
-			engine.reject(key, "file", "used in a file that may not be edited: "+engine.relative(file))
+			engine.rejectFor(key, "file", file, "used in a file that may not be edited: "+engine.relative(file))
 			continue
 		}
 		if reason := engine.hostOnlyRefusal(key); reason != "" {

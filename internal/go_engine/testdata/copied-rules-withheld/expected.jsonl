@@ -1,6 +1,6 @@
 {"kind":"provenance","contract":3,"engine":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
 {"kind":"project","root":"/project","package":"example.com/copied","elapsedMilliseconds":0,"filesInPackage":2,"filesOurs":2,"filesInScope":2,"scopeDescription":"","targets":[{"name":"example.com/copied","kind":"module","files":2,"languageMode":"1.24"}],"excluded":[]}
-{"kind":"fix","filesConsidered":2,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every Go file in the module","changedFiles":[]}
+{"kind":"fix","filesConsidered":2,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every Go file in the module","changedFiles":[],"notWritten":[]}
 {"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"types","diagnostics":0,"files":2,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"go list -deps with go test's variants built here, each package type-checked from source unless the findings cache holds its export data: N packages, 1 in the workspace","withheldInDependencyCgo":[],"withheldDependencyCgoDeclarations":0,"cgoTranslation":{"packages":0,"milliseconds":0}}
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":0,"detail":""}

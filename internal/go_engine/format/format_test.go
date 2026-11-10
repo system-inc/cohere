@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 const formattedSource = "package fixture\n\nvar Count = 1\n"
@@ -104,6 +106,22 @@ func fixturePath(name string) string {
 	return filepath.Join(fixtureDirectory, filepath.FromSlash(name))
 }
 
+// rootOf is the WriteRoot of directory, which a test's writes go under.
+func rootOf(test *testing.T, directory string) write_root.WriteRoot {
+	test.Helper()
+	root, rootError := write_root.New(directory)
+	if rootError != nil {
+		test.Fatal(rootError)
+	}
+	return root
+}
+
+// fixtureRoot is the WriteRoot of fixtureDirectory, under which every fixture the package's tests write is.
+func fixtureRoot(test *testing.T) write_root.WriteRoot {
+	test.Helper()
+	return rootOf(test, fixtureDirectory)
+}
+
 // requireContents fails the test unless the file at path holds contents.
 func requireContents(test *testing.T, path, contents string) {
 	test.Helper()
@@ -145,7 +163,7 @@ func TestAWriteRewritesAnUnformattedFileAndKeepsItsMode(test *testing.T) {
 	test.Parallel()
 
 	file := fixturePath("write/unformatted.go")
-	result := Run([]string{file}, Options{Write: true})
+	result := Run([]string{file}, Options{Write: true, Root: fixtureRoot(test)})
 	want := Result{
 		FilesConsidered: 1,
 		Changed:         []ChangedFile{{File: file, Formatted: true, Written: true, FirstDifferingLine: 5}},
@@ -178,7 +196,7 @@ func TestAWriteThroughASymbolicLinkKeepsTheLink(test *testing.T) {
 	test.Parallel()
 
 	link := fixturePath("link/link.go")
-	result := Run([]string{link}, Options{Write: true})
+	result := Run([]string{link}, Options{Write: true, Root: fixtureRoot(test)})
 	if len(result.Changed) != 1 || !result.Changed[0].Written {
 		test.Fatalf("the linked file was not rewritten: %+v", result)
 	}
@@ -217,7 +235,7 @@ func TestAFileThatDoesNotParseIsNotFormattedWithTheParseError(test *testing.T) {
 				test.Fatal("the fixture parses")
 			}
 			file := fixturePath(each.file)
-			result := Run([]string{file}, Options{Write: each.write})
+			result := Run([]string{file}, Options{Write: each.write, Root: fixtureRoot(test)})
 			if result.FilesConsidered != 1 || len(result.Changed) != 0 || len(result.Generated) != 0 ||
 				len(result.NotFormatted) != 1 || result.NotFormatted[0].File != file {
 				test.Fatalf("the file was not counted as not formatted: %+v", result)
@@ -236,7 +254,7 @@ func TestAnUnreadableFileNamesTheReadError(test *testing.T) {
 	test.Parallel()
 
 	file := fixturePath("missing.go")
-	result := Run([]string{file}, Options{Write: true})
+	result := Run([]string{file}, Options{Write: true, Root: fixtureRoot(test)})
 	if len(result.NotFormatted) != 1 || !strings.HasPrefix(result.NotFormatted[0].Reason, "it cannot be read: ") ||
 		!strings.Contains(result.NotFormatted[0].Reason, file) {
 		test.Fatalf("a missing file was not counted with its read error: %+v", result)
@@ -427,7 +445,8 @@ func TestOnlyACheckReadsTheHeldBytes(test *testing.T) {
 
 	written := writeFile(test, unformattedSource)
 	heldFormatted := func(string) ([]byte, bool) { return []byte(reformattedSource), true }
-	writeResult := Run([]string{written}, Options{Write: true, Held: heldFormatted})
+	writeResult := Run([]string{written}, Options{Write: true, Root: rootOf(test, filepath.Dir(written)),
+		Held: heldFormatted})
 	wantWritten := []ChangedFile{{File: written, Formatted: true, Written: true, FirstDifferingLine: 5}}
 	if !reflect.DeepEqual(writeResult.Changed, wantWritten) {
 		test.Fatalf("a write over held formatted bytes got %+v, want %+v", writeResult, wantWritten)
@@ -469,8 +488,9 @@ func TestRunWrapKeepsAnEquivalentWrapAndNothingElseAsks(test *testing.T) {
 
 	var asked atomic.Int32
 	file := writeFile(test, callSource)
-	if formatted := Run([]string{file}, Options{Write: true, Wrap: wrapTo(callWrapped, &asked)}); asked.Load() != 0 ||
-		!reflect.DeepEqual(formatted, Result{FilesConsidered: 1}) {
+	root := rootOf(test, filepath.Dir(file))
+	formatted := Run([]string{file}, Options{Write: true, Root: root, Wrap: wrapTo(callWrapped, &asked)})
+	if asked.Load() != 0 || !reflect.DeepEqual(formatted, Result{FilesConsidered: 1}) {
 		test.Fatalf("a run of gofmt asked the wrap %d times and got %+v", asked.Load(), formatted)
 	}
 	sources := []Source{{File: file, Contents: []byte(callSource)}}
@@ -478,7 +498,7 @@ func TestRunWrapKeepsAnEquivalentWrapAndNothingElseAsks(test *testing.T) {
 		!reflect.DeepEqual(checked, Result{FilesConsidered: 1}) {
 		test.Fatalf("a check asked the wrap %d times and got %+v", asked.Load(), checked)
 	}
-	result := RunWrap(sources, Options{Write: true, Wrap: wrapTo(callWrapped, &asked)})
+	result := RunWrap(sources, Options{Write: true, Root: root, Wrap: wrapTo(callWrapped, &asked)})
 	want := Result{
 		FilesConsidered: 1,
 		Changed:         []ChangedFile{{File: file, WrappedLines: 1, Written: true, FirstDifferingLine: 3}},
@@ -509,7 +529,7 @@ func TestAWriteDeclinesAWrapThatIsNotTheSameProgramOrNotGofmts(test *testing.T) 
 			var asked atomic.Int32
 			file := writeFile(test, callSource)
 			result := RunWrap([]Source{{File: file, Contents: []byte(callSource)}},
-				Options{Write: true, Wrap: wrapTo(testCase.output, &asked)})
+				Options{Write: true, Root: rootOf(test, filepath.Dir(file)), Wrap: wrapTo(testCase.output, &asked)})
 			if len(result.Changed) != 0 || len(result.WrapDeclined) != 1 || result.WrapDeclined[0].File != file ||
 				!strings.Contains(result.WrapDeclined[0].Reason, testCase.reason) {
 				test.Fatalf("want the wrap declined as %q, got %+v", testCase.reason, result)
@@ -544,7 +564,8 @@ func TestAVerdictWithoutTheWrapIsNotTrustedByARunThatWraps(test *testing.T) {
 		test.Fatalf("want gofmt's verdict trusted by a run that does not wrap, got %+v", again)
 	}
 
-	wrapped := RunWrap([]Source{{File: file, Contents: []byte(callSource)}}, Options{Write: true,
+	root := rootOf(test, filepath.Dir(file))
+	wrapped := RunWrap([]Source{{File: file, Contents: []byte(callSource)}}, Options{Write: true, Root: root,
 		Known: DecodeKnownFiles(encoded), Wrap: wrapTo(callWrapped, &asked)})
 	if wrapped.Known != 0 || len(wrapped.Changed) != 1 || wrapped.Changed[0].WrappedLines != 1 {
 		test.Fatalf("want gofmt's verdict read past and the file wrapped, got %+v", wrapped)
@@ -554,12 +575,12 @@ func TestAVerdictWithoutTheWrapIsNotTrustedByARunThatWraps(test *testing.T) {
 	sources := []Source{{File: file, Contents: []byte(callWrapped)}}
 	fits := DecodeKnownFiles(nil)
 	nothingToDo := func(string, []byte) Wrapping { return Wrapping{} }
-	RunWrap(sources, Options{Write: true, Known: fits, Wrap: nothingToDo})
+	RunWrap(sources, Options{Write: true, Root: root, Known: fits, Wrap: nothingToDo})
 	encoded, encodeError = fits.Encode()
 	if encodeError != nil {
 		test.Fatalf("encoding the verdicts: %v", encodeError)
 	}
-	trusted := RunWrap(sources, Options{Write: true, Known: DecodeKnownFiles(encoded), Wrap: nothingToDo})
+	trusted := RunWrap(sources, Options{Write: true, Root: root, Known: DecodeKnownFiles(encoded), Wrap: nothingToDo})
 	if trusted.Known != 1 {
 		test.Fatalf("want the wrap's verdict trusted by a run that wraps, got %+v", trusted)
 	}
@@ -569,12 +590,12 @@ func TestAVerdictWithoutTheWrapIsNotTrustedByARunThatWraps(test *testing.T) {
 
 	declines := DecodeKnownFiles(nil)
 	declining := func(string, []byte) Wrapping { return Wrapping{Declined: "a planted refusal"} }
-	RunWrap(sources, Options{Write: true, Known: declines, Wrap: declining})
+	RunWrap(sources, Options{Write: true, Root: root, Known: declines, Wrap: declining})
 	encoded, encodeError = declines.Encode()
 	if encodeError != nil {
 		test.Fatalf("encoding the verdicts: %v", encodeError)
 	}
-	again := RunWrap(sources, Options{Write: true, Known: DecodeKnownFiles(encoded), Wrap: declining})
+	again := RunWrap(sources, Options{Write: true, Root: root, Known: DecodeKnownFiles(encoded), Wrap: declining})
 	if again.Known != 0 || len(again.WrapDeclined) != 1 {
 		test.Fatalf("want a declined wrap tried and named again, got %+v", again)
 	}
@@ -609,7 +630,7 @@ func TestALatePlacementFailurePutsThePlacedFilesBack(test *testing.T) {
 		}
 		return putInPlace(staged)
 	}
-	partlyWritten, writeError := writeAllAtomically(files, failSecond)
+	partlyWritten, writeError := writeAllAtomically(rootOf(test, root), files, failSecond)
 	if writeError == nil || len(partlyWritten) != 0 {
 		test.Fatalf("want the set refused and every placed file put back, got %v, partly written %v", writeError,
 			partlyWritten)
@@ -639,8 +660,8 @@ func TestASetIsWrittenWholeOrNotAtAll(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	if _, writeError := WriteAllAtomically(map[string][]byte{first: []byte(callSource),
-		second: []byte(callSource)}); writeError != nil {
+	if _, writeError := WriteAllAtomically(rootOf(test, root),
+		map[string][]byte{first: []byte(callSource), second: []byte(callSource)}); writeError != nil {
 		test.Fatalf("a writable set was refused: %v", writeError)
 	}
 	requireContents(test, first, callSource)
@@ -653,8 +674,8 @@ func TestASetIsWrittenWholeOrNotAtAll(test *testing.T) {
 		// Ignored: a directory left read-only fails only the temporary directory's removal, which says so.
 		_ = os.Chmod(filepath.Dir(second), 0o755)
 	})
-	partlyWritten, writeError := WriteAllAtomically(map[string][]byte{first: []byte(formattedSource),
-		second: []byte(formattedSource)})
+	partlyWritten, writeError := WriteAllAtomically(rootOf(test, root),
+		map[string][]byte{first: []byte(formattedSource), second: []byte(formattedSource)})
 	if writeError == nil || len(partlyWritten) != 0 {
 		test.Fatalf("want the set refused whole, got %v, partly written %v", writeError, partlyWritten)
 	}

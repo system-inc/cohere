@@ -3,6 +3,7 @@ package go_engine
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // detailNotRequested is the one skip detail that means nobody asked for the phase, which is not a gap.
@@ -69,6 +71,15 @@ type pipeline struct {
 	// fix is the fix phase's record, held unwritten from gofmt until the long-line wrap and the rename after the load
 	// have added to it, nil when the phase was not requested.
 	fix *heldFix
+
+	// writeRoot is where the fix phase may write: the root the run was given, resolved once by runFix in a run that
+	// writes, and the zero WriteRoot, which refuses every write, in one that does not (#hwz114g).
+	writeRoot write_root.WriteRoot
+
+	// withheld are the files gofmt, the wrap or a rename would have written and did not, since each is reached
+	// through a link to a real path outside the root, by file with that real path. writeFix names them on the fix
+	// record, and each is a gap.
+	withheld map[string]string
 
 	// refusedRenames are the renames refused so far, by file, old name and new name, so a rename a round refused and
 	// whose finding still stands is not asked for, and counted, again by the next.
@@ -328,8 +339,14 @@ func (engine *pipeline) runFix(wraps bool) {
 		NotFormattedReasons: map[string]int{},
 		FormatScope:         engine.described.scopeWords(),
 		ChangedFiles:        []contract.ChangedFile{},
+		NotWritten:          []contract.NotWrittenFile{},
 	}}
 	engine.fix = held
+	// A run that writes resolves its root once, before any phase writes: gofmt, the wrap and the rename, which
+	// `--no-format` still runs. A check writes nothing and asks nothing of it.
+	if !engine.request.switches["no-fix"] {
+		engine.writeRoot = engine.resolveWriteRoot()
+	}
 	if engine.request.switches["no-format"] {
 		held.record.FormatScope = noFormatScope
 		held.elapsed = time.Since(started)
@@ -341,6 +358,7 @@ func (engine *pipeline) runFix(wraps bool) {
 	held.wraps = wraps
 	result := format.Run(candidates, format.Options{
 		Write:          !engine.request.switches["no-fix"],
+		Root:           engine.writeRoot,
 		SingleThreaded: engine.request.switches["single-threaded"],
 		Known:          held.known,
 		Held:           engine.held,
@@ -353,6 +371,12 @@ func (engine *pipeline) runFix(wraps bool) {
 	}
 	for _, notFormatted := range result.NotFormatted {
 		skipped[notFormatted.File] = true
+	}
+	// Nor is a file gofmt's write was withheld from: it holds bytes gofmt would change, which the wrap must not read
+	// as gofmt's output, and it is not this run's to write. Its finding is reported below, as a check reports it.
+	for _, withheld := range result.Withheld {
+		skipped[withheld.File] = true
+		engine.withhold(withheld.File, withheld.RealPath)
 	}
 	for _, file := range candidates {
 		if !skipped[file] {
@@ -397,14 +421,41 @@ func (engine *pipeline) runFix(wraps bool) {
 }
 
 // writeFix writes the fix phase's record and its phase record, once the wrap and the rename after the load have added
-// to them, and keeps gofmt's verdicts and the wrap's for the next run.
+// to them, and keeps gofmt's verdicts and the wrap's for the next run. Every file a write was withheld from is named on
+// the record and on stderr, and makes the run incomplete: its fixes were not made, and a run that says nothing of
+// them would read as one that fixed everything it could.
 func (engine *pipeline) writeFix() {
 	if engine.fix == nil {
 		return
 	}
+	for _, file := range slices.Sorted(maps.Keys(engine.withheld)) {
+		engine.fix.record.NotWritten = append(engine.fix.record.NotWritten,
+			contract.NotWrittenFile{File: file, RealPath: engine.withheld[file]})
+		engine.incomplete = true
+		engine.note("%s was not written: it is reached through a link to %s, outside the root, so its fixes are "+
+			"withheld and its findings stand", file, engine.withheld[file])
+	}
 	engine.keepKnownFiles(engine.fix.known)
 	engine.write(engine.fix.record)
 	engine.phase(contract.PhaseFix, contract.OutcomeRan, engine.fix.elapsed, "")
+}
+
+// resolveWriteRoot is the WriteRoot of the root the run was given. A root that cannot be resolved, which the run has
+// already read, leaves the zero WriteRoot, so every write is withheld and named rather than made blind.
+func (engine *pipeline) resolveWriteRoot() write_root.WriteRoot {
+	writeRoot, rootError := write_root.New(engine.described.workspace.Root)
+	if rootError != nil {
+		engine.note("the root could not be resolved, so no fix is written: %v", rootError)
+	}
+	return writeRoot
+}
+
+// withhold keeps file, a write refused since its real path is outside the root, for writeFix to name.
+func (engine *pipeline) withhold(file string, realPath string) {
+	if engine.withheld == nil {
+		engine.withheld = map[string]string{}
+	}
+	engine.withheld[file] = realPath
 }
 
 // wrapsLongLines is whether the fix phase wraps the long-line rule's findings: only in a run that writes, formats and

@@ -50,7 +50,8 @@ func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 // layout, writes each wrap it keeps, rereads the file, and adds what it did to the held fix record, under the
 // long-line rule. When it wrote a file and a phase reads the types (typesRead), it loads again and returns that load,
 // since every phase after it must read the bytes on disk. It returns the load it was given otherwise: a run that asked
-// for no types reads none, so a second load would feed nothing.
+// for no types reads none, so a second load would feed nothing. A wrap of a file outside the root (engine.writeRoot) is
+// withheld rather than written, and its long lines stay findings.
 func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, typesRead bool) (*load.Loaded, error) {
 	if engine.fix == nil || !engine.fix.wraps {
 		return loaded, loadError
@@ -78,6 +79,7 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, type
 	started = time.Now()
 	result := format.RunWrap(sources, format.Options{
 		Write:          true,
+		Root:           engine.writeRoot,
 		SingleThreaded: engine.request.switches["single-threaded"],
 		Known:          engine.fix.known,
 		Wrap:           engine.longLineWrap(),
@@ -95,6 +97,10 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, type
 	for _, declined := range result.WrapDeclined {
 		// Not a gap: the file holds gofmt's output, and the lint phase still reports every long line in it.
 		engine.note("%s: its long lines were not wrapped, so they stay findings: %s", declined.File, declined.Reason)
+	}
+	for _, withheld := range result.Withheld {
+		// A gap, which writeFix names: the wrap was kept and not written, and the lint phase reports its long lines.
+		engine.withhold(withheld.File, withheld.RealPath)
 	}
 	engine.fix.elapsed += time.Since(started)
 	if len(result.Changed) == 0 || !typesRead {

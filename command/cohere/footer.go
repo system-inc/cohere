@@ -269,6 +269,10 @@ func uncheckedMarkers(summary runSummary) []string {
 			counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))
 	}
 	markers = append(markers, uncheckedEngineFileMarkers(gaps.Unchecked)...)
+	if len(gaps.NotWritten) > 0 {
+		markers = append(markers, "⚠ not written: "+counted(len(gaps.NotWritten),
+			"file reached through a link outside the root", "files reached through a link outside the root"))
+	}
 	if marker := withheldCgoMarker(gaps.WithheldInDependencyCgo, gaps.WithheldDependencyCgoDeclarations); marker != "" {
 		markers = append(markers, marker)
 	}

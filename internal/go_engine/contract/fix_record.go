@@ -15,12 +15,16 @@ type FixRecord struct {
 	// written, empty when nothing was, because the front door reads an absent or null list as "not
 	// listed" rather than "no files changed" (see MarshalJSON).
 	ChangedFiles []ChangedFile `json:"changedFiles"`
+	// NotWritten is every file the phase would have written and did not, since it is reached through a link to a
+	// real path outside the run's root, sorted by file: each is a gap, its findings stand, and the run is
+	// incomplete. Additive within contract 3, and always written, `[]` when there were none, as ChangedFiles is.
+	NotWritten []NotWrittenFile `json:"notWritten"`
 }
 
 func (FixRecord) kind() Kind { return KindFix }
 
-// MarshalJSON writes an empty ChangedFiles as `[]`, never `null`. The front door decodes the list into a
-// pointer and reads null as "not listed", which would make a run that wrote nothing look like a run that
+// MarshalJSON writes an empty ChangedFiles or NotWritten as `[]`, never `null`. The front door decodes each list
+// into a pointer and reads null as "not listed", which would make a run that wrote nothing look like a run that
 // did not say.
 func (record FixRecord) MarshalJSON() ([]byte, error) {
 	// withoutMarshaler has FixRecord's fields and not its methods, so encoding it does not recurse here.
@@ -28,6 +32,9 @@ func (record FixRecord) MarshalJSON() ([]byte, error) {
 	listed := withoutMarshaler(record)
 	if listed.ChangedFiles == nil {
 		listed.ChangedFiles = []ChangedFile{}
+	}
+	if listed.NotWritten == nil {
+		listed.NotWritten = []NotWrittenFile{}
 	}
 	return encodeWithoutHtmlEscaping(listed)
 }
