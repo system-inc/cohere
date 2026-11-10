@@ -1,0 +1,95 @@
+package go_engine
+
+import (
+	"fmt"
+	"go/parser"
+	"go/token"
+	"io"
+	"slices"
+
+	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/load"
+)
+
+// runStdin is the editor's save (#qtna8m4): what a run with `--fix` would write for the one file `--stdin-filepath`
+// names, computed from the buffer on standard input, written to output whole, with nothing written to disk. It is the
+// fix phase of run over a scope of that one file, whose bytes are the buffer everywhere the run reads them
+// (invocation.read), and no other phase, so no record is written:
+//
+//   - gofmt, in memory (format.Options.KeepOutput).
+//   - the long-line wrap, in memory, over a load of the formatted buffer, and held as run holds it when the load
+//     failed or found type errors, with the same notes on stderr.
+//   - the renames the naming rules ask, never made, since a rename spans files: each one in this file is named on
+//     stderr (nameRenamesLeft).
+//
+// The outcomes are TypeScript's stdin's (command/cohere/stdin.go), for the save hook to act on:
+//
+//   - The file's text on output, exit 0, whether or not anything changed.
+//   - The buffer unchanged on output, exit 0, for a file the run declines: one the census leaves out, git's ignore
+//     files or the build constraints, with the reason on stderr in the words the run's footer uses; one no package of
+//     the root holds; and a buffer that does not parse. A save is not the place to report a typo; the gate reports it.
+//   - Nothing on output, exit 1, for a formatter that broke, with why on stderr. The hook shows it and saves the buffer
+//     as typed.
+func (engine *pipeline) runStdin(output io.Writer) int {
+	path := engine.request.stdinPath
+	if _, held := engine.described.contents[path]; !held || !engine.described.inScopeSet[path] {
+		engine.note("%s was left as typed: %s", path, engine.stdinDeclined(path))
+		return writeStdin(output, engine.request.buffer, engine.standardError)
+	}
+	if _, parseError := parser.ParseFile(token.NewFileSet(), path, engine.request.buffer,
+		parser.SkipObjectResolution); parseError != nil {
+		engine.note("%s was left as typed: it does not parse: %v", path, parseError)
+		return writeStdin(output, engine.request.buffer, engine.standardError)
+	}
+
+	wraps := engine.wrapsLongLines()
+	engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{})
+	engine.runFix(wraps)
+	if engine.fix.record.FilesNotFormatted > 0 {
+		// The buffer parses, so gofmt not formatting it is a formatter that broke, which runFix has said on stderr.
+		return exitFindings
+	}
+	names := engine.renamesNames()
+	var loaded *load.Loaded
+	var loadError error
+	if wraps || names {
+		// Said on stderr when it fails and the renames would read it, as a run says it when a phase reads the types.
+		loaded, loadError = engine.loadWorkspace(names)
+	}
+	// When the wrap changed the buffer and the renames are named, this is a load of the wrapped buffer, so a name is
+	// spelled from the bytes its finding's position is in.
+	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, names)
+	engine.runRename(loaded, loadError)
+	engine.keepKnownFiles(engine.fix.known)
+	return writeStdin(output, engine.described.contents[path], engine.standardError)
+}
+
+// stdinDeclined is why the editor's save holds nothing for its file: the reason the project record gives for leaving
+// it out, with the rule that decided it, as `ignored by git (.gitignore:1)`, the words a run's footer says it in when
+// that left nothing checked (#08cv2mp), or else that no package the run checks holds it.
+func (engine *pipeline) stdinDeclined(path string) string {
+	index := slices.IndexFunc(engine.described.record.Excluded, func(excluded contract.ExcludedFile) bool {
+		return excluded.File == path
+	})
+	if index < 0 {
+		return fmt.Sprintf("no package of the Go %s at %s holds it, so a run there checks no such file",
+			engine.described.container(), engine.described.workspace.Root)
+	}
+	excluded := engine.described.record.Excluded[index]
+	if excluded.Source == "" {
+		return excluded.Reason
+	}
+	return excluded.Reason + " (" + excluded.Source + ")"
+}
+
+// writeStdin writes a save's answer, the file's text, whole, and says on stderr when it could not.
+func writeStdin(output io.Writer, contents []byte, standardError io.Writer) int {
+	if _, writeError := output.Write(contents); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		_, _ = fmt.Fprintf(standardError, "cohere-go: the file's text could not be written to standard output: %v\n",
+			writeError)
+		return exitBroken
+	}
+	return exitClean
+}

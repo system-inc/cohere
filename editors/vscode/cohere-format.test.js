@@ -114,7 +114,7 @@ NodeTest.test(
     },
 );
 
-NodeTest.test('the formatter is registered for what cohere formats through stdin, and not for Go', function() {
+NodeTest.test('the formatter is registered for what cohere formats through stdin, Go among them', function() {
     // extension.js activated against a stand-in for the vscode module, which only VS Code provides, to
     // read the document selector it registers its formatter with.
     const selectors = [];
@@ -146,11 +146,10 @@ NodeTest.test('the formatter is registered for what cohere formats through stdin
     for(const extension of saveSettings.extensions) {
         NodeAssert.ok(selected(`/work/project/Probe${extension}`), `${extension} is not formatted on save`);
     }
-    for(const fileName of ['main.go', 'go.mod', 'Package.swift', 'Notes.txt']) {
+    NodeAssert.ok(selected('/work/project/main.go'), 'a Go file is not formatted on save');
+    for(const fileName of ['go.mod', 'Package.swift', 'Notes.txt']) {
         NodeAssert.ok(!selected(`/work/project/${fileName}`), `${fileName} is handed to cohere on save`);
     }
-    // Go is not in the list until cohere formats it through stdin (#qtna8m4).
-    NodeAssert.ok(!saveSettings.extensions.includes('.go'));
 });
 
 NodeTest.test(
@@ -159,10 +158,10 @@ NodeTest.test(
     async function() {
         const root = temporaryDirectory();
         const refusing = NodePath.join(root, 'cohere');
-        // The sentence cohere's front door prints for a file in a Go module, as the release build says it.
+        // The sentence cohere's front door prints for a file in a Swift package, as the release build says it.
         NodeFileSystem.writeFileSync(
             refusing,
-            '#!/bin/sh\ncat > /dev/null\necho "cohere: --stdin-filepath is not implemented for Go yet, so the run was refused rather than run without it, and nothing was checked." >&2\nexit 1\n',
+            '#!/bin/sh\ncat > /dev/null\necho "cohere: --stdin-filepath is not implemented for Swift yet, so the run was refused rather than run without it, and nothing was checked." >&2\nexit 1\n',
             { mode: 0o755 },
         );
         const buffer = 'export const value   = 1\n';
@@ -184,19 +183,24 @@ NodeTest.test(
 );
 
 NodeTest.test(
-    'a save in a Go module leaves the buffer as typed, with no error',
+    'a save in a Go module formats a Go file and leaves any other file as typed, with no error',
     { skip: process.env.COHERE_BINARY === undefined },
     async function() {
         const binary = process.env.COHERE_BINARY;
         const root = temporaryDirectory();
         NodeFileSystem.writeFileSync(NodePath.join(root, 'go.mod'), 'module example.com/probe\n\ngo 1.22\n');
-        for(const [fileName, buffer] of [
-            ['main.go', 'package probe\nfunc  Value( ) int { return 1 }\n'],
-            ['Probe.ts', 'export const value   = 1\n'],
-        ]) {
-            const saved = await formatWithCohere(binary, NodePath.join(root, fileName), buffer);
-            NodeAssert.deepEqual(saved, { text: buffer }, fileName);
-        }
+        // On disk unlike the buffer, as a save's file is, so the text can only have come from the buffer.
+        const goFile = NodePath.join(root, 'main.go');
+        const onDisk = 'package probe\n';
+        NodeFileSystem.writeFileSync(goFile, onDisk);
+
+        const savedGo = await formatWithCohere(binary, goFile, 'package probe\nfunc  Value( ) int { return 1 }\n');
+        NodeAssert.deepEqual(savedGo, { text: 'package probe\n\nfunc Value() int { return 1 }\n' });
+        NodeAssert.equal(NodeFileSystem.readFileSync(goFile, 'utf8'), onDisk, 'the save wrote to disk');
+
+        // No Go package holds a TypeScript file, so the Go engine declines it.
+        const buffer = 'export const value   = 1\n';
+        NodeAssert.deepEqual(await formatWithCohere(binary, NodePath.join(root, 'Probe.ts'), buffer), { text: buffer });
     },
 );
 

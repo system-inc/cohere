@@ -13,9 +13,9 @@
 //   present  in <project folder>, where cohere is found: a save must write what the gate writes.
 //   absent   in an empty directory, with PATH reduced to the system's and no COHERE_BINARY: the save
 //            must leave the file as typed.
-//   go       in a Go module, where cohere has no stdin path yet (#qtna8m4), with cohere reached through a
-//            stand-in that logs each command line: a Go file's save must never reach cohere, and a
-//            TypeScript file's, which cohere refuses there, must leave the file as typed.
+//   go       in a Go module, with cohere reached through a stand-in that logs each command line: a Go
+//            file's save must reach cohere and come back as gofmt prints it (#qtna8m4), and a TypeScript
+//            file's, which the Go engine declines there, must leave the file as typed.
 //   schema   when the fourth argument is given, a project with @system-inc/cohere installed from its npm
 //            package: a CohereSettings.json naming the installed schema must have a misspelled key flagged.
 //

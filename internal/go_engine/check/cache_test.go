@@ -120,7 +120,7 @@ func keyOf(test *testing.T, caching *Caching, path string) cache.Key {
 	test.Helper()
 	keyContext := caching.Context
 	keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+load.LoaderSource)
-	keyed, keysError := cache.Keys(fixtures.loaded.Packages, keyContext, nil, cache.FileDigests{})
+	keyed, keysError := cache.Keys(fixtures.loaded.Packages, keyContext, nil, cache.FileDigests{}, nil)
 	if keysError != nil {
 		test.Fatalf("computing the fixtures' keys: %v", keysError)
 	}

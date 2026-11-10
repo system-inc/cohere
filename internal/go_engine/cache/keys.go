@@ -40,7 +40,8 @@ type Keyed struct {
 // Keys computes every package's key, for the packages given and everything they import, reading each file once.
 // extraInputs, when non-nil, returns more inputs for one package (a rule's reads outside the pass), each hashed in.
 // known are digests the run already holds, read rather than hashed again, and the caller vouches that nothing wrote
-// any of those files since: the zero value holds none.
+// any of those files since: the zero value holds none. held is the bytes the load parsed in place of a file's on disk,
+// hashed in their place, so a key is of what the load read; nil hashes every file from disk.
 //
 // A key is a sha256 over two parts, each length-prefixed: the package's own digest, then the keys of the packages it
 // imports, sorted by import path. The own digest is a sha256 over, in this order and each part length-prefixed: the
@@ -54,12 +55,13 @@ func Keys(
 	shared Context,
 	extraInputs func(*packages.Package) ([]string, error),
 	known FileDigests,
+	held func(file string) ([]byte, bool),
 ) (*Keyed, error) {
 	reachable, reachableError := reachableFrom(given)
 	if reachableError != nil {
 		return nil, reachableError
 	}
-	digests, digestsError := fileDigests(reachable, known)
+	digests, digestsError := fileDigests(reachable, known, held)
 	if digestsError != nil {
 		return nil, digestsError
 	}

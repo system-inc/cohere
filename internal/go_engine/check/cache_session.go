@@ -32,6 +32,11 @@ type Caching struct {
 	StandardLibrary *StandardLibraryCaching
 	Files           cache.FileDigests
 
+	// Held is the bytes the load parsed in place of a file's on disk, which the keys hash in their place (see
+	// cache.Keys), nil for a run whose load read every file as it is on disk. The editor's save sets it, whose one file
+	// is the buffer, so its entries are keyed by what it checked rather than by the file the editor has not saved.
+	Held func(file string) ([]byte, bool)
+
 	// AnswersInPart names, by import path, the packages whose entry the run writes with only the answers its
 	// questions computed in them, never whole, as an entry from a build before format 10 holds them: an entry a later
 	// run's question can find no answer in, so that run reloads the package (see Reload). Only a test of the reload
@@ -264,7 +269,8 @@ func (session *CacheSession) Restore(
 	if session.caching.Store != nil {
 		keyContext := session.caching.Context
 		keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+loader)
-		keyed, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files)
+		keyed, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files,
+			session.caching.Held)
 		if keysError != nil {
 			session.problem(fmt.Sprintf("computing the keys: %v", keysError))
 			return nil

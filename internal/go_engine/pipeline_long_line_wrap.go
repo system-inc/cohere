@@ -49,9 +49,10 @@ func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 // gofmt's output stands. It wraps, in memory, each file gofmt formatted that holds a long line, through the hook the
 // fix phase has always used (longLineWrap) and format's checks that the wrap is the same program and gofmt's own
 // layout, writes each wrap it keeps, rereads the file, and adds what it did to the held fix record, under the
-// long-line rule. When it wrote a file and a phase reads the types (typesRead), it loads again and returns that load,
-// since every phase after it must read the bytes on disk. It returns the load it was given otherwise: a run that asked
-// for no types reads none, so a second load would feed nothing.
+// long-line rule. The editor's save holds each wrap it keeps in place of writing it. When it wrote a file and a phase
+// reads the types (typesRead), it loads again and returns that load, since every phase after it must read the bytes the
+// run holds. It returns the load it was given otherwise: a run that asked for no types reads none, so a second load
+// would feed nothing.
 func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, typesRead bool) (*load.Loaded, error) {
 	if engine.fix == nil || !engine.fix.wraps {
 		return loaded, loadError
@@ -77,8 +78,11 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, type
 		return loaded, loadError
 	}
 	started = time.Now()
+	// The editor's save wraps in memory and writes nothing (runStdin).
+	saves := engine.request.stdinPath != ""
 	result := format.RunWrap(sources, format.Options{
-		Write:          true,
+		Write:          !saves,
+		KeepOutput:     saves,
 		SingleThreaded: engine.request.switches["single-threaded"],
 		Known:          engine.fix.known,
 		Wrap:           engine.longLineWrap(),
@@ -91,7 +95,7 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, type
 	engine.fix.wrapKnown = result.Known
 	engine.addWrapped(result.Changed)
 	for _, changed := range result.Changed {
-		engine.reread(changed.File)
+		engine.hold(changed)
 	}
 	for _, declined := range result.WrapDeclined {
 		// Not a gap: the file holds gofmt's output, and the lint phase still reports every long line in it.

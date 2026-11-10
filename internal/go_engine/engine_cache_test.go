@@ -64,7 +64,7 @@ func runEngineAnsweringInPart(
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	if exitCode := runOverlapping(arguments, &standardOutput, &standardError, registered, nil, builtIn, true,
+	if exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, registered, nil, builtIn, true,
 		answersInPart); exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
 	}

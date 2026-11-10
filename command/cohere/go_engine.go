@@ -26,10 +26,16 @@ const goEngineChildVariable = "COHERE_GO_ENGINE_CHILD"
 
 // runGoEngineVerb is the hidden `go-engine` mode, matched by main before anything else reads the command
 // line: the Go engine, given everything after the verb, writing contract 3 to standardOutput for the front
-// door that started it. The memory available is this process's own policy's reading, taken at init, which the
-// engine sizes its limit from (go_engine's capMemory).
-func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
-	return go_engine.Main(arguments, activeMemoryPolicy.available, standardOutput, standardError)
+// door that started it, or for the editor's save the file's text, from the buffer on standardInput (runGoStdin). The
+// memory available is this process's own policy's reading, taken at init, which the engine sizes its limit from
+// (go_engine's capMemory).
+func runGoEngineVerb(
+	arguments []string,
+	standardInput io.Reader,
+	standardOutput io.Writer,
+	standardError io.Writer,
+) int {
+	return go_engine.Main(arguments, activeMemoryPolicy.available, standardInput, standardOutput, standardError)
 }
 
 // goFlags are the flags a Go run takes, as agreed with the engine on #a0cgmh6. `lint-config` is forwarded
@@ -46,13 +52,16 @@ func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError
 //
 // `timing` asks the engine for its timing record, what the run's CPU went to, which the front door prints as
 // TypeScript's timing table (#3apgjer). The run cache never admits it (see runCacheAdmits).
+//
+// `stdin-filepath` is the editor's save (#qtna8m4), forwarded with its absolute path, and run by runGoStdin rather
+// than as a check: the engine reads the buffer on stdin and writes the file's text where a check writes records.
 var goFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
 		"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing", "duplicates",
 	},
 	FrontDoorFlags: []string{
-		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open",
+		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open", "stdin-filepath",
 	},
 }
 
@@ -77,6 +86,9 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 		return 1, fmt.Errorf(
 			"--tsconfig names a TypeScript program, and %s is a Go %s, so there is no tsconfig to use",
 			location.Root, goContainer(location.Root))
+	}
+	if given["stdin-filepath"] {
+		return runGoStdin(location, given, positionals, os.Stdin, os.Stdout)
 	}
 	language := goLanguage(goContainer(location.Root))
 	arguments, mode, argumentsError := engineArguments(language, goFlags, location, given, flagValue, positionals)

@@ -318,6 +318,11 @@ func (engine *pipeline) cacheSession(environment []string, files cache.FileDiges
 		return nil
 	}
 	caching.Files = files
+	// The editor's save loads its buffer in place of the file (held), so its keys are of the buffer: keyed by the
+	// disk's bytes, its entries would be restored by the next run over the file on disk as what that file holds.
+	if engine.request.stdinPath != "" {
+		caching.Held = engine.held
+	}
 	if engine.duplicatesRequested() {
 		return check.NewCacheSession(caching, enabled, canonical_function_hash.Analyzer)
 	}

@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,7 +34,10 @@ var switchNames = []string{
 var notImplementedFlags = []string{"unused", "unused-all", "unused-deep", "explain"}
 
 // valuedFlags are the flags that take a value, as `--name value` or `--name=value`.
-var valuedFlags = []string{"contract", "root", "lint-config"}
+//
+// `stdin-filepath` is the editor's save (#qtna8m4): the path of one file whose bytes are the buffer on standard input,
+// for which the run prints on standard output what `--fix` would write, and writes nothing (pipeline.runStdin).
+var valuedFlags = []string{"contract", "root", "lint-config", "stdin-filepath"}
 
 // refusedTogether are the combinations the contract refuses, each switch with the switches it cannot be named
 // beside. `--format-only` asks for formatting alone, so asking it for a phase or for no formatting asks two
@@ -54,6 +58,9 @@ const (
 	modeVersion      mode = "Version"
 	modeRules        mode = "Rules"
 	modeRulesEnabled mode = "RulesEnabled"
+
+	// modeStdin is the editor's save, which prints one file's text rather than records.
+	modeStdin mode = "Stdin"
 )
 
 // parseInvocation reads the command line, and refuses one the engine cannot honor in full.
@@ -107,6 +114,9 @@ func parseInvocation(arguments []string) (invocation, error) {
 				request.root = value
 			case "lint-config":
 				request.lintConfiguration = value
+			case "stdin-filepath":
+				// Clean, as the census names every file, so the one path matches the file it names.
+				request.stdinPath = filepath.Clean(value)
 			}
 		case slices.Contains(switchNames, name):
 			switch {

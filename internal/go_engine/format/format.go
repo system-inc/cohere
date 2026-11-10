@@ -26,6 +26,7 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/system-inc/cohere/internal/line_wrap"
 )
@@ -35,6 +36,12 @@ type Options struct {
 	// Write rewrites each file gofmt would change. Unset, the run is the check `--no-fix` asks for: it reports
 	// every file gofmt would change and writes nothing, so the zero value never touches a project.
 	Write bool
+
+	// KeepOutput formats in memory, for a run that does not write: each file Run or RunWrap would change comes back
+	// with what a writing run would write in ChangedFile.Output, and nothing is written. The editor's save is that
+	// run, whose file is the buffer it holds and not the disk's. Unset, a check keeps no output, since `--no-fix` over
+	// a tree would hold every changed file's for nothing.
+	KeepOutput bool
 
 	// SingleThreaded formats one file at a time, for `--single-threaded`.
 	SingleThreaded bool
@@ -87,6 +94,10 @@ type ChangedFile struct {
 
 	// Written is whether the run rewrote the file, which only a run with Options.Write does.
 	Written bool
+
+	// Output is what a writing run would have written, gofmt's or the wrap's, set only by a run with
+	// Options.KeepOutput, which writes nothing.
+	Output []byte
 
 	// FirstDifferingLine is the 1-based line of the original file where the output first differs, the line a check's
 	// finding points at.
@@ -155,15 +166,16 @@ func Run(files []string, options Options) Result {
 // RunWrap wraps the long lines of sources, files gofmt formatted, through options.Wrap and WrapSource, and writes each
 // wrap it keeps, as many at once as there are cores unless options.SingleThreaded. A file options.Known holds as one
 // the wrap leaves as it is is not asked again. Changed is the files it wrote, each with Formatted unset, since gofmt's
-// changes were Run's, and WrapDeclined the files whose wrap it did not keep, which hold gofmt's output still. Without
-// options.Write or options.Wrap it does nothing, since a check leaves long lines to the lint phase.
+// changes were Run's, and WrapDeclined the files whose wrap it did not keep, which hold gofmt's output still. Under
+// options.KeepOutput it writes nothing and Changed carries each wrap it kept. Without options.Wrap, or without either
+// options.Write or options.KeepOutput, it does nothing, since a check leaves long lines to the lint phase.
 func RunWrap(sources []Source, options Options) Result {
 	files := make([]string, len(sources))
 	for index, source := range sources {
 		files[index] = source.File
 	}
 	outcomes := make([]outcome, len(sources))
-	if options.Write && options.Wrap != nil {
+	if (options.Write || options.KeepOutput) && options.Wrap != nil {
 		forEachFile(len(sources), options.SingleThreaded, func(index int) {
 			outcomes[index] = wrapFile(sources[index], options)
 		})
@@ -213,8 +225,9 @@ func collect(files []string, outcomes []outcome) Result {
 	return result
 }
 
-// formatFile formats one file, writing the result under options.Write, unless options.Known says what the run made
-// of the same bytes before. A check reads the file from options.Held when that holds it.
+// formatFile formats one file, writing the result under options.Write and keeping it under options.KeepOutput, unless
+// options.Known says what the run made of the same bytes before. A run that does not write reads the file from
+// options.Held when that holds it.
 func formatFile(file string, options Options) outcome {
 	original, readError := readOriginal(file, options)
 	if readError != nil {
@@ -254,6 +267,9 @@ func formatFile(file string, options Options) outcome {
 		return outcome{}
 	}
 	changed := &ChangedFile{File: file, Formatted: true, FirstDifferingLine: firstDifferingLine(original, formatted)}
+	if options.KeepOutput && !options.Write {
+		changed.Output = formatted
+	}
 	if options.Write {
 		if writeError := WriteAtomically(file, formatted); writeError != nil {
 			return notFormatted(file, fmt.Sprintf("it cannot be written: %v", writeError))
@@ -274,9 +290,10 @@ func readOriginal(file string, options Options) ([]byte, error) {
 	return os.ReadFile(file)
 }
 
-// wrapFile wraps one file gofmt formatted and writes the wrap WrapSource keeps, unless options.Known holds the same
-// bytes as a file the wrap leaves as it is. A file whose wrap is declined, or cannot be written, keeps gofmt's output
-// and is named with why; it is never known, so the next run tries it again and says again why it was not kept.
+// wrapFile wraps one file gofmt formatted and writes the wrap WrapSource keeps, or under options.KeepOutput without
+// options.Write keeps it unwritten, unless options.Known holds the same bytes as a file the wrap leaves as it is. A
+// file whose wrap is declined, or cannot be written, keeps gofmt's output and is named with why; it is never known, so
+// the next run tries it again and says again why it was not kept.
 func wrapFile(source Source, options Options) outcome {
 	var digest [sha256.Size]byte
 	if options.Known != nil {
@@ -294,6 +311,10 @@ func wrapFile(source Source, options Options) outcome {
 			options.Known.learn(digest, VerdictWrapUnchanged)
 		}
 		return outcome{}
+	}
+	if !options.Write {
+		return outcome{changed: &ChangedFile{File: source.File, WrappedLines: lines, Output: output,
+			FirstDifferingLine: firstDifferingLine(source.Contents, output)}}
 	}
 	if writeError := WriteAtomically(source.File, output); writeError != nil {
 		return outcome{wrapDeclined: &WrapDeclinedFile{File: source.File,
@@ -382,6 +403,25 @@ func WriteAtomically(file string, contents []byte) error {
 	return putInPlace(staged)
 }
 
+// writesRefused is set once this process answers an editor's save (RefuseWrites), after which every write of a file
+// through this package is refused.
+var writesRefused atomic.Bool
+
+// RefuseWrites refuses, for the rest of the process, every write of a file through this package, which is every write
+// of a source file the engine makes: gofmt's, the long-line wrap's and the rename's all stage the new contents first
+// (stage). The editor's save is such a process: the file it formats is a buffer the editor holds unsaved, and the disk
+// is the user's, so a phase that wrote there, one added later included, would overwrite the file under the editor.
+// Process-wide, since the engine runs one project per process, so a test running a writing run in process never
+// calls it.
+func RefuseWrites() {
+	writesRefused.Store(true)
+}
+
+// WritesRefused reports whether RefuseWrites was called in this process.
+func WritesRefused() bool {
+	return writesRefused.Load()
+}
+
 // stagedFile is a file's new contents written to a temporary file beside it, not yet renamed into place.
 type stagedFile struct {
 	// target is the file, through any symbolic link, and temporary the file beside it holding the new contents.
@@ -392,6 +432,10 @@ type stagedFile struct {
 // stage writes contents to a temporary file beside file, through any symbolic link, with the file's permissions,
 // and removes it again when it cannot be filled.
 func stage(file string, contents []byte) (stagedFile, error) {
+	if writesRefused.Load() {
+		return stagedFile{}, fmt.Errorf("%s was not written, since this process answers an editor's save, which "+
+			"writes no file", file)
+	}
 	target, resolveError := filepath.EvalSymlinks(file)
 	if resolveError != nil {
 		return stagedFile{}, fmt.Errorf("resolving %s: %w", file, resolveError)

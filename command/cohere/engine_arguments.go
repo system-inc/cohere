@@ -14,8 +14,8 @@ type engineFlags struct {
 	PassThroughSwitches []string
 
 	// FrontDoorFlags are the flags the front door answers for the run itself: where the project is, how
-	// the report is printed, the profile of this process, and the lint config (and fix passes, where the
-	// engine takes them) it forwards with their values.
+	// the report is printed, the profile of this process, and the lint config (and fix passes and the
+	// editor's save's path, where the engine takes them) it forwards with their values.
 	FrontDoorFlags []string
 }
 
@@ -63,6 +63,9 @@ func engineArguments(
 	}
 	if given["fix-passes"] {
 		arguments = append(arguments, "--fix-passes", value("fix-passes"))
+	}
+	if given["stdin-filepath"] {
+		arguments = append(arguments, "--stdin-filepath", absoluteFrom(location.ArgumentBase, value("stdin-filepath")))
 	}
 	for _, positional := range positionals {
 		arguments = append(arguments, absoluteFrom(location.ArgumentBase, positional))

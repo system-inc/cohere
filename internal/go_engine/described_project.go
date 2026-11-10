@@ -91,6 +91,15 @@ func (described *describedProject) countedAsWalked(file string) bool {
 	return described.inScopeSet[file] || !ofProject
 }
 
+// container is what the root is called in the run's words: a workspace when it holds a go.work, and otherwise a
+// module.
+func (described *describedProject) container() string {
+	if described.workspace.FromWorkspace {
+		return "workspace"
+	}
+	return "module"
+}
+
 // scopeWords says what the fix phase formatted, for its record's formatScope.
 func (described *describedProject) scopeWords() string {
 	if described.record.ScopeDescription != "" {
