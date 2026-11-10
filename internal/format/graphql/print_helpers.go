@@ -48,7 +48,7 @@ func currentNode(path *astPath) *estree.Node {
 }
 
 // printAll is upstream's path.map(print, ...names).
-func printAll(path *astPath, print printFunc, names ...string) []doc.Doc {
+func printAll(path *astPath, print printFunction, names ...string) []doc.Doc {
 	return printing.Map(path, func(*astPath, int) doc.Doc { return print("", nil) }, names...)
 }
 
@@ -73,7 +73,7 @@ func isNextLineEmpty(text string, startIndex int) bool {
 
 // print/arguments.js
 
-func printArguments(path *astPath, options *printerOptions, print printFunc) doc.Doc {
+func printArguments(path *astPath, options *printerOptions, print printFunction) doc.Doc {
 	node := currentNode(path)
 	if !isNonEmptyArray(node, "arguments") {
 		return empty
@@ -95,7 +95,7 @@ func printArguments(path *astPath, options *printerOptions, print printFunc) doc
 
 // print/description.js
 
-func printDescription(path *astPath, options *printerOptions, print printFunc) doc.Doc {
+func printDescription(path *astPath, options *printerOptions, print printFunction) doc.Doc {
 	node := currentNode(path)
 	if node.Child("description") == nil {
 		return empty
@@ -113,7 +113,7 @@ func printDescription(path *astPath, options *printerOptions, print printFunc) d
 
 // print/directives.js
 
-func printDirectives(path *astPath, print printFunc) doc.Doc {
+func printDirectives(path *astPath, print printFunction) doc.Doc {
 	node := currentNode(path)
 
 	if !isNonEmptyArray(node, "directives") {
@@ -132,7 +132,7 @@ func printDirectives(path *astPath, print printFunc) doc.Doc {
 
 // print/sequence.js
 
-func printSequence(path *astPath, options *printerOptions, print printFunc, property string) []doc.Doc {
+func printSequence(path *astPath, options *printerOptions, print printFunction, property string) []doc.Doc {
 	return printing.Map(path, func(path *astPath, _ int) doc.Doc {
 		printed := print("", nil)
 
@@ -146,7 +146,7 @@ func printSequence(path *astPath, options *printerOptions, print printFunc, prop
 
 // print/variable-definitions.js
 
-func printVariableDefinitions(path *astPath, print printFunc) doc.Doc {
+func printVariableDefinitions(path *astPath, print printFunction) doc.Doc {
 	node := currentNode(path)
 	if !isNonEmptyArray(node, "variableDefinitions") {
 		return empty

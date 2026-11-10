@@ -11,7 +11,7 @@ type resolvePropsOptions struct {
 	// next is the token after the props, nil for undefined.
 	next           *cst.Token
 	offset         int
-	onError        onErrorFunc
+	onError        onErrorFunction
 	parentIndent   int
 	startOnNewline bool
 }
@@ -215,7 +215,7 @@ type resolvedEnd struct {
 
 // resolveEnd reads the tokens after a node to the end of its line: its comment, and where it ends. end
 // is nil for upstream's undefined.
-func resolveEnd(end []*cst.Token, offset int, requiresSpace bool, onError onErrorFunc) resolvedEnd {
+func resolveEnd(end []*cst.Token, offset int, requiresSpace bool, onError onErrorFunction) resolvedEnd {
 	comment := ""
 	endOffset := offset
 	if end != nil {

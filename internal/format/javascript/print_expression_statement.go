@@ -40,7 +40,7 @@ func isSingleJsxExpressionStatementInMarkdown(path *Path, options *Options) bool
 }
 
 // printExpressionStatement is upstream's printExpressionStatement.
-func printExpressionStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printExpressionStatement(path *Path, options *Options, print PrintFunction) Doc {
 	parts := []Doc{print("expression", nil)}
 
 	if shouldExpressionStatementPrintLeadingSemicolon(path, options) {

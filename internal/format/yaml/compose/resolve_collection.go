@@ -24,7 +24,7 @@ const startColMessage = "All mapping items must start at the same column"
 //
 // Mutates: composition the shared context, whose atRoot and atKey the map switches as composing descends
 // into its keys and values, as upstream switches its ComposeContext
-func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onErrorFunc, tag *Tag) *Node {
+func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onErrorFunction, tag *Tag) *Node {
 	yamlMap := composition.newCollection(nodeClass(tag, "YAMLMap"))
 	if composition.atRoot {
 		composition.atRoot = false
@@ -197,7 +197,7 @@ func sepOrEmpty(sep []*cst.Token) []*cst.Token {
 //
 // Mutates: composition the shared context, whose atRoot and atKey the sequence clears before composing
 // its items, as upstream clears its ComposeContext's
-func resolveBlockSequence(composition *composeContext, bs *cst.Token, onError onErrorFunc, tag *Tag) *Node {
+func resolveBlockSequence(composition *composeContext, bs *cst.Token, onError onErrorFunction, tag *Tag) *Node {
 	seq := composition.newCollection(nodeClass(tag, "YAMLSeq"))
 	if composition.atRoot {
 		composition.atRoot = false
@@ -269,7 +269,7 @@ type typeError string
 //
 // Mutates: composition the shared context, whose atRoot and atKey the collection switches as composing
 // descends into its keys and values, as upstream switches its ComposeContext
-func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError onErrorFunc, tag *Tag) *Node {
+func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError onErrorFunction, tag *Tag) *Node {
 	isMap := equalsAscii(fc.FlowStart.Source, "{")
 	fcName := "flow sequence"
 	fallback := "YAMLSeq"

@@ -22,7 +22,7 @@ import (
 // backticks), which the markdown port does not carry yet.
 
 // embedPrint is a printer upstream's embed returns: given textToDoc, the doc for the template.
-type embedPrint = func(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error)
+type embedPrint = func(textToDoc printing.TextToDoc, print PrintFunction, path *Path, options *Options) (Doc, error)
 
 type embedPrinter struct {
 	test  func(path *Path) bool
@@ -63,7 +63,7 @@ func embed(path *Path, options *Options) embedPrint {
 	if quasis := current.List(
 		"quasis",
 	); len(quasis) == 1 && estree.TrimJavaScript(templateElementRaw(quasis[0])) == "" {
-		return func(printing.TextToDoc, PrintFunc, *Path, *Options) (Doc, error) { return doc.Text("``"), nil }
+		return func(printing.TextToDoc, PrintFunction, *Path, *Options) (Doc, error) { return doc.Text("``"), nil }
 	}
 
 	return createTemplateLiteralPrint(printer.print)
@@ -99,7 +99,7 @@ func holdsTemplateLiteral(node *estree.Node) bool {
 // createTemplateLiteralPrint is upstream's createTemplateLiteralPrint: the printed doc is labelled as
 // an embed, which print/call-arguments.js and print/arrow-function.js read.
 func createTemplateLiteralPrint(print embedPrint) embedPrint {
-	return func(textToDoc printing.TextToDoc, printFunction PrintFunc, path *Path, options *Options) (Doc, error) {
+	return func(textToDoc printing.TextToDoc, printFunction PrintFunction, path *Path, options *Options) (Doc, error) {
 		printed, printError := print(textToDoc, printFunction, path, options)
 		if printError != nil || printed == nil {
 			return nil, printError
@@ -120,7 +120,7 @@ func hasInvalidCookedValue(node Node) bool {
 // printEmbedUnsupported stands in for an embedded language with no native printer: it fails, and the
 // template prints as written, as upstream does when an embedded format throws.
 func printEmbedUnsupported(language string) embedPrint {
-	return func(textToDoc printing.TextToDoc, _ PrintFunc, _ *Path, _ *Options) (Doc, error) {
+	return func(textToDoc printing.TextToDoc, _ PrintFunction, _ *Path, _ *Options) (Doc, error) {
 		return nil, unsupportedEmbedError(language)
 	}
 }
@@ -211,7 +211,7 @@ var errorCouldNotInsertExpressions = errors.New("couldn't insert all the express
 
 // printEmbedCss is upstream's printEmbedCss: the template with each expression replaced by a
 // placeholder, formatted as scss, and the expressions put back.
-func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
+func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunction, path *Path, options *Options) (Doc, error) {
 	current := node(path)
 
 	// Get full template literal with expressions replaced by placeholders
@@ -393,7 +393,7 @@ func isEmbedMarkdown(path *Path) bool {
 var commentAtLineEnd = regexp.MustCompile(`#[^\n\r]*$`)
 
 // printEmbedGraphQl is upstream's printEmbedGraphQl.
-func printEmbedGraphQl(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
+func printEmbedGraphQl(textToDoc printing.TextToDoc, print PrintFunction, path *Path, options *Options) (Doc, error) {
 	current := node(path)
 	quasis := current.List("quasis")
 	quasiCount := len(quasis)

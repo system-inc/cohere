@@ -16,9 +16,9 @@ func itemAt(items []*cst.CollectionItem, index int) *cst.CollectionItem {
 	return nil
 }
 
-// createItemFunc is the factory transformPair builds its item with: createMappingItem or
+// createItemFunction is the factory transformPair builds its item with: createMappingItem or
 // createFlowMappingItem.
-type createItemFunc func(position *position, key *Node, value *Node) *Node
+type createItemFunction func(position *position, key *Node, value *Node) *Node
 
 // transformMap is upstream's transformMap.
 func (context *context) transformMap(mapNode *compose.Node, properties []*cst.Token) *Node {
@@ -264,7 +264,7 @@ func isBlockMappingOfImmediateChildOfFlowSequence(item *compose.Node, sourceItem
 func (context *context) transformPair(
 	pair *compose.Node,
 	sourceItem *cst.CollectionItem,
-	createNode createItemFunc,
+	createNode createItemFunction,
 ) *Node {
 	if sourceItem == nil {
 		throwTypeError("undefined", "start")
@@ -358,7 +358,7 @@ func (context *context) transformPair(
 // are { range, props }: the ranges, nil for null, and the prop tokens.
 func (context *context) transformAstPair(
 	pair *compose.Node,
-	createNode createItemFunc,
+	createNode createItemFunction,
 	keyRange []int,
 	keyProperties []*cst.Token,
 	valueRange []int,

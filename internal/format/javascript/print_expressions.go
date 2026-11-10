@@ -16,7 +16,7 @@ import (
 
 // printReturnOrThrowArgument is upstream's printReturnOrThrowArgument. experimentalTernaries is never
 // set in our configurations, so its branch is not taken.
-func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunc) Doc {
+func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	argumentDoc := print("", nil)
 	if returnArgumentHasLeadingComment(current, options) {
@@ -42,7 +42,7 @@ func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunc) D
 
 // printReturnOrThrowStatement is upstream's printReturnOrThrowStatement, exported upstream as
 // printReturnStatement and printThrowStatement.
-func printReturnOrThrowStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printReturnOrThrowStatement(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	keyword := "return"
 	if current.Is("ThrowStatement") {
@@ -57,16 +57,16 @@ func printReturnOrThrowStatement(path *Path, options *Options, print PrintFunc) 
 	return concatIn(path, textDoc(keyword), argument, printSemicolon(options))
 }
 
-func printReturnStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printReturnStatement(path *Path, options *Options, print PrintFunction) Doc {
 	return printReturnOrThrowStatement(path, options, print)
 }
 
-func printThrowStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printThrowStatement(path *Path, options *Options, print PrintFunction) Doc {
 	return printReturnOrThrowStatement(path, options, print)
 }
 
 // printVariableDeclaration is upstream's printVariableDeclaration.
-func printVariableDeclaration(path *Path, options *Options, print PrintFunc) Doc {
+func printVariableDeclaration(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	printed := printAll(path, print, "declarations")
 	key := keyOf(path)
@@ -125,7 +125,7 @@ func shouldIndentSequenceExpression(path *Path, options *Options) bool {
 }
 
 // printSequenceExpression is upstream's printSequenceExpression.
-func printSequenceExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printSequenceExpression(path *Path, options *Options, print PrintFunction) Doc {
 	parent := parentOf(path)
 	if parent.Is("ExpressionStatement", "ForStatement") {
 		var parts []Doc
@@ -146,7 +146,7 @@ func printSequenceExpression(path *Path, options *Options, print PrintFunc) Doc 
 }
 
 // printAwaitExpression is upstream's printAwaitExpression.
-func printAwaitExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printAwaitExpression(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parts := []Doc{doc.Text("await")}
 	if current.Child("argument") != nil {
@@ -172,17 +172,19 @@ func printAwaitExpression(path *Path, options *Options, print PrintFunc) Doc {
 
 // printRestOrSpreadElement is upstream's printRestOrSpreadElement, exported upstream as
 // printRestElement and printSpreadElement.
-func printRestOrSpreadElement(path *Path, print PrintFunc) Doc {
+func printRestOrSpreadElement(path *Path, print PrintFunction) Doc {
 	return concatIn(path, doc.Text("..."), print("argument", nil), printTypeAnnotationProperty(path, print))
 }
 
-func printRestElement(path *Path, print PrintFunc) Doc { return printRestOrSpreadElement(path, print) }
-func printSpreadElement(path *Path, print PrintFunc) Doc {
+func printRestElement(path *Path, print PrintFunction) Doc {
+	return printRestOrSpreadElement(path, print)
+}
+func printSpreadElement(path *Path, print PrintFunction) Doc {
 	return printRestOrSpreadElement(path, print)
 }
 
 // printProperty is upstream's printProperty: Property and ImportAttribute.
-func printProperty(path *Path, options *Options, print PrintFunc) Doc {
+func printProperty(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	if current.Bool("shorthand") {
 		return print("value", nil)
@@ -293,7 +295,7 @@ func shouldUnquoteKey(path *Path, options *Options) bool {
 var leadingDigit = regexp.MustCompile(`^\d`)
 
 // printKey is upstream's printKey.
-func printKey(path *Path, options *Options, print PrintFunc) Doc {
+func printKey(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	property := getKeyProperty(current)
 	if isComputedKey(current) {

@@ -13,8 +13,8 @@ func isAssignmentLikeNode(node Node) bool {
 	return node.Is("VariableDeclarator", "AssignmentExpression", "TypeAlias", "TSTypeAliasDeclaration")
 }
 
-// isComplexExprNode is upstream's createTypeCheckFunction of that name.
-func isComplexExprNode(node Node) bool {
+// isComplexExpressionNode is upstream's createTypeCheckFunction of that name.
+func isComplexExpressionNode(node Node) bool {
 	return node.Is("ObjectExpression", "ArrayExpression", "TemplateLiteral", "TaggedTemplateExpression",
 		"ObjectTypeAnnotation", "TSTypeLiteral")
 }
@@ -26,7 +26,7 @@ func handleAssignmentLikeComments(context *commentContext) bool {
 	if isAssignmentLikeNode(enclosingNode) &&
 		followingNode != nil &&
 		placement == "endOfLine" &&
-		(isComplexExprNode(followingNode) || isBlockComment(comment)) {
+		(isComplexExpressionNode(followingNode) || isBlockComment(comment)) {
 		return addLeadingCommentToPossibleUnionType(followingNode, context)
 	}
 

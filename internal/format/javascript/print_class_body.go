@@ -17,7 +17,7 @@ import (
 - `RecordDeclarationBody` (Flow)
 */
 // printClassBody is upstream's printClassBody.
-func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
+func printClassBody(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	var parts []Doc
 	isObjectType := !isClassBody(path)

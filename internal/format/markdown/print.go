@@ -13,9 +13,9 @@ import (
 // src/language-markdown/print/mdast.js, for the markdown parser.
 
 type (
-	astPath   = printing.AstPath[*Node, *settings]
-	options   = printing.Options[*Node, *settings, printing.NoArguments]
-	printFunc = printing.PrintFunc[printing.NoArguments]
+	astPath       = printing.AstPath[*Node, *settings]
+	options       = printing.Options[*Node, *settings, printing.NoArguments]
+	printFunction = printing.PrintFunction[printing.NoArguments]
 )
 
 // settings are the Prettier options the markdown printer reads, carried on options.Settings.
@@ -122,7 +122,7 @@ var (
 	javaScriptSpaceRuns    = regexp.MustCompile(`[` + javaScriptSpace + `]+`)
 )
 
-func printMdast(path *astPath, options *options, print printFunc, _ *printing.NoArguments) doc.Doc {
+func printMdast(path *astPath, options *options, print printFunction, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 
@@ -475,7 +475,7 @@ func replaceEndOfLine(text string, replacement doc.Doc) doc.Doc {
 	return doc.Join(replacement, parts)
 }
 
-func printRoot(path *astPath, options *options, print printFunc) doc.Doc {
+func printRoot(path *astPath, options *options, print printFunction) doc.Doc {
 	type ignorePosition struct{ index, offset int }
 	type ignoreRange struct{ start, end ignorePosition }
 	var ignoreRanges []ignoreRange

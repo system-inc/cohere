@@ -19,7 +19,7 @@ import (
 - `NGPipeExpression`(Angular)
 */
 // printBinaryishExpression is upstream's printBinaryishExpression.
-func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printBinaryishExpression(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parent := parentOf(path)
 	grandparent := grandparentOf(path)
@@ -166,7 +166,7 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 func printBinaryishExpressions(
 	path *Path,
 	options *Options,
-	print PrintFunc,
+	print PrintFunction,
 	isNested bool,
 	isInsideParenthesis bool,
 ) []Doc {

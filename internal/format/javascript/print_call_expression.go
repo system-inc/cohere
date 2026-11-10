@@ -14,7 +14,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 */
 
 // printCallExpression is upstream's printCallExpression.
-func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printCallExpression(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	isNewExpression := current.Is("NewExpression")
 
@@ -87,7 +87,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printCallee is upstream's printCallee.
-func printCallee(path *Path, print PrintFunc) Doc {
+func printCallee(path *Path, print PrintFunction) Doc {
 	current := node(path)
 
 	if current.Is("ImportExpression") {

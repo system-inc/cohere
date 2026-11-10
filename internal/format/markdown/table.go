@@ -14,7 +14,7 @@ type tableCell struct {
 	width int
 }
 
-func printTable(path *astPath, options *options, print printFunc) doc.Doc {
+func printTable(path *astPath, options *options, print printFunction) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 	layout := doc.Options{PrintWidth: settings.printWidth, TabWidth: settings.tabWidth, UseTabs: settings.useTabs}

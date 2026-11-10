@@ -18,7 +18,7 @@ import (
 */
 
 // printCallArguments is upstream's printCallArguments.
-func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
+func printCallArguments(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	arguments := getCallArguments(current)
@@ -220,7 +220,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 // callSelector, the Call that mainPrint runs for an array selector.
 func printCatchingArgExpansionBailout(
 	path *Path,
-	print PrintFunc,
+	print PrintFunction,
 	selector pathSelector,
 	arguments *printArguments,
 ) (printed Doc, bailedOut bool) {

@@ -44,7 +44,7 @@ func jsonVisitorKeys(node Node) []string {
 }
 
 // printJson is upstream's printJson.
-func printJson(path *Path, options *Options, print PrintFunc, _ *printArguments) Doc {
+func printJson(path *Path, options *Options, print PrintFunction, _ *printArguments) Doc {
 	current := node(path)
 	switch current.Type() {
 	case "JsonRoot":

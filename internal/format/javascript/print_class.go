@@ -26,7 +26,7 @@ func isInterface(node Node) bool {
 - `TSInterfaceDeclaration`(TypeScript)
 */
 // printClass is upstream's printClass.
-func printClass(path *Path, options *Options, print PrintFunc) Doc {
+func printClass(path *Path, options *Options, print PrintFunction) Doc {
 	printed := printClassWithoutDecorators(path, options, print)
 
 	current := node(path)
@@ -43,7 +43,7 @@ func printClass(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printClassWithoutDecorators is upstream's printClassWithoutDecorators.
-func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) Doc {
+func printClassWithoutDecorators(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	isPrintingInterface := isInterface(current)
 	isPrintingRecord := current.Is("RecordDeclaration")
@@ -201,7 +201,7 @@ func shouldPrintClassInGroupMode(path *Path) bool {
 }
 
 // printHeritageClauses is upstream's printHeritageClauses.
-func printHeritageClauses(path *Path, options *Options, print PrintFunc, listName string) Doc {
+func printHeritageClauses(path *Path, options *Options, print PrintFunction, listName string) Doc {
 	current := node(path)
 	if len(current.List(listName)) == 0 {
 		return emptyDoc
@@ -240,7 +240,7 @@ func printHeritageClauses(path *Path, options *Options, print PrintFunc, listNam
 }
 
 // printSuperClass is upstream's printSuperClass.
-func printSuperClass(path *Path, options *Options, print PrintFunc) Doc {
+func printSuperClass(path *Path, options *Options, print PrintFunction) Doc {
 	printed := print("superClass", nil)
 	parent := parentOf(path)
 	if parent.Is("AssignmentExpression") {
@@ -262,7 +262,7 @@ func printSuperClass(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printClassMethod is upstream's printClassMethod.
-func printClassMethod(path *Path, options *Options, print PrintFunc) Doc {
+func printClassMethod(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	var parts []Doc
 
@@ -298,7 +298,7 @@ func printClassMethod(path *Path, options *Options, print PrintFunc) Doc {
 */
 // printClassProperty is upstream's printClassProperty. Upstream's `node.variance` (Flow's +/- sigil) is
 // dropped with the Flow parsers that produce it.
-func printClassProperty(path *Path, options *Options, print PrintFunc) Doc {
+func printClassProperty(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	var parts []Doc
 

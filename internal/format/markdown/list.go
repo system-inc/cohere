@@ -13,7 +13,7 @@ import (
 // CommonMark: https://spec.commonmark.org/0.31.2/#ordered-list-marker
 const maximumOrderedListMarker = 999_999_999
 
-func printList(path *astPath, options *options, print printFunc) doc.Doc {
+func printList(path *astPath, options *options, print printFunction) doc.Doc {
 	node := currentNode(path)
 	nthSiblingIndex := getNthListSiblingIndex(node, parentNode(path))
 
@@ -84,7 +84,7 @@ func printList(path *astPath, options *options, print printFunc) doc.Doc {
 	})
 }
 
-func printListItem(path *astPath, options *options, print printFunc, listPrefix string) doc.Doc {
+func printListItem(path *astPath, options *options, print printFunction, listPrefix string) doc.Doc {
 	node := currentNode(path)
 	prefix := ""
 	if node.Checked != nil {

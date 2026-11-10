@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 // two-element concat per word: [[["", a], b], c]. Here a part is one flat concat of the same docs, ["", a, b,
 // c], which prints the same, and every part's docs share one array, so a sentence allocates a few slices
 // rather than one per word (#vbjv3d6).
-func printSentence(path *astPath, print printFunc) doc.Doc {
+func printSentence(path *astPath, print printFunction) doc.Doc {
 	var parts []doc.Doc
 	// contents holds every content part's docs in order. A part is contents[partStart:], closed with a
 	// full slice expression, so the next part's appends never write into it.

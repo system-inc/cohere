@@ -22,10 +22,10 @@ import (
 // pragma) are not ported.
 
 type (
-	unistNode = unist.Node
-	astPath   = printing.AstPath[*unist.Node, *settings]
-	options   = printing.Options[*unist.Node, *settings, printing.NoArguments]
-	printFunc = printing.PrintFunc[printing.NoArguments]
+	unistNode     = unist.Node
+	astPath       = printing.AstPath[*unist.Node, *settings]
+	options       = printing.Options[*unist.Node, *settings, printing.NoArguments]
+	printFunction = printing.PrintFunction[printing.NoArguments]
 )
 
 // settings are the Prettier options the YAML printer reads, carried on options.Settings, and the
@@ -68,7 +68,7 @@ func nextNode(path *astPath) *unist.Node {
 var uncachedPrint = &printing.NoArguments{}
 
 // mapPrint is upstream's path.map(print, name), whose prints are not cached.
-func mapPrint(path *astPath, print printFunc, names ...string) []doc.Doc {
+func mapPrint(path *astPath, print printFunction, names ...string) []doc.Doc {
 	return printing.Map(path, func(*astPath, int) doc.Doc { return print("", uncachedPrint) }, names...)
 }
 
@@ -219,7 +219,7 @@ func printDocFile(
 }
 
 // genericPrint is upstream's genericPrint: a node's comments, tag and anchor around printNode.
-func genericPrint(path *astPath, options *options, print printFunc, _ *printing.NoArguments) doc.Doc {
+func genericPrint(path *astPath, options *options, print printFunction, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 
@@ -317,7 +317,7 @@ func genericPrint(path *astPath, options *options, print printFunc, _ *printing.
 }
 
 // printNode is upstream's printNode: the node itself, by type.
-func printNode(path *astPath, options *options, print printFunc) doc.Doc {
+func printNode(path *astPath, options *options, print printFunction) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 	switch node.NodeType {
@@ -637,7 +637,7 @@ func preprocess(ast *unist.Node, _ *options) *unist.Node { return ast }
 var prettierRcPattern = regexp.MustCompile(`(?:[/\\]|^)\.(?:prettier|stylelint|lintstaged)rc$`)
 
 // embedPrint is what an embed returns: the function that prints the node as another language.
-type embedPrint = func(printing.TextToDoc, printFunc, *astPath, *options) (doc.Doc, error)
+type embedPrint = func(printing.TextToDoc, printFunction, *astPath, *options) (doc.Doc, error)
 
 // embed is embed.js: try to format `.prettierrc`, `.stylelintrc` and `.lintstagedrc` as JSON first.
 // When that fails, the core drops the embed and the file prints as YAML.
@@ -648,7 +648,7 @@ func embed(path *astPath, options *options) embedPrint {
 		prettierRcPattern.MatchString(settingsOf(options).filePath) {
 		return func(
 			textToDoc printing.TextToDoc,
-			_ printFunc,
+			_ printFunction,
 			_ *astPath,
 			_ *printing.Options[*unist.Node, *settings, printing.NoArguments],
 		) (doc.Doc, error) {

@@ -20,7 +20,7 @@ func printTypeScriptMappedTypeModifier(tokenNode estree.Value, keyword string) s
 }
 
 // printTypeScriptMappedType is upstream's printTypeScriptMappedType.
-func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Doc {
+func printTypeScriptMappedType(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	// Break after `{` like `printObject`
 	shouldBreak := false

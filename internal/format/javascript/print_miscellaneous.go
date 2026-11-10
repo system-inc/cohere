@@ -99,7 +99,7 @@ func shouldInlineCondition(node Node) bool {
 
 // printIfOrWhileConditionOrWithStatementObject is upstream's function of that name, exported upstream
 // as printIfStatementCondition, printWhileStatementCondition and printDoWhileStatementCondition.
-func printIfOrWhileConditionOrWithStatementObject(path *Path, options *Options, print PrintFunc) Doc {
+func printIfOrWhileConditionOrWithStatementObject(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	property := "test"
 	if current.Is("WithStatement") {
@@ -112,15 +112,15 @@ func printIfOrWhileConditionOrWithStatementObject(path *Path, options *Options, 
 	return groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, conditionDoc)), softline))
 }
 
-func printIfStatementCondition(path *Path, options *Options, print PrintFunc) Doc {
+func printIfStatementCondition(path *Path, options *Options, print PrintFunction) Doc {
 	return printIfOrWhileConditionOrWithStatementObject(path, options, print)
 }
 
-func printWhileStatementCondition(path *Path, options *Options, print PrintFunc) Doc {
+func printWhileStatementCondition(path *Path, options *Options, print PrintFunction) Doc {
 	return printIfOrWhileConditionOrWithStatementObject(path, options, print)
 }
 
-func printDoWhileStatementCondition(path *Path, options *Options, print PrintFunc) Doc {
+func printDoWhileStatementCondition(path *Path, options *Options, print PrintFunction) Doc {
 	return printIfOrWhileConditionOrWithStatementObject(path, options, print)
 }
 

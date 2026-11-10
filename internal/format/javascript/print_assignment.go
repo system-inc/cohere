@@ -13,7 +13,7 @@ import (
 func printAssignment(
 	path *Path,
 	options *Options,
-	print PrintFunc,
+	print PrintFunction,
 	leftDoc Doc,
 	operator Doc,
 	rightPropertyName string,
@@ -72,7 +72,7 @@ func printAssignment(
 }
 
 // printAssignmentExpression is upstream's printAssignmentExpression.
-func printAssignmentExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printAssignmentExpression(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	return printAssignment(
 		path,
@@ -85,12 +85,12 @@ func printAssignmentExpression(path *Path, options *Options, print PrintFunc) Do
 }
 
 // printVariableDeclarator is upstream's printVariableDeclarator.
-func printVariableDeclarator(path *Path, options *Options, print PrintFunc) Doc {
+func printVariableDeclarator(path *Path, options *Options, print PrintFunction) Doc {
 	return printAssignment(path, options, print, print("id", nil), doc.Text(" ="), "init")
 }
 
 // chooseLayout is upstream's chooseLayout.
-func chooseLayout(path *Path, options *Options, print PrintFunc, leftDoc Doc, rightPropertyName string) string {
+func chooseLayout(path *Path, options *Options, print PrintFunction, leftDoc Doc, rightPropertyName string) string {
 	current := node(path)
 	var rightNode Node
 	if rightPropertyName != "" {
@@ -185,7 +185,7 @@ func chooseLayout(path *Path, options *Options, print PrintFunc, leftDoc Doc, ri
 }
 
 // shouldBreakAfterOperator is upstream's shouldBreakAfterOperator.
-func shouldBreakAfterOperator(path *Path, options *Options, print PrintFunc, hasShortKey bool) bool {
+func shouldBreakAfterOperator(path *Path, options *Options, print PrintFunction, hasShortKey bool) bool {
 	rightNode := node(path)
 
 	if isBinaryish(rightNode) && !shouldInlineLogicalExpression(rightNode) {
@@ -346,7 +346,7 @@ func getTypeParametersFromTypeReference(current Node) []Node {
 //
 // A chain with no calls at all or whose calls are all without arguments or with lone short arguments,
 // excluding chains printed by `printMemberChain`
-func isPoorlyBreakableMemberOrCallChain(path *Path, options *Options, print PrintFunc, deep bool) bool {
+func isPoorlyBreakableMemberOrCallChain(path *Path, options *Options, print PrintFunction, deep bool) bool {
 	current := node(path)
 	goDeeper := func(path *Path) bool {
 		return isPoorlyBreakableMemberOrCallChain(path, options, print, true)
@@ -406,7 +406,7 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 }
 
 // isCallExpressionWithComplexTypeArguments is upstream's isCallExpressionWithComplexTypeArguments.
-func isCallExpressionWithComplexTypeArguments(current Node, print PrintFunc) bool {
+func isCallExpressionWithComplexTypeArguments(current Node, print PrintFunction) bool {
 	typeArguments := current.Child("typeArguments").List("params")
 	if len(typeArguments) > 0 {
 		if len(typeArguments) > 1 {

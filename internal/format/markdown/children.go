@@ -10,7 +10,7 @@ import (
 // processor is upstream's events.processor: the doc for the child at path, or false to skip it.
 type processor func(path *astPath) (doc.Doc, bool)
 
-func printChildren(path *astPath, options *options, print printFunc, process processor) doc.Doc {
+func printChildren(path *astPath, options *options, print printFunction, process processor) doc.Doc {
 	childProcessor := process
 	if childProcessor == nil {
 		childProcessor = func(*astPath) (doc.Doc, bool) { return print("", nil), true }

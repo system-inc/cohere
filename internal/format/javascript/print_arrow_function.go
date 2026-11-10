@@ -36,7 +36,7 @@ func shouldAlwaysAddParens(node Node) bool { return node.Is("SequenceExpression"
 // printArrowFunction is upstream's printArrowFunction. Upstream defaults args to {}; a nil args is
 // replaced with an empty one, and that empty one is what reaches print("body", args), as upstream's {}
 // does.
-func printArrowFunction(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printArrowFunction(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	resolvedArguments := arguments
 	if resolvedArguments == nil {
 		resolvedArguments = &printArguments{}
@@ -160,7 +160,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, arguments
 }
 
 // printArrowFunctionSignature is upstream's printArrowFunctionSignature.
-func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printArrowFunctionSignature(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	current := node(path)
 	var parts []Doc
 

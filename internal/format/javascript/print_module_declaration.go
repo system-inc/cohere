@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 - `TSModuleDeclaration` (TypeScript)
 */
 // printModuleDeclaration is upstream's printModuleDeclaration.
-func printModuleDeclaration(path *Path, options *Options, print PrintFunc) Doc {
+func printModuleDeclaration(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	kind := ""

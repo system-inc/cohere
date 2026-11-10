@@ -64,7 +64,7 @@ func isEmptyStringOrAnyLine(document Doc) bool {
 //
 // To support that case properly, all leading and trailing spaces
 // are stripped from the list of children, and replaced with a single hardline.
-func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc {
+func printJsxElementInternal(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	if current.Is("JSXElement") && isEmptyJsxElement(current) {
@@ -329,7 +329,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 func printJsxChildren(
 	path *Path,
 	options *Options,
-	print PrintFunc,
+	print PrintFunction,
 	whitespace Doc,
 	isFacebookTranslationTag bool,
 ) []Doc {

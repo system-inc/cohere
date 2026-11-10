@@ -39,7 +39,7 @@ var memberChainFactory = regexp.MustCompile(`^[A-Z]|^[$_]+$`)
 */
 
 // printMemberChain is upstream's printMemberChain.
-func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
+func printMemberChain(path *Path, options *Options, print PrintFunction) Doc {
 	statementParent := parentOf(path)
 	if statementParent.Is("ChainExpression") {
 		statementParent = grandparentOf(path)

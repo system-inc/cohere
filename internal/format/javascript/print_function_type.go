@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 */
 // printFunctionType is upstream's printFunctionType. The Flow `FunctionTypeAnnotation` branch and its
 // helper isFlowArrowFunctionTypeAnnotation never match a TypeScript tree and are dropped.
-func printFunctionType(path *Path, options *Options, print PrintFunc) Doc {
+func printFunctionType(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parts := []Doc{
 		// `TSConstructorType` only

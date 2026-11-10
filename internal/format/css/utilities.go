@@ -77,8 +77,10 @@ func maybeToLowerCase(value string) string {
 }
 
 func insideValueFunctionNode(path *astPath, functionName string) bool {
-	funcAncestorNode, found := path.FindAncestor(func(node *estree.Node) bool { return node.Type() == "value-func" })
-	return found && toLowerCase(funcAncestorNode.String("value")) == functionName
+	functionAncestorNode, found := path.FindAncestor(
+		func(node *estree.Node) bool { return node.Type() == "value-func" },
+	)
+	return found && toLowerCase(functionAncestorNode.String("value")) == functionName
 }
 
 // insideIcssRuleNode is https://github.com/css-modules/icss
@@ -378,7 +380,7 @@ func isMediaAndSupportsKeywords(node *estree.Node) bool {
 	return value != "" && slices.Contains([]string{"not", "and", "or"}, toLowerCase(value))
 }
 
-func isColorAdjusterFuncNode(node *estree.Node) bool {
+func isColorAdjusterFunctionNode(node *estree.Node) bool {
 	if node.Type() != "value-func" {
 		return false
 	}

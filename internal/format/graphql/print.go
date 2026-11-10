@@ -17,7 +17,7 @@ import (
 // escapeQuoteAndBackslash is upstream's replaceAll(/["\\]/g, String.raw`\$&`).
 var escapeQuoteAndBackslash = strings.NewReplacer(`"`, `\"`, `\`, `\\`)
 
-func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *printing.NoArguments) doc.Doc {
+func genericPrint(path *astPath, options *printerOptions, print printFunction, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 
 	switch node.Type() {

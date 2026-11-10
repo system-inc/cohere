@@ -61,13 +61,13 @@ var supportedEmbedFrontMatterLanguages = map[string]bool{"yaml": true, "toml": t
 func embed(
 	path *astPath,
 	_ *printerOptions,
-) func(printing.TextToDoc, printFunc, *astPath, *printerOptions) (doc.Doc, error) {
+) func(printing.TextToDoc, printFunction, *astPath, *printerOptions) (doc.Doc, error) {
 	node := currentNode(path)
 	if !isFrontMatter(node) || !supportedEmbedFrontMatterLanguages[node.String("language")] {
 		return nil
 	}
 
-	return func(textToDoc printing.TextToDoc, _ printFunc, _ *astPath, _ *printerOptions) (doc.Doc, error) {
+	return func(textToDoc printing.TextToDoc, _ printFunction, _ *astPath, _ *printerOptions) (doc.Doc, error) {
 		language := node.String("language")
 		value := trim(node.String("value"))
 

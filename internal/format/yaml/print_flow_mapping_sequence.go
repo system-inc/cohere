@@ -9,7 +9,7 @@ import (
 // time as printFlowSequence; here both node types call printFlowMapping.
 
 // printFlowMapping is upstream's printFlowMapping, for flow mappings and flow sequences alike.
-func printFlowMapping(path *astPath, options *options, print printFunc) doc.Doc {
+func printFlowMapping(path *astPath, options *options, print printFunction) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 	isMapping := node.NodeType == "flowMapping"
@@ -57,7 +57,7 @@ func printFlowMapping(path *astPath, options *options, print printFunc) doc.Doc 
 }
 
 // printChildren is upstream's printChildren.
-func printChildren(path *astPath, options *options, print printFunc) doc.Doc {
+func printChildren(path *astPath, options *options, print printFunction) doc.Doc {
 	settings := settingsOf(options)
 	return doc.Concat(printing.Map(path, func(path *astPath, _ int) doc.Doc {
 		printed := print("", nil)

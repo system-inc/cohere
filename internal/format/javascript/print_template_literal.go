@@ -21,7 +21,7 @@ import (
 */
 
 // printTemplateLiteral is upstream's printTemplateLiteral.
-func printTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
+func printTemplateLiteral(path *Path, options *Options, print PrintFunction) Doc {
 	if isJestEachTemplateLiteral(path) {
 		printed := printJestEachTemplateLiteral(path, options, print)
 		if printed != nil {
@@ -49,7 +49,7 @@ func printTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
 //
 // Upstream labels the result `{ tagged: true, ...quasiDoc.label }` when the quasi carries a label.
 // Go labels are strings and nothing reads `tagged`, so the quasi's own label is carried through.
-func printTaggedTemplateExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printTaggedTemplateExpression(path *Path, options *Options, print PrintFunction) Doc {
 	quasiDoc := print("quasi", nil)
 	current := node(path)
 
@@ -95,7 +95,7 @@ var jestEachHeaderSeparator = regexp.MustCompile(
 
 // printJestEachTemplateLiteral is upstream's printJestEachTemplateLiteral. It returns nil where upstream
 // returns undefined, a header row with nothing in it.
-func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
+func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunction) Doc {
 	/**
 	 * a    | b    | expected
 	 * ${1} | ${1} | ${2}
@@ -230,7 +230,7 @@ func getTemplateLiteralExpressionIndent(path *Path, options *Options) templateLi
 */
 
 // printTemplateExpression is upstream's printTemplateExpression.
-func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printTemplateExpression(path *Path, options *Options, print PrintFunction) Doc {
 	current, index := node(path), indexOf(path)
 	expressionDoc := print("", nil)
 
@@ -303,7 +303,7 @@ func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc 
 }
 
 // printTemplateExpressions is upstream's printTemplateExpressions.
-func printTemplateExpressions(path *Path, options *Options, print PrintFunc) []Doc {
+func printTemplateExpressions(path *Path, options *Options, print PrintFunction) []Doc {
 	property := "expressions"
 	if node(path).Is("TSTemplateLiteralType") {
 		property = "types"

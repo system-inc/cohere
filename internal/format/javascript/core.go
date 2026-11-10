@@ -38,8 +38,8 @@ type PathValue = printing.Value[*estree.Node]
 // Options is upstream's options object for one format: the printer, the original text, the comments.
 type Options = printing.Options[*estree.Node, *settings, printArguments]
 
-// PrintFunc is upstream's print(selector, args).
-type PrintFunc = printing.PrintFunc[printArguments]
+// PrintFunction is upstream's print(selector, args).
+type PrintFunction = printing.PrintFunction[printArguments]
 
 // Doc is a document.
 type Doc = doc.Doc
@@ -185,7 +185,7 @@ func mapPath[R any](path *Path, callback func(path *Path, index int) R, names ..
 }
 
 // printAll is path.map(print, ...names).
-func printAll(path *Path, print PrintFunc, names ...string) []Doc {
+func printAll(path *Path, print PrintFunction, names ...string) []Doc {
 	return mapPath(path, func(*Path, int) Doc { return print("", nil) }, names...)
 }
 
