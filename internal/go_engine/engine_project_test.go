@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -17,7 +18,8 @@ import (
 
 // TestReadOursKeepsTheFilesOrderWhicheverReadFinishesFirst holds the first file's read until every other has finished,
 // so the reads end in another order than the files', and reads them as a serial read does all the same: the readable
-// files in the files' order with their own bytes, and the unreadable one with its error.
+// files in the files' order with their own bytes, and the unreadable one with its error. With one core the reads run
+// one at a time, nothing can finish before the first, and the first is not held.
 func TestReadOursKeepsTheFilesOrderWhicheverReadFinishesFirst(test *testing.T) {
 	test.Parallel()
 	const count = 64
@@ -35,10 +37,11 @@ func TestReadOursKeepsTheFilesOrderWhicheverReadFinishesFirst(test *testing.T) {
 		return contentsOf(file), nil
 	}
 
+	holdsFirst := runtime.GOMAXPROCS(0) > 1
 	var othersRead atomic.Int64
 	othersDone := make(chan struct{})
 	read := func(file string) ([]byte, error) {
-		if file == files[0] {
+		if file == files[0] && holdsFirst {
 			select {
 			case <-othersDone:
 			case <-time.After(10 * time.Second):
@@ -52,7 +55,7 @@ func TestReadOursKeepsTheFilesOrderWhicheverReadFinishesFirst(test *testing.T) {
 		}
 		return contents, readError
 	}
-	readable, contents, unread := readOurs(files, read, 4)
+	readable, contents, unread := readOurs(files, read, false)
 
 	var wantReadable []string
 	wantContents := map[string][]byte{}

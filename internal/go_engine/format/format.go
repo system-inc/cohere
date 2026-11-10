@@ -24,11 +24,10 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
-	"sync"
 	"sync/atomic"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/line_wrap"
 	"github.com/system-inc/cohere/internal/write_root"
 )
@@ -176,7 +175,7 @@ type outcome struct {
 // the load has found the types sound.
 func Run(files []string, options Options) Result {
 	outcomes := make([]outcome, len(files))
-	forEachFile(len(files), options.SingleThreaded, func(index int) {
+	bounded.ForEach(len(files), options.SingleThreaded, func(index int) {
 		outcomes[index] = formatFile(files[index], options)
 	})
 	return collect(files, outcomes)
@@ -195,31 +194,11 @@ func RunWrap(sources []Source, options Options) Result {
 	}
 	outcomes := make([]outcome, len(sources))
 	if (options.Write || options.KeepOutput) && options.Wrap != nil {
-		forEachFile(len(sources), options.SingleThreaded, func(index int) {
+		bounded.ForEach(len(sources), options.SingleThreaded, func(index int) {
 			outcomes[index] = wrapFile(sources[index], options)
 		})
 	}
 	return collect(files, outcomes)
-}
-
-// forEachFile runs work for every index below count, as many at once as there are cores unless singleThreaded.
-func forEachFile(count int, singleThreaded bool, work func(index int)) {
-	if singleThreaded {
-		for index := range count {
-			work(index)
-		}
-		return
-	}
-	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
-	var group sync.WaitGroup
-	for index := range count {
-		slots <- struct{}{}
-		group.Go(func() {
-			defer func() { <-slots }()
-			work(index)
-		})
-	}
-	group.Wait()
 }
 
 // collect is the Result of a run over files, from each file's outcome, in the order the files were given.

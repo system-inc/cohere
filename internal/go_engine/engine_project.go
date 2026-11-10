@@ -7,14 +7,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/mod/modfile"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
@@ -95,12 +94,7 @@ func describeProject(request invocation) (*describedProject, error) {
 			contract.ExcludedFile{File: exclusion.File, Reason: exclusion.Reason, Source: exclusion.Source})
 	}
 
-	// One file at a time under `--single-threaded`, as gofmt's check reads them.
-	slots := runtime.GOMAXPROCS(0)
-	if request.switches["single-threaded"] {
-		slots = 1
-	}
-	readable, contents, unread := readOurs(census.Ours, request.read, slots)
+	readable, contents, unread := readOurs(census.Ours, request.read, request.switches["single-threaded"])
 	for _, failed := range unread {
 		// A file nothing could read is ours until something says otherwise; inside the scope it is a gap the run
 		// names, and outside it the load says what it makes of the file.
@@ -180,26 +174,19 @@ type unreadFile struct {
 	readError error
 }
 
-// readOurs reads each of files through read, as many at once as slots allows, and returns those it read, in files'
-// order, with their bytes, and those it could not, in files' order too. Each read lands in its own file's place, so
-// what the run names and in what order is the same whichever read finishes first.
+// readOurs reads each of files through read, as many at once as there are cores unless singleThreaded, and returns
+// those it read, in files' order, with their bytes, and those it could not, in files' order too. Each read lands in its
+// own file's place, so what the run names and in what order is the same whichever read finishes first.
 func readOurs(
-	files []string, read func(file string) ([]byte, error), slots int,
+	files []string, read func(file string) ([]byte, error), singleThreaded bool,
 ) ([]string, map[string][]byte, []unreadFile) {
 	reads := make([]struct {
 		contents  []byte
 		readError error
 	}, len(files))
-	taken := make(chan struct{}, max(slots, 1))
-	var group sync.WaitGroup
-	for index, file := range files {
-		taken <- struct{}{}
-		group.Go(func() {
-			defer func() { <-taken }()
-			reads[index].contents, reads[index].readError = read(file)
-		})
-	}
-	group.Wait()
+	bounded.ForEach(len(files), singleThreaded, func(index int) {
+		reads[index].contents, reads[index].readError = read(files[index])
+	})
 	var readable []string
 	contents := make(map[string][]byte, len(files))
 	var unread []unreadFile
