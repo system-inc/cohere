@@ -237,6 +237,12 @@ var endToEndCases = []endToEndCase{
 	},
 	{name: "unformatted-rewritten", fixture: "unformatted", exitCode: 0, verify: formatted("unformatted.go")},
 	{name: "type-error", exitCode: 1},
+	// The first load runs beside gofmt's check under `--no-fix` (loadsBesideFix), and the stream reads as it did when
+	// the load came after: gofmt's finding and the fix record first, then the type error, and lint not reached.
+	{
+		name: "unformatted-type-error-no-fix", fixture: "unformatted-type-error", extra: []string{"--no-fix"},
+		exitCode: 1, verify: unchanged("unformatted.go", "unformatted-type-error"),
+	},
 	{name: "vet-finding", exitCode: 1},
 	{name: "workspace", exitCode: 0, verify: unchanged("third_party/lib/lib.go", "workspace")},
 	{name: "cgo", exitCode: 0, needsCgo: true},

@@ -36,6 +36,10 @@ type invocation struct {
 	// answersInPart is check.Caching's AnswersInPart, the packages whose entries the run writes with only the answers
 	// its questions computed, for a test of the reload such an entry makes, never read from the command line.
 	answersInPart map[string]bool
+
+	// readFromDisk is how read reads a file from disk, os.ReadFile unless a test watches the run's reads, never read
+	// from the command line.
+	readFromDisk func(file string) ([]byte, error)
 }
 
 // check refuses what each flag allows alone but the command line does not allow as a whole.
@@ -115,6 +119,9 @@ func (request invocation) mode() mode {
 func (request invocation) read(file string) ([]byte, error) {
 	if request.stdinPath != "" && file == request.stdinPath {
 		return request.buffer, nil
+	}
+	if request.readFromDisk != nil {
+		return request.readFromDisk(file)
 	}
 	return os.ReadFile(file)
 }

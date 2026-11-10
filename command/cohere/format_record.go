@@ -430,6 +430,7 @@ func unformattedScope(engine formatEngine, record *formatRecord, root string) (f
 	}
 
 	declareFormatWalk(universe.root)
+	noteFormatWalkGaps(universe.root)
 	return unformattedScopeOf(engine, record, universe), universe.files
 }
 

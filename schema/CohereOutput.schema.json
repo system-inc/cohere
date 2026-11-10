@@ -693,6 +693,10 @@
                             },
                             "description": "Why each file of a run that checked nothing was left out, one entry per reason. Present only when nothingToCheck is set and the project had files of its language: such a run fails, since it checked nothing. A project with no file of its language at all has none, and passes with the warning alone."
                         },
+                        "indexFallback": {
+                            "type": "string",
+                            "description": "Why a format walk read no tracked path from its repository's index: a split or sparse index, one git did not write, or none yet. The walk decided by the ignore files alone, so a file git tracks under a pattern that matches it went unformatted, counted ignored. Absent when the index was read or the root is in no repository."
+                        },
                         "modifiedBuild": {
                             "type": "boolean",
                             "description": "The binary was built from a modified tree, so no commit reproduces these findings."

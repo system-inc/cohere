@@ -69,12 +69,20 @@ type Enumeration struct {
 	// pruned directory's file is not read, and not listed.
 	IgnoreFiles []string
 
-	// Index is the repository's index among IgnoreFiles, when the root holds a `.git` and the walk read the index
-	// whole, and IndexRoot the root its matcher read it from, absolute: a run cache keys the index on
-	// gitignore.TrackedIgnoredDigest over the root rather than on its bytes, which git rewrites on a `git status`
-	// (#m1daxxk). Both are "" when the walk read no index whole, and the index is then keyed on its bytes.
-	Index     string
-	IndexRoot string
+	// Index is the repository's index among IgnoreFiles, when the walk read it whole, IndexRoot the repository's
+	// root, absolute, and IndexScope the walk's root relative to it, slash separated, "" when the two are one: a run
+	// cache keys the index on gitignore.TrackedIgnoredDigest over that scope rather than on its bytes, which git
+	// rewrites on a `git status` (#m1daxxk). All are "" when the walk read no index whole, and the index is then keyed
+	// on its bytes.
+	Index      string
+	IndexRoot  string
+	IndexScope string
+
+	// IndexFallback is why the walk read no tracked path from its repository's index, empty when it read them or
+	// the root is in no repository (gitignore.Matcher.IndexFallback). A walk that fell back decides by the ignore
+	// files alone, so a file git tracks under a pattern that matches it is counted ignored, and a run says so rather
+	// than leave that silent (#14skmqy).
+	IndexFallback string
 
 	// Files is what survived, absolute paths.
 	Files []string
@@ -157,24 +165,62 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 		)
 	}
 
-	matcher, newGitignoreError := gitignore.New(root)
+	// The matcher is the repository's, entered into root, as discovery's is (#14skmqy): at a project below its
+	// repository's root, the `.gitignore` files between the two and the repository's index decide too, as they do
+	// for git check-ignore run there. A root in no repository is its own.
+	repository := gitignore.RepositoryOf(root)
+	if repository == "" {
+		repository = root
+	}
+	prefix, prefixError := filepath.Rel(repository, root)
+	if prefixError != nil {
+		return enumeration, fmt.Errorf("placing %s in its repository at %s: %w", root, repository, prefixError)
+	}
+	prefix = filepath.ToSlash(prefix)
+	if prefix == "." {
+		prefix = ""
+	}
+	// inRepository is a path relative to root, slash separated, as the matcher keys it, relative to the repository.
+	inRepository := func(relative string) string {
+		if relative == "." || relative == "" {
+			return prefix
+		}
+		if prefix == "" {
+			return relative
+		}
+		return prefix + "/" + relative
+	}
+	repositoryMatcher, newGitignoreError := gitignore.New(repository)
 	if newGitignoreError != nil {
 		return enumeration, newGitignoreError
 	}
 	if listing != nil {
-		matcher = matcher.WithListing(listing)
+		repositoryMatcher = repositoryMatcher.WithListing(listing)
 	}
-	enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, gitignore.IgnoreFileName))
-	marker := filepath.Join(root, ".git")
+	matcher, enterError := repositoryMatcher.Enter(prefix)
+	if enterError != nil {
+		return enumeration, enterError
+	}
+	// Every `.gitignore` from the repository's root down to the walk's: the matcher read each one on its way in.
+	for directory := filepath.Clean(root); ; directory = filepath.Dir(directory) {
+		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(directory, gitignore.IgnoreFileName))
+		if directory == filepath.Clean(repository) || filepath.Dir(directory) == directory {
+			break
+		}
+	}
+	marker := filepath.Join(repository, ".git")
 	if information, statError := os.Stat(marker); statError == nil {
 		if excludePath, _ := gitignore.ExcludeFileOf(marker, information.IsDir()); excludePath != "" {
 			enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, excludePath)
 		}
 	}
-	if matcher.IndexFile() != "" {
-		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, matcher.IndexFile())
-		if matcher.IndexFallback() == nil {
-			enumeration.Index, enumeration.IndexRoot = matcher.IndexFile(), matcher.Root()
+	if repositoryMatcher.IndexFile() != "" {
+		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, repositoryMatcher.IndexFile())
+		if fallback := repositoryMatcher.IndexFallback(); fallback != nil {
+			enumeration.IndexFallback = fallback.Error()
+		} else {
+			enumeration.Index, enumeration.IndexRoot = repositoryMatcher.IndexFile(), repositoryMatcher.Root()
+			enumeration.IndexScope = prefix
 		}
 	}
 	enumeration.IgnoredByLayer[GitignoreLayer] = 0
@@ -249,7 +295,7 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 				enumeration.Directories = append(enumeration.Directories, path)
 				return nil
 			}
-			if ignored, _ := scope.Ignored(relative, true); ignored {
+			if ignored, _ := scope.Ignored(inRepository(relative), true); ignored {
 				enumeration.IgnoredByLayer[GitignoreLayer]++
 				return filepath.SkipDir
 			}
@@ -272,7 +318,7 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 				enumeration.IgnoredByLayer[VendoredLayer]++
 				return filepath.SkipDir
 			}
-			entered, enterError := scope.Enter(relative)
+			entered, enterError := scope.Enter(inRepository(relative))
 			if enterError != nil {
 				return enterError
 			}
@@ -287,7 +333,7 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 		// have had their say about its name.
 		enumeration.Walked++
 
-		if ignored, _ := scope.Ignored(relative, false); ignored {
+		if ignored, _ := scope.Ignored(inRepository(relative), false); ignored {
 			enumeration.IgnoredByLayer[GitignoreLayer]++
 			return nil
 		}

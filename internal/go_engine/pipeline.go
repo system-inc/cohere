@@ -103,6 +103,11 @@ type pipeline struct {
 	// did, under `--duplicates` (see pipeline_duplicates.go).
 	duplicates       *duplicate_functions.Report
 	duplicatesNotRun string
+
+	// watchPrelude is a test's look at the run's prelude, nil outside a test: told as each load of the workspace
+	// begins, as runFix starts and returns, and as the lint pass beside a load is abandoned, each on the goroutine that
+	// does it (see pipeline_load_beside_fix.go).
+	watchPrelude func(step preludeStep)
 }
 
 func newPipeline(
@@ -199,13 +204,18 @@ func (engine *pipeline) run() int {
 	if needsTypes || wraps {
 		engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{})
 	}
-	engine.runFix(wraps)
 	var loaded *load.Loaded
 	var loadError error
-	// The load runs after gofmt, so it reads the formatted tree, and again only when the wrap wrote a file and a phase
-	// reads the types.
-	if needsTypes || wraps {
-		loaded, loadError = engine.loadWorkspace(needsTypes)
+	if (needsTypes || wraps) && engine.loadsBesideFix() {
+		// Under `--no-fix` the first load runs beside gofmt's check, which writes nothing the load reads.
+		loaded, loadError = engine.loadBesideFix(wraps, needsTypes)
+	} else {
+		engine.runFix(wraps)
+		// The load runs after gofmt, so it reads the formatted tree, and again only when the wrap wrote a file and a
+		// phase reads the types.
+		if needsTypes || wraps {
+			loaded, loadError = engine.loadWorkspace(needsTypes)
+		}
 	}
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
 	// The rename reads the wrapped tree, and needs a sound load as the wrap does. When it writes, a load of what it
@@ -330,6 +340,8 @@ type heldFix struct {
 // record unwritten in engine.fix, so the long-line wrap after the load (wrapAfterLoad) and the renames the naming rules
 // ask for (runRename) can add to it, and writeFix writes it before the types phase. No other analyzer fix is applied.
 func (engine *pipeline) runFix(wraps bool) {
+	engine.watch(preludeFixBegan)
+	defer engine.watch(preludeFixReturned)
 	if !engine.request.requests(contract.PhaseFix) {
 		engine.phase(contract.PhaseFix, contract.OutcomeSkipped, 0, detailNotRequested)
 		return
@@ -550,7 +562,8 @@ func (engine *pipeline) reread(file string) {
 // described.contents is written only on the main goroutine, between phases, and the goroutines of gofmt, the load and
 // the rules read it only while that goroutine waits for them, so it is never read while it is written and takes no
 // lock. The rules beside the load (speculativeLint) read it while the main goroutine runs the long-line wrap, which
-// stops them before its first reread.
+// stops them before its first reread, and under `--no-fix` gofmt's check reads it on a goroutine of its own beside the
+// first load and those rules, and writes none of it (loadsBesideFix).
 func (engine *pipeline) held(file string) ([]byte, bool) {
 	contents, isHeld := engine.described.contents[file]
 	return contents, isHeld

@@ -20,6 +20,22 @@ import (
 // type-check or lint to miss. A package with no file in scope is loaded for what imports it and never analyzed
 // (hasFileInScope). The editor's save loads its file's package alone, with what it imports (stdinPackage).
 func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
+	loaded, loadError := engine.loadWorkspacePackages()
+	engine.noteFailedLoad(loadError, typesRead)
+	return loaded, loadError
+}
+
+// noteFailedLoad says on stderr that the load failed, when a phase reads the types (see loadWorkspace).
+func (engine *pipeline) noteFailedLoad(loadError error, typesRead bool) {
+	if loadError != nil && typesRead {
+		engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
+	}
+}
+
+// loadWorkspacePackages is loadWorkspace's load, which says nothing on stderr, so the first load can run beside gofmt's
+// check, whose notes come first (loadBesideFix).
+func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
+	engine.watch(preludeLoadBegan)
 	workspace := engine.described.workspace
 	caching := load.Caching{
 		Held:          engine.held,
@@ -36,11 +52,7 @@ func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	if engine.lintOverlaps() {
 		caching.Begin = engine.beginSpeculativeLint
 	}
-	loaded, loadError := engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})
-	if loadError != nil && typesRead {
-		engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
-	}
-	return loaded, loadError
+	return engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})
 }
 
 // wrapAfterLoad is the fix phase's long-line wrap, run after the load and only over a load that found the types sound,

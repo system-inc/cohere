@@ -84,6 +84,13 @@ func describeEnumeration(enumeration format_files.Enumeration, formattable int) 
 		description += ", skipped nested repositories " + strings.Join(names, ", ")
 	}
 
+	// A walk that read no index decided by the ignore files alone, so a tracked file under a matching pattern is
+	// among those counted ignored, and nobody could tell without this (#14skmqy).
+	if enumeration.IndexFallback != "" {
+		description += ", git's index not read (" + enumeration.IndexFallback + "), so a file git tracks under a " +
+			"pattern that matches it was counted ignored"
+	}
+
 	// A symbolic link is never followed or read (see Enumeration.SymbolicLinks), and says so.
 	if enumeration.SymbolicLinks > 0 {
 		description += fmt.Sprintf(", skipped %d symbolic links, which are never followed", enumeration.SymbolicLinks)
