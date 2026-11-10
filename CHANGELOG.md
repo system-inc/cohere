@@ -142,7 +142,7 @@ changed in cohere outside the sets is written under the same heading.
   alone and says so. The run cache keys the index on what it decides, the tracked paths the ignore rules exclude and
   the gitlinks, so a `git status` or a `git add` of an ordinary file still replays, and a `git add -f` doesn't.
 - A project below its repository's root is formatted by the repository's ignore files and index, as `git
-  check-ignore` decides from there: a `.gitignore` above the project applies, and a file git tracks under a pattern
+check-ignore` decides from there: a `.gitignore` above the project applies, and a file git tracks under a pattern
   that matches it is formatted. A walk that can't read the index, a split or sparse one, says why under `--verbose`
   and in `--json`'s `gaps.indexFallback`, since a tracked file then reads ignored.
 - A git worktree reads the `info/exclude` it shares with its main checkout, as git does, where it read none: a file
