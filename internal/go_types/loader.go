@@ -97,7 +97,7 @@ func (loader *loader) load() (*Loaded, error) {
 			loaded.Roots = append(loaded.Roots, &Package{
 				ImportPath: listedPackage.ImportPath,
 				Name:       listedPackage.Name,
-				Fset:       loader.fileSet,
+				FileSet:    loader.fileSet,
 				Types:      imported,
 			})
 		}
@@ -122,7 +122,7 @@ func (loader *loader) check(
 	overrides map[string]*types.Package,
 ) (*Package, []*ast.File) {
 	variant := name != listedPackage.ImportPath
-	checked := &Package{ImportPath: name, Name: listedPackage.Name, Fset: loader.fileSet}
+	checked := &Package{ImportPath: name, Name: listedPackage.Name, FileSet: loader.fileSet}
 	loader.parse(listedPackage, names, !variant, checked)
 
 	info := &types.Info{
@@ -136,7 +136,7 @@ func (loader *loader) check(
 		FileVersions: map[*ast.File]string{},
 	}
 	configuration := &types.Config{
-		Importer: importerFunc(
+		Importer: importerFunction(
 			func(path string) (*types.Package, error) { return loader.resolve(listedPackage, path, overrides) },
 		),
 		Sizes: loader.sizes,

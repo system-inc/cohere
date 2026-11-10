@@ -181,7 +181,7 @@ func checkManualSlice(
 		}
 	case "HasSuffix":
 		if slice.Low != nil {
-			low, isInteger := staticcheck_code.ExprToInt(context, slice.Low)
+			low, isInteger := staticcheck_code.ExpressionToInt(context, slice.Low)
 			if !isInteger || low != 0 {
 				return
 			}
@@ -216,8 +216,8 @@ func isOffset(context *rule.Context, offset ast.Expr, affix ast.Expr, asked guar
 		if _, isLiteral := affix.(*ast.BasicLit); !isLiteral {
 			return false
 		}
-		text, isString := staticcheck_code.ExprToString(context, affix)
-		length, isInteger := staticcheck_code.ExprToInt(context, offset)
+		text, isString := staticcheck_code.ExpressionToString(context, affix)
+		length, isInteger := staticcheck_code.ExpressionToInt(context, offset)
 		return isString && isInteger && length == int64(len(text))
 	default:
 		return false

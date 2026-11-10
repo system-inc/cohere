@@ -12,13 +12,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 )
 
-// integerAnswer is what ExprToInt answered, spelled to compare.
+// integerAnswer is what ExpressionToInt answered, spelled to compare.
 type integerAnswer struct {
 	value int64
 	exact bool
 }
 
-// stringAnswer is what ExprToString answered, spelled to compare.
+// stringAnswer is what ExpressionToString answered, spelled to compare.
 type stringAnswer struct {
 	value    string
 	isString bool
@@ -28,10 +28,10 @@ type stringAnswer struct {
 // unless an integer that fits an int64, one that does not, a string, a constant of another kind and an expression of
 // no constant value were each met by each helper, so a fixture that stops holding one cannot pass by asking nothing
 // of it.
-func TestExprToIntAndExprToStringMatchStaticcheck(test *testing.T) {
+func TestExpressionToIntAndExpressionToStringMatchStaticcheck(test *testing.T) {
 	test.Parallel()
 	met := compareHelper(test, "compareexprtoconstant", []fixtureLoad{pathFixture("constants")},
-		compareExprToConstant)
+		compareExpressionToConstant)
 	requireMet(test, met, []string{
 		"ExprToInt of an integer, exact", "ExprToInt of an integer, inexact", "ExprToInt of another kind",
 		"ExprToInt of no constant",
@@ -39,8 +39,8 @@ func TestExprToIntAndExprToStringMatchStaticcheck(test *testing.T) {
 	})
 }
 
-// compareExprToConstant asks both sides the integer and the string of every expression of the pass's package.
-func compareExprToConstant(pass *analysis.Pass, context *rule.Context) []question {
+// compareExpressionToConstant asks both sides the integer and the string of every expression of the pass's package.
+func compareExpressionToConstant(pass *analysis.Pass, context *rule.Context) []question {
 	questions := []question{}
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
@@ -54,14 +54,14 @@ func compareExprToConstant(pass *analysis.Pass, context *rule.Context) []questio
 				answered, exact := code.ExprToInt(pass, expression)
 				return integerAnswer{answered, exact}
 			}, func() integerAnswer {
-				answered, exact := staticcheck_code.ExprToInt(context, expression)
+				answered, exact := staticcheck_code.ExpressionToInt(context, expression)
 				return integerAnswer{answered, exact}
 			})
 			text := ask("ExprToString", position, "", func() stringAnswer {
 				answered, isString := code.ExprToString(pass, expression)
 				return stringAnswer{answered, isString}
 			}, func() stringAnswer {
-				answered, isString := staticcheck_code.ExprToString(context, expression)
+				answered, isString := staticcheck_code.ExpressionToString(context, expression)
 				return stringAnswer{answered, isString}
 			})
 			switch {

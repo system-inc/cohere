@@ -355,8 +355,8 @@ func isLiteralElementOfVariable(address *intermediate_representation.IndexAddres
 }
 
 // isStructOrArray returns whether the underlying type is struct or array.
-func isStructOrArray(typ types.Type) bool {
-	switch typ.Underlying().(type) {
+func isStructOrArray(goType types.Type) bool {
+	switch goType.Underlying().(type) {
 	case *types.Array:
 		return true
 	case *types.Struct:
@@ -473,7 +473,7 @@ func indexText(context *rule.Context, address *intermediate_representation.Index
 // in it one space, so an index written across lines reads on one line and a finding's message holds no newline.
 func sourceText(context *rule.Context, expression ast.Expr) string {
 	var text bytes.Buffer
-	if printError := printer.Fprint(&text, context.Fset, expression); printError != nil {
+	if printError := printer.Fprint(&text, context.FileSet, expression); printError != nil {
 		// Invariant: printing a parsed expression into a buffer has no write that can fail.
 		panic("unused_write: printing an index expression: " + printError.Error())
 	}

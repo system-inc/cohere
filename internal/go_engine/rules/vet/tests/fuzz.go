@@ -242,20 +242,20 @@ func validateFuzzArguments(context *rule.Context, parameters *types.Tuple, targe
 	return valid
 }
 
-// isTestingType is whether typ is a pointer to package testing's type named name. An alias of the pointer is not
+// isTestingType is whether goType is a pointer to package testing's type named name. An alias of the pointer is not
 // looked through, as the original does not look through one. x/tools' isTestingType.
-func isTestingType(typ types.Type, name string) bool {
-	pointer, isPointer := typ.(*types.Pointer)
+func isTestingType(goType types.Type, name string) bool {
+	pointer, isPointer := goType.(*types.Pointer)
 	if !isPointer {
 		return false
 	}
 	return isTypeNamed(pointer.Elem(), "testing", name)
 }
 
-// isTypeNamed is whether typ is, or is an alias of, a type declared at package level in the package at path, named
+// isTypeNamed is whether goType is, or is an alias of, a type declared at package level in the package at path, named
 // name. x/tools' typesinternal.IsTypeNamed, for one name.
-func isTypeNamed(typ types.Type, path string, name string) bool {
-	named, isNamed := types.Unalias(typ).(*types.Named)
+func isTypeNamed(goType types.Type, path string, name string) bool {
+	named, isNamed := types.Unalias(goType).(*types.Named)
 	if !isNamed {
 		return false
 	}

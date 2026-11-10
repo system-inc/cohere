@@ -56,12 +56,17 @@ func rebasedExportData(test *testing.T, file string, dependencyFile string) []by
 		return checked
 	}
 	dependency := checkedPackage(rebasedDependencyPath, dependencyFile, rebasedDependencySource, nil)
-	rebased := checkedPackage(rebasedPath, file, rebasedSource, importerFunc(func(path string) (*types.Package, error) {
-		if path != rebasedDependencyPath {
-			return nil, fmt.Errorf("no package %s", path)
-		}
-		return dependency, nil
-	}))
+	rebased := checkedPackage(
+		rebasedPath,
+		file,
+		rebasedSource,
+		importerFunction(func(path string) (*types.Package, error) {
+			if path != rebasedDependencyPath {
+				return nil, fmt.Errorf("no package %s", path)
+			}
+			return dependency, nil
+		}),
+	)
 	var written bytes.Buffer
 	if writeError := gcexportdata.Write(&written, fileSet, rebased); writeError != nil {
 		test.Fatalf("writing the export data of %s: %v", rebasedPath, writeError)

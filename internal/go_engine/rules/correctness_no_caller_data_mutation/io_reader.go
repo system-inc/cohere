@@ -23,8 +23,8 @@ func (lookup *ioReader) bufferOf(context *rule.Context, function *ast.FuncDecl) 
 	if function.Recv == nil || function.Name.Name != "Read" {
 		return nil
 	}
-	method, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func)
-	if !isFunc || method.Signature().Recv() == nil || method.Signature().Params().Len() != 1 {
+	method, isFunction := context.TypesInfo.Defs[function.Name].(*types.Func)
+	if !isFunction || method.Signature().Recv() == nil || method.Signature().Params().Len() != 1 {
 		return nil
 	}
 	if !lookup.looked {

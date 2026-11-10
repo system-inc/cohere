@@ -139,7 +139,7 @@ func report(context *rule.Context, call *ast.CallExpr, selector *ast.SelectorExp
 	// The replacement is the call pattern.NodeToAST builds: the bound receiver, the same node, so format prints it
 	// from its own positions, a fresh identifier with no position, and no arguments.
 	replacement := &ast.CallExpr{Fun: &ast.SelectorExpr{X: receiver, Sel: &ast.Ident{Name: method}}}
-	fix := edit.Fix("Simplify conversion", edit.ReplaceWithNode(context.Fset, call, replacement))
+	fix := edit.Fix("Simplify conversion", edit.ReplaceWithNode(context.FileSet, call, replacement))
 	staticcheck_report.Report(context, call,
 		"should use "+staticcheck_report.Render(context, selector.X)+"."+method+"() instead of "+
 			staticcheck_report.Render(context, call),

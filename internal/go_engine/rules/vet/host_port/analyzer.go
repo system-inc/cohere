@@ -205,7 +205,7 @@ func reportAddress(context *rule.Context, expression ast.Expr, dialCall *ast.Cal
 	}
 	suffix := ""
 	if dialCall != nil {
-		suffix = fmt.Sprintf(" (passed to net.Dial at L%d)", context.Fset.Position(dialCall.Pos()).Line)
+		suffix = fmt.Sprintf(" (passed to net.Dial at L%d)", context.FileSet.Position(dialCall.Pos()).Line)
 	}
 	context.Report(analysis.Diagnostic{
 		Pos:     formatArgument.Pos(),

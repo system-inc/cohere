@@ -6,9 +6,9 @@ import "go/types"
 // type the set of every type, a term without tilde the set of its one type, and a term with tilde the set of every
 // type whose underlying type is its type.
 type typeTerm struct {
-	// tilde is read only when typ is set.
-	tilde bool
-	typ   types.Type
+	// tilde is read only when termType is set.
+	tilde    bool
+	termType types.Type
 }
 
 // union is term ∪ other, as none, one or two terms: x/tools' typeparams term.union.
@@ -20,9 +20,9 @@ func (term *typeTerm) union(other *typeTerm) (*typeTerm, *typeTerm) {
 		return other, nil // ∅ ∪ other == other
 	case other == nil:
 		return term, nil // term ∪ ∅ == term
-	case term.typ == nil:
+	case term.termType == nil:
 		return term, nil // 𝓤 ∪ other == 𝓤
-	case other.typ == nil:
+	case other.termType == nil:
 		return other, nil // term ∪ 𝓤 == 𝓤
 	}
 	if term.disjoint(other) {
@@ -40,9 +40,9 @@ func (term *typeTerm) intersect(other *typeTerm) *typeTerm {
 	switch {
 	case term == nil || other == nil:
 		return nil // ∅ ∩ other == ∅ and term ∩ ∅ == ∅
-	case term.typ == nil:
+	case term.termType == nil:
 		return other // 𝓤 ∩ other == other
-	case other.typ == nil:
+	case other.termType == nil:
 		return term // term ∩ 𝓤 == term
 	}
 	if term.disjoint(other) {
@@ -58,11 +58,11 @@ func (term *typeTerm) intersect(other *typeTerm) *typeTerm {
 // disjoint reports whether term ∩ other == ∅, for two terms that both have a type: x/tools' typeparams
 // term.disjoint.
 func (term *typeTerm) disjoint(other *typeTerm) bool {
-	termType := term.typ
+	termType := term.termType
 	if other.tilde {
 		termType = termType.Underlying()
 	}
-	otherType := other.typ
+	otherType := other.termType
 	if term.tilde {
 		otherType = otherType.Underlying()
 	}

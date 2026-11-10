@@ -131,7 +131,7 @@ func Owner(holder a.Holder) string { return holder.OwnerID }
 `,
 	})
 	targets := []target{
-		{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunc, NewName: "ParseUrl"},
+		{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunction, NewName: "ParseUrl"},
 		{PackageSuffix: "internal/a", Name: "FetchURL", Kind: KindMethod, Owner: "Fetcher", NewName: "FetchUrl"},
 		{PackageSuffix: "internal/a", Name: "OwnerID", Kind: KindField, NewName: "OwnerId"},
 	}
@@ -172,7 +172,7 @@ func TestFromLoadedRefusesARenameUsedInAFileTheCallerCannotWrite(test *testing.T
 	loaded := fixture.load(test)
 	outOfScope := filepath.Join(loaded.Root, "internal", "b", "b.go")
 	writable := func(filename string) bool { return filename != outOfScope }
-	parseUrl := target{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunc, NewName: "ParseUrl"}
+	parseUrl := target{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunction, NewName: "ParseUrl"}
 
 	scoped := workspace.FromLoaded(loaded.Root, loaded.Roots, loaded.Analyzed, writable)
 	requireRefused(test, Plan(scoped, propose(test, scoped, parseUrl), Options{}), "ParseURL", "file")
@@ -193,8 +193,8 @@ func TestAHostOnlyPlanRefusesARenameReachingAFileTheHostDoesNotBuild(test *testi
 	})
 	loaded := fixture.load(test)
 	result := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunc, NewName: "ParseUrl"},
-		target{PackageSuffix: "internal/b", Name: "FormatURL", Kind: KindFunc, NewName: "FormatUrl"},
+		target{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunction, NewName: "ParseUrl"},
+		target{PackageSuffix: "internal/b", Name: "FormatURL", Kind: KindFunction, NewName: "FormatUrl"},
 	), Options{HostOnly: true})
 	requireRefused(test, result, "ParseURL", "platform")
 	requireAccepted(test, result, 1)

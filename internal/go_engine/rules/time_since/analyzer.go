@@ -87,7 +87,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		// (time.Time).Sub, whose parameter is time.Time as Since's is.
 		since := &ast.CallExpr{Fun: function, Args: []ast.Expr{ast.Unparen(call.Args[0])}}
 		fixes = append(fixes,
-			edit.Fix("Replace with call to time.Since", edit.ReplaceWithNode(context.Fset, call, since)))
+			edit.Fix("Replace with call to time.Since", edit.ReplaceWithNode(context.FileSet, call, since)))
 	}
 	staticcheck_report.Report(context, call, "should use time.Since instead of time.Now().Sub",
 		staticcheck_report.FilterGenerated(),

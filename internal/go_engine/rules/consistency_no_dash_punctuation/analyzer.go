@@ -103,7 +103,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 		}
 		state.table = table
 	}
-	state.tokenFile = context.Fset.File(file.FileStart)
+	state.tokenFile = context.FileSet.File(file.FileStart)
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
 			// comment.Text is the comment's source from its first slash, so it starts at comment.Pos().

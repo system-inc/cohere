@@ -89,7 +89,7 @@ func Check(context *rule.Context, comparison *ast.BinaryExpr) {
 	}
 	staticcheck_report.Report(context, comparison, fmt.Sprintf("should use %s instead", method),
 		staticcheck_report.Fixes(
-			edit.Fix("replace with "+method, edit.ReplaceWithNode(context.Fset, comparison, replacement)),
+			edit.Fix("replace with "+method, edit.ReplaceWithNode(context.FileSet, comparison, replacement)),
 		))
 }
 

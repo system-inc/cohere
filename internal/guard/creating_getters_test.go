@@ -49,7 +49,7 @@ func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 			test.Fatalf("loading %s: %v", loadedPackage.ImportPath, loadedPackage.Errors[0])
 		}
 		for _, file := range loadedPackage.Syntax {
-			path := loadedPackage.Fset.Position(file.Pos()).Filename
+			path := loadedPackage.FileSet.Position(file.Pos()).Filename
 			if strings.HasSuffix(path, "_test.go") {
 				continue
 			}
@@ -63,7 +63,7 @@ func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 					return true
 				}
 				if creatingGetters[function.Name()] {
-					position := loadedPackage.Fset.Position(selector.Pos())
+					position := loadedPackage.FileSet.Position(selector.Pos())
 					calls = append(
 						calls,
 						filepath.Base(filepath.Dir(position.Filename))+"/"+filepath.Base(position.Filename)+

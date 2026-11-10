@@ -39,7 +39,7 @@ func BuildConstraints(context *rule.Context, file *ast.File) (constraint.Expr, b
 		}
 	}
 	// The name as written, never as a `//line` directive renames it, since the go tool reads the file's own name.
-	named := constraintsFromName(context.Fset.PositionFor(file.Pos(), false).Filename)
+	named := constraintsFromName(context.FileSet.PositionFor(file.Pos(), false).Filename)
 	if named != nil {
 		if expression == nil {
 			expression = named

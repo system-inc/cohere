@@ -181,7 +181,7 @@ func TestOne(t *testing.T) {
 	}
 }
 
-func TestPackageFuncCalledInBodyRejects(test *testing.T) {
+func TestPackageFunctionCalledInBodyRejects(test *testing.T) {
 	test.Parallel()
 	plan, _ := renameFixture(test, `package fixture
 

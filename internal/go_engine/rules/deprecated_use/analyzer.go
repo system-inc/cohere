@@ -187,7 +187,7 @@ func checkImport(
 		return
 	}
 	if path == protobufPath {
-		parsed := context.Fset.PositionFor(specification.Path.Pos(), false)
+		parsed := context.FileSet.PositionFor(specification.Path.Pos(), false)
 		// A file no generator made reads as Unknown, which is not protoc-gen-go.
 		if generators[parsed.Filename] == generated.ProtocGenGo {
 			return

@@ -81,7 +81,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		errorf := &ast.CallExpr{Fun: spelled, Args: sprintf.Args, Ellipsis: sprintf.Ellipsis}
 		// code.EditMatch drops format.Node's error where edit.ReplaceWithNode panics on it, and neither meets one,
 		// since every node printed is the package's own parsed syntax or an identifier.
-		fixes = append(fixes, edit.Fix("Use fmt.Errorf", edit.ReplaceWithNode(context.Fset, call, errorf)))
+		fixes = append(fixes, edit.Fix("Use fmt.Errorf", edit.ReplaceWithNode(context.FileSet, call, errorf)))
 	}
 	staticcheck_report.Report(context, call, "should use fmt.Errorf(...) instead of errors.New(fmt.Sprintf(...))",
 		staticcheck_report.FilterGenerated(),

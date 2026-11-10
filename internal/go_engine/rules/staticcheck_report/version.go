@@ -44,7 +44,7 @@ func StandardLibraryVersion(context *rule.Context, node Positioner) string {
 	if file == nil {
 		// Invariant: a check reports only at nodes of its own package, which are in its files; a node elsewhere is
 		// a port's bug, which the dispatcher records under the rule's name as staticcheck's crash would be.
-		panic(fmt.Sprintf("no file found for node with position %s", context.Fset.PositionFor(node.Pos(), false)))
+		panic(fmt.Sprintf("no file found for node with position %s", context.FileSet.PositionFor(node.Pos(), false)))
 	}
 	if file.GoVersion == "" {
 		return packageVersion

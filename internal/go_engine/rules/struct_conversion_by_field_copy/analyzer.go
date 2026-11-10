@@ -173,7 +173,7 @@ func Check(context *rule.Context, literal *ast.CompositeLit, isAddressOperand bo
 			types.TypeString(literalType, types.RelativeTo(context.Package))),
 		staticcheck_report.FilterGenerated(),
 		staticcheck_report.Fixes(
-			edit.Fix("Use type conversion", edit.ReplaceWithNode(context.Fset, literal, conversion))))
+			edit.Fix("Use type conversion", edit.ReplaceWithNode(context.FileSet, literal, conversion))))
 }
 
 // copiedField is the selector element copies the field at index of literalStruct from, and false when it copies

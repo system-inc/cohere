@@ -42,7 +42,7 @@ type Configuration struct {
 type Package struct {
 	ImportPath string
 	Name       string
-	Fset       *token.FileSet
+	FileSet    *token.FileSet
 
 	// Files are the absolute paths of the files Syntax holds, in the same order.
 	Files     []string
@@ -212,7 +212,7 @@ func Parse(configuration Configuration, patterns ...string) ([]*Package, error) 
 		for _, name := range listedPackage.GoFiles {
 			sourceFiles[filepath.Join(listedPackage.Directory, name)] = true
 		}
-		read := &Package{ImportPath: listedPackage.ImportPath, Name: listedPackage.Name, Fset: fileSet}
+		read := &Package{ImportPath: listedPackage.ImportPath, Name: listedPackage.Name, FileSet: fileSet}
 		reader.parse(listedPackage, listedPackage.GoFiles, true, read)
 		parsed = append(parsed, read)
 	}

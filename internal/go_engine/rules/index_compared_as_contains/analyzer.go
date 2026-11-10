@@ -5,11 +5,11 @@
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 simple/s1003/s1003.go, whose message and fix it
 // reports word for word, at the same range, the comparison. The original uses no pattern: it walks every binary
-// expression, reads the right operand through code.ExprToInt, and judges the left by syntax alone, a call of a
-// selector whose left is an identifier spelled strings or bytes. The port asks the same of the right operand, through
-// staticcheck_code.ExprToInt, and of the call's shape, but judges its qualifier by object: an import of the standard
-// library's strings or bytes, under whatever name. It builds the fix's syntax as the original builds it, around the
-// call's own qualifier and arguments, so the fix names the package as the call does, and reports through
+// expression, reads the right operand through code.ExprToInt, and judges the left by syntax alone, a call of a selector
+// whose left is an identifier spelled strings or bytes. The port asks the same of the right operand, through
+// staticcheck_code.ExpressionToInt, and of the call's shape, but judges its qualifier by object: an import of the
+// standard library's strings or bytes, under whatever name. It builds the fix's syntax as the original builds it,
+// around the call's own qualifier and arguments, so the fix names the package as the call does, and reports through
 // staticcheck_report.Report where the original reports through report.Report, with the fix made by staticcheck's
 // analysis/edit, borrowed for this wave.
 //
@@ -66,7 +66,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 func Check(context *rule.Context, binary *ast.BinaryExpr) {
 	// code.ExprToInt reads the constant the type checker recorded, so -1 parenthesized, a named constant and a
 	// conversion count as the literal does, and a constant too large for an int64 counts as none.
-	value, isInteger := staticcheck_code.ExprToInt(context, binary.Y)
+	value, isInteger := staticcheck_code.ExpressionToInt(context, binary.Y)
 	if !isInteger {
 		return
 	}
@@ -124,7 +124,7 @@ func Check(context *rule.Context, binary *ast.BinaryExpr) {
 		replacement = &ast.UnaryExpr{Op: token.NOT, X: replacement}
 	}
 	fix := edit.Fix("Simplify use of "+staticcheck_report.Render(context, call.Fun),
-		edit.ReplaceWithNode(context.Fset, binary, replacement))
+		edit.ReplaceWithNode(context.FileSet, binary, replacement))
 	staticcheck_report.Report(context, binary,
 		"should use "+staticcheck_report.Render(context, replacement)+" instead",
 		staticcheck_report.FilterGenerated(),

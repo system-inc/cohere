@@ -166,13 +166,13 @@ func judgeFunction(context *rule.Context, graphs *ctrlflow.CFGs, function ast.No
 		if returned == nil {
 			continue
 		}
-		line := context.Fset.Position(definition.Pos()).Line
+		line := context.FileSet.Position(definition.Pos()).Line
 		context.ReportRangef(definition,
 			"the %s function is not used on all paths (possible context leak)", variable.Name())
 		// golang/go#64547: the return cfg makes explicit at a function's closing brace is synthetic, and its end, six
 		// bytes on for the word return, may overflow the file, so such a return is reported as the point it starts at.
 		end := returned.End()
-		if context.Fset.File(returned.Pos()) != context.Fset.File(end) {
+		if context.FileSet.File(returned.Pos()) != context.FileSet.File(end) {
 			end = returned.Pos()
 		}
 		context.Report(analysis.Diagnostic{

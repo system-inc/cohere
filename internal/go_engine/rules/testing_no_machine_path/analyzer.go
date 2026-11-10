@@ -91,7 +91,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 		state.table = table
 	}
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-	state.isTest = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+	state.isTest = strings.HasSuffix(context.FileSet.PositionFor(file.Package, false).Filename, "_test.go")
 	state.comments = nil
 	state.coveredAbove = nil
 	if state.isTest {

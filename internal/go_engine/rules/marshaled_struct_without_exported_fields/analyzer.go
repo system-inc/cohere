@@ -71,7 +71,7 @@ func checkValue(argument string, methods ...string) staticcheck_call.Rule {
 		// The original asks by the name of the file the call was parsed from, so a generated file whose line
 		// directives point into another Go file is still judged generated, and a file pointing into a generated one
 		// is not.
-		parsed := call.Context.Fset.PositionFor(call.Instruction.Pos(), false)
+		parsed := call.Context.FileSet.PositionFor(call.Instruction.Pos(), false)
 		if call.Context.IsGenerated(parsed.Filename) {
 			return
 		}

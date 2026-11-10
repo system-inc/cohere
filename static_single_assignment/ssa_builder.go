@@ -14,12 +14,12 @@ type ssaBuilder[G Graph[F, B, P], F any, B comparable, P any] struct {
 	// an id past it ever comes, so no id is out of reach. A nil state is a block not yet touched.
 	states []*ssaState[P]
 
-	// unsealedPreds counts, per block, how many predecessors have not yet been processed. A block
+	// unsealedPredecessors counts, per block, how many predecessors have not yet been processed. A block
 	// whose count reaches zero is sealed and its incomplete phis can be filled.
 	//
 	// unseenPredecessors means "not yet decremented", which is not the same as zero; the read sites
 	// initialise from the predecessor count on first touch for exactly that reason.
-	unsealedPreds []int
+	unsealedPredecessors []int
 
 	// unknown holds bindings a lookup walked off the entry block without finding. In cohere they are
 	// globals, or captures from an enclosing function; in Adamic, which keeps both out of its graph, a
@@ -47,9 +47,9 @@ const unseenPredecessors = math.MinInt
 func (builder *ssaBuilder[G, F, B, P]) makeDenseState(count int) {
 	builder.states = make([]*ssaState[P], count)
 	builder.visited = make([]bool, count)
-	builder.unsealedPreds = make([]int, count)
-	for index := range builder.unsealedPreds {
-		builder.unsealedPreds[index] = unseenPredecessors
+	builder.unsealedPredecessors = make([]int, count)
+	for index := range builder.unsealedPredecessors {
+		builder.unsealedPredecessors[index] = unseenPredecessors
 	}
 }
 
@@ -59,7 +59,7 @@ func (builder *ssaBuilder[G, F, B, P]) reach(blockId BlockId) {
 	for int(blockId) >= len(builder.states) {
 		builder.states = append(builder.states, nil)
 		builder.visited = append(builder.visited, false)
-		builder.unsealedPreds = append(builder.unsealedPreds, unseenPredecessors)
+		builder.unsealedPredecessors = append(builder.unsealedPredecessors, unseenPredecessors)
 	}
 }
 
@@ -84,7 +84,7 @@ func (builder *ssaBuilder[G, F, B, P]) existingState(blockId BlockId) (*ssaState
 // predecessor total, when nothing has decremented it yet.
 func (builder *ssaBuilder[G, F, B, P]) remainingPredecessors(blockId BlockId, count int) int {
 	builder.reach(blockId)
-	if remaining := builder.unsealedPreds[blockId]; remaining != unseenPredecessors {
+	if remaining := builder.unsealedPredecessors[blockId]; remaining != unseenPredecessors {
 		return remaining
 	}
 	return count
@@ -163,7 +163,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 			}
 			remaining := builder.remainingPredecessors(edge.successor, len(builder.graph.Predecessors(successor)))
 			remaining--
-			builder.unsealedPreds[edge.successor] = remaining
+			builder.unsealedPredecessors[edge.successor] = remaining
 			if remaining == 0 && builder.visited[edge.successor] {
 				builder.fixIncompletePhis(edge.successor)
 			}

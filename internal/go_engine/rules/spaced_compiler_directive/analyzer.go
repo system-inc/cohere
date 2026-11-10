@@ -48,7 +48,7 @@ func CheckFile(context *rule.Context, file *ast.File) {
 			}
 			// A directive starts its line. A comment after code, such as `import _ "unsafe" // go:linkname`, is
 			// prose. The column is the file's own, not one a line directive moves it to.
-			if context.Fset.PositionFor(comment.Pos(), false).Column != 1 {
+			if context.FileSet.PositionFor(comment.Pos(), false).Column != 1 {
 				continue
 			}
 			directive := strings.TrimLeft(body, " \t")

@@ -156,7 +156,7 @@ func enterFile(context *rule.Context, _ *ast.File) {
 	if state.writes != nil {
 		return
 	}
-	state.reachable = reachOf(declarationsOf(context.Fset), context.Package)
+	state.reachable = reachOf(declarationsOf(context.FileSet), context.Package)
 	state.writes = sync.OnceValue(func() map[*types.Var]*variableWrites { return writesOf(context) })
 }
 

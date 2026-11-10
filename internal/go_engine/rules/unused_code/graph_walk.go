@@ -304,9 +304,9 @@ func (graph *graph) readCall(call *ast.CallExpr, by types.Object) {
 	}
 }
 
-// useAllFieldsRecursively uses every field of typ, and every field of theirs, through arrays too.
-func (graph *graph) useAllFieldsRecursively(typ types.Type, by types.Object) {
-	switch underlying := typ.Underlying().(type) {
+// useAllFieldsRecursively uses every field of goType, and every field of theirs, through arrays too.
+func (graph *graph) useAllFieldsRecursively(goType types.Type, by types.Object) {
+	switch underlying := goType.Underlying().(type) {
 	case *types.Struct:
 		for field := range underlying.Fields() {
 			graph.use(field, by)

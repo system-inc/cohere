@@ -539,8 +539,8 @@ func implementsInShape(implementer types.Type, candidate *types.Interface) bool 
 	for index := range candidate.NumMethods() {
 		wanted := candidate.Method(index)
 		object, _, _ := types.LookupFieldOrMethod(implementer, true, wanted.Pkg(), wanted.Name())
-		found, isFunc := object.(*types.Func)
-		if !isFunc {
+		found, isFunction := object.(*types.Func)
+		if !isFunction {
 			return false
 		}
 		if found.Signature().Params().Len() != wanted.Signature().Params().Len() ||

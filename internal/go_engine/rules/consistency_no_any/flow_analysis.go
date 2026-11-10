@@ -80,8 +80,8 @@ func (flows *flowAnalysis) recordCall(call *ast.CallExpr) {
 	// another package hands it. The declared parameters are the generic origin's, whose objects the declaration
 	// defines, while the expected types are the instantiation's, which the arguments are checked against.
 	var declaredParameters *types.Tuple
-	function, isFunc := typeutil.Callee(info, call).(*types.Func)
-	if isFunc && function.Pkg() == flows.context.Package {
+	function, isFunction := typeutil.Callee(info, call).(*types.Func)
+	if isFunction && function.Pkg() == flows.context.Package {
 		declaredParameters = function.Origin().Signature().Params()
 	}
 	for index, argument := range call.Args {
@@ -230,7 +230,7 @@ func (flows *flowAnalysis) enclosingSignature(stack []ast.Node) *types.Signature
 			signature, _ := flows.context.TypesInfo.TypeOf(function).(*types.Signature)
 			return signature
 		case *ast.FuncDecl:
-			if object, isFunc := flows.context.TypesInfo.Defs[function.Name].(*types.Func); isFunc {
+			if object, isFunction := flows.context.TypesInfo.Defs[function.Name].(*types.Func); isFunction {
 				return object.Signature()
 			}
 			return nil
@@ -367,7 +367,7 @@ func (flows *flowAnalysis) referenceToResult(call *ast.CallExpr, index int) refe
 		}
 		return reference{}
 	}
-	if function, isFunc := typeutil.Callee(info, call).(*types.Func); isFunc {
+	if function, isFunction := typeutil.Callee(info, call).(*types.Func); isFunction {
 		// A method of the predeclared error belongs to no package and returns no empty interface.
 		if function.Pkg() == nil {
 			return reference{}
@@ -543,8 +543,8 @@ func (flows *flowAnalysis) signatureOwning(functionType *ast.FuncType, above []a
 	}
 	switch owner := above[len(above)-1].(type) {
 	case *ast.FuncDecl:
-		object, isFunc := flows.context.TypesInfo.Defs[owner.Name].(*types.Func)
-		if isFunc && owner.Type == functionType {
+		object, isFunction := flows.context.TypesInfo.Defs[owner.Name].(*types.Func)
+		if isFunction && owner.Type == functionType {
 			return object.Signature()
 		}
 	case *ast.FuncLit:
@@ -558,7 +558,7 @@ func (flows *flowAnalysis) signatureOwning(functionType *ast.FuncType, above []a
 		if _, isInterface := above[len(above)-3].(*ast.InterfaceType); !isInterface {
 			return nil
 		}
-		if method, isFunc := flows.context.TypesInfo.Defs[owner.Names[0]].(*types.Func); isFunc {
+		if method, isFunction := flows.context.TypesInfo.Defs[owner.Names[0]].(*types.Func); isFunction {
 			return method.Signature()
 		}
 	}
@@ -634,7 +634,7 @@ func (flows *flowAnalysis) seedSignature(key flowKey) {
 	case key.literal != nil:
 		signature, _ = flows.context.TypesInfo.TypeOf(key.literal).(*types.Signature)
 	default:
-		if function, isFunc := key.object.(*types.Func); isFunc {
+		if function, isFunction := key.object.(*types.Func); isFunction {
 			signature = function.Signature()
 		}
 	}

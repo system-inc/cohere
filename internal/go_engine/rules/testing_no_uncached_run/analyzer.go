@@ -157,8 +157,11 @@ func holdingStatement(ancestors []ast.Node, call *ast.CallExpr) ast.Node {
 // goProgramIndex is where the program sits among the arguments of call when it is a call to os/exec's Command or
 // CommandContext whose program is the constant "go". isGoCommand is false for any other call.
 func goProgramIndex(context *rule.Context, call *ast.CallExpr) (programIndex int, isGoCommand bool) {
-	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
-	if !isFunc || function.Pkg() == nil || function.Pkg().Path() != "os/exec" || function.Signature().Recv() != nil {
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	if !isFunction ||
+		function.Pkg() == nil ||
+		function.Pkg().Path() != "os/exec" ||
+		function.Signature().Recv() != nil {
 		return 0, false
 	}
 	// The program is Command's first parameter and CommandContext's second, after the context.

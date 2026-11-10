@@ -630,8 +630,8 @@ func TestASyntaxListenersCursorIsTheNodeItIsHanded(test *testing.T) {
 			}
 			if cursor.Node() != node || !slices.Equal(enclosing, stack) {
 				context.Report(analysis.Diagnostic{Pos: node.Pos(), Message: fmt.Sprintf("%s is handed the cursor "+
-					"of %s, with %d ancestors where its stack holds %d", nodeAt(context.Fset, node),
-					nodeAt(context.Fset, cursor.Node()), len(enclosing), len(stack))})
+					"of %s, with %d ancestors where its stack holds %d", nodeAt(context.FileSet, node),
+					nodeAt(context.FileSet, cursor.Node()), len(enclosing), len(stack))})
 				return
 			}
 			var name string
@@ -648,10 +648,10 @@ func TestASyntaxListenersCursorIsTheNodeItIsHanded(test *testing.T) {
 			kind, index := cursor.ParentEdge()
 			before, after := "nothing", "nothing"
 			if sibling, found := cursor.PrevSibling(); found {
-				before = nodeAt(context.Fset, sibling.Node())
+				before = nodeAt(context.FileSet, sibling.Node())
 			}
 			if sibling, found := cursor.NextSibling(); found {
-				after = nodeAt(context.Fset, sibling.Node())
+				after = nodeAt(context.FileSet, sibling.Node())
 			}
 			context.Report(analysis.Diagnostic{Pos: node.Pos(), Message: fmt.Sprintf("%T %s is %s[%d], after %s "+
 				"and before %s", node, name, kind, index, before, after)})

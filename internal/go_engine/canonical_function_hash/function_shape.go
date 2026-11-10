@@ -12,11 +12,11 @@ import (
 // typeString names a type by its full package paths, so two packages' `Config` never read alike. Signatures and
 // tuples drop their parameter and result names, and a type parameter is named by its index, since go/types prints
 // the source names in all three and a name there is not meaning.
-func typeString(typ types.Type) string {
-	if typ == nil {
+func typeString(printedType types.Type) string {
+	if printedType == nil {
 		return "<nil type>"
 	}
-	switch typed := typ.(type) {
+	switch typed := printedType.(type) {
 	case *types.Signature:
 		text := "func(" + typeString(typed.Params()) + ")"
 		if typed.Variadic() {
@@ -42,7 +42,7 @@ func typeString(typ types.Type) string {
 	case *types.Chan:
 		return fmt.Sprintf("chan%d ", typed.Dir()) + typeString(typed.Elem())
 	}
-	return types.TypeString(typ, func(namedIn *types.Package) string { return namedIn.Path() })
+	return types.TypeString(printedType, func(namedIn *types.Package) string { return namedIn.Path() })
 }
 
 // pureBuiltins are the builtins with no effect, whose calls float free like any other pure value.
@@ -93,14 +93,14 @@ func isCommutative(binary *intermediate_representation.BinaryOperation) bool {
 	return false
 }
 
-func isNumeric(typ types.Type) bool {
-	basic, isBasic := typ.Underlying().(*types.Basic)
+func isNumeric(operandType types.Type) bool {
+	basic, isBasic := operandType.Underlying().(*types.Basic)
 	return isBasic && basic.Info()&types.IsNumeric != 0
 }
 
 // fieldName is a struct field's name: a name is meaning, beside the index the IR selects by.
-func fieldName(typ types.Type, index int, throughPointer bool) string {
-	underlying := typ.Underlying()
+func fieldName(operandType types.Type, index int, throughPointer bool) string {
+	underlying := operandType.Underlying()
 	if throughPointer {
 		pointer, isPointer := underlying.(*types.Pointer)
 		if !isPointer {

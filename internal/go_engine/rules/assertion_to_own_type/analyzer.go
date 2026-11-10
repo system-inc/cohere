@@ -81,7 +81,7 @@ func Check(context *rule.Context, assertion *ast.TypeAssertExpr) {
 // syntax holds itself, as an interface's method holds its doc and trailing comments.
 func rendered(context *rule.Context, node ast.Node) string {
 	text := &bytes.Buffer{}
-	formatError := format.Node(text, context.Fset, node)
+	formatError := format.Node(text, context.FileSet, node)
 	if formatError != nil {
 		// Invariant: go/format prints every expression the parser built, and report.Render panics the same way.
 		panic(fmt.Sprintf("assertion_to_own_type: rendering the assertion's code: %v", formatError))

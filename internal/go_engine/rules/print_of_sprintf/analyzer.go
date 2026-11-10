@@ -234,7 +234,7 @@ func checkLogPrint(context *rule.Context, call *ast.CallExpr) {
 // staticcheck's report.Render prints it.
 func render(context *rule.Context, node ast.Node) string {
 	var buffer bytes.Buffer
-	if formatError := format.Node(&buffer, context.Fset, node); formatError != nil {
+	if formatError := format.Node(&buffer, context.FileSet, node); formatError != nil {
 		// Invariant: the nodes rendered are a selector of the package's own syntax and one built from it, which
 		// go/format always prints; staticcheck's report.Render panics here too.
 		panic(formatError)

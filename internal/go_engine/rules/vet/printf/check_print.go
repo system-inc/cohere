@@ -24,12 +24,12 @@ var printFormatPattern = regexp.MustCompile(`%` + flagsPattern + optionalNumberP
 
 // checkPrint checks a call of a print function such as fmt.Println, named name.
 func checkPrint(pass *analysis.Pass, call *ast.CallExpr, name string) {
-	typ := pass.TypesInfo.Types[call.Fun].Type
-	if typ == nil {
+	calleeType := pass.TypesInfo.Types[call.Fun].Type
+	if calleeType == nil {
 		return // The callee's type is unknown.
 	}
 	firstArgument := 0
-	if signature, isSignature := typ.Underlying().(*types.Signature); isSignature {
+	if signature, isSignature := calleeType.Underlying().(*types.Signature); isSignature {
 		if !signature.Variadic() {
 			return
 		}

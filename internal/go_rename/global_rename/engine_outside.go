@@ -141,7 +141,7 @@ func (engine *engine) scanOutside() *outsideFiles {
 			switch typed := declaration.(type) {
 			case *ast.FuncDecl:
 				if typed.Recv == nil {
-					record(typed.Name, KindFunc, typed.Doc)
+					record(typed.Name, KindFunction, typed.Doc)
 				}
 			case *ast.GenDecl:
 				kind := map[token.Token]string{

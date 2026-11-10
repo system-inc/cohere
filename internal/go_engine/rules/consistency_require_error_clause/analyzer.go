@@ -78,8 +78,8 @@ func judgeCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 // isErrorConstructor is whether call calls the standard library's errors.New or fmt.Errorf, resolved by the callee's
 // package and name so a function of the same name anywhere else, or a method, is never mistaken for either.
 func isErrorConstructor(context *rule.Context, call *ast.CallExpr) bool {
-	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
-	if !isFunc || function.Pkg() == nil || function.Signature().Recv() != nil {
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	if !isFunction || function.Pkg() == nil || function.Signature().Recv() != nil {
 		return false
 	}
 	switch function.Pkg().Path() {

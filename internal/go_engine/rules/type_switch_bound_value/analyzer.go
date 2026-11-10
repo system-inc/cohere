@@ -145,7 +145,7 @@ func Check(context *rule.Context, typeSwitch *ast.TypeSwitchStmt) {
 		// `(AssignStmt ident ":=" expr)`: the identifier and the assertion as they were bound, under no position
 		// of their own, which is the node the original's pattern builds for the same printer.
 		binding := &ast.AssignStmt{Lhs: []ast.Expr{switched}, Tok: token.DEFINE, Rhs: []ast.Expr{assertion}}
-		edits := []analysis.TextEdit{edit.ReplaceWithNode(context.Fset, assertion, binding)}
+		edits := []analysis.TextEdit{edit.ReplaceWithNode(context.FileSet, assertion, binding)}
 		commaOkValues := commaOkValuesOf(typeSwitch)
 		for _, offender := range bodyOffenders {
 			// A comma-ok assertion in the case of its own type always holds, so its two values are the bound
@@ -156,7 +156,7 @@ func Check(context *rule.Context, typeSwitch *ast.TypeSwitchStmt) {
 					edit.ReplaceWithString(value, staticcheck_report.Render(context, offender.X)+", true"))
 				continue
 			}
-			edits = append(edits, edit.ReplaceWithNode(context.Fset, offender, offender.X))
+			edits = append(edits, edit.ReplaceWithNode(context.FileSet, offender, offender.X))
 		}
 		options = append(options, staticcheck_report.Fixes(edit.Fix("Simplify type switch", edits...)))
 	}

@@ -96,7 +96,7 @@ func reportSelfAssignments(context *rule.Context, cursor inspector.Cursor, assig
 	for index, left := range assignment.Lhs {
 		right := assignment.Rhs[index]
 		if isSelfAssignment(context, left, right) {
-			selfAssigned = append(selfAssigned, formatted(context.Fset, left))
+			selfAssigned = append(selfAssigned, formatted(context.FileSet, left))
 			if !runStartLeft.IsValid() {
 				if index > 0 {
 					runStartLeft, runStartRight = assignment.Lhs[index-1].End(), assignment.Rhs[index-1].End()
@@ -134,7 +134,7 @@ func reportSelfAssignments(context *rule.Context, cursor inspector.Cursor, assig
 	// deleteStatement returns nil, and the fix offers no edit, as the original's does, rather than the pairs' edits,
 	// which would leave a bare `=`.
 	if len(selfAssigned) == len(assignment.Lhs) {
-		edits = deleteStatement(context.Fset.File(assignment.Pos()), cursor, assignment)
+		edits = deleteStatement(context.FileSet.File(assignment.Pos()), cursor, assignment)
 	}
 	context.Report(analysis.Diagnostic{
 		Pos:     assignment.Pos(),
@@ -154,7 +154,7 @@ func isSelfAssignment(context *rule.Context, left ast.Expr, right ast.Expr) bool
 		hasNoEffects(context.TypesInfo, right) &&
 		!isMapIndex(context.TypesInfo, left) &&
 		reflect.TypeOf(left) == reflect.TypeOf(right) &&
-		formatted(context.Fset, left) == formatted(context.Fset, right)
+		formatted(context.FileSet, left) == formatted(context.FileSet, right)
 }
 
 // isMapIndex is whether expression, through parentheses, indexes a map, whose element the assignment may create, so

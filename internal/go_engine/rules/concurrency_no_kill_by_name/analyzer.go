@@ -76,8 +76,11 @@ func judgeCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 // programIndexOf is where the program sits among a call's arguments when the call is os/exec's Command or
 // CommandContext, resolved by the callee's object so a function of the same name in another package is never one.
 func programIndexOf(context *rule.Context, call *ast.CallExpr) (int, bool) {
-	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
-	if !isFunc || function.Pkg() == nil || function.Pkg().Path() != "os/exec" || function.Signature().Recv() != nil {
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	if !isFunction ||
+		function.Pkg() == nil ||
+		function.Pkg().Path() != "os/exec" ||
+		function.Signature().Recv() != nil {
 		return 0, false
 	}
 	switch function.Name() {

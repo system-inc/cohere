@@ -90,7 +90,7 @@ func findOptionDecodes(
 			continue
 		}
 		for _, file := range loadedPackage.Syntax {
-			fileName := loadedPackage.Fset.Position(file.Pos()).Filename
+			fileName := loadedPackage.FileSet.Position(file.Pos()).Filename
 			if strings.HasSuffix(fileName, "_test.go") {
 				continue
 			}
@@ -113,7 +113,7 @@ func findOptionDecodes(
 					if target == nil {
 						return true
 					}
-					position := loadedPackage.Fset.Position(call.Pos())
+					position := loadedPackage.FileSet.Position(call.Pos())
 					decode := optionDecode{
 						site:     site,
 						position: fmt.Sprintf("%s:%d", filepath.ToSlash(relative), position.Line),
@@ -123,7 +123,7 @@ func findOptionDecodes(
 					findings.decodes = append(findings.decodes, decode)
 					reachesStruct := walkOptionType(
 						target,
-						loadedPackage.Fset,
+						loadedPackage.FileSet,
 						rulesRoot,
 						untagged,
 						map[types.Type]bool{},

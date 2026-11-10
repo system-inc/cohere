@@ -99,8 +99,9 @@ func (sourceFile *sourceFile) listPlan(
 			)
 		}
 	}
-	if literal, isFuncLiteral := last.(*ast.FuncLit); isFuncLiteral {
-		result.lastFuncLiteral = sourceFile.lineOfPosition(literal.Pos()) != sourceFile.lineOfPosition(literal.End())
+	if literal, isFunctionLiteral := last.(*ast.FuncLit); isFunctionLiteral {
+		result.lastFunctionLiteral =
+			sourceFile.lineOfPosition(literal.Pos()) != sourceFile.lineOfPosition(literal.End())
 	}
 	return result, len(result.breaks) > 0
 }

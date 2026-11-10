@@ -12,13 +12,13 @@ import (
 	"honnef.co/go/tools/go/types/typeutil"
 )
 
-// Of is typ's core type, or nil when it has none, as typeutil.CoreType answers. A type that is no type parameter and
-// whose underlying type is no interface or union has the term set {typ}, so its core type is its underlying type, or
+// Of is goType's core type, or nil when it has none, as typeutil.CoreType answers. A type that is no type parameter and
+// whose underlying type is no interface or union has the term set {goType}, so its core type is its underlying type, or
 // none when that is the invalid type, whose term set is empty. Every other type, a type parameter among them even
 // when its constraint isn't set yet, is answered by typeutil.CoreType itself.
-func Of(typ types.Type) types.Type {
-	if _, isTypeParameter := typ.(*types.TypeParam); !isTypeParameter && typ != nil {
-		switch underlying := typ.Underlying().(type) {
+func Of(goType types.Type) types.Type {
+	if _, isTypeParameter := goType.(*types.TypeParam); !isTypeParameter && goType != nil {
+		switch underlying := goType.Underlying().(type) {
 		case *types.Interface, *types.Union:
 		default:
 			if underlying == types.Typ[types.Invalid] {
@@ -27,5 +27,5 @@ func Of(typ types.Type) types.Type {
 			return underlying
 		}
 	}
-	return typeutil.CoreType(typ)
+	return typeutil.CoreType(goType)
 }

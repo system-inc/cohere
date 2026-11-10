@@ -24,7 +24,7 @@ func fileUsesGoVersion(context *rule.Context, file *ast.File, goVersion string) 
 	// their module says. Its tests are not built by the bootstrap, and some rely on being judged at their own version.
 	// The file is named as it is on disk, not as a `//line` directive renames it, as the original's token.File.Name.
 	if bootstrapPackages[context.Package.Path()] &&
-		!strings.HasSuffix(context.Fset.PositionFor(file.Pos(), false).Filename, "_test.go") {
+		!strings.HasSuffix(context.FileSet.PositionFor(file.Pos(), false).Filename, "_test.go") {
 		fileVersion = bootstrapVersion
 	}
 	return !versionBefore(fileVersion, goVersion)

@@ -223,11 +223,11 @@ func expandFacts(known fact) []fact {
 	}
 }
 
-// isNillable is whether a value of type typ can be nil, as the original decides it for an asserted type.
-func isNillable(typ types.Type) bool {
+// isNillable is whether a value of assertedType can be nil, as the original decides it for an asserted type.
+func isNillable(assertedType types.Type) bool {
 	// The original notes that CoreType, and the case for an interface, look wrong: this should probably use
 	// Underlying, and handle a type parameter by computing the union across its normal terms.
-	switch typ := coreType(typ).(type) {
+	switch assertedCoreType := coreType(assertedType).(type) {
 	case *types.Pointer,
 		*types.Map,
 		*types.Signature,
@@ -236,26 +236,26 @@ func isNillable(typ types.Type) bool {
 		*types.Slice:
 		return true
 	case *types.Basic:
-		return typ == types.Typ[types.UnsafePointer]
+		return assertedCoreType == types.Typ[types.UnsafePointer]
 	}
 	return false
 }
 
-// coreType is the core type of typ, or nil when it has none, as x/tools' internal typeparams.CoreType reads it: the
+// coreType is the core type of goType, or nil when it has none, as x/tools' internal typeparams.CoreType reads it: the
 // underlying type of a type that is no interface, and otherwise the one type its type set's terms share, which
 // staticcheck's typeutil.CoreType reads. staticcheck's reads a type set for every type, so the port asks it only of
 // an interface, keeping the common case as cheap as the original's.
-func coreType(typ types.Type) types.Type {
-	underlying := typ.Underlying()
+func coreType(goType types.Type) types.Type {
+	underlying := goType.Underlying()
 	if _, isInterface := underlying.(*types.Interface); !isInterface {
 		return underlying
 	}
-	return core_type.Of(typ)
+	return core_type.Of(goType)
 }
 
-// isTypeParameter is whether typ is a type parameter.
-func isTypeParameter(typ types.Type) bool {
-	_, isParameter := types.Unalias(typ).(*types.TypeParam)
+// isTypeParameter is whether goType is a type parameter.
+func isTypeParameter(goType types.Type) bool {
+	_, isParameter := types.Unalias(goType).(*types.TypeParam)
 	return isParameter
 }
 

@@ -328,7 +328,7 @@ func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
 	var ruleFiles []ruleFile
 	for _, loadedPackage := range loaded {
 		for _, file := range loadedPackage.Syntax {
-			path := loadedPackage.Fset.Position(file.Pos()).Filename
+			path := loadedPackage.FileSet.Position(file.Pos()).Filename
 			if strings.Contains(path, "/internal/lint/rules/") && !strings.HasSuffix(path, "_test.go") {
 				ruleFiles = append(ruleFiles, ruleFile{path, file, loadedPackage.TypesInfo})
 			}

@@ -63,9 +63,9 @@ func judgeCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 	if !isCall || len(call.Args) == 0 {
 		return
 	}
-	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	// Package functions only, so a method that happens to be named New or Errorf is never mistaken for them.
-	if !isFunc || function.Pkg() == nil || function.Signature().Recv() != nil {
+	if !isFunction || function.Pkg() == nil || function.Signature().Recv() != nil {
 		return
 	}
 	switch {

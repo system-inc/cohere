@@ -137,7 +137,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 		state.keyed = map[types.Object]bool{}
 	}
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-	state.isTestFile = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+	state.isTestFile = strings.HasSuffix(context.FileSet.PositionFor(file.Package, false).Filename, "_test.go")
 }
 
 // hearNode judges a declaring identifier or a type switch's binding, holding its finding, and marks the names a

@@ -90,8 +90,8 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		"do not pass a nil Context, even if a function permits it; pass context.TODO if you are unsure about which "+
 			"Context to use",
 		staticcheck_report.Fixes(
-			edit.Fix("Use context.TODO", edit.ReplaceWithNode(context.Fset, call.Args[0], todo)),
-			edit.Fix("Use context.Background", edit.ReplaceWithNode(context.Fset, call.Args[0], background))))
+			edit.Fix("Use context.TODO", edit.ReplaceWithNode(context.FileSet, call.Args[0], todo)),
+			edit.Fix("Use context.Background", edit.ReplaceWithNode(context.FileSet, call.Args[0], background))))
 }
 
 // symbolFunction is the function a call's function expression names as the pattern's Symbol reads it, and nil when it

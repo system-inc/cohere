@@ -283,7 +283,7 @@ func (state *deadState) report(statement ast.Stmt) {
 		Message: "unreachable code",
 		SuggestedFixes: []analysis.SuggestedFix{{
 			Message:   "Remove",
-			TextEdits: deleteStatement(state.context.Fset.File(statement.Pos()), statementCursor),
+			TextEdits: deleteStatement(state.context.FileSet.File(statement.Pos()), statementCursor),
 		}},
 	})
 }

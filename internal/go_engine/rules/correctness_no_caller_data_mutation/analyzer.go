@@ -178,8 +178,8 @@ func callsPointerMethodOnValue(context *rule.Context, selector *ast.SelectorExpr
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return false
 	}
-	method, isFunc := selection.Obj().(*types.Func)
-	if !isFunc || method.Signature().Recv() == nil {
+	method, isFunction := selection.Obj().(*types.Func)
+	if !isFunction || method.Signature().Recv() == nil {
 		return false
 	}
 	if _, receiverIsPointer := method.Signature().Recv().Type().(*types.Pointer); !receiverIsPointer {

@@ -28,7 +28,7 @@ func TestTheSyntaxWalkCallsEachListenerForWhatItDeclaresInOrder(test *testing.T)
 			},
 			Nodes: []ast.Node{(*ast.IfStmt)(nil), (*ast.LabeledStmt)(nil)},
 			Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
-				heard = append(heard, nodeHeard(context.Fset, node, stack))
+				heard = append(heard, nodeHeard(context.FileSet, node, stack))
 			},
 			FileExit: func(_ *rule.Context, file *ast.File) {
 				heard = append(heard, "exit "+file.Name.Name)
@@ -41,7 +41,7 @@ func TestTheSyntaxWalkCallsEachListenerForWhatItDeclaresInOrder(test *testing.T)
 		&rule.Listener{
 			Nodes: []ast.Node{(*ast.IfStmt)(nil)},
 			Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
-				heard = append(heard, fmt.Sprintf("alongside if at line %d", context.Fset.Position(node.Pos()).Line))
+				heard = append(heard, fmt.Sprintf("alongside if at line %d", context.FileSet.Position(node.Pos()).Line))
 			},
 		})
 	probe, files := filesProbe()
@@ -108,7 +108,7 @@ func TestASyntaxListenerAppendingToItsStackLeavesTheWalksAlone(test *testing.T) 
 		&rule.Listener{
 			Nodes: []ast.Node{(*ast.FuncDecl)(nil), (*ast.Ident)(nil)},
 			Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
-				heard = append(heard, nodeHeard(context.Fset, node, stack))
+				heard = append(heard, nodeHeard(context.FileSet, node, stack))
 			},
 		})
 	probe, files := filesProbe()

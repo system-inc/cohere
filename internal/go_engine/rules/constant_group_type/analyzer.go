@@ -63,7 +63,7 @@ func Check(context *rule.Context, declaration *ast.GenDecl) {
 	if !declaration.Lparen.IsValid() || declaration.Tok != token.CONST {
 		return
 	}
-	for _, group := range astutil.GroupSpecs(context.Fset, declaration.Specs) {
+	for _, group := range astutil.GroupSpecs(context.FileSet, declaration.Specs) {
 		specs := valueSpecs(group)
 		if len(specs) < 2 || specs[0].Type == nil || !onlyFirstTyped(context, specs) {
 			continue
@@ -75,7 +75,7 @@ func Check(context *rule.Context, declaration *ast.GenDecl) {
 			// A spec's range leaves out its trailing comment and its printing would not, so the comment is left out of
 			// the printing and stays where it is, said once.
 			typed.Comment = nil
-			edits = append(edits, edit.ReplaceWithNode(context.Fset, spec, &typed))
+			edits = append(edits, edit.ReplaceWithNode(context.FileSet, spec, &typed))
 		}
 		staticcheck_report.Report(context, specs[0], "only the first constant in this group has an explicit type",
 			staticcheck_report.Fixes(edit.Fix("Add type to all constants in group", edits...)))

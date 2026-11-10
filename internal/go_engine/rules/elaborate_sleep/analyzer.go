@@ -97,7 +97,7 @@ func Check(context *rule.Context, selectStatement *ast.SelectStmt) {
 		// from its own positions.
 		sleepCall := &ast.CallExpr{Fun: sleep, Args: []ast.Expr{ast.Unparen(after.Args[0])}}
 		fixes = append(fixes,
-			edit.Fix("Use time.Sleep", edit.ReplaceWithNode(context.Fset, selectStatement, sleepCall)))
+			edit.Fix("Use time.Sleep", edit.ReplaceWithNode(context.FileSet, selectStatement, sleepCall)))
 	}
 	staticcheck_report.Report(context, selectStatement, message,
 		staticcheck_report.ShortRange(),

@@ -98,7 +98,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 		state.interfaces = &foreignInterfaces{current: context.Package}
 	}
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds examples.
-	state.isTestFile = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+	state.isTestFile = strings.HasSuffix(context.FileSet.PositionFor(file.Package, false).Filename, "_test.go")
 }
 
 // judgeNode judges a declaring identifier, or the name a type switch binds.
@@ -278,8 +278,8 @@ func implementsInShape(implementer types.Type, candidate *types.Interface) bool 
 	for index := range candidate.NumMethods() {
 		wanted := candidate.Method(index)
 		object, _, _ := types.LookupFieldOrMethod(implementer, true, wanted.Pkg(), wanted.Name())
-		found, isFunc := object.(*types.Func)
-		if !isFunc {
+		found, isFunction := object.(*types.Func)
+		if !isFunction {
 			return false
 		}
 		if found.Signature().Params().Len() != wanted.Signature().Params().Len() ||

@@ -40,15 +40,15 @@ func (graph *graph) embeddedField(syntax ast.Node, by types.Object) *types.Var {
 				// When embedding an alias we want to use the alias, not what the alias points to.
 				graph.use(typeName, field)
 			} else {
-				switch typ := typeutil.Dereference(graph.typesInfo.TypeOf(step)).(type) {
+				switch stepType := typeutil.Dereference(graph.typesInfo.TypeOf(step)).(type) {
 				case *types.Named:
 					// (7.2) fields use their types
-					graph.use(typ.Obj(), field)
+					graph.use(stepType.Obj(), field)
 				case *types.Basic:
 					// Nothing to do
 				default:
 					// Other types are only possible for aliases, which we've already handled
-					lint.ExhaustiveTypeSwitch(typ)
+					lint.ExhaustiveTypeSwitch(stepType)
 				}
 			}
 			return field
@@ -71,8 +71,8 @@ func (graph *graph) embeddedField(syntax ast.Node, by types.Object) *types.Var {
 // isNoCopyType reports whether a type represents the NoCopy sentinel type. The NoCopy type is a named struct with no
 // fields and exactly one method `func Lock()` that is empty. It also takes a second method, `func Unlock()`, and the
 // original notes it does not yet check that the function body is empty.
-func isNoCopyType(typ types.Type) bool {
-	structType, isStruct := typ.Underlying().(*types.Struct)
+func isNoCopyType(goType types.Type) bool {
+	structType, isStruct := goType.Underlying().(*types.Struct)
 	if !isStruct {
 		return false
 	}
@@ -80,7 +80,7 @@ func isNoCopyType(typ types.Type) bool {
 		return false
 	}
 
-	named, isNamed := types.Unalias(typ).(*types.Named)
+	named, isNamed := types.Unalias(goType).(*types.Named)
 	if !isNamed {
 		return false
 	}
@@ -122,9 +122,9 @@ func (graph *graph) namedType(typeName *types.TypeName, specification ast.Expr) 
 		if declaredStruct, isDeclaredStruct := graph.typesInfo.TypeOf(structSyntax).(*types.Struct); isDeclaredStruct {
 			seen[declaredStruct] = struct{}{}
 		}
-		var hasExportedField func(typ types.Type) bool
-		hasExportedField = func(typ types.Type) bool {
-			structType, isStructType := typeutil.Dereference(typ).Underlying().(*types.Struct)
+		var hasExportedField func(goType types.Type) bool
+		hasExportedField = func(goType types.Type) bool {
+			structType, isStructType := typeutil.Dereference(goType).Underlying().(*types.Struct)
 			if !isStructType {
 				return false
 			}

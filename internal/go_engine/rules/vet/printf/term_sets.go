@@ -38,11 +38,11 @@ func structuralTerms(typeParameter *types.TypeParam) ([]*typeTerm, bool) {
 // to itself is not computed.
 type termSets map[types.Type]*termSet
 
-// compute is the term set of typ: x/tools' typeparams computeTermSetInternal.
-func (seen termSets) compute(typ types.Type) (*termSet, bool) {
-	if known, isSeen := seen[typ]; isSeen {
+// compute is the term set of goType: x/tools' typeparams computeTermSetInternal.
+func (seen termSets) compute(goType types.Type) (*termSet, bool) {
+	if known, isSeen := seen[goType]; isSeen {
 		if !known.complete {
-			return nil, false // A cycle in the declaration of typ.
+			return nil, false // A cycle in the declaration of goType.
 		}
 		return known, true
 	}
@@ -50,8 +50,8 @@ func (seen termSets) compute(typ types.Type) (*termSet, bool) {
 	defer func() {
 		set.complete = true
 	}()
-	seen[typ] = set
-	switch underlying := typ.Underlying().(type) {
+	seen[goType] = set
+	switch underlying := goType.Underlying().(type) {
 	case *types.Interface:
 		set.terms = allTerms
 		for embedded := range underlying.EmbeddedTypes() {
@@ -81,7 +81,7 @@ func (seen termSets) compute(typ types.Type) (*termSet, bool) {
 				if unionTerm.Type() == types.Typ[types.Invalid] {
 					continue
 				}
-				terms = termList{{tilde: unionTerm.Tilde(), typ: unionTerm.Type()}}
+				terms = termList{{tilde: unionTerm.Tilde(), termType: unionTerm.Type()}}
 			}
 			set.terms = set.terms.union(terms)
 			if len(set.terms) > maximumTermCount {
@@ -93,7 +93,7 @@ func (seen termSets) compute(typ types.Type) (*termSet, bool) {
 		panic("a type parameter's underlying type is a type parameter")
 	default:
 		if underlying != types.Typ[types.Invalid] {
-			set.terms = termList{{tilde: false, typ: typ}}
+			set.terms = termList{{tilde: false, termType: goType}}
 		}
 	}
 	return set, true

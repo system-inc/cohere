@@ -217,7 +217,7 @@ func (engine *engine) outsideRefusal(candidate *candidate, outside *outsideFiles
 	}
 	directory := filepath.Dir(candidate.Position.Filename)
 	switch candidate.Kind {
-	case KindFunc, KindVariable, KindConst, KindType:
+	case KindFunction, KindVariable, KindConst, KindType:
 	default:
 		if token.IsExported(candidate.OldName) {
 			return refusal(files[0])
@@ -235,7 +235,7 @@ func (engine *engine) outsideRefusal(candidate *candidate, outside *outsideFiles
 		return file.directory == directory && file.packageName == packageName
 	}
 	switch candidate.Kind {
-	case KindFunc, KindVariable, KindConst, KindType:
+	case KindFunction, KindVariable, KindConst, KindType:
 	case KindField, KindMethod:
 		// An unexported field or method is selected only inside its own package, so a file of another package
 		// spelling the name spells something else: a planted rule's `ctx rule.Context` parameter is not a
@@ -366,7 +366,7 @@ type stringLiterals struct {
 // isTestRunnerFunction is whether a candidate is a function go test runs by name: a Test, Benchmark, Fuzz or
 // Example function in a _test.go file.
 func isTestRunnerFunction(candidate *candidate) bool {
-	if candidate.Kind != KindFunc || !strings.HasSuffix(candidate.Position.Filename, "_test.go") {
+	if candidate.Kind != KindFunction || !strings.HasSuffix(candidate.Position.Filename, "_test.go") {
 		return false
 	}
 	return isTestRunnerName(candidate.OldName)

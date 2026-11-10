@@ -90,7 +90,7 @@ func Check(context *rule.Context, assignment *ast.AssignStmt) {
 		staticcheck_report.Report(context, assignment, message,
 			staticcheck_report.FilterGenerated(),
 			staticcheck_report.Fixes(edit.Fix("Remove assignment to blank identifier",
-				edit.ReplaceWithNode(context.Fset, assignment, &shortened))))
+				edit.ReplaceWithNode(context.FileSet, assignment, &shortened))))
 	case 1:
 		// `(Ident "_")` is a lone node against the left sides, so it matches a list of one, looked through its
 		// parentheses.
@@ -101,7 +101,7 @@ func Check(context *rule.Context, assignment *ast.AssignStmt) {
 		staticcheck_report.Report(context, assignment, message,
 			staticcheck_report.FilterGenerated(),
 			staticcheck_report.Fixes(edit.Fix("Simplify channel receive operation",
-				edit.ReplaceWithNode(context.Fset, assignment, receive))))
+				edit.ReplaceWithNode(context.FileSet, assignment, receive))))
 	}
 }
 

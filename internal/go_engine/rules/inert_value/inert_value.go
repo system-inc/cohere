@@ -32,8 +32,8 @@ const depthLimit = 16
 // own.
 func Is(info *types.Info, expression ast.Expr) bool {
 	if call, isCall := ast.Unparen(expression).(*ast.CallExpr); isCall {
-		function, isFunc := typeutil.Callee(info, call).(*types.Func)
-		if isFunc && function.Pkg() != nil && function.Pkg().Path() == "strconv" &&
+		function, isFunction := typeutil.Callee(info, call).(*types.Func)
+		if isFunction && function.Pkg() != nil && function.Pkg().Path() == "strconv" &&
 			function.Signature().Recv() == nil && strconvFormatters[function.Name()] {
 			return true
 		}

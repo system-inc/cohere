@@ -53,34 +53,34 @@ func matchArgumentType(pass *analysis.Pass, accepted argumentType, argument ast.
 	if accepted == argumentAny {
 		return "", true
 	}
-	typ := pass.TypesInfo.Types[argument].Type
-	if typ == nil {
+	passedType := pass.TypesInfo.Types[argument].Type
+	if passedType == nil {
 		return "", true // Probably a problem the type checker reports.
 	}
 	matcher := &argumentMatcher{accepted: accepted, seen: map[types.Type]bool{}}
-	matched := matcher.match(typ, true)
+	matched := matcher.match(passedType, true)
 	return matcher.reason, matched
 }
 
-// match reports whether typ fits the verb. topLevel is set for the argument's own type, where special rules apply,
-// and for the types of a top-level type parameter's set, which a type argument replaces at compile time.
-func (matcher *argumentMatcher) match(typ types.Type, topLevel bool) bool {
+// match reports whether candidateType fits the verb. topLevel is set for the argument's own type, where special rules
+// apply, and for the types of a top-level type parameter's set, which a type argument replaces at compile time.
+func (matcher *argumentMatcher) match(candidateType types.Type, topLevel bool) bool {
 	// %w accepts only errors.
 	if matcher.accepted == argumentError {
-		return types.ConvertibleTo(typ, errorType)
+		return types.ConvertibleTo(candidateType, errorType)
 	}
 	// A type that implements fmt.Formatter leaves nothing to check.
-	if isFormatter(typ) {
+	if isFormatter(candidateType) {
 		return true
 	}
 	// A verb that takes a string takes a value whose String or Error method may give one.
-	if matcher.accepted&argumentString != 0 && isConvertibleToString(typ) {
+	if matcher.accepted&argumentString != 0 && isConvertibleToString(candidateType) {
 		return true
 	}
-	if typeParameter, isTypeParameter := types.Unalias(typ).(*types.TypeParam); isTypeParameter {
+	if typeParameter, isTypeParameter := types.Unalias(candidateType).(*types.TypeParam); isTypeParameter {
 		return matcher.matchTypeParameter(typeParameter, topLevel)
 	}
-	underlying := typ.Underlying()
+	underlying := candidateType.Underlying()
 	if matcher.seen[underlying] {
 		// Matched already, so it fit, or being matched, and the recursion stops here. A type such as
 		// `type R struct { F []R }` is wrongly let through, a false negative x/tools accepts.
@@ -153,14 +153,14 @@ func (matcher *argumentMatcher) matchTypeParameter(typeParameter *types.TypePara
 	// parameters, so topLevel alone cannot say which this is.
 	reportReason := len(matcher.seen) == 1
 	for _, term := range terms {
-		if matcher.match(term.typ, topLevel) {
+		if matcher.match(term.termType, topLevel) {
 			continue
 		}
 		if reportReason {
 			if term.tilde {
-				matcher.reason = fmt.Sprintf("contains ~%s", term.typ)
+				matcher.reason = fmt.Sprintf("contains ~%s", term.termType)
 			} else {
-				matcher.reason = fmt.Sprintf("contains %s", term.typ)
+				matcher.reason = fmt.Sprintf("contains %s", term.termType)
 			}
 		}
 		return false
@@ -246,17 +246,17 @@ func (matcher *argumentMatcher) matchBasic(basic *types.Basic) bool {
 	panic("a basic type of a kind printf does not know")
 }
 
-// isConvertibleToString reports whether a value of typ may give a string through an Error method or a String
+// isConvertibleToString reports whether a value of valueType may give a string through an Error method or a String
 // method of fmt.Stringer's shape.
-func isConvertibleToString(typ types.Type) bool {
+func isConvertibleToString(valueType types.Type) bool {
 	// Untyped nil converts to both interfaces, and would only panic.
-	if basic, isBasic := types.Unalias(typ).(*types.Basic); isBasic && basic.Kind() == types.UntypedNil {
+	if basic, isBasic := types.Unalias(valueType).(*types.Basic); isBasic && basic.Kind() == types.UntypedNil {
 		return false
 	}
-	if types.ConvertibleTo(typ, errorType) {
+	if types.ConvertibleTo(valueType, errorType) {
 		return true // Through Error.
 	}
-	method, _, _ := types.LookupFieldOrMethod(typ, false, nil, "String")
+	method, _, _ := types.LookupFieldOrMethod(valueType, false, nil, "String")
 	function, isFunction := method.(*types.Func)
 	if !isFunction {
 		return false

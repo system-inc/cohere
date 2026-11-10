@@ -459,8 +459,8 @@ func Run() string { return library.ParseURL("x") }
 	})
 	loaded := fixture.load(test)
 	result := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "library", Name: "ParseURL", Kind: KindFunc, NewName: "ParseUrl"},
-		target{PackageSuffix: "library", Name: "parseJSON", Kind: KindFunc, NewName: "parseJson"},
+		target{PackageSuffix: "library", Name: "ParseURL", Kind: KindFunction, NewName: "ParseUrl"},
+		target{PackageSuffix: "library", Name: "parseJSON", Kind: KindFunction, NewName: "parseJson"},
 	), Options{})
 	requireRefused(test, result, "ParseURL", "exported outside the workspace")
 	requireAccepted(test, result, 1)
@@ -491,8 +491,8 @@ func Run() string { return library.ParseURL(other.ParseJSON("x")) }
 	})
 	loaded := fixture.load(test)
 	result := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "library", Name: "ParseURL", Kind: KindFunc, NewName: "ParseUrl"},
-		target{PackageSuffix: "other", Name: "ParseJSON", Kind: KindFunc, NewName: "ParseJson"},
+		target{PackageSuffix: "library", Name: "ParseURL", Kind: KindFunction, NewName: "ParseUrl"},
+		target{PackageSuffix: "other", Name: "ParseJSON", Kind: KindFunction, NewName: "ParseJson"},
 	), Options{PinnedLibraries: map[string]string{"fixture/library": "read at a pin"}})
 	requireRefused(test, result, "ParseJSON", "exported outside the workspace")
 	requireAccepted(test, result, 1)
@@ -578,8 +578,8 @@ var Parse = a.ParseURL
 	})
 	loaded := fixture.load(test)
 	result := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunc, NewName: "ParseUrl"},
-		target{PackageSuffix: "internal/a", Name: "TestParseURL", Kind: KindFunc, NewName: "TestParseUrl"},
+		target{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunction, NewName: "ParseUrl"},
+		target{PackageSuffix: "internal/a", Name: "TestParseURL", Kind: KindFunction, NewName: "TestParseUrl"},
 	), Options{})
 	requireAccepted(test, result, 2)
 	requireModelClean(test, result)
@@ -1088,8 +1088,13 @@ func TestParseURL(test *testing.T) { test.Log("parses") }
 	})
 	loaded := fixture.load(test)
 	result := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "internal/a", Name: "TestRuleCPUBudget", Kind: KindFunc, NewName: "TestRuleCpuBudget"},
-		target{PackageSuffix: "internal/a", Name: "TestParseURL", Kind: KindFunc, NewName: "TestParseUrl"},
+		target{
+			PackageSuffix: "internal/a",
+			Name:          "TestRuleCPUBudget",
+			Kind:          KindFunction,
+			NewName:       "TestRuleCpuBudget",
+		},
+		target{PackageSuffix: "internal/a", Name: "TestParseURL", Kind: KindFunction, NewName: "TestParseUrl"},
 	), Options{})
 	requireRefused(test, result, "TestRuleCPUBudget", "string literal")
 	requireAccepted(test, result, 1)
@@ -1327,8 +1332,8 @@ func Describe(value any) string { return reflect.TypeOf(value).Name() + reflect.
 		target{PackageSuffix: "internal/a", Name: "config", Kind: KindType, NewName: "configuration"},
 		target{PackageSuffix: "internal/a", Name: "props", Kind: KindType, NewName: "properties"},
 		target{PackageSuffix: "internal/a", Name: "Limit", Kind: KindConst, NewName: "Ceiling"},
-		target{PackageSuffix: "internal/a", Name: "Sum", Kind: KindFunc, NewName: "Add"},
-		target{PackageSuffix: "internal/a", Name: "Count", Kind: KindFunc, NewName: "Tally"},
+		target{PackageSuffix: "internal/a", Name: "Sum", Kind: KindFunction, NewName: "Add"},
+		target{PackageSuffix: "internal/a", Name: "Count", Kind: KindFunction, NewName: "Tally"},
 	), Options{})
 	requireRefused(test, result, "v", "string literal")
 	requireRefused(test, result, "q", "encoding guard")

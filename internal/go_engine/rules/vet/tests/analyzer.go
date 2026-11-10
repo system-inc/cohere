@@ -87,7 +87,7 @@ func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
 func checkFile(context *rule.Context, file *ast.File) {
 	// Only a _test.go file holds what go test runs. The name is the file's own, not one a //line directive gives it,
 	// as the original reads it.
-	if !strings.HasSuffix(context.Fset.File(file.FileStart).Name(), "_test.go") {
+	if !strings.HasSuffix(context.FileSet.File(file.FileStart).Name(), "_test.go") {
 		return
 	}
 	for _, declaration := range file.Decls {

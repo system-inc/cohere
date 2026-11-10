@@ -10,14 +10,14 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// isFormatter reports whether typ could satisfy fmt.Formatter, whose one method is Format(State, rune).
-func isFormatter(typ types.Type) bool {
+// isFormatter reports whether goType could satisfy fmt.Formatter, whose one method is Format(State, rune).
+func isFormatter(goType types.Type) bool {
 	// An interface's value might be a Formatter. A type parameter is not taken for one, since a constraint can say
 	// so and is expected to.
-	if _, isInterface := typ.Underlying().(*types.Interface); isInterface && !isTypeParameter(typ) {
+	if _, isInterface := goType.Underlying().(*types.Interface); isInterface && !isTypeParameter(goType) {
 		return true
 	}
-	method, _, _ := types.LookupFieldOrMethod(typ, false, nil, "Format")
+	method, _, _ := types.LookupFieldOrMethod(goType, false, nil, "Format")
 	function, isFunction := method.(*types.Func)
 	if !isFunction {
 		return false
@@ -35,15 +35,15 @@ func isFormatter(typ types.Type) bool {
 //	func (t  T) Error() string { printf("%s",  t) }
 //	func (t  T) String() string { printf("%s", &t) }
 func recursiveStringer(pass *analysis.Pass, expression ast.Expr) (string, bool) {
-	typ := pass.TypesInfo.Types[expression].Type
+	expressionType := pass.TypesInfo.Types[expression].Type
 	// A value with a Format method is unlikely to call its String method recursively. An expression the type
 	// checker gave no type would stop the original here, and the port passes it by.
-	if typ == nil || isFormatter(typ) {
+	if expressionType == nil || isFormatter(expressionType) {
 		return "", false
 	}
-	stringObject, _, _ := types.LookupFieldOrMethod(typ, false, pass.Pkg, "String")
+	stringObject, _, _ := types.LookupFieldOrMethod(expressionType, false, pass.Pkg, "String")
 	stringMethod, hasString := stringObject.(*types.Func)
-	errorObject, _, _ := types.LookupFieldOrMethod(typ, false, pass.Pkg, "Error")
+	errorObject, _, _ := types.LookupFieldOrMethod(expressionType, false, pass.Pkg, "Error")
 	errorMethod, hasError := errorObject.(*types.Func)
 	var method *types.Func
 	switch {
@@ -85,25 +85,25 @@ func isStringer(signature *types.Signature) bool {
 // isFunctionValue reports whether expression is a function, not a function's call, which is almost always a mistake
 // to print.
 func isFunctionValue(pass *analysis.Pass, expression ast.Expr) bool {
-	typ := pass.TypesInfo.Types[expression].Type
-	if typ == nil {
+	expressionType := pass.TypesInfo.Types[expression].Type
+	if expressionType == nil {
 		return false
 	}
 	// The type itself, not its underlying type: a named function type with a String method prints well.
-	_, isSignature := typ.(*types.Signature)
+	_, isSignature := expressionType.(*types.Signature)
 	return isSignature
 }
 
-// isTypeParameter reports whether typ is a type parameter: x/tools' typeparams.IsTypeParam.
-func isTypeParameter(typ types.Type) bool {
-	_, isParameter := types.Unalias(typ).(*types.TypeParam)
+// isTypeParameter reports whether goType is a type parameter: x/tools' typeparams.IsTypeParam.
+func isTypeParameter(goType types.Type) bool {
+	_, isParameter := types.Unalias(goType).(*types.TypeParam)
 	return isParameter
 }
 
-// isTypeNamed reports whether typ is, or is an alias of, the package-level type name of the package at
+// isTypeNamed reports whether goType is, or is an alias of, the package-level type name of the package at
 // packagePath: x/tools' typesinternal.IsTypeNamed.
-func isTypeNamed(typ types.Type, packagePath string, name string) bool {
-	named, isNamed := types.Unalias(typ).(*types.Named)
+func isTypeNamed(goType types.Type, packagePath string, name string) bool {
+	named, isNamed := types.Unalias(goType).(*types.Named)
 	if !isNamed {
 		return false
 	}

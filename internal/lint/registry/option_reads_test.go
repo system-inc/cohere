@@ -85,7 +85,7 @@ func findUnreadOptionFields(
 	nonTestFiles := func(loadedPackage *go_types.Package) []*ast.File {
 		files := []*ast.File{}
 		for _, file := range loadedPackage.Syntax {
-			if !strings.HasSuffix(loadedPackage.Fset.Position(file.Pos()).Filename, "_test.go") {
+			if !strings.HasSuffix(loadedPackage.FileSet.Position(file.Pos()).Filename, "_test.go") {
 				files = append(files, file)
 			}
 		}
@@ -103,7 +103,7 @@ func findUnreadOptionFields(
 				}
 				_, target := optionDecodeTarget(loadedPackage.TypesInfo, call)
 				if target != nil {
-					collectOptionFields(target, loadedPackage.Fset, rulesRoot, fields, map[types.Type]bool{})
+					collectOptionFields(target, loadedPackage.FileSet, rulesRoot, fields, map[types.Type]bool{})
 				}
 				return true
 			})

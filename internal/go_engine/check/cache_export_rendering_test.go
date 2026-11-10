@@ -25,7 +25,7 @@ func checkedInMemory(test *testing.T, path string, source string, dependencies m
 		if parseError != nil {
 			return nil, parseError
 		}
-		configuration := types.Config{Importer: importerFunc(func(imported string) (*types.Package, error) {
+		configuration := types.Config{Importer: importerFunction(func(imported string) (*types.Package, error) {
 			if earlier, done := checked[imported]; done {
 				return earlier, nil
 			}

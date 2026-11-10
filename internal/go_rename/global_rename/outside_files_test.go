@@ -27,7 +27,11 @@ func other() string { return openURL() }
 	loaded := fixture.load(test)
 	result := Plan(
 		loaded,
-		propose(test, loaded, target{PackageSuffix: "internal/a", Name: "openURL", Kind: KindFunc, NewName: "openUrl"}),
+		propose(
+			test,
+			loaded,
+			target{PackageSuffix: "internal/a", Name: "openURL", Kind: KindFunction, NewName: "openUrl"},
+		),
 		Options{},
 	)
 	requireRefused(test, result, "openURL", "outside the load")
@@ -60,7 +64,11 @@ func other() string { return openURL() }
 	loaded := fixture.load(test)
 	result := Plan(
 		loaded,
-		propose(test, loaded, target{PackageSuffix: "internal/a", Name: "openURL", Kind: KindFunc, NewName: "openUrl"}),
+		propose(
+			test,
+			loaded,
+			target{PackageSuffix: "internal/a", Name: "openURL", Kind: KindFunction, NewName: "openUrl"},
+		),
 		Options{},
 	)
 	requireAccepted(test, result, 1)
@@ -192,7 +200,7 @@ func twice() int { return threadCPU() + threadCPU() }
 	result := Plan(loaded, propose(
 		test,
 		loaded,
-		target{PackageSuffix: "internal/a", Name: "threadCPU", Kind: KindFunc, NewName: "threadCpu"},
+		target{PackageSuffix: "internal/a", Name: "threadCPU", Kind: KindFunction, NewName: "threadCpu"},
 	), Options{})
 	requireAccepted(test, result, 1)
 	applyClean(test, fixture, loaded, result)
@@ -449,7 +457,7 @@ func threadCPU() int { return 0 }
 	result := Plan(loaded, propose(
 		test,
 		loaded,
-		target{PackageSuffix: "internal/a", Name: "threadCPU", Kind: KindFunc, NewName: "threadCpu"},
+		target{PackageSuffix: "internal/a", Name: "threadCPU", Kind: KindFunction, NewName: "threadCpu"},
 	), Options{})
 	requireAccepted(test, result, 1)
 	if len(result.TwinEdits) != 0 {
@@ -485,7 +493,7 @@ func threadCPU() int { return 0 }
 	result := Plan(loaded, propose(
 		test,
 		loaded,
-		target{PackageSuffix: "internal/a", Name: "threadCPU", Kind: KindFunc, NewName: "threadCpu"},
+		target{PackageSuffix: "internal/a", Name: "threadCPU", Kind: KindFunction, NewName: "threadCpu"},
 	), Options{})
 	requireAccepted(test, result, 1)
 	applyClean(test, fixture, loaded, result)
@@ -535,7 +543,7 @@ func Run() int { return threadCPU() }
 		result := Plan(loaded, propose(
 			test,
 			loaded,
-			target{PackageSuffix: "internal/a", Name: "threadCPU", Kind: KindFunc, NewName: "threadCpu"},
+			target{PackageSuffix: "internal/a", Name: "threadCPU", Kind: KindFunction, NewName: "threadCpu"},
 		), Options{})
 		if len(result.Accepted) != 0 || len(result.TwinEdits) != 0 {
 			test.Fatalf("%s: accepted %+v with twin edits %+v", name, result.Accepted, result.TwinEdits)
