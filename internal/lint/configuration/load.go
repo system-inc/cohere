@@ -219,6 +219,8 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 //     inherited ruling, where the departure's reason already does. A `reasons` entry for a rule the file
 //     does not turn off at top level is refused, so that list cannot rot either. The reason follows the
 //     rule up the chain until a later file turns it back on.
+//   - Under LoadFor, a rule key in any file of the chain, at top level or in an override, that reaches no
+//     registered rule is refused, so a ruling cannot load and apply to nothing (refuseKeysReachingNoRule).
 //
 // Load matches inherited rulings by exact key. LoadFor, which the command uses, also knows which rules
 // are registered, and that is what lets it tell a respelling from a twin; see sameRuling.
@@ -307,6 +309,9 @@ func loadLayers(layers []configurationLayer, root string, registeredNames []stri
 		holdsToReasons := inOurTiers || IsSet(layer.path)
 		if checkReasonsError := checkReasons(layer); checkReasonsError != nil {
 			return nil, checkReasonsError
+		}
+		if refuseKeysReachingNoRuleError := refuseKeysReachingNoRule(layer, reach); refuseKeysReachingNoRuleError != nil {
+			return nil, refuseKeysReachingNoRuleError
 		}
 		for name, value := range layer.raw.Rules {
 			setting, parseRuleSettingError := parseRuleSetting(value)
@@ -811,6 +816,62 @@ func checkReasons(layer configurationLayer) error {
 		}
 	}
 	return nil
+}
+
+// refuseKeysReachingNoRule refuses a rule key, at top level or in an override, that configures no registered
+// rule: a typo, a name a rule was renamed from, or a rule only a newer cohere has (#yv90vjs).
+//
+// Such a key loaded, resolved to nothing, and the run read green with its ruling applied nowhere: an `error`
+// enforcing nothing, an `off` recording a decision about no rule. Only `--verbose` said so, and only of
+// top-level keys. It is the silent drop checkTopLevelKeys refuses, one level down, and refused rather than
+// warned of for the reason given there. The Go engine refuses an unknown key in its `go` block at load, and
+// the Swift engine one in its `swift` block; this is the TypeScript loader's.
+//
+// Asked through reach, which asks KeyReachesRule, the resolver's own test, so a key refused here is exactly
+// one the resolver could never apply. `unused-disable` is the engine's setting rather than a rule, and passes.
+// `reasons` and `departures` need no check of their own: an entry in either must name a key the same file
+// writes under "rules" (checkReasons, and the departures check in loadLayers), and that key is judged here.
+//
+// Load knows no registered names, so it judges nothing: every command load goes through LoadFor.
+func refuseKeysReachingNoRule(layer configurationLayer, reach *ruleReach) error {
+	if reach.registeredNames == nil {
+		return nil
+	}
+	if unknown := keysReachingNoRule(layer.raw.Rules, reach); len(unknown) > 0 {
+		return unknownRuleKeysError("lint config "+layer.path, unknown)
+	}
+	for overrideIndex, rawOverride := range layer.raw.Overrides {
+		if unknown := keysReachingNoRule(rawOverride.Rules, reach); len(unknown) > 0 {
+			return unknownRuleKeysError(fmt.Sprintf("lint config %s: override %d", layer.path, overrideIndex), unknown)
+		}
+	}
+	return nil
+}
+
+// unknownRuleKeysError is the refusal of keys that reach no rule, one sentence for a top-level block and an
+// override alike, where saying which block.
+func unknownRuleKeysError(where string, unknown []string) error {
+	names := "that name"
+	if len(unknown) > 1 {
+		names = "those names"
+	}
+	return fmt.Errorf("%s names %s under \"rules\", and this cohere registers no rule by %s: the setting would "+
+		"load and apply to nothing, so the run would read as enforcing it. Correct the name (cohere --rules "+
+		"lists every rule), or remove the entry", where, strings.Join(quoteEach(unknown), ", "), names)
+}
+
+// keysReachingNoRule is every key of rules that reaches no registered rule, sorted, so one refusal names
+// them all and names them in the same order on every run.
+func keysReachingNoRule(rules map[string]json.RawMessage, reach *ruleReach) []string {
+	var unknown []string
+	for key := range rules {
+		if key == UnusedDisable || len(reach.of(key)) > 0 {
+			continue
+		}
+		unknown = append(unknown, key)
+	}
+	sort.Strings(unknown)
+	return unknown
 }
 
 // refuseUnreasonedOffs refuses a chain that turns a rule off at top level with no file saying why.
