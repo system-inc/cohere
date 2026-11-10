@@ -165,6 +165,7 @@
         "base/correctness-require-serializable-nullable-parity": "error",
         "base/correctness-require-verify-array-parity": "error",
         "base/correctness-require-verify-optional-parity": "error",
+        "nexus/consistency-no-abbreviated-file-name": "error",
         "nexus/consistency-no-abbreviated-identifier": "error",
         "nexus/consistency-require-constant-casing": "error",
         "nexus/consistency-require-identifier-casing": "error",
