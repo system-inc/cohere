@@ -178,7 +178,7 @@
         "name": "cohere:next",
         "extends": ["cohere:typescript"],
         "plugins": ["@next"],
-        "rulesOn": 305,
+        "rulesOn": 306,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -888,10 +888,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-no-abbreviated-file-name",
-                "severity": "off"
-            },
-            {
                 "name": "nexus/consistency-no-ambiguous-identifier",
                 "severity": "error"
             },
@@ -953,7 +949,7 @@
             },
             {
                 "name": "nexus/consistency-no-utils-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-utils-folder",
@@ -1737,7 +1733,7 @@
         "name": "cohere:react",
         "extends": ["cohere:typescript"],
         "plugins": ["react", "react-hooks"],
-        "rulesOn": 370,
+        "rulesOn": 371,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2359,10 +2355,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-no-abbreviated-file-name",
-                "severity": "off"
-            },
-            {
                 "name": "nexus/consistency-no-ambiguous-identifier",
                 "severity": "error"
             },
@@ -2424,7 +2416,7 @@
             },
             {
                 "name": "nexus/consistency-no-utils-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-utils-folder",
@@ -3551,7 +3543,7 @@
     },
     {
         "name": "cohere:style",
-        "rulesOn": 142,
+        "rulesOn": 143,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3885,10 +3877,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-no-abbreviated-file-name",
-                "severity": "off"
-            },
-            {
                 "name": "nexus/consistency-no-ambiguous-identifier",
                 "severity": "error"
             },
@@ -3950,7 +3938,7 @@
             },
             {
                 "name": "nexus/consistency-no-utils-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-utils-folder",
@@ -4313,7 +4301,7 @@
     {
         "name": "cohere:system-inc/base",
         "extends": ["cohere:typescript"],
-        "rulesOn": 295,
+        "rulesOn": 297,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5172,7 +5160,7 @@
             },
             {
                 "name": "nexus/consistency-no-abbreviated-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-abbreviated-identifier",
@@ -5240,7 +5228,7 @@
             },
             {
                 "name": "nexus/consistency-no-utils-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-utils-folder",
@@ -6139,7 +6127,7 @@
         "name": "cohere:system-inc/structure",
         "extends": ["cohere:typescript"],
         "plugins": ["@typescript-eslint"],
-        "rulesOn": 303,
+        "rulesOn": 305,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6834,7 +6822,7 @@
             },
             {
                 "name": "nexus/consistency-no-abbreviated-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-abbreviated-identifier",
@@ -6920,7 +6908,7 @@
             },
             {
                 "name": "nexus/consistency-no-utils-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-utils-folder",
@@ -7867,7 +7855,7 @@
     {
         "name": "cohere:tailwind",
         "extends": ["cohere:typescript"],
-        "rulesOn": 294,
+        "rulesOn": 295,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8537,10 +8525,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-no-abbreviated-file-name",
-                "severity": "off"
-            },
-            {
                 "name": "nexus/consistency-no-ambiguous-identifier",
                 "severity": "error"
             },
@@ -8602,7 +8586,7 @@
             },
             {
                 "name": "nexus/consistency-no-utils-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-utils-folder",
@@ -9370,7 +9354,7 @@
     {
         "name": "cohere:typescript",
         "extends": ["cohere:adamic", "cohere:style"],
-        "rulesOn": 282,
+        "rulesOn": 283,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9992,10 +9976,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-no-abbreviated-file-name",
-                "severity": "off"
-            },
-            {
                 "name": "nexus/consistency-no-ambiguous-identifier",
                 "severity": "error"
             },
@@ -10057,7 +10037,7 @@
             },
             {
                 "name": "nexus/consistency-no-utils-file-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-no-utils-folder",

@@ -473,6 +473,7 @@ public struct Pipeline {
                     refusals: [:],
                     reformatted: 0,
                     notFormatted: ["a file in scope does not parse, so nothing was rewritten": parsed.files.count],
+                    notWritten: [],
                 )
             )
             try writer.write(
@@ -573,6 +574,29 @@ public struct Pipeline {
             var changedFiles: [FixRecord.ChangedFile] = []
             var reformatted = 0
             var notFormatted: [String: Int] = [:]
+            var notWritten: [FixRecord.NotWrittenFile] = []
+            /*
+             The root with every link resolved, which no file the phase writes may lie outside (#723rzxm). A root that
+             does not resolve is taken as given, which can only refuse more: no real path lies below a path with a link
+             in it.
+             */
+            let realRoot = SourceWrite.realPath(of: root) ?? root.standardizedFileURL.path
+            /*
+             A file the phase does not write, under `--no-fix` or outside the root, is reported as what formatting would
+             change: one finding per file, at the first line that moves.
+             */
+            func notFormattedFinding(_ file: ParsedFile, line: Int) -> FindingRecord {
+                FindingRecord(
+                    source: .format,
+                    file: file.url.path,
+                    line: line,
+                    column: 1,
+                    severity: .error,
+                    rule: "cohere-swift/consistency-require-formatting",
+                    messageId: "notFormatted",
+                    message: "not formatted the house way; a run without --no-fix rewrites it",
+                )
+            }
             for (file, outcome) in formatting.outcomes {
                 var final = file.source
                 var formattedHere = false
@@ -581,33 +605,49 @@ public struct Pipeline {
                         break
                     case let .changed(formatted):
                         final = formatted
-                        reformatted += 1
                         formattedHere = true
                     case let .wouldChange(line):
-                        /* `--no-fix` writes nothing and reports what it would have changed, one finding per file, at the first line that moves. */
-                        try writer.write(
-                            FindingRecord(
-                                source: .format,
-                                file: file.url.path,
-                                line: line,
-                                column: 1,
-                                severity: .error,
-                                rule: "cohere-swift/consistency-require-formatting",
-                                messageId: "notFormatted",
-                                message: "not formatted the house way; a run without --no-fix rewrites it",
-                            )
-                        )
+                        try writer.write(notFormattedFinding(file, line: line))
                     case let .failed(reason):
                         notFormatted["the formatter failed: \(reason)", default: 0] += 1
                         complete = false
+                }
+                /* Where the one write of a file whose text moved would go; nil for a file the run leaves as it is. */
+                let destination =
+                    options.mutate && final != originals[file.url.path]
+                    ? SourceWrite.destination(of: file.url, root: realRoot) : nil
+                /*
+                 A file reached through a link to outside the root is checked as `--no-fix` checks it and never
+                 written: none of its fixes landed, lint walks the text on disk, so the findings they would have fixed
+                 report, and the formatter's verdict on that text is a finding. It is named, and the run is incomplete.
+                 */
+                if case let .outside(realPath) = destination {
+                    notWritten.append(FixRecord.NotWrittenFile(file: file.url.path, realPath: realPath))
+                    complete = false
+                    fixesApplied -= (fixedByFile[file.url.path] ?? [:]).values.reduce(0, +)
+                    if options.runFormat, let original = originals[file.url.path],
+                        case let .changed(formatted) = FormatPhase.format(
+                            source: original,
+                            url: file.url,
+                            configuration: HouseSwiftFormat.configuration,
+                        )
+                    {
+                        try writer.write(
+                            notFormattedFinding(file, line: FormatPhase.firstDifferingLine(original, formatted))
+                        )
+                    }
+                    continue
+                }
+                if formattedHere {
+                    reformatted += 1
                 }
                 /* The fixer walked exactly this text when the formatter left it as the fixer did, so its findings are lint's. */
                 if final == file.source, let found = fixerFindings[file.url.path] {
                     reusableFindings[file.url.path] = found
                 }
                 /* One write per file, of the fixed and formatted text, and only when it differs from what was read. */
-                if options.mutate, final != originals[file.url.path] {
-                    try final.write(to: file.url, atomically: true, encoding: .utf8)
+                if case let .inside(realPath) = destination {
+                    try SourceWrite.write(final, toRealPath: realPath)
                     changedFiles.append(
                         FixRecord.ChangedFile(
                             file: file.url.path,
@@ -647,6 +687,7 @@ public struct Pipeline {
                     refusals: refusals,
                     reformatted: reformatted,
                     notFormatted: notFormatted,
+                    notWritten: notWritten.sorted { $0.file < $1.file },
                 )
             )
             try writer.write(
@@ -1187,6 +1228,7 @@ public struct Pipeline {
         refusals: [String: Int],
         reformatted: Int,
         notFormatted: [String: Int],
+        notWritten: [FixRecord.NotWrittenFile],
     ) -> FixRecord {
         FixRecord(
             filesConsidered: considered,
@@ -1201,6 +1243,7 @@ public struct Pipeline {
                 ? "none: formatting was left out (--no-format)"
                 : scope.everything ? "every file in the package" : scope.description,
             changedFiles: rewritten,
+            notWritten: notWritten,
         )
     }
 

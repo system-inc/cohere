@@ -19,6 +19,7 @@ struct ContractFixtureTests {
 
     static let fixtureNames = [
         "Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused", "LintOnly", "FormatOnly",
+        "NotWritten",
     ]
 
     @Test(arguments: fixtureNames)

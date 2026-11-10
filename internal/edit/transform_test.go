@@ -31,6 +31,7 @@ func TestTransformRunsAfterFixesAndSeesTheFixedText(test *testing.T) {
 	}
 
 	result, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		transform,
@@ -72,6 +73,7 @@ func TestATransformProducingInvalidSyntaxIsRefused(test *testing.T) {
 	}
 
 	result, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		breaking,
@@ -121,6 +123,7 @@ func TestATransformThatErrorsDoesNotBlockFixes(test *testing.T) {
 	}
 
 	result, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		failing,
@@ -164,6 +167,7 @@ func TestTransformRunsWhenNoFixLanded(test *testing.T) {
 	}
 
 	result, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeOnce(),
 		func(_ string, text string, _ *ast.SourceFile) (string, error) {
@@ -205,6 +209,7 @@ func TestAnIdentityTransformDoesNotTouchTheFile(test *testing.T) {
 	}
 
 	result, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeOnce(),
 		func(_ string, text string, _ *ast.SourceFile) (string, error) {
@@ -292,6 +297,7 @@ func TestFixFileIsFixAndTransformWithNoTransform(test *testing.T) {
 	}
 
 	firstResult, fixFileError := FixFile(
+		rootOf(test, withFixFile),
 		withFixFile,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		DefaultMaxPasses,
@@ -300,6 +306,7 @@ func TestFixFileIsFixAndTransformWithNoTransform(test *testing.T) {
 		test.Fatal(fixFileError)
 	}
 	secondResult, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, withNilTransform),
 		withNilTransform,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		nil,
@@ -358,7 +365,13 @@ func TestATransformCanSkipAFileAndTheSkipIsRecorded(test *testing.T) {
 		return "", fmt.Errorf("%w: markdown doubles a standalone tilde", ErrSkipped)
 	}
 
-	result, fixAndTransformFileError := FixAndTransformFile(fileName, proposeOnce(), skipping, DefaultMaxPasses)
+	result, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, fileName),
+		fileName,
+		proposeOnce(),
+		skipping,
+		DefaultMaxPasses,
+	)
 	if fixAndTransformFileError != nil {
 		test.Fatalf("a skip must not be an error: %v", fixAndTransformFileError)
 	}
@@ -455,6 +468,7 @@ func TestASkipWithNoReasonIsStillCounted(test *testing.T) {
 	}
 
 	result, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeOnce(),
 		func(_ string, _ string, _ *ast.SourceFile) (string, error) {
@@ -582,6 +596,7 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(test *testing.T) {
 		test.Fatal(checkFileError)
 	}
 	writeResult, fixAndTransformFileError := FixAndTransformFile(
+		rootOf(test, written),
 		written,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		transform,

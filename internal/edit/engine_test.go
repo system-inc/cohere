@@ -225,7 +225,12 @@ func TestFixFileWritesAtomicallyAndKeepsMode(test *testing.T) {
 		test.Fatal(changeModeError)
 	}
 
-	result, fixFileError := FixFile(fileName, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
+	result, fixFileError := FixFile(
+		rootOf(test, fileName),
+		fileName,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		DefaultMaxPasses,
+	)
 	if fixFileError != nil {
 		test.Fatalf("unexpected error: %v", fixFileError)
 	}
@@ -279,7 +284,7 @@ func TestFixFileDoesNotTouchAnUnchangedFile(test *testing.T) {
 		test.Fatal(statError)
 	}
 
-	result, fixFileError := FixFile(fileName, proposeOnce(), DefaultMaxPasses)
+	result, fixFileError := FixFile(rootOf(test, fileName), fileName, proposeOnce(), DefaultMaxPasses)
 	if fixFileError != nil {
 		test.Fatalf("unexpected error: %v", fixFileError)
 	}
@@ -309,6 +314,7 @@ func TestFixFileLeavesTheFileUntouchedOnRefusal(test *testing.T) {
 
 	closingBrace := strings.LastIndex(source, "}")
 	result, fixFileError := FixFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeOnce(proposal("brace-eater", closingBrace, closingBrace+1, "")),
 		DefaultMaxPasses,
@@ -333,7 +339,12 @@ func TestFixFileLeavesTheFileUntouchedOnRefusal(test *testing.T) {
 // reports success, which is the shape of every silent-green failure this project has recorded.
 func TestMissingFileIsAnError(test *testing.T) {
 	test.Parallel()
-	_, fixFileError := FixFile(filepath.Join(test.TempDir(), "absent.ts"), proposeOnce(), DefaultMaxPasses)
+	_, fixFileError := FixFile(
+		rootOf(test, filepath.Join(test.TempDir(), "absent.ts")),
+		filepath.Join(test.TempDir(), "absent.ts"),
+		proposeOnce(),
+		DefaultMaxPasses,
+	)
 	if fixFileError == nil {
 		test.Fatalf("expected an error for a file that does not exist")
 	}

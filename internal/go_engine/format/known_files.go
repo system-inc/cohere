@@ -73,6 +73,16 @@ func (known *KnownFiles) verdict(digest [sha256.Size]byte, wraps bool) (Verdict,
 	return verdict, true
 }
 
+// KeepAll keeps every verdict known, those the run never read included, for a run that reads only a few files, the
+// editor's save, and whose keeping must not drop the rest.
+func (known *KnownFiles) KeepAll() {
+	known.lock.Lock()
+	defer known.lock.Unlock()
+	for digest, verdict := range known.verdicts {
+		known.seen[digest] = verdict
+	}
+}
+
 // learn keeps what the run made of a file with digest.
 func (known *KnownFiles) learn(digest [sha256.Size]byte, verdict Verdict) {
 	known.lock.Lock()

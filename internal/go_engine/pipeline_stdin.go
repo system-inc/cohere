@@ -65,6 +65,12 @@ func (engine *pipeline) runStdin(output io.Writer) int {
 	// spelled from the bytes its finding's position is in.
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, names)
 	engine.runRename(loaded, loadError)
+	if engine.fix.known != nil {
+		// A save looks up one file's verdict, and the record keeps only what a run read or learned, so kept as it is it
+		// would drop every other file's and the next plain run would format them all again (#h6dvf3j). So a save keeps
+		// every verdict it read beside what it learned; a plain run still drops the files long gone.
+		engine.fix.known.KeepAll()
+	}
 	engine.keepKnownFiles(engine.fix.known)
 	return writeStdin(output, engine.described.contents[path], engine.standardError)
 }

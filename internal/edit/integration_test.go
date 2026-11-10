@@ -98,6 +98,7 @@ func TestARealRuleFixLandsCorrectly(test *testing.T) {
 	}
 
 	result, fixFileError := FixFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeFromRules(unconfigured(nexus.ImportRequireNodeNamespace)),
 		DefaultMaxPasses,
@@ -240,6 +241,7 @@ func TestAFindingWithNoFixChangesNothing(test *testing.T) {
 	}
 
 	result, fixFileError := FixFile(
+		rootOf(test, fileName),
 		fileName,
 		proposeFromRules(unconfigured(nexus.ImportRequireNodeNamespace)),
 		DefaultMaxPasses,
@@ -296,7 +298,12 @@ func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, fixFileError := FixFile(fileName, proposeFromRules(unconfigured(breakingRule)), DefaultMaxPasses)
+	result, fixFileError := FixFile(
+		rootOf(test, fileName),
+		fileName,
+		proposeFromRules(unconfigured(breakingRule)),
+		DefaultMaxPasses,
+	)
 	if fixFileError != nil {
 		test.Fatalf("unexpected error: %v", fixFileError)
 	}
@@ -380,7 +387,12 @@ func TestAFileThatDoesNotConvergeIsNotWritten(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, fixFileError := FixFile(fileName, proposeFromRules(unconfigured(nonSilencingRule)), DefaultMaxPasses)
+	result, fixFileError := FixFile(
+		rootOf(test, fileName),
+		fileName,
+		proposeFromRules(unconfigured(nonSilencingRule)),
+		DefaultMaxPasses,
+	)
 	if fixFileError != nil {
 		test.Fatalf("unexpected error: %v", fixFileError)
 	}

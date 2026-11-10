@@ -441,9 +441,20 @@ func (report *pipelineReport) Write(out *bufio.Writer) {
 	// The format project has no program, so the type check and the lint rules it never runs are no gap in it.
 	if !report.checkedEverything() && !activeSummary.FormatProject {
 		fmt.Fprintf(out, "  this run did not check everything: the phases above say what was not checked\n")
-	} else if report.incompleteBeyondPhases != "" {
-		fmt.Fprintf(out, "  this run did not check everything: %s\n", report.incompleteBeyondPhases)
+	} else if incompleteness := report.incompleteness(); incompleteness != "" {
+		fmt.Fprintf(out, "  this run did not check everything: %s\n", incompleteness)
 	}
+}
+
+// incompleteness is what the run fell short of once every phase it was asked for ran: the sentence a path set, or,
+// when the only gap is files whose fixes were not written, since a link leads each outside the root, that. TypeScript's
+// run sets that gap with no engine record to decide the sentence, so it is read from the gap here (#td3zta2). A crash,
+// or a file nothing checked, is the larger gap and keeps its own sentence.
+func (report *pipelineReport) incompleteness() string {
+	if report.incompleteBeyondPhases == "" && len(activeSummary.Gaps.NotWritten) > 0 {
+		return notWrittenSentence
+	}
+	return report.incompleteBeyondPhases
 }
 
 // writeAccounting states how much of the run the phases above actually explain.

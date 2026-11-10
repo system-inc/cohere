@@ -73,6 +73,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 			func() (edit.Transform, []string) { return formatTransform(engine), enumeration.Files },
 			wholeTreeScope(),
 			graph.Anchor.Root(),
+			writeRootOf(test, graph.Anchor.Root()),
 			0,
 			write,
 			nil,

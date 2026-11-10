@@ -38,6 +38,7 @@
         "nexus/consistency-no-single-line-jsdoc": "error",
         "nexus/consistency-no-stuttering-name": "error",
         "nexus/consistency-no-utils-folder": "error",
+        "nexus/consistency-no-utils-file-name": "error",
         "nexus/consistency-require-separated-folder-words": "error",
         "nexus/consistency-require-type-suffix": "error",
         "nexus/import-require-module-alias": "error",
@@ -190,9 +191,7 @@
         "id-denylist": "off",
         "id-match": "off",
         "no-restricted-exports": "off",
-        "no-restricted-imports": "off",
-        "nexus/consistency-no-utils-file-name": "off",
-        "nexus/consistency-no-abbreviated-file-name": "off"
+        "no-restricted-imports": "off"
     },
     "reasons": {
         "dot-notation": "@typescript-eslint/dot-notation runs in its place: the same check, reading types, so a protected member reached through brackets, which TypeScript allows from a subclass or a test, is not reported (#qv7evaa, #79aqact).",
@@ -227,9 +226,7 @@
         "id-denylist": "It does nothing without a list, and the house's name bans live in nexus/ rules (#e4cn6wq Block 4).",
         "id-match": "It does nothing without a pattern, and casing is ruled by nexus/consistency-require-constant-casing (#e4cn6wq Block 4).",
         "no-restricted-exports": "It does nothing without a list, and no export name is banned (#e4cn6wq Block 4).",
-        "no-restricted-imports": "It does nothing without a list: api writes one where it needs one, and ahra and www ban sources through nexus/import-no-forbidden-source (#e4cn6wq Block 4).",
-        "nexus/consistency-no-utils-file-name": "Off until the census of the house's trees is routed and each finding renamed, so it turns on at zero (#2xt6v5r, step 1).",
-        "nexus/consistency-no-abbreviated-file-name": "Off until the census of the house's trees is routed and each finding renamed, so it turns on at zero (#2xt6v5r, step 1); step 2 widens the vocabulary first."
+        "no-restricted-imports": "It does nothing without a list: api writes one where it needs one, and ahra and www ban sources through nexus/import-no-forbidden-source (#e4cn6wq Block 4)."
     },
     "overrides": [
         {

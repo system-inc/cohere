@@ -19,6 +19,17 @@ public struct FixRecord: Codable, Equatable, Sendable {
         }
     }
 
+    /* One file the phase would have written and did not: the path as the run reached it, and where it really is. */
+    public struct NotWrittenFile: Codable, Equatable, Sendable {
+        public var file: String
+        public var realPath: String
+
+        public init(file: String, realPath: String) {
+            self.file = file
+            self.realPath = realPath
+        }
+    }
+
     public var kind = "fix"
     public var filesConsidered: Int
     public var filesRewritten: Int
@@ -34,6 +45,12 @@ public struct FixRecord: Codable, Equatable, Sendable {
      engine always writes it, and a stream from an engine before it has none, which decodes as nil.
      */
     public var changedFiles: [ChangedFile]?
+    /*
+     Every file the phase would have written and did not, since its real path, every link resolved, lies outside the
+     run's root (#723rzxm), sorted by file. Additive within contract 3, in the Go engine's shape: this engine always
+     writes it, `[]` when there were none, and a stream from an engine before it has none, which decodes as nil.
+     */
+    public var notWritten: [NotWrittenFile]?
 
     public init(
         filesConsidered: Int,
@@ -46,6 +63,7 @@ public struct FixRecord: Codable, Equatable, Sendable {
         notFormattedReasons: [String: Int],
         formatScope: String,
         changedFiles: [ChangedFile]?,
+        notWritten: [NotWrittenFile]?,
     ) {
         self.filesConsidered = filesConsidered
         self.filesRewritten = filesRewritten
@@ -57,5 +75,6 @@ public struct FixRecord: Codable, Equatable, Sendable {
         self.notFormattedReasons = notFormattedReasons
         self.formatScope = formatScope
         self.changedFiles = changedFiles
+        self.notWritten = notWritten
     }
 }

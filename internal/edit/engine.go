@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // DefaultMaxPasses bounds convergence.
@@ -75,6 +76,12 @@ type FileResult struct {
 
 	// TransformSkipReason is why, in the transform's own words. Empty when it did not say.
 	TransformSkipReason string
+
+	// NotWritten is the file's real path when a run that writes left it as it was because that path,
+	// every symbolic link resolved, is outside the run's root (#td3zta2). The fixes and the format were
+	// computed and checked as for any file, and Changed is false, since nothing reached the disk. Empty
+	// for every other file, and on a run that writes nothing, which never asks.
+	NotWritten string
 
 	// Failed is set when the engine could not process the file at all: unreadable, unwritable, or
 	// already unparseable before anything was applied.
@@ -280,8 +287,8 @@ func ruleNamesOf(proposals []Proposal) []string {
 // A file with nothing to apply is not written at all. Rewriting identical bytes would update the
 // modification time, which invalidates every downstream cache keyed on it and makes a run that
 // changed nothing look like a run that changed everything.
-func FixFile(fileName string, propose Propose, maximumPasses int) (FileResult, error) {
-	return FixAndTransformFile(fileName, propose, nil, maximumPasses)
+func FixFile(root write_root.WriteRoot, fileName string, propose Propose, maximumPasses int) (FileResult, error) {
+	return FixAndTransformFile(root, fileName, propose, nil, maximumPasses)
 }
 
 // Transform is a whole-text rewrite applied after fixes have converged: formatting, in practice.
@@ -350,7 +357,17 @@ func skipReasonOf(transformError error) string {
 // The transform runs even when no fix landed, because a file can be correctly written and badly
 // formatted. It is guarded exactly as a fix pass is: a transform that errors, or whose output does
 // not parse, is discarded whole and the file is left alone.
-func FixAndTransformFile(fileName string, propose Propose, transform Transform, maximumPasses int) (FileResult, error) {
+//
+// root is where the run may write. A file whose real path is outside it is fixed and formatted in memory
+// as any other and never written: the result names its real path in NotWritten, and it is not an error,
+// since nothing failed and the run goes on to say so as a gap (#td3zta2).
+func FixAndTransformFile(
+	root write_root.WriteRoot,
+	fileName string,
+	propose Propose,
+	transform Transform,
+	maximumPasses int,
+) (FileResult, error) {
 	result, checkFileError := CheckFile(fileName, propose, transform, maximumPasses)
 	if checkFileError != nil {
 		return result, checkFileError
@@ -367,7 +384,16 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 		return result, nil
 	}
 
-	if writeAtomicallyError := WriteAtomically(fileName, result.Text); writeAtomicallyError != nil {
+	writeAtomicallyError := WriteAtomically(root, fileName, result.Text)
+	var outside *write_root.OutsideRootError
+	if errors.As(writeAtomicallyError, &outside) {
+		// Refused before anything was created, so the file holds what it held. Not a failure: the
+		// fixes stand as findings, and the run names the file and where it really is.
+		result.Changed = false
+		result.NotWritten = outside.RealPath
+		return result, nil
+	}
+	if writeAtomicallyError != nil {
 		// The file on disk is untouched: the rename is the only step that changes it, and a failure
 		// before it leaves the original intact. Report the fixes as not-applied rather than applied,
 		// so the count matches what a reader would find in the tree.
@@ -615,6 +641,14 @@ type RefusedFile struct {
 	Rules []string
 }
 
+// NotWrittenFile is one file a run that writes left as it was, since its real path, every symbolic link
+// resolved, is outside the run's root (#td3zta2).
+type NotWrittenFile struct {
+	// FileName is the file as the run reached it, and RealPath where it really is.
+	FileName string
+	RealPath string
+}
+
 // NotTransformedFile is one file the whole-text transform left as it was without having shaped it.
 type NotTransformedFile struct {
 	FileName string
@@ -695,6 +729,12 @@ func Summarize(results []FileResult) Summary {
 		summary.FixesRefused += len(result.Rejected)
 		summary.FilesByPasses[result.Passes]++
 
+		if result.NotWritten != "" {
+			summary.NotWritten = append(
+				summary.NotWritten,
+				NotWrittenFile{FileName: result.FileName, RealPath: result.NotWritten},
+			)
+		}
 		if result.Failed {
 			summary.FilesFailed = append(summary.FilesFailed, result.FileName)
 		} else if !result.Converged {
@@ -748,6 +788,9 @@ func Summarize(results []FileResult) Summary {
 		return summary.FilesRefused[first].FileName < summary.FilesRefused[second].FileName
 	})
 	sort.Strings(summary.FilesFailed)
+	sort.Slice(summary.NotWritten, func(first, second int) bool {
+		return summary.NotWritten[first].FileName < summary.NotWritten[second].FileName
+	})
 	sort.Slice(summary.ChangedFiles, func(first, second int) bool {
 		return summary.ChangedFiles[first].FileName < summary.ChangedFiles[second].FileName
 	})
