@@ -25,7 +25,7 @@ func (key *TrackedIgnoredKey) stillDecides(index string) error {
 	if newError != nil {
 		return fmt.Errorf("%w: %s moved, and its ignore rules cannot be read: %w", ErrRunCacheMiss, index, newError)
 	}
-	if matcher.IndexFile() != index {
+	if !matcher.ReadsIndex(index) {
 		return fmt.Errorf("%w: %s moved, and the repository at %s now reads its index from %q", ErrRunCacheMiss,
 			index, key.Root, matcher.IndexFile())
 	}

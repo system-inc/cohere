@@ -173,3 +173,67 @@ func TestAKeyedIndexThatCannotBeReadAgainMisses(test *testing.T) {
 			checkError)
 	}
 }
+
+// TestAWorktreesIndexNamedThroughALinkReplays: a worktree made under a directory reached through a link, as a temp
+// directory is on macOS (/var is /private/var), has its index named by the path the caller holds, while git writes the
+// worktree's pointer to its git directory by the real path, so the matcher reads the same file under another spelling.
+// The index is keyed all the same, and replays after a `git status` rewrote it (#ny1mv0y). Skipped where the temp
+// directory reaches no link, since then the two spellings are one.
+func TestAWorktreesIndexNamedThroughALinkReplays(test *testing.T) {
+	test.Parallel()
+	linked := test.TempDir()
+	resolved, resolveError := filepath.EvalSymlinks(linked)
+	if resolveError != nil {
+		test.Fatal(resolveError)
+	}
+	if resolved == linked {
+		test.Skip("the temp directory is reached through no link here, so its spellings cannot differ")
+	}
+	main := &trackedIgnoredTree{test: test, root: filepath.Join(linked, "main")}
+	if makeError := os.MkdirAll(main.root, 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	main.git("init", "-q", "-b", "main")
+	for name, contents := range map[string]string{".gitignore": "*.log\n", "main.go": "package main\n",
+		"other.go": "package main\n"} {
+		if writeError := os.WriteFile(filepath.Join(main.root, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	main.git("add", "-A")
+	main.git("commit", "-q", "-m", "first")
+	worktree := filepath.Join(linked, "worktree")
+	main.git("worktree", "add", "-q", worktree)
+
+	// The index as the caller spells it, through the link, and the file git's pointer names, by its real path.
+	tree := &trackedIgnoredTree{test: test, root: worktree,
+		index: filepath.Join(linked, "main", ".git", "worktrees", "worktree", "index")}
+	matcher, newError := gitignore.New(worktree)
+	if newError != nil {
+		test.Fatal(newError)
+	}
+	realIndex, resolveIndexError := filepath.EvalSymlinks(tree.index)
+	if resolveIndexError != nil {
+		test.Fatal(resolveIndexError)
+	}
+	if matcher.IndexFile() == tree.index || matcher.IndexFile() != realIndex {
+		test.Fatalf("the matcher reads %s, which should be the index %s spelled another way", matcher.IndexFile(),
+			tree.index)
+	}
+	digest, digestError := matcher.TrackedIgnoredDigest("")
+	if digestError != nil {
+		test.Fatal(digestError)
+	}
+	files := []string{tree.index, filepath.Join(worktree, "main.go")}
+	cache, recordError := program.RecordRunCacheWithin(nil, "key", files, nil, nil, nil, []byte("output\n"), 0,
+		time.Time{},
+		map[string]program.TrackedIgnoredKey{tree.index: {Root: worktree, Digest: digest}})
+	if recordError != nil {
+		test.Fatal(recordError)
+	}
+	tree.rewriteIndexWithStatus()
+	if checkError := cache.Check("key"); checkError != nil {
+		test.Errorf("a worktree's index named through a link kept the run from replaying after `git status`: %v",
+			checkError)
+	}
+}

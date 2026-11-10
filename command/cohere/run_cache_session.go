@@ -142,7 +142,7 @@ func (session *runCacheSession) trackedIgnoredKeys() map[string]program.TrackedI
 			continue
 		}
 		matcher, newError := gitignore.New(named.root)
-		if newError != nil || matcher.IndexFile() != named.index {
+		if newError != nil || !matcher.ReadsIndex(named.index) {
 			continue
 		}
 		digest, digestError := matcher.TrackedIgnoredDigest(named.scope)
