@@ -9,13 +9,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 )
 
-// The differential: on a real tree, every path's verdict and deciding rule equals git check-ignore's.
+// The differential: on a real tree, every path's verdict and deciding rule equals git check-ignore's, read
+// with the index as git reads it, so a path the index tracks, or a directory holding one, is not ignored.
 //
 // git runs here and nowhere else, as the oracle. It reads the trees named by COHERE_GITIGNORE_TREES
 // (colon separated), and every repository nested in them is compared as a repository of its own, the way
@@ -36,12 +38,13 @@ func TestTheMatcherAgreesWithGitOnRealTrees(test *testing.T) {
 			comparison := compareWithGit(test, oracle, root)
 			pending = append(pending, comparison.nested...)
 			test.Logf(
-				"%s: %d paths compared (%d ignored, %d re-included by a negation, %d decided by no rule), %d ignore files read, %d nested repositories, %d differences",
+				"%s: %d paths compared (%d ignored, %d re-included by a negation, %d decided by no rule, %d tracked though a rule matches), %d ignore files read, %d nested repositories, %d differences",
 				root,
 				comparison.compared,
 				comparison.ignored,
 				comparison.reincluded,
 				comparison.undecided,
+				comparison.trackedUnderRule,
 				comparison.ignoreFiles,
 				len(comparison.nested),
 				len(comparison.differences),
@@ -62,7 +65,9 @@ func TestTheMatcherAgreesWithGitOnRealTrees(test *testing.T) {
 
 // The same differential over generated trees: random names, random ignore files at random depths, and
 // patterns drawn from every construct gitignore(5) describes, so the matcher meets combinations no real
-// tree holds. COHERE_GITIGNORE_GENERATED is how many trees, COHERE_GITIGNORE_SEED fixes the sequence.
+// tree holds. Some files of each tree are added to its index whatever the patterns say, as `git add -f`
+// adds them, so a tracked path under a matching pattern, and inside an excluded directory, is compared too.
+// COHERE_GITIGNORE_GENERATED is how many trees, COHERE_GITIGNORE_SEED fixes the sequence.
 func TestTheMatcherAgreesWithGitOnGeneratedTrees(test *testing.T) {
 	test.Parallel()
 	generated := os.Getenv("COHERE_GITIGNORE_GENERATED")
@@ -81,7 +86,7 @@ func TestTheMatcherAgreesWithGitOnGeneratedTrees(test *testing.T) {
 	random := rand.New(rand.NewSource(seed))
 	oracle := newOracle(test)
 
-	compared, ignored, reincluded, failing := 0, 0, 0, 0
+	compared, ignored, reincluded, trackedUnderRule, failing := 0, 0, 0, 0, 0
 	for tree := 0; tree < count; tree++ {
 		root := filepath.Join(oracle.scratch, fmt.Sprintf("generated-%d", tree))
 		exclude := generateTree(test, random, root)
@@ -89,10 +94,12 @@ func TestTheMatcherAgreesWithGitOnGeneratedTrees(test *testing.T) {
 		if exclude != "" {
 			writeTree(test, root, map[string]string{ExcludeFile: exclude})
 		}
+		trackRandomFiles(test, oracle, random, root)
 		comparison := compareWithGit(test, oracle, root)
 		compared += comparison.compared
 		ignored += comparison.ignored
 		reincluded += comparison.reincluded
+		trackedUnderRule += comparison.trackedUnderRule
 		if len(comparison.differences) > 0 {
 			failing++
 			if failing <= 5 {
@@ -107,20 +114,23 @@ func TestTheMatcherAgreesWithGitOnGeneratedTrees(test *testing.T) {
 		}
 	}
 	test.Logf(
-		"%d generated trees, %d paths compared (%d ignored, %d re-included by a negation), %d trees with a difference",
+		"%d generated trees, %d paths compared (%d ignored, %d re-included by a negation, %d tracked though a rule matches), %d trees with a difference",
 		count,
 		compared,
 		ignored,
 		reincluded,
+		trackedUnderRule,
 		failing,
 	)
-	// Trees whose rules decided nothing would agree with git without testing the matcher.
-	if compared == 0 || ignored == 0 || reincluded == 0 {
+	// Trees whose rules decided nothing, or whose index tracked nothing a rule matched, would agree with git
+	// without testing the matcher.
+	if compared == 0 || ignored == 0 || reincluded == 0 || trackedUnderRule == 0 {
 		test.Errorf(
-			"the generated trees exercised too little: %d compared, %d ignored, %d re-included",
+			"the generated trees exercised too little: %d compared, %d ignored, %d re-included, %d tracked though a rule matches",
 			compared,
 			ignored,
 			reincluded,
+			trackedUnderRule,
 		)
 	}
 }
@@ -231,8 +241,11 @@ type verdict struct {
 
 type comparison struct {
 	compared, ignored, reincluded, undecided, ignoreFiles int
-	nested                                                []string
-	differences                                           []string
+	// trackedUnderRule counts the paths the index tracks that the ignore files alone would ignore: the answer
+	// reading the index changes.
+	trackedUnderRule int
+	nested           []string
+	differences      []string
 }
 
 // compareWithGit decides every path in the repository at root with the matcher and with git, and lists
@@ -274,11 +287,17 @@ func compareWithGit(test *testing.T, oracle *oracle, root string) comparison {
 			ignored, source := scope.Ignored(relative, isDirectory)
 			ours[relative] = verdict{ignored, source}
 			paths = append(paths, relative)
+			rulesOnly := *scope
+			rulesOnly.index = nil
+			if ignoredByRules, _ := rulesOnly.Ignored(relative, isDirectory); ignoredByRules && !ignored {
+				result.trackedUnderRule++
+			}
 			if isDirectory {
-				// Below an excluded directory every path takes the same answer, from the rule that excluded
-				// the directory. Its own entries are compared, which shows the answer is inherited; going
-				// deeper (node_modules, a build cache) would compare that one fact many thousands of times.
-				if excluded, _ := scope.Excluded(); excluded {
+				// Below an excluded directory every untracked path takes the same answer, from the rule that
+				// excluded the directory. Its own entries are compared, which shows the answer is inherited;
+				// going deeper (node_modules, a build cache) would compare that one fact many thousands of
+				// times. A directory holding a tracked path is entered, since its answers differ.
+				if excluded, _ := scope.Excluded(); excluded && ignored {
 					continue
 				}
 				child, enterError := scope.Enter(relative)
@@ -291,42 +310,31 @@ func compareWithGit(test *testing.T, oracle *oracle, root string) comparison {
 	}
 	walk(matcher, "")
 
-	var input bytes.Buffer
+	// check-ignore asks the index whether each path, as a pathspec, matches a tracked path, and a pathspec is a
+	// glob there, which `--literal-pathspecs` would fix and check-ignore refuses: `star*/x` would match a
+	// tracked `star*/deeper/x`. So a path holding a glob character is asked of the rules alone, with
+	// `--no-index`, and of the index by git's own listing of it, read literally: tracked, or a directory holding
+	// a tracked path, it is not ignored and no rule decided it, which is what check-ignore answers for one.
+	var literal []string
+	var globbed []string
 	for _, relative := range paths {
-		input.WriteString(relative)
-		input.WriteByte(0)
-	}
-	output := oracle.run(
-		test,
-		root,
-		input.Bytes(),
-		"check-ignore",
-		"--no-index",
-		"--verbose",
-		"--non-matching",
-		"-z",
-		"--stdin",
-	)
-	fields := bytes.Split(bytes.TrimSuffix(output, []byte{0}), []byte{0})
-	if len(output) > 0 && len(fields)%4 != 0 {
-		test.Fatalf("%s: git printed %d fields, not a multiple of four", root, len(fields))
-	}
-	theirs := map[string]verdict{}
-	for index := 0; index+3 < len(fields); index += 4 {
-		file, line, pattern, relative := string(
-			fields[index],
-		), string(fields[index+1]), string(fields[index+2]), string(fields[index+3])
-		if file == "" {
-			theirs[relative] = verdict{}
-			continue
+		if strings.ContainsAny(relative, `*?[\`) {
+			globbed = append(globbed, relative)
+		} else {
+			literal = append(literal, relative)
 		}
-		lineNumber, parseError := strconv.Atoi(line)
-		if parseError != nil {
-			test.Fatalf("%s: git printed line %q for %s", root, line, relative)
-		}
-		theirs[relative] = verdict{
-			ignored: !strings.HasPrefix(pattern, "!"),
-			source:  Source{File: file, Line: lineNumber, Pattern: pattern},
+	}
+	theirs := checkIgnore(test, oracle, root, literal)
+	if len(globbed) > 0 {
+		listing := oracle.run(test, root, nil, "ls-files", "-z")
+		tracked := strings.Split(strings.TrimSuffix(string(listing), "\x00"), "\x00")
+		for relative, answer := range checkIgnore(test, oracle, root, globbed, "--no-index") {
+			if slices.ContainsFunc(tracked, func(trackedPath string) bool {
+				return trackedPath == relative || strings.HasPrefix(trackedPath, relative+"/")
+			}) {
+				answer = verdict{}
+			}
+			theirs[relative] = answer
 		}
 	}
 
@@ -359,6 +367,77 @@ func compareWithGit(test *testing.T, oracle *oracle, root string) comparison {
 		)
 	}
 	return result
+}
+
+// trackRandomFiles adds about a quarter of a generated tree's files to its index, as `git add -f` would, ignored
+// or not. update-index reads each path literally, where `git add` would read `star*` as a pattern.
+func trackRandomFiles(test *testing.T, oracle *oracle, random *rand.Rand, root string) {
+	test.Helper()
+	var paths bytes.Buffer
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
+		}
+		if entry.IsDir() && entry.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		if !entry.Type().IsRegular() || random.Intn(4) != 0 {
+			return nil
+		}
+		relative, relativeError := filepath.Rel(root, path)
+		if relativeError != nil {
+			return relativeError
+		}
+		paths.WriteString(filepath.ToSlash(relative))
+		paths.WriteByte(0)
+		return nil
+	})
+	if walkError != nil {
+		test.Fatalf("%s: %v", root, walkError)
+	}
+	if paths.Len() > 0 {
+		oracle.run(test, root, paths.Bytes(), "update-index", "--add", "-z", "--stdin")
+	}
+}
+
+// checkIgnore is git check-ignore's verbose answer for each path, read with the index unless arguments say
+// `--no-index`.
+func checkIgnore(test *testing.T, oracle *oracle, root string, paths []string, arguments ...string) map[string]verdict {
+	test.Helper()
+	var input bytes.Buffer
+	for _, relative := range paths {
+		input.WriteString(relative)
+		input.WriteByte(0)
+	}
+	output := oracle.run(
+		test,
+		root,
+		input.Bytes(),
+		append([]string{"check-ignore", "--verbose", "--non-matching", "-z", "--stdin"}, arguments...)...,
+	)
+	fields := bytes.Split(bytes.TrimSuffix(output, []byte{0}), []byte{0})
+	if len(output) > 0 && len(fields)%4 != 0 {
+		test.Fatalf("%s: git printed %d fields, not a multiple of four", root, len(fields))
+	}
+	answers := map[string]verdict{}
+	for index := 0; index+3 < len(fields); index += 4 {
+		file, line, pattern, relative := string(
+			fields[index],
+		), string(fields[index+1]), string(fields[index+2]), string(fields[index+3])
+		if file == "" {
+			answers[relative] = verdict{}
+			continue
+		}
+		lineNumber, parseError := strconv.Atoi(line)
+		if parseError != nil {
+			test.Fatalf("%s: git printed line %q for %s", root, line, relative)
+		}
+		answers[relative] = verdict{
+			ignored: !strings.HasPrefix(pattern, "!"),
+			source:  Source{File: file, Line: lineNumber, Pattern: pattern},
+		}
+	}
+	return answers
 }
 
 // generateTree writes a random tree with random ignore files under root, and returns patterns for its

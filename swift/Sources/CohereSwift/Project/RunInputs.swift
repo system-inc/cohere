@@ -20,9 +20,10 @@ import Foundation
  - each package's `Package.swift` and `Package.resolved`, there or absent. A remote dependency's checkout lives in
    the engine's scratch and is pinned by the resolved file, so the file stands for it;
  - every directory the file set's walk listed (`FileSet.directoriesListed`), hidden ones it entered among them, and
-   every ignore file and git config file it consulted, there or absent, since a line in any of them moves files in
-   or out of the run. A `.git` in each directory from a package up to its repository is named absent, since one
-   appearing moves the repository's boundary, and a `.git` file a worktree points through is named as a file;
+   every ignore file, git config file and git index it consulted, there or absent, since a line in any of them, or a
+   file added to the index, moves files in or out of the run. A `.git` in each directory from a package up to its
+   repository is named absent, since one appearing moves the repository's boundary, and a `.git` file a worktree
+   points through is named as a file;
  - every Swift file no target compiles that the walk read to tell whether it is a script (`FileSet.filesRead`), a file
    of declarations among them, since an edit can make it one. At a scripts-only root, where no root is walked, these,
    the scripts and the walk's listings are the whole of what decides which files it checks and what it finds there;

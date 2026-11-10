@@ -153,14 +153,18 @@ func TestARuleReadsAFileAsTheFixPhaseRewroteIt(test *testing.T) {
 	}
 }
 
-// A file the run holds no bytes for, here one outside the paths the run was narrowed to, which the rules are still
-// given, is read from disk.
+// A file the run holds no bytes for, here one git ignores in a package with a file in scope, which the rules are still
+// given with its package, is read from disk.
 func TestAFileTheRunDoesNotHoldIsReadFromDisk(test *testing.T) {
 	test.Parallel()
-	root := copyFixture(test, filepath.Join("testdata", "scoped"))
+	root := excludedModule(test, map[string]string{
+		".gitignore": "scratch.go\n",
+		"value.go":   "package value\n\n// Value is one.\nfunc Value() int { return 1 }\n",
+		"scratch.go": "package value\n\n// Scratch is two.\nfunc Scratch() int { return Value() + Value() }\n",
+	})
 	recorder := newSourceRecorder()
-	stream, prose := runRecorded(test, root, []rule.Rule{recorder.rule()}, filepath.Join(root, "inside"))
-	for _, relative := range []string{"outside/outside.go", "inside/inside.go"} {
+	stream, prose := runRecorded(test, root, []rule.Rule{recorder.rule()})
+	for _, relative := range []string{"scratch.go", "value.go"} {
 		path := filepath.Join(root, filepath.FromSlash(relative))
 		onDisk, readError := os.ReadFile(path)
 		if readError != nil {

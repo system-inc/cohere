@@ -8,5 +8,5 @@
 {"kind":"phase","name":"lint","outcome":"notReached","elapsedMilliseconds":0,"detail":"types bailed: 1 type errors, so lint findings against wrong semantics would be noise"}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
 {"kind":"duplicates","ran":false,"notRun":"the lint phase did not run (types bailed: 1 type errors, so lint findings against wrong semantics would be noise), and the report reads its pass","floor":11,"files":0,"filesIgnored":0,"functions":0,"hashed":0,"groups":null,"withheld":0,"belowFloor":0,"refused":null,"notRead":null,"deadSuppressions":null,"elapsedMilliseconds":0,"cache":{"unit":"","read":0,"hashed":0}}
-{"kind":"inputs","files":["/project/.git/info/exclude","/project/broken.go","/project/go.mod"],"directories":["/project"],"absent":["/project/.gitignore","/project/CohereSettings.json","/project/go.sum","/project/go.work","/project/staticcheck.conf","/project/vendor/modules.txt"]}
+{"kind":"inputs","files":["/project/.git/info/exclude","/project/broken.go","/project/go.mod"],"directories":["/project"],"absent":["/project/.git/index","/project/.gitignore","/project/CohereSettings.json","/project/go.sum","/project/go.work","/project/staticcheck.conf","/project/vendor/modules.txt"]}
 {"kind":"summary","findings":1,"complete":false,"exitCode":1}

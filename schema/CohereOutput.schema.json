@@ -658,6 +658,30 @@
                         },
                         "formattingNotChecked": { "type": "boolean" },
                         "nothingToCheck": { "type": "boolean", "description": "The project had no files to check." },
+                        "excluded": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["reason", "count"],
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "description": "Why the files were left out, in the words the footer prints, such as `ignored by git`."
+                                    },
+                                    "count": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "description": "How many files this reason left out."
+                                    },
+                                    "source": {
+                                        "type": "string",
+                                        "description": "The first rule that decided, as `path:line` relative to the project root, such as `.gitignore:1`. Absent where no rule did, as for a narrowing."
+                                    }
+                                }
+                            },
+                            "description": "Why each file of a run that checked nothing was left out, one entry per reason. Present only when nothingToCheck is set and the project had files of its language: such a run fails, since it checked nothing. A project with no file of its language at all has none, and passes with the warning alone."
+                        },
                         "modifiedBuild": {
                             "type": "boolean",
                             "description": "The binary was built from a modified tree, so no commit reproduces these findings."

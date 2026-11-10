@@ -193,6 +193,8 @@ func finishTypeCheck(
 // that neither fixes nor lints, lintConfiguration nil, loads them here: `--types` reported the type errors of
 // files the settings never check. Until lint counts its own, the summary counts here as in a run lint reaches:
 // a file a plain ignore matched is not checked, and one an entry keeping the type check matched is types-only.
+// Every file lint checks the type check reports on, so with none to report on the run checked nothing, and what
+// kept each file out is counted here, where the settings are (#08cv2mp).
 func finishScopedTypeCheck(
 	callerContext context.Context,
 	check *typeCheck,
@@ -213,6 +215,9 @@ func finishScopedTypeCheck(
 	typeChecked, typesOnly := typeCheckedFiles(projectFiles, settings)
 	activeSummary.FilesInScope = len(typeChecked) - typesOnly
 	activeSummary.FilesChecked, activeSummary.FilesTypesOnly = activeSummary.FilesInScope, typesOnly
+	if len(typeChecked) == 0 {
+		addTypeScriptExcluded(graph, projectFiles, settings, location.Root)
+	}
 	return typeChecked, finishTypeCheck(callerContext, check, typeChecked, persist), nil
 }
 

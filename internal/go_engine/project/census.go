@@ -35,6 +35,10 @@ type Census struct {
 type Exclusion struct {
 	File   string
 	Reason string
+
+	// Source is the rule that decided, as `path:line` with the path relative to the workspace's root, such as
+	// `.gitignore:1`, so a reader can find the line that left the file out.
+	Source string
 }
 
 // TakeCensus lists every `.go` file the workspace's modules hold, the way ./... sees packages: under each
@@ -43,7 +47,8 @@ type Exclusion struct {
 // go.mod of its own (an owned one is walked as itself, and an unowned one is another project), or a
 // repository of its own, a submodule's checkout included, and never counting a file whose name starts with
 // `.` or `_`, which go does not read either. A file git ignores is excluded, by the ignore
-// files of the nearest repository at or above the root; a root in no repository ignores nothing. Generated
+// files of the nearest repository at or above the root, and a file its index tracks never is, as git never
+// ignores a tracked file; a root in no repository ignores nothing. Generated
 // files are counted as ours here: the format and lint phases decide about those.
 func TakeCensus(workspace Workspace) (Census, error) {
 	var census Census
@@ -99,8 +104,13 @@ func TakeCensus(workspace Workspace) (Census, error) {
 					// Invariant: WalkDir visits a directory before its files, and every visit enters it.
 					panic(fmt.Sprintf("project: %s was reached before its directory was entered", visited))
 				}
-				if ignored, _ := scope.Ignored(relative, false); ignored {
-					census.Excluded = append(census.Excluded, Exclusion{File: visited, Reason: IgnoredByGit})
+				if ignored, source := scope.Ignored(relative, false); ignored {
+					decided, sourceError := sourceFromRoot(workspace.Root, repositoryRoot, source)
+					if sourceError != nil {
+						return sourceError
+					}
+					census.Excluded = append(census.Excluded,
+						Exclusion{File: visited, Reason: IgnoredByGit, Source: decided})
 					return nil
 				}
 			}
@@ -220,6 +230,17 @@ func repositoryRelative(repositoryRoot string, entryPath string) (string, error)
 		return "", nil
 	}
 	return filepath.ToSlash(relative), nil
+}
+
+// sourceFromRoot is the ignore rule that decided, as `path:line` with its file relative to the workspace's root
+// rather than the repository's, which a root below the repository's makes `../.gitignore:1`.
+func sourceFromRoot(workspaceRoot string, repositoryRoot string, source gitignore.Source) (string, error) {
+	ignoreFile := filepath.Join(repositoryRoot, filepath.FromSlash(source.File))
+	relative, relativeError := filepath.Rel(workspaceRoot, ignoreFile)
+	if relativeError != nil {
+		return "", fmt.Errorf("placing %s from the root at %s: %w", ignoreFile, workspaceRoot, relativeError)
+	}
+	return fmt.Sprintf("%s:%d", filepath.ToSlash(relative), source.Line), nil
 }
 
 // parentOf is the directory holding a repository-relative path, "" at the root.

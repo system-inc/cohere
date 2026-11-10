@@ -45,6 +45,13 @@ type engineLanguage struct {
 	// whole or by one of these, and every other is the run's gap.
 	ExpectedExclusionReasonPrefixes []string
 
+	// NotSourceReasons are the reasons the engine gives for a file that was never one of the project's sources to
+	// check, as Swift's package manifest. A run that checked nothing counts every other excluded file in its reasons
+	// (engineRun.countExcludedWhenNothingChecked), so a package whose only file is its manifest is a project with none
+	// of its language's files, which passes with the warning, and an all-ignored package's sentence does not count the
+	// manifest beside its sources.
+	NotSourceReasons map[string]bool
+
 	// CacheOffDetail is what `--no-cache` kept the run from, said after "cache: off, by --no-cache:" in the
 	// account. An engine keeps no cache table of the TypeScript pipeline's, so each says what is true of its own.
 	CacheOffDetail string
@@ -96,6 +103,7 @@ var swiftLanguage = engineLanguage{
 		"vendored under Vendor/": true,
 		"a package manifest":     true,
 	},
+	NotSourceReasons: map[string]bool{"a package manifest": true},
 	// A Swift run's cache is the run cache's table, which replays a verdict with nothing changed (beginSwiftRunCache),
 	// beside the engine's own scratch in the package's .cache, so the sentence says the flag reaches both.
 	CacheOffDetail: "nothing was read from or written to this package's cache: no recorded run was replayed and " +

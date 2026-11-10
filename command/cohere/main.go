@@ -825,9 +825,8 @@ func run() error {
 	findings := 0
 	// What the footer says, filled in as the phases finish. Checked is what a phase examined, so it starts at none:
 	// the type check sets it to the files it reports on (finishScopedTypeCheck), and lint replaces the counts with
-	// its own (#1hva1ya).
+	// its own (#1hva1ya). Whether that is nothing is decided once they are done (settleNothingChecked).
 	activeSummary.FilesInScope, activeSummary.FilesChecked = len(projectFiles), 0
-	activeSummary.Gaps.NothingToCheck = graph != nil && len(projectFiles) == 0
 
 	// A generated file the program asks for and nobody has generated yet (#wxsqavy) leads the output, and
 	// while one is missing every lint fix is held (#46ern7e): a rule reads the names that file declares as
@@ -1584,6 +1583,7 @@ func run() error {
 		report.record(phaseUnused, outcomeRan, unusedDuration, "")
 	}
 	writeTypeScriptDuplicates(backgroundContext, graph, projectFiles, lintConfiguration, location)
+	settleNothingChecked(graph, projectFiles, lintConfiguration, location, runTypes, runLint)
 
 	// The phase line prints on every run, success included. A run that checked nothing must not be
 	// able to print like a run that checked everything and found it clean, and a phase summary that
@@ -1592,9 +1592,9 @@ func run() error {
 
 	// A crash fails the run as a finding does, though it is not one: see runCrash. So does a generated file
 	// the program asks for that does not exist, even with no type error after it, since what it declares
-	// was never checked (#wxsqavy).
+	// was never checked (#wxsqavy), and so does a run that kept every file it had out of its checks (#08cv2mp).
 	if findings > 0 || activeSummary.Gaps.CrashedFiles > 0 || activeSummary.Gaps.RuleCrashes > 0 ||
-		len(activeSummary.Gaps.MissingGenerated) > 0 {
+		len(activeSummary.Gaps.MissingGenerated) > 0 || activeSummary.Gaps.nothingChecked() {
 		finishRunCache(1)
 	}
 	return nil

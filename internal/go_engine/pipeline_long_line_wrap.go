@@ -17,10 +17,16 @@ import (
 // standard library and keeps nothing. Every load reads each file the run holds from its held bytes (held), which are
 // the disk's after every write the fix phase made. When a phase reads the types it says on stderr that the load
 // failed; a load made for the wrap alone leaves that to the wrap's own held note, since that run asked for no
-// type-check or lint to miss.
+// type-check or lint to miss. A package with no file in scope is loaded for what imports it and never analyzed
+// (hasFileInScope).
 func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	workspace := engine.described.workspace
-	caching := load.Caching{Held: engine.held, GoEnvironment: engine.described.goEnvironment, Timing: engine.timing}
+	caching := load.Caching{
+		Held:          engine.held,
+		GoEnvironment: engine.described.goEnvironment,
+		Timing:        engine.timing,
+		Analyzes:      engine.described.hasFileInScope,
+	}
 	if engine.session != nil {
 		caching.Restorer = engine.session
 		if engine.session.HasStore() {

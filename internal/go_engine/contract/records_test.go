@@ -270,6 +270,7 @@ func populatedRecords() []Record {
 			},
 			Excluded: []ExcludedFile{
 				{File: "/project/b_windows.go", Reason: "excluded by build constraints on darwin/arm64"},
+				{File: "/project/scratch.go", Reason: "ignored by git", Source: ".gitignore:1"},
 			},
 		},
 		UnreadableRecord{File: "/project/c.go", Error: "it could not be opened"},
