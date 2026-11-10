@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/served"
 	"github.com/system-inc/cohere/policy"
@@ -48,23 +49,6 @@ var noAlternative = requireMatchingFileNameMessage.Option("alternative", "none")
 
 // methodFileAlternative is the message for a file of only a type's methods, which may also take a theme.
 var methodFileAlternative = requireMatchingFileNameMessage.Option("alternative", "methodFile")
-
-// knownOperatingSystems and knownArchitectures are go/build's own lists, copied from internal/syslist at Go 1.27,
-// which the toolchain reads a file name's suffix against. They are the toolchain's grammar rather than a house
-// choice, and like the toolchain's they only grow: an entry stays after its port is gone, so a file named for it
-// keeps meaning the same thing.
-var knownOperatingSystems = map[string]bool{
-	"aix": true, "android": true, "darwin": true, "dragonfly": true, "freebsd": true, "hurd": true,
-	"illumos": true, "ios": true, "js": true, "linux": true, "nacl": true, "netbsd": true, "openbsd": true,
-	"plan9": true, "solaris": true, "wasip1": true, "windows": true, "zos": true,
-}
-
-var knownArchitectures = map[string]bool{
-	"386": true, "amd64": true, "amd64p32": true, "arm": true, "armbe": true, "arm64": true, "arm64be": true,
-	"loong64": true, "mips": true, "mipsle": true, "mips64": true, "mips64le": true, "mips64p32": true,
-	"mips64p32le": true, "ppc": true, "ppc64": true, "ppc64le": true, "riscv": true, "riscv64": true, "s390": true,
-	"s390x": true, "sparc": true, "sparc64": true, "wasm": true,
-}
 
 func run(pass *analysis.Pass) (any, error) {
 	// The types a file serves come from package served, which consistency-require-one-type-per-file reads too, so the
@@ -176,9 +160,9 @@ func isToolchainSuffix(tail string) bool {
 	parts := strings.Split(tail, "_")
 	switch len(parts) {
 	case 1:
-		return knownOperatingSystems[parts[0]] || knownArchitectures[parts[0]]
+		return file_name_words.KnownOperatingSystems[parts[0]] || file_name_words.KnownArchitectures[parts[0]]
 	case 2:
-		return knownOperatingSystems[parts[0]] && knownArchitectures[parts[1]]
+		return file_name_words.KnownOperatingSystems[parts[0]] && file_name_words.KnownArchitectures[parts[1]]
 	default:
 		return false
 	}
@@ -215,29 +199,11 @@ func isThemeSuffix(string) bool {
 	return true
 }
 
-// toolchainSuffix is the build constraint suffix stem ends with, read as go/build reads it, or empty. go/build sets
-// aside everything before the first underscore, so linux.go alone is no constraint.
-func toolchainSuffix(stem string) string {
-	_, rest, found := strings.Cut(stem, "_")
-	if !found {
-		return ""
-	}
-	parts := strings.Split(rest, "_")
-	count := len(parts)
-	if count >= 2 && knownOperatingSystems[parts[count-2]] && knownArchitectures[parts[count-1]] {
-		return "_" + parts[count-2] + "_" + parts[count-1]
-	}
-	if knownOperatingSystems[parts[count-1]] || knownArchitectures[parts[count-1]] {
-		return "_" + parts[count-1]
-	}
-	return ""
-}
-
 // variantSuffix is the suffix a suggested name keeps, so following the suggestion never changes what the file builds
 // for: the toolchain suffix stem ends with, or else, in a build-constrained file, its last word, which names the
 // variant when anything does. The name it makes always passes the rule.
 func variantSuffix(stem string, buildConstrained bool) string {
-	if suffix := toolchainSuffix(stem); suffix != "" || !buildConstrained {
+	if suffix := file_name_words.ToolchainSuffix(stem); suffix != "" || !buildConstrained {
 		return suffix
 	}
 	index := strings.LastIndex(stem, "_")

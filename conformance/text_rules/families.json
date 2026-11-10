@@ -1,4 +1,9 @@
 {
+    "abbreviated-file-name": {
+        "typescript": "nexus/consistency-no-abbreviated-file-name",
+        "go": "cohere-go/consistency-no-abbreviated-file-name",
+        "swift": "cohere-swift/consistency-no-abbreviated-file-name"
+    },
     "abbreviated-identifier": {
         "typescript": "nexus/consistency-no-abbreviated-identifier",
         "go": "cohere-go/consistency-no-abbreviated-identifier",
@@ -38,6 +43,11 @@
         "typescript": "nexus/consistency-no-shouting",
         "go": "cohere-go/consistency-no-shouting",
         "swift": "cohere-swift/consistency-no-shouting"
+    },
+    "utils-file-name": {
+        "typescript": "nexus/consistency-no-utils-file-name",
+        "go": "cohere-go/consistency-no-utils-file-name",
+        "swift": "cohere-swift/consistency-no-utils-file-name"
     },
     "utils-folder": {
         "typescript": "nexus/consistency-no-utils-folder",

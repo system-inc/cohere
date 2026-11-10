@@ -5,7 +5,8 @@
 // of util: a caller reads utils.Parse and learns nothing from the qualifier. "utilities" is not meaningfully better
 // at that, but it is the spelling the house settled on, and one spelling searched is worth two spellings guessed.
 // This is the Go form of nexus/consistency-no-utils-folder and cohere-swift's rule of the same name, and reads a
-// folder's name the way they do (textrules-decisions.md, "Utils folder").
+// folder's name the way they do (textrules-decisions.md, "Utils folder"), through file_name_words.IsUtils, which
+// cohere-go/consistency-no-utils-file-name reads too.
 package consistency_no_utils_folder
 
 import (
@@ -14,6 +15,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -56,7 +58,7 @@ func run(pass *analysis.Pass) (any, error) {
 			report(pass, file, message, map[string]string{"folder": folder, "replacement": replacement(folder)})
 			continue
 		}
-		if isBanned(file.Name.Name) {
+		if file_name_words.IsUtils(file.Name.Name) {
 			report(pass, file, utilsPackageNameMessage, map[string]string{
 				"package":     file.Name.Name,
 				"replacement": replacement(file.Name.Name),
@@ -85,22 +87,11 @@ func bannedFolder(pass *analysis.Pass) (string, bool) {
 		relative = strings.TrimSuffix(relative, externalTestSuffix)
 	}
 	for folder := range strings.SplitSeq(relative, "/") {
-		if isBanned(folder) {
+		if file_name_words.IsUtils(folder) {
 			return folder, true
 		}
 	}
 	return "", false
-}
-
-// isBanned reports whether name, lowercased and with its leading underscores removed, is utils or util. The name is
-// matched whole, so utilities, myutils and utilsomething pass, since a rule that fires on the spelling it asks for is
-// worse than no rule. util is banned beside utils, the common spelling in Go, in every engine alike.
-func isBanned(name string) bool {
-	switch strings.ToLower(strings.TrimLeft(name, "_")) {
-	case "utils", "util":
-		return true
-	}
-	return false
 }
 
 // replacement is the house spelling for a banned name: utilities, lowercase whatever casing the name was written in,

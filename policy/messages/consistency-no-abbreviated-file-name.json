@@ -1,0 +1,18 @@
+{
+    "rules": {
+        "TypeScript": "nexus/consistency-no-abbreviated-file-name",
+        "Swift": "cohere-swift/consistency-no-abbreviated-file-name",
+        "Go": "cohere-go/consistency-no-abbreviated-file-name"
+    },
+    "phrases": {
+        "reasoning": "A file's name is read on every path and every import, so the letters saved when it was named are paid back by every reader who has to expand the word themselves and hope they expanded it the way the author meant."
+    },
+    "messages": {
+        "abbreviatedFileName": {
+            "text": "File name \"{{fileName}}\" abbreviates \"{{word}}\". Spell it out as {{expansions}}. <<reasoning>>"
+        },
+        "abbreviatedFileNameAdvice": {
+            "text": "File name \"{{fileName}}\" abbreviates \"{{word}}\". {{advice}} <<reasoning>>"
+        }
+    }
+}

@@ -1,0 +1,4 @@
+{
+    "rule": "nexus/consistency-no-utils-file-name",
+    "assertedMessageIds": ["utilsFileName"]
+}

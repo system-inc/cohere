@@ -1,0 +1,15 @@
+{
+    "why": "af15: a registered rule's name is set aside and the words beside it are judged, so `max_lines_cfg` reports `cfg`; a rule's name never hides an abbreviation next to it",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "max_lines_cfg",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

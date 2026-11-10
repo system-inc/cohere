@@ -1,0 +1,9 @@
+{
+    "why": "af09: a generated file's name is its generator's, and is not judged: a `Code generated` header marks one in Go. Go form only, since TypeScript and Swift mark one in its name (af10)",
+    "expect": [],
+    "options": {},
+    "path": "msg_printer",
+    "languages": [
+        "go"
+    ]
+}

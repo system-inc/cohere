@@ -1,0 +1,11 @@
+{
+    "why": "af06: a name spelled in full passes",
+    "expect": [],
+    "options": {},
+    "path": "MessagePrinter",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

@@ -1,0 +1,11 @@
+{
+    "why": "un06: the house spelling, `utilities`, passes",
+    "expect": [],
+    "options": {},
+    "path": "utilities",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

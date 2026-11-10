@@ -1,0 +1,11 @@
+{
+    "why": "un15: a word right after `no` names a ban on it, so a file named for the rule `consistency-no-utils-folder` is named for exactly what it holds, and passes",
+    "expect": [],
+    "options": {},
+    "path": "ConsistencyNoUtilsFolder",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

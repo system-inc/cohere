@@ -1,0 +1,13 @@
+{
+    "why": "un13: a Swift extension file's `+` separates the type from its purpose, so `String+Utils` is reported. Swift form only: the `+Purpose` file is Swift's convention",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "String+Utils",
+    "languages": [
+        "swift"
+    ]
+}

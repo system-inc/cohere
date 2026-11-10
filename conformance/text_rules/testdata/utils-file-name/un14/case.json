@@ -1,0 +1,13 @@
+{
+    "why": "un14: a TypeScript role marker a tool reads, `.test`, is set aside, and the name before it still holds the word. TypeScript form only",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "utils.test",
+    "languages": [
+        "typescript"
+    ]
+}

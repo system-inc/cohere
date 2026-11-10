@@ -1,0 +1,16 @@
+{
+    "why": "af00: the control, a file named `cfg`, a word the vocabulary spells `configuration`, is reported once, at the file's start, in every language",
+    "control": true,
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "cfg",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

@@ -1,0 +1,4 @@
+{
+    "rule": "nexus/consistency-no-abbreviated-file-name",
+    "assertedMessageIds": ["abbreviatedFileName", "abbreviatedFileNameAdvice"]
+}
