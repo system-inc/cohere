@@ -1,0 +1,11 @@
+// Package unformattedtypeerror is gofmt's to fix and does not type-check, so a check reports the formatting and the
+// type error both.
+package unformattedtypeerror
+
+// Triple is three times value.
+func Triple(value int) int {
+    return value*3
+}
+
+// Count is a number, given text.
+var Count int = "text"
