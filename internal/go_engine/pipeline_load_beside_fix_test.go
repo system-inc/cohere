@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -64,6 +65,14 @@ func (watch *preludeWatch) toldSteps() []preludeStep {
 // with extra after its root, telling watch of each step of the prelude.
 func runWatchingPrelude(test *testing.T, fixture string, extra []string, watch *preludeWatch) {
 	test.Helper()
+	watchedPipeline(test, fixture, extra, watch, io.Discard).run()
+}
+
+// watchedPipeline is the pipeline runWatchingPrelude runs, writing its stream to standardOutput.
+func watchedPipeline(
+	test *testing.T, fixture string, extra []string, watch *preludeWatch, standardOutput io.Writer,
+) *pipeline {
+	test.Helper()
 	root := copyFixture(test, filepath.Join("testdata", fixture))
 	request, parseError := parseInvocation(append(
 		[]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"}, extra...))
@@ -82,9 +91,9 @@ func runWatchingPrelude(test *testing.T, fixture string, extra []string, watch *
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
-	engine := newPipeline(request, described, ruleSettings, registered, io.Discard, io.Discard, nil)
+	engine := newPipeline(request, described, ruleSettings, registered, standardOutput, io.Discard, nil)
 	engine.watchPrelude = watch.told
-	engine.run()
+	return engine
 }
 
 // Under `--no-fix` the first load begins before gofmt's check returns: told when runFix has returned, the watch holds
@@ -153,6 +162,45 @@ func TestALoadWithATypeErrorStopsTheLintBesideItBeforeGofmtReturns(test *testing
 	runWatchingPrelude(test, "unformatted-type-error", []string{"--no-fix"}, watch)
 	if steps := watch.toldSteps(); !slices.Contains(steps, preludeLintAbandoned) {
 		test.Fatalf("the run told %v, want the lint pass abandoned", steps)
+	}
+}
+
+// gofmtPanic is what runFix panics with in TestAPanicInGofmtsCheckBesideTheLoadEndsTheRun.
+type gofmtPanic struct{}
+
+// Under `--no-fix` a panic in gofmt's check, on its goroutine beside the load, ends the run with that same panic on
+// the pipeline's goroutine, as a check run there would, once the load has returned and before any record of the
+// load's: the types record and the fixture's type error never reach the stream. A held panic the join let go would
+// read as a run that went on to its summary.
+func TestAPanicInGofmtsCheckBesideTheLoadEndsTheRun(test *testing.T) {
+	test.Parallel()
+	watch := &preludeWatch{}
+	watch.onStep = func(step preludeStep) {
+		if step == preludeFixBegan {
+			panic(gofmtPanic{})
+		}
+	}
+	var standardOutput bytes.Buffer
+	engine := watchedPipeline(test, "unformatted-type-error", []string{"--no-fix"}, watch, &standardOutput)
+	recovered := func() (recovered any) {
+		defer func() { recovered = recover() }()
+		engine.run()
+		return nil
+	}()
+	if _, isGofmts := recovered.(gofmtPanic); !isGofmts {
+		test.Fatalf("the run ended with %v, want gofmt's check's panic", recovered)
+	}
+	if !slices.Contains(watch.toldSteps(), preludeLoadBegan) {
+		test.Fatalf("the run told %v, want the load to have run beside gofmt's check", watch.toldSteps())
+	}
+	stream := standardOutput.String()
+	if types := recordsOfKind(test, stream, "types"); len(types) > 0 {
+		test.Errorf("the stream holds the load's types record after gofmt's check panicked:\n%s", stream)
+	}
+	for _, finding := range recordsOfKind(test, stream, "finding") {
+		if finding.Source == string(contract.SourceCompiler) {
+			test.Errorf("the stream holds the load's type error after gofmt's check panicked:\n%s", stream)
+		}
 	}
 }
 
