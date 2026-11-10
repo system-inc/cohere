@@ -57,6 +57,10 @@ type loader struct {
 	testFunctionsLock sync.Mutex
 	testFunctions     map[*packages.Package][]Diagnostic
 
+	// typesOnly are the dependencies whose types alone the caller reads (see PackagesWithRootSyntax): each is checked
+	// with no type maps, but one that withholds, which judges its errors and withholds its declarations by them.
+	typesOnly map[*packages.Package]bool
+
 	// filesParsed counts the files parsed, and fromExportData the packages whose types were read from export data.
 	filesParsed    atomic.Int64
 	fromExportData atomic.Int64
@@ -434,7 +438,11 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 	loaded := current.loaded
 	loaded.Fset = loader.fileSet
 	loaded.TypesSizes = loader.sizes
-	loaded.TypesInfo = newTypesInfo()
+	if loader.typesOnly[loaded] && !current.withholds {
+		loaded.TypesInfo = &types.Info{}
+	} else {
+		loaded.TypesInfo = newTypesInfo()
+	}
 	if loaded.PkgPath == "unsafe" {
 		loaded.Types = types.Unsafe
 		loaded.Syntax = []*ast.File{}
@@ -599,6 +607,7 @@ func newLoader(
 		held:          held,
 		analyzed:      map[*packages.Package]bool{},
 		testFunctions: map[*packages.Package][]Diagnostic{},
+		typesOnly:     map[*packages.Package]bool{},
 		timing:        collector,
 	}
 }

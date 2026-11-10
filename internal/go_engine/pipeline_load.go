@@ -12,6 +12,9 @@ type loadRequest struct {
 	// overlay, when withOverlay is set, is read in place of the disk (load.PackagesWithOverlay).
 	overlay     map[string][]byte
 	withOverlay bool
+	// rootSyntaxOnly keeps syntax and type maps for the roots alone (load.PackagesWithRootSyntax), for the rename's
+	// plan and platform loads, which never read a dependency's. It reads overlay, nil for none, and takes no caching.
+	rootSyntaxOnly bool
 }
 
 // loadPackages is every load of the workspace the engine makes, the only caller of package load's loads in it (a test
@@ -25,6 +28,9 @@ func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) 
 	var loaded *load.Loaded
 	var loadError error
 	switch {
+	case request.rootSyntaxOnly:
+		loaded, loadError = load.PackagesWithRootSyntax(workspace.Root, workspace.Patterns(), request.environment,
+			engine.described.readableOurs, request.overlay)
 	case request.withOverlay:
 		loaded, loadError = load.PackagesWithOverlay(workspace.Root, workspace.Patterns(), request.environment,
 			engine.described.readableOurs, request.overlay)
