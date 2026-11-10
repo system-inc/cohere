@@ -11,6 +11,15 @@ const macRoot = "/Users/someone/Projects/ahra" // want `^This test names a home 
 // A Linux home path, in a raw string.
 const linuxRoot = `/home/someone/checkouts/ahra` // want `This test names a home directory`
 
+// A home path spelled with escapes, which name it only once the literal is unquoted.
+var escaped = "\x2fUsers\x2fsomeone\x2fx" // want `This test names a home directory`
+
+// A home path in octal escapes.
+var octal = "\057home\057someone\057x" // want `This test names a home directory`
+
+// A raw string that names a home directory only once the carriage return inside it is dropped, as unquoting does.
+var carriageReturn = `/Users/someone/x` // want `This test names a home directory`
+
 // A home path inside a longer string.
 var line = "error at /Users/someone/a.ts:1:1" // want `This test names a home directory`
 
