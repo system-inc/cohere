@@ -29,7 +29,7 @@ var messageArrowAssignment = rule.Message{
 //
 // A named string type rather than a struct because this rule's option is a bare string in the
 // config tuple: `["error", "always"]` puts `"always"` where other rules put an object. This mirrors
-// NoCondAssignMode, which shares the option surface and the same two spellings.
+// NoAssignmentInConditionMode, which shares the option surface and the same two spellings.
 type NoReturnAssignMode = string
 
 const (

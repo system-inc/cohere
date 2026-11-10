@@ -19,11 +19,11 @@ type NoPlusplusOptions struct {
 	AllowForLoopAfterthoughts bool `json:"allowForLoopAfterthoughts"`
 }
 
-// noPlusplusUnexpectedUnaryOp builds the finding, naming the operator.
+// noPlusplusUnexpectedUnaryOperator builds the finding, naming the operator.
 //
 // The Id is fixed and only the Description moves, so `ExpectFindings` can count these while the
 // rendered text names the operator the way upstream's `{{operator}}` interpolation does.
-func noPlusplusUnexpectedUnaryOp(operator string) rule.Message {
+func noPlusplusUnexpectedUnaryOperator(operator string) rule.Message {
 	return rule.Message{
 		Id: "unexpectedUnaryOp",
 		Description: fmt.Sprintf(
@@ -90,7 +90,7 @@ var NoPlusplus = rule.Rule[NoPlusplusOptions]{
 				if allowForLoopAfterthoughts && noPlusplusIsForLoopAfterthought(node) {
 					return
 				}
-				ruleContext.ReportNode(node, noPlusplusUnexpectedUnaryOp(
+				ruleContext.ReportNode(node, noPlusplusUnexpectedUnaryOperator(
 					noPlusplusOperatorText(expression.Operator)))
 			},
 
@@ -109,7 +109,7 @@ var NoPlusplus = rule.Rule[NoPlusplusOptions]{
 				if allowForLoopAfterthoughts && noPlusplusIsForLoopAfterthought(node) {
 					return
 				}
-				ruleContext.ReportNode(node, noPlusplusUnexpectedUnaryOp(
+				ruleContext.ReportNode(node, noPlusplusUnexpectedUnaryOperator(
 					noPlusplusOperatorText(expression.Operator)))
 			},
 		}

@@ -6,13 +6,13 @@ import (
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// funcNameMatchingFile is where the fixtures pretend to live.
+// functionNameMatchingFile is where the fixtures pretend to live.
 //
 // A `.ts` name: this rule has no file gate, and nothing in its corpus is JSX.
-const funcNameMatchingFile = "/repository/source/FuncNameMatching.ts"
+const functionNameMatchingFile = "/repository/source/FuncNameMatching.ts"
 
-// funcNameMatchingCase is one row of upstream's corpus.
-type funcNameMatchingCase struct {
+// functionNameMatchingCase is one row of upstream's corpus.
+type functionNameMatchingCase struct {
 	// name is the corpus list and index the row came from, so a failure names a case that
 	// can be found in upstream's own file rather than a number local to this table.
 	name string
@@ -29,8 +29,8 @@ type funcNameMatchingCase struct {
 	ids []string
 }
 
-// funcNameMatchingFiresCases are the rows upstream reports on.
-var funcNameMatchingFiresCases = []funcNameMatchingCase{
+// functionNameMatchingFiresCases are the rows upstream reports on.
+var functionNameMatchingFiresCases = []functionNameMatchingCase{
 	{
 		name:    "invalid-0",
 		source:  "let foo = function bar() {};",
@@ -333,8 +333,8 @@ var funcNameMatchingFiresCases = []funcNameMatchingCase{
 	},
 }
 
-// funcNameMatchingSilentCases are the rows upstream is clean on.
-var funcNameMatchingSilentCases = []funcNameMatchingCase{
+// functionNameMatchingSilentCases are the rows upstream is clean on.
+var functionNameMatchingSilentCases = []functionNameMatchingCase{
 	{
 		name:    "valid-0",
 		source:  "var foo;",
@@ -1047,41 +1047,41 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	},
 }
 
-// decodedFuncNameMatching routes a row's raw JSON through the rule's own exported decoder.
-func decodedFuncNameMatching(test *testing.T, raw string) FuncNameMatchingOptions {
+// decodedFunctionNameMatching routes a row's raw JSON through the rule's own exported decoder.
+func decodedFunctionNameMatching(test *testing.T, raw string) FunctionNameMatchingOptions {
 	test.Helper()
-	decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(raw))
-	if decodeFuncNameMatchingOptionsError != nil {
-		test.Fatalf("decoding options %q: %v", raw, decodeFuncNameMatchingOptionsError)
+	decoded, decodeFunctionNameMatchingOptionsError := DecodeFunctionNameMatchingOptions([]byte(raw))
+	if decodeFunctionNameMatchingOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeFunctionNameMatchingOptionsError)
 	}
 	return decoded
 }
 
-func TestFuncNameMatchingFires(test *testing.T) {
+func TestFunctionNameMatchingFires(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range funcNameMatchingFiresCases {
+	for _, testCase := range functionNameMatchingFiresCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, FuncNameMatching, funcNameMatchingFile, testCase.source,
-				decodedFuncNameMatching(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, FunctionNameMatching, functionNameMatchingFile, testCase.source,
+				decodedFunctionNameMatching(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestFuncNameMatchingStaysSilent(test *testing.T) {
+func TestFunctionNameMatchingStaysSilent(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range funcNameMatchingSilentCases {
+	for _, testCase := range functionNameMatchingSilentCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, FuncNameMatching, funcNameMatchingFile, testCase.source,
-				decodedFuncNameMatching(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, FunctionNameMatching, functionNameMatchingFile, testCase.source,
+				decodedFunctionNameMatching(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestFuncNameMatchingResolvesAVersionGateTowardEs6 pins a case held out of the tables above.
+// TestFunctionNameMatchingResolvesAVersionGateTowardEs6 pins a case held out of the tables above.
 //
 // Upstream's corpus carries `var obj = { 'ᢅ': function foo() {} };` twice, byte for byte
 // identical, with opposite verdicts:
@@ -1101,52 +1101,52 @@ func TestFuncNameMatchingStaysSilent(test *testing.T) {
 //
 // If an `ecmaVersion` channel is ever added, this test is where the choice is written down and the
 // held-out row is waiting in upstream's corpus.
-func TestFuncNameMatchingResolvesAVersionGateTowardEs6(test *testing.T) {
+func TestFunctionNameMatchingResolvesAVersionGateTowardEs6(test *testing.T) {
 	test.Parallel()
 
 	const source = "var obj = { 'ᢅ': function foo() {} };"
 
-	result := rule_testing.RunWithOptions(test, FuncNameMatching, funcNameMatchingFile, source,
-		decodedFuncNameMatching(test, ""))
+	result := rule_testing.RunWithOptions(test, FunctionNameMatching, functionNameMatchingFile, source,
+		decodedFunctionNameMatching(test, ""))
 
 	// The ES6 answer, which is upstream's invalid[49].
 	rule_testing.ExpectFindings(test, result, "matchProperty")
 
 	// The premise, asserted so this test fails loudly if the predicate ever narrows back to ASCII
 	// rather than passing vacuously.
-	if !funcNameMatchingIsIdentifier("ᢅ") {
+	if !functionNameMatchingIsIdentifier("ᢅ") {
 		test.Error("U+1885 is an ES6 identifier start; the predicate no longer says so, which means " +
 			"this rule has silently reverted to the ES5 answer for every non-ASCII key")
 	}
 	// The control. Without it an always-true predicate would satisfy the check above.
-	if funcNameMatchingIsIdentifier("0not-an-identifier") {
+	if functionNameMatchingIsIdentifier("0not-an-identifier") {
 		test.Error("the identifier predicate accepts everything, so the assertion above proved nothing")
 	}
 }
 
-// TestDecodeFuncNameMatchingOptions pins the list shapes the config layer delivers and the ones it
+// TestDecodeFunctionNameMatchingOptions pins the list shapes the config layer delivers and the ones it
 // must refuse. Every row above reaches the decoder with a list this file wrote, so this is where the
 // refusals are, and where the second element is proved to be read rather than defaulted.
-func TestDecodeFuncNameMatchingOptions(test *testing.T) {
+func TestDecodeFunctionNameMatchingOptions(test *testing.T) {
 	test.Parallel()
 
 	accepted := []struct {
 		raw  string
-		want FuncNameMatchingOptions
+		want FunctionNameMatchingOptions
 	}{
-		{``, FuncNameMatchingOptions{Direction: "always"}},
-		{`["never"]`, FuncNameMatchingOptions{Direction: "never"}},
+		{``, FunctionNameMatchingOptions{Direction: "always"}},
+		{`["never"]`, FunctionNameMatchingOptions{Direction: "never"}},
 		{`["never", {"considerPropertyDescriptor": true}]`,
-			FuncNameMatchingOptions{Direction: "never", ConsiderPropertyDescriptor: true}},
+			FunctionNameMatchingOptions{Direction: "never", ConsiderPropertyDescriptor: true}},
 		{`["always", {"includeCommonJSModuleExports": true}]`,
-			FuncNameMatchingOptions{Direction: "always", IncludeCommonJsModuleExports: true}},
+			FunctionNameMatchingOptions{Direction: "always", IncludeCommonJsModuleExports: true}},
 		{`[{"considerPropertyDescriptor": true}]`,
-			FuncNameMatchingOptions{Direction: "always", ConsiderPropertyDescriptor: true}},
+			FunctionNameMatchingOptions{Direction: "always", ConsiderPropertyDescriptor: true}},
 	}
 	for _, testCase := range accepted {
-		decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(testCase.raw))
-		if decodeFuncNameMatchingOptionsError != nil {
-			test.Errorf("%s was refused: %v", testCase.raw, decodeFuncNameMatchingOptionsError)
+		decoded, decodeFunctionNameMatchingOptionsError := DecodeFunctionNameMatchingOptions([]byte(testCase.raw))
+		if decodeFunctionNameMatchingOptionsError != nil {
+			test.Errorf("%s was refused: %v", testCase.raw, decodeFunctionNameMatchingOptionsError)
 			continue
 		}
 		if decoded != testCase.want {
@@ -1162,9 +1162,9 @@ func TestDecodeFuncNameMatchingOptions(test *testing.T) {
 		`"never"`,
 		`{"considerPropertyDescriptor": true}`,
 	} {
-		if decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions(
+		if decoded, decodeFunctionNameMatchingOptionsError := DecodeFunctionNameMatchingOptions(
 			[]byte(raw),
-		); decodeFuncNameMatchingOptionsError == nil {
+		); decodeFunctionNameMatchingOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

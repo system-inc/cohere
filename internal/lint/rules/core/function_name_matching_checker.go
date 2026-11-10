@@ -5,8 +5,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// funcNameMatchingChecker carries the resolved configuration across the listeners.
-type funcNameMatchingChecker struct {
+// functionNameMatchingChecker carries the resolved configuration across the listeners.
+type functionNameMatchingChecker struct {
 	ruleContext                rule.Context
 	direction                  string
 	considerPropertyDescriptor bool
@@ -14,7 +14,7 @@ type funcNameMatchingChecker struct {
 }
 
 // shouldWarn answers upstream's `shouldWarn`: the direction decides which way the comparison runs.
-func (checker *funcNameMatchingChecker) shouldWarn(left string, right string) bool {
+func (checker *functionNameMatchingChecker) shouldWarn(left string, right string) bool {
 	if checker.direction == "never" {
 		return left == right
 	}
@@ -22,8 +22,8 @@ func (checker *funcNameMatchingChecker) shouldWarn(left string, right string) bo
 }
 
 // report emits the finding, choosing among the four messages the way upstream's `report` does.
-func (checker *funcNameMatchingChecker) report(node *ast.Node, name string, functionName string, isProperty bool) {
-	checker.ruleContext.ReportNode(node, funcNameMatchingMessage(checker.direction, isProperty, functionName, name))
+func (checker *functionNameMatchingChecker) report(node *ast.Node, name string, functionName string, isProperty bool) {
+	checker.ruleContext.ReportNode(node, functionNameMatchingMessage(checker.direction, isProperty, functionName, name))
 }
 
 // checkVariableDeclarator is upstream's `VariableDeclarator` listener.
@@ -31,7 +31,7 @@ func (checker *funcNameMatchingChecker) report(node *ast.Node, name string, func
 // Our parser groups declarators under one `KindVariableDeclaration` per `var`, so the listener fires
 // once and iterates rather than firing per declarator. Upstream reports on the declarator, so the
 // finding is anchored on each declaration individually rather than on the statement.
-func (checker *funcNameMatchingChecker) checkVariableDeclarator(node *ast.Node) {
+func (checker *functionNameMatchingChecker) checkVariableDeclarator(node *ast.Node) {
 	declaration := node.AsVariableDeclaration()
 	if declaration == nil || declaration.Initializer == nil {
 		return
@@ -40,7 +40,7 @@ func (checker *funcNameMatchingChecker) checkVariableDeclarator(node *ast.Node) 
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return
 	}
-	functionName, named := funcNameMatchingFunctionExpressionName(declaration.Initializer)
+	functionName, named := functionNameMatchingFunctionExpressionName(declaration.Initializer)
 	if !named {
 		return
 	}
@@ -50,13 +50,13 @@ func (checker *funcNameMatchingChecker) checkVariableDeclarator(node *ast.Node) 
 }
 
 // checkAssignment is upstream's `AssignmentExpression` listener.
-func (checker *funcNameMatchingChecker) checkAssignment(node *ast.Node) {
+func (checker *functionNameMatchingChecker) checkAssignment(node *ast.Node) {
 	expression := node.AsBinaryExpression()
 	if expression == nil || expression.OperatorToken == nil ||
-		!funcNameMatchingIsAssignmentOperator(expression.OperatorToken.Kind) {
+		!functionNameMatchingIsAssignmentOperator(expression.OperatorToken.Kind) {
 		return
 	}
-	functionName, named := funcNameMatchingFunctionExpressionName(expression.Right)
+	functionName, named := functionNameMatchingFunctionExpressionName(expression.Right)
 	if !named {
 		return
 	}
@@ -71,11 +71,11 @@ func (checker *funcNameMatchingChecker) checkAssignment(node *ast.Node) {
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 		// `module.exports = function foo(){}` is exempt unless the option turns it on. Checked
 		// before the name is read, matching upstream's guard order.
-		if !checker.includeModuleExports && funcNameMatchingIsModuleExports(target) {
+		if !checker.includeModuleExports && functionNameMatchingIsModuleExports(target) {
 			return
 		}
-		name, readable := funcNameMatchingStaticPropertyName(target)
-		if !readable || !funcNameMatchingIsIdentifier(name) {
+		name, readable := functionNameMatchingStaticPropertyName(target)
+		if !readable || !functionNameMatchingIsIdentifier(name) {
 			return
 		}
 		if checker.shouldWarn(name, functionName) {
@@ -85,12 +85,12 @@ func (checker *funcNameMatchingChecker) checkAssignment(node *ast.Node) {
 }
 
 // checkProperty is upstream's `"Property, PropertyDefinition[value]"` listener.
-func (checker *funcNameMatchingChecker) checkProperty(node *ast.Node) {
-	value := funcNameMatchingPropertyValue(node)
+func (checker *functionNameMatchingChecker) checkProperty(node *ast.Node) {
+	value := functionNameMatchingPropertyValue(node)
 	if value == nil {
 		return
 	}
-	functionName, named := funcNameMatchingFunctionExpressionName(value)
+	functionName, named := functionNameMatchingFunctionExpressionName(value)
 	if !named {
 		return
 	}
@@ -111,7 +111,7 @@ func (checker *funcNameMatchingChecker) checkProperty(node *ast.Node) {
 			return
 		}
 		keyText := computed.Expression.Text()
-		if !funcNameMatchingIsIdentifier(keyText) {
+		if !functionNameMatchingIsIdentifier(keyText) {
 			return
 		}
 		if checker.shouldWarn(keyText, functionName) {
@@ -127,7 +127,7 @@ func (checker *funcNameMatchingChecker) checkProperty(node *ast.Node) {
 		// compares against the property being defined rather than against the literal key `value`.
 		if checker.considerPropertyDescriptor && propertyName == "value" &&
 			node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
-			descriptorName, isDescriptor, readable := funcNameMatchingDescriptorTarget(node.Parent)
+			descriptorName, isDescriptor, readable := functionNameMatchingDescriptorTarget(node.Parent)
 			if isDescriptor {
 				// Inside a descriptor whose target name cannot be read -- `'b' + 'ar'`, or a
 				// computed key -- upstream reports nothing. It does not fall back to comparing
@@ -155,7 +155,7 @@ func (checker *funcNameMatchingChecker) checkProperty(node *ast.Node) {
 	// function foo(){}}` is silent: renaming the function to match would not be writable as a name.
 	if key.Kind == ast.KindStringLiteral {
 		keyText := key.Text()
-		if !funcNameMatchingIsIdentifier(keyText) {
+		if !functionNameMatchingIsIdentifier(keyText) {
 			return
 		}
 		if checker.shouldWarn(keyText, functionName) {

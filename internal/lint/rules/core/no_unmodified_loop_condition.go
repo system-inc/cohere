@@ -142,7 +142,7 @@ func reportUnmodifiedLoopConditions(ruleContext rule.Context) {
 	// resolves to. Upstream reads the equivalent off eslint-scope, walking every scope and every
 	// variable in it; iterating the index's keys reaches the same set of bindings, since a binding
 	// with no reference anywhere has nothing in a loop condition either.
-	referencesByDeclaration := loopFuncReferenceIndex(ruleContext)
+	referencesByDeclaration := functionInLoopReferenceIndex(ruleContext)
 
 	// Declarations in a stable order, because map iteration is randomised and findings are sorted
 	// by position at the end regardless. Sorting here as well keeps a group's members in source
@@ -448,7 +448,7 @@ func unmodifiedLoopIsInitializerReference(identifier *ast.Node) bool {
 // the misreading in the first version of this comment was caught.
 func unmodifiedLoopIsWriteReference(identifier *ast.Node, declaration *ast.Node) bool {
 	if unmodifiedLoopIsInitializerReference(identifier) {
-		list := loopFuncDeclarationListFor(declaration)
+		list := functionInLoopDeclarationListFor(declaration)
 		if list == nil {
 			return false
 		}
@@ -457,7 +457,7 @@ func unmodifiedLoopIsWriteReference(identifier *ast.Node, declaration *ast.Node)
 			return false
 		}
 	}
-	return loopFuncWritesTo(identifier)
+	return functionInLoopWritesTo(identifier)
 }
 
 // unmodifiedLoopIsInLoop reports whether a reference sits in the part of a loop that runs each

@@ -9,7 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// FuncNameMatchingOptions configures the rule.
+// FunctionNameMatchingOptions configures the rule.
 //
 // Upstream's schema is unusual and worth stating exactly, because it decides how the decoder has to
 // behave. It is an `anyOf` of two array shapes:
@@ -18,8 +18,8 @@ import (
 //	[{options}]                         an options object alone, direction defaulting to "always"
 //
 // So the first element is either a string or the object. The rule registers with `DecodeOptionList`
-// and is handed upstream's list as written; see DecodeFuncNameMatchingOptions, which reads both.
-type FuncNameMatchingOptions struct {
+// and is handed upstream's list as written; see DecodeFunctionNameMatchingOptions, which reads both.
+type FunctionNameMatchingOptions struct {
 	// Direction is upstream's `nameMatches`: "always" requires the names to match, "never" requires
 	// them to differ. Empty means "always".
 	Direction string `json:"-"`
@@ -32,7 +32,7 @@ type FuncNameMatchingOptions struct {
 	IncludeCommonJsModuleExports bool `json:"includeCommonJSModuleExports"`
 }
 
-// funcNameMatchingIsIdentifier answers upstream's `isIdentifier`, which routes through `esutils`.
+// functionNameMatchingIsIdentifier answers upstream's `isIdentifier`, which routes through `esutils`.
 //
 // An earlier draft was an ASCII regex, documented as a deliberate narrowing on the reasoning that
 // every corpus case is ASCII. That reasoning was wrong and upstream's own corpus said so:
@@ -71,37 +71,37 @@ type FuncNameMatchingOptions struct {
 // Other_ID_Continue`, plus the two zero-width joiners JavaScript allows. `unicode.Other_ID_Start`
 // is the table that carries U+1885, and reaching for a regex instead is what hid it. Checked
 // against `esutils` on seven inputs including the corpus character, all agreeing.
-func funcNameMatchingIsIdentifier(name string) bool {
+func functionNameMatchingIsIdentifier(name string) bool {
 	if name == "" {
 		return false
 	}
 	for index, character := range name {
 		if index == 0 {
-			if !funcNameMatchingIsIdentifierStart(character) {
+			if !functionNameMatchingIsIdentifierStart(character) {
 				return false
 			}
 			continue
 		}
-		if !funcNameMatchingIsIdentifierPart(character) {
+		if !functionNameMatchingIsIdentifierPart(character) {
 			return false
 		}
 	}
 	return true
 }
 
-// funcNameMatchingIsIdentifierStart answers ES6's IdentifierStart.
-func funcNameMatchingIsIdentifierStart(character rune) bool {
+// functionNameMatchingIsIdentifierStart answers ES6's IdentifierStart.
+func functionNameMatchingIsIdentifierStart(character rune) bool {
 	return character == '$' || character == '_' ||
 		unicode.In(character, unicode.L, unicode.Nl, unicode.Other_ID_Start)
 }
 
-// funcNameMatchingIsIdentifierPart answers ES6's IdentifierPart.
+// functionNameMatchingIsIdentifierPart answers ES6's IdentifierPart.
 //
 // The two zero-width characters are U+200C `ZERO WIDTH NON-JOINER` and U+200D `ZERO WIDTH JOINER`,
 // which JavaScript admits in identifiers and Unicode's ID_Continue does not. Written as escapes
 // rather than as literals: this file is scanned for non-ASCII bytes.
-func funcNameMatchingIsIdentifierPart(character rune) bool {
-	if funcNameMatchingIsIdentifierStart(character) {
+func functionNameMatchingIsIdentifierPart(character rune) bool {
+	if functionNameMatchingIsIdentifierStart(character) {
 		return true
 	}
 	if character == '\u200c' || character == '\u200d' {
@@ -113,8 +113,8 @@ func funcNameMatchingIsIdentifierPart(character rune) bool {
 
 // The four messages. Which one fires is a product of two booleans -- the configured direction, and
 // whether the target is a property or a variable -- and upstream picks among them in a single
-// if/else chain that this port reproduces in `funcNameMatchingMessage`.
-func funcNameMatchingMessage(direction string, isProperty bool, functionName string, name string) rule.Message {
+// if/else chain that this port reproduces in `functionNameMatchingMessage`.
+func functionNameMatchingMessage(direction string, isProperty bool, functionName string, name string) rule.Message {
 	if direction == "never" {
 		if isProperty {
 			return rule.Message{
@@ -165,7 +165,7 @@ func funcNameMatchingMessage(direction string, isProperty bool, functionName str
 	}
 }
 
-// FuncNameMatching requires a named function expression's name to match what it is assigned to.
+// FunctionNameMatching requires a named function expression's name to match what it is assigned to.
 //
 //	valid:   var foo = function foo() {};
 //	valid:   var foo = function() {};
@@ -201,11 +201,11 @@ func funcNameMatchingMessage(direction string, isProperty bool, functionName str
 // to compare and an arrow function cannot have one. Every arm requires
 // `node.init.type === "FunctionExpression"` and then `node.init.id`, so both exclusions come from
 // the same two lines rather than from a separate guard.
-var FuncNameMatching = rule.Rule[FuncNameMatchingOptions]{
+var FunctionNameMatching = rule.Rule[FunctionNameMatchingOptions]{
 	Name: "func-name-matching",
-	Run: func(ruleContext rule.Context, options rule.Given[FuncNameMatchingOptions]) rule.Listeners {
-		resolved := DefaultFuncNameMatchingOptions()
-		if given, isFuncNameMatchingOptions := options.Read(); isFuncNameMatchingOptions {
+	Run: func(ruleContext rule.Context, options rule.Given[FunctionNameMatchingOptions]) rule.Listeners {
+		resolved := DefaultFunctionNameMatchingOptions()
+		if given, isFunctionNameMatchingOptions := options.Read(); isFunctionNameMatchingOptions {
 			resolved = given
 		}
 		direction := resolved.Direction
@@ -213,7 +213,7 @@ var FuncNameMatching = rule.Rule[FuncNameMatchingOptions]{
 			direction = "always"
 		}
 
-		checker := &funcNameMatchingChecker{
+		checker := &functionNameMatchingChecker{
 			ruleContext:                ruleContext,
 			direction:                  direction,
 			considerPropertyDescriptor: resolved.ConsiderPropertyDescriptor,
@@ -229,8 +229,8 @@ var FuncNameMatching = rule.Rule[FuncNameMatchingOptions]{
 	},
 }
 
-// funcNameMatchingPropertyValue reads the value of a property-shaped node.
-func funcNameMatchingPropertyValue(node *ast.Node) *ast.Node {
+// functionNameMatchingPropertyValue reads the value of a property-shaped node.
+func functionNameMatchingPropertyValue(node *ast.Node) *ast.Node {
 	switch node.Kind {
 	case ast.KindPropertyAssignment:
 		if assignment := node.AsPropertyAssignment(); assignment != nil {
@@ -244,12 +244,12 @@ func funcNameMatchingPropertyValue(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// funcNameMatchingFunctionExpressionName reads a named function expression's own name.
+// functionNameMatchingFunctionExpressionName reads a named function expression's own name.
 //
 // Both halves are the rule's whole precondition. It must be a function expression, which excludes an
 // arrow (which cannot be named) and a function declaration (whose name is its binding); and it must
 // be named, since an anonymous function has nothing to compare.
-func funcNameMatchingFunctionExpressionName(node *ast.Node) (string, bool) {
+func functionNameMatchingFunctionExpressionName(node *ast.Node) (string, bool) {
 	if node == nil || node.Kind != ast.KindFunctionExpression {
 		return "", false
 	}
@@ -264,12 +264,12 @@ func funcNameMatchingFunctionExpressionName(node *ast.Node) (string, bool) {
 	return name.Text(), true
 }
 
-// funcNameMatchingIsModuleExports answers upstream's `isModuleExports`.
+// functionNameMatchingIsModuleExports answers upstream's `isModuleExports`.
 //
 // Two accepted spellings, and upstream writes them out separately: `module.exports` as a property
 // access, and `module["exports"]` as an element access whose argument is a string literal. Anything
 // else, including `notModule.exports` and `module[exports]`, is not exempt.
-func funcNameMatchingIsModuleExports(target *ast.Node) bool {
+func functionNameMatchingIsModuleExports(target *ast.Node) bool {
 	switch target.Kind {
 	case ast.KindPropertyAccessExpression:
 		access := target.AsPropertyAccessExpression()
@@ -294,12 +294,12 @@ func funcNameMatchingIsModuleExports(target *ast.Node) bool {
 	return false
 }
 
-// funcNameMatchingStaticPropertyName answers upstream's `getStaticPropertyName` for an assignment
+// functionNameMatchingStaticPropertyName answers upstream's `getStaticPropertyName` for an assignment
 // target.
 //
 // A computed access is readable only when its argument is a literal, which is upstream's
 // `node.left.computed && node.left.property.type !== "Literal"` guard inverted.
-func funcNameMatchingStaticPropertyName(target *ast.Node) (string, bool) {
+func functionNameMatchingStaticPropertyName(target *ast.Node) (string, bool) {
 	switch target.Kind {
 	case ast.KindPropertyAccessExpression:
 		access := target.AsPropertyAccessExpression()
@@ -321,7 +321,7 @@ func funcNameMatchingStaticPropertyName(target *ast.Node) (string, bool) {
 	return "", false
 }
 
-// funcNameMatchingDescriptorTarget finds the property name a descriptor object is defining.
+// functionNameMatchingDescriptorTarget finds the property name a descriptor object is defining.
 //
 // Three shapes, which upstream handles as three branches off the same `considerPropertyDescriptor`
 // arm:
@@ -336,7 +336,7 @@ func funcNameMatchingStaticPropertyName(target *ast.Node) (string, bool) {
 //	isDescriptor=true, readable=false   a descriptor whose target name is not static, so upstream
 //	                               reports NOTHING rather than falling back
 //	isDescriptor=true, readable=true    the target name, to compare against
-func funcNameMatchingDescriptorTarget(descriptor *ast.Node) (name string, isDescriptor bool, readable bool) {
+func functionNameMatchingDescriptorTarget(descriptor *ast.Node) (name string, isDescriptor bool, readable bool) {
 	call := descriptor.Parent
 	if call == nil {
 		return "", false, false
@@ -344,8 +344,8 @@ func funcNameMatchingDescriptorTarget(descriptor *ast.Node) (name string, isDesc
 
 	// `Object.defineProperty(o, 'foo', {...})` and `Reflect.defineProperty(...)`: the descriptor is
 	// an argument of the call, and the name is the argument before it.
-	if funcNameMatchingIsPropertyCall(call, "Object", "defineProperty") ||
-		funcNameMatchingIsPropertyCall(call, "Reflect", "defineProperty") {
+	if functionNameMatchingIsPropertyCall(call, "Object", "defineProperty") ||
+		functionNameMatchingIsPropertyCall(call, "Reflect", "defineProperty") {
 		arguments := call.AsCallExpression().Arguments
 		if arguments == nil || len(arguments.Nodes) < 2 {
 			return "", true, false
@@ -369,8 +369,8 @@ func funcNameMatchingDescriptorTarget(descriptor *ast.Node) (name string, isDesc
 		return "", false, false
 	}
 	outerCall := container.Parent
-	if !funcNameMatchingIsPropertyCall(outerCall, "Object", "defineProperties") &&
-		!funcNameMatchingIsPropertyCall(outerCall, "Object", "create") {
+	if !functionNameMatchingIsPropertyCall(outerCall, "Object", "defineProperties") &&
+		!functionNameMatchingIsPropertyCall(outerCall, "Object", "create") {
 		return "", false, false
 	}
 	// Upstream guards with `!node.parent.parent.computed`, so a computed key here is a descriptor
@@ -383,8 +383,8 @@ func funcNameMatchingDescriptorTarget(descriptor *ast.Node) (name string, isDesc
 	return key.Text(), true, true
 }
 
-// funcNameMatchingIsPropertyCall answers upstream's `isPropertyCall`.
-func funcNameMatchingIsPropertyCall(node *ast.Node, objectName string, functionName string) bool {
+// functionNameMatchingIsPropertyCall answers upstream's `isPropertyCall`.
+func functionNameMatchingIsPropertyCall(node *ast.Node, objectName string, functionName string) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -415,12 +415,12 @@ func funcNameMatchingIsPropertyCall(node *ast.Node, objectName string, functionN
 		access.Name().Text() == functionName
 }
 
-// DefaultFuncNameMatchingOptions is the unconfigured answer: direction "always", both flags off.
-func DefaultFuncNameMatchingOptions() FuncNameMatchingOptions {
-	return FuncNameMatchingOptions{Direction: "always"}
+// DefaultFunctionNameMatchingOptions is the unconfigured answer: direction "always", both flags off.
+func DefaultFunctionNameMatchingOptions() FunctionNameMatchingOptions {
+	return FunctionNameMatchingOptions{Direction: "always"}
 }
 
-// DecodeFuncNameMatchingOptions reads upstream's option list off the config.
+// DecodeFunctionNameMatchingOptions reads upstream's option list off the config.
 //
 // Hand-rolled because upstream's schema is an `anyOf` of two list shapes rather than a single
 // object, and the generic decoder has no way to express that:
@@ -434,8 +434,8 @@ func DefaultFuncNameMatchingOptions() FuncNameMatchingOptions {
 // that is neither "always" nor "never", a key the schema does not declare, a second element after an
 // object, or a third element. Each was silently read as the default by the decoder this replaced,
 // and the defaults are exactly what the author wrote the option to change.
-func DecodeFuncNameMatchingOptions(list []byte) (FuncNameMatchingOptions, error) {
-	options := DefaultFuncNameMatchingOptions()
+func DecodeFunctionNameMatchingOptions(list []byte) (FunctionNameMatchingOptions, error) {
+	options := DefaultFunctionNameMatchingOptions()
 	elements, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(elements) == 0 {
 		return options, optionElementsError
@@ -459,7 +459,7 @@ func DecodeFuncNameMatchingOptions(list []byte) (FuncNameMatchingOptions, error)
 				"never be read", elements[1])
 	}
 
-	var object FuncNameMatchingOptions
+	var object FunctionNameMatchingOptions
 	if unmarshalOptionsError := rule.UnmarshalOptions(objectElement, &object); unmarshalOptionsError != nil {
 		return options, fmt.Errorf("func-name-matching options object: %w", unmarshalOptionsError)
 	}
@@ -468,7 +468,7 @@ func DecodeFuncNameMatchingOptions(list []byte) (FuncNameMatchingOptions, error)
 	return options, nil
 }
 
-// funcNameMatchingIsAssignmentOperator answers whether a binary operator assigns.
+// functionNameMatchingIsAssignmentOperator answers whether a binary operator assigns.
 //
 // Upstream's listener is `AssignmentExpression`, which in ESTree covers every assignment operator
 // rather than just `=`. Our parser models all of them as binary expressions, so the operator has to
@@ -477,7 +477,7 @@ func DecodeFuncNameMatchingOptions(list []byte) (FuncNameMatchingOptions, error)
 //
 // The logical assignments are the ones a reader is most likely to leave out, because they are the
 // newest and because the rule reads as being about plain assignment.
-func funcNameMatchingIsAssignmentOperator(kind ast.Kind) bool {
+func functionNameMatchingIsAssignmentOperator(kind ast.Kind) bool {
 	switch kind {
 	case ast.KindEqualsToken,
 		ast.KindPlusEqualsToken,
