@@ -31,6 +31,11 @@
 // well for the call, where asmdecl and framepointer read their target (see Target), and `.JudgingBy("GOARCH=sparc64")`
 // sets them there apart from the load, for a file the load hands over whose architecture the check must not be able to
 // name. The census command, command/cohere-parity, runs Analyze over a real tree.
+//
+// The originals, staticcheck's checks and x/tools' passes, stay in the tests as live oracles, never frozen into
+// recorded findings: a frozen oracle can't tell us when a staticcheck or x/tools release moves away from a port, and
+// the live comparison is the only check that holds a port to upstream across releases. It costs the binary nothing,
+// since the registry's guard keeps every original out of ./command/cohere.
 package parity
 
 import (

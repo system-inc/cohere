@@ -6,15 +6,15 @@ import (
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/directives"
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/lint"
 )
 
 // Analyzer is U1000, cohere's port of staticcheck's, under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read as they did when the registry ran the original. It reads staticcheck's directives
-// and generated files, as the original does, and reports each unused object as the registry reported the original's:
-// at the object's position, worded `<kind> <name> is unused`, U1000 its category. It also returns its verdict on every
+// `//cohere:ignore` naming it read as they did when the registry ran the original. It reads the package's //lint:
+// directives, through directivesAnalyzer, its own copy of staticcheck's that skips a file with none, and staticcheck's
+// generated files, as the original does, and reports each unused object as the registry reported the original's: at
+// the object's position, worded `<kind> <name> is unused`, U1000 its category. It also returns its verdict on every
 // object, used, unused or quiet, which the original returns for staticcheck's runner to report and which the tests
 // beside this file hold to the original's expectations.
 //
@@ -24,7 +24,7 @@ var Analyzer = &analysis.Analyzer{
 	Name:       "U1000",
 	Doc:        "Unused code: staticcheck's U1000, ported as cohere's own.",
 	Run:        run,
-	Requires:   []*analysis.Analyzer{generated.Analyzer, directives.Analyzer},
+	Requires:   []*analysis.Analyzer{generated.Analyzer, directivesAnalyzer},
 	ResultType: reflect.TypeFor[result](),
 }
 
@@ -32,9 +32,9 @@ var Analyzer = &analysis.Analyzer{
 const category = "U1000"
 
 func run(pass *analysis.Pass) (any, error) {
-	packageDirectives, isDirectives := pass.ResultOf[directives.Analyzer].([]lint.Directive)
+	packageDirectives, isDirectives := pass.ResultOf[directivesAnalyzer].([]lint.Directive)
 	if !isDirectives {
-		return nil, fmt.Errorf("reading staticcheck's directives: they are %T", pass.ResultOf[directives.Analyzer])
+		return nil, fmt.Errorf("reading the //lint: directives: they are %T", pass.ResultOf[directivesAnalyzer])
 	}
 	generatedFiles, isGenerated := pass.ResultOf[generated.Analyzer].(map[string]generated.Generator)
 	if !isGenerated {

@@ -11,8 +11,8 @@ import (
 	"honnef.co/go/tools/analysis/lint"
 )
 
-// directiveCase is one file ParseDirectives reads: its source, how many directives it holds, and, for a file with
-// none, that the file is one the copy's fast path skips without building its comment map.
+// directiveCase is one file parseDirectives reads: its source, and how many directives it holds. A file with none is
+// one the fast path skips without building its comment map.
 type directiveCase struct {
 	name       string
 	source     string
@@ -20,9 +20,9 @@ type directiveCase struct {
 }
 
 // directiveCases are files with a directive where the release finds one, in a comment group's later line, in a later
-// group than the first, above the package clause, and files the copy's fast path skips: no comment at all, comments
-// none of which is a directive, and `//lint:` inside a block comment and inside a string, neither of which the
-// release's comment map ever read as a directive.
+// group than the first, above the package clause, and files the fast path skips: no comment at all, comments none of
+// which is a directive, and `//lint:` inside a block comment and inside a string, neither of which the release's
+// comment map ever read as a directive.
 var directiveCases = []directiveCase{
 	{
 		name: "a directive on a doc comment's second line, in the file's second group",
@@ -59,15 +59,15 @@ var directiveCases = []directiveCase{
 	},
 }
 
-// TestParseDirectivesSkipsOnlyFilesWithoutOne holds the second change cohere's copy of staticcheck makes to its
-// release (third_party/honnef.co/go/tools/README.cohere.md, #tcbjtmj): lint.ParseDirectives builds no comment map
-// for a file none of whose comments starts `//lint:`. Each file's directives must be the release's, read through
-// ast.NewCommentMap as the release reads them, each with the same comment and the same Node, and a file with none
-// must allocate nothing, which only the fast path does, since a comment map for any comment allocates.
+// TestParseDirectivesReadsAsTheReleaseAndSkipsFilesWithoutOne holds parseDirectives, the port's own reading of the
+// //lint: directives (#tcbjtmj), to staticcheck v0.8.1's lint.ParseDirectives, which builds a comment map for every
+// file. Each file's directives must be the release's, read through ast.NewCommentMap as the release reads them, each
+// with the same comment and the same Node, and a file with none must allocate nothing, which only the fast path does,
+// since a comment map for any comment allocates.
 //
 // Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would
 // add to.
-func TestParseDirectivesSkipsOnlyFilesWithoutOne(test *testing.T) {
+func TestParseDirectivesReadsAsTheReleaseAndSkipsFilesWithoutOne(test *testing.T) {
 	for _, directiveCase := range directiveCases {
 		// Not parallel: each case counts the process's allocations, as its parent does.
 		test.Run(directiveCase.name, func(test *testing.T) {
@@ -77,14 +77,14 @@ func TestParseDirectivesSkipsOnlyFilesWithoutOne(test *testing.T) {
 				test.Fatalf("parsing the case: %v", parseError)
 			}
 			files := []*ast.File{file}
-			found := sortedDirectives(lint.ParseDirectives(files, fileSet))
+			found := sortedDirectives(parseDirectives(files, fileSet))
 			expected := sortedDirectives(directivesThroughCommentMap(files, fileSet))
 			if len(expected) != directiveCase.directives {
 				test.Fatalf("the release's reading finds %d directives, the case expects %d", len(expected),
 					directiveCase.directives)
 			}
 			if len(found) != len(expected) {
-				test.Fatalf("ParseDirectives found %d directives, the release's reading %d", len(found),
+				test.Fatalf("parseDirectives found %d directives, the release's reading %d", len(found),
 					len(expected))
 			}
 			for index, directive := range found {
@@ -98,9 +98,9 @@ func TestParseDirectivesSkipsOnlyFilesWithoutOne(test *testing.T) {
 				}
 			}
 			if directiveCase.directives == 0 && len(file.Comments) > 0 {
-				allocations := testing.AllocsPerRun(10, func() { lint.ParseDirectives(files, fileSet) })
+				allocations := testing.AllocsPerRun(10, func() { parseDirectives(files, fileSet) })
 				if allocations != 0 {
-					test.Errorf("ParseDirectives allocated %.0f times over a file with no directive: it built the "+
+					test.Errorf("parseDirectives allocated %.0f times over a file with no directive: it built the "+
 						"comment map the fast path skips", allocations)
 				}
 			}
@@ -108,8 +108,8 @@ func TestParseDirectivesSkipsOnlyFilesWithoutOne(test *testing.T) {
 	}
 }
 
-// directivesThroughCommentMap is ParseDirectives as staticcheck v0.8.1 released it, a comment map built for every
-// file and only its `//lint:` comments kept, the oracle the copy's fast path is held to.
+// directivesThroughCommentMap is lint.ParseDirectives as staticcheck v0.8.1 released it, a comment map built for every
+// file and only its `//lint:` comments kept, the oracle parseDirectives is held to.
 func directivesThroughCommentMap(files []*ast.File, fileSet *token.FileSet) []lint.Directive {
 	var directives []lint.Directive
 	for _, file := range files {

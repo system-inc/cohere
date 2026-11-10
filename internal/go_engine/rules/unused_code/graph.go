@@ -138,7 +138,7 @@ type graph struct {
 	files []*ast.File
 	// fileSet holds the positions of the package's syntax and objects.
 	fileSet *token.FileSet
-	// directives is every //lint: directive in the package, which staticcheck's directives analyzer read.
+	// directives is every //lint: directive in the package, which directivesAnalyzer read.
 	directives []lint.Directive
 	// generated is each generated file of the package, by its name, which staticcheck's generated analyzer read.
 	generated map[string]generated.Generator

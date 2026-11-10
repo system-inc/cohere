@@ -6,8 +6,8 @@
 // the parser `go work edit` uses rather than by running go, so the land fixture's stand-in go doesn't answer
 // for it. A module inside a submodule (a gitlink in the index, by rule, never by name) is not owned: its
 // tests and its findings are its upstream's. Nor is a module copied into the tree whole and wired in by a
-// directory replace in a module go.work uses, as third_party's staticcheck is: it is somebody else's code
-// built as a dependency, so its tests are its upstream's too.
+// directory replace in a module go.work uses: it is somebody else's code built as a dependency, so its tests
+// are its upstream's too.
 package project
 
 import (

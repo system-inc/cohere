@@ -224,6 +224,51 @@ func TestAStaticcheckConfAboveAPackageIsInItsKey(test *testing.T) {
 	}
 }
 
+// A `//lint:` directive is in its package's key, since U1000 reads the package's directives through its own analyzer
+// and the findings cache is keyed per package: adding `//lint:ignore U1000` above the fixture's one unused function
+// misses the package and drops U1000's finding, and removing it again brings the finding back, each run writing what a
+// run under `--no-cache` writes. Were the directive outside the key, the run after adding it would restore the finding
+// it no longer has.
+func TestALintDirectiveIsInItsPackagesKey(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "lint-directive"))
+	file := filepath.Join(root, "unused", "unused.go")
+	original, readError := os.ReadFile(file)
+	if readError != nil {
+		test.Fatalf("reading %s: %v", file, readError)
+	}
+	function := []byte("func kept() {}")
+	ignored := bytes.Replace(original, function,
+		append([]byte("//lint:ignore U1000 kept to show the directive keys the package\n"), function...), 1)
+	if bytes.Equal(ignored, original) {
+		test.Fatalf("%s holds no %s to put the directive above", file, function)
+	}
+	for _, state := range []struct {
+		name     string
+		contents []byte
+		reported bool
+	}{
+		{name: "no directive", contents: original, reported: true},
+		{name: "a //lint:ignore U1000 above the function", contents: ignored},
+		{name: "the directive removed again", contents: original, reported: true},
+	} {
+		if writeError := os.WriteFile(file, state.contents, 0o644); writeError != nil {
+			test.Fatalf("%s: writing %s: %v", state.name, file, writeError)
+		}
+		cached := runCachedEngine(test, root)
+		uncached := runCachedEngine(test, root, "--no-cache")
+		if cached.withoutCounts != uncached.withoutCounts {
+			test.Fatalf("%s: cached\n%s\nunder --no-cache\n%s", state.name, cached.withoutCounts,
+				uncached.withoutCounts)
+		}
+		if reported := strings.Contains(cached.stream, `"rule":"cohere-go/U1000"`); reported != state.reported {
+			test.Fatalf("%s: want U1000 reported %t, got %t in\n%s", state.name, state.reported, reported,
+				cached.stream)
+		}
+	}
+}
+
 // goEnvironmentIn is what readGoEnvironment reads in root under environment, failing the test when go env fails.
 func goEnvironmentIn(test *testing.T, root string, environment []string) map[string]string {
 	test.Helper()

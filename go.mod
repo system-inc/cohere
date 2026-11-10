@@ -36,13 +36,6 @@ replace (
 
 	// Go's build cache layout and how to delete from it safely, shared with Loom the same way (#xwfdr3d).
 	github.com/system-inc/cohere/go_cache => ./go_cache
-
-	// staticcheck v0.8.1 as released, but for upstream's fa9ae6d1a5 in unused/: U1000 shares one object path
-	// encoder per package, where the release walks the package afresh for every object it records. That walk was
-	// most of U1000's CPU at cohere's root, 4.3 to 4.5 core-seconds, and with the fix it is 0.5 to 0.7, findings
-	// the same (#j3bfnyt). The copy and this line are deleted at the first staticcheck release that carries the
-	// commit (third_party/honnef.co/go/tools/README.cohere.md).
-	honnef.co/go/tools => ./third_party/honnef.co/go/tools
 )
 
 require (
@@ -90,10 +83,11 @@ require (
 	// depends on the type it decodes into, which a regex over the source cannot see.
 	golang.org/x/tools v0.50.0
 
-	// staticcheck's SA, S, ST and U1000 checks, which the Go engine registers as rules under their own codes
-	// (internal/go_engine/rules). They are go/analysis analyzers already, so they run in the engine's one
-	// load with no runner of staticcheck's own. Minimal version selection keeps our x/tools over the older
-	// one staticcheck asks for, and the registry's tests prove its analyzers validate against ours.
+	// staticcheck as released. The binary links only its helper packages (type utilities, edits, the
+	// generated-file facts); every check it registers is cohere's own port, and the original checks run
+	// only in the tests, as the live oracles each port is held to (internal/go_engine/check/parity). Move
+	// to the first release that carries upstream's fa9ae6d1a5, one object path encoder per package, which
+	// makes the original U1000 cheaper in its parity tests, once x/tools is at v0.51, which it requires.
 	honnef.co/go/tools v0.8.1
 )
 
