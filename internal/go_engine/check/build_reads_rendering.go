@@ -1,58 +1,11 @@
 package check
 
 import (
-	"cmp"
 	"go/types"
-	"slices"
 	"strings"
 )
 
-// closureRendering is what an importer can observe of object, another package's, written out so that two builds
-// whose types render alike for it give it the same lines, the reading an extra build compares with the host's to
-// tell whether a package that read object reads the same there (#b2t9xmf). It errs wide, as exportRendering does: a
-// rendering that changes when it need not costs the reading package a recheck, while one that stays the same when it
-// should change restores a stale analysis.
-//
-//   - The object's own line: its kind, package, name and type, a constant with its exact value, a field with whether
-//     it is embedded, a method with its receiver.
-//   - Every named type and alias reachable from its type, each once, sorted by package path, name and rendering: its
-//     path and name, then its lines as exportRendering writes them (renderedTypeName), which hold its type parameters
-//     with their constraints, its underlying type with every field, unexported ones too, and every method with its
-//     signature. The walk follows each into what those lines name (closureTypeNames), so a struct two levels down
-//     whose unexported field differs by target changes the rendering of every object that reaches it.
-//
-// A named type of no package, the universe's error or comparable, is the same in every build, and is left out.
-func closureRendering(object types.Object) []string {
-	lines := []string{ownRendering(object)}
-	roots := []types.Type{object.Type()}
-	if function, isFunction := object.(*types.Func); isFunction && function.Signature().Recv() != nil {
-		roots = append(roots, function.Signature().Recv().Type())
-	}
-	type renderedName struct {
-		path  string
-		name  string
-		lines []string
-	}
-	reached := closureTypeNames(roots)
-	rendered := make([]renderedName, 0, len(reached))
-	for _, typeName := range reached {
-		rendered = append(rendered, renderedName{path: typeName.Pkg().Path(), name: typeName.Name(),
-			lines: renderedTypeName(typeName)})
-	}
-	// Two of one path and name are local types of two functions, which no package-level type can name, so they are
-	// rare; their lines settle the order, never their positions, which differ by build.
-	slices.SortFunc(rendered, func(left, right renderedName) int {
-		return cmp.Or(cmp.Compare(left.path, right.path), cmp.Compare(left.name, right.name),
-			slices.Compare(left.lines, right.lines))
-	})
-	for _, typeName := range rendered {
-		lines = append(lines, "named "+typeName.path+"."+typeName.name)
-		lines = append(lines, typeName.lines...)
-	}
-	return lines
-}
-
-// ownRendering is the line of object itself in its closureRendering.
+// ownRendering is the line of object itself in its closure digest (ReadsBuild.closureDigest).
 func ownRendering(object types.Object) string {
 	owner := "universe"
 	if object.Pkg() != nil {
@@ -83,13 +36,23 @@ func ownRendering(object types.Object) string {
 	}
 }
 
-// closureTypeNames are the named types and aliases reachable from roots, each once, in the order the walk meets them:
-// through pointers, slices, arrays, maps, channels, signatures (type parameters and their constraints, parameters,
-// results), struct fields, unexported ones too, interface methods and embedded types, union terms and instance type
-// arguments, and from each named type into its type parameters' constraints, its underlying type and its methods'
-// signatures, and from each alias into its type parameters' constraints, the type its declaration names and the type
-// it stands for. A type of no package is left out, and so is its walk: the universe's are the same in every build.
-func closureTypeNames(roots []types.Type) []*types.TypeName {
+// rootTypes are the types object's closure starts from: its type, and a method's receiver type, which a signature's
+// walk leaves alone.
+func rootTypes(object types.Object) []types.Type {
+	roots := []types.Type{object.Type()}
+	if function, isFunction := object.(*types.Func); isFunction && function.Signature().Recv() != nil {
+		roots = append(roots, function.Signature().Recv().Type())
+	}
+	return roots
+}
+
+// directTypeNames are the named types and aliases roots name, each once, in the order a walk meets them: through
+// pointers, slices, arrays, maps, channels, signatures (type parameters and their constraints, parameters, results),
+// struct fields, unexported ones too, interface methods and embedded types, union terms and instance type arguments.
+// The walk stops at each named type and alias, whose declaration is a node of its own (declarationTypes), so a closure
+// is the named types these reach, and what their declarations reach in turn. A type of no package is left out: the
+// universe's are the same in every build.
+func directTypeNames(roots []types.Type) []*types.TypeName {
 	seen := map[*types.TypeName]bool{}
 	var reached []*types.TypeName
 	var walk func(walked types.Type)
@@ -98,7 +61,7 @@ func closureTypeNames(roots []types.Type) []*types.TypeName {
 			walk(parameter.Constraint())
 		}
 	}
-	// A signature's receiver is left alone: a method's is the type that declares it, walked already, and an interface
+	// A signature's receiver is left alone: a method's is the type that declares it, a node already, and an interface
 	// method's is the interface, which the walk is inside of.
 	walkSignature := func(signature *types.Signature) {
 		walkParameters(signature.RecvTypeParams())
@@ -106,36 +69,21 @@ func closureTypeNames(roots []types.Type) []*types.TypeName {
 		walk(signature.Params())
 		walk(signature.Results())
 	}
-	visit := func(typeName *types.TypeName) {
-		if typeName.Pkg() == nil || seen[typeName] {
-			return
-		}
-		seen[typeName] = true
-		reached = append(reached, typeName)
-		switch declared := typeName.Type().(type) {
-		case *types.Named:
-			walkParameters(declared.TypeParams())
-			walk(declared.Underlying())
-			for method := range declared.Methods() {
-				walkSignature(method.Signature())
-			}
-		case *types.Alias:
-			walkParameters(declared.TypeParams())
-			walk(declared.Rhs())
-			walk(types.Unalias(declared))
-		default:
-			walk(declared)
+	reach := func(typeName *types.TypeName) {
+		if typeName.Pkg() != nil && !seen[typeName] {
+			seen[typeName] = true
+			reached = append(reached, typeName)
 		}
 	}
 	walk = func(walked types.Type) {
 		switch composite := walked.(type) {
 		case *types.Named:
-			visit(composite.Origin().Obj())
+			reach(composite.Origin().Obj())
 			for argument := range composite.TypeArgs().Types() {
 				walk(argument)
 			}
 		case *types.Alias:
-			visit(composite.Origin().Obj())
+			reach(composite.Origin().Obj())
 			for argument := range composite.TypeArgs().Types() {
 				walk(argument)
 			}
@@ -180,4 +128,30 @@ func closureTypeNames(roots []types.Type) []*types.TypeName {
 		walk(root)
 	}
 	return reached
+}
+
+// declarationTypes are the types typeName's declaration names, which its rendered lines write (renderedTypeName): a
+// defined type's type parameters' constraints, its underlying type and its methods' signatures, and an alias's type
+// parameters' constraints, the type its declaration names and the type it stands for.
+func declarationTypes(typeName *types.TypeName) []types.Type {
+	var named []types.Type
+	constraints := func(parameters *types.TypeParamList) {
+		for parameter := range parameters.TypeParams() {
+			named = append(named, parameter.Constraint())
+		}
+	}
+	switch declared := typeName.Type().(type) {
+	case *types.Named:
+		constraints(declared.TypeParams())
+		named = append(named, declared.Underlying())
+		for method := range declared.Methods() {
+			named = append(named, method.Signature())
+		}
+	case *types.Alias:
+		constraints(declared.TypeParams())
+		named = append(named, declared.Rhs(), types.Unalias(declared))
+	default:
+		named = append(named, declared)
+	}
+	return named
 }

@@ -18,6 +18,7 @@ import (
 	"honnef.co/go/tools/analysis/facts/deprecated"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
 // The verdict fixture's paths: platform has files of one target each, and every user package imports it.
@@ -220,24 +221,25 @@ func TestATypeReadHoldsOnlyWhenEveryObjectRendersAlikeInTheBuild(test *testing.T
 	}
 }
 
-// The closure rendering of an object is the same for two checks of the same declarations, and differs for two whose
+// The closure digest of an object is the same for two checks of the same declarations, and differs for two whose
 // only difference is an unexported field of a struct its type reaches.
-func TestTheClosureRenderingFollowsUnexportedFieldsAndNothingElseMoves(test *testing.T) {
+func TestTheClosureDigestFollowsUnexportedFieldsAndNothingElseMoves(test *testing.T) {
 	test.Parallel()
 
 	first := checkedWorld(test, "darwin", "")
 	again := checkedWorld(test, "darwin", "")
 	linux := checkedWorld(test, "linux", "")
-	handleOf := func(world verdictWorld) []string {
-		return closureRendering(world.platform.Scope().Lookup("Handle"))
+	handleOf := func(world verdictWorld) cache.Key {
+		return NewReadsBuild().closureDigest(world.platform.Scope().Lookup("Handle"))
 	}
-	if strings.Join(handleOf(first), "\n") != strings.Join(handleOf(again), "\n") {
-		test.Errorf("two checks of darwin render Handle apart:\n%s\n\n%s", strings.Join(handleOf(first), "\n"),
-			strings.Join(handleOf(again), "\n"))
+	if handleOf(first) != handleOf(again) {
+		test.Errorf("two checks of darwin digest Handle apart:\n%s\n\n%s",
+			strings.Join(closureRendering(first.platform.Scope().Lookup("Handle")), "\n"),
+			strings.Join(closureRendering(again.platform.Scope().Lookup("Handle")), "\n"))
 	}
-	if strings.Join(handleOf(first), "\n") == strings.Join(handleOf(linux), "\n") {
-		test.Errorf("darwin and linux render Handle alike, though state's descriptor differs:\n%s",
-			strings.Join(handleOf(first), "\n"))
+	if handleOf(first) == handleOf(linux) {
+		test.Errorf("darwin and linux digest Handle alike, though state's descriptor differs:\n%s",
+			strings.Join(closureRendering(first.platform.Scope().Lookup("Handle")), "\n"))
 	}
 }
 

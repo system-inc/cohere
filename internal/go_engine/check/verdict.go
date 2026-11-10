@@ -54,7 +54,7 @@ func (judged verdict) objectHolds(hostObject types.Object) (bool, string) {
 	if found == nil {
 		return false, "object " + objectName(hostObject) + ": " + why
 	}
-	if judged.host.rendering(hostObject) != judged.build.rendering(found) {
+	if judged.host.closureDigest(hostObject) != judged.build.closureDigest(found) {
 		return false, "object " + objectName(hostObject) + " renders differently"
 	}
 	return true, ""
@@ -68,7 +68,7 @@ func (judged verdict) instanceHolds(instance build_reads.Instance, ownPath strin
 	if holds, why := judged.objectHolds(instance.Generic); !holds {
 		return false, "instance of " + objectName(instance.Generic) + ": " + why
 	}
-	for _, typeName := range closureTypeNames(slices.Collect(instance.TypeArguments.Types())) {
+	for _, typeName := range judged.host.graph.reachable(slices.Collect(instance.TypeArguments.Types())) {
 		if typeName.Pkg().Path() == ownPath {
 			continue
 		}
@@ -208,7 +208,7 @@ func (judged verdict) sameObject(hostObject types.Object, buildObject types.Obje
 	if !hostHasPath || !buildHasPath || hostPath != buildPath {
 		return false
 	}
-	return judged.host.rendering(hostObject) == judged.build.rendering(buildObject)
+	return judged.host.closureDigest(hostObject) == judged.build.closureDigest(buildObject)
 }
 
 // deprecationHolds reports whether a Deprecated lookup gets the same answer from the build's deprecated facts: the

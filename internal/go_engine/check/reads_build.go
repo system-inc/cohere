@@ -26,8 +26,9 @@ type FactLookup func(owner string, path objectpath.Path, factType reflect.Type) 
 type ReadsBuild struct {
 	lock sync.Mutex
 
-	// renderings are each object's closureRendering, as a digest.
-	renderings map[types.Object]cache.Key
+	// digests are each object's closure digest, and graph the named types they are made of (typeGraph).
+	digests map[types.Object]cache.Key
+	graph   *typeGraph
 
 	// paths are each object's objectpath, and encoder the encoder that found them, which keeps what it learns of each
 	// package for the next object of it.
@@ -44,34 +45,34 @@ type objectPathResult struct {
 	found bool
 }
 
-// NewReadsBuild is an empty memo of one build's renderings, objectpaths and method names.
+// NewReadsBuild is an empty memo of one build's closure digests, objectpaths and method names.
 func NewReadsBuild() *ReadsBuild {
 	return &ReadsBuild{
-		renderings:  map[types.Object]cache.Key{},
+		digests:     map[types.Object]cache.Key{},
+		graph:       newTypeGraph(),
 		paths:       map[types.Object]objectPathResult{},
 		methodNames: map[*types.Package]map[string][]*types.TypeName{},
 	}
 }
 
-// rendering is object's closureRendering as a digest, rendered the first time it is asked. Two goroutines asking at
-// once may both render it, which costs time and never a wrong answer.
-func (build *ReadsBuild) rendering(object types.Object) cache.Key {
+// closureDigest is object's closure digest (typeGraph.closureDigest), memoized: what an importer can observe of
+// object, another package's, its own line and every named type its type reaches, each type as exportRendering writes
+// it, unexported fields and methods included, so two builds whose types render alike for it digest it alike, and a
+// struct two levels down whose unexported field differs by target changes the digest of every object that reaches it.
+// It errs wide, as exportRendering does: a digest that changes when it need not costs the reading package a recheck,
+// while one that stays the same when it should change restores a stale analysis.
+func (build *ReadsBuild) closureDigest(object types.Object) cache.Key {
 	build.lock.Lock()
-	rendered, known := build.renderings[object]
+	digest, known := build.digests[object]
 	build.lock.Unlock()
 	if known {
-		return rendered
+		return digest
 	}
-	lines := closureRendering(object)
-	parts := make([][]byte, 0, len(lines))
-	for _, line := range lines {
-		parts = append(parts, []byte(line))
-	}
-	rendered = cache.DigestOf(parts...)
+	digest = build.graph.closureDigest(object)
 	build.lock.Lock()
-	build.renderings[object] = rendered
+	build.digests[object] = digest
 	build.lock.Unlock()
-	return rendered
+	return digest
 }
 
 // pathOf is object's objectpath in its package, and whether it has one.
