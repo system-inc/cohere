@@ -1,6 +1,7 @@
 package format
 
 import (
+	"errors"
 	"fmt"
 	"go/parser"
 	"go/token"
@@ -751,4 +752,28 @@ func TestRefusedWritesLeaveEveryFileAsItWas(test *testing.T) {
 	if !WritesRefused() {
 		test.Fatal("WritesRefused does not report the refusal")
 	}
+}
+
+// stage asks the save's refusal before the root's check (#hxqqgfz): a process answering an editor's save writes no
+// file, inside the root or out, so a file outside the root is refused as a save's write, never as a file outside, which
+// a run would name not written. A save never reaches stage today, since its phases ask no write, so only this holds
+// the order: swapped, the root's check answers first, and this sees an OutsideRootError.
+//
+// Not parallel: RefuseWrites is process-wide, and this test turns it back off before any parallel test of the package,
+// each of which writes, is let run.
+func TestStageRefusesASavesWriteBeforeAskingTheRoot(test *testing.T) {
+	tree := newLinkedTree(test)
+	RefuseWrites()
+	defer writesRefused.Store(false)
+
+	outsideFile := filepath.Join(tree.project, "shared", "unformatted.go")
+	staged, stageError := stage(rootOf(test, tree.project), outsideFile, []byte(formattedSource))
+	var outside *write_root.OutsideRootError
+	if errors.As(stageError, &outside) {
+		test.Fatalf("a save's write outside the root was refused by the root first: %v", stageError)
+	}
+	if stageError == nil || !strings.Contains(stageError.Error(), "answers an editor's save, which writes no file") {
+		test.Fatalf("want the save's refusal, got %v (staged %+v)", stageError, staged)
+	}
+	requireContents(test, filepath.Join(tree.shared, "unformatted.go"), unformattedSource)
 }
