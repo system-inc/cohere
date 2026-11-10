@@ -392,16 +392,16 @@
         },
         {
             "abbreviation": "preds",
-            "expansions": ["predecessors"],
-            "reason": "go/ir's list of a block's predecessors, which the census found in a static single assignment builder too.",
+            "expansions": ["predecessors", "predicates"],
+            "reason": "It has two meanings, so every message names both: the census found it naming go/ir's list of a block's predecessors, and in a static single assignment builder too, while outside an IR it most often names predicates, filters' `func(T) bool`.",
             "whole": { "style": "orDescriptive" },
             "prefix": { "phase": "late" },
             "segment": {}
         },
         {
             "abbreviation": "pred",
-            "expansions": ["predecessor"],
-            "reason": "The census found it naming a block's predecessor in all 5 of its findings. `Predicate` and `Predict` never read as it.",
+            "expansions": ["predecessor", "predicate"],
+            "reason": "It has two meanings, so every message names both: the census found it naming a block's predecessor in go/ir in all 5 of its findings, while outside an IR it most often names a predicate, a filter's `func(T) bool`. `Predicate` and `Predict` spelled out never read as it.",
             "whole": { "style": "orDescriptive" },
             "prefix": { "phase": "late" },
             "segment": {}

@@ -496,6 +496,19 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(test *testing.T) 
 			"const outputDirPath = 1;\n",
 			`Use "outputDirectoryPath" or "outputDirectionPath", whichever it means.`,
 		},
+		// `pred` is a block's predecessor in go/ir and most often a filter's predicate elsewhere, so a message
+		// naming only the predecessor would steer `items.filter(pred)` toward a wrong name.
+		{
+			"a whole pred names both meanings",
+			"export function keep(values: number[], pred: (value: number) => boolean) {\n" +
+				"    return values.filter(pred);\n}\n",
+			`Use "predecessor" or "predicate", whichever it means, or a more descriptive name.`,
+		},
+		{
+			"a preds prefix names both meanings",
+			"const predsByBlock = 1;\n",
+			`Use "predecessorsByBlock" or "predicatesByBlock", whichever it means.`,
+		},
 		// `Var` can mean JavaScript's var keyword, as in `NoVar`, which no word spells out, so it offers no name.
 		{
 			"a var segment asks which it means",
@@ -531,6 +544,9 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(test *testing.T) 
 			description := result.Diagnostics[0].Message.Description
 			if !strings.Contains(description, testCase.wantText) {
 				test.Fatalf("expected the message to contain %q, got %q", testCase.wantText, description)
+			}
+			if len(result.Diagnostics[0].Fixes) != 0 {
+				test.Fatalf("expected no fix for %q, since the message carries the name", testCase.sourceText)
 			}
 		})
 	}
