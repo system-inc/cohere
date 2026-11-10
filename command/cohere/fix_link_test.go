@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -29,7 +31,8 @@ func writeRootOf(test testing.TB, root string) write_root.WriteRoot {
 func TestAFixRunNeverWritesThroughALinkOutsideTheRoot(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	for _, arguments := range [][]string{{"--fix"}, {}} {
+	for _, arguments := range [][]string{{"--fix"}, {}, {"--fix", "--json"}} {
+		asJson := len(arguments) == 2
 		base := test.TempDir()
 		root := filepath.Join(base, "root")
 		source := "let value = 1;\nexport { value };\n"
@@ -54,7 +57,7 @@ func TestAFixRunNeverWritesThroughALinkOutsideTheRoot(test *testing.T) {
 		output, _ := runCohere(test, binary, root, arguments...)
 		// LinkedIn.ts and real/Inside.ts are one file: fixed under both names, the second applied proposals
 		// measured against the text the first replaced, and the parse guard refused it.
-		if !strings.Contains(output, ", 0 refused") {
+		if !asJson && !strings.Contains(output, ", 0 refused") {
 			test.Fatalf("%v: a fix was refused, so one file was fixed under two names:\n%s", arguments, output)
 		}
 
@@ -86,16 +89,55 @@ func TestAFixRunNeverWritesThroughALinkOutsideTheRoot(test *testing.T) {
 					written, contents, output)
 			}
 		}
-		for _, reached := range []string{
-			filepath.Join(root, "linked", "Outside.ts") + " → " +
-				realPathIn(test, base, "outside/directory/Outside.ts"),
-			filepath.Join(root, "LinkedFile.ts") + " → " + realPathIn(test, base, "outside/file/File.ts"),
-		} {
-			if !strings.Contains(output, "not written: "+reached) {
+		notWritten := []notWrittenFile{
+			{File: filepath.Join(root, "LinkedFile.ts"), RealPath: realPathIn(test, base, "outside/file/File.ts")},
+			{
+				File:     filepath.Join(root, "linked", "Outside.ts"),
+				RealPath: realPathIn(test, base, "outside/directory/Outside.ts"),
+			},
+		}
+		if asJson {
+			assertGapNamesNotWritten(test, output, notWritten)
+			continue
+		}
+		// Each by name with where it really is, the footer's gap, and the run read as short, in the Go engine's
+		// words (#hwz114g), so a run that withheld a write never ends on a clean bill of health.
+		for _, file := range notWritten {
+			if reached := file.File + " → " + file.RealPath; !strings.Contains(output, "not written: "+reached) {
 				test.Fatalf("%v: the run did not name %q as not written:\n%s", arguments, reached, output)
 			}
 		}
+		said := []string{"⚠ not written: 2 files reached through a link outside the root"}
+		// `--fix` alone skips the type check and the lint, so its line says the phases fell short; a bare run checks
+		// every phase, and the files not written are what it says.
+		if len(arguments) == 0 {
+			said = append(said, "this run did not check everything: "+notWrittenSentence)
+		}
+		for _, said := range said {
+			if !strings.Contains(output, said) {
+				test.Fatalf("%v: the run did not say %q:\n%s", arguments, said, output)
+			}
+		}
 	}
+}
+
+// assertGapNamesNotWritten fails unless output's summary record holds want as its gaps' notWritten, in order.
+func assertGapNamesNotWritten(test *testing.T, output string, want []notWrittenFile) {
+	test.Helper()
+	for line := range strings.Lines(output) {
+		var record struct {
+			Kind string  `json:"kind"`
+			Gaps runGaps `json:"gaps"`
+		}
+		if json.Unmarshal([]byte(line), &record) != nil || record.Kind != "summary" {
+			continue
+		}
+		if !reflect.DeepEqual(record.Gaps.NotWritten, want) {
+			test.Fatalf("--json's gap names %+v as not written, want %+v:\n%s", record.Gaps.NotWritten, want, output)
+		}
+		return
+	}
+	test.Fatalf("--json wrote no summary record:\n%s", output)
 }
 
 // oneNamePerRealFile keeps the name that is not itself a link, the real file a person opened, wherever it sorts:

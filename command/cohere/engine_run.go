@@ -1350,8 +1350,7 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 		case uncheckedGaps:
 			run.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
 		case namedGaps:
-			run.report.incompleteBeyondPhases = "the notes above name the files whose fixes were not written, each " +
-				"reached through a link outside the root"
+			run.report.incompleteBeyondPhases = notWrittenSentence
 		default:
 			run.report.incompleteBeyondPhases = run.language.theEngine() +
 				" reported that it fell short without a record saying where"

@@ -597,6 +597,21 @@ func isLink(fileName string) bool {
 	return statError == nil && information.Mode()&os.ModeSymlink != 0
 }
 
+// recordFixedFiles keeps the fix phase's account in the run's summary: on a run that writes, the files it rewrote,
+// printed in the views that list them, and the files it would have rewritten and did not, since a link leads each
+// outside the root (#td3zta2). Those are the run's gap, in the footer and in --json, as the Go engine's are.
+func recordFixedFiles(summary edit.Summary, root string, write bool) {
+	if !write {
+		return
+	}
+	activeSummary.Changed = changedFilesFrom(summary.ChangedFiles, root)
+	printChangedFiles(streams.Output, activeSummary.Changed)
+	for _, file := range summary.NotWritten {
+		activeSummary.Gaps.NotWritten = append(activeSummary.Gaps.NotWritten,
+			notWrittenFile{File: file.FileName, RealPath: file.RealPath})
+	}
+}
+
 // reportNotWritten names each file a run that writes left as it was because a link leads it outside the
 // run's root, with where it really is, as the Go engine names its own (#hwz114g, #td3zta2). Every one,
 // never a count alone: a gap nobody can find is half a gap.
