@@ -2,6 +2,7 @@ package global_rename
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -108,5 +109,153 @@ func TestAPlatformThatDoesNotLoadIsAMismatch(test *testing.T) {
 	proven := ProvePlatform(loaded, Expect(loaded, result), windows, files, Options{})
 	if len(proven.Mismatches) != 0 || proven.Compared == 0 {
 		test.Fatalf("the plan's rewrite under windows: %d compared, mismatches %v", proven.Compared, proven.Mismatches)
+	}
+}
+
+// windowsPlan is a plan, over the windows platform fixture, renaming name in internal/b, whose package holds a file
+// only windows builds, and its rewrite.
+func windowsPlan(
+	test *testing.T,
+	loaded *workspace.Workspace,
+	name string,
+	newName string,
+	options Options,
+) (*Result, map[string][]byte) {
+	test.Helper()
+	result := Plan(loaded, propose(test, loaded,
+		target{PackageSuffix: "internal/b", Name: name, Kind: KindFunc, NewName: newName},
+	), options)
+	requireAccepted(test, result, 1)
+	files, rewriteError := RewrittenFiles(result)
+	if rewriteError != nil {
+		test.Fatal(rewriteError)
+	}
+	return result, files
+}
+
+// A platform's proof from the fingerprint the plan took of the platform's load reads exactly what a proof that loads
+// the platform again before the rewrite reads, mismatches included: over the rewrite, over no rewrite, where every
+// renamed identifier reads back under its old name, and over a rewrite that leaves the windows file unrenamed, where
+// its package fails to type-check after.
+func TestAPlatformProofFromThePlansFingerprintReadsAsAFreshLoad(test *testing.T) {
+	test.Parallel()
+	fixture := platformFixture(test, "package b\n\nfunc windowsOnly() string { return FormatURL() }\n")
+	loaded := fixture.load(test)
+	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
+	result, files := windowsPlan(test, loaded, "FormatURL", "FormatUrl", Options{})
+	expectation := Expect(loaded, result)
+	if _, stored := expectation.platformFingerprints[windows]; !stored {
+		test.Fatalf("the plan read windows and kept no fingerprint of it: %v", result.Platforms())
+	}
+	hostOnly := map[string][]byte{}
+	for filename, contents := range files {
+		if !strings.HasSuffix(filename, "_windows.go") {
+			hostOnly[filename] = contents
+		}
+	}
+	if len(hostOnly) == len(files) {
+		test.Fatalf("the rewrite edits no windows file: %v", files)
+	}
+	for _, overlay := range []struct {
+		name       string
+		files      map[string][]byte
+		mismatches bool
+	}{
+		{"the rewrite", files, false},
+		{"no rewrite", nil, true},
+		{"the rewrite without the windows file", hostOnly, true},
+	} {
+		stored := ProvePlatform(loaded, expectation, windows, overlay.files, Options{})
+		fresh, freshError := provePlatform(loaded.LoadPlatform, windows, overlay.files, expectation.newNameAt, nil)
+		if freshError != nil {
+			test.Fatal(freshError)
+		}
+		if !reflect.DeepEqual(stored, fresh) {
+			test.Errorf("over %s, the stored fingerprint's proof reads %+v, a fresh load's %+v", overlay.name, stored,
+				fresh)
+		}
+		if (len(stored.Mismatches) > 0) != overlay.mismatches || stored.Compared == 0 {
+			test.Errorf("over %s, %d compared and mismatches %v", overlay.name, stored.Compared, stored.Mismatches)
+		}
+	}
+}
+
+// One stored fingerprint serves every proof of a round, each with its own renames, and none of them changes it: two
+// proofs of two plans' rewrites over one plan's fingerprint each read what a fresh load reads, and the fingerprint is
+// still the platform's own after both.
+func TestAPlatformProofLeavesTheStoredFingerprintAsItWas(test *testing.T) {
+	test.Parallel()
+	fixture := platformFixture(test, "package b\n\nfunc windowsOnly() string { return FormatURL() + Run() }\n")
+	loaded := fixture.load(test)
+	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
+	formatResult, formatFiles := windowsPlan(test, loaded, "FormatURL", "FormatUrl", Options{})
+	runResult, runFiles := windowsPlan(test, loaded, "Run", "RunAll", Options{})
+	stored, read := formatResult.platformFingerprints[windows]
+	if !read {
+		test.Fatalf("the plan read windows and kept no fingerprint of it: %v", formatResult.Platforms())
+	}
+	for _, plan := range []struct {
+		name   string
+		result *Result
+		files  map[string][]byte
+	}{
+		{"FormatURL", formatResult, formatFiles},
+		{"Run", runResult, runFiles},
+	} {
+		newNameAt := Expect(loaded, plan.result).newNameAt
+		fromStored, storedError := provePlatform(loaded.LoadPlatform, windows, plan.files, newNameAt, &stored)
+		fresh, freshError := provePlatform(loaded.LoadPlatform, windows, plan.files, newNameAt, nil)
+		if storedError != nil || freshError != nil {
+			test.Fatal(storedError, freshError)
+		}
+		if !reflect.DeepEqual(fromStored, fresh) || len(fresh.Mismatches) != 0 {
+			test.Errorf("renaming %s, the stored fingerprint's proof reads %+v, a fresh load's %+v", plan.name,
+				fromStored, fresh)
+		}
+	}
+	freshLoad, loadError := loaded.LoadPlatform(windows, nil)
+	if loadError != nil {
+		test.Fatal(loadError)
+	}
+	if !reflect.DeepEqual(stored, fingerprintBefore(freshLoad.Clean)) {
+		test.Error("the stored fingerprint changed under the proofs it served")
+	}
+}
+
+// A proof with the plan's fingerprint of a platform asks for the rewrite's load only, never the load before it; a
+// platform the plan did not read is loaded before the rewrite too, as it always was.
+func TestAPlatformProofWithTheStoredFingerprintLoadsOnlyTheRewrite(test *testing.T) {
+	test.Parallel()
+	fixture := platformFixture(test, "package b\n\nfunc windowsOnly() string { return FormatURL() }\n")
+	loaded := fixture.load(test)
+	var lock sync.Mutex
+	// loads counts each load by platform and whether it read an overlay.
+	loads := map[string]int{}
+	loader := func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
+		lock.Lock()
+		if len(overlay) == 0 {
+			loads[platform.String()+" before"]++
+		} else {
+			loads[platform.String()+" rewrite"]++
+		}
+		lock.Unlock()
+		return loaded.LoadPlatform(platform, overlay)
+	}
+	options := Options{LoadPlatform: loader}
+	result, files := windowsPlan(test, loaded, "FormatURL", "FormatUrl", options)
+	expectation := Expect(loaded, result)
+	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
+	proven := ProvePlatform(loaded, expectation, windows, files, options)
+	if len(proven.Mismatches) != 0 || proven.Compared == 0 {
+		test.Fatalf("the rewrite under windows: %d compared, mismatches %v", proven.Compared, proven.Mismatches)
+	}
+	if want := map[string]int{"windows/amd64 before": 1, "windows/amd64 rewrite": 1}; !reflect.DeepEqual(loads, want) {
+		test.Fatalf("the plan and its windows proof loaded %v, want %v: the plan's load only, then the rewrite's",
+			loads, want)
+	}
+	darwin := workspace.Platform{OperatingSystem: "darwin", Architecture: "amd64"}
+	ProvePlatform(loaded, expectation, darwin, files, options)
+	if loads["darwin/amd64 before"] != 1 || loads["darwin/amd64 rewrite"] != 1 {
+		test.Errorf("a proof under a platform the plan did not read loaded %v, want its load before and after", loads)
 	}
 }
