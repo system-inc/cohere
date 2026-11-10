@@ -116,8 +116,16 @@ type Loaded struct {
 	// by (see build_reads). The load leaves a package it checked from source unknown, for check.Run, handed the same
 	// map, to walk its type reads into and add its rules' reads to, unless it knows the package can never be
 	// restored: one checked for its types alone, or with cgo (recordReads). A package whose types came from export
-	// data, or that the load never needed, was restored from the findings cache, and is marked never for it.
+	// data, or that the load never needed, was restored from the findings cache, and is marked never for it. Nil
+	// unless Caching.RecordReads asked for them.
 	Reads map[*packages.Package]*build_reads.Reads
+
+	// ReadsRecorded counts the packages given reads, 0 for a load that records none.
+	ReadsRecorded int
+
+	// WalkSlots are the load's slots, which the rules' type-read walks take below every package's work (see
+	// check.Options.WalkSlots), free once the load has ended.
+	WalkSlots *WalkSlots
 
 	// testFunctions is each test variant to analyze's refused test functions, judged as it was checked, for the
 	// diagnostics, one Caching.Analyzes turned down included, since go test refuses them all the same.
@@ -197,6 +205,11 @@ type Caching struct {
 	// what the Restorer and Begin are given as the packages to analyze. The engine turns down a package with no file
 	// in scope, so a package every file of which git ignores is never linted. Nil analyzes every one.
 	Analyzes func(root *packages.Package) bool
+
+	// RecordReads has the load give every package reads of other packages, to record into (see Loaded.Reads), which
+	// only a run with extra builds to restore packages into asks for (#b2t9xmf). Unset, the load records nothing, and
+	// Loaded.Reads and Overlap.Reads are nil.
+	RecordReads bool
 
 	// rootSyntaxOnly has every dependency type-checked with no type maps and left without its syntax (see
 	// PackagesWithRootSyntax).
@@ -383,9 +396,11 @@ func fromSource(
 	}
 	// Made for every reachable package before any is checked, the restored ones too, whose export data may not read,
 	// so the map a run beside the load is handed (Overlap.Reads) never changes once it starts.
-	typeChecker.reads = make(map[*packages.Package]*build_reads.Reads, len(reachable))
-	for _, current := range reachable {
-		typeChecker.reads[current.loaded] = &build_reads.Reads{}
+	if caching.RecordReads {
+		typeChecker.reads = make(map[*packages.Package]*build_reads.Reads, len(reachable))
+		for _, current := range reachable {
+			typeChecker.reads[current.loaded] = &build_reads.Reads{}
+		}
 	}
 	if caching.Restorer != nil {
 		loaderName := LoaderSource
@@ -399,7 +414,8 @@ func fromSource(
 		for _, current := range reachable {
 			nodes[current.loaded] = current
 		}
-		caching.Begin(&Overlap{Packages: analyzedPackages, Reads: typeChecker.reads, nodes: nodes, ended: ended})
+		caching.Begin(&Overlap{Packages: analyzedPackages, Reads: typeChecker.reads,
+			WalkSlots: &WalkSlots{slots: typeChecker.slots}, nodes: nodes, ended: ended})
 	}
 	typeChecker.load(reachable)
 
@@ -446,6 +462,8 @@ func fromSource(
 		FilesParsed:                       int(typeChecker.filesParsed.Load()),
 		PackagesFromExportData:            int(typeChecker.fromExportData.Load()),
 		Reads:                             typeChecker.reads,
+		ReadsRecorded:                     len(typeChecker.reads),
+		WalkSlots:                         &WalkSlots{slots: typeChecker.slots},
 		testFunctions:                     typeChecker.testFunctions,
 	}, nil
 }

@@ -79,7 +79,7 @@ func TestARulesLookupsOfOtherPackagesAreRecordedHitAndMiss(test *testing.T) {
 
 	directory := test.TempDir()
 	writeFiles(test, directory, lookupFiles)
-	loaded := loadAt(test, directory)
+	loaded := loadRecordingAt(test, directory)
 	if len(loaded.Diagnostics) > 0 {
 		test.Fatalf("the fixture loaded with diagnostics: %+v", loaded.Diagnostics)
 	}

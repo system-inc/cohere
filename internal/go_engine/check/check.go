@@ -88,6 +88,11 @@ type Options struct {
 	// Result.Reads. The findings are the same either way.
 	Reads map[*packages.Package]*build_reads.Reads
 
+	// WalkSlots, when not nil, are the load's slots (load.Loaded.WalkSlots or load.Overlap.WalkSlots), which each
+	// type-read walk takes one of below every package's work, so a walk beside the load never displaces its chain.
+	// Nil, the walks take slots of their own, as many as there are cores.
+	WalkSlots build_reads.Slots
+
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
 	holdWalk func(owner *packages.Package)
@@ -280,7 +285,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// chain; whoever reads the reads waits for them (Result.ReadWalks).
 	var walks *build_reads.Walks
 	if options.Reads != nil {
-		walks = build_reads.NewWalks(runtime.GOMAXPROCS(0), options.holdWalk, nil)
+		walks = build_reads.NewWalks(runtime.GOMAXPROCS(0), options.WalkSlots, options.holdWalk, nil)
 		checkerOptions.Walks = walks
 	}
 	if options.ReleaseAnalyzed {

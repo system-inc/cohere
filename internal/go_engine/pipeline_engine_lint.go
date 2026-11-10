@@ -202,8 +202,10 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 	analyzed := slices.DeleteFunc(slices.Clone(loaded.Packages), func(each *packages.Package) bool {
 		return !engine.described.hasFileInScope(each)
 	})
-	// The host's reads are recorded for the extra builds to restore packages by (#b2t9xmf).
-	return engine.lintPackages(analyzed, check.Options{Withheld: loaded.Withheld, Reads: loaded.Reads})
+	// The host's reads, recorded only when the run has extra builds to restore packages into (recordsReads), walked in
+	// the load's slots below its work.
+	return engine.lintPackages(analyzed, check.Options{Withheld: loaded.Withheld, Reads: loaded.Reads,
+		WalkSlots: loaded.WalkSlots})
 }
 
 // lintPackages is lint over the packages to analyze, with what the load gives the run in options: its Withheld once

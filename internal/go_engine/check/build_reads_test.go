@@ -34,7 +34,7 @@ func loadedBuildReads(test *testing.T) (*load.Loaded, map[string]*packages.Packa
 
 	directory := test.TempDir()
 	writeFiles(test, directory, buildReadsFiles)
-	loaded := loadAt(test, directory)
+	loaded := loadRecordingAt(test, directory)
 	if len(loaded.Diagnostics) > 0 {
 		test.Fatalf("the fixture loaded with diagnostics: %+v", loaded.Diagnostics)
 	}

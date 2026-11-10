@@ -52,6 +52,7 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 	if engine.lintOverlaps() {
 		caching.Begin = engine.beginSpeculativeLint
 	}
+	caching.RecordReads = engine.recordsReads()
 	return engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})
 }
 

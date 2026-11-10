@@ -26,6 +26,18 @@ var typeReadsFiles = map[string]string{
 		"\tvar mine own\n\treturn os.Getpid() + outer.Value + mine.Count + base.Identity(1)\n}\n",
 }
 
+// loadRecordingAt is a load of root's packages of the test's own that gives every package reads to record into, as a
+// run with extra builds loads.
+func loadRecordingAt(test *testing.T, root string) *load.Loaded {
+	test.Helper()
+	loaded, loadError := load.PackagesCached(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
+		load.Caching{RecordReads: true})
+	if loadError != nil {
+		test.Fatalf("loading %s: %v", root, loadError)
+	}
+	return loaded
+}
+
 // loadedTypeReads writes typeReadsFiles under a directory of the test's and loads it, failing the test on any
 // diagnostic.
 func loadedTypeReads(test *testing.T) (string, *load.Loaded) {
@@ -33,7 +45,7 @@ func loadedTypeReads(test *testing.T) (string, *load.Loaded) {
 
 	directory := test.TempDir()
 	writeFiles(test, directory, typeReadsFiles)
-	loaded := loadAt(test, directory)
+	loaded := loadRecordingAt(test, directory)
 	if len(loaded.Diagnostics) > 0 {
 		test.Fatalf("the fixture loaded with diagnostics: %+v", loaded.Diagnostics)
 	}
@@ -134,7 +146,7 @@ func TestEveryPackageEndsItsRunRecordedOrNever(test *testing.T) {
 	for _, run := range []string{"cold", "warm"} {
 		session := NewCacheSession(caching, enabled)
 		loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
-			load.Caching{Restorer: session, Listings: session})
+			load.Caching{Restorer: session, Listings: session, RecordReads: true})
 		if loadError != nil {
 			test.Fatal(loadError)
 		}

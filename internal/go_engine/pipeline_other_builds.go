@@ -77,6 +77,14 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 	return engine.described.builds[0], engine.described.builds[1:], nil
 }
 
+// recordsReads is whether the host's load and lint record what each package read of other packages (#b2t9xmf): only
+// when the run checks extra builds and the census needs at least one, since a build restores a package from the host's
+// run by those reads, and a run with none to restore into would pay for reads nothing reads.
+func (engine *pipeline) recordsReads() bool {
+	_, extras, buildsError := engine.buildsBeside()
+	return engine.request.switches["other-builds"] && buildsError == nil && len(extras) > 0
+}
+
 // readBuilds is the host's build, as go env's answer reads it, then the extra builds the census needs beside it, on
 // the host's `GOARCH` (project.BuildsFor), with the targets the toolchain lists. Each file no build compiles is left
 // to the types phase, which names it as a gap, and keeps its constraint reason in the project record.

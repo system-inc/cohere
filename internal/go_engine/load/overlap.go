@@ -15,8 +15,13 @@ type Overlap struct {
 
 	// Reads are every package's reads of other packages, for check.Run beside the load (see Loaded.Reads). The map
 	// never changes; a package checked from source has its never mark, if the load gives it one, by the time Ready
-	// closes for it, and one whose types come from export data is marked never as the load ends.
+	// closes for it, and one whose types come from export data is marked never as the load ends. Nil unless
+	// Caching.RecordReads asked for them.
 	Reads map[*packages.Package]*build_reads.Reads
+
+	// WalkSlots are the load's slots, which the walks of a run beside the load take below every package's work, so
+	// they never displace its chain (see Loaded.WalkSlots).
+	WalkSlots *WalkSlots
 
 	nodes map[*packages.Package]*node
 

@@ -22,7 +22,7 @@ func TestTheExtraBuildsReadTheHostsReadsWhole(test *testing.T) {
 	hold := make(chan struct{})
 	var released sync.Once
 	release := func() { released.Do(func() { close(hold) }) }
-	walks := build_reads.NewWalks(1, nil, release)
+	walks := build_reads.NewWalks(1, nil, nil, release)
 	walks.Go(walked, nil, func() {
 		<-hold
 		reads.RecordTypes(walked.Types, &types.Info{})

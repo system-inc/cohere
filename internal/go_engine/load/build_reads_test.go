@@ -26,7 +26,22 @@ func readsOf(test *testing.T, loaded *Loaded, path string) *build_reads.Reads {
 func TestADependencyCheckedForItsTypesAloneIsNeverRestored(test *testing.T) {
 	test.Parallel()
 
-	lean, whole, packagesOf := rootSyntaxLoads(test)
+	directory := test.TempDir()
+	writeListingFiles(test, directory, rootSyntaxFiles)
+	lean, leanError := loadWorkspace(directory, []string{"./root"}, []string{"GOWORK=off"}, nil, true,
+		Caching{RecordReads: true, rootSyntaxOnly: true}, nil)
+	whole, wholeError := loadWorkspace(directory, []string{"./root"}, []string{"GOWORK=off"}, nil, true,
+		Caching{RecordReads: true}, nil)
+	if leanError != nil || wholeError != nil {
+		test.Fatalf("loading the fixture: %v, %v", leanError, wholeError)
+	}
+	// rootSyntaxFiles' one root, and the dependency it imports.
+	packagesOf := func(loaded *Loaded) (*packages.Package, *packages.Package) {
+		if len(loaded.Roots) != 1 {
+			test.Fatalf("want the one root, got %d", len(loaded.Roots))
+		}
+		return loaded.Roots[0], loaded.Roots[0].Imports["example.com/rootsyntax/dependency"]
+	}
 	root, dependency := packagesOf(lean)
 	if never := lean.Reads[dependency].Never(); never != "checked for its types only" {
 		test.Fatalf("want the types-only dependency marked never, got %q", never)
@@ -51,7 +66,7 @@ func TestAPackageWithCgoIsNeverRestored(test *testing.T) {
 		"go.mod":       "module example.com/cgoreads\n\ngo 1.21\n",
 		"user/user.go": "package user\n\nimport _ \"runtime/cgo\"\n",
 	})
-	loaded, loadError := Packages(directory, []string{"./user"}, cgoEnvironment, nil)
+	loaded, loadError := PackagesCached(directory, []string{"./user"}, cgoEnvironment, nil, Caching{RecordReads: true})
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
