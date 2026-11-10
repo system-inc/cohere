@@ -487,19 +487,49 @@ const goCleanLintLine = "lint: 0 findings \u2014 5 rules over 3 files, 1408 node
 
 // measuredTotalLine stands for the account's total line, whose total is how long the render took, so it and the
 // remainder against the 354ms the module and the phases account for move with the machine's load: a loaded run read
-// `total 1ms` and failed (#wq0c0sv). What the code guarantees is the module's 96ms and the line's two shapes, the
-// phases overlapping the total while it is under 354ms and the rest outside any phase once it is over, so the test
-// pins those and never the time it measured.
-const measuredTotalLine = "  total (measured): module 96ms"
+// `total 1ms` and failed (#wq0c0sv). What the code guarantees is the module's 96ms, the phases' 258ms, and the
+// relation between the two durations the line measures, so the test pins those and never the time it measured.
+const measuredTotalLine = "  total (measured): module 96ms, phases 258ms"
 
-// measuredTotal reads the account's total line in either shape, so pinMeasuredTotal can write it as measuredTotalLine.
-var measuredTotal = regexp.MustCompile(`(?m)^  total [0-9][0-9.hmsµ]*: module 96ms` +
-	`(?: plus phases, overlapping by [0-9][0-9.hmsµ]*|, phases 258ms, [0-9][0-9.hmsµ]* outside any phase)$`)
+// accountedTotal is what the module and the phases account for in the account's total line, the 96ms and the 258ms.
+const accountedTotal = 354 * time.Millisecond
 
-// pinMeasuredTotal is an account with its total line written as measuredTotalLine, and the account as it was when the
-// line holds anything but the module's 96ms in one of its two shapes, so a wrong line still differs from the want.
+// measuredTotal reads the account's total line in either of its shapes: the phases overlapping the total while it is
+// under accountedTotal, and the rest outside any phase once it is over. It captures the total and the remainder.
+var measuredTotal = regexp.MustCompile(`(?m)^  total ([0-9][0-9.hmsµ]*): module 96ms` +
+	`(?: plus phases, overlapping by ([0-9][0-9.hmsµ]*)|, phases 258ms, ([0-9][0-9.hmsµ]*) outside any phase)$`)
+
+// pinMeasuredTotal is an account with its total line written as measuredTotalLine when the line's two durations keep
+// the relation the render computes: the total and the overlap add up to accountedTotal, or the total less what sits
+// outside any phase does. Each is rounded to the millisecond on its own, so the two may miss it by one. Any other
+// line is left as it was, so it still differs from the want: one naming another module time, and one in shape whose
+// arithmetic is wrong.
 func pinMeasuredTotal(account string) string {
-	return measuredTotal.ReplaceAllLiteralString(account, measuredTotalLine)
+	return measuredTotal.ReplaceAllStringFunc(account, func(line string) string {
+		parts := measuredTotal.FindStringSubmatch(line)
+		total, totalError := time.ParseDuration(parts[1])
+		if totalError != nil {
+			return line
+		}
+		accounted := total
+		if parts[2] != "" {
+			overlap, overlapError := time.ParseDuration(parts[2])
+			if overlapError != nil {
+				return line
+			}
+			accounted += overlap
+		} else {
+			outside, outsideError := time.ParseDuration(parts[3])
+			if outsideError != nil {
+				return line
+			}
+			accounted -= outside
+		}
+		if difference := accounted - accountedTotal; difference < -time.Millisecond || difference > time.Millisecond {
+			return line
+		}
+		return measuredTotalLine
+	})
 }
 
 // goCleanAccount is the --verbose account of the Go contract's clean stream, its footer aside, as it read before the
@@ -518,7 +548,9 @@ const goCleanAccount = "module described in 96ms: 4 Go files in the module, 3 of
 	"  memory: the collector runs at Go's default, since this is a test binary\n"
 
 // TestTheMeasuredTotalLineIsPinnedByItsShape: either shape the total line takes, by how long the render took, reads
-// as measuredTotalLine, and a line naming another module time is left as it was, so it still differs from the want.
+// as measuredTotalLine while its durations keep their relation, within the millisecond rounding can cost, and a line
+// naming another module time, or in shape with arithmetic that is wrong, is left as it was, so it still differs from
+// the want.
 func TestTheMeasuredTotalLineIsPinnedByItsShape(test *testing.T) {
 	test.Parallel()
 	for _, testCase := range []struct {
@@ -528,8 +560,12 @@ func TestTheMeasuredTotalLineIsPinnedByItsShape(test *testing.T) {
 		{line: "  total 0s: module 96ms plus phases, overlapping by 354ms", pinned: true},
 		{line: "  total 1ms: module 96ms plus phases, overlapping by 353ms", pinned: true},
 		{line: "  total 1.204s: module 96ms, phases 258ms, 850ms outside any phase", pinned: true},
+		{line: "  total 1ms: module 96ms plus phases, overlapping by 354ms", pinned: true},
 		{line: "  total 1ms: module 97ms plus phases, overlapping by 353ms", pinned: false},
 		{line: "  total 1.204s: module 96ms, phases 259ms, 849ms outside any phase", pinned: false},
+		{line: "  total 1ms: module 96ms plus phases, overlapping by 900ms", pinned: false},
+		{line: "  total 1ms: module 96ms plus phases, overlapping by 351ms", pinned: false},
+		{line: "  total 1.204s: module 96ms, phases 258ms, 1.204s outside any phase", pinned: false},
 	} {
 		account := "before\n" + testCase.line + "\nafter\n"
 		want := account
@@ -559,7 +595,8 @@ const goCleanSummaryJson = `{"kind":"summary","schemaVersion":1,"verdict":"pass"
 // package, which the front door does not read. A record without it, as a run of one build's is, prints none of them,
 // and its account, footer and summary are byte for byte what they were before the field was read (#72n9mq0). The
 // time a render took is the one thing that moves, so the footer is read off the summary with no time, and the
-// summary's seconds are set to 0, and the account's total line is pinned by its shape (pinMeasuredTotal).
+// summary's seconds are set to 0, and the account's total line is pinned by its shape and its arithmetic
+// (pinMeasuredTotal), from a process started 100ms before the render.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestAGoRunSaysWhichBuildsItChecked(test *testing.T) {
 	savedOutput, savedSummary := activeOutput, activeSummary
@@ -592,7 +629,10 @@ func TestAGoRunSaysWhichBuildsItChecked(test *testing.T) {
 			summary: goCleanSummaryJson,
 		},
 	} {
-		verbose, summary := renderGoStreamAs(test, outputVerbose, testCase.lines)
+		// Started 100ms back, so the total line measures one and its overlap is one the render computed: at a total
+		// that rounds to 0s, an overlap of a flat 354ms would read the same as the right one.
+		verbose, summary := renderGoStreamStartedAt(test, outputVerbose, testCase.lines,
+			time.Now().Add(-100*time.Millisecond))
 		if account := pinMeasuredTotal(footerLine.ReplaceAllString(verbose, "")); account != testCase.account {
 			test.Errorf("%s: the account is\n%s\nwant\n%s", testCase.name, account, testCase.account)
 		}
