@@ -1,6 +1,7 @@
 package bench_results
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -198,6 +199,72 @@ func TestAColdOnlyRecordThatStoppedEarlyValidates(test *testing.T) {
 	}
 }
 
+// A run narrowed to the Go engine is a record of its own: it validates with the Go settings it saw, it
+// takes a file name the same day's whole-root record of the same commit and machine never takes, and it
+// reads back, through Read, with what it said. A record without either field, as every record written before
+// them, still validates and keeps the name it had.
+func TestARecordNarrowedToOneEngineIsNamedApart(test *testing.T) {
+	test.Parallel()
+	whole := coldOnlyRecord()
+	narrowed := coldOnlyRecord()
+	narrowed.Engine = EngineGo
+	narrowed.GoEnvironment = &GoEnvironment{Gogc: "200", Gomaxprocs: "8"}
+	for _, record := range []Record{whole, narrowed} {
+		if validateError := Validate(record); validateError != nil {
+			test.Fatalf("engine %q: %v", record.Engine, validateError)
+		}
+	}
+	if got := FileName(whole); got != "2026-10-05-aaaaaaaaaaaa-mac16-5.json" {
+		test.Errorf("the whole-root record is named %s", got)
+	}
+	if got := FileName(narrowed); got != "2026-10-05-aaaaaaaaaaaa-mac16-5-go.json" {
+		test.Errorf("the Go record is named %s", got)
+	}
+
+	directory := test.TempDir()
+	for _, record := range []Record{whole, narrowed} {
+		encoded, encodeError := Encode(record)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		if writeError := os.WriteFile(filepath.Join(directory, FileName(record)), encoded, 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	records, readError := Read(directory)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	// Read sorts by file name, and `-go.json` sorts before `.json`, so the narrowed record reads first.
+	if len(records) != 2 || records[0].Engine != EngineGo || records[1].Engine != "" {
+		test.Fatalf("read back %d records, engines %q", len(records), engineNames(records))
+	}
+	if settings := records[0].GoEnvironment; settings == nil || *settings != *narrowed.GoEnvironment {
+		test.Errorf("the Go settings read back %+v, want %+v", settings, narrowed.GoEnvironment)
+	}
+	if records[1].GoEnvironment != nil {
+		test.Errorf("a record that kept no Go settings read back %+v", records[1].GoEnvironment)
+	}
+
+	// The whole root's record says nothing of an engine, so absent means the whole root, as every record
+	// written before the field reads.
+	encoded, encodeError := Encode(whole)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if strings.Contains(string(encoded), `"engine"`) {
+		test.Errorf("the whole-root record names an engine:\n%s", encoded)
+	}
+}
+
+func engineNames(records []Record) []Engine {
+	engines := []Engine{}
+	for _, record := range records {
+		engines = append(engines, record.Engine)
+	}
+	return engines
+}
+
 // Each way a record could claim more than its runs measured is refused.
 func TestADishonestRecordIsRefused(test *testing.T) {
 	test.Parallel()
@@ -311,6 +378,7 @@ func TestADishonestRecordIsRefused(test *testing.T) {
 			record.Runs[1].Quiet = true
 			record.Modes = Summarize(loadSchemaModes, record.Runs)
 		},
+		"an engine no run is narrowed to": func(record *Record) { record.Engine = "Swift" },
 		"a schema 1 ceiling of zero": func(record *Record) {
 			*record = loadSchemaRecord()
 			record.LoadCeiling = 0
