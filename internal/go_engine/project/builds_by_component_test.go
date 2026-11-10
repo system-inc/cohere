@@ -53,7 +53,7 @@ func TestBuildsForChoosesByTagComponentWhenTheTagsAreTooMany(test *testing.T) {
 	}
 	done := make(chan selection, 1)
 	go func() {
-		builds, unbuilt, buildsError := BuildsFor(census, testHost, testPorts)
+		builds, unbuilt, buildsError := BuildsFor(census, testHost, testPorts, nil)
 		done <- selection{builds: builds, unbuilt: unbuilt, failure: buildsError}
 	}()
 	var chosen selection

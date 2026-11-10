@@ -45,6 +45,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -91,6 +93,10 @@ type Settings struct {
 
 	// OffReasons maps each rule the go block turns off to why, from its reasons, and is empty when it gives none.
 	OffReasons map[string]string
+
+	// Targets are the go block's targets, each `GOOS/GOARCH`, which build selection checks beside the platforms the
+	// project's files name (#ntamp9e), in the order written, and empty when it gives none.
+	Targets []string
 
 	// Note is empty when a go block was read. Otherwise it is the sentence the lint record carries as
 	// `configNote`, naming the defaults in force and where a config would go.
@@ -183,14 +189,15 @@ func parse(contents []byte, path string, knownRules []string, modulePaths []stri
 	}
 	var unknownKeys []string
 	for key := range block {
-		if key != "rules" && key != "departures" && key != "reasons" {
+		if key != "rules" && key != "departures" && key != "reasons" && key != "targets" {
 			unknownKeys = append(unknownKeys, fmt.Sprintf("%q", key))
 		}
 	}
 	if len(unknownKeys) > 0 {
 		sort.Strings(unknownKeys)
 		return Settings{}, fmt.Errorf("reading %s: the go block declares %s, which the Go engine does not read, so "+
-			"the key would configure nothing. The go block takes \"rules\", \"departures\" and \"reasons\"", path,
+			"the key would configure nothing. The go block takes \"rules\", \"departures\", \"reasons\" and "+
+			"\"targets\"", path,
 			strings.Join(unknownKeys, ", "))
 	}
 	rawRules, hasRules := block["rules"]
@@ -239,6 +246,13 @@ func parse(contents []byte, path string, knownRules []string, modulePaths []stri
 			return Settings{}, fmt.Errorf("reading %s: %w", path, reasonsError)
 		}
 		settings.OffReasons = offReasons
+	}
+	if rawTargets, hasTargets := block["targets"]; hasTargets {
+		targets, targetsError := parseTargets(rawTargets)
+		if targetsError != nil {
+			return Settings{}, fmt.Errorf("reading %s: %w", path, targetsError)
+		}
+		settings.Targets = targets
 	}
 	if unreasonedError := refuseUnreasonedOffs(settings, names, modulePaths); unreasonedError != nil {
 		return Settings{}, fmt.Errorf("reading %s: %w", path, unreasonedError)
@@ -433,4 +447,44 @@ func jsonKind(value json.RawMessage) byte {
 		return 0
 	}
 	return trimmed[0]
+}
+
+// TargetPattern is a target as go tool dist list spells one, `GOOS/GOARCH`, each a word of lowercase letters and
+// digits, for the settings schema (internal/settings_schema) to read rather than copy.
+const TargetPattern = `^[a-z0-9]+/[a-z0-9]+$`
+
+// targetPattern is TargetPattern, compiled.
+var targetPattern = regexp.MustCompile(TargetPattern)
+
+// parseTargets reads the go block's targets (#ntamp9e, Kirk's ruling, Nov 10): the platforms, `GOOS/GOARCH`, the
+// project is checked under beside the ones its files name. A target only ever adds to them, so an entry that reads
+// as taking one away, `!windows/arm64` or `-windows/arm64`, is refused, and so is one not spelled as a pair, a
+// duplicate, and an entry that is not a string. Whether the toolchain targets the pair is the engine's to check,
+// against go tool dist list, when it selects the builds.
+func parseTargets(value json.RawMessage) ([]string, error) {
+	var entries []json.RawMessage
+	if jsonKind(value) != '[' || json.Unmarshal(value, &entries) != nil {
+		return nil, fmt.Errorf("the go block's targets is %s, which is not a list of `GOOS/GOARCH` pairs", value)
+	}
+	targets := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		var target string
+		if jsonKind(entry) != '"' || json.Unmarshal(entry, &target) != nil {
+			return nil, fmt.Errorf("the go block's targets hold %s, which is not a `GOOS/GOARCH` pair written as a "+
+				"string", entry)
+		}
+		if strings.HasPrefix(target, "!") || strings.HasPrefix(target, "-") {
+			return nil, fmt.Errorf("the go block's targets hold %q, which reads as taking a platform away: targets "+
+				"only add to the platforms the files name, so remove it", target)
+		}
+		if !targetPattern.MatchString(target) {
+			return nil, fmt.Errorf("the go block's targets hold %q, which is not a `GOOS/GOARCH` pair as go tool "+
+				"dist list spells one, such as \"wasip1/wasm\"", target)
+		}
+		if slices.Contains(targets, target) {
+			return nil, fmt.Errorf("the go block's targets name %q twice", target)
+		}
+		targets = append(targets, target)
+	}
+	return targets, nil
 }

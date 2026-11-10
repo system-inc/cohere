@@ -187,6 +187,7 @@ func runOverlapping(
 	if optionsError := configureRules(ruleSettings, registered); optionsError != nil {
 		return refuse(standardError, optionsError)
 	}
+	request.targets = ruleSettings.Targets
 	described, describeError := describeProject(request)
 	if describeError != nil {
 		return refuse(standardError, describeError)

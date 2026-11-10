@@ -23,6 +23,10 @@ type invocation struct {
 	// paths narrow the scope, each absolute, as given.
 	paths []string
 
+	// targets are the settings' `targets`, each `GOOS/GOARCH`, which build selection checks beside the platforms the
+	// files name (#ntamp9e), set once the settings are read.
+	targets []string
+
 	// stdinPath is the file `--stdin-filepath` names, absolute and clean, or empty for a run over the tree. buffer is
 	// its bytes as the editor holds them, read from standard input, never from the command line, which stand in for the
 	// file's on disk everywhere the run reads it (read).

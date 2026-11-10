@@ -1,6 +1,8 @@
 package load
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -94,7 +96,28 @@ func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 		test.Fatal(environmentError)
 	}
 	buildContext, goFlags := goEnvironment.Target()
-	builds, _, buildsError := project.BuildsFor(census, project.HostBuild(buildContext, goFlags), ports)
+	// The targets cohere's go block adds, as the engine reads them (settings.parseTargets), matched to their ports.
+	contents, readError := os.ReadFile(filepath.Join(workspace.Root, "CohereSettings.json"))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	var settingsFile struct {
+		Go struct {
+			Targets []string `json:"targets"`
+		} `json:"go"`
+	}
+	if decodeError := json.Unmarshal(contents, &settingsFile); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	var extraTargets []project.Port
+	for _, target := range settingsFile.Go.Targets {
+		for _, port := range ports {
+			if port.OperatingSystem+"/"+port.Architecture == target {
+				extraTargets = append(extraTargets, port)
+			}
+		}
+	}
+	builds, _, buildsError := project.BuildsFor(census, project.HostBuild(buildContext, goFlags), ports, extraTargets)
 	if buildsError != nil {
 		test.Fatal(buildsError)
 	}

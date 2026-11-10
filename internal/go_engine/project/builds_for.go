@@ -42,9 +42,11 @@ const enumerationBudget = 1 << 16
 // an extra build another `GOOS` needs, or on the host's platform when nothing else needs one. When the sets of tags
 // are too many to weigh one by one (enumerationBudget), the builds are chosen tag component by tag component instead
 // (buildsByComponent), still compiling every file some build on the host's architecture compiles.
-func BuildsFor(census Census, host Build, ports []Port) ([]Build, []Unbuilt, error) {
+func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]Build, []Unbuilt, error) {
 	var candidatesUncompiled []source
 	var unbuilt []Unbuilt
+	// named are the `GOOS` values the project's files name as ones they are built for (targetPorts).
+	var named []string
 	// compiledPackages are the packages the host's build compiles in each directory, by name as packageOf reads it.
 	compiledPackages := map[string]map[string]bool{}
 	for _, file := range census.Ours {
@@ -54,6 +56,7 @@ func BuildsFor(census Census, host Build, ports []Port) ([]Build, []Unbuilt, err
 			unbuilt = append(unbuilt, Unbuilt{File: file, Reason: readError.Error()})
 			continue
 		}
+		named = append(named, positiveOperatingSystems(read)...)
 		compiled, compileError := compiles(host, read)
 		if compileError != nil {
 			return nil, nil, compileError
@@ -95,7 +98,8 @@ func BuildsFor(census Census, host Build, ports []Port) ([]Build, []Unbuilt, err
 	}
 
 	dimensions := dimensionsOf(uncompiled, ports)
-	platforms := platformsFor(host, ports, dimensions.Cgo)
+	targets := targetPorts(host, ports, sortedSet(named), extraTargets)
+	platforms := platformsFor(host, targets, dimensions.Cgo)
 	var chosen []Build
 	var coverable coverage
 	if enumerationCost(len(platforms), len(dimensions.Tags), len(uncompiled)) > enumerationBudget {
@@ -120,7 +124,7 @@ func BuildsFor(census Census, host Build, ports []Port) ([]Build, []Unbuilt, err
 	builds = append(builds, chosen...)
 	for index, read := range uncompiled {
 		if !coverable.has(index) {
-			reason, reasonError := unbuiltReason(read, host, ports)
+			reason, reasonError := unbuiltReason(read, host, ports, targets)
 			if reasonError != nil {
 				return nil, nil, reasonError
 			}
@@ -148,25 +152,36 @@ func enumerationCost(platforms int, tags int, files int) int {
 	return min(platforms*(1<<tags)*files, enumerationBudget+1)
 }
 
-// platformsFor is each platform an extra build may take, a build with no tags of its own yet, in the order they
-// are preferred: on the host's architecture, by `GOOS` (see compareOperatingSystems), the host's cgo before the
-// other. A platform other than the host's has cgo off; the host's takes the other cgo setting too when a file
-// names `cgo` or imports "C", where the platform supports it.
-func platformsFor(host Build, ports []Port, cgo bool) []Build {
-	var onArchitecture []Port
-	for _, port := range ports {
-		if port.Architecture == host.Architecture &&
-			!slices.ContainsFunc(onArchitecture, func(seen Port) bool { return seen == port }) {
-			onArchitecture = append(onArchitecture, port)
+// platformsFor is each platform an extra build may take, a build with no tags of its own yet, one for each target
+// (see targetPorts), in the order they are preferred: the host's architecture first, then by `GOOS` (see
+// compareOperatingSystems), then by architecture, the host's cgo before the other. A platform other than the
+// host's has cgo off; the host's takes the other cgo setting too when a file names `cgo` or imports "C", where the
+// platform supports it.
+func platformsFor(host Build, targets []Port, cgo bool) []Build {
+	var ordered []Port
+	for _, port := range targets {
+		if !slices.ContainsFunc(ordered, func(seen Port) bool { return seen == port }) {
+			ordered = append(ordered, port)
 		}
 	}
-	slices.SortFunc(onArchitecture, func(left Port, right Port) int {
-		return compareOperatingSystems(left.OperatingSystem, right.OperatingSystem, host.OperatingSystem)
+	slices.SortFunc(ordered, func(left Port, right Port) int {
+		leftElsewhere, rightElsewhere := left.Architecture != host.Architecture, right.Architecture != host.Architecture
+		if leftElsewhere != rightElsewhere {
+			if leftElsewhere {
+				return 1
+			}
+			return -1
+		}
+		if order := compareOperatingSystems(left.OperatingSystem, right.OperatingSystem,
+			host.OperatingSystem); order != 0 {
+			return order
+		}
+		return strings.Compare(left.Architecture, right.Architecture)
 	})
 	var platforms []Build
-	for _, port := range onArchitecture {
+	for _, port := range ordered {
 		cgoSettings := []bool{false}
-		if port.OperatingSystem == host.OperatingSystem {
+		if port.OperatingSystem == host.OperatingSystem && port.Architecture == host.Architecture {
 			cgoSettings = []bool{host.CgoEnabled}
 			if cgo && (host.CgoEnabled || port.CgoSupported) {
 				cgoSettings = append(cgoSettings, !host.CgoEnabled)
@@ -178,6 +193,23 @@ func platformsFor(host Build, ports []Port, cgo bool) []Build {
 		}
 	}
 	return platforms
+}
+
+// targetPorts are the platforms the project is built for (#ntamp9e, Kirk's ruling, Nov 10): on the host's
+// architecture, the host's own `GOOS` and every `GOOS` named positively by the project's files, in a constraint
+// outside a negation or in a file name's suffix, and beside them each port the settings' targets name, whatever its
+// architecture. A file whose constraint only rules platforms out, as `!linux && !darwin` does, is satisfied from
+// these alone, so it is never checked as a platform nobody named, and a file no target compiles is a named gap.
+func targetPorts(host Build, ports []Port, named []string, extra []Port) []Port {
+	var targets []Port
+	for _, port := range ports {
+		onHost := port.Architecture == host.Architecture &&
+			(port.OperatingSystem == host.OperatingSystem || slices.Contains(named, port.OperatingSystem))
+		if onHost || slices.Contains(extra, port) {
+			targets = append(targets, port)
+		}
+	}
+	return targets
 }
 
 // candidatesFor is every extra build of platforms, under each of tagChoices for the named tags, that compiles at
@@ -350,7 +382,7 @@ func greedyCovering(candidates []candidate, want coverage) []int {
 // unbuiltReason is why no extra build compiles a file: only another architecture does, which is the layout blind
 // spot; only cgo on another `GOOS` does; or no target of ports does, with whatever its constraint names that says
 // why.
-func unbuiltReason(read source, host Build, ports []Port) (string, error) {
+func unbuiltReason(read source, host Build, ports []Port, targets []Port) (string, error) {
 	fileReading := readingOf(read, unixOperatingSystems(ports))
 	// The targets are tried on the host's architecture first, so a file cgo on another `GOOS` builds is named for
 	// that, then in the order an extra build prefers them, so the reason never turns on the order go tool dist list
@@ -384,6 +416,11 @@ func unbuiltReason(read source, host Build, ports []Port) (string, error) {
 				}
 				if !compiled {
 					continue
+				}
+				if port.Architecture == host.Architecture && !slices.Contains(targets, port) {
+					// A platform the project never named builds it, as a constraint that only rules platforms out
+					// lets every other: it is no target, so the file is a gap, never checked as that platform.
+					return "no target platform compiles it: " + constraintText(read), nil
 				}
 				if port.Architecture != host.Architecture {
 					return "only another architecture than the host's " + host.Architecture + " builds it, as " +

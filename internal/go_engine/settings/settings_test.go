@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -95,6 +96,14 @@ var fileFixtures = map[string]string{
 		"reasons": {"` + parallelRule + `": "Why."}
 	}}`,
 	"departure-not-string": `{"go": {"rules": {}, "departures": {"` + parallelRule + `": 2}}}`,
+
+	// The platforms checked beside the ones the files name (#ntamp9e).
+	"targets":           `{"go": {"rules": {}, "targets": ["wasip1/wasm", "freebsd/arm64"]}}`,
+	"targets-not-list":  `{"go": {"rules": {}, "targets": "wasip1/wasm"}}`,
+	"target-removing":   `{"go": {"rules": {}, "targets": ["!windows/amd64"]}}`,
+	"target-not-pair":   `{"go": {"rules": {}, "targets": ["windows"]}}`,
+	"target-duplicate":  `{"go": {"rules": {}, "targets": ["wasip1/wasm", "wasip1/wasm"]}}`,
+	"target-not-string": `{"go": {"rules": {}, "targets": [2]}}`,
 	"departure-unknown-rule": `{"go": {"rules": {},
 		"departures": {"cohere-go/performance-require-paralel-test": "x"}}}`,
 }
@@ -372,6 +381,12 @@ func TestEveryBadShapeIsRefusedByName(test *testing.T) {
 		"reason-not-string":       {parallelRule, "is 2", "not a sentence written as a string"},
 		"reason-for-a-rule-on":    {parallelRule, "do not turn off"},
 		"reason-beside-departure": {parallelRule, `both "reasons" and "departures"`},
+
+		"targets-not-list":  {`"wasip1/wasm"`, "not a list of `GOOS/GOARCH` pairs"},
+		"target-removing":   {`"!windows/amd64"`, "taking a platform away"},
+		"target-not-pair":   {`"windows"`, "not a `GOOS/GOARCH` pair"},
+		"target-duplicate":  {`"wasip1/wasm"`, "twice"},
+		"target-not-string": {"2", "not a `GOOS/GOARCH` pair written as a string"},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
@@ -443,5 +458,25 @@ func TestAnOffSaysWhyInsideOurTiers(test *testing.T) {
 				test.Errorf("the reason held for %s is %q, want %q", parallelRule, got, want)
 			}
 		})
+	}
+}
+
+// TestTheGoBlocksTargetsLoadInTheOrderWritten: the targets a go block lists load as written, each `GOOS/GOARCH`, for
+// build selection to check beside the platforms the files name (#ntamp9e), and a block without them names none.
+func TestTheGoBlocksTargetsLoadInTheOrderWritten(test *testing.T) {
+	test.Parallel()
+	loaded, loadError := Load(fixtureRoot, filePath("targets"), knownRules, nil)
+	if loadError != nil {
+		test.Fatal(loadError)
+	}
+	if !slices.Equal(loaded.Targets, []string{"wasip1/wasm", "freebsd/arm64"}) {
+		test.Errorf("the targets loaded as %v, want wasip1/wasm and freebsd/arm64 as written", loaded.Targets)
+	}
+	empty, emptyError := Load(fixtureRoot, filePath("empty-rules"), knownRules, nil)
+	if emptyError != nil {
+		test.Fatal(emptyError)
+	}
+	if len(empty.Targets) != 0 {
+		test.Errorf("a block with no targets loaded %v", empty.Targets)
 	}
 }
