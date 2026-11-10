@@ -8,9 +8,9 @@ import (
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
 )
 
-// onErrorFunc is upstream's ComposeErrorHandler: source places the error, as an offset, a position, a
+// onErrorFunction is upstream's ComposeErrorHandler: source places the error, as an offset, a position, a
 // range or a token (errorSource).
-type onErrorFunc func(source errorSource, code string, message string, warning bool)
+type onErrorFunction func(source errorSource, code string, message string, warning bool)
 
 // parsePrelude collects the comments of the prelude: the comment and newline tokens, and the directive
 // lines, since the previous document.

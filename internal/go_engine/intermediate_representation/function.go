@@ -280,8 +280,8 @@ type Function struct {
 	AnonymousFunctions []*Function     // anonymous functions (from FuncLit, RangeStmt) directly beneath this one
 	referrers          []Instruction   // referring instructions (iff Parent() != nil)
 	// position of a nested function in parent's AnonymousFunctions.
-	// fn.Parent()!=nil => fn.Parent().AnonymousFunctions[fn.anonIndex] == fn.
-	anonIndex int32
+	// fn.Parent()!=nil => fn.Parent().AnonymousFunctions[fn.anonymousIndex] == fn.
+	anonymousIndex int32
 
 	Sccs []*Scc // strongly connected components, a directed acyclic graph in reverse topological order
 
@@ -302,7 +302,7 @@ type Function struct {
 	generic        *generic // instances of this function, if generic
 
 	// The following fields are cleared after building.
-	build        buildFunc            // algorithm to build function body (nil => built)
+	build        buildFunction        // algorithm to build function body (nil => built)
 	currentBlock *BasicBlock          // where to emit code
 	vars         map[*types.Var]Value // addresses of local variables
 	results      []*Allocation        // result allocations of the current function
@@ -411,8 +411,8 @@ func (function *Function) NumNodes() int { return len(function.Blocks) }
 // Out returns an iterator over the successor block indices of a given node.
 func (function *Function) Out(node int) iter.Seq[int] {
 	return func(yield func(int) bool) {
-		for _, succ := range function.Blocks[node].Successors {
-			if !yield(succ.Index) {
+		for _, successor := range function.Blocks[node].Successors {
+			if !yield(successor.Index) {
 				return
 			}
 		}
@@ -544,7 +544,7 @@ func targstr(targs []types.Type) string {
 // Precondition: fn and the origin function are done building.
 func origin(function *Function) *Function {
 	if function.parent != nil && function.parent.hasTypeArguments() {
-		return origin(function.parent).AnonymousFunctions[function.anonIndex]
+		return origin(function.parent).AnonymousFunctions[function.anonymousIndex]
 	}
 	return function.topLevelOrigin
 }
@@ -572,19 +572,19 @@ func (function *Function) objectOf(id *ast.Ident) types.Object {
 
 // Like TypeOf, but panics instead of returning nil.
 // Only valid during f's create and build phases.
-func (function *Function) typeOf(expr ast.Expr) types.Type {
-	if resolvedType := function.info.TypeOf(expr); resolvedType != nil {
-		return function.typ(resolvedType)
+func (function *Function) typeOf(expression ast.Expr) types.Type {
+	if resolvedType := function.info.TypeOf(expression); resolvedType != nil {
+		return function.instantiatedType(resolvedType)
 	}
 	// Invariant: callers pass expressions of syntax go/types checked, and go/types records the type of each such
 	// expression in Types, or for an identifier in Defs or Uses.
-	panic(fmt.Sprintf("no type for %T @ %s", expr, function.Program.FileSet.Position(expr.Pos())))
+	panic(fmt.Sprintf("no type for %T @ %s", expression, function.Program.FileSet.Position(expression.Pos())))
 }
 
-// typ is the locally instantiated type of T. go/ir substitutes type arguments here when it builds an
+// instantiatedType is the locally instantiated type of T. go/ir substitutes type arguments here when it builds an
 // instantiated body (its InstantiateGenerics mode); ours builds every generic body in generic form, so
-// f.typ(T)==T always.
-func (function *Function) typ(declaredType types.Type) types.Type {
+// f.instantiatedType(T)==T always.
+func (function *Function) instantiatedType(declaredType types.Type) types.Type {
 	return declaredType
 }
 
@@ -600,40 +600,45 @@ func (function *Function) instanceType(id *ast.Ident) types.Type {
 // selection returns a *selection corresponding to f.info.Selections[selector]
 // with potential updates for type substitution.
 func (function *Function) selection(selector *ast.SelectorExpr) *selection {
-	sel := function.info.Selections[selector]
-	if sel == nil {
+	typesSelection := function.info.Selections[selector]
+	if typesSelection == nil {
 		return nil
 	}
 
-	switch sel.Kind() {
+	switch typesSelection.Kind() {
 	case types.MethodExpr, types.MethodVal:
-		if recv := function.typ(sel.Recv()); recv != sel.Recv() {
-			// recv changed during type substitution.
+		if receiverType := function.instantiatedType(typesSelection.Recv()); receiverType != typesSelection.Recv() {
+			// The receiver type changed during type substitution.
 			goPackage := function.declaredPackage().Types
-			object, index, indirect := types.LookupFieldOrMethod(recv, true, goPackage, sel.Obj().Name())
+			object, index, indirect := types.LookupFieldOrMethod(
+				receiverType,
+				true,
+				goPackage,
+				typesSelection.Obj().Name(),
+			)
 
-			// sig replaces sel.Type(). See (types.Selection).Typ() for details.
+			// sig replaces typesSelection.Type(). See (types.Selection).Typ() for details.
 			sig, isSignature := object.Type().(*types.Signature)
 			if !isSignature {
 				// Invariant: the selection is a method, so looking its name up on the receiver finds a *types.Func,
 				// and go/types gives every *types.Func a *types.Signature type.
 				panic(fmt.Sprintf("selection: method %s has type %s, not a signature", object, object.Type()))
 			}
-			sig = changeRecv(sig, newVariable(sig.Recv().Name(), recv))
-			if sel.Kind() == types.MethodExpr {
-				sig = recvAsFirstArgument(sig)
+			sig = changeReceiver(sig, newVariable(sig.Recv().Name(), receiverType))
+			if typesSelection.Kind() == types.MethodExpr {
+				sig = receiverAsFirstArgument(sig)
 			}
 			return &selection{
-				kind:     sel.Kind(),
-				recv:     recv,
-				typ:      sig,
-				object:   object,
-				index:    index,
-				indirect: indirect,
+				kind:          typesSelection.Kind(),
+				receiverType:  receiverType,
+				selectionType: sig,
+				object:        object,
+				index:         index,
+				indirect:      indirect,
 			}
 		}
 	}
-	return toSelection(sel)
+	return toSelection(typesSelection)
 }
 
 // Destinations associated with unlabelled for/switch/select stmts.
@@ -760,7 +765,7 @@ func (function *Function) addParamVariable(variable *types.Var, source ast.Node)
 	if name == "" {
 		name = fmt.Sprintf("arg%d", len(function.Parameters))
 	}
-	parameter := &Parameter{name: name, typ: function.typ(variable.Type()), parent: function}
+	parameter := &Parameter{name: name, valueType: function.instantiatedType(variable.Type()), parent: function}
 	parameter.setSource(source)
 	parameter.object = variable
 	function.Parameters = append(function.Parameters, parameter)
@@ -792,10 +797,10 @@ func (function *Function) startBody() {
 // f.startBody() was called. f.info != nil.
 // Postcondition:
 // len(f.Parameters) == len(f.Signature.Params) + (f.Signature.Recv() ? 1 : 0)
-func (function *Function) createSyntacticParameters(recv *ast.FieldList, functype *ast.FuncType) {
+func (function *Function) createSyntacticParameters(receiverField *ast.FieldList, functype *ast.FuncType) {
 	// Receiver (at most one inner iteration).
-	if recv != nil {
-		for _, field := range recv.List {
+	if receiverField != nil {
+		for _, field := range receiverField.List {
 			for _, name := range field.Names {
 				function.addSpilledParameter(identVariable(function, name), name)
 			}
@@ -853,20 +858,20 @@ func (function *Function) createDeferStack() {
 func numberNodes(function *Function) {
 	var base Id
 	for _, block := range function.Blocks {
-		for _, instr := range block.Instructions {
-			if instr == nil {
+		for _, instruction := range block.Instructions {
+			if instruction == nil {
 				continue
 			}
 			base++
-			instr.setId(base)
+			instruction.setId(base)
 		}
 	}
 }
 
-func updateOperandsReferrers(instr Instruction, ops []*Value) {
-	for _, op := range ops {
-		if value := *op; value != nil {
-			if refs := (*op).Referrers(); refs != nil {
+func updateOperandsReferrers(instruction Instruction, ops []*Value) {
+	for _, operand := range ops {
+		if value := *operand; value != nil {
+			if refs := (*operand).Referrers(); refs != nil {
 				if len(*refs) == 0 {
 					// per median, each value has two referrers, so we can avoid one call into growslice
 					//
@@ -876,9 +881,9 @@ func updateOperandsReferrers(instr Instruction, ops []*Value) {
 					// performance than making many individual
 					// allocations
 					*refs = make([]Instruction, 1, 2)
-					(*refs)[0] = instr
+					(*refs)[0] = instruction
 				} else {
-					*refs = append(*refs, instr)
+					*refs = append(*refs, instruction)
 				}
 			}
 		}
@@ -892,9 +897,9 @@ func buildReferrers(function *Function) {
 	var rands []*Value
 
 	for _, block := range function.Blocks {
-		for _, instr := range block.Instructions {
-			rands = instr.Operands(rands[:0]) // recycle storage
-			updateOperandsReferrers(instr, rands)
+		for _, instruction := range block.Instructions {
+			rands = instruction.Operands(rands[:0]) // recycle storage
+			updateOperandsReferrers(instruction, rands)
 		}
 	}
 }
@@ -952,8 +957,8 @@ func (function *Function) done() {
 
 	var visit func(*Function)
 	visit = func(function *Function) {
-		for _, anon := range function.AnonymousFunctions {
-			visit(anon) // anon is done building before f.
+		for _, anonymous := range function.AnonymousFunctions {
+			visit(anonymous) // anon is done building before f.
 		}
 
 		function.uniq = 0    // done with uniq
@@ -994,8 +999,8 @@ func (function *Function) lookup(object *types.Var, escaping bool) Value {
 				typed.Heap = true
 			case *Phi:
 				for _, edge := range typed.Edges {
-					if alloc, ok := edge.(*Allocation); ok {
-						alloc.Heap = true
+					if allocation, ok := edge.(*Allocation); ok {
+						allocation.Heap = true
 					}
 				}
 			}
@@ -1012,10 +1017,10 @@ func (function *Function) lookup(object *types.Var, escaping bool) Value {
 	}
 	outer := function.parent.lookup(object, true) // escaping
 	variable := &FreeVariable{
-		name:   object.Name(),
-		typ:    outer.Type(),
-		outer:  outer,
-		parent: function,
+		name:      object.Name(),
+		valueType: outer.Type(),
+		outer:     outer,
+		parent:    function,
 	}
 	function.vars[object] = variable
 	function.FreeVariables = append(function.FreeVariables, variable)
@@ -1023,8 +1028,8 @@ func (function *Function) lookup(object *types.Var, escaping bool) Value {
 }
 
 // emit emits the specified instruction to function f.
-func (function *Function) emit(instr Instruction, source ast.Node) Value {
-	return function.currentBlock.emit(instr, source)
+func (function *Function) emit(instruction Instruction, source ast.Node) Value {
+	return function.currentBlock.emit(instruction, source)
 }
 
 // RelativeString returns the full name of this function, qualified by
@@ -1056,8 +1061,8 @@ func (function *Function) RelativeString(from *types.Package) string {
 		// An anonymous function's Name() looks like "parentName$1",
 		// but its String() should include the type/package/etc.
 		parent := function.parent.RelativeString(from)
-		for index, anon := range function.parent.AnonymousFunctions {
-			if anon == function {
+		for index, anonymous := range function.parent.AnonymousFunctions {
+			if anonymous == function {
 				return fmt.Sprintf("%s$%d", parent, 1+index)
 			}
 		}
@@ -1066,13 +1071,13 @@ func (function *Function) RelativeString(from *types.Package) string {
 	}
 
 	// Method (declared or wrapper)?
-	if recv := function.Signature.Recv(); recv != nil {
-		return function.relativeMethod(from, recv.Type())
+	if receiver := function.Signature.Recv(); receiver != nil {
+		return function.relativeMethod(from, receiver.Type())
 	}
 
 	// Thunk?
 	if function.method != nil {
-		return function.relativeMethod(from, function.method.recv)
+		return function.relativeMethod(from, function.method.receiverType)
 	}
 
 	// Bound?
@@ -1090,8 +1095,8 @@ func (function *Function) RelativeString(from *types.Package) string {
 	return function.name
 }
 
-func (function *Function) relativeMethod(from *types.Package, recv types.Type) string {
-	return fmt.Sprintf("(%s).%s", relativeType(recv, from), function.name)
+func (function *Function) relativeMethod(from *types.Package, receiverType types.Type) string {
+	return fmt.Sprintf("(%s).%s", relativeType(receiverType, from), function.name)
 }
 
 // declaredPackage returns the package fn is declared in or nil if the

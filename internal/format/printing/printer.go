@@ -7,12 +7,12 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 )
 
-// PrintFunc is upstream's mainPrint as a printer receives it: print the node at selector, a property name
+// PrintFunction is upstream's mainPrint as a printer receives it: print the node at selector, a property name
 // of the current node, or the current node itself for "". Upstream's selector may also be a list of names;
 // a printer here walks those through Call or CallElement and prints "" inside, which is the same Call
 // mainPrint runs. args is the language's own arguments to a child's print; a non-nil args is never
 // cached, as upstream caches only a print without them.
-type PrintFunc[A any] func(selector string, arguments *A) doc.Doc
+type PrintFunction[A any] func(selector string, arguments *A) doc.Doc
 
 // NoArguments is the args of a language whose printer passes none.
 type NoArguments struct{}
@@ -45,7 +45,7 @@ type CommentHandlers[N Node[N], S any, A any] struct {
 type Embed[N Node[N], S any, A any] func(
 	path *AstPath[N, S],
 	options *Options[N, S, A],
-) func(textToDoc TextToDoc, print PrintFunc[A], path *AstPath[N, S], options *Options[N, S, A]) (doc.Doc, error)
+) func(textToDoc TextToDoc, print PrintFunction[A], path *AstPath[N, S], options *Options[N, S, A]) (doc.Doc, error)
 
 // TextToDoc formats text in another language and returns its doc, upstream's textToDoc. The parser
 // name is upstream's (typescript, babel, json, graphql, css, markdown). Supplied by whoever knows every
@@ -58,7 +58,7 @@ type TextToDoc func(text string, parser string) (doc.Doc, error)
 //
 // S is the language's per-print state, Options.Settings, and A its arguments to a child's print.
 type Printer[N Node[N], S any, A any] struct {
-	Print func(path *AstPath[N, S], options *Options[N, S, A], print PrintFunc[A], arguments *A) doc.Doc
+	Print func(path *AstPath[N, S], options *Options[N, S, A], print PrintFunction[A], arguments *A) doc.Doc
 
 	// LocStart and LocEnd are upstream's options.locStart and locEnd: byte offsets, with the
 	// language's own overrides.
@@ -77,7 +77,12 @@ type Printer[N Node[N], S any, A any] struct {
 	EmbedVisitorKeys     func(node N) []string
 	Preprocess           func(ast N, options *Options[N, S, A]) N
 	HasPrettierIgnore    func(path *AstPath[N, S]) bool
-	PrintPrettierIgnored func(path *AstPath[N, S], options *Options[N, S, A], print PrintFunc[A], arguments *A) doc.Doc
+	PrintPrettierIgnored func(
+		path *AstPath[N, S],
+		options *Options[N, S, A],
+		print PrintFunction[A],
+		arguments *A,
+	) doc.Doc
 	WillPrintOwnComments func(path *AstPath[N, S], options *Options[N, S, A]) bool
 
 	CanAttachComment     func(node N, ancestors []N) bool
@@ -121,7 +126,7 @@ func PrintAstToDoc[N Node[N], S any, A any](ast N, comments []N, options *Option
 	path := NewAstPath(root, options.Settings)
 	embeds := map[N]doc.Doc{}
 
-	var mainPrint PrintFunc[A]
+	var mainPrint PrintFunction[A]
 	mainPrintInternal := func(arguments *A) doc.Doc {
 		ensurePrintingNode(path, options)
 		value := path.Value()
@@ -161,7 +166,7 @@ func PrintAstToDoc[N Node[N], S any, A any](ast N, comments []N, options *Option
 func callPluginPrintFunction[N Node[N], S any, A any](
 	path *AstPath[N, S],
 	options *Options[N, S, A],
-	print PrintFunc[A],
+	print PrintFunction[A],
 	arguments *A,
 	embeds map[N]doc.Doc,
 ) doc.Doc {
@@ -194,7 +199,7 @@ func callPluginPrintFunction[N Node[N], S any, A any](
 func printIgnored[N Node[N], S any, A any](
 	path *AstPath[N, S],
 	options *Options[N, S, A],
-	print PrintFunc[A],
+	print PrintFunction[A],
 	arguments *A,
 ) doc.Doc {
 	node, _ := path.Node()
@@ -242,7 +247,7 @@ func ensurePrintingNode[N Node[N], S any, A any](path *AstPath[N, S], options *O
 // Mutates: embeds every embed that printed is stored by node, for callPluginPrintFunction to print in its place
 func printEmbeddedLanguages[N Node[N], S any, A any](
 	path *AstPath[N, S],
-	print PrintFunc[A],
+	print PrintFunction[A],
 	options *Options[N, S, A],
 	embeds map[N]doc.Doc,
 ) {
@@ -264,7 +269,7 @@ func printEmbeddedLanguages[N Node[N], S any, A any](
 	}
 
 	type pending struct {
-		print func(TextToDoc, PrintFunc[A], *AstPath[N, S], *Options[N, S, A]) (doc.Doc, error)
+		print func(TextToDoc, PrintFunction[A], *AstPath[N, S], *Options[N, S, A]) (doc.Doc, error)
 		node  N
 		stack []Frame[N]
 	}

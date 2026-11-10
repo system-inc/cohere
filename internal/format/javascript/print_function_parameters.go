@@ -46,7 +46,7 @@ func functionParameterDanglingCommentFilter(comment Node) bool {
 func printFunctionParameters(
 	path *Path,
 	options *Options,
-	print PrintFunc,
+	print PrintFunction,
 	shouldExpandParameters bool,
 	shouldPrintTypeParameters bool,
 ) Doc {

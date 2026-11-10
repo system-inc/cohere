@@ -131,7 +131,7 @@ func checkAssignment(context *rule.Context, assignment *ast.AssignStmt, currentF
 			continue
 		}
 		context.ReportRangef(
-			value, "assignment copies lock value to %v: %v", formatted(context.Fset, assignment.Lhs[index]), path,
+			value, "assignment copies lock value to %v: %v", formatted(context.FileSet, assignment.Lhs[index]), path,
 		)
 		reportedValue = true
 	}
@@ -155,7 +155,7 @@ func checkAssignment(context *rule.Context, assignment *ast.AssignStmt, currentF
 		}
 		if path := lockPath(object.Type()); path != nil {
 			context.ReportRangef(
-				operand, "for loop iteration copies lock value to %v: %v", formatted(context.Fset, operand), path,
+				operand, "for loop iteration copies lock value to %v: %v", formatted(context.FileSet, operand), path,
 			)
 		}
 	}
@@ -196,7 +196,12 @@ func checkCompositeLiteral(context *rule.Context, literal *ast.CompositeLit) {
 			value = keyed.Value
 		}
 		if path := lockPathOfValue(context, value); path != nil {
-			context.ReportRangef(value, "literal copies lock value from %v: %v", formatted(context.Fset, value), path)
+			context.ReportRangef(
+				value,
+				"literal copies lock value from %v: %v",
+				formatted(context.FileSet, value),
+				path,
+			)
 		}
 	}
 }
@@ -232,7 +237,12 @@ func checkCall(context *rule.Context, call *ast.CallExpr) {
 	}
 	for _, argument := range call.Args {
 		if path := lockPathOfValue(context, argument); path != nil {
-			context.ReportRangef(argument, "call of %s copies lock value: %v", formatted(context.Fset, call.Fun), path)
+			context.ReportRangef(
+				argument,
+				"call of %s copies lock value: %v",
+				formatted(context.FileSet, call.Fun),
+				path,
+			)
 		}
 	}
 }
@@ -293,7 +303,7 @@ func checkRangeVariable(context *rule.Context, operator token.Token, variable as
 		return
 	}
 	if path := lockPath(variableType); path != nil {
-		context.Reportf(variable.Pos(), "range var %s copies lock: %v", formatted(context.Fset, variable), path)
+		context.Reportf(variable.Pos(), "range var %s copies lock: %v", formatted(context.FileSet, variable), path)
 	}
 }
 

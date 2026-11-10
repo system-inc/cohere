@@ -94,7 +94,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	if isNamed && isReached {
 		until := &ast.CallExpr{Fun: function, Args: []ast.Expr{argument}}
 		fixes = append(fixes, edit.Fix("Replace with call to time.Until",
-			edit.ReplaceWithNode(context.Fset, call, until)))
+			edit.ReplaceWithNode(context.FileSet, call, until)))
 	}
 	staticcheck_report.Report(context, call, message,
 		staticcheck_report.FilterGenerated(),

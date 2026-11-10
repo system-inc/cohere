@@ -159,8 +159,8 @@ func (reader queryReader) replaceStep(expression ast.Expr) (string, ast.Expr) {
 	if !isCall {
 		return "", nil
 	}
-	function, isFunc := typeutil.Callee(reader.context.TypesInfo, call).(*types.Func)
-	if !isFunc || function.Pkg() == nil || function.Pkg().Path() != "strings" {
+	function, isFunction := typeutil.Callee(reader.context.TypesInfo, call).(*types.Func)
+	if !isFunction || function.Pkg() == nil || function.Pkg().Path() != "strings" {
 		return "", nil
 	}
 	switch {

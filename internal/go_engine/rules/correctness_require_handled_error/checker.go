@@ -93,8 +93,8 @@ func (checker checker) isError(candidate types.Type) bool {
 
 // isExempt is whether call is one of the callees above whose error need not be checked at the call.
 func (checker checker) isExempt(call *ast.CallExpr) bool {
-	function, isFunc := typeutil.Callee(checker.context.TypesInfo, call).(*types.Func)
-	if !isFunc {
+	function, isFunction := typeutil.Callee(checker.context.TypesInfo, call).(*types.Func)
+	if !isFunction {
 		return false
 	}
 	if checker.isExemptCallee(function) {
@@ -192,8 +192,8 @@ func (checker checker) isAtGoVersion(since string) bool {
 // calleeName is how the message names what call calls: a function or method by its package and receiver type,
 // with this package's own names left bare, and anything else, a function value or literal, as written.
 func (checker checker) calleeName(call *ast.CallExpr) string {
-	function, isFunc := typeutil.Callee(checker.context.TypesInfo, call).(*types.Func)
-	if !isFunc {
+	function, isFunction := typeutil.Callee(checker.context.TypesInfo, call).(*types.Func)
+	if !isFunction {
 		return types.ExprString(call.Fun)
 	}
 	qualifier := func(other *types.Package) string {

@@ -36,7 +36,7 @@ func TestFileMatchesTheFileSetAtEveryEdge(test *testing.T) {
 	first := parse("first.go", "// The first file starts with its comment.\npackage sample\n\nvar First = 1\n")
 	second := parse("second.go", "package sample\n\nfunc Second() {}")
 	after := parse("after.go", "package other\n")
-	context := &rule.Context{Fset: fileSet, Files: []*ast.File{first, second}}
+	context := &rule.Context{FileSet: fileSet, Files: []*ast.File{first, second}}
 	// The lookup File replaces: the package's file whose token.File holds the position.
 	fileSetAnswer := func(at token.Pos) *ast.File {
 		nodeFile := fileSet.File(at)

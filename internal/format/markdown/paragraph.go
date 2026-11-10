@@ -7,7 +7,7 @@ import (
 
 // src/language-markdown/print/paragraph.js.
 
-func printParagraph(path *astPath, print printFunc) doc.Doc {
+func printParagraph(path *astPath, print printFunction) doc.Doc {
 	parts := printing.Map(path, func(*astPath, int) doc.Doc { return print("", nil) }, "children")
 	return flattenFill(parts)
 }

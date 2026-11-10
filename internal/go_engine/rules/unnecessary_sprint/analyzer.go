@@ -93,6 +93,6 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	}
 	staticcheck_report.Report(context, call, fmt.Sprintf("unnecessary use of fmt.%s", function.Name()),
 		staticcheck_report.FilterGenerated(),
-		staticcheck_report.Fixes(edit.Fix("Replace with string literal", edit.ReplaceWithNode(context.Fset, call,
+		staticcheck_report.Fixes(edit.Fix("Replace with string literal", edit.ReplaceWithNode(context.FileSet, call,
 			literal))))
 }

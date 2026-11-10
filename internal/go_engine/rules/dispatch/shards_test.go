@@ -42,7 +42,7 @@ func (heard *heardFiles) listen(fileLocal bool) *rule.Listener {
 		FileEnter: func(context *rule.Context, file *ast.File) {
 			heard.mutex.Lock()
 			defer heard.mutex.Unlock()
-			heard.entered = append(heard.entered, context.Fset.Position(file.Pos()).Filename)
+			heard.entered = append(heard.entered, context.FileSet.Position(file.Pos()).Filename)
 			heard.contexts[context] = true
 		},
 		Nodes: []ast.Node{(*ast.IfStmt)(nil)},

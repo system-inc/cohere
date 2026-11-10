@@ -11,7 +11,7 @@ import (
 
 var trailingBlockquoteMarkerPattern = regexp.MustCompile(`\n>[` + javaScriptSpace + `]*$`)
 
-func printPrettierIgnored(path *astPath, options *options, _ printFunc, _ *printing.NoArguments) doc.Doc {
+func printPrettierIgnored(path *astPath, options *options, _ printFunction, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 	originalText := options.OriginalText[node.Position.Start.Offset:node.Position.End.Offset]
 

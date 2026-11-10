@@ -25,7 +25,7 @@ func shouldInlineNewExpressionCallee(path *Path) bool {
 }
 
 // printMemberExpression is upstream's printMemberExpression.
-func printMemberExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printMemberExpression(path *Path, options *Options, print PrintFunction) Doc {
 	objectDoc := print("object", nil)
 	lookupDoc := printMemberLookup(path, options, print)
 	current := node(path)
@@ -63,7 +63,7 @@ func printMemberExpression(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printMemberLookup is upstream's printMemberLookup.
-func printMemberLookup(path *Path, options *Options, print PrintFunc) Doc {
+func printMemberLookup(path *Path, options *Options, print PrintFunction) Doc {
 	property := print("property", nil)
 	current := node(path)
 	optional := printOptionalToken(path)

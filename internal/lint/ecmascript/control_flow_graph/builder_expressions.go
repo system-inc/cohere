@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
-func (builder *Builder[E]) expr(node *ast.Node) {
+func (builder *Builder[E]) expression(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -20,7 +20,7 @@ func (builder *Builder[E]) expr(node *ast.Node) {
 		}
 
 	case ast.KindParenthesizedExpression:
-		builder.expr(node.AsParenthesizedExpression().Expression)
+		builder.expression(node.AsParenthesizedExpression().Expression)
 
 	case ast.KindBinaryExpression:
 		builder.binaryExpression(node)
@@ -34,7 +34,7 @@ func (builder *Builder[E]) expr(node *ast.Node) {
 			builder.updateExpression(unary.Operand)
 			return
 		}
-		builder.expr(unary.Operand)
+		builder.expression(unary.Operand)
 
 	case ast.KindPostfixUnaryExpression:
 		builder.updateExpression(node.AsPostfixUnaryExpression().Operand)
@@ -44,7 +44,7 @@ func (builder *Builder[E]) expr(node *ast.Node) {
 		builder.accessOrCall(node)
 
 	case ast.KindYieldExpression:
-		builder.expr(node.AsYieldExpression().Expression)
+		builder.expression(node.AsYieldExpression().Expression)
 		builder.makeYield()
 
 	case ast.KindClassExpression:
@@ -63,7 +63,7 @@ func (builder *Builder[E]) expr(node *ast.Node) {
 }
 
 // condition evaluates node while keeping its truthy and falsy continuations
-// separate. A plain expr may merge short-circuit branches because its value is
+// separate. A plain expression may merge short-circuit branches because its value is
 // all the consumer needs; a control-flow condition cannot merge them before it
 // decides which statement executes, or impossible paths can appear across the
 // join (for example, the short branch of `a || b` reaching an `else` body).
@@ -84,7 +84,7 @@ func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[
 	case ast.KindPrefixUnaryExpression:
 		unary := node.AsPrefixUnaryExpression()
 		if unary.Operator != ast.KindExclamationToken {
-			builder.expr(node)
+			builder.expression(node)
 			builder.link(builder.current, whenTrue)
 			builder.link(builder.current, whenFalse)
 			return
@@ -100,7 +100,7 @@ func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[
 		if operator != ast.KindAmpersandAmpersandToken &&
 			operator != ast.KindBarBarToken &&
 			operator != ast.KindQuestionQuestionToken {
-			builder.expr(node)
+			builder.expression(node)
 			builder.link(builder.current, whenTrue)
 			builder.link(builder.current, whenFalse)
 			return
@@ -117,7 +117,7 @@ func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[
 		case ast.KindQuestionQuestionToken:
 			// A non-nullish left operand may itself be truthy or falsy; a
 			// nullish one evaluates the right operand.
-			builder.expr(binary.Left)
+			builder.expression(binary.Left)
 			builder.link(builder.current, whenTrue)
 			builder.link(builder.current, whenFalse)
 			builder.link(builder.current, right)
@@ -139,7 +139,7 @@ func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[
 		builder.condition(conditional.WhenFalse, whenTrue, whenFalse)
 
 	default:
-		builder.expr(node)
+		builder.expression(node)
 		builder.link(builder.current, whenTrue)
 		builder.link(builder.current, whenFalse)
 	}
@@ -156,7 +156,7 @@ func (builder *Builder[E]) visitUnknown(node *ast.Node) {
 		builder.statement(node)
 		return
 	}
-	builder.expr(node)
+	builder.expression(node)
 }
 
 func (builder *Builder[E]) binaryExpression(node *ast.Node) {
@@ -167,13 +167,13 @@ func (builder *Builder[E]) binaryExpression(node *ast.Node) {
 	case operator == ast.KindAmpersandAmpersandToken ||
 		operator == ast.KindBarBarToken ||
 		operator == ast.KindQuestionQuestionToken:
-		builder.expr(binary.Left)
+		builder.expression(binary.Left)
 		join := builder.newBlock()
 		builder.link(builder.current, join)
 		right := builder.newBlock()
 		builder.link(builder.current, right)
 		builder.enter(right)
-		builder.expr(binary.Right)
+		builder.expression(binary.Right)
 		builder.link(builder.current, join)
 		builder.enter(join)
 
@@ -185,7 +185,7 @@ func (builder *Builder[E]) binaryExpression(node *ast.Node) {
 		right := builder.newBlock()
 		builder.link(builder.current, right)
 		builder.enter(right)
-		builder.expr(binary.Right)
+		builder.expression(binary.Right)
 		builder.patternWrites(binary.Left)
 		builder.link(builder.current, join)
 		builder.enter(join)
@@ -194,42 +194,42 @@ func (builder *Builder[E]) binaryExpression(node *ast.Node) {
 		if isDestructuringTarget(binary.Left) {
 			// Run-time evaluation order: the right-hand side produces the
 			// value first, then the pattern binds element by element.
-			builder.expr(binary.Right)
+			builder.expression(binary.Right)
 			builder.patternBind(binary.Left)
 			return
 		}
 		builder.patternReads(binary.Left)
-		builder.expr(binary.Right)
+		builder.expression(binary.Right)
 		builder.patternWrites(binary.Left)
 
 	case ast.IsAssignmentOperator(operator):
 		// Compound assignment reads the target before writing it.
 		builder.patternReads(binary.Left)
-		builder.expr(binary.Right)
+		builder.expression(binary.Right)
 		builder.patternWrites(binary.Left)
 
 	default:
-		builder.expr(binary.Left)
-		builder.expr(binary.Right)
+		builder.expression(binary.Left)
+		builder.expression(binary.Right)
 	}
 }
 
 func (builder *Builder[E]) conditionalExpression(node *ast.Node) {
-	cond := node.AsConditionalExpression()
-	builder.expr(cond.Condition)
+	condition := node.AsConditionalExpression()
+	builder.expression(condition.Condition)
 	testEnd := builder.current
 	join := builder.newBlock()
 
 	whenTrue := builder.newBlock()
 	builder.link(testEnd, whenTrue)
 	builder.enter(whenTrue)
-	builder.expr(cond.WhenTrue)
+	builder.expression(condition.WhenTrue)
 	builder.link(builder.current, join)
 
 	whenFalse := builder.newBlock()
 	builder.link(testEnd, whenFalse)
 	builder.enter(whenFalse)
-	builder.expr(cond.WhenFalse)
+	builder.expression(condition.WhenFalse)
 	builder.link(builder.current, join)
 
 	builder.enter(join)
@@ -250,37 +250,37 @@ func (builder *Builder[E]) accessOrCall(node *ast.Node) {
 
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
-		builder.expr(node.AsPropertyAccessExpression().Expression)
+		builder.expression(node.AsPropertyAccessExpression().Expression)
 		builder.forkOptionalChain(node)
 	case ast.KindElementAccessExpression:
 		access := node.AsElementAccessExpression()
-		builder.expr(access.Expression)
+		builder.expression(access.Expression)
 		builder.forkOptionalChain(node)
-		builder.expr(access.ArgumentExpression)
+		builder.expression(access.ArgumentExpression)
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
-		builder.expr(call.Expression)
+		builder.expression(call.Expression)
 		builder.forkOptionalChain(node)
 		builder.typeArguments(node)
 		if call.Arguments != nil {
 			for _, argument := range call.Arguments.Nodes {
-				builder.expr(argument)
+				builder.expression(argument)
 			}
 		}
 	case ast.KindNewExpression:
-		newExpr := node.AsNewExpression()
-		builder.expr(newExpr.Expression)
+		newExpression := node.AsNewExpression()
+		builder.expression(newExpression.Expression)
 		builder.typeArguments(node)
-		if newExpr.Arguments != nil {
-			for _, argument := range newExpr.Arguments.Nodes {
-				builder.expr(argument)
+		if newExpression.Arguments != nil {
+			for _, argument := range newExpression.Arguments.Nodes {
+				builder.expression(argument)
 			}
 		}
 	case ast.KindTaggedTemplateExpression:
 		tagged := node.AsTaggedTemplateExpression()
-		builder.expr(tagged.Tag)
+		builder.expression(tagged.Tag)
 		builder.typeArguments(node)
-		builder.expr(tagged.Template)
+		builder.expression(tagged.Template)
 	}
 
 	builder.firstThrowableFork()
@@ -307,7 +307,7 @@ func (builder *Builder[E]) forkOptionalChain(node *ast.Node) {
 // it still counts as a read even though nothing in it runs.
 func (builder *Builder[E]) typeArguments(node *ast.Node) {
 	for _, typeArgument := range node.TypeArguments() {
-		builder.expr(typeArgument)
+		builder.expression(typeArgument)
 	}
 }
 
@@ -320,8 +320,8 @@ func (builder *Builder[E]) typeParameters(node *ast.Node) {
 		if parameter == nil {
 			continue
 		}
-		builder.expr(parameter.Constraint)
-		builder.expr(parameter.DefaultType)
+		builder.expression(parameter.Constraint)
+		builder.expression(parameter.DefaultType)
 	}
 }
 
@@ -346,7 +346,7 @@ func (builder *Builder[E]) classLike(node *ast.Node) {
 				continue
 			}
 			for _, typeNode := range heritage.Types.Nodes {
-				builder.expr(typeNode)
+				builder.expression(typeNode)
 			}
 		}
 	}
@@ -372,21 +372,21 @@ func (builder *Builder[E]) memberHeader(node *ast.Node) {
 	}
 	name := node.Name()
 	if name != nil && name.Kind == ast.KindComputedPropertyName {
-		builder.expr(name.AsComputedPropertyName().Expression)
+		builder.expression(name.AsComputedPropertyName().Expression)
 	}
 	switch node.Kind {
 	case ast.KindPropertyDeclaration:
-		builder.expr(node.AsPropertyDeclaration().Type)
+		builder.expression(node.AsPropertyDeclaration().Type)
 	case ast.KindIndexSignature:
 		for _, parameter := range node.Parameters() {
-			builder.expr(parameter.Type())
+			builder.expression(parameter.Type())
 		}
-		builder.expr(node.Type())
+		builder.expression(node.Type())
 	}
 }
 
 func (builder *Builder[E]) decorators(node *ast.Node) {
 	for _, decorator := range node.Decorators() {
-		builder.expr(decorator.AsDecorator().Expression)
+		builder.expression(decorator.AsDecorator().Expression)
 	}
 }

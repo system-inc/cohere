@@ -91,9 +91,9 @@ func findEnclosingPackageLevelFunction(irPackage *Package, path []ast.Node) *Fun
 			if decl.Recv == nil && decl.Name.Name == "init" {
 				// Explicit init() function.
 				for _, block := range irPackage.init.Blocks {
-					for _, instr := range block.Instructions {
-						if instr, ok := instr.(*Call); ok {
-							if callee, ok := instr.Call.Value.(*Function); ok &&
+					for _, instruction := range block.Instructions {
+						if call, ok := instruction.(*Call); ok {
+							if callee, ok := call.Call.Value.(*Function); ok &&
 								callee.Package == irPackage &&
 								callee.Pos() == decl.Name.NamePos {
 								return callee
@@ -106,15 +106,15 @@ func findEnclosingPackageLevelFunction(irPackage *Package, path []ast.Node) *Fun
 				return irPackage.init
 			}
 			// Declared function/method.
-			return findNamedFunc(irPackage, decl.Name.NamePos)
+			return findNamedFunction(irPackage, decl.Name.NamePos)
 		}
 	}
 	return nil // not in any function
 }
 
-// findNamedFunc returns the named function whose FuncDecl.Ident is at
+// findNamedFunction returns the named function whose FuncDecl.Ident is at
 // position pos.
-func findNamedFunc(irPackage *Package, position token.Pos) *Function {
+func findNamedFunction(irPackage *Package, position token.Pos) *Function {
 	// Look at all package members and method sets of named types.
 	// Not very efficient.
 	for _, mem := range irPackage.Members() {
@@ -127,8 +127,8 @@ func findNamedFunc(irPackage *Package, position token.Pos) *Function {
 			mset := irPackage.Program.MethodSets.MethodSet(types.NewPointer(mem.Type()))
 			for index, length := 0, mset.Len(); index < length; index++ {
 				// Don't call Program.Method: avoid creating wrappers.
-				object, isFunc := mset.At(index).Obj().(*types.Func)
-				if !isFunc {
+				object, isFunction := mset.At(index).Obj().(*types.Func)
+				if !isFunction {
 					// Invariant: every entry of a method set is a method selection, whose object is a *types.Func.
 					panic(fmt.Sprintf("method set entry %s is not a function", mset.At(index)))
 				}

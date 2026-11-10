@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
-func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print printFunc) doc.Doc {
+func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print printFunction) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	parentParentNode, _ := path.Grandparent()
@@ -276,7 +276,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			index == 0 &&
 			(iNextNode.Type() == "value-number" || iNextNode.Truthy("isHex")) &&
 			parentParentNode != nil &&
-			isColorAdjusterFuncNode(parentParentNode) &&
+			isColorAdjusterFunctionNode(parentParentNode) &&
 			!hasEmptyRawBefore(iNextNode)
 		requireSpaceBeforeOperator := iNextNextNode.Type() == "value-func" ||
 			(iNextNextNode != nil && isWordNode(iNextNextNode)) ||

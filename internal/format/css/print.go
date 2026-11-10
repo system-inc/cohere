@@ -37,7 +37,7 @@ var (
 	valueAllSpacePattern      = regexp.MustCompile(`^ *$`)
 )
 
-func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *printing.NoArguments) doc.Doc {
+func genericPrint(path *astPath, options *printerOptions, print printFunction, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 
 	// The core's front matter support prints front matter that is not embedded as written
@@ -350,7 +350,7 @@ func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *pr
 	panic(fmt.Sprintf("Unexpected PostCSS node type: %q.", node.Type()))
 }
 
-func printDeclaration(path *astPath, options *printerOptions, print printFunc) doc.Doc {
+func printDeclaration(path *astPath, options *printerOptions, print printFunction) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 
@@ -451,7 +451,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printFunc) d
 	}
 }
 
-func printAtRule(path *astPath, options *printerOptions, print printFunc) doc.Doc {
+func printAtRule(path *astPath, options *printerOptions, print printFunction) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	isTemplatePlaceholderNodeWithoutSemiColon := isTemplatePlaceholderNode(node) &&

@@ -143,7 +143,7 @@ func Check(context *rule.Context, assignment *ast.AssignStmt) {
 		fmt.Sprintf("%s is a type, not a function, and %s doesn't sort your values; consider using sort.%s instead",
 			typeName, staticcheck_report.Render(context, assignment.Rhs[0]), alternative),
 		staticcheck_report.Fixes(edit.Fix(fmt.Sprintf("Replace with call to sort.%s", alternative),
-			edit.ReplaceWithNode(context.Fset, assignment, replacement))))
+			edit.ReplaceWithNode(context.FileSet, assignment, replacement))))
 }
 
 // symbolType is the type name function names when the pattern's Symbol accepts it as one of sort's slice types, and

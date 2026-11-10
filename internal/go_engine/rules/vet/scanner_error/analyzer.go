@@ -164,7 +164,7 @@ func judgeCandidates(context *rule.Context) {
 			End: judged.call.End(),
 			Message: fmt.Sprintf(
 				"bufio.Scanner %q is used in Scan loop at line %d without final check of %s.Err()",
-				judged.scanner.Name(), context.Fset.Position(scanPosition).Line, judged.scanner.Name(),
+				judged.scanner.Name(), context.FileSet.Position(scanPosition).Line, judged.scanner.Name(),
 			),
 		})
 	}

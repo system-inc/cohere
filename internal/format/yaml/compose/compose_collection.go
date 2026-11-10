@@ -7,7 +7,7 @@ import "github.com/system-inc/cohere/internal/format/yaml/cst"
 func resolveCollection(
 	composition *composeContext,
 	token *cst.Token,
-	onError onErrorFunc,
+	onError onErrorFunction,
 	tagName string,
 	tag *Tag,
 ) *Node {
@@ -36,7 +36,7 @@ func composeCollection(
 	composition *composeContext,
 	token *cst.Token,
 	properties properties,
-	onError onErrorFunc,
+	onError onErrorFunction,
 ) *Node {
 	tagToken := properties.tag
 	tagName := ""
@@ -147,7 +147,7 @@ type scalarResolution struct {
 	valueRange []int
 }
 
-func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.Token, onError onErrorFunc) *Node {
+func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.Token, onError onErrorFunction) *Node {
 	var resolved scalarResolution
 	if token.Type == "block-scalar" {
 		resolved = resolveBlockScalar(composition, token, onError)
@@ -223,7 +223,7 @@ func findScalarTagByName(
 	value []uint16,
 	tagName string,
 	tagToken *cst.Token,
-	onError onErrorFunc,
+	onError onErrorFunction,
 ) *Tag {
 	if tagName == "!" {
 		return schema.scalarTag() // non-specific tag
@@ -257,7 +257,7 @@ func findScalarTagByName(
 	return schema.scalarTag()
 }
 
-func findScalarTagByTest(composition *composeContext, value []uint16, _ *cst.Token, _ onErrorFunc) *Tag {
+func findScalarTagByTest(composition *composeContext, value []uint16, _ *cst.Token, _ onErrorFunction) *Tag {
 	// The view every test reads is made once, at the first tag with a test, rather than per tag (#vbjv3d6).
 	view, viewMade := "", false
 	for _, tag := range composition.schema.Tags {

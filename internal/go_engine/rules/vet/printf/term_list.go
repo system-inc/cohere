@@ -20,7 +20,7 @@ func (list termList) isEmpty() bool {
 // isAll reports whether the list is the set of every type.
 func (list termList) isAll() bool {
 	for _, term := range list {
-		if term != nil && term.typ == nil {
+		if term != nil && term.termType == nil {
 			return true
 		}
 	}
@@ -47,7 +47,7 @@ func (list termList) norm() termList {
 			}
 			// A term of every type makes the whole list every type, and returning now keeps the result in normal
 			// form, which going on with other terms beside it would not.
-			if union.typ == nil {
+			if union.termType == nil {
 				return allTerms
 			}
 			merged = union

@@ -28,10 +28,10 @@ const (
 // In that case, if there are no specific terms, typeset calls yield with (nil, nil).
 // If t is not a type parameter, the implied type set consists of just t.
 // In any case, typeset is guaranteed to call yield at least once.
-func typeset(typ types.Type, yield func(termType, underlyingType types.Type) bool) {
-	switch typ := types.Unalias(typ).(type) {
+func typeset(goType types.Type, yield func(termType, underlyingType types.Type) bool) {
+	switch unaliased := types.Unalias(goType).(type) {
 	case *types.TypeParam, *types.Interface:
-		terms := termListOf(typ)
+		terms := termListOf(unaliased)
 		if len(terms) == 0 {
 			yield(nil, nil)
 			return
@@ -50,19 +50,19 @@ func typeset(typ types.Type, yield func(termType, underlyingType types.Type) boo
 		}
 		return
 	default:
-		yield(typ, typ.Underlying())
+		yield(unaliased, unaliased.Underlying())
 	}
 }
 
-// termListOf returns the type set of typ as a normalized term set. Returns an empty set on an error.
-func termListOf(typ types.Type) []*types.Term {
-	return typeutil.NewTypeSet(typ).Terms
+// termListOf returns the type set of `goType` as a normalized term set. Returns an empty set on an error.
+func termListOf(goType types.Type) []*types.Term {
+	return typeutil.NewTypeSet(goType).Terms
 }
 
 // typeSetIsEmpty returns true if a typeset is empty.
-func typeSetIsEmpty(typ types.Type) bool {
+func typeSetIsEmpty(goType types.Type) bool {
 	var empty bool
-	typeset(typ, func(resolvedType, _ types.Type) bool {
+	typeset(goType, func(resolvedType, _ types.Type) bool {
 		empty = resolvedType == nil
 		return false
 	})
@@ -96,11 +96,11 @@ func isBytestring(goType types.Type) bool {
 }
 
 // underIs calls `predicate` with the underlying types of the type terms
-// of the type set of typ and reports whether all calls to `predicate` returned true.
+// of the type set of `goType` and reports whether all calls to `predicate` returned true.
 // If there are no specific terms, underIs returns the result of `predicate`(nil).
-func underIs(typ types.Type, predicate func(types.Type) bool) bool {
+func underIs(goType types.Type, predicate func(types.Type) bool) bool {
 	var ok bool
-	typeset(typ, func(termType, underlyingType types.Type) bool {
+	typeset(goType, func(termType, underlyingType types.Type) bool {
 		ok = predicate(underlyingType)
 		return ok
 	})
@@ -109,8 +109,8 @@ func underIs(typ types.Type, predicate func(types.Type) bool) bool {
 
 // indexType returns the element type and index mode of a IndexExpr over a type.
 // It returns an invalid mode if the type is not indexable; this should never occur in a well-typed program.
-func indexType(typ types.Type) (types.Type, indexMode) {
-	switch underlyingType := typ.Underlying().(type) {
+func indexType(goType types.Type) (types.Type, indexMode) {
+	switch underlyingType := goType.Underlying().(type) {
 	case *types.Array:
 		return underlyingType.Elem(), ixArrVariable
 	case *types.Pointer:
@@ -126,7 +126,7 @@ func indexType(typ types.Type) (types.Type, indexMode) {
 	case *types.Interface:
 		var elem types.Type
 		mode := ixInvalid
-		typeset(typ, func(termType, _ types.Type) bool {
+		typeset(goType, func(termType, _ types.Type) bool {
 			if termType == nil {
 				return false // empty set
 			}

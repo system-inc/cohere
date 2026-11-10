@@ -86,7 +86,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 	}
 	state.comments = nil
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-	if strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
+	if strings.HasSuffix(context.FileSet.PositionFor(file.Package, false).Filename, "_test.go") {
 		state.comments = state.indexes.ForFile(file)
 	}
 }
@@ -230,8 +230,8 @@ func isMeasurement(context *rule.Context, expression ast.Expr, readings map[*typ
 	if !isCall {
 		return false
 	}
-	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
-	if !isFunc || function.Pkg() == nil || function.Pkg().Path() != "time" {
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	if !isFunction || function.Pkg() == nil || function.Pkg().Path() != "time" {
 		return false
 	}
 	receiver := function.Signature().Recv()
@@ -268,8 +268,8 @@ func isClockReading(context *rule.Context, expression ast.Expr, readings map[*ty
 		variable, isVariable := context.TypesInfo.Uses[value].(*types.Var)
 		return isVariable && readings[variable]
 	case *ast.CallExpr:
-		function, isFunc := typeutil.Callee(context.TypesInfo, value).(*types.Func)
-		return isFunc && function.Pkg() != nil && function.Pkg().Path() == "time" && function.Name() == "Now" &&
+		function, isFunction := typeutil.Callee(context.TypesInfo, value).(*types.Func)
+		return isFunction && function.Pkg() != nil && function.Pkg().Path() == "time" && function.Name() == "Now" &&
 			function.Signature().Recv() == nil
 	}
 	return false
@@ -384,8 +384,8 @@ func isTest(context *rule.Context, function *ast.FuncDecl) bool {
 	if function.Recv != nil || function.Body == nil || !isTestName(function.Name.Name) {
 		return false
 	}
-	object, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func)
-	if !isFunc {
+	object, isFunction := context.TypesInfo.Defs[function.Name].(*types.Func)
+	if !isFunction {
 		return false
 	}
 	signature := object.Signature()

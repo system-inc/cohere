@@ -130,7 +130,7 @@ var NoWillUpdateSetState = rule.Rule[NoMethodSetStateOptions]{
 		// comma-ok form matters: the plain harness and a bare severity in the config both hand this
 		// a nil, and an unchecked assertion would panic on every real file.
 		settings, _ := options.Read()
-		reportInsideNestedFunctions := settings.DisallowInFunc
+		reportInsideNestedFunctions := settings.DisallowInFunction
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

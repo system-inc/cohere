@@ -248,32 +248,32 @@ func (analysis *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 	}
 
 	exit := blockCount
-	predCounts := make([]int, blockCount+2)
+	predecessorCounts := make([]int, blockCount+2)
 	for index, block := range graph.Blocks {
 		if !block.Reachable {
 			continue
 		}
 		for _, successor := range block.Successors {
 			if successor != nil && successor.Reachable {
-				predCounts[successor.Index()+1]++
+				predecessorCounts[successor.Index()+1]++
 			}
 		}
 		if analysis.blocks[index].flags&pathFinal != 0 {
-			predCounts[exit+1]++
+			predecessorCounts[exit+1]++
 		}
 	}
-	for index := 1; index < len(predCounts); index++ {
-		predCounts[index] += predCounts[index-1]
+	for index := 1; index < len(predecessorCounts); index++ {
+		predecessorCounts[index] += predecessorCounts[index-1]
 	}
-	totalPredecessors := predCounts[len(predCounts)-1]
+	totalPredecessors := predecessorCounts[len(predecessorCounts)-1]
 	nodeCount := blockCount + 1
 	work := make([]int, totalPredecessors+nodeCount*4)
 	predecessors := work[:totalPredecessors]
-	predCursor := work[totalPredecessors : totalPredecessors+nodeCount]
+	predecessorCursor := work[totalPredecessors : totalPredecessors+nodeCount]
 	postOrderStorage := work[totalPredecessors+nodeCount : totalPredecessors+nodeCount*2]
 	rpoPosition := work[totalPredecessors+nodeCount*2 : totalPredecessors+nodeCount*3]
 	immediate := work[totalPredecessors+nodeCount*3:]
-	copy(predCursor, predCounts[:nodeCount])
+	copy(predecessorCursor, predecessorCounts[:nodeCount])
 	for index, block := range graph.Blocks {
 		if !block.Reachable {
 			continue
@@ -283,12 +283,12 @@ func (analysis *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 				continue
 			}
 			successorIndex := successor.Index()
-			predecessors[predCursor[successorIndex]] = index
-			predCursor[successorIndex]++
+			predecessors[predecessorCursor[successorIndex]] = index
+			predecessorCursor[successorIndex]++
 		}
 		if analysis.blocks[index].flags&pathFinal != 0 {
-			predecessors[predCursor[exit]] = index
-			predCursor[exit]++
+			predecessors[predecessorCursor[exit]] = index
+			predecessorCursor[exit]++
 		}
 	}
 
@@ -340,8 +340,8 @@ func (analysis *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 	for changed {
 		changed = false
 		for _, index := range postOrder[1:] {
-			start := predCounts[index]
-			end := predCounts[index+1]
+			start := predecessorCounts[index]
+			end := predecessorCounts[index+1]
 			newImmediate := -1
 			for _, predecessor := range predecessors[start:end] {
 				if immediate[predecessor] == -1 {

@@ -6,7 +6,7 @@
 // whose message it reports word for word, at the same range, the program argument. The original matches its query,
 // `(CallExpr (Symbol "os/exec.Command") arg1:_)`, through staticcheck's pattern language; the port asks the same of
 // each call directly, reading pattern/match.go for what each construct of the query matches, asks
-// staticcheck_code.ExprToString where the original asks code.ExprToString, and reports through
+// staticcheck_code.ExpressionToString where the original asks code.ExprToString, and reports through
 // staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
 // original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
 // both over the same packages, and the two differ nowhere they hold.
@@ -64,7 +64,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	// The matcher reaches the program through its outer parentheses, so the binding, the constant asked of it and the
 	// finding's range are the expression inside them.
 	program := ast.Unparen(call.Args[0])
-	value, isString := staticcheck_code.ExprToString(context, program)
+	value, isString := staticcheck_code.ExpressionToString(context, program)
 	if !isString {
 		return
 	}

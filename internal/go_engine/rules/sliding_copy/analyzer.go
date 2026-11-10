@@ -153,7 +153,7 @@ func Check(context *rule.Context, loop *ast.ForStmt) {
 	// it is a question of flow the port does not ask: the declaration's place is exact, so the port withholds the fix
 	// for every counter the header does not declare, and keeps the finding, since the loop is still a slide.
 	if namesBuiltinCopy(context, loop) && isDeclaredIn(counterObject, loop) {
-		fixes = append(fixes, edit.Fix("Use copy() instead of loop", edit.ReplaceWithNode(context.Fset, loop, call)))
+		fixes = append(fixes, edit.Fix("Use copy() instead of loop", edit.ReplaceWithNode(context.FileSet, loop, call)))
 	}
 	staticcheck_report.Report(context, loop, "should use copy() instead of loop for sliding slice elements",
 		staticcheck_report.ShortRange(),

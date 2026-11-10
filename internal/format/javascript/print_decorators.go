@@ -5,7 +5,7 @@ import "github.com/system-inc/cohere/internal/format/estree"
 // print/decorators.js and print/ignored.js.
 
 // printClassMemberDecorators is upstream's printClassMemberDecorators.
-func printClassMemberDecorators(path *Path, options *Options, print PrintFunc) Doc {
+func printClassMemberDecorators(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	separator := line
 	if hasNewlineBetweenOrAfterDecorators(current, options) {
@@ -15,7 +15,7 @@ func printClassMemberDecorators(path *Path, options *Options, print PrintFunc) D
 }
 
 // printDecoratorsBeforeExport is upstream's printDecoratorsBeforeExport.
-func printDecoratorsBeforeExport(path *Path, options *Options, print PrintFunc) Doc {
+func printDecoratorsBeforeExport(path *Path, options *Options, print PrintFunction) Doc {
 	if !hasDecoratorsBeforeExport(node(path)) {
 		return emptyDoc
 	}
@@ -23,7 +23,7 @@ func printDecoratorsBeforeExport(path *Path, options *Options, print PrintFunc) 
 }
 
 // printDecorators is upstream's printDecorators.
-func printDecorators(path *Path, options *Options, print PrintFunc) Doc {
+func printDecorators(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parent := parentOf(path)
 	decorators := current.List("decorators")

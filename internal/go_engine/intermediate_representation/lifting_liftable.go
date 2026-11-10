@@ -240,7 +240,7 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int, sc
 
 	split := &Allocation{Heap: true}
 	split.setBlock(allocation.block)
-	split.setType(allocation.typ)
+	split.setType(allocation.valueType)
 	split.setSource(allocation.source)
 	split.comment = "split alloc"
 	liftingInsertBefore(work, allocation.block.Index, allocation, split)
@@ -258,7 +258,7 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int, sc
 		propagate := func(in *BasicBlock, before Instruction) {
 			load := &Load{X: allocation}
 			store := &Store{Address: split, Value: load}
-			load.setType(deref(allocation.typ))
+			load.setType(dereference(allocation.valueType))
 			load.setBlock(in)
 			load.comment = "split alloc"
 			store.setBlock(in)

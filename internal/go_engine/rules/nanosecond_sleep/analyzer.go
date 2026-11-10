@@ -90,8 +90,8 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		fmt.Sprintf("sleeping for %d nanoseconds is probably a bug; be explicit if it isn't", nanoseconds),
 		staticcheck_report.Fixes(
 			edit.Fix("Explicitly use nanoseconds",
-				edit.ReplaceWithNode(context.Fset, literal, multipliedBy(literal, "Nanosecond"))),
-			edit.Fix("Use seconds", edit.ReplaceWithNode(context.Fset, literal, multipliedBy(literal, "Second"))),
+				edit.ReplaceWithNode(context.FileSet, literal, multipliedBy(literal, "Nanosecond"))),
+			edit.Fix("Use seconds", edit.ReplaceWithNode(context.FileSet, literal, multipliedBy(literal, "Second"))),
 		))
 }
 

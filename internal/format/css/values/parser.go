@@ -508,7 +508,7 @@ func (parser *parser) splitWord() {
 			// value.replace(unit, ''): the first occurrence, which is not always the suffix.
 			node = newNumber(strings.Replace(text, unit, "", 1), nodeSource, nodeSourceIndex, unit)
 		} else if nextToken != nil && nextToken.kind == "(" {
-			node = newFunc(decode(value), nodeSource, nodeSourceIndex)
+			node = newFunction(decode(value), nodeSource, nodeSourceIndex)
 			parser.cache = append(parser.cache, parser.current)
 		} else {
 			node = leaf("word", decode(value), nodeSource, nodeSourceIndex)

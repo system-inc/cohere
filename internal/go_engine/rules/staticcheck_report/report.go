@@ -85,7 +85,7 @@ func Report(context *rule.Context, node Positioner, message string, options ...O
 		// The judgment is keyed by the name a file was parsed from, and staticcheck's report asks it by the name a
 		// position is displayed in, as this does, so a generated file whose line directives point into another Go
 		// file is asked by that file's name, found not generated, and its findings are not withheld.
-		if context.IsGenerated(DisplayPosition(context.Fset, node.Pos()).Filename) {
+		if context.IsGenerated(DisplayPosition(context.FileSet, node.Pos()).Filename) {
 			return
 		}
 	}

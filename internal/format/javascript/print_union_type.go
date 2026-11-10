@@ -8,7 +8,7 @@ import (
 // print/union-type.js and print/intersection-type.js.
 
 // printUnionType is upstream's printUnionType, for `TSUnionType` and `UnionTypeAnnotation`.
-func printUnionType(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printUnionType(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	current := node(path)
 
 	// {
@@ -94,7 +94,7 @@ func shouldIndentUnionType(path *Path) bool {
 
 // printIntersectionType is upstream's printIntersectionType, for `TSIntersectionType` and
 // `IntersectionTypeAnnotation`.
-func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
+func printIntersectionType(path *Path, options *Options, print PrintFunction) Doc {
 	wasIndented := false
 	return groupIn(path, doc.Concat(mapPath(path, func(path *Path, index int) Doc {
 		printed := print("", nil)

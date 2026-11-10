@@ -36,6 +36,6 @@ func (element *compositeElement) address(function *Function) Value {
 	panic("not implemented")
 }
 
-func (element *compositeElement) typ() types.Type {
+func (element *compositeElement) storedType() types.Type {
 	return element.elementType
 }

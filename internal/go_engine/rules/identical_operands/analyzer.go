@@ -161,7 +161,7 @@ func isGeneratedZeroComparison(context *rule.Context, binary *ast.BinaryExpr) bo
 	if left.Value != "0" || right.Value != "0" {
 		return false
 	}
-	return context.IsGenerated(context.Fset.PositionFor(left.Pos(), false).Filename)
+	return context.IsGenerated(context.FileSet.PositionFor(left.Pos(), false).Filename)
 }
 
 // mayBeFloat is whether a value of valueType may be or hold a float: a float, an array of them, a struct with one, or

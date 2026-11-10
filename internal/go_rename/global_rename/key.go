@@ -54,7 +54,7 @@ const (
 	KindLocal         = "local"
 	KindLabel         = "label"
 	KindTypeParameter = "type parameter"
-	KindFunc          = "func"
+	KindFunction      = "func"
 	KindType          = "type"
 	KindConst         = "const"
 	KindVariable      = "var"
@@ -78,7 +78,7 @@ func kindOf(object types.Object) string {
 		if typed.Signature().Recv() != nil {
 			return KindMethod
 		}
-		return KindFunc
+		return KindFunction
 	case *types.TypeName:
 		if _, isParameter := typed.Type().(*types.TypeParam); isParameter {
 			return KindTypeParameter

@@ -6,7 +6,7 @@
 // argument. The original matches its query, `(CallExpr (Symbol name@(Or "(*text/template.Template).Parse"
 // "(*html/template.Template).Parse")) [s])`, through staticcheck's pattern language; the port asks the same of each
 // call directly, reading pattern/match.go for what each construct of the query matches, asks
-// staticcheck_code.IsCallToAny and staticcheck_code.ExprToString where the original asks code.IsCallToAny and
+// staticcheck_code.IsCallToAny and staticcheck_code.ExpressionToString where the original asks code.IsCallToAny and
 // code.ExprToString, reads the template argument's position from staticcheck's knowledge package, the table of
 // argument positions the original reads, which this wave imports as data and a later wave ports, and reports through
 // staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
@@ -83,7 +83,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		return
 	}
 	// The matcher reaches s through its outer parentheses, and the constant is the same through them.
-	text, isString := staticcheck_code.ExprToString(context, ast.Unparen(call.Args[0]))
+	text, isString := staticcheck_code.ExpressionToString(context, ast.Unparen(call.Args[0]))
 	if !isString {
 		return
 	}

@@ -137,13 +137,13 @@ func Check(context *rule.Context, node ast.Node) {
 			staticcheck_report.FilterGenerated(),
 			staticcheck_report.ShortRange(),
 			staticcheck_report.Fixes(edit.Fix("Replace loop with assignment",
-				edit.ReplaceWithNode(context.Fset, node, assignment))))
+				edit.ReplaceWithNode(context.FileSet, node, assignment))))
 		return
 	}
 
 	// The loop's own scope decides what copy names where the loop starts: a copy the code declares there, in a
 	// function or a package, is not the builtin, and the loop is left alone.
-	copyAtLoop, evaluationError := types.Eval(context.Fset, context.Package, node.Pos(), "copy")
+	copyAtLoop, evaluationError := types.Eval(context.FileSet, context.Package, node.Pos(), "copy")
 	if evaluationError != nil || !copyAtLoop.IsBuiltin() {
 		return
 	}
@@ -165,7 +165,7 @@ func Check(context *rule.Context, node ast.Node) {
 		staticcheck_report.ShortRange(),
 		staticcheck_report.FilterGenerated(),
 		staticcheck_report.Fixes(edit.Fix("Replace loop with call to copy()",
-			edit.ReplaceWithNode(context.Fset, node, call))))
+			edit.ReplaceWithNode(context.FileSet, node, call))))
 }
 
 // rangeCopy is what the two range alternatives bind of loop, and whether either matches. Both declare the key, an

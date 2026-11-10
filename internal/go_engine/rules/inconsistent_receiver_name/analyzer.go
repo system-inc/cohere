@@ -88,7 +88,7 @@ func checkType(context *rule.Context, typeName *types.TypeName) {
 		receiver := method.Signature().Recv()
 		// The original asks staticcheck's generated-file judgment by the name the receiver's file was parsed from,
 		// code.IsGenerated, as IsGenerated is keyed.
-		if context.IsGenerated(context.Fset.PositionFor(receiver.Pos(), false).Filename) {
+		if context.IsGenerated(context.FileSet.PositionFor(receiver.Pos(), false).Filename) {
 			continue
 		}
 		// A method promoted from an embedded field is declared on the field's type and counted there. The comparison

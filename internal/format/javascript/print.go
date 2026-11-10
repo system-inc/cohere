@@ -23,7 +23,7 @@ func shouldPrintDirectly(node Node) bool {
 }
 
 // printWithoutParentheses is upstream's printWithoutParentheses.
-func printWithoutParentheses(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printWithoutParentheses(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	if printed := printJsx(path, options, print); printed != nil {
 		return printed
 	}
@@ -34,7 +34,7 @@ func printWithoutParentheses(path *Path, options *Options, print PrintFunc, argu
 }
 
 // printEstree is upstream's print, print/index.js: the printer's entry for every node.
-func printEstree(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printEstree(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	current := node(path)
 
 	var printed Doc
@@ -93,7 +93,7 @@ func printCommentsForFunction(path *Path, options *Options, printed Doc) Doc {
 var lowercaseLetterEnd = regexp.MustCompile(`[a-z]$`)
 
 // printEstreeNode is upstream's printEstree, print/estree.js.
-func printEstreeNode(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printEstreeNode(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	current := node(path)
 
 	if isLiteral(current) {
@@ -310,7 +310,7 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, arguments *p
 
 // printTypescript is upstream's printTypescript, print/typescript.js. It returns nil for a node that
 // is not TypeScript, where upstream returns undefined.
-func printTypescript(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printTypescript(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	current := node(path)
 	nodeType := current.Type()
 	if !strings.HasPrefix(nodeType, "TS") {

@@ -980,7 +980,7 @@ func (engine *engine) platformRefusal(candidate *candidate) string {
 	if reading == nil || len(reading.files) == 0 {
 		return ""
 	}
-	packageLevel := candidate.Kind == KindFunc ||
+	packageLevel := candidate.Kind == KindFunction ||
 		candidate.Kind == KindVariable ||
 		candidate.Kind == KindConst ||
 		candidate.Kind == KindType

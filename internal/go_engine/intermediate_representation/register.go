@@ -14,13 +14,13 @@ import (
 // completion of building a function in IR form.
 type register struct {
 	anInstruction
-	typ       types.Type // type of virtual register
+	valueType types.Type // type of virtual register
 	referrers []Instruction
 }
 
-func (register *register) Type() types.Type { return register.typ }
+func (register *register) Type() types.Type { return register.valueType }
 
-func (register *register) setType(typ types.Type) { register.typ = typ }
+func (register *register) setType(valueType types.Type) { register.valueType = valueType }
 
 func (register *register) Name() string { return fmt.Sprintf("t%d", register.id) }
 

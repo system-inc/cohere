@@ -186,7 +186,7 @@ func judgePackage(context *rule.Context) {
 				Pos: judged.call.Pos(),
 				End: judged.call.End(),
 				Message: fmt.Sprintf("sql.Rows %q is used in Next loop at line %d without final check of %s.Err()",
-					judged.rows.Name(), context.Fset.Position(nextLoop).Line, judged.rows.Name()),
+					judged.rows.Name(), context.FileSet.Position(nextLoop).Line, judged.rows.Name()),
 			})
 		}
 	}

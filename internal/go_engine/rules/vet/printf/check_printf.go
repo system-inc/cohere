@@ -159,13 +159,13 @@ func operationRange(formatArgument ast.Expr, operation *formatOperation) analysi
 // formatStringIndex is the index of a printf call's format string, its last parameter before the variadic one, or
 // -1 when the callee's type is unknown, not a function's, not variadic or has no parameter before the variadic one.
 func formatStringIndex(pass *analysis.Pass, call *ast.CallExpr) int {
-	typ := pass.TypesInfo.Types[call.Fun].Type
-	if typ == nil {
+	calleeType := pass.TypesInfo.Types[call.Fun].Type
+	if calleeType == nil {
 		return -1
 	}
 	// The type itself, not its underlying type: a call through a named function type is not checked, as the
 	// original does not check it.
-	signature, isSignature := typ.(*types.Signature)
+	signature, isSignature := calleeType.(*types.Signature)
 	if !isSignature || !signature.Variadic() {
 		return -1
 	}

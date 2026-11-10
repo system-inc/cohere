@@ -116,8 +116,8 @@ func (block *BasicBlock) Phis() []Instruction {
 
 // phis returns the prefix of b.Instructions containing all the block's φ-nodes.
 func (block *BasicBlock) phis() []Instruction {
-	for index, instr := range block.Instructions {
-		if _, ok := instr.(*Phi); !ok {
+	for index, instruction := range block.Instructions {
+		if _, ok := instruction.(*Phi); !ok {
 			return block.Instructions[:index]
 		}
 	}
@@ -127,8 +127,8 @@ func (block *BasicBlock) phis() []Instruction {
 // replacePred replaces all occurrences of p in b's predecessor list with q.
 // Ordinarily there should be at most one.
 func (block *BasicBlock) replacePredecessor(oldPredecessor, newPredecessor *BasicBlock) {
-	for index, pred := range block.Predecessors {
-		if pred == oldPredecessor {
+	for index, predecessor := range block.Predecessors {
+		if predecessor == oldPredecessor {
 			block.Predecessors[index] = newPredecessor
 		}
 	}
@@ -137,8 +137,8 @@ func (block *BasicBlock) replacePredecessor(oldPredecessor, newPredecessor *Basi
 // replaceSucc replaces all occurrences of p in b's successor list with q.
 // Ordinarily there should be at most one.
 func (block *BasicBlock) replaceSuccessor(oldSuccessor, newSuccessor *BasicBlock) {
-	for index, succ := range block.Successors {
-		if succ == oldSuccessor {
+	for index, successor := range block.Successors {
+		if successor == oldSuccessor {
 			block.Successors[index] = newSuccessor
 		}
 	}
@@ -152,15 +152,15 @@ func (block *BasicBlock) removePredecessor(basicBlock *BasicBlock) {
 
 	// We must preserve edge order for φ-nodes.
 	keptCount := 0
-	for predecessorIndex, pred := range block.Predecessors {
-		if pred != basicBlock {
+	for predecessorIndex, predecessor := range block.Predecessors {
+		if predecessor != basicBlock {
 			block.Predecessors[keptCount] = block.Predecessors[predecessorIndex]
 			// Strike out φ-edge too.
-			for _, instr := range phis {
-				phi, isPhi := instr.(*Phi)
+			for _, instruction := range phis {
+				phi, isPhi := instruction.(*Phi)
 				if !isPhi {
 					// Invariant: phis returns only the prefix of the block's instructions that are φ-nodes.
-					panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instr))
+					panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instruction))
 				}
 				phi.Edges[keptCount] = phi.Edges[predecessorIndex]
 			}
@@ -170,21 +170,21 @@ func (block *BasicBlock) removePredecessor(basicBlock *BasicBlock) {
 	// Nil out b.Predecessors[j:] and φ-edges[j:] to aid GC.
 	for predecessorIndex := keptCount; predecessorIndex < len(block.Predecessors); predecessorIndex++ {
 		block.Predecessors[predecessorIndex] = nil
-		for _, instr := range phis {
-			phi, isPhi := instr.(*Phi)
+		for _, instruction := range phis {
+			phi, isPhi := instruction.(*Phi)
 			if !isPhi {
 				// Invariant: phis returns only the prefix of the block's instructions that are φ-nodes.
-				panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instr))
+				panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instruction))
 			}
 			phi.Edges[predecessorIndex] = nil
 		}
 	}
 	block.Predecessors = block.Predecessors[:keptCount]
-	for _, instr := range phis {
-		phi, isPhi := instr.(*Phi)
+	for _, instruction := range phis {
+		phi, isPhi := instruction.(*Phi)
 		if !isPhi {
 			// Invariant: phis returns only the prefix of the block's instructions that are φ-nodes.
-			panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instr))
+			panic(fmt.Sprintf("removePredecessor: %s in the φ prefix is not a φ-node", instruction))
 		}
 		phi.Edges = phi.Edges[:keptCount]
 	}

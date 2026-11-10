@@ -37,8 +37,8 @@ import (
 type Constant struct {
 	node
 
-	typ   types.Type
-	Value constant.Value
+	valueType types.Type
+	Value     constant.Value
 }
 
 func (irConstant *Constant) Operands(rands []*Value) []*Value { return rands }
@@ -52,12 +52,12 @@ func (irConstant *Constant) Operands(rands []*Value) []*Value { return rands }
 //	types.IsInteger for 0
 //	types.IsString for ""
 //	0 otherwise.
-func soleTypeKind(typ types.Type) types.BasicInfo {
+func soleTypeKind(goType types.Type) types.BasicInfo {
 	// State records the set of possible zero values (false, 0, "").
 	// Candidates (perhaps all) are eliminated during the type-set
 	// iteration, which executes at least once.
 	state := types.IsBoolean | types.IsInteger | types.IsString
-	underIs(typ, func(ut types.Type) bool {
+	underIs(goType, func(ut types.Type) bool {
 		var info types.BasicInfo
 		if basic, ok := ut.(*types.Basic); ok {
 			info = basic.Info()
@@ -73,10 +73,10 @@ func soleTypeKind(typ types.Type) types.BasicInfo {
 
 // NewConstant returns a new constant of the specified value and type.
 // val must be valid according to the specification of Constant.Value.
-func NewConstant(value constant.Value, typ types.Type, source ast.Node) *Constant {
+func NewConstant(value constant.Value, constantType types.Type, source ast.Node) *Constant {
 	constantValue := value
 	if value == nil {
-		switch soleTypeKind(typ) {
+		switch soleTypeKind(constantType) {
 		case types.IsBoolean:
 			constantValue = constant.MakeBool(false)
 		case types.IsInteger:
@@ -86,8 +86,8 @@ func NewConstant(value constant.Value, typ types.Type, source ast.Node) *Constan
 		}
 	}
 	irConstant := &Constant{
-		typ:   typ,
-		Value: constantValue,
+		valueType: constantType,
+		Value:     constantValue,
 	}
 	irConstant.setSource(source)
 	return irConstant
@@ -101,8 +101,8 @@ func intConstant(index int64, source ast.Node) *Constant {
 
 // nilConst returns a nil constant of the specified type, which may
 // be any reference type, including interfaces.
-func nilConstant(typ types.Type, source ast.Node) *Constant {
-	return NewConstant(nil, typ, source)
+func nilConstant(constantType types.Type, source ast.Node) *Constant {
+	return NewConstant(nil, constantType, source)
 }
 
 // stringConst returns a 'string' constant that evaluates to `text`.
@@ -118,18 +118,18 @@ func zeroConstant(resolvedType types.Type, source ast.Node) *Constant {
 func (irConstant *Constant) RelativeString(from *types.Package) string {
 	var valueText string
 	if irConstant.Value == nil {
-		switch irConstant.typ.(type) {
+		switch irConstant.valueType.(type) {
 		case *types.Array, *types.Struct:
 			valueText = "{}"
 		case *types.Alias:
-			switch irConstant.typ.Underlying().(type) {
+			switch irConstant.valueType.Underlying().(type) {
 			case *types.Array, *types.Struct:
 				valueText = "{}"
 			default:
-				valueText, _ = zeroString(types.Unalias(irConstant.typ), types.RelativeTo(from))
+				valueText, _ = zeroString(types.Unalias(irConstant.valueType), types.RelativeTo(from))
 			}
 		default:
-			valueText, _ = zeroString(irConstant.typ, types.RelativeTo(from))
+			valueText, _ = zeroString(irConstant.valueType, types.RelativeTo(from))
 		}
 	} else if irConstant.Value.Kind() == constant.String {
 		value := constant.StringVal(irConstant.Value)
@@ -154,7 +154,7 @@ func (irConstant *Constant) String() string {
 }
 
 func (irConstant *Constant) Type() types.Type {
-	return irConstant.typ
+	return irConstant.valueType
 }
 
 func (irConstant *Constant) Referrers() *[]Instruction {
@@ -165,7 +165,7 @@ func (irConstant *Constant) Parent() *Function { return nil }
 
 // IsNil returns true if this constant represents a typed or untyped nil value.
 func (irConstant *Constant) IsNil() bool {
-	return irConstant.Value == nil && nillable(irConstant.typ)
+	return irConstant.Value == nil && nillable(irConstant.valueType)
 }
 
 // nillable reports whether *new(T) == nil is legal for type T.

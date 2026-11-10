@@ -72,7 +72,7 @@ func checkComparison(context *rule.Context, node ast.Node, _ []ast.Node) {
 	swapped := &bytes.Buffer{}
 	// The pattern's NodeToAST sets the expression's operands and operator by name and leaves its operator's position
 	// unset, which the printer reads when it decides where to break a line, so the port leaves it unset too.
-	printError := format.Node(swapped, context.Fset, &ast.BinaryExpr{X: right, Op: comparison.Op, Y: left})
+	printError := format.Node(swapped, context.FileSet, &ast.BinaryExpr{X: right, Op: comparison.Op, Y: left})
 	if printError != nil {
 		// Invariant: go/format prints any expression the parser built into a buffer, which never fails to take a
 		// write, so an error is a fault in the printer, and the dispatcher's recover makes it this rule's crash on

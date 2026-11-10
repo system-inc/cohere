@@ -59,7 +59,7 @@ func run(pass *analysis.Pass) (any, error) {
 			if function.Body == nil {
 				return
 			}
-			if _, isFunc := pass.TypesInfo.Defs[function.Name].(*types.Func); !isFunc {
+			if _, isFunction := pass.TypesInfo.Defs[function.Name].(*types.Func); !isFunction {
 				return
 			}
 			graph = graphs.FuncDecl(function)

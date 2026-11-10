@@ -58,7 +58,7 @@ var mustOutsideInitializationMessage = policy.MessageOf(Name, "mustOutsideInitia
 func judgeFile(context *rule.Context, file *ast.File) {
 	// The file's own name, not one a //line directive gives it: a test's panic and Must calls fail one test, not a
 	// running program, so test files are not judged.
-	if strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
+	if strings.HasSuffix(context.FileSet.PositionFor(file.Package, false).Filename, "_test.go") {
 		return
 	}
 	indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)

@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 - `TypeAlias`(flow)
 - `TSTypeAliasDeclaration`(TypeScript)
 */
-func printTypeAlias(path *Path, options *Options, print PrintFunc) Doc {
+func printTypeAlias(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parts := concatIn(path, printDeclareToken(path),
 		doc.Text("type "),

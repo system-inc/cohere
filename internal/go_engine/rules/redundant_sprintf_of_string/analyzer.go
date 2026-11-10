@@ -81,7 +81,7 @@ func Check(context *rule.Context, call *ast.CallExpr, stack []ast.Node) {
 	// Each binding holds its argument without the parentheses the pattern looks through, and the fixes build on that.
 	argument := ast.Unparen(call.Args[1])
 	// A named constant whose value is "%s" is the format too, as code.ExprToString reads any constant.
-	if format, isString := staticcheck_code.ExprToString(context, ast.Unparen(call.Args[0])); !isString ||
+	if format, isString := staticcheck_code.ExpressionToString(context, ast.Unparen(call.Args[0])); !isString ||
 		format != "%s" {
 		return
 	}
@@ -119,7 +119,7 @@ func Check(context *rule.Context, call *ast.CallExpr, stack []ast.Node) {
 		// The original filters no generated file for this finding, where it filters them for the other three.
 		staticcheck_report.Report(context, call, "should use String() instead of fmt.Sprintf",
 			staticcheck_report.Fixes(edit.Fix("Replace with call to String method",
-				edit.ReplaceWithNode(context.Fset, call, stringCall))))
+				edit.ReplaceWithNode(context.FileSet, call, stringCall))))
 	case types.Unalias(argumentType) == types.Universe.Lookup("string").Type():
 		fixes := []analysis.SuggestedFix{}
 		// The argument alone, as a statement, is a value evaluated and not used, and after go or defer no call at
@@ -131,7 +131,7 @@ func Check(context *rule.Context, call *ast.CallExpr, stack []ast.Node) {
 				replacement = &ast.ParenExpr{X: argument}
 			}
 			fixes = append(fixes, edit.Fix("Remove unnecessary call to fmt.Sprintf",
-				edit.ReplaceWithNode(context.Fset, call, replacement)))
+				edit.ReplaceWithNode(context.FileSet, call, replacement)))
 		}
 		staticcheck_report.Report(context, call,
 			"the argument is already a string, there's no need to use fmt.Sprintf",
@@ -170,16 +170,16 @@ func conversionFixes(
 	}
 	conversion := &ast.CallExpr{Fun: &ast.Ident{Name: "string"}, Args: []ast.Expr{argument}}
 	return []analysis.SuggestedFix{
-		edit.Fix("Replace with conversion to string", edit.ReplaceWithNode(context.Fset, call, conversion)),
+		edit.Fix("Replace with conversion to string", edit.ReplaceWithNode(context.FileSet, call, conversion)),
 	}
 }
 
-// isFormatter is whether a value of typ has a method Format of two parameters and no results, which fmt calls for
-// every verb. It is the original's isFormatter, which reads typ's method set from the intermediate representation's
-// cache, typeutil.MethodSetCache, whose answer for any type is types.NewMethodSet's, an alias looked through either
-// way. The parameters' types go unchecked, as the original leaves them.
-func isFormatter(typ types.Type) bool {
-	selection := types.NewMethodSet(typ).Lookup(nil, "Format")
+// isFormatter is whether a value of valueType has a method Format of two parameters and no results, which fmt calls
+// for every verb. It is the original's isFormatter, which reads valueType's method set from the intermediate
+// representation's cache, typeutil.MethodSetCache, whose answer for any type is types.NewMethodSet's, an alias looked
+// through either way. The parameters' types go unchecked, as the original leaves them.
+func isFormatter(valueType types.Type) bool {
+	selection := types.NewMethodSet(valueType).Lookup(nil, "Format")
 	if selection == nil {
 		return false
 	}

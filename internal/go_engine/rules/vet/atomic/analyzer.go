@@ -119,9 +119,9 @@ func checkAtomicAddAssignment(context *rule.Context, left ast.Expr, call *ast.Ca
 	}
 	broken := false
 	if addressOf, isUnary := call.Args[0].(*ast.UnaryExpr); isUnary && addressOf.Op == token.AND {
-		broken = formatted(context.Fset, left) == formatted(context.Fset, addressOf.X)
+		broken = formatted(context.FileSet, left) == formatted(context.FileSet, addressOf.X)
 	} else if dereference, isStar := left.(*ast.StarExpr); isStar {
-		broken = formatted(context.Fset, dereference.X) == formatted(context.Fset, call.Args[0])
+		broken = formatted(context.FileSet, dereference.X) == formatted(context.FileSet, call.Args[0])
 	}
 	if broken {
 		context.ReportRangef(left, "direct assignment to atomic value")

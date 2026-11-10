@@ -5,7 +5,7 @@ package compose
 
 import "github.com/system-inc/cohere/internal/format/yaml/cst"
 
-func composeDoc(options Options, directives *Directives, token *cst.Token, onError onErrorFunc) *Document {
+func composeDoc(options Options, directives *Directives, token *cst.Token, onError onErrorFunction) *Document {
 	offset, start, value, end := token.Offset, token.Start, token.Value, token.End
 	doc := newDocument(directives, options)
 	composition := &composeContext{
@@ -53,7 +53,7 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 	return doc
 }
 
-func composeNode(composition *composeContext, token *cst.Token, properties properties, onError onErrorFunc) *Node {
+func composeNode(composition *composeContext, token *cst.Token, properties properties, onError onErrorFunction) *Node {
 	atKey := composition.atKey
 	spaceBefore, comment, anchor, tag := properties.spaceBefore, properties.comment, properties.anchor, properties.tag
 	var node *Node
@@ -120,7 +120,7 @@ func composeCollectionCatching(
 	composition *composeContext,
 	token *cst.Token,
 	properties properties,
-	onError onErrorFunc,
+	onError onErrorFunction,
 ) (node *Node) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -151,7 +151,7 @@ func composeEmptyNode(
 	offset int,
 	before []*cst.Token,
 	properties properties,
-	onError onErrorFunc,
+	onError onErrorFunction,
 ) *Node {
 	token := &cst.Token{
 		Type:   "scalar",
@@ -176,7 +176,7 @@ func composeEmptyNode(
 	return node
 }
 
-func composeAlias(composition *composeContext, token *cst.Token, onError onErrorFunc) *Node {
+func composeAlias(composition *composeContext, token *cst.Token, onError onErrorFunction) *Node {
 	offset, source, end := token.Offset, token.Source, token.End
 	alias := newAlias(unitsToString(substring(source, 1, len(source))))
 	if alias.Source == "" {

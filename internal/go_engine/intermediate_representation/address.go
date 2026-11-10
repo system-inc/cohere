@@ -7,7 +7,7 @@ import (
 
 // An address is an lvalue represented by a true pointer.
 type address struct {
-	addr Value // must have a pointer core type.
+	pointer Value // must have a pointer core type.
 
 	// expression is the syntax of the value (not the address), for the debug references a package built with
 	// SetDebugMode records; nil where there is none.
@@ -15,11 +15,11 @@ type address struct {
 }
 
 func (address *address) load(function *Function, source ast.Node) Value {
-	return emitLoad(function, address.addr, source)
+	return emitLoad(function, address.pointer, source)
 }
 
 func (address *address) store(function *Function, value Value, source ast.Node) {
-	store := emitStore(function, address.addr, value, source)
+	store := emitStore(function, address.pointer, value, source)
 	if address.expression != nil {
 		// store.Value is value, converted for assignability.
 		emitDebugReference(function, address.expression, store.Value, false)
@@ -28,11 +28,11 @@ func (address *address) store(function *Function, value Value, source ast.Node) 
 
 func (address *address) address(function *Function) Value {
 	if address.expression != nil {
-		emitDebugReference(function, address.expression, address.addr, true)
+		emitDebugReference(function, address.expression, address.pointer, true)
 	}
-	return address.addr
+	return address.pointer
 }
 
-func (address *address) typ() types.Type {
-	return deref(address.addr.Type())
+func (address *address) storedType() types.Type {
+	return dereference(address.pointer.Type())
 }

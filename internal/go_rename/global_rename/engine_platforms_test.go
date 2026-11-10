@@ -49,7 +49,7 @@ func TestOnlyAPlatformARenameReachesIsLoaded(test *testing.T) {
 
 	loader, counts := countingLoader(loaded)
 	untouched := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunc, NewName: "ParseUrl"},
+		target{PackageSuffix: "internal/a", Name: "ParseURL", Kind: KindFunction, NewName: "ParseUrl"},
 	), Options{LoadPlatform: loader})
 	requireAccepted(test, untouched, 1)
 	if len(counts) != 0 || len(untouched.Platforms()) != 0 {
@@ -57,7 +57,7 @@ func TestOnlyAPlatformARenameReachesIsLoaded(test *testing.T) {
 	}
 
 	reaching := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "internal/b", Name: "FormatURL", Kind: KindFunc, NewName: "FormatUrl"},
+		target{PackageSuffix: "internal/b", Name: "FormatURL", Kind: KindFunction, NewName: "FormatUrl"},
 	), Options{LoadPlatform: loader})
 	requireAccepted(test, reaching, 1)
 	if counts["windows/amd64"] != 1 || len(counts) != 1 || len(reaching.TwinEdits) != 1 ||
@@ -73,7 +73,7 @@ func TestRequireSoundPlatformsRefusesWhatAPlatformCannotType(test *testing.T) {
 	test.Parallel()
 	fixture := platformFixture(test, "package b\n\nvar broken int = FormatURL()\n")
 	loaded := fixture.load(test)
-	formatUrl := target{PackageSuffix: "internal/b", Name: "FormatURL", Kind: KindFunc, NewName: "FormatUrl"}
+	formatUrl := target{PackageSuffix: "internal/b", Name: "FormatURL", Kind: KindFunction, NewName: "FormatUrl"}
 
 	strict := Plan(loaded, propose(test, loaded, formatUrl), Options{RequireSoundPlatforms: true})
 	requireRefused(test, strict, "FormatURL", "platform")
@@ -94,7 +94,7 @@ func TestAPlatformThatDoesNotLoadIsAMismatch(test *testing.T) {
 	fixture := platformFixture(test, "package b\n\nfunc windowsOnly() string { return FormatURL() }\n")
 	loaded := fixture.load(test)
 	result := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "internal/b", Name: "FormatURL", Kind: KindFunc, NewName: "FormatUrl"},
+		target{PackageSuffix: "internal/b", Name: "FormatURL", Kind: KindFunction, NewName: "FormatUrl"},
 	), Options{})
 	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
 	failing := Options{LoadPlatform: func(workspace.Platform, map[string][]byte) (*workspace.PlatformLoad, error) {
@@ -126,7 +126,7 @@ func windowsPlan(
 ) (*Result, map[string][]byte) {
 	test.Helper()
 	result := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "internal/b", Name: name, Kind: KindFunc, NewName: newName},
+		target{PackageSuffix: "internal/b", Name: name, Kind: KindFunction, NewName: newName},
 	), options)
 	requireAccepted(test, result, 1)
 	files, rewriteError := RewrittenFiles(result)

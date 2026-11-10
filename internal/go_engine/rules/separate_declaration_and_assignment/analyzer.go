@@ -121,7 +121,7 @@ func checkStatements(context *rule.Context, holder ast.Node, statements []ast.St
 			"should merge variable declaration with assignment on next line",
 			staticcheck_report.FilterGenerated(),
 			staticcheck_report.Fixes(edit.Fix("Merge declaration with assignment",
-				edit.ReplaceWithNode(context.Fset, edit.Range{declaration.Pos(), assignment.End()}, merged))))
+				edit.ReplaceWithNode(context.FileSet, edit.Range{declaration.Pos(), assignment.End()}, merged))))
 	}
 }
 

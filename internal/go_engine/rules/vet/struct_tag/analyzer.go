@@ -205,9 +205,9 @@ func checkTagDuplicates(
 	}
 	// The other position is named relative to this field's directory, without its column, so the message is
 	// unambiguous even when the two fields sit in different packages and directories through embedding.
-	also := context.Fset.Position(claimedAt)
+	also := context.FileSet.Position(claimedAt)
 	also.Column = 0
-	relative, relativeError := filepath.Rel(filepath.Dir(context.Fset.Position(field.Pos()).Filename), also.Filename)
+	relative, relativeError := filepath.Rel(filepath.Dir(context.FileSet.Position(field.Pos()).Filename), also.Filename)
 	// Rel fails only when one path is absolute and the other is not, which a loaded package's files never are, and
 	// then the file name is left as it is, as the original leaves it.
 	if relativeError == nil {

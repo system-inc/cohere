@@ -56,46 +56,46 @@ func DecodeNoConfusingVoidExpressionOptions(raw []byte) (NoConfusingVoidExpressi
 	return settings, nil
 }
 
-var messageInvalidVoidExpr = rule.Message{
+var messageInvalidVoidExpression = rule.Message{
 	Id: "invalidVoidExpr",
 	Description: "Placing a void expression inside another expression is forbidden. Move it to " +
 		"its own statement instead. A void expression evaluates to undefined, so whatever this " +
 		"outer expression does with the value is working on undefined rather than on a result.",
 }
 
-var messageInvalidVoidExprArrow = rule.Message{
+var messageInvalidVoidExpressionArrow = rule.Message{
 	Id: "invalidVoidExprArrow",
 	Description: "Returning a void expression from an arrow function shorthand is forbidden. " +
 		"Please add braces to the arrow function. The concise body makes the arrow return " +
 		"undefined, which reads as deliberate when it is usually an accident of the syntax.",
 }
 
-var messageInvalidVoidExprArrowWrapVoid = rule.Message{
+var messageInvalidVoidExpressionArrowWrapVoid = rule.Message{
 	Id: "invalidVoidExprArrowWrapVoid",
 	Description: "Void expressions returned from an arrow function shorthand must be marked " +
 		"explicitly with the `void` operator, so a reader can see the discard was intended.",
 }
 
-var messageInvalidVoidExprReturn = rule.Message{
+var messageInvalidVoidExpressionReturn = rule.Message{
 	Id: "invalidVoidExprReturn",
 	Description: "Returning a void expression from a function is forbidden. Please move it " +
 		"before the `return` statement. Returning it says the value matters when it is undefined.",
 }
 
-var messageInvalidVoidExprReturnLast = rule.Message{
+var messageInvalidVoidExpressionReturnLast = rule.Message{
 	Id: "invalidVoidExprReturnLast",
 	Description: "Returning a void expression from a function is forbidden. Please remove the " +
 		"`return` statement. It is the last statement, so the return adds nothing but the " +
 		"suggestion that a value comes back.",
 }
 
-var messageInvalidVoidExprReturnWrapVoid = rule.Message{
+var messageInvalidVoidExpressionReturnWrapVoid = rule.Message{
 	Id: "invalidVoidExprReturnWrapVoid",
 	Description: "Void expressions returned from a function must be marked explicitly with the " +
 		"`void` operator, so a reader can see the discard was intended.",
 }
 
-var messageInvalidVoidExprWrapVoid = rule.Message{
+var messageInvalidVoidExpressionWrapVoid = rule.Message{
 	Id: "invalidVoidExprWrapVoid",
 	Description: "Void expressions used inside another expression must be moved to their own " +
 		"statement or marked explicitly with the `void` operator.",
@@ -218,7 +218,7 @@ func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 			return
 		}
 		if settings.IgnoreVoidOperator {
-			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprArrowWrapVoid,
+			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExpressionArrowWrapVoid,
 				noConfusingVoidExpressionWrapFix(ruleContext, node))
 			return
 		}
@@ -228,11 +228,11 @@ func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 		// is attached to the first finding for a given arrow and withheld from the rest.
 		fix, fixable := noConfusingVoidExpressionArrowFix(ruleContext, invalidAncestor)
 		if !fixable || repairedArrows[invalidAncestor] {
-			ruleContext.ReportNode(node, messageInvalidVoidExprArrow)
+			ruleContext.ReportNode(node, messageInvalidVoidExpressionArrow)
 			return
 		}
 		repairedArrows[invalidAncestor] = true
-		ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprArrow, fix...)
+		ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExpressionArrow, fix...)
 		return
 	}
 
@@ -244,32 +244,32 @@ func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 			}
 		}
 		if settings.IgnoreVoidOperator {
-			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprReturnWrapVoid,
+			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExpressionReturnWrapVoid,
 				noConfusingVoidExpressionWrapFix(ruleContext, node))
 			return
 		}
 		if isConfusingVoidFinalReturn(invalidAncestor) {
 			fix, fixable := noConfusingVoidExpressionReturnFix(ruleContext, invalidAncestor, true)
 			if !fixable {
-				ruleContext.ReportNode(node, messageInvalidVoidExprReturnLast)
+				ruleContext.ReportNode(node, messageInvalidVoidExpressionReturnLast)
 				return
 			}
-			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprReturnLast, fix)
+			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExpressionReturnLast, fix)
 			return
 		}
 		fix, fixable := noConfusingVoidExpressionReturnFix(ruleContext, invalidAncestor, false)
 		if !fixable {
-			ruleContext.ReportNode(node, messageInvalidVoidExprReturn)
+			ruleContext.ReportNode(node, messageInvalidVoidExpressionReturn)
 			return
 		}
-		ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprReturn, fix)
+		ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExpressionReturn, fix)
 		return
 	}
 
 	if settings.IgnoreVoidOperator {
 		// A suggestion rather than a fix upstream, and the distinction is the port: wrapping in
 		// `void` changes what the expression means to a reader, so a human chooses it.
-		ruleContext.ReportNodeWithSuggestions(node, messageInvalidVoidExprWrapVoid, rule.Suggestion{
+		ruleContext.ReportNodeWithSuggestions(node, messageInvalidVoidExpressionWrapVoid, rule.Suggestion{
 			Message: rule.Message{
 				Id:          "voidExprWrapVoid",
 				Description: "Mark with an explicit `void` operator.",
@@ -279,7 +279,7 @@ func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 		return
 	}
 
-	ruleContext.ReportNode(node, messageInvalidVoidExpr)
+	ruleContext.ReportNode(node, messageInvalidVoidExpression)
 }
 
 // findConfusingVoidInvalidAncestor climbs to the first ancestor that decides the position, or nil

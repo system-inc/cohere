@@ -64,7 +64,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	// the package runtime_test, in a file whose base name is map_test.go. It reads the name a position displays, so
 	// a line directive naming map_test.go is skipped there too, and one naming another file in map_test.go is not.
 	if context.Package.Path() == "runtime_test" &&
-		filepath.Base(context.Fset.Position(call.Pos()).Filename) == "map_test.go" {
+		filepath.Base(context.FileSet.Position(call.Pos()).Filename) == "map_test.go" {
 		return
 	}
 	// `(Builtin "make")` is the universe's make, named by an identifier parenthesized or not; a make the code

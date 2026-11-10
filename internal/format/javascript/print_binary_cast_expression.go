@@ -7,7 +7,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 // printBinaryCastExpression is upstream's printBinaryCastExpression. Upstream's isFlowAsConstExpression
 // branch (Flow's AsConstExpression prints "const") is Flow-only; TSAsExpression and
 // TSSatisfiesExpression always print their typeAnnotation.
-func printBinaryCastExpression(path *Path, options *Options, print PrintFunc) Doc {
+func printBinaryCastExpression(path *Path, options *Options, print PrintFunction) Doc {
 	parent := parentOf(path)
 	current := node(path)
 	key := keyOf(path)

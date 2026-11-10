@@ -12,7 +12,7 @@ import (
 // no space between a keyword and its `(`, `else`, `catch` and `finally` on their own lines.
 
 // printIfStatement is upstream's printIfStatement.
-func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printIfStatement(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	opening := groupIn(path, concatIn(path, // @system-inc: no space between `if` and `(`.
 		doc.Text("if("),
@@ -50,7 +50,7 @@ func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printForStatement is upstream's printForStatement.
-func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printForStatement(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	body := printClause(path, options, print, "body")
 
@@ -98,7 +98,7 @@ func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printForXStatement is upstream's printForXStatement.
-func printForXStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printForXStatement(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	isForOfStatement := current.Is("ForOfStatement")
 	await, keyword := "", "in"
@@ -123,7 +123,7 @@ func printForXStatement(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printWhileStatement is upstream's printWhileStatement.
-func printWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printWhileStatement(path *Path, options *Options, print PrintFunction) Doc {
 	keyword := "while"
 	if node(path).Is("WithStatement") {
 		keyword = "with"
@@ -138,7 +138,7 @@ func printWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printDoWhileStatement is upstream's printDoWhileStatement.
-func printDoWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printDoWhileStatement(path *Path, options *Options, print PrintFunction) Doc {
 	var separator Doc = hardline
 	if node(path).Child("body").Is("BlockStatement") {
 		separator = concatIn(path, doc.Text(" "))
@@ -154,7 +154,7 @@ func printDoWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printTryStatement is upstream's printTryStatement.
-func printTryStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printTryStatement(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	var handler Doc = emptyDoc
 	var finalizer Doc = emptyDoc
@@ -170,7 +170,7 @@ func printTryStatement(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printCatchClause is upstream's printCatchClause.
-func printCatchClause(path *Path, options *Options, print PrintFunc) Doc {
+func printCatchClause(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	if parameter := current.Child("param"); parameter != nil {
 		text := options.OriginalText
@@ -200,7 +200,7 @@ func printCatchClause(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printSwitchStatement is upstream's printSwitchStatement.
-func printSwitchStatement(path *Path, options *Options, print PrintFunc) Doc {
+func printSwitchStatement(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	var cases Doc
 	if len(current.List("cases")) > 0 {
@@ -229,7 +229,7 @@ func printSwitchStatement(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printSwitchCase is upstream's printSwitchCase.
-func printSwitchCase(path *Path, options *Options, print PrintFunc) Doc {
+func printSwitchCase(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	var parts []Doc
 	if current.Child("test") != nil {
@@ -275,7 +275,7 @@ func shouldPrintLeadingHardline(node Node, options *Options) bool {
 
 // printClause is upstream's printClause, exported upstream as printDoWhileStatementBody,
 // printForXStatementBody and printWhileStatementBody.
-func printClause(path *Path, options *Options, print PrintFunc, property string) Doc {
+func printClause(path *Path, options *Options, print PrintFunction, property string) Doc {
 	return call(path, func(path *Path) Doc {
 		current := node(path)
 		printed := print("", nil)
@@ -301,11 +301,11 @@ func printClause(path *Path, options *Options, print PrintFunc, property string)
 }
 
 // printIfStatementConsequent is upstream's printIfStatementConsequent.
-func printIfStatementConsequent(path *Path, options *Options, print PrintFunc) Doc {
+func printIfStatementConsequent(path *Path, options *Options, print PrintFunction) Doc {
 	return printClause(path, options, print, "consequent")
 }
 
 // printIfStatementAlternate is upstream's printIfStatementAlternate.
-func printIfStatementAlternate(path *Path, options *Options, print PrintFunc) Doc {
+func printIfStatementAlternate(path *Path, options *Options, print PrintFunction) Doc {
 	return printClause(path, options, print, "alternate")
 }

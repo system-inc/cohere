@@ -31,7 +31,7 @@ func isMethodValue(path *Path) bool {
 - `TSDeclareFunction`(TypeScript)
 */
 // printFunction is upstream's printFunction.
-func printFunction(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printFunction(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	if isMethodValue(path) {
 		return printMethodValue(path, options, print)
 	}
@@ -133,7 +133,7 @@ func printFunction(path *Path, options *Options, print PrintFunc, arguments *pri
 - `TSDeclareMethod` (TypeScript)
 */
 // printMethod is upstream's printMethod.
-func printMethod(path *Path, options *Options, print PrintFunc) Doc {
+func printMethod(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	kind := current.String("kind")
 	// upstream's node.value || node
@@ -194,7 +194,7 @@ func printMethod(path *Path, options *Options, print PrintFunc) Doc {
 - `TSEmptyBodyFunctionExpression` (TypeScript)
 */
 // printMethodValue is upstream's printMethodValue.
-func printMethodValue(path *Path, options *Options, print PrintFunc) Doc {
+func printMethodValue(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parametersDoc := printFunctionParameters(path, options, print, false, false)
 	returnTypeDoc := printReturnType(path, print)
@@ -258,7 +258,7 @@ func shouldPrintParamsWithoutParens(path *Path, options *Options) bool {
 }
 
 // printReturnType is upstream's printReturnType.
-func printReturnType(path *Path, print PrintFunc) Doc {
+func printReturnType(path *Path, print PrintFunction) Doc {
 	current := node(path)
 	returnType := printTypeAnnotationProperty(path, print, "returnType")
 

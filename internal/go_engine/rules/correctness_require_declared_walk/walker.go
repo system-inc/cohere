@@ -42,8 +42,8 @@ func (walker *walker) collect() {
 			if !isFunction || functionDeclaration.Body == nil {
 				continue
 			}
-			object, isFunc := walker.pass.TypesInfo.Defs[functionDeclaration.Name].(*types.Func)
-			if !isFunc {
+			object, isDefinedFunction := walker.pass.TypesInfo.Defs[functionDeclaration.Name].(*types.Func)
+			if !isDefinedFunction {
 				continue
 			}
 			signature := object.Signature()

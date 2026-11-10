@@ -31,7 +31,7 @@ func namingCheck(context *rule.Context, function *intermediate_representation.Fu
 	context.Report(analysis.Diagnostic{
 		Pos: function.Pos(),
 		Message: fmt.Sprintf("%s in %s, line %d", function.Name(), context.Package.Name(),
-			context.Fset.Position(function.Pos()).Line),
+			context.FileSet.Position(function.Pos()).Line),
 	})
 }
 
@@ -112,7 +112,7 @@ func TestIsGeneratedReadsStaticchecksJudgment(test *testing.T) {
 	judging := NewSyntax().RuleAnalyzer(rule.Namespace+"judging", "judging", "records each file's judgment",
 		&rule.Listener{
 			FileEnter: func(context *rule.Context, file *ast.File) {
-				filename := context.Fset.PositionFor(file.Pos(), false).Filename
+				filename := context.FileSet.PositionFor(file.Pos(), false).Filename
 				judged[filepath.Base(filename)] = context.IsGenerated(filename)
 			},
 		})

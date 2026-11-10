@@ -7,9 +7,9 @@ type plan struct {
 	// openLine is the line of the opening bracket, or of the chain's first operand.
 	openLine int
 	breaks   []breakPoint
-	// lastFuncLiteral is set when the last element is a function literal spanning lines, a call people
+	// lastFunctionLiteral is set when the last element is a function literal spanning lines, a call people
 	// rarely want exploded one argument per line.
-	lastFuncLiteral bool
+	lastFunctionLiteral bool
 }
 
 func (plan plan) edits() []edit {

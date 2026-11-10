@@ -27,7 +27,7 @@ Token *before* `(TS)TypeAnnotation.typeAnnotation` should be printed in `getType
 // "typeAnnotation"). Go has no default parameters, so the property name is an optional trailing
 // argument. Upstream's typeAnnotationNodesCheckedLeadingComments WeakSet only feeds a development
 // assertion in printTypeAnnotation, so it is not ported.
-func printTypeAnnotationProperty(path *Path, print PrintFunc, property ...string) Doc {
+func printTypeAnnotationProperty(path *Path, print PrintFunction, property ...string) Doc {
 	propertyName := "typeAnnotation"
 	if len(property) > 0 {
 		propertyName = property[0]
@@ -104,7 +104,7 @@ func getTypeAnnotationFirstToken(path *Path) string {
 // printTypeAnnotation is upstream's printTypeAnnotation. We need print space before leading comments,
 // `printTypeAnnotationProperty` is responsible for it. Upstream's development-only check that the node
 // went through printTypeAnnotationProperty is not ported.
-func printTypeAnnotation(path *Path, options *Options, print PrintFunc) Doc {
+func printTypeAnnotation(path *Path, options *Options, print PrintFunction) Doc {
 	token := getTypeAnnotationFirstToken(path)
 	if token != "" {
 		return concatIn(path, textDoc(token), doc.Text(" "), print("typeAnnotation", nil))

@@ -259,8 +259,8 @@ func queryArgumentIndex(context *rule.Context, call *ast.CallExpr) (int, bool) {
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return 0, false
 	}
-	method, isFunc := selection.Obj().(*types.Func)
-	if !isFunc || method.Pkg() == nil || method.Pkg().Path() != "database/sql" {
+	method, isFunction := selection.Obj().(*types.Func)
+	if !isFunction || method.Pkg() == nil || method.Pkg().Path() != "database/sql" {
 		return 0, false
 	}
 	argumentIndex, isQueryMethod := queryArgumentIndexes[method.Name()]
@@ -354,8 +354,8 @@ func readFormat(format string) ([]string, []verb, bool) {
 
 // isSprintf is whether call calls fmt.Sprintf, by its object, so a function of that name elsewhere never counts.
 func isSprintf(context *rule.Context, call *ast.CallExpr) bool {
-	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
-	return isFunc && function.Pkg() != nil && function.Pkg().Path() == "fmt" && function.Name() == "Sprintf"
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	return isFunction && function.Pkg() != nil && function.Pkg().Path() == "fmt" && function.Name() == "Sprintf"
 }
 
 // isString is whether candidate is a string type, a named one included.

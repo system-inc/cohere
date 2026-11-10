@@ -24,7 +24,7 @@ var functionConstructorMethods = map[string]bool{
 	"call":  true,
 }
 
-// NoNewFunc flags building a function from a string through the `Function` constructor.
+// NoFunctionConstructor flags building a function from a string through the `Function` constructor.
 //
 //	valid:   var a = new _function("b", "c", "return b+c");
 //	valid:   class Function {}; new Function()
@@ -78,7 +78,7 @@ var functionConstructorMethods = map[string]bool{
 // Upstream additionally requires `variable.defs.length === 0`, which excludes a global that source
 // redeclares. That is the same judgment from the other side and `resolvesToAGlobal` answers it
 // alike, since a redeclaration in source puts a non-declaration-file declaration on the symbol.
-var NoNewFunc = rule.Rule[rule.NoOptions]{
+var NoFunctionConstructor = rule.Rule[rule.NoOptions]{
 	Name: "no-new-func",
 
 	// See the doc above: the whole discrimination is whether `Function` is the global or a local

@@ -527,8 +527,8 @@ func commandMethod(context *rule.Context, selector *ast.SelectorExpr) string {
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return ""
 	}
-	method, isFunc := selection.Obj().(*types.Func)
-	if !isFunc {
+	method, isFunction := selection.Obj().(*types.Func)
+	if !isFunction {
 		return ""
 	}
 	receiver := method.Signature().Recv()

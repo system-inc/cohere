@@ -11,7 +11,7 @@ import (
 // src/language-yaml/print/mapping-item.js.
 
 // printMappingItem is upstream's printMappingItem, for block and flow mapping items.
-func printMappingItem(path *astPath, options *options, print printFunc) doc.Doc {
+func printMappingItem(path *astPath, options *options, print printFunction) doc.Doc {
 	node := currentNode(path)
 	parent := parentNode(path)
 	settings := settingsOf(options)

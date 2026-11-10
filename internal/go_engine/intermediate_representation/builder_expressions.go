@@ -18,35 +18,39 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )
 
-// cond emits to fn code to evaluate boolean condition `expr` and jump
+// condition emits to fn code to evaluate boolean condition `expression` and jump
 // to t or f depending on its value, performing various simplifications.
 //
 // Postcondition: fn.currentBlock is nil.
 //
 // Mutates: function gains the blocks of the condition, and its current block moves into them
-func (packageBuilder *builder) cond(function *Function, expr ast.Expr, trueBlock, falseBlock *BasicBlock) *If {
-	switch typed := expr.(type) {
+func (packageBuilder *builder) condition(
+	function *Function,
+	expression ast.Expr,
+	trueBlock, falseBlock *BasicBlock,
+) *If {
+	switch typed := expression.(type) {
 	case *ast.ParenExpr:
-		return packageBuilder.cond(function, typed.X, trueBlock, falseBlock)
+		return packageBuilder.condition(function, typed.X, trueBlock, falseBlock)
 
 	case *ast.BinaryExpr:
 		switch typed.Op {
 		case token.LAND:
 			ltrue := function.newBasicBlock("cond.true")
-			packageBuilder.cond(function, typed.X, ltrue, falseBlock)
+			packageBuilder.condition(function, typed.X, ltrue, falseBlock)
 			function.currentBlock = ltrue
-			return packageBuilder.cond(function, typed.Y, trueBlock, falseBlock)
+			return packageBuilder.condition(function, typed.Y, trueBlock, falseBlock)
 
 		case token.LOR:
 			lfalse := function.newBasicBlock("cond.false")
-			packageBuilder.cond(function, typed.X, trueBlock, lfalse)
+			packageBuilder.condition(function, typed.X, trueBlock, lfalse)
 			function.currentBlock = lfalse
-			return packageBuilder.cond(function, typed.Y, trueBlock, falseBlock)
+			return packageBuilder.condition(function, typed.Y, trueBlock, falseBlock)
 		}
 
 	case *ast.UnaryExpr:
 		if typed.Op == token.NOT {
-			return packageBuilder.cond(function, typed.X, falseBlock, trueBlock)
+			return packageBuilder.condition(function, typed.X, falseBlock, trueBlock)
 		}
 	}
 
@@ -56,32 +60,32 @@ func (packageBuilder *builder) cond(function *Function, expr ast.Expr, trueBlock
 	// The value of a constant condition may be platform-specific,
 	// and may cause blocks that are reachable in some configuration
 	// to be hidden from subsequent analyses such as bug-finding tools.
-	return emitIf(function, packageBuilder.expr(function, expr), trueBlock, falseBlock, expr)
+	return emitIf(function, packageBuilder.expression(function, expression), trueBlock, falseBlock, expression)
 }
 
-// logicalBinop emits code to fn to evaluate `expr`, a &&- or
+// logicalBinop emits code to fn to evaluate `expression`, a &&- or
 // ||-expression whose reified boolean value is wanted.
 // The value is returned.
 //
 // Mutates: function gains the blocks of both operands, and its current block moves on to the done block
-func (packageBuilder *builder) logicalBinop(function *Function, expr *ast.BinaryExpr) Value {
+func (packageBuilder *builder) logicalBinop(function *Function, expression *ast.BinaryExpr) Value {
 	rhs := function.newBasicBlock("binop.rhs")
 	done := function.newBasicBlock("binop.done")
 
 	// T(e) = T(e.X) = T(e.Y) after untyped constants have been
 	// eliminated.
 	// That does not hold in every case: MyBool==MyBool yields UntypedBool.
-	resolvedType := function.typeOf(expr)
+	resolvedType := function.typeOf(expression)
 
 	var short Value // value of the short-circuit path
-	switch expr.Op {
+	switch expression.Op {
 	case token.LAND:
-		packageBuilder.cond(function, expr.X, rhs, done)
-		short = NewConstant(constant.MakeBool(false), resolvedType, expr)
+		packageBuilder.condition(function, expression.X, rhs, done)
+		short = NewConstant(constant.MakeBool(false), resolvedType, expression)
 
 	case token.LOR:
-		packageBuilder.cond(function, expr.X, done, rhs)
-		short = NewConstant(constant.MakeBool(true), resolvedType, expr)
+		packageBuilder.condition(function, expression.X, done, rhs)
+		short = NewConstant(constant.MakeBool(true), resolvedType, expression)
 	}
 
 	// Is rhs unreachable?
@@ -95,7 +99,7 @@ func (packageBuilder *builder) logicalBinop(function *Function, expr *ast.Binary
 	if done.Predecessors == nil {
 		// Simplify true&&y (or false||y) to y.
 		function.currentBlock = rhs
-		return packageBuilder.expr(function, expr.Y)
+		return packageBuilder.expression(function, expression.Y)
 	}
 
 	// All edges from e.X to done carry the short-circuit value.
@@ -106,33 +110,33 @@ func (packageBuilder *builder) logicalBinop(function *Function, expr *ast.Binary
 
 	// The edge from e.Y to done carries the value of e.Y.
 	function.currentBlock = rhs
-	edges = append(edges, packageBuilder.expr(function, expr.Y))
-	emitJump(function, done, expr)
+	edges = append(edges, packageBuilder.expression(function, expression.Y))
+	emitJump(function, done, expression)
 	function.currentBlock = done
 
 	phi := &Phi{Edges: edges}
-	phi.typ = resolvedType
-	phi.comment = expr.Op.String()
-	return done.emit(phi, expr)
+	phi.valueType = resolvedType
+	phi.comment = expression.Op.String()
+	return done.emit(phi, expression)
 }
 
-// exprN lowers a multi-result expression `expr` to IR form, emitting code
+// expressionN lowers a multi-result expression `expression` to IR form, emitting code
 // to fn and returning a single Value whose type is a *types.Tuple.
 // The caller must access the components via Extract.
 //
 // Multi-result expressions include CallExprs in a multi-value
 // assignment or return statement, and "value,ok" uses of
 // TypeAssertExpr, IndexExpr (when X is a map), and Receive.
-func (packageBuilder *builder) exprN(function *Function, expr ast.Expr) Value {
-	typ, isTuple := function.typeOf(expr).(*types.Tuple)
+func (packageBuilder *builder) expressionN(function *Function, expression ast.Expr) Value {
+	tuple, isTuple := function.typeOf(expression).(*types.Tuple)
 	if !isTuple {
 		// Invariant: callers pass only multi-result expressions, a call in a multi-value assignment or return or a
 		// comma-ok form, and go/types gives each of those a tuple type.
-		panic(fmt.Sprintf("exprN(%T) in %s: type %s is not a tuple", expr, function, function.typeOf(expr)))
+		panic(fmt.Sprintf("exprN(%T) in %s: type %s is not a tuple", expression, function, function.typeOf(expression)))
 	}
-	switch typed := expr.(type) {
+	switch typed := expression.(type) {
 	case *ast.ParenExpr:
-		return packageBuilder.exprN(function, typed.X)
+		return packageBuilder.expressionN(function, typed.X)
 
 	case *ast.CallExpr:
 		// Currently, no built-in function nor type conversion
@@ -140,7 +144,7 @@ func (packageBuilder *builder) exprN(function *Function, expr ast.Expr) Value {
 		// cases for single-valued CallExpr.
 		var call Call
 		packageBuilder.setCall(function, typed, &call.Call)
-		call.typ = typ
+		call.valueType = tuple
 		return emitCall(function, &call, typed)
 
 	case *ast.IndexExpr:
@@ -150,22 +154,22 @@ func (packageBuilder *builder) exprN(function *Function, expr ast.Expr) Value {
 			panic(fmt.Sprintf("exprN: comma-ok index of %s, not a map", function.typeOf(typed.X)))
 		}
 		lookup := &MapLookup{
-			X:       packageBuilder.expr(function, typed.X),
-			Index:   emitConv(function, packageBuilder.expr(function, typed.Index), mapt.Key(), typed),
+			X:       packageBuilder.expression(function, typed.X),
+			Index:   emitConv(function, packageBuilder.expression(function, typed.Index), mapt.Key(), typed),
 			CommaOk: true,
 		}
-		lookup.setType(typ)
+		lookup.setType(tuple)
 		return function.emit(lookup, typed)
 
 	case *ast.TypeAssertExpr:
-		return emitTypeTest(function, packageBuilder.expr(function, typed.X), typ.At(0).Type(), typed)
+		return emitTypeTest(function, packageBuilder.expression(function, typed.X), tuple.At(0).Type(), typed)
 
 	case *ast.UnaryExpr: // must be receive <-
-		return emitReceive(function, packageBuilder.expr(function, typed.X), true, typ, typed)
+		return emitReceive(function, packageBuilder.expression(function, typed.X), true, tuple, typed)
 	}
 	// Invariant: the multi-result expressions are calls, comma-ok map indexes, type assertions and receives, each
 	// handled above, with parentheses unwrapped.
-	panic(fmt.Sprintf("exprN(%T) in %s", expr, function))
+	panic(fmt.Sprintf("exprN(%T) in %s", expression, function))
 }
 
 // builtin emits to fn IR instructions to implement a call to the
@@ -181,18 +185,18 @@ func (packageBuilder *builder) builtin(
 	function *Function,
 	object *types.Builtin,
 	arguments []ast.Expr,
-	typ types.Type,
+	callType types.Type,
 	source ast.Node,
 ) Value {
-	resultType := function.typ(typ)
+	resultType := function.instantiatedType(callType)
 	switch object.Name() {
 	case "make":
 		switch ct := core_type.Of(resultType).(type) {
 		case *types.Slice:
-			length := packageBuilder.expr(function, arguments[1])
+			length := packageBuilder.expression(function, arguments[1])
 			capacity := length
 			if len(arguments) == 3 {
-				capacity = packageBuilder.expr(function, arguments[2])
+				capacity = packageBuilder.expression(function, arguments[2])
 			}
 			if constantCapacity, ok := capacity.(*Constant); ok {
 				// treat make([]T, n, m) as new([m]T)[:n]
@@ -215,7 +219,7 @@ func (packageBuilder *builder) builtin(
 		case *types.Map:
 			var reserve Value
 			if len(arguments) == 2 {
-				reserve = packageBuilder.expr(function, arguments[1])
+				reserve = packageBuilder.expression(function, arguments[1])
 			}
 			makeMap := &MakeMap{Reserve: reserve}
 			makeMap.setType(resultType)
@@ -224,7 +228,7 @@ func (packageBuilder *builder) builtin(
 		case *types.Chan:
 			var sz Value = intConstant(0, source)
 			if len(arguments) == 2 {
-				sz = packageBuilder.expr(function, arguments[1])
+				sz = packageBuilder.expression(function, arguments[1])
 			}
 			channel := &MakeChannel{Size: sz}
 			channel.setType(resultType)
@@ -235,13 +239,13 @@ func (packageBuilder *builder) builtin(
 		}
 
 	case "new":
-		alloc := emitNew(function, deref(resultType), source, "new")
+		allocation := emitNew(function, dereference(resultType), source, "new")
 		if !function.info.Types[arguments[0]].IsType() {
 			// new(expr), requires go1.26
-			value := packageBuilder.expr(function, arguments[0])
-			emitStore(function, alloc, value, source)
+			value := packageBuilder.expression(function, arguments[0])
+			emitStore(function, allocation, value, source)
 		}
-		return alloc
+		return allocation
 
 	case "len", "cap":
 		// Special case: len or cap of an array or *array is based on the type, not the value which may be nil. We must
@@ -253,16 +257,16 @@ func (packageBuilder *builder) builtin(
 		//
 		// Technically this shouldn't apply to type parameters because their length/capacity is never constant. We still
 		// choose to treat them as constant so that users of the IR get the practically constant length for free.
-		resolvedType := core_type.Of(deref(function.typeOf(arguments[0])))
+		resolvedType := core_type.Of(dereference(function.typeOf(arguments[0])))
 		if at, ok := resolvedType.(*types.Array); ok {
-			packageBuilder.expr(function, arguments[0]) // for effects only
+			packageBuilder.expression(function, arguments[0]) // for effects only
 			return intConstant(at.Len(), arguments[0])
 		}
 		// Otherwise treat as normal.
 
 	case "panic":
 		function.emit(&Panic{
-			X: emitConv(function, packageBuilder.expr(function, arguments[0]), tEface, source),
+			X: emitConv(function, packageBuilder.expression(function, arguments[0]), tEface, source),
 		}, source)
 		function.currentBlock = function.newBasicBlock("unreachable")
 		return vTrue // any non-nil Value will do
@@ -270,12 +274,12 @@ func (packageBuilder *builder) builtin(
 	return nil // treat all others as a regular function call
 }
 
-// addr lowers a single-result addressable expression `expr` to IR form,
+// address lowers a single-result addressable expression `expression` to IR form,
 // emitting code to fn and returning the location (an lvalue) defined
 // by the expression.
 //
-// If escaping is true, addr marks the base variable of the
-// addressable expression `expr` as being a potentially escaping pointer
+// If escaping is true, address marks the base variable of the
+// addressable expression `expression` as being a potentially escaping pointer
 // value.  For example, in this code:
 //
 //	a := A{
@@ -292,8 +296,8 @@ func (packageBuilder *builder) builtin(
 // - &x, including when implicit in method call or composite literals.
 // - a[:] iff a is an array (not *array)
 // - references to variables in lexically enclosing functions.
-func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping bool) lvalue {
-	switch typed := expr.(type) {
+func (packageBuilder *builder) address(function *Function, expression ast.Expr, escaping bool) lvalue {
+	switch typed := expression.(type) {
 	case *ast.Ident:
 		if isBlankIdent(typed) {
 			return blank{}
@@ -315,10 +319,10 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		} else {
 			value = function.lookup(object, escaping)
 		}
-		return &address{addr: value, expression: typed}
+		return &address{pointer: value, expression: typed}
 
 	case *ast.CompositeLit:
-		resolvedType := deref(function.typeOf(typed))
+		resolvedType := dereference(function.typeOf(typed))
 		var allocation *Allocation
 		if escaping {
 			allocation = emitNew(function, resolvedType, typed, "complit")
@@ -328,26 +332,26 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		var stores storebuf
 		packageBuilder.compLit(function, allocation, typed, true, &stores)
 		stores.emit(function)
-		return &address{addr: allocation, expression: typed}
+		return &address{pointer: allocation, expression: typed}
 
 	case *ast.ParenExpr:
-		return packageBuilder.addr(function, typed.X, escaping)
+		return packageBuilder.address(function, typed.X, escaping)
 
 	case *ast.SelectorExpr:
-		sel := function.selection(typed)
-		if sel == nil {
+		selection := function.selection(typed)
+		if selection == nil {
 			// qualified identifier
-			return packageBuilder.addr(function, typed.Sel, escaping)
+			return packageBuilder.address(function, typed.Sel, escaping)
 		}
-		if sel.kind != types.FieldVal {
+		if selection.kind != types.FieldVal {
 			// Invariant: an addressable selector selects a field, since method values and method expressions are
 			// not addressable and cannot be assigned to.
-			panic(sel)
+			panic(selection)
 		}
-		wantAddr := true
-		value := packageBuilder.receiver(function, typed.X, wantAddr, escaping, sel, typed)
-		index := sel.index[len(sel.index)-1]
-		fld := fieldOf(deref(value.Type()), index) // v is an addr.
+		wantAddress := true
+		value := packageBuilder.receiver(function, typed.X, wantAddress, escaping, selection, typed)
+		index := selection.index[len(selection.index)-1]
+		fld := fieldOf(dereference(value.Type()), index) // v is an addr.
 
 		// Due to the two phases of resolving AssignStmt, a panic from x.f = p()
 		// when x is nil is required to come after the side-effects of
@@ -355,7 +359,7 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		emit := func(function *Function) Value {
 			return emitFieldSelection(function, value, index, true, typed.Sel)
 		}
-		return &lazyAddress{addr: emit, locationType: fld.Type(), expression: typed.Sel}
+		return &lazyAddress{computeAddress: emit, locationType: fld.Type(), expression: typed.Sel}
 
 	case *ast.IndexExpr:
 		xt := function.typeOf(typed.X)
@@ -364,10 +368,10 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		var et types.Type
 		switch mode {
 		case ixArrVariable: // array, array|slice, array|*array, or array|*array|slice.
-			x = packageBuilder.addr(function, typed.X, escaping).address(function)
+			x = packageBuilder.address(function, typed.X, escaping).address(function)
 			et = types.NewPointer(elem)
 		case ixVariable: // *array, slice, *array|slice
-			x = packageBuilder.expr(function, typed.X)
+			x = packageBuilder.expression(function, typed.X)
 			et = types.NewPointer(elem)
 		case ixMap:
 			mt, isMap := core_type.Of(xt).(*types.Map)
@@ -377,16 +381,21 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 				panic("addr: map index of " + xt.String() + ", which has no map core type")
 			}
 			return &element{
-				mapValue:    packageBuilder.expr(function, typed.X),
-				key:         emitConv(function, packageBuilder.expr(function, typed.Index), mt.Key(), typed.Index),
+				mapValue: packageBuilder.expression(function, typed.X),
+				key: emitConv(
+					function,
+					packageBuilder.expression(function, typed.Index),
+					mt.Key(),
+					typed.Index,
+				),
 				elementType: mt.Elem(),
 			}
 		default:
-			// Invariant: addr is reached only for an addressable index expression or a map element assigned to, and
+			// Invariant: address is reached only for an addressable index expression or a map element assigned to, and
 			// indexing a string or an array value is neither.
 			panic("unexpected container type in IndexExpr: " + xt.String())
 		}
-		index := packageBuilder.expr(function, typed.Index)
+		index := packageBuilder.expression(function, typed.Index)
 		if isUntyped(index.Type()) {
 			index = emitConv(function, index, tInt, typed.Index)
 		}
@@ -402,15 +411,15 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 			address.setType(et)
 			return function.emit(address, typed)
 		}
-		return &lazyAddress{addr: emit, locationType: deref(et), expression: typed}
+		return &lazyAddress{computeAddress: emit, locationType: dereference(et), expression: typed}
 
 	case *ast.StarExpr:
-		return &address{addr: packageBuilder.expr(function, typed.X), expression: typed}
+		return &address{pointer: packageBuilder.expression(function, typed.X), expression: typed}
 	}
 
 	// Invariant: go/types makes addressable, or lets a statement assign to, only identifiers, field selectors, index
 	// expressions and pointer indirections, and & applies also to composite literals; each is handled above.
-	panic(fmt.Sprintf("unexpected address expression: %T", expr))
+	panic(fmt.Sprintf("unexpected address expression: %T", expression))
 }
 
 type store struct {
@@ -424,14 +433,14 @@ type store struct {
 }
 
 // assign emits to fn code to initialize the lvalue loc with the value
-// of expression `expr`.  If isZero is true, assign assumes that loc holds
+// of expression `expression`.  If isZero is true, assign assumes that loc holds
 // the zero value for its type.
 //
-// This is equivalent to loc.store(fn, b.expr(fn, expr)), but may generate
+// This is equivalent to loc.store(fn, b.expression(fn, expression)), but may generate
 // better code in some cases, e.g., for composite literals in an
 // addressable location.
 //
-// If sb is not nil, assign generates code to evaluate expression `expr`, but
+// If sb is not nil, assign generates code to evaluate expression `expression`, but
 // not to update loc.  Instead, the necessary stores are appended to the
 // storebuf sb so that they can be executed later.  This allows correct
 // in-place update of existing variables when the RHS is a composite
@@ -439,18 +448,18 @@ type store struct {
 func (packageBuilder *builder) assign(
 	function *Function,
 	loc lvalue,
-	expr ast.Expr,
+	expression ast.Expr,
 	isZero bool,
 	deferredStores *storebuf,
 	source ast.Node,
 ) {
 	// Can we initialize it in place?
-	if lit, ok := ast.Unparen(expr).(*ast.CompositeLit); ok {
+	if lit, ok := ast.Unparen(expression).(*ast.CompositeLit); ok {
 		// A CompositeLit never evaluates to a pointer,
 		// so if the type of the location is a pointer,
 		// an &-operation is implied.
-		if _, ok := loc.(blank); !ok { // avoid calling blank.typ()
-			if isPointerCore(loc.typ()) {
+		if _, ok := loc.(blank); !ok { // avoid calling blank.storedType()
+			if isPointerCore(loc.storedType()) {
 				// Example input that hits this code:
 				//
 				// 	type S1 struct{ X int }
@@ -458,44 +467,44 @@ func (packageBuilder *builder) assign(
 				// 		{1}, // <-- & is implied
 				// 	}
 				// 	_ = x
-				ptr := packageBuilder.addr(function, lit, true).address(function)
+				pointer := packageBuilder.address(function, lit, true).address(function)
 				// copy address
 				if deferredStores != nil {
-					deferredStores.store(loc, ptr, source)
+					deferredStores.store(loc, pointer, source)
 				} else {
-					loc.store(function, ptr, source)
+					loc.store(function, pointer, source)
 				}
 				return
 			}
 		}
 
 		if _, ok := loc.(*address); ok {
-			if types.IsInterface(loc.typ()) && !typeparams.IsTypeParam(loc.typ()) {
+			if types.IsInterface(loc.storedType()) && !typeparams.IsTypeParam(loc.storedType()) {
 				// e.g. var x interface{} = T{...}
 				// Can't in-place initialize an interface value.
 				// Fall back to copying.
 			} else {
 				// x = T{...} or x := T{...}
-				addr := loc.address(function)
+				address := loc.address(function)
 				if deferredStores != nil {
-					packageBuilder.compLit(function, addr, lit, isZero, deferredStores)
+					packageBuilder.compLit(function, address, lit, isZero, deferredStores)
 				} else {
 					var stores storebuf
-					packageBuilder.compLit(function, addr, lit, isZero, &stores)
+					packageBuilder.compLit(function, address, lit, isZero, &stores)
 					stores.emit(function)
 				}
 
 				// Subtle: emit debug ref for aggregate types only;
 				// slice and map are handled by store ops in compLit.
-				switch core_type.Of(loc.typ()).(type) {
+				switch core_type.Of(loc.storedType()).(type) {
 				case *types.Struct, *types.Array:
 					if deferredStores != nil {
 						// Make sure we don't emit DebugRefs before the store has actually occurred
-						if reference := makeDebugReference(function, lit, addr, true); reference != nil {
+						if reference := makeDebugReference(function, lit, address, true); reference != nil {
 							deferredStores.storeDebugReference(reference)
 						}
 					} else {
-						emitDebugReference(function, lit, addr, true)
+						emitDebugReference(function, lit, address, true)
 					}
 				}
 
@@ -505,7 +514,7 @@ func (packageBuilder *builder) assign(
 	}
 
 	// simple case: just copy
-	rhs := packageBuilder.expr(function, expr)
+	rhs := packageBuilder.expression(function, expression)
 	if deferredStores != nil {
 		deferredStores.store(loc, rhs, source)
 	} else {
@@ -513,16 +522,16 @@ func (packageBuilder *builder) assign(
 	}
 }
 
-// expr lowers a single-result expression `expr` to IR form, emitting code
+// expression lowers a single-result expression `expression` to IR form, emitting code
 // to fn and returning the Value defined by the expression.
-func (packageBuilder *builder) expr(function *Function, expr ast.Expr) Value {
-	unparenthesized := ast.Unparen(expr)
+func (packageBuilder *builder) expression(function *Function, expression ast.Expr) Value {
+	unparenthesized := ast.Unparen(expression)
 
 	tv := function.info.Types[unparenthesized]
 
 	// Is expression a constant?
 	if tv.Value != nil {
-		return NewConstant(tv.Value, function.typ(tv.Type), unparenthesized)
+		return NewConstant(tv.Value, function.instantiatedType(tv.Type), unparenthesized)
 	}
 
 	var value Value
@@ -530,9 +539,9 @@ func (packageBuilder *builder) expr(function *Function, expr ast.Expr) Value {
 		// Prefer pointer arithmetic ({Index,Field}Address) followed
 		// by Load over subelement extraction (e.g. Index, Field),
 		// to avoid large copies.
-		value = packageBuilder.addr(function, unparenthesized, false).load(function, unparenthesized)
+		value = packageBuilder.address(function, unparenthesized, false).load(function, unparenthesized)
 	} else {
-		value = packageBuilder.expr0(function, unparenthesized, tv)
+		value = packageBuilder.expression0(function, unparenthesized, tv)
 	}
 	if function.debugInformation() {
 		emitDebugReference(function, unparenthesized, value, false)
@@ -540,14 +549,15 @@ func (packageBuilder *builder) expr(function *Function, expr ast.Expr) Value {
 	return value
 }
 
-// expr0 lowers a single-result expression `expr` that is neither a constant nor addressable to IR form,
+// expression0 lowers a single-result expression `expression` that is neither a constant nor addressable to IR form,
 // emitting code to fn and returning the Value defined by the expression.
 //
 // Mutates: function gains a function literal as an anonymous function and resumes its unique values after it's built
-func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types.TypeAndValue) Value {
-	switch typed := expr.(type) {
+func (packageBuilder *builder) expression0(function *Function, expression ast.Expr, tv types.TypeAndValue) Value {
+	switch typed := expression.(type) {
 	case *ast.BasicLit:
-		// Invariant: a basic literal is always constant, so expr returned it as a constant before calling expr0.
+		// Invariant: a basic literal is always constant, so expression returned it as a constant before calling
+		// expression0.
 		panic("non-constant BasicLit") // unreachable
 
 	case *ast.FuncLit:
@@ -566,7 +576,7 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			Signature:      signature,
 			position:       typed.Type.Func,
 			parent:         function,
-			anonIndex:      int32(len(function.AnonymousFunctions)),
+			anonymousIndex: int32(len(function.AnonymousFunctions)),
 			Package:        function.Package,
 			Program:        function.Program,
 			syntax:         typed,
@@ -587,7 +597,7 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			return fn2
 		}
 		closure := &MakeClosure{Function: fn2}
-		closure.setType(function.typ(tv.Type))
+		closure.setType(function.instantiatedType(tv.Type))
 		for _, fv := range fn2.FreeVariables {
 			closure.Bindings = append(closure.Bindings, fv.outer)
 			fv.outer = nil
@@ -595,13 +605,18 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		return function.emit(closure, typed)
 
 	case *ast.TypeAssertExpr: // single-result form only
-		return emitTypeAssert(function, packageBuilder.expr(function, typed.X), function.typ(tv.Type), typed)
+		return emitTypeAssert(
+			function,
+			packageBuilder.expression(function, typed.X),
+			function.instantiatedType(tv.Type),
+			typed,
+		)
 
 	case *ast.CallExpr:
 		if function.info.Types[typed.Fun].IsType() {
 			// Explicit type conversion, e.g. string(x) or big.Int(x)
-			x := packageBuilder.expr(function, typed.Args[0])
-			y := emitConv(function, x, function.typ(tv.Type), typed)
+			x := packageBuilder.expression(function, typed.Args[0])
+			y := emitConv(function, x, function.instantiatedType(tv.Type), typed)
 			return y
 		}
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
@@ -611,7 +626,7 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 					function,
 					object,
 					typed.Args,
-					function.typ(tv.Type),
+					function.instantiatedType(tv.Type),
 					typed,
 				); value != nil {
 					return value
@@ -621,32 +636,38 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		// Regular function call.
 		var call Call
 		packageBuilder.setCall(function, typed, &call.Call)
-		call.setType(function.typ(tv.Type))
+		call.setType(function.instantiatedType(tv.Type))
 		return emitCall(function, &call, typed)
 
 	case *ast.UnaryExpr:
 		switch typed.Op {
 		case token.AND: // &X --- potentially escaping.
-			addr := packageBuilder.addr(function, typed.X, true)
+			address := packageBuilder.address(function, typed.X, true)
 			if _, ok := ast.Unparen(typed.X).(*ast.StarExpr); ok {
 				// &*p must panic if p is nil (https://golang.org/s/go12nil).
 				// For simplicity, we'll just (suboptimally) rely
 				// on the side effects of a load.
 				// No dedicated nil check is emitted.
-				addr.load(function, typed)
+				address.load(function, typed)
 			}
-			return addr.address(function)
+			return address.address(function)
 		case token.ADD:
-			return packageBuilder.expr(function, typed.X)
+			return packageBuilder.expression(function, typed.X)
 		case token.NOT, token.SUB, token.XOR: // ! <- - ^
 			operation := &UnaryOperation{
 				Operator: typed.Op,
-				X:        packageBuilder.expr(function, typed.X),
+				X:        packageBuilder.expression(function, typed.X),
 			}
-			operation.setType(function.typ(tv.Type))
+			operation.setType(function.instantiatedType(tv.Type))
 			return function.emit(operation, typed)
 		case token.ARROW:
-			return emitReceive(function, packageBuilder.expr(function, typed.X), false, function.typ(tv.Type), typed)
+			return emitReceive(
+				function,
+				packageBuilder.expression(function, typed.X),
+				false,
+				function.instantiatedType(tv.Type),
+				typed,
+			)
 		default:
 			// Invariant: go/types accepts only the unary operators &, +, !, -, ^ and <-, each handled above, as
 			// *p is a StarExpr.
@@ -663,9 +684,9 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			return emitArith(
 				function,
 				typed.Op,
-				packageBuilder.expr(function, typed.X),
-				packageBuilder.expr(function, typed.Y),
-				function.typ(tv.Type),
+				packageBuilder.expression(function, typed.X),
+				packageBuilder.expression(function, typed.Y),
+				function.instantiatedType(tv.Type),
 				typed,
 			)
 
@@ -673,12 +694,12 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			cmp := emitCompare(
 				function,
 				typed.Op,
-				packageBuilder.expr(function, typed.X),
-				packageBuilder.expr(function, typed.Y),
+				packageBuilder.expression(function, typed.X),
+				packageBuilder.expression(function, typed.Y),
 				typed,
 			)
 			// The type of x==y may be UntypedBool.
-			return emitConv(function, cmp, types.Default(function.typ(tv.Type)), typed)
+			return emitConv(function, cmp, types.Default(function.instantiatedType(tv.Type)), typed)
 		default:
 			// Invariant: the cases above cover every binary operator Go has.
 			panic("illegal op in BinaryExpr: " + typed.Op.String())
@@ -693,13 +714,13 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		switch core_type.Of(xtyp).(type) {
 		case *types.Array:
 			// Potentially escaping.
-			x = packageBuilder.addr(function, typed.X, true).address(function)
+			x = packageBuilder.address(function, typed.X, true).address(function)
 		case *types.Basic, *types.Slice, *types.Pointer: // *array
-			x = packageBuilder.expr(function, typed.X)
+			x = packageBuilder.expression(function, typed.X)
 		default:
 			// core type exception?
 			if isBytestring(xtyp) {
-				x = packageBuilder.expr(function, typed.X) // bytestring is handled as string and []byte.
+				x = packageBuilder.expression(function, typed.X) // bytestring is handled as string and []byte.
 			} else {
 				// Invariant: go/types slices only strings, arrays, pointers to arrays, slices and type sets of
 				// byte strings, each handled above.
@@ -707,13 +728,13 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			}
 		}
 		if typed.Low != nil {
-			low = packageBuilder.expr(function, typed.Low)
+			low = packageBuilder.expression(function, typed.Low)
 		}
 		if typed.High != nil {
-			high = packageBuilder.expr(function, typed.High)
+			high = packageBuilder.expression(function, typed.High)
 		}
 		if typed.Slice3 {
-			maximum = packageBuilder.expr(function, typed.Max)
+			maximum = packageBuilder.expression(function, typed.Max)
 		}
 		slice := &Slice{
 			X:       x,
@@ -721,7 +742,7 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			High:    high,
 			Maximum: maximum,
 		}
-		slice.setType(function.typ(tv.Type))
+		slice.setType(function.instantiatedType(tv.Type))
 		return function.emit(slice, typed)
 
 	case *ast.Ident:
@@ -731,7 +752,7 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		case *types.Builtin:
 			signature, isSignature := function.instanceType(typed).(*types.Signature)
 			if !isSignature {
-				// Invariant: a built-in reaches expr only as the callee of a call the builtin method left as a
+				// Invariant: a built-in reaches expression only as the callee of a call the builtin method left as a
 				// regular call, and go/types records that call's signature as its type.
 				panic(fmt.Sprintf(
 					"built-in %s has type %s, not a signature",
@@ -752,8 +773,8 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			}
 			callee, isFunction := member.(*Function) // (func)
 			if !isFunction {
-				// Invariant: a package's values are its constants, Globals and Functions; expr returns a constant
-				// before calling expr0, and a Global returns above as a load.
+				// Invariant: a package's values are its constants, Globals and Functions; expression returns a constant
+				// before calling expression0, and a Global returns above as a load.
 				panic(fmt.Sprintf("package-level member %s is %T, not a function", typed.Name, member))
 			}
 			if callee.typeparams.Len() > 0 {
@@ -772,51 +793,51 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		return emitLoad(function, function.lookup(variable, false), typed) // var (address)
 
 	case *ast.SelectorExpr:
-		sel := function.selection(typed)
-		if sel == nil {
+		selection := function.selection(typed)
+		if selection == nil {
 			// builtin unsafe.{Add,Slice}
 			if object, ok := function.info.Uses[typed.Sel].(*types.Builtin); ok {
-				signature, isSignature := function.typ(tv.Type).(*types.Signature)
+				signature, isSignature := function.instantiatedType(tv.Type).(*types.Signature)
 				if !isSignature {
-					// Invariant: unsafe.Add and unsafe.Slice reach expr only as the callee of a call, and go/types
-					// records that call's signature as their type.
+					// Invariant: unsafe.Add and unsafe.Slice reach expression only as the callee of a call, and
+					// go/types records that call's signature as their type.
 					panic(fmt.Sprintf("unsafe.%s has type %s, not a signature", object.Name(), tv.Type))
 				}
 				return &Builtin{name: "Unsafe" + object.Name(), sig: signature}
 			}
 			// qualified identifier
-			return packageBuilder.expr(function, typed.Sel)
+			return packageBuilder.expression(function, typed.Sel)
 		}
-		switch sel.kind {
+		switch selection.kind {
 		case types.MethodExpr:
 			// (*T).f or T.f, the method f from the method-set of type T.
 			// The result is a "thunk".
 			targs := function.subtargs(typed.Sel)
-			thunk := createThunk(function.Program, sel, targs)
+			thunk := createThunk(function.Program, selection, targs)
 			packageBuilder.enqueue(thunk)
 			return thunk
 
 		case types.MethodVal:
 			// e.f where e is an expression and f is a method.
 			// The result is a "bound".
-			method, isFunc := sel.object.(*types.Func)
-			if !isFunc {
+			method, isFunction := selection.object.(*types.Func)
+			if !isFunction {
 				// Invariant: go/types makes the object of every method selection a *types.Func.
-				panic(fmt.Sprintf("method value %s selects %T, not a method", typed.Sel.Name, sel.object))
+				panic(fmt.Sprintf("method value %s selects %T, not a method", typed.Sel.Name, selection.object))
 			}
-			rt := function.typ(recvType(method))
-			wantAddr := isPointer(rt)
+			rt := function.instantiatedType(methodReceiverType(method))
+			wantAddress := isPointer(rt)
 			escaping := true
-			value := packageBuilder.receiver(function, typed.X, wantAddr, escaping, sel, typed)
+			value := packageBuilder.receiver(function, typed.X, wantAddress, escaping, selection, typed)
 
 			if types.IsInterface(rt) {
 				// If v may be an interface type I (after instantiating),
 				// we must emit a check that v is non-nil.
-				if recv, ok := types.Unalias(sel.recv).(*types.TypeParam); ok {
+				if receiverTypeParameter, ok := types.Unalias(selection.receiverType).(*types.TypeParam); ok {
 					// Emit a nil check if any possible instantiation of the
 					// type parameter is an interface type.
-					if !typeSetIsEmpty(recv) {
-						// recv has a concrete term its typeset.
+					if !typeSetIsEmpty(receiverTypeParameter) {
+						// receiverTypeParameter has a concrete term its typeset.
 						// So it cannot be instantiated as an interface.
 						//
 						// Example:
@@ -857,9 +878,9 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			return function.emit(closure, typed.Sel)
 
 		case types.FieldVal:
-			indices := sel.index
+			indices := selection.index
 			last := len(indices) - 1
-			value := packageBuilder.expr(function, typed.X)
+			value := packageBuilder.expression(function, typed.X)
 			value = emitImplicitSelections(function, value, indices[:last], typed)
 			value = emitFieldSelection(function, value, indices[last], false, typed.Sel)
 			return value
@@ -875,31 +896,34 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			// position only of a generic function.
 			panic("unexpected expression-could not match index list to instantiation")
 		}
-		return packageBuilder.expr(function, typed.X) // Handle instantiation within the *Ident or *SelectorExpr cases.
+		return packageBuilder.expression(
+			function,
+			typed.X,
+		) // Handle instantiation within the *Ident or *SelectorExpr cases.
 
 	case *ast.IndexExpr:
 		if instance(function.info, typed.X) {
 			// Handle instantiation within the *Ident or *SelectorExpr cases.
-			return packageBuilder.expr(function, typed.X)
+			return packageBuilder.expression(function, typed.X)
 		}
 		// not a generic instantiation.
 		xt := function.typeOf(typed.X)
 		switch et, mode := indexType(xt); mode {
 		case ixVariable:
 			// Addressable slice/array; use IndexAddress and Load.
-			return packageBuilder.addr(function, typed, false).load(function, typed)
+			return packageBuilder.address(function, typed, false).load(function, typed)
 
 		case ixArrVariable, ixValue:
 			// An array in a register, a string or a combined type that contains
 			// either an [_]array (ixArrVar) or string (ixValue).
 
 			// Note: for ixArrVar and CoreType(xt)==nil can be IndexAddress and Load.
-			index := packageBuilder.expr(function, typed.Index)
+			index := packageBuilder.expression(function, typed.Index)
 			if isUntyped(index.Type()) {
 				index = emitConv(function, index, tInt, typed.Index)
 			}
 			elementValue := &Index{
-				X:     packageBuilder.expr(function, typed.X),
+				X:     packageBuilder.expression(function, typed.X),
 				Index: index,
 			}
 			elementValue.setType(et)
@@ -913,8 +937,8 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 				panic("map index of " + xt.String() + ", which has no map core type")
 			}
 			lookup := &MapLookup{
-				X:     packageBuilder.expr(function, typed.X),
-				Index: emitConv(function, packageBuilder.expr(function, typed.Index), ct.Key(), typed.Index),
+				X:     packageBuilder.expression(function, typed.X),
+				Index: emitConv(function, packageBuilder.expression(function, typed.Index), ct.Key(), typed.Index),
 			}
 			lookup.setType(ct.Elem())
 			return function.emit(lookup, typed)
@@ -926,57 +950,57 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 
 	case *ast.CompositeLit, *ast.StarExpr:
 		// Addressable types (lvalues)
-		return packageBuilder.addr(function, typed, false).load(function, typed)
+		return packageBuilder.address(function, typed, false).load(function, typed)
 	}
 
-	// Invariant: expr unwraps parentheses and returns constants, and every other expression that has a value is
+	// Invariant: expression unwraps parentheses and returns constants, and every other expression that has a value is
 	// handled above.
-	panic(fmt.Sprintf("unexpected expr: %T", expr))
+	panic(fmt.Sprintf("unexpected expr: %T", expression))
 }
 
-// receiver emits to fn code for expression `expr` in the "receiver"
+// receiver emits to fn code for expression `expression` in the "receiver"
 // position of selection e.f (where f may be a field or a method) and
 // returns the effective receiver after applying the implicit field
-// selections of sel.
+// selections of selection.
 //
-// wantAddr requests that the result is an address.  If
-// !sel.indirect, this may require that `expr` be built in addr() mode; it
+// wantAddress requests that the result is an address.  If
+// !selection.indirect, this may require that `expression` be built in address() mode; it
 // must thus be addressable.
 //
-// escaping is defined as per builder.addr().
+// escaping is defined as per builder.address().
 func (packageBuilder *builder) receiver(
 	function *Function,
-	expr ast.Expr,
-	wantAddr, escaping bool,
-	sel *selection,
+	expression ast.Expr,
+	wantAddress, escaping bool,
+	selection *selection,
 	source ast.Node,
 ) Value {
 	var value Value
-	if wantAddr && !sel.indirect && !isPointerCore(function.typeOf(expr)) {
-		value = packageBuilder.addr(function, expr, escaping).address(function)
+	if wantAddress && !selection.indirect && !isPointerCore(function.typeOf(expression)) {
+		value = packageBuilder.address(function, expression, escaping).address(function)
 	} else {
-		value = packageBuilder.expr(function, expr)
+		value = packageBuilder.expression(function, expression)
 	}
 
-	last := len(sel.index) - 1
-	value = emitImplicitSelections(function, value, sel.index[:last], source)
+	last := len(selection.index) - 1
+	value = emitImplicitSelections(function, value, selection.index[:last], source)
 	if types.IsInterface(value.Type()) {
 		// When v is an interface, sel.Kind()==MethodValue and v.f is invoked.
 		// So v is not loaded, even if v has a pointer core type.
-	} else if !wantAddr && isPointerCore(value.Type()) {
-		value = emitLoad(function, value, expr)
+	} else if !wantAddress && isPointerCore(value.Type()) {
+		value = emitLoad(function, value, expression)
 	}
 	return value
 }
 
-// setCallFunc populates the function parts of a CallCommon structure
+// setCallFunction populates the function parts of a CallCommon structure
 // (Function, Method, receiver, Arguments[0]) based on the kind of invocation
 // occurring in `callExpr`.
 //
 // Mutates: common takes the callee, and for a method its receiver or method
-func (packageBuilder *builder) setCallFunc(function *Function, callExpr *ast.CallExpr, common *CallCommon) {
+func (packageBuilder *builder) setCallFunction(function *Function, callExpression *ast.CallExpr, common *CallCommon) {
 	// Is this a (possibly generic) method call?
-	calleeExpression := ast.Unparen(callExpr.Fun)
+	calleeExpression := ast.Unparen(callExpression.Fun)
 	switch typed := calleeExpression.(type) {
 	case *ast.IndexExpr:
 		calleeExpression = typed.X
@@ -984,19 +1008,19 @@ func (packageBuilder *builder) setCallFunc(function *Function, callExpr *ast.Cal
 		calleeExpression = typed.X
 	}
 	if selector, ok := calleeExpression.(*ast.SelectorExpr); ok {
-		sel := function.selection(selector)
-		if sel != nil && sel.kind == types.MethodVal {
-			object, isFunc := sel.object.(*types.Func)
-			if !isFunc {
+		selection := function.selection(selector)
+		if selection != nil && selection.kind == types.MethodVal {
+			object, isFunction := selection.object.(*types.Func)
+			if !isFunction {
 				// Invariant: go/types makes the object of every method selection a *types.Func.
-				panic(fmt.Sprintf("method call %s selects %T, not a method", selector.Sel.Name, sel.object))
+				panic(fmt.Sprintf("method call %s selects %T, not a method", selector.Sel.Name, selection.object))
 			}
-			recv := recvType(object)
+			receiverType := methodReceiverType(object)
 
-			wantAddr := isPointer(recv)
+			wantAddress := isPointer(receiverType)
 			escaping := true
-			value := packageBuilder.receiver(function, selector.X, wantAddr, escaping, sel, selector)
-			if types.IsInterface(recv) {
+			value := packageBuilder.receiver(function, selector.X, wantAddress, escaping, selection, selector)
+			if types.IsInterface(receiverType) {
 				// Invoke-mode call.
 				common.Value = value // possibly type param
 				common.Method = object
@@ -1016,7 +1040,7 @@ func (packageBuilder *builder) setCallFunc(function *Function, callExpr *ast.Cal
 		// e.Fun would evaluate to a concrete method, interface
 		// wrapper function, or promotion wrapper.
 		//
-		// It is evaluated in the usual way. Inlining expr() here
+		// It is evaluated in the usual way. Inlining expression() here
 		// would make the call static and avoid generating wrappers,
 		// but it's somewhat tricky as it may consume the first
 		// actual parameter if the call is "invoke" mode.
@@ -1033,32 +1057,32 @@ func (packageBuilder *builder) setCallFunc(function *Function, callExpr *ast.Cal
 		//
 		// An approach to inlining it:
 		// - consume the first actual parameter expression
-		//   and build it with b.expr().
+		//   and build it with b.expression().
 		// - apply implicit field selections.
 		// - use MethodVal logic to populate fields of c.
 	}
 
 	// Evaluate the function operand in the usual way.
-	common.Value = packageBuilder.expr(function, callExpr.Fun)
+	common.Value = packageBuilder.expression(function, callExpression.Fun)
 }
 
-// emitCallArguments emits to f code for the actual parameters of call `expr` to
+// emitCallArguments emits to f code for the actual parameters of call `expression` to
 // a (possibly built-in) function of effective type sig.
 // The argument values are appended to args, which is then returned.
 func (packageBuilder *builder) emitCallArguments(
 	function *Function,
 	sig *types.Signature,
-	expr *ast.CallExpr,
+	expression *ast.CallExpr,
 	arguments []Value,
 ) []Value {
 	callArguments := arguments
 
 	// f(x, y, z...): pass slice z straight through.
-	if expr.Ellipsis != 0 {
-		for index, argument := range expr.Args {
+	if expression.Ellipsis != 0 {
+		for index, argument := range expression.Args {
 			value := emitConv(
 				function,
-				packageBuilder.expr(function, argument),
+				packageBuilder.expression(function, argument),
 				sig.Params().At(index).Type(),
 				argument,
 			)
@@ -1074,8 +1098,8 @@ func (packageBuilder *builder) emitCallArguments(
 	// If this is a chained call of the form f(g()) where g has
 	// multiple return values (MRV), they are flattened out into
 	// args; a suffix of them may end up in a varargs slice.
-	for _, argument := range expr.Args {
-		value := packageBuilder.expr(function, argument)
+	for _, argument := range expression.Args {
+		value := packageBuilder.expression(function, argument)
 		if ttuple, ok := value.Type().(*types.Tuple); ok { // MRV chain
 			for index, length := 0, ttuple.Len(); index < length; index++ {
 				callArguments = append(callArguments, emitExtract(function, value, index, argument))
@@ -1115,14 +1139,14 @@ func (packageBuilder *builder) emitCallArguments(
 		} else {
 			// Replace a suffix of args with a slice containing it.
 			at := types.NewArray(vt, int64(len(varargs)))
-			allocation := emitNew(function, at, expr, "varargs")
+			allocation := emitNew(function, at, expression, "varargs")
 			for index, argument := range varargs {
 				iaddr := &IndexAddress{
 					X:     allocation,
 					Index: intConstant(int64(index), nil),
 				}
 				iaddr.setType(types.NewPointer(vt))
-				function.emit(iaddr, expr)
+				function.emit(iaddr, expression)
 				emitStore(function, iaddr, argument, argument.Source())
 			}
 			slice := &Slice{X: allocation}
@@ -1135,26 +1159,36 @@ func (packageBuilder *builder) emitCallArguments(
 }
 
 // setCall emits to fn code to evaluate all the parameters of a function
-// call `expr`, and populates *`common` with those values.
+// call `expression`, and populates *`common` with those values.
 //
 // Mutates: common takes the callee and the call's arguments
-func (packageBuilder *builder) setCall(function *Function, expr *ast.CallExpr, common *CallCommon) {
+func (packageBuilder *builder) setCall(function *Function, expression *ast.CallExpr, common *CallCommon) {
 	// First deal with the f(...) part and optional receiver.
-	packageBuilder.setCallFunc(function, expr, common)
+	packageBuilder.setCallFunction(function, expression, common)
 
 	// Then append the other actual parameters.
-	sig, _ := core_type.Of(function.typeOf(expr.Fun)).(*types.Signature)
+	sig, _ := core_type.Of(function.typeOf(expression.Fun)).(*types.Signature)
 	if sig == nil {
-		// Invariant: setCall is reached only for calls of functions, conversions having returned in expr0, and
+		// Invariant: setCall is reached only for calls of functions, conversions having returned in expression0, and
 		// go/types records a signature as the core type of every callee, built-ins included.
-		panic(fmt.Sprintf("no signature for call of %s", expr.Fun))
+		panic(fmt.Sprintf("no signature for call of %s", expression.Fun))
 	}
-	common.Arguments = packageBuilder.emitCallArguments(function, sig, expr, common.Arguments)
+	common.Arguments = packageBuilder.emitCallArguments(function, sig, expression, common.Arguments)
 }
 
-// assignOp emits to fn code to perform loc <op>= val.
-func (packageBuilder *builder) assignOp(function *Function, loc lvalue, value Value, op token.Token, source ast.Node) {
-	loc.store(function, emitArith(function, op, loc.load(function, source), value, loc.typ(), source), source)
+// assignOperation emits to fn code to perform loc <op>= val.
+func (packageBuilder *builder) assignOperation(
+	function *Function,
+	loc lvalue,
+	value Value,
+	operator token.Token,
+	source ast.Node,
+) {
+	loc.store(
+		function,
+		emitArith(function, operator, loc.load(function, source), value, loc.storedType(), source),
+		source,
+	)
 }
 
 // arrayLength returns the length of the array whose composite literal elements are elts.
@@ -1163,7 +1197,7 @@ func (packageBuilder *builder) arrayLength(function *Function, elts []ast.Expr) 
 	var index int64 = -1
 	for _, elt := range elts {
 		if kv, ok := elt.(*ast.KeyValueExpr); ok {
-			key, isConstant := packageBuilder.expr(function, kv.Key).(*Constant)
+			key, isConstant := packageBuilder.expression(function, kv.Key).(*Constant)
 			if !isConstant {
 				// Invariant: go/types requires every index key of an array or slice literal to be a constant.
 				panic(fmt.Sprintf("array literal key %T is not a constant", kv.Key))
@@ -1180,11 +1214,11 @@ func (packageBuilder *builder) arrayLength(function *Function, elts []ast.Expr) 
 }
 
 // compLit emits to fn code to initialize a composite literal `lit` at
-// address addr with type typ.
+// address `pointer`.
 //
 // Nested composite literals are recursively initialized in place
-// where possible. If isZero is true, compLit assumes that addr
-// holds the zero value for typ.
+// where possible. If isZero is true, compLit assumes that `pointer`
+// holds the zero value for the literal's type.
 //
 // Because the elements of a composite literal may refer to the
 // variables being updated, as in the second line below,
@@ -1198,21 +1232,21 @@ func (packageBuilder *builder) arrayLength(function *Function, elts []ast.Expr) 
 // A CompositeLit may have pointer type only in the recursive (nested)
 // case when the type name is implicit.  e.g. in []*T{{}}, the inner
 // literal has type *T behaves like &T{}.
-// In that case, addr must hold a T, not a *T.
+// In that case, `pointer` must point to a T, not a *T.
 func (packageBuilder *builder) compLit(
 	function *Function,
-	addr Value,
+	pointer Value,
 	lit *ast.CompositeLit,
 	isZero bool,
 	deferredStores *storebuf,
 ) {
-	typ := deref(function.typeOf(lit)) // retain the named/alias/param type, if any
-	switch typed := core_type.Of(typ).(type) {
+	literalType := dereference(function.typeOf(lit)) // retain the named/alias/param type, if any
+	switch typed := core_type.Of(literalType).(type) {
 	case *types.Struct:
-		lvalue := &address{addr: addr, expression: lit}
+		lvalue := &address{pointer: pointer, expression: lit}
 		if len(lit.Elts) == 0 {
 			if !isZero {
-				deferredStores.store(lvalue, zeroConstant(deref(addr.Type()), lit), lit)
+				deferredStores.store(lvalue, zeroConstant(dereference(pointer.Type()), lit), lit)
 			}
 		} else {
 			value := &CompositeValue{
@@ -1221,7 +1255,7 @@ func (packageBuilder *builder) compLit(
 			for index := range typed.NumFields() {
 				value.Values[index] = zeroConstant(typed.Field(index).Type(), lit)
 			}
-			value.setType(typ)
+			value.setType(literalType)
 
 			type chainElement struct {
 				children []chainElement
@@ -1336,7 +1370,7 @@ func (packageBuilder *builder) compLit(
 			array = emitNew(function, at, lit, "slicelit")
 		case *types.Array:
 			at = typed
-			array = addr
+			array = pointer
 		}
 
 		var final Value
@@ -1359,7 +1393,7 @@ func (packageBuilder *builder) compLit(
 			var index *Constant
 			for _, elt := range lit.Elts {
 				if kv, ok := elt.(*ast.KeyValueExpr); ok {
-					key, isConstant := packageBuilder.expr(function, kv.Key).(*Constant)
+					key, isConstant := packageBuilder.expression(function, kv.Key).(*Constant)
 					if !isConstant {
 						// Invariant: go/types requires every index key of an array or slice literal to be a
 						// constant.
@@ -1397,13 +1431,13 @@ func (packageBuilder *builder) compLit(
 			// like []int{1<<62: 1}.
 			if !isZero {
 				// memclear
-				deferredStores.store(&address{addr: array}, zeroConstant(deref(array.Type()), lit), lit)
+				deferredStores.store(&address{pointer: array}, zeroConstant(dereference(array.Type()), lit), lit)
 			}
 
 			var index *Constant
 			for _, elt := range lit.Elts {
 				if kv, ok := elt.(*ast.KeyValueExpr); ok {
-					key, isConstant := packageBuilder.expr(function, kv.Key).(*Constant)
+					key, isConstant := packageBuilder.expression(function, kv.Key).(*Constant)
 					if !isConstant {
 						// Invariant: go/types requires every index key of an array or slice literal to be a
 						// constant.
@@ -1426,30 +1460,30 @@ func (packageBuilder *builder) compLit(
 				function.emit(iaddr, elt)
 				if typed != at { // slice
 					// backing array is unaliased => storebuf not needed.
-					packageBuilder.assign(function, &address{addr: iaddr, expression: elt}, elt, true, nil, elt)
+					packageBuilder.assign(function, &address{pointer: iaddr, expression: elt}, elt, true, nil, elt)
 				} else {
-					location := &address{addr: iaddr, expression: elt}
+					location := &address{pointer: iaddr, expression: elt}
 					packageBuilder.assign(function, location, elt, true, deferredStores, elt)
 				}
 			}
 		}
 		if typed != at { // slice
 			if final != nil {
-				deferredStores.store(&address{addr: array}, final, lit)
+				deferredStores.store(&address{pointer: array}, final, lit)
 			}
 			slice := &Slice{X: array}
-			slice.setType(typ)
-			deferredStores.store(&address{addr: addr, expression: lit}, function.emit(slice, lit), lit)
+			slice.setType(literalType)
+			deferredStores.store(&address{pointer: pointer, expression: lit}, function.emit(slice, lit), lit)
 		} else if final != nil {
-			deferredStores.store(&address{addr: array, expression: lit}, final, lit)
+			deferredStores.store(&address{pointer: array, expression: lit}, final, lit)
 		}
 
 	case *types.Map:
 		makeMap := &MakeMap{Reserve: intConstant(int64(len(lit.Elts)), lit)}
-		makeMap.setType(typ)
+		makeMap.setType(literalType)
 		function.emit(makeMap, lit)
 		for _, elt := range lit.Elts {
-			expr, isKeyValue := elt.(*ast.KeyValueExpr)
+			expression, isKeyValue := elt.(*ast.KeyValueExpr)
 			if !isKeyValue {
 				// Invariant: go/types requires every element of a map literal to be a key-value pair.
 				panic(fmt.Sprintf("map literal element %T is not a key-value pair", elt))
@@ -1461,24 +1495,24 @@ func (packageBuilder *builder) compLit(
 			//	map[*struct{}]bool{{}: true}
 			// An &-operation may be implied:
 			//	map[*struct{}]bool{&struct{}{}: true}
-			wantAddr := false
-			if _, ok := ast.Unparen(expr.Key).(*ast.CompositeLit); ok {
-				wantAddr = isPointerCore(typed.Key())
+			wantAddress := false
+			if _, ok := ast.Unparen(expression.Key).(*ast.CompositeLit); ok {
+				wantAddress = isPointerCore(typed.Key())
 			}
 
 			var key Value
-			if wantAddr {
+			if wantAddress {
 				// A CompositeLit never evaluates to a pointer,
 				// so if the type of the location is a pointer,
 				// an &-operation is implied.
-				key = packageBuilder.addr(function, expr.Key, true).address(function)
+				key = packageBuilder.address(function, expression.Key, true).address(function)
 			} else {
-				key = packageBuilder.expr(function, expr.Key)
+				key = packageBuilder.expression(function, expression.Key)
 			}
 
 			loc := element{
 				mapValue:    makeMap,
-				key:         emitConv(function, key, typed.Key(), expr),
+				key:         emitConv(function, key, typed.Key(), expression),
 				elementType: typed.Elem(),
 			}
 
@@ -1488,12 +1522,12 @@ func (packageBuilder *builder) compLit(
 			// map[int]*struct{}{0: {}} implies &struct{}{}.
 			// In-place update is of course impossible,
 			// and no storebuf is needed.
-			packageBuilder.assign(function, &loc, expr.Value, true, nil, expr)
+			packageBuilder.assign(function, &loc, expression.Value, true, nil, expression)
 		}
-		deferredStores.store(&address{addr: addr, expression: lit}, makeMap, lit)
+		deferredStores.store(&address{pointer: pointer, expression: lit}, makeMap, lit)
 
 	default:
 		// Invariant: go/types accepts composite literals only of struct, array, slice and map core types.
-		panic("unexpected CompositeLit type: " + typ.String())
+		panic("unexpected CompositeLit type: " + literalType.String())
 	}
 }

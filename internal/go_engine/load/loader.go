@@ -465,7 +465,7 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 	}
 	loaded.Syntax = syntax
 	configuration := &types.Config{
-		Importer: importerFunc(func(path string) (*types.Package, error) {
+		Importer: importerFunction(func(path string) (*types.Package, error) {
 			if path == "unsafe" {
 				return types.Unsafe, nil
 			}

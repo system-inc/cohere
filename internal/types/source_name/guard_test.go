@@ -243,7 +243,7 @@ func tsDecisions(test *testing.T) []tsDecision {
 			if relativePathError != nil {
 				test.Fatal(relativePathError)
 			}
-			found = append(found, tsDecisionsIn(loadedPackage.Fset, file, filepath.ToSlash(relative))...)
+			found = append(found, tsDecisionsIn(loadedPackage.FileSet, file, filepath.ToSlash(relative))...)
 		}
 	}
 	sort.Slice(found, func(left, right int) bool {

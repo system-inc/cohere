@@ -19,8 +19,8 @@ type Context struct {
 	Package *types.Package
 	// TypesInfo is the type information of the package's syntax.
 	TypesInfo *types.Info
-	// Fset holds the positions of the package's files.
-	Fset *token.FileSet
+	// FileSet holds the positions of the package's files.
+	FileSet *token.FileSet
 	// Files is the package's syntax, one file for each of its Go files.
 	Files []*ast.File
 	// ReadFile reads a file of the package, such as an assembly or embedded file, as the pass's ReadFile does,
@@ -28,7 +28,7 @@ type Context struct {
 	ReadFile func(filename string) ([]byte, error)
 	// IsGenerated is staticcheck's own judgment of whether filename was generated, read from
 	// honnef.co/go/tools/analysis/facts/generated, so a check ported from staticcheck leaves alone the files
-	// staticcheck's leaves alone. filename is the name the file was parsed from, `Fset.PositionFor(pos,
+	// staticcheck's leaves alone. filename is the name the file was parsed from, `FileSet.PositionFor(pos,
 	// false).Filename`, which is how staticcheck keys the judgment. A caller asking by display name, as
 	// report.FilterGenerated does, misses under a `//line` directive naming another file, exactly as staticcheck's own
 	// does.
@@ -80,7 +80,7 @@ func NewContext(
 	return &Context{
 		Package:     pass.Pkg,
 		TypesInfo:   pass.TypesInfo,
-		Fset:        pass.Fset,
+		FileSet:     pass.Fset,
 		Files:       pass.Files,
 		ReadFile:    pass.ReadFile,
 		IsGenerated: isGenerated,

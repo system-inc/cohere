@@ -28,9 +28,9 @@ import (
 //     or [Program.Build] to build all of them.
 //
 // See the Example tests for simple examples.
-func NewProgram(fset *token.FileSet) *Program {
+func NewProgram(fileSet *token.FileSet) *Program {
 	return &Program{
-		FileSet:  fset,
+		FileSet:  fileSet,
 		imported: make(map[string]*Package),
 		packages: make(map[*types.Package]*Package),
 		canon:    newCanonizer(),
@@ -77,10 +77,10 @@ func memberFromObject(irPackage *Package, object types.Object, syntax ast.Node, 
 
 	case *types.Var:
 		global := &Global{
-			Package: irPackage,
-			name:    name,
-			object:  typedObject,
-			typ:     types.NewPointer(typedObject.Type()), // address
+			Package:   irPackage,
+			name:      name,
+			object:    typedObject,
+			valueType: types.NewPointer(typedObject.Type()), // address
 		}
 		global.source = syntax
 		irPackage.values[typedObject] = global
@@ -137,7 +137,7 @@ func forEachScopeMember(packageTypes *types.Package, create func(object types.Ob
 // CreatePackage (with or without syntax) and the on-demand creation
 // of methods in non-created packages based on their types.Func.
 func createFunction(
-	prog *Program,
+	program *Program,
 	object *types.Func,
 	name string,
 	syntax ast.Node,
@@ -161,7 +161,7 @@ func createFunction(
 		position:       object.Pos(),
 		syntax:         syntax,
 		Package:        nil, // may be set by caller
-		Program:        prog,
+		Program:        program,
 		recvtypeparams: sig.RecvTypeParams(),
 		typeparams:     sig.TypeParams(),
 	}

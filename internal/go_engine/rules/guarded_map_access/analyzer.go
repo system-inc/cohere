@@ -115,7 +115,7 @@ func Check(context *rule.Context, ifStatement *ast.IfStmt, isElseBranch bool) {
 	staticcheck_report.Report(context, ifStatement, "unnecessary guard around map access",
 		staticcheck_report.ShortRange(),
 		staticcheck_report.Fixes(edit.Fix("Simplify map access",
-			edit.ReplaceWithNode(context.Fset, ifStatement, replacement))))
+			edit.ReplaceWithNode(context.FileSet, ifStatement, replacement))))
 }
 
 // guardedIndex is the index expression an if's header asks a map about, `_, ok := m[k]` with its condition ok, and

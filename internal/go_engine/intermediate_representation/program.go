@@ -34,15 +34,15 @@ type Program struct {
 	noReturn func(*types.Func) bool // (optional) predicate that decides whether a given call cannot return
 }
 
-// Build calls Package.Build for each package in prog, in parallel.
+// Build calls Package.Build for each package in program, in parallel.
 //
 // Build is intended for whole-program analysis; a typical compiler
 // need only build a single package.
 //
 // Build is idempotent and thread-safe.
-func (prog *Program) Build() {
+func (program *Program) Build() {
 	var waitGroup sync.WaitGroup
-	for _, value := range prog.AllPackages() {
+	for _, value := range program.AllPackages() {
 		waitGroup.Add(1)
 		cpuLimit <- unit{} // acquire a token
 		go func(irPackage *Package) {
@@ -64,7 +64,7 @@ func (prog *Program) Build() {
 //
 // The real work of building IR form for each function is not done
 // until a subsequent call to Package.Build.
-func (prog *Program) CreatePackage(
+func (program *Program) CreatePackage(
 	goPackage *types.Package,
 	files []*ast.File,
 	info *types.Info,
@@ -76,7 +76,7 @@ func (prog *Program) CreatePackage(
 		panic("nil pkg")
 	}
 	irPackage := &Package{
-		Program:   prog,
+		Program:   program,
 		members:   make(map[string]Member),
 		values:    make(map[types.Object]Member),
 		Types:     goPackage,
@@ -94,7 +94,7 @@ func (prog *Program) CreatePackage(
 		Signature: new(types.Signature),
 		Synthetic: "package initializer",
 		Package:   irPackage,
-		Program:   prog,
+		Program:   program,
 		build:     (*builder).buildPackageInit,
 		info:      irPackage.info,
 		goversion: "", // See Package.build for details.
@@ -124,29 +124,29 @@ func (prog *Program) CreatePackage(
 
 	// Add initializer guard variable.
 	initguard := &Global{
-		Package: irPackage,
-		name:    "init$guard",
-		typ:     types.NewPointer(tBool),
+		Package:   irPackage,
+		name:      "init$guard",
+		valueType: types.NewPointer(tBool),
 	}
 	irPackage.members[initguard.Name()] = initguard
 
-	prog.packagesMutex.Lock()
-	defer prog.packagesMutex.Unlock()
+	program.packagesMutex.Lock()
+	defer program.packagesMutex.Unlock()
 	if importable {
-		prog.imported[irPackage.Types.Path()] = irPackage
+		program.imported[irPackage.Types.Path()] = irPackage
 	}
-	prog.packages[irPackage.Types] = irPackage
+	program.packages[irPackage.Types] = irPackage
 
 	return irPackage
 }
 
 // AllPackages returns a new slice containing all packages created by
-// prog.CreatePackage in unspecified order.
-func (prog *Program) AllPackages() []*Package {
-	prog.packagesMutex.RLock()
-	defer prog.packagesMutex.RUnlock()
-	pkgs := make([]*Package, 0, len(prog.packages))
-	for _, irPackage := range prog.packages {
+// program.CreatePackage in unspecified order.
+func (program *Program) AllPackages() []*Package {
+	program.packagesMutex.RLock()
+	defer program.packagesMutex.RUnlock()
+	pkgs := make([]*Package, 0, len(program.packages))
+	for _, irPackage := range program.packages {
 		pkgs = append(pkgs, irPackage)
 	}
 	return pkgs
@@ -169,34 +169,34 @@ func (prog *Program) AllPackages() []*Package {
 // Furthermore, the graph of packages may contain multiple variants
 // (e.g. "p" vs "p as compiled for q.test"), and each has a different
 // view of its dependencies.
-func (prog *Program) ImportedPackage(path string) *Package {
-	prog.packagesMutex.RLock()
-	defer prog.packagesMutex.RUnlock()
-	return prog.imported[path]
+func (program *Program) ImportedPackage(path string) *Package {
+	program.packagesMutex.RLock()
+	defer program.packagesMutex.RUnlock()
+	return program.imported[path]
 }
 
 // SetNoReturn sets the predicate used when building the ir.Program
-// prog that reports whether a given function cannot return.
+// program that reports whether a given function cannot return.
 // This may be used to prune spurious control flow edges
 // after (e.g.) log.Fatal, improving the precision of analyses.
 //
 // A typical implementation is the [ctrlflow.CFGs.NoReturn] method from
 // [golang.org/x/tools/go/analysis/passes/ctrlflow].
-func (prog *Program) SetNoReturn(predicate func(*types.Func) bool) {
-	prog.noReturn = predicate
+func (program *Program) SetNoReturn(predicate func(*types.Func) bool) {
+	program.noReturn = predicate
 }
 
 // noReturnFor is the no-return predicate function is built with: its package's, where Package.SetNoReturn set one,
 // else the program's, nil when neither is set.
-func (prog *Program) noReturnFor(function *Function) func(*types.Func) bool {
+func (program *Program) noReturnFor(function *Function) func(*types.Func) bool {
 	if function.Package != nil && function.Package.noReturn != nil {
 		return function.Package.noReturn
 	}
-	return prog.noReturn
+	return program.noReturn
 }
 
 // NewFunction returns a new synthetic Function instance belonging to
-// prog, with its name and signature fields set as specified.
+// program, with its name and signature fields set as specified.
 //
 // The caller is responsible for initializing the remaining fields of
 // the function object, e.g. Package, Parameters, Blocks.
@@ -209,29 +209,29 @@ func (prog *Program) noReturnFor(function *Function) func(*types.Func) bool {
 // "reflect" package, etc.
 //
 // The shape of this API is provisional.
-func (prog *Program) NewFunction(name string, sig *types.Signature, provenance string) *Function {
-	return &Function{Program: prog, name: name, Signature: sig, Synthetic: provenance}
+func (program *Program) NewFunction(name string, sig *types.Signature, provenance string) *Function {
+	return &Function{Program: program, name: name, Signature: sig, Synthetic: provenance}
 }
 
 // Package returns the IR Package corresponding to the specified
 // type-checker package object.
 // It returns nil if no such IR package has been created.
-func (prog *Program) Package(object *types.Package) *Package {
-	prog.packagesMutex.RLock()
-	defer prog.packagesMutex.RUnlock()
-	return prog.packages[object]
+func (program *Program) Package(object *types.Package) *Package {
+	program.packagesMutex.RLock()
+	defer program.packagesMutex.RUnlock()
+	return program.packages[object]
 }
 
 // packageLevelMember returns the package-level member corresponding
 // to the specified symbol, which may be a package-level const
 // (*NamedConstant), var (*Global) or func/method (*Function) of some
-// package in prog.
+// package in program.
 //
 // It returns nil if the object belongs to a package that has not been
-// created by prog.CreatePackage. A package created from its types alone
+// created by program.CreatePackage. A package created from its types alone
 // creates the member here, on its first lookup.
-func (prog *Program) packageLevelMember(object types.Object) Member {
-	if irPackage := prog.Package(object.Pkg()); irPackage != nil {
+func (program *Program) packageLevelMember(object types.Object) Member {
+	if irPackage := program.Package(object.Pkg()); irPackage != nil {
 		return irPackage.memberOf(object)
 	}
 	return nil
@@ -240,15 +240,15 @@ func (prog *Program) packageLevelMember(object types.Object) Member {
 // FunctionValue returns the SSA function or (non-interface) method
 // denoted by the specified func symbol. It returns nil if the symbol
 // denotes an interface method, or belongs to a package that was not
-// created by prog.CreatePackage.
-func (prog *Program) FunctionValue(object *types.Func) *Function {
-	function, _ := prog.packageLevelMember(object).(*Function)
+// created by program.CreatePackage.
+func (program *Program) FunctionValue(object *types.Func) *Function {
+	function, _ := program.packageLevelMember(object).(*Function)
 	return function
 }
 
 // ConstantValue returns the IR Value denoted by the source-level named
 // constant obj.
-func (prog *Program) ConstantValue(object *types.Const) *Constant {
+func (program *Program) ConstantValue(object *types.Const) *Constant {
 	// Constants for const objects and constant ast.Exprs are not shared;
 	// each call allocates its own.
 
@@ -257,7 +257,7 @@ func (prog *Program) ConstantValue(object *types.Const) *Constant {
 		return NewConstant(object.Val(), object.Type(), nil)
 	}
 	// Package-level named constant?
-	if member := prog.packageLevelMember(object); member != nil {
+	if member := program.packageLevelMember(object); member != nil {
 		namedConstant, isNamedConstant := member.(*NamedConstant)
 		if !isNamedConstant {
 			// Invariant: memberFromObject records every package-level *types.Const as a *NamedConstant.

@@ -152,13 +152,13 @@ var NoUnsafeUnaryMinus = rule.Rule[rule.NoOptions]{
 					return
 				}
 
-				expr := node.AsPrefixUnaryExpression()
+				expression := node.AsPrefixUnaryExpression()
 
-				if expr.Operator != ast.KindMinusToken {
+				if expression.Operator != ast.KindMinusToken {
 					return
 				}
 
-				argumentType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expr.Operand)
+				argumentType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expression.Operand)
 
 				for part := range type_checking.UnionTypePartsSequence(argumentType) {
 					if !type_checking.IsTypeFlagSet(

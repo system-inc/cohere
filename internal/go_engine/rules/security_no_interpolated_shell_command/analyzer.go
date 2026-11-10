@@ -143,8 +143,8 @@ func programIndexOf(context *rule.Context, call *ast.CallExpr) (int, bool) {
 
 // isFunction is whether call resolves to the package-level function name in the package at packagePath.
 func isFunction(context *rule.Context, call *ast.CallExpr, packagePath string, name string) bool {
-	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
-	return isFunc && function.Pkg() != nil && function.Pkg().Path() == packagePath &&
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	return isFunction && function.Pkg() != nil && function.Pkg().Path() == packagePath &&
 		function.Signature().Recv() == nil && function.Name() == name
 }
 

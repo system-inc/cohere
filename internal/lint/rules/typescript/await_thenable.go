@@ -181,17 +181,17 @@ var AwaitThenable = rule.Rule[rule.NoOptions]{
 				}
 			},
 			ast.KindForOfStatement: func(node *ast.Node) {
-				stmt := node.AsForInOrOfStatement()
-				if stmt.AwaitModifier == nil {
+				statement := node.AsForInOrOfStatement()
+				if statement.AwaitModifier == nil {
 					return
 				}
 
-				exprType := ruleContext.TypeChecker.GetTypeAtLocation(stmt.Expression)
-				if type_checking.IsTypeAnyType(exprType) {
+				expressionType := ruleContext.TypeChecker.GetTypeAtLocation(statement.Expression)
+				if type_checking.IsTypeAnyType(expressionType) {
 					return
 				}
 
-				for typePart := range type_checking.UnionTypePartsSequence(exprType) {
+				for typePart := range type_checking.UnionTypePartsSequence(expressionType) {
 					if type_checking.GetWellKnownSymbolPropertyOfType(
 						typePart,
 						"asyncIterator",
@@ -209,7 +209,7 @@ var AwaitThenable = rule.Rule[rule.NoOptions]{
 					rule.Suggestion{
 						Message: buildConvertToOrdinaryForMessage(),
 						Fixes: []rule.Fix{
-							ruleContext.RemoveNode(stmt.AwaitModifier),
+							ruleContext.RemoveNode(statement.AwaitModifier),
 						},
 					},
 				)

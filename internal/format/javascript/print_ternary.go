@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 
 // printTernary is upstream's printTernary. The experimental-ternaries branch is dropped; args is only
 // read there, so it is unused here.
-func printTernary(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+func printTernary(path *Path, options *Options, print PrintFunction, arguments *printArguments) Doc {
 	return printTernaryOld(path, options, print)
 }
 
@@ -89,7 +89,7 @@ func conditionalExpressionChainContainsJsx(node Node) bool {
 }
 
 // printTernaryTest is upstream's printTernaryTest.
-func printTernaryTest(path *Path, options *Options, print PrintFunc) Doc {
+func printTernaryTest(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	isConditionalExpression := current.Is("ConditionalExpression")
 	alternateNodePropertyName := "falseType"
@@ -190,7 +190,7 @@ func shouldExtraIndentForConditionalExpression(path *Path) bool {
 
 // printTernaryOld is upstream's printTernaryOld: the shared logic for ternary operators, namely
 // ConditionalExpression, ConditionalTypeAnnotation and TSConditionalType.
-func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
+func printTernaryOld(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	isConditionalExpression := current.Is("ConditionalExpression")
 	consequentNodePropertyName := "trueType"

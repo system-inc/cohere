@@ -204,6 +204,14 @@ func TestFindNamesEveryMeaningOfAWordWithMore(test *testing.T) {
 			`Use "doneChannel" or "doneCharacter", whichever it means.`},
 		{"outputDirPath", abbreviation.Policy, `Identifier "outputDirPath" abbreviates "Dir". ` +
 			`Use "outputDirectoryPath" or "outputDirectionPath", whichever it means.`},
+		// The census for #r0fa8pa found `recv` naming a receiver and a receive, `op` an operation, an operator
+		// and an operand, and `sel` a selection and a select statement beside go/ast's selector.
+		{"recv", abbreviation.Policy, `Identifier "recv" should not be abbreviated. ` +
+			`Use "receiver" or "receive", whichever it means, or a more descriptive name.`},
+		{"matchOp", abbreviation.Policy, `Identifier "matchOp" abbreviates "Op". ` +
+			`Use "matchOperation", "matchOperator" or "matchOperand", whichever it means.`},
+		{"selIndex", abbreviation.Policy, `Identifier "selIndex" should not be abbreviated. ` +
+			`Use "selectionIndex", "selectorIndex" or "selectIndex", whichever it means.`},
 		// The plain whole form, which no word in policy's file has two meanings in yet.
 		{"neg", listed, `Identifier "neg" should not be abbreviated. ` +
 			`Use "negative" or "negation", whichever it means.`},

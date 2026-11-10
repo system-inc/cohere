@@ -79,7 +79,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		"calling net/http.CanonicalHeaderKey on the 'key' argument of "+method+" is redundant",
 		staticcheck_report.FilterGenerated(),
 		staticcheck_report.Fixes(edit.Fix("Remove call to CanonicalHeaderKey",
-			edit.ReplaceWithNode(context.Fset, canonical, canonical.Args[0]))))
+			edit.ReplaceWithNode(context.FileSet, canonical, canonical.Args[0]))))
 }
 
 // headerMethodNames are the four methods the pattern's Or names, by the full names the finding reports.

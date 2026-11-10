@@ -50,8 +50,8 @@ func Terminates(function *Function) bool {
 					if !isFunction {
 						return true
 					}
-					calleeObject, isFunc := callee.Object().(*types.Func)
-					if !isFunc {
+					calleeObject, isFunctionObject := callee.Object().(*types.Func)
+					if !isFunctionObject {
 						return true
 					}
 					if calleeObject.FullName() != "time.Tick" {

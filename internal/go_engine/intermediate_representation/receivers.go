@@ -9,8 +9,8 @@ package intermediate_representation
 
 import "go/types"
 
-// recvType returns the receiver type of method obj.
-func recvType(object *types.Func) types.Type {
+// methodReceiverType returns the receiver type of method `object`.
+func methodReceiverType(object *types.Func) types.Type {
 	sig, isSignature := object.Type().(*types.Signature)
 	if !isSignature {
 		// Invariant: go/types gives every *types.Func a *types.Signature type.
@@ -22,17 +22,17 @@ func recvType(object *types.Func) types.Type {
 // receiverTypeArguments returns the type arguments to a method's receiver.
 // Returns an empty list if the receiver does not have type arguments.
 func receiverTypeArguments(method *types.Func) []types.Type {
-	recv := method.Signature().Recv()
+	receiver := method.Signature().Recv()
 	named := func() (named *types.Named) {
-		resolvedType := recv.Type()
-		if ptr, ok := types.Unalias(resolvedType).(*types.Pointer); ok {
-			resolvedType = ptr.Elem()
+		resolvedType := receiver.Type()
+		if pointer, ok := types.Unalias(resolvedType).(*types.Pointer); ok {
+			resolvedType = pointer.Elem()
 		}
 		named, _ = types.Unalias(resolvedType).(*types.Named)
 		return named
 	}()
 	if named == nil {
-		return nil // recv is anonymous struct/interface
+		return nil // receiver is anonymous struct/interface
 	}
 	ts := named.TypeArgs()
 	if ts.Len() == 0 {
@@ -45,9 +45,9 @@ func receiverTypeArguments(method *types.Func) []types.Type {
 	return targs
 }
 
-// recvAsFirstArgument takes a method signature and returns a function
+// receiverAsFirstArgument takes a method signature and returns a function
 // signature with receiver as the first parameter.
-func recvAsFirstArgument(sig *types.Signature) *types.Signature {
+func receiverAsFirstArgument(sig *types.Signature) *types.Signature {
 	parameters := make([]*types.Var, 0, 1+sig.Params().Len())
 	parameters = append(parameters, sig.Recv())
 	for variable := range sig.Params().Variables() {

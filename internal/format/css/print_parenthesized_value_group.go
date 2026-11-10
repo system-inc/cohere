@@ -38,7 +38,7 @@ func printTrailingComma(path *astPath, options *printerOptions) doc.Doc {
 	return doc.Text("")
 }
 
-func printParenthesizedValueGroup(path *astPath, options *printerOptions, print printFunc) doc.Doc {
+func printParenthesizedValueGroup(path *astPath, options *printerOptions, print printFunction) doc.Doc {
 	node := currentNode(path)
 	parent, hasParent := path.Parent()
 	// A url() argument the value parser cannot handle is a plain string among the groups

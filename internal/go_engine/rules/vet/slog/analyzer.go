@@ -205,13 +205,13 @@ func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 func reportMisplaced(context *rule.Context, function *types.Func, argument ast.Expr, unknownArgument ast.Expr) {
 	if unknownArgument == nil {
 		context.ReportRangef(argument, "%s arg %q should be a string or a slog.Attr (possible missing key or value)",
-			shortName(function), formatted(context.Fset, argument))
+			shortName(function), formatted(context.FileSet, argument))
 		return
 	}
 	context.ReportRangef(
 		argument,
 		"%s arg %q should probably be a string or a slog.Attr (previous arg %q cannot be a key)",
-		shortName(function), formatted(context.Fset, argument), formatted(context.Fset, unknownArgument),
+		shortName(function), formatted(context.FileSet, argument), formatted(context.FileSet, unknownArgument),
 	)
 }
 

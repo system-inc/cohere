@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageCondAssign = rule.Message{
+var messageAssignmentInCondition = rule.Message{
 	Id: "condAssign",
 	Description: "This condition assigns rather than compares, so it does not test what it reads " +
 		"as testing: it writes the value and then branches on whatever was written, which makes " +
@@ -14,27 +14,27 @@ var messageCondAssign = rule.Message{
 		"parentheses to say so.",
 }
 
-// NoCondAssignMode is the option value, spelled as the config spells it.
+// NoAssignmentInConditionMode is the option value, spelled as the config spells it.
 //
 // A named string type rather than a struct because this rule's option is a bare string in the
 // config tuple: `["error", "always"]` puts `"always"` where other rules put an object. The decoder
 // is a plain json.Unmarshal, which decodes a JSON string into this directly.
-type NoCondAssignMode = string
+type NoAssignmentInConditionMode = string
 
 const (
-	// NoCondAssignExceptParens permits an assignment wrapped in its own parentheses, which is the
+	// NoAssignmentInConditionExceptParens permits an assignment wrapped in its own parentheses, which is the
 	// established way to write "the assignment here is deliberate". This is the default.
-	NoCondAssignExceptParens NoCondAssignMode = "except-parens"
+	NoAssignmentInConditionExceptParens NoAssignmentInConditionMode = "except-parens"
 
-	// NoCondAssignAlways reports every assignment reachable from a conditional test, parenthesized
+	// NoAssignmentInConditionAlways reports every assignment reachable from a conditional test, parenthesized
 	// or not.
-	NoCondAssignAlways NoCondAssignMode = "always"
+	NoAssignmentInConditionAlways NoAssignmentInConditionMode = "always"
 )
 
-// NoCondAssignOptions is the decoded option.
-type NoCondAssignOptions = NoCondAssignMode
+// NoAssignmentInConditionOptions is the decoded option.
+type NoAssignmentInConditionOptions = NoAssignmentInConditionMode
 
-// NoCondAssign flags an assignment in a conditional test.
+// NoAssignmentInCondition flags an assignment in a conditional test.
 //
 //	valid:   if (x === 0) { }
 //	valid:   if ((someNode = someNode.parentNode) !== null) { }
@@ -89,13 +89,13 @@ type NoCondAssignOptions = NoCondAssignMode
 // second thing to fix, and it double-counts in any total. The walk under `always` already covers
 // the direct case on its own, so this reports through one path per mode and emits one finding. The
 // divergence is stated rather than silent, and the fixtures assert the single count.
-var NoCondAssign = rule.Rule[NoCondAssignOptions]{
+var NoAssignmentInCondition = rule.Rule[NoAssignmentInConditionOptions]{
 	Name: "no-cond-assign",
-	Run: func(ruleContext rule.Context, options rule.Given[NoCondAssignOptions]) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoAssignmentInConditionOptions]) rule.Listeners {
 		// Unrecognized and absent both land on the permissive mode. A rule enabled with a bare
 		// severity must not silently run the strict half, and a typo must not silently escalate.
 		always := false
-		if mode, configured := options.Read(); configured && mode == NoCondAssignAlways {
+		if mode, configured := options.Read(); configured && mode == NoAssignmentInConditionAlways {
 			always = true
 		}
 
@@ -109,7 +109,7 @@ var NoCondAssign = rule.Rule[NoCondAssignOptions]{
 						return
 					}
 					if assignmentSitsInAConditionalTest(node) {
-						reportCondAssign(ruleContext, node)
+						reportAssignmentInCondition(ruleContext, node)
 					}
 				},
 			}
@@ -126,7 +126,7 @@ var NoCondAssign = rule.Rule[NoCondAssignOptions]{
 			if !isAssignmentExpression(test) {
 				return
 			}
-			reportCondAssign(ruleContext, test)
+			reportAssignmentInCondition(ruleContext, test)
 		}
 
 		return rule.Listeners{
@@ -225,13 +225,13 @@ func assignmentSitsInAConditionalTest(assignment *ast.Node) bool {
 	return false
 }
 
-// reportCondAssign points the finding at the assignment operator rather than the whole expression.
+// reportAssignmentInCondition points the finding at the assignment operator rather than the whole expression.
 //
 // `rule.TokenRange` rather than the operator token's own position: a node's `Pos()` runs from before
 // its leading trivia, so on `while (a /* = */ = b) {}` a span built from `OperatorToken.Pos()`
 // covers ` /* = */ =` and anchors the finding inside the comment. Upstream carries that exact input
 // in its fail corpus for this reason, and `TokenRange` scans past the trivia to the token itself.
-func reportCondAssign(ruleContext rule.Context, assignment *ast.Node) {
+func reportAssignmentInCondition(ruleContext rule.Context, assignment *ast.Node) {
 	operator := assignment.AsBinaryExpression().OperatorToken
-	ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, operator), messageCondAssign)
+	ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, operator), messageAssignmentInCondition)
 }

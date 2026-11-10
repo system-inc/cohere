@@ -17,7 +17,7 @@ import (
 */
 
 // printArray is upstream's printArray.
-func printArray(path *Path, options *Options, print PrintFunc) Doc {
+func printArray(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	var parts []Doc
 
@@ -171,7 +171,7 @@ func isLineAfterElementEmpty(path *Path, options *Options) bool {
 }
 
 // printArrayElements is upstream's printArrayElements, without the Flow-only `inexact` parameter.
-func printArrayElements(path *Path, options *Options, print PrintFunc, elementsProperty string) Doc {
+func printArrayElements(path *Path, options *Options, print PrintFunction, elementsProperty string) Doc {
 	var parts []Doc
 
 	each(path, func(path *Path, _ int) {
@@ -195,7 +195,7 @@ func printArrayElements(path *Path, options *Options, print PrintFunc, elementsP
 }
 
 // printArrayElementsConcisely is upstream's printArrayElementsConcisely.
-func printArrayElementsConcisely(path *Path, options *Options, print PrintFunc, trailingComma Doc) Doc {
+func printArrayElementsConcisely(path *Path, options *Options, print PrintFunction, trailingComma Doc) Doc {
 	var parts []Doc
 
 	each(path, func(path *Path, _ int) {
@@ -227,7 +227,7 @@ func printArrayElementsConcisely(path *Path, options *Options, print PrintFunc, 
 
 // printNamedTupleMember is upstream's printNamedTupleMember, print/tuple.js. `variance` is
 // `TupleTypeLabeledElement` (Flow) only and is dropped.
-func printNamedTupleMember(path *Path, options *Options, print PrintFunc) Doc {
+func printNamedTupleMember(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	optional := ""
@@ -246,6 +246,6 @@ func printNamedTupleMember(path *Path, options *Options, print PrintFunc) Doc {
 */
 
 // printArrayType is upstream's printArrayType, print/array-type.js.
-func printArrayType(print PrintFunc) Doc {
+func printArrayType(print PrintFunction) Doc {
 	return concat(print("elementType", nil), doc.Text("[]"))
 }

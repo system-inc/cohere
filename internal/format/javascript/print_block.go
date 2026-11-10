@@ -8,7 +8,7 @@ import (
 // print/block.js and print/statement-sequence.js.
 
 // printBlock is upstream's printBlock: Program, BlockStatement, StaticBlock and TSModuleBlock.
-func printBlock(path *Path, options *Options, print PrintFunc) Doc {
+func printBlock(path *Path, options *Options, print PrintFunction) Doc {
 	bodyDoc := printBlockBody(path, options, print)
 	current := node(path)
 	parent := parentOf(path)
@@ -45,7 +45,7 @@ func printBlock(path *Path, options *Options, print PrintFunc) Doc {
 // printBlockBody is upstream's printBlockBody. It returns nil where upstream returns "", the falsy
 // value printBlock tests for. typescript-estree has no directives array (directives are expression
 // statements in body), so that branch is the Babel one and is not reached.
-func printBlockBody(path *Path, options *Options, print PrintFunc) Doc {
+func printBlockBody(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	hasDirectives := len(current.List("directives")) > 0
 	hasBody := false
@@ -82,7 +82,7 @@ func printBlockBody(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printStatementSequence is upstream's printStatementSequence.
-func printStatementSequence(path *Path, options *Options, print PrintFunc, property string) Doc {
+func printStatementSequence(path *Path, options *Options, print PrintFunction, property string) Doc {
 	current := node(path)
 	var parts []Doc
 

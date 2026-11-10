@@ -327,15 +327,15 @@ var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 				return
 			}
 
-			expr := parent.AsCallExpression()
-			arguments := expr.Arguments.Nodes
+			expression := parent.AsCallExpression()
+			arguments := expression.Arguments.Nodes
 			if len(arguments) == 0 {
 				return
 			}
 
 			callback := arguments[0]
 
-			if type_checking.IsArrayMethodCallWithPredicate(ruleContext.TypeChecker, expr) &&
+			if type_checking.IsArrayMethodCallWithPredicate(ruleContext.TypeChecker, expression) &&
 				returnsThenable(callback) {
 				ruleContext.ReportNode(callback, buildPredicateMessage())
 			}
@@ -411,11 +411,11 @@ var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 
 		var checkConditional func(
 			node *ast.Expression,
-			isTestExpr bool,
+			isTestExpression bool,
 		)
 		checkConditional = func(
 			node *ast.Expression,
-			isTestExpr bool,
+			isTestExpression bool,
 		) {
 			if node == nil || ast.IsAssignmentExpression(node, false) {
 				return
@@ -429,14 +429,14 @@ var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 			unparenthesized := ast.SkipParentheses(node)
 
 			if ast.IsBinaryExpression(unparenthesized) && ast.IsLogicalExpression(unparenthesized) {
-				expr := unparenthesized.AsBinaryExpression()
+				expression := unparenthesized.AsBinaryExpression()
 				// ignore the left operand for nullish coalescing expressions not in a context of a test expression
-				if expr.OperatorToken.Kind != ast.KindQuestionQuestionToken || isTestExpr {
-					checkConditional(expr.Left, isTestExpr)
+				if expression.OperatorToken.Kind != ast.KindQuestionQuestionToken || isTestExpression {
+					checkConditional(expression.Left, isTestExpression)
 				}
 				// we ignore the right operand when not in a context of a test expression
-				if isTestExpr {
-					checkConditional(expr.Right, isTestExpr)
+				if isTestExpression {
+					checkConditional(expression.Right, isTestExpression)
 				}
 				return
 			}
@@ -1021,9 +1021,9 @@ var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 			listeners[ast.KindElementAccessExpression] = checkArrayPredicates
 
 			listeners[ast.KindPrefixUnaryExpression] = func(node *ast.Node) {
-				expr := node.AsPrefixUnaryExpression()
-				if expr.Operator == ast.KindExclamationToken {
-					checkConditional(expr.Operand, true)
+				expression := node.AsPrefixUnaryExpression()
+				if expression.Operator == ast.KindExclamationToken {
+					checkConditional(expression.Operand, true)
 				}
 			}
 

@@ -178,7 +178,7 @@ func checkLongShift(context *rule.Context, shift ast.Node, shifted ast.Expr, cou
 	}
 	context.ReportRangef(
 		shift, "%s (%s%d bits) too small for shift of %d",
-		formatted(context.Fset, shifted), qualifier, narrowest, amount,
+		formatted(context.FileSet, shifted), qualifier, narrowest, amount,
 	)
 }
 

@@ -71,7 +71,7 @@ type fileState struct {
 func enterFile(context *rule.Context, file *ast.File) {
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
 	rule.FileState[fileState](context).isTest = strings.HasSuffix(
-		context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+		context.FileSet.PositionFor(file.Package, false).Filename, "_test.go")
 }
 
 // judgeFunction reports node when it is a test in a _test.go file that cannot fail on a wrong result.
@@ -160,8 +160,8 @@ func isReporterValue(context *rule.Context, expression ast.Expr) bool {
 	}
 	// Addressable, so a value whose Errorf has a pointer receiver counts too: the code handed it may take its address.
 	object, _, _ := types.LookupFieldOrMethod(typeAndValue.Type, true, nil, "Errorf")
-	_, isFunc := object.(*types.Func)
-	return isFunc
+	_, isFunction := object.(*types.Func)
+	return isFunction
 }
 
 // isBuiltinPanic is whether call is the predeclared panic, which fails the test it runs in.
@@ -177,8 +177,8 @@ func isBuiltinPanic(context *rule.Context, call *ast.CallExpr) bool {
 // isTestingMethod is whether object is a method declared in package testing, on T, the common type T embeds, or the
 // TB interface, so a method of the same name on any other type is never mistaken for it.
 func isTestingMethod(object types.Object) bool {
-	method, isFunc := object.(*types.Func)
-	return isFunc && method.Pkg() != nil && method.Pkg().Path() == "testing" && method.Signature().Recv() != nil
+	method, isFunction := object.(*types.Func)
+	return isFunction && method.Pkg() != nil && method.Pkg().Path() == "testing" && method.Signature().Recv() != nil
 }
 
 // skipsFirst is whether body skips unconditionally on parameter before doing anything, after at most a leading
@@ -222,8 +222,8 @@ func testParameter(context *rule.Context, function *ast.FuncDecl) *types.Var {
 	if function.Recv != nil || function.Body == nil || !isTestName(function.Name.Name) {
 		return nil
 	}
-	object, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func)
-	if !isFunc {
+	object, isFunction := context.TypesInfo.Defs[function.Name].(*types.Func)
+	if !isFunction {
 		return nil
 	}
 	signature := object.Signature()

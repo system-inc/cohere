@@ -9,10 +9,10 @@
 // for code.CouldMatchAny to rule a package out by and so walks every assignment and binary expression the inspector
 // holds; the port walks the same nodes and asks the same of each: an assignment that shifts in place, or a binary
 // expression that shifts, whose shifted operand is of a fixed-size integer type, signed or not, by the sizes the
-// pass's types were checked for, and whose shift is a constant that staticcheck_code.ExprToInt, the port of the helper
-// the original asks, reads as at least that many bits. The original keeps nothing from one shift to the next. The
-// registry runs the port in the original's place, under its name, and the original stays only as the oracle: the parity
-// tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// pass's types were checked for, and whose shift is a constant that staticcheck_code.ExpressionToInt, the port of the
+// helper the original asks, reads as at least that many bits. The original keeps nothing from one shift to the next.
+// The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
+// parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package oversized_shift
 
 import (
@@ -85,7 +85,7 @@ func reportOversized(context *rule.Context, node ast.Node, shifted ast.Expr, amo
 		return
 	}
 	width := context.TypesSizes.Sizeof(basic) * bitsInByte
-	bits, isConstant := staticcheck_code.ExprToInt(context, amount)
+	bits, isConstant := staticcheck_code.ExpressionToInt(context, amount)
 	if !isConstant || bits < width {
 		return
 	}

@@ -84,7 +84,7 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 				if binding != allocation {
 					continue
 				}
-				shown := staticcheck_report.DisplayPosition(context.Fset, closure.Function.Pos())
+				shown := staticcheck_report.DisplayPosition(context.FileSet, closure.Function.Pos())
 				staticcheck_report.Report(context, site, fmt.Sprintf(messageFormat, shown))
 			}
 		}

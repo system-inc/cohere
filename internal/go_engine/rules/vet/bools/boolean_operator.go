@@ -33,7 +33,7 @@ func (operator booleanOperator) checkRedundant(context *rule.Context, operands [
 	// written holds each operand's source, as printed, seen so far.
 	written := map[string]bool{}
 	for _, operand := range operands {
-		source := formatted(context.Fset, operand)
+		source := formatted(context.FileSet, operand)
 		if written[source] {
 			context.Report(analysis.Diagnostic{
 				Pos:     operand.Pos(),
@@ -69,8 +69,8 @@ func (operator booleanOperator) checkSuspect(context *rule.Context, operands []a
 		default:
 			continue
 		}
-		testedSource := formatted(context.Fset, tested)
-		comparisonSource := formatted(context.Fset, operand)
+		testedSource := formatted(context.FileSet, tested)
+		comparisonSource := formatted(context.FileSet, operand)
 		first, testedBefore := comparisons[testedSource]
 		if !testedBefore {
 			comparisons[testedSource] = comparisonSource

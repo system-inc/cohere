@@ -65,7 +65,7 @@ func Check(context *rule.Context, expression *ast.UnaryExpr) {
 	operand := ast.Unparen(single.X)
 	staticcheck_report.Report(context, expression, "negating a boolean twice has no effect; is this a typo?",
 		staticcheck_report.Fixes(
-			edit.Fix("Turn into single negation", edit.ReplaceWithNode(context.Fset, expression, single)),
-			edit.Fix("Remove double negation", edit.ReplaceWithNode(context.Fset, expression, operand)),
+			edit.Fix("Turn into single negation", edit.ReplaceWithNode(context.FileSet, expression, single)),
+			edit.Fix("Remove double negation", edit.ReplaceWithNode(context.FileSet, expression, operand)),
 		))
 }

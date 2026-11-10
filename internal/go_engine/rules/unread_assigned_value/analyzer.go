@@ -70,7 +70,7 @@ func generatorLookup(context *rule.Context) func(position token.Pos) (generated.
 		panic("unread_assigned_value: the generated pass's result is missing")
 	}
 	return func(position token.Pos) (generated.Generator, bool) {
-		generator, isGenerated := generators[context.Fset.PositionFor(position, false).Filename]
+		generator, isGenerated := generators[context.FileSet.PositionFor(position, false).Filename]
 		return generator, isGenerated
 	}
 }

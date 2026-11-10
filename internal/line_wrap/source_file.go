@@ -529,7 +529,7 @@ func (sourceFile *sourceFile) choosePlan(plans []plan, indexes []int, line int) 
 	var ordered []int
 	var lastResort []int
 	for _, index := range indexes {
-		if plans[index].lastFuncLiteral {
+		if plans[index].lastFunctionLiteral {
 			lastResort = append(lastResort, index)
 		} else {
 			ordered = append(ordered, index)

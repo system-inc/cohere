@@ -12,11 +12,11 @@ import (
 )
 
 // newVariable creates a 'var' for use in a types.Tuple.
-func newVariable(name string, typ types.Type) *types.Var {
-	return types.NewParam(token.NoPos, nil, name, typ)
+func newVariable(name string, variableType types.Type) *types.Var {
+	return types.NewParam(token.NoPos, nil, name, variableType)
 }
 
-// anonVariable creates an anonymous 'var' for use in a types.Tuple.
-func anonVariable(typ types.Type) *types.Var {
-	return newVariable("", typ)
+// anonymousVariable creates an anonymous 'var' for use in a types.Tuple.
+func anonymousVariable(variableType types.Type) *types.Var {
+	return newVariable("", variableType)
 }

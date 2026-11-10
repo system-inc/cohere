@@ -73,15 +73,15 @@ func (canonizer *canonizer) instantiateMethod(
 	targs []types.Type,
 	ctxt *types.Context,
 ) *types.Func {
-	recv := recvType(function)
-	if pointer, ok := types.Unalias(recv).(*types.Pointer); ok {
-		recv = pointer.Elem()
+	receiverType := methodReceiverType(function)
+	if pointer, ok := types.Unalias(receiverType).(*types.Pointer); ok {
+		receiverType = pointer.Elem()
 	}
-	named, isNamed := types.Unalias(recv).(*types.Named)
+	named, isNamed := types.Unalias(receiverType).(*types.Named)
 	if !isNamed {
 		// Invariant: callers instantiate only a method with receiver type arguments, which is declared on a generic
 		// named type, so its receiver is that type or a pointer to it.
-		panic(fmt.Sprintf("instantiateMethod: %s has receiver %s, not a named type", function, recv))
+		panic(fmt.Sprintf("instantiateMethod: %s has receiver %s, not a named type", function, receiverType))
 	}
 	inst, instantiateError := types.Instantiate(ctxt, named.Origin(), targs, false)
 	if instantiateError != nil {

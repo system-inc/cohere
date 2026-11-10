@@ -149,7 +149,7 @@ func newNumber(value string, nodeSource sourceSpan, sourceIndex int, unit string
 
 // FunctionNode: Container with type 'func', unbalanced starting at -1 so the parser knows no parens
 // have been added yet.
-func newFunc(value string, nodeSource sourceSpan, sourceIndex int) *estree.Node {
+func newFunction(value string, nodeSource sourceSpan, sourceIndex int) *estree.Node {
 	node := estree.New(
 		"func",
 		0,

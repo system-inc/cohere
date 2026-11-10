@@ -357,14 +357,14 @@ func strictVoidReturnWalkStatements(body *ast.Node) []*ast.Node {
 	return found
 }
 
-func strictVoidReturnNonVoidFuncMessage() rule.Message {
+func strictVoidReturnNonVoidFunctionMessage() rule.Message {
 	return rule.Message{
 		Id:          "nonVoidFunc",
 		Description: "Value-returning function used in a context where a void function is expected.",
 	}
 }
 
-func strictVoidReturnAsyncFuncMessage() rule.Message {
+func strictVoidReturnAsyncFunctionMessage() rule.Message {
 	return rule.Message{
 		Id:          "asyncFunc",
 		Description: "Async function used in a context where a void function is expected.",

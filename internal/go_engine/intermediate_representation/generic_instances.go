@@ -13,11 +13,11 @@ import (
 
 // instance returns whether an expression is a simple or qualified identifier
 // that is a generic instantiation.
-func instance(info *types.Info, expr ast.Expr) bool {
+func instance(info *types.Info, expression ast.Expr) bool {
 	// Compare the logic here against go/types.instantiatedIdent,
 	// which also handles  *IndexExpr and *IndexListExpr.
 	var id *ast.Ident
-	switch x := expr.(type) {
+	switch x := expression.(type) {
 	case *ast.Ident:
 		id = x
 	case *ast.SelectorExpr:

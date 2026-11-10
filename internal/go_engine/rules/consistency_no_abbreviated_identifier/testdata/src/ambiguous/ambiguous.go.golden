@@ -28,14 +28,14 @@ func makeTable(res int) map[string]int { // want `Identifier "res" should not be
 }
 
 // `ch` as a channel and as a character, and `dir` as a directory and as a channel's direction.
-func walk(text string, outputDir string, chanDir reflect.ChanDir) int { // want `Identifier "outputDir" abbreviates "Dir"\. Use "outputDirectory" or "outputDirection", whichever it means\.` `Identifier "chanDir" abbreviates "Dir"\. Use "chanDirectory" or "chanDirection", whichever it means\.`
+func walk(text string, outputDir string, channelDir reflect.ChanDir) int { // want `Identifier "outputDir" abbreviates "Dir"\. Use "outputDirectory" or "outputDirection", whichever it means\.` `Identifier "channelDir" abbreviates "Dir"\. Use "channelDirectory" or "channelDirection", whichever it means\.`
 	ch := make(chan rune, len(text)) // want `Identifier "ch" should not be abbreviated\. Use "channel" or "character", whichever it means, or a more descriptive name\.`
 	doneCh := make(chan bool, 1)     // want `Identifier "doneCh" abbreviates "Ch"\. Use "doneChannel" or "doneCharacter", whichever it means\.`
 	for _, ch := range text {        // want `Identifier "ch" should not be abbreviated\. Use "channel" or "character", whichever it means, or a more descriptive name\.`
 		_ = ch
 	}
 	doneCh <- true
-	return len(ch) + len(outputDir) + int(chanDir)
+	return len(ch) + len(outputDir) + int(channelDir)
 }
 
 // `Var` and `Vars` as JavaScript's var keyword, as a rule against it is named, and as variables. A bare lowercase

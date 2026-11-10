@@ -338,7 +338,7 @@ func consistentTypeDefinitionsInterfaceFixes(ruleContext rule.Context, node *ast
 		consistentTypeDefinitionsHasModifier(node, ast.KindExportKeyword) {
 		nameText := node.Name().Text()
 		fixes = append(fixes,
-			rule.RemoveRange(core.NewTextRange(statement.Pos(), *consistentTypeDefinitionsPtr(keyword.Pos()))),
+			rule.RemoveRange(core.NewTextRange(statement.Pos(), *consistentTypeDefinitionsIntPointer(keyword.Pos()))),
 			rule.Fix{
 				Range: core.NewTextRange(bodyEnd, bodyEnd),
 				Text:  "\nexport default " + nameText,
@@ -368,8 +368,8 @@ func consistentTypeDefinitionsUnwrapParentheses(node *ast.Node) *ast.Node {
 	return current
 }
 
-// consistentTypeDefinitionsPtr is a small helper so a computed int can be taken by address inline.
-func consistentTypeDefinitionsPtr(value int) *int { return new(value) }
+// consistentTypeDefinitionsIntPointer is a small helper so a computed int can be taken by address inline.
+func consistentTypeDefinitionsIntPointer(value int) *int { return new(value) }
 
 // consistentTypeDefinitionsHeritageTypes returns the types an interface extends, in source order.
 func consistentTypeDefinitionsHeritageTypes(declaration *ast.InterfaceDeclaration) []*ast.Node {

@@ -19,8 +19,8 @@ type astPath = printing.AstPath[*estree.Node, format_options.Options]
 // printerOptions is upstream's options object for one format.
 type printerOptions = printing.Options[*estree.Node, format_options.Options, printing.NoArguments]
 
-// printFunc is upstream's print(selector), which the GraphQL printer passes no args.
-type printFunc = printing.PrintFunc[printing.NoArguments]
+// printFunction is upstream's print(selector), which the GraphQL printer passes no args.
+type printFunction = printing.PrintFunction[printing.NoArguments]
 
 // locStart and locEnd are loc.js: a node's or token's loc.start and loc.end, which are the Range here.
 func locStart(nodeOrToken *estree.Node) int { return nodeOrToken.Range[0] }

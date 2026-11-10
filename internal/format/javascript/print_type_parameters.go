@@ -38,7 +38,7 @@ func shouldForceTrailingComma(path *Path, options *Options, parametersKey string
 - `TSTypeReference` (TypeScript)
 */
 // printTypeParameters is upstream's printTypeParameters.
-func printTypeParameters(path *Path, options *Options, print PrintFunc, parametersKey string) Doc {
+func printTypeParameters(path *Path, options *Options, print PrintFunction, parametersKey string) Doc {
 	current := node(path)
 	// Upstream's `node[paramsKey]` is either an array or a single node; Go reads which with a type
 	// switch. An empty array is truthy upstream, so only a missing value returns "".
@@ -144,7 +144,7 @@ func printDanglingCommentsForInline(path *Path, options *Options) Doc {
 // `TSTypeParameter` and `TypeParameter`
 //
 // printTypeParameter is upstream's printTypeParameter.
-func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
+func printTypeParameter(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	constKeyword := ""

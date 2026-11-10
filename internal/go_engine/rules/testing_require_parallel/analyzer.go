@@ -76,7 +76,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 		for _, packageFile := range context.Files {
 			for _, declaration := range packageFile.Decls {
 				if function, isFunction := declaration.(*ast.FuncDecl); isFunction {
-					if object, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func); isFunc {
+					if object, isFunction := context.TypesInfo.Defs[function.Name].(*types.Func); isFunction {
 						state.declarations[object] = function
 					}
 				}
@@ -84,7 +84,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 		}
 	}
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-	state.isTest = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+	state.isTest = strings.HasSuffix(context.FileSet.PositionFor(file.Package, false).Filename, "_test.go")
 	state.comments = nil
 	if !state.isTest {
 		return
@@ -120,7 +120,7 @@ func judgeSubtest(context *rule.Context, node ast.Node, _ []ast.Node) {
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return
 	}
-	if method, isFunc := selection.Obj().(*types.Func); !isFunc || !isTestingTMethod(method, "Run") {
+	if method, isFunction := selection.Obj().(*types.Func); !isFunction || !isTestingTMethod(method, "Run") {
 		return
 	}
 	body, parameter, doc := subtestFunction(context, call.Args[1], state.declarations)
@@ -171,8 +171,8 @@ func subtestFunction(
 			object = context.TypesInfo.Uses[named.Sel]
 		}
 	}
-	function, isFunc := object.(*types.Func)
-	if !isFunc {
+	function, isFunction := object.(*types.Func)
+	if !isFunction {
 		return nil, nil, nil
 	}
 	// A method of an instantiated generic type, suite.serial on a *Suite[int], is an object of its own that no
@@ -194,8 +194,8 @@ func testParameter(context *rule.Context, function *ast.FuncDecl) *types.Var {
 	if function.Recv != nil || function.Body == nil || !isTestName(function.Name.Name) {
 		return nil
 	}
-	object, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func)
-	if !isFunc {
+	object, isFunction := context.TypesInfo.Defs[function.Name].(*types.Func)
+	if !isFunction {
 		return nil
 	}
 	signature := object.Signature()
@@ -250,8 +250,8 @@ func firstStatementCallsParallel(context *rule.Context, body *ast.BlockStmt, par
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return false
 	}
-	method, isFunc := selection.Obj().(*types.Func)
-	return isFunc && isTestingTMethod(method, "Parallel")
+	method, isFunction := selection.Obj().(*types.Func)
+	return isFunction && isTestingTMethod(method, "Parallel")
 }
 
 // isTestingTMethod is whether method is testing's (*T).<name>, by its package and receiver, so a method of the same

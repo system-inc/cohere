@@ -43,10 +43,10 @@ type Select struct {
 	Blocking bool
 }
 
-func (instr *Select) Operands(rands []*Value) []*Value {
+func (instruction *Select) Operands(rands []*Value) []*Value {
 	operands := rands
-	for index := range instr.States {
-		operands = append(operands, &instr.States[index].Channel, &instr.States[index].Send)
+	for index := range instruction.States {
+		operands = append(operands, &instruction.States[index].Channel, &instruction.States[index].Send)
 	}
 	return operands
 }

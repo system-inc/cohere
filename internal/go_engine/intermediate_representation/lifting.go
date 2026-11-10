@@ -515,7 +515,7 @@ func liftingResolve(lifting *liftingFunction, scratch *liftingScratch) {
 			phi := &Phi{Edges: make([]Value, len(block.block.Predecessors))}
 			phi.comment = allocation.comment
 			phi.setSource(allocation.source)
-			phi.setType(deref(allocation.Type()))
+			phi.setType(dereference(allocation.Type()))
 			phi.setBlock(block.block)
 			scratch.definitions[core.Place.identifier].phi = phi
 			placed = append(placed, placedPhi{block: block.block, core: core, phi: phi})
@@ -549,7 +549,7 @@ func liftingResolve(lifting *liftingFunction, scratch *liftingScratch) {
 			if allocation == nil {
 				allocation = lifting.allocations[lifting.declarations[identifier]]
 			}
-			scratch.definitions[identifier].value = zeroConstant(deref(allocation.Type()), allocation.source)
+			scratch.definitions[identifier].value = zeroConstant(dereference(allocation.Type()), allocation.source)
 		}
 		return scratch.definitions[identifier].value
 	}
@@ -713,7 +713,7 @@ func liftingUselessPhi(phi *Phi) (Value, bool) {
 		}
 		firstConstant, firstIsConstant := first.(*Constant)
 		edgeConstant, edgeIsConstant := edge.(*Constant)
-		if firstIsConstant && edgeIsConstant && firstConstant.typ == edgeConstant.typ &&
+		if firstIsConstant && edgeIsConstant && firstConstant.valueType == edgeConstant.valueType &&
 			firstConstant.Value == edgeConstant.Value {
 			continue
 		}

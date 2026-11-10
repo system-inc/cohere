@@ -157,7 +157,7 @@ func Check(context *rule.Context, isPure func(function *types.Func) bool, statem
 	fixes := []analysis.SuggestedFix{}
 	if isDeclaredIn(matched.index, statement) && isDeclaredIn(matched.value, statement) {
 		fixes = append(fixes, edit.Fix("Replace loop with call to append",
-			edit.ReplaceWithNode(context.Fset, statement, replacement)))
+			edit.ReplaceWithNode(context.FileSet, statement, replacement)))
 	}
 	staticcheck_report.Report(context, statement,
 		"should replace loop with "+staticcheck_report.Render(context, replacement),

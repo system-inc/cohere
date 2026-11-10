@@ -85,7 +85,7 @@ func shouldBreakJsxElement(path *Path) bool {
 
 // printJsxAttribute is upstream's printJsxAttribute. jsxSingleQuote is never set in our
 // configurations, so the preferred quote is always the double quote.
-func printJsxAttribute(path *Path, options *Options, print PrintFunc) Doc {
+func printJsxAttribute(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parts := []Doc{print("name", nil)}
 
@@ -122,7 +122,7 @@ func printJsxAttribute(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printJsxExpressionContainer is upstream's printJsxExpressionContainer.
-func printJsxExpressionContainer(path *Path, options *Options, print PrintFunc) Doc {
+func printJsxExpressionContainer(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	var shouldInline func(node Node, parent Node) bool
@@ -158,7 +158,7 @@ func printJsxExpressionContainer(path *Path, options *Options, print PrintFunc) 
 
 // printJsxOpeningElement is upstream's printJsxOpeningElement. singleAttributePerLine is never set in
 // our configurations, so attributeLine is always line.
-func printJsxOpeningElement(path *Path, options *Options, print PrintFunc) Doc {
+func printJsxOpeningElement(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	attributes := current.List("attributes")
 
@@ -273,7 +273,7 @@ func shouldPrintBracketSameLine(node Node, options *Options, nameHasComments boo
 }
 
 // printJsxClosingElement is upstream's printJsxClosingElement.
-func printJsxClosingElement(path *Path, options *Options, print PrintFunc) Doc {
+func printJsxClosingElement(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parts := []Doc{doc.Text("</")}
 
@@ -322,7 +322,7 @@ func printJsxOpeningClosingFragment(path *Path, options *Options) Doc {
 }
 
 // printJsxElement is upstream's printJsxElement.
-func printJsxElement(path *Path, options *Options, print PrintFunc) Doc {
+func printJsxElement(path *Path, options *Options, print PrintFunction) Doc {
 	elem := printing.PrintComments(
 		path,
 		printJsxElementInternal(path, options, print),
@@ -350,7 +350,7 @@ func printJsxEmptyExpression(path *Path, options *Options) Doc {
 
 // printJsxSpreadAttributeOrChild is upstream's printJsxSpreadAttributeOrChild:
 // `JSXSpreadAttribute` and `JSXSpreadChild`.
-func printJsxSpreadAttributeOrChild(path *Path, options *Options, print PrintFunc) Doc {
+func printJsxSpreadAttributeOrChild(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	name := "expression"
 	if current.Is("JSXSpreadAttribute") {
@@ -374,7 +374,7 @@ func printJsxSpreadAttributeOrChild(path *Path, options *Options, print PrintFun
 
 // printJsx is upstream's printJsx. It returns nil for a node that is not JSX, where upstream returns
 // undefined, so the dispatch moves on to the TypeScript and ESTree printers.
-func printJsx(path *Path, options *Options, print PrintFunc) Doc {
+func printJsx(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	// JSX nodes always starts with `JSX`

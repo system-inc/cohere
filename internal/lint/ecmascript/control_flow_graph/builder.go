@@ -188,7 +188,7 @@ func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 		builder.statement(root.AsClassStaticBlockDeclaration().Body)
 
 	case ast.KindPropertyDeclaration:
-		builder.expr(root.AsPropertyDeclaration().Initializer)
+		builder.expression(root.AsPropertyDeclaration().Initializer)
 
 	default:
 		for _, parameter := range root.Parameters() {
@@ -196,12 +196,12 @@ func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 		}
 		// A `typeof x` inside the signature's type annotations references the
 		// variable even though nothing in them runs.
-		builder.expr(root.Type())
+		builder.expression(root.Type())
 		if body := root.Body(); body != nil {
 			if body.Kind == ast.KindBlock {
 				builder.statement(body)
 			} else {
-				builder.expr(body)
+				builder.expression(body)
 			}
 		}
 	}
@@ -225,7 +225,7 @@ func (builder *Builder[E]) parameter(node *ast.Node) {
 	if parameter == nil {
 		return
 	}
-	builder.expr(parameter.Type)
+	builder.expression(parameter.Type)
 	builder.bindWithDefault(parameter.Name(), parameter.Initializer)
 }
 

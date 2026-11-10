@@ -143,8 +143,8 @@ func (check *printfCall) argumentFits(
 	}
 	if reason, matched := matchArgumentType(check.pass, known.accepted, argument); !matched {
 		typeString := ""
-		if typ := check.pass.TypesInfo.Types[argument].Type; typ != nil {
-			typeString = typ.String()
+		if passedType := check.pass.TypesInfo.Types[argument].Type; passedType != nil {
+			typeString = passedType.String()
 		}
 		check.pass.ReportRangef(span, "%s format %s has arg %s of wrong type %s%s", check.name, operation.text,
 			formatNode(check.pass, argument), typeString, detailsOf(reason))
@@ -167,11 +167,11 @@ func (check *printfCall) argumentFits(
 // reports whether it did. errors.Is and errors.As then behave unexpectedly with the error fmt.Errorf returns, when
 // the pointer implements error too (golang/go#61342).
 func (check *printfCall) wrapsPointerToError(span analysis.Range, argument ast.Expr) bool {
-	typ := check.pass.TypesInfo.Types[argument].Type
-	if typ == nil {
+	operandType := check.pass.TypesInfo.Types[argument].Type
+	if operandType == nil {
 		return false
 	}
-	pointer, isPointer := typ.Underlying().(*types.Pointer)
+	pointer, isPointer := operandType.Underlying().(*types.Pointer)
 	if !isPointer || !types.Implements(pointer.Elem(), errorType) || !atLeast(check.fileVersion, go127) {
 		return false
 	}
@@ -183,7 +183,7 @@ func (check *printfCall) wrapsPointerToError(span analysis.Range, argument ast.E
 		return qualified.Name()
 	}
 	check.pass.ReportRangef(span, "%%w wants operand of error type %s, not pointer type %s (defeats errors.Is)",
-		types.TypeString(pointer.Elem(), qualifier), types.TypeString(typ, qualifier))
+		types.TypeString(pointer.Elem(), qualifier), types.TypeString(operandType, qualifier))
 	return true
 }
 

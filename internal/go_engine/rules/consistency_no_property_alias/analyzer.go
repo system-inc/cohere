@@ -288,8 +288,8 @@ func writesThroughTheRead(context *rule.Context, path []ast.Node) bool {
 				continue
 			}
 			// A pointer method called on a value takes the value's address, and the method may write through it.
-			method, isFunc := selection.Obj().(*types.Func)
-			if !isFunc {
+			method, isFunction := selection.Obj().(*types.Func)
+			if !isFunction {
 				return false
 			}
 			receiver := method.Signature().Recv()

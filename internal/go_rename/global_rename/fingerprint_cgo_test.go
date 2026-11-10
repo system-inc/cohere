@@ -42,7 +42,7 @@ func TestARenameReachingACgoPackageIsProvenAcrossItsTranslationsNewNames(test *t
 	}
 	loaded := fixture.load(test)
 	result := Plan(loaded, propose(test, loaded,
-		target{PackageSuffix: "internal/text", Name: "FormatURL", Kind: KindFunc, NewName: "FormatUrl"},
+		target{PackageSuffix: "internal/text", Name: "FormatURL", Kind: KindFunction, NewName: "FormatUrl"},
 	), Options{})
 	requireAccepted(test, result, 1)
 	// Never expected: a comment's word, which moves cgo's translations to new names.

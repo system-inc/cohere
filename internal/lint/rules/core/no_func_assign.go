@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageNoFuncAssign = rule.Message{
+var messageNoFunctionReassignment = rule.Message{
 	Id: "noFuncAssign",
 	Description: "This assigns to the name a function declares. The declaration is hoisted, so the " +
 		"assignment usually parses and runs without complaint, and what it costs shows up somewhere " +
@@ -17,7 +17,7 @@ var messageNoFuncAssign = rule.Message{
 		"a separate variable, or declare the function as a variable if it is meant to be replaced.",
 }
 
-// NoFuncAssign flags an assignment to the name a function declares.
+// NoFunctionReassignment flags an assignment to the name a function declares.
 //
 //	valid:   function foo() { var foo = bar; }
 //	valid:   function foo(foo) { foo = bar; }
@@ -83,7 +83,7 @@ var messageNoFuncAssign = rule.Message{
 //
 // No fix. The repair is a new binding, which means choosing a name and deciding which later uses of
 // the old one meant the function, and the rule cannot know that.
-var NoFuncAssign = rule.Rule[rule.NoOptions]{
+var NoFunctionReassignment = rule.Rule[rule.NoOptions]{
 	Name: "no-func-assign",
 
 	// See the doc above: four of upstream's seven clean cases are textually near-identical to
@@ -156,7 +156,7 @@ func reportWritesToFunctionName(ruleContext rule.Context, function *ast.Node, ju
 	// structural test runs first because it is far cheaper than the checker.
 	for _, occurrence := range reference.IdentifiersNamed(ruleContext, name.Text()) {
 		if reference.WritesToBinding(occurrence) && resolvedDeclarationOf(ruleContext, occurrence) == declaration {
-			ruleContext.ReportNode(occurrence, messageNoFuncAssign)
+			ruleContext.ReportNode(occurrence, messageNoFunctionReassignment)
 		}
 	}
 }

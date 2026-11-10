@@ -87,7 +87,7 @@ var NoDidUpdateSetState = rule.Rule[NoMethodSetStateOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[NoMethodSetStateOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default.
 		settings, _ := options.Read()
-		reportInsideNestedFunctions := settings.DisallowInFunc
+		reportInsideNestedFunctions := settings.DisallowInFunction
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

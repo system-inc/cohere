@@ -99,7 +99,7 @@ func Check(context *rule.Context, binary *ast.BinaryExpr) {
 			replacement = &ast.UnaryExpr{Op: token.NOT, X: equal}
 		}
 		fixes = append(fixes,
-			edit.Fix("Simplify use of bytes.Compare", edit.ReplaceWithNode(context.Fset, binary, replacement)))
+			edit.Fix("Simplify use of bytes.Compare", edit.ReplaceWithNode(context.FileSet, binary, replacement)))
 	}
 	staticcheck_report.Report(context, binary,
 		"should use "+prefix+"bytes.Equal("+renderedArguments(context, call.Args)+") instead",
@@ -190,7 +190,7 @@ func renderedArguments(context *rule.Context, arguments []ast.Expr) string {
 	rendered := []string{}
 	for _, argument := range arguments {
 		text := &bytes.Buffer{}
-		if formatError := format.Node(text, context.Fset, argument); formatError != nil {
+		if formatError := format.Node(text, context.FileSet, argument); formatError != nil {
 			// Invariant: format.Node fails only on a node it cannot print, and every argument is syntax the package
 			// was parsed and type-checked from; report.Render panics on the same error.
 			panic(formatError)

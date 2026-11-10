@@ -9,7 +9,7 @@ import (
 // src/language-yaml/print/block.js.
 
 // printBlock is upstream's printBlock: a block literal (|) or folded (>) scalar.
-func printBlock(path *astPath, options *options, print printFunc) doc.Doc {
+func printBlock(path *astPath, options *options, print printFunction) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 	parentIndent := 0

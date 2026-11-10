@@ -83,12 +83,12 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 				replaced := *call
 				replaced.Args = replacedArgument(call.Args, index, edit.Selector("syscall", "SIGTERM"))
 				fixes = append(fixes, edit.Fix(fmt.Sprintf("Use syscall.SIGTERM instead of %s", rendered),
-					edit.ReplaceWithNode(context.Fset, call, &replaced)))
+					edit.ReplaceWithNode(context.FileSet, call, &replaced)))
 			}
 			removed := *call
 			removed.Args = removedArgument(call.Args, index)
 			fixes = append(fixes, edit.Fix(fmt.Sprintf("Remove %s from list of arguments", rendered),
-				edit.ReplaceWithNode(context.Fset, call, &removed)))
+				edit.ReplaceWithNode(context.FileSet, call, &removed)))
 			staticcheck_report.Report(context, signal,
 				fmt.Sprintf("%s cannot be trapped (did you mean syscall.SIGTERM?)", rendered),
 				staticcheck_report.Fixes(fixes...))
@@ -98,7 +98,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 			removed.Args = removedArgument(call.Args, index)
 			staticcheck_report.Report(context, signal, "syscall.SIGSTOP cannot be trapped",
 				staticcheck_report.Fixes(edit.Fix("Remove syscall.SIGSTOP from list of arguments",
-					edit.ReplaceWithNode(context.Fset, call, &removed))))
+					edit.ReplaceWithNode(context.FileSet, call, &removed))))
 		}
 	}
 }

@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 - `TSMethodSignature` (TypeScript)
 */
 // printMethodSignature is upstream's printMethodSignature.
-func printMethodSignature(path *Path, options *Options, print PrintFunc) Doc {
+func printMethodSignature(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	var parts []Doc
 	kind := ""
@@ -66,7 +66,7 @@ func printMethodSignature(path *Path, options *Options, print PrintFunc) Doc {
 */
 // printEnumMember is upstream's printEnumMember. Only `TSEnumMember` reaches it in a TypeScript tree,
 // so upstream's Flow `id` / `init` branch is dropped.
-func printEnumMember(path *Path, options *Options, print PrintFunc) Doc {
+func printEnumMember(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	idDoc := printKey(path, options, print)
@@ -84,7 +84,7 @@ func printEnumMember(path *Path, options *Options, print PrintFunc) Doc {
 - `TSEnumDeclaration`(TypeScript)
 */
 // printEnumDeclaration is upstream's printEnumDeclaration.
-func printEnumDeclaration(path *Path, print PrintFunc) Doc {
+func printEnumDeclaration(path *Path, print PrintFunction) Doc {
 	current := node(path)
 	constToken := ""
 	if current.Truthy("const") {
@@ -105,7 +105,7 @@ func printEnumDeclaration(path *Path, print PrintFunc) Doc {
 - `TSTypeAssertion` (TypeScript)
 */
 // printTypeAssertion is upstream's printTypeAssertion.
-func printTypeAssertion(path *Path, options *Options, print PrintFunc) Doc {
+func printTypeAssertion(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	shouldBreakAfterCast := !(isArrayExpression(current.Child("expression")) ||
 		isObjectExpression(current.Child("expression")))
@@ -116,7 +116,7 @@ func printTypeAssertion(path *Path, options *Options, print PrintFunc) Doc {
 		doc.Text(">"),
 	))
 
-	exprContents := concatIn(path, ifBreak(doc.Text("("), doc.Text("")),
+	expressionContents := concatIn(path, ifBreak(doc.Text("("), doc.Text("")),
 		indentIn(path, concatIn(path, softline, print("expression", nil))),
 		softline,
 		ifBreak(doc.Text(")"), doc.Text("")),
@@ -125,7 +125,7 @@ func printTypeAssertion(path *Path, options *Options, print PrintFunc) Doc {
 	if shouldBreakAfterCast {
 		return conditionalGroup([]Doc{
 			concatIn(path, castGroup, print("expression", nil)),
-			concatIn(path, castGroup, groupWithIn(path, exprContents, doc.GroupOptions{ShouldBreak: true})),
+			concatIn(path, castGroup, groupWithIn(path, expressionContents, doc.GroupOptions{ShouldBreak: true})),
 			concatIn(path, castGroup, print("expression", nil)),
 		}, doc.GroupOptions{})
 	}
@@ -135,7 +135,7 @@ func printTypeAssertion(path *Path, options *Options, print PrintFunc) Doc {
 // print/index-signature.js
 
 // printIndexSignature is upstream's printIndexSignature.
-func printIndexSignature(path *Path, options *Options, print PrintFunc) Doc {
+func printIndexSignature(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	// The TypeScript parser accepts multiple parameters here. If you're
 	// using them, it makes sense to have a trailing comma. But if you
@@ -189,7 +189,7 @@ func printIndexSignature(path *Path, options *Options, print PrintFunc) Doc {
 - `OptionalIndexedAccessType`(flow)
 */
 // printIndexedAccessType is upstream's printIndexedAccessType.
-func printIndexedAccessType(path *Path, options *Options, print PrintFunc) Doc {
+func printIndexedAccessType(path *Path, options *Options, print PrintFunction) Doc {
 	return concatIn(path, print("objectType", nil),
 		printOptionalToken(path),
 		doc.Text("["),
@@ -205,7 +205,7 @@ func printIndexedAccessType(path *Path, options *Options, print PrintFunc) Doc {
 - `InferTypeAnnotation`(flow)
 */
 // printInferType is upstream's printInferType.
-func printInferType(path *Path, options *Options, print PrintFunc) Doc {
+func printInferType(path *Path, options *Options, print PrintFunction) Doc {
 	return concatIn(path, doc.Text("infer "), print("typeParameter", nil))
 }
 
@@ -217,7 +217,7 @@ func printInferType(path *Path, options *Options, print PrintFunc) Doc {
 */
 // printRestType is upstream's printRestType. The Flow `TupleTypeSpreadElement` label branch is
 // dropped.
-func printRestType(path *Path, options *Options, print PrintFunc) Doc {
+func printRestType(path *Path, options *Options, print PrintFunction) Doc {
 	return concatIn(path, doc.Text("..."),
 		print("typeAnnotation", nil),
 	)
@@ -231,7 +231,7 @@ func printRestType(path *Path, options *Options, print PrintFunc) Doc {
 */
 // printTypePredicate is upstream's printTypePredicate. The Flow `TypePredicate` kind prefix is
 // dropped.
-func printTypePredicate(path *Path, print PrintFunc) Doc {
+func printTypePredicate(path *Path, print PrintFunction) Doc {
 	current := node(path)
 	prefix := ""
 	if current.Is("TSTypePredicate") && current.Truthy("asserts") {
@@ -254,7 +254,7 @@ func printTypePredicate(path *Path, print PrintFunc) Doc {
 - `TypeofTypeAnnotation` (flow)
 */
 // printTypeQuery is upstream's printTypeQuery.
-func printTypeQuery(path *Path, print PrintFunc) Doc {
+func printTypeQuery(path *Path, print PrintFunction) Doc {
 	argumentPropertyName := "argument"
 	if node(path).Is("TSTypeQuery") {
 		argumentPropertyName = "exprName"

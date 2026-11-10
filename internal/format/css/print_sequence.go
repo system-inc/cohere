@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-func printSequence(path *astPath, options *printerOptions, print printFunc) doc.Doc {
+func printSequence(path *astPath, options *printerOptions, print printFunction) doc.Doc {
 	parts := doc.Concat{}
 	path.Each(func(path *astPath, _ int) {
 		node := currentNode(path)

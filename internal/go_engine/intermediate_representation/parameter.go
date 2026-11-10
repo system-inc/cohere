@@ -11,12 +11,12 @@ type Parameter struct {
 
 	name      string
 	object    *types.Var // non-nil
-	typ       types.Type
+	valueType types.Type
 	parent    *Function
 	referrers []Instruction
 }
 
-func (parameter *Parameter) Type() types.Type { return parameter.typ }
+func (parameter *Parameter) Type() types.Type { return parameter.valueType }
 
 func (parameter *Parameter) Name() string { return parameter.name }
 

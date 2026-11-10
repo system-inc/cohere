@@ -112,7 +112,7 @@ func Check(context *rule.Context, block *ast.BlockStmt) {
 		// Invariant: the inspector walks the package's files, so every block it hands over is in one of them.
 		panic("boolean_return_of_condition: a block in none of the package's files")
 	}
-	commentMap := ast.NewCommentMap(context.Fset, file, file.Comments)
+	commentMap := ast.NewCommentMap(context.FileSet, file, file.Comments)
 	if isCommented(commentMap, first) || isCommented(commentMap, last) {
 		return
 	}

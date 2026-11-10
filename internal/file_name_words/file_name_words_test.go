@@ -152,6 +152,9 @@ func TestAbbreviated(test *testing.T) {
 		{"errorMsg.test.ts", LanguageTypeScript, "msg"},
 		{"timeout_ms.go", LanguageGo, "ms"},
 		{"output_dir.go", LanguageGo, "dir"},
+		// The words go/ast, go/types and go/ir taught, judged where the word ends (#r0fa8pa).
+		{"importer_func.go", LanguageGo, "func"},
+		{"PrintExpr.swift", LanguageSwift, "expr"},
 	}
 	for _, testCase := range cases {
 		words, _ := Words(testCase.fileName, testCase.language)
@@ -160,7 +163,10 @@ func TestAbbreviated(test *testing.T) {
 			test.Errorf("%s: %+v (found %t), want the word %q", testCase.fileName, finding.Entry, found, testCase.word)
 		}
 	}
-	for _, fileName := range []string{"message_printer.go", "configuration.go", "registry_linux.go", "client.go"} {
+	for _, fileName := range []string{
+		"message_printer.go", "configuration.go", "registry_linux.go", "client.go", "condition.go",
+		"change_set.go", "open_file.go", "progress.go", "select_all.go", "type_queries.go",
+	} {
 		words, _ := Words(fileName, LanguageGo)
 		if finding, found := Abbreviated(words, nil); found {
 			test.Errorf("%s: reported %q, and it passes", fileName, finding.Entry.Abbreviation)

@@ -646,11 +646,11 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 	case ast.KindPrivateIdentifier:
 		return member.AsPrivateIdentifier().Text, MemberNameTypePrivate
 	case ast.KindComputedPropertyName:
-		expr := member.AsComputedPropertyName().Expression
+		expression := member.AsComputedPropertyName().Expression
 		// A literal key is named by its text. A keyword key, such as true or null, falls through to the
 		// computed name's source text, as any other expression does.
-		if ast.IsLiteralExpression(expr) {
-			text := expr.Text()
+		if ast.IsLiteralExpression(expression) {
+			text := expression.Text()
 			if !scanner.IsValidIdentifier(text) {
 				return "\"" + text + "\"", MemberNameTypeQuoted
 			}

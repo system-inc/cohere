@@ -17,7 +17,7 @@ import (
 )
 
 // emitAllocation emits to `function` a new Allocation instruction allocating a variable
-// of type typ.
+// of type `allocatedType`.
 //
 // The caller must set Allocation.Heap=true (for a heap-allocated variable)
 // or add the Allocation to f.Locals (for a frame-allocated variable).
@@ -27,20 +27,20 @@ import (
 // These Allocations are removed from f.Locals at the end.
 //
 // The builder should generally call one of the emit{New,Local,LocalVar} wrappers instead.
-func emitAllocation(function *Function, typ types.Type, source ast.Node, comment string) *Allocation {
+func emitAllocation(function *Function, allocatedType types.Type, source ast.Node, comment string) *Allocation {
 	allocation := &Allocation{}
 	allocation.comment = comment
-	allocation.setType(types.NewPointer(typ))
+	allocation.setType(types.NewPointer(allocatedType))
 	function.emit(allocation, source)
 	return allocation
 }
 
 // emitNew emits to `function` a new Allocation instruction heap-allocating a
-// variable of type typ.
-func emitNew(function *Function, typ types.Type, source ast.Node, comment string) *Allocation {
-	alloc := emitAllocation(function, typ, source, comment)
-	alloc.Heap = true
-	return alloc
+// variable of type `allocatedType`.
+func emitNew(function *Function, allocatedType types.Type, source ast.Node, comment string) *Allocation {
+	allocation := emitAllocation(function, allocatedType, source, comment)
+	allocation.Heap = true
+	return allocation
 }
 
 // emitLocal creates a local var for (resolvedType, source, comment) and
@@ -60,36 +60,36 @@ func emitLocal(function *Function, resolvedType types.Type, source ast.Node, com
 // Subsequent calls to f.lookup(variable) return it.
 // It applies the appropriate generic instantiation to the type.
 func emitLocalVariable(function *Function, variable *types.Var, source ast.Node) *Allocation {
-	alloc := emitLocal(function, function.typ(variable.Type()), source, variable.Name())
-	function.vars[variable] = alloc
-	return alloc
+	allocation := emitLocal(function, function.instantiatedType(variable.Type()), source, variable.Name())
+	function.vars[variable] = allocation
+	return allocation
 }
 
-// emitLoad emits to `function` an instruction to load the address addr into a
+// emitLoad emits to `function` an instruction to load the address `address` into a
 // new temporary, and returns the value so defined.
-func emitLoad(function *Function, addr Value, source ast.Node) *Load {
-	load := &Load{X: addr}
-	load.setType(deref(addr.Type()))
+func emitLoad(function *Function, address Value, source ast.Node) *Load {
+	load := &Load{X: address}
+	load.setType(dereference(address.Type()))
 	function.emit(load, source)
 	return load
 }
 
-func emitReceive(function *Function, channel Value, commaOk bool, typ types.Type, source ast.Node) Value {
-	recv := &Receive{
+func emitReceive(function *Function, channel Value, commaOk bool, resultType types.Type, source ast.Node) Value {
+	receive := &Receive{
 		Channel: channel,
 		CommaOk: commaOk,
 	}
-	recv.setType(typ)
-	return function.emit(recv, source)
+	receive.setType(resultType)
+	return function.emit(receive, source)
 }
 
-// emitArith emits to `function` code to compute the binary operation op(x, y)
-// where op is an eager shift, logical or arithmetic operation.
+// emitArith emits to `function` code to compute the binary operation operator(x, y)
+// where operator is an eager shift, logical or arithmetic operation.
 // (Use emitCompare() for comparisons and Builder.logicalBinop() for
 // non-eager operations.)
-func emitArith(function *Function, op token.Token, x, y Value, resolvedType types.Type, source ast.Node) Value {
+func emitArith(function *Function, operator token.Token, x, y Value, resolvedType types.Type, source ast.Node) Value {
 	operandX, operandY := x, y
-	switch op {
+	switch operator {
 	case token.SHL, token.SHR:
 		operandX = emitConv(function, x, resolvedType, source)
 		// y may be signed or an 'untyped' constant.
@@ -110,11 +110,11 @@ func emitArith(function *Function, op token.Token, x, y Value, resolvedType type
 	default:
 		// Invariant: callers pass only the operators of shift, logical and arithmetic expressions and of
 		// op-assignments, since comparisons go to emitCompare and && and || go to logicalBinop.
-		panic("illegal op in emitArith: " + op.String())
+		panic("illegal op in emitArith: " + operator.String())
 
 	}
 	operation := &BinaryOperation{
-		Operator: op,
+		Operator: operator,
 		X:        operandX,
 		Y:        operandY,
 	}
@@ -123,8 +123,8 @@ func emitArith(function *Function, op token.Token, x, y Value, resolvedType type
 }
 
 // emitCompare emits to `function` code compute the boolean result of
-// comparison 'x op y'.
-func emitCompare(function *Function, op token.Token, x, y Value, source ast.Node) Value {
+// comparison 'x operator y'.
+func emitCompare(function *Function, operator token.Token, x, y Value, source ast.Node) Value {
 	xt := x.Type().Underlying()
 	yt := y.Type().Underlying()
 
@@ -136,7 +136,7 @@ func emitCompare(function *Function, op token.Token, x, y Value, source ast.Node
 	// even in the case when e's type is an interface.
 	// Only a constant true on the left of == is optimised; x==true, false!=y and the like are not.
 	if x, ok := x.(*Constant); ok &&
-		op == token.EQL &&
+		operator == token.EQL &&
 		x.Value != nil &&
 		x.Value.Kind() == constant.Bool &&
 		constant.BoolVal(x.Value) {
@@ -162,7 +162,7 @@ func emitCompare(function *Function, op token.Token, x, y Value, source ast.Node
 	}
 
 	operation := &BinaryOperation{
-		Operator: op,
+		Operator: operator,
 		X:        operandX,
 		Y:        operandY,
 	}
@@ -247,9 +247,9 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 	const (
 		changeType conversionCase = 1 << iota
 		sliceToArray
-		sliceToArrayPtr
+		sliceToArrayPointer
 		sliceTo0Array
-		sliceTo0ArrayPtr
+		sliceTo0ArrayPointer
 		convert
 	)
 	// classify the conversion case of a source type us to a destination type ud.
@@ -263,24 +263,24 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 		// Conversion from slice to array or slice to array pointer?
 		if slice, ok := fromTerm.(*types.Slice); ok {
 			var array *types.Array
-			var ptr bool
+			var pointer bool
 			// Conversion from slice to array pointer?
 			switch typed := toTerm.(type) {
 			case *types.Array:
 				array = typed
 			case *types.Pointer:
 				array, _ = typed.Elem().Underlying().(*types.Array)
-				ptr = true
+				pointer = true
 			}
 			if array != nil && types.Identical(slice.Elem(), array.Elem()) {
 				if array.Len() == 0 {
-					if ptr {
-						return sliceTo0ArrayPtr
+					if pointer {
+						return sliceTo0ArrayPointer
 					}
 					return sliceTo0Array
 				}
-				if ptr {
-					return sliceToArrayPtr
+				if pointer {
+					return sliceToArrayPointer
 				}
 				return sliceToArray
 			}
@@ -331,7 +331,7 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 			return NewConstant(irConstant.Value, toType, source)
 		}
 		// Can we always convert from zero value without panicking?
-		const mayPanic = sliceToArray | sliceToArrayPtr
+		const mayPanic = sliceToArray | sliceToArrayPointer
 		if irConstant.Value == nil && classifications&mayPanic == 0 {
 			return NewConstant(nil, toType, source)
 		}
@@ -346,7 +346,7 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 		changeType.setType(toType)
 		return function.emit(changeType, source)
 
-	case sliceToArrayPtr, sliceTo0ArrayPtr: // slice to array pointer
+	case sliceToArrayPointer, sliceTo0ArrayPointer: // slice to array pointer
 		pointer := &SliceToArrayPointer{X: value}
 		pointer.setType(toType)
 		return function.emit(pointer, source)
@@ -372,11 +372,11 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 }
 
 // emitTypeCoercion emits to `function` code to coerce the type of a
-// Value `value` to exactly type typ, and returns the coerced value.
+// Value `value` to exactly type `targetType`, and returns the coerced value.
 //
-// Requires that coercing v.Typ() to typ is a value preserving change.
+// Requires that coercing v.Typ() to `targetType` is a value preserving change.
 //
-// Currently used only when v.Type() is a type instance of typ or vice versa.
+// Currently used only when v.Type() is a type instance of `targetType` or vice versa.
 // A type `value` is a type instance of a type t if there exists a
 // type parameter substitution σ s.t. σ(value) == t. Example:
 //
@@ -385,26 +385,26 @@ func emitConv(function *Function, value Value, toType types.Type, source ast.Nod
 // This happens in instantiation wrappers for conversion
 // from an instantiation to a parameterized type (and vice versa)
 // with σ substituting f.typeparams by f.typeargs.
-func emitTypeCoercion(function *Function, value Value, typ types.Type, source ast.Node) Value {
-	if types.Identical(value.Type(), typ) {
+func emitTypeCoercion(function *Function, value Value, targetType types.Type, source ast.Node) Value {
+	if types.Identical(value.Type(), targetType) {
 		return value // no coercion needed
 	}
 	// The coercion does not record which side is the instance.
 	changeType := &ChangeType{
 		X: value,
 	}
-	changeType.setType(typ)
+	changeType.setType(targetType)
 	function.emit(changeType, source)
 	return changeType
 }
 
 // emitStore emits to `function` an instruction to store value val at location
-// addr, applying implicit conversions as required by assignability rules.
-func emitStore(function *Function, addr, value Value, source ast.Node) *Store {
-	typ := deref(addr.Type())
+// `address`, applying implicit conversions as required by assignability rules.
+func emitStore(function *Function, address, value Value, source ast.Node) *Store {
+	storedType := dereference(address.Type())
 	store := &Store{
-		Address: addr,
-		Value:   emitConv(function, value, typ, source),
+		Address: address,
+		Value:   emitConv(function, value, storedType, source),
 	}
 	function.emit(store, source)
 	return store
@@ -424,18 +424,18 @@ func emitJump(function *Function, target *BasicBlock, source ast.Node) *Jump {
 }
 
 // emitIf emits to `function` a conditional jump to tblock or fblock based on
-// cond, and updates the control-flow graph.
+// `condition`, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
 //
 // Mutates: function ends its current block with the conditional jump
-func emitIf(function *Function, cond Value, tblock, fblock *BasicBlock, source ast.Node) *If {
+func emitIf(function *Function, condition Value, tblock, fblock *BasicBlock, source ast.Node) *If {
 	block := function.currentBlock
-	stmt := &If{Condition: cond}
-	block.emit(stmt, source)
+	instruction := &If{Condition: condition}
+	block.emit(instruction, source)
 	addEdge(block, tblock)
 	addEdge(block, fblock)
 	function.currentBlock = nil
-	return stmt
+	return instruction
 }
 
 // emitExtract emits to `function` an instruction to extract the index'th
@@ -487,9 +487,9 @@ func emitTailCall(function *Function, call *Call, source ast.Node) {
 	tresults := function.Signature.Results()
 	nr := tresults.Len()
 	if nr == 1 {
-		call.typ = tresults.At(0).Type()
+		call.valueType = tresults.At(0).Type()
 	} else {
-		call.typ = tresults
+		call.valueType = tresults
 	}
 	tuple := emitCall(function, call, source)
 	var ret Return
@@ -552,25 +552,25 @@ func emitImplicitSelections(function *Function, value Value, indices []int, sour
 		// pointer to a generic containing a pointer to a struct shouldn't be possible because the outer pointer gets
 		// dereferenced implicitly before we get here.
 		if isPointerCore(selected.Type()) {
-			fld := fieldOf(deref(selected.Type()), index)
-			instr := &FieldAddress{
+			fld := fieldOf(dereference(selected.Type()), index)
+			instruction := &FieldAddress{
 				X:     selected,
 				Field: index,
 			}
-			instr.setType(types.NewPointer(fld.Type()))
-			selected = function.emit(instr, source)
+			instruction.setType(types.NewPointer(fld.Type()))
+			selected = function.emit(instruction, source)
 			// Load the field's value iff indirectly embedded.
 			if isPointerCore(fld.Type()) {
 				selected = emitLoad(function, selected, source)
 			}
 		} else {
 			fld := fieldOf(selected.Type(), index)
-			instr := &Field{
+			instruction := &Field{
 				X:     selected,
 				Field: index,
 			}
-			instr.setType(fld.Type())
-			selected = function.emit(instr, source)
+			instruction.setType(fld.Type())
+			selected = function.emit(instruction, source)
 		}
 	}
 	return selected
@@ -582,32 +582,32 @@ func emitImplicitSelections(function *Function, value Value, indices []int, sour
 // will be the field's address; otherwise the result will be the
 // field's value.
 // Ident id is used for position and debug info.
-func emitFieldSelection(function *Function, value Value, index int, wantAddr bool, id *ast.Ident) Value {
+func emitFieldSelection(function *Function, value Value, index int, wantAddress bool, id *ast.Ident) Value {
 	var selected Value
 	if isPointerCore(value.Type()) {
-		fld := fieldOf(deref(value.Type()), index)
-		instr := &FieldAddress{
+		fld := fieldOf(dereference(value.Type()), index)
+		instruction := &FieldAddress{
 			X:     value,
 			Field: index,
 		}
-		instr.setSource(id)
-		instr.setType(types.NewPointer(fld.Type()))
-		selected = function.emit(instr, id)
+		instruction.setSource(id)
+		instruction.setType(types.NewPointer(fld.Type()))
+		selected = function.emit(instruction, id)
 		// Load the field's value iff we don't want its address.
-		if !wantAddr {
+		if !wantAddress {
 			selected = emitLoad(function, selected, id)
 		}
 	} else {
 		fld := fieldOf(value.Type(), index)
-		instr := &Field{
+		instruction := &Field{
 			X:     value,
 			Field: index,
 		}
-		instr.setSource(id)
-		instr.setType(fld.Type())
-		selected = function.emit(instr, id)
+		instruction.setSource(id)
+		instruction.setType(fld.Type())
+		selected = function.emit(instruction, id)
 	}
-	emitDebugReference(function, id, selected, wantAddr)
+	emitDebugReference(function, id, selected, wantAddress)
 	return selected
 }
 

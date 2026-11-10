@@ -253,12 +253,12 @@ func TestDisjointSetAbsentValueIsNotClassZero(test *testing.T) {
 	}
 }
 
-// TestDisjointSetEmptyUnionIsANoOp pins the one place this deliberately differs from upstream.
+// TestDisjointSetEmptyUnionChangesNothing pins the one place this deliberately differs from upstream.
 //
 // React raises an invariant on an empty union. Every call site in this file builds the operand list
 // conditionally, so an empty list is the ordinary outcome for an instruction that entangles nothing
 // rather than a bug, and raising would turn the common case into a crash.
-func TestDisjointSetEmptyUnionIsANoOp(test *testing.T) {
+func TestDisjointSetEmptyUnionChangesNothing(test *testing.T) {
 	test.Parallel()
 
 	set := &DisjointSet{}

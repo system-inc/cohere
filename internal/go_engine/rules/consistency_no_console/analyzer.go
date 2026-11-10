@@ -79,7 +79,7 @@ type fileState struct {
 // one a //line directive gives it, since only a real _test.go file is a test's.
 func enterFile(context *rule.Context, file *ast.File) {
 	rule.FileState[fileState](context).judged = context.Package.Name() != "main" &&
-		!strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+		!strings.HasSuffix(context.FileSet.PositionFor(file.Package, false).Filename, "_test.go")
 }
 
 // judgeNode reports a call, selector or identifier of a judged file that writes to the process's own standard output

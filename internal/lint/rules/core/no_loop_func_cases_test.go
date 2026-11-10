@@ -15,10 +15,10 @@ package core
 // accepts the syntax, so the rule decides: all four report nothing, which is the same verdict for
 // the reason upstream intended.
 
-// loopFuncFiringCases are the corpus inputs upstream reports on, with the rendered message it
+// functionInLoopFiringCases are the corpus inputs upstream reports on, with the rendered message it
 // produced for each. The message names the unsafe variables, so the text is the assertion rather
 // than the id.
-var loopFuncFiringCases = []struct {
+var functionInLoopFiringCases = []struct {
 	source          string
 	unsafeVariables string
 	typeScriptOnly  bool
@@ -143,11 +143,11 @@ var loopFuncFiringCases = []struct {
 	},
 }
 
-// loopFuncCleanCases are the corpus inputs upstream stays silent on. These are the false positives
+// functionInLoopCleanCases are the corpus inputs upstream stays silent on. These are the false positives
 // upstream already thought about, and they carry the whole discrimination: an undeclared name, a
 // constant binding, a `let` per iteration, a variable nothing writes, and an immediately invoked
 // function are each represented.
-var loopFuncCleanCases = []struct {
+var functionInLoopCleanCases = []struct {
 	source         string
 	typeScriptOnly bool
 }{

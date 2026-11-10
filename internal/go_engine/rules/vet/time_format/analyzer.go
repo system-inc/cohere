@@ -180,7 +180,7 @@ func spanOf(context *rule.Context, literal *ast.BasicLit, badAt int) (token.Pos,
 	start, startError := sourceOffset(source, badAt)
 	if startError != nil {
 		return token.NoPos, token.NoPos,
-			fmt.Errorf("time_format: %s: %w", context.Fset.Position(literal.Pos()), startError)
+			fmt.Errorf("time_format: %s: %w", context.FileSet.Position(literal.Pos()), startError)
 	}
 	// The walk stops at the first byte after the value before the mistake, and in a raw literal the carriage returns
 	// there decode into nothing, so they spell no part of the mistake. The mistake follows them, so the loop ends on
@@ -191,7 +191,7 @@ func spanOf(context *rule.Context, literal *ast.BasicLit, badAt int) (token.Pos,
 	end, endError := sourceOffset(source, badAt+len(badFormat))
 	if endError != nil {
 		return token.NoPos, token.NoPos,
-			fmt.Errorf("time_format: %s: %w", context.Fset.Position(literal.Pos()), endError)
+			fmt.Errorf("time_format: %s: %w", context.FileSet.Position(literal.Pos()), endError)
 	}
 	return literal.Pos() + token.Pos(start), literal.Pos() + token.Pos(end), nil
 }
@@ -203,7 +203,7 @@ func sourceOf(context *rule.Context, literal *ast.BasicLit) (string, error) {
 	if !strings.HasPrefix(literal.Value, "`") {
 		return literal.Value, nil
 	}
-	file := context.Fset.File(literal.Pos())
+	file := context.FileSet.File(literal.Pos())
 	if file == nil {
 		// Invariant: every position in a package's syntax lies in a file of the package's file set.
 		panic("time_format: a layout literal lies in no file of the file set")
@@ -221,7 +221,7 @@ func sourceOf(context *rule.Context, literal *ast.BasicLit) (string, error) {
 	}
 	if closing < 0 {
 		return "", fmt.Errorf("time_format: %s: %s no longer holds the raw literal the syntax holds there",
-			context.Fset.Position(literal.Pos()), file.Name())
+			context.FileSet.Position(literal.Pos()), file.Name())
 	}
 	return string(content[opening : opening+1+closing+1]), nil
 }

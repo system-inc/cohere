@@ -124,7 +124,7 @@ func Check(context *rule.Context, statement *ast.IfStmt) {
 	staticcheck_report.Report(context, statement, "unnecessary guard around call to delete",
 		staticcheck_report.ShortRange(),
 		staticcheck_report.FilterGenerated(),
-		staticcheck_report.Fixes(edit.Fix("Remove guard", edit.ReplaceWithNode(context.Fset, statement, call))))
+		staticcheck_report.Fixes(edit.Fix("Remove guard", edit.ReplaceWithNode(context.FileSet, statement, call))))
 }
 
 // loneCall is the call statements hold, as the pattern's `[call@(CallExpr ...)]` meets an if's body: a list of one

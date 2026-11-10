@@ -15,7 +15,7 @@ import (
 - `ImportDeclaration`
 */
 // printImportDeclaration is upstream's printImportDeclaration.
-func printImportDeclaration(path *Path, options *Options, print PrintFunc) Doc {
+func printImportDeclaration(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	phase := ""
 	if current.Truthy("phase") {
@@ -46,7 +46,7 @@ func isDefaultExport(node Node) bool {
 - `DeclareExportAllDeclaration`(flow)
 */
 // printExportDeclaration is upstream's printExportDeclaration.
-func printExportDeclaration(path *Path, options *Options, print PrintFunc) Doc {
+func printExportDeclaration(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	defaultKeyword := ""
@@ -152,7 +152,7 @@ func printExportKind(node Node) string {
 }
 
 // printModuleSource is upstream's printModuleSource.
-func printModuleSource(path *Path, options *Options, print PrintFunc) Doc {
+func printModuleSource(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	if current.Child("source") == nil {
@@ -167,7 +167,7 @@ func printModuleSource(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printModuleSpecifiers is upstream's printModuleSpecifiers.
-func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
+func printModuleSpecifiers(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	if !shouldPrintSpecifiers(current, options) {
@@ -319,7 +319,7 @@ func isSingleTypeImportAttributes(node Node) bool {
 - `DeclareExportAllDeclaration` (Flow)
 */
 // printImportAttributes is upstream's printImportAttributes.
-func printImportAttributes(path *Path, options *Options, print PrintFunc) Doc {
+func printImportAttributes(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 
 	if current.Child("source") == nil {
@@ -340,7 +340,7 @@ func printImportAttributes(path *Path, options *Options, print PrintFunc) Doc {
 }
 
 // printModuleSpecifier is upstream's printModuleSpecifier.
-func printModuleSpecifier(path *Path, options *Options, print PrintFunc) Doc {
+func printModuleSpecifier(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	specifierType := current.Type()
 

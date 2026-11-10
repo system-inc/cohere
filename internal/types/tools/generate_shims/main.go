@@ -223,9 +223,9 @@ func main() {
 			shimBuilder.WriteByte(' ')
 			shimBuilder.WriteString(function.Pkg().Path())
 			shimBuilder.WriteByte('.')
-			if recv := function.Signature().Recv(); recv != nil {
+			if receiver := function.Signature().Recv(); receiver != nil {
 				shimBuilder.WriteByte('(')
-				shimBuilder.WriteString(types.TypeString(recv.Type(), qualifierEmptyPackageName))
+				shimBuilder.WriteString(types.TypeString(receiver.Type(), qualifierEmptyPackageName))
 				shimBuilder.WriteByte(')')
 				shimBuilder.WriteByte('.')
 			}
@@ -272,8 +272,8 @@ func main() {
 		for _, name := range scope.Names() {
 			object := scope.Lookup(name)
 			if !object.Exported() {
-				function, isFunc := object.(*types.Func)
-				if _, exists := matchedExtraFunctions[name]; isFunc && exists {
+				function, isFunction := object.(*types.Func)
+				if _, exists := matchedExtraFunctions[name]; isFunction && exists {
 					if emitLinkedFunction(function) {
 						matchedExtraFunctions[name] = true
 					}
@@ -323,11 +323,11 @@ func main() {
 					if len(typeParameters) > 0 {
 						// (*typeWriter)typeList
 						shimBuilder.WriteByte('[')
-						for index, typ := range typeParameters {
+						for index, typeParameter := range typeParameters {
 							if index > 0 {
 								shimBuilder.WriteByte(',')
 							}
-							shimBuilder.WriteString(typ.String())
+							shimBuilder.WriteString(typeParameter.String())
 						}
 						shimBuilder.WriteByte(']')
 					}
@@ -346,33 +346,33 @@ func main() {
 						extraMethods[methodName] = true
 						prefix := name + "_"
 						emitGoLinknameDirective(prefix+methodName, method)
-						funcDeclString := types.ObjectString(method, qualifierOnlyPackageName)
-						recvStart := 0
-						recvEnd := 0
+						functionDeclString := types.ObjectString(method, qualifierOnlyPackageName)
+						receiverStart := 0
+						receiverEnd := 0
 						parametersStart := 0
-						for index, character := range funcDeclString {
+						for index, character := range functionDeclString {
 							if character == '(' {
-								if recvStart == 0 {
-									recvStart = index + 1
+								if receiverStart == 0 {
+									receiverStart = index + 1
 								}
-								if recvEnd != 0 {
+								if receiverEnd != 0 {
 									parametersStart = index + 1
 									break
 								}
 							}
-							if character == ')' && recvEnd == 0 {
-								recvEnd = index
+							if character == ')' && receiverEnd == 0 {
+								receiverEnd = index
 							}
 						}
 						shimBuilder.WriteString("func ")
 						shimBuilder.WriteString(prefix)
-						shimBuilder.WriteString(funcDeclString[recvEnd+2 : parametersStart])
+						shimBuilder.WriteString(functionDeclString[receiverEnd+2 : parametersStart])
 						shimBuilder.WriteString("recv ")
-						shimBuilder.WriteString(funcDeclString[recvStart:recvEnd])
+						shimBuilder.WriteString(functionDeclString[receiverStart:receiverEnd])
 						if method.Signature().Params() != nil {
 							shimBuilder.WriteString(", ")
 						}
-						shimBuilder.WriteString(funcDeclString[parametersStart:])
+						shimBuilder.WriteString(functionDeclString[parametersStart:])
 						shimBuilder.WriteString("\n")
 					}
 				}
@@ -400,9 +400,9 @@ func main() {
 								shimBuilder.WriteByte(' ')
 							}
 
-							ptrType, ok := field.Type().(*types.Pointer)
+							pointerType, ok := field.Type().(*types.Pointer)
 							if ok {
-								named, ok := ptrType.Elem().(*types.Named)
+								named, ok := pointerType.Elem().(*types.Named)
 								if ok && !named.Obj().Exported() {
 									strct, ok := named.Underlying().(*types.Struct)
 									if ok {

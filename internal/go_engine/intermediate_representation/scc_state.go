@@ -89,11 +89,11 @@ func buildSccs(function *Function) {
 	for _, scc := range state.sccs {
 		clear(seen)
 		for _, block := range scc.Blocks {
-			for _, succ := range block.Successors {
-				if succ.Scc != block.Scc && !seen[succ.Scc.Index] {
-					block.Scc.Successors = append(block.Scc.Successors, succ.Scc)
-					succ.Scc.Predecessors = append(succ.Scc.Predecessors, block.Scc)
-					seen[succ.Scc.Index] = true
+			for _, successor := range block.Successors {
+				if successor.Scc != block.Scc && !seen[successor.Scc.Index] {
+					block.Scc.Successors = append(block.Scc.Successors, successor.Scc)
+					successor.Scc.Predecessors = append(successor.Scc.Predecessors, block.Scc)
+					seen[successor.Scc.Index] = true
 				}
 			}
 		}
@@ -105,8 +105,8 @@ func buildSccs(function *Function) {
 	// up". This allows us to build up reachability sets.
 	for _, scc := range function.Sccs {
 		scc.reachable.SetBit(&scc.reachable, scc.Index, 1)
-		for _, succ := range scc.Successors {
-			scc.reachable.Or(&scc.reachable, &succ.reachable)
+		for _, successor := range scc.Successors {
+			scc.reachable.Or(&scc.reachable, &successor.reachable)
 		}
 	}
 }

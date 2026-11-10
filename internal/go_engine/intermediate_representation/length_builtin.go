@@ -8,11 +8,11 @@ package intermediate_representation
 
 import "go/types"
 
-var lenResults = types.NewTuple(anonVariable(tInt))
+var lenResults = types.NewTuple(anonymousVariable(tInt))
 
 // makeLength returns the len builtin specialized to type func(T)int.
 func makeLength(operandType types.Type) *Builtin {
-	lenParameters := types.NewTuple(anonVariable(operandType))
+	lenParameters := types.NewTuple(anonymousVariable(operandType))
 	return &Builtin{
 		name: "len",
 		sig:  types.NewSignatureType(nil, nil, nil, lenParameters, lenResults, false),

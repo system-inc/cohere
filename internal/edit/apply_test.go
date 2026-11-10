@@ -237,7 +237,7 @@ func TestInvertedRangeIsRefused(test *testing.T) {
 // A fix that replaces text with itself is not progress. Counting it as applied would make a run
 // that changed nothing report as a run that changed something, and would keep the convergence loop
 // spinning on a rule that proposes it every pass.
-func TestNoOpFixIsRefused(test *testing.T) {
+func TestFixReplacingTextWithItselfIsRefused(test *testing.T) {
 	test.Parallel()
 	source := "const a = 1;"
 

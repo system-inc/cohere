@@ -27,22 +27,22 @@ func TestConstString(test *testing.T) {
 	func fn() (int, bool, string)
 	func gen[T int]() {}
 	`
-	fset := token.NewFileSet()
-	file, parseFileError := parser.ParseFile(fset, "p.go", source, 0)
+	fileSet := token.NewFileSet()
+	file, parseFileError := parser.ParseFile(fileSet, "p.go", source, 0)
 	if parseFileError != nil {
 		test.Fatal(parseFileError)
 	}
 
 	var conf types.Config
-	goPackage, checkError := conf.Check("P", fset, []*ast.File{file}, nil)
+	goPackage, checkError := conf.Check("P", fileSet, []*ast.File{file}, nil)
 	if checkError != nil {
 		test.Fatal(checkError)
 	}
 
 	for _, testCase := range []struct {
-		expr     string // type expression
-		constant any    // constant value
-		want     string // expected String() value
+		expression string // type expression
+		constant   any    // constant value
+		want       string // expected String() value
 	}{
 		{"int", int64(0), "0:int"},
 		{"int64", int64(0), "0:int64"},
@@ -69,9 +69,9 @@ func TestConstString(test *testing.T) {
 		{"func() (int, bool, string)", nil, "nil:func() (int, bool, string)"},
 	} {
 		// Eval() expr for its type.
-		tv, evalError := types.Eval(fset, goPackage, 0, testCase.expr)
+		tv, evalError := types.Eval(fileSet, goPackage, 0, testCase.expression)
 		if evalError != nil {
-			test.Fatalf("Eval(%s) failed: %v", testCase.expr, evalError)
+			test.Fatalf("Eval(%s) failed: %v", testCase.expression, evalError)
 		}
 		var value constant.Value
 		if testCase.constant != nil {

@@ -6,7 +6,7 @@ package compose
 
 import "github.com/system-inc/cohere/internal/format/yaml/cst"
 
-func resolveFlowScalar(scalar *cst.Token, strict bool, onError onErrorFunc) scalarResolution {
+func resolveFlowScalar(scalar *cst.Token, strict bool, onError onErrorFunction) scalarResolution {
 	offset, tokenType, source, end := scalar.Offset, scalar.Type, scalar.Source, scalar.End
 	var scalarType string
 	var value []uint16
@@ -300,7 +300,7 @@ type blockScalarHeader struct {
 	length  int
 }
 
-func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError onErrorFunc) scalarResolution {
+func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError onErrorFunction) scalarResolution {
 	start := scalar.Offset
 	header := parseBlockScalarHeader(scalar, composition.options.Strict, onError)
 	if header == nil {
@@ -456,7 +456,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 	}
 }
 
-func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc) *blockScalarHeader {
+func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunction) *blockScalarHeader {
 	offset, properties := scalar.Offset, scalar.Properties
 	/* istanbul ignore if should not happen */
 	if properties[0].Type != "block-scalar-header" {

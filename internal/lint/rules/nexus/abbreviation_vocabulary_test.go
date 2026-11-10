@@ -40,24 +40,30 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 		got  []string
 		want []string
 	}{
-		// The switch (13), the early group (7), exactAbbreviations (10) and the thirteen Go words @system_cohere
-		// added for every engine on #ec8mvbg. Whole-word matches cannot overlap, so this one is compared as a set.
+		// The switch (13), the early group (7), exactAbbreviations (10), the thirteen Go words @system_cohere
+		// added for every engine on #ec8mvbg, and the twenty-three go/ast, go/types and go/ir taught (#r0fa8pa).
+		// Whole-word matches cannot overlap, so this one is compared as a set.
 		{"whole", wholeWords, sortedCopy([]string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "acc", "char", "fn", "str",
 			"ctx", "db", "tx", "opts", "cur", "pct", "prev",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
 			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
+			"instrs", "instr", "succs", "succ", "preds", "pred", "prog", "alloc", "addr", "conds", "cond", "chan",
+			"expr", "func", "fset", "recv", "op", "stmt", "ptr", "typ", "sel", "anon", "deref",
 		})},
 		// The early group's loop, in its order.
 		{"early prefix", abbreviationsOf(vocabulary.EarlyPrefixes), []string{
 			"ctx", "db", "tx", "opts", "cur", "pct", "prev",
 		}},
-		// The late group (9), the role prefixes (3), prefixAbbreviations (10) and the thirteen Go words. No two
-		// of these can match one name, so their relative order was never observable; the file's order is pinned.
+		// The late group (9), the role prefixes (3), prefixAbbreviations (10), the thirteen Go words and the
+		// syntax tree's twenty-three. No two of these can match one name, so their relative order was never
+		// observable; the file's order is pinned.
 		{"late prefix", abbreviationsOf(vocabulary.LatePrefixes), []string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "char", "fn", "str",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
 			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
+			"instrs", "instr", "succs", "succ", "preds", "pred", "prog", "alloc", "addr", "conds", "cond", "chan",
+			"expr", "func", "fset", "recv", "op", "stmt", "ptr", "typ", "sel", "anon", "deref",
 		}},
 		// The hand-written suffix chain (12), the millisecond check where it ran, and
 		// suffixAbbreviations (10), in the chain's order.
@@ -66,10 +72,13 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
 		}},
 		// wordSegmentAbbreviations (10), in order, then the thirteen Go words @system_cohere added for every engine
-		// on #ec8mvbg, after them so no earlier entry's order moves.
+		// on #ec8mvbg and the syntax tree's twenty-three (#r0fa8pa), each after the last so no earlier entry's order
+		// moves.
 		{"segment", abbreviationsOf(vocabulary.Segments), []string{
 			"cwd", "dir", "env", "cli", "len", "seq", "db", "tx", "vars", "var",
 			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
+			"instrs", "instr", "succs", "succ", "preds", "pred", "prog", "alloc", "addr", "conds", "cond", "chan",
+			"expr", "func", "fset", "recv", "op", "stmt", "ptr", "typ", "sel", "anon", "deref",
 		}},
 		{"allowed segment", vocabulary.AllowedSegments, []string{"InnoDb"}},
 	}
@@ -139,26 +148,36 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 		}
 		judged++
 	}
-	// 43 whole, 42 prefix, 23 suffix, 23 segment: the counts the table above pins.
-	if judged != 131 {
-		test.Errorf("judged %d forms, want 131", judged)
+	// 66 whole, 65 prefix, 23 suffix, 46 segment: the counts the table above pins.
+	if judged != 200 {
+		test.Errorf("judged %d forms, want 200", judged)
 	}
 }
 
 // TestAbbreviationSegmentsJudgeOnlyTheWholeWord: the short Go words are judged only as a whole camelCase word, so a
 // name that holds their letters inside a longer word is not an abbreviation. `ch` must never read `Check`, nor `pos`
-// read `Posix`, nor `buf` read `Buffer`.
+// read `Posix`, nor `buf` read `Buffer`. The words go/ast, go/types and go/ir taught are held the same way, since
+// each opens real words: `Cond` must never read `Condition`, `Chan` `Change`, `Op` `Open` or `Optional`, `Func`
+// `Function`, `Prog` `Progress`, `Sel` `Select` or `Self`, nor `Typ` `Type` or `Typical`.
 func TestAbbreviationSegmentsJudgeOnlyTheWholeWord(test *testing.T) {
 	test.Parallel()
 	for _, name := range []string{
 		"checkName", "widgetCheckName", "changeSet", "posixPath", "postOffice", "bufferSize", "widgetBuffer",
 		"muteButton", "multiplier", "temporaryFile", "sourceMap", "commandLine", "packageName", "position",
+		"Condition", "readCondition", "ChangeSet", "widgetChannel", "OpenFile", "isOptional", "readOperation",
+		"FunctionName", "progressBar", "ProgressBar", "SelectAll", "SelfReference", "TypeName", "isTypical",
+		"AddressLine", "widgetInstruction", "isSuccessful", "PredicateList", "allocateBuffer", "AnonymousUser",
+		"isDereferenced", "ExpressionText", "StatementList", "PointerEvent", "ReceiverName",
 	} {
 		if finding, found := findAbbreviation(name, true); found {
 			test.Errorf("%q reads as an abbreviation: %+v", name, finding)
 		}
 	}
-	for _, name := range []string{"chList", "readCh", "posValue", "bufSize", "widgetMu", "sb"} {
+	for _, name := range []string{
+		"chList", "readCh", "posValue", "bufSize", "widgetMu", "sb",
+		"cond", "nextCond", "CondList", "isFunc", "funcName", "exprText", "BinOp", "opCount", "readChan", "TypName",
+		"selIndex", "recvType", "matchOp",
+	} {
 		if _, found := findAbbreviation(name, true); !found {
 			test.Errorf("%q holds a whole abbreviated word and was not judged", name)
 		}

@@ -6,17 +6,17 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-const condAssignFile = "/repository/source/Thing.ts"
+const assignmentInConditionFile = "/repository/source/Thing.ts"
 
 // alwaysOptions is the non-default mode, spelled the way the config spells it.
-var alwaysOptions = NoCondAssignOptions(NoCondAssignAlways)
+var alwaysOptions = NoAssignmentInConditionOptions(NoAssignmentInConditionAlways)
 
 // exceptParensOptions is the default, stated explicitly where upstream states it explicitly.
-var exceptParensOptions = NoCondAssignOptions(NoCondAssignExceptParens)
+var exceptParensOptions = NoAssignmentInConditionOptions(NoAssignmentInConditionExceptParens)
 
 // Fires, default mode. Every case here is upstream's `fail` list carrying `None` for options,
 // meaning the default `except-parens`.
-func TestNoCondAssignFiresUnderExceptParens(test *testing.T) {
+func TestNoAssignmentInConditionFiresUnderExceptParens(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -44,8 +44,8 @@ func TestNoCondAssignFiresUnderExceptParens(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(
 				test,
-				NoCondAssign,
-				condAssignFile,
+				NoAssignmentInCondition,
+				assignmentInConditionFile,
 				testCase.sourceText,
 				exceptParensOptions,
 			)
@@ -59,7 +59,7 @@ func TestNoCondAssignFiresUnderExceptParens(test *testing.T) {
 // Nine of these report twice upstream, at a byte-identical span, because its statement branch and
 // its assignment branch both fire on a bare assignment in a test position. This asserts one finding
 // each. The divergence is deliberate and is argued at the rule.
-func TestNoCondAssignFiresUnderAlways(test *testing.T) {
+func TestNoAssignmentInConditionFiresUnderAlways(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -93,8 +93,8 @@ func TestNoCondAssignFiresUnderAlways(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(
 				test,
-				NoCondAssign,
-				condAssignFile,
+				NoAssignmentInCondition,
+				assignmentInConditionFile,
 				testCase.sourceText,
 				alwaysOptions,
 			)
@@ -104,13 +104,13 @@ func TestNoCondAssignFiresUnderAlways(test *testing.T) {
 }
 
 // Stays silent. Upstream's whole `pass` list, each with the mode it was written under.
-func TestNoCondAssignStaysSilent(test *testing.T) {
+func TestNoAssignmentInConditionStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
-		options    NoCondAssignOptions
+		options    NoAssignmentInConditionOptions
 	}{
 		{"comparison", "var x = 0; if (x == 0) { var b = 1; }", exceptParensOptions},
 		{"comparison under always", "var x = 0; if (x == 0) { var b = 1; }", alwaysOptions},
@@ -208,8 +208,8 @@ func TestNoCondAssignStaysSilent(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(
 				test,
-				NoCondAssign,
-				condAssignFile,
+				NoAssignmentInCondition,
+				assignmentInConditionFile,
 				testCase.sourceText,
 				testCase.options,
 			)
@@ -219,7 +219,7 @@ func TestNoCondAssignStaysSilent(test *testing.T) {
 }
 
 // Cases upstream does not cover, each here for a reason stated at the case.
-func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
+func TestNoAssignmentInConditionBeyondTheUpstreamCorpus(test *testing.T) {
 	test.Parallel()
 
 	test.Run("no options at all falls back to except-parens", func(test *testing.T) {
@@ -228,10 +228,10 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		// gets nothing at all. Upstream's corpus always supplies a mode, so nothing there pins what
 		// happens when the config says only `"error"`. The default has to be the permissive one, or
 		// enabling the rule the ordinary way silently turns on the strict mode.
-		result := rule_testing.Run(test, NoCondAssign, condAssignFile, "if ((a = b));")
+		result := rule_testing.Run(test, NoAssignmentInCondition, assignmentInConditionFile, "if ((a = b));")
 		rule_testing.ExpectClean(test, result)
 
-		result = rule_testing.Run(test, NoCondAssign, condAssignFile, "if (a = b);")
+		result = rule_testing.Run(test, NoAssignmentInCondition, assignmentInConditionFile, "if (a = b);")
 		rule_testing.ExpectFindings(test, result, "condAssign")
 	})
 
@@ -241,10 +241,10 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		// documented default instead, which is the same direction the decoder fails in.
 		result := rule_testing.RunWithOptions(
 			test,
-			NoCondAssign,
-			condAssignFile,
+			NoAssignmentInCondition,
+			assignmentInConditionFile,
 			"if ((a = b));",
-			NoCondAssignOptions("alwyas"),
+			NoAssignmentInConditionOptions("alwyas"),
 		)
 		rule_testing.ExpectClean(test, result)
 	})
@@ -254,7 +254,13 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		// `&&=` and `??=` are assignments the ES2021 grammar added, and a rule matching only `=`
 		// and the arithmetic compounds misses them. Upstream's corpus predates them.
 		for _, source := range []string{"if (a ||= b) { }", "if (a &&= b) { }", "if (a ??= b) { }"} {
-			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, source, exceptParensOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoAssignmentInCondition,
+				assignmentInConditionFile,
+				source,
+				exceptParensOptions,
+			)
 			rule_testing.ExpectFindings(test, result, "condAssign")
 		}
 	})
@@ -264,7 +270,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		// Two assignments in one test position. A rule reporting per statement rather than per
 		// assignment finds one of these; a rule that walks ancestors without stopping finds one of
 		// them twice. This is the case that separates those two defects.
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoAssignmentInCondition, assignmentInConditionFile,
 			"if ((a = b) || (c = d)) { }", alwaysOptions)
 		rule_testing.ExpectFindings(test, result, "condAssign", "condAssign")
 	})
@@ -280,7 +286,13 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		// not the start bound is checked. It takes an assignment in both positions to separate them,
 		// and the finding must land on the test's assignment rather than the initializer's.
 		const source = "for (x = 0; y = 1; z++) { }"
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, source, alwaysOptions)
+		result := rule_testing.RunWithOptions(
+			test,
+			NoAssignmentInCondition,
+			assignmentInConditionFile,
+			source,
+			alwaysOptions,
+		)
 		rule_testing.ExpectFindings(test, result, "condAssign")
 		reported := result.Diagnostics[0].Range.Pos()
 		if want := 14; reported != want {
@@ -296,7 +308,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		test.Parallel()
 		// The same bound, reached a different way: here the initializer nests an assignment, so a
 		// rule missing the start bound reports two findings on a loop whose test assigns nothing.
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoAssignmentInCondition, assignmentInConditionFile,
 			"for (a = (b = 1); c; d) { }", alwaysOptions)
 		rule_testing.ExpectClean(test, result)
 	})
@@ -305,7 +317,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		test.Parallel()
 		// The else branch of an if is another IfStatement, so this passes only if the listener sees
 		// nested statements rather than top-level ones.
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoAssignmentInCondition, assignmentInConditionFile,
 			"if (a) { } else if (b = c) { }", exceptParensOptions)
 		rule_testing.ExpectFindings(test, result, "condAssign")
 	})
@@ -319,7 +331,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		// Upstream's corpus covers the function-expression and arrow forms of this and not the
 		// accessor form. Its own stop set names Function and ArrowFunctionExpression, so a port
 		// naming only those two would report here; the Block is what actually stops it.
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoAssignmentInCondition, assignmentInConditionFile,
 			"if ({ get p(){ a = 1; return 1; } }) { }", alwaysOptions)
 		rule_testing.ExpectClean(test, result)
 	})
@@ -328,7 +340,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		test.Parallel()
 		// The one function form with no Block to stop at, which is why ArrowFunction is in the stop
 		// set and the four other function kinds are not.
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoAssignmentInCondition, assignmentInConditionFile,
 			"if ((() => a = 1)()) { }", alwaysOptions)
 		rule_testing.ExpectClean(test, result)
 	})
@@ -337,7 +349,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		test.Parallel()
 		// Same shape as the getter, reached through an ordinary method. Stopped by the Block rather
 		// than by any method-specific case.
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoAssignmentInCondition, assignmentInConditionFile,
 			"if ({ m(){ a = 1; } }) { }", alwaysOptions)
 		rule_testing.ExpectClean(test, result)
 	})
@@ -347,7 +359,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		// Upstream stops at Function, ArrowFunction, Program, and BlockStatement. A method body is
 		// a BlockStatement so it stops, but this pins that a whole class expression sitting in a
 		// test position does not leak its assignments into the condition.
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoAssignmentInCondition, assignmentInConditionFile,
 			"if (class { m() { let a; a = 1; return a; } }) { }", alwaysOptions)
 		rule_testing.ExpectClean(test, result)
 	})
@@ -358,13 +370,13 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 // `ExpectFindings` asserts ids and count and nothing else, so a rule reporting the whole assignment
 // rather than just its operator passes every fixture above. Upstream points at the operator token
 // specifically, and the two differ by the whole left operand.
-func TestNoCondAssignReportsTheOperator(test *testing.T) {
+func TestNoAssignmentInConditionReportsTheOperator(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
-		options    NoCondAssignOptions
+		options    NoAssignmentInConditionOptions
 		want       string
 	}{
 		{"simple assignment", "if (x = 0) { }", exceptParensOptions, "="},
@@ -385,8 +397,8 @@ func TestNoCondAssignReportsTheOperator(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(
 				test,
-				NoCondAssign,
-				condAssignFile,
+				NoAssignmentInCondition,
+				assignmentInConditionFile,
 				testCase.sourceText,
 				testCase.options,
 			)
@@ -403,11 +415,17 @@ func TestNoCondAssignReportsTheOperator(test *testing.T) {
 
 // The `while (a /* = */ = b) {}` case above pins the comment, and this pins the column upstream
 // snapshots for it, so a span that is right in text but shifted in position still fails.
-func TestNoCondAssignOperatorSpanMatchesUpstreamOffset(test *testing.T) {
+func TestNoAssignmentInConditionOperatorSpanMatchesUpstreamOffset(test *testing.T) {
 	test.Parallel()
 
 	const source = "while (a /* = */ = b) {}"
-	result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, source, alwaysOptions)
+	result := rule_testing.RunWithOptions(
+		test,
+		NoAssignmentInCondition,
+		assignmentInConditionFile,
+		source,
+		alwaysOptions,
+	)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}

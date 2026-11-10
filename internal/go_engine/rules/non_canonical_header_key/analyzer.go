@@ -88,7 +88,7 @@ func CheckIndex(context *rule.Context, index *ast.IndexExpr) {
 	if !typeutil.IsTypeWithName(context.TypesInfo.TypeOf(index.X), headerType) {
 		return
 	}
-	key, isString := staticcheck_code.ExprToString(context, index.Index)
+	key, isString := staticcheck_code.ExpressionToString(context, index.Index)
 	if !isString {
 		return
 	}
@@ -109,7 +109,7 @@ func CheckIndex(context *rule.Context, index *ast.IndexExpr) {
 			Args: []ast.Expr{keyNode},
 		}
 		staticcheck_report.Report(context, index, message, staticcheck_report.Fixes(edit.Fix(
-			"Wrap in http.CanonicalHeaderKey", edit.ReplaceWithNode(context.Fset, keyNode, call))))
+			"Wrap in http.CanonicalHeaderKey", edit.ReplaceWithNode(context.FileSet, keyNode, call))))
 	default:
 		staticcheck_report.Report(context, index, message)
 	}

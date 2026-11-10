@@ -29,9 +29,9 @@ func init() {
 		rule.Registration[rule.NoOptions]{Rule: NoClassAssign},
 		rule.Registration[rule.NoOptions]{Rule: NoConstAssign},
 		rule.Registration[rule.NoOptions]{Rule: NoCompareNegZero},
-		rule.Registration[NoCondAssignOptions]{
-			Rule:   NoCondAssign,
-			Decode: rule.DecodeOptionsInto[NoCondAssignOptions](),
+		rule.Registration[NoAssignmentInConditionOptions]{
+			Rule:   NoAssignmentInCondition,
+			Decode: rule.DecodeOptionsInto[NoAssignmentInConditionOptions](),
 		},
 		rule.Registration[rule.NoOptions]{Rule: NoCaller},
 		rule.Registration[rule.NoOptions]{Rule: NoControlRegex},
@@ -96,7 +96,7 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoEvalOptions](),
 		},
 		rule.Registration[rule.NoOptions]{Rule: NoExAssign},
-		rule.Registration[rule.NoOptions]{Rule: NoFuncAssign},
+		rule.Registration[rule.NoOptions]{Rule: NoFunctionReassignment},
 		rule.Registration[NoGlobalAssignOptions]{
 			Rule:   NoGlobalAssign,
 			Decode: rule.DecodeOptionsInto[NoGlobalAssignOptions](),

@@ -158,7 +158,7 @@ func toyPrinter() *Printer[*toyNode, toySettings, NoArguments] {
 	printer.Print = func(
 		path *AstPath[*toyNode, toySettings],
 		options *Options[*toyNode, toySettings, NoArguments],
-		print PrintFunc[NoArguments],
+		print PrintFunction[NoArguments],
 		_ *NoArguments,
 	) doc.Doc {
 		node, _ := path.Node()

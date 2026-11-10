@@ -33,7 +33,7 @@ printing is dropped.
 */
 
 // printObject is upstream's printObject.
-func printObject(path *Path, options *Options, print PrintFunc) Doc {
+func printObject(path *Path, options *Options, print PrintFunction) Doc {
 	current := node(path)
 	parent := parentOf(path)
 
