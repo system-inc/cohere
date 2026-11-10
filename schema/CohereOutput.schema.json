@@ -761,7 +761,12 @@
                                     }
                                 }
                             },
-                            "description": "Files a Go run's fix phase would have written and did not, since each is reached through a symbolic link to a real path outside the root. A fix never writes another project's files: each was checked, its findings stand, and its fixes were withheld. The run is incomplete. Absent when there are none."
+                            "description": "Files a fix phase, TypeScript's or an engine's, would have written and did not, since each is reached through a symbolic link to a real path outside the root. A fix never writes another project's files: each was checked, its findings stand, and its fixes were withheld. The run is incomplete. Absent when there are none."
+                        },
+                        "changedDuringRun": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Files whose text changed between the fix phase's walk and its fix, under another agent or an editor's save. The walk's fixes for each were refused, since their offsets point into bytes the file no longer holds, and asked for again against the text it holds; its findings describe the text the walk read. The run is incomplete, and is never replayed. Absent when there are none."
                         },
                         "withheldInDependencyCgo": {
                             "type": "array",

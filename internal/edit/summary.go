@@ -73,6 +73,10 @@ type Summary struct {
 	// rules when it is actually a finding about the file.
 	FilesFailed []string
 
+	// ChangedDuringRun names every file whose text changed between the walk and the fix, sorted: its walk's
+	// proposals were refused and its fixes asked for again against the text in hand (#bxmcf34).
+	ChangedDuringRun []string
+
 	// NotWritten names every file a run that writes left as it was because its real path is outside the
 	// run's root, with that path, sorted by name. Each was checked as any other file and its fixes are
 	// withheld, so the run is incomplete and says where (#td3zta2).
@@ -194,6 +198,12 @@ func (summary Summary) String() string {
 
 	if len(summary.FilesNotConverged) > 0 {
 		line += fmt.Sprintf(", %d files did not converge", len(summary.FilesNotConverged))
+	}
+
+	// A file that changed under the run had its walk's fixes refused and asked for again, so its findings
+	// describe bytes that are gone. Said, never folded into the refusal count alone.
+	if len(summary.ChangedDuringRun) > 0 {
+		line += fmt.Sprintf(", %d changed during the run (fixes measured again)", len(summary.ChangedDuringRun))
 	}
 
 	// A file the run would have written and did not, since it lies outside the root through a link, is

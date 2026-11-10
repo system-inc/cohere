@@ -447,14 +447,21 @@ func (report *pipelineReport) Write(out *bufio.Writer) {
 }
 
 // incompleteness is what the run fell short of once every phase it was asked for ran: the sentence a path set, or,
-// when the only gap is files whose fixes were not written, since a link leads each outside the root, that. TypeScript's
+// when the gap is files that changed during the run (#bxmcf34) or whose fixes were not written, since a link leads
+// each outside the root, that. TypeScript's
 // run sets that gap with no engine record to decide the sentence, so it is read from the gap here (#td3zta2). A crash,
 // or a file nothing checked, is the larger gap and keeps its own sentence.
 func (report *pipelineReport) incompleteness() string {
-	if report.incompleteBeyondPhases == "" && len(activeSummary.Gaps.NotWritten) > 0 {
+	if report.incompleteBeyondPhases != "" {
+		return report.incompleteBeyondPhases
+	}
+	if len(activeSummary.Gaps.ChangedDuringRun) > 0 {
+		return changedDuringRunSentence
+	}
+	if len(activeSummary.Gaps.NotWritten) > 0 {
 		return notWrittenSentence
 	}
-	return report.incompleteBeyondPhases
+	return ""
 }
 
 // writeAccounting states how much of the run the phases above actually explain.

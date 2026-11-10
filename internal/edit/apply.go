@@ -24,6 +24,7 @@
 package edit
 
 import (
+	"crypto/sha256"
 	"sort"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -37,6 +38,28 @@ import (
 type Proposal struct {
 	RuleName string
 	Fix      rule.Fix
+
+	// MeasuredOn is the digest of the text the fix's offsets were measured against, or the zero digest when
+	// the proposer measured it against exactly the text it was handed, which Propose's contract asks of
+	// every proposer. A proposal carried from somewhere else, the fix phase's walk above all, carries the
+	// digest of what the walk read, and the engine refuses it against any other text (#bxmcf34): a file
+	// that changed between the walk and the write, under another agent or an editor's save, would
+	// otherwise take offsets into bytes that are no longer there, and a stale fix that still parses is
+	// written as wrong code.
+	MeasuredOn Digest
+}
+
+// Digest is the sha256 of a text a proposal was measured against. The zero Digest is no claim.
+type Digest [sha256.Size]byte
+
+// DigestOf is text's Digest.
+func DigestOf(text string) Digest {
+	return sha256.Sum256([]byte(text))
+}
+
+// measuredOnOtherText is whether proposal says it was measured against a text other than text.
+func measuredOnOtherText(proposal Proposal, text string) bool {
+	return proposal.MeasuredOn != Digest{} && proposal.MeasuredOn != DigestOf(text)
 }
 
 // Rejection is a proposal that did not land, and why.
@@ -84,6 +107,11 @@ const (
 	ReasonParseFailure  = "the rewritten file does not parse"
 	ReasonNoProgress    = "the fix replaces text with itself"
 	ReasonPassesReached = "the pass budget was exhausted before the file converged"
+
+	// ReasonChangedSinceMeasured is a proposal whose offsets were measured against text the file no longer
+	// holds (Proposal.MeasuredOn). It never lands: the next pass asks for proposals against the text in
+	// hand, and the file is named as changed during the run.
+	ReasonChangedSinceMeasured = "the file changed after its fixes were measured"
 
 	// ReasonTransformFailed is the whole-text transform erroring rather than producing bad output.
 	// Distinct from a parse failure: one means the formatter broke, the other means it produced
