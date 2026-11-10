@@ -141,6 +141,10 @@ changed in cohere outside the sets is written under the same heading.
   repository's index itself, and a run whose index can't be read, a split or sparse one, decides by the ignore files
   alone and says so. The run cache keys the index on what it decides, the tracked paths the ignore rules exclude and
   the gitlinks, so a `git status` or a `git add` of an ordinary file still replays, and a `git add -f` doesn't.
+- A project below its repository's root is formatted by the repository's ignore files and index, as `git
+check-ignore` decides from there: a `.gitignore` above the project applies, and a file git tracks under a pattern
+  that matches it is formatted. A walk that can't read the index, a split or sparse one, says why under `--verbose`
+  and in `--json`'s `gaps.indexFallback`, since a tracked file then reads ignored.
 - A git worktree reads the `info/exclude` it shares with its main checkout, as git does, where it read none: a file
   only that exclude lists is ignored, named by the file's path as `git check-ignore -v` names it.
 - The footer's checked count is the files a phase examined, never the files in scope. A Swift project whose

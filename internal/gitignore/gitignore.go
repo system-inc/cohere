@@ -84,6 +84,24 @@ const maximumFileSize = 100 << 20
 // files govern it, through its own New, and the parent's patterns do not.
 var ErrNestedRepository = errors.New("is a repository of its own")
 
+// RepositoryOf is the nearest directory at or above start holding a `.git`, a clone's directory or a worktree's or
+// submodule's file: the repository whose ignore files and index govern start, as git finds it from a subdirectory.
+// It is "" when there is none. A matcher for a project below its repository's root is New of it, entered into the
+// project's directory, so the `.gitignore` files above the project and the repository's index apply there too.
+func RepositoryOf(start string) string {
+	directory := filepath.Clean(start)
+	for {
+		if _, statError := os.Lstat(filepath.Join(directory, ".git")); statError == nil {
+			return directory
+		}
+		parent := filepath.Dir(directory)
+		if parent == directory {
+			return ""
+		}
+		directory = parent
+	}
+}
+
 // Listing is a directory's entries as os.ReadDir returned them, and whether the directory was listed, for an
 // absolute path. A directory not listed is not empty: it is read from the disk.
 type Listing func(directory string) ([]os.DirEntry, bool)

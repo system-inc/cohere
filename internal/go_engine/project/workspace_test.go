@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/gitignore"
 )
 
 // A go.work's modules are its uses, minus any inside a submodule, found by its gitlink in the index rather
@@ -48,7 +49,7 @@ func TestReadWorkspaceLeavesOutAModuleInsideASubmodule(test *testing.T) {
 func TestReadWorkspaceOutsideARepositoryReadsWithoutGit(test *testing.T) {
 	test.Parallel()
 	built := readFixture(test)
-	if repository := nearestRepository(built.outside); repository != "" {
+	if repository := gitignore.RepositoryOf(built.outside); repository != "" {
 		test.Fatalf("the fixture's temporary directory is inside the repository at %s, so this proves nothing",
 			repository)
 	}
@@ -171,7 +172,7 @@ func withoutVariable(environment []string, name string) []string {
 func TestRefuseUnlistedModulesLeavesAVendoredReplaceTargetToItsUpstream(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	if repository := nearestRepository(root); repository != "" {
+	if repository := gitignore.RepositoryOf(root); repository != "" {
 		test.Fatalf("the temporary directory is inside the repository at %s, so its gitlinks would be read", repository)
 	}
 	files := map[string]string{
