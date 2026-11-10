@@ -74,6 +74,26 @@ func (matcher *Matcher) Directory() string { return matcher.directory }
 // `.git`, whose matcher never looks for one.
 func (matcher *Matcher) IndexFile() string { return matcher.indexFile }
 
+// ReadsIndex reports whether the index the matcher read or looked for is the file at index, compared by real path:
+// each side with its links resolved, so one spelling of a directory and another reach the same answer. On macOS git
+// writes a worktree's pointer to its git directory as /private/tmp/..., while a caller may hold the /tmp/... it was
+// given, and the two name one file (#ny1mv0y). A path that cannot be resolved, one that is not there, is compared
+// as it is spelled.
+func (matcher *Matcher) ReadsIndex(index string) bool {
+	if matcher.indexFile == "" || index == "" {
+		return false
+	}
+	return realPath(matcher.indexFile) == realPath(index)
+}
+
+// realPath is path with every link resolved, cleaned, or path cleaned when it cannot be resolved.
+func realPath(path string) string {
+	if resolved, resolveError := filepath.EvalSymlinks(path); resolveError == nil {
+		return resolved
+	}
+	return filepath.Clean(path)
+}
+
 // IndexFallback is why the matcher read no tracked paths from the repository's index, wrapping ErrNoIndex,
 // ErrSplitIndex, ErrSparseIndex or ErrMalformedIndex, and nil when it read them. A matcher that fell back decides by
 // the ignore files alone, so a file git tracks under a pattern that matches it reads ignored.
