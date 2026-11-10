@@ -58,9 +58,24 @@ func renderRecordsIn(
 	yieldedDirectories []string,
 ) (string, int, error) {
 	test.Helper()
+	return renderRecordsStartedAt(test, language, mode, lines, engineExit, yieldedDirectories, time.Now())
+}
+
+// renderRecordsStartedAt is renderRecordsIn for a process that started at processStart, which the account's total
+// line measures from, so a test can give the render a total it did not have to spend.
+func renderRecordsStartedAt(
+	test *testing.T,
+	language engineLanguage,
+	mode engineMode,
+	lines []string,
+	engineExit int,
+	yieldedDirectories []string,
+	processStart time.Time,
+) (string, int, error) {
+	test.Helper()
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
-	run := newEngineRun(stream, mode, language, "", time.Now())
+	run := newEngineRun(stream, mode, language, "", processStart)
 	run.yieldedDirectories = yieldedDirectories
 	for index, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
@@ -1194,17 +1209,29 @@ func goStreamWithheld(test *testing.T, withheldFields string) []string {
 // summary the run left.
 func renderGoStreamAs(test *testing.T, mode outputMode, lines []string) (string, runSummary) {
 	test.Helper()
+	return renderGoStreamStartedAt(test, mode, lines, time.Now())
+}
+
+// renderGoStreamStartedAt is renderGoStreamAs for a process that started at processStart (see renderRecordsStartedAt).
+func renderGoStreamStartedAt(
+	test *testing.T,
+	mode outputMode,
+	lines []string,
+	processStart time.Time,
+) (string, runSummary) {
+	test.Helper()
 	activeOutput, activeSummary = outputSettings{Mode: mode}, runSummary{}
-	output, exitCode, renderRecordsInError := renderRecordsIn(
+	output, exitCode, renderRecordsError := renderRecordsStartedAt(
 		test,
 		goLanguage("module"),
 		engineModeCheck,
 		lines,
 		0,
 		nil,
+		processStart,
 	)
-	if renderRecordsInError != nil || exitCode != 0 {
-		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsInError, output)
+	if renderRecordsError != nil || exitCode != 0 {
+		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 	}
 	return output, activeSummary
 }
