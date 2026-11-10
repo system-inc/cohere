@@ -56,8 +56,8 @@ func runOverlapCase(test *testing.T, endToEnd endToEndCase, overlaps bool) overl
 	}
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	exitCode := runOverlapping(arguments, &standardOutput, &standardError, registered, nil, embeddedStandardLibrary,
-		overlaps, nil)
+	exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, registered, nil,
+		embeddedStandardLibrary, overlaps, nil)
 	return overlapRun{
 		stream:   normalize(standardOutput.String(), root),
 		prose:    strings.ReplaceAll(standardError.String(), root, "/project"),

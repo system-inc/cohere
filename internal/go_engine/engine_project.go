@@ -27,7 +27,8 @@ type moduleDescription struct {
 }
 
 // describeProject reads the workspace, takes its census, decides which files are ours and in scope, and reads
-// each of those once. It refuses a root that is not a Go root, and a path outside the root.
+// each of those once. It refuses a root that is not a Go root, and a path outside the root. The editor's save is
+// scoped to its one path, and that file is read as the buffer (invocation.read).
 func describeProject(request invocation) (*describedProject, error) {
 	started := time.Now()
 	root := filepath.Clean(request.root)
@@ -65,6 +66,11 @@ func describeProject(request invocation) (*describedProject, error) {
 	if scopeError != nil {
 		return nil, scopeError
 	}
+	if request.stdinPath != "" {
+		// Unchecked, unlike a path to narrow to: a save of a file outside the root, or of one not on disk yet, is not
+		// refused but declined, as a file the run holds nothing for (runStdin).
+		scope, scopeDescription = []string{request.stdinPath}, request.stdinPath
+	}
 
 	described := &describedProject{
 		workspace:          workspace,
@@ -90,7 +96,7 @@ func describeProject(request invocation) (*describedProject, error) {
 	contents := map[string][]byte{}
 	var readable []string
 	for _, file := range census.Ours {
-		fileContents, readError := os.ReadFile(file)
+		fileContents, readError := request.read(file)
 		if readError != nil {
 			// A file nothing could read is ours until something says otherwise; inside the scope it is a gap
 			// the run names, and outside it the load says what it makes of the file.

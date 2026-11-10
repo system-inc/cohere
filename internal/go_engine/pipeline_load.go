@@ -25,6 +25,11 @@ type loadRequest struct {
 func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) {
 	engine.loads.begin()
 	workspace := engine.described.workspace
+	// The workspace, unless this is the editor's save, which loads its file's package alone (stdinPackage).
+	patterns, census := workspace.Patterns(), engine.described.readableOurs
+	if engine.request.stdinPath != "" {
+		patterns, census = engine.stdinPackage()
+	}
 	var loaded *load.Loaded
 	var loadError error
 	switch {
@@ -32,14 +37,13 @@ func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) 
 		loaded, loadError = load.PackagesWithRootSyntax(workspace.Root, workspace.Patterns(), request.environment,
 			engine.described.readableOurs, request.overlay)
 	case request.withOverlay:
-		loaded, loadError = load.PackagesWithOverlay(workspace.Root, workspace.Patterns(), request.environment,
-			engine.described.readableOurs, request.overlay)
+		loaded, loadError = load.PackagesWithOverlay(workspace.Root, patterns, request.environment, census,
+			request.overlay)
 	case request.caching != nil:
-		loaded, loadError = load.PackagesCached(workspace.Root, workspace.Patterns(), request.environment,
-			engine.described.readableOurs, engine.watchedCaching(*request.caching))
+		loaded, loadError = load.PackagesCached(workspace.Root, patterns, request.environment, census,
+			engine.watchedCaching(*request.caching))
 	default:
-		loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), request.environment,
-			engine.described.readableOurs)
+		loaded, loadError = load.Packages(workspace.Root, patterns, request.environment, census)
 	}
 	engine.loads.end()
 	return loaded, loadError

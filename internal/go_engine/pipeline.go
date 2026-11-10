@@ -356,8 +356,11 @@ func (engine *pipeline) runFix(wraps bool) {
 	severity, reported := engine.severityOf(ruleRequireFormatting)
 	held.known = engine.knownFiles()
 	held.wraps = wraps
+	// The editor's save formats in memory and writes nothing (runStdin).
+	saves := engine.request.stdinPath != ""
 	result := format.Run(candidates, format.Options{
-		Write:          !engine.request.switches["no-fix"],
+		Write:          !engine.request.switches["no-fix"] && !saves,
+		KeepOutput:     saves,
 		Root:           engine.writeRoot,
 		SingleThreaded: engine.request.switches["single-threaded"],
 		Known:          held.known,
@@ -384,12 +387,13 @@ func (engine *pipeline) runFix(wraps bool) {
 		}
 	}
 	for _, changed := range result.Changed {
-		if changed.Written {
+		// A save's file is rewritten in memory, as a run that writes rewrites it on disk.
+		if changed.Written || changed.Output != nil {
 			held.record.FilesRewritten++
 			held.record.FilesReformatted++
 			held.record.ChangedFiles = append(held.record.ChangedFiles,
 				contract.ChangedFile{File: changed.File, FixedBy: map[string]int{}, Formatted: true})
-			engine.reread(changed.File)
+			engine.hold(changed)
 			continue
 		}
 		if reported {
@@ -502,9 +506,26 @@ func (engine *pipeline) keepKnownFiles(known *format.KnownFiles) {
 	}
 }
 
+// hold makes the bytes the run holds of a file the fix phase changed the bytes the change left: the output itself for
+// a save, which formats in memory (format.Options.KeepOutput), and the disk's, read again, for a run that wrote it.
+func (engine *pipeline) hold(changed format.ChangedFile) {
+	if changed.Output != nil {
+		engine.described.contents[changed.File] = changed.Output
+		return
+	}
+	engine.reread(changed.File)
+}
+
 // reread reads a file the fix phase just rewrote, so the suppression comments lint reads are on the lines the
 // load and the rules see: gofmt can join blank lines, which moves every line below.
+//
+// A process that refuses writes, the editor's save (format.RefuseWrites), rewrote nothing, and the file it names holds
+// what the editor has not saved, so it reads nothing again: the disk's bytes would take the place of the buffer. A
+// write it was asked for anyway was refused, and the bytes it holds are the ones that stand.
 func (engine *pipeline) reread(file string) {
+	if format.WritesRefused() {
+		return
+	}
 	contents, readError := os.ReadFile(file)
 	if readError != nil {
 		// Without its contents the file gets no suppression index, so its findings are kept rather than
@@ -521,7 +542,8 @@ func (engine *pipeline) reread(file string) {
 // is on disk, since describeProject read it and each write after was reread (reread). Every reader that would open a
 // file again reads it here instead: gofmt's check, the load, and a rule through sourceReader. The one time the map
 // runs ahead of the disk is inside the rename, whose askedOver sets a file to the rewrite before writeRenamed writes
-// and rereads it, and there the rename's loads read the disk and its rules read the rewrite from the overlay first.
+// and rereads it, and there the rename's loads read the disk and its rules read the rewrite from the overlay first. The
+// editor's save is the other: its one file is the buffer, and gofmt's and the wrap's output of it, never the disk's.
 // described.contents is written only on the main goroutine, between phases, and the goroutines of gofmt, the load and
 // the rules read it only while that goroutine waits for them, so it is never read while it is written and takes no
 // lock. The rules beside the load (speculativeLint) read it while the main goroutine runs the long-line wrap, which

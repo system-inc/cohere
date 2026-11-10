@@ -90,6 +90,13 @@ func TestInProcessListingIsGoListsAnswer(test *testing.T) {
 			"testing/fstest"},
 		{"Workspace", listedWorkspaceFiles, nil, []string{"./...", "example.com/shim/...",
 			"example.com/shim/nested/..."}, ""},
+		// One directory each, as the editor's save lists its file's package: the module's own, with its tests, one
+		// below it, and in a workspace one inside a module nested in another.
+		{"ModuleDirectory", listedModuleFiles, []string{"GOWORK=off", "CGO_ENABLED=0"}, []string{"."},
+			"testing/fstest"},
+		{"ModuleSubdirectory", listedModuleFiles, []string{"GOWORK=off", "CGO_ENABLED=0"},
+			[]string{"./internal/helper"}, ""},
+		{"WorkspaceDirectory", listedWorkspaceFiles, nil, []string{"./shim/inner", "./shim/nested"}, ""},
 	}
 	for _, each := range cases {
 		test.Run(each.name, func(test *testing.T) {

@@ -71,8 +71,8 @@ function activate(context) {
         },
     };
 
-    // Registered only for what cohere formats through stdin, so a file it cannot format, a Go file
-    // among them, is never handed to it and its save never shows an error.
+    // Registered only for what cohere formats through stdin, so a file it cannot format is never handed
+    // to it and its save never shows an error.
     context.subscriptions.push(Vscode.languages.registerDocumentFormattingEditProvider(saveDocumentSelector, provider));
 }
 

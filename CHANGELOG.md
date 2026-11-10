@@ -115,6 +115,14 @@ changed in cohere outside the sets is written under the same heading.
   `vendor`, `third_party` or `testdata` are never judged. `internal/file_name_words` is the one judgment the
   TypeScript and Go rules read, and Swift ports it. Both are off in `cohere:style`, and the Go pair in cohere's
   own settings, until their census is routed.
+- An editor's save of a `.go` file: `cohere --fix [--format] --stdin-filepath <path>` in a Go module or
+  workspace reads the buffer on stdin and prints what a run with `--fix` would write for that file once the
+  rest of the workspace type-checks, writing nothing to disk (#qtna8m4). gofmt and the long-line wrap apply;
+  a rename spans files, so it is never made, and each one asked of the file is named on stderr, "left for a
+  run over the module". A save loads only the file's package and what it imports, so where another package
+  holds a type error, a run holds the wrap and the save makes it, ahead of the gate and never against it. An
+  ignored file, one no package holds, and a buffer that does not parse come back as typed, the reason on
+  stderr. The VS Code extension now formats `.go` on save.
 
 ### Changed
 

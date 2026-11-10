@@ -74,7 +74,7 @@ func printKeys() error {
 	if loadError != nil {
 		return loadError
 	}
-	keyed, keysError := Keys(loaded.Packages, fixtureContext, nil, FileDigests{})
+	keyed, keysError := Keys(loaded.Packages, fixtureContext, nil, FileDigests{}, nil)
 	if keysError != nil {
 		return keysError
 	}
@@ -119,7 +119,7 @@ func loadedFixture(test *testing.T) (*load.Loaded, map[string]Key) {
 		if fixture.failure != nil {
 			return
 		}
-		keyed, keysError := Keys(fixture.loaded.Packages, fixtureContext, nil, FileDigests{})
+		keyed, keysError := Keys(fixture.loaded.Packages, fixtureContext, nil, FileDigests{}, nil)
 		if keysError != nil {
 			fixture.failure = keysError
 			return
@@ -228,7 +228,7 @@ func keyClone(
 	loaded, _ := loadedFixture(test)
 	roots, byId := cloneGraph(loaded.Packages)
 	change(byId)
-	keyed, keysError := Keys(roots, shared, extraInputs, FileDigests{})
+	keyed, keysError := Keys(roots, shared, extraInputs, FileDigests{}, nil)
 	if keysError != nil {
 		test.Fatalf("keying a changed clone of the chain: %v", keysError)
 	}
@@ -259,7 +259,7 @@ func TestKeysCoverEveryPackageReachedAndAreTheSameAcrossCalls(test *testing.T) {
 		distinct[key] = id
 	}
 
-	again, keysError := Keys(loaded.Packages, fixtureContext, nil, FileDigests{})
+	again, keysError := Keys(loaded.Packages, fixtureContext, nil, FileDigests{}, nil)
 	if keysError != nil {
 		test.Fatalf("keying the chain again: %v", keysError)
 	}
@@ -356,7 +356,7 @@ func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 		test.Fatalf("bottom loaded without its other and ignored files: %q, %q", bottom.OtherFiles, bottom.IgnoredFiles)
 	}
 
-	keyed, keysError := Keys(loaded.Packages, fixtureContext, nil, FileDigests{})
+	keyed, keysError := Keys(loaded.Packages, fixtureContext, nil, FileDigests{}, nil)
 	if keysError != nil {
 		test.Fatal(keysError)
 	}
@@ -384,7 +384,7 @@ func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 		if writeError := os.WriteFile(path, append(contents, '\n'), 0o644); writeError != nil {
 			test.Fatal(writeError)
 		}
-		keyed, keysError = Keys(loaded.Packages, fixtureContext, nil, FileDigests{})
+		keyed, keysError = Keys(loaded.Packages, fixtureContext, nil, FileDigests{}, nil)
 		if keysError != nil {
 			test.Fatal(keysError)
 		}
@@ -510,7 +510,7 @@ func TestExtraInputsChangeItsPackageAndItsImporters(test *testing.T) {
 	loaded, _ := loadedFixture(test)
 	_, keysError := Keys(loaded.Packages, fixtureContext, func(*packages.Package) ([]string, error) {
 		return nil, fs.ErrPermission
-	}, FileDigests{})
+	}, FileDigests{}, nil)
 	if keysError == nil || !strings.Contains(keysError.Error(), "extra inputs") {
 		test.Errorf("want the extra inputs' error, got %v", keysError)
 	}
@@ -554,7 +554,7 @@ func TestAnImportCycleIsAnError(test *testing.T) {
 	loaded, _ := loadedFixture(test)
 	roots, byId := cloneGraph(loaded.Packages)
 	byId[bottomId].Imports["example.com/chain/top"] = byId[topId]
-	_, keysError := Keys(roots, fixtureContext, nil, FileDigests{})
+	_, keysError := Keys(roots, fixtureContext, nil, FileDigests{}, nil)
 	if keysError == nil || !strings.Contains(keysError.Error(), "import cycle") {
 		test.Errorf("want an import cycle's error, got %v", keysError)
 	}
@@ -581,7 +581,7 @@ func TestAnUnreadableFileIsAnError(test *testing.T) {
 	roots, byId := cloneGraph(loaded.Packages)
 	missing := filepath.Join(test.TempDir(), "missing.go")
 	byId[middleId].GoFiles = append(byId[middleId].GoFiles, missing)
-	_, keysError := Keys(roots, fixtureContext, nil, FileDigests{})
+	_, keysError := Keys(roots, fixtureContext, nil, FileDigests{}, nil)
 	if keysError == nil || !strings.Contains(keysError.Error(), missing) {
 		test.Errorf("want an error naming %s, got %v", missing, keysError)
 	}
@@ -597,4 +597,36 @@ func TestAKeyReadsAsLowercaseHex(test *testing.T) {
 	if key.String() != want {
 		test.Errorf("want %s, got %s", want, key.String())
 	}
+}
+
+// A key is of the bytes the load parsed: a file held in place of the disk's, as the editor's save holds its buffer, is
+// hashed from the held bytes, so its package and every importer key apart from the disk's, and held bytes that are
+// the disk's key as the disk does. Hashed from disk instead, a save's entry would be written under the key of the file
+// on disk, and the next run over that file would restore what the buffer held.
+func TestHeldBytesAreKeyedInPlaceOfTheDisks(test *testing.T) {
+	test.Parallel()
+
+	loaded, keys := loadedFixture(test)
+	middle := filepath.Join(chainDirectory(), "middle", "middle.go")
+	onDisk, readError := os.ReadFile(middle)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	keyedWith := func(contents []byte) map[string]Key {
+		test.Helper()
+		keyed, keysError := Keys(loaded.Packages, fixtureContext, nil, FileDigests{},
+			func(file string) ([]byte, bool) {
+				if file == middle {
+					return contents, true
+				}
+				return nil, false
+			})
+		if keysError != nil {
+			test.Fatal(keysError)
+		}
+		return keysById(keyed.Keys)
+	}
+	expectChanged(test, "the disk's bytes held", keys, keyedWith(onDisk))
+	expectChanged(test, "a buffer held for middle.go", keys, keyedWith(append(onDisk, '\n')),
+		middleId, topId, topExternalId)
 }

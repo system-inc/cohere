@@ -264,10 +264,13 @@ func (lister *inProcessLister) match(patterns []string) ([]string, string) {
 		group.Go(func() {
 			if pattern == "./..." {
 				measureListing(lister.timing, func() { matches[index], doubts[index] = lister.matchLocal() })
+			} else if pattern == "." || strings.HasPrefix(pattern, "./") && !strings.Contains(pattern, "...") {
+				measureListing(lister.timing, func() { matches[index], doubts[index] = lister.matchDirectory(pattern) })
 			} else if strings.HasPrefix(pattern, ".") || filepath.IsAbs(pattern) {
 				// A directory pattern below or outside the workspace, `./sub/...` or an absolute path, is matched by
-				// directory, which only matchLocal does and only for the workspace itself. Read as a module import
-				// path it would name no module, match nothing and answer an empty listing, which go list never does.
+				// directory, which matchLocal does only for the workspace itself and matchDirectory only for one
+				// directory below it. Read as a module import path it would name no module, match nothing and answer
+				// an empty listing, which go list never does.
 				doubts[index] = fmt.Sprintf("the pattern %s names a directory, which the lister matches only as ./...",
 					pattern)
 			} else if prefix, wildcard := strings.CutSuffix(
@@ -314,6 +317,19 @@ func (lister *inProcessLister) matchLocal() ([]string, string) {
 		return nil, doubt
 	}
 	return lister.packagesIn(directories, owner.Dir, owner.Path)
+}
+
+// matchDirectory is what a local pattern naming one directory, `.` or `./sub`, names: the package in that directory,
+// by its import path in the main module the directory is in, as go list names it. A directory in no main module is a
+// doubt, and one holding no package matches nothing, which match leaves to go list. The editor's save lists its
+// file's package so (see the engine's stdinPackage).
+func (lister *inProcessLister) matchDirectory(pattern string) ([]string, string) {
+	directory := filepath.Join(lister.workspace, filepath.FromSlash(pattern))
+	owner := lister.moduleRootOf(directory)
+	if owner == nil {
+		return nil, fmt.Sprintf("%s is in no main module", directory)
+	}
+	return lister.packagesIn([]string{directory}, owner.Dir, owner.Path)
 }
 
 // matchModules is what `prefix/...` names: every package of a main module whose import path is prefix or below it,

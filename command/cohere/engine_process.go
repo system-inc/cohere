@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -67,18 +68,7 @@ func runEngineBinaryUntil(
 
 	// With Setpgid the engine leads its group, so the group's id is the engine's process id.
 	engineGroup := command.Process.Pid
-	runEnded := make(chan struct{})
-	defer close(runEnded)
-	go func() {
-		for {
-			select {
-			case received := <-interrupts:
-				signalProcessGroup(engineGroup, received)
-			case <-runEnded:
-				return
-			}
-		}
-	}()
+	defer forwardInterrupts(engineGroup, interrupts)()
 
 	scanner := bufio.NewScanner(standardOutput)
 	// A finding's message is bounded by what a rule writes, not by a line length, so the limit is far
@@ -108,6 +98,60 @@ func runEngineBinaryUntil(
 	waitError := command.Wait()
 	exitCode, ended := describeExit(command.ProcessState, waitError)
 	return run.finish(exitCode, ended)
+}
+
+// forwardInterrupts passes each signal interrupts delivers on to the engine's process group, which is out of the
+// terminal's reach, until the stop it returns is called.
+func forwardInterrupts(engineGroup int, interrupts <-chan os.Signal) (stop func()) {
+	runEnded := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case received := <-interrupts:
+				signalProcessGroup(engineGroup, received)
+			case <-runEnded:
+				return
+			}
+		}
+	}()
+	return func() { close(runEnded) }
+}
+
+// runEngineForText runs an engine whose standard output is a file's text rather than records: the editor's save
+// (go_stdin.go), with input on its standard input. The text is returned whole once the engine has ended, never
+// streamed, so a save is handed all of it or none; its stderr is passed through untouched. It runs as runEngineBinary
+// runs an engine, in a process group of its own with the terminal's interrupts passed on, and environment is what its
+// process gets beyond this one's, each `NAME=value`.
+func runEngineForText(
+	binaryPath string,
+	arguments []string,
+	environment []string,
+	input []byte,
+	standardError io.Writer,
+) (text []byte, exitCode int, ended string, runError error) {
+	interrupts := make(chan os.Signal, 1)
+	signal.Notify(interrupts, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	defer signal.Stop(interrupts)
+
+	command := exec.Command(binaryPath, arguments...)
+	if len(environment) > 0 {
+		command.Env = append(os.Environ(), environment...)
+	}
+	command.Stdin = bytes.NewReader(input)
+	var output bytes.Buffer
+	command.Stdout = &output
+	command.Stderr = standardError
+	startInOwnProcessGroup(command)
+	command.WaitDelay = engineWaitDelay
+	// Anything this run said first reaches stderr before the engine's own words.
+	streams.Show(streams.Errors)
+	if startError := command.Start(); startError != nil {
+		return nil, 1, "", fmt.Errorf("starting the engine %s: %w", binaryPath, startError)
+	}
+	defer forwardInterrupts(command.Process.Pid, interrupts)()
+	waitError := command.Wait()
+	exitCode, ended = describeExit(command.ProcessState, waitError)
+	return output.Bytes(), exitCode, ended, nil
 }
 
 // killEngineGroup kills every process in the engine's group and waits for the engine.

@@ -42,8 +42,13 @@ func FilesHashed() int64 {
 
 // fileDigests is the digest of every file of the packages that are not keyed by path alone: known's when it holds
 // the file, else hashed, each once, across the cores, since reading and hashing the files is nearly all of Keys'
-// work. A file that cannot be read is an error, since a key without its bytes would say nothing about it.
-func fileDigests(reachable []*packages.Package, known FileDigests) (map[string]fileDigest, error) {
+// work, from held's bytes when held holds the file and from disk otherwise. A file that cannot be read is an error,
+// since a key without its bytes would say nothing about it.
+func fileDigests(
+	reachable []*packages.Package,
+	known FileDigests,
+	held func(file string) ([]byte, bool),
+) (map[string]fileDigest, error) {
 	seen := map[string]bool{}
 	var files []string
 	byPath := map[string]fileDigest{}
@@ -75,7 +80,7 @@ func fileDigests(reachable []*packages.Package, known FileDigests) (map[string]f
 	for range min(runtime.GOMAXPROCS(0), max(len(files), 1)) {
 		workers.Go(func() {
 			for index := range indexes {
-				digests[index], readErrors[index] = digestOf(files[index])
+				digests[index], readErrors[index] = digestOf(files[index], held)
 			}
 		})
 	}
@@ -94,8 +99,15 @@ func fileDigests(reachable []*packages.Package, known FileDigests) (map[string]f
 	return byPath, nil
 }
 
-// digestOf is the sha256 of one file's bytes, streamed rather than read whole.
-func digestOf(file string) (fileDigest, error) {
+// digestOf is the sha256 of one file's bytes: held's when held holds them, and otherwise the disk's, streamed rather
+// than read whole.
+func digestOf(file string, held func(file string) ([]byte, bool)) (fileDigest, error) {
+	if held != nil {
+		if contents, isHeld := held(file); isHeld {
+			filesHashed.Add(1)
+			return sha256.Sum256(contents), nil
+		}
+	}
 	opened, openError := os.Open(file)
 	if openError != nil {
 		return fileDigest{}, fmt.Errorf("hashing %s: %w", file, openError)

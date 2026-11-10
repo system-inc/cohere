@@ -1,10 +1,11 @@
 {
-    "about": "What a save hands cohere, read by cohere-format.js and held to the binary by TestTheEditorSavesWhatStdinFormats in command/cohere. extensions are the file types `cohere --fix --format --stdin-filepath` acts on, which cohere decides by the file name's extension: fixes for TypeScript's own extensions (internal/edit, TypeScriptParsableExtensions) and formatting for those its printers register (internal/format/native, Register). The formatter is registered for these alone. .mts and .cts get fixes but no formatting through stdin today, since no printer handles them; that gap is the formatter's. Go is not among them: cohere has no stdin path for Go until front door task #qtna8m4 implements one, and .go joins this list then, with the test widened to read it. refusal begins what cohere says, exiting 1, when the project a file is in (a Go module, a Swift package) has no stdin path at all, which a save takes as a decline and saves the buffer as typed.",
+    "about": "What a save hands cohere, read by cohere-format.js and held to the binary by TestTheEditorSavesWhatStdinFormats in command/cohere. extensions are the file types `cohere --fix --format --stdin-filepath` acts on, which cohere decides by the file name's extension: fixes for TypeScript's own extensions (internal/edit, TypeScriptParsableExtensions) and formatting for those its printers register (internal/format/native, Register). The formatter is registered for these alone. .mts and .cts get fixes but no formatting through stdin today, since no printer handles them; that gap is the formatter's. .go is formatted by gofmt and fixed by the Go engine in a Go module or workspace (#qtna8m4). refusal begins what cohere says, exiting 1, when the project a file is in (a Swift package) has no stdin path at all, which a save takes as a decline and saves the buffer as typed.",
     "extensions": [
         ".a",
         ".cjs",
         ".css",
         ".cts",
+        ".go",
         ".gql",
         ".graphql",
         ".js",

@@ -150,17 +150,17 @@ func TestStdinNeedsFix(test *testing.T) {
 // TestTheEditorSavesWhatStdinFormats holds the VS Code extension's list (editors/vscode/cohere-save.json) to
 // this binary, so the two cannot drift. The extension registers its formatter for the extensions listed,
 // and they must be exactly the ones the stdin mode acts on, both decided by the file name's extension: fixes
-// for a name edit.TypeScriptParsable claims (runStdin's stdinProposals) and formatting for one native has a
-// printer for. A file type left off would never be fixed or formatted on save, and one added that cohere
-// does nothing with would be handed to it for nothing. Go is not among them until #qtna8m4 gives it a stdin
-// path, and this test is widened then to read Go's.
+// for a name edit.TypeScriptParsable claims (runStdin's stdinProposals), formatting for one native has a
+// printer for, and gofmt and the Go engine's fixes for a `.go` name, the one suffix the Go engine's census
+// reads as source (runGoStdin). A file type left off would never be fixed or formatted on save, and one added
+// that cohere does nothing with would be handed to it for nothing.
 //
 // The two sets differ today: .mts and .cts are TypeScript's but have no printer, so a save fixes them and
 // leaves their formatting as typed. That gap is the formatter's to close, not the save's.
 //
-// The refusal is the start of what the front door says when the project a file is in has no stdin path,
-// which the extension takes as a decline rather than an error, so it must begin the sentence every engine
-// without one prints.
+// The refusal is the start of what the front door says when the project a file is in has no stdin path, a
+// Swift package's, which the extension takes as a decline rather than an error, so it must begin the
+// sentence every engine without one prints.
 //
 // Read from Go, not from node: native's registry is the set, and reading it here needs nothing but the file.
 func TestTheEditorSavesWhatStdinFormats(test *testing.T) {
@@ -177,7 +177,7 @@ func TestTheEditorSavesWhatStdinFormats(test *testing.T) {
 		test.Fatal(unmarshalError)
 	}
 
-	accepted := slices.Concat(edit.TypeScriptParsableExtensions(), native.Extensions())
+	accepted := slices.Concat(edit.TypeScriptParsableExtensions(), native.Extensions(), []string{".go"})
 	slices.Sort(accepted)
 	accepted = slices.Compact(accepted)
 	if !slices.Equal(save.Extensions, accepted) {
@@ -195,18 +195,14 @@ func TestTheEditorSavesWhatStdinFormats(test *testing.T) {
 		}
 		return "true"
 	}
-	for _, engine := range []struct {
-		language engineLanguage
-		flags    engineFlags
-	}{
-		{goLanguage("module"), goFlags},
-		{swiftLanguage, swiftFlags},
-	} {
-		location := projectLocation{Root: "/work/project", ArgumentBase: "/work/project"}
-		_, _, engineArgumentsError := engineArguments(engine.language, engine.flags, location, given, value, nil)
-		if engineArgumentsError == nil || !strings.HasPrefix(engineArgumentsError.Error(), save.Refusal) {
-			test.Errorf("%s's refusal of a save does not begin %q: %v",
-				engine.language.Name, save.Refusal, engineArgumentsError)
-		}
+	location := projectLocation{Root: "/work/project", ArgumentBase: "/work/project"}
+	_, _, swiftError := engineArguments(swiftLanguage, swiftFlags, location, given, value, nil)
+	if swiftError == nil || !strings.HasPrefix(swiftError.Error(), save.Refusal) {
+		test.Errorf("Swift's refusal of a save does not begin %q: %v", save.Refusal, swiftError)
+	}
+	// Go's save forwards the path to its engine, absolute, rather than refusing it.
+	goArguments, _, goError := engineArguments(goLanguage("module"), goFlags, location, given, value, nil)
+	if goError != nil || !slices.Contains(goArguments, "/work/project/Probe.ts") {
+		test.Errorf("Go's save was not forwarded to its engine: %q, %v", goArguments, goError)
 	}
 }

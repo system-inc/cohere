@@ -686,3 +686,69 @@ func TestASetIsWrittenWholeOrNotAtAll(test *testing.T) {
 		test.Fatalf("want first.go and locked alone in the directory, got %v (%v)", entries, readError)
 	}
 }
+
+// A run that keeps its output formats in memory, the editor's save: gofmt's output and the wrap's come back in Output,
+// read from the held bytes, and the file on disk, which here holds other text, is left as it was. A writing run keeps
+// none, since what it wrote is on disk.
+func TestKeepOutputFormatsAndWrapsInMemory(test *testing.T) {
+	test.Parallel()
+
+	file := writeFile(test, formattedSource)
+	heldUnformatted := func(string) ([]byte, bool) { return []byte(unformattedSource), true }
+	formatted := Run([]string{file}, Options{KeepOutput: true, Held: heldUnformatted})
+	wantFormatted := []ChangedFile{{File: file, Formatted: true, FirstDifferingLine: 5,
+		Output: []byte(reformattedSource)}}
+	if !reflect.DeepEqual(formatted.Changed, wantFormatted) {
+		test.Fatalf("gofmt in memory got %+v, want %+v", formatted.Changed, wantFormatted)
+	}
+
+	var asked atomic.Int32
+	sources := []Source{{File: file, Contents: []byte(callSource)}}
+	wrapped := RunWrap(sources, Options{KeepOutput: true, Wrap: wrapTo(callWrapped, &asked)})
+	wantWrapped := []ChangedFile{{File: file, WrappedLines: 1, FirstDifferingLine: 3, Output: []byte(callWrapped)}}
+	if !reflect.DeepEqual(wrapped.Changed, wantWrapped) {
+		test.Fatalf("the wrap in memory got %+v, want %+v", wrapped.Changed, wantWrapped)
+	}
+	requireContents(test, file, formattedSource)
+
+	written := writeFile(test, unformattedSource)
+	writeResult := Run([]string{written}, Options{Write: true, KeepOutput: true,
+		Root: rootOf(test, filepath.Dir(written))})
+	if len(writeResult.Changed) != 1 || writeResult.Changed[0].Output != nil || !writeResult.Changed[0].Written {
+		test.Fatalf("a writing run kept its output or did not write: %+v", writeResult.Changed)
+	}
+	requireContents(test, written, reformattedSource)
+}
+
+// Once a process refuses writes, the editor's save, every way this package writes a file is refused and the file is
+// left as it was: gofmt's write, the wrap's and a rename's set alike, since all three stage the new contents first. The
+// writes name a root that holds the file, so the root would let each through, and only the save's refusal, which stage
+// asks first, can be what stops them.
+//
+// Not parallel: RefuseWrites is process-wide, and this test turns it back off before any parallel test of the package,
+// each of which writes, is let run.
+func TestRefusedWritesLeaveEveryFileAsItWas(test *testing.T) {
+	RefuseWrites()
+	defer writesRefused.Store(false)
+
+	file := writeFile(test, unformattedSource)
+	root := rootOf(test, filepath.Dir(file))
+	formatted := Run([]string{file}, Options{Write: true, Root: root})
+	if len(formatted.NotFormatted) != 1 ||
+		!strings.Contains(formatted.NotFormatted[0].Reason, "answers an editor's save, which writes no file") {
+		test.Fatalf("gofmt's write was not refused: %+v", formatted)
+	}
+	var asked atomic.Int32
+	wrapped := RunWrap([]Source{{File: file, Contents: []byte(callSource)}},
+		Options{Write: true, Root: root, Wrap: wrapTo(callWrapped, &asked)})
+	if len(wrapped.Changed) != 0 || len(wrapped.WrapDeclined) != 1 {
+		test.Fatalf("the wrap's write was not refused: %+v", wrapped)
+	}
+	if _, setError := WriteAllAtomically(root, map[string][]byte{file: []byte(callSource)}); setError == nil {
+		test.Fatal("a rename's set was written")
+	}
+	requireContents(test, file, unformattedSource)
+	if !WritesRefused() {
+		test.Fatal("WritesRefused does not report the refusal")
+	}
+}

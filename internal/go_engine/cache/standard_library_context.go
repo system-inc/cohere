@@ -93,7 +93,8 @@ func StandardLibraryKeys(
 			standard = append(standard, judged)
 		}
 	}
-	digests, digestsError := fileDigests(standard, known)
+	// No run holds a standard-library file, so each is read from disk.
+	digests, digestsError := fileDigests(standard, known, nil)
 	if digestsError != nil {
 		return nil, digestsError
 	}

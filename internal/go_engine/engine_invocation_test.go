@@ -48,6 +48,29 @@ func TestParseInvocationRefuses(test *testing.T) {
 			"no-format with format-all", append(slices.Clone(contractArguments), "--no-format", "--format-all"),
 			"--no-format cannot be named with --format-all",
 		},
+		{
+			"a relative save", append(slices.Clone(contractArguments), "--fix", "--stdin-filepath", "value.go"),
+			"--stdin-filepath value.go is not an absolute path",
+		},
+		{
+			"a save without fix", append(slices.Clone(contractArguments), "--stdin-filepath", "/project/value.go"),
+			"--stdin-filepath answers what --fix writes for one file",
+		},
+		{
+			"a save that lints", append(slices.Clone(contractArguments), "--fix", "--lint", "--stdin-filepath",
+				"/project/value.go"),
+			"--stdin-filepath answers what --fix writes for one file",
+		},
+		{
+			"a save beside a path", append(slices.Clone(contractArguments), "--fix", "--stdin-filepath",
+				"/project/value.go", "/project/other.go"),
+			"--stdin-filepath answers what --fix writes for one file",
+		},
+		{
+			"a save of other builds", append(slices.Clone(contractArguments), "--fix", "--other-builds",
+				"--stdin-filepath", "/project/value.go"),
+			"takes no --other-builds",
+		},
 	}
 	for _, refused := range cases {
 		test.Run(refused.name, func(test *testing.T) {
@@ -82,6 +105,8 @@ func TestParseInvocationReads(test *testing.T) {
 		{"rules before version", append(slices.Clone(contractArguments), "--version", "--rules"), modeRules, nil, nil},
 		{"rules-enabled", append(slices.Clone(contractArguments), "--rules-enabled"), modeRulesEnabled, nil, nil},
 		{"version", append(slices.Clone(contractArguments), "--version"), modeVersion, nil, nil},
+		{"a save", append(slices.Clone(contractArguments), "--fix", "--format", "--stdin-filepath",
+			"/project/value.go"), modeStdin, nil, nil},
 		// The front door forwards it for a cache the engine will keep of its own, so it is read, never refused.
 		{"no-cache", append(slices.Clone(contractArguments), "--no-cache", "--no-fix"), modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, nil},
@@ -153,12 +178,12 @@ func TestMainRefusesASecondRun(test *testing.T) {
 	versionArguments := append(slices.Clone(contractArguments), "--version")
 	var firstOutput bytes.Buffer
 	var firstError bytes.Buffer
-	if exitCode := Main(versionArguments, 0, &firstOutput, &firstError); exitCode != exitClean {
+	if exitCode := Main(versionArguments, 0, nil, &firstOutput, &firstError); exitCode != exitClean {
 		test.Fatalf("the first run exited %d, want %d; stderr: %s", exitCode, exitClean, firstError.String())
 	}
 	var secondOutput bytes.Buffer
 	var secondError bytes.Buffer
-	if exitCode := Main(versionArguments, 0, &secondOutput, &secondError); exitCode != exitRefused {
+	if exitCode := Main(versionArguments, 0, nil, &secondOutput, &secondError); exitCode != exitRefused {
 		test.Fatalf("the second run exited %d, want %d", exitCode, exitRefused)
 	}
 	if secondOutput.Len() != 0 || !strings.Contains(secondError.String(), "second engine run in one process") {

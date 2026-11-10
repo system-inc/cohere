@@ -32,8 +32,8 @@ const saveSettings = require('./cohere-save.json');
 
 /*
  * The documents a save formats: files whose extension is one cohere fixes or formats through stdin, which
- * is how cohere decides too, by the name's extension. Any other file never reaches cohere, so saving a Go file,
- * which cohere has no stdin path for yet (#qtna8m4), runs nothing and says nothing.
+ * is how cohere decides too, by the name's extension. Any other file never reaches cohere, so its save runs
+ * nothing and says nothing.
  */
 const saveDocumentSelector = {
     scheme: 'file',
@@ -158,7 +158,7 @@ function environmentWithoutCohereOverride(environment = process.env) {
  *
  * Resolves to { text } on success, which is the buffer unchanged when cohere declines the file (no
  * printer for its type, outside the format scope, source that does not parse, or a project with no
- * stdin path, such as a Go module, which cohere refuses by name and exits 1), or to { error } when
+ * stdin path, such as a Swift package, which cohere refuses by name and exits 1), or to { error } when
  * cohere failed: a broken formatter, a project it cannot load, a binary that would not start. The
  * caller shows the error and saves the buffer as typed.
  *

@@ -99,9 +99,11 @@ func (engine *pipeline) renamingRulesOn() map[string]rule.Rule {
 // `--no-fix` nor `--format-only` renames, and only while the registry holds a naming rule and the settings leave it on.
 // `--no-format` still renames: it leaves formatting out, and a rename is a rule's fix, as its help says. A file the
 // rename rewrites is still printed by gofmt, since a longer name moves gofmt's alignment and leaving it would trade
-// one finding for another, but the long-line wrap, which is formatting, does not run (wrapsLongLines).
+// one finding for another, but the long-line wrap, which is formatting, does not run (wrapsLongLines). The editor's
+// save, which asks for `--fix` alone, names the renames rather than making them (nameRenamesLeft), so it lints too.
 func (engine *pipeline) renamesNames() bool {
-	if engine.fix == nil || !engine.request.requests(contract.PhaseLint) {
+	saves := engine.request.stdinPath != ""
+	if engine.fix == nil || !(engine.request.requests(contract.PhaseLint) || saves) {
 		return false
 	}
 	for _, mode := range []string{"no-fix", "format-only"} {
@@ -137,6 +139,10 @@ func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.L
 		return loaded, &first
 	}
 	asked := engine.askedRenames(first.outcome.kept)
+	if engine.request.stdinPath != "" {
+		engine.nameRenamesLeft(asked)
+		return loaded, &first
+	}
 	if len(asked) == 0 {
 		return loaded, &first
 	}
@@ -158,6 +164,21 @@ func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.L
 	// The first load and its lint pass served only the rename, and the load that proved it is the types phase's.
 	engine.fix.elapsed += loaded.Elapsed + time.Since(started) - written.Elapsed
 	return written, nil
+}
+
+// nameRenamesLeft says on stderr each rename the naming rules ask of the editor's save, in its file, and makes none: a
+// rename spans every file that names what it renames, so applied to the one file a save holds it would leave the
+// others' references broken. Named from the first lint pass's findings rather than planned, since a plan loads the
+// tree again under every platform, which a save cannot wait for to name what it will not apply. A run over the tree
+// makes them.
+func (engine *pipeline) nameRenamesLeft(asked []nameRename) {
+	for _, each := range asked {
+		if each.file != engine.request.stdinPath {
+			continue
+		}
+		engine.note("%s:%d:%d: left for a run over the %s: `%s` asks `%s` to be `%s`", each.file, each.line,
+			each.column, engine.described.container(), each.rule, engine.spelledAt(each), each.newName)
+	}
 }
 
 // askedRenames are the renames the kept findings ask for, in the order of renamingRules and then of the findings.
