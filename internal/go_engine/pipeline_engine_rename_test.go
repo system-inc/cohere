@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -314,5 +318,58 @@ func TestANamingRuleLearningFactsThroughItsRequirementsGetsOneRound(test *testin
 		"asked for again after a round"
 	if !strings.Contains(standardError.String(), note) {
 		test.Fatalf("want stderr to say %q, got:\n%s", note, standardError.String())
+	}
+}
+
+// The rename's loads to plan over keep no dependency's syntax or type maps, which the plan never reads and which are
+// most of a load's memory: the first load to plan over (rename) and every platform's (platformLoad, which each
+// platform's proof loads through too). The host's proof (prove) keeps them, since the last round's proof is the load
+// the lint phase lints after the rename writes. Read from the rename's source, each function by the loads it asks of
+// loadPackages, the engine's one caller of package load's loads, and whether each asks for the roots' syntax alone.
+func TestTheRenamesPlanLoadsKeepOnlyTheRootsSyntax(test *testing.T) {
+	test.Parallel()
+
+	fileSet := token.NewFileSet()
+	parsed, parseError := parser.ParseFile(fileSet, "pipeline_engine_rename.go", nil, parser.SkipObjectResolution)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	loadsBy := map[string][]string{}
+	for _, declaration := range parsed.Decls {
+		function, isFunction := declaration.(*ast.FuncDecl)
+		if !isFunction {
+			continue
+		}
+		ast.Inspect(function, func(node ast.Node) bool {
+			literal, isLiteral := node.(*ast.CompositeLit)
+			if !isLiteral {
+				return true
+			}
+			if typeName, isIdentifier := literal.Type.(*ast.Ident); !isIdentifier || typeName.Name != "loadRequest" {
+				return true
+			}
+			syntax := "whole"
+			for _, element := range literal.Elts {
+				field, isField := element.(*ast.KeyValueExpr)
+				if !isField {
+					continue
+				}
+				key, keyIsIdentifier := field.Key.(*ast.Ident)
+				value, valueIsIdentifier := field.Value.(*ast.Ident)
+				if keyIsIdentifier && key.Name == "rootSyntaxOnly" && valueIsIdentifier && value.Name == "true" {
+					syntax = "roots only"
+				}
+			}
+			loadsBy[function.Name.Name] = append(loadsBy[function.Name.Name], syntax)
+			return true
+		})
+	}
+	want := map[string][]string{
+		"rename":       {"roots only"},
+		"platformLoad": {"roots only"},
+		"prove":        {"whole"},
+	}
+	if !maps.EqualFunc(loadsBy, want, slices.Equal) {
+		test.Fatalf("want the rename's loads %v, got %v", want, loadsBy)
 	}
 }

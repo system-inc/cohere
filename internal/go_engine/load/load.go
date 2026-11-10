@@ -139,6 +139,24 @@ func PackagesWithOverlay(
 	return loadWorkspace(directory, patterns, environment, census, true, Caching{}, overlay)
 }
 
+// PackagesWithRootSyntax is PackagesWithOverlay keeping syntax and type information for the roots alone, for a
+// reader of Roots and Packages that reads a dependency's types and never its syntax, as the rename does. A dependency,
+// any package not among Roots, is type-checked into a types.Info with no maps, so the checker records nothing of it,
+// and leaves the load with no Syntax and that empty TypesInfo; its Types, Errors, Imports and the rest are as
+// PackagesWithOverlay gives them. One that withholds what reaches its cgo files keeps both until its errors are
+// judged and its declarations withheld (see withholdCgoDeclarations), so what the load withholds is the same. A
+// dependency's syntax and maps are most of a load's memory once the standard library is in it: its maps are never
+// made, and its syntax goes when the load returns.
+func PackagesWithRootSyntax(
+	directory string,
+	patterns []string,
+	environment []string,
+	census []string,
+	overlay map[string][]byte,
+) (*Loaded, error) {
+	return loadWorkspace(directory, patterns, environment, census, true, Caching{rootSyntaxOnly: true}, overlay)
+}
+
 // Caching is what the findings cache gives a load: a Restorer, whose packages the load parses and type-checks none
 // of, and a store for go list's answer, kept until something it reads moves. Either may be nil.
 type Caching struct {
@@ -171,6 +189,10 @@ type Caching struct {
 	// what the Restorer and Begin are given as the packages to analyze. The engine turns down a package with no file
 	// in scope, so a package every file of which git ignores is never linted. Nil analyzes every one.
 	Analyzes func(root *packages.Package) bool
+
+	// rootSyntaxOnly has every dependency type-checked with no type maps and left without its syntax (see
+	// PackagesWithRootSyntax).
+	rootSyntaxOnly bool
 }
 
 // PackagesCached is Packages with the findings cache.
@@ -331,6 +353,14 @@ func fromSource(
 	withheld := newWithheldErrors()
 	typeChecker := newLoader(built, sizes, withheld, overlay, caching.Held, caching.Timing)
 	reachable := typeChecker.connect()
+	if caching.rootSyntaxOnly {
+		for _, current := range reachable {
+			typeChecker.typesOnly[current.loaded] = true
+		}
+		for _, root := range built.roots {
+			delete(typeChecker.typesOnly, root.loaded)
+		}
+	}
 	toAnalyze := analyzedOfGraph(built)
 	// Every package to analyze has its test functions judged, one the caller's rules leave alone too: go test refuses
 	// a wrongly signed test whoever reads the package.
@@ -364,6 +394,14 @@ func fromSource(
 		roots = append(roots, root.loaded)
 	}
 	declarations := withholdCgoDeclarations(typeChecker.fileSet, reachable)
+	// Only now is a dependency that withholds done with its syntax and type maps; one that withholds nothing was
+	// checked without maps, and its syntax goes with the rest.
+	for _, current := range reachable {
+		if typeChecker.typesOnly[current.loaded] {
+			current.loaded.Syntax = nil
+			current.loaded.TypesInfo = &types.Info{}
+		}
+	}
 	byPackage := map[*packages.Package]PackageWithheld{}
 	distinct := map[string]bool{}
 	for _, current := range reachable {

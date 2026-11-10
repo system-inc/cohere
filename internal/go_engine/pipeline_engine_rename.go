@@ -196,8 +196,12 @@ type renameRound struct {
 // renameOnce). After a proven round the naming rules run over its load, which is from source and holds the rewrite,
 // and what they ask next is the next round, so a name that needs two renames gets both. Every round's bytes are
 // written together, once, as one set (see writeRenamed), and the last round's proof is the load of what is on disk.
+// The plan reads only the roots' syntax and type maps, so the load to plan over keeps no dependency's
+// (load.PackagesWithRootSyntax).
 func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
-	current, loadError := engine.loadPackages(loadRequest{environment: engine.described.workspace.Environment()})
+	current, loadError := engine.loadPackages(loadRequest{
+		environment: engine.described.workspace.Environment(), rootSyntaxOnly: true,
+	})
 	if loadError == nil && len(current.Diagnostics) > 0 {
 		loadError = fmt.Errorf("it found %d errors the first load did not", len(current.Diagnostics))
 	}
@@ -560,6 +564,9 @@ func (engine *pipeline) prove(
 			declined[file] = reason
 		}
 	}
+	// The proof keeps every dependency's syntax, as the plan's loads do not: the last round's proof is the load the
+	// lint phase lints once the rename is written, with no findings cache, and the checker hands every fact action its
+	// package's syntax, a dependency's included.
 	proof, proofError := engine.loadPackages(loadRequest{
 		environment: engine.described.workspace.Environment(), overlay: next, withOverlay: true,
 	})
@@ -621,7 +628,8 @@ func (engine *pipeline) prove(
 // does not (workspace.PlatformLoadOf), with space's judgment of which files may be written. It reads base, the
 // round's rewrite so far, in place of the disk, as the host's load of the round does, and each call's overlay over
 // that. The load of base alone is the plan's reading and every proof's load before its rewrite, the same bytes each
-// time, so it is made once per platform and kept for the round.
+// time, so it is made once per platform and kept for the round. Neither the plan nor the proof reads a dependency's
+// syntax there, so the load keeps none (load.PackagesWithRootSyntax).
 func (engine *pipeline) platformLoad(
 	space *workspace.Workspace, base map[string][]byte,
 ) func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
@@ -636,7 +644,7 @@ func (engine *pipeline) platformLoad(
 		environment := append(slices.Clone(engine.described.workspace.Environment()),
 			"GOOS="+platform.OperatingSystem, "GOARCH="+platform.Architecture, "CGO_ENABLED=0")
 		loaded, loadError := engine.loadPackages(loadRequest{
-			environment: environment, overlay: merged, withOverlay: true,
+			environment: environment, overlay: merged, withOverlay: true, rootSyntaxOnly: true,
 		})
 		if loadError != nil {
 			return nil, fmt.Errorf("loading as %s: %w", platform, loadError)
