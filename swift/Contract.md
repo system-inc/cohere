@@ -959,6 +959,11 @@ unused in every such build. `findingsAdded` counts the findings that stand which
 did not, and `findingsDropped` those it reported that the merge left out. A run of one build writes no `builds`, so
 its record reads as it always has. A file no build compiles stays a named gap, in the summary's `gaps.unchecked`.
 
+A type error only another build finds is a finding of that build, so the lint phase writes it as a compiler finding
+record, after the types phase has ended, and the lint record counts it in `typeErrors` (#rw6tg3a), additive within
+contract 3 and written only when it is not 0. The phase's finding records are `findings` plus `typeErrors`, and the
+front door refuses a lint record whose two counts do not add up to the records that came with it.
+
 ### `phase`
 
 ```json

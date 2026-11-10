@@ -171,7 +171,10 @@ type engineTypesRecord struct {
 }
 
 type engineLintRecord struct {
-	Findings             int            `json:"findings"`
+	Findings int `json:"findings"`
+	// TypeErrors is the type errors of a Go run's other builds, written in the lint phase as compiler finding records
+	// beside the findings counted above, additive within contract 3 (#rw6tg3a). An engine that writes none sends none.
+	TypeErrors           int            `json:"typeErrors"`
 	RulesRun             int            `json:"rulesRun"`
 	FilesWalked          int            `json:"filesWalked"`
 	NodesVisited         int            `json:"nodesVisited"`
@@ -934,10 +937,11 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 	if run.mode != engineModeCheck {
 		return fmt.Errorf("a lint record in a %s run", run.mode)
 	}
-	if record.Findings != run.findingsInPhase {
+	if record.Findings+record.TypeErrors != run.findingsInPhase {
 		return fmt.Errorf(
-			"the lint record counts %d findings and %d finding records came with it",
+			"the lint record counts %d findings and %d type errors of other builds, and %d finding records came with it",
 			record.Findings,
+			record.TypeErrors,
 			run.findingsInPhase,
 		)
 	}

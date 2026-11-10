@@ -138,6 +138,10 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	}
 
 	record := engine.lintCoverage(result, findings, pass.turnedOff, notConfigured(pass.enabled))
+	if verdict != nil {
+		// Written above as compiler findings, so the record counts every finding record of the phase (#rw6tg3a).
+		record.TypeErrors = len(verdict.merged.typeErrors)
+	}
 	record.WithheldBySuppression = outcome.withheldByRule
 	record.WithheldAsGenerated = result.WithheldAsGenerated
 	record.WithheldAsCopied = result.WithheldAsCopied

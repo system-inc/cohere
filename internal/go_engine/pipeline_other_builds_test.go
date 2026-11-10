@@ -514,3 +514,51 @@ func TestOtherBuildsNameEveryBuildsInputs(test *testing.T) {
 func sortedKeys(set map[string]bool) string {
 	return strings.Join(slices.Sorted(maps.Keys(set)), ", ")
 }
+
+// A type error only another build finds is a finding of the run, written in the lint phase as a compiler finding, and
+// the lint record counts it in typeErrors beside its findings, so the phase's finding records are what its record
+// says (#rw6tg3a): before, the record counted the rule findings alone, and the front door refused the run as an
+// engine that broke its contract. The fixture's windows-only file names a constant no build declares.
+func TestAnOtherBuildsTypeErrorIsCountedInTheLintRecord(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	broken := "//go:build windows\n\npackage separator\n\n// Broken names a constant no build declares.\nconst Broken = Missing\n"
+	if writeError := os.WriteFile(filepath.Join(root, "internal", "separator", "broken_windows.go"), []byte(broken),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	inLint := false
+	compilerRecords, ruleRecords := 0, 0
+	var lint contract.LintRecord
+	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+		var kind struct {
+			Kind   string `json:"kind"`
+			Source string `json:"source"`
+			Name   string `json:"name"`
+		}
+		if decodeError := json.Unmarshal([]byte(line), &kind); decodeError != nil {
+			test.Fatalf("%v: %s", decodeError, line)
+		}
+		switch {
+		case kind.Kind == "phase" && kind.Name == "types":
+			inLint = true
+		case kind.Kind == "finding" && inLint && kind.Source == "compiler":
+			compilerRecords++
+		case kind.Kind == "finding" && inLint:
+			ruleRecords++
+		case kind.Kind == "lint":
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			inLint = false
+		}
+	}
+	if compilerRecords == 0 {
+		test.Fatalf("the windows build's type error was written as no compiler finding:\n%s", stream)
+	}
+	if lint.TypeErrors != compilerRecords || lint.Findings != ruleRecords {
+		test.Errorf("the lint record counts %d findings and %d type errors, and the phase wrote %d rule findings and "+
+			"%d compiler findings", lint.Findings, lint.TypeErrors, ruleRecords, compilerRecords)
+	}
+}
