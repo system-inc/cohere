@@ -126,3 +126,8 @@ func (gaps *runGaps) addExcluded(reason string, source string, files int) {
 	}
 	gaps.Excluded = append(gaps.Excluded, excludedReason{Reason: reason, Count: files, Source: source})
 }
+
+// notWrittenSentence is the run's account when every phase ran and its only gap is files whose fixes were not written,
+// each reached through a link outside the root. TypeScript's run and an engine's say it in the same words.
+const notWrittenSentence = "the notes above name the files whose fixes were not written, each reached through a link " +
+	"outside the root"

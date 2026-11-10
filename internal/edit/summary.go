@@ -73,6 +73,11 @@ type Summary struct {
 	// rules when it is actually a finding about the file.
 	FilesFailed []string
 
+	// NotWritten names every file a run that writes left as it was because its real path is outside the
+	// run's root, with that path, sorted by name. Each was checked as any other file and its fixes are
+	// withheld, so the run is incomplete and says where (#td3zta2).
+	NotWritten []NotWrittenFile
+
 	// ChangedFiles names every file counted in FilesChanged, with what changed it, sorted by name.
 	//
 	// The count says how much; this says where and why, which is what `--no-fix` reports as findings:
@@ -189,6 +194,12 @@ func (summary Summary) String() string {
 
 	if len(summary.FilesNotConverged) > 0 {
 		line += fmt.Sprintf(", %d files did not converge", len(summary.FilesNotConverged))
+	}
+
+	// A file the run would have written and did not, since it lies outside the root through a link, is
+	// said here as well as in the footer's gap, so the fix line never reads as every rewrite landing.
+	if len(summary.NotWritten) > 0 {
+		line += fmt.Sprintf(", %d not written (reached through a link outside the root)", len(summary.NotWritten))
 	}
 
 	// Failures print even though they were already written to stderr as they happened. A summary

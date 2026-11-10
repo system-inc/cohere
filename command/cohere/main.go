@@ -1114,7 +1114,7 @@ func run() error {
 			backgroundContext, graph, fixFiles, fixRules,
 			formatPlan,
 			writeScope,
-			repositoryRoot,
+			repositoryRoot, fixWriteRoot(location.Root, mutate),
 			*maximumFixPasses,
 			mutate,
 			early,
@@ -1138,11 +1138,8 @@ func run() error {
 		for _, refusal := range fixSummary.Refusals() {
 			printProvenance(accountOutput(streams.Output), "%s\n", "  "+refusal)
 		}
-		// The files the fix phase rewrote, above the findings, in the views that list them.
-		if mutate {
-			activeSummary.Changed = changedFilesFrom(fixSummary.ChangedFiles, location.Root)
-			printChangedFiles(streams.Output, activeSummary.Changed)
-		}
+		// The files the fix phase rewrote, above the findings, and those it would have and did not.
+		recordFixedFiles(fixSummary, location.Root, mutate)
 		// The fix phase's line is out before the format record's write.
 		streams.Show(streams.Output)
 

@@ -161,6 +161,7 @@ func TestARunWithNoWalkStopsItsSpeculation(test *testing.T) {
 			func() (edit.Transform, []string) { return holding, candidates },
 			wholeTreeScope(),
 			directory,
+			writeRootOf(test, directory),
 			1,
 			false,
 			nil,
