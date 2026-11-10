@@ -295,6 +295,16 @@ type Options struct {
 	Restored func(*packages.Package) bool
 	Restore  func(*Action) error
 
+	// cohere: FactsBelowRestored, when set, names restored packages whose
+	// actions still depend on the actions, on the same package, of every
+	// analyzer that learns facts among what they require, transitively,
+	// though nothing on the package runs: those are restored too, and
+	// their vertical edges have the analyzers run on what the package
+	// imports, so what it imports exports every fact the package's own
+	// analysis read. An extra build asks it of a package restored from the
+	// host's run, to judge those reads once the analysis is over.
+	FactsBelowRestored func(*packages.Package) bool
+
 	// cohere: Finished, when set, is called with a package Analyze was
 	// given once the last action on it has finished, and the package's
 	// syntax and type information are then let go of as a dependency's
@@ -515,6 +525,28 @@ type syntaxReaders struct {
 	finished func(*packages.Package)
 }
 
+// cohere: factAnalyzersRequired are the analyzers that learn facts among
+// everything a requires, transitively, a itself left out, in a fixed order.
+func factAnalyzersRequired(a *analysis.Analyzer) []*analysis.Analyzer {
+	var found []*analysis.Analyzer
+	seen := map[*analysis.Analyzer]bool{a: true}
+	var visit func(required []*analysis.Analyzer)
+	visit = func(required []*analysis.Analyzer) {
+		for _, req := range required {
+			if seen[req] {
+				continue
+			}
+			seen[req] = true
+			if len(req.FactTypes) > 0 {
+				found = append(found, req)
+			}
+			visit(req.Requires)
+		}
+	}
+	visit(a.Requires)
+	return found
+}
+
 func (act *Action) String() string {
 	return fmt.Sprintf("%s@%s", act.Analyzer, act.Package)
 }
@@ -566,6 +598,10 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 			// cohere: unless the package is restored, since then nothing on it runs.
 			if opts.Restored == nil || !opts.Restored(pkg) {
 				for _, req := range a.Requires {
+					act.Deps = append(act.Deps, mkAction(req, pkg))
+				}
+			} else if opts.FactsBelowRestored != nil && opts.FactsBelowRestored(pkg) {
+				for _, req := range factAnalyzersRequired(a) {
 					act.Deps = append(act.Deps, mkAction(req, pkg))
 				}
 			}

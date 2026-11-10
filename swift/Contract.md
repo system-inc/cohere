@@ -959,6 +959,20 @@ unused in every such build. `findingsAdded` counts the findings that stand which
 did not, and `findingsDropped` those it reported that the merge left out. A run of one build writes no `builds`, so
 its record reads as it always has. A file no build compiles stays a named gap, in the summary's `gaps.unchecked`.
 
+An extra build restores from the host's run each package its own findings cache does not hold whose own files,
+module and import map are the host's and whose every read of other packages reads the same in the build: the
+objects its type check reached, the rules' lookups, the facts its analyzers read and the answers it asked, each
+compared by what an importer can observe of it, never by bytes. Its findings and facts are then the host's, so the
+merge is the one checking it would give. Each count below is written only when it is not 0: the host's
+`"entriesKept":349` counts the packages it kept an entry of for the other builds, and an extra build's
+`"restoredFromHost":301` the packages it restored, `"declinedAtLoad":12` those its load checked after all, since
+what they read of types did not hold, and `"declinedAtCheck":3` those its check declined, since a fact or answer they
+read did not, which had the build loaded again `"hostReloadRounds":1` times, at most 2. `"declinedBy"` counts each
+decline, and each package never restored, by why: `inputs` (its own files differ), `noEntry`, `never` (what it read
+cannot be recorded, as with cgo), `unknown`, `export` (its export data did not read), `T` (a type it read), `L` (a
+rule's lookup), `F` (a fact), `D` (a deprecation) or `A` (an answer). Under `--timing` nothing is restored from the
+host, so every figure is of work that ran.
+
 ### `phase`
 
 ```json

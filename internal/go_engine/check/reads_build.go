@@ -1,7 +1,6 @@
 package check
 
 import (
-	"fmt"
 	"go/types"
 	"reflect"
 	"slices"
@@ -20,17 +19,11 @@ import (
 // package at owner, or on that package itself when path is empty, and whether there is one.
 type FactLookup func(owner string, path objectpath.Path, factType reflect.Type) (analysis.Fact, bool)
 
-// ReadsBuild is one build's types as a verdict on a package's reads reads them, the host's or an extra build's (linux,
-// windows, freebsd), with what the verdicts compute of them memoized for the build, so every package's verdict
-// renders each object once (#b2t9xmf). Its methods take its lock, so verdicts may run on several goroutines.
+// ReadsBuild is what the verdicts on packages' reads compute of one build's types, the host's or an extra build's
+// (linux, windows, freebsd), memoized for the build, so every package's verdict renders each object once (#b2t9xmf).
+// Which packages a verdict asks of is the judged package's own (see TypesHold), since a test variant sees its
+// package's test variant at that package's path. Its methods take its lock, so verdicts may run on several goroutines.
 type ReadsBuild struct {
-	// packages are the build's packages by path, as the package a verdict judges sees them, its imports and what they
-	// reach among them. The host's needs none: its reads hold its objects.
-	packages map[string]*types.Package
-
-	// fact is the build's fact lookup, nil for the host's, whose reads hold their facts.
-	fact FactLookup
-
 	lock sync.Mutex
 
 	// renderings are each object's closureRendering, as a digest.
@@ -51,12 +44,9 @@ type objectPathResult struct {
 	found bool
 }
 
-// NewReadsBuild is a build of packages, by path as the package a verdict judges sees them, whose facts fact looks up.
-// The host's is NewReadsBuild(nil, nil).
-func NewReadsBuild(packages map[string]*types.Package, fact FactLookup) *ReadsBuild {
+// NewReadsBuild is an empty memo of one build's renderings, objectpaths and method names.
+func NewReadsBuild() *ReadsBuild {
 	return &ReadsBuild{
-		packages:    packages,
-		fact:        fact,
 		renderings:  map[types.Object]cache.Key{},
 		paths:       map[types.Object]objectPathResult{},
 		methodNames: map[*types.Package]map[string][]*types.TypeName{},
@@ -94,19 +84,6 @@ func (build *ReadsBuild) pathOf(object types.Object) (objectpath.Path, bool) {
 	path, pathError := build.encoder.For(object)
 	build.paths[object] = objectPathResult{path: path, found: pathError == nil}
 	return path, pathError == nil
-}
-
-// find is the object of the build at path in the package of ownerPath, and why not when there is none.
-func (build *ReadsBuild) find(ownerPath string, path objectpath.Path) (types.Object, string) {
-	owner := build.packages[ownerPath]
-	if owner == nil {
-		return nil, "the build has no package " + ownerPath
-	}
-	found, findError := objectpath.Object(owner, path)
-	if findError != nil {
-		return nil, "the build's " + ownerPath + " has no " + string(path)
-	}
-	return found, ""
 }
 
 // methodNamesOf are the type names declared package declares, by the name of each method in their method sets,
@@ -154,45 +131,103 @@ type Restoring struct {
 	Reads *build_reads.Reads
 }
 
-// Holds reports whether everything restoring read on the host's run, in host, reads the same in build, and when it
-// does not, the first read that differs, named by its row: T for an object or instance its type check reached, F for
-// a fact, L for a rule's lookup, D for a deprecation, and never or unknown for reads that cannot hold at all. A
+// deprecatedFactType is the deprecated analyzer's fact, which its result gathers for SA1019 from every fact of the
+// import closure, so a Deprecated lookup is that fact asked of the build.
+var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
+
+// TypesHold reports whether what restoring read of other packages' types on the host's run, in host, reads the same in
+// build, whose packages it reaches are closure, by path, and when it does not, the first read that differs, named by
+// its row: T for an object or instance its type check reached, L for a rule's lookup of the types, and never or
+// unknown for reads that cannot hold at all. It is the load's half of the verdict, decided once the package's imports
+// are done in build and before anything of the package is read there (load.Restored.Holds); FactsHold is check's. A
 // package whose own inputs are the host's and whose reads hold may take the host's results in build (#b2t9xmf).
 //
-// Every read fails closed: an object with no objectpath, a package the build lacks, a fact that does not encode, and a
-// lookup of a kind it does not know each fail it.
-func Holds(restoring Restoring, host *ReadsBuild, build *ReadsBuild) (bool, string) {
+// Every read fails closed: an object with no objectpath, a package the build lacks, and a lookup of a kind it does not
+// know each fail it.
+func TypesHold(
+	restoring Restoring,
+	closure map[string]*types.Package,
+	host *ReadsBuild,
+	build *ReadsBuild,
+) (bool, string) {
 	if restorable, why := restoring.Reads.Restorable(); !restorable {
 		if restoring.Reads.Never() != "" {
 			return false, "never: " + why
 		}
 		return false, "unknown: " + why
 	}
+	judged := verdict{host: host, build: build, closure: closure}
 	for _, object := range restoring.Reads.Objects() {
-		if holds, why := objectHolds(object, host, build); !holds {
+		if holds, why := judged.objectHolds(object); !holds {
 			return false, "T " + why
 		}
 	}
 	for _, instance := range restoring.Reads.Instances() {
-		if holds, why := instanceHolds(instance, restoring.Path, host, build); !holds {
+		if holds, why := judged.instanceHolds(instance, restoring.Path); !holds {
 			return false, "T " + why
 		}
 	}
-	for _, fact := range restoring.Reads.Facts() {
-		if holds, why := factHolds(fact, host, build); !holds {
-			return false, "F " + why
-		}
-	}
 	for _, lookup := range restoring.Reads.Lookups() {
-		row := "L "
 		if lookup.Query == build_reads.QueryDeprecated {
-			row = "D "
+			continue
 		}
-		if holds, why := lookupHolds(lookup, restoring, host, build); !holds {
-			return false, row + why
+		if holds, why := judged.lookupHolds(lookup, restoring); !holds {
+			return false, "L " + why
 		}
 	}
 	return true, ""
+}
+
+// FactsHold reports whether the fact reads restoring made on the host's run of the types among factTypes, and its
+// deprecation lookups when the deprecated fact is among them, read the same in build, whose facts fact gives as one
+// action on the package inherited them, and when they do not, the first that differs: F for a fact, D for a
+// deprecation. It is check's half of the verdict, decided as each action on the package is restored, once every
+// action it inherits from has finished; an action asks only the fact types its analyzer learns, so the caller tells
+// which read types every action asked.
+func FactsHold(
+	restoring Restoring,
+	closure map[string]*types.Package,
+	host *ReadsBuild,
+	build *ReadsBuild,
+	fact FactLookup,
+	factTypes map[reflect.Type]bool,
+) (bool, string) {
+	judged := verdict{host: host, build: build, closure: closure, fact: fact}
+	for _, read := range restoring.Reads.Facts() {
+		if !factTypes[read.FactType] {
+			continue
+		}
+		if holds, why := judged.factHolds(read); !holds {
+			return false, "F " + why
+		}
+	}
+	if !factTypes[deprecatedFactType] {
+		return true, ""
+	}
+	for _, lookup := range restoring.Reads.Lookups() {
+		if lookup.Query != build_reads.QueryDeprecated {
+			continue
+		}
+		if holds, why := judged.deprecationHolds(lookup); !holds {
+			return false, "D " + why
+		}
+	}
+	return true, ""
+}
+
+// ReadFactTypes are the fact types restoring's fact reads asked, and the deprecated fact's when it looked up a
+// deprecation, every type FactsHold must be asked of before its fact reads are all decided.
+func ReadFactTypes(restoring Restoring) map[reflect.Type]bool {
+	asked := map[reflect.Type]bool{}
+	for _, read := range restoring.Reads.Facts() {
+		asked[read.FactType] = true
+	}
+	for _, lookup := range restoring.Reads.Lookups() {
+		if lookup.Query == build_reads.QueryDeprecated {
+			asked[deprecatedFactType] = true
+		}
+	}
+	return asked
 }
 
 // objectName is object as a reason names it, its package's path and its name.
@@ -201,189 +236,6 @@ func objectName(object types.Object) string {
 		return object.Name()
 	}
 	return object.Pkg().Path() + "." + object.Name()
-}
-
-// counterpart is the build's object at the place of hostObject, the host's, by its package's path and objectpath, and
-// why not when there is none. unsafe's objects are the type checker's own, the same in every build.
-func counterpart(hostObject types.Object, host *ReadsBuild, build *ReadsBuild) (types.Object, string) {
-	if hostObject.Pkg() == types.Unsafe {
-		return hostObject, ""
-	}
-	path, hasPath := host.pathOf(hostObject)
-	if !hasPath {
-		return nil, "object " + objectName(hostObject) + " has no objectpath"
-	}
-	return build.find(hostObject.Pkg().Path(), path)
-}
-
-// objectHolds reports whether hostObject, the host's, is in build at the same place and renders alike there.
-func objectHolds(hostObject types.Object, host *ReadsBuild, build *ReadsBuild) (bool, string) {
-	found, why := counterpart(hostObject, host, build)
-	if found == nil {
-		return false, "object " + objectName(hostObject) + ": " + why
-	}
-	if host.rendering(hostObject) != build.rendering(found) {
-		return false, "object " + objectName(hostObject) + " renders differently"
-	}
-	return true, ""
-}
-
-// instanceHolds reports whether an instance the package made of another package's generic reads the same in build:
-// the generic, and every named type of another package its type arguments reach, each in build and rendered alike.
-// The arguments' shape is the package's own source and what it inferred from the objects it read, each a read of its
-// own; a named type of the package itself is an own input.
-func instanceHolds(instance build_reads.Instance, ownPath string, host *ReadsBuild, build *ReadsBuild) (bool, string) {
-	if holds, why := objectHolds(instance.Generic, host, build); !holds {
-		return false, "instance of " + objectName(instance.Generic) + ": " + why
-	}
-	for _, typeName := range closureTypeNames(slices.Collect(instance.TypeArguments.Types())) {
-		if typeName.Pkg().Path() == ownPath {
-			continue
-		}
-		if holds, why := objectHolds(typeName, host, build); !holds {
-			return false, "instance of " + objectName(instance.Generic) + ": " + why
-		}
-	}
-	return true, ""
-}
-
-// factHolds reports whether a fact read reads the same in build: there both times or neither, and when there, its
-// value equal by what gob carries of it (factValueDigest).
-func factHolds(fact build_reads.Fact, host *ReadsBuild, build *ReadsBuild) (bool, string) {
-	var path objectpath.Path
-	named := fact.Package.Path()
-	if fact.Object != nil {
-		named = objectName(fact.Object)
-		objectPath, hasPath := host.pathOf(fact.Object)
-		if !hasPath {
-			return false, "fact " + fact.FactType.String() + " of " + named + ": the object has no objectpath"
-		}
-		path = objectPath
-	}
-	name := "fact " + fact.FactType.String() + " of " + named
-	if build.fact == nil {
-		return false, name + ": the build has no facts to ask"
-	}
-	value, found := build.fact(fact.Package.Path(), path, fact.FactType)
-	switch {
-	case found != fact.Found:
-		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", fact.Found, found)
-	case !found:
-		return true, ""
-	}
-	hostDigest, hostError := factValueDigest(fact.Value)
-	buildDigest, buildError := factValueDigest(value)
-	if hostError != nil || buildError != nil {
-		return false, name + ": its value does not encode"
-	}
-	if hostDigest != buildDigest {
-		return false, name + ": its value differs"
-	}
-	return true, ""
-}
-
-// lookupHolds reports whether a rule's lookup gets the same answer asked again of build: the same object, rendered
-// alike, or none both times, or for a deprecation the same message.
-//
-//   - Scope asks the build's package at the lookup's path for the name.
-//   - Closure asks the build's import closure, from the package's imports, as the rule asked (ClosureInterface).
-//   - PackageName asks whether a package of that closure has the name, as the rule's walk does.
-//   - Interface and Method answer by the subject, the package's own method, which is the host's in the build, and by
-//     the closure's type names with a method of the name: so they hold when those type names are the same in both
-//     builds, rendered alike. That errs wide, failing when a type name the rule would not have matched changes.
-//   - Deprecated asks the build's deprecated fact of the subject, or of its package.
-func lookupHolds(lookup build_reads.Lookup, restoring Restoring, host *ReadsBuild, build *ReadsBuild) (bool, string) {
-	name := "lookup " + lookup.Query + " " + strings.Trim(lookup.Path+"."+lookup.Name, ".")
-	roots := make([]*types.Package, 0, len(restoring.Imports))
-	for _, imported := range restoring.Imports {
-		if build.packages[imported] == nil {
-			return false, name + ": the build has no package " + imported
-		}
-		roots = append(roots, build.packages[imported])
-	}
-	switch lookup.Query {
-	case build_reads.QueryScope:
-		declaring := build.packages[lookup.Path]
-		if declaring == nil {
-			return false, name + ": the build has no package " + lookup.Path
-		}
-		return answerHolds(name, lookup, declaring.Scope().Lookup(lookup.Name), host, build)
-	case build_reads.QueryClosure:
-		_, declared := build_reads.ClosureInterface(roots, lookup.Path, lookup.Name)
-		var answer types.Object
-		if declared != nil {
-			answer = declared
-		}
-		return answerHolds(name, lookup, answer, host, build)
-	case build_reads.QueryPackageName:
-		taken := false
-		for reached := range build_reads.ClosurePackages(roots) {
-			if reached.Name() == lookup.Name {
-				taken = true
-				break
-			}
-		}
-		if taken != lookup.Found {
-			return false, name + fmt.Sprintf(": found %t on the host, %t in the build", lookup.Found, taken)
-		}
-		return true, ""
-	case build_reads.QueryInterface, build_reads.QueryMethod:
-		if lookup.Subject == nil || lookup.Subject.Pkg() == nil {
-			return false, name + ": it has no subject to find the host's closure by"
-		}
-		hostCandidates := methodCandidates(host, lookup.Subject.Pkg().Imports(), lookup.Name)
-		buildCandidates := methodCandidates(build, roots, lookup.Name)
-		if len(hostCandidates) != len(buildCandidates) {
-			return false, name + fmt.Sprintf(": %d type names have the method on the host, %d in the build",
-				len(hostCandidates), len(buildCandidates))
-		}
-		for index, hostCandidate := range hostCandidates {
-			if !sameObject(hostCandidate, buildCandidates[index], host, build) {
-				return false, name + ": " + objectName(hostCandidate) + " differs in the build"
-			}
-		}
-		return true, ""
-	case build_reads.QueryDeprecated:
-		return deprecationHolds(name, lookup, host, build)
-	default:
-		return false, name + ": a lookup of this kind cannot be asked again"
-	}
-}
-
-// answerHolds reports whether answer, the build's, is the answer lookup recorded on the host.
-func answerHolds(
-	name string,
-	lookup build_reads.Lookup,
-	answer types.Object,
-	host *ReadsBuild,
-	build *ReadsBuild,
-) (bool, string) {
-	switch {
-	case lookup.Found != (answer != nil):
-		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", lookup.Found, answer != nil)
-	case answer == nil:
-		return true, ""
-	case !sameObject(lookup.Answer, answer, host, build):
-		return false, name + ": the answer differs"
-	}
-	return true, ""
-}
-
-// sameObject reports whether hostObject, the host's, and buildObject, the build's, are one object in each: of one
-// package path at one objectpath, rendered alike.
-func sameObject(hostObject types.Object, buildObject types.Object, host *ReadsBuild, build *ReadsBuild) bool {
-	if hostObject.Pkg() == nil || buildObject.Pkg() == nil {
-		return hostObject == buildObject
-	}
-	if hostObject.Pkg().Path() != buildObject.Pkg().Path() {
-		return false
-	}
-	hostPath, hostHasPath := host.pathOf(hostObject)
-	buildPath, buildHasPath := build.pathOf(buildObject)
-	if !hostHasPath || !buildHasPath || hostPath != buildPath {
-		return false
-	}
-	return host.rendering(hostObject) == build.rendering(buildObject)
 }
 
 // methodCandidates are the type names of the import closure of roots with a method named name in their method sets,
@@ -401,38 +253,4 @@ func methodCandidates(build *ReadsBuild, roots []*types.Package, name string) []
 		return strings.Compare(left.Name(), right.Name())
 	})
 	return candidates
-}
-
-// deprecatedFactType is the deprecated analyzer's fact, which its result gathers for SA1019 from every fact of the
-// import closure, so a Deprecated lookup is that fact asked of the build.
-var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
-
-// deprecationHolds reports whether a Deprecated lookup gets the same answer from the build's deprecated facts: the
-// subject, or its package, deprecated both times with the same message, or neither time.
-func deprecationHolds(name string, lookup build_reads.Lookup, host *ReadsBuild, build *ReadsBuild) (bool, string) {
-	var path objectpath.Path
-	asked := name
-	if lookup.Subject != nil {
-		subjectPath, hasPath := host.pathOf(lookup.Subject)
-		if !hasPath {
-			return false, name + ": the subject has no objectpath"
-		}
-		path = subjectPath
-		asked = name + " of " + objectName(lookup.Subject)
-	}
-	if build.fact == nil {
-		return false, asked + ": the build has no facts to ask"
-	}
-	value, found := build.fact(lookup.Path, path, deprecatedFactType)
-	if found != lookup.Found {
-		return false, asked + fmt.Sprintf(": found %t on the host, %t in the build", lookup.Found, found)
-	}
-	if !found {
-		return true, ""
-	}
-	deprecation, isDeprecation := value.(*deprecated.IsDeprecated)
-	if !isDeprecation || deprecation.Msg != lookup.Text {
-		return false, asked + ": its message differs"
-	}
-	return true, ""
 }

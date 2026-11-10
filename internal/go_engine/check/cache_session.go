@@ -191,6 +191,19 @@ type CacheSession struct {
 	// cache_session_reads.go), and byIdentifier every package the load reached, by ID, which a read names its owner by.
 	trusted      map[*packages.Package]bool
 	byIdentifier map[string]*packages.Package
+
+	// keepsForBuilds is set on the host's session of a run with extra builds (KeepForBuilds), whose every Restore keys
+	// the load, a store or none, into keptKeys, for the portable digests and the reads' owners of the entries it keeps
+	// for them (keepForBuilds). written are the misses whose entry this run wrote to the store, which it reads back
+	// rather than encode again, and buildKeys the keys a run without a store names an entry's reads' owners by
+	// (readsOf).
+	keepsForBuilds bool
+	keptKeys       *cache.Keyed
+	written        map[*packages.Package]bool
+	buildKeys      map[*packages.Package]cache.Key
+
+	// host is the restore from the host's run of an extra build's session, nil for any other (see RestoreFromHost).
+	host *hostState
 }
 
 // NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
@@ -243,6 +256,8 @@ func (session *CacheSession) Restore(
 	session.outputs = map[*packages.Package]cache.Key{}
 	session.closures = map[*packages.Package]closureDigest{}
 	session.attempted = map[*packages.Package]bool{}
+	session.written = map[*packages.Package]bool{}
+	session.buildKeys = nil
 	session.standardLibraryKeys = nil
 	session.fromBinary = map[*packages.Package]bool{}
 	session.given = make(map[*packages.Package]bool, len(analyzed))
@@ -266,15 +281,25 @@ func (session *CacheSession) Restore(
 	// The digests of every file Keys hashed, which the standard library's keys read rather than hash again; none
 	// without a store, which keys only the standard library.
 	var hashed cache.FileDigests
-	if session.caching.Store != nil {
+	var keyed *cache.Keyed
+	session.keptKeys = nil
+	// The host's run keys its load here even without a store, as an extra build's restore keys its own (see
+	// restoreFromHost): only before any package has its syntax do the extra inputs read what both builds read alike.
+	if session.caching.Store != nil || session.keepsForBuilds {
 		keyContext := session.caching.Context
 		keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+loader)
-		keyed, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files,
+		var keysError error
+		keyed, keysError = cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files,
 			session.caching.Held)
 		if keysError != nil {
 			session.problem(fmt.Sprintf("computing the keys: %v", keysError))
 			return nil
 		}
+		if session.keepsForBuilds {
+			session.keptKeys = keyed
+		}
+	}
+	if session.caching.Store != nil {
 		session.keys, session.own, hashed = keyed.Keys, keyed.Own, keyed.Files
 		session.files = keyed.Files
 	}
@@ -287,6 +312,13 @@ func (session *CacheSession) Restore(
 	for dropping {
 		dropping = session.dropShortHits(reachable)
 	}
+	// What the build's own store holds is restored by the build's key, exactly; only what it does not hold is restored
+	// from the host's run, by what the package read (#b2t9xmf).
+	session.restoreFromHost(loader, reachable, keyed)
+	for dropping = true; dropping; {
+		dropping = session.dropShortHits(reachable)
+	}
+	session.dropShortHostHits()
 	restoring := make(map[*packages.Package]*load.Restored, len(session.hits))
 	for hit, restored := range session.hits {
 		restoring[hit] = restored.types
@@ -604,7 +636,14 @@ func (session *CacheSession) save(
 		}
 	}
 	session.saveMisses([]*checker.Graph{graph}, missed, withheld, files)
-	session.counts.Hit = len(session.hits) - len(session.fromBinary)
+	// A package restored from the host's run is neither a hit of the build's store nor a miss, and gets no entry here:
+	// the host's entry is not provably the one this build would write, since its output digest and second key are
+	// of the host's types, so restoring a warm build from them is the next unit's (#b2t9xmf).
+	hostRestored := 0
+	if session.host != nil {
+		hostRestored = len(session.host.restoring)
+	}
+	session.counts.Hit = len(session.hits) - len(session.fromBinary) - hostRestored
 	session.counts.Missed = len(session.keys) - len(session.hits)
 	session.counts.SecondKeyHit = len(session.secondKeyHits)
 }
@@ -630,9 +669,12 @@ func (session *CacheSession) saveMisses(
 		}
 	}
 	knownFiles := session.allFiles()
+	// A package above one restored from the host's run whose restore is not settled, or was declined, read what the
+	// restore gave, which may not stand: it is saved by a later wave, or by the build's next load, never now.
+	unsettled := session.unsettledBelow()
 	var saving []*packages.Package
 	for _, keyed := range missed {
-		if session.attempted[keyed] {
+		if session.attempted[keyed] || unsettled[keyed] {
 			continue
 		}
 		session.attempted[keyed] = true
@@ -687,6 +729,7 @@ func (session *CacheSession) saveMisses(
 			default:
 				session.counts.FactsDropped += entry.dropped
 				session.counts.Written++
+				session.written[saved] = true
 				written = append(written, saved)
 			}
 		}()

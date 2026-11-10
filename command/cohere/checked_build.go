@@ -6,15 +6,23 @@ import "fmt"
 // (swift/Contract.md, internal/go_engine/contract.BuildRecord), the host's first: its target as go env would make it,
 // with ` cgo` when cgo is on and its tags after ` tags `; the files of ours it compiles and the packages it analyzed,
 // every package of the workspace in each; and the findings that stand which it kept and the host's did not, and those
-// it kept that the merge left out. A run of one build writes none, and neither does a Swift run, so their output is
-// as it was.
+// it kept that the merge left out. Then what the build restored from the host's run rather than checked, each count
+// written only when not 0: the host's entries kept for the others, and another's packages restored, declined by its
+// load and by its check, the loads again those took, and every decline by why. A run of one build writes none, and
+// neither does a Swift run, so their output is as it was.
 type checkedBuild struct {
-	Target           string `json:"target"`
-	Host             bool   `json:"host"`
-	CompiledFiles    int    `json:"compiledFiles"`
-	AnalyzedPackages int    `json:"analyzedPackages"`
-	FindingsAdded    int    `json:"findingsAdded"`
-	FindingsDropped  int    `json:"findingsDropped"`
+	Target           string         `json:"target"`
+	Host             bool           `json:"host"`
+	CompiledFiles    int            `json:"compiledFiles"`
+	AnalyzedPackages int            `json:"analyzedPackages"`
+	FindingsAdded    int            `json:"findingsAdded"`
+	FindingsDropped  int            `json:"findingsDropped"`
+	EntriesKept      int            `json:"entriesKept,omitempty"`
+	RestoredFromHost int            `json:"restoredFromHost,omitempty"`
+	DeclinedAtLoad   int            `json:"declinedAtLoad,omitempty"`
+	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
+	HostReloadRounds int            `json:"hostReloadRounds,omitempty"`
+	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
 }
 
 // line is the build's clause of the --verbose account, after "lint: ". The host's says what it covered, and the

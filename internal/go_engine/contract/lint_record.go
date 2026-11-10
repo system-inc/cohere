@@ -62,6 +62,23 @@ type BuildRecord struct {
 	// on the file reports.
 	FindingsAdded   int `json:"findingsAdded"`
 	FindingsDropped int `json:"findingsDropped"`
+
+	// EntriesKept counts the packages the host's build kept an entry of for the extra builds to restore from
+	// (#b2t9xmf), the host's alone, and written only when not 0.
+	EntriesKept int `json:"entriesKept,omitempty"`
+
+	// RestoredFromHost counts the packages an extra build restored from the host's run rather than check: its own
+	// findings cache did not hold them, their own inputs were the host's, and everything they read of other packages
+	// read the same in the build. DeclinedAtLoad counts the packages its load checked from source after all, since
+	// what they read of other packages' types did not hold, and DeclinedAtCheck those its check declined, since what
+	// they read of facts or answers did not hold, which had the build loaded again HostReloadRounds times. DeclinedBy
+	// counts each decline, and each package that was never a candidate, by why: inputs, noEntry, never, unknown,
+	// export, T, L, F, D or A. Each is written only when not 0.
+	RestoredFromHost int            `json:"restoredFromHost,omitempty"`
+	DeclinedAtLoad   int            `json:"declinedAtLoad,omitempty"`
+	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
+	HostReloadRounds int            `json:"hostReloadRounds,omitempty"`
+	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
 }
 
 // LintCache counts, by package, what the per-package findings cache did: every package the load reached was hit,

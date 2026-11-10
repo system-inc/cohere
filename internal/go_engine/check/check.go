@@ -93,6 +93,12 @@ type Options struct {
 	// Nil, the walks take slots of their own, as many as there are cores.
 	WalkSlots build_reads.Slots
 
+	// KeepForBuilds has the run keep, in Result.Host, the entry of each package it analyzed from source whose reads can
+	// hold, for its extra builds to restore from (#b2t9xmf). It needs Cache and Reads, and only a run with extra builds
+	// sets it, since keeping costs an entry's encoding of each package without a store and its bytes until the builds
+	// end.
+	KeepForBuilds bool
+
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
 	holdWalk func(owner *packages.Package)
@@ -225,6 +231,11 @@ type Result struct {
 	// ReadWalks are the type-read walks Run left running, nil when Options.Reads is (see Reads).
 	ReadWalks *build_reads.Walks
 
+	// Host is what the run kept for its extra builds under Options.KeepForBuilds, nil without it, and FromHost what an
+	// extra build's session restored from the host's run (CacheSession.RestoreFromHost), all zero without one.
+	Host     *HostRun
+	FromHost HostRestoreCounts
+
 	Elapsed time.Duration
 }
 
@@ -317,6 +328,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
 		}
 		checkerOptions.Restored, checkerOptions.Restore = session.restoredInWave, session.restore
+		// A package restored from the host's run has the analyzers that learn facts run on what it imports, as one
+		// analyzed here would, so its fact reads can be asked of what those exported (decideHostRestores).
+		checkerOptions.FactsBelowRestored = func(restoring *packages.Package) bool {
+			return session.fromHost(restoring) != nil
+		}
 		firstGraph, waveError := session.firstWave(roots, checkerOptions, options.Withheld)
 		if waveError != nil {
 			return nil, waveError
@@ -324,7 +340,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		if firstGraph != nil {
 			graphs = append(graphs, firstGraph)
 		}
-		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), session.restoredInWave)
+		// A package to analyze restored from the host's run is analyzed by restoring, so the actions of the analyzers
+		// that learn facts run on what it imports, and its fact reads can be asked of what those exported
+		// (decideHostRestores).
+		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), func(restoring *packages.Package) bool {
+			return session.restoredInWave(restoring) && session.fromHost(restoring) == nil
+		})
 		// A session without a store counts only what it restored from the binary, as a run without the cache counts
 		// no wave.
 		if len(toAnalyze) > 0 && session.HasStore() {
@@ -340,6 +361,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 	graphs = append(graphs, graph)
 	recordUnreachedTypes(options.Reads, options.Ready, walks)
+	// What the packages restored from the host's run read of other packages' answers is decided now, with no pass
+	// running, before anything is saved over them.
+	var hostReloads []string
+	if session != nil {
+		hostReloads = session.decideHostRestores(graphs)
+	}
 	type rootKey struct {
 		analyzer        *analysis.Analyzer
 		analyzedPackage *packages.Package
@@ -444,6 +471,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	})
 	if session != nil {
 		result.Reloads = session.reloadsOf(session.resolver)
+		// A package restored from the host's run whose facts or answers do not hold here has no syntax to analyze, so
+		// the build is loaded again with it checked from source, as a question's reload loads its package.
+		result.Reloads = slices.Compact(slices.Sorted(slices.Values(append(result.Reloads, hostReloads...))))
 	}
 	if len(result.Reloads) > 0 {
 		// The pipeline runs again over a load that checks the reloads from source and drops this result, but a caller
@@ -475,6 +505,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if session != nil {
 		session.save(graph, options.Withheld, files)
 		result.Cache = session.counts
+		result.FromHost = session.hostCounts()
+		if options.KeepForBuilds && options.Reads != nil {
+			result.Host = session.keepForBuilds(graphs, analyzed, options.Reads, options.Withheld, files)
+		}
 	}
 	result.Elapsed = time.Since(started)
 	return result, nil

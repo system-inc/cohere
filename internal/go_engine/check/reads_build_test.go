@@ -156,16 +156,36 @@ func factKeyOf(owner string, path objectpath.Path, factType reflect.Type) string
 	return owner + " " + string(path) + " " + factType.String()
 }
 
+// linuxWorld is the fixture's linux build of platform as a verdict reads it: its memo, the packages the user package
+// reaches by path, and its facts, facts by factKeyOf.
+type linuxWorld struct {
+	build   *ReadsBuild
+	closure map[string]*types.Package
+	fact    FactLookup
+}
+
 // linuxBuild is the fixture's linux build of platform, whose facts are facts, by factKeyOf.
-func linuxBuild(test *testing.T, facts map[string]analysis.Fact) *ReadsBuild {
+func linuxBuild(test *testing.T, facts map[string]analysis.Fact) linuxWorld {
 	test.Helper()
 
 	linux := checkedWorld(test, "linux", "")
-	return NewReadsBuild(map[string]*types.Package{verdictPlatform: linux.platform},
-		func(owner string, path objectpath.Path, factType reflect.Type) (analysis.Fact, bool) {
+	return linuxWorld{
+		build:   NewReadsBuild(),
+		closure: map[string]*types.Package{verdictPlatform: linux.platform},
+		fact: func(owner string, path objectpath.Path, factType reflect.Type) (analysis.Fact, bool) {
 			fact, found := facts[factKeyOf(owner, path, factType)]
 			return fact, found
-		})
+		},
+	}
+}
+
+// holdsIn is the whole verdict on restoring's reads in linux, its types' half as the load asks it, then its facts'
+// half over every fact type it read, as every action on it asks its own.
+func holdsIn(restoring Restoring, host *ReadsBuild, linux linuxWorld) (bool, string) {
+	if holds, why := TypesHold(restoring, linux.closure, host, linux.build); !holds {
+		return false, why
+	}
+	return FactsHold(restoring, linux.closure, host, linux.build, linux.fact, ReadFactTypes(restoring))
 }
 
 // A package reads the same in another build when every object it read is there and renders alike, and it does not
@@ -175,7 +195,7 @@ func linuxBuild(test *testing.T, facts map[string]analysis.Fact) *ReadsBuild {
 func TestATypeReadHoldsOnlyWhenEveryObjectRendersAlikeInTheBuild(test *testing.T) {
 	test.Parallel()
 
-	host, linux := NewReadsBuild(nil, nil), linuxBuild(test, nil)
+	host, linux := NewReadsBuild(), linuxBuild(test, nil)
 	for _, step := range []struct {
 		user string
 		want string
@@ -191,7 +211,7 @@ func TestATypeReadHoldsOnlyWhenEveryObjectRendersAlikeInTheBuild(test *testing.T
 			test.Parallel()
 
 			restoring, _ := hostReads(test, step.user)
-			holds, why := Holds(restoring, host, linux)
+			holds, why := holdsIn(restoring, host, linux)
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want the %s user's reads to hold %t, %q, got %t, %q", step.user, step.want == "",
 					step.want, holds, why)
@@ -257,7 +277,7 @@ func TestAFactReadHoldsOnlyWhenTheBuildReadsTheSameFact(test *testing.T) {
 			if step.buildFact != nil {
 				facts[factKeyOf(verdictPlatform, newStablePath, valueFactType)] = step.buildFact
 			}
-			holds, why := Holds(restoring, NewReadsBuild(nil, nil), linuxBuild(test, facts))
+			holds, why := holdsIn(restoring, NewReadsBuild(), linuxBuild(test, facts))
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
 			}
@@ -372,7 +392,7 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 
 			restoring, host := hostReads(test, "stable")
 			restoring.Reads.AddLookup(step.lookup(host))
-			holds, why := Holds(restoring, NewReadsBuild(nil, nil), linuxBuild(test, step.facts))
+			holds, why := holdsIn(restoring, NewReadsBuild(), linuxBuild(test, step.facts))
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
 			}
@@ -405,7 +425,7 @@ func TestNeverAndUnknownReadsNeverHold(test *testing.T) {
 		{never, "never: a finding names another package's file"},
 		{unknown, "unknown: its type reads were never recorded"},
 	} {
-		holds, why := Holds(step.restoring, NewReadsBuild(nil, nil), linuxBuild(test, nil))
+		holds, why := holdsIn(step.restoring, NewReadsBuild(), linuxBuild(test, nil))
 		if holds || why != step.want {
 			test.Errorf("want false, %q, got %t, %q", step.want, holds, why)
 		}

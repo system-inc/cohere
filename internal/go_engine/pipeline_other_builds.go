@@ -54,7 +54,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	}
 
 	for _, extra := range extras {
-		extraRun, extraError := engine.extraBuildRun(extra, ours)
+		extraRun, extraError := engine.extraBuildRun(extra, ours, pass.result.Host)
 		if extraError != nil {
 			engine.otherBuildsFailed(extraError)
 			return nil
@@ -136,7 +136,15 @@ func checkingBuild(builds []project.Build, file string, contents []byte) (projec
 // and this one: gofmt, the long-line wrap and the rename all write before the load the lint reads (pipeline.run), the
 // wrap's write is followed by a second load whose Restore keys every file again, and a run whose rename wrote reads no
 // findings cache here at all.
-func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool) (buildRun, error) {
+//
+// host is what the host's run kept for the extra builds, nil when it kept nothing: the build restores from it each
+// package its own findings cache does not hold whose own inputs are the host's and whose reads hold here (#b2t9xmf),
+// unless the run renamed, whose build reads no cache, or measures under `--timing`, whose build has no session.
+func (engine *pipeline) extraBuildRun(
+	extra project.Build,
+	ours map[string]bool,
+	host *check.HostRun,
+) (buildRun, error) {
 	environment := append(slices.Clone(engine.described.workspace.Environment()), extra.Environment()...)
 	var session *check.CacheSession
 	// As the host's lint does, a run that renamed reads no findings cache, whose keys are of the bytes it replaced.
@@ -146,6 +154,9 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 			hostFiles = engine.session.Files()
 		}
 		session = engine.cacheSession(environment, hostFiles)
+		if session != nil && !engine.keepsHostRestoreOff {
+			session.RestoreFromHost(host)
+		}
 	}
 	// As the host's load does (loadWorkspace), a package with no file in scope is loaded and never analyzed.
 	caching := load.Caching{Held: engine.held, Timing: engine.timing, Analyzes: engine.described.hasFileInScope}
@@ -192,7 +203,8 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 	}
 	result, checkError := runRules(loaded)
 	// As the host's lint does (reloadedPass), a question that reached a package the cache restored, with no answer
-	// stored, has the build loaded again with that package checked from source, until none does.
+	// stored, has the build loaded again with that package checked from source, until none does. So does a package
+	// restored from the host's run whose facts or answers do not hold here (check.Result.Reloads).
 	for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
 		reloads := strings.Join(result.Reloads, ", ")
 		loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
@@ -272,6 +284,17 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			AnalyzedPackages: len(run.analyzed),
 			FindingsAdded:    verdict.merged.added[index],
 			FindingsDropped:  verdict.merged.dropped[index],
+		}
+		if run.result != nil {
+			record.EntriesKept = run.result.Host.EntriesKept()
+			fromHost := run.result.FromHost
+			record.RestoredFromHost = len(fromHost.Restored)
+			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
+			record.DeclinedAtCheck = fromHost.DeclinedAtCheck
+			record.HostReloadRounds = fromHost.ReloadRounds
+			if len(fromHost.DeclinedBy) > 0 {
+				record.DeclinedBy = fromHost.DeclinedBy
+			}
 		}
 		verdict.records = append(verdict.records, record)
 	}

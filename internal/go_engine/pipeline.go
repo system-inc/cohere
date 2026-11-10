@@ -64,6 +64,10 @@ type pipeline struct {
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
 
+	// keepsHostRestoreOff, set only by a test, has every extra build check every package itself rather than restore any
+	// from the host's run, so the test can compare the two (#b2t9xmf).
+	keepsHostRestoreOff bool
+
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
 	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
 	renamed bool
@@ -203,6 +207,10 @@ func (engine *pipeline) run() int {
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
 		engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{})
+		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
+		if engine.session != nil && engine.recordsReads() {
+			engine.session.KeepForBuilds()
+		}
 	}
 	var loaded *load.Loaded
 	var loadError error
