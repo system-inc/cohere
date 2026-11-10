@@ -3,6 +3,7 @@ package project
 import (
 	"encoding/json"
 	"go/build"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,7 +43,7 @@ func censusOf(test *testing.T, files map[string]string) Census {
 	if writeError := writeFiles(directory, files); writeError != nil {
 		test.Fatal(writeError)
 	}
-	var census Census
+	census := Census{Root: directory}
 	for name := range files {
 		census.Ours = append(census.Ours, filepath.Join(directory, filepath.FromSlash(name)))
 	}
@@ -107,8 +108,9 @@ func requireEachCompiledOnce(test *testing.T, census Census, builds []Build, unb
 	}
 }
 
-// A `_windows.go` file, a `linux` file, a `!unix` file and a custom tag's file need two builds beside the host's:
-// linux with the tag folded in, and windows, which builds both the windows and the `!unix` file.
+// A `_windows.go` file, a `linux` file, a `!unix` file and a custom tag's file need three builds beside the host's:
+// linux, windows, which builds both the windows and the `!unix` file, and the host's platform with the tag, which
+// never rides a platform's build (#h7m6zyp).
 func TestBuildsForCompilesEachFileOnce(test *testing.T) {
 	test.Parallel()
 	census := censusOf(test, map[string]string{
@@ -119,7 +121,7 @@ func TestBuildsForCompilesEachFileOnce(test *testing.T) {
 		"poison.go":          "//go:build cohere_poison\n\npackage p\n",
 	})
 	builds, unbuilt := buildsFor(test, census, testHost, testPorts)
-	want := []string{"darwin/arm64 cgo", "linux/arm64 tags cohere_poison", "windows/arm64"}
+	want := []string{"darwin/arm64 cgo", "darwin/arm64 cgo tags cohere_poison", "linux/arm64", "windows/arm64"}
 	if !slices.Equal(labels(builds), want) {
 		test.Errorf("the builds are %q, want %q", labels(builds), want)
 	}
@@ -127,16 +129,17 @@ func TestBuildsForCompilesEachFileOnce(test *testing.T) {
 		test.Errorf("unbuilt are %v, want none", unbuilt)
 	}
 	requireEachCompiledOnce(test, census, builds, unbuilt)
-	for _, extra := range builds[1:] {
+	for _, extra := range builds[2:] {
 		if extra.CgoEnabled || !slices.Equal(extra.Flags, testHost.Flags) {
 			test.Errorf("%v has cgo or other flags than the host's %q", extra, testHost.Flags)
 		}
 	}
 }
 
-// A custom tag's file that nothing else needs an extra build for is built on the host's own platform with the
-// tag, never on another platform.
-func TestBuildsForFoldsTagsIntoTheHostsPlatformWhenNothingElseNeedsABuild(test *testing.T) {
+// A custom tag's file is built on the host's own platform with the tag, never on a platform no file names beside
+// it, and each file of one package takes the least setting of its own tags, so two tags of one package each get a
+// build (buildsByComponent).
+func TestBuildsForPutsTagsOnTheHostsPlatform(test *testing.T) {
 	test.Parallel()
 	census := censusOf(test, map[string]string{
 		"main.go":    "package p\n",
@@ -144,7 +147,8 @@ func TestBuildsForFoldsTagsIntoTheHostsPlatformWhenNothingElseNeedsABuild(test *
 		"planted.go": "//go:build cohere_planted_panic && !windows\n\npackage p\n",
 	})
 	builds, unbuilt := buildsFor(test, census, testHost, testPorts)
-	want := []string{"darwin/arm64 cgo", "darwin/arm64 cgo tags cohere_planted_panic,cohere_poison"}
+	want := []string{"darwin/arm64 cgo", "darwin/arm64 cgo tags cohere_planted_panic",
+		"darwin/arm64 cgo tags cohere_poison"}
 	if !slices.Equal(labels(builds), want) || len(unbuilt) != 0 {
 		test.Errorf("the builds are %q and unbuilt %v, want %q and none", labels(builds), unbuilt, want)
 	}
@@ -245,8 +249,8 @@ func TestBuildsForComeOutInTheSameOrderEveryRun(test *testing.T) {
 	slices.Reverse(reversed)
 	rotated := append(slices.Clone(testPorts[5:]), testPorts[:5]...)
 	firstBuilds, firstUnbuilt := buildsFor(test, census, testHost, testPorts)
-	want := []string{"darwin/arm64 cgo", "linux/arm64 tags cohere_poison", "windows/arm64", "freebsd/arm64",
-		"netbsd/arm64"}
+	want := []string{"darwin/arm64 cgo", "darwin/arm64 cgo tags cohere_poison", "linux/arm64", "windows/arm64",
+		"freebsd/arm64", "netbsd/arm64"}
 	if !slices.Equal(labels(firstBuilds), want) {
 		test.Errorf("the builds are %q, want %q", labels(firstBuilds), want)
 	}
@@ -415,6 +419,80 @@ func TestBuildsForNeverFoldsAProgramOfItsOwnIntoItsDirectorysPackage(test *testi
 		unbuilt[0].Reason != "a program of its own, package main beside package assertions, so no build of its "+
 			"directory's package compiles it" {
 		test.Errorf("unbuilt %+v, want oracle.go alone, named as a program of its own", unbuilt)
+	}
+	requireEachCompiledOnce(test, census, builds, unbuilt)
+}
+
+// adamic's oracles as its census holds them (#h7m6zyp): lintoracle is named by `package main` oracles, one beside a
+// package's tests, the rest alone in their directories, where they are the directory's package. Setting lintoracle
+// for the lone ones compiles the one beside the tests too, so the tag a program of its own names is never set: the
+// oracle beside the tests is unbuilt as a program of its own, and each lone one for its tag, naming the directory it
+// would break. No build sets lintoracle.
+func TestBuildsForNeverSetsATagAProgramOfItsOwnNames(test *testing.T) {
+	test.Parallel()
+	census := censusOf(test, map[string]string{
+		"rules/beside/build_test.go": "package assertions\n",
+		"rules/beside/oracle.go":     "//go:build lintoracle\n\npackage main\n",
+		"rules/alone/oracle.go":      "//go:build lintoracle\n\npackage main\n",
+		"rules/apart/oracle.go":      "//go:build lintoracle\n\npackage main\n",
+		"rules/apart/apart_test.go":  "//go:build lintoracle\n\npackage main\n",
+	})
+	builds, unbuilt := buildsFor(test, census, testHost, testPorts)
+	if got := labels(builds); !slices.Equal(got, []string{"darwin/arm64 cgo"}) {
+		test.Errorf("the builds are %v, want the host's alone: lintoracle is never set", got)
+	}
+	poisoned := "its tag lintoracle is never set: setting it puts package main beside package assertions in " +
+		"rules/beside"
+	want := map[string]string{
+		"rules/alone/oracle.go":     poisoned,
+		"rules/apart/apart_test.go": poisoned,
+		"rules/apart/oracle.go":     poisoned,
+		"rules/beside/oracle.go": "a program of its own, package main beside package assertions, so no build of " +
+			"its directory's package compiles it",
+	}
+	got := map[string]string{}
+	for _, each := range unbuilt {
+		relative, relativeError := filepath.Rel(census.Root, each.File)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		got[filepath.ToSlash(relative)] = each.Reason
+	}
+	if !maps.Equal(got, want) {
+		test.Errorf("unbuilt are %v, want %v", got, want)
+	}
+}
+
+// adamic's shape on a box (#h7m6zyp): a darwin-only file beside two tags, each named in a package of its own, as
+// stage3_split_metrics names a lone program and census_overlay an external test. darwin's build carries the host's
+// tags alone, so neither tag's type errors can cost it its linting, and each tag gets a build of its own on the host's
+// platform. A file that names linux beside a tag gets that tag on linux, and one whose tag only a platform it never
+// names would compile is unbuilt for that.
+func TestBuildsForKeepsTagsOffPlatformBuilds(test *testing.T) {
+	test.Parallel()
+	host := Build{OperatingSystem: "linux", Architecture: "arm64", CgoEnabled: true, Flags: []string{"-trimpath"}}
+	census := censusOf(test, map[string]string{
+		"native/native.go":        "package native\n",
+		"native/native_darwin.go": "package native\n",
+		"metrics/main.go":         "//go:build stage3_split_metrics\n\npackage main\n",
+		"latent/latent.go":        "package latent\n",
+		"latent/deferred_test.go": "//go:build census_overlay\n\npackage latent_test\n",
+		"probe/probe.go":          "package probe\n",
+		"probe/probe_windows.go":  "//go:build probetag\n\npackage probe\n",
+		"orphan/orphan.go":        "package orphan\n",
+		"orphan/elsewhere.go":     "//go:build !linux && orphantag\n\npackage orphan\n",
+	})
+	builds, unbuilt := buildsFor(test, census, host, testPorts)
+	want := []string{"linux/arm64 cgo", "linux/arm64 cgo tags census_overlay",
+		"linux/arm64 cgo tags stage3_split_metrics", "windows/arm64 tags probetag", "darwin/arm64"}
+	if got := labels(builds); !slices.Equal(got, want) {
+		test.Errorf("the builds are %v, want %v: no platform's build carries a tag no file names beside it", got,
+			want)
+	}
+	if len(unbuilt) != 1 || filepath.Base(unbuilt[0].File) != "elsewhere.go" ||
+		unbuilt[0].Reason != "only windows/arm64 tags orphantag builds it, and a platform's build carries the "+
+			"host's tags alone, taking a tag only where a file names the platform beside it" {
+		test.Errorf("unbuilt %+v, want elsewhere.go alone, named for a tag no file names beside a platform", unbuilt)
 	}
 	requireEachCompiledOnce(test, census, builds, unbuilt)
 }

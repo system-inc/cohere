@@ -10,14 +10,14 @@ import (
 )
 
 // selectionDeadline bounds a selection that must finish by the files, not the combinations of their tags. It is a
-// correctness guard, not a measure of speed: a walk of every set of the fixture's 42 tags makes 2^42 sets a platform
+// correctness guard, not a measure of speed: a walk of every set of the fixture's 47 tags makes 2^47 sets a platform
 // and never finishes, while the selection by component finishes in milliseconds, so the deadline sits far from both.
 const selectionDeadline = 30 * time.Second
 
 // manyTagsFiles are files that name more tags than any set of them can be weighed one by one: 40 tags each named by
 // one linux file and one windows file of a package of its own, two linux files that want two other tags in opposite
-// ways, so linux needs two builds, a package that keeps two versions apart in a file each, one whose file compiles
-// under either of two tags it keeps apart elsewhere, and a file only another architecture compiles.
+// ways, a package that keeps two versions apart in a file each, one whose file compiles under either of two tags it
+// keeps apart elsewhere, and a file only another architecture compiles.
 func manyTagsFiles() map[string]string {
 	files := map[string]string{}
 	for index := range 40 {
@@ -37,13 +37,13 @@ func manyTagsFiles() map[string]string {
 	return files
 }
 
-// With 42 tags the sets are too many to weigh, so the builds are chosen tag component by tag component, in time
-// bounded by the files (selectionDeadline): every file some build of the host's architecture compiles under some
-// setting of its own tags is compiled, each tag that only ever turns a file on is folded into one build per
-// platform, the two linux files that want opposite tags get a linux build each, two tags one package keeps apart
-// never ride one build, even where a file compiles under either, and only the file no build on the host's
-// architecture compiles is unbuilt.
-func TestBuildsForChoosesByTagComponentWhenTheTagsAreTooMany(test *testing.T) {
+// With 47 tags the builds are chosen tag component by tag component, in time bounded by the files
+// (selectionDeadline), and no build sets two components' tags (#h7m6zyp): each of the 40 packages' tags gets a linux
+// build and a windows build of its own, the two linux files that want opposite tags get a linux build each, two tags
+// one package keeps apart never ride one build, even where a file compiles under either, every file some build of
+// the host's architecture compiles is compiled, and only the file no build on the host's architecture compiles is
+// unbuilt.
+func TestBuildsForChoosesByTagComponentWhenTheTagsAreMany(test *testing.T) {
 	test.Parallel()
 	census := censusOf(test, manyTagsFiles())
 	type selection struct {
@@ -65,20 +65,22 @@ func TestBuildsForChoosesByTagComponentWhenTheTagsAreTooMany(test *testing.T) {
 	if chosen.failure != nil {
 		test.Fatal(chosen.failure)
 	}
-	var allTags []string
+	linuxTags := []string{"eithera", "eitherb"}
+	var windowsTags []string
 	for index := range 40 {
-		allTags = append(allTags, fmt.Sprintf("tag%02d", index))
+		linuxTags = append(linuxTags, fmt.Sprintf("tag%02d", index))
+		windowsTags = append(windowsTags, fmt.Sprintf("tag%02d", index))
 	}
-	joined := func(tags []string) string { return fmt.Sprint(tags) }
-	want := []string{
-		"darwin/arm64 cgo",
-		Build{OperatingSystem: "linux", Architecture: "arm64", Tags: sortedSet(append(slices.Clone(allTags),
-			"eithera", "tagx", "versiona"))}.String(),
-		"linux/arm64 tags eitherb,tagy,versionb",
-		Build{OperatingSystem: "windows", Architecture: "arm64", Tags: allTags}.String(),
+	linuxTags = append(linuxTags, "tagx", "tagy", "versiona", "versionb")
+	want := []string{"darwin/arm64 cgo"}
+	for _, tag := range linuxTags {
+		want = append(want, "linux/arm64 tags "+tag)
+	}
+	for _, tag := range windowsTags {
+		want = append(want, "windows/arm64 tags "+tag)
 	}
 	if got := labels(chosen.builds); !slices.Equal(got, want) {
-		test.Errorf("the builds are\n%v\nwant\n%v", joined(got), joined(want))
+		test.Errorf("the builds are\n%v\nwant\n%v", got, want)
 	}
 	requireEachCompiledOnce(test, census, chosen.builds, chosen.unbuilt)
 	var unbuiltNames []string
@@ -87,24 +89,6 @@ func TestBuildsForChoosesByTagComponentWhenTheTagsAreTooMany(test *testing.T) {
 	}
 	if !slices.Equal(unbuiltNames, []string{"elsewhere.go"}) {
 		test.Errorf("unbuilt %v, want only elsewhere.go, which no build on arm64 compiles", unbuiltNames)
-	}
-}
-
-// The census of a few tags stays under the budget, so its builds are weighed set by set as they always were, and
-// the census of many is past it: the switch is decided by the walk's own size.
-func TestEnumerationCostDecidesTheWalk(test *testing.T) {
-	test.Parallel()
-	// cohere's own census: 23 files its host leaves out, 3 tags, 8 platforms.
-	if cost := enumerationCost(8, 3, 23); cost > enumerationBudget {
-		test.Errorf("cohere's census costs %d, past the budget %d", cost, enumerationBudget)
-	}
-	// std's root: 1,455 files, 23 tags, 9 platforms.
-	if cost := enumerationCost(9, 23, 1455); cost <= enumerationBudget {
-		test.Errorf("std's census costs %d, within the budget %d", cost, enumerationBudget)
-	}
-	// So many tags that a shift would overflow is past it too.
-	if cost := enumerationCost(1, 64, 1); cost <= enumerationBudget {
-		test.Errorf("64 tags cost %d, within the budget %d", cost, enumerationBudget)
 	}
 }
 

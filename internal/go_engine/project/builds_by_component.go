@@ -6,9 +6,10 @@ import (
 	"strings"
 )
 
-// tagComponents are the custom tags the uncompiled files name, grouped so that tags named in one package's
-// directory are in one component, joined across packages. A file's constraint reads only the custom tags it names,
-// so setting a tag never changes whether a file naming none of its component's tags compiles.
+// tagComponents are the custom tags the files name, grouped so that tags named in one package's directory are in
+// one component, joined across packages. A file's constraint reads only the custom tags it names, so setting a tag
+// never changes whether a file naming none of its component's tags compiles. Each component's tags share builds of
+// their own, and no build sets two components' tags (BuildsFor).
 type tagComponents struct {
 	// tags are each component's tags, sorted, the components by their first tag.
 	tags [][]string
@@ -21,8 +22,9 @@ type tagComponents struct {
 	files [][]int
 }
 
-// newTagComponents reads each file's custom tags and groups them into components.
-func newTagComponents(uncompiled []source, unix []string) tagComponents {
+// newTagComponents reads each file's custom tags, but the poisoned ones no build sets (poisonedTags), and groups
+// them into components.
+func newTagComponents(uncompiled []source, unix []string, poisoned map[string]string) tagComponents {
 	components := tagComponents{
 		fileTags:      make([][]string, len(uncompiled)),
 		fileComponent: make([]int, len(uncompiled)),
@@ -42,7 +44,10 @@ func newTagComponents(uncompiled []source, unix []string) tagComponents {
 	// build together (std's crypto/internal/fips140test, #zzs7jm5).
 	inDirectory := map[string][]string{}
 	for index, read := range uncompiled {
-		tags := readingOf(read, unix).tags
+		tags := slices.DeleteFunc(readingOf(read, unix).tags, func(tag string) bool {
+			_, never := poisoned[tag]
+			return never
+		})
 		components.fileTags[index] = tags
 		directory := filepath.Dir(read.file)
 		inDirectory[directory] = append(inDirectory[directory], tags...)
@@ -84,17 +89,16 @@ func newTagComponents(uncompiled []source, unix []string) tagComponents {
 	return components
 }
 
-// componentChoice is a platform's best build in a round of buildsByComponent: how many files still wanted it
-// compiles, and how many of the named tags it sets otherwise than the host.
+// componentChoice is a platform's best build in a round of buildsByComponent, and how many files still wanted it
+// compiles.
 type componentChoice struct {
 	build Build
 	gain  int
-	cost  int
 }
 
-// buildsByComponent chooses the extra builds when the named tags are too many for candidatesFor to weigh every set
-// of them (enumerationBudget), from what the files' constraints distinguish rather than from every combination. It
-// returns the builds, in the order candidatesFor would list them, and the files they compile.
+// buildsByComponent chooses the extra builds for the files of one tag component (BuildsFor), from what the files'
+// constraints distinguish rather than from every combination of the tags. It returns the builds, in the order they
+// were chosen, and the files they compile.
 //
 // A build's tags are an assignment of each tag component (tagComponents), and the builds are chosen one at a time.
 // Each round, every platform takes, component by component, the assignment compiling the most files still wanted,
@@ -102,10 +106,18 @@ type componentChoice struct {
 // compiles the most wins, the earliest on a tie. The assignments a component weighs are the host's and, for each of
 // its files still wanted, each least setting of that file's own tags that compiles it on the platform, so a round
 // costs each file's own settings and a compile of each wanted file under each distinct assignment, never a walk of
-// the combinations. Rounds end when no platform compiles one more file, and every file some platform compiles under
-// some setting of its own tags is compiled by then: its least setting alone would have compiled it.
-func buildsByComponent(uncompiled []source, host Build, platforms []Build, unix []string) ([]Build, coverage, error) {
-	components := newTagComponents(uncompiled, unix)
+// the combinations, and two tags one package keeps apart, a version each, never ride one build (std's
+// crypto/internal/fips140test, #zzs7jm5). Rounds end when no platform compiles one more file, and every file some
+// platform compiles under some setting of its own tags is compiled by then: its least setting alone would have
+// compiled it.
+func buildsByComponent(
+	uncompiled []source,
+	host Build,
+	platforms []Build,
+	unix []string,
+	poisoned map[string]string,
+) ([]Build, coverage, error) {
+	components := newTagComponents(uncompiled, unix, poisoned)
 	wanted := newCoverage(len(uncompiled))
 	for index := range uncompiled {
 		wanted.set(index)
@@ -148,21 +160,6 @@ func buildsByComponent(uncompiled []source, host Build, platforms []Build, unix 
 		chosen = append(chosen, best)
 	}
 
-	// The order candidatesFor lists builds in: by platform, then the more tags changed first, then by tags.
-	platformOf := func(target Build) int {
-		return slices.IndexFunc(platforms, func(each Build) bool {
-			return each.OperatingSystem == target.OperatingSystem && each.CgoEnabled == target.CgoEnabled
-		})
-	}
-	slices.SortStableFunc(chosen, func(left componentChoice, right componentChoice) int {
-		if order := platformOf(left.build) - platformOf(right.build); order != 0 {
-			return order
-		}
-		if left.cost != right.cost {
-			return right.cost - left.cost
-		}
-		return slices.Compare(left.build.Tags, right.build.Tags)
-	})
 	builds := make([]Build, 0, len(chosen))
 	for _, each := range chosen {
 		builds = append(builds, each.build)
@@ -297,7 +294,6 @@ func bestOnPlatform(
 		}
 		tags = append(tags, bestAssignment...)
 		choice.gain += bestGain
-		choice.cost += bestCost
 	}
 	choice.build = platform
 	choice.build.Tags = sortedSet(tags)
