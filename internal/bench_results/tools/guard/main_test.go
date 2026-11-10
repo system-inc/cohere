@@ -203,6 +203,67 @@ func TestAcceptRefusesALoadedRecordAndAMissingReason(test *testing.T) {
 	}
 }
 
+// writeNarrowedRecord writes the record writeRecord writes, narrowed to the Go project alone, as
+// quiet_machine.sh's --engine Go records it.
+func writeNarrowedRecord(test *testing.T, directory string, name string, medianSeconds float64) string {
+	test.Helper()
+	path := writeRecord(test, directory, name, medianSeconds, true)
+	record, readError := readRecord(path)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	record.Engine = bench_results.EngineGo
+	encoded, encodeError := bench_results.Encode(record)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if writeError := os.WriteFile(path, encoded, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	return path
+}
+
+// A record narrowed to one engine's project never becomes a baseline, on either path that makes one: the first
+// night and -accept each exit 1 naming the engine, and write no baseline, no move and no verdict. The same
+// quiet record of the whole root is still made the baseline on both paths, so the refusal is the engine's alone.
+func TestANarrowedRecordIsNeverABaseline(test *testing.T) {
+	test.Parallel()
+	records := test.TempDir()
+	narrowedPath := writeNarrowedRecord(test, records, "narrowed.json", 10)
+	wholePath := writeRecord(test, records, "whole.json", 10, true)
+	for name, want := range map[string]struct {
+		arguments func(recordPath string) []string
+	}{
+		"first night": {arguments: func(recordPath string) []string { return []string{"-tonight", recordPath} }},
+		"accept": {arguments: func(recordPath string) []string {
+			return []string{"-accept", recordPath, "-because", "the measured start"}
+		}},
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			state := test.TempDir()
+			exit, _, said := runGuard(append([]string{"-state", state}, want.arguments(narrowedPath)...)...)
+			if exit != 1 {
+				test.Fatalf("a narrowed record exited %d, want 1:\n%s", exit, said)
+			}
+			if !strings.Contains(said, "checked the Go project alone (engine Go)") ||
+				!strings.Contains(said, "a baseline is a record of the whole root") {
+				test.Errorf("the refusal %q does not name the engine and the rule", said)
+			}
+			if entries, readError := os.ReadDir(state); readError != nil || len(entries) != 0 {
+				test.Errorf("the state directory holds %v (%v)", entries, readError)
+			}
+			wholeState := test.TempDir()
+			if exit, _, said := runGuard(append([]string{"-state", wholeState}, want.arguments(wholePath)...)...); exit != 0 {
+				test.Fatalf("a whole-root record exited %d:\n%s", exit, said)
+			}
+			if _, statError := os.Stat(filepath.Join(wholeState, "baseline-ahra.json")); statError != nil {
+				test.Errorf("the whole-root record did not become the baseline: %v", statError)
+			}
+		})
+	}
+}
+
 // A night that left no record still counts: after two loaded nights a lost one makes a streak of three, and
 // after a measured night it starts one. The lost night carries its reason and the baseline's number, and is on
 // record beside the others.
