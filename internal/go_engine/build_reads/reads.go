@@ -160,14 +160,23 @@ func (reads *Reads) AddInstance(generic types.Object, typeArguments *types.TypeL
 
 // AddFact records one fact read, keeping the first of reads alike.
 func (reads *Reads) AddFact(fact Fact) {
+	reads.AddFacts([]Fact{fact})
+}
+
+// AddFacts records fact reads, under one hold of the lock, as an action publishes the reads it gathered, keeping the
+// first of reads alike.
+func (reads *Reads) AddFacts(facts []Fact) {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
 	if reads.facts == nil {
-		reads.facts = map[factKey]Fact{}
+		reads.facts = make(map[factKey]Fact, len(facts))
 	}
-	key := factKey{object: fact.Object, owner: fact.Package, factType: fact.FactType, packageFact: fact.Object == nil}
-	if _, recorded := reads.facts[key]; !recorded {
-		reads.facts[key] = fact
+	for _, fact := range facts {
+		key := factKey{object: fact.Object, owner: fact.Package, factType: fact.FactType,
+			packageFact: fact.Object == nil}
+		if _, recorded := reads.facts[key]; !recorded {
+			reads.facts[key] = fact
+		}
 	}
 }
 
