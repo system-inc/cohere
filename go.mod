@@ -83,10 +83,11 @@ require (
 	// depends on the type it decodes into, which a regex over the source cannot see.
 	golang.org/x/tools v0.50.0
 
-	// staticcheck's SA, S, ST and U1000 checks, which the Go engine registers as rules under their own codes
-	// (internal/go_engine/rules). They are go/analysis analyzers already, so they run in the engine's one
-	// load with no runner of staticcheck's own. Minimal version selection keeps our x/tools over the older
-	// one staticcheck asks for, and the registry's tests prove its analyzers validate against ours.
+	// staticcheck as released. The binary links only its helper packages (type utilities, edits, the
+	// generated-file facts); every check it registers is cohere's own port, and the original checks run
+	// only in the tests, as the live oracles each port is held to (internal/go_engine/check/parity). Move
+	// to the first release that carries upstream's fa9ae6d1a5, one object path encoder per package, which
+	// makes the original U1000 cheaper in its parity tests, once x/tools is at v0.51, which it requires.
 	honnef.co/go/tools v0.8.1
 )
 
