@@ -165,8 +165,7 @@ func withoutVariable(environment []string, name string) []string {
 }
 
 // A module copied into the tree whole and wired in by a directory replace in a module go.work uses is a vendored
-// dependency, as third_party's staticcheck is, and its own go.mod is not refused: its tests are its upstream's. The
-// exemption is exact. A stray module nobody replaces is still refused, and so is one only an unlisted module
+// dependency, and its own go.mod is not refused: its tests are its upstream's. The exemption is exact. A stray module nobody replaces is still refused, and so is one only an unlisted module
 // replaces with, one a replace by module and version merely shares a name with, and a second go.mod inside the copy.
 func TestRefuseUnlistedModulesLeavesAVendoredReplaceTargetToItsUpstream(test *testing.T) {
 	test.Parallel()

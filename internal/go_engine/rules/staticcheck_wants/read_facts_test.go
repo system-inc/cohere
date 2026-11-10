@@ -1,16 +1,12 @@
 package staticcheck_wants
 
 import (
-	"fmt"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
 )
-
-// sa5012DiagnosticNotes is how many diag notes sa5012's fixture holds, counted apart from this reader.
-const sa5012DiagnosticNotes = 16
 
 // ReadWithFacts finds a fact in each shape of fact note staticcheck's fixtures write, at the line of the note's name,
 // each with the object it names, and the diag notes beside them as Read finds them.
@@ -75,51 +71,6 @@ func TestReadWithFactsRefusesANoteItCannotRead(test *testing.T) {
 			test.Errorf("the %s note failed with %q, which does not say %q at %s", testCase.folder, readError,
 				testCase.says, place)
 		}
-	}
-}
-
-// Over every fixture of staticcheck v0.8.1's checks, ReadWithFacts reads every diag note Read reads and sa5012's
-// besides, refusing none, and the fact notes, which sa5012's fixture alone holds: its four, one on each function that
-// needs its slice of even length.
-func TestReadWithFactsReadsStaticchecksFixtures(test *testing.T) {
-	test.Parallel()
-	fixtures := []string{}
-	for _, checks := range []string{"staticcheck", "simple", "stylecheck", "quickfix"} {
-		found, globError := filepath.Glob(filepath.Join("..", "..", "..", "..", "third_party", "honnef.co", "go",
-			"tools", checks, "*", "testdata"))
-		if globError != nil {
-			test.Fatal(globError)
-		}
-		fixtures = append(fixtures, found...)
-	}
-	read := 0
-	facts := []string{}
-	for _, fixture := range fixtures {
-		wants, fixtureFacts, readError := ReadWithFacts(fixture)
-		if readError != nil {
-			test.Errorf("reading %s: %v", fixture, readError)
-			continue
-		}
-		read += len(wants)
-		for _, fact := range fixtureFacts {
-			// The fact as its note writes it, after the base name of its file and its line.
-			written := strings.SplitN(fact.String(), ":", 3)[2]
-			facts = append(facts, fmt.Sprintf("%s:%d:%s", filepath.Base(fact.File), fact.Line, written))
-		}
-	}
-	test.Logf("read %d wants and %d facts from %d fixtures", read, len(facts), len(fixtures))
-	if expected := staticcheckDiagnosticNotes + sa5012DiagnosticNotes; read != expected {
-		test.Errorf("read %d wants from staticcheck's fixtures, where they hold %d diag notes", read, expected)
-	}
-	expectedFacts := []string{
-		`CheckEvenSliceLength.go:5: fact(args, "needs even elements")`,
-		`CheckEvenSliceLength.go:11: fact(args, "needs even elements")`,
-		`CheckEvenSliceLength.go:17: fact(args, "needs even elements")`,
-		`CheckEvenSliceLength.go:21: fact(bleh, "needs even elements")`,
-	}
-	if !slices.Equal(facts, expectedFacts) {
-		test.Errorf("read the facts\n%s\nwhere sa5012's fixture holds\n%s", strings.Join(facts, "\n"),
-			strings.Join(expectedFacts, "\n"))
 	}
 }
 

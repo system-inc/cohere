@@ -11,20 +11,17 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 )
 
-// upstreamFolder is staticcheck's own fixtures for `ST1018` at Go 1.0, where the vendored copy keeps them, from this
-// package's directory. They are read from there, never copied into this package's testdata: the fixture is not
-// gofmt-clean, one comment is a space out of gofmt's alignment, and every Go file the module owns outside third_party
-// must be, so a byte-for-byte copy can live only in the test's own temporary directory.
-var upstreamFolder = filepath.Join("..", "..", "..", "..", "third_party", "honnef.co", "go", "tools", "stylecheck",
-	"st1018", "testdata", "go1.0")
-
-// upstreamTestdata is a testdata of the test's own, holding upstreamFolder copied byte for byte as go1.0, with the
-// go.mod staticcheck's testutil lays over the folder, `module example.com` at Go 1.0, written to disk beside it since
-// the engine's load reads go.mod from disk. parity's calls take one testdata, and this package's cannot hold the copy,
-// so the copy is the port's own.
+// upstreamTestdata is a testdata of the test's own, holding staticcheck's own fixtures for `ST1018` at Go 1.0, read
+// where the module cache keeps them, copied byte for byte as go1.0, with the go.mod staticcheck's testutil lays over
+// the folder, `module example.com` at Go 1.0, written to disk beside it since the engine's load reads go.mod from
+// disk. parity's calls take one testdata, and this package's cannot hold the copy, so the copy is the port's own.
 func upstreamTestdata(test *testing.T) string {
 	test.Helper()
 	testdata := test.TempDir()
+	// Never copied into this package's testdata: the fixture is not gofmt-clean, one comment is a space out of gofmt's
+	// alignment, and every Go file the module owns must be, so a byte-for-byte copy can live only in the test's own
+	// temporary directory.
+	upstreamFolder := filepath.Join(parity.StaticcheckDirectory(test), "stylecheck", "st1018", "testdata", "go1.0")
 	folder := filepath.Join(testdata, "go1.0")
 	if copyError := os.CopyFS(folder, os.DirFS(upstreamFolder)); copyError != nil {
 		test.Fatalf("copying %s: %v", upstreamFolder, copyError)

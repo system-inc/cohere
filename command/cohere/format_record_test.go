@@ -539,10 +539,9 @@ func sourceSnapshot(test *testing.T) string {
 		copySnapshotFile(test, filepath.Join(moduleRoot, name), filepath.Join(snapshot, name))
 	}
 	// Every directory holding source go builds: the module's own, docs among them, whose data/rules.json the
-	// Go engine's file-name rule embeds (#2xt6v5r), third_party, whose vendored copies go.mod replaces dependencies
-	// with (#j3bfnyt), and every module go.work names, read from go.work itself so a module added there is never
-	// one the snapshot names and cannot find (#wy3dbnz).
-	directories := []string{"command", "internal", "policy", "unicode_properties", "docs", "third_party"}
+	// Go engine's file-name rule embeds (#2xt6v5r), and every module go.work names, read from go.work itself so a
+	// module added there is never one the snapshot names and cannot find (#wy3dbnz).
+	directories := []string{"command", "internal", "policy", "unicode_properties", "docs"}
 	for _, directory := range goWorkModuleDirectories(test, filepath.Join(moduleRoot, "go.work")) {
 		if !slices.Contains(directories, directory) {
 			directories = append(directories, directory)

@@ -11,24 +11,23 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 )
 
-// upstreamFixture is staticcheck's own fixture for SA9009, read where the vendored module keeps it. The check judges
-// whether a comment starts in its line's first column, and the fixture's cases are comments indented before it, which
-// gofmt would move there, so a gofmt-clean copy would test nothing; the repository's gofmt guard walks testdata, so an
-// unchanged copy cannot live there. upstreamTree copies it byte for byte into a tree of the test's own instead.
-var upstreamFixture = filepath.Join("..", "..", "..", "..", "third_party", "honnef.co", "go", "tools", "staticcheck",
-	"sa9009", "testdata", "go1.0", "Directives", "pkg.go")
-
 // upstreamPackage is the import path upstreamTree gives the fixture, its folder's name in staticcheck's testdata.
 const upstreamPackage = "Directives"
 
 // upstreamTree is a tree laid out by import path, made for the test, holding staticcheck's fixture for SA9009 byte for
-// byte as the vendored module keeps it, which the harness loads as it loads testdata. The go1.0 folder sets the
-// language version of staticcheck's run, which SA9009 never reads.
+// byte as the module cache keeps it, which the harness loads as it loads testdata. The go1.0 folder sets the language
+// version of staticcheck's run, which SA9009 never reads.
+//
+// The check judges whether a comment starts in its line's first column, and the fixture's cases are comments indented
+// before it, which gofmt would move there, so a gofmt-clean copy would test nothing; the repository's gofmt guard walks
+// testdata, so an unchanged copy cannot live there, and this copies it into a tree of the test's own instead.
 func upstreamTree(test *testing.T) string {
 	test.Helper()
+	upstreamFixture := filepath.Join(parity.StaticcheckDirectory(test), "staticcheck", "sa9009", "testdata", "go1.0",
+		"Directives", "pkg.go")
 	contents, readError := os.ReadFile(upstreamFixture)
 	if readError != nil {
-		test.Fatalf("reading staticcheck's fixture for SA9009, which the vendored module must keep: %v", readError)
+		test.Fatalf("reading staticcheck's fixture for SA9009, which the module must keep: %v", readError)
 	}
 	tree := test.TempDir()
 	directory := filepath.Join(tree, "src", upstreamPackage)

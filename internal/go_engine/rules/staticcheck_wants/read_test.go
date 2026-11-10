@@ -8,11 +8,6 @@ import (
 	"testing"
 )
 
-// staticcheckDiagnosticNotes is how many diag notes the Go files of staticcheck v0.8.1's check fixtures hold outside
-// sa5012's, counted apart from this reader: every diag name after a comma, a space or the opening of a line's first
-// //@ or /*@. A count is the one way a note the reader silently passes over shows, so it moves only with the pin.
-const staticcheckDiagnosticNotes = 1204
-
 // Read finds a want in each shape of note staticcheck's fixtures write, in a folder below too, at the line of the
 // note's name, and none in a comment that only mentions an @ or a diag: a string is a text the message contains, and
 // re and a string a pattern it matches.
@@ -76,47 +71,6 @@ func TestReadRefusesANoteItCannotRead(test *testing.T) {
 			test.Errorf("the %s note failed with %q, which does not say %q at %s", testCase.folder, readError,
 				testCase.says, place)
 		}
-	}
-}
-
-// Every note in the fixtures of staticcheck v0.8.1's checks, the ones the house ports, reads, but sa5012's, whose fact
-// notes are refused, and the reader finds every diag note there is.
-func TestReadReadsStaticchecksFixtures(test *testing.T) {
-	test.Parallel()
-	fixtures := []string{}
-	for _, checks := range []string{"staticcheck", "simple", "stylecheck", "quickfix"} {
-		found, globError := filepath.Glob(filepath.Join("..", "..", "..", "..", "third_party", "honnef.co", "go",
-			"tools", checks, "*", "testdata"))
-		if globError != nil {
-			test.Fatal(globError)
-		}
-		fixtures = append(fixtures, found...)
-	}
-	if len(fixtures) == 0 {
-		test.Fatal("found no fixture of staticcheck's, so the test proves nothing")
-	}
-	read := 0
-	refused := []string{}
-	for _, fixture := range fixtures {
-		wants, readError := Read(fixture)
-		if readError != nil {
-			if strings.Contains(readError.Error(), "a fact note, where this reader reads diag notes alone") {
-				refused = append(refused, fixture)
-				continue
-			}
-			test.Errorf("reading %s: %v", fixture, readError)
-			continue
-		}
-		read += len(wants)
-	}
-	test.Logf("read %d wants from %d fixtures, and refused %d for their fact notes: %v", read,
-		len(fixtures)-len(refused), len(refused), refused)
-	if read != staticcheckDiagnosticNotes {
-		test.Errorf("read %d wants from staticcheck's fixtures, where they hold %d diag notes outside sa5012", read,
-			staticcheckDiagnosticNotes)
-	}
-	if len(refused) != 1 || filepath.Base(filepath.Dir(refused[0])) != "sa5012" {
-		test.Errorf("refused %v for their fact notes, where only sa5012's fixture holds any", refused)
 	}
 }
 

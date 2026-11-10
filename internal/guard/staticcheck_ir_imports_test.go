@@ -24,8 +24,8 @@ var staticcheckIntermediateRepresentation = []string{
 // One program form (#kk4864m): every rule reads the engine's own intermediate representation, so no code of cohere's
 // imports staticcheck's, and the run never builds buildir beside ours. Tests are exempt, since the parity harness
 // runs staticcheck's originals, which build on go/ir, and the representation's differential tests compare ours with
-// it. third_party holds staticcheck itself. The walk must read the module's code, so a walk that read too few files
-// to hold it fails rather than finding nothing.
+// it. The walk must read the module's code, so a walk that read too few files to hold it fails rather than finding
+// nothing.
 func TestNoCodeImportsStaticchecksIntermediateRepresentation(test *testing.T) {
 	test.Parallel()
 	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
@@ -54,8 +54,8 @@ type staticcheckIntermediateRepresentationImport struct {
 }
 
 // staticcheckIntermediateRepresentationImporters is every import of staticcheck's intermediate representation by a
-// Go file under root that is not a test, outside third_party, the vendored TypeScript, hidden directories and
-// fixtures, read from each file's imports alone, and how many files it read.
+// Go file under root that is not a test, outside the vendored TypeScript, hidden directories and fixtures, read from
+// each file's imports alone, and how many files it read.
 func staticcheckIntermediateRepresentationImporters(
 	root string,
 ) (importers []staticcheckIntermediateRepresentationImport, read int, walkError error) {
@@ -71,7 +71,7 @@ func staticcheckIntermediateRepresentationImporters(
 		relative := filepath.ToSlash(native)
 		if entry.IsDir() {
 			if relative != "." && (strings.HasPrefix(entry.Name(), ".") || entry.Name() == "testdata" ||
-				relative == "TypeScript" || relative == "third_party") {
+				relative == "TypeScript") {
 				return filepath.SkipDir
 			}
 			return nil
