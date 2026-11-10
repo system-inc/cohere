@@ -48,8 +48,26 @@ import (
 // IgnoreFileName is the per-directory ignore file.
 const IgnoreFileName = ".gitignore"
 
-// ExcludeFile is the repository's own exclude file, relative to its root.
+// ExcludeFile is the repository's own exclude file, relative to its root, where a clone keeps it. A worktree's and a
+// submodule's are in the git directory their `.git` file points to: see ExcludeFileOf.
 const ExcludeFile = ".git/info/exclude"
+
+// ExcludeFileOf is the exclude file git reads for the repository whose `.git` is marker, an absolute path, and the
+// name a Source gives it: ExcludeFile below a `.git` directory, and below a `.git` file, `info/exclude` in the common
+// directory of the git directory it points to, which a worktree shares with its main checkout, named by its absolute
+// path as git check-ignore names it. A pointer that cannot be read gives "", since git cannot read that repository
+// either.
+func ExcludeFileOf(marker string, isDirectory bool) (path string, name string) {
+	if isDirectory {
+		return filepath.Join(filepath.Dir(marker), filepath.FromSlash(ExcludeFile)), ExcludeFile
+	}
+	gitDirectory, gitDirectoryError := gitDirectoryOf(marker, false)
+	if gitDirectoryError != nil {
+		return "", ""
+	}
+	path = filepath.Join(commonDirectoryOf(gitDirectory), "info", "exclude")
+	return path, filepath.ToSlash(path)
+}
 
 // maximumFileSize is the largest ignore file read. Git skips one past 100 MiB with a warning; here it is
 // refused, since skipping it would leave every pattern in it unapplied without a word.
@@ -63,8 +81,9 @@ var ErrNestedRepository = errors.New("is a repository of its own")
 // absolute path. A directory not listed is not empty: it is read from the disk.
 type Listing func(directory string) ([]os.DirEntry, bool)
 
-// New reads a repository's root `.gitignore`, its info/exclude when `.git` is a directory, and its index when
-// it holds a `.git` of either kind. An index it cannot read is a fallback, said by IndexFallback, never an error.
+// New reads a repository's root `.gitignore`, its info/exclude, and its index, when it holds a `.git` of either kind:
+// a worktree's info/exclude is the one it shares with its main checkout (ExcludeFileOf). An index it cannot read is a
+// fallback, said by IndexFallback, never an error.
 func New(repositoryRoot string) (*Matcher, error) {
 	root, absolutePathError := filepath.Abs(repositoryRoot)
 	if absolutePathError != nil {
@@ -86,15 +105,14 @@ func New(repositoryRoot string) (*Matcher, error) {
 	}
 	matcher.index, matcher.indexFile, matcher.indexFallback = readRepositoryIndex(marker, information.IsDir())
 
-	if information.IsDir() {
+	if excludePath, excludeName := ExcludeFileOf(marker, information.IsDir()); excludePath != "" {
 		// info/exclude lives outside the tree, so a symbolic link to it is followed, as git follows it.
-		excludePath := filepath.Join(root, filepath.FromSlash(ExcludeFile))
 		contents, readError := readIgnoreFile(excludePath, true)
 		if readError != nil {
 			return nil, readError
 		}
 		var parseRulesError error
-		matcher.exclude, parseRulesError = parseRules(contents, ExcludeFile, "")
+		matcher.exclude, parseRulesError = parseRules(contents, excludeName, "")
 		if parseRulesError != nil {
 			return nil, parseRulesError
 		}

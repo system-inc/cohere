@@ -129,6 +129,8 @@ changed in cohere outside the sets is written under the same heading.
   repository's index itself, and a run whose index can't be read, a split or sparse one, decides by the ignore files
   alone and says so. The run cache keys the index on what it decides, the tracked paths the ignore rules exclude and
   the gitlinks, so a `git status` or a `git add` of an ordinary file still replays, and a `git add -f` doesn't.
+- A git worktree reads the `info/exclude` it shares with its main checkout, as git does, where it read none: a file
+  only that exclude lists is ignored, named by the file's path as `git check-ignore -v` names it.
 - The footer's checked count is the files a phase examined, never the files in scope. A Swift project whose
   files had no compiler record, with lint not run, read
   `1 type error (13 checked) • ⚠ 13 files nothing checked`, and now reads no checked count beside the gap, which

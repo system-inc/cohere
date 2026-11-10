@@ -62,11 +62,11 @@ type Enumeration struct {
 	Directories []string
 
 	// IgnoreFiles is every git ignore file the walk read or looked for, absolute paths, present or not:
-	// the `.gitignore` of the root and of each directory it entered, `.git/info/exclude` when `.git`
-	// is a directory, and the repository's index when the root holds a `.git`, since a path the index
-	// tracks is never ignored. An edit to one changes what the walk skips without moving any directory's
-	// modification time, so a cache replaying the walk reads them too. A pruned directory's file is not
-	// read, and not listed.
+	// the `.gitignore` of the root and of each directory it entered, and when the root holds a `.git`, the
+	// repository's info/exclude (a worktree's is the one its common directory shares, gitignore.ExcludeFileOf)
+	// and its index, since a path the index tracks is never ignored. An edit to one changes what the walk
+	// skips without moving any directory's modification time, so a cache replaying the walk reads them too. A
+	// pruned directory's file is not read, and not listed.
 	IgnoreFiles []string
 
 	// Index is the repository's index among IgnoreFiles, when the root holds a `.git` and the walk read the index
@@ -165,11 +165,11 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 		matcher = matcher.WithListing(listing)
 	}
 	enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, gitignore.IgnoreFileName))
-	if information, statError := os.Stat(filepath.Join(root, ".git")); statError == nil && information.IsDir() {
-		enumeration.IgnoreFiles = append(
-			enumeration.IgnoreFiles,
-			filepath.Join(root, filepath.FromSlash(gitignore.ExcludeFile)),
-		)
+	marker := filepath.Join(root, ".git")
+	if information, statError := os.Stat(marker); statError == nil {
+		if excludePath, _ := gitignore.ExcludeFileOf(marker, information.IsDir()); excludePath != "" {
+			enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, excludePath)
+		}
 	}
 	if matcher.IndexFile() != "" {
 		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, matcher.IndexFile())
