@@ -18,6 +18,11 @@ type runGaps struct {
 	RulesSkippingEverything int  `json:"rulesSkippingEverything"`
 	FormattingNotChecked    bool `json:"formattingNotChecked"`
 	NothingToCheck          bool `json:"nothingToCheck"`
+	// SourceFiles is how many files of its language the project held before anything kept one out of a check, set
+	// only when NothingToCheck is: a TypeScript program's own files, or the files an engine's project record counts
+	// in its package. It is the fact a run that checked nothing fails on, and Excluded is only its explanation, so a
+	// file kept out for a reason no path counted still fails the run, named as unrecorded (#08cv2mp).
+	SourceFiles int `json:"sourceFiles,omitempty"`
 	// Excluded is why each file of a run that checked nothing was left out, one entry per reason in the order first
 	// met, filled only when NothingToCheck is set. A run whose language's files were all excluded fails, and its
 	// footer names each reason and the rule that decided it: a run that checked nothing never reads as a pass
@@ -78,10 +83,31 @@ type excludedReason struct {
 	Source string `json:"source,omitempty"`
 }
 
-// nothingChecked is whether the run had files of its language and checked none of them, every one excluded, which
-// fails it (#08cv2mp).
+// unrecordedReason is what a run that checked nothing says of the files no reason counted. Such a file was kept
+// out by a path that never said why, so the words name it as cohere's bug to report rather than the project's.
+const unrecordedReason = "for a reason cohere did not record, a cohere bug to report"
+
+// nothingChecked is whether the run had files of its language and checked none of them, which fails it (#08cv2mp).
+// It rests on the fact, SourceFiles, and never on a reason having been counted: a path that dropped every file
+// without counting one would otherwise read as a project with no file at all, ✓ beside a warning. A reason counted
+// of a file the fact leaves out, a Swift file no target compiles, fails it too, as it did before.
 func (gaps runGaps) nothingChecked() bool {
-	return gaps.NothingToCheck && len(gaps.Excluded) > 0
+	return gaps.NothingToCheck && (gaps.SourceFiles > 0 || len(gaps.Excluded) > 0)
+}
+
+// countUnrecorded names, under unrecordedReason, the files of a run that checked nothing that no reason counted:
+// SourceFiles less every file Excluded counts. Called once the reasons are in.
+func (gaps *runGaps) countUnrecorded() {
+	if !gaps.NothingToCheck {
+		return
+	}
+	counted := 0
+	for _, excluded := range gaps.Excluded {
+		counted += excluded.Count
+	}
+	if unrecorded := gaps.SourceFiles - counted; unrecorded > 0 {
+		gaps.addExcluded(unrecordedReason, "", unrecorded)
+	}
 }
 
 // addExcluded counts files left out for reason, decided by source, under its reason's entry, keeping the first

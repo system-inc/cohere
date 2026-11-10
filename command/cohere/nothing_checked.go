@@ -14,8 +14,9 @@ import (
 // lint, so a project whose every file an ignore matched read `0 checked`, passed, and said nothing of it. A file
 // the type check alone reads, under an entry naming `"check": "types"`, is checked. Each file kept out is counted
 // by what kept it out, a narrowing to named paths or the ignore entry that matched it, and the front door fails the
-// run and says why (runGaps.nothingChecked). A program with no file of its own has nothing kept out, and keeps the
-// warning alone.
+// run and says why (runGaps.nothingChecked). It fails on the program's own files having been there, never on a
+// reason having been counted, so a file a path dropped without counting it is named as cohere's bug. A program with
+// no file of its own has nothing kept out, and keeps the warning alone.
 
 // outsideNamedPaths is the reason a narrowing gives, said of the program's files no named path reached.
 const outsideNamedPaths = "outside the named paths"
@@ -45,9 +46,14 @@ func settleNothingChecked(
 	}
 	activeSummary.Gaps.NothingToCheck =
 		activeSummary.FilesChecked+activeSummary.FilesCached+activeSummary.FilesTypesOnly == 0
-	if activeSummary.Gaps.NothingToCheck && !typesRan {
+	if !activeSummary.Gaps.NothingToCheck {
+		return
+	}
+	activeSummary.Gaps.SourceFiles = len(graph.ProjectFiles())
+	if !typesRan {
 		addTypeScriptExcluded(graph, projectFiles, lintConfiguration, location.Root)
 	}
+	activeSummary.Gaps.countUnrecorded()
 }
 
 // addTypeScriptExcluded counts what kept each of the program's files out of a run over projectFiles that checked
