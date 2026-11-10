@@ -13,9 +13,9 @@ type Overlap struct {
 	// Packages are the ones to analyze, as Loaded.Packages will hold them.
 	Packages []*packages.Package
 
-	// Reads are every package's reads of other packages as the load records them, for check.Run beside the load (see
-	// Loaded.Reads). The map never changes; a package's entry gains its type reads by the time Ready closes for it,
-	// and is empty for one whose types come from export data.
+	// Reads are every package's reads of other packages, for check.Run beside the load (see Loaded.Reads). The map
+	// never changes; a package checked from source has its never mark, if the load gives it one, by the time Ready
+	// closes for it, and one whose types come from export data is marked never as the load ends.
 	Reads map[*packages.Package]*build_reads.Reads
 
 	nodes map[*packages.Package]*node

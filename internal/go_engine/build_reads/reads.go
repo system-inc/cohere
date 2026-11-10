@@ -20,10 +20,21 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Reads is one package's reads of other packages. The load writes its type reads, then every action on the package
-// may add fact reads from its own goroutine, so each method takes the lock.
+// RestoredFromCache is why a package the findings cache restored can never be restored by its reads: its types came
+// from export data, so it has no type maps to walk, and its entry keeps no reads.
+const RestoredFromCache = "restored from the findings cache; its reads are not stored yet (next unit)"
+
+// Reads is one package's reads of other packages. The rules' run walks its type reads once (RecordTypes), and every
+// action on the package may add fact reads and lookups from its own goroutine, so each method takes the lock.
+//
+// Its state is explicit, since empty reads promise something: recorded, its type reads walked, empty when it read
+// nothing; never, with the first reason; or unknown, its type reads never walked, which is no promise at all. Only
+// recorded reads with no never mark can restore their package (see Restorable).
 type Reads struct {
 	lock sync.Mutex
+
+	// recorded is set once the package's type reads have been walked.
+	recorded bool
 
 	// objects are the foreign objects the package's type check reached, each once.
 	objects map[types.Object]bool
@@ -189,6 +200,43 @@ func (reads *Reads) ScopeLookup(own *types.Package, declaring *types.Package, na
 			Answer: found})
 	}
 	return found
+}
+
+// RecordTypes walks own's type information, info, for every object of another package it reaches (see
+// recordTypeReads), once, and marks the reads recorded. A package already marked never is not walked, nor one already
+// recorded.
+func (reads *Reads) RecordTypes(own *types.Package, info *types.Info) {
+	reads.lock.Lock()
+	settled := reads.recorded || reads.never != ""
+	reads.lock.Unlock()
+	if settled {
+		return
+	}
+	recordTypeReads(reads, own, info)
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	reads.recorded = true
+}
+
+// Recorded reports whether the package's type reads have been walked.
+func (reads *Reads) Recorded() bool {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	return reads.recorded
+}
+
+// Restorable reports whether the package may be restored by its reads, and when it may not, why: the never mark's
+// reason, or, for reads never recorded, that they are unknown, which is never read as empty.
+func (reads *Reads) Restorable() (bool, string) {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	switch {
+	case reads.never != "":
+		return false, reads.never
+	case !reads.recorded:
+		return false, "its type reads were never recorded"
+	}
+	return true, ""
 }
 
 // MarkNever records that the package can never be restored, and why, unless a reason is recorded already.

@@ -73,9 +73,9 @@ type loader struct {
 	typesOnly map[*packages.Package]bool
 
 	// reads are every reachable package's reads of other packages (see build_reads), made before any work starts, so
-	// the map is only read after, and each package's type reads recorded by its check (recordReads). checked are the
-	// packages checked from source, under checkedLock, whose reads the load hands out: one whose types came from
-	// export data was not checked here, and recorded nothing.
+	// the map is only read after, each marked never by its check when the load knows it can never be restored
+	// (recordReads). checked are the packages checked from source, under checkedLock: one whose types came from export
+	// data was not checked here, has no type maps to walk, and is marked never once the load ends.
 	reads       map[*packages.Package]*build_reads.Reads
 	checkedLock sync.Mutex
 	checked     map[*packages.Package]bool
@@ -576,10 +576,11 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 	loader.recordReads(current)
 }
 
-// recordReads records what current's type check, just done, read of other packages (see build_reads): every foreign
-// object its type maps reach, or why it can never be restored. A package checked for its types alone has no maps to
-// read them from. One with cgo files, or whose types import runtime/cgo, as cgo's translation makes them, is one vet's
-// cgocall type-checks a second time from its raw cgo files, a check nothing records. Neither is walked.
+// recordReads marks current, just checked, never restorable when the load knows it can never be (see build_reads). A
+// package checked for its types alone has no maps to read its reads from. One with cgo files, or whose types import
+// runtime/cgo, as cgo's translation makes them, is one vet's cgocall type-checks a second time from its raw cgo files,
+// a check nothing records. Every other package's type reads are walked by the rules' run, off the load's chain, once
+// its last action has finished (see checker.Options.Reads), or after the rules for a package no action reached.
 func (loader *loader) recordReads(current *node) {
 	reads := loader.reads[current.loaded]
 	if reads == nil {
@@ -595,80 +596,7 @@ func (loader *loader) recordReads(current *node) {
 		return imported.Path() == "runtime/cgo"
 	}):
 		reads.MarkNever("it imports runtime/cgo, so vet's cgocall type-checks its cgo files again, unrecorded")
-	default:
-		recordTypeReads(reads, loaded.Types, loaded.TypesInfo)
 	}
-}
-
-// recordTypeReads records into reads every object of another package that info reaches, own's type information: each
-// identifier's use, each selection's selected field or method and the embedded fields on its path, each implicit
-// object, and, for each instance of another package's generic, its type arguments. An object of an instance, a field
-// or method of an instantiated type or an instantiated function, is recorded as its generic declares it, which is
-// what another build can find; the instance's type arguments are its own read. An object of no package, the
-// universe's, is the same in every build.
-//
-// Mutates: reads gains every read
-func recordTypeReads(reads *build_reads.Reads, own *types.Package, info *types.Info) {
-	for _, used := range info.Uses {
-		if foreign, isForeign := foreignDeclared(used, own); isForeign {
-			reads.AddObject(foreign)
-		}
-	}
-	for _, selection := range info.Selections {
-		if foreign, isForeign := foreignDeclared(selection.Obj(), own); isForeign {
-			reads.AddObject(foreign)
-		}
-		recordSelectionPath(reads, own, selection)
-	}
-	for _, implicit := range info.Implicits {
-		if foreign, isForeign := foreignDeclared(implicit, own); isForeign {
-			reads.AddObject(foreign)
-		}
-	}
-	for identifier, instance := range info.Instances {
-		if generic, isForeign := foreignDeclared(info.Uses[identifier], own); isForeign {
-			reads.AddInstance(generic, instance.TypeArgs)
-		}
-	}
-}
-
-// recordSelectionPath records into reads each embedded field of another package that selection passes through on its
-// way to what it selects, which the package never names, so no use holds it: `outer.Value`, where another package's
-// Outer embeds an inner struct declaring Value, reads Outer's embedded inner.
-//
-// Mutates: reads gains each such field
-func recordSelectionPath(reads *build_reads.Reads, own *types.Package, selection *types.Selection) {
-	path := selection.Index()
-	current := selection.Recv()
-	for _, index := range path[:len(path)-1] {
-		if pointer, isPointer := current.Underlying().(*types.Pointer); isPointer {
-			current = pointer.Elem()
-		}
-		structure, isStruct := current.Underlying().(*types.Struct)
-		if !isStruct {
-			return
-		}
-		embedded := structure.Field(index)
-		if foreign, isForeign := foreignDeclared(embedded, own); isForeign {
-			reads.AddObject(foreign)
-		}
-		current = embedded.Type()
-	}
-}
-
-// foreignDeclared is object as its package declares it, the generic one for a field, method or function of an
-// instance, and whether that package is another than own. An object of no package, the universe's, is no other's.
-func foreignDeclared(object types.Object, own *types.Package) (types.Object, bool) {
-	if object == nil || object.Pkg() == nil || object.Pkg() == own {
-		return nil, false
-	}
-	switch instantiated := object.(type) {
-	case *types.Func:
-		return instantiated.Origin(), true
-	case *types.Var:
-		return instantiated.Origin(), true
-	}
-	return object, true
 }
 
 // appendError adds one parse or type error to a package's Errors, in go/packages' words.

@@ -85,6 +85,10 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	result, outcome := pass.result, pass.outcome
 	var verdict *buildsVerdict
 	if engine.request.switches["other-builds"] {
+		// The host's reads, pass.result.Reads, are what an extra build will restore a package by (#b2t9xmf). Every
+		// host package's type-read walk has finished by now, since the walks run within the host's lint, which has
+		// returned, and the builds start only after it. A build overlapping the host's lint would have to wait on each
+		// package's walk before reading its reads.
 		if runs := engine.otherBuilds(lintedLoad, pass); len(runs) > 0 {
 			ran := make([]string, 0, len(pass.enabled))
 			for _, enabledRule := range pass.enabled {

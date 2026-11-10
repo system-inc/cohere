@@ -12,8 +12,10 @@ import (
 	"fmt"
 	"go/token"
 	"maps"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/tools/go/analysis"
@@ -317,6 +319,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, ErrAbandoned
 	}
 	graphs = append(graphs, graph)
+	recordUnreachedTypes(options.Reads, options.Ready)
 	type rootKey struct {
 		analyzer        *analysis.Analyzer
 		analyzedPackage *packages.Package
@@ -441,9 +444,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if options.Reads != nil {
 		for recorded, reads := range options.Reads {
 			// A package an earlier wave of this run analyzed recorded its reads then; one the cache restored ran
-			// nothing.
+			// nothing, and its entry keeps no reads yet.
 			if session != nil && session.restored(recorded) {
-				reads.MarkNever("the findings cache restored it, so its rules read nothing this run")
+				reads.MarkNever(build_reads.RestoredFromCache)
 			}
 		}
 		result.Reads = options.Reads
@@ -454,6 +457,42 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 	result.Elapsed = time.Since(started)
 	return result, nil
+}
+
+// recordUnreachedTypes walks the type reads of each package of reads that no action reached, so nothing walked them as
+// its last action finished (checker.Options.Reads): a dependency no analyzer that learns facts runs on, or a root the
+// run does not analyze. Its type information is still whole, since only the checker lets it go, and only for a
+// package it ran on. A package already recorded or marked never is passed over, and one with no type information,
+// whose types came from export data, is marked never by the load. The walks run as many at once as there are cores,
+// each into its own package's reads. Beside the load, ready is Options.Ready: a package no action reached may still be
+// in its check, as a root the run does not analyze can be, so each is read only once it is final.
+//
+// Every package then ends its run in one of three ways. One checked from source and reached by an action is walked
+// by the checker; one checked from source and reached by none, here; one the load knows can never be restored (types
+// alone, cgo) or restored from the findings cache, marked never by the load or by Run.
+func recordUnreachedTypes(
+	reads map[*packages.Package]*build_reads.Reads,
+	ready func(*packages.Package) <-chan struct{},
+) {
+	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
+	var group sync.WaitGroup
+	for unreached, packageReads := range reads {
+		if packageReads.Recorded() || packageReads.Never() != "" {
+			continue
+		}
+		group.Go(func() {
+			if ready != nil {
+				<-ready(unreached)
+			}
+			if unreached.TypesInfo == nil {
+				return
+			}
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			packageReads.RecordTypes(unreached.Types, unreached.TypesInfo)
+		})
+	}
+	group.Wait()
 }
 
 // markForeignFindings marks reads never when a finding of analyzedPackage names a file that is not the package's own:

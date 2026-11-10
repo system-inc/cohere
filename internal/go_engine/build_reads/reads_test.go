@@ -82,3 +82,23 @@ func TestReadsFromManyGoroutinesKeepEachReadOnceInOrder(test *testing.T) {
 		test.Fatalf("want the first reason kept, got %q", never)
 	}
 }
+
+// Reads are restorable only once their type reads are recorded and while no never mark is set: reads never recorded
+// are unknown, which is never read as empty, however little else they hold.
+func TestUnknownReadsAreNeverRestorable(test *testing.T) {
+	test.Parallel()
+
+	unknown := &Reads{}
+	if restorable, why := unknown.Restorable(); restorable || why != "its type reads were never recorded" {
+		test.Fatalf("want unknown reads unrestorable, never recorded, got %t, %q", restorable, why)
+	}
+	recorded := &Reads{}
+	recorded.RecordTypes(types.NewPackage("example.com/own", "own"), &types.Info{})
+	if restorable, why := recorded.Restorable(); !restorable || !recorded.Recorded() {
+		test.Fatalf("want recorded empty reads restorable, got %t, %q", restorable, why)
+	}
+	recorded.MarkNever(RestoredFromCache)
+	if restorable, why := recorded.Restorable(); restorable || why != RestoredFromCache {
+		test.Fatalf("want reads marked never unrestorable for the mark, got %t, %q", restorable, why)
+	}
+}

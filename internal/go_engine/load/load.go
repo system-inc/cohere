@@ -112,10 +112,11 @@ type Loaded struct {
 	// Inputs are what the load read to decide what it returned, for the inputs record (see inputs.go).
 	Inputs Inputs
 
-	// Reads are, by package, what each package the load checked from source read of other packages, for an extra
-	// build to restore it by (see build_reads): the type reads its check recorded, or why it never can be. A package
-	// whose types came from export data was not checked here and is not among them. The rules add their fact reads
-	// when check.Run is handed the same map.
+	// Reads are, by package, what every package of the graph read of other packages, for an extra build to restore it
+	// by (see build_reads). The load leaves a package it checked from source unknown, for check.Run, handed the same
+	// map, to walk its type reads into and add its rules' reads to, unless it knows the package can never be
+	// restored: one checked for its types alone, or with cgo (recordReads). A package whose types came from export
+	// data, or that the load never needed, was restored from the findings cache, and is marked never for it.
 	Reads map[*packages.Package]*build_reads.Reads
 
 	// testFunctions is each test variant to analyze's refused test functions, judged as it was checked, for the
@@ -429,9 +430,12 @@ func fromSource(
 			byPackage[current.loaded] = owned
 		}
 	}
-	reads := make(map[*packages.Package]*build_reads.Reads, len(typeChecker.checked))
-	for checked := range typeChecker.checked {
-		reads[checked] = typeChecker.reads[checked]
+	// A package the findings cache restored has no type maps to walk, and its entry keeps no reads yet, so it is never
+	// left unknown.
+	for current, reads := range typeChecker.reads {
+		if !typeChecker.checked[current] {
+			reads.MarkNever(build_reads.RestoredFromCache)
+		}
 	}
 	return roots, &Loaded{
 		Packages:                          analyzedPackages,
@@ -441,7 +445,7 @@ func fromSource(
 		Withheld:                          byPackage,
 		FilesParsed:                       int(typeChecker.filesParsed.Load()),
 		PackagesFromExportData:            int(typeChecker.fromExportData.Load()),
-		Reads:                             reads,
+		Reads:                             typeChecker.reads,
 		testFunctions:                     typeChecker.testFunctions,
 	}, nil
 }

@@ -188,8 +188,11 @@
 // as much as a hit, since a build where the fact is there would analyze
 // the package differently. Options.Recorded keys the package's reads in
 // every pass's ResultOf, as Options.Resolved keys the resolver, so a rule
-// records there what else it asks of other packages. Unset, nothing is
-// recorded and both are upstream's.
+// records there what else it asks of other packages. And releaseSyntax,
+// once the last action on a package has finished and before its type
+// information goes, walks the package's type reads into them, so the
+// walk runs beside the rules rather than on the load's chain. Unset,
+// nothing is recorded and both are upstream's.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -357,8 +360,10 @@ type Options struct {
 	// cohere: Reads, when set, holds the reads of each package whose
 	// fact reads are recorded: every ObjectFact and PackageFact an action
 	// on such a package asks of another package's object, or of another
-	// package, is added to them, found or not. A package it does not hold,
-	// and every package while it is nil, records nothing.
+	// package, is added to them, found or not, and the package's type reads
+	// are walked into them once its last action has finished (see
+	// releaseSyntax). A package it does not hold, and every package while
+	// it is nil, records nothing.
 	Reads map[*packages.Package]*build_reads.Reads
 
 	// cohere: Recorded, when Reads is set too, keys in every pass's
@@ -913,6 +918,12 @@ func (act *Action) releaseInputs() {
 func (act *Action) releaseSyntax() {
 	if act.syntax.unfinished.Add(-1) != 0 {
 		return
+	}
+	// cohere: under Options.Reads, the package's type reads, walked once,
+	// here, while its type information is whole, a given package's too,
+	// whether or not it is let go of below.
+	if reads := act.opts.Reads[act.Package]; reads != nil && act.Package.TypesInfo != nil {
+		reads.RecordTypes(act.Package.Types, act.Package.TypesInfo)
 	}
 	if act.syntax.given {
 		if act.syntax.finished == nil {
