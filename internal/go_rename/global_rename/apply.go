@@ -22,7 +22,9 @@ import (
 // ordinal of its declaring identifier in that file, which a rename cannot move, so a use in one package of a
 // declaration in another compares across a rename. One in a file FileKey leaves out, generated outside the root
 // with no source under it, as cgo's _cgo_gotypes.go, is keyed by package path, kind, owner and name: no rename
-// edits such a file. Anything else by package path, kind, owner, name and file, which no rename here changes.
+// edits such a file. Anything else by package path, kind, owner, name and file, which no rename here changes. Every
+// record of one key holds one string: a whole tree's fingerprint spells a declaration's key once per identifier
+// naming it, about 2.5 million records on cohere, so each key is kept once per call and shared.
 func Fingerprint(
 	loaded *workspace.Workspace,
 ) (map[string]map[string][]rename.IdentifierRecord, map[string]map[string][]int) {
@@ -101,6 +103,15 @@ func Fingerprint(
 			declared.Name(),
 		)
 	}
+	// interned holds each key once, so every record of one key shares its string.
+	interned := map[string]string{}
+	intern := func(key string) string {
+		if held, found := interned[key]; found {
+			return held
+		}
+		interned[key] = key
+		return key
+	}
 	fingerprints := map[string]map[string][]rename.IdentifierRecord{}
 	offsets := map[string]map[string][]int{}
 	for _, rootsPackage := range loaded.Roots {
@@ -136,7 +147,10 @@ func Fingerprint(
 					}
 					key += fmt.Sprintf("|selection %d %v %t", selection.Kind(), path, selection.Indirect())
 				}
-				byFile[filename] = append(byFile[filename], rename.IdentifierRecord{Name: identifier.Name, Key: key})
+				byFile[filename] = append(byFile[filename], rename.IdentifierRecord{
+					Name: identifier.Name,
+					Key:  intern(key),
+				})
 				offsetsByFile[filename] = append(
 					offsetsByFile[filename],
 					rootsPackage.Fset.PositionFor(identifier.Pos(), false).Offset,
@@ -169,17 +183,62 @@ type Expectation struct {
 	Offsets map[string]map[string][]int
 	// newNameAt is each renamed identifier's new name by its file and offset, which a platform's expectation reads.
 	newNameAt map[rename.EditKey]string
-	// platformFingerprints are the plan's, each platform's load before the rewrite fingerprinted while the plan read
-	// it, which ProvePlatform reads in place of loading the platform again.
-	platformFingerprints map[workspace.Platform]unrenamedFingerprint
+	// platformDifferences are the plan's, each platform's load before the rewrite fingerprinted while the plan read
+	// it and kept as its difference from the host's, which ProvePlatform reads with Fingerprints in place of loading
+	// the platform again. Only an expectation of the very workspace the plan read carries them (Expect).
+	platformDifferences map[workspace.Platform]platformDifference
 }
 
-// unrenamedFingerprint is a load's Fingerprint and offsets as the load reads, before any rename is applied to it. A
-// plan keeps one per platform it read, so a proof there need not keep, or make again, a load of several gigabytes
-// only to fingerprint it.
+// unrenamedFingerprint is a load's Fingerprint and offsets as the load reads, before any rename is applied to it.
 type unrenamedFingerprint struct {
 	fingerprints map[string]map[string][]rename.IdentifierRecord
 	offsets      map[string]map[string][]int
+}
+
+// platformDifference is a platform's unrenamedFingerprint as it differs from the host's, which a plan keeps per
+// platform it read, so a proof there need not keep, or make again, a load of several gigabytes only to fingerprint
+// it. Most of a platform's files read exactly as the host's (96 to 99% of each on cohere), and a whole fingerprint
+// is about 480 MB there, so a file whose records and offsets are the host's, under the same package ID and file key,
+// is only marked, and the rest are kept whole. Every package ID and file key of the platform is in one of the two,
+// so a file the platform lacks is never taken from the host.
+type platformDifference struct {
+	// sameAsHost holds, per package ID, each file whose records and offsets equal the host's, element by element.
+	sameAsHost map[string]map[string]bool
+	// fingerprints and offsets hold, per package ID, every other file's records and offsets as the platform reads
+	// them, and every package ID of the platform, with no files when all of them are marked.
+	fingerprints map[string]map[string][]rename.IdentifierRecord
+	offsets      map[string]map[string][]int
+}
+
+// differenceFrom is platform as it differs from host (platformDifference). Offsets are compared beside records, so a
+// marked file's renames, made by offset, are the host's: a file keyed by its source may be cgo's translation in one
+// load and the source itself in the other.
+func differenceFrom(host unrenamedFingerprint, platform unrenamedFingerprint) platformDifference {
+	difference := platformDifference{
+		sameAsHost:   map[string]map[string]bool{},
+		fingerprints: make(map[string]map[string][]rename.IdentifierRecord, len(platform.fingerprints)),
+		offsets:      make(map[string]map[string][]int, len(platform.fingerprints)),
+	}
+	for id, byFile := range platform.fingerprints {
+		kept := map[string][]rename.IdentifierRecord{}
+		keptOffsets := map[string][]int{}
+		for filename, records := range byFile {
+			hostRecords, hostHas := host.fingerprints[id][filename]
+			if hostHas && slices.Equal(records, hostRecords) &&
+				slices.Equal(platform.offsets[id][filename], host.offsets[id][filename]) {
+				if difference.sameAsHost[id] == nil {
+					difference.sameAsHost[id] = map[string]bool{}
+				}
+				difference.sameAsHost[id][filename] = true
+				continue
+			}
+			kept[filename] = records
+			keptOffsets[filename] = platform.offsets[id][filename]
+		}
+		difference.fingerprints[id] = kept
+		difference.offsets[id] = keptOffsets
+	}
+	return difference
 }
 
 // Verification is a load of the rewrite read against an Expectation: how many identifiers were compared, and every
@@ -256,14 +315,29 @@ func Apply(
 }
 
 // Expect is what the plan's rewrite must read back, taken from the load the plan was made over before anything is
-// rewritten: its fingerprint, with each identifier an edit or a twin's edit renames given its new name.
+// rewritten: its fingerprint, with each identifier an edit or a twin's edit renames given its new name. Only when
+// loaded is the very workspace the plan read does it carry the plan's platform differences, which are differences
+// from that workspace's fingerprint, and take that fingerprint from the plan rather than make it again; over any
+// other workspace, as a codemod that plans over one load and applies over a reload gives it, a platform's proof
+// loads its before side fresh.
+//
+// Mutates: result the host fingerprint the plan kept, handed to the expectation and released from result
 func Expect(loaded *workspace.Workspace, result *Result) *Expectation {
 	newNameAt := map[rename.EditKey]string{}
 	for _, edit := range append(append([]rename.Edit(nil), result.Edits...), result.TwinEdits...) {
 		newNameAt[rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = edit.NewText
 	}
-	expectation := expectedFingerprint(loaded, newNameAt)
-	expectation.platformFingerprints = result.platformFingerprints
+	if loaded != result.planned {
+		return expectedFingerprint(loaded, newNameAt)
+	}
+	var expectation *Expectation
+	if result.hostFingerprint != nil {
+		expectation = renamedExpectation(*result.hostFingerprint, newNameAt)
+		result.hostFingerprint = nil
+	} else {
+		expectation = expectedFingerprint(loaded, newNameAt)
+	}
+	expectation.platformDifferences = result.platformDifferences
 	return expectation
 }
 
@@ -347,9 +421,14 @@ func Write(files map[string][]byte) (int, error) {
 // expectedFingerprint is a load's fingerprint with each identifier an edit renames given its new name: what the
 // rewrite must read back. The fingerprint is its own, so it is renamed in place.
 func expectedFingerprint(loaded *workspace.Workspace, newNameAt map[rename.EditKey]string) *Expectation {
-	expected, offsets := Fingerprint(loaded)
-	renameRecords(expected, offsets, newNameAt)
-	return &Expectation{Fingerprints: expected, Offsets: offsets, newNameAt: newNameAt}
+	return renamedExpectation(fingerprintBefore(loaded), newNameAt)
+}
+
+// renamedExpectation is an unrenamed fingerprint with each identifier an edit renames given its new name, renamed in
+// place: the fingerprint is the expectation's from then on.
+func renamedExpectation(unrenamed unrenamedFingerprint, newNameAt map[rename.EditKey]string) *Expectation {
+	renameRecords(unrenamed.fingerprints, unrenamed.offsets, newNameAt)
+	return &Expectation{Fingerprints: unrenamed.fingerprints, Offsets: unrenamed.offsets, newNameAt: newNameAt}
 }
 
 // fingerprintBefore is a load's fingerprint before any rename, for a plan to keep for a platform's proof.
@@ -358,21 +437,33 @@ func fingerprintBefore(loaded *workspace.Workspace) unrenamedFingerprint {
 	return unrenamedFingerprint{fingerprints: fingerprints, offsets: offsets}
 }
 
-// expectedFrom is what the rewrite must read back given an unrenamed fingerprint: a copy of its records with each
-// identifier an edit renames given its new name. The copy keeps the unrenamed one as it was, since one serves every
-// proof of a round, each with its own renames, and a proof drops the packages that fail from what it is given. The
-// offsets are shared: nothing writes them.
-func expectedFrom(unrenamed unrenamedFingerprint, newNameAt map[rename.EditKey]string) *Expectation {
-	expected := make(map[string]map[string][]rename.IdentifierRecord, len(unrenamed.fingerprints))
-	for id, byFile := range unrenamed.fingerprints {
-		copied := make(map[string][]rename.IdentifierRecord, len(byFile))
+// expectedFrom is what the rewrite must read back under a platform given its difference from the host and host, the
+// host's expectation of the same rewrite: a marked file's records are the host's already renamed, since the same
+// records at the same offsets take the same renames, and every kept file's are a copy of the platform's with each
+// identifier an edit renames given its new name. The copy keeps the difference as it was, since one serves every
+// proof of a round, each with its own renames. The maps are the expectation's own, since a proof drops the packages
+// that fail from what it is given, and the slices are shared: nothing writes records once renamed, or offsets.
+func expectedFrom(difference platformDifference, host *Expectation) *Expectation {
+	expected := make(map[string]map[string][]rename.IdentifierRecord, len(difference.fingerprints))
+	offsets := make(map[string]map[string][]int, len(difference.fingerprints))
+	for id, byFile := range difference.fingerprints {
+		copied := make(map[string][]rename.IdentifierRecord, len(byFile)+len(difference.sameAsHost[id]))
+		copiedOffsets := make(map[string][]int, len(byFile)+len(difference.sameAsHost[id]))
 		for filename, records := range byFile {
 			copied[filename] = slices.Clone(records)
+			copiedOffsets[filename] = difference.offsets[id][filename]
 		}
 		expected[id] = copied
+		offsets[id] = copiedOffsets
 	}
-	renameRecords(expected, unrenamed.offsets, newNameAt)
-	return &Expectation{Fingerprints: expected, Offsets: unrenamed.offsets, newNameAt: newNameAt}
+	renameRecords(expected, offsets, host.newNameAt)
+	for id, sameAsHost := range difference.sameAsHost {
+		for filename := range sameAsHost {
+			expected[id][filename] = host.Fingerprints[id][filename]
+			offsets[id][filename] = host.Offsets[id][filename]
+		}
+	}
+	return &Expectation{Fingerprints: expected, Offsets: offsets, newNameAt: host.newNameAt}
 }
 
 // renameRecords gives each record of fingerprints an edit renames, by its file and offset, its new name, in place.
@@ -406,7 +497,7 @@ func verifyPlatform(
 	expectation *Expectation,
 	output *bufio.Writer,
 ) (int, error) {
-	verification, proveError := provePlatform(loaded.LoadPlatform, platform, overlay, expectation.newNameAt, nil)
+	verification, proveError := provePlatform(loaded.LoadPlatform, platform, overlay, expectation, nil)
 	if proveError != nil {
 		return 0, proveError
 	}
@@ -422,28 +513,42 @@ func verifyPlatform(
 	return len(verification.Mismatches), nil
 }
 
+// checkDifference is nil, and a build with the rename_differential tag sets it (platform_differential.go) to check
+// each proof's expectation from a stored difference against one from the platform's before side loaded fresh. It is
+// a function a tagged file sets, never code the untagged build carries, so a proof there pays one nil check.
+var checkDifference func(
+	loadPlatform func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error),
+	platform workspace.Platform,
+	difference platformDifference,
+	fromDifference *Expectation,
+)
+
 // provePlatform proves the rewrite under one platform: it loads the tree as the platform builds it, before and with
 // the rewrite in memory, and requires every package that type-checked before to type-check after, and every
 // identifier in it to resolve to the same declaration, under its expected name. Nothing reads the load before once
 // its fingerprint is taken, so it is collected before the rewrite loads: the loads are several gigabytes each. Given
-// stored, the fingerprint the plan took of that same load, it loads only the rewrite. A package that fails after is
-// a PlatformPackage mismatch, by ID, and every mismatch names the platform.
+// stored, the plan's difference of that same load from the host's, read with host, the host's expectation, it loads
+// only the rewrite. A package that fails after is a PlatformPackage mismatch, by ID, and every mismatch names the
+// platform.
 func provePlatform(
 	loadPlatform func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error),
 	platform workspace.Platform,
 	overlay map[string][]byte,
-	newNameAt map[rename.EditKey]string,
-	stored *unrenamedFingerprint,
+	host *Expectation,
+	stored *platformDifference,
 ) (Verification, error) {
 	var before *Expectation
 	if stored != nil {
-		before = expectedFrom(*stored, newNameAt)
+		before = expectedFrom(*stored, host)
+		if checkDifference != nil {
+			checkDifference(loadPlatform, platform, *stored, before)
+		}
 	} else {
 		beforeLoad, beforeError := loadPlatform(platform, nil)
 		if beforeError != nil {
 			return Verification{}, beforeError
 		}
-		before = expectedFingerprint(beforeLoad.Clean, newNameAt)
+		before = expectedFingerprint(beforeLoad.Clean, host.newNameAt)
 	}
 	afterLoad, afterError := loadPlatform(platform, overlay)
 	if afterError != nil {

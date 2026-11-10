@@ -867,7 +867,7 @@ func (engine *engine) readPlatforms(reached map[string]map[Key]bool) *platformRe
 	engine.unbuiltFiles = map[string][]unbuiltFile{}
 	engine.platformFailures = map[workspace.Platform]platformFailure{}
 	engine.result.platformKeys = map[workspace.Platform]map[Key]bool{}
-	engine.result.platformFingerprints = map[workspace.Platform]unrenamedFingerprint{}
+	engine.result.platformDifferences = map[workspace.Platform]platformDifference{}
 	hostBuilt := map[string]bool{}
 	for _, rootsPackage := range engine.roots {
 		for _, list := range [][]string{rootsPackage.GoFiles, rootsPackage.CompiledGoFiles, rootsPackage.OtherFiles} {
@@ -931,8 +931,17 @@ func (engine *engine) readPlatforms(reached map[string]map[Key]bool) *platformRe
 		reading.loaded = append(reading.loaded, platform)
 		reading.read(engine, load, hostBuilt)
 		// The proof's load before the rewrite is this one, so its fingerprint is taken while the plan holds it, and
-		// nothing need keep the load for the proof.
-		engine.result.platformFingerprints[platform] = fingerprintBefore(load.Clean)
+		// nothing need keep the load for the proof. Only its difference from the host's is kept, and the host's
+		// fingerprint, taken once for every platform, is kept for Expect.
+		if engine.result.hostFingerprint == nil {
+			host := fingerprintBefore(engine.workspace)
+			engine.result.hostFingerprint = &host
+			engine.result.planned = engine.workspace
+		}
+		engine.result.platformDifferences[platform] = differenceFrom(
+			*engine.result.hostFingerprint,
+			fingerprintBefore(load.Clean),
+		)
 		failure := platformFailure{packages: map[string]string{}}
 		for id, reason := range load.Failed {
 			if directory := engine.packageDirectory(id); directory != "" {

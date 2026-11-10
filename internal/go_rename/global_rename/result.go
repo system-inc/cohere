@@ -32,9 +32,16 @@ type Result struct {
 	platforms []workspace.Platform
 	// platformKeys are, by platform, the candidates that reach a package holding a file only that platform builds.
 	platformKeys map[workspace.Platform]map[Key]bool
-	// platformFingerprints are, by platform, the fingerprint of each platform's load the plan read, taken before any
-	// rename, which the platform's proof reads in place of loading the platform again (ProvePlatform).
-	platformFingerprints map[workspace.Platform]unrenamedFingerprint
+	// platformDifferences are, by platform, the fingerprint of each platform's load the plan read, taken before any
+	// rename and kept as its difference from hostFingerprint, which the platform's proof reads in place of loading the
+	// platform again (ProvePlatform).
+	platformDifferences map[workspace.Platform]platformDifference
+	// planned is the workspace the plan read, set when it read a platform: the differences are from its fingerprint,
+	// so only an expectation of it carries them (Expect).
+	planned *workspace.Workspace
+	// hostFingerprint is planned's fingerprint before any rename, taken for the differences and kept for Expect over
+	// planned, which takes it rather than fingerprint the tree again, and releases it here.
+	hostFingerprint *unrenamedFingerprint
 }
 
 // Platforms are the platforms the plan read files under, in order, each of which the rewrite must be proven under

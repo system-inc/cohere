@@ -117,13 +117,15 @@ func (engine *pipeline) renamesNames() bool {
 // runRename is the part of the fix phase that needs types: the renames the naming rules ask for. The lint phase's rules
 // run over the load first, through the findings cache or as the pass beside the load when one ran (speculativeLint),
 // and the run keeps what they found for the lint phase, so a
-// tree whose findings ask for no rename pays nothing past its one load. Otherwise it renames (see rename) and returns
-// the load that proved what it wrote, which the types and lint phases read in place of the first, with no lint pass,
-// and marks the run renamed, so the lint phase runs without the findings cache: the first pass's findings and the
-// cache's keys are of the bytes it replaced.
-func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.Loaded, *lintPass) {
+// tree whose findings ask for no rename pays nothing past its one load. Otherwise it renames (see rename) and, once
+// the rename is written, loads the written tree whole, which the types and lint phases read in place of the first,
+// with no lint pass, and marks the run renamed, so the lint phase runs without the findings cache: the first pass's
+// findings and the cache's keys are of the bytes it replaced. That load is its own, rather than the last round's
+// proof, since the proof keeps no dependency's syntax and the lint's rules learn facts from every dependency's
+// syntax; it reads the bytes the proof proved, which are on disk now. Its error is that load's, or loadError.
+func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.Loaded, *lintPass, error) {
 	if !engine.renamesNames() || loadError != nil || len(loaded.Diagnostics) > 0 {
-		return loaded, nil
+		return loaded, nil, loadError
 	}
 	started := time.Now()
 	var first lintPass
@@ -136,34 +138,36 @@ func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.L
 		first = engine.lint(loaded)
 	}
 	if first.checkError != nil {
-		return loaded, &first
+		return loaded, &first, loadError
 	}
 	asked := engine.askedRenames(first.outcome.kept)
 	if engine.request.stdinPath != "" {
 		engine.nameRenamesLeft(asked)
-		return loaded, &first
+		return loaded, &first, loadError
 	}
 	if len(asked) == 0 {
-		return loaded, &first
+		return loaded, &first, loadError
 	}
 	if loaded.CgoTranslated {
 		for _, refused := range asked {
 			engine.refuseRename(refused, engine.spelledAt(refused), refusedCgo,
 				"the cgo tool reads its files from disk, so the rewrite cannot be loaded before it is written")
 		}
-		return loaded, &first
+		return loaded, &first, loadError
 	}
 	written := engine.rename(asked)
 	if written == nil {
 		// Nothing was written, so the first load and its lint pass are still of the tree on disk. What this cost was
 		// the fix phase's, but the lint pass, which the lint phase reports.
 		engine.fix.elapsed += time.Since(started) - first.elapsed
-		return loaded, &first
+		return loaded, &first, loadError
 	}
 	engine.renamed = true
-	// The first load and its lint pass served only the rename, and the load that proved it is the types phase's.
-	engine.fix.elapsed += loaded.Elapsed + time.Since(started) - written.Elapsed
-	return written, nil
+	// The first load and its lint pass served only the rename, and the load of what it wrote is the types phase's. The
+	// last round's proof is unread from here, so it goes as the written tree loads.
+	engine.fix.elapsed += loaded.Elapsed + time.Since(started)
+	reloaded, reloadError := engine.loadPackages(loadRequest{environment: engine.described.workspace.Environment()})
+	return reloaded, nil, reloadError
 }
 
 // nameRenamesLeft says on stderr each rename the naming rules ask of the editor's save, in its file, and makes none: a
@@ -585,11 +589,10 @@ func (engine *pipeline) prove(
 			declined[file] = reason
 		}
 	}
-	// The proof keeps every dependency's syntax, as the plan's loads do not: the last round's proof is the load the
-	// lint phase lints once the rename is written, with no findings cache, and the checker hands every fact action its
-	// package's syntax, a dependency's included.
+	// The proof keeps no dependency's syntax either: what reads it is the next round's plan and the naming rules
+	// (askedOver), which learn no facts, and the lint phase loads the written tree whole for itself (runRename).
 	proof, proofError := engine.loadPackages(loadRequest{
-		environment: engine.described.workspace.Environment(), overlay: next, withOverlay: true,
+		environment: engine.described.workspace.Environment(), overlay: next, withOverlay: true, rootSyntaxOnly: true,
 	})
 	if proofError != nil {
 		return rewriteProof{failures: everyRename("the load of the rewrite failed: " + oneLine(proofError))}

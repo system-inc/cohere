@@ -364,11 +364,12 @@ func TestANamingRuleLearningFactsThroughItsRequirementsGetsOneRound(test *testin
 	}
 }
 
-// The rename's loads to plan over keep no dependency's syntax or type maps, which the plan never reads and which are
-// most of a load's memory: the first load to plan over (rename) and every platform's (platformLoad, which each
-// platform's proof loads through too). The host's proof (prove) keeps them, since the last round's proof is the load
-// the lint phase lints after the rename writes. Read from the rename's source, each function by the loads it asks of
-// loadPackages, the engine's one caller of package load's loads, and whether each asks for the roots' syntax alone.
+// The rename's loads keep no dependency's syntax or type maps, which neither the plan nor the proof reads and which
+// are most of a load's memory: the first load to plan over (rename), every platform's (platformLoad, which each
+// platform's proof loads through too) and the host's proof (prove). The load of the written tree (runRename) keeps
+// them, since the lint phase lints it and its rules learn facts from every dependency's syntax. Read from the rename's
+// source, each function by the loads it asks of loadPackages, the engine's one caller of package load's loads, and
+// whether each asks for the roots' syntax alone.
 func TestTheRenamesPlanLoadsKeepOnlyTheRootsSyntax(test *testing.T) {
 	test.Parallel()
 
@@ -408,9 +409,10 @@ func TestTheRenamesPlanLoadsKeepOnlyTheRootsSyntax(test *testing.T) {
 		})
 	}
 	want := map[string][]string{
+		"runRename":    {"whole"},
 		"rename":       {"roots only"},
 		"platformLoad": {"roots only"},
-		"prove":        {"whole"},
+		"prove":        {"roots only"},
 	}
 	if !maps.EqualFunc(loadsBy, want, slices.Equal) {
 		test.Fatalf("want the rename's loads %v, got %v", want, loadsBy)

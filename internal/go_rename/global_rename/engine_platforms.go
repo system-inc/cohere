@@ -15,8 +15,9 @@ import (
 // read it: every root package that type-checks there before the rewrite must after, and every identifier in it must
 // resolve to the same declaration under its expected name, as Compare requires of the host. A load that fails is a
 // PlatformLoad mismatch, so the rewrite is never taken as proven under a platform nothing was compared under. The
-// load before the rewrite is the plan's own, fingerprinted while the plan read it, so only the rewrite is loaded; a
-// platform the plan did not read is loaded before the rewrite too.
+// load before the rewrite is the plan's own, fingerprinted while the plan read it and kept as its difference from the
+// host's, so only the rewrite is loaded; a platform the plan did not read, or an expectation of a workspace other
+// than the plan's, which carries no difference (Expect), loads the platform before the rewrite too.
 func ProvePlatform(
 	loaded *workspace.Workspace,
 	expectation *Expectation,
@@ -28,11 +29,11 @@ func ProvePlatform(
 	if loadPlatform == nil {
 		loadPlatform = loaded.LoadPlatform
 	}
-	var stored *unrenamedFingerprint
-	if fingerprint, read := expectation.platformFingerprints[platform]; read {
-		stored = &fingerprint
+	var stored *platformDifference
+	if difference, read := expectation.platformDifferences[platform]; read {
+		stored = &difference
 	}
-	verification, proveError := provePlatform(loadPlatform, platform, overlay, expectation.newNameAt, stored)
+	verification, proveError := provePlatform(loadPlatform, platform, overlay, expectation, stored)
 	if proveError != nil {
 		return Verification{Mismatches: []Mismatch{{
 			Kind: MismatchKindPlatformLoad, Platform: platform.String(), Reason: proveError.Error(),

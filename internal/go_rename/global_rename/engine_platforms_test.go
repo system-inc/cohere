@@ -2,11 +2,14 @@ package global_rename
 
 import (
 	"errors"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"unsafe"
 
+	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
 
@@ -144,7 +147,7 @@ func TestAPlatformProofFromThePlansFingerprintReadsAsAFreshLoad(test *testing.T)
 	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
 	result, files := windowsPlan(test, loaded, "FormatURL", "FormatUrl", Options{})
 	expectation := Expect(loaded, result)
-	if _, stored := expectation.platformFingerprints[windows]; !stored {
+	if _, stored := expectation.platformDifferences[windows]; !stored {
 		test.Fatalf("the plan read windows and kept no fingerprint of it: %v", result.Platforms())
 	}
 	hostOnly := map[string][]byte{}
@@ -166,7 +169,7 @@ func TestAPlatformProofFromThePlansFingerprintReadsAsAFreshLoad(test *testing.T)
 		{"the rewrite without the windows file", hostOnly, true},
 	} {
 		stored := ProvePlatform(loaded, expectation, windows, overlay.files, Options{})
-		fresh, freshError := provePlatform(loaded.LoadPlatform, windows, overlay.files, expectation.newNameAt, nil)
+		fresh, freshError := provePlatform(loaded.LoadPlatform, windows, overlay.files, expectation, nil)
 		if freshError != nil {
 			test.Fatal(freshError)
 		}
@@ -180,9 +183,10 @@ func TestAPlatformProofFromThePlansFingerprintReadsAsAFreshLoad(test *testing.T)
 	}
 }
 
-// One stored fingerprint serves every proof of a round, each with its own renames, and none of them changes it: two
-// proofs of two plans' rewrites over one plan's fingerprint each read what a fresh load reads, and the fingerprint is
-// still the platform's own after both.
+// One stored difference serves every proof of a round, each with its own renames, and none of them changes it or the
+// host's expectation it reads: two proofs of two plans' rewrites over one plan's difference each read what a fresh
+// load reads, the difference is still the platform's own from the host's after both, and each host expectation is
+// what a fresh one is.
 func TestAPlatformProofLeavesTheStoredFingerprintAsItWas(test *testing.T) {
 	test.Parallel()
 	fixture := platformFixture(test, "package b\n\nfunc windowsOnly() string { return FormatURL() + Run() }\n")
@@ -190,7 +194,7 @@ func TestAPlatformProofLeavesTheStoredFingerprintAsItWas(test *testing.T) {
 	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
 	formatResult, formatFiles := windowsPlan(test, loaded, "FormatURL", "FormatUrl", Options{})
 	runResult, runFiles := windowsPlan(test, loaded, "Run", "RunAll", Options{})
-	stored, read := formatResult.platformFingerprints[windows]
+	stored, read := formatResult.platformDifferences[windows]
 	if !read {
 		test.Fatalf("the plan read windows and kept no fingerprint of it: %v", formatResult.Platforms())
 	}
@@ -202,9 +206,9 @@ func TestAPlatformProofLeavesTheStoredFingerprintAsItWas(test *testing.T) {
 		{"FormatURL", formatResult, formatFiles},
 		{"Run", runResult, runFiles},
 	} {
-		newNameAt := Expect(loaded, plan.result).newNameAt
-		fromStored, storedError := provePlatform(loaded.LoadPlatform, windows, plan.files, newNameAt, &stored)
-		fresh, freshError := provePlatform(loaded.LoadPlatform, windows, plan.files, newNameAt, nil)
+		expectation := Expect(loaded, plan.result)
+		fromStored, storedError := provePlatform(loaded.LoadPlatform, windows, plan.files, expectation, &stored)
+		fresh, freshError := provePlatform(loaded.LoadPlatform, windows, plan.files, expectation, nil)
 		if storedError != nil || freshError != nil {
 			test.Fatal(storedError, freshError)
 		}
@@ -212,12 +216,15 @@ func TestAPlatformProofLeavesTheStoredFingerprintAsItWas(test *testing.T) {
 			test.Errorf("renaming %s, the stored fingerprint's proof reads %+v, a fresh load's %+v", plan.name,
 				fromStored, fresh)
 		}
+		if !reflect.DeepEqual(expectation.Fingerprints, Expect(loaded, plan.result).Fingerprints) {
+			test.Errorf("renaming %s, the host's expectation changed under the proofs that read it", plan.name)
+		}
 	}
 	freshLoad, loadError := loaded.LoadPlatform(windows, nil)
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
-	if !reflect.DeepEqual(stored, fingerprintBefore(freshLoad.Clean)) {
+	if !reflect.DeepEqual(stored, differenceFrom(fingerprintBefore(loaded), fingerprintBefore(freshLoad.Clean))) {
 		test.Error("the stored fingerprint changed under the proofs it served")
 	}
 }
@@ -226,6 +233,9 @@ func TestAPlatformProofLeavesTheStoredFingerprintAsItWas(test *testing.T) {
 // platform the plan did not read is loaded before the rewrite too, as it always was.
 func TestAPlatformProofWithTheStoredFingerprintLoadsOnlyTheRewrite(test *testing.T) {
 	test.Parallel()
+	if checkDifference != nil {
+		test.Skip("a rename_differential build loads every stored proof's before side too, to check it")
+	}
 	fixture := platformFixture(test, "package b\n\nfunc windowsOnly() string { return FormatURL() }\n")
 	loaded := fixture.load(test)
 	var lock sync.Mutex
@@ -257,5 +267,156 @@ func TestAPlatformProofWithTheStoredFingerprintLoadsOnlyTheRewrite(test *testing
 	ProvePlatform(loaded, expectation, darwin, files, options)
 	if loads["darwin/amd64 before"] != 1 || loads["darwin/amd64 rewrite"] != 1 {
 		test.Errorf("a proof under a platform the plan did not read loaded %v, want its load before and after", loads)
+	}
+}
+
+// A file the host and a platform both build whose identifiers resolve otherwise there, here a call to a function each
+// declares in a file of its own, is kept whole in the platform's difference, never read as the host's, and the proof
+// from the difference still reads exactly what a fresh load's does; a file both read alike is only marked.
+func TestASharedFileThatResolvesOtherwiseUnderAPlatformIsKept(test *testing.T) {
+	test.Parallel()
+	fixture := newFixture(test, map[string]string{
+		"internal/a/a.go": "package a\n\nfunc ParseURL(text string) string { return text }\n",
+		"internal/b/b.go": "package b\n\nfunc FormatURL() string { return \"\" }\n\nfunc Run() string { " +
+			"return helper() + FormatURL() }\n",
+		"internal/b/c.go":              "package b\n\nfunc Format() string { return FormatURL() }\n",
+		"internal/b/helper_windows.go": "package b\n\nfunc helper() string { return FormatURL() }\n",
+		"internal/b/helper_other.go":   "//go:build !windows\n\npackage b\n\nfunc helper() string { return \"\" }\n",
+	})
+	loaded := fixture.load(test)
+	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
+	result, files := windowsPlan(test, loaded, "FormatURL", "FormatUrl", Options{})
+	expectation := Expect(loaded, result)
+	difference, stored := expectation.platformDifferences[windows]
+	if !stored {
+		test.Fatalf("the plan read windows and kept no difference of it: %v", result.Platforms())
+	}
+	// fileStates says, for each file of package b under windows, whether the difference keeps it or marks it.
+	fileStates := map[string]string{}
+	for id, byFile := range difference.fingerprints {
+		for filename := range byFile {
+			fileStates[filepath.Base(filename)] = "kept " + id
+		}
+	}
+	for id, sameAsHost := range difference.sameAsHost {
+		for filename := range sameAsHost {
+			fileStates[filepath.Base(filename)] = "marked " + id
+		}
+	}
+	want := map[string]string{
+		"a.go": "marked fixture/internal/a", "b.go": "kept fixture/internal/b", "c.go": "marked fixture/internal/b",
+		"helper_windows.go": "kept fixture/internal/b",
+	}
+	if !reflect.DeepEqual(fileStates, want) {
+		test.Errorf("windows' difference reads %v, want %v", fileStates, want)
+	}
+	hostOnly := map[string][]byte{}
+	for filename, contents := range files {
+		if !strings.HasSuffix(filename, "_windows.go") {
+			hostOnly[filename] = contents
+		}
+	}
+	for _, overlay := range []struct {
+		name       string
+		files      map[string][]byte
+		mismatches bool
+	}{
+		{"the rewrite", files, false},
+		{"no rewrite", nil, true},
+		{"the rewrite without the windows file", hostOnly, true},
+	} {
+		fromStored := ProvePlatform(loaded, expectation, windows, overlay.files, Options{})
+		fresh, freshError := provePlatform(loaded.LoadPlatform, windows, overlay.files, expectation, nil)
+		if freshError != nil {
+			test.Fatal(freshError)
+		}
+		if !reflect.DeepEqual(fromStored, fresh) {
+			test.Errorf("over %s, the stored difference's proof reads %+v, a fresh load's %+v", overlay.name,
+				fromStored, fresh)
+		}
+		if (len(fromStored.Mismatches) > 0) != overlay.mismatches || fromStored.Compared == 0 {
+			test.Errorf("over %s, %d compared and mismatches %v", overlay.name, fromStored.Compared,
+				fromStored.Mismatches)
+		}
+	}
+}
+
+// An expectation of a workspace other than the one the plan read, as a codemod that plans over one load and applies
+// over a reload makes, carries none of the plan's platform differences, which are differences from the plan's own
+// workspace, so its platform proof loads the platform before the rewrite and reads what a fresh load does.
+func TestAnExpectationOfAnotherWorkspaceCarriesNoPlatformDifference(test *testing.T) {
+	test.Parallel()
+	fixture := platformFixture(test, "package b\n\nfunc windowsOnly() string { return FormatURL() }\n")
+	loaded := fixture.load(test)
+	reloaded := fixture.load(test)
+	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
+	result, files := windowsPlan(test, loaded, "FormatURL", "FormatUrl", Options{})
+	expectation := Expect(reloaded, result)
+	if len(expectation.platformDifferences) != 0 {
+		test.Fatalf("an expectation of a reload carries the plan's differences for %d platforms",
+			len(expectation.platformDifferences))
+	}
+	var lock sync.Mutex
+	// loads counts each load by whether it read an overlay.
+	loads := map[string]int{}
+	loader := func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
+		lock.Lock()
+		if len(overlay) == 0 {
+			loads["before"]++
+		} else {
+			loads["rewrite"]++
+		}
+		lock.Unlock()
+		return reloaded.LoadPlatform(platform, overlay)
+	}
+	proven := ProvePlatform(reloaded, expectation, windows, files, Options{LoadPlatform: loader})
+	if want := map[string]int{"before": 1, "rewrite": 1}; !reflect.DeepEqual(loads, want) {
+		test.Errorf("the proof over a reload loaded %v, want %v", loads, want)
+	}
+	fresh, freshError := provePlatform(reloaded.LoadPlatform, windows, files, expectation, nil)
+	if freshError != nil {
+		test.Fatal(freshError)
+	}
+	if !reflect.DeepEqual(proven, fresh) || len(proven.Mismatches) != 0 || proven.Compared == 0 {
+		test.Errorf("the proof over a reload reads %+v, a fresh load's %+v", proven, fresh)
+	}
+}
+
+// Fingerprint keeps each key once: every record of one key holds the same string, as two uses of one declaration
+// show, and each key reads as it always did, a declaration's by its declaring identifier's ordinal in its file.
+func TestFingerprintSharesEachKey(test *testing.T) {
+	test.Parallel()
+	fixture := newFixture(test, map[string]string{
+		"internal/a/a.go": "package a\n\nfunc ParseURL(text string) string { return text }\n\n" +
+			"func One() string { return ParseURL(\"\") }\n\nfunc Two() string { return ParseURL(\"\") }\n",
+	})
+	fingerprints, _ := Fingerprint(fixture.load(test))
+	byFile := fingerprints["fixture/internal/a"]
+	if len(byFile) != 1 {
+		test.Fatalf("want one file of package a, got %v", fingerprints)
+	}
+	// storage is where a string's bytes are, so two equal strings read as one only when they share them.
+	storage := func(text string) *byte {
+		// Unsafe: the pointer is only compared, never read through or kept past the fingerprint it points into.
+		return unsafe.StringData(text)
+	}
+	held := map[string]*byte{}
+	var uses []rename.IdentifierRecord
+	for filename, records := range byFile {
+		if records[1] != (rename.IdentifierRecord{Name: "ParseURL", Key: "declared:" + filename + "#1|-"}) {
+			test.Errorf("ParseURL declares as %+v", records[1])
+		}
+		for _, record := range records {
+			if pointer, seen := held[record.Key]; seen && pointer != storage(record.Key) {
+				test.Errorf("two records of %q hold two strings", record.Key)
+			}
+			held[record.Key] = storage(record.Key)
+			if record.Name == "ParseURL" && record.Key == "-|declared:"+filename+"#1" {
+				uses = append(uses, record)
+			}
+		}
+	}
+	if len(uses) != 2 || storage(uses[0].Key) != storage(uses[1].Key) {
+		test.Errorf("want ParseURL's two uses to share one key, got %+v", uses)
 	}
 }

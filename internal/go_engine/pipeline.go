@@ -208,9 +208,10 @@ func (engine *pipeline) run() int {
 		loaded, loadError = engine.loadWorkspace(needsTypes)
 	}
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
-	// The rename reads the wrapped tree, and needs a sound load as the wrap does. When it writes, the load that proved
-	// what it wrote is the one the types and lint phases read in place of this one.
-	loaded, linted := engine.runRename(loaded, loadError)
+	// The rename reads the wrapped tree, and needs a sound load as the wrap does. When it writes, a load of what it
+	// wrote is the one the types and lint phases read in place of this one.
+	var linted *lintPass
+	loaded, linted, loadError = engine.runRename(loaded, loadError)
 	// The fix phase's records come before any of the types phase's, so the stream reads in phase order.
 	engine.writeFix()
 	if !needsTypes {
