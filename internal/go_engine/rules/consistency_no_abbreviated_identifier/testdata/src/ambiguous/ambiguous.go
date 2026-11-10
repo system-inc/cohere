@@ -51,6 +51,17 @@ func theme() int {
 	return len(themeVars) + len(themeVarName) + vars
 }
 
+// `pred` as a filter's predicate, where a block's predecessor, go/ir's sense, would be a confident wrong name.
+func keep(values []int, pred func(int) bool) []int { // want `Identifier "pred" should not be abbreviated\. Use "predecessor" or "predicate", whichever it means, or a more descriptive name\.`
+	var kept []int
+	for _, value := range values {
+		if pred(value) {
+			kept = append(kept, value)
+		}
+	}
+	return kept
+}
+
 // A word with one meaning, beside them: its rename runs, so a golden that kept every name above still compares.
 func label() string {
 	strValue := "label" // want `Identifier "strValue" should not be abbreviated\. Use "stringValue"\.`

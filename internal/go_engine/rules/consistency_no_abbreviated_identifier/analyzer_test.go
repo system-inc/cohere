@@ -65,8 +65,9 @@ func TestAnalyzer(test *testing.T) {
 
 // A word the vocabulary gives more than one meaning, or advice in place of one, is found and never renamed. An audit
 // of the fix's renames found single expansions that guessed: `res` became `response` where it meant a result or
-// MakeMap's reserve, `ch` and `dir` meant a rune and a ChanDir, and `Var` meant JavaScript's var keyword. So
-// ambiguous.go declares each in every sense the audit found, and its golden keeps every one of those names.
+// MakeMap's reserve, `ch` and `dir` meant a rune and a ChanDir, `Var` meant JavaScript's var keyword, and `pred`,
+// go/ir's predecessor, would have renamed a filter's predicate. So ambiguous.go declares each in every sense the
+// audit found, `pred` as a predicate, and its golden keeps every one of those names.
 //
 // analysistest compares a golden only for a file some fix edits, so a rule that offered no rename at all would pass
 // the golden by skipping it. The test reads the renames themselves instead: exactly one, `strValue`'s, the word with
