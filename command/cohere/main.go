@@ -1114,7 +1114,7 @@ func run() error {
 			backgroundContext, graph, fixFiles, fixRules,
 			formatPlan,
 			writeScope,
-			repositoryRoot,
+			repositoryRoot, fixWriteRoot(location.Root, mutate),
 			*maximumFixPasses,
 			mutate,
 			early,

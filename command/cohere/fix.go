@@ -26,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // slowFixNotice is how long one file may spend in the fix phase before the run names it. A healthy file takes
@@ -59,6 +60,7 @@ func applyProposedFixes(
 	formatPlan func() (edit.Transform, []string),
 	writable formatScope,
 	repositoryRoot string,
+	writeRoot write_root.WriteRoot,
 	maximumPasses int,
 	write bool,
 	early *earlyFormat,
@@ -248,7 +250,13 @@ func applyProposedFixes(
 		return summary, result, lineEndings, nil
 	}
 
-	process := edit.FixAndTransformFile
+	// A run that writes writes only inside writeRoot, the run's root with every link resolved: a file a
+	// link leads outside it is fixed and formatted in memory and never written, and comes back naming
+	// where it really is (#td3zta2). A run that writes nothing never asks.
+	process := func(fileName string, propose edit.Propose, transform edit.Transform, maximumPasses int) (
+		edit.FileResult, error) {
+		return edit.FixAndTransformFile(writeRoot, fileName, propose, transform, maximumPasses)
+	}
 	if !write {
 		process = edit.CheckFile
 	}
@@ -259,6 +267,7 @@ func applyProposedFixes(
 		fileNames = append(fileNames, fileName)
 	}
 	sort.Strings(fileNames)
+	fileNames = oneNamePerRealFile(fileNames, writeRoot)
 
 	// linted is every file the walk ran the rules over, in the form the candidates are keyed by.
 	linted := make(map[string]bool, len(projectFiles))
@@ -361,6 +370,8 @@ func applyProposedFixes(
 	showWarning()
 
 	summary := edit.Summarize(results)
+	reportNotWritten(accountOutput(streams.Errors), summary.NotWritten)
+	showWarning()
 	summary.Checked = !write
 	return summary, result, lineEndings, nil
 }
@@ -532,6 +543,67 @@ func reportWithheld(withheld map[string]struct{}, writable formatScope) {
 		"note: %d file%s outside %s had fixable findings and %s not rewritten, because only what was stated is written: %s%s\n",
 		len(names), plural(len(names)), stated, verb, strings.Join(listed, ", "), more)
 	showWarning()
+}
+
+// fixWriteRoot is where the fix phase may write: the project's root, every link resolved, so a file a link leads
+// outside it is checked and never written (#td3zta2). A root that cannot be resolved, which the run has already read,
+// leaves the zero WriteRoot, so every write is withheld and named rather than made blind, as the Go engine does, and a
+// run that writes says so first.
+func fixWriteRoot(root string, write bool) write_root.WriteRoot {
+	writeRoot, writeRootError := write_root.New(root)
+	if writeRootError != nil && write {
+		fmt.Fprintf(accountOutput(streams.Errors), "note: no file will be written: %s\n",
+			sentence.FromError(writeRootError))
+		showWarning()
+	}
+	return writeRoot
+}
+
+// oneNamePerRealFile keeps one name for each real file among fileNames, which are sorted, and keeps their order.
+//
+// A link inside the root is written through to its target (#td3zta2), so a file the program holds under two
+// names, its own and a link's, is one file on disk. Fixed once under each name, the second read the text the
+// first had written and applied proposals measured against the text before it: on a probe tree prefer-const's
+// `let` to `const` landed twice and the parse guard refused the file, and a fix whose stale offsets still parsed
+// would have been written. Both names hold the same text, so their proposals are the same, and one name's are
+// all the file needs. The name kept is one that is not itself a link where there is one, so the real file is
+// named, and otherwise the first in order. A name that cannot be resolved is kept as its own file, and the fix
+// phase reports it as it always has.
+func oneNamePerRealFile(fileNames []string, writeRoot write_root.WriteRoot) []string {
+	keptByRealPath := make(map[string]int, len(fileNames))
+	kept := make([]string, 0, len(fileNames))
+	for _, fileName := range fileNames {
+		realPath, _, resolveError := writeRoot.Inside(fileName)
+		if resolveError != nil {
+			kept = append(kept, fileName)
+			continue
+		}
+		index, seen := keptByRealPath[realPath]
+		if !seen {
+			keptByRealPath[realPath] = len(kept)
+			kept = append(kept, fileName)
+			continue
+		}
+		if isLink(kept[index]) && !isLink(fileName) {
+			kept[index] = fileName
+		}
+	}
+	return kept
+}
+
+// isLink is whether fileName is itself a symbolic link, as distinct from a file reached through a linked directory.
+func isLink(fileName string) bool {
+	information, statError := os.Lstat(fileName)
+	return statError == nil && information.Mode()&os.ModeSymlink != 0
+}
+
+// reportNotWritten names each file a run that writes left as it was because a link leads it outside the
+// run's root, with where it really is, as the Go engine names its own (#hwz114g, #td3zta2). Every one,
+// never a count alone: a gap nobody can find is half a gap.
+func reportNotWritten(out *bufio.Writer, notWritten []edit.NotWrittenFile) {
+	for _, file := range notWritten {
+		fmt.Fprintf(out, "  not written: %s → %s\n", file.FileName, file.RealPath)
+	}
 }
 
 // reportInNestedRepositories says, per repository, how many fixes a whole-tree run did not apply
