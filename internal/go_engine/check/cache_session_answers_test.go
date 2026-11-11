@@ -3,8 +3,10 @@ package check
 import (
 	"fmt"
 	"go/ast"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -127,5 +129,40 @@ func TestAReloadThatFailsIsANamedGap(test *testing.T) {
 		"the run loaded from source to answer it and still never learned, so it has no answer"
 	if len(result.Crashes) != 1 || !strings.Contains(result.Crashes[0].Error, named) {
 		test.Fatalf("want one crash naming bottom's failed reload, got %+v", result.Crashes)
+	}
+}
+
+// A pass whose question reached a restored package with no answer stored asks for it to be loaded again, and the round
+// that loads it is counted under missingAnswer, so an extra build's record shows a reload no decline of the host's
+// restore asked for.
+func TestAReloadRoundForAMissingAnswerIsCountedByItsReason(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	rules := []rule.Rule{houseRule(purityProbe)}
+	caching := testCaching(test, rules)
+	caching.AnswersInPart = map[string]bool{"example.com/answers/bottom": true}
+	runCached(test, answerModule(test, directory, "var Limit = 3\n\nvar _ = bottom.Double\n"), caching, rules)
+	caching.AnswersInPart = nil
+	session := NewCacheSession(caching, rules)
+	pass := func() *Result {
+		analyzed := answerModule(test, directory, "func Use() int {\n\treturn bottom.Double(2)\n}\n")
+		var reachable []*packages.Package
+		packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
+		session.Restore(load.LoaderSource, reachable, analyzed)
+		result, runError := Run(analyzed, rules, Options{Cache: session})
+		if runError != nil {
+			test.Fatalf("running the probe: %v", runError)
+		}
+		return result
+	}
+	first := pass()
+	if !slices.Equal(first.Reloads, []string{"example.com/answers/bottom"}) || !session.Reload(first.Reloads) {
+		test.Fatalf("want the first pass to ask for bottom to be loaded again, got %v", first.Reloads)
+	}
+	again := pass()
+	want := map[string]int{reloadForMissingAnswer: 1}
+	if len(again.Reloads) > 0 || again.Cache.ReloadRounds != 1 || !maps.Equal(again.Cache.ReloadRoundsBy, want) {
+		test.Fatalf("want one round, counted under %v, and nothing more to load, got %d rounds by %v, reloads %v",
+			want, again.Cache.ReloadRounds, again.Cache.ReloadRoundsBy, again.Reloads)
 	}
 }

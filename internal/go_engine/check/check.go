@@ -470,10 +470,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		)
 	})
 	if session != nil {
-		result.Reloads = session.reloadsOf(session.resolver)
+		missingAnswers := session.reloadsOf(session.resolver)
+		session.noteReloadReasons(missingAnswers, hostReloads)
 		// A package restored from the host's run whose facts or answers do not hold here has no syntax to analyze, so
 		// the build is loaded again with it checked from source, as a question's reload loads its package.
-		result.Reloads = slices.Compact(slices.Sorted(slices.Values(append(result.Reloads, hostReloads...))))
+		result.Reloads = slices.Compact(slices.Sorted(slices.Values(append(missingAnswers, hostReloads...))))
 	}
 	if len(result.Reloads) > 0 {
 		// The pipeline runs again over a load that checks the reloads from source and drops this result, but a caller

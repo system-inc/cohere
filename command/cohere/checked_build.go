@@ -8,7 +8,7 @@ import "fmt"
 // every package of the workspace in each; and the findings that stand which it kept and the host's did not, and those
 // it kept that the merge left out. Then what the build restored from the host's run rather than checked, each count
 // written only when not 0: the host's entries kept for the others, and another's packages restored, declined by its
-// load and by its check, the loads again those took, and every decline by why. A run of one build writes none, and
+// load and by its check, every decline by why, and the loads again it took, by why. A run of one build writes none, and
 // neither does a Swift run, so their output is as it was.
 type checkedBuild struct {
 	Target           string         `json:"target"`
@@ -21,8 +21,9 @@ type checkedBuild struct {
 	RestoredFromHost int            `json:"restoredFromHost,omitempty"`
 	DeclinedAtLoad   int            `json:"declinedAtLoad,omitempty"`
 	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
-	HostReloadRounds int            `json:"hostReloadRounds,omitempty"`
 	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
+	ReloadRounds     int            `json:"reloadRounds,omitempty"`
+	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
 	// FilesAlone, NotLinted and NotLintedReason are the files of ours only this build compiled and linted, and those it
 	// compiled that no rule ran on, with why (#ytnvt8k), each absent when there is nothing to count.
 	FilesAlone      int      `json:"filesAlone,omitempty"`

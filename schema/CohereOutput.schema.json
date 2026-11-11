@@ -603,14 +603,19 @@
                                 "type": "integer",
                                 "description": "The packages this build's check declined, since what they read of other packages' facts or answers did not hold here, which had the build loaded again. Absent when 0."
                             },
-                            "hostReloadRounds": {
-                                "type": "integer",
-                                "description": "How many times this build was loaded again for the packages its check declined: at most 2. Absent when 0."
-                            },
                             "declinedBy": {
                                 "type": "object",
                                 "additionalProperties": { "type": "integer" },
                                 "description": "Each decline, and each package never restored from the host's run, by why: inputs, noEntry, never, unknown, export, T, L, F, D or A. Absent when empty."
+                            },
+                            "reloadRounds": {
+                                "type": "integer",
+                                "description": "How many times this build was loaded again, for the packages its check declined or for a package a question reached restored with no answer of it kept. Absent when 0."
+                            },
+                            "reloadRoundsBy": {
+                                "type": "object",
+                                "additionalProperties": { "type": "integer" },
+                                "description": "Each time this build was loaded again, under every reason it had: hostDecline or missingAnswer. Absent when empty."
                             },
                             "filesAlone": {
                                 "type": "integer",

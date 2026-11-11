@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -61,6 +62,11 @@ func TestAnExtraBuildRestoresWhatReadsTheSameAndChecksTheRest(test *testing.T) {
 	if fromHost.DeclinedAtLoad != 1 || fromHost.DeclinedAtCheck != 2 || fromHost.ReloadRounds != 1 {
 		test.Errorf("windows declined %d at its load and %d at its check over %d reloads, want 1, 2 and 1",
 			fromHost.DeclinedAtLoad, fromHost.DeclinedAtCheck, fromHost.ReloadRounds)
+	}
+	if rounds := windows.result.Cache; rounds.ReloadRounds != 1 ||
+		!maps.Equal(rounds.ReloadRoundsBy, map[string]int{"hostDecline": 1}) {
+		test.Errorf("windows was loaded again %d times, by %v, want once, for its host declines",
+			rounds.ReloadRounds, rounds.ReloadRoundsBy)
 	}
 	for _, file := range []string{"logger.go", "opener.go"} {
 		if !foundIn(host, file) {

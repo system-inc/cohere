@@ -315,9 +315,16 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.RestoredFromHost = len(fromHost.Restored)
 			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
 			record.DeclinedAtCheck = fromHost.DeclinedAtCheck
-			record.HostReloadRounds = fromHost.ReloadRounds
 			if len(fromHost.DeclinedBy) > 0 {
 				record.DeclinedBy = fromHost.DeclinedBy
+			}
+			// Every round an extra build was loaded again is its record's, for a decline or a missing answer alike;
+			// the host's own rounds are its lint cache record's.
+			if index > 0 {
+				record.ReloadRounds = run.result.Cache.ReloadRounds
+				if len(run.result.Cache.ReloadRoundsBy) > 0 {
+					record.ReloadRoundsBy = run.result.Cache.ReloadRoundsBy
+				}
 			}
 		}
 		verdict.records = append(verdict.records, record)

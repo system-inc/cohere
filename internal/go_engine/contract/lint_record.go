@@ -76,14 +76,17 @@ type BuildRecord struct {
 	// findings cache did not hold them, their own inputs were the host's, and everything they read of other packages
 	// read the same in the build. DeclinedAtLoad counts the packages its load checked from source after all, since
 	// what they read of other packages' types did not hold, and DeclinedAtCheck those its check declined, since what
-	// they read of facts or answers did not hold, which had the build loaded again HostReloadRounds times. DeclinedBy
-	// counts each decline, and each package that was never a candidate, by why: inputs, noEntry, never, unknown,
-	// export, T, L, F, D or A. Each is written only when not 0.
+	// they read of facts or answers did not hold. DeclinedBy counts each decline, and each package that was never a
+	// candidate, by why: inputs, noEntry, never, unknown, export, T, L, F, D or A. ReloadRounds counts every time the
+	// build was loaded again, and ReloadRoundsBy each of those under every reason it had: hostDecline, for a package
+	// its check declined, or missingAnswer, for a package a question reached restored with no answer of it kept. Each
+	// is written only when not 0.
 	RestoredFromHost int            `json:"restoredFromHost,omitempty"`
 	DeclinedAtLoad   int            `json:"declinedAtLoad,omitempty"`
 	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
-	HostReloadRounds int            `json:"hostReloadRounds,omitempty"`
 	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
+	ReloadRounds     int            `json:"reloadRounds,omitempty"`
+	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
 
 	// FilesAlone, additive within contract 3 (#ytnvt8k), counts the files of ours in scope that this build alone
 	// compiles and a rule ran on: the coverage it buys. NotLinted are the files of ours in scope the host's build
