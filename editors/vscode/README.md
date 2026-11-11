@@ -11,10 +11,10 @@ reload and undo works as usual.
 ## What a save does
 
 The formatter is registered only for the file types cohere fixes or formats through stdin, listed in
-`cohere-save.json`: TypeScript, JavaScript, Adamic, JSON, Markdown, CSS, GraphQL, YAML and Go. A `.mts` or
-`.cts` file is fixed but not yet formatted, since no printer handles it. A Go file in a Go module or workspace is
-formatted by gofmt and has its long lines wrapped; a rename a naming rule asks for spans files, so a save leaves it
-for a run over the module. Any other file never reaches cohere, so its save does nothing and says nothing.
+`cohere-save.json`: TypeScript, `.mts` and `.cts` among it, JavaScript, Adamic, JSON, Markdown, CSS, GraphQL, YAML
+and Go. A Go file in a Go module or workspace is formatted by gofmt and has its long lines wrapped; a rename a
+naming rule asks for spans files, so a save leaves it for a run over the module. Any other file never reaches
+cohere, so its save does nothing and says nothing.
 
 - **Formats and fixes:** the buffer comes back fixed and formatted.
 - **Leaves alone, silently:** a file cohere declines comes back as typed. That covers a file outside

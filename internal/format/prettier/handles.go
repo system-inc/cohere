@@ -28,6 +28,8 @@ import (
 var parserForExtension = map[string]string{
 	".ts":      "typescript",
 	".tsx":     "typescript",
+	".mts":     "typescript",
+	".cts":     "typescript",
 	".js":      "babel",
 	".jsx":     "babel",
 	".mjs":     "babel",

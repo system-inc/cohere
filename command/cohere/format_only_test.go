@@ -127,6 +127,47 @@ func TestTheFormatOnlyGateExitsOnFormattingAlone(test *testing.T) {
 	}
 }
 
+// TestTheFormatWalkChecksModuleAndCommonJsTypeScript: the walk offers `.mts` and `.cts` to the printer, so the
+// gate names each when formatting would change it and a writing run leaves the fork's answer (#9v2x63d). They
+// were declined as types no printer handles, so the gate read them as formatted whatever they held.
+func TestTheFormatWalkChecksModuleAndCommonJsTypeScript(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	fixScopeProject(test, root, nil)
+	// The settings files are formatted first, so the gate below hears only the two under test.
+	if output, code := runCohere(test, binary, root, "--format-only"); code != 0 {
+		test.Fatalf("the writing format-only run exited %d:\n%s", code, output)
+	}
+	names := []string{"Module.mts", "Common.cts"}
+	for _, name := range names {
+		writeTree(test, root, map[string]string{name: moduleTypeScriptBuffer})
+	}
+
+	output, code := runCohere(test, binary, root, "--no-fix", "--format-only", "--format-all")
+	if code != 1 {
+		test.Fatalf("the gate exited %d over two unformatted files, want 1:\n%s", code, output)
+	}
+	for _, name := range names {
+		line := filepath.Join(root, name) + ":1:1 - --fix would rewrite this file: format [fix/would-change]"
+		if !strings.Contains(output, line) {
+			test.Errorf("the gate did not name %s:\n%s", name, output)
+		}
+	}
+
+	if output, code := runCohere(test, binary, root, "--format-only"); code != 0 {
+		test.Fatalf("the writing format-only run exited %d:\n%s", code, output)
+	}
+	for _, name := range names {
+		if got := readForTest(test, filepath.Join(root, name)); got != moduleTypeScriptFormatted {
+			test.Errorf("%s was written as\n%s\nand the fork prints\n%s", name, got, moduleTypeScriptFormatted)
+		}
+	}
+	if output, code := runCohere(test, binary, root, "--no-fix", "--format-only", "--format-all"); code != 0 {
+		test.Fatalf("the gate exited %d once both were formatted:\n%s", code, output)
+	}
+}
+
 // TestOnlyAFileTheFormatterCouldNotReadIsUnchecked: a skip that is about the file (it does not parse) or a
 // formatter that broke on it is a file nobody checked; a skip about the run (outside the named paths, a
 // type the formatter does not handle) is a file that was never the run's to check.
