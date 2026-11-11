@@ -41,6 +41,10 @@ func FilesHashed() int64 {
 	return filesHashed.Load()
 }
 
+// digestBufferSize is the bytes each of fileDigests' workers reads a file through, one buffer a worker for every file
+// it hashes, as large as the buffer io.Copy would make for each file.
+const digestBufferSize = 32 << 10
+
 // fileDigests is the digest of every file of the packages that are not keyed by path alone: known's when it holds
 // the file, else hashed, each once, across the cores, since reading and hashing the files is nearly all of Keys'
 // work, from held's bytes when held holds the file and from disk otherwise. A file that cannot be read is an error,
@@ -101,13 +105,9 @@ func fileDigests(
 	return byPath, nil
 }
 
-// digestBufferSize is the bytes each of fileDigests' workers reads a file through, one buffer a worker for every file it
-// hashes, as large as the buffer io.Copy would make for each file.
-const digestBufferSize = 32 << 10
-
 // digestOf is the sha256 of one file's bytes: held's when held holds them, and otherwise the disk's, streamed through
-// buffer rather than read whole. It reads into buffer itself rather than through io.Copy, which, since a file can
-// write itself out, makes a buffer of its own for every file however many it is given (#b2t9xmf).
+// buffer rather than read whole. It reads into buffer itself rather than through io.Copy, which, since a file can write
+// itself out, makes a buffer of its own for every file however many it is given (#b2t9xmf).
 func digestOf(file string, held func(file string) ([]byte, bool), buffer []byte) (fileDigest, error) {
 	if held != nil {
 		if contents, isHeld := held(file); isHeld {

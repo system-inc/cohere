@@ -191,9 +191,9 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 		reading = append(reading, candidate)
 		readingKept = append(readingKept, kept)
 	}
-	// The host's run encodes an entry the first time a build asks for it (lazyEntry), so the entries are read, and
-	// decoded, on every core at once, as readHits reads the store's, and made hits in reachable's order after. Their
-	// export data is written only when the load reads it, in the package's own turn.
+	// The entries are read, and decoded, on every core at once, as readHits reads the store's, and made hits in
+	// reachable's order after. Their export data is written only when the load reads it, in the package's own turn
+	// (lazyExportData).
 	read := make([]*restoredPackage, len(reading))
 	readErrors := make([]error, len(reading))
 	bounded.ForEach(len(reading), false, func(index int) {
@@ -206,9 +206,7 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 	for index, candidate := range reading {
 		kept, restored, readError := readingKept[index], read[index], readErrors[index]
 		if readError != nil {
-			if !errors.Is(readError, errorUnstorable) {
-				session.problem(fmt.Sprintf("restoring %s from the host: %v", candidate.ID, readError))
-			}
+			session.problem(fmt.Sprintf("restoring %s from the host: %v", candidate.ID, readError))
 			state.loadDeclines[declineKeys["noEntry"]]++
 			continue
 		}
@@ -528,21 +526,34 @@ func (session *CacheSession) keepForBuilds(
 			host.entries[keptPackage.ID] = kept
 		}
 	}
-	// Only what an entry reads of the resolver is taken here, since the resolver goes below; the entry itself is encoded
-	// the first time a build asks for it, and the export data that is most of its cost the first time a load reads it,
-	// each once however many ask at once, and never for a package no build asks about or restores (lazyEntry). Until
-	// the last build has decided, the host's actions and types live on for it.
+	// Each entry is encoded here, on every core, without its export data, which is most of its cost and is written
+	// only when a load first reads it (lazyExportData). What it is written from is the package's types alone, so the
+	// host's syntax, type maps, intermediate representation and actions all go once the keep returns, as they did
+	// when the keep wrote everything: holding them for a later write marked about 4 GB on every collection of adamic's
+	// builds. The types live until the last build has run (HostRun.Release).
 	knownFiles := session.allFiles()
-	demanded := make([]entryDemand, len(encoding))
+	encoded := make([]encodedEntry, len(encoding))
+	encodeErrors := make([]error, len(encoding))
 	bounded.ForEach(len(encoding), false, func(index int) {
-		demanded[index] = session.recordedDemandOf(encoding[index])
+		saved := encoding[index]
+		encoded[index], encodeErrors[index] = encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
+			withheld[saved], session.recordedDemandOf(saved), files[saved], knownFiles, false)
 	})
 	for index, saved := range encoding {
-		host.entries[saved.ID].contents = lazyEntry(func() (encodedEntry, error) {
-			return encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved], withheld[saved],
-				demanded[index], files[saved], knownFiles, false)
-		}, func() ([]byte, error) { return writeExportData(saved) })
+		if encodeErrors[index] != nil {
+			if !errors.Is(encodeErrors[index], errorUnstorable) {
+				session.problem(encodeErrors[index].Error())
+			}
+			delete(host.entries, saved.ID)
+			continue
+		}
+		entry := encoded[index].entry
+		readExportData := lazyExportData(saved)
+		host.entries[saved.ID].contents = func() ([]byte, func() ([]byte, error), error) {
+			return entry, readExportData, nil
+		}
 	}
+	host.kept = len(host.entries)
 	// What the analysis built to answer questions, every package's intermediate representation, syntax and type maps,
 	// is the session's to keep only for its next save; a run under `--no-cache` has none, and the extra builds that run
 	// next read only the entries, so it goes now rather than outlive the host's pass through every build (#b2t9xmf).
@@ -557,25 +568,14 @@ func (session *CacheSession) keepForBuilds(
 	return host
 }
 
-// lazyEntry is an entry's contents made the first time they are asked for and held from then on, so two builds asking
-// at once make them once: the entry by encode when a build asks for it, and the export data by writeExportData when
-// a load reads it, which a load does only for a package whose late decision held. An entry gob refuses is an error
-// wrapping errorUnstorable, which the build that asked counts as no entry, as the host's run counted it when it
-// encoded every entry itself; export data that cannot be written is the load's to decline, as export data that did
-// not read.
-func lazyEntry(
-	encode func() (encodedEntry, error),
-	writeExportData func() ([]byte, error),
-) func() ([]byte, func() ([]byte, error), error) {
-	encodeOnce := sync.OnceValues(encode)
-	readExportData := sync.OnceValues(writeExportData)
-	return func() ([]byte, func() ([]byte, error), error) {
-		encoded, encodeError := encodeOnce()
-		if encodeError != nil {
-			return nil, nil, encodeError
-		}
-		return encoded.entry, readExportData, nil
-	}
+// lazyExportData is the reader of kept's export data, written the first time a load reads it and held from then on,
+// so two loads reading at once write it once, and a package no load reads, because no build restores it, never has
+// it written. The reader holds only what writeExportData reads of kept, its identity, types and file set, never kept
+// itself, whose syntax and type maps would otherwise live as long as the reader. Export data that cannot be written
+// is the load's to decline, as export data that did not read.
+func lazyExportData(kept *packages.Package) func() ([]byte, error) {
+	slim := &packages.Package{ID: kept.ID, PkgPath: kept.PkgPath, Types: kept.Types, Fset: kept.Fset}
+	return sync.OnceValues(func() ([]byte, error) { return writeExportData(slim) })
 }
 
 // recordedDemandOf is what an entry kept for the extra builds holds of the fact kinds computed on demand: the answers

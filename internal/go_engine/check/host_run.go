@@ -21,21 +21,34 @@ type HostRun struct {
 
 	// keeping is the time the run spent keeping its packages for the extra builds over every load (Keeping).
 	keeping time.Duration
+
+	// kept is how many entries the run kept, which outlives Release (EntriesKept).
+	kept int
 }
 
-// EntriesKept counts the packages the host's run kept an entry of for the extra builds, each encoded only when a build
-// asks for it, so one gob turns out to refuse is still counted here and counted as no entry by the build that asked.
+// EntriesKept counts the packages the host's run kept an entry of for the extra builds.
 func (host *HostRun) EntriesKept() int {
 	if host == nil {
 		return 0
 	}
-	return len(host.entries)
+	return host.kept
+}
+
+// Release lets go of everything the host's run kept for the extra builds once the last of them has run, since no
+// build can ask for an entry, or a verdict render a host type, after that: the entries, with the host's types their
+// export data is written from, and the renderings, keyed by the host's objects (#b2t9xmf). What the record counts of
+// it stays.
+func (host *HostRun) Release() {
+	if host == nil {
+		return
+	}
+	host.entries = nil
+	host.renderings = nil
 }
 
 // Keeping is the time the host's run spent keeping its packages for the extra builds, over every load: the keys a run
-// without a store computes only to keep them, and what each entry holds of the run's answers; the entries themselves
-// are encoded when a build first asks for them (lazyEntry), within that build's load. A run that kept nothing spent
-// none.
+// without a store computes only to keep them, and the entries, encoded without their export data, which is written when
+// a load first reads it (lazyExportData), within that build's load. A run that kept nothing spent none.
 func (host *HostRun) Keeping() time.Duration {
 	if host == nil {
 		return 0
@@ -44,11 +57,11 @@ func (host *HostRun) Keeping() time.Duration {
 }
 
 // hostEntry is one package the host's run kept: what a verdict judges it by, its portable digest, and its entry and
-// export data, read from the store when the run wrote them there, or, under `--no-cache`, which never stores them, made
-// from the host's analysis the first time a build asks for them and held in memory from then on (lazyEntry): the
-// entry when a build first decides which packages to restore, and the export data, most of the cost, only when a
-// load reads it, after the package's late decision held, so a package no build restores never has it written
-// (#b2t9xmf). contents and the reader it returns may be called from several goroutines at once.
+// export data, read from the store when the run wrote them there, or, under `--no-cache`, which never stores them, held
+// in memory: the entry encoded at the host's tail, and the export data, most of the cost, written from the package's
+// types only when a load first reads it, after the package's late decision held, so a package no build restores never
+// has it written (lazyExportData, #b2t9xmf). contents and the reader it returns may be called from several goroutines
+// at once.
 type hostEntry struct {
 	restoring Restoring
 	portable  cache.Key

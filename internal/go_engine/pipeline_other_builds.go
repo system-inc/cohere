@@ -33,6 +33,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	if len(extras) == 0 {
 		return nil
 	}
+	// Once the last build has run, or one has failed, no build is left to ask for what the host kept for them, so it
+	// goes before the builds are merged.
+	defer pass.result.Host.Release()
 	// Before any build decides anything, the host's reads are whole.
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
@@ -196,7 +199,8 @@ func (engine *pipeline) extraBuildRun(
 			caching.Listings = session
 		}
 	}
-	var loading, linting time.Duration
+	var loading time.Duration
+	var linting time.Duration
 	started := time.Now()
 	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 	loading += time.Since(started)
@@ -349,9 +353,10 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 	return verdict
 }
 
-// recordTimes writes into record where run's time went: its load and its lint, every reload's included, the host's
-// wait for its walks before the extra builds could start, and of its result, an extra build's deciding which packages restore from the host's run and the host's keeping its packages for
-// the others, each in wall milliseconds, as the record writes them.
+// recordTimes writes into record where run's time went: its load and its lint, every reload's included, the host's wait
+// for its walks before the extra builds could start, and of its result, an extra build's deciding which packages
+// restore from the host's run and the host's keeping its packages for the others, each in wall milliseconds, as the
+// record writes them.
 //
 // Mutates: record gains run's times
 func recordTimes(record *contract.BuildRecord, run buildRun) {

@@ -70,8 +70,8 @@ type pipeline struct {
 	keepsHostRestoreOff bool
 
 	// hostLoading and hostLinting are the host's build's wall time loading the workspace and running the rules over it,
-	// in nanoseconds, over every load and pass, its build record's (buildRun). A load or a pass beside another runs on a
-	// goroutine of its own, so each is added when it ends.
+	// in nanoseconds, over every load and pass, its build record's (buildRun). A load or a pass beside another runs on
+	// a goroutine of its own, so each is added when it ends.
 	hostLoading atomic.Int64
 	hostLinting atomic.Int64
 

@@ -1,67 +1,92 @@
 package check
 
 import (
-	"errors"
-	"fmt"
+	"bytes"
+	"go/ast"
+	"go/importer"
+	"go/parser"
+	"go/token"
+	"go/types"
+	"runtime"
 	"sync"
-	"sync/atomic"
 	"testing"
+	"weak"
+
+	"golang.org/x/tools/go/gcexportdata"
+	"golang.org/x/tools/go/packages"
 )
 
-// A kept entry is encoded the first time a build asks for it and never before, once however many ask at the same
-// moment, and its export data is written only when a load reads it, once however many read at once; every ask gets the
-// same bytes. An entry gob refuses is the same error at every ask, wrapping errorUnstorable, so the build that asked
-// counts it as no entry.
-func TestAKeptEntryIsEncodedOnceWhenABuildFirstAsksForIt(test *testing.T) {
-	test.Parallel()
+// A kept package's export data reader holds the package's types and nothing else of the host's analysis: its syntax
+// and type maps are collected while the reader lives, and the reader still writes the types, once however many loads
+// read at the same moment, as export data that imports back to the same package.
+//
+// Not parallel: whether the type maps were collected is read after runtime.GC, which another test's allocations could
+// keep from finishing what this one asks.
+func TestKeptExportDataHoldsOnlyThePackagesTypes(test *testing.T) {
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "kept.go", "package kept\n\ntype Counter struct{ count int }\n\n"+
+		"func (counter *Counter) Add() { counter.count++ }\n", parser.ParseComments)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	information := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{}}
+	checked, checkError := (&types.Config{Importer: importer.Default()}).Check("example.com/kept", fileSet,
+		[]*ast.File{file}, information)
+	if checkError != nil {
+		test.Fatal(checkError)
+	}
+	kept := &packages.Package{ID: "example.com/kept", PkgPath: "example.com/kept", Types: checked, Fset: fileSet,
+		Syntax: []*ast.File{file}, TypesInfo: information}
+	typeMaps := weak.Make(information)
 
-	var encodings, exportWrites atomic.Int64
-	contents := lazyEntry(func() (encodedEntry, error) {
-		encodings.Add(1)
-		return encodedEntry{entry: []byte("entry")}, nil
-	}, func() ([]byte, error) {
-		exportWrites.Add(1)
-		return []byte("export data"), nil
-	})
-	if encodings.Load() != 0 || exportWrites.Load() != 0 {
-		test.Fatalf("before any build asked, the entry was encoded %d times and its export data written %d, want 0",
-			encodings.Load(), exportWrites.Load())
+	readExportData := lazyExportData(kept)
+	kept, information, file = nil, nil, nil
+	runtime.GC()
+	if typeMaps.Value() != nil {
+		test.Error("the export data reader kept the package's type maps alive, want only its types held")
 	}
-	readers := make([]func() ([]byte, error), 16)
-	var asking sync.WaitGroup
-	for index := range readers {
-		asking.Go(func() {
-			entry, readExportData, readError := contents()
-			if readError != nil || string(entry) != "entry" {
-				test.Errorf("an ask read %q with %v, want the entry", entry, readError)
-			}
-			readers[index] = readExportData
-		})
-	}
-	asking.Wait()
-	if encodings.Load() != 1 || exportWrites.Load() != 0 {
-		test.Errorf("16 asks encoded the entry %d times and wrote its export data %d, want once and never",
-			encodings.Load(), exportWrites.Load())
-	}
+
+	written := map[string]bool{}
+	var lock sync.Mutex
 	var reading sync.WaitGroup
-	for _, readExportData := range readers {
+	for range 16 {
 		reading.Go(func() {
-			if exportData, readError := readExportData(); readError != nil || string(exportData) != "export data" {
-				test.Errorf("a load read %q with %v, want the export data", exportData, readError)
+			exportData, readError := readExportData()
+			lock.Lock()
+			defer lock.Unlock()
+			written[string(exportData)] = true
+			if readError != nil {
+				test.Errorf("a load read the export data with %v, want none", readError)
 			}
 		})
 	}
 	reading.Wait()
-	if exportWrites.Load() != 1 {
-		test.Errorf("16 loads reading wrote the export data %d times, want once", exportWrites.Load())
+	if len(written) != 1 {
+		test.Fatalf("16 loads read %d different export data, want one write they all read", len(written))
 	}
-
-	refused := lazyEntry(func() (encodedEntry, error) {
-		return encodedEntry{}, fmt.Errorf("encoding the entry: %w", errorUnstorable)
-	}, func() ([]byte, error) { return nil, nil })
-	for range 2 {
-		if _, _, readError := refused(); !errors.Is(readError, errorUnstorable) {
-			test.Errorf("an entry gob refuses read %v, want an error wrapping errorUnstorable", readError)
+	for exportData := range written {
+		imported, importError := gcexportdata.Read(bytes.NewReader([]byte(exportData)), token.NewFileSet(),
+			map[string]*types.Package{}, "example.com/kept")
+		if importError != nil || imported.Scope().Lookup("Counter") == nil {
+			test.Errorf("the export data imported as %v with %v, want the package with Counter", imported, importError)
 		}
 	}
+}
+
+// Release lets go of every entry and rendering the host kept once no build is left to ask, and keeps the count the
+// record writes; a run that kept nothing releases nothing.
+func TestReleasingTheHostKeepsOnlyItsCounts(test *testing.T) {
+	test.Parallel()
+
+	host := &HostRun{entries: map[string]*hostEntry{"a": {}, "b": {}}, renderings: NewReadsBuild(), kept: 2}
+	host.Release()
+	if host.entries != nil || host.renderings != nil {
+		test.Errorf("after Release the host holds %d entries and renderings %v, want none", len(host.entries),
+			host.renderings)
+	}
+	if host.EntriesKept() != 2 {
+		test.Errorf("after Release the host counts %d entries kept, want 2", host.EntriesKept())
+	}
+	var none *HostRun
+	none.Release()
 }

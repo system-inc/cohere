@@ -28,7 +28,8 @@ func TestAFileIsHashedThroughItsWorkersBuffer(test *testing.T) {
 	}
 
 	const hashes = 20
-	var before, after runtime.MemStats
+	var before runtime.MemStats
+	var after runtime.MemStats
 	runtime.ReadMemStats(&before)
 	for range hashes {
 		if _, digestError := digestOf(file, nil, buffer); digestError != nil {
