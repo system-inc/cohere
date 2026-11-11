@@ -2,6 +2,7 @@ package check
 
 import (
 	"reflect"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
@@ -119,8 +120,10 @@ func (exported *buildFacts) factsHold(candidate *packages.Package, restoring Res
 		fact, found := facts.facts[factType][path]
 		return fact, found
 	}
+	started := time.Now()
 	holds, why := FactsHold(restoring, load.ClosureTypes(candidate), state.host.renderings, state.renderings, lookup,
 		ReadFactTypes(restoring))
+	state.deciding.Add(int64(time.Since(started)))
 	switch {
 	case unavailable != "":
 		return unavailable

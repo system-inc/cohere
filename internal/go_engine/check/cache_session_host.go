@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 
@@ -31,7 +33,9 @@ import (
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
 // facts or answers did not hold), how many times the build was loaded again for those, and every decline and every
 // package never a candidate by the first word of why: inputs, noEntry, never, unknown, export, T, L, F, D or A.
-// Declined is why each package was declined, by ID, the last load's and check's over every load.
+// Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
+// TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
+// wall time it ran within.
 type HostRestoreCounts struct {
 	Restored        []string
 	DeclinedAtLoad  int
@@ -39,6 +43,7 @@ type HostRestoreCounts struct {
 	ReloadRounds    int
 	DeclinedBy      map[string]int
 	Declined        map[string]string
+	Deciding        time.Duration
 }
 
 // hostRestore is one package an extra build restores from the host's run, and what deciding it has learned: the first
@@ -58,6 +63,9 @@ type hostState struct {
 
 	// lock guards the session's hits, trusted and restoring while the load declines packages from its goroutines.
 	lock sync.Mutex
+
+	// deciding is the time TypesHold and FactsHold took over every load, in nanoseconds, summed across goroutines.
+	deciding atomic.Int64
 
 	// restoring are this load's packages restored from the host's run, and renderings the verdicts' memo of this load's
 	// types.
@@ -209,8 +217,10 @@ func (session *CacheSession) typesHoldFunction(
 		// The load set the package's sizes, the build's, before deciding any package, so the first verdict tells
 		// the memo its build before it renders anything.
 		session.host.renderings.measureBy(candidate.TypesSizes)
+		started := time.Now()
 		holds, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
 			session.host.host.renderings, session.host.renderings)
+		session.host.deciding.Add(int64(time.Since(started)))
 		if !holds {
 			hosted.lock.Lock()
 			hosted.declined = why
@@ -401,6 +411,7 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 		ReloadRounds:    state.rounds,
 		DeclinedBy:      map[string]int{},
 		Declined:        map[string]string{},
+		Deciding:        time.Duration(state.deciding.Load()),
 	}
 	for candidate, hosted := range state.restoring {
 		hosted.lock.Lock()
@@ -437,6 +448,7 @@ func (session *CacheSession) keepForBuilds(
 	if session.known == nil || keyed == nil {
 		return nil
 	}
+	started := time.Now()
 	// The reads an entry holds name each owner by its ID and its key in this run (readsOf), so the session knows every
 	// package now, which a run beside the load knew only as each was restored; a run without a store keys here.
 	reachable := make([]*packages.Package, 0, len(keyed.Keys))
@@ -527,6 +539,8 @@ func (session *CacheSession) keepForBuilds(
 		session.answering.byTypes = nil
 		session.answering.lock.Unlock()
 	}
+	session.keeping += time.Since(started)
+	host.keeping = session.keeping
 	return host
 }
 

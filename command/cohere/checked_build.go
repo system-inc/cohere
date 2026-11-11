@@ -24,6 +24,13 @@ type checkedBuild struct {
 	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
 	ReloadRounds     int            `json:"reloadRounds,omitempty"`
 	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
+	// LoadMilliseconds, LintMilliseconds, DecideMilliseconds (summed across goroutines), KeepMilliseconds and
+	// WaitMilliseconds (the host's) are where the build's time went, each absent when 0.
+	LoadMilliseconds   int `json:"loadMilliseconds,omitempty"`
+	LintMilliseconds   int `json:"lintMilliseconds,omitempty"`
+	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
+	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
+	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
 	// FilesAlone, NotLinted and NotLintedReason are the files of ours only this build compiled and linted, and those it
 	// compiled that no rule ran on, with why (#ytnvt8k), each absent when there is nothing to count.
 	FilesAlone      int      `json:"filesAlone,omitempty"`

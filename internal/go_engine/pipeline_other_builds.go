@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 
@@ -33,7 +34,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		return nil
 	}
 	// Before any build decides anything, the host's reads are whole.
+	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
+	waited := time.Since(waitStarted)
 	ours := engine.oursSet()
 	analyzed := map[string]bool{}
 	for _, each := range loaded.Packages {
@@ -48,6 +51,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
 		reads:      hostReads,
+		loading:    time.Duration(engine.hostLoading.Load()),
+		linting:    time.Duration(engine.hostLinting.Load()),
+		waited:     waited,
 	}}
 	if engine.session != nil {
 		runs[0].files = engine.session.Files()
@@ -190,7 +196,10 @@ func (engine *pipeline) extraBuildRun(
 			caching.Listings = session
 		}
 	}
+	var loading, linting time.Duration
+	started := time.Now()
 	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
+	loading += time.Since(started)
 	if loadError != nil {
 		return buildRun{}, fmt.Errorf("loading the build %s: %w", extra, loadError)
 	}
@@ -202,6 +211,7 @@ func (engine *pipeline) extraBuildRun(
 		result:     &check.Result{FindingsByRule: map[string]int{}},
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
+		loading:    loading,
 	}
 	if session != nil {
 		run.files = session.Files()
@@ -215,6 +225,8 @@ func (engine *pipeline) extraBuildRun(
 	run.said = compiledFiles(loaded.Packages, ours)
 	enabled, _ := engine.enabledRules()
 	runRules := func(over *load.Loaded) (*check.Result, error) {
+		started := time.Now()
+		defer func() { linting += time.Since(started) }()
 		return check.Run(over.Packages, enabled, check.Options{
 			SingleThreaded: engine.request.switches["single-threaded"],
 			Cache:          session,
@@ -231,7 +243,9 @@ func (engine *pipeline) extraBuildRun(
 	// restored from the host's run whose facts or answers do not hold here (check.Result.Reloads).
 	for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
 		reloads := strings.Join(result.Reloads, ", ")
+		started := time.Now()
 		loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
+		loading += time.Since(started)
 		if loadError != nil {
 			return buildRun{}, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
 				loadError)
@@ -249,6 +263,7 @@ func (engine *pipeline) extraBuildRun(
 		engine.note("the findings cache of the build %s: %s", extra, problem)
 	}
 	run.result = result
+	run.loading, run.linting = loading, linting
 	return run, nil
 }
 
@@ -309,6 +324,7 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			FindingsAdded:    verdict.merged.added[index],
 			FindingsDropped:  verdict.merged.dropped[index],
 		}
+		recordTimes(&record, run)
 		if run.result != nil {
 			record.EntriesKept = run.result.Host.EntriesKept()
 			fromHost := run.result.FromHost
@@ -331,6 +347,21 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 	}
 	engine.recordBuildCoverage(runs, verdict.records)
 	return verdict
+}
+
+// recordTimes writes into record where run's time went: its load and its lint, every reload's included, the host's
+// wait for its walks before the extra builds could start, and of its result, an extra build's deciding which packages restore from the host's run and the host's keeping its packages for
+// the others, each in wall milliseconds, as the record writes them.
+//
+// Mutates: record gains run's times
+func recordTimes(record *contract.BuildRecord, run buildRun) {
+	record.LoadMilliseconds = int(run.loading.Milliseconds())
+	record.LintMilliseconds = int(run.linting.Milliseconds())
+	record.WaitMilliseconds = int(run.waited.Milliseconds())
+	if run.result != nil {
+		record.DecideMilliseconds = int(run.result.FromHost.Deciding.Milliseconds())
+		record.KeepMilliseconds = int(run.result.Host.Keeping().Milliseconds())
+	}
 }
 
 // recordBuildCoverage counts, into each build's record, what it alone covered and what it compiled that no rule ran

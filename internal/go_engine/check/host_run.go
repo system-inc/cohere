@@ -3,6 +3,7 @@ package check
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 
@@ -17,6 +18,9 @@ type HostRun struct {
 	entries    map[string]*hostEntry
 	renderings *ReadsBuild
 	files      cache.FileDigests
+
+	// keeping is the time the run spent keeping its packages for the extra builds over every load (Keeping).
+	keeping time.Duration
 }
 
 // EntriesKept counts the packages the host's run kept an entry of for the extra builds.
@@ -25,6 +29,15 @@ func (host *HostRun) EntriesKept() int {
 		return 0
 	}
 	return len(host.entries)
+}
+
+// Keeping is the time the host's run spent keeping its packages for the extra builds, over every load: the keys a run
+// without a store computes only to keep them, and the entries kept. A run that kept nothing spent none.
+func (host *HostRun) Keeping() time.Duration {
+	if host == nil {
+		return 0
+	}
+	return host.keeping
 }
 
 // hostEntry is one package the host's run kept: what a verdict judges it by, its portable digest, and its entry and

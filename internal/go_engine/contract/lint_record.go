@@ -89,6 +89,19 @@ type BuildRecord struct {
 	ReloadRounds     int            `json:"reloadRounds,omitempty"`
 	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
 
+	// LoadMilliseconds is the build's wall time loading the workspace and LintMilliseconds running the rules over it,
+	// every reload's included, so a run can be read build by build. DecideMilliseconds is the time an extra build spent
+	// deciding which packages restore from the host's run, summed across the goroutines that decided, so it can exceed
+	// the load and lint it ran within, and KeepMilliseconds the time the host's build spent keeping its packages for
+	// the others, within its lint: their keys, which a run without a store computes only for this, and their entries.
+	// WaitMilliseconds is the host's too: how long the extra builds waited after its lint for its walks of what each
+	// package read of others to end, before any could start. Each is written only when not 0.
+	LoadMilliseconds   int `json:"loadMilliseconds,omitempty"`
+	LintMilliseconds   int `json:"lintMilliseconds,omitempty"`
+	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
+	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
+	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
+
 	// FilesAlone, additive within contract 3 (#ytnvt8k), counts the files of ours in scope that this build alone
 	// compiles and a rule ran on: the coverage it buys. NotLinted are the files of ours in scope the host's build
 	// leaves out that no build analyzed, absolute and sorted, each under the first build that compiles it, and

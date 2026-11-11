@@ -1,6 +1,8 @@
 package go_engine
 
 import (
+	"time"
+
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
@@ -38,4 +40,11 @@ type buildRun struct {
 	// reads are the host's reads of other packages, whole (wholeReads), on the host's run alone, which an extra build
 	// restores a package by (#b2t9xmf).
 	reads map[*packages.Package]*build_reads.Reads
+	// loading and linting are the build's wall time loading the workspace and running the rules over it, over every
+	// load and pass, its reloads' included.
+	loading time.Duration
+	linting time.Duration
+	// waited is the host's alone: how long the extra builds waited, after its lint, for its walks of what each package
+	// read of others to end (wholeReads), before any could start.
+	waited time.Duration
 }

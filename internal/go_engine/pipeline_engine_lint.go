@@ -235,6 +235,7 @@ func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check
 		options.Report = canonical_function_hash.Analyzer
 	}
 	result, checkError := check.Run(analyzed, enabled, options)
+	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}
 	}

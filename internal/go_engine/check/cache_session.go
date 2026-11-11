@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
@@ -206,6 +207,10 @@ type CacheSession struct {
 	written        map[*packages.Package]bool
 	buildKeys      map[*packages.Package]cache.Key
 
+	// keeping is the time the host's run spent keeping its packages for the extra builds over every load: the keys a
+	// run without a store computes only to keep them, and keepForBuilds.
+	keeping time.Duration
+
 	// host is the restore from the host's run of an extra build's session, nil for any other (see RestoreFromHost).
 	host *hostState
 }
@@ -290,11 +295,16 @@ func (session *CacheSession) Restore(
 	// The host's run keys its load here even without a store, as an extra build's restore keys its own (see
 	// restoreFromHost): only before any package has its syntax do the extra inputs read what both builds read alike.
 	if session.caching.Store != nil || session.keepsForBuilds {
+		keysStarted := time.Now()
 		keyContext := session.caching.Context
 		keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+loader)
 		var keysError error
 		keyed, keysError = cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files,
 			session.caching.Held)
+		// Keys a run with a store computes anyway; without one, they are the keep's alone.
+		if session.caching.Store == nil {
+			session.keeping += time.Since(keysStarted)
+		}
 		if keysError != nil {
 			session.problem(fmt.Sprintf("computing the keys: %v", keysError))
 			return nil

@@ -617,6 +617,26 @@
                                 "additionalProperties": { "type": "integer" },
                                 "description": "Each time this build was loaded again, under every reason it had: hostDecline or missingAnswer. Absent when empty."
                             },
+                            "loadMilliseconds": {
+                                "type": "integer",
+                                "description": "This build's wall time loading the workspace, every reload included. Absent when 0."
+                            },
+                            "lintMilliseconds": {
+                                "type": "integer",
+                                "description": "This build's wall time running the rules, every reload included. Absent when 0."
+                            },
+                            "decideMilliseconds": {
+                                "type": "integer",
+                                "description": "An extra build's time deciding which packages restore from the host's run, summed across the goroutines that decided, so it can exceed the load and lint it ran within. Absent when 0."
+                            },
+                            "keepMilliseconds": {
+                                "type": "integer",
+                                "description": "The host's alone: its time keeping its packages for the other builds, within its lint: their keys, which a run without a store computes only for this, and their entries. Absent when 0."
+                            },
+                            "waitMilliseconds": {
+                                "type": "integer",
+                                "description": "The host's alone: how long the other builds waited after its lint for its walks of what each package read of others to end, before any could start. Absent when 0."
+                            },
                             "filesAlone": {
                                 "type": "integer",
                                 "description": "Files of ours in scope that only this build compiles and that a rule ran on: the coverage it buys. Absent when 0."

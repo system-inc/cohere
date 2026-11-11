@@ -1,13 +1,16 @@
 package go_engine
 
 import (
+	"encoding/json"
 	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 )
 
 // The restore-from-host fixture's packages: platform, whose files differ by build as os's do, and four packages
@@ -99,5 +102,68 @@ func TestTheMergeIsTheSameWhetherTheBuildsRestoreFromTheHostOrNot(test *testing.
 	if withoutCache(cached) != withoutCache(off) {
 		test.Errorf("restoring from the host with the findings cache on changed the stream:\ncached\n%s\nchecking "+
 			"every package\n%s", cached, off)
+	}
+}
+
+// Each build says where its time went: over the restore fixture, the host's load, lint and keeping its packages for
+// the others, and windows' load, lint and deciding which packages restore, each measured, and each written into the
+// build's record as its milliseconds.
+func TestEachBuildsRecordSaysWhereItsTimeWent(test *testing.T) {
+	test.Parallel()
+
+	engine, stream := runOverRaw(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")),
+		exitFindings, "--no-cache", "--other-builds")
+	host, windows := engine.buildRuns[0], windowsRun(test, engine)
+	for name, measured := range map[string]time.Duration{
+		"the host's load":    host.loading,
+		"the host's lint":    host.linting,
+		"the host's keeping": host.result.Host.Keeping(),
+		"windows' load":      windows.loading,
+		"windows' lint":      windows.linting,
+		"windows' deciding":  windows.result.FromHost.Deciding,
+	} {
+		if measured <= 0 {
+			test.Errorf("%s took %s, want it measured", name, measured)
+		}
+	}
+	var builds []contract.BuildRecord
+	for line := range strings.SplitSeq(stream, "\n") {
+		var record contract.LintRecord
+		if !strings.HasPrefix(line, `{"kind":"lint"`) || json.Unmarshal([]byte(line), &record) != nil {
+			continue
+		}
+		builds = record.Builds
+	}
+	if len(builds) != len(engine.buildRuns) {
+		test.Fatalf("the lint record holds %d builds, want %d", len(builds), len(engine.buildRuns))
+	}
+	for index, run := range engine.buildRuns {
+		var want contract.BuildRecord
+		recordTimes(&want, run)
+		got := builds[index]
+		if got.LoadMilliseconds != want.LoadMilliseconds || got.LintMilliseconds != want.LintMilliseconds ||
+			got.DecideMilliseconds != want.DecideMilliseconds || got.KeepMilliseconds != want.KeepMilliseconds ||
+			got.WaitMilliseconds != want.WaitMilliseconds {
+			test.Errorf("build %d's record says %+v, want the times %+v", index, got, want)
+		}
+		if got.LoadMilliseconds == 0 || got.LintMilliseconds == 0 {
+			test.Errorf("build %d's record says it loaded in %d ms and linted in %d ms, want both written", index,
+				got.LoadMilliseconds, got.LintMilliseconds)
+		}
+	}
+}
+
+// recordTimes writes each of a build's times into its record, the result's deciding and keeping included, so a time
+// measured is never left out of the record.
+func TestEveryTimeOfABuildIsRecorded(test *testing.T) {
+	test.Parallel()
+
+	var record contract.BuildRecord
+	recordTimes(&record, buildRun{loading: 4 * time.Millisecond, linting: 5 * time.Millisecond,
+		waited: 7 * time.Millisecond,
+		result: &check.Result{FromHost: check.HostRestoreCounts{Deciding: 6 * time.Millisecond}}})
+	if record.LoadMilliseconds != 4 || record.LintMilliseconds != 5 || record.DecideMilliseconds != 6 ||
+		record.WaitMilliseconds != 7 {
+		test.Errorf("want 4, 5, 6 and 7 ms recorded, got %+v", record)
 	}
 }

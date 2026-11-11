@@ -991,6 +991,14 @@ reason it had: `hostDecline` (a package its check declined, at most 2 such round
 reached a restored package with no answer of it kept). Under `--timing` nothing is restored from the host, so every
 figure is of work that ran.
 
+Each build's record also says where its time went, each figure in wall milliseconds and written only when it is not
+0: `"loadMilliseconds":1200` loading the workspace and `"lintMilliseconds":2400` running the rules, every reload
+included, an extra build's `"decideMilliseconds":310` deciding which packages restore from the host's run, summed
+across the goroutines that decided, so it can exceed the load and lint it ran within, and the host's
+`"keepMilliseconds":180` keeping its packages for the other builds, within its lint: their keys, which a run without
+a store computes only for this, and their entries, and the host's `"waitMilliseconds":40`, how long the other builds
+waited after its lint for its walks of what each package read of others to end, before any could start.
+
 ### `phase`
 
 ```json
