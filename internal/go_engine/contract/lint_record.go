@@ -67,6 +67,42 @@ type BuildRecord struct {
 	// on the file reports.
 	FindingsAdded   int `json:"findingsAdded"`
 	FindingsDropped int `json:"findingsDropped"`
+
+	// EntriesKept counts the packages the host's build kept an entry of for the extra builds to restore from
+	// (#b2t9xmf), the host's alone, and written only when not 0.
+	EntriesKept int `json:"entriesKept,omitempty"`
+
+	// RestoredFromHost counts the packages an extra build restored from the host's run rather than check: its own
+	// findings cache did not hold them, their own inputs were the host's, and everything they read of other packages
+	// read the same in the build. DeclinedAtLoad counts the packages its load checked from source after all, since
+	// what they read of other packages' types did not hold, and DeclinedAtCheck those its check declined, since what
+	// they read of facts or answers did not hold. DeclinedBy counts each decline, and each package that was never a
+	// candidate, by why: ownInputs, noHostEntry, neverRestorable, readsUnknown, exportData, typeReads, lookups,
+	// factReads, deprecations or answers. ReloadRounds counts every time the build was loaded again, and
+	// ReloadRoundsBy each of those under every reason it had: hostDecline, for a package its check declined, or
+	// missingAnswer, for a package a question reached restored with no answer of it kept. Each is written only when
+	// not 0.
+	RestoredFromHost int            `json:"restoredFromHost,omitempty"`
+	DeclinedAtLoad   int            `json:"declinedAtLoad,omitempty"`
+	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
+	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
+	ReloadRounds     int            `json:"reloadRounds,omitempty"`
+	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
+
+	// LoadMilliseconds is the build's wall time loading the workspace and LintMilliseconds running the rules over it,
+	// every reload's included, so a run can be read build by build. DecideMilliseconds is the time an extra build spent
+	// deciding which packages restore from the host's run, summed across the goroutines that decided, so it can exceed
+	// the load and lint it ran within, and KeepMilliseconds the time the host's build spent keeping its packages for
+	// the others, within its lint: their keys, which a run without a store computes only for this, and what each entry
+	// holds of the run's answers, since the entries themselves are encoded when a build first asks for them.
+	// WaitMilliseconds is the host's too: how long the extra builds waited after its lint for its walks of what each
+	// package read of others to end, before any could start. Each is written only when not 0.
+	LoadMilliseconds   int `json:"loadMilliseconds,omitempty"`
+	LintMilliseconds   int `json:"lintMilliseconds,omitempty"`
+	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
+	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
+	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
+
 	// FilesAlone, additive within contract 3 (#ytnvt8k), counts the files of ours in scope that this build alone
 	// compiles and a rule ran on: the coverage it buys. NotLinted are the files of ours in scope the host's build
 	// leaves out that no build analyzed, absolute and sorted, each under the first build that compiles it, and

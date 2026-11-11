@@ -9,6 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -48,6 +49,19 @@ func runOverWith(test *testing.T, root string, wantExit int, extra ...string) (*
 // the inputs outside the root.
 func runOverRaw(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
 	test.Helper()
+	return runOverConfigured(test, root, wantExit, nil, extra...)
+}
+
+// runOverConfigured is runOverRaw with configure, when not nil, given the pipeline before it runs, as a test sets what
+// no switch sets.
+func runOverConfigured(
+	test *testing.T,
+	root string,
+	wantExit int,
+	configure func(*pipeline),
+	extra ...string,
+) (*pipeline, string) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
@@ -67,6 +81,9 @@ func runOverRaw(test *testing.T, root string, wantExit int, extra ...string) (*p
 	}
 	var standardOutput bytes.Buffer
 	engine := newPipeline(request, described, ruleSettings, registered, &standardOutput, io.Discard, nil)
+	if configure != nil {
+		configure(engine)
+	}
 	if exitCode := engine.run(); exitCode != wantExit {
 		test.Fatalf("the run exited %d, want %d:\n%s", exitCode, wantExit, standardOutput.String())
 	}
@@ -241,12 +258,16 @@ func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 // With the findings cache on, each extra build keeps its own entries, keyed on its own target, cgo and flags: a first
 // run over the fixture hits nothing another build wrote and writes an entry for every package of every build, and a
 // second over the same tree restores every package of every build from them, writing nothing, as the host's build
-// does. Its verdict is the first run's.
+// does. Its verdict is the first run's. The extra builds restore nothing from the host's run here: a package a build
+// restores from it gets no entry in the build's own store, which restoring a warm build from is the next unit's
+// (#b2t9xmf).
 func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	cold, coldStream := runOverWith(test, root, exitFindings, "--other-builds")
-	warm, warmStream := runOverWith(test, root, exitFindings, "--other-builds")
+	restoringNothing := func(engine *pipeline) { engine.keepsHostRestoreOff = true }
+	cold, coldRaw := runOverConfigured(test, root, exitFindings, restoringNothing, "--other-builds")
+	warm, warmRaw := runOverConfigured(test, root, exitFindings, restoringNothing, "--other-builds")
+	coldStream, warmStream := normalize(coldRaw, root), normalize(warmRaw, root)
 	if len(cold.buildRuns) != 3 || len(warm.buildRuns) != 3 {
 		test.Fatalf("the runs handed the merge %d and %d runs, want 3 each", len(cold.buildRuns), len(warm.buildRuns))
 	}
@@ -375,9 +396,10 @@ func TestOtherBuildsReadTheDigestsOfTheBytesTheWrapWrote(test *testing.T) {
 }
 
 // withoutCache is a normalized stream with its lint record's cache counts left out, the one field a warm run writes
-// otherwise than a cold one.
+// otherwise than a cold one, and each build's counts of what it restored from the host's run, which a warm host's
+// run, restoring from its own store, keeps nothing for (withoutHostRestore).
 func withoutCache(stream string) string {
-	lines := strings.Split(stream, "\n")
+	lines := strings.Split(withoutHostRestore(stream), "\n")
 	for index, line := range lines {
 		if start := strings.Index(line, `"cache":{`); start >= 0 {
 			end := strings.Index(line[start:], "}")
@@ -385,6 +407,17 @@ func withoutCache(stream string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds and what each restored
+// from it (contract.BuildRecord), each written only when not 0.
+var hostRestoreCounts = regexp.MustCompile(
+	`,"(entriesKept|restoredFromHost|declinedAtLoad|declinedAtCheck|reloadRounds)":[0-9]+|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}`)
+
+// withoutHostRestore is stream with every build record's counts of the restore from the host's run left out, the one
+// thing a run that restores writes otherwise than one that checks every package of every build.
+func withoutHostRestore(stream string) string {
+	return hostRestoreCounts.ReplaceAllString(stream, "")
 }
 
 // A module whose every file the host builds needs no other build, so `--other-builds` hands the merge nothing, and the

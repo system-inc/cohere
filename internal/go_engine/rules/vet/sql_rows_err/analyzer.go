@@ -206,7 +206,7 @@ func queryMethodIndex(context *rule.Context, call *ast.CallExpr) (int, bool) {
 		return 0, false
 	}
 	for index, query := range queryMethods {
-		if selection(method.Pkg(), query.typeName, query.methodName) == method {
+		if selection(context, method.Pkg(), query.typeName, query.methodName) == method {
 			return index, true
 		}
 	}
@@ -214,9 +214,11 @@ func queryMethodIndex(context *rule.Context, call *ast.CallExpr) (int, bool) {
 }
 
 // selection is the method or field named member of the type typeName declares in declaring, and nil when there is
-// none. x/tools' typeindex.Index.Selection, given the package typeindex.Index.Object finds by its path.
-func selection(declaring *types.Package, typeName string, member string) types.Object {
-	declared, isTypeName := declaring.Scope().Lookup(typeName).(*types.TypeName)
+// none. x/tools' typeindex.Index.Selection, given the package typeindex.Index.Object finds by its path. The look into
+// declaring's scope is recorded in the context's reads, its answer a type whose members the answer's own rendering
+// holds (#b2t9xmf).
+func selection(context *rule.Context, declaring *types.Package, typeName string, member string) types.Object {
+	declared, isTypeName := context.LookupIn(declaring, typeName).(*types.TypeName)
 	if !isTypeName {
 		return nil
 	}

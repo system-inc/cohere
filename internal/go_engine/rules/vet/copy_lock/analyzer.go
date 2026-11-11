@@ -8,9 +8,9 @@
 // on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/copylock/copylock.go, whose
-// logic it keeps and whose messages it reports word for word, at the same position. What the original takes from
-// x/tools' internal packages is translated beside it: typeparams.StructuralTerms with its term lists in
-// structural_terms.go, term.go and term_list.go, and versions.FileVersion and versions.AtLeast over go/version
+// logic it keeps and whose messages it reports word for word, at the same position. Its walk of a type for a
+// lock, lockPath, with typeparams.StructuralTerms and its term lists, is translated into type_predicates/locks,
+// which the restore from the host shares (#b2t9xmf), and versions.FileVersion and versions.AtLeast over go/version
 // below. The registry runs the port in the original's place, and the original stays the oracle: the parity tests
 // beside this file run both over the same packages.
 //
@@ -34,6 +34,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates/locks"
 )
 
 // passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
@@ -153,7 +154,7 @@ func checkAssignment(context *rule.Context, assignment *ast.AssignStmt, currentF
 		if object == nil || object.Type() == nil {
 			continue
 		}
-		if path := lockPath(object.Type()); path != nil {
+		if path := locks.Of(object.Type()); path != nil {
 			context.ReportRangef(
 				operand, "for loop iteration copies lock value to %v: %v", formatted(context.FileSet, operand), path,
 			)
@@ -253,7 +254,7 @@ func checkCall(context *rule.Context, call *ast.CallExpr) {
 func checkFunction(context *rule.Context, name string, receiver *ast.FieldList, signature *ast.FuncType) {
 	if receiver != nil && len(receiver.List) > 0 {
 		receiverType := receiver.List[0].Type
-		if path := lockPath(context.TypesInfo.Types[receiverType].Type); path != nil {
+		if path := locks.Of(context.TypesInfo.Types[receiverType].Type); path != nil {
 			context.ReportRangef(receiverType, "%s passes lock by value: %v", name, path)
 		}
 	}
@@ -261,7 +262,7 @@ func checkFunction(context *rule.Context, name string, receiver *ast.FieldList, 
 		return
 	}
 	for _, field := range signature.Params.List {
-		if path := lockPath(context.TypesInfo.Types[field.Type].Type); path != nil {
+		if path := locks.Of(context.TypesInfo.Types[field.Type].Type); path != nil {
 			context.ReportRangef(field.Type, "%s passes lock by value: %v", name, path)
 		}
 	}
@@ -302,7 +303,7 @@ func checkRangeVariable(context *rule.Context, operator token.Token, variable as
 	if variableType == nil {
 		return
 	}
-	if path := lockPath(variableType); path != nil {
+	if path := locks.Of(variableType); path != nil {
 		context.Reportf(variable.Pos(), "range var %s copies lock: %v", formatted(context.FileSet, variable), path)
 	}
 }

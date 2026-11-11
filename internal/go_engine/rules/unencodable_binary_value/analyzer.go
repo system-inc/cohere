@@ -27,6 +27,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )
 
 // Check judges every call in a function to encoding/binary.Write.
@@ -73,39 +74,9 @@ func encodable(call *staticcheck_call.Call, dataType types.Type) bool {
 			judged = container.Elem()
 		}
 	}
-	return encodableType(call, judged)
-}
-
-// encodableType is whether binary.Write can encode a value of judged, given to call: a number of fixed size, a bool
-// from Go 1.8's standard library, and an array or a struct of encodable values. An interface could hold anything, so
-// it is taken as encodable, and so is a type that did not type-check.
-func encodableType(call *staticcheck_call.Call, judged types.Type) bool {
-	switch underlying := judged.Underlying().(type) {
-	case *types.Basic:
-		switch underlying.Kind() {
-		case types.Uint8, types.Uint16, types.Uint32, types.Uint64,
-			types.Int8, types.Int16, types.Int32, types.Int64,
-			types.Float32, types.Float64, types.Complex64, types.Complex128, types.Invalid:
-			return true
-		case types.Bool:
-			// The original asks the version of the file of the function the call is in, and the package
-			// initializer is in none; the call itself is always in the file whose version it is judged by.
-			return version.Compare(
-				staticcheck_report.StandardLibraryVersion(call.Context, call.Instruction), "go1.8",
-			) >= 0
-		}
-		return false
-	case *types.Struct:
-		for index := 0; index < underlying.NumFields(); index++ {
-			if !encodableType(call, underlying.Field(index).Type()) {
-				return false
-			}
-		}
-		return true
-	case *types.Array:
-		return encodableType(call, underlying.Elem())
-	case *types.Interface:
-		return true
-	}
-	return false
+	// The original asks the version of the file of the function the call is in, and the package initializer is in
+	// none; the call itself is always in the file whose version it is judged by. It is asked only of a bool.
+	return type_predicates.BinaryEncodable(judged, func() bool {
+		return version.Compare(staticcheck_report.StandardLibraryVersion(call.Context, call.Instruction), "go1.8") >= 0
+	})
 }

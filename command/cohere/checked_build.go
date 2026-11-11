@@ -6,15 +6,31 @@ import "fmt"
 // (swift/Contract.md, internal/go_engine/contract.BuildRecord), the host's first: its target as go env would make it,
 // with ` cgo` when cgo is on and its tags after ` tags `; the files of ours it compiles and the packages it analyzed,
 // every package of the workspace in each; and the findings that stand which it kept and the host's did not, and those
-// it kept that the merge left out. A run of one build writes none, and neither does a Swift run, so their output is
-// as it was.
+// it kept that the merge left out. Then what the build restored from the host's run rather than checked, each count
+// written only when not 0: the host's entries kept for the others, and another's packages restored, declined by its
+// load and by its check, every decline by why, and the loads again it took, by why. A run of one build writes none, and
+// neither does a Swift run, so their output is as it was.
 type checkedBuild struct {
-	Target           string `json:"target"`
-	Host             bool   `json:"host"`
-	CompiledFiles    int    `json:"compiledFiles"`
-	AnalyzedPackages int    `json:"analyzedPackages"`
-	FindingsAdded    int    `json:"findingsAdded"`
-	FindingsDropped  int    `json:"findingsDropped"`
+	Target           string         `json:"target"`
+	Host             bool           `json:"host"`
+	CompiledFiles    int            `json:"compiledFiles"`
+	AnalyzedPackages int            `json:"analyzedPackages"`
+	FindingsAdded    int            `json:"findingsAdded"`
+	FindingsDropped  int            `json:"findingsDropped"`
+	EntriesKept      int            `json:"entriesKept,omitempty"`
+	RestoredFromHost int            `json:"restoredFromHost,omitempty"`
+	DeclinedAtLoad   int            `json:"declinedAtLoad,omitempty"`
+	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
+	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
+	ReloadRounds     int            `json:"reloadRounds,omitempty"`
+	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
+	// LoadMilliseconds, LintMilliseconds, DecideMilliseconds (summed across goroutines), KeepMilliseconds and
+	// WaitMilliseconds (the host's) are where the build's time went, each absent when 0.
+	LoadMilliseconds   int `json:"loadMilliseconds,omitempty"`
+	LintMilliseconds   int `json:"lintMilliseconds,omitempty"`
+	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
+	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
+	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
 	// FilesAlone, NotLinted and NotLintedReason are the files of ours only this build compiled and linted, and those it
 	// compiled that no rule ran on, with why (#ytnvt8k), each absent when there is nothing to count.
 	FilesAlone      int      `json:"filesAlone,omitempty"`

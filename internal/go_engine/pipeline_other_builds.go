@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -31,6 +33,13 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	if len(extras) == 0 {
 		return nil
 	}
+	// Once the last build has run, or one has failed, no build is left to ask for what the host kept for them, so it
+	// goes before the builds are merged.
+	defer pass.result.Host.Release()
+	// Before any build decides anything, the host's reads are whole.
+	waitStarted := time.Now()
+	hostReads := wholeReads(pass.result)
+	waited := time.Since(waitStarted)
 	ours := engine.oursSet()
 	analyzed := map[string]bool{}
 	for _, each := range loaded.Packages {
@@ -44,13 +53,17 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		result:     pass.result,
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
+		reads:      hostReads,
+		loading:    time.Duration(engine.hostLoading.Load()),
+		linting:    time.Duration(engine.hostLinting.Load()),
+		waited:     waited,
 	}}
 	if engine.session != nil {
 		runs[0].files = engine.session.Files()
 	}
 
 	for _, extra := range extras {
-		extraRun, extraError := engine.extraBuildRun(extra, ours)
+		extraRun, extraError := engine.extraBuildRun(extra, ours, pass.result.Host)
 		if extraError != nil {
 			engine.otherBuildsFailed(extraError)
 			return nil
@@ -71,6 +84,14 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 		return project.Build{}, nil, nil
 	}
 	return engine.described.builds[0], engine.described.builds[1:], nil
+}
+
+// recordsReads is whether the host's load and lint record what each package read of other packages (#b2t9xmf): only
+// when the run checks extra builds and the census needs at least one, since a build restores a package from the host's
+// run by those reads, and a run with none to restore into would pay for reads nothing reads.
+func (engine *pipeline) recordsReads() bool {
+	_, extras, buildsError := engine.buildsBeside()
+	return engine.request.switches["other-builds"] && buildsError == nil && len(extras) > 0
 }
 
 // readBuilds is the host's build, as go env's answer reads it, then the extra builds the census needs beside it
@@ -148,7 +169,15 @@ func checkingBuild(builds []project.Build, file string, contents []byte) (projec
 // and this one: gofmt, the long-line wrap and the rename all write before the load the lint reads (pipeline.run), the
 // wrap's write is followed by a second load whose Restore keys every file again, and a run whose rename wrote reads no
 // findings cache here at all.
-func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool) (buildRun, error) {
+//
+// host is what the host's run kept for the extra builds, nil when it kept nothing: the build restores from it each
+// package its own findings cache does not hold whose own inputs are the host's and whose reads hold here (#b2t9xmf),
+// unless the run renamed, whose build reads no cache, or measures under `--timing`, whose build has no session.
+func (engine *pipeline) extraBuildRun(
+	extra project.Build,
+	ours map[string]bool,
+	host *check.HostRun,
+) (buildRun, error) {
 	environment := append(slices.Clone(engine.described.workspace.Environment()), extra.Environment()...)
 	var session *check.CacheSession
 	// As the host's lint does, a run that renamed reads no findings cache, whose keys are of the bytes it replaced.
@@ -158,6 +187,9 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 			hostFiles = engine.session.Files()
 		}
 		session = engine.cacheSession(environment, hostFiles)
+		if session != nil && !engine.keepsHostRestoreOff {
+			session.RestoreFromHost(host)
+		}
 	}
 	// As the host's load does (loadWorkspace), a package with no file in scope is loaded and never analyzed.
 	caching := load.Caching{Held: engine.held, Timing: engine.timing, Analyzes: engine.described.hasFileInScope}
@@ -167,7 +199,11 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 			caching.Listings = session
 		}
 	}
+	var loading time.Duration
+	var linting time.Duration
+	started := time.Now()
 	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
+	loading += time.Since(started)
 	if loadError != nil {
 		return buildRun{}, fmt.Errorf("loading the build %s: %w", extra, loadError)
 	}
@@ -179,6 +215,7 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 		result:     &check.Result{FindingsByRule: map[string]int{}},
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
+		loading:    loading,
 	}
 	if session != nil {
 		run.files = session.Files()
@@ -192,10 +229,13 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 	run.said = compiledFiles(loaded.Packages, ours)
 	enabled, _ := engine.enabledRules()
 	runRules := func(over *load.Loaded) (*check.Result, error) {
+		started := time.Now()
+		defer func() { linting += time.Since(started) }()
 		return check.Run(over.Packages, enabled, check.Options{
 			SingleThreaded: engine.request.switches["single-threaded"],
 			Cache:          session,
 			Withheld:       over.Withheld,
+			Bodiless:       over.Bodiless,
 			// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
 			ReleaseAnalyzed: true,
 			ReadFile:        engine.sourceReader(nil, over.Rewritten),
@@ -204,10 +244,13 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 	}
 	result, checkError := runRules(loaded)
 	// As the host's lint does (reloadedPass), a question that reached a package the cache restored, with no answer
-	// stored, has the build loaded again with that package checked from source, until none does.
+	// stored, has the build loaded again with that package checked from source, until none does. So does a package
+	// restored from the host's run whose facts or answers do not hold here (check.Result.Reloads).
 	for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
 		reloads := strings.Join(result.Reloads, ", ")
+		started := time.Now()
 		loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
+		loading += time.Since(started)
 		if loadError != nil {
 			return buildRun{}, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
 				loadError)
@@ -225,7 +268,15 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 		engine.note("the findings cache of the build %s: %s", extra, problem)
 	}
 	run.result = result
+	run.loading, run.linting = loading, linting
 	return run, nil
+}
+
+// wholeReads is result's reads once every type-read walk the run left running has ended (check.Result.ReadWalks):
+// read any earlier, a package whose walk is still running reads as unknown.
+func wholeReads(result *check.Result) map[*packages.Package]*build_reads.Reads {
+	result.ReadWalks.Wait()
+	return result.Reads
 }
 
 // otherBuildsFailed notes why the builds beside the host's were not checked, which leaves the run incomplete: it
@@ -278,10 +329,45 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			FindingsAdded:    verdict.merged.added[index],
 			FindingsDropped:  verdict.merged.dropped[index],
 		}
+		recordTimes(&record, run)
+		if run.result != nil {
+			record.EntriesKept = run.result.Host.EntriesKept()
+			fromHost := run.result.FromHost
+			record.RestoredFromHost = len(fromHost.Restored)
+			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
+			record.DeclinedAtCheck = fromHost.DeclinedAtCheck
+			if len(fromHost.DeclinedBy) > 0 {
+				record.DeclinedBy = fromHost.DeclinedBy
+			}
+			// Every round an extra build was loaded again is its record's, for a decline or a missing answer alike;
+			// the host's own rounds are its lint cache record's.
+			if index > 0 {
+				record.ReloadRounds = run.result.Cache.ReloadRounds
+				if len(run.result.Cache.ReloadRoundsBy) > 0 {
+					record.ReloadRoundsBy = run.result.Cache.ReloadRoundsBy
+				}
+			}
+		}
 		verdict.records = append(verdict.records, record)
 	}
 	engine.recordBuildCoverage(runs, verdict.records)
 	return verdict
+}
+
+// recordTimes writes into record where run's time went: its load and its lint, every reload's included, the host's wait
+// for its walks before the extra builds could start, and of its result, an extra build's deciding which packages
+// restore from the host's run and the host's keeping its packages for the others, each in wall milliseconds, as the
+// record writes them.
+//
+// Mutates: record gains run's times
+func recordTimes(record *contract.BuildRecord, run buildRun) {
+	record.LoadMilliseconds = int(run.loading.Milliseconds())
+	record.LintMilliseconds = int(run.linting.Milliseconds())
+	record.WaitMilliseconds = int(run.waited.Milliseconds())
+	if run.result != nil {
+		record.DecideMilliseconds = int(run.result.FromHost.Deciding.Milliseconds())
+		record.KeepMilliseconds = int(run.result.Host.Keeping().Milliseconds())
+	}
 }
 
 // recordBuildCoverage counts, into each build's record, what it alone covered and what it compiled that no rule ran

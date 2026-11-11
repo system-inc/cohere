@@ -335,6 +335,9 @@ func (graph *graph) write(syntax ast.Node, by types.Object) {
 
 		// (4.9) functions use package-level variables they assign to iff in tests (sinks for benchmarks)
 		// (9.7) variable _reads_ use variables, writes do not, except in tests
+		// The written variable may be another package's, `other.Value = x`, so this reads the name of a file of
+		// another package, which no build read records (#b2t9xmf). It decides only whether that variable is used, and
+		// the rule reports the judged package's own objects alone, so another build's answer changes no finding here.
 		path := graph.fileSet.File(written.Pos()).Name()
 		if strings.HasSuffix(path, "_test.go") {
 			if isGlobal(written) {

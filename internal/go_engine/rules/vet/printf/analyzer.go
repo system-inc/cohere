@@ -4,14 +4,15 @@
 // with a non-constant format and no other arguments; a printf call whose %w wraps a pointer to an error; and a
 // wrapper that forwards its arguments without `...`.
 //
-// It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/printf/printf.go and types.go,
-// with the parser of golang.org/x/tools@v0.50.0 internal/fmtstr/parse.go, whose logic it keeps and whose messages
-// and suggested fix it reports word for word, at the same positions. The x/tools internal helpers it calls are
-// translated beside it, each naming the helper it translates, among them the normalization of a type parameter's
-// type set from internal/typeparams, as far as printf reads it. It exports its own fact type, isWrapper, with the
-// original's meaning and the original's words for it, so a wrapper declared in a dependency is found as the original
-// finds it, and it takes the original's -funcs flag. The registry runs the port in the original's place, and the
-// original stays the oracle: the parity tests beside this file run both over the same packages.
+// It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/printf/printf.go and types.go, with
+// the parser of golang.org/x/tools@v0.50.0 internal/fmtstr/parse.go, whose logic it keeps and whose messages and
+// suggested fix it reports word for word, at the same positions. The x/tools internal helpers it calls are translated
+// beside it, each naming the helper it translates. Its match of an argument's type against a verb, the argMatcher of
+// types.go with the normalization of a type parameter's type set from internal/typeparams, is translated into
+// type_predicates/verbs, which the restore from the host shares (#b2t9xmf). It exports its own fact type, isWrapper,
+// with the original's meaning and the original's words for it, so a wrapper declared in a dependency is found as the
+// original finds it, and it takes the original's -funcs flag. The registry runs the port in the original's place, and
+// the original stays the oracle: the parity tests beside this file run both over the same packages.
 //
 // Two things differ, neither in what it finds. The original's analyzer has a result, which reports to a client
 // whether a function behaves like fmt.Print or fmt.Printf; nothing in cohere requires it, so the port has none. And

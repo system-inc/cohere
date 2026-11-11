@@ -149,8 +149,9 @@ func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 		return
 	}
 	// Every function the table names is log/slog's, so its package's scope holds Attr. The original looks it up once
-	// a pass, at the first such call, and the port once a call; both find the same object.
-	attrType := function.Pkg().Scope().Lookup("Attr").Type()
+	// a pass, at the first such call, and the port once a call; both find the same object. The look is recorded in the
+	// context's reads (#b2t9xmf).
+	attrType := context.LookupIn(function.Pkg(), "Attr").Type()
 	// The first argument after those skipped should be a key or an Attr.
 	expected := expectKey
 	// unknownArgument is nil, or the last argument at a position whose expectation was unknown.

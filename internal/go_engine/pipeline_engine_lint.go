@@ -85,6 +85,10 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	result, outcome := pass.result, pass.outcome
 	var verdict *buildsVerdict
 	if engine.request.switches["other-builds"] {
+		// The host's reads, pass.result.Reads, are what an extra build will restore a package by (#b2t9xmf). Their
+		// type-read walks run beside the host's lint and past its end, so otherBuilds waits for every one before any
+		// build decides anything (wholeReads); a run with no extra builds never waits, so the host's verdict never
+		// pays for them. A build started while the host's walks run would wait on each package's walk the same way.
 		if runs := engine.otherBuilds(lintedLoad, pass); len(runs) > 0 {
 			ran := make([]string, 0, len(pass.enabled))
 			for _, enabledRule := range pass.enabled {
@@ -202,7 +206,10 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 	analyzed := slices.DeleteFunc(slices.Clone(loaded.Packages), func(each *packages.Package) bool {
 		return !engine.described.hasFileInScope(each)
 	})
-	return engine.lintPackages(analyzed, loaded.Rewritten, check.Options{Withheld: loaded.Withheld})
+	// The host's reads, recorded only when the run has extra builds to restore packages into (recordsReads), walked in
+	// the load's slots below its work.
+	return engine.lintPackages(analyzed, loaded.Rewritten, check.Options{Withheld: loaded.Withheld,
+		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots})
 }
 
 // lintPackages is lint over the packages to analyze, with what the load gives the run in options: its Withheld once
@@ -221,6 +228,8 @@ func (engine *pipeline) lintPackages(
 	}
 	options.SingleThreaded = engine.request.switches["single-threaded"]
 	options.Cache = session
+	// The host's run keeps its packages' entries for the extra builds to restore from, only when there are any.
+	options.KeepForBuilds = session != nil && options.Reads != nil && engine.recordsReads()
 	// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 	// and what follows reads the files' contents the project description holds, and the types.
 	options.ReleaseAnalyzed = true
@@ -231,6 +240,7 @@ func (engine *pipeline) lintPackages(
 		options.Report = canonical_function_hash.Analyzer
 	}
 	result, checkError := check.Run(analyzed, enabled, options)
+	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}
 	}
@@ -309,8 +319,10 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // cacheSession is the findings cache for the run's enabled rules over a load under environment, made before the load
 // so the load restores what it holds, whose keys read files' digests rather than hashing those files again, and nil
 // when lintCache gives none, as under `--no-cache` in a binary with no standard-library entries, or when what every key
-// shares cannot be read, which the run says on stderr, and always under `--timing`. files must be of the files as they
-// are on disk when the load runs (see extraBuildRun).
+// shares cannot be read, which the run says on stderr, and always under `--timing`. A run with extra builds gets a
+// session without a store when lintCache gives none, since the host's keeps its packages' entries for the extra
+// builds and theirs restore from them (#b2t9xmf); under `--timing` it gets none, so nothing is restored from the host.
+// files must be of the files as they are on disk when the load runs (see extraBuildRun).
 func (engine *pipeline) cacheSession(environment []string, files cache.FileDigests) *check.CacheSession {
 	// A run under `--timing` is a measurement, and a package the cache restores, its load's or its rules', runs
 	// nothing, so a table over it would read as measured where it is not. Such a run reads and writes no cache at all,
@@ -322,6 +334,10 @@ func (engine *pipeline) cacheSession(environment []string, files cache.FileDiges
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, enabled)
 	if cachingError != nil {
 		engine.note("the findings cache sat this run out: %v", cachingError)
+	}
+	if caching == nil && cachingError == nil && engine.recordsReads() {
+		// Nothing is stored or read from a store: the session keeps entries in memory for the extra builds alone.
+		caching = &check.Caching{ExtraInputs: newStaticcheckConfigurationInputs().inputs}
 	}
 	if caching == nil {
 		return nil

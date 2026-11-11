@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are twelve.
+// The changes are thirteen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -179,6 +179,23 @@
 // whether its readers ask for the expression map, so it shares that
 // package with them and builds a root once (#wt5vaft).
 //
+// The thirteenth is Options.Reads, the seam an extra build's restore
+// records through (#b2t9xmf). An extra build restores a package from the
+// host's run only when everything it read of other packages is the same
+// there, and a fact of another package is such a read. So when Reads
+// holds the action's package, ObjectFact and PackageFact add each fact
+// asked of another package's object or of another package to it, a miss
+// as much as a hit, since a build where the fact is there would analyze
+// the package differently, each action gathering its reads with no lock
+// and publishing them once, as its run ends. Options.Recorded keys the package's reads in
+// every pass's ResultOf, as Options.Resolved keys the resolver, so a rule
+// records there what else it asks of other packages. And releaseSyntax,
+// once the last action on a package has finished, walks the package's
+// type reads into them before its type information goes, on a goroutine
+// of Options.Walks when it is set, which lets the package go once the
+// walk ends, so neither the load's chain nor the rules' waits on it.
+// Unset, nothing is recorded and both are upstream's.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -247,7 +264,9 @@ import (
 	// import x/tools' internal packages.
 	"github.com/system-inc/cohere/internal/go_engine/check/checker/driverutil"
 	"github.com/system-inc/cohere/internal/go_engine/check/internal"
-	// cohere: the collector Options.Timing measures into.
+	// cohere: the reads Options.Reads records into, and the collector
+	// Options.Timing measures into.
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -275,6 +294,16 @@ type Options struct {
 	// returns is the action's Err. Both are nil when nothing is restored.
 	Restored func(*packages.Package) bool
 	Restore  func(*Action) error
+
+	// cohere: FactsBelowRestored, when set, names restored packages whose
+	// actions still depend on the actions, on the same package, of every
+	// analyzer that learns facts among what they require, transitively,
+	// though nothing on the package runs: those are restored too, and
+	// their vertical edges have the analyzers run on what the package
+	// imports, so what it imports exports every fact the package's own
+	// analysis read. An extra build asks it of a package restored from the
+	// host's run, to judge those reads once the analysis is over.
+	FactsBelowRestored func(*packages.Package) bool
 
 	// cohere: Finished, when set, is called with a package Analyze was
 	// given once the last action on it has finished, and the package's
@@ -340,6 +369,28 @@ type Options struct {
 	Resolver Resolver
 	Resolved *analysis.Analyzer
 
+	// cohere: Reads, when set, holds the reads of each package whose
+	// fact reads are recorded: every ObjectFact and PackageFact an action
+	// on such a package asks of another package's object, or of another
+	// package, is added to them, found or not, and the package's type reads
+	// are walked into them once its last action has finished (see
+	// releaseSyntax). A package it does not hold, and every package while
+	// it is nil, records nothing.
+	Reads map[*packages.Package]*build_reads.Reads
+
+	// cohere: Walks, when set, runs each type-read walk under Reads on a
+	// goroutine of its own, and the package's syntax and type information
+	// are let go of only once its walk ends, which Analyze does not wait
+	// for: a reader of the reads waits on Walks. Unset, the walk runs
+	// inline, as the last action on the package finishes.
+	Walks *build_reads.Walks
+
+	// cohere: Recorded, when Reads is set too, keys in every pass's
+	// ResultOf the reads Reads holds of the pass's package, nil for a
+	// package it does not hold, a key never run, as Dependents is. Unset,
+	// ResultOf holds no reads.
+	Recorded *analysis.Analyzer
+
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once
 	// in place of the default; workers, above 0, is how many actions; and
@@ -348,6 +399,11 @@ type Options struct {
 	slots        int
 	workers      int
 	observeGroup func(pkg *packages.Package, running bool)
+
+	// cohere: publishedFacts, nil outside tests, is called each time an
+	// action publishes its fact reads (see publishFactReads), with its
+	// package and how many reads it published under the one lock.
+	publishedFacts func(pkg *packages.Package, published int)
 }
 
 // cohere: Resolver is what Options.Resolver is told of: each action that
@@ -436,6 +492,23 @@ type Action struct {
 	// so the last of them to finish can release the package's syntax
 	// (see releaseSyntax).
 	syntax *syntaxReaders
+
+	// cohere: factReads are the reads of other packages' facts this action
+	// made under Options.Reads, each once, gathered on its own goroutine
+	// with no lock and published to its package's reads once, as its run
+	// ends (publishFactReads), after which factReadsPublished sends any
+	// later read straight to them.
+	factReads          map[factReadKey]build_reads.Fact
+	factReadsPublished bool
+}
+
+// cohere: factReadKey is what makes two of an action's fact reads the
+// same read: the object, nil for a package fact, its package and the
+// fact's type.
+type factReadKey struct {
+	obj types.Object
+	pkg *types.Package
+	typ reflect.Type
 }
 
 // cohere: syntaxReaders is what the actions on one package share to
@@ -450,6 +523,28 @@ type syntaxReaders struct {
 	// is set, to take what it reads before the syntax goes.
 	given    bool
 	finished func(*packages.Package)
+}
+
+// cohere: factAnalyzersRequired are the analyzers that learn facts among
+// everything a requires, transitively, a itself left out, in a fixed order.
+func factAnalyzersRequired(a *analysis.Analyzer) []*analysis.Analyzer {
+	var found []*analysis.Analyzer
+	seen := map[*analysis.Analyzer]bool{a: true}
+	var visit func(required []*analysis.Analyzer)
+	visit = func(required []*analysis.Analyzer) {
+		for _, req := range required {
+			if seen[req] {
+				continue
+			}
+			seen[req] = true
+			if len(req.FactTypes) > 0 {
+				found = append(found, req)
+			}
+			visit(req.Requires)
+		}
+	}
+	visit(a.Requires)
+	return found
 }
 
 func (act *Action) String() string {
@@ -503,6 +598,10 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 			// cohere: unless the package is restored, since then nothing on it runs.
 			if opts.Restored == nil || !opts.Restored(pkg) {
 				for _, req := range a.Requires {
+					act.Deps = append(act.Deps, mkAction(req, pkg))
+				}
+			} else if opts.FactsBelowRestored != nil && opts.FactsBelowRestored(pkg) {
+				for _, req := range factAnalyzersRequired(a) {
 					act.Deps = append(act.Deps, mkAction(req, pkg))
 				}
 			}
@@ -736,6 +835,10 @@ func (act *Action) execOnce() {
 	if act.opts.Resolved != nil && act.opts.Resolver != nil {
 		inputs[act.opts.Resolved] = act.opts.Resolver
 	}
+	// cohere: Options.Recorded, the package's reads under Options.Reads.
+	if act.opts.Recorded != nil && act.opts.Reads != nil {
+		inputs[act.opts.Recorded] = act.opts.Reads[act.Package]
+	}
 
 	// cohere: a restored package's own facts come from the cache, in
 	// place of a pass, on top of those it inherited (see Options.Restored).
@@ -831,6 +934,10 @@ func (act *Action) execOnce() {
 		return result, nil
 	}()
 
+	// cohere: the fact reads the run gathered, published to the package's
+	// reads under one lock (see Options.Reads).
+	act.publishFactReads()
+
 	// Help detect (disallowed) calls after Run.
 	pass.ExportObjectFact = nil
 	pass.ExportPackageFact = nil
@@ -883,12 +990,37 @@ func (act *Action) releaseSyntax() {
 	if act.syntax.unfinished.Add(-1) != 0 {
 		return
 	}
-	if act.syntax.given {
-		if act.syntax.finished == nil {
-			return
-		}
+	keeps := act.syntax.given && act.syntax.finished == nil
+	if act.syntax.given && !keeps {
 		act.syntax.finished(act.Package)
 	}
+	// cohere: under Options.Reads, the package's type reads, walked once,
+	// while its type information is whole, a given package's too, and
+	// only then let go of (see Options.Walks).
+	letGo := func() {
+		if !keeps {
+			act.letGoOfSyntax()
+		}
+	}
+	reads := act.opts.Reads[act.Package]
+	if reads == nil || act.Package.TypesInfo == nil || !reads.Claim() {
+		letGo()
+		return
+	}
+	if act.opts.Walks == nil {
+		reads.Record(act.Package.Types, act.Package.TypesInfo)
+		letGo()
+		return
+	}
+	act.opts.Walks.Go(act.Package, nil, func() {
+		reads.Record(act.Package.Types, act.Package.TypesInfo)
+		letGo()
+	})
+}
+
+// cohere: letGoOfSyntax clears act's package's syntax and type
+// information, and every action's pass on it, which holds them too.
+func (act *Action) letGoOfSyntax() {
 	for _, finished := range act.syntax.actions {
 		if finished.pass != nil {
 			finished.pass.Files = nil
@@ -1113,8 +1245,12 @@ func (act *Action) ObjectFact(obj types.Object, ptr analysis.Fact) bool {
 	key := objectFactKey{obj, factType(ptr)}
 	if v, ok := act.objectFacts[key]; ok {
 		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v).Elem())
+		// cohere: a read of another package's fact (see Options.Reads).
+		act.readFact(obj, obj.Pkg(), key.typ, v)
 		return true
 	}
+	// cohere: a miss is a read too (see Options.Reads).
+	act.readFact(obj, obj.Pkg(), key.typ, nil)
 	return false
 }
 
@@ -1193,9 +1329,63 @@ func (act *Action) PackageFact(pkg *types.Package, ptr analysis.Fact) bool {
 	key := packageFactKey{pkg, factType(ptr)}
 	if v, ok := act.packageFacts[key]; ok {
 		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v).Elem())
+		// cohere: a read of another package's fact (see Options.Reads).
+		act.readFact(nil, pkg, key.typ, v)
 		return true
 	}
+	// cohere: a miss is a read too (see Options.Reads).
+	act.readFact(nil, pkg, key.typ, nil)
 	return false
+}
+
+// cohere: readFact adds a fact act asked of obj, or of pkg itself when obj
+// is nil, to the reads of act's package under Options.Reads, when pkg is
+// another package: found is the fact, nil on a miss. A fact of act's own
+// package is no read of another, and an object of no package, the
+// universe's, holds no fact in any build.
+//
+// A read is gathered on the action, the first of reads alike kept, as
+// reads.AddFact keeps it: a fact of another package is inherited before
+// the run, so a second read of it reads the same. ctrlflow alone asks
+// whether every callee returns, the same callee many times over, so the
+// action takes no lock per read, only one as its run ends.
+func (act *Action) readFact(obj types.Object, pkg *types.Package, typ reflect.Type, found analysis.Fact) {
+	reads := act.opts.Reads[act.Package]
+	if reads == nil || pkg == nil || pkg == act.Package.Types {
+		return
+	}
+	read := build_reads.Fact{Object: obj, Package: pkg, FactType: typ, Found: found != nil, Value: found}
+	if act.factReadsPublished {
+		reads.AddFact(read)
+		return
+	}
+	key := factReadKey{obj, pkg, typ}
+	if _, gathered := act.factReads[key]; gathered {
+		return
+	}
+	if act.factReads == nil {
+		act.factReads = make(map[factReadKey]build_reads.Fact)
+	}
+	act.factReads[key] = read
+}
+
+// cohere: publishFactReads publishes the fact reads act gathered to its
+// package's reads under one hold of their lock, once its run has ended,
+// before anything reads them: a reader waits for the run.
+func (act *Action) publishFactReads() {
+	act.factReadsPublished = true
+	if len(act.factReads) == 0 {
+		return
+	}
+	gathered := make([]build_reads.Fact, 0, len(act.factReads))
+	for _, read := range act.factReads {
+		gathered = append(gathered, read)
+	}
+	act.opts.Reads[act.Package].AddFacts(gathered)
+	if act.opts.publishedFacts != nil {
+		act.opts.publishedFacts(act.Package, len(gathered))
+	}
+	act.factReads = nil
 }
 
 // exportPackageFact implements Pass.ExportPackageFact.

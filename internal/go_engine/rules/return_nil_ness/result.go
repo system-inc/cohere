@@ -19,7 +19,22 @@ func init() {
 				return nil
 			}
 			return heldResults(resolver, home, function)
-		})
+		}, bodilessResults)
+}
+
+// bodilessResults is the nilness of the results of object, a function declared without a body, as a fact holds it,
+// from its types alone (fact_resolver.Ask): judgeIn's verdict of a function with no blocks is the defaults of its
+// signature, which heldResults holds only when they say more than the defaults, so never.
+func bodilessResults(object types.Object) []ValueNilness {
+	function, isFunction := object.(*types.Func)
+	if !isFunction {
+		return nil
+	}
+	results := defaultNilnessForSignature(function.Signature())
+	if !interesting(function.Signature(), results) {
+		return nil
+	}
+	return results
 }
 
 // Result is one package's nilness of results, as its readers ask it.
@@ -64,7 +79,7 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, functi
 	}
 	results := fact_resolver.Ask(resolver, reader, Kind, function, func(home *fact_resolver.Package) []ValueNilness {
 		return heldResults(resolver, home, function)
-	})
+	}, func() []ValueNilness { return bodilessResults(function) })
 	return results, results != nil
 }
 

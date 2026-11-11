@@ -31,6 +31,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -75,6 +76,10 @@ type Loaded struct {
 	// findings cache saves; a package it restored has what it had when it was checked.
 	Withheld map[*packages.Package]PackageWithheld
 
+	// Bodiless is what each package the load checked from source declares without a body, for the findings cache
+	// to keep with each package it saves (see Bodiless).
+	Bodiless *Bodiless
+
 	// ListingKept is set when go list's answer was the one kept from an earlier run, since nothing it reads had moved
 	// (see cachedList).
 	ListingKept bool
@@ -110,6 +115,21 @@ type Loaded struct {
 
 	// Inputs are what the load read to decide what it returned, for the inputs record (see inputs.go).
 	Inputs Inputs
+
+	// Reads are, by package, what every package of the graph read of other packages, for an extra build to restore it
+	// by (see build_reads). The load leaves a package it checked from source unknown, for check.Run, handed the same
+	// map, to walk its type reads into and add its rules' reads to, unless it knows the package can never be
+	// restored: one checked for its types alone, or with cgo (recordReads). A package whose types came from export
+	// data, or that the load never needed, was restored from the findings cache, and is marked never for it. Nil
+	// unless Caching.RecordReads asked for them.
+	Reads map[*packages.Package]*build_reads.Reads
+
+	// ReadsRecorded counts the packages given reads, 0 for a load that records none.
+	ReadsRecorded int
+
+	// WalkSlots are the load's slots, which the rules' type-read walks take below every package's work (see
+	// check.Options.WalkSlots), free once the load has ended.
+	WalkSlots *WalkSlots
 
 	// Rewritten is the bytes the load parsed each cgo output from whose `//line` directives it rewrote, which a
 	// reader of a file's source reads in place of the disk's (see Rewritten).
@@ -193,6 +213,11 @@ type Caching struct {
 	// what the Restorer and Begin are given as the packages to analyze. The engine turns down a package with no file
 	// in scope, so a package every file of which git ignores is never linted. Nil analyzes every one.
 	Analyzes func(root *packages.Package) bool
+
+	// RecordReads has the load give every package reads of other packages, to record into (see Loaded.Reads), which
+	// only a run with extra builds to restore packages into asks for (#b2t9xmf). Unset, the load records nothing, and
+	// Loaded.Reads and Overlap.Reads are nil.
+	RecordReads bool
 
 	// rootSyntaxOnly has every dependency type-checked with no type maps and left without its syntax (see
 	// PackagesWithRootSyntax).
@@ -377,6 +402,14 @@ func fromSource(
 			return !caching.Analyzes(root)
 		})
 	}
+	// Made for every reachable package before any is checked, the restored ones too, whose export data may not read,
+	// so the map a run beside the load is handed (Overlap.Reads) never changes once it starts.
+	if caching.RecordReads {
+		typeChecker.reads = make(map[*packages.Package]*build_reads.Reads, len(reachable))
+		for _, current := range reachable {
+			typeChecker.reads[current.loaded] = &build_reads.Reads{}
+		}
+	}
 	if caching.Restorer != nil {
 		loaderName := LoaderSource
 		if compiled != nil {
@@ -391,6 +424,9 @@ func fromSource(
 		}
 		caching.Begin(&Overlap{
 			Packages:  analyzedPackages,
+			Reads:     typeChecker.reads,
+			Bodiless:  typeChecker.bodiless,
+			WalkSlots: &WalkSlots{slots: typeChecker.slots},
 			Rewritten: typeChecker.rewritten,
 			nodes:     nodes,
 			ended:     ended,
@@ -415,7 +451,7 @@ func fromSource(
 	distinct := map[string]bool{}
 	for _, current := range reachable {
 		owned := PackageWithheld{Errors: withheld.ownedBy(current.loaded), Declarations: declarations[current.loaded]}
-		if restored, held := typeChecker.restored[current.loaded]; held {
+		if restored, held := typeChecker.restored[current.loaded]; held && !typeChecker.declined[current.loaded] {
 			owned.Declarations = restored.Withheld.Declarations
 		}
 		for _, position := range owned.Declarations {
@@ -425,14 +461,25 @@ func fromSource(
 			byPackage[current.loaded] = owned
 		}
 	}
+	// A package the findings cache restored has no type maps to walk, and its entry keeps no reads yet, so it is never
+	// left unknown.
+	for current, reads := range typeChecker.reads {
+		if !typeChecker.checked[current] {
+			reads.MarkNever(build_reads.RestoredFromCache)
+		}
+	}
 	return roots, &Loaded{
 		Packages:                          analyzedPackages,
 		PackagesInWorkspace:               len(toAnalyze),
 		WithheldInDependencyCgo:           withheld.sorted(),
 		WithheldDependencyCgoDeclarations: len(distinct),
 		Withheld:                          byPackage,
+		Bodiless:                          typeChecker.bodiless,
 		FilesParsed:                       int(typeChecker.filesParsed.Load()),
 		PackagesFromExportData:            int(typeChecker.fromExportData.Load()),
+		Reads:                             typeChecker.reads,
+		ReadsRecorded:                     len(typeChecker.reads),
+		WalkSlots:                         &WalkSlots{slots: typeChecker.slots},
 		Rewritten:                         typeChecker.rewritten,
 		testFunctions:                     typeChecker.testFunctions,
 	}, nil

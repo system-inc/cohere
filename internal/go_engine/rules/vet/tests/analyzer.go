@@ -200,7 +200,7 @@ func checkExampleName(context *rule.Context, function *ast.FuncDecl) {
 	}
 	exampleName := strings.TrimPrefix(function.Name.Name, "Example")
 	elements := strings.SplitN(exampleName, "_", 3)
-	objects := lookupObjects(context.Package, elements[0])
+	objects := lookupObjects(context, elements[0])
 	if elements[0] != "" && len(objects) == 0 {
 		// Nothing is named, so there is no member or suffix left to judge.
 		context.Reportf(function.Pos(), "%s refers to unknown identifier: %s", function.Name.Name, elements[0])
@@ -240,14 +240,15 @@ func hasFieldOrMethod(objects []types.Object, member string) bool {
 
 // lookupObjects is the object package declares as name, or, when it declares none, every object one of its imports
 // declares as name. Which package an example documents is hard to tell, so an import's declaration is enough: the
-// example must reach what it names, so there is no false finding, only the rare missed one. x/tools' lookup.
-func lookupObjects(examined *types.Package, name string) []types.Object {
-	if object := examined.Scope().Lookup(name); object != nil {
+// example must reach what it names, so there is no false finding, only the rare missed one. x/tools' lookup. Each
+// look into an import is recorded in the context's reads (#b2t9xmf).
+func lookupObjects(context *rule.Context, name string) []types.Object {
+	if object := context.Package.Scope().Lookup(name); object != nil {
 		return []types.Object{object}
 	}
 	objects := []types.Object{}
-	for _, imported := range examined.Imports() {
-		if object := imported.Scope().Lookup(name); object != nil {
+	for _, imported := range context.Package.Imports() {
+		if object := context.LookupIn(imported, name); object != nil {
 			objects = append(objects, object)
 		}
 	}

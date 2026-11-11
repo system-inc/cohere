@@ -15,7 +15,15 @@ func init() {
 		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) bool {
 			function, isFunction := object.(*types.Func)
 			return isFunction && judgeIn(resolver, home, function)
-		})
+		}, bodilessPurity)
+}
+
+// bodilessPurity is whether a function declared without a body is pure, from its types alone (fact_resolver.Ask):
+// never. Built from its declaration, it has no blocks and its syntax, so judge reads it as a stub, which
+// intermediate_representation.IsStub finds no instruction in, before it reads pureStandardLibrary: even a listed one
+// is not pure.
+func bodilessPurity(types.Object) bool {
+	return false
 }
 
 // Result is one package's purity, as its readers ask it.
@@ -49,7 +57,7 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, functi
 	}
 	return fact_resolver.Ask(resolver, reader, Kind, function, func(home *fact_resolver.Package) bool {
 		return judgeIn(resolver, home, function)
-	})
+	}, func() bool { return bodilessPurity(function) })
 }
 
 // judgeIn is whether function, of home, is pure, judged there under home's lock, or the verdict kept.

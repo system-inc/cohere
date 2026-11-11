@@ -977,6 +977,29 @@ error, so it analyzed no package"`). The project record names such a file `check
 before any build runs, so the front door reads `notLinted` and names those files as not checked, `not linted: ` and
 the reason, in the summary's `gaps.unchecked` and the footer's count, rather than as checked by the build.
 
+An extra build restores from the host's run each package its own findings cache does not hold whose own files,
+module and import map are the host's and whose every read of other packages reads the same in the build: the
+objects its type check reached, the rules' lookups, the facts its analyzers read and the answers it asked, each
+compared by what an importer can observe of it, never by bytes. Its findings and facts are then the host's, so the
+merge is the one checking it would give. Each count below is written only when it is not 0: the host's
+`"entriesKept":349` counts the packages it kept an entry of for the other builds, and an extra build's
+`"restoredFromHost":301` the packages it restored, `"declinedAtLoad":12` those its load checked after all, since
+what they read of types did not hold, and `"declinedAtCheck":3` those its check declined, since a fact or answer they
+read did not. `"declinedBy"` counts each decline, and each package never restored, by why: `ownInputs` (its own files differ), `noHostEntry`, `neverRestorable` (what it read cannot be recorded, as with cgo), `readsUnknown`, `exportData` (its export data did not read), `typeReads` (a type it read), `lookups` (a rule's lookup), `factReads` (a fact), `deprecations` (a deprecation) or `answers` (an answer).
+`"reloadRounds":2` counts every time the build was loaded again, and `"reloadRoundsBy"` each of those under every
+reason it had: `hostDecline` (a package its check declined, at most 2 such rounds) or `missingAnswer` (a question
+reached a restored package with no answer of it kept). Under `--timing` nothing is restored from the host, so every
+figure is of work that ran.
+
+Each build's record also says where its time went, each figure in wall milliseconds and written only when it is not
+0: `"loadMilliseconds":1200` loading the workspace and `"lintMilliseconds":2400` running the rules, every reload
+included, an extra build's `"decideMilliseconds":310` deciding which packages restore from the host's run, summed
+across the goroutines that decided, so it can exceed the load and lint it ran within, and the host's
+`"keepMilliseconds":180` keeping its packages for the other builds, within its lint: their keys, which a run without
+a store computes only for this, and what each entry holds of the run's answers, since the entries themselves are
+encoded when a build first asks for them, and the host's `"waitMilliseconds":40`, how long the other builds
+waited after its lint for its walks of what each package read of others to end, before any could start.
+
 ### `phase`
 
 ```json

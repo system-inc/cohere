@@ -130,7 +130,7 @@ func sinceFunction(context *rule.Context, call *ast.CallExpr, nowFunction ast.Ex
 			return nil, false
 		}
 		_, since := scope.LookupParent("Since", call.Pos())
-		if since != nil && since == now.Pkg().Scope().Lookup("Since") {
+		if since != nil && since == context.LookupIn(now.Pkg(), "Since") {
 			return &ast.Ident{Name: "Since"}, true
 		}
 	}

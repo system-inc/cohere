@@ -19,17 +19,15 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"maps"
 	"reflect"
 	"slices"
-
-	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )
 
 // Listener is what the port hears of each package from the dispatcher: every binary expression, in preorder, with its
@@ -103,7 +101,7 @@ func Check(context *rule.Context, binary *ast.BinaryExpr, ancestors []ast.Node) 
 		return
 	}
 	// A float can differ from itself, NaN does, so floats are left alone for every operator.
-	if mayBeFloat(context.TypesInfo.TypeOf(binary.X)) {
+	if type_predicates.MayHoldFloat(context.TypesInfo.TypeOf(binary.X)) {
 		return
 	}
 	if reflect.TypeOf(binary.X) != reflect.TypeOf(binary.Y) {
@@ -162,31 +160,4 @@ func isGeneratedZeroComparison(context *rule.Context, binary *ast.BinaryExpr) bo
 		return false
 	}
 	return context.IsGenerated(context.FileSet.PositionFor(left.Pos(), false).Filename)
-}
-
-// mayBeFloat is whether a value of valueType may be or hold a float: a float, an array of them, a struct with one, or
-// a type parameter any of whose types is such, or whose types are unrestricted.
-func mayBeFloat(valueType types.Type) bool {
-	typeSet := typeutil.NewTypeSet(valueType)
-	if len(typeSet.Terms) == 0 {
-		// No terms, so a float is possible.
-		return true
-	}
-	return typeSet.Any(func(term *types.Term) bool {
-		switch underlying := term.Type().Underlying().(type) {
-		case *types.Basic:
-			return underlying.Kind() == types.Float32 || underlying.Kind() == types.Float64
-		case *types.Array:
-			return mayBeFloat(underlying.Elem())
-		case *types.Struct:
-			for field := range underlying.Fields() {
-				if mayBeFloat(field.Type()) {
-					return true
-				}
-			}
-			return false
-		default:
-			return false
-		}
-	})
 }

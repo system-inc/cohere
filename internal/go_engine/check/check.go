@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -39,6 +41,11 @@ type Options struct {
 
 	// Withheld is the load's Loaded.Withheld, which the cache keeps with each package it saves.
 	Withheld map[*packages.Package]load.PackageWithheld
+
+	// Bodiless is the load's Loaded.Bodiless, or Overlap.Bodiless for a run beside the load, which the cache keeps
+	// with each package it saves, so a run restoring the package answers a question of a function it declares without
+	// a body from its types alone (#b2t9xmf). Nil, every entry says it recorded none, and such a question reloads.
+	Bodiless *load.Bodiless
 
 	// ReleaseAnalyzed lets each analyzed package's syntax and type information go once the rules have finished on it,
 	// as a dependency's already go, rather than when the run ends; the Result is the same either way. Run then
@@ -78,6 +85,27 @@ type Options struct {
 	// `--duplicates` it is the duplicates report's hasher (#jfvhbj7). Its ResultType must be a pointer to a type gob
 	// can encode.
 	Report *analysis.Analyzer
+
+	// Reads, when not nil, is the load's Loaded.Reads, or Overlap.Reads for a run beside the load: each package's reads
+	// of other packages, which the rules' fact reads join (see checker.Options.Reads), for an extra build to restore
+	// the package by (#b2t9xmf). The run marks the packages it cannot vouch for, and hands them all back in
+	// Result.Reads. The findings are the same either way.
+	Reads map[*packages.Package]*build_reads.Reads
+
+	// WalkSlots, when not nil, are the load's slots (load.Loaded.WalkSlots or load.Overlap.WalkSlots), which each
+	// type-read walk takes one of below every package's work, so a walk beside the load never displaces its chain.
+	// Nil, the walks take slots of their own, as many as there are cores.
+	WalkSlots build_reads.Slots
+
+	// KeepForBuilds has the run keep, in Result.Host, the entry of each package it analyzed from source whose reads can
+	// hold, for its extra builds to restore from (#b2t9xmf). It needs Cache and Reads, and only a run with extra builds
+	// sets it, since keeping costs an entry's encoding of each package without a store and its bytes until the builds
+	// end.
+	KeepForBuilds bool
+
+	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
+	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
+	holdWalk func(owner *packages.Package)
 }
 
 // ErrAbandoned is Run's error when Options.Abandon closed before every rule had run, so the result would be partial.
@@ -197,6 +225,21 @@ type Result struct {
 	// package, every kind's (fact_resolver.Counts' Fallbacks), with the cache or without.
 	Replays int
 
+	// Reads is Options.Reads, each package's type reads from the load and fact reads from the rules in one, a package
+	// marked never when a finding on it names a file not its own, which can change with a line of another package, or
+	// when the findings cache restored it, so its rules read nothing this run. Nil when Options.Reads is. The type
+	// reads are walked beside the run, and Run returns without waiting for them, so Reads is whole only once
+	// ReadWalks.Wait has returned: every reader of Reads waits first.
+	Reads map[*packages.Package]*build_reads.Reads
+
+	// ReadWalks are the type-read walks Run left running, nil when Options.Reads is (see Reads).
+	ReadWalks *build_reads.Walks
+
+	// Host is what the run kept for its extra builds under Options.KeepForBuilds, nil without it, and FromHost what an
+	// extra build's session restored from the host's run (CacheSession.RestoreFromHost), all zero without one.
+	Host     *HostRun
+	FromHost HostRestoreCounts
+
 	Elapsed time.Duration
 }
 
@@ -252,6 +295,14 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Ready, checkerOptions.Abandon = options.Ready, options.Abandon
 	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
+	checkerOptions.Reads = options.Reads
+	// The walks run beside the rules, and on past Run's return, so no package's walk sits at the end of the run's
+	// chain; whoever reads the reads waits for them (Result.ReadWalks).
+	var walks *build_reads.Walks
+	if options.Reads != nil {
+		walks = build_reads.NewWalks(runtime.GOMAXPROCS(0), options.WalkSlots, options.holdWalk, nil)
+		checkerOptions.Walks = walks
+	}
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
@@ -277,10 +328,16 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		// it, and no store answers a package the run learns, which has none there.
 		resolver = fact_resolver.New(session)
 		checkerOptions.Resolver, session.resolver = resolver, resolver
+		session.bodiless = options.Bodiless
 		if options.Ready == nil {
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
 		}
 		checkerOptions.Restored, checkerOptions.Restore = session.restoredInWave, session.restore
+		// A package restored from the host's run has the analyzers that learn facts run on what it imports, as one
+		// analyzed here would, so its fact reads can be asked of what those exported (decideHostRestores).
+		checkerOptions.FactsBelowRestored = func(restoring *packages.Package) bool {
+			return session.fromHost(restoring) != nil
+		}
 		firstGraph, waveError := session.firstWave(roots, checkerOptions, options.Withheld)
 		if waveError != nil {
 			return nil, waveError
@@ -288,7 +345,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		if firstGraph != nil {
 			graphs = append(graphs, firstGraph)
 		}
-		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), session.restoredInWave)
+		// A package to analyze restored from the host's run is analyzed by restoring, so the actions of the analyzers
+		// that learn facts run on what it imports, and its fact reads can be asked of what those exported
+		// (decideHostRestores).
+		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), func(restoring *packages.Package) bool {
+			return session.restoredInWave(restoring) && session.fromHost(restoring) == nil
+		})
 		// A session without a store counts only what it restored from the binary, as a run without the cache counts
 		// no wave.
 		if len(toAnalyze) > 0 && session.HasStore() {
@@ -303,6 +365,13 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, ErrAbandoned
 	}
 	graphs = append(graphs, graph)
+	recordUnreachedTypes(options.Reads, options.Ready, walks)
+	// What the packages restored from the host's run read of other packages' answers is decided now, with no pass
+	// running, before anything is saved over them.
+	var hostReloads []string
+	if session != nil {
+		hostReloads = session.decideHostRestores(graphs)
+	}
 	type rootKey struct {
 		analyzer        *analysis.Analyzer
 		analyzedPackage *packages.Package
@@ -317,6 +386,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 
 	result := &Result{
+		ReadWalks:           walks,
 		RulesRun:            len(rules),
 		FindingsByRule:      make(map[string]int, len(rules)),
 		WithheldAsGenerated: map[string]int{},
@@ -327,6 +397,16 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 	files := analyzedFiles(analyzed, session, record)
 	generated, copies := withheldFiles(files)
+	// known is every file of the load, which a finding's message is read for (see namesForeignFile), made only
+	// once a package whose reads are recorded has a finding.
+	var loadedFiles *knownFiles
+	known := func() *knownFiles {
+		if loadedFiles == nil {
+			loadedFiles = newKnownFiles()
+			packages.Visit(analyzed, nil, loadedFiles.addPackage)
+		}
+		return loadedFiles
+	}
 	seenFindings := map[findingKey]bool{}
 	seenCrashes := map[Crash]bool{}
 	// In the order of graph.Roots, each analyzer over each package, so of two findings alike the one kept is the
@@ -353,6 +433,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 					continue
 				}
 				found = actionFindings(analyzerRule, action)
+			}
+			if reads := options.Reads[analyzedPackage]; reads != nil && len(found) > 0 {
+				markForeignFindings(reads, analyzedPackage, found, known)
 			}
 			for _, finding := range found {
 				key := findingKey{finding.Rule, finding.File, finding.Line, finding.Column, finding.Message}
@@ -392,7 +475,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		)
 	})
 	if session != nil {
-		result.Reloads = session.reloadsOf(session.resolver)
+		missingAnswers := session.reloadsOf(session.resolver)
+		session.noteReloadReasons(missingAnswers, hostReloads)
+		// A package restored from the host's run whose facts or answers do not hold here has no syntax to analyze, so
+		// the build is loaded again with it checked from source, as a question's reload loads its package.
+		result.Reloads = slices.Compact(slices.Sorted(slices.Values(append(missingAnswers, hostReloads...))))
 	}
 	if len(result.Reloads) > 0 {
 		// The pipeline runs again over a load that checks the reloads from source and drops this result, but a caller
@@ -411,12 +498,80 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	slices.Sort(result.CrashedRules)
 	result.FilesWalked, result.NodesVisited = walk(files, options.Counted)
 	result.Replays = int(resolver.Fallbacks())
+	if options.Reads != nil {
+		for recorded, reads := range options.Reads {
+			// A package an earlier wave of this run analyzed recorded its reads then; one the cache restored ran
+			// nothing, and its entry keeps no reads yet.
+			if session != nil && session.restored(recorded) {
+				reads.MarkNever(build_reads.RestoredFromCache)
+			}
+		}
+		result.Reads = options.Reads
+	}
 	if session != nil {
 		session.save(graph, options.Withheld, files)
 		result.Cache = session.counts
+		result.FromHost = session.hostCounts()
+		if options.KeepForBuilds && options.Reads != nil {
+			result.Host = session.keepForBuilds(graphs, analyzed, options.Reads, options.Withheld, files)
+		}
 	}
 	result.Elapsed = time.Since(started)
 	return result, nil
+}
+
+// recordUnreachedTypes starts, on walks, the walk of the type reads of each package of reads that no action reached,
+// so nothing walked them as its last action finished (checker.Options.Reads): a dependency no analyzer that learns
+// facts runs on, or a root the run does not analyze. Its type information is still whole, since only the checker
+// lets it go, and only for a package it ran on. A package whose walk is claimed already, or marked never, is passed
+// over, and one with no type information, whose types came from export data, is left to the load, which marks it
+// never. Beside the load, ready is Options.Ready: a package no action reached may still be in its check, as a root the
+// run does not analyze can be, so each is read only once it is final.
+//
+// Every package then ends its run in one of three ways. One checked from source and reached by an action is walked
+// by the checker; one checked from source and reached by none, here; one the load knows can never be restored (types
+// alone, cgo) or restored from the findings cache, marked never by the load or by Run.
+func recordUnreachedTypes(
+	reads map[*packages.Package]*build_reads.Reads,
+	ready func(*packages.Package) <-chan struct{},
+	walks *build_reads.Walks,
+) {
+	for unreached, packageReads := range reads {
+		if packageReads.Claimed() {
+			continue
+		}
+		var final <-chan struct{}
+		if ready != nil {
+			final = ready(unreached)
+		}
+		walks.Go(unreached, final, func() {
+			if !packageReads.Claim() || unreached.TypesInfo == nil {
+				return
+			}
+			packageReads.Record(unreached.Types, unreached.TypesInfo)
+		})
+	}
+}
+
+// markForeignFindings marks reads never when a finding of analyzedPackage names a file that is not the package's own:
+// the file it is in, a file its message names or one its fix edits (see namesForeignFile). Such a finding can change
+// with a line of another package, which no read records. known gives every file of the load.
+func markForeignFindings(
+	reads *build_reads.Reads,
+	analyzedPackage *packages.Package,
+	found []Finding,
+	known func() *knownFiles,
+) {
+	if reads.Never() != "" {
+		return
+	}
+	own := ownFiles(analyzedPackage)
+	for _, finding := range found {
+		if !own[finding.File] || namesForeignFile(finding, own, known()) {
+			reads.MarkNever(fmt.Sprintf("a finding of %s names a file of another package", finding.Rule))
+			return
+		}
+	}
 }
 
 // abandoned is whether abandon is closed, never for a nil one.
@@ -438,7 +593,8 @@ func abandoned(abandon <-chan struct{}) bool {
 // rule on the dispatcher. ForDependents keeps a dispatcher's requirement for its listeners only where a rule of this
 // run requires it too, so what only a left-out rule reads never runs. Resolver is a new fact resolver, one for the run
 // the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat), with no
-// store, which Run gives the resolver of a run with the findings cache.
+// store, which Run gives the resolver of a run with the findings cache. Recorded hands each rule its package's reads,
+// to record its lookups of other packages in, once Run sets Reads (#b2t9xmf).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
@@ -447,6 +603,7 @@ func DispatchOptions() *checker.Options {
 		ForDependents: dispatch.ListenerRequirement,
 		Resolver:      fact_resolver.New(nil),
 		Resolved:      rule.Resolved,
+		Recorded:      rule.Recorded,
 	}
 }
 

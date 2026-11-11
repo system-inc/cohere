@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/tools/go/analysis"
@@ -63,6 +64,16 @@ type pipeline struct {
 	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads,
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
+
+	// keepsHostRestoreOff, set only by a test, has every extra build check every package itself rather than restore any
+	// from the host's run, so the test can compare the two (#b2t9xmf).
+	keepsHostRestoreOff bool
+
+	// hostLoading and hostLinting are the host's build's wall time loading the workspace and running the rules over it,
+	// in nanoseconds, over every load and pass, its build record's (buildRun). A load or a pass beside another runs on
+	// a goroutine of its own, so each is added when it ends.
+	hostLoading atomic.Int64
+	hostLinting atomic.Int64
 
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
 	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
@@ -203,6 +214,10 @@ func (engine *pipeline) run() int {
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
 		engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{})
+		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
+		if engine.session != nil && engine.recordsReads() {
+			engine.session.KeepForBuilds()
+		}
 	}
 	var loaded *load.Loaded
 	var loadError error

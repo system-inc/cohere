@@ -16,7 +16,14 @@ func init() {
 		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) bool {
 			parameter, isParameter := object.(*types.Var)
 			return isParameter && judgeIn(resolver, home, parameter)
-		})
+		}, bodilessMark)
+}
+
+// bodilessMark is whether a parameter of a function declared without a body is marked, from its types alone
+// (fact_resolver.Ask): never. The push marks a parameter only by a check or a call in its function's blocks, and such
+// a function, built from its declaration, has none.
+func bodilessMark(types.Object) bool {
+	return false
 }
 
 // marks is SA5012's state in one package: the parameters of each function judged that it marks, by the function,
@@ -45,7 +52,7 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, parame
 	}
 	return fact_resolver.Ask(resolver, reader, Kind, parameter, func(home *fact_resolver.Package) bool {
 		return judgeIn(resolver, home, parameter)
-	})
+	}, func() bool { return bodilessMark(parameter) })
 }
 
 // judgeIn is whether parameter, of home, is marked, judged there under home's lock, or the verdict kept.

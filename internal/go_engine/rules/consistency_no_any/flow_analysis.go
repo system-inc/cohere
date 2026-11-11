@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -668,20 +669,35 @@ func (flows *flowAnalysis) anyFixed(declarations []flowKey) bool {
 // Implementing an interface takes exactly its method's signature, and an interface written here to be satisfied by
 // another package's type copies that type's method, so in both cases the signature is that package's. A near miss,
 // a generic type's method with as many parameters and results, is left alone too, since some instantiation may be
-// what it matches.
+// what it matches. The question and the method that answers it, or none, are recorded in the context's reads, since
+// the answer depends on every method of the import closure, which no type read of the package holds (#b2t9xmf).
 func (flows *flowAnalysis) matchesForeignMethod(method *types.Func) bool {
+	matched := flows.matchingForeignMethod(method)
+	flows.context.Reads().AddLookup(build_reads.Lookup{
+		Query:   build_reads.QueryMethod,
+		Name:    method.Name(),
+		Subject: method,
+		Found:   matched != nil,
+		Answer:  matched,
+	})
+	return matched != nil
+}
+
+// matchingForeignMethod is the first method of another package that matchesForeignMethod matches method to, nil when
+// none does.
+func (flows *flowAnalysis) matchingForeignMethod(method *types.Func) *types.Func {
 	if flows.foreign == nil {
 		flows.foreign = buildForeignMethods(flows.context.Package)
 	}
-	for _, foreignSignature := range flows.foreign.byName[method.Name()] {
-		if types.Identical(method.Signature(), foreignSignature) {
-			return true
+	for _, foreignMethod := range flows.foreign.byName[method.Name()] {
+		if types.Identical(method.Signature(), foreignMethod.Signature()) {
+			return foreignMethod
 		}
 	}
-	for _, foreignSignature := range flows.foreign.genericByName[method.Name()] {
-		if sameShape(method.Signature(), foreignSignature) {
-			return true
+	for _, foreignMethod := range flows.foreign.genericByName[method.Name()] {
+		if sameShape(method.Signature(), foreignMethod.Signature()) {
+			return foreignMethod
 		}
 	}
-	return false
+	return nil
 }

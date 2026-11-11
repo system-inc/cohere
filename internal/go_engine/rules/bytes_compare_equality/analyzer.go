@@ -142,7 +142,7 @@ func equalFunction(context *rule.Context, binary *ast.BinaryExpr, compareFunctio
 			return nil, false
 		}
 		_, equal := scope.LookupParent("Equal", binary.Pos())
-		if equal != nil && equal == compare.Pkg().Scope().Lookup("Equal") {
+		if equal != nil && equal == context.LookupIn(compare.Pkg(), "Equal") {
 			return &ast.Ident{Name: "Equal"}, true
 		}
 	}

@@ -43,6 +43,9 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 		key, keyed := cache.Key{}, false
 		if owner != nil {
 			key, keyed = session.keys[owner]
+			if !keyed {
+				key, keyed = session.buildKeys[owner]
+			}
 		}
 		if !keyed {
 			incomplete = true

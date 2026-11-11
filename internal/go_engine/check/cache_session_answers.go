@@ -80,10 +80,21 @@ type answering struct {
 	byTypes map[*types.Package]*packages.Package
 
 	// reloaded are the IDs of the packages every load of the run so far checked from source to answer a question,
-	// never restored, and rounds how many times a pass asked for new ones, each a load and a lint of its own.
+	// never restored, and rounds how many times a pass asked for new ones, each a load and a lint of its own. reasons
+	// are why the last pass asked for each, by ID (noteReloadReasons), and roundsBy counts each round under every
+	// reason of the packages it added.
 	reloaded map[string]bool
 	rounds   int
+	reasons  map[string][]string
+	roundsBy map[string]int
 }
+
+// The reasons a pass asks for a package to be loaded again, which count its rounds (answering.roundsBy): a question
+// reached it restored with no answer stored, or the extra build restored it from the host's run and declined it.
+const (
+	reloadForMissingAnswer = "missingAnswer"
+	reloadForHostDecline   = "hostDecline"
+)
 
 // know adds each package of known whose types are set, which the run's questions may reach.
 func (session *CacheSession) know(known ...*packages.Package) {
@@ -110,28 +121,37 @@ func (session *CacheSession) packageOf(packageTypes *types.Package) *packages.Pa
 // entry's, for a package the run trusts the entry of (see trusted), restored from the binary's table, complete in every
 // kind its release computed, or from the store by its own first key, or by an alias or its second key once its reads
 // held; or, for a package loaded from source to answer a question, its entry's under its own first key, which the run
-// did not restore. It is nil when there are none.
+// did not restore. A trusted entry's record of what its package declares without a body comes with them. It is nil
+// when there are none and no such record.
 func (session *CacheSession) Answers(packageTypes *types.Package) *fact_resolver.Answers {
 	asked := session.packageOf(packageTypes)
 	if asked == nil {
 		return nil
 	}
-	var held []kindAnswers
+	var held entryDemand
 	if restored := session.hits[asked]; restored != nil {
 		if session.trusted[asked] {
-			held = restored.answers
+			held = entryDemand{answers: restored.answers, bodiless: restored.bodiless,
+				bodiesRecorded: restored.bodiesRecorded}
 		}
 	} else {
-		held = session.previous[asked].answers
+		held = session.previous[asked]
 	}
-	if len(held) == 0 {
+	if len(held.answers) == 0 && !held.bodiesRecorded {
 		return nil
 	}
 	answers := &fact_resolver.Answers{
-		Values:   map[string]map[objectpath.Path][]byte{},
-		Complete: map[string]bool{},
+		Values:         map[string]map[objectpath.Path][]byte{},
+		Complete:       map[string]bool{},
+		BodiesRecorded: held.bodiesRecorded,
 	}
-	addAnswers(answers, held)
+	addAnswers(answers, held.answers)
+	if held.bodiesRecorded {
+		answers.Bodiless = make(map[objectpath.Path]bool, len(held.bodiless))
+		for _, path := range held.bodiless {
+			answers.Bodiless[path] = true
+		}
+	}
 	return answers
 }
 
@@ -157,16 +177,41 @@ func (session *CacheSession) Reload(reloads []string) bool {
 		session.answering.reloaded = map[string]bool{}
 	}
 	added := false
+	reasons := map[string]bool{}
 	for _, identifier := range reloads {
 		if !session.answering.reloaded[identifier] {
 			session.answering.reloaded[identifier] = true
 			added = true
+			for _, reason := range session.answering.reasons[identifier] {
+				reasons[reason] = true
+			}
 		}
 	}
 	if added {
 		session.answering.rounds++
+		if session.answering.roundsBy == nil {
+			session.answering.roundsBy = map[string]int{}
+		}
+		for reason := range reasons {
+			session.answering.roundsBy[reason]++
+		}
 	}
 	return added
+}
+
+// noteReloadReasons keeps why a pass asks for each package it names to be loaded again, which the round that loads
+// them counts (Reload): missingAnswers, the IDs a question reached restored with no answer stored, and hostDeclines,
+// those restored from the host's run that the build declined. Each pass's replace the last's.
+func (session *CacheSession) noteReloadReasons(missingAnswers []string, hostDeclines []string) {
+	session.answering.lock.Lock()
+	defer session.answering.lock.Unlock()
+	session.answering.reasons = map[string][]string{}
+	for _, identifier := range missingAnswers {
+		session.answering.reasons[identifier] = append(session.answering.reasons[identifier], reloadForMissingAnswer)
+	}
+	for _, identifier := range hostDeclines {
+		session.answering.reasons[identifier] = append(session.answering.reasons[identifier], reloadForHostDecline)
+	}
 }
 
 // reloading reports whether the run checks the package from source to answer a question, so no load restores it.
@@ -215,12 +260,22 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 	}
 }
 
-// entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, and the answers
-// its analysis read of other packages, with whether those could all be named.
+// entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, the answers its
+// analysis read of other packages, with whether those could all be named, and what it declares without a body, with
+// whether the load recorded that (see cacheEntry's Bodiless).
 type entryDemand struct {
 	answers         []kindAnswers
 	reads           []storedRead
 	readsIncomplete bool
+	bodiless        []objectpath.Path
+	bodiesRecorded  bool
+}
+
+// withBodiless is demanded with what saved declares without a body, as the run's load recorded it while it held
+// saved's syntax (load.Bodiless), for the entry written of saved.
+func (session *CacheSession) withBodiless(saved *packages.Package, demanded entryDemand) entryDemand {
+	demanded.bodiless, demanded.bodiesRecorded = session.bodiless.Of(saved)
+	return demanded
 }
 
 // demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are every answer of its

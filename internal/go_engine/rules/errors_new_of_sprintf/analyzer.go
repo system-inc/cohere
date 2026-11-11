@@ -123,7 +123,7 @@ func errorfFunction(context *rule.Context, call *ast.CallExpr, sprintfFunction a
 			return nil, false
 		}
 		_, errorf := scope.LookupParent("Errorf", call.Pos())
-		if errorf != nil && errorf == sprintf.Pkg().Scope().Lookup("Errorf") {
+		if errorf != nil && errorf == context.LookupIn(sprintf.Pkg(), "Errorf") {
 			return &ast.Ident{Name: "Errorf"}, true
 		}
 	}

@@ -19,7 +19,9 @@ import (
 	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )
 
 // loader parses and type-checks a graph from source, every package once its imports are, as many at once as
@@ -76,6 +78,23 @@ type loader struct {
 	// typesOnly are the dependencies whose types alone the caller reads (see PackagesWithRootSyntax): each is checked
 	// with no type maps, but one that withholds, which judges its errors and withholds its declarations by them.
 	typesOnly map[*packages.Package]bool
+
+	// reads are every reachable package's reads of other packages (see build_reads), made before any work starts, so
+	// the map is only read after, each marked never by its check when the load knows it can never be restored
+	// (recordReads). checked are the packages checked from source, under checkedLock: one whose types came from export
+	// data was not checked here, has no type maps to walk, and is marked never once the load ends.
+	reads       map[*packages.Package]*build_reads.Reads
+	checkedLock sync.Mutex
+	checked     map[*packages.Package]bool
+
+	// declined are the restored packages checked from source after all, under declinedLock: their export data did
+	// not read, or their late decision turned them down (see restoreTypes).
+	declinedLock sync.Mutex
+	declined     map[*packages.Package]bool
+
+	// bodiless is what each package checked from source declares without a body, recorded as it is checked, while
+	// its syntax is surely there (see Bodiless).
+	bodiless *Bodiless
 
 	// filesParsed counts the files parsed, and fromExportData the packages whose types were read from export data.
 	filesParsed    atomic.Int64
@@ -171,7 +190,8 @@ func identifiersOf(stack []*node) string {
 // load type-checks every reachable package the findings cache does not hold. Each starts parsing at once and
 // type-checks when its imports are done; the graph is acyclic, so none waits forever. A package the cache holds is
 // never parsed: its types are read from its export data once its imports are done, when a package checked here
-// imports it, directly or through other packages the cache holds, and are never read otherwise (see needed).
+// imports it, directly or through other packages the cache holds, or when its restore is decided late (Restored.Holds),
+// and are never read otherwise (see needed).
 func (loader *loader) load(reachable []*node) {
 	needed := loader.needed(reachable)
 	loader.priorities = loader.prioritize(reachable)
@@ -183,13 +203,19 @@ func (loader *loader) load(reachable []*node) {
 			claims[current] = loader.claim(current.loaded.CompiledGoFiles)
 		}
 	}
+	turns := loader.lateClaimTurns(reachable)
 	var group sync.WaitGroup
 	for _, current := range reachable {
 		if restored, held := loader.restored[current.loaded]; held {
-			loader.withheld.restore(current.loaded, restored.Withheld.Errors)
+			// A package decided late gets what was withheld of it only once it is restored: declined, it is checked
+			// here, which withholds its own.
+			if restored.Holds == nil {
+				loader.withheld.restore(current.loaded, restored.Withheld.Errors)
+			}
 			current.loaded.Fset = loader.fileSet
 			current.loaded.TypesSizes = loader.sizes
 			if !needed[current] {
+				close(turns.decided[current])
 				close(current.done)
 				continue
 			}
@@ -200,16 +226,21 @@ func (loader *loader) load(reachable []*node) {
 				for _, imported := range current.loaded.Imports {
 					<-loader.graph.nodes[imported.ID].done
 				}
-				loader.acquire(current, slotWorkExportData)
-				readError := loader.readExportData(current, restored)
-				loader.slots.release()
-				if readError == nil {
+				if loader.restoreTypes(current, restored) {
+					close(turns.decided[current])
 					return
 				}
-				// Export data that does not read is a package checked from source after all, its imports done. It
-				// claims its files only now, after every package checked from source, so it waits only on claims
-				// made before its own.
-				syntax, parseErrors := loader.parseClaimed(loader.claim(current.loaded.CompiledGoFiles), current)
+				// Export data that does not read, or that the package must not be restored from, is a package checked
+				// from source after all, its imports done. It claims its files only now, after every package checked
+				// from source, so it waits only on claims made before its own, and after every restored package before
+				// it in reachable's order that shares a file with it has decided, so which of the two parses the file
+				// is the same every run, however their imports' timing falls.
+				for _, earlier := range turns.before[current] {
+					<-turns.decided[earlier]
+				}
+				taken := loader.claim(current.loaded.CompiledGoFiles)
+				close(turns.decided[current])
+				syntax, parseErrors := loader.parseClaimed(taken, current)
 				loader.acquire(current, slotWorkCheck)
 				loader.check(current, syntax, parseErrors)
 				loader.slots.release()
@@ -232,8 +263,95 @@ func (loader *loader) load(reachable []*node) {
 	group.Wait()
 }
 
-// needed is the packages whose types the load sets: each it checks from source, and each the cache holds that one
-// of those imports, directly or through other packages the cache holds.
+// restoreTypes sets the types of current, a restored package whose imports are done, from its export data, and
+// reports whether it did: not when its late decision (Restored.Holds) turns it down, before anything is read, nor when
+// its export data does not read. Either way it is declined (decline).
+//
+// Mutates: current its package gains its types when restored
+func (loader *loader) restoreTypes(current *node, restored *Restored) bool {
+	closure := ClosureTypes(current.loaded)
+	if restored.Holds != nil && !restored.Holds(closure) {
+		loader.decline(current, restored)
+		return false
+	}
+	loader.acquire(current, slotWorkExportData)
+	readError := loader.readExportData(current, restored, closure)
+	loader.slots.release()
+	if readError != nil {
+		loader.decline(current, restored)
+		return false
+	}
+	if restored.Holds != nil {
+		loader.withheld.restore(current.loaded, restored.Withheld.Errors)
+	}
+	return true
+}
+
+// decline notes that current, restored, is checked from source after all, and tells its restore when it was decided
+// late.
+func (loader *loader) decline(current *node, restored *Restored) {
+	loader.declinedLock.Lock()
+	loader.declined[current.loaded] = true
+	loader.declinedLock.Unlock()
+	if restored.Declined != nil {
+		restored.Declined()
+	}
+}
+
+// lateTurns are what orders the late claims of restored packages checked from source after all: each restored
+// package's decided, closed once it has either read its types or claimed its files, and before, the restored packages
+// earlier in reachable's order that share a file with it, whose decisions its claim waits for.
+type lateTurns struct {
+	decided map[*node]chan struct{}
+	before  map[*node][]*node
+}
+
+// lateClaimTurns are the late claims' turns over reachable (see lateTurns). Waiting on an earlier package's decision
+// never waits forever: a decision waits only on the package's imports and on earlier packages' decisions, and reachable
+// is connect's postorder, every import before its importer, so no wait ever leads to a later package.
+func (loader *loader) lateClaimTurns(reachable []*node) lateTurns {
+	turns := lateTurns{decided: map[*node]chan struct{}{}, before: map[*node][]*node{}}
+	claimants := map[string][]*node{}
+	for _, current := range reachable {
+		if _, held := loader.restored[current.loaded]; !held {
+			continue
+		}
+		turns.decided[current] = make(chan struct{})
+		seen := map[*node]bool{}
+		for _, file := range current.loaded.CompiledGoFiles {
+			for _, earlier := range claimants[file] {
+				if !seen[earlier] {
+					seen[earlier] = true
+					turns.before[current] = append(turns.before[current], earlier)
+				}
+			}
+			claimants[file] = append(claimants[file], current)
+		}
+	}
+	return turns
+}
+
+// ClosureTypes is the types of every package current reaches through its imports, by path, each already set: what a
+// package restored by its reads judges them against (Restored.Holds), and what its export data is read under.
+func ClosureTypes(current *packages.Package) map[string]*types.Package {
+	closure := map[string]*types.Package{}
+	var collect func(importer *packages.Package)
+	collect = func(importer *packages.Package) {
+		for _, imported := range importer.Imports {
+			if _, collected := closure[imported.PkgPath]; collected || imported.Types == nil {
+				continue
+			}
+			closure[imported.PkgPath] = imported.Types
+			collect(imported)
+		}
+	}
+	collect(current)
+	return closure
+}
+
+// needed is the packages whose types the load sets: each it checks from source, each whose restore is decided late
+// (Restored.Holds), and each the cache holds that one of those imports, directly or through other packages the cache
+// holds.
 func (loader *loader) needed(reachable []*node) map[*node]bool {
 	needed := map[*node]bool{}
 	var need func(current *node)
@@ -247,7 +365,7 @@ func (loader *loader) needed(reachable []*node) map[*node]bool {
 		}
 	}
 	for _, current := range reachable {
-		if _, held := loader.restored[current.loaded]; !held {
+		if restored, held := loader.restored[current.loaded]; !held || restored.Holds != nil {
 			need(current)
 		}
 	}
@@ -288,32 +406,21 @@ func (loader *loader) acquire(current *node, work slotWork) {
 }
 
 // readExportData sets a package's types from the export data the findings cache holds, against the types its
-// imports already have: every package its export data names is among its imports, transitively, and is put in the
-// importer's map first, so each object is the one that package declares, and every package of the run has exactly
-// one *types.Package. The package's own imports are set to the ones its type check had, in its order, since export
-// data names every package it reaches.
+// imports already have, closure (ClosureTypes): every package its export data names is among its imports,
+// transitively, and is put in the importer's map first, so each object is the one that package declares, and every
+// package of the run has exactly one *types.Package. The package's own imports are set to the ones its type check had,
+// in its order, since export data names every package it reaches.
 //
 // Mutates: current its package gains its types
-func (loader *loader) readExportData(current *node, restored *Restored) error {
+// Mutates: closure gains the package itself, which export data names its own objects by
+func (loader *loader) readExportData(current *node, restored *Restored, closure map[string]*types.Package) error {
 	loaded := current.loaded
 	if loaded.PkgPath == "unsafe" {
 		loaded.Types = types.Unsafe
 		return nil
 	}
-	imports := map[string]*types.Package{}
-	var collect func(importer *packages.Package)
-	collect = func(importer *packages.Package) {
-		for _, imported := range importer.Imports {
-			if _, collected := imports[imported.PkgPath]; collected || imported.Types == nil {
-				continue
-			}
-			imports[imported.PkgPath] = imported.Types
-			collect(imported)
-		}
-	}
-	collect(loaded)
 	own := types.NewPackage(loaded.PkgPath, loaded.Name)
-	imports[loaded.PkgPath] = own
+	closure[loaded.PkgPath] = own
 	var read *types.Package
 	var readError error
 	exportDataCpu := loader.timing.Measure(func() {
@@ -322,14 +429,14 @@ func (loader *loader) readExportData(current *node, restored *Restored) error {
 			readError = exportError
 			return
 		}
-		read, readError = gcexportdata.Read(bytes.NewReader(exportData), loader.fileSet, imports, loaded.PkgPath)
+		read, readError = gcexportdata.Read(bytes.NewReader(exportData), loader.fileSet, closure, loaded.PkgPath)
 	})
 	if readError != nil {
 		return fmt.Errorf("reading the export data of %s: %w", loaded.ID, readError)
 	}
 	ownImports := make([]*types.Package, 0, len(restored.Imports))
 	for _, path := range restored.Imports {
-		imported, found := imports[path]
+		imported, found := closure[path]
 		if !found {
 			return fmt.Errorf("reading the export data of %s: it imports %s, which none of its imports is", loaded.ID,
 				path)
@@ -490,11 +597,15 @@ func (loader *loader) parseInto(file string, contents []byte, placeholder *token
 // that: its syntax is the cgo tool's outputs. One the cgo tool did not translate differs in two things: the type
 // checker fakes package "C" (types.Config.FakeImportC) for the cgo files as written, and a type error of a
 // dependency's that reaches its cgo files is withheld (see withheld_errors.go). The package is checked at its
-// module's go version, and a package in no module, as the standard library's, at the newest.
+// module's go version, and a package in no module, as the standard library's, at the newest. What it declares without
+// a body is recorded then, while its syntax is surely there (see Bodiless).
 //
 // Mutates: current its package gains its syntax, types and errors
 func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []error) {
 	loaded := current.loaded
+	loader.checkedLock.Lock()
+	loader.checked[loaded] = true
+	loader.checkedLock.Unlock()
 	loaded.Fset = loader.fileSet
 	loaded.TypesSizes = loader.sizes
 	if loader.typesOnly[loaded] && !current.withholds {
@@ -575,6 +686,31 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 		loader.testFunctionsLock.Lock()
 		loader.testFunctions[loaded] = refused
 		loader.testFunctionsLock.Unlock()
+	}
+	loader.bodiless.record(loaded)
+	loader.recordReads(current)
+}
+
+// recordReads marks current, just checked, never restorable when the load knows it can never be (see build_reads). A
+// package checked for its types alone has no maps to read its reads from. One with cgo files, or whose types import
+// runtime/cgo, as cgo's translation makes them, is one vet's cgocall type-checks a second time from its raw cgo files,
+// a check nothing records. Every other package's type reads are walked by the rules' run, off the load's chain, once
+// its last action has finished (see checker.Options.Reads), or after the rules for a package no action reached.
+func (loader *loader) recordReads(current *node) {
+	reads := loader.reads[current.loaded]
+	if reads == nil {
+		return
+	}
+	loaded := current.loaded
+	switch {
+	case loader.typesOnly[loaded]:
+		reads.MarkNever("checked for its types only")
+	case len(current.listed.CgoFiles) > 0:
+		reads.MarkNever("it has cgo files, which vet's cgocall type-checks again, unrecorded")
+	// The same predicate vet's cgocall judges by, so a package it judges is never restored, which is what lets the
+	// restore leave cgocall's property out of a foreign field's rendering.
+	case type_predicates.UsesCgo(loaded.Types):
+		reads.MarkNever("it imports runtime/cgo, so vet's cgocall type-checks its cgo files again, unrecorded")
 	}
 }
 
@@ -669,6 +805,9 @@ func newLoader(
 		analyzed:      map[*packages.Package]bool{},
 		testFunctions: map[*packages.Package][]Diagnostic{},
 		typesOnly:     map[*packages.Package]bool{},
+		checked:       map[*packages.Package]bool{},
+		declined:      map[*packages.Package]bool{},
+		bodiless:      newBodiless(),
 		timing:        collector,
 	}
 }

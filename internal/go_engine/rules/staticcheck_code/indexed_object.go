@@ -18,7 +18,8 @@ func IndexedObject(context *rule.Context, path string, name string) types.Object
 	if indexed == nil {
 		return nil
 	}
-	return indexed.Scope().Lookup(name)
+	// Recorded in the context's reads, as every look into another package's scope is (#b2t9xmf).
+	return context.LookupIn(indexed, name)
 }
 
 // indexedPackage is the package of path the type index holds for the context's package, or nil.

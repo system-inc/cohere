@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // widePackageFiles is how many files the wide fixture's package has, besides its one in-package test file, and
@@ -213,6 +215,55 @@ func TestATestVariantWhoseTestFilesComeBetweenItsPackagesIsTheSameEveryLoad(test
 		last := len(files) - 1
 		withTests.loaded.CompiledGoFiles = slices.Concat(files[:last-1], []string{files[last], files[last-1]})
 		typeChecker.load(reachable)
+		names, bases := basesOf(typeChecker.fileSet, withTests)
+		byBase := slices.Clone(names)
+		slices.SortFunc(byBase, func(left, right string) int {
+			return bases[slices.Index(names, left)] - bases[slices.Index(names, right)]
+		})
+		orders[strings.Join(byBase, " ")]++
+	}
+	if len(orders) > 1 {
+		test.Errorf("the test variant's files took %d different orders over %d loads: %v", len(orders), loads, orders)
+	}
+}
+
+// TestRestoredPackagesCheckedFromSourceClaimInTheSameOrderEveryLoad restores the wide package and its test variant,
+// shaped as TestATestVariantWhoseTestFilesComeBetweenItsPackagesIsTheSameEveryLoad shapes it, each decided late and
+// each checked from source after all, the package turned down by its decision and the test variant by export data
+// that does not read, so both claim their files late, and loads it many times: the order the test variant's files
+// take depends on which of the two claims the shared files, so it must be the same every load, as a package checked
+// from source from the start has it.
+func TestRestoredPackagesCheckedFromSourceClaimInTheSameOrderEveryLoad(test *testing.T) {
+	test.Parallel()
+	if runtime.GOMAXPROCS(0) < 2 {
+		test.Skip("parses never overlap on one core")
+	}
+
+	newGraphOf, _ := wideGraph(test)
+	const loads = 200
+	orders := map[string]int{}
+	unreadable := func() ([]byte, error) { return nil, fmt.Errorf("no export data") }
+	for range loads {
+		typeChecker, reachable := newWideLoader(test, newGraphOf)
+		alone := typeChecker.graph.nodes["example.com/wide"]
+		withTests := typeChecker.graph.nodes["example.com/wide [example.com/wide.test]"]
+		if alone == nil || withTests == nil {
+			test.Fatalf("want example.com/wide and its test variant in the graph, got %v", typeChecker.graph.nodes)
+		}
+		files := withTests.loaded.CompiledGoFiles
+		last := len(files) - 1
+		withTests.loaded.CompiledGoFiles = slices.Concat(files[:last-1], []string{files[last], files[last-1]})
+		turnedDown := func(map[string]*types.Package) bool { return false }
+		held := func(map[string]*types.Package) bool { return true }
+		typeChecker.restored = map[*packages.Package]*Restored{
+			alone.loaded:     {ReadExportData: unreadable, Holds: turnedDown},
+			withTests.loaded: {ReadExportData: unreadable, Holds: held},
+		}
+		typeChecker.load(reachable)
+		if len(withTests.loaded.Syntax) != len(withTests.loaded.CompiledGoFiles) {
+			test.Fatalf("the test variant parsed %d of its %d files: %v", len(withTests.loaded.Syntax),
+				len(withTests.loaded.CompiledGoFiles), withTests.loaded.Errors)
+		}
 		names, bases := basesOf(typeChecker.fileSet, withTests)
 		byBase := slices.Clone(names)
 		slices.SortFunc(byBase, func(left, right string) int {

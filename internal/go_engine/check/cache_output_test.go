@@ -141,3 +141,49 @@ func TestTheFirstEditAfterAColdRunMissesOnlyTheEditedPackage(test *testing.T) {
 			"%+v, agreeing %t", edited.Cache, edited.Agrees)
 	}
 }
+
+// A finding names another package's file only by a word whose path is a file the load holds and not its own, and a
+// word whose base name no file has is passed over unjoined, except one ending in `..` or `.`, which cleaning folds
+// into the elements before it and which can still name a file. A word's one trailing period is a sentence's, so
+// `...` reads as `..`.
+func TestAFindingNamesAForeignFileOnlyByAFileTheLoadHolds(test *testing.T) {
+	test.Parallel()
+
+	own := &packages.Package{GoFiles: []string{"/w/p/x.go"}}
+	other := &packages.Package{GoFiles: []string{"/w/q/y.go"}, OtherFiles: []string{"/w/q/VERSION"}}
+	known := newKnownFiles()
+	known.addPackage(own)
+	known.addPackage(other)
+	for message, want := range map[string]bool{
+		"struct field tag conflicts with a field in ../q/y.go:12:3": true,
+		"see /w/q/y.go.":                             true,
+		"embeds (../q/VERSION)":                      true,
+		"reaches ../q/y.go/z/... here":               true,
+		"conflicts with x.go:4":                      false,
+		"names y.go, which is not in this directory": false,
+		"the value is never used":                    false,
+		"reaches ../q/z/... here":                    false,
+	} {
+		finding := Finding{File: "/w/p/x.go", Message: message}
+		if got := namesForeignFile(finding, ownFiles(own), known); got != want {
+			test.Errorf("%q names another package's file: %t, want %t", message, got, want)
+		}
+	}
+}
+
+// Reading a finding that names no file allocates nothing, since every finding of a package whose reads are recorded is
+// read for the files it names, and most name none.
+//
+// Not parallel: testing.AllocsPerRun refuses to run inside a parallel test, since other tests' allocations would count.
+func TestAFindingThatNamesNoFileIsReadWithoutAllocating(test *testing.T) {
+	own := &packages.Package{GoFiles: []string{"/w/p/x.go"}}
+	known := newKnownFiles()
+	known.addPackage(own)
+	ownFilesOf := ownFiles(own)
+	finding := Finding{File: "/w/p/x.go", Message: "the value (of type int) assigned to x is never used, see the docs"}
+	if allocations := testing.AllocsPerRun(100, func() {
+		namesForeignFile(finding, ownFilesOf, known)
+	}); allocations != 0 {
+		test.Errorf("reading a finding that names no file allocated %.0f times, want none", allocations)
+	}
+}

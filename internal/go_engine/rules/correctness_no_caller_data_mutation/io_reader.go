@@ -29,7 +29,7 @@ func (lookup *ioReader) bufferOf(context *rule.Context, function *ast.FuncDecl) 
 	}
 	if !lookup.looked {
 		lookup.looked = true
-		lookup.reader = findIoReader(context.Package)
+		lookup.reader = findIoReader(context.Package, context.Reads())
 	}
 	if lookup.reader == nil {
 		return nil

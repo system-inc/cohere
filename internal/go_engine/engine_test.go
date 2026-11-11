@@ -821,9 +821,13 @@ var (
 	cachePackagesPattern   = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped|waves)":\d+`)
 	panicFramesPattern     = regexp.MustCompile(`, at [^"]*"`)
 	buildTargetPattern     = regexp.MustCompile(`"target":"[^"]*"`)
-	checkedByBuildPattern  = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
-	hostTarget             = " on " + runtime.GOOS + "/" + runtime.GOARCH
-	normalizedProvenance   = contract.ProvenanceRecord{
+	// buildTimingPattern is a build record's times, each written only when not 0, so one that took under a
+	// millisecond on one run and more on the next would appear and vanish: each is normalized to 0, which the record
+	// writes by leaving it out.
+	buildTimingPattern    = regexp.MustCompile(`,"(load|lint|decide|keep|wait)Milliseconds":\d+`)
+	checkedByBuildPattern = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
+	hostTarget            = " on " + runtime.GOOS + "/" + runtime.GOARCH
+	normalizedProvenance  = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",
 	}
 )
@@ -855,6 +859,7 @@ func normalize(stream string, root string) string {
 	normalized = cgoMillisecondsPattern.ReplaceAllString(normalized, "${1}0")
 	normalized = panicFramesPattern.ReplaceAllString(normalized, `, at <frames>"`)
 	normalized = buildTargetPattern.ReplaceAllString(normalized, `"target":"target"`)
+	normalized = buildTimingPattern.ReplaceAllString(normalized, "")
 	normalized = checkedByBuildPattern.ReplaceAllString(normalized, `"reason":"checked by the target build"`)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
 }

@@ -4,9 +4,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
@@ -108,10 +110,13 @@ type CacheCounts struct {
 	WriteFailed int
 
 	// Reloads is the packages the run loaded from source, though the cache held them, because a question of a fact
-	// computed on demand reached one restored and no store answered it (#w7zmvat wave 3), over every load of the run,
-	// and ReloadRounds how many times the run loaded and linted again to do so.
-	Reloads      int
-	ReloadRounds int
+	// computed on demand reached one restored and no store answered it (#w7zmvat wave 3), or, in an extra build, a
+	// package restored from the host's run was declined (#b2t9xmf), over every load of the run, and ReloadRounds how
+	// many times the run loaded and linted again to do so. ReloadRoundsBy counts each round under each reason its
+	// packages were loaded again for: missingAnswer or hostDecline.
+	Reloads        int
+	ReloadRounds   int
+	ReloadRoundsBy map[string]int
 
 	// Problems are what kept the cache from being read or written: keys that could not be computed, which leaves
 	// every package a miss and none written, an entry that could not be encoded, and the first write that failed.
@@ -158,7 +163,7 @@ type CacheSession struct {
 	attempted map[*packages.Package]bool
 
 	// knownFiles is every file of every package the load reached, for positionDependent, made once.
-	knownFiles map[string]bool
+	knownFiles *knownFiles
 
 	// given is the packages to analyze, as the load named them.
 	given map[*packages.Package]bool
@@ -187,10 +192,31 @@ type CacheSession struct {
 	resolver  *fact_resolver.Resolver
 	previous  map[*packages.Package]entryDemand
 
+	// bodiless is the last run's load's record of what each package checked from source declares without a body,
+	// which each entry written keeps (see load.Bodiless), nil for none.
+	bodiless *load.Bodiless
+
 	// trusted are the hits whose entry's findings and answers hold for the package as the run finds it (see
 	// cache_session_reads.go), and byIdentifier every package the load reached, by ID, which a read names its owner by.
 	trusted      map[*packages.Package]bool
 	byIdentifier map[string]*packages.Package
+
+	// keepsForBuilds is set on the host's session of a run with extra builds (KeepForBuilds), whose every Restore keys
+	// the load, a store or none, into keptKeys, for the portable digests and the reads' owners of the entries it keeps
+	// for them (keepForBuilds). written are the misses whose entry this run wrote to the store, which it reads back
+	// rather than encode again, and buildKeys the keys a run without a store names an entry's reads' owners by
+	// (readsOf).
+	keepsForBuilds bool
+	keptKeys       *cache.Keyed
+	written        map[*packages.Package]bool
+	buildKeys      map[*packages.Package]cache.Key
+
+	// keeping is the time the host's run spent keeping its packages for the extra builds over every load: the keys a
+	// run without a store computes only to keep them, and keepForBuilds.
+	keeping time.Duration
+
+	// host is the restore from the host's run of an extra build's session, nil for any other (see RestoreFromHost).
+	host *hostState
 }
 
 // NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
@@ -243,6 +269,8 @@ func (session *CacheSession) Restore(
 	session.outputs = map[*packages.Package]cache.Key{}
 	session.closures = map[*packages.Package]closureDigest{}
 	session.attempted = map[*packages.Package]bool{}
+	session.written = map[*packages.Package]bool{}
+	session.buildKeys = nil
 	session.standardLibraryKeys = nil
 	session.fromBinary = map[*packages.Package]bool{}
 	session.given = make(map[*packages.Package]bool, len(analyzed))
@@ -266,15 +294,30 @@ func (session *CacheSession) Restore(
 	// The digests of every file Keys hashed, which the standard library's keys read rather than hash again; none
 	// without a store, which keys only the standard library.
 	var hashed cache.FileDigests
-	if session.caching.Store != nil {
+	var keyed *cache.Keyed
+	session.keptKeys = nil
+	// The host's run keys its load here even without a store, as an extra build's restore keys its own (see
+	// restoreFromHost): only before any package has its syntax do the extra inputs read what both builds read alike.
+	if session.caching.Store != nil || session.keepsForBuilds {
+		keysStarted := time.Now()
 		keyContext := session.caching.Context
 		keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+loader)
-		keyed, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files,
+		var keysError error
+		keyed, keysError = cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files,
 			session.caching.Held)
+		// Keys a run with a store computes anyway; without one, they are the keep's alone.
+		if session.caching.Store == nil {
+			session.keeping += time.Since(keysStarted)
+		}
 		if keysError != nil {
 			session.problem(fmt.Sprintf("computing the keys: %v", keysError))
 			return nil
 		}
+		if session.keepsForBuilds {
+			session.keptKeys = keyed
+		}
+	}
+	if session.caching.Store != nil {
 		session.keys, session.own, hashed = keyed.Keys, keyed.Own, keyed.Files
 		session.files = keyed.Files
 	}
@@ -287,6 +330,13 @@ func (session *CacheSession) Restore(
 	for dropping {
 		dropping = session.dropShortHits(reachable)
 	}
+	// What the build's own store holds is restored by the build's key, exactly; only what it does not hold is restored
+	// from the host's run, by what the package read (#b2t9xmf).
+	session.restoreFromHost(loader, reachable, keyed)
+	for dropping = true; dropping; {
+		dropping = session.dropShortHits(reachable)
+	}
+	session.dropShortHostHits()
 	restoring := make(map[*packages.Package]*load.Restored, len(session.hits))
 	for hit, restored := range session.hits {
 		restoring[hit] = restored.types
@@ -592,6 +642,7 @@ func (session *CacheSession) save(
 	session.answering.lock.Lock()
 	session.counts.Reloads = len(session.answering.reloaded)
 	session.counts.ReloadRounds = session.answering.rounds
+	session.counts.ReloadRoundsBy = maps.Clone(session.answering.roundsBy)
 	session.answering.lock.Unlock()
 	if session.caching.Store == nil {
 		return
@@ -604,7 +655,14 @@ func (session *CacheSession) save(
 		}
 	}
 	session.saveMisses([]*checker.Graph{graph}, missed, withheld, files)
-	session.counts.Hit = len(session.hits) - len(session.fromBinary)
+	// A package restored from the host's run is neither a hit of the build's store nor a miss, and gets no entry here:
+	// the host's entry is not provably the one this build would write, since its output digest and second key are
+	// of the host's types, so restoring a warm build from them is the next unit's (#b2t9xmf).
+	hostRestored := 0
+	if session.host != nil {
+		hostRestored = len(session.host.restoring)
+	}
+	session.counts.Hit = len(session.hits) - len(session.fromBinary) - hostRestored
 	session.counts.Missed = len(session.keys) - len(session.hits)
 	session.counts.SecondKeyHit = len(session.secondKeyHits)
 }
@@ -630,9 +688,12 @@ func (session *CacheSession) saveMisses(
 		}
 	}
 	knownFiles := session.allFiles()
+	// A package above one restored from the host's run whose restore is not settled, or was declined, read what the
+	// restore gave, which may not stand: it is saved by a later wave, or by the build's next load, never now.
+	unsettled := session.unsettledBelow()
 	var saving []*packages.Package
 	for _, keyed := range missed {
-		if session.attempted[keyed] {
+		if session.attempted[keyed] || unsettled[keyed] {
 			continue
 		}
 		session.attempted[keyed] = true
@@ -654,9 +715,9 @@ func (session *CacheSession) saveMisses(
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
-			demanded := session.demandOf(saved, session.previous[saved])
+			demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
 			entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-				withheld[saved], demanded, files[saved], knownFiles)
+				withheld[saved], demanded, files[saved], knownFiles, true)
 			var putError error
 			// The export data goes first, so an entry is never in the store before what it needs to be read.
 			if encodeError == nil && entry.exportData != nil {
@@ -687,6 +748,7 @@ func (session *CacheSession) saveMisses(
 			default:
 				session.counts.FactsDropped += entry.dropped
 				session.counts.Written++
+				session.written[saved] = true
 				written = append(written, saved)
 			}
 		}()
@@ -727,18 +789,13 @@ func (session *CacheSession) alias(aliases map[cache.Key]cache.Key) {
 }
 
 // allFiles is every file of every package the load reached, made on first use.
-func (session *CacheSession) allFiles() map[string]bool {
+func (session *CacheSession) allFiles() *knownFiles {
 	if session.knownFiles != nil {
 		return session.knownFiles
 	}
-	session.knownFiles = map[string]bool{}
+	session.knownFiles = newKnownFiles()
 	for keyed := range session.keys {
-		for _, files := range [][]string{keyed.GoFiles, keyed.CompiledGoFiles, keyed.OtherFiles, keyed.EmbedFiles,
-			keyed.IgnoredFiles} {
-			for _, file := range files {
-				session.knownFiles[file] = true
-			}
-		}
+		session.knownFiles.addPackage(keyed)
 	}
 	return session.knownFiles
 }

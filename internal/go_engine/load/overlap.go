@@ -2,6 +2,8 @@ package load
 
 import (
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
 // Overlap is a load's graph as it stands before any package is type-checked, every package's imports known (see
@@ -10,6 +12,20 @@ import (
 type Overlap struct {
 	// Packages are the ones to analyze, as Loaded.Packages will hold them.
 	Packages []*packages.Package
+
+	// Reads are every package's reads of other packages, for check.Run beside the load (see Loaded.Reads). The map
+	// never changes; a package checked from source has its never mark, if the load gives it one, by the time Ready
+	// closes for it, and one whose types come from export data is marked never as the load ends. Nil unless
+	// Caching.RecordReads asked for them.
+	Reads map[*packages.Package]*build_reads.Reads
+
+	// Bodiless is what each package checked from source declares without a body, filled as the load checks each one
+	// (see Loaded.Bodiless).
+	Bodiless *Bodiless
+
+	// WalkSlots are the load's slots, which the walks of a run beside the load take below every package's work, so
+	// they never displace its chain (see Loaded.WalkSlots).
+	WalkSlots *WalkSlots
 
 	// Rewritten is Loaded.Rewritten as the load fills it, which holds a package's rewritten files once Ready closes.
 	Rewritten *Rewritten

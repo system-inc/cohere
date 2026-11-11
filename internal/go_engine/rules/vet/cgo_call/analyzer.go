@@ -32,6 +32,8 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )
 
 // Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
@@ -59,9 +61,10 @@ const thisPackagePath = "·this·"
 const embeddedPointerMessage = "possibly passing Go type with embedded pointer to C"
 
 func run(pass *analysis.Pass) (any, error) {
-	// A package whose types do not import runtime/cgo does not use cgo. The cgo tool's translation adds the import,
-	// and so does the load, for a package whose cgo files it type-checked with package "C" faked.
-	if !importsPath(pass.Pkg, "runtime/cgo") {
+	// A package whose types do not import runtime/cgo does not use cgo. The load marks every package that does never
+	// restored from the host's run by the same predicate, which is why the restore can leave this pass's property out
+	// of a foreign field's rendering (type_predicates.UsesCgo).
+	if !type_predicates.UsesCgo(pass.Pkg) {
 		return nil, nil
 	}
 	cgoFiles, information, checkError := typeCheckCgoSourceFiles(
@@ -345,16 +348,6 @@ func typeOkForCgoCall(typed types.Type, visited map[types.Type]bool) bool {
 func isUnsafePointer(information *types.Info, expression ast.Expr) bool {
 	typed := information.Types[expression].Type
 	return typed != nil && typed.Underlying() == types.Typ[types.UnsafePointer]
-}
-
-// importsPath reports whether checked imports the package at path directly. x/tools' typesinternal.Imports.
-func importsPath(checked *types.Package, path string) bool {
-	for _, imported := range checked.Imports() {
-		if imported.Path() == path {
-			return true
-		}
-	}
-	return false
 }
 
 // importedPackage is the package specification imports, as information records it: under the specification itself

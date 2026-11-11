@@ -81,46 +81,64 @@ func compareFactDigests(left factDigest, right factDigest) int {
 	return cmp.Or(cmp.Compare(left.typeName, right.typeName), bytes.Compare(left.value[:], right.value[:]))
 }
 
-// positionDependent reports whether a finding of saved can change with a line of another package: its message names
-// a file the load holds that is not one of saved's own, by its absolute path or by its path relative to the finding's
-// own directory, as structtag writes it, a trailing `:line` or `:line:column` aside; or one of its fixes edits a
-// file that is not saved's own. Such a package is analyzed again whenever anything below it changes, as without the
-// early cutoff, since its importers' outputs say nothing about where their declarations are.
-func positionDependent(saved *packages.Package, analyses map[string]storedAnalysis, knownFiles map[string]bool) bool {
-	own := map[string]bool{}
-	for _, files := range [][]string{saved.GoFiles, saved.CompiledGoFiles, saved.OtherFiles, saved.EmbedFiles,
-		saved.IgnoredFiles} {
-		for _, file := range files {
-			own[file] = true
-		}
-	}
+// positionDependent reports whether a finding of saved can change with a line of another package, by naming a file of
+// it (see namesForeignFile). Such a package is analyzed again whenever anything below it changes, as without the early
+// cutoff, since its importers' outputs say nothing about where their declarations are.
+func positionDependent(saved *packages.Package, analyses map[string]storedAnalysis, known *knownFiles) bool {
+	own := ownFiles(saved)
 	for _, stored := range analyses {
 		for _, finding := range stored.Findings {
-			for _, named := range namedFiles(finding) {
-				if knownFiles[named] && !own[named] {
-					return true
-				}
-			}
-			for _, suggestion := range finding.Suggestions {
-				for _, edit := range suggestion.Edits {
-					if !own[edit.File] {
-						return true
-					}
-				}
+			if namesForeignFile(finding, own, known) {
+				return true
 			}
 		}
 	}
 	return false
 }
 
-// namedFiles are the paths a finding's message may name, each word of it with a trailing `:line` or `:line:column`
-// taken off, made absolute against the directory of the finding's file when it is relative.
-func namedFiles(finding Finding) []string {
-	words := strings.FieldsFunc(finding.Message, func(character rune) bool {
+// ownFiles is every file of owner's, of each kind the load lists.
+func ownFiles(owner *packages.Package) map[string]bool {
+	own := map[string]bool{}
+	for _, files := range [][]string{owner.GoFiles, owner.CompiledGoFiles, owner.OtherFiles, owner.EmbedFiles,
+		owner.IgnoredFiles} {
+		for _, file := range files {
+			own[file] = true
+		}
+	}
+	return own
+}
+
+// namesForeignFile reports whether finding names a file that is not one of own, its package's: its message names a
+// file of known, those the load holds, by its absolute path or by its path relative to the finding's own directory, as
+// structtag writes it, a trailing `:line` or `:line:column` aside; or one of its fixes edits any file not of own.
+func namesForeignFile(finding Finding, own map[string]bool, known *knownFiles) bool {
+	for _, named := range namedFiles(finding, known.baseNames) {
+		if known.paths[named] && !own[named] {
+			return true
+		}
+	}
+	for _, suggestion := range finding.Suggestions {
+		for _, edit := range suggestion.Edits {
+			if !own[edit.File] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// namedFiles are the paths a finding's message may name of files whose base names are among baseNames, each word of it
+// with a trailing `:line` or `:line:column` taken off, made absolute against the directory of the finding's file when
+// it is relative. A word whose base name no file has is passed over unjoined: cleaning a path keeps its last element,
+// so its path could name no file, except when that element is `.` or `..`, which cleaning folds into the elements
+// before it, and such a word is always made a path.
+func namedFiles(finding Finding, baseNames map[string]bool) []string {
+	// The words are read in place, never gathered into a slice, since most findings name no file and every finding
+	// of a package whose reads are recorded is read here (#b2t9xmf).
+	var named []string
+	for word := range strings.FieldsFuncSeq(finding.Message, func(character rune) bool {
 		return unicode.IsSpace(character) || strings.ContainsRune("\"'`()[]{},;", character)
-	})
-	named := make([]string, 0, len(words))
-	for _, word := range words {
+	}) {
 		word = strings.TrimSuffix(word, ".")
 		for range 2 {
 			index := strings.LastIndexByte(word, ':')
@@ -133,6 +151,9 @@ func namedFiles(finding Finding) []string {
 			word = word[:index]
 		}
 		if word == "" {
+			continue
+		}
+		if base := filepath.Base(word); base != "." && base != ".." && !baseNames[base] {
 			continue
 		}
 		if !filepath.IsAbs(word) {
