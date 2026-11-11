@@ -235,7 +235,7 @@ func TestChildArgumentsCarryTheLintConfigAbsolute(test *testing.T) {
 		{"--no-fix", "-lint-config=settings/Cohere.json", "--json"},
 		{"--no-fix", "--lint-config=settings/Cohere.json", "--json"},
 	} {
-		got := childArguments(arguments, "/work/settings/Cohere.json")
+		got := childArguments(arguments, "/work/settings/Cohere.json", false)
 		if want := []string{
 			"--no-fix",
 			"--json",
@@ -245,7 +245,7 @@ func TestChildArgumentsCarryTheLintConfigAbsolute(test *testing.T) {
 			test.Errorf("%v became %v, want %v", arguments, got, want)
 		}
 	}
-	if got := childArguments([]string{"--no-fix"}, ""); !reflect.DeepEqual(got, []string{"--no-fix"}) {
+	if got := childArguments([]string{"--no-fix"}, "", false); !reflect.DeepEqual(got, []string{"--no-fix"}) {
 		test.Errorf("no lint config named changed the arguments: %v", got)
 	}
 }

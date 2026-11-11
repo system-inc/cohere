@@ -624,3 +624,82 @@ func TestADiscoveredGoProjectNamesItsBuildsAndWhatNoRuleRanOn(test *testing.T) {
 		}
 	}
 }
+
+// TestANamedDirectoryHoldingSeveralProjectsChecksEach: `--directory` naming a directory that holds a tsconfig.json and
+// a go.work, adamic's shape, checks both projects and the TypeScript project nested below them, as `cd` there and
+// `cohere` would, never TypeScript's alone in silence (#pswhv5q). `--other-builds`, a Go switch, then reaches the Go
+// project rather than being refused as no Go project.
+func TestANamedDirectoryHoldingSeveralProjectsChecksEach(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"tsconfig.json":     discoveryTsconfig,
+		"source/a.ts":       "export const a = 1;\n",
+		"go.work":           "go 1.27\n\nuse .\n",
+		"go.mod":            "module example.com/mixed\n\ngo 1.27\n",
+		"sep/sep.go":        "// Package sep joins.\npackage sep\n\n// Separator joins.\nconst Separator = \"/\"\n",
+		"web/tsconfig.json": discoveryTsconfig,
+		"web/source/b.ts":   "export const b = 1;\n",
+	})
+	// The Go engine reads the repository's index, so the fixture is a repository git knows, not an empty `.git`.
+	initialize := exec.Command("git", "init", "--quiet")
+	initialize.Dir = root
+	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
+		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
+	}
+	// The TypeScript fixture's own findings fail the run, which is beside the point: each project's summary is.
+	output, _ := runCohere(test, binary, test.TempDir(), "--directory", root, "--no-fix", "--no-cache",
+		"--other-builds", "--json")
+	var labels []string
+	for _, line := range strings.Split(output, "\n") {
+		var record struct {
+			Kind  string `json:"kind"`
+			Label string `json:"label"`
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" {
+			labels = append(labels, record.Label)
+		}
+	}
+	slices.Sort(labels)
+	if want := []string{".", ". (Go)", "web"}; !slices.Equal(labels, want) {
+		test.Errorf("the run wrote the summaries %q, want %q, each project's:\n%s", labels, want, output)
+	}
+}
+
+// TestAChildRunAtADirectoryOfSeveralProjectsChecksItsOwnAlone: a project's run, which names its engine as every
+// child of a run over several projects does, checks that one project at the directory and starts no run of its own,
+// though the directory holds a tsconfig.json beside the go.work (#pswhv5q). Asked of the one process: it writes the Go
+// project's summary alone, with the label its parent gave it.
+func TestAChildRunAtADirectoryOfSeveralProjectsChecksItsOwnAlone(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"tsconfig.json": discoveryTsconfig,
+		"source/a.ts":   "export const a = 1;\n",
+		"go.work":       "go 1.27\n\nuse .\n",
+		"go.mod":        "module example.com/mixed\n\ngo 1.27\n",
+		"sep/sep.go":    "// Package sep joins.\npackage sep\n\n// Separator joins.\nconst Separator = \"/\"\n",
+	})
+	initialize := exec.Command("git", "init", "--quiet")
+	initialize.Dir = root
+	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
+		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
+	}
+	output, exitCode := runCohereWithEnvironment(test, binary, test.TempDir(),
+		[]string{projectEngineVariable + "=" + string(engineGo), projectLabelVariable + "=. (Go)"},
+		"--directory", root, "--no-fix", "--no-cache", "--json")
+	var labels []string
+	for _, line := range strings.Split(output, "\n") {
+		var record struct {
+			Kind  string `json:"kind"`
+			Label string `json:"label"`
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" {
+			labels = append(labels, record.Label)
+		}
+	}
+	if exitCode != 0 || !slices.Equal(labels, []string{". (Go)"}) {
+		test.Errorf("the child run exited %d with the summaries %q, want 0 and the Go project's alone:\n%s", exitCode,
+			labels, output)
+	}
+}

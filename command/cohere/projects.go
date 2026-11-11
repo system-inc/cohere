@@ -34,6 +34,13 @@ const projectLabelVariable = "COHERE_PROJECT_LABEL"
 // process, for its build to serve the tsconfig's include enumeration from. Nil otherwise. See #bjv0tg4.
 var discoveredListings *program.DirectoryListings
 
+// narrowingFlags are the flags beside `--directory` that name one project or answer about one, so a run given
+// any of them never discovers (discoveryApplies).
+var narrowingFlags = []string{
+	"tsconfig", "rules", "rules-enabled", "print-config", "version", "cache-dump", "explain", "stdin-filepath",
+	"profile",
+}
+
 // discoveryApplies reports whether a run discovers its projects. Anything that names one project, a
 // directory, a tsconfig or a path, narrows the run to it as it always did, and so do the listings, the
 // explanations and the editor's save, which answer about one project.
@@ -42,18 +49,31 @@ var discoveredListings *program.DirectoryListings
 // under it. It used to narrow, and the quiet hundred's harness, which names one, checked 2 of TanStack
 // Query's thousand files and refused prisma outright (#wvgxtey).
 func discoveryApplies(given map[string]bool, arguments []string) bool {
-	if len(arguments) > 0 {
+	if len(arguments) > 0 || given["directory"] {
 		return false
 	}
-	for _, name := range []string{
-		"directory", "tsconfig", "rules", "rules-enabled", "print-config",
-		"version", "cache-dump", "explain", "stdin-filepath", "profile",
-	} {
-		if given[name] {
-			return false
-		}
+	return !slices.ContainsFunc(narrowingFlags, func(name string) bool { return given[name] })
+}
+
+// namedDirectoryHoldsSeveral reports whether a run names a directory with `--directory`, and nothing else that
+// narrows it, and that directory is more than one engine's project, as adamic's root holds a tsconfig.json and a
+// go.work (#pswhv5q). `--directory` is a `cd`, so such a run discovers from that directory and checks every project
+// discovery finds there, nested ones included, as `cd` there and `cohere` would, where it once read the directory as
+// TypeScript's alone and checked nothing else, in silence. A child run, which names its engine, is one project as
+// ever: it never discovers, so a project's run never starts runs of its own.
+func namedDirectoryHoldsSeveral(
+	given map[string]bool,
+	arguments []string,
+	location projectLocation,
+	locateError error,
+) bool {
+	if !given["directory"] || len(arguments) > 0 || locateError != nil || os.Getenv(projectEngineVariable) != "" {
+		return false
 	}
-	return true
+	if slices.ContainsFunc(narrowingFlags, func(name string) bool { return given[name] }) {
+		return false
+	}
+	return len(enginesAt(location.Root)) > 1
 }
 
 // checkDiscoveredProjects discovers the projects under the root and, when there is more than the one the
@@ -71,8 +91,12 @@ func checkDiscoveredProjects(
 	lintConfigFileName string,
 	formats bool,
 	given map[string]bool,
+	atNamedDirectory bool,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
+	if atNamedDirectory {
+		root = location.Root
+	}
 	ignoreEntries, rootIgnoreEntriesError := rootIgnoreEntries(root)
 	if rootIgnoreEntriesError != nil {
 		return 0, false, rootIgnoreEntriesError
@@ -144,26 +168,38 @@ func checkDiscoveredProjects(
 		writeJsonLine(streams.Output, ignorePatternsJson{Kind: "ignorePatterns", IgnorePatterns: discoveredIgnores})
 	}
 	showWarning()
-	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), streams.Output), true, nil
+	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName, atNamedDirectory), streams.Output),
+		true, nil
 }
 
 // childArguments are the arguments every project's run gets: this run's, with a named lint config made
-// absolute. Discovery runs only when no path was named, so every argument is a flag, and a flag's value is
-// either joined to it with `=` or the next argument, since no boolean flag takes a separate one.
-func childArguments(arguments []string, lintConfigFileName string) []string {
-	if lintConfigFileName == "" {
+// absolute, and without the named directory when the run is at one (namedDirectoryHoldsSeveral), since each
+// project's run names its own. Discovery runs only when no path was named, so every argument is a flag, and a
+// flag's value is either joined to it with `=` or the next argument, since no boolean flag takes a separate one.
+func childArguments(arguments []string, lintConfigFileName string, atNamedDirectory bool) []string {
+	var dropped []string
+	if lintConfigFileName != "" {
+		dropped = append(dropped, "lint-config")
+	}
+	if atNamedDirectory {
+		dropped = append(dropped, "directory")
+	}
+	if len(dropped) == 0 {
 		return arguments
 	}
 	kept := make([]string, 0, len(arguments)+2)
 	for index := 0; index < len(arguments); index++ {
 		name, _, joined := strings.Cut(strings.TrimLeft(arguments[index], "-"), "=")
-		if name == "lint-config" && strings.HasPrefix(arguments[index], "-") {
+		if slices.Contains(dropped, name) && strings.HasPrefix(arguments[index], "-") {
 			if !joined {
 				index++
 			}
 			continue
 		}
 		kept = append(kept, arguments[index])
+	}
+	if lintConfigFileName == "" {
+		return kept
 	}
 	return append(kept, "--lint-config", lintConfigFileName)
 }
