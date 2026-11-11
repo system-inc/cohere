@@ -58,6 +58,23 @@ func TestGuardRecordValidates(test *testing.T) {
 	}
 }
 
+// A record whose runs asked for the host's build alone checked one build, so one that names more is refused. An
+// every-build record that checked one is not, since a tree whose files name no other platform has no other build.
+func TestARecordOfTheHostsBuildAloneNamesOneBuild(test *testing.T) {
+	test.Parallel()
+	hostAlone := guardRecord("cohere", "Mac16,5", 2, true)
+	hostAlone.Builds = []string{"darwin/arm64 cgo", "linux/arm64"}
+	validateError := Validate(hostAlone)
+	if validateError == nil || !strings.Contains(validateError.Error(), "asked for the host's build alone") {
+		test.Errorf("a host-only record of two builds validates with %v, want refused", validateError)
+	}
+	oneEveryBuild := guardRecord("cohere", "Mac16,5", 2, true)
+	oneEveryBuild.EveryBuild, oneEveryBuild.Builds = true, []string{"darwin/arm64 cgo"}
+	if validateError := Validate(oneEveryBuild); validateError != nil {
+		test.Errorf("an every-build record of one build is refused: %v", validateError)
+	}
+}
+
 // The threshold is a bound, not a band to land in: a median just inside it passes either way, and one just
 // past it is called, slower or faster. Each case sits a tenth of a percent from the 10% line, so a comparison
 // that moved the line, or let it include its own edge loosely, turns one of them.
@@ -147,6 +164,13 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 	goAlone.Engine = EngineGo
 	goAloneChecking := goAlone
 	goAloneChecking.NoFix = true
+	everyBuild := goAloneChecking
+	everyBuild.EveryBuild = true
+	everyBuild.Builds = []string{"darwin/arm64 cgo", "linux/arm64", "windows/arm64"}
+	everyBuildHostAlone := everyBuild
+	everyBuildHostAlone.Builds = []string{"darwin/arm64 cgo"}
+	release := goAloneChecking
+	release.StandardLibraryTable = &StandardLibraryTable{ReleaseStamp: "v0.2.0+e51c6a1e", Bytes: 1 << 20}
 	for name, want := range map[string]struct {
 		baseline Record
 		tonight  Record
@@ -188,6 +212,37 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 			baseline: goAloneChecking,
 			tonight:  goAlone,
 			refusal:  "the baseline's cold runs checked without fixing and tonight's fixed",
+		},
+		// An every-build night is never judged against a host-only baseline, either way round (#ccqee0e).
+		"an every-build night against a host-only baseline": {
+			baseline: goAloneChecking,
+			tonight:  everyBuild,
+			refusal:  "the baseline checked the host's build alone and tonight every build the Go files name",
+		},
+		"a host-only night against an every-build baseline": {
+			baseline: everyBuild,
+			tonight:  goAloneChecking,
+			refusal:  "the baseline checked every build the Go files name and tonight the host's build alone",
+		},
+		// A night labelled every-build that checked the host's alone, its forwarding broken, is never judged against
+		// an every-build baseline, though the labels agree: the builds it read decide.
+		"an every-build night that checked the host's alone": {
+			baseline: everyBuild,
+			tonight:  everyBuildHostAlone,
+			refusal: "the baseline checked the builds darwin/arm64 cgo; linux/arm64; windows/arm64 and tonight " +
+				"darwin/arm64 cgo, and runs of different builds are never compared",
+		},
+		// A release binary's night is never judged against a local build's baseline, either way round (#ccqee0e).
+		"a release night against a local build's baseline": {
+			baseline: goAloneChecking,
+			tonight:  release,
+			refusal: "the baseline's cohere carried no standard library table (a local build) and tonight's " +
+				"carried release v0.2.0+e51c6a1e's standard library table",
+		},
+		"a local build's night against a release baseline": {
+			baseline: release,
+			tonight:  goAloneChecking,
+			refusal:  "a local build is never compared with a release's",
 		},
 		"loaded baseline": {
 			baseline: guardRecord("ahra", "Mac16,5", 10, false),

@@ -4,12 +4,14 @@
 //
 //	go run ./internal/bench_results/tools/record -runs <runs.tsv> -engine <engine> -project <name> \
 //	  -project-commit <sha> -idle-floor <percent> -settle <seconds> -rounds <n> -modes <Cold,Warm,...> \
-//	  -band <percent> [-stopped-early] [-edit <path>] [-project-engine Go] [-no-fix] \
+//	  -band <percent> [-stopped-early] [-edit <path>] [-project-engine Go] [-no-fix] [-every-build] \
 //	  -gogc <value> -gomemlimit <value> -gomaxprocs <value>
 //
 // The Go settings are what the benchmark saw in its environment, each empty when unset, and -project-engine
 // names the one engine whose project every run checked alone, absent for a run of the whole root. -no-fix says the
-// cold and idle runs checked without fixing.
+// cold and idle runs checked without fixing, and -every-build that every run asked to check every build the Go files
+// name. The builds the cold and idle runs checked are read from the runs table, and whether the engine carries the
+// standard library's table from its --version.
 //
 // The engine's commit and whether its tree was modified come from the binary's own build info, not from
 // its --version prose, so a binary that names no commit is refused rather than recorded as clean.
@@ -23,11 +25,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/system-inc/cohere/internal/bench_results"
+	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 )
 
 func main() {
@@ -44,6 +48,7 @@ func main() {
 	edit := flag.String("edit", "", "the file the Edit runs changed, when Edit was measured")
 	projectEngine := flag.String("project-engine", "", "the engine whose project every run checked alone, if one")
 	noFix := flag.Bool("no-fix", false, "the cold and idle runs checked without fixing")
+	everyBuild := flag.Bool("every-build", false, "every run asked to check every build the Go files name")
 	goEnvironment := bench_results.GoEnvironment{}
 	flag.StringVar(&goEnvironment.Gogc, "gogc", "", "GOGC in the benchmark's environment, empty when unset")
 	flag.StringVar(&goEnvironment.Gomemlimit, "gomemlimit", "", "GOMEMLIMIT in the environment, empty when unset")
@@ -69,6 +74,7 @@ func main() {
 		*edit,
 		bench_results.Engine(*projectEngine),
 		*noFix,
+		*everyBuild,
 		&goEnvironment,
 		*out,
 	)
@@ -91,10 +97,11 @@ func record(
 	edit string,
 	projectEngine bench_results.Engine,
 	noFix bool,
+	everyBuild bool,
 	goEnvironment *bench_results.GoEnvironment,
 	out string,
 ) (string, error) {
-	cohere, engineProvenanceError := engineProvenance(engine)
+	cohere, table, engineProvenanceError := engineProvenance(engine)
 	if engineProvenanceError != nil {
 		return "", engineProvenanceError
 	}
@@ -102,28 +109,31 @@ func record(
 	if thisMachineError != nil {
 		return "", thisMachineError
 	}
-	runs, readRunsError := readRuns(runsPath)
+	runs, builds, readRunsError := readRuns(runsPath)
 	if readRunsError != nil {
 		return "", readRunsError
 	}
 	result := bench_results.Record{
-		Schema:        bench_results.SchemaVersion,
-		RecordedAt:    time.Now().UTC().Format(time.RFC3339),
-		Cohere:        cohere,
-		Project:       bench_results.Project{Name: project, Commit: projectCommit},
-		Machine:       machine,
-		IdleFloor:     idleFloor,
-		SettleSeconds: settle,
-		Rounds:        rounds,
-		MeasuredModes: measured,
-		Band:          band,
-		StoppedEarly:  stoppedEarly,
-		Edit:          edit,
-		Engine:        projectEngine,
-		NoFix:         noFix,
-		GoEnvironment: goEnvironment,
-		Runs:          runs,
-		Modes:         bench_results.Summarize(measured, runs),
+		Schema:               bench_results.SchemaVersion,
+		RecordedAt:           time.Now().UTC().Format(time.RFC3339),
+		Cohere:               cohere,
+		Project:              bench_results.Project{Name: project, Commit: projectCommit},
+		Machine:              machine,
+		IdleFloor:            idleFloor,
+		SettleSeconds:        settle,
+		Rounds:               rounds,
+		MeasuredModes:        measured,
+		Band:                 band,
+		StoppedEarly:         stoppedEarly,
+		Edit:                 edit,
+		Engine:               projectEngine,
+		NoFix:                noFix,
+		EveryBuild:           everyBuild,
+		Builds:               builds,
+		GoEnvironment:        goEnvironment,
+		StandardLibraryTable: table,
+		Runs:                 runs,
+		Modes:                bench_results.Summarize(measured, runs),
 	}
 	encoded, encodeError := bench_results.Encode(result)
 	if encodeError != nil {
@@ -142,15 +152,27 @@ func record(
 	return path, os.WriteFile(path, encoded, 0o644)
 }
 
-// engineProvenance is the engine's commit, its first --version line, and whether it was built from a
-// modified tree, as the engine states them (internal/release/packaging's Provenance). The launcher builds
-// from a committed snapshot with VCS stamping off and stamps the commit itself, so the commit comes from
-// the `commit:` line, lengthened to the full commit by this repository, and the tree was modified when the
-// `source:` line is printed or the binary's own vcs.modified stamp says so.
-func engineProvenance(engine string) (bench_results.Cohere, error) {
+// engineProvenance is the engine's commit, its first --version line, whether it was built from a modified tree, and the
+// standard library's table it carries and reads, nil for none, as the engine states them (internal/release/packaging's
+// Provenance). The launcher builds from a committed snapshot with VCS stamping off and stamps the commit itself, so the
+// commit comes from the `commit:` line, lengthened to the full commit by this repository, and the tree was modified
+// when the `source:` line is printed or the binary's own vcs.modified stamp says so.
+func engineProvenance(engine string) (bench_results.Cohere, *bench_results.StandardLibraryTable, error) {
 	output, outputError := exec.Command(engine, "--version").Output()
 	if outputError != nil {
-		return bench_results.Cohere{}, fmt.Errorf("%s --version: %w", engine, outputError)
+		return bench_results.Cohere{}, nil, fmt.Errorf("%s --version: %w", engine, outputError)
+	}
+	stamp, size, carries, found := standard_library_table.ReadVersionLine(string(output))
+	if !found {
+		// A release candidate from before the line carries a table and says nothing, so read as a local build it
+		// would be compared with a local build's number.
+		return bench_results.Cohere{}, nil, fmt.Errorf("%s does not say whether it carries a standard library "+
+			"table (no %q line in its --version), so its record could not say what its cold runs computed",
+			engine, strings.TrimSpace(standard_library_table.VersionPrefix))
+	}
+	var table *bench_results.StandardLibraryTable
+	if carries {
+		table = &bench_results.StandardLibraryTable{ReleaseStamp: stamp, Bytes: size}
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	cohere := bench_results.Cohere{Version: strings.TrimSpace(lines[0])}
@@ -168,11 +190,11 @@ func engineProvenance(engine string) (bench_results.Cohere, error) {
 		}
 	}
 	if short == "" {
-		return cohere, fmt.Errorf("%s names no commit, so nothing reproduces its numbers", engine)
+		return cohere, nil, fmt.Errorf("%s names no commit, so nothing reproduces its numbers", engine)
 	}
 	full, outputError := exec.Command("git", "rev-parse", "--verify", "--quiet", short+"^{commit}").Output()
 	if outputError != nil {
-		return cohere, fmt.Errorf("%s was built from %s, which this repository does not have", engine, short)
+		return cohere, nil, fmt.Errorf("%s was built from %s, which this repository does not have", engine, short)
 	}
 	cohere.Commit = strings.TrimSpace(string(full))
 	if info, readFileError := buildinfo.ReadFile(engine); readFileError == nil {
@@ -182,7 +204,7 @@ func engineProvenance(engine string) (bench_results.Cohere, error) {
 			}
 		}
 	}
-	return cohere, nil
+	return cohere, table, nil
 }
 
 // thisMachine is the hardware, read from sysctl and sw_vers. The host's name is never read.
@@ -226,12 +248,13 @@ func thisMachine() (bench_results.Machine, error) {
 }
 
 // readRuns reads quiet_machine.sh's runs table: mode, round, verdict_s, settled_s, engine_s, findings,
-// cache, load_before, load_after, idle_before, idle_after, quiet, exit, primes, tab-separated, with a header
-// line the script prints apart.
-func readRuns(path string) ([]bench_results.Run, error) {
+// cache, load_before, load_after, idle_before, idle_after, quiet, exit, primes, builds, tab-separated, with a header
+// line the script prints apart. It also gives the builds the cold and idle runs checked, which must be the same in
+// each: a record names one set of builds for the number Guard compares.
+func readRuns(path string) ([]bench_results.Run, []string, error) {
 	file, openError := os.Open(path)
 	if openError != nil {
-		return nil, openError
+		return nil, nil, openError
 	}
 	defer file.Close() // Ignored: the file was only read, so a failed close loses nothing.
 	modes := map[string]bench_results.Mode{
@@ -241,25 +264,38 @@ func readRuns(path string) ([]bench_results.Run, error) {
 		"idle": bench_results.ModeIdle,
 	}
 	runs := []bench_results.Run{}
+	var builds []string
+	buildsRead := false
 	scanner := bufio.NewScanner(file)
 	for line := 1; scanner.Scan(); line++ {
 		fields := strings.Split(scanner.Text(), "\t")
-		if len(fields) != 14 {
-			return nil, fmt.Errorf("%s:%d: %d fields, want 14", path, line, len(fields))
+		if len(fields) != 15 {
+			return nil, nil, fmt.Errorf("%s:%d: %d fields, want 15", path, line, len(fields))
 		}
 		mode, found := modes[fields[0]]
 		if !found {
-			return nil, fmt.Errorf("%s:%d: no mode %q", path, line, fields[0])
+			return nil, nil, fmt.Errorf("%s:%d: no mode %q", path, line, fields[0])
 		}
 		if fields[11] != "quiet" && fields[11] != "loaded" {
-			return nil, fmt.Errorf("%s:%d: quiet is %q, want quiet or loaded", path, line, fields[11])
+			return nil, nil, fmt.Errorf("%s:%d: quiet is %q, want quiet or loaded", path, line, fields[11])
 		}
 		numbers := map[int]float64{}
 		for _, index := range []int{1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13} {
 			var parseError error
 			if numbers[index], parseError = strconv.ParseFloat(fields[index], 64); parseError != nil {
-				return nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, parseError)
+				return nil, nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, parseError)
 			}
+		}
+		if mode == bench_results.ModeCold || mode == bench_results.ModeIdle {
+			var checked []string
+			if fields[14] != "" {
+				checked = strings.Split(fields[14], bench_results.BuildsSeparator)
+			}
+			if buildsRead && !slices.Equal(checked, builds) {
+				return nil, nil, fmt.Errorf("%s:%d: the run checked the builds %q, and an earlier one %q", path, line,
+					checked, builds)
+			}
+			builds, buildsRead = checked, true
 		}
 		runs = append(runs, bench_results.Run{
 			Mode:           mode,
@@ -278,5 +314,5 @@ func readRuns(path string) ([]bench_results.Run, error) {
 			Primes:         int(numbers[13]),
 		})
 	}
-	return runs, scanner.Err()
+	return runs, builds, scanner.Err()
 }

@@ -3,6 +3,7 @@ package bench_results
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -175,5 +176,27 @@ func TestRunOutputRefusesWhatItCannotRead(test *testing.T) {
 				test.Fatalf("read %+v", run)
 			}
 		})
+	}
+}
+
+// A Go project's summary names the builds it checked, and the reader keeps them in order, the host's first, for the
+// record (#ccqee0e). A summary that names none, a host-only run's or another engine's, adds none.
+func TestRunOutputReadsTheBuildsAGoRunChecked(test *testing.T) {
+	test.Parallel()
+	summary := func(label string, builds string) string {
+		return `{"kind":"summary","schemaVersion":1,"label":"` + label + `","verdict":"pass","seconds":1.5,` +
+			`"phases":[{"name":"lint","outcome":"ran"}],"cache":{"off":true},"filesInScope":3,"checked":3` + builds +
+			`}`
+	}
+	output := strings.Join([]string{
+		summary(".", ""),
+		summary(". (Go)", `,"builds":[{"target":"darwin/arm64 cgo","host":true},{"target":"linux/arm64 tags a,b"}]`),
+	}, "\n")
+	run, parseRunOutputError := ParseRunOutput([]byte(output))
+	if parseRunOutputError != nil {
+		test.Fatal(parseRunOutputError)
+	}
+	if want := []string{"darwin/arm64 cgo", "linux/arm64 tags a,b"}; !slices.Equal(run.Builds, want) {
+		test.Errorf("the builds read %q, want %q", run.Builds, want)
 	}
 }
