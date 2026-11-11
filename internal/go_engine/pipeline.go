@@ -570,15 +570,24 @@ func (engine *pipeline) held(file string) ([]byte, bool) {
 }
 
 // sourceReader is what a rule's pass.ReadFile reads through over a load that parsed overlay's bytes in place of the
-// disk's: a file's bytes in overlay, else the bytes the run holds for it, else the disk, so a rule reads the bytes the
-// load parsed without reading a file it holds again. The run holds each readable file in scope as every load after the
-// fix phase's writes parsed it, since each write is reread before the next load (reread), and the rename's proof
-// overlays its rewrite, which askedOver gives here. A file it holds nothing for, a dependency's, a cgo file the cgo
-// tool generated, one outside the scope or one whose reread failed, is read from disk, where the load read it. The
-// bytes are shared rather than copied, which holds while every reader only reads them, as every analyzer does.
-func (engine *pipeline) sourceReader(overlay map[string][]byte) func(file string) ([]byte, error) {
+// disk's and rewritten's in place of a cgo output's: a file's bytes in overlay, else in rewritten, else the bytes the
+// run holds for it, else the disk, so a rule reads the bytes the load parsed without reading a file it holds again.
+// The run holds each readable file in scope as every load after the fix phase's writes parsed it, since each write is
+// reread before the next load (reread), and the rename's proof overlays its rewrite, which askedOver gives here. A
+// file it holds nothing for, a dependency's, a cgo output the load did not rewrite, one outside the scope or one whose
+// reread failed, is read from disk, where the load read it. The bytes are shared rather than copied, which holds while
+// every reader only reads them, as every analyzer does.
+func (engine *pipeline) sourceReader(
+	overlay map[string][]byte,
+	rewritten *load.Rewritten,
+) func(file string) ([]byte, error) {
 	return func(file string) ([]byte, error) {
 		if contents, overlaid := overlay[file]; overlaid {
+			return contents, nil
+		}
+		// A cgo output the load rewrote differs from the build cache's file in its `//line` directives' paths, so
+		// the offsets its syntax holds are into the rewritten bytes alone.
+		if contents, isRewritten := rewritten.Lookup(file); isRewritten {
 			return contents, nil
 		}
 		if contents, isHeld := engine.held(file); isHeld {

@@ -11,6 +11,9 @@ type Overlap struct {
 	// Packages are the ones to analyze, as Loaded.Packages will hold them.
 	Packages []*packages.Package
 
+	// Rewritten is Loaded.Rewritten as the load fills it, which holds a package's rewritten files once Ready closes.
+	Rewritten *Rewritten
+
 	nodes map[*packages.Package]*node
 
 	// ended is closed when the load returns, whatever it returns.

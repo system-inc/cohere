@@ -862,7 +862,7 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 	// current parsed the rewrite from overlay, which is not on disk yet, so a rule reads it from there.
 	result, checkError := check.Run(current.Packages, naming, check.Options{
 		SingleThreaded: engine.request.switches["single-threaded"],
-		ReadFile:       engine.sourceReader(overlay),
+		ReadFile:       engine.sourceReader(overlay, current.Rewritten),
 		Timing:         engine.timing,
 	})
 	if checkError != nil {

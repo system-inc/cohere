@@ -53,7 +53,7 @@ func (engine *pipeline) beginSpeculativeLint(overlap *load.Overlap) {
 		// A panic is held, not raised here: main would never have run the rules over a load with diagnostics, so
 		// only a clean load's pass may end the process, on the pipeline's goroutine, as main's would.
 		defer func() { speculation.panicked = recover() }()
-		speculation.pass = engine.lintPackages(overlap.Packages,
+		speculation.pass = engine.lintPackages(overlap.Packages, overlap.Rewritten,
 			check.Options{Ready: overlap.Ready, Abandon: speculation.abandon})
 	}()
 }
