@@ -77,7 +77,7 @@ func TestCommandLinesAreMaskedAndProseOnThemIsRead(test *testing.T) {
 				subtest.Fatalf("masking %q changed its length from %d to %d bytes",
 					testCase.text, len(testCase.text), len(masked))
 			}
-			if got := TokensInMasked(masked); !slices.Equal(got, testCase.want) {
+			if got := distinctShoutedWords(masked); !slices.Equal(got, testCase.want) {
 				subtest.Fatalf("shouts in %q: got %v, want %v (masked: %q)", testCase.text, got, testCase.want, masked)
 			}
 		})

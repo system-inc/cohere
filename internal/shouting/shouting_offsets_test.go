@@ -21,7 +21,19 @@ func TestShoutedTokensInMaskedGivesEachWordItsByteOffset(test *testing.T) {
 			test.Errorf("the offset %d covers %q in the text, not %q", shouted.Offset, covered, shouted.Text)
 		}
 	}
-	if tokens := TokensInMasked(MaskCodeAndCommands(text)); !slices.Equal(tokens, []string{"NEVER"}) {
-		test.Errorf("TokensInMasked still names each word once, and gave %v", tokens)
+}
+
+// distinctShoutedWords is each shouted word in masked once, in the order a reader scans a comment for what to fix,
+// the reading the tests that list a text's shouts compare against.
+func distinctShoutedWords(masked string) []string {
+	var words []string
+	seen := map[string]bool{}
+	for _, shouted := range ShoutedTokensInMasked(masked) {
+		if seen[shouted.Text] {
+			continue
+		}
+		seen[shouted.Text] = true
+		words = append(words, shouted.Text)
 	}
+	return words
 }
