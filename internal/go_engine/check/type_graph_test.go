@@ -231,7 +231,7 @@ func TestAVerdictRendersEachNamedTypeOncePerBuild(test *testing.T) {
 	hostRendered, buildRendered := map[*types.TypeName]int{}, map[*types.TypeName]int{}
 	host.graph.rendered, build.graph.rendered = counted(hostRendered), counted(buildRendered)
 	restoring := Restoring{Path: "example.com/user", Imports: []string{"example.com/deep"}, Reads: reads}
-	holds, why := TypesHold(restoring, map[string]*types.Package{"example.com/deep": built}, host, build)
+	holds, why := TypesHold(restoring, map[string]*types.Package{"example.com/deep": built}, nil, host, build)
 	if !holds {
 		test.Fatalf("the reads of one source checked twice do not hold: %s", why)
 	}

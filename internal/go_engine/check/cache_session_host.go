@@ -167,7 +167,7 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 			continue
 		}
 		hosted := &hostRestore{kept: kept, restored: restored}
-		restored.types.Holds = session.typesHoldFunction(hosted)
+		restored.types.Holds = session.typesHoldFunction(candidate, hosted)
 		restored.types.Declined = func() { session.declineAtLoad(candidate, hosted) }
 		session.hits[candidate] = restored
 		session.trusted[candidate] = true
@@ -175,14 +175,18 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 	}
 }
 
-// typesHoldFunction is the load's late decision of hosted (load.Restored.Holds): its types' reads judged against the
-// packages it reaches in this build. Why it declined is kept for the decline to count.
+// typesHoldFunction is the load's late decision of hosted, candidate's restore (load.Restored.Holds): its types' reads
+// judged against the packages it reaches in this build, and those of them restored from the host's run. Why it
+// declined is kept for the decline to count.
 //
 // Mutates: hosted keeps why its types' reads did not hold, which the decline that follows counts
-func (session *CacheSession) typesHoldFunction(hosted *hostRestore) func(map[string]*types.Package) bool {
+func (session *CacheSession) typesHoldFunction(
+	candidate *packages.Package,
+	hosted *hostRestore,
+) func(map[string]*types.Package) bool {
 	return func(closure map[string]*types.Package) bool {
-		holds, why := TypesHold(hosted.kept.restoring, closure, session.host.host.renderings,
-			session.host.renderings)
+		holds, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
+			session.host.host.renderings, session.host.renderings)
 		if !holds {
 			hosted.lock.Lock()
 			hosted.declined = why
@@ -190,6 +194,36 @@ func (session *CacheSession) typesHoldFunction(hosted *hostRestore) func(map[str
 		}
 		return holds
 	}
+}
+
+// restoredBelow are the types of the packages of closure, what candidate reaches by path, that this load restored from
+// the host's run. Each is done when candidate's restore is decided, its types set and its decline, if any, counted
+// (declineAtLoad), so a package still among the restores is one whose types were read from the host's export data.
+func (session *CacheSession) restoredBelow(
+	candidate *packages.Package,
+	closure map[string]*types.Package,
+) map[*types.Package]bool {
+	state := session.host
+	restored := map[*types.Package]bool{}
+	visited := map[*packages.Package]bool{}
+	state.lock.Lock()
+	defer state.lock.Unlock()
+	var collect func(importer *packages.Package)
+	collect = func(importer *packages.Package) {
+		for _, imported := range importer.Imports {
+			if visited[imported] {
+				continue
+			}
+			visited[imported] = true
+			if _, fromHost := state.restoring[imported]; fromHost && imported.Types != nil &&
+				closure[imported.PkgPath] == imported.Types {
+				restored[imported.Types] = true
+			}
+			collect(imported)
+		}
+	}
+	collect(candidate)
+	return restored
 }
 
 // declineAtLoad drops candidate, which the load checks from source after all, from the hits restored from the host,

@@ -137,7 +137,8 @@ type Restoring struct {
 var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 
 // TypesHold reports whether what restoring read of other packages' types on the host's run, in host, reads the same in
-// build, whose packages it reaches are closure, by path, and when it does not, the first read that differs, named by
+// build, whose packages it reaches are closure, by path, restored those of them build restored from the host's run,
+// and when it does not, the first read that differs, named by
 // its row: T for an object or instance its type check reached, L for a rule's lookup of the types, and never or
 // unknown for reads that cannot hold at all. It is the load's half of the verdict, decided once the package's imports
 // are done in build and before anything of the package is read there (load.Restored.Holds); FactsHold is check's. A
@@ -148,6 +149,7 @@ var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 func TypesHold(
 	restoring Restoring,
 	closure map[string]*types.Package,
+	restored map[*types.Package]bool,
 	host *ReadsBuild,
 	build *ReadsBuild,
 ) (bool, string) {
@@ -157,7 +159,7 @@ func TypesHold(
 		}
 		return false, "unknown: " + why
 	}
-	judged := verdict{host: host, build: build, closure: closure}
+	judged := verdict{host: host, build: build, closure: closure, restored: restored}
 	for _, object := range restoring.Reads.Objects() {
 		if holds, why := judged.objectHolds(object); !holds {
 			return false, "T " + why
@@ -239,13 +241,13 @@ func objectName(object types.Object) string {
 	return object.Pkg().Path() + "." + object.Name()
 }
 
-// methodCandidates are the type names of the import closure of roots with a method named name in their method sets,
-// sorted by package path and name: every type whose method an Interface or Method lookup of the name may match, by
-// whichever measure the asking rule takes.
-func methodCandidates(build *ReadsBuild, roots []*types.Package, name string) []*types.TypeName {
+// methodCandidates are the type names of the import closure of roots with a method of a lookup's name in their method
+// sets, as namesOf gives each package's, sorted by package path and name: every type whose method an Interface or
+// Method lookup of the name may match, by whichever measure the asking rule takes.
+func methodCandidates(roots []*types.Package, namesOf func(*types.Package) []*types.TypeName) []*types.TypeName {
 	var candidates []*types.TypeName
 	for reached := range build_reads.ClosurePackages(roots) {
-		candidates = append(candidates, build.methodNamesOf(reached)[name]...)
+		candidates = append(candidates, namesOf(reached)...)
 	}
 	slices.SortFunc(candidates, func(left, right *types.TypeName) int {
 		if order := strings.Compare(left.Pkg().Path(), right.Pkg().Path()); order != 0 {

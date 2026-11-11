@@ -13,13 +13,14 @@ import (
 )
 
 // verdict is one package's reads judged in another build: the host's memo and the build's, the packages the judged
-// package reaches in the build by path, its closure, and, at check time, the build's facts as its action inherited
-// them, nil at the load's, which asks no fact.
+// package reaches in the build by path, its closure, those of them the build restored from the host's run, and, at
+// check time, the build's facts as its action inherited them, nil at the load's, which asks no fact.
 type verdict struct {
-	host    *ReadsBuild
-	build   *ReadsBuild
-	closure map[string]*types.Package
-	fact    FactLookup
+	host     *ReadsBuild
+	build    *ReadsBuild
+	closure  map[string]*types.Package
+	restored map[*types.Package]bool
+	fact     FactLookup
 }
 
 // find is the build's object at path in the package of ownerPath, and why not when there is none.
@@ -122,7 +123,10 @@ func (judged verdict) factHolds(fact build_reads.Fact) (bool, string) {
 //   - PackageName asks whether a package of that closure has the name, as the rule's walk does.
 //   - Interface and Method answer by the subject, the package's own method, which is the host's in the build, and by
 //     the closure's type names with a method of the name: so they hold when those type names are the same in both
-//     builds, rendered alike. That errs wide, failing when a type name the rule would not have matched changes.
+//     builds, rendered alike. That errs wide, failing when a type name the rule would not have matched changes. A
+//     package the build restored from the host's run gives the host's own type names: its types there are read from
+//     export data, which holds only what its exported declarations reach, so its unexported types would go missing,
+//     while its source and its reads are the host's, so checked from source it declares what the host's does.
 //
 // A deprecation is a fact, asked at check time (deprecationHolds).
 func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring) (bool, string) {
@@ -164,8 +168,20 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 		if lookup.Subject == nil || lookup.Subject.Pkg() == nil {
 			return false, name + ": it has no subject to find the host's closure by"
 		}
-		hostCandidates := methodCandidates(judged.host, lookup.Subject.Pkg().Imports(), lookup.Name)
-		buildCandidates := methodCandidates(judged.build, roots, lookup.Name)
+		hostRoots := lookup.Subject.Pkg().Imports()
+		hostCandidates := methodCandidates(hostRoots, func(reached *types.Package) []*types.TypeName {
+			return judged.host.methodNamesOf(reached)[lookup.Name]
+		})
+		hostByPath := map[string]*types.Package{}
+		for reached := range build_reads.ClosurePackages(hostRoots) {
+			hostByPath[reached.Path()] = reached
+		}
+		buildCandidates := methodCandidates(roots, func(reached *types.Package) []*types.TypeName {
+			if hostPackage := hostByPath[reached.Path()]; judged.restored[reached] && hostPackage != nil {
+				return judged.host.methodNamesOf(hostPackage)[lookup.Name]
+			}
+			return judged.build.methodNamesOf(reached)[lookup.Name]
+		})
 		if len(hostCandidates) != len(buildCandidates) {
 			return false, name + fmt.Sprintf(": %d type names have the method on the host, %d in the build",
 				len(hostCandidates), len(buildCandidates))
@@ -195,10 +211,14 @@ func (judged verdict) answerHolds(name string, lookup build_reads.Lookup, answer
 }
 
 // sameObject reports whether hostObject, the host's, and buildObject, the build's, are one object in each: of one
-// package path at one objectpath, rendered alike.
+// package path at one objectpath, rendered alike. The host's own object, as a package restored from the host answers
+// a method lookup with, is the same object, which renders alike wherever it is asked.
 func (judged verdict) sameObject(hostObject types.Object, buildObject types.Object) bool {
+	if hostObject == buildObject {
+		return true
+	}
 	if hostObject.Pkg() == nil || buildObject.Pkg() == nil {
-		return hostObject == buildObject
+		return false
 	}
 	if hostObject.Pkg().Path() != buildObject.Pkg().Path() {
 		return false

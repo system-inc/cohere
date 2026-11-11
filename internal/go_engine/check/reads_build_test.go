@@ -184,7 +184,7 @@ func linuxBuild(test *testing.T, facts map[string]analysis.Fact) linuxWorld {
 // holdsIn is the whole verdict on restoring's reads in linux, its types' half as the load asks it, then its facts'
 // half over every fact type it read, as every action on it asks its own.
 func holdsIn(restoring Restoring, host *ReadsBuild, linux linuxWorld) (bool, string) {
-	if holds, why := TypesHold(restoring, linux.closure, host, linux.build); !holds {
+	if holds, why := TypesHold(restoring, linux.closure, nil, host, linux.build); !holds {
 		return false, why
 	}
 	return FactsHold(restoring, linux.closure, host, linux.build, linux.fact, ReadFactTypes(restoring))
