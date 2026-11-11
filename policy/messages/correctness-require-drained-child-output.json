@@ -1,10 +1,16 @@
 {
     "rules": {
-        "TypeScript": "nexus/correctness-require-drained-child-output"
+        "TypeScript": "nexus/correctness-require-drained-child-output",
+        "Go": "cohere-go/correctness-require-drained-child-output"
     },
     "messages": {
         "childOutputNeverDrained": {
-            "text": "{{stream}} of this child is never read before its {{event}} is awaited, so output past the pipe buffer blocks the child and {{event}} never fires. Read it (`child.{{stream}}.on('data', ...)`, or pipe it), or pass `'ignore'` or `'inherit'` in stdio."
+            "text": "{{stream}} of this child is never read before its {{event}} is awaited, so output past the pipe buffer blocks the child and {{event}} never fires. Read it (`child.{{stream}}.on('data', ...)`, or pipe it), or pass `'ignore'` or `'inherit'` in stdio.",
+            "languages": ["TypeScript"]
+        },
+        "pipeUnreadAtWait": {
+            "text": "The {{stream}} pipe is not read before `{{wait}}` on some path here, so output past the 64 KB pipe buffer blocks the child and `{{wait}}` never returns. Read it to its end first (`io.ReadAll`, or a goroutine copying it, started before the wait), or give the command a buffer or `os.Stdout` instead of a pipe.",
+            "languages": ["Go"]
         }
     }
 }
