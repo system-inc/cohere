@@ -31,9 +31,11 @@ import (
  *   - `declare global` is a ModuleDeclaration whose Keyword is GlobalKeyword, where TypeScript sets
  *     NodeFlags.GlobalAugmentation; `namespace` versus `module` is the Keyword too.
  *
- * Upstream's syntax checks (check-syntax-errors.js) are not ported. They reject programs TypeScript
- * parsed but ESTree cannot represent, the oracle fails on those files, and a file the oracle fails on
- * leaves the differential's denominator. Parse errors themselves are refused before conversion.
+ * Upstream's syntax checks (check-syntax-errors.js) are ported for one case, an update of something
+ * that cannot be assigned (`1++`, Converter.checkSyntaxError), which the tsc corpus found the formatter
+ * printing where Prettier refuses. The rest are not. They reject programs TypeScript parsed but ESTree
+ * cannot represent, the oracle fails on those files, and a file the oracle fails on leaves the
+ * differential's denominator. Parse errors themselves are refused before conversion.
  */
 
 // ConvertForBabel is Convert for a file Prettier would parse with babel (see ParseJavaScript). The
@@ -96,6 +98,11 @@ func convert(
 	}()
 
 	program = converter.converter(sourceFile.AsNode(), nil, false)
+	// Upstream throws a syntax error as it meets it, before any node it cannot convert later in the file,
+	// so the syntax error is the answer when both happen.
+	if converter.invalid != nil {
+		return nil, nil, converter.invalid
+	}
 	if converter.unsupported != nil {
 		return nil, nil, converter.unsupported
 	}
@@ -224,6 +231,21 @@ func canContainDirective(node *ast.Node) bool {
 		}
 	}
 	return true
+}
+
+// isValidAssignmentTarget is upstream's isValidAssignmentTarget, node-utils.js: an identifier, or a member
+// access that is not an optional chain, under any parentheses, type assertions and non-null assertions.
+func isValidAssignmentTarget(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return true
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return node.Flags&ast.NodeFlagsOptionalChain == 0
+	case ast.KindParenthesizedExpression, ast.KindTypeAssertionExpression, ast.KindAsExpression,
+		ast.KindSatisfiesExpression, ast.KindExpressionWithTypeArguments, ast.KindNonNullExpression:
+		return isValidAssignmentTarget(node.Expression())
+	}
+	return false
 }
 
 // getNamespaceModifiers is upstream's getNamespaceModifiers: nested namespaces use the topmost
