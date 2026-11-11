@@ -62,9 +62,19 @@ type runSummary struct {
 
 	// Changed is each file the run rewrote, by fixing, formatting or both: the files it cohered, the
 	// brand's verb for altering. WouldChange is the files a `--no-fix` run found a fix or formatting
-	// would rewrite, which fail it.
+	// would rewrite, which fail it, its nested repositories' included: a reader that counts the finding
+	// lines counts those too, and the release cut's gate holds the two equal.
 	Changed     []changedFile
 	WouldChange int
+	// NestedWouldChange is the part of WouldChange in nested repositories, each a file their own run would
+	// rewrite. WouldChangeConsidered is the files this run's fix phase examined, the scope its own part of
+	// WouldChange was found in, and NestedWouldChangeConsidered the nested files the formatter read, the
+	// scope of NestedWouldChange. Each count is said against its own scope, never the program's files: a run
+	// at adamic's root read "6,394 files would change (3,165 checked)", nested drift added to its own and
+	// both set against a program that holds neither its JSON nor its Markdown (#hb90yfp).
+	NestedWouldChange           int
+	WouldChangeConsidered       int
+	NestedWouldChangeConsidered int
 
 	// FilesInScope is every file the run was to account for. FilesChecked is the ones a phase examined fresh,
 	// and FilesCached the ones the cache answered for, so the two are at most FilesInScope, and short of it only

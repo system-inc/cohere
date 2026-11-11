@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -623,4 +625,84 @@ func TestANestedRepositorysFailureIsAGapAndItsOwnIgnoresApply(test *testing.T) {
 		test.Errorf("the writing run exited %d:\n%s", code, output)
 	}
 	assertTreeUnchanged(test, filepath.Join(root, "library"), before, "the writing run")
+}
+
+// TestWouldChangeCountsEveryFindingLineAndSaysEachScope is #hb90yfp through the binary. `wouldChange` stays every
+// would-change finding line, this project's and its nested repositories', since the release cut's gate holds the
+// summary's counts equal to the finding lines; `nestedWouldChange` is the nested part, and each part's scope is kept,
+// so the footer sets the nested drift against the nested files read rather than the program's files.
+func TestWouldChangeCountsEveryFindingLineAndSaysEachScope(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		"tsconfig.json":      fixScopeTsconfig,
+		"Ugly.ts":            "export const ugly   =   1\n",
+		"Tidy.ts":            "export const tidy = 1;\n",
+		".gitmodules":        "[submodule \"library\"]\n\tpath = library\n\turl = ../library\n",
+		"library/.git":       "gitdir: ../.git/modules/library\n",
+		"library/Inner.ts":   "export const inner   =   1\n",
+		"library/Settled.ts": "export const settled = 1;\n",
+		"library/Another.ts": "export const another   =   1\n",
+		"library/Fourth.ts":  "export const fourth = 1;\n",
+	})
+
+	output, code := runCohere(test, binary, root, "--no-fix", "--format", "--no-cache", "--json")
+	if code == 0 {
+		test.Fatalf("a check with drift here and in the library exited 0:\n%s", output)
+	}
+	own, nested := 0, 0
+	var summary *summaryJson
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		var envelope struct {
+			Kind      string `json:"kind"`
+			MessageId string `json:"messageId"`
+		}
+		if json.Unmarshal([]byte(line), &envelope) != nil {
+			continue
+		}
+		switch {
+		case envelope.Kind == "finding" && envelope.MessageId == "would-change":
+			own++
+		case envelope.Kind == "finding" && envelope.MessageId == "nested-drift":
+			nested++
+		case envelope.Kind == "summary":
+			summary = &summaryJson{}
+			if decodeError := json.Unmarshal([]byte(line), summary); decodeError != nil {
+				test.Fatalf("the summary line does not decode: %v\n%s", decodeError, line)
+			}
+		}
+	}
+	if summary == nil {
+		test.Fatalf("no summary line:\n%s", output)
+	}
+	if own < 1 || nested != 2 {
+		test.Fatalf("want this project's drift and the library's two files as finding lines, got %d and %d:\n%s",
+			own, nested, output)
+	}
+	if summary.WouldChange != own+nested {
+		test.Errorf("wouldChange is %d, want %d, every would-change finding line, this project's %d and the nested %d",
+			summary.WouldChange, own+nested, own, nested)
+	}
+	if summary.NestedWouldChange != nested {
+		test.Errorf("nestedWouldChange is %d, want the %d nested-drift finding lines", summary.NestedWouldChange,
+			nested)
+	}
+	if summary.NestedWouldChangeConsidered != 4 {
+		test.Errorf("nestedWouldChangeConsidered is %d, want the library's 4 files the formatter read",
+			summary.NestedWouldChangeConsidered)
+	}
+	if summary.WouldChangeConsidered < own {
+		test.Errorf("wouldChangeConsidered is %d, fewer than the %d files it found would change",
+			summary.WouldChangeConsidered, own)
+	}
+
+	// The footer says each part against its own scope, and the program's count stays in the parentheses. Both runs are
+	// uncached, so neither format scope is narrowed by the other's record and the two runs consider the same files.
+	output, _ = runCohere(test, binary, root, "--no-fix", "--format", "--no-cache")
+	want := fmt.Sprintf("%s of %s would change, 2 of 4 more in nested repositories",
+		grouped(own), counted(summary.WouldChangeConsidered, "file", "files"))
+	if !strings.Contains(output, want) {
+		test.Errorf("the footer does not say %q:\n%s", want, output)
+	}
 }

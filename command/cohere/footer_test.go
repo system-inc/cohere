@@ -605,3 +605,49 @@ func TestARunThatExcludedEveryFileFailsAndSaysWhy(test *testing.T) {
 		})
 	}
 }
+
+// TestWouldChangeIsSaidAgainstItsOwnScope is #hb90yfp: at adamic's root a `--no-fix` footer read "6,394 files would
+// change (3,165 checked)", nested drift added to the project's own and both set against the program's files. Each
+// part is said against the files it was found among, and the parentheses keep the program's count.
+func TestWouldChangeIsSaidAgainstItsOwnScope(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name                         string
+		wouldChange, nested          int
+		considered, nestedConsidered int
+		want                         string
+	}{
+		{"this project's alone", 4943, 0, 5574, 0, "4,943 of 5,574 files would change"},
+		{"nested repositories' alone", 1451, 1451, 0, 1533, "1,451 of 1,533 files would change in nested repositories"},
+		{
+			"both", 6394, 1451, 5574, 1533,
+			"4,943 of 5,574 files would change, 1,451 of 1,533 more in nested repositories",
+		},
+		{"one of one", 1, 0, 1, 0, "1 of 1 file would change"},
+		// A run cache's record from before the scopes were kept has none, and says its counts alone.
+		{"no scope recorded", 3, 1, 0, 0, "2 files would change, 1 more in nested repositories"},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			summary := cleanSummary()
+			summary.FilesInScope, summary.FilesChecked = 3165, 3165
+			summary.WouldChange, summary.NestedWouldChange = testCase.wouldChange, testCase.nested
+			summary.WouldChangeConsidered, summary.NestedWouldChangeConsidered = testCase.considered,
+				testCase.nestedConsidered
+			want := "✗ ☠️ 2.4s • " + testCase.want + " (480 rules • 3,165 checked)"
+			if got := footer(summary, plain, footerOptions{}); got != want {
+				test.Errorf("the footer is\n%q, want\n%q", got, want)
+			}
+			// wouldChange stays the total, the finding lines' count, which the release cut's gate holds equal.
+			line := summaryAsJson(summary)
+			if line.WouldChange != testCase.wouldChange || line.NestedWouldChange != testCase.nested ||
+				line.WouldChangeConsidered != testCase.considered ||
+				line.NestedWouldChangeConsidered != testCase.nestedConsidered {
+				test.Errorf("under --json the counts are %d, %d, %d and %d, want %d, %d, %d and %d", line.WouldChange,
+					line.NestedWouldChange, line.WouldChangeConsidered, line.NestedWouldChangeConsidered,
+					testCase.wouldChange, testCase.nested, testCase.considered, testCase.nestedConsidered)
+			}
+		})
+	}
+}

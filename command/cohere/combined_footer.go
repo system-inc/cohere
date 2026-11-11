@@ -95,6 +95,9 @@ func combinedFooter(runs []projectRun, facts overallFacts, total time.Duration, 
 		combined.Findings += summary.Findings
 		combined.WarningFindings += summary.WarningFindings
 		combined.WouldChange += summary.WouldChange
+		combined.NestedWouldChange += summary.NestedWouldChange
+		combined.WouldChangeConsidered += summary.WouldChangeConsidered
+		combined.NestedWouldChangeConsidered += summary.NestedWouldChangeConsidered
 		combined.Changed = append(combined.Changed, summary.Changed...)
 		combined.Rules += summary.Rules
 		combined.FilesInScope += summary.FilesInScope

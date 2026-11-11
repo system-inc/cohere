@@ -115,6 +115,12 @@ type summaryJson struct {
 	FilesFixed     int `json:"filesFixed"`
 	FilesFormatted int `json:"filesFormatted"`
 	WouldChange    int `json:"wouldChange"`
+	// NestedWouldChange is the part of WouldChange in nested repositories. WouldChangeConsidered is the files the fix
+	// phase examined, the scope of the rest of it, and NestedWouldChangeConsidered the nested files the formatter
+	// read. Each absent when zero, as on a run that wrote its fixes.
+	NestedWouldChange           int `json:"nestedWouldChange,omitempty"`
+	WouldChangeConsidered       int `json:"wouldChangeConsidered,omitempty"`
+	NestedWouldChangeConsidered int `json:"nestedWouldChangeConsidered,omitempty"`
 	// Cohered is the files rewritten; Checked and Cached split FilesInScope between fresh and cached.
 	Cohered      int `json:"cohered"`
 	FilesInScope int `json:"filesInScope"`
@@ -176,34 +182,37 @@ func summaryAsJson(summary runSummary) summaryJson {
 		})
 	}
 	return summaryJson{
-		Kind:                "summary",
-		SchemaVersion:       outputSchemaVersion,
-		Label:               summary.Label,
-		Verdict:             verdict,
-		Seconds:             summary.Total.Seconds(),
-		GraphSeconds:        summary.Graph.Seconds(),
-		Rules:               summary.Rules,
-		Phases:              phases,
-		FormattingSeconds:   summary.Formatting.Seconds(),
-		Cache:               summary.Cache,
-		PackageCache:        summary.PackageCache,
-		MemoryRaisedToBytes: summary.MemoryRaisedToBytes,
-		Builds:              summary.Builds,
-		TypeErrors:          summary.TypeErrors,
-		Findings:            summary.Findings,
-		FilesFixed:          summary.filesFixed(),
-		FilesFormatted:      summary.filesFormatted(),
-		WouldChange:         summary.WouldChange,
-		Cohered:             summary.cohered(),
-		FilesInScope:        summary.FilesInScope,
-		Checked:             summary.FilesChecked,
-		Cached:              summary.FilesCached,
-		TypesOnly:           summary.FilesTypesOnly,
-		Nodes:               summary.Nodes,
-		Gaps:                summary.Gaps,
-		Swift:               summary.Swift,
-		Adamic:              adamic,
-		IgnorePatterns:      summary.IgnorePatterns,
+		Kind:                        "summary",
+		SchemaVersion:               outputSchemaVersion,
+		Label:                       summary.Label,
+		Verdict:                     verdict,
+		Seconds:                     summary.Total.Seconds(),
+		GraphSeconds:                summary.Graph.Seconds(),
+		Rules:                       summary.Rules,
+		Phases:                      phases,
+		FormattingSeconds:           summary.Formatting.Seconds(),
+		Cache:                       summary.Cache,
+		PackageCache:                summary.PackageCache,
+		MemoryRaisedToBytes:         summary.MemoryRaisedToBytes,
+		Builds:                      summary.Builds,
+		TypeErrors:                  summary.TypeErrors,
+		Findings:                    summary.Findings,
+		FilesFixed:                  summary.filesFixed(),
+		FilesFormatted:              summary.filesFormatted(),
+		WouldChange:                 summary.WouldChange,
+		NestedWouldChange:           summary.NestedWouldChange,
+		WouldChangeConsidered:       summary.WouldChangeConsidered,
+		NestedWouldChangeConsidered: summary.NestedWouldChangeConsidered,
+		Cohered:                     summary.cohered(),
+		FilesInScope:                summary.FilesInScope,
+		Checked:                     summary.FilesChecked,
+		Cached:                      summary.FilesCached,
+		TypesOnly:                   summary.FilesTypesOnly,
+		Nodes:                       summary.Nodes,
+		Gaps:                        summary.Gaps,
+		Swift:                       summary.Swift,
+		Adamic:                      adamic,
+		IgnorePatterns:              summary.IgnorePatterns,
 	}
 }
 
