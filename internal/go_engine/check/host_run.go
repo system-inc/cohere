@@ -23,7 +23,8 @@ type HostRun struct {
 	keeping time.Duration
 }
 
-// EntriesKept counts the packages the host's run kept an entry of for the extra builds.
+// EntriesKept counts the packages the host's run kept an entry of for the extra builds, each encoded only when a build
+// asks for it, so one gob turns out to refuse is still counted here and counted as no entry by the build that asked.
 func (host *HostRun) EntriesKept() int {
 	if host == nil {
 		return 0
@@ -32,7 +33,9 @@ func (host *HostRun) EntriesKept() int {
 }
 
 // Keeping is the time the host's run spent keeping its packages for the extra builds, over every load: the keys a run
-// without a store computes only to keep them, and the entries kept. A run that kept nothing spent none.
+// without a store computes only to keep them, and what each entry holds of the run's answers; the entries themselves
+// are encoded when a build first asks for them (lazyEntry), within that build's load. A run that kept nothing spent
+// none.
 func (host *HostRun) Keeping() time.Duration {
 	if host == nil {
 		return 0
@@ -41,8 +44,9 @@ func (host *HostRun) Keeping() time.Duration {
 }
 
 // hostEntry is one package the host's run kept: what a verdict judges it by, its portable digest, and its entry and
-// export data, read from the store when the run wrote them there, or held in memory under `--no-cache`, which never
-// stores them.
+// export data, read from the store when the run wrote them there, or, under `--no-cache`, which never stores them,
+// encoded from the host's analysis the first time a build asks for them and held in memory from then on, so a package
+// no build asks about is never encoded (#b2t9xmf). contents may be called from several goroutines at once.
 type hostEntry struct {
 	restoring Restoring
 	portable  cache.Key

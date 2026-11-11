@@ -93,7 +93,8 @@ type BuildRecord struct {
 	// every reload's included, so a run can be read build by build. DecideMilliseconds is the time an extra build spent
 	// deciding which packages restore from the host's run, summed across the goroutines that decided, so it can exceed
 	// the load and lint it ran within, and KeepMilliseconds the time the host's build spent keeping its packages for
-	// the others, within its lint: their keys, which a run without a store computes only for this, and their entries.
+	// the others, within its lint: their keys, which a run without a store computes only for this, and what each entry
+	// holds of the run's answers, since the entries themselves are encoded when a build first asks for them.
 	// WaitMilliseconds is the host's too: how long the extra builds waited after its lint for its walks of what each
 	// package read of others to end, before any could start. Each is written only when not 0.
 	LoadMilliseconds   int `json:"loadMilliseconds,omitempty"`

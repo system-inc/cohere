@@ -631,7 +631,7 @@
                             },
                             "keepMilliseconds": {
                                 "type": "integer",
-                                "description": "The host's alone: its time keeping its packages for the other builds, within its lint: their keys, which a run without a store computes only for this, and their entries. Absent when 0."
+                                "description": "The host's alone: its time keeping its packages for the other builds, within its lint: their keys, which a run without a store computes only for this, and what each entry holds of the run's answers, since the entries themselves are encoded when a build first asks for them. Absent when 0."
                             },
                             "waitMilliseconds": {
                                 "type": "integer",

@@ -996,7 +996,8 @@ Each build's record also says where its time went, each figure in wall milliseco
 included, an extra build's `"decideMilliseconds":310` deciding which packages restore from the host's run, summed
 across the goroutines that decided, so it can exceed the load and lint it ran within, and the host's
 `"keepMilliseconds":180` keeping its packages for the other builds, within its lint: their keys, which a run without
-a store computes only for this, and their entries, and the host's `"waitMilliseconds":40`, how long the other builds
+a store computes only for this, and what each entry holds of the run's answers, since the entries themselves are
+encoded when a build first asks for them, and the host's `"waitMilliseconds":40`, how long the other builds
 waited after its lint for its walks of what each package read of others to end, before any could start.
 
 ### `phase`
