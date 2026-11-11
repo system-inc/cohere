@@ -170,3 +170,20 @@ func TestAFindingNamesAForeignFileOnlyByAFileTheLoadHolds(test *testing.T) {
 		}
 	}
 }
+
+// Reading a finding that names no file allocates nothing, since every finding of a package whose reads are recorded is
+// read for the files it names, and most name none.
+//
+// Not parallel: testing.AllocsPerRun refuses to run inside a parallel test, since other tests' allocations would count.
+func TestAFindingThatNamesNoFileIsReadWithoutAllocating(test *testing.T) {
+	own := &packages.Package{GoFiles: []string{"/w/p/x.go"}}
+	known := newKnownFiles()
+	known.addPackage(own)
+	ownFilesOf := ownFiles(own)
+	finding := Finding{File: "/w/p/x.go", Message: "the value (of type int) assigned to x is never used, see the docs"}
+	if allocations := testing.AllocsPerRun(100, func() {
+		namesForeignFile(finding, ownFilesOf, known)
+	}); allocations != 0 {
+		test.Errorf("reading a finding that names no file allocated %.0f times, want none", allocations)
+	}
+}

@@ -155,11 +155,12 @@ func namesForeignFile(finding Finding, own map[string]bool, known *knownFiles) b
 // so its path could name no file, except when that element is `.` or `..`, which cleaning folds into the elements
 // before it, and such a word is always made a path.
 func namedFiles(finding Finding, baseNames map[string]bool) []string {
-	words := strings.FieldsFunc(finding.Message, func(character rune) bool {
+	// The words are read in place, never gathered into a slice, since most findings name no file and every finding
+	// of a package whose reads are recorded is read here (#b2t9xmf).
+	var named []string
+	for word := range strings.FieldsFuncSeq(finding.Message, func(character rune) bool {
 		return unicode.IsSpace(character) || strings.ContainsRune("\"'`()[]{},;", character)
-	})
-	named := make([]string, 0, len(words))
-	for _, word := range words {
+	}) {
 		word = strings.TrimSuffix(word, ".")
 		for range 2 {
 			index := strings.LastIndexByte(word, ':')
