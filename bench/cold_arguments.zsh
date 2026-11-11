@@ -6,6 +6,15 @@
 # spends about 0.3s formatting before its load (#jp0cqkk). A whole-root run fixes as it always has, so its records
 # still compare with the baselines taken that way. The arguments live here, apart from the benchmark, so a test runs
 # them alone (internal/bench_results' cold_arguments_test.go) rather than through a measurement.
+# build_arguments prints, one to a line, the arguments every run gives cohere for the builds it checks: none for the
+# host's build alone, as every record before #ccqee0e measured, and `--other-builds` for every build the Go files name.
+# Every run takes them, primes, warm and edit runs too, so each mode measures the same run. When every build becomes a
+# plain run's default (#qqyq61s), every prints none here and host prints the switch that asks for the host's alone.
+build_arguments() {
+  [[ $1 == every ]] && print -r -- --other-builds
+  return 0
+}
+
 cold_arguments() {
   print -r -- --no-cache
   [[ -n $1 ]] && print -r -- --no-fix

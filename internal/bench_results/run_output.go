@@ -26,6 +26,10 @@ type RunOutput struct {
 	// file. N is the summary's `cached`, the count the footer prints, which splits the files in scope with
 	// `checked`; `cache.filesReplayed` is narrower, and read 0 on a run that took every file from the cache.
 	Cache string
+	// Builds are the builds the run's Go project checked, as its summary names them, the host's first: one for a
+	// run of the host's build alone, every build the files name for one that checks them all (#ccqee0e). Empty when
+	// no project is Go, or its summary names none.
+	Builds []string
 }
 
 // outputSchemaVersion is the `--json` contract version this reader knows.
@@ -77,6 +81,9 @@ func ParseRunOutput(output []byte) (RunOutput, error) {
 		everyReplayed = everyReplayed && summary.Cache.Replayed
 		cached += summary.Cached
 		inScope += summary.FilesInScope
+		for _, checked := range summary.Builds {
+			result.Builds = append(result.Builds, checked.Target)
+		}
 	}
 	switch {
 	case everyOff:

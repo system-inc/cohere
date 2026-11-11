@@ -12,6 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/streams"
 )
@@ -24,7 +25,8 @@ const engineContractVersion = 3
 // that line from the cohere it stages and refuses a cohere-swift that will not speak the same version,
 // so the number comes from the binary that ships rather than from a copy that could drift.
 func versionReport() string {
-	return fmt.Sprintf("%s\n  swift contract: %d", release.Current(), engineContractVersion)
+	return fmt.Sprintf("%s\n  swift contract: %d\n  %s", release.Current(), engineContractVersion,
+		standard_library_table.VersionLine(standard_library_table.ReleaseStamp, len(standard_library_table.Contents)))
 }
 
 // engineMode is which question an engine run answers, and so which records it may carry.

@@ -147,6 +147,11 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 	goAlone.Engine = EngineGo
 	goAloneChecking := goAlone
 	goAloneChecking.NoFix = true
+	everyBuild := goAloneChecking
+	everyBuild.EveryBuild = true
+	everyBuild.Builds = []string{"darwin/arm64 cgo", "linux/arm64", "windows/arm64"}
+	release := goAloneChecking
+	release.StandardLibraryTable = &StandardLibraryTable{ReleaseStamp: "v0.2.0+e51c6a1e", Bytes: 1 << 20}
 	for name, want := range map[string]struct {
 		baseline Record
 		tonight  Record
@@ -188,6 +193,29 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 			baseline: goAloneChecking,
 			tonight:  goAlone,
 			refusal:  "the baseline's cold runs checked without fixing and tonight's fixed",
+		},
+		// An every-build night is never judged against a host-only baseline, either way round (#ccqee0e).
+		"an every-build night against a host-only baseline": {
+			baseline: goAloneChecking,
+			tonight:  everyBuild,
+			refusal:  "the baseline checked the host's build alone and tonight every build the Go files name",
+		},
+		"a host-only night against an every-build baseline": {
+			baseline: everyBuild,
+			tonight:  goAloneChecking,
+			refusal:  "the baseline checked every build the Go files name and tonight the host's build alone",
+		},
+		// A release binary's night is never judged against a local build's baseline, either way round (#ccqee0e).
+		"a release night against a local build's baseline": {
+			baseline: goAloneChecking,
+			tonight:  release,
+			refusal: "the baseline's cohere carried no standard library table (a local build) and tonight's " +
+				"carried release v0.2.0+e51c6a1e's standard library table",
+		},
+		"a local build's night against a release baseline": {
+			baseline: release,
+			tonight:  goAloneChecking,
+			refusal:  "a local build is never compared with a release's",
 		},
 		"loaded baseline": {
 			baseline: guardRecord("ahra", "Mac16,5", 10, false),

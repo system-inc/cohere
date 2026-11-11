@@ -13,11 +13,11 @@ import (
 // arguments, relative to this package.
 var coldArgumentsScript = filepath.Join("..", "..", "bench", "cold_arguments.zsh")
 
-// coldArguments runs bench/cold_arguments.zsh's cold_arguments for engine, empty for the whole root, as
-// quiet_machine.sh does, and gives the arguments it printed. The script is read here, through os, and its bytes
+// benchArguments runs bench/cold_arguments.zsh's function named by function on argument, as quiet_machine.sh does,
+// and gives the arguments it printed. The script is read here, through os, and its bytes
 // handed to zsh, rather than zsh opening it: go test's cache keys a test on the files the test process opens, and
 // one only zsh opened would let an edit to the script replay a cached pass.
-func coldArguments(test *testing.T, engine string) []string {
+func benchArguments(test *testing.T, function string, argument string) []string {
 	test.Helper()
 	zsh, lookError := exec.LookPath("zsh")
 	if lookError != nil {
@@ -27,9 +27,9 @@ func coldArguments(test *testing.T, engine string) []string {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	printed, runError := exec.Command(zsh, "-c", string(script)+"\ncold_arguments \"$1\"", "zsh", engine).Output()
+	printed, runError := exec.Command(zsh, "-c", string(script)+"\n"+function+" \"$1\"", "zsh", argument).Output()
 	if runError != nil {
-		test.Fatalf("cold_arguments %q: %v", engine, runError)
+		test.Fatalf("%s %q: %v", function, argument, runError)
 	}
 	return strings.Fields(string(printed))
 }
@@ -44,8 +44,25 @@ func TestTheGoEnginesColdRunChecksWithoutFixing(test *testing.T) {
 	} {
 		test.Run("engine "+engine, func(test *testing.T) {
 			test.Parallel()
-			if arguments := coldArguments(test, engine); !slices.Equal(arguments, want) {
+			if arguments := benchArguments(test, "cold_arguments", engine); !slices.Equal(arguments, want) {
 				test.Errorf("cold_arguments %q printed %q, want %q", engine, arguments, want)
+			}
+		})
+	}
+}
+
+// Every run of a bench asked for every build checks every build the Go files name, `--other-builds`, and a bench of
+// the host's build alone passes nothing, as every record before #ccqee0e measured.
+func TestTheBenchAsksForEveryBuildWhenToldTo(test *testing.T) {
+	test.Parallel()
+	for builds, want := range map[string][]string{
+		"every": {"--other-builds"},
+		"host":  nil,
+	} {
+		test.Run("builds "+builds, func(test *testing.T) {
+			test.Parallel()
+			if arguments := benchArguments(test, "build_arguments", builds); !slices.Equal(arguments, want) {
+				test.Errorf("build_arguments %q printed %q, want %q", builds, arguments, want)
 			}
 		})
 	}

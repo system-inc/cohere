@@ -22,7 +22,11 @@ type runSummary struct {
 	WouldChange  int `json:"wouldChange"`
 	FilesInScope int `json:"filesInScope"`
 	Cached       int `json:"cached"`
-	Phases       []struct {
+	// Builds are the builds a Go project's run checked, the host's first, which only a Go summary names.
+	Builds []struct {
+		Target string `json:"target"`
+	} `json:"builds"`
+	Phases []struct {
 		Name    string `json:"name"`
 		Outcome string `json:"outcome"`
 		Detail  string `json:"detail"`

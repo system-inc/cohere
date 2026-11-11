@@ -39,15 +39,16 @@ type GuardResult struct {
 	Reason string `json:"reason,omitempty"`
 }
 
-// Guard compares tonight's cold quiet median with the baseline's. The baseline is the baseline of record,
-// never last night's, so a creep of a few percent a night still trips once it adds up past the threshold.
+// Guard compares tonight's cold quiet median with the baseline's. The baseline is the baseline of record, never last
+// night's, so a creep of a few percent a night still trips once it adds up past the threshold.
 //
-// Records of different projects or machines are refused, since their numbers measure different work or
-// different hardware, and so are a record of the whole root and one narrowed to one engine's project
-// (Record.Engine), which measure different work on the same project. A baseline with no quiet cold number, or
-// from a modified engine, is refused too: a baseline is a number someone can reproduce. A tonight with neither
-// is Unmeasured, not an error, because a loaded night is the machine's doing, not the record's, and the guard
-// must still say the night was lost.
+// Records of different projects or machines are refused, since their numbers measure different work or different
+// hardware, and so are a record of the whole root and one narrowed to one engine's project (Record.Engine), which
+// measure different work on the same project, a host-only record and an every-build one (Record.EveryBuild), and a
+// local build's record and a release binary's (Record.StandardLibraryTable). A baseline with no quiet cold number, or
+// from a modified engine, is refused too: a baseline is a number someone can reproduce. A tonight with neither is
+// Unmeasured, not an error, because a loaded night is the machine's doing, not the record's, and the guard must still
+// say the night was lost.
 func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, error) {
 	// A NaN threshold compares false with everything, so every night would pass; refuse it with the negatives.
 	if !(threshold >= 0) {
@@ -72,6 +73,20 @@ func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, err
 			"the baseline's cold runs %s and tonight's %s, and a fixing run is never compared with a checking one",
 			coldKind(baseline.NoFix),
 			coldKind(tonight.NoFix),
+		)
+	}
+	if baseline.EveryBuild != tonight.EveryBuild {
+		return GuardResult{}, fmt.Errorf(
+			"the baseline checked %s and tonight %s, and runs of different builds are never compared",
+			buildsKind(baseline.EveryBuild),
+			buildsKind(tonight.EveryBuild),
+		)
+	}
+	if (baseline.StandardLibraryTable == nil) != (tonight.StandardLibraryTable == nil) {
+		return GuardResult{}, fmt.Errorf(
+			"the baseline's cohere %s and tonight's %s, and a local build is never compared with a release's",
+			binaryKind(baseline.StandardLibraryTable),
+			binaryKind(tonight.StandardLibraryTable),
 		)
 	}
 	if baseline.Machine.Model != tonight.Machine.Model || baseline.Machine.Cores != tonight.Machine.Cores {
@@ -143,6 +158,22 @@ func coldKind(noFix bool) string {
 		return "checked without fixing"
 	}
 	return "fixed"
+}
+
+// buildsKind says which builds a record's runs asked to check, for a refusal to name.
+func buildsKind(everyBuild bool) string {
+	if everyBuild {
+		return "every build the Go files name"
+	}
+	return "the host's build alone"
+}
+
+// binaryKind says whether a record's engine carried the standard library's table, for a refusal to name.
+func binaryKind(table *StandardLibraryTable) string {
+	if table == nil {
+		return "carried no standard library table (a local build)"
+	}
+	return "carried release " + table.ReleaseStamp + "'s standard library table"
 }
 
 // checkedScope says what a record with engine checked, for a refusal to name: the whole root, or one

@@ -111,6 +111,9 @@
 #   --cohere PATH        the cohere launcher, or an engine binary, to run (default: `cohere` on PATH)
 #   --engine NAME        check only this engine's project at the copy's root, as COHERE_PROJECT_ENGINE
 #                        names it: Go (default: the whole root, every project discovery finds)
+#   --builds WHICH       the Go builds every run checks: host, the machine's own build alone, or every, each build
+#                        the Go files name (`--other-builds`, cold_arguments.zsh's build_arguments). The record keeps
+#                        which, and the builds the cold runs checked, and the guard never compares the two (default host)
 #   --generate COMMAND   the project's own generator, run in the copy once, with no network, before its
 #                        tree is hashed, so the copy holds what a checkout's generators wrote, as ahra's route
 #                        types: `NEXT_TELEMETRY_DISABLED=1 node_modules/.bin/next typegen` (see run_generator)
@@ -149,6 +152,7 @@ work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
 record_directory=
 project_engine=
+builds=host
 
 while (( $# > 0 )); do
   case $1 in
@@ -162,6 +166,7 @@ while (( $# > 0 )); do
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
     --engine) project_engine=$2; shift 2 ;;
+    --builds) builds=$2; shift 2 ;;
     --generate) generate=$2; shift 2 ;;
     --commit) commit=$2; shift 2 ;;
     --link) links+=($2); shift 2 ;;
@@ -174,12 +179,15 @@ while (( $# > 0 )); do
 done
 (( runs >= 1 )) || fail "--runs must be at least 1"
 [[ -z $project_engine || $project_engine == Go ]] || fail "--engine: no engine $project_engine (Go)"
+[[ $builds == (host|every) ]] || fail "--builds: no builds $builds (host, every)"
 (( ${+GODEBUG} )) &&
   fail "GODEBUG is set ($GODEBUG), which sends the Go engine's in-process lister to \`go list\` (#9wfsmqv); unset it and run again"
 (( ${+COHERE_PROJECT_ENGINE} )) &&
   fail "COHERE_PROJECT_ENGINE is set ($COHERE_PROJECT_ENGINE), which every run would inherit; unset it, and name an engine with --engine"
 # The cold and idle runs' arguments, and the record's noFix, which reads them rather than the engine.
 cold=(${(f)"$(cold_arguments $project_engine)"})
+# The arguments every run takes for the builds it checks, cold and idle runs among them.
+build_arguments=(${(f)"$(build_arguments $builds)"})
 modes=(${(s:,:)modes_asked})
 (( ${#modes} > 0 )) || fail "--modes names no mode"
 for mode in $modes; do
@@ -235,7 +243,8 @@ print "# quiet    at least $idle_floor% of all cores idle over 2s before and 1s 
 measuring edit && print "# edit     $edit"
 measuring idle && print "# idle     each idle run after ${idle_seconds}s of the machine sitting idle"
 [[ -n $project_engine ]] && print "# engine   $project_engine alone (COHERE_PROJECT_ENGINE), with --directory at each run's copy"
-(measuring cold || measuring idle) && print "# cold     cohere ${cold}"
+(measuring cold || measuring idle) && print "# cold     cohere ${cold} ${build_arguments}"
+print "# builds   $builds${build_arguments:+, every run given ${build_arguments}}"
 print "# go       GOGC ${GOGC-(unset)}, GOMEMLIMIT ${GOMEMLIMIT-(unset)}, GOMAXPROCS ${GOMAXPROCS-(unset)}"
 print
 
@@ -244,9 +253,9 @@ print
 run_cohere() {
   local log=$1; shift
   if [[ -n $project_engine ]]; then
-    COHERE_PROJECT_ENGINE=$project_engine run_timed $log $engine --json --directory $copy "$@"
+    COHERE_PROJECT_ENGINE=$project_engine run_timed $log $engine --json --directory $copy $build_arguments "$@"
   else
-    run_timed $log $engine --json "$@"
+    run_timed $log $engine --json $build_arguments "$@"
   fi
 }
 
@@ -285,12 +294,13 @@ measure() {
   at_floor $idle_before && at_floor $idle_after && quiet=quiet
   # The run's engine seconds, findings and cache use, from its --json summary. A log the reader cannot
   # read stops the benchmark rather than recording a column it could not fill.
-  local output engine_seconds findings cache
+  # And the builds its Go project checked, which the record keeps for the cold and idle runs.
+  local output engine_seconds findings cache checked_builds
   output=$($run_output_reader $log) || fail "could not read the run's output, see $log"
-  IFS=$'\t' read -r engine_seconds findings cache <<< $output
-  printf '%s\t%d\t%.3f\t%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\n' $mode $round $verdict_seconds $settled_seconds \
-    $engine_seconds $findings "$cache" $before $after $idle_before $idle_after $quiet $exit_code $primes |
-    tee -a $table
+  IFS=$'\t' read -r engine_seconds findings cache checked_builds <<< $output
+  printf '%s\t%d\t%.3f\t%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\n' $mode $round $verdict_seconds \
+    $settled_seconds $engine_seconds $findings "$cache" $before $after $idle_before $idle_after $quiet $exit_code $primes \
+    "$checked_builds" | tee -a $table
 }
 
 # quiet_runs prints a mode's quiet verdict seconds from <table>, sorted.
@@ -316,7 +326,7 @@ if measuring edit; then
   original_hash=$(shasum -a 256 < $edit_original)
 fi
 
-printf 'mode\tround\tverdict_s\tsettled_s\tengine_s\tfindings\tcache\tload_before\tload_after\tidle_before\tidle_after\tquiet\texit\tprimes\n'
+printf 'mode\tround\tverdict_s\tsettled_s\tengine_s\tfindings\tcache\tload_before\tload_after\tidle_before\tidle_after\tquiet\texit\tprimes\tbuilds\n'
 rounds_taken=0
 stopped_early=false
 for round in $(seq 1 $runs); do
@@ -441,6 +451,7 @@ if [[ $record == true ]]; then
   measuring edit && record_flags+=(-edit $edit)
   [[ -n $project_engine ]] && record_flags+=(-project-engine $project_engine)
   (( ${cold[(Ie)--no-fix]} )) && record_flags+=(-no-fix)
+  [[ $builds == every ]] && record_flags+=(-every-build)
   record_flags+=(-gogc=${GOGC-} -gomemlimit=${GOMEMLIMIT-} -gomaxprocs=${GOMAXPROCS-})
   (cd ${0:A:h:h} && go run ./internal/bench_results/tools/record -runs $runs_table -engine $engine \
     -project ${project:t} -project-commit $project_commit -idle-floor $idle_floor -settle $settle \

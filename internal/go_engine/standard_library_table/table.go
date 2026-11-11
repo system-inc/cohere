@@ -4,7 +4,11 @@
 // computes the standard library as it always has.
 package standard_library_table
 
-import _ "embed"
+import (
+	_ "embed"
+	"fmt"
+	"strings"
+)
 
 // Contents is the table as cache.WriteStandardLibraryTable wrote it, empty unless a release wrote one before
 // compiling.
@@ -17,3 +21,42 @@ var Contents []byte
 // for one release is never read by another. Its default, empty, is what a local `go build` produces, and reads
 // nothing.
 var ReleaseStamp = ""
+
+// VersionPrefix begins the `--version` line that says whether a binary carries a table it reads (VersionLine).
+const VersionPrefix = "go standard library table: "
+
+// VersionLine is the `--version` line for a binary stamped with stamp and carrying a table of size bytes: whether its
+// cold runs read the standard library's entries or compute them, which the benchmark's record keeps, since a
+// release-shaped binary and a local build measure different work and are never compared (#ccqee0e). The engine reads
+// a table only when both are present (go_engine's lintCache), so a binary with one and not the other carries none.
+func VersionLine(stamp string, size int) string {
+	switch {
+	case stamp != "" && size > 0:
+		return fmt.Sprintf("%srelease %s, %d bytes", VersionPrefix, stamp, size)
+	case stamp != "":
+		return VersionPrefix + "none, though stamped release " + stamp + ", so a run computes it"
+	case size > 0:
+		return fmt.Sprintf("%snone read: %d bytes carried with no release stamp, so a run computes it",
+			VersionPrefix, size)
+	}
+	return VersionPrefix + "none, a local build, so a run computes it"
+}
+
+// ReadVersionLine is the release stamp and table size a `--version` output's line says the binary carries, and
+// whether it carries one it reads. An output with no such line, from a binary older than the line, carries none.
+func ReadVersionLine(output string) (string, int, bool) {
+	for line := range strings.SplitSeq(output, "\n") {
+		described, found := strings.CutPrefix(strings.TrimSpace(line), VersionPrefix)
+		if !found {
+			continue
+		}
+		var stamp string
+		var size int
+		if _, scanError := fmt.Sscanf(described, "release %s %d bytes", &stamp, &size); scanError != nil {
+			return "", 0, false
+		}
+		stamp = strings.TrimSuffix(stamp, ",")
+		return stamp, size, stamp != "" && size > 0
+	}
+	return "", 0, false
+}

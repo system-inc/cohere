@@ -1,6 +1,7 @@
 // Command run_output prints what one measured run said about itself, read from its `--json` output
-// (bench_results.ParseRunOutput), as quiet_machine.sh's columns: engine seconds, findings and cache use,
-// tab-separated. quiet_machine.sh builds it once and runs it after each measured run, outside the timing:
+// (bench_results.ParseRunOutput), as quiet_machine.sh's columns: engine seconds, findings, cache use, and the builds
+// its Go project checked, joined by `; ` (a build's own label holds spaces and commas), tab-separated. quiet_machine.sh
+// builds it once and runs it after each measured run, outside the timing:
 //
 //	run_output <log>
 //
@@ -12,6 +13,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/system-inc/cohere/internal/bench_results"
 )
@@ -34,7 +36,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "run_output: %s: %v\n", os.Args[1], parseRunOutputError)
 		os.Exit(1)
 	}
-	if _, printError := fmt.Printf("%.3f\t%d\t%s\n", run.EngineSeconds, run.Findings, run.Cache); printError != nil {
+	columns := fmt.Sprintf("%.3f\t%d\t%s\t%s", run.EngineSeconds, run.Findings, run.Cache,
+		strings.Join(run.Builds, bench_results.BuildsSeparator))
+	if _, printError := fmt.Println(columns); printError != nil {
 		// Ignored: the exit code below says the columns never arrived even when standard error cannot.
 		fmt.Fprintf(os.Stderr, "run_output: printing the columns: %v\n", printError)
 		os.Exit(1)

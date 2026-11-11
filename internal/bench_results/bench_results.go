@@ -96,10 +96,34 @@ type Record struct {
 	// to the Go engine does: #pff7xhr's bar is a checking run's seconds, and a fixing run formats first (#jp0cqkk).
 	// Absent, they fixed, as every record before it did, so Guard never compares a fixing number with a checking one.
 	NoFix bool `json:"noFix,omitempty"`
+	// EveryBuild is whether the runs asked to check every build the Go files name, `--other-builds`, rather than the
+	// host's build alone, which every record before it measured. The two measure different work, so Guard never
+	// compares one with the other (#ccqee0e).
+	EveryBuild bool `json:"everyBuild,omitempty"`
+	// Builds are the builds the Cold and Idle runs' Go project checked, as its summary names them, the host's first,
+	// the same in every one of those runs. Absent when they name none: no Go project, or a record written before the
+	// benchmark read them.
+	Builds []string `json:"builds,omitempty"`
+	// StandardLibraryTable is the Go standard library's analysis entries the engine binary carries and reads, as a
+	// release's binary does, from its `--version`. Absent, the binary computed the standard library in every cold
+	// run, as a local build does, and so did every record before it: the bar is read on the binary a user runs
+	// (#b2t9xmf's ruling), so Guard never compares a local build's number with a release's (#ccqee0e).
+	StandardLibraryTable *StandardLibraryTable `json:"standardLibraryTable,omitempty"`
 
 	Runs  []Run                `json:"runs"`
 	Modes map[Mode]ModeSummary `json:"modes"`
 }
+
+// StandardLibraryTable is the table of the Go standard library's analysis entries a release writes into its binary:
+// the release stamp its keys hold, and its size.
+type StandardLibraryTable struct {
+	ReleaseStamp string `json:"releaseStamp"`
+	Bytes        int    `json:"bytes"`
+}
+
+// BuildsSeparator joins the builds one run checked in the benchmark's runs table, since a build's label holds spaces
+// and commas (`darwin/arm64 cgo tags a,b`).
+const BuildsSeparator = "; "
 
 // Engine is one engine of cohere's, named as `COHERE_PROJECT_ENGINE` names it (command/cohere/root.go's
 // projectEngine), whose project a record's runs checked alone.
