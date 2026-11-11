@@ -293,6 +293,68 @@ func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 	}
 }
 
+// A file Prettier's core normalizes before any parser runs (#08m6pqx): a leading byte order mark, which
+// postcss drops too, so comments printed from the text must not slip by its width; and text that is only
+// JavaScript whitespace, U+00A0 included, which formats to nothing where postcss would call it an unknown
+// word. The fork puts the mark back on its output, and Format leaves it off, so it is compared without.
+func TestCoreNormalizedInputMatchesTheFork(test *testing.T) {
+	test.Parallel()
+	bomFixture, readError := os.ReadFile(filepath.Join("testdata", "prettier", "css", "bom", "bom.css"))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	cases := []struct {
+		fileName string
+		source   string
+		// contains is what the fork's output must hold, so a printer and an oracle that both lost it cannot
+		// agree. The whitespace-only cases hold nothing, and the fork's output must be empty.
+		contains string
+	}{
+		{fileName: "Probe.css", source: "\ufeff/**/", contains: "/**/\n"},
+		{fileName: "Probe.scss", source: "\ufeff//", contains: "//\n"},
+		{fileName: "Probe.css", source: string(bomFixture), contains: "/* Block comment */\n"},
+		{fileName: "Probe.scss", source: string(bomFixture), contains: "/* Block comment */\n"},
+		{fileName: "Probe.css", source: "\u00a0"},
+		{fileName: "Probe.scss", source: "\u00a0"},
+		{fileName: "Probe.css", source: "\u00a0\n"},
+		{fileName: "Probe.scss", source: "\u00a0\n"},
+		{fileName: "Probe.css", source: "\u00a0\u00a0\t\n"},
+		{fileName: "Probe.scss", source: "\u00a0\u00a0\t\n"},
+	}
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
+	for optionsName, options := range formatOptionSets() {
+		oracle := golden.Engine(options)
+		for _, testCase := range cases {
+			expected, oracleError := oracle.Format(testCase.fileName, testCase.source)
+			if oracleError != nil {
+				test.Fatalf("%q as %s (%s): the oracle failed: %v", testCase.source, testCase.fileName, optionsName,
+					oracleError)
+			}
+			if strings.HasPrefix(testCase.source, "\ufeff") {
+				if !strings.HasPrefix(expected, "\ufeff") {
+					test.Fatalf("%q as %s (%s): the fork dropped the mark: %q", testCase.source, testCase.fileName,
+						optionsName, expected)
+				}
+				expected = strings.TrimPrefix(expected, "\ufeff")
+			}
+			if testCase.contains == "" && expected != "" || !strings.Contains(expected, testCase.contains) {
+				test.Fatalf("%q as %s (%s): the fork printed %q", testCase.source, testCase.fileName, optionsName,
+					expected)
+			}
+			format := Format
+			if testCase.fileName == "Probe.scss" {
+				format = FormatScss
+			}
+			actual, formatError := format(testCase.source, options, nil)
+			if formatError != nil || actual != expected {
+				test.Errorf("%q as %s (%s):\n--- fork\n%q\n--- native (%v)\n%q", testCase.source, testCase.fileName,
+					optionsName, expected, formatError, actual)
+			}
+		}
+	}
+}
+
 // PrintToDoc is the same doc without its trailing hardline, which an embedding printer lays out.
 func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
@@ -444,7 +506,8 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 			text := string(source)
 			actual, nativeError := Format(text, options, nil)
 
-			// A byte order mark is the shared layer's to strip, before any printer runs.
+			// The fork puts a byte order mark back on its output, and Format leaves it off.
+			// TestCoreNormalizedInputMatchesTheFork compares this file without it.
 			if strings.HasPrefix(text, "\xef\xbb\xbf") {
 				continue
 			}
