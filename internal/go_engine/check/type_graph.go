@@ -11,8 +11,9 @@ import (
 )
 
 // typeGraph is one build's named types and aliases as the closure digests read them, each rendered once (#b2t9xmf): a
-// node per type name, its lines as exportRendering writes them (renderedTypeName), and an edge to every type name those
-// lines name (directTypeNames over declarationTypes). A type name's closure is what its edges reach, so the closure
+// node per type name, its lines as exportRendering writes them (renderedTypeName) but for the unexported methods no
+// importer sees (importerSees), and an edge to every type name those lines name (directTypeNames over
+// declarationTypes). A type name's closure is what its edges reach, so the closure
 // digest of an object is its own line and the digests of the strongly connected components its types name, each
 // component digested once from its members' lines and the digests of the components it points to. Two builds' digests
 // of an object are equal exactly when every named type its closure reaches renders alike in both, which is what the
@@ -21,6 +22,10 @@ import (
 type typeGraph struct {
 	lock  sync.Mutex
 	nodes map[*types.TypeName]*typeNode
+
+	// unexportedInterfaces are whether each package declares an interface with an unexported method of its own
+	// (declaresUnexportedInterface), memoized, which decides whether an importer sees its unexported methods.
+	unexportedInterfaces map[*types.Package]bool
 
 	// rendered, nil outside tests, is told of each type name as it is rendered, so a test can count the renderings.
 	rendered func(*types.TypeName)
@@ -38,7 +43,19 @@ type typeNode struct {
 
 // newTypeGraph is an empty graph of one build's type names.
 func newTypeGraph() *typeGraph {
-	return &typeGraph{nodes: map[*types.TypeName]*typeNode{}}
+	return &typeGraph{nodes: map[*types.TypeName]*typeNode{}, unexportedInterfaces: map[*types.Package]bool{}}
+}
+
+// importerSees reports whether a type name's node keeps method (importerSeesMethod). The caller holds the lock.
+func (graph *typeGraph) importerSees(method *types.Func) bool {
+	return importerSeesMethod(method, func(declaring *types.Package) bool {
+		declares, known := graph.unexportedInterfaces[declaring]
+		if !known {
+			declares = declaresUnexportedInterface(declaring)
+			graph.unexportedInterfaces[declaring] = declares
+		}
+		return declares
+	})
 }
 
 // closureDigest is object's closure digest: its own line (ownRendering) and the digests of the components the named
@@ -83,8 +100,8 @@ func (graph *typeGraph) nodeOf(typeName *types.TypeName) *typeNode {
 	}
 	node := &typeNode{
 		typeName: typeName,
-		lines:    renderedTypeName(typeName),
-		edges:    directTypeNames(declarationTypes(typeName)),
+		lines:    renderedTypeName(typeName, graph.importerSees),
+		edges:    directTypeNames(declarationTypes(typeName, graph.importerSees)),
 	}
 	graph.nodes[typeName] = node
 	return node

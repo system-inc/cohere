@@ -75,8 +75,9 @@ func NewReadsBuild() *ReadsBuild {
 
 // closureDigest is object's closure digest (typeGraph.closureDigest), memoized: what an importer can observe of
 // object, another package's, its own line and every named type its type reaches, each type as exportRendering writes
-// it, unexported fields and methods included, so two builds whose types render alike for it digest it alike, and a
-// struct two levels down whose unexported field differs by target changes the digest of every object that reaches it.
+// it, unexported fields included, and unexported methods only where an importer sees them (importerSeesMethod), so two
+// builds whose types render alike for it digest it alike, and a struct two levels down whose unexported field differs
+// by target changes the digest of every object that reaches it.
 // It errs wide, as exportRendering does: a digest that changes when it need not costs the reading package a recheck,
 // while one that stays the same when it should change restores a stale analysis.
 func (build *ReadsBuild) closureDigest(object types.Object) cache.Key {

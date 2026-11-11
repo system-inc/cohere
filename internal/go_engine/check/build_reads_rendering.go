@@ -2,6 +2,7 @@ package check
 
 import (
 	"go/constant"
+	"go/token"
 	"go/types"
 	"math/big"
 	"strconv"
@@ -180,9 +181,9 @@ func directTypeNames(roots []types.Type) []*types.TypeName {
 }
 
 // declarationTypes are the types typeName's declaration names, which its rendered lines write (renderedTypeName): a
-// defined type's type parameters' constraints, its underlying type and its methods' signatures, and an alias's type
-// parameters' constraints, the type its declaration names and the type it stands for.
-func declarationTypes(typeName *types.TypeName) []types.Type {
+// defined type's type parameters' constraints, its underlying type and the signatures of the methods methodKept keeps,
+// and an alias's type parameters' constraints, the type its declaration names and the type it stands for.
+func declarationTypes(typeName *types.TypeName, methodKept func(*types.Func) bool) []types.Type {
 	var named []types.Type
 	constraints := func(parameters *types.TypeParamList) {
 		for parameter := range parameters.TypeParams() {
@@ -194,7 +195,9 @@ func declarationTypes(typeName *types.TypeName) []types.Type {
 		constraints(declared.TypeParams())
 		named = append(named, declared.Underlying())
 		for method := range declared.Methods() {
-			named = append(named, method.Signature())
+			if methodKept(method) {
+				named = append(named, method.Signature())
+			}
 		}
 	case *types.Alias:
 		constraints(declared.TypeParams())
@@ -203,4 +206,112 @@ func declarationTypes(typeName *types.TypeName) []types.Type {
 		named = append(named, declared)
 	}
 	return named
+}
+
+// importerSeesMethod reports whether an importer's findings can depend on method, a method another package declares,
+// given whether its package declares an interface with an unexported method of its own (declaresUnexportedInterface).
+// An exported method it can call by name. An unexported one it can never name, so it reaches the importer only through
+// whether a type satisfies an interface whose method set holds it, and only an interface of the method's own package
+// can: an unexported method is its package's alone, so another package's interface never names it. The method's
+// package is method.Pkg(), never the package of a type it reaches the importer on, which embedding makes another.
+func importerSeesMethod(method *types.Func, declaresUnexportedInterface func(*types.Package) bool) bool {
+	return method.Exported() || method.Pkg() == nil || declaresUnexportedInterface(method.Pkg())
+}
+
+// declaresUnexportedInterface reports whether declaring declares, among what an importer can reach of it, an interface
+// with an unexported method of declaring: a named interface, or an unnamed one in a signature, a field, a constraint
+// or a type argument. What an importer reaches is what export data holds of the package: its exported objects and,
+// walked from them, every type of its own their types name, each with its whole declaration, every method's signature
+// included. So the answer is the same whether the package was checked from source or read from export data, which
+// holds nothing else, and an interface no exported object reaches, or one declared inside a function body, is left
+// out, since no importer can ever hold a value of it. It walks no named type of another package, whose interfaces name
+// only that package's unexported methods.
+func declaresUnexportedInterface(declaring *types.Package) bool {
+	found := false
+	expanded := map[*types.TypeName]bool{}
+	var walk func(walked types.Type)
+	expand := func(typeName *types.TypeName) {
+		if typeName.Pkg() != declaring || expanded[typeName] {
+			return
+		}
+		expanded[typeName] = true
+		for _, declared := range declarationTypes(typeName, func(*types.Func) bool { return true }) {
+			walk(declared)
+		}
+	}
+	walkParameters := func(parameters *types.TypeParamList) {
+		for parameter := range parameters.TypeParams() {
+			walk(parameter.Constraint())
+		}
+	}
+	walkSignature := func(signature *types.Signature) {
+		walkParameters(signature.TypeParams())
+		walk(signature.Params())
+		walk(signature.Results())
+	}
+	walk = func(walked types.Type) {
+		if found {
+			return
+		}
+		switch composite := walked.(type) {
+		case *types.Named:
+			expand(composite.Origin().Obj())
+			for argument := range composite.TypeArgs().Types() {
+				walk(argument)
+			}
+		case *types.Alias:
+			expand(composite.Origin().Obj())
+			for argument := range composite.TypeArgs().Types() {
+				walk(argument)
+			}
+		case *types.Pointer:
+			walk(composite.Elem())
+		case *types.Slice:
+			walk(composite.Elem())
+		case *types.Array:
+			walk(composite.Elem())
+		case *types.Chan:
+			walk(composite.Elem())
+		case *types.Map:
+			walk(composite.Key())
+			walk(composite.Elem())
+		case *types.Signature:
+			walkSignature(composite)
+		case *types.Tuple:
+			for variable := range composite.Variables() {
+				walk(variable.Type())
+			}
+		case *types.Struct:
+			for field := range composite.Fields() {
+				walk(field.Type())
+			}
+		case *types.Interface:
+			for method := range composite.ExplicitMethods() {
+				if !method.Exported() && method.Pkg() == declaring {
+					found = true
+					return
+				}
+				walkSignature(method.Signature())
+			}
+			for embedded := range composite.EmbeddedTypes() {
+				walk(embedded)
+			}
+		case *types.Union:
+			for index := range composite.Len() {
+				walk(composite.Term(index).Type())
+			}
+		}
+	}
+	for _, name := range declaring.Scope().Names() {
+		if !token.IsExported(name) {
+			continue
+		}
+		object := declaring.Scope().Lookup(name)
+		if typeName, isTypeName := object.(*types.TypeName); isTypeName {
+			expand(typeName)
+			continue
+		}
+		walk(object.Type())
+	}
+	return found
 }

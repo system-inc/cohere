@@ -90,15 +90,16 @@ func renderedObject(object types.Object) []string {
 	case *types.Func:
 		return []string{"func " + declared.Name() + " " + writtenType(declared.Type())}
 	case *types.TypeName:
-		return renderedTypeName(declared)
+		return renderedTypeName(declared, nil)
 	default:
 		return []string{"object " + object.Name() + " " + writtenType(object.Type())}
 	}
 }
 
-// renderedTypeName is the lines of a type name: an alias, a defined type with its methods, or any other type name by
-// its type. A defined type's first line is the one that writes its underlying type.
-func renderedTypeName(object *types.TypeName) []string {
+// renderedTypeName is the lines of a type name: an alias, a defined type with its methods, those methodKept keeps, or
+// every one when it is nil, or any other type name by its type. A defined type's first line is the one that writes its
+// underlying type.
+func renderedTypeName(object *types.TypeName, methodKept func(*types.Func) bool) []string {
 	switch declared := object.Type().(type) {
 	case *types.Alias:
 		return []string{"alias " + object.Name() + renderedTypeParameters(declared.TypeParams()) + " = " +
@@ -106,7 +107,12 @@ func renderedTypeName(object *types.TypeName) []string {
 	case *types.Named:
 		lines := []string{"type " + object.Name() + renderedTypeParameters(declared.TypeParams()) + " " +
 			writtenType(declared.Underlying())}
-		methods := slices.Collect(declared.Methods())
+		var methods []*types.Func
+		for method := range declared.Methods() {
+			if methodKept == nil || methodKept(method) {
+				methods = append(methods, method)
+			}
+		}
 		inOrder := make([]string, 0, len(methods))
 		for _, method := range methods {
 			inOrder = append(inOrder, method.Name())

@@ -17,8 +17,9 @@ import (
 
 // closureRendering is the closure an object's digest stands for, written out whole, the oracle the digests are held
 // to: its own line, then every named type and alias reachable from its type, each once, sorted by package path, name
-// and lines, each as its path and name and its lines (renderedTypeName). It walks every closure from scratch, as the
-// verdicts once did, so it is the test's alone.
+// and lines, each as its path and name and its lines (renderedTypeName), an unexported method kept only where an
+// importer sees it (oracleSees). It walks every closure from scratch, as the verdicts once did, so it is the test's
+// alone.
 func closureRendering(object types.Object) []string {
 	lines := []string{ownRendering(object)}
 	type renderedName struct {
@@ -29,7 +30,7 @@ func closureRendering(object types.Object) []string {
 	var rendered []renderedName
 	for _, typeName := range closureTypeNames(rootTypes(object)) {
 		rendered = append(rendered, renderedName{path: typeName.Pkg().Path(), name: typeName.Name(),
-			lines: renderedTypeName(typeName)})
+			lines: renderedTypeName(typeName, oracleSees)})
 	}
 	slices.SortFunc(rendered, func(left, right renderedName) int {
 		return cmp.Or(cmp.Compare(left.path, right.path), cmp.Compare(left.name, right.name),
@@ -40,6 +41,11 @@ func closureRendering(object types.Object) []string {
 		lines = append(lines, typeName.lines...)
 	}
 	return lines
+}
+
+// oracleSees is whether the oracle keeps a method of a type name, as the graph does, asked of its package from scratch.
+func oracleSees(method *types.Func) bool {
+	return importerSeesMethod(method, declaresUnexportedInterface)
 }
 
 // closureTypeNames are the named types and aliases roots reach, walked from scratch: those roots name, and those their
@@ -56,7 +62,7 @@ func closureTypeNames(roots []types.Type) []*types.TypeName {
 		}
 		seen[current] = true
 		reached = append(reached, current)
-		pending = append(pending, directTypeNames(declarationTypes(current))...)
+		pending = append(pending, directTypeNames(declarationTypes(current, oracleSees))...)
 	}
 	return reached
 }
