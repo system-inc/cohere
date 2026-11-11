@@ -11,7 +11,7 @@ func TestParserForMatchesPrettierInference(test *testing.T) {
 	test.Parallel()
 
 	expected := map[string]string{
-		"a.ts": "typescript", "a.tsx": "typescript",
+		"a.ts": "typescript", "a.tsx": "typescript", "a.mts": "typescript", "a.cts": "typescript",
 		"a.js": "babel", "a.jsx": "babel", "a.mjs": "babel", "a.cjs": "babel",
 		"a.json": "json", "package.json": "json-stringify",
 		"a.css": "css", "a.scss": "scss", "a.less": "less",

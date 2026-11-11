@@ -106,10 +106,13 @@ var embeddedFileNames = map[string]string{
 
 // embeddedParsers is the parser a file name an embed passes resolves to, for the embeds that override
 // the file path rather than name a parser: markdown's ts and tsx fences, whose trailing comma of type
-// parameters follows the extension.
+// parameters follows the extension. `.mts` and `.cts` are typescript's as `.ts` is, so a name with
+// either never resolves to no parser, though no embed passes one today.
 var embeddedParsers = map[string]string{
 	".ts":  "typescript",
 	".tsx": "typescript",
+	".mts": "typescript",
+	".cts": "typescript",
 	".js":  "babel",
 	".md":  "markdown",
 }

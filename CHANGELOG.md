@@ -130,6 +130,10 @@ changed in cohere outside the sets is written under the same heading.
 
 ### Changed
 
+- `.mts` and `.cts` files are formatted, as Prettier formats them: its typescript parser with no JSX, so a
+  `<T>x` cast stays a cast, and an arrow's lone type parameter keeps its `<T,>`, since upstream's `.ts` test
+  misses both names. The format walk offers them, a root's `Format` project counts them, and a save through
+  `--stdin-filepath` formats them, where each read them as a type no printer handles and left them as typed.
 - A run that checked nothing because every file of its language was excluded fails, exit 1, where it passed with
   a warning. Its footer says how many files and why, quoting the rule that decided, as
   `no files checked: 1 file excluded, ignored by git (.gitignore:1)`, and `--json` reads `"verdict": "fail"` with

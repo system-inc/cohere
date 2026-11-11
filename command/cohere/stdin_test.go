@@ -43,6 +43,17 @@ func runCohereWithStdin(
 	return stdout.String(), stderr.String(), childExitCode(test, exitError)
 }
 
+// moduleTypeScriptBuffer is the text a `.mts` or `.cts` fixture holds (#9v2x63d), and moduleTypeScriptFormatted
+// the fork's answer for it under either name and Prettier's defaults, the options fixScopeProject resolves to,
+// recorded with node. No JSX, so the cast is one, and upstream's /\.ts$/ misses both names, so the arrow keeps
+// its `<T,>`. fixScopeProject's tsconfig includes `.ts` alone, so either name is the format-only path.
+const (
+	moduleTypeScriptBuffer = "import  {join}  from \"node:path\"\nconst a  =   1\nconst b = <number>a\n" +
+		"const identity = <T>(value: T) => value\nexport default join(String(b), String(identity(a)))\n"
+	moduleTypeScriptFormatted = "import { join } from \"node:path\";\nconst a = 1;\nconst b = <number>a;\n" +
+		"const identity = <T,>(value: T) => value;\nexport default join(String(b), String(identity(a)));\n"
+)
+
 // TestStdinAnswersWhatTheGateWrites is the editor save's contract: for a buffer at a path, the stdin
 // mode prints exactly what `cohere --fix --format` writes when the same text is on disk at that path,
 // and writes nothing itself.
@@ -70,11 +81,25 @@ func TestStdinAnswersWhatTheGateWrites(test *testing.T) {
 			buffer:   "Title\n=====\n\n*  one\n*  two\n",
 			contains: "- one\n- two\n",
 		},
+		{
+			name:     "Module.mts",
+			buffer:   moduleTypeScriptBuffer,
+			contains: moduleTypeScriptFormatted,
+		},
+		{
+			name:     "Common.cts",
+			buffer:   moduleTypeScriptBuffer,
+			contains: moduleTypeScriptFormatted,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			root := test.TempDir()
-			fixScopeProject(test, root, map[string]string{"Notes.md": "# Notes\n"})
+			fixScopeProject(test, root, map[string]string{
+				"Notes.md":   "# Notes\n",
+				"Module.mts": "export const module = 1;\n",
+				"Common.cts": "export const common = 1;\n",
+			})
 			path := filepath.Join(root, testCase.name)
 			onDisk := readForTest(test, path)
 
@@ -154,9 +179,6 @@ func TestStdinNeedsFix(test *testing.T) {
 // printer for, and gofmt and the Go engine's fixes for a `.go` name, the one suffix the Go engine's census
 // reads as source (runGoStdin). A file type left off would never be fixed or formatted on save, and one added
 // that cohere does nothing with would be handed to it for nothing.
-//
-// The two sets differ today: .mts and .cts are TypeScript's but have no printer, so a save fixes them and
-// leaves their formatting as typed. That gap is the formatter's to close, not the save's.
 //
 // The refusal is the start of what the front door says when the project a file is in has no stdin path, a
 // Swift package's, which the extension takes as a decline rather than an error, so it must begin the
