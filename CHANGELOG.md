@@ -157,6 +157,10 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   the line with its name, as in `⚠ 👑 lint did not run (CapturePhone)`, and a project that didn't finish or
   failed without a summary is named too. `--verbose` and `--phases` print each project's footer and the line
   counting the projects, as before, and `--json` is unchanged.
+- `--directory` naming a directory that holds more than one engine's project, a `tsconfig.json` beside a `go.work`
+  as Adamic's root holds them, checks each project there, as a run standing in that directory does, and reports them
+  as one. It used to read the directory as TypeScript's alone and check nothing else, without saying so, and refused
+  `--other-builds` as having no Go project.
 - The format walk never enters `testdata`, whose fixtures are what their tests read, and the account counts
   each one it skipped.
 - A declared submodule the root's `ignorePatterns` name isn't read by the nested format check, and a note

@@ -294,7 +294,8 @@ func run() error {
 
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
 	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
-	if discoveryApplies(given, flag.Args()) {
+	atNamedDirectory := namedDirectoryHoldsSeveral(given, flag.Args(), location, locateError)
+	if discoveryApplies(given, flag.Args()) || atNamedDirectory {
 		namedLintConfiguration := ""
 		if given["lint-config"] {
 			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
@@ -309,6 +310,7 @@ func run() error {
 			namedLintConfiguration,
 			formats,
 			given,
+			atNamedDirectory,
 		)
 		if checkDiscoveredProjectsError != nil {
 			return checkDiscoveredProjectsError

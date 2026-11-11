@@ -624,3 +624,41 @@ func TestADiscoveredGoProjectNamesItsBuildsAndWhatNoRuleRanOn(test *testing.T) {
 		}
 	}
 }
+
+// TestANamedDirectoryHoldingSeveralProjectsChecksEach: `--directory` naming a directory that holds a tsconfig.json and
+// a go.work, adamic's shape, checks both projects, as a run standing there would, never TypeScript's alone in silence
+// (#pswhv5q). `--other-builds`, a Go switch, then reaches the Go project rather than being refused as no Go project.
+func TestANamedDirectoryHoldingSeveralProjectsChecksEach(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"tsconfig.json": discoveryTsconfig,
+		"source/a.ts":   "export const a = 1;\n",
+		"go.work":       "go 1.27\n\nuse .\n",
+		"go.mod":        "module example.com/mixed\n\ngo 1.27\n",
+		"sep/sep.go":    "// Package sep joins.\npackage sep\n\n// Separator joins.\nconst Separator = \"/\"\n",
+	})
+	// The Go engine reads the repository's index, so the fixture is a repository git knows, not an empty `.git`.
+	initialize := exec.Command("git", "init", "--quiet")
+	initialize.Dir = root
+	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
+		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
+	}
+	// The TypeScript fixture's own findings fail the run, which is beside the point: each project's summary is.
+	output, _ := runCohere(test, binary, test.TempDir(), "--directory", root, "--no-fix", "--no-cache",
+		"--other-builds", "--json")
+	var labels []string
+	for _, line := range strings.Split(output, "\n") {
+		var record struct {
+			Kind  string `json:"kind"`
+			Label string `json:"label"`
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" {
+			labels = append(labels, record.Label)
+		}
+	}
+	hasGo := slices.ContainsFunc(labels, func(label string) bool { return strings.HasSuffix(label, "(Go)") })
+	if len(labels) != 2 || !hasGo {
+		test.Errorf("the run wrote the summaries %q, want both projects', the Go one among them:\n%s", labels, output)
+	}
+}
