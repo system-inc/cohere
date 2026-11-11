@@ -48,7 +48,8 @@ func (engine *pipeline) runStdin(output io.Writer) int {
 	}
 
 	wraps := engine.wrapsLongLines()
-	engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{})
+	engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{},
+		engine.standardError)
 	engine.runFix(wraps)
 	if engine.fix.record.FilesNotFormatted > 0 {
 		// The buffer parses, so gofmt not formatting it is a formatter that broke, which runFix has said on stderr.

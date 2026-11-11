@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -62,6 +61,19 @@ func runOverConfigured(
 	extra ...string,
 ) (*pipeline, string) {
 	test.Helper()
+	engine, stream, _ := runOverNoted(test, root, wantExit, configure, extra...)
+	return engine, stream
+}
+
+// runOverNoted is runOverConfigured with what the run noted on stderr beside its stream, both as written.
+func runOverNoted(
+	test *testing.T,
+	root string,
+	wantExit int,
+	configure func(*pipeline),
+	extra ...string,
+) (*pipeline, string, string) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
@@ -80,14 +92,16 @@ func runOverConfigured(
 		test.Fatal(describeError)
 	}
 	var standardOutput bytes.Buffer
-	engine := newPipeline(request, described, ruleSettings, registered, &standardOutput, io.Discard, nil)
+	var standardError bytes.Buffer
+	engine := newPipeline(request, described, ruleSettings, registered, &standardOutput, &standardError, nil)
 	if configure != nil {
 		configure(engine)
 	}
 	if exitCode := engine.run(); exitCode != wantExit {
-		test.Fatalf("the run exited %d, want %d:\n%s", exitCode, wantExit, standardOutput.String())
+		test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, wantExit, standardOutput.String(),
+			standardError.String())
 	}
-	return engine, standardOutput.String()
+	return engine, standardOutput.String(), standardError.String()
 }
 
 // Under `--other-builds` a module with a file only windows builds and one only the cohere_extra tag builds is
@@ -410,9 +424,11 @@ func withoutCache(stream string) string {
 }
 
 // hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds and what each restored
-// from it (contract.BuildRecord), each written only when not 0.
+// from it (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source,
+// which are what it did not restore.
 var hostRestoreCounts = regexp.MustCompile(
-	`,"(entriesKept|restoredFromHost|declinedAtLoad|declinedAtCheck|reloadRounds)":[0-9]+|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}`)
+	`,"(entriesKept|restoredFromHost|declinedAtLoad|declinedAtCheck|reloadRounds|checkedFromSource)":[0-9]+` +
+		`|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}`)
 
 // withoutHostRestore is stream with every build record's counts of the restore from the host's run left out, the one
 // thing a run that restores writes otherwise than one that checks every package of every build.

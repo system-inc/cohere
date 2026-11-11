@@ -45,6 +45,16 @@ type LintRecord struct {
 	// Builds is additive within contract 3: every build a run checked when it checked more than one, the host's first
 	// (#72n9mq0). It is absent for a run of one build, so such a run writes the record it always has.
 	Builds []BuildRecord `json:"builds,omitempty"`
+	// BuildsAtOnce is additive within contract 3, and the Go engine's alone: how many of the extra builds ran side by
+	// side, decided once as they started from the cores, the memory cap and the host's live heap (#b2t9xmf). It changes
+	// no finding, no note and no key: a run one build at a time writes the same records but this one. Absent when
+	// Builds is.
+	BuildsAtOnce int `json:"buildsAtOnce,omitempty"`
+	// BuildsWidthLiveBytes is additive within contract 3, and the Go engine's alone: the host's live heap that decision
+	// was given, measured by a collection once the host's reads are whole, so a reader sees why a width was chosen.
+	// Absent when the decision needed none: under `--single-threaded`, a limit other than the cap, builds that restore
+	// nothing from the host, or too few cores or builds for more than one at a time.
+	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
 	// OffReasons is additive within contract 3, and the Go engine's alone: why the settings turn each rule off, for
 	// every off the go block's reasons explain (#v11k0g2), which the front door prints beside the rule in coverage.
 	// Always written, `{}` when no off is explained, so a reader tells an engine that explains its offs, where a rule
@@ -102,6 +112,19 @@ type BuildRecord struct {
 	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
 	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
 	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
+
+	// CheckedFromSource and PackagesLoaded are an extra build's alone (#b2t9xmf): the packages of its whole graph its
+	// first load checked from source rather than restored, from its own findings cache or the host's run, and every
+	// package that load loaded, dependencies and test variants included. CheckedFromSource over PackagesLoaded is the
+	// share that weighs its lint, which takes the whole of a budget of one build the extra builds share once the share
+	// is at or above one half, so no two near-full builds lint at once. LintWaitMilliseconds is the wall time its lint
+	// waited for that weight, and LintWaited whether it waited at all, so a wait under a millisecond still reads as
+	// one. None of them reaches a key or the verdict, and each is written only when not 0 or false, so the host's
+	// record writes none.
+	CheckedFromSource    int  `json:"checkedFromSource,omitempty"`
+	PackagesLoaded       int  `json:"packagesLoaded,omitempty"`
+	LintWaitMilliseconds int  `json:"lintWaitMilliseconds,omitempty"`
+	LintWaited           bool `json:"lintWaited,omitempty"`
 
 	// FilesAlone, additive within contract 3 (#ytnvt8k), counts the files of ours in scope that this build alone
 	// compiles and a rule ran on: the coverage it buys. NotLinted are the files of ours in scope the host's build

@@ -197,6 +197,9 @@ type engineLintRecord struct {
 	// Builds is every build the Go engine checked when it checked more than one, the host's first, additive within
 	// contract 3. A run of one build and a Swift engine send none, which decodes as nil and prints nothing.
 	Builds []checkedBuild `json:"builds"`
+	// BuildsAtOnce is how many of those builds beside the host's the Go engine ran side by side, additive within
+	// contract 3 (#b2t9xmf): a record of how the run ran, which changes nothing it found. Sent only with Builds.
+	BuildsAtOnce int `json:"buildsAtOnce"`
 	// OffReasons is why the settings turn each rule off, for each off the Go engine's settings explain, additive
 	// within contract 3 (#v11k0g2). Nil from an engine that never explains its offs, a Swift engine's, so only an
 	// engine that sends it can say a rule is off with no reason given.
@@ -975,6 +978,7 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 		printProvenance(accountOutput(run.out), "  lint: %s\n", build.line())
 	}
 	activeSummary.Builds = record.Builds
+	activeSummary.BuildsAtOnce = record.BuildsAtOnce
 	for _, build := range record.Builds {
 		for _, file := range build.NotLinted {
 			if run.notLinted == nil {

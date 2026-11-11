@@ -3,6 +3,7 @@ package go_engine
 import (
 	"cmp"
 	"fmt"
+	"io"
 	"runtime"
 	"slices"
 	"strings"
@@ -172,6 +173,8 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 			record.Crashes = append(record.Crashes, contract.Crash{File: crash.File, Error: crash.Error})
 		}
 		record.Builds = verdict.records
+		record.BuildsAtOnce = engine.buildsAtOnce
+		record.BuildsWidthLiveBytes = engine.buildsWidthLiveBytes
 	}
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true
@@ -322,8 +325,13 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // shares cannot be read, which the run says on stderr, and always under `--timing`. A run with extra builds gets a
 // session without a store when lintCache gives none, since the host's keeps its packages' entries for the extra
 // builds and theirs restore from them (#b2t9xmf); under `--timing` it gets none, so nothing is restored from the host.
-// files must be of the files as they are on disk when the load runs (see extraBuildRun).
-func (engine *pipeline) cacheSession(environment []string, files cache.FileDigests) *check.CacheSession {
+// files must be of the files as they are on disk when the load runs (see extraBuildRun). Why the cache sat out is
+// noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns).
+func (engine *pipeline) cacheSession(
+	environment []string,
+	files cache.FileDigests,
+	notes io.Writer,
+) *check.CacheSession {
 	// A run under `--timing` is a measurement, and a package the cache restores, its load's or its rules', runs
 	// nothing, so a table over it would read as measured where it is not. Such a run reads and writes no cache at all,
 	// the binary's standard-library entries included (#3apgjer).
@@ -333,7 +341,7 @@ func (engine *pipeline) cacheSession(environment []string, files cache.FileDiges
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, enabled)
 	if cachingError != nil {
-		engine.note("the findings cache sat this run out: %v", cachingError)
+		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}
 	if caching == nil && cachingError == nil && engine.recordsReads() {
 		// Nothing is stored or read from a store: the session keeps entries in memory for the extra builds alone.
