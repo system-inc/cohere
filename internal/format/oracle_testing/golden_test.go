@@ -55,6 +55,23 @@ func TestAMissingGoldenIsRefused(test *testing.T) {
 	}
 }
 
+// TestAGoldenNamedInAnotherCaseIsRefused: a golden whose stored name differs from its test's only in case
+// fails on every disk, not only on a case-sensitive one where the open itself would miss it.
+func TestAGoldenNamedInAnotherCaseIsRefused(test *testing.T) {
+	test.Parallel()
+	path := writeGolden(test, record{Digest: "embedded", Answers: map[string]Answer{"k": {Output: "x"}}})
+	if _, readError := read(
+		filepath.Join(filepath.Dir(path), "Golden.json.gz"),
+		"embedded",
+	); readError == nil || !strings.Contains(readError.Error(), "rename it to Golden.json.gz") {
+		test.Fatalf("a golden stored as golden.json.gz was read as Golden.json.gz: %v", readError)
+	}
+	// The control: the name as stored reads.
+	if answers, readError := read(path, "embedded"); readError != nil || answers["k"].Output != "x" {
+		test.Fatalf("a golden read by its stored name was refused: %v, %v", answers, readError)
+	}
+}
+
 // TestKeysDoNotRunTogether: inputs that concatenate to the same text are different keys.
 func TestKeysDoNotRunTogether(test *testing.T) {
 	test.Parallel()

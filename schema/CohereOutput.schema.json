@@ -611,6 +611,19 @@
                                 "type": "object",
                                 "additionalProperties": { "type": "integer" },
                                 "description": "Each decline, and each package never restored from the host's run, by why: inputs, noEntry, never, unknown, export, T, L, F, D or A. Absent when empty."
+                            },
+                            "filesAlone": {
+                                "type": "integer",
+                                "description": "Files of ours in scope that only this build compiles and that a rule ran on: the coverage it buys. Absent when 0."
+                            },
+                            "notLinted": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Files of ours in scope the host's build leaves out that this build, the first to compile them, compiled and no build analyzed, absolute and sorted. Each is also in gaps.unchecked, as not linted. Absent when none."
+                            },
+                            "notLintedReason": {
+                                "type": "string",
+                                "description": "Why no rule ran on notLinted: a build whose load found a type error analyzes no package. Absent when notLinted is."
                             }
                         }
                     }
@@ -621,7 +634,19 @@
                 "filesFormatted": { "type": "integer" },
                 "wouldChange": {
                     "type": "integer",
-                    "description": "Under `--no-fix`, the files a fix or formatting would rewrite. They fail the run."
+                    "description": "Under `--no-fix`, the files a fix or formatting would rewrite, the nested repositories' included, each a finding line. They fail the run."
+                },
+                "nestedWouldChange": {
+                    "type": "integer",
+                    "description": "The part of wouldChange in nested repositories: files their own run would rewrite. Absent when zero."
+                },
+                "wouldChangeConsidered": {
+                    "type": "integer",
+                    "description": "Under `--no-fix`, the files the fix phase examined, the scope wouldChange less nestedWouldChange was found in. Absent when zero."
+                },
+                "nestedWouldChangeConsidered": {
+                    "type": "integer",
+                    "description": "The nested repositories' files the formatter read, the scope nestedWouldChange was found in. Absent when zero."
                 },
                 "cohered": {
                     "type": "integer",

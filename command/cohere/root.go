@@ -204,6 +204,28 @@ func engineAt(directory string) (projectEngine, bool) {
 	return "", false
 }
 
+// enginesAt is every engine whose project a directory is, in engineAt's order: a Go module counts only when its run
+// stands there, never when a workspace above it builds it (goModuleRoot), since that workspace is its project.
+func enginesAt(directory string) []projectEngine {
+	var engines []projectEngine
+	if isRegularFile(filepath.Join(directory, projectMarker)) {
+		engines = append(engines, engineTypeScript)
+	}
+	if isRegularFile(filepath.Join(directory, swiftProjectMarker)) {
+		engines = append(engines, engineSwift)
+	}
+	if isRegularFile(filepath.Join(directory, goWorkspaceMarker)) {
+		return append(engines, engineGo)
+	}
+	if isRegularFile(filepath.Join(directory, goModuleMarker)) {
+		root, rootError := goModuleRoot(directory)
+		if rootError == nil && filepath.Clean(root) == filepath.Clean(directory) {
+			engines = append(engines, engineGo)
+		}
+	}
+	return engines
+}
+
 // goModuleRoot is the root a Go module's run stands on: the directory of the nearest go.work above it, when
 // that workspace uses the module, since that is the build go itself runs there, and the module's own
 // directory otherwise. Only the nearest go.work counts, as with go, and the search stops at the enclosing

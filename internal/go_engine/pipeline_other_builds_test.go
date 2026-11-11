@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -188,8 +189,8 @@ func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 // and names each file the host's build constraints leave out and an extra build compiles as checked by that build, in
 // the build's own words, which the front door counts as checked (#72n9mq0): the windows file by windows's build, the
 // tagged file by the cohere_extra one, each the build the lint phase ran. A file no build compiles, one whose
-// constraint names `ignore`, keeps the constraint's reason and stays a gap, and adds no build. Without the switch
-// every one of the three keeps the constraint's reason.
+// constraint names `ignore`, stays a gap for the selection's reason, that no build sets `ignore` (#ntamp9e), and adds
+// no build. Without the switch every one of the three keeps the constraint's reason.
 func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 	test.Parallel()
 	const constraintPrefix = "excluded by build constraints on "
@@ -247,9 +248,10 @@ func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 			test.Errorf("under the switch %s is left out for %q, want %q", file, onReasons[file], want)
 		}
 	}
-	if !strings.HasPrefix(onReasons[ignoredFile], constraintPrefix) {
-		test.Errorf("under the switch %s, which no build compiles, is left out for %q, want the constraint's reason",
-			ignoredFile, onReasons[ignoredFile])
+	// Why no build compiles it, from the selection, which says more than the host's constraint (#ntamp9e).
+	if want := "its constraint names `ignore`, which no build sets"; onReasons[ignoredFile] != want {
+		test.Errorf("under the switch %s, which no build compiles, is left out for %q, want %q", ignoredFile,
+			onReasons[ignoredFile], want)
 	}
 }
 
@@ -546,4 +548,185 @@ func TestOtherBuildsNameEveryBuildsInputs(test *testing.T) {
 // sortedKeys is a set's members, sorted and joined, for a message.
 func sortedKeys(set map[string]bool) string {
 	return strings.Join(slices.Sorted(maps.Keys(set)), ", ")
+}
+
+// A type error only another build finds is a finding of the run, written in the lint phase as a compiler finding, and
+// the lint record counts it in typeErrors beside its findings, so the phase's finding records are what its record
+// says (#rw6tg3a): before, the record counted the rule findings alone, and the front door refused the run as an
+// engine that broke its contract. The fixture's windows-only file names a constant no build declares.
+func TestAnOtherBuildsTypeErrorIsCountedInTheLintRecord(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	broken := "//go:build windows\n\npackage separator\n\n// Broken names a constant no build declares.\nconst Broken = Missing\n"
+	if writeError := os.WriteFile(filepath.Join(root, "internal", "separator", "broken_windows.go"), []byte(broken),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	inLint := false
+	compilerRecords, ruleRecords := 0, 0
+	var lint contract.LintRecord
+	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+		var kind struct {
+			Kind   string `json:"kind"`
+			Source string `json:"source"`
+			Name   string `json:"name"`
+		}
+		if decodeError := json.Unmarshal([]byte(line), &kind); decodeError != nil {
+			test.Fatalf("%v: %s", decodeError, line)
+		}
+		switch {
+		case kind.Kind == "phase" && kind.Name == "types":
+			inLint = true
+		case kind.Kind == "finding" && inLint && kind.Source == "compiler":
+			compilerRecords++
+		case kind.Kind == "finding" && inLint:
+			ruleRecords++
+		case kind.Kind == "lint":
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			inLint = false
+		}
+	}
+	if compilerRecords == 0 {
+		test.Fatalf("the windows build's type error was written as no compiler finding:\n%s", stream)
+	}
+	if lint.TypeErrors != compilerRecords || lint.Findings != ruleRecords {
+		test.Errorf("the lint record counts %d findings and %d type errors, and the phase wrote %d rule findings and "+
+			"%d compiler findings", lint.Findings, lint.TypeErrors, ruleRecords, compilerRecords)
+	}
+}
+
+// Each build's record says what it alone covered, and what it compiled that no rule ran on (#ytnvt8k). Over the
+// other-builds fixture the windows build alone compiles separator_windows.go and lints it. With a windows-only type
+// error beside it, the windows build analyzes no package, so it lints nothing alone, and both windows-only files
+// are named as compiled and not linted, with the type error as why.
+func TestEachBuildSaysWhatItAloneCoveredAndWhatNoRuleRanOn(test *testing.T) {
+	test.Parallel()
+	windowsRecord := func(root string, wantExit int) contract.BuildRecord {
+		test.Helper()
+		_, stream := runOverRaw(test, root, wantExit, "--no-cache", "--other-builds")
+		for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+			var lint contract.LintRecord
+			if !strings.HasPrefix(line, `{"kind":"lint"`) {
+				continue
+			}
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			for _, build := range lint.Builds {
+				if strings.HasPrefix(build.Target, "windows/") {
+					return build
+				}
+			}
+		}
+		test.Fatalf("no lint record names a windows build:\n%s", stream)
+		return contract.BuildRecord{}
+	}
+
+	clean := windowsRecord(copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
+	if clean.FilesAlone != 1 || len(clean.NotLinted) != 0 {
+		test.Errorf("the windows build alone linted %d files and left %v unlinted, want 1 and none", clean.FilesAlone,
+			clean.NotLinted)
+	}
+
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	broken := filepath.Join(root, "internal", "separator", "broken_windows.go")
+	if writeError := os.WriteFile(broken, []byte("//go:build windows\n\npackage separator\n\n"+
+		"// Broken names a constant no build declares.\nconst Broken = Missing\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	failed := windowsRecord(root, exitFindings)
+	var names []string
+	for _, file := range failed.NotLinted {
+		names = append(names, filepath.Base(file))
+	}
+	if failed.FilesAlone != 0 || !slices.Equal(names, []string{"broken_windows.go", "separator_windows.go"}) ||
+		!strings.Contains(failed.NotLintedReason, "found a type error, so it analyzed no package") {
+		test.Errorf("the windows build alone linted %d files and left %v unlinted for %q, want 0 and both its files "+
+			"for its type error", failed.FilesAlone, names, failed.NotLintedReason)
+	}
+}
+
+// A file two extra builds compile is linted when either analyzes it, so it is never named not linted because the
+// first of them is broken (#ytnvt8k). Beside the other-builds fixture: a file every platform but the host's compiles,
+// a type error only the first extra build compiles, so that build analyzes no package, and a file only the second
+// compiles, so both builds run. The shared file is linted by the second; only the first build's own file is named.
+func TestAFileTwoBuildsCompileIsLintedWhenEitherAnalyzesIt(test *testing.T) {
+	test.Parallel()
+	var others []string
+	for _, operatingSystem := range []string{"linux", "windows", "darwin", "freebsd"} {
+		if operatingSystem != runtime.GOOS {
+			others = append(others, operatingSystem)
+		}
+	}
+	first, second := others[0], others[1]
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	files := map[string]string{
+		"shared.go": "// Package shared is compiled beside the fixture's.\npackage shared\n",
+		"shared_elsewhere.go": "//go:build !" + runtime.GOOS +
+			"\n\npackage shared\n\n// Elsewhere is one.\nconst Elsewhere = 1\n",
+		"broken_first.go": "//go:build " + first +
+			"\n\npackage shared\n\n// Broken is undeclared.\nconst Broken = Missing\n",
+		"only_second.go": "//go:build " + second + "\n\npackage shared\n\n// Second is two.\nconst Second = 2\n",
+	}
+	for name, contents := range files {
+		path := filepath.Join(root, "internal", "shared", name)
+		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	var lint contract.LintRecord
+	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+		if strings.HasPrefix(line, `{"kind":"lint"`) {
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+		}
+	}
+	notLinted := map[string]string{}
+	for _, build := range lint.Builds {
+		for _, file := range build.NotLinted {
+			notLinted[filepath.Base(file)] = build.Target
+		}
+	}
+	if target, named := notLinted["shared_elsewhere.go"]; named {
+		test.Errorf("shared_elsewhere.go, which the %s build lints, is named not linted under %s", second, target)
+	}
+	if target := notLinted["broken_first.go"]; !strings.HasPrefix(target, first+"/") {
+		test.Errorf("broken_first.go is named not linted under %q, want the %s build's: %v", target, first, notLinted)
+	}
+}
+
+// A target the settings name that go tool dist list does not is refused when the project is described, before any
+// record, since the settings asked for a check that can never be made (#ntamp9e), and one it does target is
+// accepted.
+func TestATargetTheToolchainDoesNotListIsRefusedAtLoad(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	describe := func(targets []string) (*describedProject, error) {
+		test.Helper()
+		request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root,
+			"--no-cache", "--other-builds"})
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		request.targets = targets
+		return describeProject(request)
+	}
+	if _, refused := describe([]string{"plan9/arm64"}); refused == nil ||
+		!strings.Contains(refused.Error(), "the go block's targets name plan9/arm64, which go tool dist list does "+
+			"not target") {
+		test.Errorf("an unknown target described as %v, want it refused by name", refused)
+	}
+	// A target the toolchain lists is accepted. It widens what selection may choose and forces no build: this
+	// fixture holds no file only wasm compiles, so selection still needs none there.
+	if _, describeError := describe([]string{"wasip1/wasm"}); describeError != nil {
+		test.Errorf("a target the toolchain lists was refused: %v", describeError)
+	}
 }

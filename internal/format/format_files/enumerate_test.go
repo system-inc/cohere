@@ -890,3 +890,73 @@ func TestTheWalkNeverEntersAVendorDirectory(test *testing.T) {
 		test.Errorf("%d Vendor directories counted, want 2", skipped)
 	}
 }
+
+// goVendorCases are trees with a vendor directory, each with what the walk offers and how many vendor directories
+// it counts skipped: one beside a go.mod or go.work is the Go tool's copy of its dependencies and never entered,
+// at the root or in a nested module, and one with neither beside it is somebody's own code and entered (#366nf1f).
+var goVendorCases = []struct {
+	name    string
+	files   map[string]string
+	offered []string
+	skipped int
+}{
+	{
+		name: "beside the root's go.mod",
+		files: map[string]string{
+			"go.mod":                                 "module example.com/project\n",
+			"README.md":                              "# root\n",
+			"vendor/golang.org/x/sys/unix/README.md": "#upstream\n",
+			"vendor/golang.org/x/sys/unix/notes.json": "{ }\n",
+		},
+		offered: []string{"README.md"},
+		skipped: 1,
+	},
+	{
+		name: "with no Go module beside it",
+		files: map[string]string{
+			"README.md":         "# root\n",
+			"vendor/own.js":     "x\n",
+			"web/vendor/a.json": "{ }\n",
+		},
+		offered: []string{"README.md", "vendor/own.js", "web/vendor/a.json"},
+	},
+	{
+		name: "beside a nested module's go.mod and a workspace's go.work",
+		files: map[string]string{
+			"go.mod":                   "module example.com/project\n",
+			"README.md":                "# root\n",
+			"tools/go.mod":             "module example.com/tools\n",
+			"tools/vendor/y/a.md":      "#a\n",
+			"work/go.work":             "go 1.22\n",
+			"work/vendor/z/b.json":     "{ }\n",
+			"web/vendor/kept.js":       "x\n",
+			"tools/source/vendor/c.md": "# c\n",
+		},
+		offered: []string{"README.md", "web/vendor/kept.js", "tools/source/vendor/c.md"},
+		skipped: 2,
+	},
+}
+
+// A vendor directory beside a go.mod or go.work is never entered, and each skip is counted under its own layer,
+// so `--verbose` names it: Loom's run read vendor/golang.org/x/sys/unix/README.md as a file --fix would rewrite
+// (#366nf1f). A vendor directory with no Go module beside it, at the root or nested, is still offered.
+func TestTheWalkNeverEntersAGoModulesVendorDirectory(test *testing.T) {
+	test.Parallel()
+	for _, goVendorCase := range goVendorCases {
+		root := writeTree(test, goVendorCase.files)
+		enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+		if enumerateError != nil {
+			test.Fatal(enumerateError)
+		}
+		want := map[string]bool{}
+		for _, file := range goVendorCase.offered {
+			want[file] = true
+		}
+		if survivors := survivorsOf(root, enumeration); !maps.Equal(survivors, want) {
+			test.Errorf("%s: offered %v, want %v", goVendorCase.name, survivors, want)
+		}
+		if skipped := enumeration.IgnoredByLayer[GoVendoredLayer]; skipped != goVendorCase.skipped {
+			test.Errorf("%s: %d vendor directories counted, want %d", goVendorCase.name, skipped, goVendorCase.skipped)
+		}
+	}
+}

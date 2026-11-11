@@ -6,6 +6,7 @@ import (
 	"go/build/constraint"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"go/version"
 	"io"
 	"os"
@@ -24,8 +25,8 @@ type Dimensions struct {
 	// unix, sorted.
 	OperatingSystems []string
 
-	// Architectures are every `GOARCH` the files name, sorted. The builds stay on the host's architecture (see
-	// BuildsFor), so a file only one of these builds is a layout blind spot, never a build.
+	// Architectures are every `GOARCH` the files name, gccgo's among them, sorted. The builds stay on the host's
+	// architecture (see BuildsFor), so a file only one of these builds is a layout blind spot, never a build.
 	Architectures []string
 
 	// Tags are the custom tags the files name, sorted: every tag that is no `GOOS`, `GOARCH`, `unix`, `cgo`,
@@ -219,7 +220,11 @@ func tagReading(tag string, unix []string, fileReading *reading) {
 		fileReading.operatingSystems = append(fileReading.operatingSystems, tag)
 		return
 	}
-	if architecture, _, _ := strings.Cut(tag, "."); knownAs(architecture) == knownArchitecture {
+	if architecture, _, _ := strings.Cut(tag, "."); knownAs(architecture) == knownArchitecture ||
+		types.SizesFor("gccgo", architecture) != nil {
+		// gccgo targets architectures go/build does not know, `m68k` and `shbe` among them, and std's constraints
+		// name them beside gc's (encoding/binary's big-endian file). The toolchain's own table of them is the sizes
+		// go/types holds for gccgo, so such a name is read as the architecture it is, never as a tag a build may set.
 		fileReading.architectures = append(fileReading.architectures, architecture)
 		return
 	}
@@ -331,4 +336,74 @@ func unixOperatingSystems(ports []Port) []string {
 func sortedSet(values []string) []string {
 	slices.Sort(values)
 	return slices.Compact(values)
+}
+
+// packageOf is the package a file's clause names, an external test's `_test` suffix trimmed so it reads as the
+// package it tests, or empty when the clause does not parse.
+func packageOf(read source) string {
+	// Ignored: a clause that does not parse names no package, and the load reports the error itself.
+	header, _ := parser.ParseFile(token.NewFileSet(), read.file, read.contents, parser.PackageClauseOnly)
+	if header == nil || header.Name == nil {
+		return ""
+	}
+	if strings.HasSuffix(read.file, "_test.go") {
+		return strings.TrimSuffix(header.Name.Name, "_test")
+	}
+	return header.Name.Name
+}
+
+// sortedKeys is a set's members, sorted.
+func sortedKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+// positiveOperatingSystems is every `GOOS` a file names as one it is built for: its name's suffix's, and each its
+// constraint names outside a negation (#ntamp9e). `unix` names a family and no one platform, so it adds none, and a
+// `GOOS` named only under a negation, as `!windows`, is one the file rules out.
+func positiveOperatingSystems(read source) []string {
+	operatingSystems, _ := namedBySuffix(filepath.Base(read.file))
+	for _, expression := range constraintsOf(read) {
+		for _, tag := range positiveTags(expression, false, nil) {
+			if knownAs(tag) == knownOperatingSystem {
+				operatingSystems = append(operatingSystems, tag)
+			}
+		}
+	}
+	return sortedSet(operatingSystems)
+}
+
+// positiveTags is every tag an expression names outside a negation, appended to tags, negated saying whether the
+// expression itself sits under an odd number of them.
+func positiveTags(expression constraint.Expr, negated bool, tags []string) []string {
+	switch typed := expression.(type) {
+	case *constraint.TagExpr:
+		if !negated {
+			return append(tags, typed.Tag)
+		}
+	case *constraint.NotExpr:
+		return positiveTags(typed.X, !negated, tags)
+	case *constraint.AndExpr:
+		return positiveTags(typed.Y, negated, positiveTags(typed.X, negated, tags))
+	case *constraint.OrExpr:
+		return positiveTags(typed.Y, negated, positiveTags(typed.X, negated, tags))
+	}
+	return tags
+}
+
+// constraintText is a file's constraint as its `//go:build` line spells it, its lines joined by ` && ` when it has
+// several, or its name when only its suffix constrains it.
+func constraintText(read source) string {
+	var spelled []string
+	for _, expression := range constraintsOf(read) {
+		spelled = append(spelled, expression.String())
+	}
+	if len(spelled) == 0 {
+		return "its name, " + filepath.Base(read.file)
+	}
+	return strings.Join(spelled, " && ")
 }

@@ -21,6 +21,13 @@ const IgnoredByGit = "ignored by git"
 
 // Census is every `.go` file a workspace's modules hold, as absolute paths in order, and which are ours.
 type Census struct {
+	// Root is the workspace's root, which every file is under.
+	Root string
+
+	// Modules are the workspace's modules, each with its path, read from its go.mod where the workspace left it
+	// unnamed, so a file's import path can be told from its directory.
+	Modules []Module
+
 	// Files are every file go would see in an owned module's packages.
 	Files []string
 
@@ -51,7 +58,18 @@ type Exclusion struct {
 // ignores a tracked file; a root in no repository ignores nothing. Generated
 // files are counted as ours here: the format and lint phases decide about those.
 func TakeCensus(workspace Workspace) (Census, error) {
-	var census Census
+	census := Census{Root: workspace.Root}
+	for _, module := range workspace.Modules {
+		if module.Path == "" {
+			goModPath := filepath.Join(workspace.Root, filepath.FromSlash(module.Directory), "go.mod")
+			goMod, goModError := os.ReadFile(goModPath)
+			if goModError != nil {
+				return Census{}, fmt.Errorf("reading the module at %s: %w", module.Directory, goModError)
+			}
+			module.Path = modfile.ModulePath(goMod)
+		}
+		census.Modules = append(census.Modules, module)
+	}
 	repositoryRoot := gitignore.RepositoryOf(workspace.Root)
 	var rootMatcher *gitignore.Matcher
 	if repositoryRoot != "" {

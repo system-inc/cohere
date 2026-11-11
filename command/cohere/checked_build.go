@@ -23,6 +23,11 @@ type checkedBuild struct {
 	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
 	HostReloadRounds int            `json:"hostReloadRounds,omitempty"`
 	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
+	// FilesAlone, NotLinted and NotLintedReason are the files of ours only this build compiled and linted, and those it
+	// compiled that no rule ran on, with why (#ytnvt8k), each absent when there is nothing to count.
+	FilesAlone      int      `json:"filesAlone,omitempty"`
+	NotLinted       []string `json:"notLinted,omitempty"`
+	NotLintedReason string   `json:"notLintedReason,omitempty"`
 }
 
 // line is the build's clause of the --verbose account, after "lint: ". The host's says what it covered, and the
@@ -38,6 +43,13 @@ func (build checkedBuild) line() string {
 		}
 		return line
 	}
-	return fmt.Sprintf("build %s: %s, %s, %s dropped by the merge", build.Target, covered,
+	line := fmt.Sprintf("build %s: %s, %s, %s dropped by the merge", build.Target, covered,
 		counted(build.FindingsAdded, "finding added", "findings added"), grouped(build.FindingsDropped))
+	if build.FilesAlone > 0 {
+		line += ", " + counted(build.FilesAlone, "file", "files") + " no other build compiles"
+	}
+	if len(build.NotLinted) > 0 {
+		line += ", " + counted(len(build.NotLinted), "file", "files") + " compiled and not linted"
+	}
+	return line
 }

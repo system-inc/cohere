@@ -556,3 +556,183 @@ func TestAManifestIsNoReasonANothingCheckedRunCounts(test *testing.T) {
 		})
 	}
 }
+
+// TestADiscoveredGoProjectNamesItsBuildsAndWhatNoRuleRanOn: at a root discovery splits into a TypeScript project and
+// a Go workspace, adamic's shape, `--other-builds --json` writes the `. (Go)` summary with the builds it checked and
+// its lint phase run, though a windows-only file fails to type-check (#rw6tg3a, #ytnvt8k). The windows build's load
+// found that type error and analyzed no package, so its files were compiled and never linted: they are named as not
+// checked, with why, never as checked by the windows build.
+func TestADiscoveredGoProjectNamesItsBuildsAndWhatNoRuleRanOn(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"tsconfig.json":       discoveryTsconfig,
+		"source/a.ts":         "export const a = 1;\n",
+		"go.work":             "go 1.27\n\nuse .\n",
+		"go.mod":              "module example.com/mixed\n\ngo 1.27\n",
+		"sep/sep.go":          "// Package sep joins.\npackage sep\n\n// Separator joins.\nconst Separator = \"/\"\n",
+		"sep/wide_windows.go": "// Package sep joins.\npackage sep\n\n// Wide is two.\nconst Wide = 2\n",
+		"sep/broken_windows.go": "// Package sep joins.\npackage sep\n\n// Broken names what nothing declares.\n" +
+			"const Broken = Missing\n",
+	})
+	// The Go engine reads the repository's index, so the fixture is a repository git knows, not an empty `.git`.
+	initialize := exec.Command("git", "init", "--quiet")
+	initialize.Dir = root
+	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
+		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
+	}
+	output, _ := runCohere(test, binary, root, "--no-fix", "--no-cache", "--other-builds", "--json")
+	type goSummaryRecord struct {
+		Kind   string         `json:"kind"`
+		Label  string         `json:"label"`
+		Builds []checkedBuild `json:"builds"`
+		Phases []struct {
+			Name    string `json:"name"`
+			Outcome string `json:"outcome"`
+			Detail  string `json:"detail"`
+		} `json:"phases"`
+		Gaps struct {
+			Unchecked []uncheckedEngineFile `json:"unchecked"`
+		} `json:"gaps"`
+	}
+	var goSummary *goSummaryRecord
+	for _, line := range strings.Split(output, "\n") {
+		var record goSummaryRecord
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" && record.Label == ". (Go)" {
+			goSummary = &record
+		}
+	}
+	if goSummary == nil {
+		test.Fatalf("no `. (Go)` summary:\n%s", output)
+	}
+	if len(goSummary.Builds) != 2 {
+		test.Errorf("the Go summary names %d builds, want the host's and windows's:\n%s", len(goSummary.Builds), output)
+	}
+	for _, phase := range goSummary.Phases {
+		if phase.Name == "lint" && phase.Outcome != "ran" {
+			test.Errorf("the Go project's lint phase %s: %s", phase.Outcome, phase.Detail)
+		}
+	}
+	notLinted := map[string]string{}
+	for _, each := range goSummary.Gaps.Unchecked {
+		notLinted[filepath.Base(each.File)] = each.Reason
+	}
+	for _, file := range []string{"wide_windows.go", "broken_windows.go"} {
+		if reason := notLinted[file]; !strings.HasPrefix(reason, "not linted: the windows/") {
+			test.Errorf("%s is named not checked for %q, want not linted by the windows build:\n%s", file,
+				reason, output)
+		}
+	}
+}
+
+// TestANamedDirectoryHoldingSeveralProjectsChecksEach: `--directory` naming a directory that holds a tsconfig.json and
+// a go.work, adamic's shape, checks both projects and the TypeScript project nested below them, as `cd` there and
+// `cohere` would, never TypeScript's alone in silence (#pswhv5q). `--other-builds`, a Go switch, then reaches the Go
+// project rather than being refused as no Go project.
+func TestANamedDirectoryHoldingSeveralProjectsChecksEach(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"tsconfig.json":     discoveryTsconfig,
+		"source/a.ts":       "export const a = 1;\n",
+		"go.work":           "go 1.27\n\nuse .\n",
+		"go.mod":            "module example.com/mixed\n\ngo 1.27\n",
+		"sep/sep.go":        "// Package sep joins.\npackage sep\n\n// Separator joins.\nconst Separator = \"/\"\n",
+		"web/tsconfig.json": discoveryTsconfig,
+		"web/source/b.ts":   "export const b = 1;\n",
+	})
+	// The Go engine reads the repository's index, so the fixture is a repository git knows, not an empty `.git`.
+	initialize := exec.Command("git", "init", "--quiet")
+	initialize.Dir = root
+	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
+		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
+	}
+	// The TypeScript fixture's own findings fail the run, which is beside the point: each project's summary is.
+	output, _ := runCohere(test, binary, test.TempDir(), "--directory", root, "--no-fix", "--no-cache",
+		"--other-builds", "--json")
+	var labels []string
+	for _, line := range strings.Split(output, "\n") {
+		var record struct {
+			Kind  string `json:"kind"`
+			Label string `json:"label"`
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" {
+			labels = append(labels, record.Label)
+		}
+	}
+	slices.Sort(labels)
+	if want := []string{".", ". (Go)", "web"}; !slices.Equal(labels, want) {
+		test.Errorf("the run wrote the summaries %q, want %q, each project's:\n%s", labels, want, output)
+	}
+}
+
+// TestAChildRunAtADirectoryOfSeveralProjectsChecksItsOwnAlone: a project's run, which names its engine as every
+// child of a run over several projects does, checks that one project at the directory and starts no run of its own,
+// though the directory holds a tsconfig.json beside the go.work (#pswhv5q). Asked of the one process: it writes the Go
+// project's summary alone, with the label its parent gave it.
+func TestAChildRunAtADirectoryOfSeveralProjectsChecksItsOwnAlone(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"tsconfig.json": discoveryTsconfig,
+		"source/a.ts":   "export const a = 1;\n",
+		"go.work":       "go 1.27\n\nuse .\n",
+		"go.mod":        "module example.com/mixed\n\ngo 1.27\n",
+		"sep/sep.go":    "// Package sep joins.\npackage sep\n\n// Separator joins.\nconst Separator = \"/\"\n",
+	})
+	initialize := exec.Command("git", "init", "--quiet")
+	initialize.Dir = root
+	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
+		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
+	}
+	output, exitCode := runCohereWithEnvironment(test, binary, test.TempDir(),
+		[]string{projectEngineVariable + "=" + string(engineGo), projectLabelVariable + "=. (Go)"},
+		"--directory", root, "--no-fix", "--no-cache", "--json")
+	var labels []string
+	for _, line := range strings.Split(output, "\n") {
+		var record struct {
+			Kind  string `json:"kind"`
+			Label string `json:"label"`
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" {
+			labels = append(labels, record.Label)
+		}
+	}
+	if exitCode != 0 || !slices.Equal(labels, []string{". (Go)"}) {
+		test.Errorf("the child run exited %d with the summaries %q, want 0 and the Go project's alone:\n%s", exitCode,
+			labels, output)
+	}
+}
+
+// TestARunAProjectsRunStartedNeverStartsRunsOfItsOwn: a run marked as one another run started (runDepthVariable)
+// that discovery hands several projects, here a tsconfig.json beside a go.work, refuses to start a run for any, by
+// name, with exit 2, and writes no project's summary (#excff9x). It is the wall behind every guard that keeps a child
+// from discovering: on Nov 10 one such guard removed forked about 7,700 copies, and with this wall a broken guard
+// ends one level down.
+func TestARunAProjectsRunStartedNeverStartsRunsOfItsOwn(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"tsconfig.json": discoveryTsconfig,
+		"source/a.ts":   "export const a = 1;\n",
+		"go.work":       "go 1.27\n\nuse .\n",
+		"go.mod":        "module example.com/mixed\n\ngo 1.27\n",
+		"sep/sep.go":    "// Package sep joins.\npackage sep\n\n// Separator joins.\nconst Separator = \"/\"\n",
+	})
+	output, exitCode := runCohereWithEnvironment(test, binary, root, []string{runDepthVariable + "=1"},
+		"--no-fix", "--no-cache", "--json")
+	summaries := 0
+	for _, line := range strings.Split(output, "\n") {
+		var record struct {
+			Kind  string `json:"kind"`
+			Label string `json:"label"`
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" && record.Label != "" {
+			summaries++
+		}
+	}
+	if exitCode != 2 || summaries != 0 || !strings.Contains(output, "was about to start runs for 2 projects") {
+		test.Errorf("the marked run exited %d with %d project summaries, want 2, none, and the refusal named:\n%s",
+			exitCode, summaries, output)
+	}
+}

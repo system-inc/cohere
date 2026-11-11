@@ -382,6 +382,15 @@ func TestARootNoTypeScriptProjectHoldsGetsTheFormatProject(test *testing.T) {
 			wantFormat:    true,
 			wantYieldFrom: []string{"web"},
 		},
+		// A script Node runs as ES or CommonJS is TypeScript the house formatter reads (#9v2x63d).
+		"a `.mts` script beside the module": {
+			files:      withFiles(map[string]string{"scripts/release.mts": "export const release = 1;\n"}),
+			wantFormat: true,
+		},
+		"a `.cts` script beside the module": {
+			files:      withFiles(map[string]string{"scripts/release.cts": "export const release = 1;\n"}),
+			wantFormat: true,
+		},
 		"a TypeScript project at the root": {
 			files: withFiles(map[string]string{"tsconfig.json": discoveryTsconfig, "README.md": "# root\n"}),
 		},

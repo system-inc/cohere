@@ -957,7 +957,25 @@ and analyzed its package reports it, but for a rule whose findings stand only wh
 (U1000, and each staticcheck check whose documentation says so), and a `//cohere:ignore` is unused only if it is
 unused in every such build. `findingsAdded` counts the findings that stand which this build reported and the host's
 did not, and `findingsDropped` those it reported that the merge left out. A run of one build writes no `builds`, so
-its record reads as it always has. A file no build compiles stays a named gap, in the summary's `gaps.unchecked`.
+its record reads as it always has. A file no build compiles stays a named gap, in the summary's `gaps.unchecked`,
+and its exclusion reason in the project record says why no build compiles it rather than which constraint the
+host's build fails: `no target platform compiles it: !linux && !darwin` for a file whose constraint only rules out
+the platforms the project's files name, which a target in the settings' go block can check (#ntamp9e), `only
+another architecture than the host's ...`, or `a program of its own, ...` (#rkw4xcn).
+
+A type error only another build finds is a finding of that build, so the lint phase writes it as a compiler finding
+record, after the types phase has ended, and the lint record counts it in `typeErrors` (#rw6tg3a), additive within
+contract 3 and written only when it is not 0. The phase's finding records are `findings` plus `typeErrors`, and the
+front door refuses a lint record whose two counts do not add up to the records that came with it.
+
+Each build's entry says what it covered that no other build did, additive within contract 3 (#ytnvt8k), each field
+absent when there is nothing to count. `filesAlone` counts the files of ours in scope that only this build compiles
+and that a rule ran on. `notLinted` lists the files of ours in scope that the host's build leaves out and no build
+analyzed, absolute and sorted, each under the first build that compiles it, and `notLintedReason` says why: a build
+whose load found a type error analyzes no package (`"the windows/arm64 build compiles it, and its load found a type
+error, so it analyzed no package"`). The project record names such a file `checked by` its build, since it is written
+before any build runs, so the front door reads `notLinted` and names those files as not checked, `not linted: ` and
+the reason, in the summary's `gaps.unchecked` and the footer's count, rather than as checked by the build.
 
 An extra build restores from the host's run each package its own findings cache does not hold whose own files,
 module and import map are the host's and whose every read of other packages reads the same in the build: the

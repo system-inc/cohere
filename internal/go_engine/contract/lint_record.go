@@ -2,7 +2,12 @@ package contract
 
 // LintRecord summarizes the lint phase, for the lint line and its coverage notes.
 type LintRecord struct {
-	Findings            int `json:"findings"`
+	Findings int `json:"findings"`
+	// TypeErrors is additive within contract 3, and the Go engine's alone: the type errors of the run's other builds
+	// (`--other-builds`), which the lint phase writes as compiler finding records beside the Findings it counts, since
+	// only the merge of every build's verdict knows them (#rw6tg3a). The finding records of the phase are Findings
+	// plus TypeErrors. Absent for a run of one build, so such a run writes the record it always has.
+	TypeErrors          int `json:"typeErrors,omitempty"`
 	RulesRun            int `json:"rulesRun"`
 	FilesWalked         int `json:"filesWalked"`
 	NodesVisited        int `json:"nodesVisited"`
@@ -79,6 +84,16 @@ type BuildRecord struct {
 	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
 	HostReloadRounds int            `json:"hostReloadRounds,omitempty"`
 	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
+
+	// FilesAlone, additive within contract 3 (#ytnvt8k), counts the files of ours in scope that this build alone
+	// compiles and a rule ran on: the coverage it buys. NotLinted are the files of ours in scope the host's build
+	// leaves out that no build analyzed, absolute and sorted, each under the first build that compiles it, and
+	// NotLintedReason says why, as a build whose load found a type error analyzes no package. Such a file was compiled
+	// and no rule ran on it, so the front door names it as not checked rather than as checked by this build. All three
+	// are absent when there is nothing to count.
+	FilesAlone      int      `json:"filesAlone,omitempty"`
+	NotLinted       []string `json:"notLinted,omitempty"`
+	NotLintedReason string   `json:"notLintedReason,omitempty"`
 }
 
 // LintCache counts, by package, what the per-package findings cache did: every package the load reached was hit,

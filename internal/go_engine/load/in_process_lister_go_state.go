@@ -30,9 +30,11 @@ type goState struct {
 	workspaceFile string
 }
 
-// listerTargets are the targets whose linker adds no dependency but runtime to a command and that link without cgo,
-// so a package main's walk is its imports and runtime, as the lister walks it. Any other is go list's to answer.
-var listerTargets = []string{"darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64"}
+// internallyLinkedPieTargets are the targets whose default binary is position independent and that the linker can
+// still link without an external linker, as the toolchain's internal/platform.InternalLinkPIESupported names them
+// among the targets whose binaries are position independent by default (DefaultPIE).
+var internallyLinkedPieTargets = []string{"android/arm64", "darwin/amd64", "darwin/arm64", "windows/386",
+	"windows/amd64", "windows/arm64"}
 
 // listerFlags are the flags in `GOFLAGS` that change nothing go list prints of a package the lister reads: the
 // build tags, which the build context it asks go for holds, and those that only a build or a download reads, the
@@ -166,14 +168,49 @@ func readContext(output []byte) (build.Context, string) {
 	context.BuildTags = tagList(lines[5])
 	context.ToolTags = tagList(lines[6])
 	context.ReleaseTags = tagList(lines[7])
-	if !slices.Contains(listerTargets, context.GOOS+"/"+context.GOARCH) || context.Compiler != "gc" {
-		return build.Context{}, fmt.Sprintf("the target is %s/%s with %s", context.GOOS, context.GOARCH,
-			context.Compiler)
+	if context.Compiler != "gc" {
+		return build.Context{}, fmt.Sprintf("the compiler is %s", context.Compiler)
+	}
+	if linksExternally(context.GOOS, context.GOARCH) {
+		// The linker needs runtime/cgo there, and with cgo off go list reports every command as an error.
+		return build.Context{}, fmt.Sprintf("every command for %s/%s links externally", context.GOOS,
+			context.GOARCH)
 	}
 	if context.GOROOT == "" {
 		return build.Context{}, "go list printed no GOROOT"
 	}
 	return context, ""
+}
+
+// linksExternally reports whether every command for the target is linked by an external linker, whatever the flags,
+// as the go command's externalLinkingReason decides it for a build whose flags name no build mode, no linking mode
+// and no shared linking, the only builds the lister answers (see listerFlags): the targets internal/platform's
+// MustLinkExternal names for a program without cgo, and those whose binaries are position independent by default and
+// cannot be linked so internally.
+func linksExternally(operatingSystem string, architecture string) bool {
+	switch operatingSystem {
+	case "android":
+		if architecture != "arm64" {
+			return true
+		}
+	case "ios":
+		if architecture == "arm64" {
+			return true
+		}
+	}
+	defaultPie := slices.Contains([]string{"android", "ios", "windows", "darwin"}, operatingSystem)
+	return defaultPie && !slices.Contains(internallyLinkedPieTargets, operatingSystem+"/"+architecture)
+}
+
+// linkerDependencies are the imports go's linker adds to every command on the target, which go list walks from a
+// package main as it walks its imports (the go command's LinkerDeps): runtime everywhere, and math on arm for its
+// soft floating point. The rest it adds come from flags the lister does not carry (see listerFlags), or from external
+// linking, where readContext doubts.
+func linkerDependencies(architecture string) []string {
+	if architecture == "arm" {
+		return []string{"runtime", "math"}
+	}
+	return []string{"runtime"}
 }
 
 // tagList is the tags a comma-joined line names.

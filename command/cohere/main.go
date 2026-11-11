@@ -294,7 +294,8 @@ func run() error {
 
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
 	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
-	if discoveryApplies(given, flag.Args()) {
+	atNamedDirectory := namedDirectoryHoldsSeveral(given, flag.Args(), location, locateError)
+	if discoveryApplies(given, flag.Args()) || atNamedDirectory {
 		namedLintConfiguration := ""
 		if given["lint-config"] {
 			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
@@ -309,6 +310,7 @@ func run() error {
 			namedLintConfiguration,
 			formats,
 			given,
+			atNamedDirectory,
 		)
 		if checkDiscoveredProjectsError != nil {
 			return checkDiscoveredProjectsError
@@ -1183,6 +1185,7 @@ func run() error {
 			printWouldChange(streams.Output, fixSummary.ChangedFiles, lineEndings)
 			findings += len(fixSummary.ChangedFiles)
 			activeSummary.WouldChange += len(fixSummary.ChangedFiles)
+			activeSummary.WouldChangeConsidered += fixSummary.FilesConsidered
 
 			// The nested check started beside the fix phase. What it adds to the phase is only the wait
 			// past the fix phase's own end.
@@ -1206,7 +1209,11 @@ func run() error {
 					showWarning()
 					printNestedDrift(streams.Output, nested)
 					findings += len(nested.Drift)
+					// In WouldChange, since each is a finding line, and apart in NestedWouldChange, so the footer
+					// sets it against the nested files read rather than this project's (#hb90yfp).
 					activeSummary.WouldChange += len(nested.Drift)
+					activeSummary.NestedWouldChange += len(nested.Drift)
+					activeSummary.NestedWouldChangeConsidered += nested.Checked
 					// A nested file the formatter could not check is named in every mode and counted as a gap, never as
 					// a finding: the nested repository is read-only here, and its own run fails on it (#zmt3tv5).
 					for _, file := range nestedUnchecked(nested) {

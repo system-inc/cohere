@@ -16,6 +16,7 @@ import (
 //	✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)   two rewritten, listed above
 //	✓ 💎 0.05s (480 rules • 3,926 cached)                          nothing changed
 //	✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached)
+//	✗ ☠️ 5.4s • 4,943 of 5,574 files would change, 1,451 of 1,533 more in nested repositories (3,165 checked)
 //
 // The words are the brand's. Cohered is altered: the files cohere rewrote, fixed or formatted, the same
 // files the 🪄 and 💅 lines above the footer list, said only when there were any. Checked is the files a
@@ -97,7 +98,7 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		line += " • " + style.red(counted(summary.Findings, "finding", "findings"))
 	}
 	if summary.WouldChange > 0 {
-		line += " • " + style.red(counted(summary.WouldChange, "file would change", "files would change"))
+		line += " • " + style.red(wouldChangeSegment(summary))
 	}
 	if summary.Gaps.nothingChecked() {
 		line += " • " + style.red(nothingCheckedSentence(summary.Gaps.Excluded))
@@ -157,6 +158,45 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		line = summary.Label + "  " + line
 	}
 	return line
+}
+
+// wouldChangeSegment is what a `--no-fix` run found would change, each part against the files it was found among:
+// this project's against the files its fix phase examined, a nested repository's against the nested files the
+// formatter read. Neither is set against the parentheses' checked count, the program's files, which holds no
+// Markdown or JSON and no nested file (#hb90yfp):
+//
+//	4,943 of 5,574 files would change, 1,451 of 1,533 more in nested repositories
+//	1,451 of 1,533 files would change in nested repositories
+//
+// A summary with no scope for a part, as one a run cache recorded before the scopes were kept, says its count alone.
+func wouldChangeSegment(summary runSummary) string {
+	own := summary.WouldChange - summary.NestedWouldChange
+	var parts []string
+	if own > 0 {
+		parts = append(parts, ofConsidered(own, summary.WouldChangeConsidered)+" would change")
+	}
+	switch {
+	case summary.NestedWouldChange > 0 && own > 0:
+		// The part before has said "files", and "more" carries it.
+		nested := grouped(summary.NestedWouldChange)
+		if summary.NestedWouldChangeConsidered > 0 {
+			nested += " of " + grouped(summary.NestedWouldChangeConsidered)
+		}
+		parts = append(parts, nested+" more in nested repositories")
+	case summary.NestedWouldChange > 0:
+		parts = append(parts, ofConsidered(summary.NestedWouldChange, summary.NestedWouldChangeConsidered)+
+			" would change in nested repositories")
+	}
+	return strings.Join(parts, ", ")
+}
+
+// ofConsidered is a count of files against the files it was found among, "4,943 of 5,574 files", its noun the
+// scope's, or the count alone, "3 files", when there is no scope to give.
+func ofConsidered(count, considered int) string {
+	if considered <= 0 {
+		return counted(count, "file", "files")
+	}
+	return grouped(count) + " of " + counted(considered, "file", "files")
 }
 
 // phaseTimes is where the time went: the graph, then each phase that spent time, in pipeline order,

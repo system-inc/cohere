@@ -36,6 +36,10 @@ type describedProject struct {
 	builds      []project.Build
 	buildsError error
 
+	// unbuiltReasons are why each file no build compiles is left so, by path, from the build selection (readBuilds),
+	// which the project record names in place of the host's constraint reason (#ntamp9e).
+	unbuiltReasons map[string]string
+
 	// manifest is the root's go.work, or its go.mod for a module root: where a diagnostic that names no file
 	// is placed, since the front door refuses a finding with no position.
 	manifest string

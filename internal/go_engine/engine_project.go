@@ -120,7 +120,11 @@ func describeProject(request invocation) (*describedProject, error) {
 	// Only a run whose lint phase is asked for reads them, since that phase is where every extra build is loaded and
 	// checked (runLint): a file said checked by a build is one that build's run checks.
 	if request.switches["other-builds"] && request.requests(contract.PhaseLint) && goEnvironment != nil {
-		described.builds, described.buildsError = readBuilds(workspace, census, goEnvironment)
+		described.builds, described.unbuiltReasons, described.buildsError = readBuilds(workspace, census,
+			goEnvironment, request.targets)
+		if refused, isRefused := errors.AsType[refusedTarget](described.buildsError); isRefused {
+			return nil, refused
+		}
 	}
 	constraintReasons := map[string]string{}
 	for _, excluded := range constrained {
@@ -139,6 +143,10 @@ func describeProject(request invocation) (*describedProject, error) {
 			}
 			if checked {
 				reason = project.CheckedByBuild(checkedBy)
+			} else if unbuiltReason, found := described.unbuiltReasons[file]; found {
+				// Why no build compiles it, which says more than the host's constraint alone: no target platform
+				// compiles it, or only another architecture does.
+				reason = unbuiltReason
 			}
 			described.record.Excluded = append(described.record.Excluded,
 				contract.ExcludedFile{File: file, Reason: reason})

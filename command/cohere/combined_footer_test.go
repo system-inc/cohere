@@ -48,6 +48,25 @@ func TestTheCombinedFooterSumsProjectsAndNamesEachGap(test *testing.T) {
 		test.Errorf("a project with findings reads %q, want %q", failed, want)
 	}
 
+	// Would-change counts sum with their scopes, the nested part apart, so the line sets each against its own
+	// (#hb90yfp).
+	drift := &projectSummary{Summary: runSummary{
+		Rules: 57, FilesInScope: 4, FilesChecked: 4, WouldChange: 3, NestedWouldChange: 1, WouldChangeConsidered: 6,
+		NestedWouldChangeConsidered: 10,
+	}}
+	nestedDrift := &projectSummary{Summary: runSummary{
+		Rules: 428, FilesInScope: 4_900, FilesCached: 4_900, WouldChange: 2, NestedWouldChange: 1,
+		WouldChangeConsidered: 9, NestedWouldChangeConsidered: 20,
+	}}
+	drifted := combinedFooter([]projectRun{
+		{label: ".", summary: nestedDrift, exitCode: 1},
+		{label: "swift", summary: drift, exitCode: 1},
+	}, overallFacts{}, total, textStyle{})
+	if want := "✗ ☠️ 0.1s • 3 of 15 files would change, 2 of 30 more in nested repositories " +
+		"(485 rules • 4 checked • 4,900 cached)"; drifted != want {
+		test.Errorf("two projects with drift read %q, want %q", drifted, want)
+	}
+
 	// A project that did not finish, one that failed before it could hand back a summary, and one that handed none
 	// back and exited zero are each named, the first two failing the line.
 	missing := combinedFooter([]projectRun{

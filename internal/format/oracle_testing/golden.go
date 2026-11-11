@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -92,6 +93,27 @@ func Open(test testing.TB, name string) *Golden {
 
 // read is a golden's answers, refused when the bundles that recorded them are not these.
 func read(path string, digest string) (map[string]Answer, error) {
+	// A golden is named for its test, byte for byte. A case-insensitive disk (macOS's) opens
+	// TestFormatSCSSMatchesTheFork.json.gz for TestFormatScssMatchesTheFork and a case-sensitive one (a Linux
+	// test box, a Loom unit) does not, so a name that differs only in case passes here and fails there. The
+	// directory's own listing holds the name as stored, so the check reads it rather than trusting the open.
+	if entries, readDirectoryError := os.ReadDir(filepath.Dir(path)); readDirectoryError == nil {
+		storedExactly, storedName := false, ""
+		for _, entry := range entries {
+			storedExactly = storedExactly || entry.Name() == filepath.Base(path)
+			if strings.EqualFold(entry.Name(), filepath.Base(path)) {
+				storedName = entry.Name()
+			}
+		}
+		if !storedExactly && storedName != "" {
+			return nil, fmt.Errorf(
+				"%s is stored as %s, which only a case-insensitive disk opens: rename it to %s",
+				path,
+				storedName,
+				filepath.Base(path),
+			)
+		}
+	}
 	file, openError := os.Open(path)
 	if openError != nil {
 		return nil, fmt.Errorf("%s holds no recorded oracle answers (%w)", path, openError)
