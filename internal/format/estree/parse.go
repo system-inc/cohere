@@ -33,17 +33,62 @@ func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node
 // property of the file and no node), so a tree that matches them is the tree a fresh parse returns.
 // Anything else is parsed here as before, so a nil tree, or the wrong one, costs a parse and never a
 // different result.
+//
+// Prettier reads a .ts or .tsx file as a module first, and as commonjs only when that throws
+// (parse/typescript.js's combinations). The module reading sets the file's external module indicator
+// before TypeScript decides whether to reparse top-level statements in an await context, so a file with
+// no import or export still reads `await (x)` as an await of x, where TypeScript's own detection reads a
+// call to a function named await (#0yhe787). The module reading is ParseSourceFile's with the indicator
+// forced, and the commonjs one is ParseSourceFile's, TypeScript's detection unforced. A file that fails
+// both is refused with the module reading's error, the one Prettier reports.
+//
+// The tree handed in is parsed with TypeScript's detection, as the fix engine's guard parses, and is taken
+// for the module reading only where forcing could not change it: see readsAlikeAsModule.
 func ParseTypeScriptFrom(
 	fileName string,
 	text string,
 	parsed *ast.SourceFile,
 	nodes *Arena,
 ) (*Node, []*Node, *StrippedText, error) {
-	sourceFile := parsed
-	if !treeIsFor(fileName, text, parsed) {
-		sourceFile = ParseSourceFile(fileName, ReplaceHashbang(text))
+	handedIsFor := treeIsFor(fileName, text, parsed)
+	moduleTree := parsed
+	if !handedIsFor || !readsAlikeAsModule(parsed) {
+		moduleTree = parseSourceFile(fileName, ReplaceHashbang(text), true)
 	}
-	return convertTypeScript(sourceFile, text, nodes)
+	program, comments, stripped, moduleError := convertTypeScript(moduleTree, text, nodes)
+	// Only a file that is a module because it was forced to be one, and that names await, reads otherwise
+	// as commonjs; any other failure would fail again, the same way, at the cost of a second parse.
+	if moduleError == nil ||
+		moduleTree.ExternalModuleIndicator != moduleTree.AsNode() ||
+		!strings.Contains(text, "await") {
+		return program, comments, stripped, moduleError
+	}
+	commonJsTree := parsed
+	if !handedIsFor {
+		commonJsTree = ParseSourceFile(fileName, ReplaceHashbang(text))
+	}
+	program, comments, stripped, commonJsError := convertTypeScript(commonJsTree, text, nodes)
+	if commonJsError != nil {
+		return nil, nil, nil, moduleError
+	}
+	return program, comments, stripped, nil
+}
+
+// readsAlikeAsModule reports whether parsed, a tree built with TypeScript's own module detection, is the tree
+// the module reading builds. Forcing the indicator changes a tree only through the top-level await reparse,
+// which runs for a module whose top-level statements hold an identifier named await. A declaration file is
+// never reparsed, and a tree that is a module already was reparsed when it was built.
+func readsAlikeAsModule(parsed *ast.SourceFile) bool {
+	return parsed.IsDeclarationFile || parsed.ExternalModuleIndicator != nil || !namesAwait(parsed.AsNode())
+}
+
+// namesAwait reports whether an identifier named await is anywhere under node: what the parser records,
+// statement by statement, to reparse in an await context.
+func namesAwait(node *ast.Node) bool {
+	if node.Kind == ast.KindIdentifier && node.Text() == "await" {
+		return true
+	}
+	return node.ForEachChild(namesAwait)
 }
 
 // treeIsFor reports whether parsed is the tree ParseTypeScript would build for text: see ParseTypeScriptFrom.
@@ -105,15 +150,26 @@ func findTypeScriptNode(node *Node) *Node {
 	return nil
 }
 
-// ParseSourceFile parses one file with typescript-go, choosing the script kind by extension.
+// ParseSourceFile parses one file with typescript-go, choosing the script kind by extension, and leaving
+// whether it is a module to TypeScript's own detection.
 func ParseSourceFile(fileName string, text string) *ast.SourceFile {
+	return parseSourceFile(fileName, text, false)
+}
+
+// parseSourceFile is ParseSourceFile, with the file a module whatever it holds when asModule is set:
+// typescript-estree's sourceType "module", which sets every file's external module indicator.
+func parseSourceFile(fileName string, text string, asModule bool) *ast.SourceFile {
 	rooted := fileName
 	if !tspath.IsRootedDiskPath(rooted) {
 		rooted = "/" + strings.TrimPrefix(rooted, "/")
 	}
 	rooted = tspath.NormalizePath(rooted)
 	return parser.ParseSourceFile(
-		ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(rooted), PathKey: tspath.PathKey(rooted)},
+		ast.SourceFileParseOptions{
+			FileName:                       tspath.RootedFilePath(rooted),
+			PathKey:                        tspath.PathKey(rooted),
+			ExternalModuleIndicatorOptions: ast.ExternalModuleIndicatorOptions{Force: asModule},
+		},
 		text,
 		scriptKindOf(fileName),
 	)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/format/printing"
 	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
@@ -17,6 +18,10 @@ type Converter struct {
 	allowPattern bool
 	scan         *scanner.Scanner
 	unsupported  error
+
+	// invalid is the first syntax error upstream's check-syntax-errors.js throws, which refuses the file the
+	// way a parse error does: see checkSyntaxError.
+	invalid error
 
 	// typeCastCommentEnds are the ends of the file's type cast comments, in order, when converting
 	// for the babel parser (ConvertForBabel). Nil converts for typescript.
@@ -104,9 +109,44 @@ func (converter *Converter) converter(node *ast.Node, parent *ast.Node, allowPat
 	if parentNode == nil {
 		parentNode = node.Parent
 	}
+	converter.checkSyntaxError(node)
 	result := converter.convertNode(node, parentNode)
 	converter.allowPattern = pattern
 	return result
+}
+
+// checkSyntaxError is one case of upstream's checkSyntaxError, check-syntax-errors.js, which upstream asks of
+// every node before converting it: `++` or `--` on an operand that cannot be assigned. TypeScript's parser
+// accepts `1++` and leaves it to the checker, Prettier refuses it, and a formatter that printed it would format
+// a file Prettier does not (#0yhe787). Only this case is ported: the others are untested against the fork, and
+// each one ported unasked is a file the formatter might newly refuse.
+//
+// Upstream throws, and the conversion stops at the first node that fails. Recording the first and converting
+// on gives the same refusal, since convert returns it before the tree is read.
+func (converter *Converter) checkSyntaxError(node *ast.Node) {
+	if converter.invalid != nil {
+		return
+	}
+	var operatorKind ast.Kind
+	var operand *ast.Node
+	switch node.Kind {
+	case ast.KindPrefixUnaryExpression:
+		operatorKind, operand = node.AsPrefixUnaryExpression().Operator, node.AsPrefixUnaryExpression().Operand
+	case ast.KindPostfixUnaryExpression:
+		operatorKind, operand = node.AsPostfixUnaryExpression().Operator, node.AsPostfixUnaryExpression().Operand
+	default:
+		return
+	}
+	// ESTree uses UpdateExpression for ++/--, and an update's argument must be something assignable.
+	if (operatorKind == ast.KindPlusPlusToken || operatorKind == ast.KindMinusMinusToken) &&
+		!isValidAssignmentTarget(operand) {
+		// Marked as a parse failure, which it is to Prettier, so the format phase skips the file as one that
+		// does not parse rather than counting a broken formatter.
+		converter.invalid = printing.Syntax(fmt.Errorf(
+			"parse error at %d: Invalid left-hand side expression in unary operation",
+			converter.getStart(operand),
+		))
+	}
 }
 
 // convertBindingNameWithTypeAnnotation is upstream's convertBindingNameWithTypeAnnotation.
