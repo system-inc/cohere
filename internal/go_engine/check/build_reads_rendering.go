@@ -1,9 +1,16 @@
 package check
 
 import (
+	"go/constant"
 	"go/types"
+	"math/big"
+	"strconv"
 	"strings"
 )
+
+// constantPrecision is the bits of mantissa a float constant keeps in export data, as the compiler keeps it
+// (gcimporter's constantToFloat), so a constant read from export data holds its source's value rounded to it.
+const constantPrecision = 512
 
 // ownRendering is the line of object itself in its closure digest (ReadsBuild.closureDigest).
 func ownRendering(object types.Object) string {
@@ -30,10 +37,52 @@ func ownRendering(object types.Object) string {
 			renderedTypeParameters(declared.Signature().TypeParams()) + " " + writtenType(declared.Type())
 	case *types.TypeName:
 		return "type name of " + owner + " " + declared.Name()
+	case *types.Const:
+		return "const of " + owner + " " + declared.Name() + " " + writtenType(declared.Type()) + " = " +
+			canonicalConstant(declared.Val())
 	default:
-		// A constant's line holds its exact value; any other kind is written by its kind, name and type.
+		// Any other kind is written by its kind, name and type.
 		return "of " + owner + " " + strings.Join(renderedObject(object), " ")
 	}
+}
+
+// canonicalConstant is a constant's value written by value alone, its kind and then the value, so a constant checked
+// from source and the same constant read from export data write alike, while two values never do. ExactString
+// writes a value by how it is held: math.Pi checked from source is a fraction of its decimal digits, and read from
+// export data a binary float of the export precision, so the two write apart though an importer reads one value.
+// A float is the exact fraction of its value rounded to the export precision (constantPrecision), which a value read
+// from export data already is, and a complex number its two parts as floats.
+func canonicalConstant(value constant.Value) string {
+	switch value.Kind() {
+	case constant.Bool:
+		return "bool " + strconv.FormatBool(constant.BoolVal(value))
+	case constant.String:
+		return "string " + strconv.Quote(constant.StringVal(value))
+	case constant.Int:
+		return "int " + value.ExactString()
+	case constant.Float:
+		return "float " + canonicalFloat(value)
+	case constant.Complex:
+		return "complex " + canonicalFloat(constant.Real(value)) + " " + canonicalFloat(constant.Imag(value))
+	default:
+		return "unknown"
+	}
+}
+
+// canonicalFloat is a float constant's value rounded to the export precision, as an exact fraction in lowest terms.
+func canonicalFloat(value constant.Value) string {
+	rounded := new(big.Float).SetPrec(constantPrecision)
+	switch exact := constant.Val(constant.ToFloat(value)).(type) {
+	case *big.Rat:
+		rounded.SetRat(exact)
+	case *big.Float:
+		rounded.Set(exact)
+	default:
+		// A float's value is always one of the two; anything else is written as it is held, which errs wide.
+		return "held " + value.ExactString()
+	}
+	fraction, _ := rounded.Rat(nil)
+	return fraction.RatString()
 }
 
 // rootTypes are the types object's closure starts from: its type, and a method's receiver type, which a signature's
