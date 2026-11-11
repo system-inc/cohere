@@ -271,9 +271,12 @@ measure() {
   # A run the machine was quiet before and not after names who held the cores, so a night of loaded runs says
   # whether the load was the run's own tail (the kernel freeing its memory, fseventsd reading what it touched)
   # or something else that started (#8sqsgee: every run of the guard's first night read 90% idle before and 77
-  # to 88% after). ps's CPU share is a recent average, which the run's own processes, gone by now, are not in.
+  # to 88% after). top's second sample, over the second after this one, since its first has no interval to
+  # measure, and since ps leaves out kernel_task, one of the two the question is about. It costs that second only
+  # on a run that failed the gate, before the next run's settle, which would wait for it anyway.
   at_floor $idle_after ||
-    ps -A -o %cpu=,pid=,comm= | sort -rn | head -12 > $logs/$mode-$round.busy-after 2> /dev/null
+    top -l 2 -s 1 -n 12 -o cpu -stats command,pid,cpu 2> /dev/null |
+    awk '/^COMMAND/ { sample++ } sample == 2' > $logs/$mode-$round.busy-after
   # One build per round: a run that ran any Swift engine but the pinned one measured another (#ywx8zgd).
   local other_swift=$(swift_engine_named_otherwise $log)
   [[ -z $other_swift ]] ||
