@@ -106,7 +106,8 @@ func TestAResultIsANumberOrUnknown(test *testing.T) {
 			Errno:  "ERESTARTSYS",
 			Detail: "(To be restarted if SA_RESTART is set)",
 		},
-		`9 openat(AT_FDCWD</tree/p>, "data.txt", O_RDONLY|O_CLOEXEC) = ? ERESTART_RESTARTBLOCK (Interrupted by signal)`: {
+		`9 openat(AT_FDCWD</tree/p>, "data.txt", O_RDONLY|O_CLOEXEC) = ? ` +
+			`ERESTART_RESTARTBLOCK (Interrupted by signal)`: {
 			Kind:   strace_events.UnknownResult,
 			Raw:    "?",
 			Errno:  "ERESTART_RESTARTBLOCK",
@@ -355,7 +356,10 @@ func TestEveryDecoratedPathReadsAsItself(test *testing.T) {
 			statDescriptor.Path != (strace_events.Text{Raw: spelled + "/via", Unescaped: name + "/via"}) ||
 			!isEmptyQuoted ||
 			empty.Unescaped != "" {
-			test.Errorf("%q decorating a stat's descriptor reads as %+v, %+v and %+v", name, stat, statDescriptor, empty)
+			test.Errorf(
+				"%q decorating a stat's descriptor reads as %+v, %+v and %+v",
+				name, stat, statDescriptor, empty,
+			)
 		}
 	}
 }
