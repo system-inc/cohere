@@ -77,10 +77,11 @@ type BuildRecord struct {
 	// read the same in the build. DeclinedAtLoad counts the packages its load checked from source after all, since
 	// what they read of other packages' types did not hold, and DeclinedAtCheck those its check declined, since what
 	// they read of facts or answers did not hold. DeclinedBy counts each decline, and each package that was never a
-	// candidate, by why: inputs, noEntry, never, unknown, export, T, L, F, D or A. ReloadRounds counts every time the
-	// build was loaded again, and ReloadRoundsBy each of those under every reason it had: hostDecline, for a package
-	// its check declined, or missingAnswer, for a package a question reached restored with no answer of it kept. Each
-	// is written only when not 0.
+	// candidate, by why: ownInputs, noHostEntry, neverRestorable, readsUnknown, exportData, typeReads, lookups,
+	// factReads, deprecations or answers. ReloadRounds counts every time the build was loaded again, and
+	// ReloadRoundsBy each of those under every reason it had: hostDecline, for a package its check declined, or
+	// missingAnswer, for a package a question reached restored with no answer of it kept. Each is written only when
+	// not 0.
 	RestoredFromHost int            `json:"restoredFromHost,omitempty"`
 	DeclinedAtLoad   int            `json:"declinedAtLoad,omitempty"`
 	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`

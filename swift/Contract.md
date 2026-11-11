@@ -985,9 +985,7 @@ merge is the one checking it would give. Each count below is written only when i
 `"entriesKept":349` counts the packages it kept an entry of for the other builds, and an extra build's
 `"restoredFromHost":301` the packages it restored, `"declinedAtLoad":12` those its load checked after all, since
 what they read of types did not hold, and `"declinedAtCheck":3` those its check declined, since a fact or answer they
-read did not. `"declinedBy"` counts each decline, and each package never restored, by why: `inputs` (its own files
-differ), `noEntry`, `never` (what it read cannot be recorded, as with cgo), `unknown`, `export` (its export data did
-not read), `T` (a type it read), `L` (a rule's lookup), `F` (a fact), `D` (a deprecation) or `A` (an answer).
+read did not. `"declinedBy"` counts each decline, and each package never restored, by why: `ownInputs` (its own files differ), `noHostEntry`, `neverRestorable` (what it read cannot be recorded, as with cgo), `readsUnknown`, `exportData` (its export data did not read), `typeReads` (a type it read), `lookups` (a rule's lookup), `factReads` (a fact), `deprecations` (a deprecation) or `answers` (an answer).
 `"reloadRounds":2` counts every time the build was loaded again, and `"reloadRoundsBy"` each of those under every
 reason it had: `hostDecline` (a package its check declined, at most 2 such rounds) or `missingAnswer` (a question
 reached a restored package with no answer of it kept). Under `--timing` nothing is restored from the host, so every

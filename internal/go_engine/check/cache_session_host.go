@@ -98,10 +98,31 @@ func (session *CacheSession) RestoreFromHost(host *HostRun) {
 		checkReasons: map[string]string{}}
 }
 
-// reasonWord is the first word of why a package was not restored from the host, which counts it.
+// declineKeys spell out, for the record people read, the first word of each reason a package was not restored from the
+// host: a reason starts with a short tag so a test can match it, but a reader of the record took `T` for a leaked type
+// parameter.
+var declineKeys = map[string]string{
+	"T":       "typeReads",
+	"L":       "lookups",
+	"F":       "factReads",
+	"D":       "deprecations",
+	"A":       "answers",
+	"never":   "neverRestorable",
+	"unknown": "readsUnknown",
+	"export":  "exportData",
+	"inputs":  "ownInputs",
+	"noEntry": "noHostEntry",
+}
+
+// reasonWord is why a package was not restored from the host, as the record counts it: the reason's first word,
+// spelled out (declineKeys), or the word itself for one the table does not name, so a new reason is still counted.
 func reasonWord(reason string) string {
 	word, _, _ := strings.Cut(reason, " ")
-	return strings.TrimSuffix(word, ":")
+	word = strings.TrimSuffix(word, ":")
+	if spelled, named := declineKeys[word]; named {
+		return spelled
+	}
+	return word
 }
 
 // restoreFromHost makes a hit of each package among reachable the session holds nothing of, with no list error and no
@@ -140,10 +161,10 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 		kept := state.host.entries[candidate.ID]
 		switch {
 		case kept == nil:
-			state.loadDeclines["noEntry"]++
+			state.loadDeclines[declineKeys["noEntry"]]++
 			continue
 		case kept.portable != portable[candidate]:
-			state.loadDeclines["inputs"]++
+			state.loadDeclines[declineKeys["inputs"]]++
 			continue
 		}
 		if restorable, why := kept.restoring.Reads.Restorable(); !restorable {
@@ -163,7 +184,7 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 		}
 		if readError != nil {
 			session.problem(fmt.Sprintf("restoring %s from the host: %v", candidate.ID, readError))
-			state.loadDeclines["noEntry"]++
+			state.loadDeclines[declineKeys["noEntry"]]++
 			continue
 		}
 		hosted := &hostRestore{kept: kept, restored: restored}

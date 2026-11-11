@@ -606,7 +606,7 @@
                             "declinedBy": {
                                 "type": "object",
                                 "additionalProperties": { "type": "integer" },
-                                "description": "Each decline, and each package never restored from the host's run, by why: inputs, noEntry, never, unknown, export, T, L, F, D or A. Absent when empty."
+                                "description": "Each decline, and each package never restored from the host's run, by why: ownInputs, noHostEntry, neverRestorable, readsUnknown, exportData, typeReads, lookups, factReads, deprecations or answers. Absent when empty."
                             },
                             "reloadRounds": {
                                 "type": "integer",
