@@ -20,6 +20,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_buffered_wait_delay"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_kill_by_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_require_escape_hatch_reason"
+	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_require_joined_pipe_reader"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_file_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_ambiguous_identifier"
@@ -574,6 +575,7 @@ func House() []rule.Rule {
 		concurrency_no_buffered_wait_delay.Rule,
 		concurrency_no_kill_by_name.Rule,
 		concurrency_require_escape_hatch_reason.Rule,
+		concurrency_require_joined_pipe_reader.Rule,
 		consistency_no_abbreviated_file_name.Rule,
 		consistency_no_abbreviated_identifier.Rule,
 		consistency_no_ambiguous_identifier.Rule,

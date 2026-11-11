@@ -149,6 +149,7 @@
 {"kind":"rule","name":"cohere-go/concurrency-no-buffered-wait-delay","severity":"error"}
 {"kind":"rule","name":"cohere-go/concurrency-no-kill-by-name","severity":"error"}
 {"kind":"rule","name":"cohere-go/concurrency-require-escape-hatch-reason","severity":"error"}
+{"kind":"rule","name":"cohere-go/concurrency-require-joined-pipe-reader","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-abbreviated-file-name","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-abbreviated-identifier","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-ambiguous-identifier","severity":"error"}
