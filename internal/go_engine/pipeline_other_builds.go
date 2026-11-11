@@ -198,7 +198,7 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 			Withheld:       over.Withheld,
 			// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
 			ReleaseAnalyzed: true,
-			ReadFile:        engine.sourceReader(nil),
+			ReadFile:        engine.sourceReader(nil, over.Rewritten),
 			Timing:          engine.timing,
 		})
 	}

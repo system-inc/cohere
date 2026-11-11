@@ -56,6 +56,12 @@ type loader struct {
 	overlay map[string][]byte
 	held    Held
 
+	// cgoOutputs are the cgo tool's outputs the load parses, by path, with the package each translates, whose
+	// `//line` directives readFile points at the package's directory (see rewriteCgoLines), and rewritten the bytes
+	// of each it rewrote, which every reader of the load's files is given (see Rewritten).
+	cgoOutputs map[string]*listedPackage
+	rewritten  *Rewritten
+
 	// restored are the packages the findings cache holds, whose types come from their export data (see Restorer).
 	restored map[*packages.Package]*Restored
 
@@ -437,12 +443,21 @@ func (loader *loader) parseClaimed(taken *claim, current *node) ([]*ast.File, []
 }
 
 // readFile is one file's bytes: the overlay's when it holds the file, else the ones the run holds of it, else the
-// disk's.
+// disk's. A cgo output's `//line` directives that name a copy of the package elsewhere are pointed at the package's
+// own directory first, in a copy, never in the build cache (see rewriteCgoLines), and the copy is kept in rewritten,
+// so a rule that reads the file reads the bytes its syntax was parsed from.
 func (loader *loader) readFile(file string) ([]byte, error) {
 	if contents, overlaid := loader.overlay[file]; overlaid {
 		return contents, nil
 	}
-	return loader.held.read(file)
+	contents, readError := loader.held.read(file)
+	if listedPackage := loader.cgoOutputs[file]; listedPackage != nil && readError == nil {
+		if parsed, isRewritten := rewriteCgoLines(contents, listedPackage); isRewritten {
+			loader.rewritten.add(file, parsed)
+			return parsed, nil
+		}
+	}
+	return contents, readError
 }
 
 // parseInto parses one file's contents in the mode go/packages parses in, into the range placeholder reserved for it
@@ -649,6 +664,8 @@ func newLoader(
 		withheld:      withheld,
 		overlay:       overlay,
 		held:          held,
+		cgoOutputs:    cgoOutputsOf(built),
+		rewritten:     newRewritten(),
 		analyzed:      map[*packages.Package]bool{},
 		testFunctions: map[*packages.Package][]Diagnostic{},
 		typesOnly:     map[*packages.Package]bool{},

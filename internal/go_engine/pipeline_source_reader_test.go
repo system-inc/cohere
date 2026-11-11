@@ -228,7 +228,7 @@ func TestSourceReaderServesTheOverlayThenTheHeldBytesThenTheDisk(test *testing.T
 		overlaid: []byte("package held\n"),
 		held:     []byte("package held\n"),
 	}}}
-	read := engine.sourceReader(map[string][]byte{overlaid: []byte("package overlay\n")})
+	read := engine.sourceReader(map[string][]byte{overlaid: []byte("package overlay\n")}, nil)
 	for path, expected := range map[string]string{
 		overlaid: "package overlay\n",
 		held:     "package held\n",
