@@ -13,14 +13,62 @@ import (
 )
 
 // verdict is one package's reads judged in another build: the host's memo and the build's, the packages the judged
-// package reaches in the build by path, its closure, those of them the build restored from the host's run, and, at
-// check time, the build's facts as its action inherited them, nil at the load's, which asks no fact.
+// package reaches in the build by path, its closure, those of them the build restored from the host's run, at check
+// time the build's facts as its action inherited them, nil at the load's, which asks no fact, and the closures its
+// Interface and Method lookups ask of, each gathered once for the verdict.
 type verdict struct {
 	host     *ReadsBuild
 	build    *ReadsBuild
 	closure  map[string]*types.Package
 	restored map[*types.Package]bool
 	fact     FactLookup
+	methods  *verdictClosures
+}
+
+// verdictClosures are a verdict's import closures as its Interface and Method lookups ask them: the host's, by the
+// package whose import closure it is, which is the subject's, and the build's, from the judged package's imports
+// there, nil until a lookup first asks.
+type verdictClosures struct {
+	host  map[*types.Package]*gatheredClosure
+	build *gatheredClosure
+}
+
+// gatheredClosure is one import closure, the union of its roots' (ReadsBuild.closureOf): its packages, and each by its
+// path, one package of a path in any closure.
+type gatheredClosure struct {
+	reached map[*types.Package]bool
+	byPath  map[string]*types.Package
+}
+
+// gatherClosure is the import closure of roots in memo, every package of it indexed by its methods' names there.
+func gatherClosure(memo *ReadsBuild, roots []*types.Package) *gatheredClosure {
+	gathered := &gatheredClosure{reached: map[*types.Package]bool{}, byPath: map[string]*types.Package{}}
+	for _, root := range roots {
+		for _, reached := range memo.closureOf(root) {
+			gathered.reached[reached] = true
+			gathered.byPath[reached.Path()] = reached
+		}
+	}
+	return gathered
+}
+
+// hostClosure is the host's import closure of subjectPackage, gathered once for the verdict.
+func (judged verdict) hostClosure(subjectPackage *types.Package) *gatheredClosure {
+	if gathered, known := judged.methods.host[subjectPackage]; known {
+		return gathered
+	}
+	gathered := gatherClosure(judged.host, subjectPackage.Imports())
+	judged.methods.host[subjectPackage] = gathered
+	return gathered
+}
+
+// buildClosure is the build's import closure of roots, the judged package's imports there, gathered once for the
+// verdict.
+func (judged verdict) buildClosure(roots []*types.Package) *gatheredClosure {
+	if judged.methods.build == nil {
+		judged.methods.build = gatherClosure(judged.build, roots)
+	}
+	return judged.methods.build
 }
 
 // find is the build's object at path in the package of ownerPath, and why not when there is none.
@@ -168,20 +216,29 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 		if lookup.Subject == nil || lookup.Subject.Pkg() == nil {
 			return false, name + ": it has no subject to find the host's closure by"
 		}
-		hostRoots := lookup.Subject.Pkg().Imports()
-		hostCandidates := methodCandidates(hostRoots, func(reached *types.Package) []*types.TypeName {
-			return judged.host.methodNamesOf(reached)[lookup.Name]
-		})
-		hostByPath := map[string]*types.Package{}
-		for reached := range build_reads.ClosurePackages(hostRoots) {
-			hostByPath[reached.Path()] = reached
-		}
-		buildCandidates := methodCandidates(roots, func(reached *types.Package) []*types.TypeName {
-			if hostPackage := hostByPath[reached.Path()]; judged.restored[reached] && hostPackage != nil {
-				return judged.host.methodNamesOf(hostPackage)[lookup.Name]
+		hostClosure, buildClosure := judged.hostClosure(lookup.Subject.Pkg()), judged.buildClosure(roots)
+		// Every type name of either closure with a method of the name, read from each side's index, sorted by
+		// package path and name. A package the build restored from the host gives the host's type names of its path.
+		var hostCandidates []*types.TypeName
+		var buildCandidates []*types.TypeName
+		for _, indexed := range judged.host.methodsNamed(lookup.Name) {
+			if !hostClosure.reached[indexed.owner] {
+				continue
 			}
-			return judged.build.methodNamesOf(reached)[lookup.Name]
-		})
+			hostCandidates = append(hostCandidates, indexed.typeNames...)
+			if judged.restored[buildClosure.byPath[indexed.owner.Path()]] {
+				buildCandidates = append(buildCandidates, indexed.typeNames...)
+			}
+		}
+		for _, indexed := range judged.build.methodsNamed(lookup.Name) {
+			if !buildClosure.reached[indexed.owner] ||
+				judged.restored[indexed.owner] && hostClosure.byPath[indexed.owner.Path()] != nil {
+				continue
+			}
+			buildCandidates = append(buildCandidates, indexed.typeNames...)
+		}
+		sortTypeNames(hostCandidates)
+		sortTypeNames(buildCandidates)
 		if len(hostCandidates) != len(buildCandidates) {
 			return false, name + fmt.Sprintf(": %d type names have the method on the host, %d in the build",
 				len(hostCandidates), len(buildCandidates))

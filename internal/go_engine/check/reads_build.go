@@ -35,8 +35,24 @@ type ReadsBuild struct {
 	paths   map[types.Object]objectPathResult
 	encoder objectpath.Encoder
 
-	// methodNames are each package's type names by the name of each method in their method sets (methodNamesOf).
-	methodNames map[*types.Package]map[string][]*types.TypeName
+	// closures are each root's import closure, the root and every package it reaches, walked once (closureOf), and
+	// methodIndex the type names of every package a walk reached with a method of each name, by the name, each
+	// package's method sets computed once, when it is first indexed (indexed). So no Interface or Method lookup walks
+	// a closure or a method set again.
+	closures    map[*types.Package][]*types.Package
+	methodIndex map[string][]packageMethods
+	indexed     map[*types.Package]bool
+
+	// walking and indexing, nil outside tests, are told of each root as its closure is walked and of each package as
+	// it is indexed, so a test can count them.
+	walking  func(*types.Package)
+	indexing func(*types.Package)
+}
+
+// packageMethods are the type names of owner with a method of one name in their method sets.
+type packageMethods struct {
+	owner     *types.Package
+	typeNames []*types.TypeName
 }
 
 // objectPathResult is an object's objectpath, and whether it has one.
@@ -45,13 +61,15 @@ type objectPathResult struct {
 	found bool
 }
 
-// NewReadsBuild is an empty memo of one build's closure digests, objectpaths and method names.
+// NewReadsBuild is an empty memo of one build's closure digests, objectpaths, closures and method names.
 func NewReadsBuild() *ReadsBuild {
 	return &ReadsBuild{
 		digests:     map[types.Object]cache.Key{},
 		graph:       newTypeGraph(),
 		paths:       map[types.Object]objectPathResult{},
-		methodNames: map[*types.Package]map[string][]*types.TypeName{},
+		closures:    map[*types.Package][]*types.Package{},
+		methodIndex: map[string][]packageMethods{},
+		indexed:     map[*types.Package]bool{},
 	}
 }
 
@@ -87,14 +105,37 @@ func (build *ReadsBuild) pathOf(object types.Object) (objectpath.Path, bool) {
 	return path, pathError == nil
 }
 
-// methodNamesOf are the type names declared package declares, by the name of each method in their method sets,
-// promoted ones included, and a pointer's for a type that is not an interface, memoized for the build.
-func (build *ReadsBuild) methodNamesOf(declaring *types.Package) map[string][]*types.TypeName {
+// closureOf is root's import closure, root and every package it reaches, walked once for the build, each package of
+// it indexed by its methods' names (indexPackage) before it is returned.
+func (build *ReadsBuild) closureOf(root *types.Package) []*types.Package {
 	build.lock.Lock()
-	known, isKnown := build.methodNames[declaring]
+	known, isKnown := build.closures[root]
+	walking := build.walking
 	build.lock.Unlock()
 	if isKnown {
 		return known
+	}
+	if walking != nil {
+		walking(root)
+	}
+	reached := slices.Collect(build_reads.ClosurePackages([]*types.Package{root}))
+	for _, each := range reached {
+		build.indexPackage(each)
+	}
+	build.lock.Lock()
+	build.closures[root] = reached
+	build.lock.Unlock()
+	return reached
+}
+
+// indexPackage adds the type names declaring declares to the method index, by the name of each method in their
+// method sets, promoted ones included, and a pointer's for a type that is not an interface, once for the build.
+func (build *ReadsBuild) indexPackage(declaring *types.Package) {
+	build.lock.Lock()
+	known := build.indexed[declaring]
+	build.lock.Unlock()
+	if known {
+		return
 	}
 	byName := map[string][]*types.TypeName{}
 	for _, name := range declaring.Scope().Names() {
@@ -113,9 +154,27 @@ func (build *ReadsBuild) methodNamesOf(declaring *types.Package) map[string][]*t
 		}
 	}
 	build.lock.Lock()
-	build.methodNames[declaring] = byName
-	build.lock.Unlock()
-	return byName
+	defer build.lock.Unlock()
+	// Another verdict's walk may have indexed it meanwhile, and a package is indexed once.
+	if build.indexed[declaring] {
+		return
+	}
+	build.indexed[declaring] = true
+	if build.indexing != nil {
+		build.indexing(declaring)
+	}
+	for methodName, typeNames := range byName {
+		build.methodIndex[methodName] = append(build.methodIndex[methodName],
+			packageMethods{owner: declaring, typeNames: typeNames})
+	}
+}
+
+// methodsNamed are the packages indexed so far with a type name with a method named name, each with those type
+// names. The slice is the index's as it stands: a later package's entry is appended past its end, never into it.
+func (build *ReadsBuild) methodsNamed(name string) []packageMethods {
+	build.lock.Lock()
+	defer build.lock.Unlock()
+	return build.methodIndex[name]
 }
 
 // Restoring is one package of the host's run whose reads a verdict judges in another build.
@@ -159,7 +218,8 @@ func TypesHold(
 		}
 		return false, "unknown: " + why
 	}
-	judged := verdict{host: host, build: build, closure: closure, restored: restored}
+	judged := verdict{host: host, build: build, closure: closure, restored: restored,
+		methods: &verdictClosures{host: map[*types.Package]*gatheredClosure{}}}
 	for _, object := range restoring.Reads.Objects() {
 		if holds, why := judged.objectHolds(object); !holds {
 			return false, "T " + why
@@ -241,19 +301,14 @@ func objectName(object types.Object) string {
 	return object.Pkg().Path() + "." + object.Name()
 }
 
-// methodCandidates are the type names of the import closure of roots with a method of a lookup's name in their method
-// sets, as namesOf gives each package's, sorted by package path and name: every type whose method an Interface or
-// Method lookup of the name may match, by whichever measure the asking rule takes.
-func methodCandidates(roots []*types.Package, namesOf func(*types.Package) []*types.TypeName) []*types.TypeName {
-	var candidates []*types.TypeName
-	for reached := range build_reads.ClosurePackages(roots) {
-		candidates = append(candidates, namesOf(reached)...)
-	}
-	slices.SortFunc(candidates, func(left, right *types.TypeName) int {
+// sortTypeNames sorts typeNames by package path and name.
+//
+// Mutates: typeNames is sorted in place
+func sortTypeNames(typeNames []*types.TypeName) {
+	slices.SortFunc(typeNames, func(left, right *types.TypeName) int {
 		if order := strings.Compare(left.Pkg().Path(), right.Pkg().Path()); order != 0 {
 			return order
 		}
 		return strings.Compare(left.Name(), right.Name())
 	})
-	return candidates
 }

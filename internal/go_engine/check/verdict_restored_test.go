@@ -121,3 +121,50 @@ func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) 
 		})
 	}
 }
+
+// Many verdicts, each with many Interface and Method lookups, over packages that share their imports, walk each
+// root's closure once per build and index each package's methods once per build, however many lookups ask: the
+// method index is built once, never per lookup or per verdict.
+func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
+	test.Parallel()
+
+	world := checkedRestoredWorld(test)
+	host, build := NewReadsBuild(), NewReadsBuild()
+	counted := func(counts map[*types.Package]int) func(*types.Package) {
+		return func(counted *types.Package) { counts[counted]++ }
+	}
+	hostWalked, buildWalked := map[*types.Package]int{}, map[*types.Package]int{}
+	hostIndexed, buildIndexed := map[*types.Package]int{}, map[*types.Package]int{}
+	host.walking, build.walking = counted(hostWalked), counted(buildWalked)
+	host.indexing, build.indexing = counted(hostIndexed), counted(buildIndexed)
+	subject := world.restoring.Reads.Lookups()[0].Subject
+	closure := map[string]*types.Package{restoredHiddenPath: world.exportHidden}
+	for range 3 {
+		reads := &build_reads.Reads{}
+		for _, lookup := range world.restoring.Reads.Lookups() {
+			reads.AddLookup(lookup)
+		}
+		for _, name := range []string{"Close", "Count", "Missing", "Close"} {
+			reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name, Subject: subject})
+		}
+		restoring := Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads}
+		reads.RecordTypes(subject.Pkg(), &types.Info{})
+		if holds, why := TypesHold(restoring, closure, map[*types.Package]bool{world.exportHidden: true}, host,
+			build); !holds {
+			test.Fatalf("the lookups of one source do not hold: %s", why)
+		}
+	}
+	for side, counts := range map[string]map[*types.Package]int{
+		"host's walks": hostWalked, "build's walks": buildWalked, "host's index": hostIndexed,
+		"build's index": buildIndexed,
+	} {
+		if len(counts) == 0 {
+			test.Errorf("the %s counted no package", side)
+		}
+		for counted, times := range counts {
+			if times != 1 {
+				test.Errorf("the %s counted %s %d times, want once", side, counted.Path(), times)
+			}
+		}
+	}
+}
