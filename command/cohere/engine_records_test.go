@@ -1531,7 +1531,8 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 	requireLines(
 		test,
 		clean,
-		"\n  swift contract: 3\ngo engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n",
+		"\n  swift contract: 3\n  go standard library table: none, a local build, so a run computes it\n"+
+			"go engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n",
 	)
 	forbidLines(test, clean, "modified tree", "identical to commit", "swift engine", "Swift", "swift-syntax")
 
