@@ -256,7 +256,8 @@ func IsTypeUnknownArrayType(
 // missed an `any` inside the type arguments of every parameter, variable or return typed through an alias
 // (#chvhz8t).
 func IsTypeReferenceType(subjectType *checker.Type) bool {
-	return subjectType.Flags()&checker.TypeFlagsObject != 0 && subjectType.ObjectFlags()&checker.ObjectFlagsReference != 0
+	return subjectType.Flags()&checker.TypeFlagsObject != 0 &&
+		subjectType.ObjectFlags()&checker.ObjectFlagsReference != 0
 }
 
 // CanBeUnsafeAssignment answers whether IsUnsafeAssignment could find this sender unsafe against any
