@@ -3,7 +3,6 @@ package check
 import (
 	"fmt"
 	"go/types"
-	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/types/objectpath"
@@ -105,25 +104,6 @@ func (judged verdict) objectHolds(hostObject types.Object) (bool, string) {
 	}
 	if judged.host.closureDigest(hostObject) != judged.build.closureDigest(found) {
 		return false, "object " + objectName(hostObject) + " renders differently"
-	}
-	return true, ""
-}
-
-// instanceHolds reports whether an instance the package made of another package's generic reads the same in the
-// build: the generic, and every named type of another package its type arguments reach, each in the build and
-// rendered alike. The arguments' shape is the package's own source and what it inferred from the objects it read,
-// each a read of its own; a named type of the package itself is an own input.
-func (judged verdict) instanceHolds(instance build_reads.Instance, ownPath string) (bool, string) {
-	if holds, why := judged.objectHolds(instance.Generic); !holds {
-		return false, "instance of " + objectName(instance.Generic) + ": " + why
-	}
-	for _, typeName := range judged.host.graph.reachable(slices.Collect(instance.TypeArguments.Types())) {
-		if typeName.Pkg().Path() == ownPath {
-			continue
-		}
-		if holds, why := judged.objectHolds(typeName); !holds {
-			return false, "instance of " + objectName(instance.Generic) + ": " + why
-		}
 	}
 	return true, ""
 }

@@ -229,11 +229,11 @@ var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 
 // TypesHold reports whether what restoring read of other packages' types on the host's run, in host, reads the same in
 // build, whose packages it reaches are closure, by path, restored those of them build restored from the host's run,
-// and when it does not, the first read that differs, named by
-// its row: T for an object or instance its type check reached, L for a rule's lookup of the types, and never or
-// unknown for reads that cannot hold at all. It is the load's half of the verdict, decided once the package's imports
-// are done in build and before anything of the package is read there (load.Restored.Holds); FactsHold is check's. A
-// package whose own inputs are the host's and whose reads hold may take the host's results in build (#b2t9xmf).
+// and when it does not, the first read that differs, named by its row: T for an object its type check reached, L for
+// a rule's lookup of the types, and never or unknown for reads that cannot hold at all. It is the load's half of the
+// verdict, decided once the package's imports are done in build and before anything of the package is read there
+// (load.Restored.Holds); FactsHold is check's. A package whose own inputs are the host's and whose reads hold may take
+// the host's results in build (#b2t9xmf).
 //
 // A package with assembly files is judged by the memos' whole twins (Restoring.Assembly), never by another package's
 // unexported field rendered by its properties.
@@ -261,11 +261,6 @@ func TypesHold(
 		methods: &verdictClosures{host: map[*types.Package]*gatheredClosure{}}}
 	for _, object := range restoring.Reads.Objects() {
 		if holds, why := judged.objectHolds(object); !holds {
-			return false, "T " + why
-		}
-	}
-	for _, instance := range restoring.Reads.Instances() {
-		if holds, why := judged.instanceHolds(instance, restoring.Path); !holds {
 			return false, "T " + why
 		}
 	}

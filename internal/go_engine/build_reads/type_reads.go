@@ -1,26 +1,29 @@
 package build_reads
 
-import (
-	"go/types"
-	"slices"
-)
+import "go/types"
 
 // typeReads are the type reads of one package as its walk collects them, on the walk's own goroutine, and publishes
 // them to its Reads under one hold of the lock (see Reads.publishTypes).
 type typeReads struct {
-	objects   map[types.Object]bool
-	instances map[types.Object][]*types.TypeList
+	objects map[types.Object]bool
 }
 
 // collectTypeReads is every object of another package that info, own's type information, reaches: each
-// identifier's use, each embedded field on a selection's path, each implicit object, and, for each instance of
-// another package's generic, its type arguments, each distinct list once. A selection's selected field or method is
-// among the uses already, since the type checker records a selector's name as a use of what it selects. An object of
-// an instance, a field or method of an instantiated type or an instantiated function, is collected as its generic
-// declares it, which is what another build can find; the instance's type arguments are its own read. An object of no
-// package, the universe's, is the same in every build.
+// identifier's use, each embedded field on a selection's path, and each implicit object. A selection's selected field
+// or method is among the uses already, since the type checker records a selector's name as a use of what it selects.
+// An object of an instance, a field or method of an instantiated type or an instantiated function, is collected as its
+// generic declares it, which is what another build can find. An object of no package, the universe's, is the same in
+// every build.
+//
+// An instance of another package's generic is no read of its own. Its generic is a use. Its type arguments are types
+// the package wrote, which name each type name they hold, or types it inferred from the objects it read, whose closure
+// digests reach every named type their types do (#b2t9xmf): `generic.Identity(platform.Get())` infers
+// platform.Handle from Get's result, and Get's digest changes with Handle's definition. So every named type of
+// another package a type argument reaches is reached by an object read's closure, which the restore-instance
+// fixture's test pins, and a census of every instance at cohere's root, loom and a cohere tree found none
+// uncovered.
 func collectTypeReads(own *types.Package, info *types.Info) typeReads {
-	collected := typeReads{objects: map[types.Object]bool{}, instances: map[types.Object][]*types.TypeList{}}
+	collected := typeReads{objects: map[types.Object]bool{}}
 	for _, used := range info.Uses {
 		if foreign, isForeign := foreignDeclared(used, own); isForeign {
 			collected.objects[foreign] = true
@@ -36,15 +39,6 @@ func collectTypeReads(own *types.Package, info *types.Info) typeReads {
 		if foreign, isForeign := foreignDeclared(implicit, own); isForeign {
 			collected.objects[foreign] = true
 		}
-	}
-	for identifier, instance := range info.Instances {
-		generic, isForeign := foreignDeclared(info.Uses[identifier], own)
-		if !isForeign || slices.ContainsFunc(collected.instances[generic], func(recorded *types.TypeList) bool {
-			return identicalLists(recorded, instance.TypeArgs)
-		}) {
-			continue
-		}
-		collected.instances[generic] = append(collected.instances[generic], instance.TypeArgs)
 	}
 	return collected
 }

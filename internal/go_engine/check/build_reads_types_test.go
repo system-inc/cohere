@@ -1,7 +1,6 @@
 package check
 
 import (
-	"go/types"
 	"slices"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 
 // typeReadsFiles are a module whose package user reads another package, base, every way the type check records: a
 // call of os.Getpid, a field of base reached through a field base embeds and user never names, so only the selection's
-// path holds it, and an instance of base's generic. user's own struct and its field are its own, never a read.
+// path holds it, and base's generic, instantiated. user's own struct and its field are its own, never a read.
 var typeReadsFiles = map[string]string{
 	"go.mod": "module example.com/reads\n\ngo 1.21\n",
 	"base/base.go": "package base\n\ntype inner struct{ Value int }\n\n// Outer embeds inner.\n" +
@@ -67,8 +66,8 @@ func readsOfPath(test *testing.T, reads map[*packages.Package]*build_reads.Reads
 }
 
 // A package's type reads, walked by the run once its last action has finished, are every object of another package
-// its check reached, the field it reached only through a selection's path among them, and the type arguments of the
-// instance of another package's generic, and never an object of its own or of the universe.
+// its check reached, the field it reached only through a selection's path and the generic it instantiated among them,
+// and never an object of its own or of the universe.
 func TestAPackagesTypeReadsAreEveryForeignObjectItReached(test *testing.T) {
 	test.Parallel()
 
@@ -96,11 +95,6 @@ func TestAPackagesTypeReadsAreEveryForeignObjectItReached(test *testing.T) {
 	}
 	if !slices.Equal(names, want) {
 		test.Fatalf("want user's reads\n%q\ngot\n%q", want, names)
-	}
-	instances := reads.Instances()
-	if len(instances) != 1 || instances[0].Generic.Name() != "Identity" || instances[0].TypeArguments.Len() != 1 ||
-		instances[0].TypeArguments.At(0) != types.Typ[types.Int] {
-		test.Fatalf("want the one instance base.Identity[int], got %+v", instances)
 	}
 }
 

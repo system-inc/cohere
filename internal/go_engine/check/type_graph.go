@@ -133,33 +133,6 @@ func (graph *typeGraph) measureBy(sizes types.Sizes) {
 	}
 }
 
-// reachable are the type names roots name and every type name those reach, each once.
-func (graph *typeGraph) reachable(roots []types.Type) []*types.TypeName {
-	sizes := graph.sizesForWalk()
-	pending := directTypeNames(roots, sizes).typeNames
-	seen := map[*types.TypeName]bool{}
-	var reached []*types.TypeName
-	for len(pending) > 0 {
-		current := pending[len(pending)-1]
-		pending = pending[:len(pending)-1]
-		if seen[current] {
-			continue
-		}
-		seen[current] = true
-		reached = append(reached, current)
-		pending = append(pending, graph.edgesOf(current, sizes)...)
-	}
-	return reached
-}
-
-// edgesOf are the type names typeName's node names, under its package's lock.
-func (graph *typeGraph) edgesOf(typeName *types.TypeName, sizes types.Sizes) []*types.TypeName {
-	part := graph.packageOf(typeName.Pkg())
-	part.lock.Lock()
-	defer part.lock.Unlock()
-	return graph.nodeOf(part, typeName, sizes).edges
-}
-
 // nodeOf is typeName's node in part, its package's, rendered and its edges found the first time it is asked. The
 // caller holds part's lock.
 func (graph *typeGraph) nodeOf(part *packageTypeGraph, typeName *types.TypeName, sizes types.Sizes) *typeNode {

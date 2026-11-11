@@ -105,6 +105,39 @@ func TestTheMergeIsTheSameWhetherTheBuildsRestoreFromTheHostOrNot(test *testing.
 	}
 }
 
+// The restore-instance fixture's package instantiating another package's generic with a type argument it inferred.
+const restoreInferrer = "example.com/restoreinstance/inferrer"
+
+// An extra build declines a package whose instance of another package's generic has a type argument it inferred and
+// never named, when that type's definition differs in the build: inferrer passes platform.Get's Handle through
+// generic.Identity, and only windows' Handle holds a lock, so only windows finds copylocks' copy of it. An instance is
+// no read of its own (collectTypeReads): the read that covers its type argument is Get, whose closure digest reaches
+// Handle, so windows declines inferrer at its load by Get, finds the copy, and the merge is the one a run checking
+// every package itself writes (#b2t9xmf).
+func TestAnExtraBuildDeclinesAnInstanceWhoseInferredTypeArgumentDiffers(test *testing.T) {
+	test.Parallel()
+
+	fixture := filepath.Join("testdata", "restore-instance")
+	offRoot := copyFixture(test, fixture)
+	_, offRaw := runOverConfigured(test, offRoot, exitFindings,
+		func(engine *pipeline) { engine.keepsHostRestoreOff = true }, "--other-builds", "--no-cache")
+	off := normalize(offRaw, offRoot)
+	engine, on := runOver(test, copyFixture(test, fixture), exitFindings, "--other-builds")
+	host, windows := engine.buildRuns[0], windowsRun(test, engine)
+	if why := windows.result.FromHost.Declined[restoreInferrer]; !strings.HasPrefix(why,
+		"T object example.com/restoreinstance/platform.Get ") {
+		test.Errorf("windows declined %s for %q, want by Get, the object whose result the type argument is inferred "+
+			"from", restoreInferrer, why)
+	}
+	if foundIn(host, "inferrer.go") || !foundIn(windows, "inferrer.go") {
+		test.Errorf("want the copy of Handle found by windows alone, got the host %t and windows %t",
+			foundIn(host, "inferrer.go"), foundIn(windows, "inferrer.go"))
+	}
+	if withoutHostRestore(on) != withoutHostRestore(off) {
+		test.Errorf("restoring from the host changed the stream:\nrestoring\n%s\nchecking every package\n%s", on, off)
+	}
+}
+
 // The restore-bodiless fixture's package declaring a function without a body, which every build declares alike.
 const restoreIntrinsic = "example.com/restorebodiless/intrinsic"
 

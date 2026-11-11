@@ -30,33 +30,15 @@ func TestReadsFromManyGoroutinesKeepEachReadOnceInOrder(test *testing.T) {
 		types.NewConst(token.NoPos, other, "Beta", types.Typ[types.Int], nil),
 	}
 	factType := reflect.TypeFor[*readFact]()
-	// Two lists of the same type arguments, each its own instantiation, which the reads keep as one instance.
-	box := types.NewNamed(types.NewTypeName(token.NoPos, other, "Box", nil), types.Typ[types.Int], nil)
-	box.SetTypeParams([]*types.TypeParam{
-		types.NewTypeParam(types.NewTypeName(token.NoPos, other, "Type", nil), types.NewInterfaceType(nil, nil)),
-	})
-	var lists []*types.TypeList
-	for range 2 {
-		instance, instantiateError := types.Instantiate(nil, box, []types.Type{types.Typ[types.Int]}, true)
-		named, isNamed := instance.(*types.Named)
-		if instantiateError != nil || !isNamed {
-			test.Fatalf("instantiating Box[int]: %v", instantiateError)
-		}
-		lists = append(lists, named.TypeArgs())
-	}
-	if lists[0] == lists[1] {
-		test.Fatal("the two instantiations share their type arguments, so nothing tells identical lists apart")
-	}
 	reads := &Reads{}
 	var group sync.WaitGroup
-	for round := range 8 {
+	for range 8 {
 		group.Go(func() {
 			for _, object := range objects {
 				reads.AddObject(object)
 				reads.AddFact(Fact{Object: object, Package: object.Pkg(), FactType: factType, Found: true})
 			}
 			reads.AddFact(Fact{Package: other, FactType: factType})
-			reads.AddInstance(box.Obj(), lists[round%2])
 		})
 	}
 	group.Wait()
@@ -74,9 +56,6 @@ func TestReadsFromManyGoroutinesKeepEachReadOnceInOrder(test *testing.T) {
 	facts := reads.Facts()
 	if len(facts) != 4 || facts[0].Object != nil || facts[0].Package != other {
 		test.Fatalf("want three object facts after other's package fact, got %+v", facts)
-	}
-	if instances := reads.Instances(); len(instances) != 1 {
-		test.Fatalf("want the one instance, identical type arguments kept once, got %d", len(instances))
 	}
 	if never := reads.Never(); never != "first" {
 		test.Fatalf("want the first reason kept, got %q", never)
