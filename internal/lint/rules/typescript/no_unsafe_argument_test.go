@@ -49,6 +49,7 @@ func TestNoUnsafeArgumentStaysSilent(test *testing.T) {
 		"declare function foo<E extends string[]>(...params: E): void;\n\nfoo('a', 'b', 1 as any);\n",
 		"declare function toHaveBeenCalledWith<E extends any[]>(...params: E): void;\ntoHaveBeenCalledWith(1 as any);\n",
 		"declare function acceptsMap(arg: Map<string, string>): void;\nacceptsMap(new Map());\n",
+		"type MapType = Map<string, string>;\ndeclare function acceptsMap(arg: MapType): void;\nacceptsMap(new Map());\n",
 		"type T = [number, T[]];\ndeclare function foo(t: T): void;\ndeclare const t: T;\n\nfoo(t);\n",
 		"type T = Array<T>;\ndeclare function foo<T>(t: T): T;\nconst t: T = [];\nfoo(t);\n",
 		"function foo(templates: TemplateStringsArray) {}\nfoo``;\n",
@@ -100,6 +101,40 @@ func TestNoUnsafeArgumentFires(test *testing.T) {
 		sourceText   string
 		wantFindings []noUnsafeArgumentFinding
 	}{
+		// A type written as an alias's whole body is a deferred reference, and its type arguments are
+		// compared as an inline one's are (#chvhz8t). Upstream reports all three.
+		{
+			sourceText: "type MapType = Map<string, number>;\ndeclare function takes(arg: MapType): void;\ndeclare const anyMap: Map<any, any>;\ntakes(anyMap);\n",
+			wantFindings: []noUnsafeArgumentFinding{
+				{
+					wantSpan:    "anyMap",
+					wantId:      "unsafeArgument",
+					wantMessage: "Unsafe argument of type `Map<any, any>` assigned to a parameter of type `MapType`.",
+				},
+			},
+		},
+		{
+			sourceText: "type AnyMapType = Map<any, any>;\ndeclare function takes(arg: Map<string, number>): void;\ndeclare const anyMap: AnyMapType;\ntakes(anyMap);\n",
+			wantFindings: []noUnsafeArgumentFinding{
+				{
+					wantSpan:    "anyMap",
+					wantId:      "unsafeArgument",
+					wantMessage: "Unsafe argument of type `AnyMapType` assigned to a parameter of type `Map<string, number>`.",
+				},
+			},
+		},
+		{
+			// The empty constructor's exemption is for the `new Map()` itself, and a `??` around it is the
+			// argument, so the exemption does not reach it: upstream reports this, and so does cohere.
+			sourceText: "type MapType = Map<string, number>;\ndeclare function takes(arg: MapType): void;\ndeclare const maybe: MapType | undefined;\ntakes(maybe ?? new Map());\n",
+			wantFindings: []noUnsafeArgumentFinding{
+				{
+					wantSpan:    "maybe ?? new Map()",
+					wantId:      "unsafeArgument",
+					wantMessage: "Unsafe argument of type `Map<any, any>` assigned to a parameter of type `MapType`.",
+				},
+			},
+		},
 		{
 			sourceText: "declare function foo(...args: [string, string]): void;\n\ndeclare const spread: [string, ...string[]];\nfoo(...spread, 1 as any);\n",
 			wantFindings: []noUnsafeArgumentFinding{
