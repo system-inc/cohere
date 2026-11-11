@@ -1,0 +1,10 @@
+{
+    "rules": {
+        "Go": "cohere-go/concurrency-require-joined-pipe-reader"
+    },
+    "messages": {
+        "readerUnjoinedAtWait": {
+            "text": "A goroutine reads the {{stream}} pipe, and `{{wait}}` is reached on some path here before that goroutine is joined. `{{wait}}` closes the pipe once the child exits, so the goroutine can lose the end of the output. Join it first, with a `sync.WaitGroup`'s `Wait` or a receive from a channel it closes when it is done, then call `{{wait}}`."
+        }
+    }
+}
