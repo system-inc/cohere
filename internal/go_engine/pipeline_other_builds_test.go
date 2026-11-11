@@ -424,9 +424,11 @@ func withoutCache(stream string) string {
 }
 
 // hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds and what each restored
-// from it (contract.BuildRecord), each written only when not 0.
+// from it (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source,
+// which are what it did not restore.
 var hostRestoreCounts = regexp.MustCompile(
-	`,"(entriesKept|restoredFromHost|declinedAtLoad|declinedAtCheck|reloadRounds)":[0-9]+|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}`)
+	`,"(entriesKept|restoredFromHost|declinedAtLoad|declinedAtCheck|reloadRounds|checkedFromSource)":[0-9]+` +
+		`|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}`)
 
 // withoutHostRestore is stream with every build record's counts of the restore from the host's run left out, the one
 // thing a run that restores writes otherwise than one that checks every package of every build.

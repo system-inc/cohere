@@ -637,6 +637,22 @@
                                 "type": "integer",
                                 "description": "The host's alone: how long the other builds waited after its lint for its walks of what each package read of others to end, before any could start. Absent when 0."
                             },
+                            "checkedFromSource": {
+                                "type": "integer",
+                                "description": "Another build's alone: the packages of its whole graph its first load checked from source rather than restored. Over packagesLoaded it is the share that weighs its lint, which lints alone at or above one half. Absent when 0."
+                            },
+                            "packagesLoaded": {
+                                "type": "integer",
+                                "description": "Another build's alone: every package its first load loaded, dependencies and test variants included. Absent for the host's."
+                            },
+                            "lintWaitMilliseconds": {
+                                "type": "integer",
+                                "description": "Another build's alone: how long its lint waited for its weight of the budget of one build the builds share, admitted in the order they became ready. Absent when 0."
+                            },
+                            "lintWaited": {
+                                "type": "boolean",
+                                "description": "Another build's alone: whether its lint waited for its weight at all, so a wait under a millisecond still reads as one. Absent when it did not."
+                            },
                             "filesAlone": {
                                 "type": "integer",
                                 "description": "Files of ours in scope that only this build compiles and that a rule ran on: the coverage it buys. Absent when 0."

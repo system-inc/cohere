@@ -76,10 +76,14 @@ type pipeline struct {
 	// apply to builds that restore nothing, so a test can show the width reaches no key with builds that each check
 	// every package. extraBuildEnds, also a test's alone, is called as each extra build's run ends with the build's own
 	// notes, and fails the build when it returns an error, so a test can note from a build and fail one by name.
+	// lintSteps, a test's alone too, is told each step of an extra build's lint at the gate with the weight it takes
+	// (lintStep), on the build's own goroutine, so a test can count the lints holding weight and hold a build at a
+	// step.
 	buildsAtOnce         int
 	buildsWidthForced    int
 	buildsWidthUnguarded bool
 	extraBuildEnds       func(extra project.Build, notes io.Writer) error
+	lintSteps            func(extra project.Build, step lintStep, weight int)
 
 	// hostLoading and hostLinting are the host's build's wall time loading the workspace and running the rules over it,
 	// in nanoseconds, over every load and pass, its build record's (buildRun). A load or a pass beside another runs on

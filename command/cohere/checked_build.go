@@ -31,6 +31,13 @@ type checkedBuild struct {
 	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
 	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
 	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
+	// CheckedFromSource of PackagesLoaded is the share of its graph another build's first load checked from source,
+	// which weighs its lint, and LintWaitMilliseconds and LintWaited how long and whether that lint waited for its
+	// weight (#b2t9xmf), each absent when 0 or false, and the host's never written.
+	CheckedFromSource    int  `json:"checkedFromSource,omitempty"`
+	PackagesLoaded       int  `json:"packagesLoaded,omitempty"`
+	LintWaitMilliseconds int  `json:"lintWaitMilliseconds,omitempty"`
+	LintWaited           bool `json:"lintWaited,omitempty"`
 	// FilesAlone, NotLinted and NotLintedReason are the files of ours only this build compiled and linted, and those it
 	// compiled that no rule ran on, with why (#ytnvt8k), each absent when there is nothing to count.
 	FilesAlone      int      `json:"filesAlone,omitempty"`

@@ -108,6 +108,19 @@ type BuildRecord struct {
 	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
 	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
 
+	// CheckedFromSource and PackagesLoaded are an extra build's alone (#b2t9xmf): the packages of its whole graph its
+	// first load checked from source rather than restored, from its own findings cache or the host's run, and every
+	// package that load loaded, dependencies and test variants included. CheckedFromSource over PackagesLoaded is the
+	// share that weighs its lint, which takes the whole of a budget of one build the extra builds share once the share
+	// is at or above one half, so no two near-full builds lint at once. LintWaitMilliseconds is the wall time its lint
+	// waited for that weight, and LintWaited whether it waited at all, so a wait under a millisecond still reads as
+	// one. None of them reaches a key or the verdict, and each is written only when not 0 or false, so the host's
+	// record writes none.
+	CheckedFromSource    int  `json:"checkedFromSource,omitempty"`
+	PackagesLoaded       int  `json:"packagesLoaded,omitempty"`
+	LintWaitMilliseconds int  `json:"lintWaitMilliseconds,omitempty"`
+	LintWaited           bool `json:"lintWaited,omitempty"`
+
 	// FilesAlone, additive within contract 3 (#ytnvt8k), counts the files of ours in scope that this build alone
 	// compiles and a rule ran on: the coverage it buys. NotLinted are the files of ours in scope the host's build
 	// leaves out that no build analyzed, absolute and sorted, each under the first build that compiles it, and

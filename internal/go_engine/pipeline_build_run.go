@@ -47,4 +47,12 @@ type buildRun struct {
 	// waited is the host's alone: how long the extra builds waited, after its lint, for its walks of what each package
 	// read of others to end (wholeReads), before any could start.
 	waited time.Duration
+	// checkedFromSource and packagesLoaded are an extra build's alone: the packages of its whole graph its first load
+	// checked from source, and every package that load loaded, whose ratio weighs its lint at the gate (lintWeight).
+	// lintWait is how long its lint waited for that weight, and lintWaited whether it waited at all, so a wait under a
+	// millisecond still reads as one.
+	checkedFromSource int
+	packagesLoaded    int
+	lintWait          time.Duration
+	lintWaited        bool
 }

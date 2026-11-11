@@ -824,7 +824,10 @@ var (
 	// buildTimingPattern is a build record's times, each written only when not 0, so one that took under a
 	// millisecond on one run and more on the next would appear and vanish: each is normalized to 0, which the record
 	// writes by leaving it out.
-	buildTimingPattern    = regexp.MustCompile(`,"(load|lint|decide|keep|wait)Milliseconds":\d+`)
+	buildTimingPattern = regexp.MustCompile(`,"(load|lint|decide|keep|wait|lintWait)Milliseconds":\d+`)
+	// lintWaitedPattern is whether an extra build's lint waited for its weight at the gate, which turns on how the
+	// builds side by side fall in time and never reaches the verdict, so it is left out as the times are.
+	lintWaitedPattern     = regexp.MustCompile(`,"lintWaited":true`)
 	checkedByBuildPattern = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
 	// buildsAtOncePattern is how many extra builds ran side by side, which the machine decides and the verdict never
 	// reads, so it is left out as the times are.
@@ -863,6 +866,7 @@ func normalize(stream string, root string) string {
 	normalized = panicFramesPattern.ReplaceAllString(normalized, `, at <frames>"`)
 	normalized = buildTargetPattern.ReplaceAllString(normalized, `"target":"target"`)
 	normalized = buildTimingPattern.ReplaceAllString(normalized, "")
+	normalized = lintWaitedPattern.ReplaceAllString(normalized, "")
 	normalized = buildsAtOncePattern.ReplaceAllString(normalized, "")
 	normalized = checkedByBuildPattern.ReplaceAllString(normalized, `"reason":"checked by the target build"`)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
