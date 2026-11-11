@@ -45,6 +45,11 @@ type LintRecord struct {
 	// Builds is additive within contract 3: every build a run checked when it checked more than one, the host's first
 	// (#72n9mq0). It is absent for a run of one build, so such a run writes the record it always has.
 	Builds []BuildRecord `json:"builds,omitempty"`
+	// BuildsAtOnce is additive within contract 3, and the Go engine's alone: how many of the extra builds ran side by
+	// side, decided once as they started from the cores, the memory cap and the live heap (#b2t9xmf). It changes no
+	// finding, no note and no key: a run one build at a time writes the same records but this one. Absent when Builds
+	// is.
+	BuildsAtOnce int `json:"buildsAtOnce,omitempty"`
 	// OffReasons is additive within contract 3, and the Go engine's alone: why the settings turn each rule off, for
 	// every off the go block's reasons explain (#v11k0g2), which the front door prints beside the rule in coverage.
 	// Always written, `{}` when no off is explained, so a reader tells an engine that explains its offs, where a rule

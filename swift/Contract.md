@@ -1000,6 +1000,13 @@ a store computes only for this, and what each entry holds of the run's answers, 
 encoded when a build first asks for them, and the host's `"waitMilliseconds":40`, how long the other builds
 waited after its lint for its walks of what each package read of others to end, before any could start.
 
+Beside `builds` the Go engine writes `"buildsAtOnce":3`, additive within contract 3: how many of the builds beside
+the host's ran side by side, decided once as they started (#b2t9xmf), from a quarter of the cores, the memory cap
+and the host's live heap at its last collection, and one at a time under `--single-threaded` or a limit other than
+the cap. Each build notes into its own buffer, and once every build has ended their results and notes are taken in
+build order, up to and including the first that failed, so the records and stderr are those of a run one build at a
+time, byte for byte, but this field, which no key and no verdict reads. It is absent when `builds` is.
+
 ### `phase`
 
 ```json

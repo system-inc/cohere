@@ -1,9 +1,13 @@
 package go_engine
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/tools/go/packages"
@@ -22,8 +26,10 @@ import (
 // when the builds could not be read, which it notes, and the run is incomplete.
 //
 // The host's run is its lint pass as it is. Each extra build loads the workspace under its own environment and runs
-// the enabled rules over every package, through its own findings cache (extraBuildRun). A file no build the
-// toolchain targets compiles (project.Unbuilt) stays the gap the types phase names.
+// the enabled rules over every package, through its own findings cache (extraBuildRun). The extra builds run side by
+// side, as many at once as extraBuildsWidth decides when they start, and are taken in build order whatever their width
+// (extraBuildRuns). A file no build the toolchain targets compiles (project.Unbuilt) stays the gap the types phase
+// names.
 func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []buildRun {
 	host, extras, buildsError := engine.buildsBeside()
 	if buildsError != nil {
@@ -62,15 +68,68 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		runs[0].files = engine.session.Files()
 	}
 
-	for _, extra := range extras {
-		extraRun, extraError := engine.extraBuildRun(extra, ours, pass.result.Host)
-		if extraError != nil {
-			engine.otherBuildsFailed(extraError)
-			return nil
-		}
-		runs = append(runs, extraRun)
+	engine.buildsAtOnce = engine.extraBuildsWidth(len(extras))
+	extraRuns, extraError := engine.extraBuildRuns(extras, ours, pass.result.Host, engine.buildsAtOnce)
+	if extraError != nil {
+		engine.otherBuildsFailed(extraError)
+		return nil
 	}
-	return runs
+	return append(runs, extraRuns...)
+}
+
+// extraBuildRuns is every extra build's run, in build order, at most width of them at once, each into a slot of its
+// own, so the merge reads the runs in the order a run one build at a time hands it, or the first build in that order
+// that failed, and its error.
+//
+// One at a time, a build that fails stops the run before any later build starts, so their notes are never written. Side
+// by side, a later build may already have ended, so each build notes into a buffer of its own, and once every build has
+// ended the buffers are written to stderr in build order, up to and including the first build that failed, and the rest
+// are dropped with the runs after it: the stream and stderr are a run one at a time's, byte for byte, at any width. A
+// build after one known to have failed is never started, as it never would be one at a time.
+func (engine *pipeline) extraBuildRuns(
+	extras []project.Build,
+	ours map[string]bool,
+	host *check.HostRun,
+	width int,
+) ([]buildRun, error) {
+	runs := make([]buildRun, len(extras))
+	failures := make([]error, len(extras))
+	notes := make([]bytes.Buffer, len(extras))
+	// firstFailed is the earliest build in build order known to have failed, len(extras) while none has.
+	var firstFailed atomic.Int64
+	firstFailed.Store(int64(len(extras)))
+	slots := make(chan struct{}, width)
+	var group sync.WaitGroup
+	for index, extra := range extras {
+		slots <- struct{}{}
+		if int64(index) > firstFailed.Load() {
+			<-slots
+			break
+		}
+		group.Go(func() {
+			// A build hands its slot back only once its failure is known, so at width 1 the next build is never
+			// started after one that failed.
+			defer func() { <-slots }()
+			runs[index], failures[index] = engine.extraBuildRun(extra, ours, host, &notes[index])
+			if failures[index] == nil {
+				return
+			}
+			for earliest := firstFailed.Load(); int64(index) < earliest; earliest = firstFailed.Load() {
+				if firstFailed.CompareAndSwap(earliest, int64(index)) {
+					break
+				}
+			}
+		})
+	}
+	group.Wait()
+	for index := range extras {
+		// Ignored: a note that cannot reach stderr changes no record, as note says.
+		_, _ = engine.standardError.Write(notes[index].Bytes())
+		if failures[index] != nil {
+			return nil, failures[index]
+		}
+	}
+	return runs, nil
 }
 
 // buildsBeside is the host's build and the extra builds the census needs beside it, as describeProject read them
@@ -173,10 +232,14 @@ func checkingBuild(builds []project.Build, file string, contents []byte) (projec
 // host is what the host's run kept for the extra builds, nil when it kept nothing: the build restores from it each
 // package its own findings cache does not hold whose own inputs are the host's and whose reads hold here (#b2t9xmf),
 // unless the run renamed, whose build reads no cache, or measures under `--timing`, whose build has no session.
+//
+// notes is the build's own, where everything it notes goes rather than stderr, since builds side by side end in any
+// order (extraBuildRuns).
 func (engine *pipeline) extraBuildRun(
 	extra project.Build,
 	ours map[string]bool,
 	host *check.HostRun,
+	notes io.Writer,
 ) (buildRun, error) {
 	environment := append(slices.Clone(engine.described.workspace.Environment()), extra.Environment()...)
 	var session *check.CacheSession
@@ -186,7 +249,7 @@ func (engine *pipeline) extraBuildRun(
 		if engine.session != nil {
 			hostFiles = engine.session.Files()
 		}
-		session = engine.cacheSession(environment, hostFiles)
+		session = engine.cacheSession(environment, hostFiles, notes)
 		if session != nil && !engine.keepsHostRestoreOff {
 			session.RestoreFromHost(host)
 		}
@@ -265,10 +328,15 @@ func (engine *pipeline) extraBuildRun(
 		return buildRun{}, fmt.Errorf("running the rules over the build %s: %w", extra, checkError)
 	}
 	for _, problem := range result.Cache.Problems {
-		engine.note("the findings cache of the build %s: %s", extra, problem)
+		noteTo(notes, "the findings cache of the build %s: %s", extra, problem)
 	}
 	run.result = result
 	run.loading, run.linting = loading, linting
+	if engine.extraBuildEnds != nil {
+		if endError := engine.extraBuildEnds(extra, notes); endError != nil {
+			return buildRun{}, fmt.Errorf("the build %s: %w", extra, endError)
+		}
+	}
 	return run, nil
 }
 

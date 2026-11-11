@@ -653,6 +653,11 @@
                         }
                     }
                 },
+                "buildsAtOnce": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "How many of the builds beside the host's ran side by side, decided once as they started from the machine's cores, the memory cap and the live heap. It changes no finding: the builds' results are merged in the order of builds whatever it is. Absent when builds is, and kept by a replay with them."
+                },
                 "typeErrors": { "type": "integer" },
                 "findings": { "type": "integer", "description": "Rule findings, type errors not included." },
                 "filesFixed": { "type": "integer" },

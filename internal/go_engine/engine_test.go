@@ -826,8 +826,11 @@ var (
 	// writes by leaving it out.
 	buildTimingPattern    = regexp.MustCompile(`,"(load|lint|decide|keep|wait)Milliseconds":\d+`)
 	checkedByBuildPattern = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
-	hostTarget            = " on " + runtime.GOOS + "/" + runtime.GOARCH
-	normalizedProvenance  = contract.ProvenanceRecord{
+	// buildsAtOncePattern is how many extra builds ran side by side, which the machine decides and the verdict never
+	// reads, so it is left out as the times are.
+	buildsAtOncePattern  = regexp.MustCompile(`,"buildsAtOnce":\d+`)
+	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
+	normalizedProvenance = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",
 	}
 )
@@ -860,6 +863,7 @@ func normalize(stream string, root string) string {
 	normalized = panicFramesPattern.ReplaceAllString(normalized, `, at <frames>"`)
 	normalized = buildTargetPattern.ReplaceAllString(normalized, `"target":"target"`)
 	normalized = buildTimingPattern.ReplaceAllString(normalized, "")
+	normalized = buildsAtOncePattern.ReplaceAllString(normalized, "")
 	normalized = checkedByBuildPattern.ReplaceAllString(normalized, `"reason":"checked by the target build"`)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
 }

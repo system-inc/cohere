@@ -54,6 +54,9 @@ type runSummary struct {
 	// Builds is every build a Go run checked when it checked more than one, the host's first, nil for a run of one
 	// build and every other run. A replay keeps them, since the verdict it repeats was merged from them.
 	Builds []checkedBuild
+	// BuildsAtOnce is how many of Builds beside the host's ran side by side, 0 when Builds is nil. A replay keeps it
+	// with them, as the record of the run that checked them.
+	BuildsAtOnce int
 
 	TypeErrors int
 	Findings   int

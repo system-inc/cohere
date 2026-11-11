@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -62,6 +61,19 @@ func runOverConfigured(
 	extra ...string,
 ) (*pipeline, string) {
 	test.Helper()
+	engine, stream, _ := runOverNoted(test, root, wantExit, configure, extra...)
+	return engine, stream
+}
+
+// runOverNoted is runOverConfigured with what the run noted on stderr beside its stream, both as written.
+func runOverNoted(
+	test *testing.T,
+	root string,
+	wantExit int,
+	configure func(*pipeline),
+	extra ...string,
+) (*pipeline, string, string) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
@@ -80,14 +92,16 @@ func runOverConfigured(
 		test.Fatal(describeError)
 	}
 	var standardOutput bytes.Buffer
-	engine := newPipeline(request, described, ruleSettings, registered, &standardOutput, io.Discard, nil)
+	var standardError bytes.Buffer
+	engine := newPipeline(request, described, ruleSettings, registered, &standardOutput, &standardError, nil)
 	if configure != nil {
 		configure(engine)
 	}
 	if exitCode := engine.run(); exitCode != wantExit {
-		test.Fatalf("the run exited %d, want %d:\n%s", exitCode, wantExit, standardOutput.String())
+		test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, wantExit, standardOutput.String(),
+			standardError.String())
 	}
-	return engine, standardOutput.String()
+	return engine, standardOutput.String(), standardError.String()
 }
 
 // Under `--other-builds` a module with a file only windows builds and one only the cohere_extra tag builds is

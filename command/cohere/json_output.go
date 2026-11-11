@@ -109,6 +109,8 @@ type summaryJson struct {
 	// Builds is every build a Go run checked when it checked more than one, the host's first, absent for a run of
 	// one build and every other run.
 	Builds []checkedBuild `json:"builds,omitempty"`
+	// BuildsAtOnce is how many of those builds beside the host's ran side by side, absent when builds is.
+	BuildsAtOnce int `json:"buildsAtOnce,omitempty"`
 
 	TypeErrors     int `json:"typeErrors"`
 	Findings       int `json:"findings"`
@@ -195,6 +197,7 @@ func summaryAsJson(summary runSummary) summaryJson {
 		PackageCache:                summary.PackageCache,
 		MemoryRaisedToBytes:         summary.MemoryRaisedToBytes,
 		Builds:                      summary.Builds,
+		BuildsAtOnce:                summary.BuildsAtOnce,
 		TypeErrors:                  summary.TypeErrors,
 		Findings:                    summary.Findings,
 		FilesFixed:                  summary.filesFixed(),
