@@ -2,6 +2,7 @@ package cache
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -79,8 +80,9 @@ func fileDigests(
 	var workers sync.WaitGroup
 	for range min(runtime.GOMAXPROCS(0), max(len(files), 1)) {
 		workers.Go(func() {
+			buffer := make([]byte, digestBufferSize)
 			for index := range indexes {
-				digests[index], readErrors[index] = digestOf(files[index], held)
+				digests[index], readErrors[index] = digestOf(files[index], held, buffer)
 			}
 		})
 	}
@@ -99,9 +101,14 @@ func fileDigests(
 	return byPath, nil
 }
 
-// digestOf is the sha256 of one file's bytes: held's when held holds them, and otherwise the disk's, streamed rather
-// than read whole.
-func digestOf(file string, held func(file string) ([]byte, bool)) (fileDigest, error) {
+// digestBufferSize is the bytes each of fileDigests' workers reads a file through, one buffer a worker for every file it
+// hashes, as large as the buffer io.Copy would make for each file.
+const digestBufferSize = 32 << 10
+
+// digestOf is the sha256 of one file's bytes: held's when held holds them, and otherwise the disk's, streamed through
+// buffer rather than read whole. It reads into buffer itself rather than through io.Copy, which, since a file can
+// write itself out, makes a buffer of its own for every file however many it is given (#b2t9xmf).
+func digestOf(file string, held func(file string) ([]byte, bool), buffer []byte) (fileDigest, error) {
 	if held != nil {
 		if contents, isHeld := held(file); isHeld {
 			filesHashed.Add(1)
@@ -118,8 +125,16 @@ func digestOf(file string, held func(file string) ([]byte, bool)) (fileDigest, e
 	}()
 	filesHashed.Add(1)
 	digester := sha256.New()
-	if _, copyError := io.Copy(digester, opened); copyError != nil {
-		return fileDigest{}, fmt.Errorf("hashing %s: %w", file, copyError)
+	for {
+		read, readError := opened.Read(buffer)
+		// Ignored: a hash's Write never returns an error.
+		_, _ = digester.Write(buffer[:read])
+		if errors.Is(readError, io.EOF) {
+			break
+		}
+		if readError != nil {
+			return fileDigest{}, fmt.Errorf("hashing %s: %w", file, readError)
+		}
 	}
 	var digest fileDigest
 	copy(digest[:], digester.Sum(nil))
