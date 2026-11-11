@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"go/types"
 	"reflect"
 	"slices"
@@ -22,29 +23,32 @@ type FactLookup func(owner string, path objectpath.Path, factType reflect.Type) 
 // ReadsBuild is what the verdicts on packages' reads compute of one build's types, the host's or an extra build's
 // (linux, windows, freebsd), memoized for the build, so every package's verdict renders each object once (#b2t9xmf).
 // Which packages a verdict asks of is the judged package's own (see TypesHold), since a test variant sees its
-// package's test variant at that package's path. Its methods take its lock, so verdicts may run on several goroutines:
-// a memo already known is read under the read lock, so the verdicts deciding a load at once do not queue on each
-// other's hits.
+// package's test variant at that package's path. Verdicts run on several goroutines, so its memos are written once
+// and read many times without a lock (sync.Map), and only the method index, appended to, is under its lock: the
+// verdicts deciding a load at once never queue on each other's hits (#b2t9xmf).
 type ReadsBuild struct {
-	lock sync.RWMutex
+	// lock guards methodIndex and whole, and orders each package's entries in the index before it reads as indexed.
+	lock sync.Mutex
 
-	// digests are each object's closure digest, and graph the named types they are made of (typeGraph).
-	digests map[types.Object]cache.Key
+	// digests are each object's closure digest, a cache.Key by types.Object, and graph the named types they are made
+	// of (typeGraph).
+	digests sync.Map
 	graph   *typeGraph
 
-	// paths are each object's objectpath, and encoder the encoder that found them, which keeps what it learns of each
-	// package for the next object of it, under its own lock, so an encode never holds the memo's.
-	paths       map[types.Object]objectPathResult
+	// paths are each object's objectpath, an objectPathResult by types.Object, and encoder the encoder that found them,
+	// which keeps what it learns of each package for the next object of it, under its own lock.
+	paths       sync.Map
 	encoder     objectpath.Encoder
 	encoderLock sync.Mutex
 
-	// closures are each root's import closure, the root and every package it reaches, walked once (closureOf), and
-	// methodIndex the type names of every package a walk reached with a method of each name, by the name, each
-	// package's method sets computed once, when it is first indexed (indexed). So no Interface or Method lookup walks
-	// a closure or a method set again.
-	closures    map[*types.Package][]*types.Package
+	// closures are each root's import closure, a []*types.Package by root, the root and every package it reaches,
+	// walked once (closureOf), and methodIndex the type names of every package a walk reached with a method of each
+	// name, by the name, each package's method sets computed once, when it is first indexed (indexed, a package read
+	// as indexed only once its entries are in methodIndex). So no Interface or Method lookup walks a closure or a
+	// method set again.
+	closures    sync.Map
 	methodIndex map[string][]packageMethods
-	indexed     map[*types.Package]bool
+	indexed     sync.Map
 
 	// whole is the memo's twin told no build, which renders every field of every type whole, for a package with
 	// assembly files (Restoring.Assembly), made the first time one is judged (wholeTwin).
@@ -70,14 +74,7 @@ type objectPathResult struct {
 
 // NewReadsBuild is an empty memo of one build's closure digests, objectpaths, closures and method names.
 func NewReadsBuild() *ReadsBuild {
-	return &ReadsBuild{
-		digests:     map[types.Object]cache.Key{},
-		graph:       newTypeGraph(),
-		paths:       map[types.Object]objectPathResult{},
-		closures:    map[*types.Package][]*types.Package{},
-		methodIndex: map[string][]packageMethods{},
-		indexed:     map[*types.Package]bool{},
-	}
+	return &ReadsBuild{graph: newTypeGraph(), methodIndex: map[string][]packageMethods{}}
 }
 
 // wholeTwin is the memo's twin told no build, which renders every field whole, made once.
@@ -106,67 +103,64 @@ func (build *ReadsBuild) measureBy(sizes types.Sizes) {
 // It errs wide, as exportRendering does: a digest that changes when it need not costs the reading package a recheck,
 // while one that stays the same when it should change restores a stale analysis.
 func (build *ReadsBuild) closureDigest(object types.Object) cache.Key {
-	build.lock.RLock()
-	digest, known := build.digests[object]
-	build.lock.RUnlock()
-	if known {
+	if known, isKnown := build.digests.Load(object); isKnown {
+		digest, isDigest := known.(cache.Key)
+		if !isDigest {
+			// Invariant: closureDigest stores only a cache.Key.
+			panic(fmt.Sprintf("check: the closure digest of %s is a %T", object.Name(), known))
+		}
 		return digest
 	}
-	digest = build.graph.closureDigest(object)
-	build.lock.Lock()
-	build.digests[object] = digest
-	build.lock.Unlock()
+	digest := build.graph.closureDigest(object)
+	build.digests.Store(object, digest)
 	return digest
 }
 
 // pathOf is object's objectpath in its package, and whether it has one.
 func (build *ReadsBuild) pathOf(object types.Object) (objectpath.Path, bool) {
-	build.lock.RLock()
-	known, isKnown := build.paths[object]
-	build.lock.RUnlock()
-	if isKnown {
-		return known.path, known.found
+	if known, isKnown := build.paths.Load(object); isKnown {
+		result, isResult := known.(objectPathResult)
+		if !isResult {
+			// Invariant: pathOf stores only an objectPathResult.
+			panic(fmt.Sprintf("check: the objectpath of %s is a %T", object.Name(), known))
+		}
+		return result.path, result.found
 	}
 	// Two verdicts may encode the same object at once; the encoder answers both alike, so either may store it.
 	build.encoderLock.Lock()
 	path, pathError := build.encoder.For(object)
 	build.encoderLock.Unlock()
-	build.lock.Lock()
-	build.paths[object] = objectPathResult{path: path, found: pathError == nil}
-	build.lock.Unlock()
+	build.paths.Store(object, objectPathResult{path: path, found: pathError == nil})
 	return path, pathError == nil
 }
 
 // closureOf is root's import closure, root and every package it reaches, walked once for the build, each package of
 // it indexed by its methods' names (indexPackage) before it is returned.
 func (build *ReadsBuild) closureOf(root *types.Package) []*types.Package {
-	build.lock.RLock()
-	known, isKnown := build.closures[root]
-	walking := build.walking
-	build.lock.RUnlock()
-	if isKnown {
-		return known
+	if known, isKnown := build.closures.Load(root); isKnown {
+		closure, isClosure := known.([]*types.Package)
+		if !isClosure {
+			// Invariant: closureOf stores only a []*types.Package.
+			panic(fmt.Sprintf("check: the closure of %s is a %T", root.Path(), known))
+		}
+		return closure
 	}
-	if walking != nil {
-		walking(root)
+	if build.walking != nil {
+		build.walking(root)
 	}
 	reached := slices.Collect(build_reads.ClosurePackages([]*types.Package{root}))
 	for _, each := range reached {
 		build.indexPackage(each)
 	}
-	build.lock.Lock()
-	build.closures[root] = reached
-	build.lock.Unlock()
+	// Stored once every package of it is indexed, so a verdict that reads the closure finds each in the method index.
+	build.closures.Store(root, reached)
 	return reached
 }
 
 // indexPackage adds the type names declaring declares to the method index, by the name of each method in their
 // method sets, promoted ones included, and a pointer's for a type that is not an interface, once for the build.
 func (build *ReadsBuild) indexPackage(declaring *types.Package) {
-	build.lock.RLock()
-	known := build.indexed[declaring]
-	build.lock.RUnlock()
-	if known {
+	if _, known := build.indexed.Load(declaring); known {
 		return
 	}
 	byName := map[string][]*types.TypeName{}
@@ -187,11 +181,11 @@ func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 	}
 	build.lock.Lock()
 	defer build.lock.Unlock()
-	// Another verdict's walk may have indexed it meanwhile, and a package is indexed once.
-	if build.indexed[declaring] {
+	// Another verdict's walk may have indexed it meanwhile, and a package is indexed once. It reads as indexed only
+	// once its entries are in the method index, so a verdict that skips it finds them there.
+	if _, known := build.indexed.Load(declaring); known {
 		return
 	}
-	build.indexed[declaring] = true
 	if build.indexing != nil {
 		build.indexing(declaring)
 	}
@@ -199,13 +193,14 @@ func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 		build.methodIndex[methodName] = append(build.methodIndex[methodName],
 			packageMethods{owner: declaring, typeNames: typeNames})
 	}
+	build.indexed.Store(declaring, true)
 }
 
 // methodsNamed are the packages indexed so far with a type name with a method named name, each with those type
 // names. The slice is the index's as it stands: a later package's entry is appended past its end, never into it.
 func (build *ReadsBuild) methodsNamed(name string) []packageMethods {
-	build.lock.RLock()
-	defer build.lock.RUnlock()
+	build.lock.Lock()
+	defer build.lock.Unlock()
 	return build.methodIndex[name]
 }
 
