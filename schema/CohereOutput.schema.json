@@ -609,7 +609,19 @@
                 "filesFormatted": { "type": "integer" },
                 "wouldChange": {
                     "type": "integer",
-                    "description": "Under `--no-fix`, the files a fix or formatting would rewrite. They fail the run."
+                    "description": "Under `--no-fix`, the files a fix or formatting would rewrite, the nested repositories' included, each a finding line. They fail the run."
+                },
+                "nestedWouldChange": {
+                    "type": "integer",
+                    "description": "The part of wouldChange in nested repositories: files their own run would rewrite. Absent when zero."
+                },
+                "wouldChangeConsidered": {
+                    "type": "integer",
+                    "description": "Under `--no-fix`, the files the fix phase examined, the scope wouldChange less nestedWouldChange was found in. Absent when zero."
+                },
+                "nestedWouldChangeConsidered": {
+                    "type": "integer",
+                    "description": "The nested repositories' files the formatter read, the scope nestedWouldChange was found in. Absent when zero."
                 },
                 "cohered": {
                     "type": "integer",
