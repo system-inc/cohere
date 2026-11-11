@@ -208,8 +208,8 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 	})
 	// The host's reads, recorded only when the run has extra builds to restore packages into (recordsReads), walked in
 	// the load's slots below its work.
-	return engine.lintPackages(analyzed, check.Options{Withheld: loaded.Withheld, Reads: loaded.Reads,
-		WalkSlots: loaded.WalkSlots})
+	return engine.lintPackages(analyzed, check.Options{Withheld: loaded.Withheld, Bodiless: loaded.Bodiless,
+		Reads: loaded.Reads, WalkSlots: loaded.WalkSlots})
 }
 
 // lintPackages is lint over the packages to analyze, with what the load gives the run in options: its Withheld once

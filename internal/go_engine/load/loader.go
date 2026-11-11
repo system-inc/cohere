@@ -86,6 +86,10 @@ type loader struct {
 	declinedLock sync.Mutex
 	declined     map[*packages.Package]bool
 
+	// bodiless is what each package checked from source declares without a body, recorded as it is checked, while
+	// its syntax is surely there (see Bodiless).
+	bodiless *Bodiless
+
 	// filesParsed counts the files parsed, and fromExportData the packages whose types were read from export data.
 	filesParsed    atomic.Int64
 	fromExportData atomic.Int64
@@ -578,7 +582,8 @@ func (loader *loader) parseInto(file string, contents []byte, placeholder *token
 // that: its syntax is the cgo tool's outputs. One the cgo tool did not translate differs in two things: the type
 // checker fakes package "C" (types.Config.FakeImportC) for the cgo files as written, and a type error of a
 // dependency's that reaches its cgo files is withheld (see withheld_errors.go). The package is checked at its
-// module's go version, and a package in no module, as the standard library's, at the newest.
+// module's go version, and a package in no module, as the standard library's, at the newest. What it declares without
+// a body is recorded then, while its syntax is surely there (see Bodiless).
 //
 // Mutates: current its package gains its syntax, types and errors
 func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []error) {
@@ -667,6 +672,7 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 		loader.testFunctions[loaded] = refused
 		loader.testFunctionsLock.Unlock()
 	}
+	loader.bodiless.record(loaded)
 	loader.recordReads(current)
 }
 
@@ -784,6 +790,7 @@ func newLoader(
 		typesOnly:     map[*packages.Package]bool{},
 		checked:       map[*packages.Package]bool{},
 		declined:      map[*packages.Package]bool{},
+		bodiless:      newBodiless(),
 		timing:        collector,
 	}
 }

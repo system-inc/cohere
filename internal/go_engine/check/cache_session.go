@@ -192,6 +192,10 @@ type CacheSession struct {
 	resolver  *fact_resolver.Resolver
 	previous  map[*packages.Package]entryDemand
 
+	// bodiless is the last run's load's record of what each package checked from source declares without a body,
+	// which each entry written keeps (see load.Bodiless), nil for none.
+	bodiless *load.Bodiless
+
 	// trusted are the hits whose entry's findings and answers hold for the package as the run finds it (see
 	// cache_session_reads.go), and byIdentifier every package the load reached, by ID, which a read names its owner by.
 	trusted      map[*packages.Package]bool
@@ -711,7 +715,7 @@ func (session *CacheSession) saveMisses(
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
-			demanded := session.demandOf(saved, session.previous[saved])
+			demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
 			entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
 				withheld[saved], demanded, files[saved], knownFiles, true)
 			var putError error

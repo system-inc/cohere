@@ -27,9 +27,16 @@ type Store interface {
 
 // Answers is what a store holds of one package: by kind's name, each answer by its object's objectpath, as JSON, and
 // the kinds the package was computed whole in, the push's way, in which an object with no answer has no fact.
+//
+// Bodiless are the objectpaths of the functions and methods the package declares without a body, and of their
+// parameters and results, and BodiesRecorded is whether the run that checked the package from source recorded them
+// (#b2t9xmf). Export data cannot tell a function without a body from one with a body the run never loaded, so only a
+// recorded Bodiless says that an object it does not name has a body.
 type Answers struct {
-	Values   map[string]map[objectpath.Path][]byte
-	Complete map[string]bool
+	Values         map[string]map[objectpath.Path][]byte
+	Complete       map[string]bool
+	Bodiless       map[objectpath.Path]bool
+	BodiesRecorded bool
 }
 
 // answerKey is one memoized answer: a kind's, about one object.
@@ -53,7 +60,11 @@ type answerKey struct {
 // about another package's object is among reader's reads (see Reads), which its entry keeps, so a later run restoring
 // reader by anything but its own first key can tell whether the answer still holds (#w7zmvat wave 3b).
 //
-// compute is the kind's own judgment in home, which takes home's lock itself. Each answer is asked of compute or the
+// compute is the kind's own judgment in home, which takes home's lock itself. bodiless is the kind's answer about
+// object from its types alone, for an object the store names as a function declared without a body, or a parameter or
+// result of one, in a package the run restored: exactly what compute would answer were the package loaded, so the
+// question is answered without loading it again (#b2t9xmf). It is an argument rather than a field of Kind, which knows
+// no Value, so the compiler holds it to the type compute returns. Each answer is asked of compute, bodiless or the
 // store once in a run, and memoized.
 func Ask[Value any](
 	resolver *Resolver,
@@ -61,12 +72,13 @@ func Ask[Value any](
 	kind *Kind,
 	object types.Object,
 	compute func(home *Package) Value,
+	bodiless func() Value,
 ) Value {
 	var zero Value
 	if object.Pkg() == nil || !isOrigin(object) {
 		return zero
 	}
-	answer, unsure := answerOf(resolver, kind, object, compute)
+	answer, unsure := answerOf(resolver, kind, object, compute, bodiless)
 	if unsure {
 		resolver.markUnsure(reader.Types)
 		return answer
@@ -77,14 +89,16 @@ func Ask[Value any](
 	return answer
 }
 
-// answerOf is Ask's answer about object, an object of a package and its own origin: memoized, the store's, or
-// compute's, and whether it is unsure: a placeholder for a package the run must reload, or computed from one, which
-// compute's home was handed while it ran.
+// answerOf is Ask's answer about object, an object of a package and its own origin: memoized, the store's, bodiless's
+// for a restored package's object the store names as declared without a body, or compute's, and whether it is unsure:
+// a placeholder for a package the run must reload, or computed from one, which compute's home was handed while it
+// ran.
 func answerOf[Value any](
 	resolver *Resolver,
 	kind *Kind,
 	object types.Object,
 	compute func(home *Package) Value,
+	bodiless func() Value,
 ) (Value, bool) {
 	key := answerKey{kind: kind, object: object}
 	if memoized, held := resolver.answers.Load(key); held {
@@ -119,6 +133,15 @@ func answerOf[Value any](
 		}
 	}
 	if home == nil {
+		// A restored package's object the store names as declared without a body is answered from its types, as a
+		// computed answer is. An object it does not name, in a package whose bodies were recorded, has a body; one in
+		// a package whose bodies were not may have one. Either way only its package, loaded, can answer.
+		if hasPath && resolver.storedBodiless(object.Pkg(), path) {
+			answer := bodiless()
+			resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
+			resolver.answers.Store(key, answer)
+			return answer, false
+		}
 		resolver.reload(kind, object)
 		var placeholder Value
 		return placeholder, true
@@ -152,6 +175,25 @@ func isOrigin(object types.Object) bool {
 // stored is the store's answer of kind at path in packageTypes, read through the store once per package: its JSON, or
 // nothing, for no fact, where the package was computed whole in kind and holds no answer at path.
 func (resolver *Resolver) stored(kind *Kind, packageTypes *types.Package, path objectpath.Path) ([]byte, bool) {
+	answers := resolver.storedAnswersOf(packageTypes)
+	if answers == nil {
+		return nil, false
+	}
+	if value, answered := answers.Values[kind.Name][path]; answered {
+		return value, true
+	}
+	return nil, answers.Complete[kind.Name]
+}
+
+// storedBodiless reports whether the store names the object at path in packageTypes as a function declared without a
+// body, or a parameter or result of one, which only a store that recorded the package's bodies does.
+func (resolver *Resolver) storedBodiless(packageTypes *types.Package, path objectpath.Path) bool {
+	answers := resolver.storedAnswersOf(packageTypes)
+	return answers != nil && answers.BodiesRecorded && answers.Bodiless[path]
+}
+
+// storedAnswersOf is the store's answers of packageTypes, read through the store once per package, or nil for none.
+func (resolver *Resolver) storedAnswersOf(packageTypes *types.Package) *Answers {
 	read, _ := resolver.storedAnswers.LoadOrStore(packageTypes, &storedRead{})
 	held, isRead := read.(*storedRead)
 	if !isRead {
@@ -159,13 +201,7 @@ func (resolver *Resolver) stored(kind *Kind, packageTypes *types.Package, path o
 		panic(fmt.Sprintf("fact_resolver: %s's stored answers are a %T", packageTypes.Path(), read))
 	}
 	held.once.Do(func() { held.answers = resolver.store.Answers(packageTypes) })
-	if held.answers == nil {
-		return nil, false
-	}
-	if value, answered := held.answers.Values[kind.Name][path]; answered {
-		return value, true
-	}
-	return nil, held.answers.Complete[kind.Name]
+	return held.answers
 }
 
 // storedRead is one package's answers as the store gave them, read once.
@@ -330,12 +366,14 @@ var (
 
 // Register adds kind to the kinds Whole computes and Probe asks: whole computes every answer of kind in a package,
 // each answer of no fact left out, as Ask's compute would answer it, for every entry a run writes and the standard
-// library's table, and compute is the kind's own judgment of one object of home, as the compute it hands Ask. A kind
-// registers as its package initializes.
+// library's table, compute is the kind's own judgment of one object of home, as the compute it hands Ask, and
+// bodiless its answer about an object declared without a body, as the bodiless it hands Ask. A kind registers as its
+// package initializes.
 func Register[Value any](
 	kind *Kind,
 	whole func(resolver *Resolver, home *Package) map[types.Object]Value,
 	compute func(resolver *Resolver, home *Package, object types.Object) Value,
+	bodiless func(object types.Object) Value,
 ) {
 	var zero Value
 	encodedZero, encodeError := json.Marshal(zero)
@@ -359,7 +397,7 @@ func Register[Value any](
 		probe: func(resolver *Resolver, home *Package, object types.Object) []byte {
 			answer := Ask(resolver, home, kind, object, func(owner *Package) Value {
 				return compute(resolver, owner, object)
-			})
+			}, func() Value { return bodiless(object) })
 			return encodeAnswer(kind, object, answer)
 		},
 		zero: encodedZero,

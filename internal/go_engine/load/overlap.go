@@ -19,6 +19,10 @@ type Overlap struct {
 	// Caching.RecordReads asked for them.
 	Reads map[*packages.Package]*build_reads.Reads
 
+	// Bodiless is what each package checked from source declares without a body, filled as the load checks each one
+	// (see Loaded.Bodiless).
+	Bodiless *Bodiless
+
 	// WalkSlots are the load's slots, which the walks of a run beside the load take below every package's work, so
 	// they never displace its chain (see Loaded.WalkSlots).
 	WalkSlots *WalkSlots

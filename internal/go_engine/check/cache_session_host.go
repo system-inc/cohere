@@ -537,7 +537,8 @@ func (session *CacheSession) keepForBuilds(
 	bounded.ForEach(len(encoding), false, func(index int) {
 		saved := encoding[index]
 		encoded[index], encodeErrors[index] = encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-			withheld[saved], session.recordedDemandOf(saved), files[saved], knownFiles, false)
+			withheld[saved], session.withBodiless(saved, session.recordedDemandOf(saved)), files[saved], knownFiles,
+			false)
 	})
 	for index, saved := range encoding {
 		if encodeErrors[index] != nil {

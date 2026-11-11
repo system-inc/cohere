@@ -72,6 +72,15 @@ type cacheEntry struct {
 	// the run did not key, and then the entry is held by its own first key alone.
 	Reads           []storedRead
 	ReadsIncomplete bool
+
+	// Bodiless are the objectpaths of the functions and methods the package declares without a body, and of their
+	// parameters and results, as the load that checked it from source recorded them (load.Bodiless), and
+	// BodiesRecorded is whether it did. A run that restores the package answers a question of one from its types
+	// alone, where an object it holds no answer of may be a function with a body it never loaded, so it reloads the
+	// package (#b2t9xmf). An entry written before these fields decodes with BodiesRecorded false, and its package
+	// reloads as it always did, so they need no new CacheFormatVersion.
+	Bodiless       []objectpath.Path
+	BodiesRecorded bool
 }
 
 // storedRead is one read (see fact_resolver.Read): the kind, the owner's ID and its first key when the read was
@@ -128,10 +137,13 @@ type restoredPackage struct {
 	output    cache.Key
 	hasOutput bool
 
-	// answers are the entry's Answers, and reads and readsIncomplete its Reads and ReadsIncomplete.
+	// answers are the entry's Answers, reads and readsIncomplete its Reads and ReadsIncomplete, and bodiless and
+	// bodiesRecorded its Bodiless and BodiesRecorded.
 	answers         []kindAnswers
 	reads           []storedRead
 	readsIncomplete bool
+	bodiless        []objectpath.Path
+	bodiesRecorded  bool
 }
 
 // encodedEntry is one package's entry as encodeEntry makes it, with what the session needs of it beside the bytes.
@@ -178,12 +190,13 @@ func factTypeName(factType reflect.Type) string {
 }
 
 // encodeEntry is the entry of one package that missed, from every action on it, each of which finished without an
-// error, its types, what the load withheld of it, the answers of the fact kinds computed on demand in it and those its
-// analysis read of other packages (demanded), and, for a package Analyze was given, its files' walk, with its
-// export data beside it, its output digest, and whether a finding of it names a file outside it, among loadFiles,
-// every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact the package exported, or
-// factValueDigest cannot read one, or its types cannot be written as export data. Without writesExportData the entry
-// is encoded alone, for a caller that writes the export data itself only if it is ever read (lazyEntry).
+// error, its types, what the load withheld of it, the answers of the fact kinds computed on demand in it, those its
+// analysis read of other packages and what it declares without a body (demanded), and, for a package Analyze was
+// given, its files' walk, with its export data beside it, its output digest, and whether a finding of it names a file
+// outside it, among loadFiles, every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact
+// the package exported, or factValueDigest cannot read one, or its types cannot be written as export data. Without
+// writesExportData the entry is encoded alone, for a caller that writes the export data itself only if it is ever read
+// (lazyExportData).
 func encodeEntry(
 	known *cacheAnalyzers,
 	ruleOf map[*analysis.Analyzer]rule.Rule,
@@ -203,6 +216,8 @@ func encodeEntry(
 		Answers:         demanded.answers,
 		Reads:           demanded.reads,
 		ReadsIncomplete: demanded.readsIncomplete,
+		Bodiless:        demanded.bodiless,
+		BodiesRecorded:  demanded.bodiesRecorded,
 	}
 	encoded := encodedEntry{}
 	digested := map[string]analysisFacts{}
@@ -411,6 +426,8 @@ func restoredOf(
 		answers:         entry.Answers,
 		reads:           entry.Reads,
 		readsIncomplete: entry.ReadsIncomplete,
+		bodiless:        entry.Bodiless,
+		bodiesRecorded:  entry.BodiesRecorded,
 	}
 	if len(entry.Output) == len(restored.output) {
 		copy(restored.output[:], entry.Output)

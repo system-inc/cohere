@@ -42,6 +42,11 @@ type Options struct {
 	// Withheld is the load's Loaded.Withheld, which the cache keeps with each package it saves.
 	Withheld map[*packages.Package]load.PackageWithheld
 
+	// Bodiless is the load's Loaded.Bodiless, or Overlap.Bodiless for a run beside the load, which the cache keeps
+	// with each package it saves, so a run restoring the package answers a question of a function it declares without
+	// a body from its types alone (#b2t9xmf). Nil, every entry says it recorded none, and such a question reloads.
+	Bodiless *load.Bodiless
+
 	// ReleaseAnalyzed lets each analyzed package's syntax and type information go once the rules have finished on it,
 	// as a dependency's already go, rather than when the run ends; the Result is the same either way. Run then
 	// leaves the analyzed packages without their Syntax and TypesInfo, so only a caller that runs once over a load
@@ -323,6 +328,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		// it, and no store answers a package the run learns, which has none there.
 		resolver = fact_resolver.New(session)
 		checkerOptions.Resolver, session.resolver = resolver, resolver
+		session.bodiless = options.Bodiless
 		if options.Ready == nil {
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
 		}

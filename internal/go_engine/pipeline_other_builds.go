@@ -235,6 +235,7 @@ func (engine *pipeline) extraBuildRun(
 			SingleThreaded: engine.request.switches["single-threaded"],
 			Cache:          session,
 			Withheld:       over.Withheld,
+			Bodiless:       over.Bodiless,
 			// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
 			ReleaseAnalyzed: true,
 			ReadFile:        engine.sourceReader(nil),

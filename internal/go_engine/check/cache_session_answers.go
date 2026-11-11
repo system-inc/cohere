@@ -121,28 +121,37 @@ func (session *CacheSession) packageOf(packageTypes *types.Package) *packages.Pa
 // entry's, for a package the run trusts the entry of (see trusted), restored from the binary's table, complete in every
 // kind its release computed, or from the store by its own first key, or by an alias or its second key once its reads
 // held; or, for a package loaded from source to answer a question, its entry's under its own first key, which the run
-// did not restore. It is nil when there are none.
+// did not restore. A trusted entry's record of what its package declares without a body comes with them. It is nil
+// when there are none and no such record.
 func (session *CacheSession) Answers(packageTypes *types.Package) *fact_resolver.Answers {
 	asked := session.packageOf(packageTypes)
 	if asked == nil {
 		return nil
 	}
-	var held []kindAnswers
+	var held entryDemand
 	if restored := session.hits[asked]; restored != nil {
 		if session.trusted[asked] {
-			held = restored.answers
+			held = entryDemand{answers: restored.answers, bodiless: restored.bodiless,
+				bodiesRecorded: restored.bodiesRecorded}
 		}
 	} else {
-		held = session.previous[asked].answers
+		held = session.previous[asked]
 	}
-	if len(held) == 0 {
+	if len(held.answers) == 0 && !held.bodiesRecorded {
 		return nil
 	}
 	answers := &fact_resolver.Answers{
-		Values:   map[string]map[objectpath.Path][]byte{},
-		Complete: map[string]bool{},
+		Values:         map[string]map[objectpath.Path][]byte{},
+		Complete:       map[string]bool{},
+		BodiesRecorded: held.bodiesRecorded,
 	}
-	addAnswers(answers, held)
+	addAnswers(answers, held.answers)
+	if held.bodiesRecorded {
+		answers.Bodiless = make(map[objectpath.Path]bool, len(held.bodiless))
+		for _, path := range held.bodiless {
+			answers.Bodiless[path] = true
+		}
+	}
 	return answers
 }
 
@@ -251,12 +260,22 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 	}
 }
 
-// entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, and the answers
-// its analysis read of other packages, with whether those could all be named.
+// entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, the answers its
+// analysis read of other packages, with whether those could all be named, and what it declares without a body, with
+// whether the load recorded that (see cacheEntry's Bodiless).
 type entryDemand struct {
 	answers         []kindAnswers
 	reads           []storedRead
 	readsIncomplete bool
+	bodiless        []objectpath.Path
+	bodiesRecorded  bool
+}
+
+// withBodiless is demanded with what saved declares without a body, as the run's load recorded it while it held
+// saved's syntax (load.Bodiless), for the entry written of saved.
+func (session *CacheSession) withBodiless(saved *packages.Package, demanded entryDemand) entryDemand {
+	demanded.bodiless, demanded.bodiesRecorded = session.bodiless.Of(saved)
+	return demanded
 }
 
 // demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are every answer of its

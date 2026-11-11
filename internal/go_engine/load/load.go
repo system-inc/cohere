@@ -76,6 +76,10 @@ type Loaded struct {
 	// findings cache saves; a package it restored has what it had when it was checked.
 	Withheld map[*packages.Package]PackageWithheld
 
+	// Bodiless is what each package the load checked from source declares without a body, for the findings cache
+	// to keep with each package it saves (see Bodiless).
+	Bodiless *Bodiless
+
 	// ListingKept is set when go list's answer was the one kept from an earlier run, since nothing it reads had moved
 	// (see cachedList).
 	ListingKept bool
@@ -414,7 +418,7 @@ func fromSource(
 		for _, current := range reachable {
 			nodes[current.loaded] = current
 		}
-		caching.Begin(&Overlap{Packages: analyzedPackages, Reads: typeChecker.reads,
+		caching.Begin(&Overlap{Packages: analyzedPackages, Reads: typeChecker.reads, Bodiless: typeChecker.bodiless,
 			WalkSlots: &WalkSlots{slots: typeChecker.slots}, nodes: nodes, ended: ended})
 	}
 	typeChecker.load(reachable)
@@ -459,6 +463,7 @@ func fromSource(
 		WithheldInDependencyCgo:           withheld.sorted(),
 		WithheldDependencyCgoDeclarations: len(distinct),
 		Withheld:                          byPackage,
+		Bodiless:                          typeChecker.bodiless,
 		FilesParsed:                       int(typeChecker.filesParsed.Load()),
 		PackagesFromExportData:            int(typeChecker.fromExportData.Load()),
 		Reads:                             typeChecker.reads,

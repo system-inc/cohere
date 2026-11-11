@@ -55,7 +55,7 @@ func (engine *pipeline) beginSpeculativeLint(overlap *load.Overlap) {
 		defer func() { speculation.panicked = recover() }()
 		speculation.pass = engine.lintPackages(overlap.Packages,
 			check.Options{Ready: overlap.Ready, Abandon: speculation.abandon, Reads: overlap.Reads,
-				WalkSlots: overlap.WalkSlots})
+				Bodiless: overlap.Bodiless, WalkSlots: overlap.WalkSlots})
 	}()
 }
 

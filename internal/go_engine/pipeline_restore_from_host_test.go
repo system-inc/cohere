@@ -105,6 +105,50 @@ func TestTheMergeIsTheSameWhetherTheBuildsRestoreFromTheHostOrNot(test *testing.
 	}
 }
 
+// The restore-bodiless fixture's package declaring a function without a body, which every build declares alike.
+const restoreIntrinsic = "example.com/restorebodiless/intrinsic"
+
+// An extra build answers a question of a function declared without a body, in a package it restored from the host's
+// run, from the function's types, since the host recorded which of the package's functions have no body, where it
+// once loaded the build again to tell such a function from one whose body it never loaded (#b2t9xmf). Only windows
+// compiles caller's call of doubled, whose purity discarded_pure_call asks, and judging doubled asks whether
+// intrinsic.Raw, which has no body, is pure: the host never asked of Raw, and windows restores intrinsic from it and is
+// loaded once, and the merge is the one a run checking every package itself writes. Without the record, windows loads
+// again for Raw, one round. With the findings cache on, the host's entry holds intrinsic computed whole, which answers
+// Raw with no record, and the run must still merge alike.
+func TestAnExtraBuildAnswersABodilessFunctionWithoutLoadingAgain(test *testing.T) {
+	test.Parallel()
+
+	fixture := filepath.Join("testdata", "restore-bodiless")
+	offRoot := copyFixture(test, fixture)
+	_, offRaw := runOverConfigured(test, offRoot, exitClean,
+		func(engine *pipeline) { engine.keepsHostRestoreOff = true }, "--other-builds", "--no-cache")
+	off := normalize(offRaw, offRoot)
+	for name, run := range map[string]func() (*pipeline, string){
+		"without the findings cache": func() (*pipeline, string) {
+			return runOver(test, copyFixture(test, fixture), exitClean, "--other-builds")
+		},
+		"with the findings cache": func() (*pipeline, string) {
+			return runOverWith(test, copyFixture(test, fixture), exitClean, "--other-builds")
+		},
+	} {
+		engine, on := run()
+		windows := windowsRun(test, engine)
+		if !slices.Contains(windows.result.FromHost.Restored, restoreIntrinsic) {
+			test.Errorf("%s, windows restored %q from the host, want %s among them", name,
+				windows.result.FromHost.Restored, restoreIntrinsic)
+		}
+		if rounds := windows.result.Cache; rounds.ReloadRounds != 0 {
+			test.Errorf("%s, windows was loaded again %d times, by %v, want never", name, rounds.ReloadRounds,
+				rounds.ReloadRoundsBy)
+		}
+		if withoutCache(on) != withoutCache(off) {
+			test.Errorf("%s, answering Raw from its types changed the stream:\nrestoring\n%s\nchecking every "+
+				"package\n%s", name, on, off)
+		}
+	}
+}
+
 // Each build says where its time went: over the restore fixture, the host's load, lint and keeping its packages for
 // the others, and windows' load, lint and deciding which packages restore, each measured, and each written into the
 // build's record as its milliseconds.
