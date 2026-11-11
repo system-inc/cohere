@@ -95,6 +95,11 @@ type CacheCounts struct {
 	// Written is the misses whose entry was written.
 	Written int
 
+	// WrittenThrough is, in an extra build, the packages restored from the host's run whose entry the build wrote
+	// under its own key once their restore had settled (writeThrough), so its next run hits them in its own store.
+	// They are hits, never misses, so Written leaves them out.
+	WrittenThrough int
+
 	// Unstorable is the misses an entry cannot hold, a fact gob refuses or types export data cannot carry, which
 	// therefore got no entry.
 	Unstorable int
@@ -655,9 +660,8 @@ func (session *CacheSession) save(
 		}
 	}
 	session.saveMisses([]*checker.Graph{graph}, missed, withheld, files)
-	// A package restored from the host's run is neither a hit of the build's store nor a miss, and gets no entry here:
-	// the host's entry is not provably the one this build would write, since its output digest and second key are
-	// of the host's types, so restoring a warm build from them is the next unit's (#b2t9xmf).
+	// A package restored from the host's run is neither a hit of the build's store nor a miss: saveMisses wrote its
+	// entry through to the build's store once its restore settled, and WrittenThrough counts it there.
 	hostRestored := 0
 	if session.host != nil {
 		hostRestored = len(session.host.restoring)
@@ -754,6 +758,9 @@ func (session *CacheSession) saveMisses(
 		}()
 	}
 	group.Wait()
+	// The packages restored from the host's run that have settled are written beside the misses, by the same rule of
+	// what is settled below them, and given an alias under their second key with them.
+	throughPositionDependent := session.writeThrough(actionsOf, unsettled, knownFiles)
 	clear(session.closures)
 	aliases := map[cache.Key]cache.Key{}
 	for _, saved := range written {
@@ -762,6 +769,14 @@ func (session *CacheSession) saveMisses(
 		}
 		if second, known := session.secondKey(saved); known {
 			aliases[second] = session.keys[saved]
+		}
+	}
+	for through, dependent := range throughPositionDependent {
+		if dependent {
+			continue
+		}
+		if second, known := session.secondKey(through); known {
+			aliases[second] = session.keys[through]
 		}
 	}
 	session.alias(aliases)

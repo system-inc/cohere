@@ -99,6 +99,12 @@ type BuildRecord struct {
 	ReloadRounds     int            `json:"reloadRounds,omitempty"`
 	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
 
+	// WrittenThrough counts the packages an extra build restored from the host's run whose entry it wrote under its
+	// own key once their restore held, with a findings cache to write to, so its next run hits them in its own store
+	// rather than check them from source: the host, hitting its own store, keeps nothing to restore them from then.
+	// Written only when not 0, so a run under `--no-cache` writes none.
+	WrittenThrough int `json:"writtenThrough,omitempty"`
+
 	// LoadMilliseconds is the build's wall time loading the workspace and LintMilliseconds running the rules over it,
 	// every reload's included, so a run can be read build by build. DecideMilliseconds is the time an extra build spent
 	// deciding which packages restore from the host's run, summed across the goroutines that decided, so it can exceed
