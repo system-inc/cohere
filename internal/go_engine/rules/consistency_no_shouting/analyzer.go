@@ -59,10 +59,6 @@ var (
 	// exampleOutput is go/doc's test for the comment that holds an example's expected output, which is whatever
 	// the example prints, capitals and all.
 	exampleOutput = regexp.MustCompile(`(?i)^[[:space:]]*(unordered )?output:`)
-
-	// generatedMarker is the line go.dev/s/generatedcode says marks a file as generated, spelled exactly so tools
-	// can find it. Its capitals are the convention's, which no writer can lower, so it is notation.
-	generatedMarker = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)
 )
 
 func run(pass *analysis.Pass) (any, error) {
@@ -81,14 +77,15 @@ func run(pass *analysis.Pass) (any, error) {
 
 // generatedMarkerOf is the first comment before file's package clause that is the generated-code marker, where
 // go/ast.IsGenerated looks for it, or nil when file has none. The convention counts the line only there, so the same
-// words after the package clause are a comment like any other and are read.
+// words after the package clause are a comment like any other and are read. What the marker is, its capitals the
+// convention's and no writer's, is shouting.IsGeneratedMarker's one judgment, which the TypeScript rule reads too.
 func generatedMarkerOf(file *ast.File) *ast.Comment {
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
 			if comment.Pos() > file.Package {
 				return nil
 			}
-			if generatedMarker.MatchString(comment.Text) {
+			if shouting.IsGeneratedMarker(comment.Text) {
 				return comment
 			}
 		}

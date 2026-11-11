@@ -426,23 +426,6 @@ func isCommandShaped(word string) bool {
 		uppercaseToken.FindString(word) == word
 }
 
-// TokensInMasked returns the distinct shouted tokens in text MaskCodeAndCommands has already masked, in first-seen
-// order, which is the order a reader looking for what to fix scans a comment in. It is for a caller that masks a
-// wider text than the one it reports on: an engine masks a whole run of comments, so a fence or a wrapped quote
-// spanning its lines is seen, then reads each comment's slice of the result.
-func TokensInMasked(masked string) []string {
-	var tokens []string
-	seen := map[string]bool{}
-	for _, shouted := range ShoutedTokensInMasked(masked) {
-		if seen[shouted.Text] {
-			continue
-		}
-		seen[shouted.Text] = true
-		tokens = append(tokens, shouted.Text)
-	}
-	return tokens
-}
-
 // ShoutedToken is one shouted word in a masked text, and the byte offset it starts at.
 type ShoutedToken struct {
 	Text   string

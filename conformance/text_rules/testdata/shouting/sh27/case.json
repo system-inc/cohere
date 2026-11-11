@@ -1,0 +1,15 @@
+{
+    "why": "sh27: a blank line between two // comments ends the run, so a backtick left open in the first never pairs with one in the second, and the word between them is read",
+    "expect": [
+        {
+            "covers": "KEEP",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}
