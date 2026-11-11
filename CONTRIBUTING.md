@@ -82,6 +82,14 @@ arrival order and names who holds them; `cohere-dev status` shows the pool and t
 110 to 180, made a 27s gate take 7 to 10 minutes, and failed tests on their deadlines. Inside a token's run
 nothing more is held back: its packages and `t.Parallel` tests use the whole share.
 
+A mutant or probe in code that starts processes runs bounded: `cohere-dev test --bounded <package>`, or
+`cohere-dev exec --bounded -- <command>` (#fp1td9e). The run may start 512 processes beyond the account's
+count when it begins (`--bounded-margin`), and its whole process group is stopped after 15 minutes
+(`--bounded-deadline`) and whenever its command ends. A review mutant with a guard removed forked its own
+binary about 7,700 times on 2026-11-10 and filled the machine's process table (#excff9x). A fixed `ulimit -u`
+is the wrong recipe: the kernel counts every process the account owns, about 900 on Kirk's Mac, so a limit
+of 512 refuses every fork.
+
 Work lands on main through `go run ./command/cohere-dev land`, run in the worktree being landed, with
 its work committed (#fz6xejy). It takes the machine's one land lock in arrival order and holds it from
 merge to fast-forward. It makes one merge commit of the worktree's head onto current main, first parent

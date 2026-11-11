@@ -390,6 +390,12 @@
         "reason": "`Process.run()` throws, so a launch failure must be handled at the call."
     },
     {
+        "typeScriptRule": "nexus/correctness-require-drained-child-output",
+        "verdict": "Port",
+        "swiftRule": null,
+        "reason": "The Swift port, cohere-swift/correctness-require-drained-child-output, is built on #a2bx2fx and lands once the three true findings its census found in ahraos-presence are fixed."
+    },
+    {
         "typeScriptRule": "nexus/correctness-require-response-status-check",
         "verdict": "Ported",
         "swiftRule": "cohere-swift/correctness-require-response-status-check",
