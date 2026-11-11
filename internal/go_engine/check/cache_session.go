@@ -163,7 +163,7 @@ type CacheSession struct {
 	attempted map[*packages.Package]bool
 
 	// knownFiles is every file of every package the load reached, for positionDependent, made once.
-	knownFiles map[string]bool
+	knownFiles *knownFiles
 
 	// given is the packages to analyze, as the load named them.
 	given map[*packages.Package]bool
@@ -785,18 +785,13 @@ func (session *CacheSession) alias(aliases map[cache.Key]cache.Key) {
 }
 
 // allFiles is every file of every package the load reached, made on first use.
-func (session *CacheSession) allFiles() map[string]bool {
+func (session *CacheSession) allFiles() *knownFiles {
 	if session.knownFiles != nil {
 		return session.knownFiles
 	}
-	session.knownFiles = map[string]bool{}
+	session.knownFiles = newKnownFiles()
 	for keyed := range session.keys {
-		for _, files := range [][]string{keyed.GoFiles, keyed.CompiledGoFiles, keyed.OtherFiles, keyed.EmbedFiles,
-			keyed.IgnoredFiles} {
-			for _, file := range files {
-				session.knownFiles[file] = true
-			}
-		}
+		session.knownFiles.addPackage(keyed)
 	}
 	return session.knownFiles
 }

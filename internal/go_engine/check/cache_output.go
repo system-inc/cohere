@@ -84,11 +84,11 @@ func compareFactDigests(left factDigest, right factDigest) int {
 // positionDependent reports whether a finding of saved can change with a line of another package, by naming a file of
 // it (see namesForeignFile). Such a package is analyzed again whenever anything below it changes, as without the early
 // cutoff, since its importers' outputs say nothing about where their declarations are.
-func positionDependent(saved *packages.Package, analyses map[string]storedAnalysis, knownFiles map[string]bool) bool {
+func positionDependent(saved *packages.Package, analyses map[string]storedAnalysis, known *knownFiles) bool {
 	own := ownFiles(saved)
 	for _, stored := range analyses {
 		for _, finding := range stored.Findings {
-			if namesForeignFile(finding, own, knownFiles) {
+			if namesForeignFile(finding, own, known) {
 				return true
 			}
 		}
@@ -108,13 +108,34 @@ func ownFiles(owner *packages.Package) map[string]bool {
 	return own
 }
 
+// knownFiles are every file of a load by path, and every base name among them, so a word of a finding's message whose
+// base name no file has is passed over before it is made a path (namedFiles), which most words are.
+type knownFiles struct {
+	paths     map[string]bool
+	baseNames map[string]bool
+}
+
+// newKnownFiles is an empty set of a load's files.
+func newKnownFiles() *knownFiles {
+	return &knownFiles{paths: map[string]bool{}, baseNames: map[string]bool{}}
+}
+
+// addPackage adds every file of owner's, of each kind the load lists (ownFiles), by path and by base name.
+//
+// Mutates: known gains owner's files
+func (known *knownFiles) addPackage(owner *packages.Package) {
+	for file := range ownFiles(owner) {
+		known.paths[file] = true
+		known.baseNames[filepath.Base(file)] = true
+	}
+}
+
 // namesForeignFile reports whether finding names a file that is not one of own, its package's: its message names a
-// file of knownFiles, those the load holds, by its absolute path or by its path relative to the finding's own
-// directory, as structtag writes it, a trailing `:line` or `:line:column` aside; or one of its fixes edits any file
-// not of own.
-func namesForeignFile(finding Finding, own map[string]bool, knownFiles map[string]bool) bool {
-	for _, named := range namedFiles(finding) {
-		if knownFiles[named] && !own[named] {
+// file of known, those the load holds, by its absolute path or by its path relative to the finding's own directory, as
+// structtag writes it, a trailing `:line` or `:line:column` aside; or one of its fixes edits any file not of own.
+func namesForeignFile(finding Finding, own map[string]bool, known *knownFiles) bool {
+	for _, named := range namedFiles(finding, known.baseNames) {
+		if known.paths[named] && !own[named] {
 			return true
 		}
 	}
@@ -128,9 +149,12 @@ func namesForeignFile(finding Finding, own map[string]bool, knownFiles map[strin
 	return false
 }
 
-// namedFiles are the paths a finding's message may name, each word of it with a trailing `:line` or `:line:column`
-// taken off, made absolute against the directory of the finding's file when it is relative.
-func namedFiles(finding Finding) []string {
+// namedFiles are the paths a finding's message may name of files whose base names are among baseNames, each word of it
+// with a trailing `:line` or `:line:column` taken off, made absolute against the directory of the finding's file when
+// it is relative. A word whose base name no file has is passed over unjoined: cleaning a path keeps its last element,
+// so its path could name no file, except when that element is `.` or `..`, which cleaning folds into the elements
+// before it, and such a word is always made a path.
+func namedFiles(finding Finding, baseNames map[string]bool) []string {
 	words := strings.FieldsFunc(finding.Message, func(character rune) bool {
 		return unicode.IsSpace(character) || strings.ContainsRune("\"'`()[]{},;", character)
 	})
@@ -148,6 +172,9 @@ func namedFiles(finding Finding) []string {
 			word = word[:index]
 		}
 		if word == "" {
+			continue
+		}
+		if base := filepath.Base(word); base != "." && base != ".." && !baseNames[base] {
 			continue
 		}
 		if !filepath.IsAbs(word) {

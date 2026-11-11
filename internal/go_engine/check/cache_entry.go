@@ -180,7 +180,7 @@ func factTypeName(factType reflect.Type) string {
 // encodeEntry is the entry of one package that missed, from every action on it, each of which finished without an
 // error, its types, what the load withheld of it, the answers of the fact kinds computed on demand in it and those its
 // analysis read of other packages (demanded), and, for a package Analyze was given, its files' walk, with its
-// export data beside it, its output digest, and whether a finding of it names a file outside it, among knownFiles,
+// export data beside it, its output digest, and whether a finding of it names a file outside it, among loadFiles,
 // every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact the package exported, or
 // factValueDigest cannot read one, or its types cannot be written as export data.
 func encodeEntry(
@@ -191,7 +191,7 @@ func encodeEntry(
 	withheld load.PackageWithheld,
 	demanded entryDemand,
 	files []storedFile,
-	knownFiles map[string]bool,
+	loadFiles *knownFiles,
 ) (encodedEntry, error) {
 	entry := cacheEntry{
 		Version:         CacheFormatVersion,
@@ -274,7 +274,7 @@ func encodeEntry(
 		encoded.output, encoded.hasOutput = outputDigest(exportDigest(saved.Types), digested), true
 		entry.Output = encoded.output[:]
 	}
-	encoded.positionDependent = positionDependent(saved, entry.Analyzers, knownFiles)
+	encoded.positionDependent = positionDependent(saved, entry.Analyzers, loadFiles)
 	var entryBytes bytes.Buffer
 	if gobError := gob.NewEncoder(&entryBytes).Encode(entry); gobError != nil {
 		return encodedEntry{}, fmt.Errorf("encoding the entry: %w: %w", errorUnstorable, gobError)

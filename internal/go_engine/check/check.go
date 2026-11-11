@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
-	"maps"
 	"runtime"
 	"slices"
 	"strings"
@@ -392,13 +391,13 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 	files := analyzedFiles(analyzed, session, record)
 	generated, copies := withheldFiles(files)
-	// knownFiles is every file of the load, which a finding's message is read for (see namesForeignFile), made only
+	// known is every file of the load, which a finding's message is read for (see namesForeignFile), made only
 	// once a package whose reads are recorded has a finding.
-	var loadedFiles map[string]bool
-	knownFiles := func() map[string]bool {
+	var loadedFiles *knownFiles
+	known := func() *knownFiles {
 		if loadedFiles == nil {
-			loadedFiles = map[string]bool{}
-			packages.Visit(analyzed, nil, func(visited *packages.Package) { maps.Copy(loadedFiles, ownFiles(visited)) })
+			loadedFiles = newKnownFiles()
+			packages.Visit(analyzed, nil, loadedFiles.addPackage)
 		}
 		return loadedFiles
 	}
@@ -430,7 +429,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 				found = actionFindings(analyzerRule, action)
 			}
 			if reads := options.Reads[analyzedPackage]; reads != nil && len(found) > 0 {
-				markForeignFindings(reads, analyzedPackage, found, knownFiles)
+				markForeignFindings(reads, analyzedPackage, found, known)
 			}
 			for _, finding := range found {
 				key := findingKey{finding.Rule, finding.File, finding.Line, finding.Column, finding.Message}
@@ -550,19 +549,19 @@ func recordUnreachedTypes(
 
 // markForeignFindings marks reads never when a finding of analyzedPackage names a file that is not the package's own:
 // the file it is in, a file its message names or one its fix edits (see namesForeignFile). Such a finding can change
-// with a line of another package, which no read records. knownFiles gives every file of the load.
+// with a line of another package, which no read records. known gives every file of the load.
 func markForeignFindings(
 	reads *build_reads.Reads,
 	analyzedPackage *packages.Package,
 	found []Finding,
-	knownFiles func() map[string]bool,
+	known func() *knownFiles,
 ) {
 	if reads.Never() != "" {
 		return
 	}
 	own := ownFiles(analyzedPackage)
 	for _, finding := range found {
-		if !own[finding.File] || namesForeignFile(finding, own, knownFiles()) {
+		if !own[finding.File] || namesForeignFile(finding, own, known()) {
 			reads.MarkNever(fmt.Sprintf("a finding of %s names a file of another package", finding.Rule))
 			return
 		}
