@@ -235,12 +235,12 @@ func TestTheClosureDigestFollowsUnexportedFieldsAndNothingElseMoves(test *testin
 	}
 	if handleOf(first) != handleOf(again) {
 		test.Errorf("two checks of darwin digest Handle apart:\n%s\n\n%s",
-			strings.Join(closureRendering(first.platform.Scope().Lookup("Handle")), "\n"),
-			strings.Join(closureRendering(again.platform.Scope().Lookup("Handle")), "\n"))
+			strings.Join(closureRendering(first.platform.Scope().Lookup("Handle"), nil), "\n"),
+			strings.Join(closureRendering(again.platform.Scope().Lookup("Handle"), nil), "\n"))
 	}
 	if handleOf(first) == handleOf(linux) {
 		test.Errorf("darwin and linux digest Handle alike, though state's descriptor differs:\n%s",
-			strings.Join(closureRendering(first.platform.Scope().Lookup("Handle")), "\n"))
+			strings.Join(closureRendering(first.platform.Scope().Lookup("Handle"), nil), "\n"))
 	}
 }
 

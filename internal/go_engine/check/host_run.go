@@ -2,6 +2,7 @@ package check
 
 import (
 	"slices"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 
@@ -35,12 +36,14 @@ type hostEntry struct {
 	contents  func() (entry []byte, exportData []byte, readError error)
 }
 
-// restoringOf is kept, a package of the host's run, as a verdict judges it: its path, its imports' paths and its reads.
+// restoringOf is kept, a package of the host's run, as a verdict judges it: its path, its imports' paths, its reads,
+// and whether it has assembly files, as asmdecl finds them among its other files.
 func restoringOf(kept *packages.Package, reads *build_reads.Reads) Restoring {
 	imports := make([]string, 0, len(kept.Imports))
 	for _, imported := range kept.Imports {
 		imports = append(imports, imported.PkgPath)
 	}
 	slices.Sort(imports)
-	return Restoring{Path: kept.PkgPath, Imports: imports, Reads: reads}
+	assembly := slices.ContainsFunc(kept.OtherFiles, func(file string) bool { return strings.HasSuffix(file, ".s") })
+	return Restoring{Path: kept.PkgPath, Imports: imports, Reads: reads, Assembly: assembly}
 }

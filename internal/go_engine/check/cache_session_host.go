@@ -185,6 +185,9 @@ func (session *CacheSession) typesHoldFunction(
 	hosted *hostRestore,
 ) func(map[string]*types.Package) bool {
 	return func(closure map[string]*types.Package) bool {
+		// The load set the package's sizes, the build's, before deciding any package, so the first verdict tells
+		// the memo its build before it renders anything.
+		session.host.renderings.measureBy(candidate.TypesSizes)
 		holds, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
 			session.host.host.renderings, session.host.renderings)
 		if !holds {
@@ -433,6 +436,13 @@ func (session *CacheSession) keepForBuilds(
 		}
 	}
 	host := &HostRun{entries: map[string]*hostEntry{}, renderings: NewReadsBuild(), files: keyed.Files}
+	// Every package of one load has the load's sizes, the host's build's.
+	for keyedPackage := range keyed.Keys {
+		if keyedPackage.TypesSizes != nil {
+			host.renderings.measureBy(keyedPackage.TypesSizes)
+			break
+		}
+	}
 	var encoding []*packages.Package
 	for keptPackage := range keyed.Portable {
 		packageReads := reads[keptPackage]

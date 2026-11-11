@@ -5,6 +5,7 @@ import (
 	"go/types"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
@@ -26,6 +27,12 @@ type typeGraph struct {
 	// unexportedInterfaces are whether each package declares an interface with an unexported method of its own
 	// (declaresUnexportedInterface), memoized, which decides whether an importer sees its unexported methods.
 	unexportedInterfaces map[*types.Package]bool
+
+	// sizes are the build's, which the properties of another package's unexported field are computed under
+	// (directTypeNames), nil until the build is known, when every field is entered (measureBy), and walked whether
+	// any walk has run, after which they are never set, so no two renderings of one graph differ in kind.
+	sizes  types.Sizes
+	walked bool
 
 	// rendered, nil outside tests, is told of each type name as it is rendered, so a test can count the renderings.
 	rendered func(*types.TypeName)
@@ -63,18 +70,32 @@ func (graph *typeGraph) importerSees(method *types.Func) bool {
 func (graph *typeGraph) closureDigest(object types.Object) cache.Key {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
+	graph.walked = true
 	var components []cache.Key
-	for _, root := range directTypeNames(rootTypes(object)) {
+	step := directTypeNames(rootTypes(object), graph.sizes)
+	for _, root := range step.typeNames {
 		components = append(components, graph.digestOf(root))
 	}
-	return cache.DigestOf(digestParts([]byte(ownRendering(object)), components)...)
+	own := strings.Join(append([]string{ownRendering(object)}, step.observed...), "\n")
+	return cache.DigestOf(digestParts([]byte(own), components)...)
+}
+
+// measureBy has the graph compute the properties of another package's unexported field under sizes, the build's,
+// when no walk has run yet: a graph that walked before it knew its build keeps entering every field, which errs wide.
+func (graph *typeGraph) measureBy(sizes types.Sizes) {
+	graph.lock.Lock()
+	defer graph.lock.Unlock()
+	if !graph.walked {
+		graph.sizes = sizes
+	}
 }
 
 // reachable are the type names roots name and every type name those reach, each once.
 func (graph *typeGraph) reachable(roots []types.Type) []*types.TypeName {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
-	pending := directTypeNames(roots)
+	graph.walked = true
+	pending := directTypeNames(roots, graph.sizes).typeNames
 	seen := map[*types.TypeName]bool{}
 	var reached []*types.TypeName
 	for len(pending) > 0 {
@@ -98,10 +119,11 @@ func (graph *typeGraph) nodeOf(typeName *types.TypeName) *typeNode {
 	if graph.rendered != nil {
 		graph.rendered(typeName)
 	}
+	step := directTypeNames(declarationTypes(typeName, graph.importerSees), graph.sizes)
 	node := &typeNode{
 		typeName: typeName,
-		lines:    renderedTypeName(typeName, graph.importerSees),
-		edges:    directTypeNames(declarationTypes(typeName, graph.importerSees)),
+		lines:    append(renderedTypeName(typeName, graph.importerSees), step.observed...),
+		edges:    step.typeNames,
 	}
 	graph.nodes[typeName] = node
 	return node

@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
+
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates/verbs"
 )
 
 // printVerb is a verb printf knows, the flags it takes and the kinds of operand it accepts.
@@ -18,7 +20,7 @@ type printVerb struct {
 	// flags are all ASCII.
 	flags string
 
-	accepted argumentType
+	accepted verbs.Kinds
 }
 
 // The common flag sets of printf's verbs.
@@ -30,35 +32,35 @@ const (
 )
 
 // hexadecimalArguments are what %x and %X accept.
-const hexadecimalArguments = argumentRune | argumentInt | argumentString | argumentPointer | argumentFloat |
-	argumentComplex
+const hexadecimalArguments = verbs.Rune | verbs.Int | verbs.String | verbs.Pointer | verbs.Float |
+	verbs.Complex
 
 // printVerbs are the verbs printf knows. A `-` is a width modifier, always valid; a `.` is a float's precision and a
 // string's maximum width; a `+` is a number's sign and Go syntax for %v; a `#` is an alternate format for several
 // verbs; a space pads numbers.
 var printVerbs = []printVerb{
 	{'%', noFlag, 0},
-	{'b', sharpNumberFlags, argumentInt | argumentFloat | argumentComplex | argumentPointer},
-	{'c', "-", argumentRune | argumentInt},
+	{'b', sharpNumberFlags, verbs.Int | verbs.Float | verbs.Complex | verbs.Pointer},
+	{'c', "-", verbs.Rune | verbs.Int},
 	// Code of go1.27 or later takes no pointer with %d (checkOperation).
-	{'d', numberFlags, argumentInt | argumentPointer},
-	{'e', sharpNumberFlags, argumentFloat | argumentComplex},
-	{'E', sharpNumberFlags, argumentFloat | argumentComplex},
-	{'f', sharpNumberFlags, argumentFloat | argumentComplex},
-	{'F', sharpNumberFlags, argumentFloat | argumentComplex},
-	{'g', sharpNumberFlags, argumentFloat | argumentComplex},
-	{'G', sharpNumberFlags, argumentFloat | argumentComplex},
-	{'o', sharpNumberFlags, argumentInt | argumentPointer},
-	{'O', sharpNumberFlags, argumentInt | argumentPointer},
-	{'p', "-#", argumentPointer},
+	{'d', numberFlags, verbs.Int | verbs.Pointer},
+	{'e', sharpNumberFlags, verbs.Float | verbs.Complex},
+	{'E', sharpNumberFlags, verbs.Float | verbs.Complex},
+	{'f', sharpNumberFlags, verbs.Float | verbs.Complex},
+	{'F', sharpNumberFlags, verbs.Float | verbs.Complex},
+	{'g', sharpNumberFlags, verbs.Float | verbs.Complex},
+	{'G', sharpNumberFlags, verbs.Float | verbs.Complex},
+	{'o', sharpNumberFlags, verbs.Int | verbs.Pointer},
+	{'O', sharpNumberFlags, verbs.Int | verbs.Pointer},
+	{'p', "-#", verbs.Pointer},
 	// Code of go1.26 or later takes only a byte or a rune of the integers with %q (checkOperation).
-	{'q', " -+.0#", argumentRune | argumentInt | argumentString},
-	{'s', " -+.0", argumentString},
-	{'t', "-", argumentBool},
-	{'T', "-", argumentAny},
-	{'U', "-#", argumentRune | argumentInt},
-	{'v', allFlags, argumentAny},
-	{'w', allFlags, argumentError},
+	{'q', " -+.0#", verbs.Rune | verbs.Int | verbs.String},
+	{'s', " -+.0", verbs.String},
+	{'t', "-", verbs.Bool},
+	{'T', "-", verbs.Any},
+	{'U', "-#", verbs.Rune | verbs.Int},
+	{'v', allFlags, verbs.Any},
+	{'w', allFlags, verbs.Error},
 	{'x', sharpNumberFlags, hexadecimalArguments},
 	{'X', sharpNumberFlags, hexadecimalArguments},
 }

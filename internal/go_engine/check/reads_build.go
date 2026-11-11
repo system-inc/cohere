@@ -43,6 +43,10 @@ type ReadsBuild struct {
 	methodIndex map[string][]packageMethods
 	indexed     map[*types.Package]bool
 
+	// whole is the memo's twin told no build, which renders every field of every type whole, for a package with
+	// assembly files (Restoring.Assembly), made the first time one is judged (wholeTwin).
+	whole *ReadsBuild
+
 	// walking and indexing, nil outside tests, are told of each root as its closure is walked and of each package as
 	// it is indexed, so a test can count them.
 	walking  func(*types.Package)
@@ -70,6 +74,24 @@ func NewReadsBuild() *ReadsBuild {
 		closures:    map[*types.Package][]*types.Package{},
 		methodIndex: map[string][]packageMethods{},
 		indexed:     map[*types.Package]bool{},
+	}
+}
+
+// wholeTwin is the memo's twin told no build, which renders every field whole, made once.
+func (build *ReadsBuild) wholeTwin() *ReadsBuild {
+	build.lock.Lock()
+	defer build.lock.Unlock()
+	if build.whole == nil {
+		build.whole = NewReadsBuild()
+	}
+	return build.whole
+}
+
+// measureBy has the memo render another package's unexported field by its properties under sizes, the build's
+// (typeGraph.measureBy), asked before the build's first verdict; a memo never told renders every field whole.
+func (build *ReadsBuild) measureBy(sizes types.Sizes) {
+	if sizes != nil {
+		build.graph.measureBy(sizes)
 	}
 }
 
@@ -190,6 +212,11 @@ type Restoring struct {
 
 	// Reads are its reads on the host's run.
 	Reads *build_reads.Reads
+
+	// Assembly is whether it has assembly files, whose frames vet's asmdecl lays out field by field: the name, offset,
+	// size and kind of every field of each argument's type, another package's unexported ones too, which no property
+	// stands for. Its types' reads are judged by every type they reach rendered whole, every field's type entered.
+	Assembly bool
 }
 
 // deprecatedFactType is the deprecated analyzer's fact, which its result gathers for SA1019 from every fact of the
@@ -203,6 +230,9 @@ var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 // unknown for reads that cannot hold at all. It is the load's half of the verdict, decided once the package's imports
 // are done in build and before anything of the package is read there (load.Restored.Holds); FactsHold is check's. A
 // package whose own inputs are the host's and whose reads hold may take the host's results in build (#b2t9xmf).
+//
+// A package with assembly files is judged by the memos' whole twins (Restoring.Assembly), never by another package's
+// unexported field rendered by its properties.
 //
 // Every read fails closed: an object with no objectpath, a package the build lacks, and a lookup of a kind it does not
 // know each fail it.
@@ -219,7 +249,11 @@ func TypesHold(
 		}
 		return false, "unknown: " + why
 	}
-	judged := verdict{host: host, build: build, closure: closure, restored: restored,
+	judgedHost, judgedBuild := host, build
+	if restoring.Assembly {
+		judgedHost, judgedBuild = host.wholeTwin(), build.wholeTwin()
+	}
+	judged := verdict{host: judgedHost, build: judgedBuild, closure: closure, restored: restored,
 		methods: &verdictClosures{host: map[*types.Package]*gatheredClosure{}}}
 	for _, object := range restoring.Reads.Objects() {
 		if holds, why := judged.objectHolds(object); !holds {

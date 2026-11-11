@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )
 
 // callees is what judging a function's body asks of each function it calls statically: whether that one is pure.
@@ -29,7 +30,7 @@ func judge(asking callees, function *intermediate_representation.Function, decla
 		return false
 	}
 	for _, parameter := range function.Parameters {
-		if !isBasic(parameter.Type()) {
+		if !type_predicates.OnlyBasicValues(parameter.Type()) {
 			return false
 		}
 	}
@@ -95,24 +96,6 @@ func allowsCall(
 		return false
 	}
 	return asking.isPure(callee)
-}
-
-// isBasic is whether a value of valueType holds only basic values: a basic type, or a struct whose fields are all
-// basic.
-func isBasic(valueType types.Type) bool {
-	switch underlying := valueType.Underlying().(type) {
-	case *types.Basic:
-		return true
-	case *types.Struct:
-		for field := range underlying.Fields() {
-			if !isBasic(field.Type()) {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
-	}
 }
 
 // isStackAddress is whether value is the address of a variable on the function's own stack, or of a field of one.

@@ -1,4 +1,4 @@
-package copy_lock
+package locks
 
 import "go/types"
 

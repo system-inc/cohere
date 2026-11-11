@@ -1,12 +1,15 @@
 package check
 
 import (
+	"fmt"
 	"go/constant"
 	"go/token"
 	"go/types"
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )
 
 // constantPrecision is the bits of mantissa a float constant keeps in export data, as the compiler keeps it
@@ -96,15 +99,29 @@ func rootTypes(object types.Object) []types.Type {
 	return roots
 }
 
-// directTypeNames are the named types and aliases roots name, each once, in the order a walk meets them: through
-// pointers, slices, arrays, maps, channels, signatures (type parameters and their constraints, parameters, results),
-// struct fields, unexported ones too, interface methods and embedded types, union terms and instance type arguments.
-// The walk stops at each named type and alias, whose declaration is a node of its own (declarationTypes), so a closure
-// is the named types these reach, and what their declarations reach in turn. A type of no package is left out: the
-// universe's are the same in every build.
-func directTypeNames(roots []types.Type) []*types.TypeName {
+// closureStep is what one step of a closure walk finds in some types before it stops at each named type: the type
+// names they name (directTypeNames), and a line for each field whose type the walk does not enter, rendered by what
+// an importer can observe of it (type_predicates.Observe).
+type closureStep struct {
+	typeNames []*types.TypeName
+	observed  []string
+}
+
+// directTypeNames is the step of a closure walk from roots: the named types and aliases they name, each once, in the
+// order a walk meets them, through pointers, slices, arrays, maps, channels, signatures (type parameters and their
+// constraints, parameters, results), struct fields, interface methods and embedded types, union terms and instance
+// type arguments. The walk stops at each named type and alias, whose declaration is a node of its own
+// (declarationTypes), so a closure is the named types these reach, and what their declarations reach in turn. A type
+// of no package is left out: the universe's are the same in every build.
+//
+// With sizes, the build's, a field type.ObservedOnly is not entered: an unexported, non-embedded field of a struct,
+// each of which here is another package's than the one whose reads are judged, since that package's own types are
+// never a read. Its line is its position, name and type as written, and every property a rule can read of it,
+// computed in this build (type_predicates.Observe). Without sizes, as a memo told no build, every field is entered.
+func directTypeNames(roots []types.Type, sizes types.Sizes) closureStep {
 	seen := map[*types.TypeName]bool{}
-	var reached []*types.TypeName
+	var step closureStep
+	structs := 0
 	var walk func(walked types.Type)
 	walkParameters := func(parameters *types.TypeParamList) {
 		for parameter := range parameters.TypeParams() {
@@ -122,7 +139,7 @@ func directTypeNames(roots []types.Type) []*types.TypeName {
 	reach := func(typeName *types.TypeName) {
 		if typeName.Pkg() != nil && !seen[typeName] {
 			seen[typeName] = true
-			reached = append(reached, typeName)
+			step.typeNames = append(step.typeNames, typeName)
 		}
 	}
 	walk = func(walked types.Type) {
@@ -155,8 +172,21 @@ func directTypeNames(roots []types.Type) []*types.TypeName {
 				walk(variable.Type())
 			}
 		case *types.Struct:
-			for field := range composite.Fields() {
-				walk(field.Type())
+			structs++
+			for index := range composite.NumFields() {
+				field := composite.Field(index)
+				if sizes == nil || !type_predicates.ObservedOnly(field) {
+					walk(field.Type())
+					continue
+				}
+				// No edge into the named types the field's type names, and its type as written is no identity:
+				// internal/poll.FD writes the same on every target while its shape differs. That is safe only because
+				// no importer can declare a struct holding another package's unexported field, so a conversion's check
+				// of two struct types' identity never meets two copies of this field built apart; the importer reaches
+				// the field's type through a walk of the struct alone, whose every answer is rendered here. Adding the
+				// edge back to be safe would only check every importer of a type such as os.File again in each build.
+				step.observed = append(step.observed, fmt.Sprintf("observed field %d.%d %s %s: %s", structs, index,
+					field.Name(), writtenType(field.Type()), type_predicates.Observe(field.Type(), sizes)))
 			}
 		case *types.Interface:
 			for method := range composite.ExplicitMethods() {
@@ -177,7 +207,7 @@ func directTypeNames(roots []types.Type) []*types.TypeName {
 	for _, root := range roots {
 		walk(root)
 	}
-	return reached
+	return step
 }
 
 // declarationTypes are the types typeName's declaration names, which its rendered lines write (renderedTypeName): a

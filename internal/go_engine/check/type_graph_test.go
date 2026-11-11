@@ -18,19 +18,20 @@ import (
 // closureRendering is the closure an object's digest stands for, written out whole, the oracle the digests are held
 // to: its own line, then every named type and alias reachable from its type, each once, sorted by package path, name
 // and lines, each as its path and name and its lines (renderedTypeName), an unexported method kept only where an
-// importer sees it (oracleSees). It walks every closure from scratch, as the verdicts once did, so it is the test's
-// alone.
-func closureRendering(object types.Object) []string {
-	lines := []string{ownRendering(object)}
+// importer sees it (oracleSees), and, with sizes, another package's unexported field by its properties alone
+// (directTypeNames). It walks every closure from scratch, as the verdicts once did, so it is the test's alone.
+func closureRendering(object types.Object, sizes types.Sizes) []string {
+	lines := append([]string{ownRendering(object)}, directTypeNames(rootTypes(object), sizes).observed...)
 	type renderedName struct {
 		path  string
 		name  string
 		lines []string
 	}
 	var rendered []renderedName
-	for _, typeName := range closureTypeNames(rootTypes(object)) {
+	for _, typeName := range closureTypeNames(rootTypes(object), sizes) {
 		rendered = append(rendered, renderedName{path: typeName.Pkg().Path(), name: typeName.Name(),
-			lines: renderedTypeName(typeName, oracleSees)})
+			lines: append(renderedTypeName(typeName, oracleSees),
+				directTypeNames(declarationTypes(typeName, oracleSees), sizes).observed...)})
 	}
 	slices.SortFunc(rendered, func(left, right renderedName) int {
 		return cmp.Or(cmp.Compare(left.path, right.path), cmp.Compare(left.name, right.name),
@@ -50,10 +51,10 @@ func oracleSees(method *types.Func) bool {
 
 // closureTypeNames are the named types and aliases roots reach, walked from scratch: those roots name, and those their
 // declarations name, each once.
-func closureTypeNames(roots []types.Type) []*types.TypeName {
+func closureTypeNames(roots []types.Type, sizes types.Sizes) []*types.TypeName {
 	seen := map[*types.TypeName]bool{}
 	var reached []*types.TypeName
-	pending := directTypeNames(roots)
+	pending := directTypeNames(roots, sizes).typeNames
 	for len(pending) > 0 {
 		current := pending[len(pending)-1]
 		pending = pending[:len(pending)-1]
@@ -62,7 +63,7 @@ func closureTypeNames(roots []types.Type) []*types.TypeName {
 		}
 		seen[current] = true
 		reached = append(reached, current)
-		pending = append(pending, directTypeNames(declarationTypes(current, oracleSees))...)
+		pending = append(pending, directTypeNames(declarationTypes(current, oracleSees), sizes).typeNames...)
 	}
 	return reached
 }
@@ -133,22 +134,29 @@ func TestAClosureDigestIsEqualExactlyWhenItsWholeClosureIs(test *testing.T) {
 			checkedInMemory(test, renderingPath, "package rendered\n\n"+sources[1], nil)})
 	}
 	differing := 0
-	for _, compared := range pairs {
-		beforeBuild, afterBuild := NewReadsBuild(), NewReadsBuild()
-		before, after := comparedObjects(compared.before), comparedObjects(compared.after)
-		for _, name := range slices.Sorted(maps.Keys(before)) {
-			afterObject, inBoth := after[name]
-			if !inBoth {
-				continue
-			}
-			renderedAlike := slices.Equal(closureRendering(before[name]), closureRendering(afterObject))
-			digestedAlike := beforeBuild.closureDigest(before[name]) == afterBuild.closureDigest(afterObject)
-			if renderedAlike != digestedAlike {
-				test.Errorf("%s, %s: the closures written out are alike %t, the digests %t", compared.name, name,
-					renderedAlike, digestedAlike)
-			}
-			if !renderedAlike {
-				differing++
+	// Each pair is compared by a memo told no build, which enters every field, and by one told a build's sizes,
+	// which renders another package's unexported field by its properties.
+	for _, sizes := range []types.Sizes{nil, types.SizesFor("gc", "amd64")} {
+		for _, compared := range pairs {
+			beforeBuild, afterBuild := NewReadsBuild(), NewReadsBuild()
+			beforeBuild.measureBy(sizes)
+			afterBuild.measureBy(sizes)
+			before, after := comparedObjects(compared.before), comparedObjects(compared.after)
+			for _, name := range slices.Sorted(maps.Keys(before)) {
+				afterObject, inBoth := after[name]
+				if !inBoth {
+					continue
+				}
+				renderedAlike := slices.Equal(closureRendering(before[name], sizes),
+					closureRendering(afterObject, sizes))
+				digestedAlike := beforeBuild.closureDigest(before[name]) == afterBuild.closureDigest(afterObject)
+				if renderedAlike != digestedAlike {
+					test.Errorf("%s, %s, sized %t: the closures written out are alike %t, the digests %t",
+						compared.name, name, sizes != nil, renderedAlike, digestedAlike)
+				}
+				if !renderedAlike {
+					differing++
+				}
 			}
 		}
 	}

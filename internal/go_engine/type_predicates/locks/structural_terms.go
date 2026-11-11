@@ -1,4 +1,4 @@
-package copy_lock
+package locks
 
 import "go/types"
 
@@ -15,8 +15,8 @@ type termSet struct {
 // structuralTerms is the normalized terms of typeParameter's constraint, the types it permits, each one exactly or by
 // its underlying type: for `[P interface{ ~int; m() }]`, the one term ~int. The order is the original's, which is
 // deterministic. It is nil when the constraint is invalid, too complex, has an empty type set, or restricts no type
-// at all, since lockPath finds no lock in any of those. x/tools' typeparams.StructuralTerms, with its errors, which
-// lockPath only tested for, folded into the nil result.
+// at all, since Of finds no lock in any of those. x/tools' typeparams.StructuralTerms, with its errors, which
+// Of only tested for, folded into the nil result.
 func structuralTerms(typeParameter *types.TypeParam) []*types.Term {
 	constraint := typeParameter.Constraint()
 	if constraint == nil {

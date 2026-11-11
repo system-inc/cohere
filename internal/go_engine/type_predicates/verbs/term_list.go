@@ -1,4 +1,4 @@
-package printf
+package verbs
 
 // termList is the union of its terms' type sets, and in normal form when its terms are disjoint: x/tools' typeparams
 // termlist, translated as far as structuralTerms reads it.

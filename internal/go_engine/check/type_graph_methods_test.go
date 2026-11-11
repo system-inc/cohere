@@ -41,15 +41,32 @@ var methodsFiles = map[string]string{
 		"type Wrapper struct{ embedded.Thing }\n",
 }
 
-// methodsOrder are the fixtures' packages, each after what it imports.
-var methodsOrder = []string{"file", "embedded", "wrapper"}
+// targetPackage is one package of a fixture checked per target: the directory of its files, and its path.
+type targetPackage struct {
+	directory string
+	path      string
+}
 
-// checkedMethods type-checks the fixtures' packages for goos, from the files its build context matches, by path.
-func checkedMethods(test *testing.T, goos string) map[string]*types.Package {
+// targetFixture is a module whose packages, some of their files of one target each, are checked per target: its
+// files by path, and its packages, each after what it imports.
+type targetFixture struct {
+	files    map[string]string
+	packages []targetPackage
+}
+
+// methodsFixture is the unexported-method fixtures' module.
+var methodsFixture = targetFixture{files: methodsFiles, packages: []targetPackage{
+	{"file", methodsModule + "/file"},
+	{"embedded", methodsModule + "/embedded"},
+	{"wrapper", methodsModule + "/wrapper"},
+}}
+
+// checkedTargets type-checks fixture's packages for goos, from the files its build context matches, by path.
+func checkedTargets(test *testing.T, goos string, fixture targetFixture) map[string]*types.Package {
 	test.Helper()
 
 	directory := test.TempDir()
-	writeFiles(test, directory, methodsFiles)
+	writeFiles(test, directory, fixture.files)
 	context := build.Default
 	context.GOOS, context.GOARCH, context.CgoEnabled = goos, "amd64", false
 	fileSet := token.NewFileSet()
@@ -60,8 +77,8 @@ func checkedMethods(test *testing.T, goos string) map[string]*types.Package {
 		}
 		return nil, fmt.Errorf("no package %s", path)
 	})}
-	for _, name := range methodsOrder {
-		packageDirectory := filepath.Join(directory, name)
+	for _, checking := range fixture.packages {
+		packageDirectory := filepath.Join(directory, checking.directory)
 		entries, readError := os.ReadDir(packageDirectory)
 		if readError != nil {
 			test.Fatal(readError)
@@ -82,23 +99,29 @@ func checkedMethods(test *testing.T, goos string) map[string]*types.Package {
 			}
 			files = append(files, parsed)
 		}
-		path := methodsModule + "/" + name
-		typed, checkError := configuration.Check(path, fileSet, files, nil)
+		typed, checkError := configuration.Check(checking.path, fileSet, files, nil)
 		if checkError != nil {
-			test.Fatalf("type-checking %s for %s: %v", path, goos, checkError)
+			test.Fatalf("type-checking %s for %s: %v", checking.path, goos, checkError)
 		}
-		checked[path] = typed
+		checked[checking.path] = typed
 	}
 	return checked
 }
 
-// methodsReadsHold is the load's verdict, in the linux build, on a user package checked on the darwin host from
-// source, which imports the fixtures' package imported and reads what source reads of it.
-func methodsReadsHold(test *testing.T, imported string, source string) (bool, string) {
+// readsHoldAcross is the load's verdict, in fixture's linux build, on a user package checked on its darwin host from
+// source, which imports the package at importedPath and reads what source reads of it, each build's memo told sizes,
+// nil for none, and the user judged as a package with assembly files when assembly is set.
+func readsHoldAcross(
+	test *testing.T,
+	fixture targetFixture,
+	importedPath string,
+	source string,
+	sizes types.Sizes,
+	assembly bool,
+) (bool, string) {
 	test.Helper()
 
-	darwin := checkedMethods(test, "darwin")
-	importedPath := methodsModule + "/" + imported
+	darwin := checkedTargets(test, "darwin", fixture)
 	fileSet := token.NewFileSet()
 	file, parseError := parser.ParseFile(fileSet, "user.go", "package user\n\nimport \""+importedPath+"\"\n\n"+
 		source, parser.SkipObjectResolution)
@@ -118,14 +141,25 @@ func methodsReadsHold(test *testing.T, imported string, source string) (bool, st
 		}
 		return nil, fmt.Errorf("no package %s", path)
 	})}
-	user, checkError := configuration.Check(methodsModule+"/user", fileSet, []*ast.File{file}, info)
+	user, checkError := configuration.Check("example.com/user", fileSet, []*ast.File{file}, info)
 	if checkError != nil {
 		test.Fatal(checkError)
 	}
 	reads := &build_reads.Reads{}
 	reads.RecordTypes(user, info)
-	restoring := Restoring{Path: user.Path(), Imports: []string{importedPath}, Reads: reads}
-	return TypesHold(restoring, checkedMethods(test, "linux"), nil, NewReadsBuild(), NewReadsBuild())
+	restoring := Restoring{Path: user.Path(), Imports: []string{importedPath}, Reads: reads, Assembly: assembly}
+	host, build := NewReadsBuild(), NewReadsBuild()
+	host.measureBy(sizes)
+	build.measureBy(sizes)
+	return TypesHold(restoring, checkedTargets(test, "linux", fixture), nil, host, build)
+}
+
+// methodsReadsHold is the load's verdict, in the linux build, on a user package checked on the darwin host from
+// source, which imports the methods fixture's package imported and reads what source reads of it.
+func methodsReadsHold(test *testing.T, imported string, source string) (bool, string) {
+	test.Helper()
+
+	return readsHoldAcross(test, methodsFixture, methodsModule+"/"+imported, source, nil, false)
 }
 
 // An importer reading a type whose unexported method differs by target, os.File's shape, reads the same in either

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
+
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates/verbs"
 )
 
 // printfCall is one call of a printf function as checkPrintf checks its operations in turn.
@@ -46,17 +48,17 @@ func (check *printfCall) checkOperation(span analysis.Range, operation *formatOp
 	// Code of go1.26 or later takes only a byte or a rune of the integers with %q (#72850). An unknown version fails
 	// open.
 	if verb == 'q' && check.fileVersion != "" && atLeast(check.fileVersion, go126) {
-		known.accepted = argumentRune | argumentByte | argumentString
+		known.accepted = verbs.Rune | verbs.Byte | verbs.String
 	}
 	// Code of go1.27 or later takes no pointer with %d (#62595).
 	if verb == 'd' && check.fileVersion != "" && atLeast(check.fileVersion, go127) {
-		known.accepted = argumentInt
+		known.accepted = verbs.Int
 	}
 	// An argument that may implement fmt.Formatter takes any verb and flag. %w's needs an error, so it is not asked.
 	formatter := false
-	if known.accepted != argumentError && operation.verb.argumentIndex < len(check.call.Args) {
+	if known.accepted != verbs.Error && operation.verb.argumentIndex < len(check.call.Args) {
 		if typed, recorded := check.pass.TypesInfo.Types[check.call.Args[operation.verb.argumentIndex]]; recorded {
-			formatter = isFormatter(typed.Type)
+			formatter = verbs.IsFormatter(typed.Type)
 		}
 	}
 	if !formatter && !check.flagsAreKnown(span, operation, known, found) {
@@ -75,7 +77,7 @@ func (check *printfCall) checkOperation(span analysis.Range, operation *formatOp
 			return false
 		}
 		argument := check.call.Args[argumentIndex]
-		if reason, matched := matchArgumentType(check.pass, argumentInt, argument); !matched {
+		if reason, matched := matchArgumentType(check.pass, verbs.Int, argument); !matched {
 			check.pass.ReportRangef(span, "%s format %s uses non-int %s%s as argument of *", check.name, operation.text,
 				formatNode(check.pass, argument), detailsOf(reason))
 			return false
@@ -152,7 +154,7 @@ func (check *printfCall) argumentFits(
 	}
 	// A value's String or Error method that formats the value calls itself. The `#` flag keeps fmt from calling
 	// them, except with %x, %X and %q.
-	if known.accepted&argumentString != 0 && known.verb != 'T' &&
+	if known.accepted&verbs.String != 0 && known.verb != 'T' &&
 		(!strings.Contains(operation.flags, "#") || strings.ContainsRune("qxX", known.verb)) {
 		if methodName, recursive := recursiveStringer(check.pass, argument); recursive {
 			check.pass.ReportRangef(span, "%s format %s with arg %s causes recursive %s method call", check.name,
@@ -172,7 +174,7 @@ func (check *printfCall) wrapsPointerToError(span analysis.Range, argument ast.E
 		return false
 	}
 	pointer, isPointer := operandType.Underlying().(*types.Pointer)
-	if !isPointer || !types.Implements(pointer.Elem(), errorType) || !atLeast(check.fileVersion, go127) {
+	if !isPointer || !types.Implements(pointer.Elem(), verbs.ErrorInterface) || !atLeast(check.fileVersion, go127) {
 		return false
 	}
 	// A type of the package being checked is named without its package.

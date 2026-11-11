@@ -1,4 +1,4 @@
-package printf
+package verbs
 
 import "go/types"
 
