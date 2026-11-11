@@ -319,17 +319,6 @@ func (engine *pipeline) extraBuildRun(
 		run.lintWait = time.Since(waitStarted)
 	}
 	engine.lintStepped(extra, lintStepTaken, weight)
-	given := false
-	giveBack := func() {
-		if given {
-			return
-		}
-		given = true
-		engine.lintStepped(extra, lintStepGiving, weight)
-		gate.giveBack(weight)
-	}
-	// Every return before the rules end, a reload that fails among them, gives the weight back here.
-	defer giveBack()
 	enabled, _ := engine.enabledRules()
 	runRules := func(over *load.Loaded) (*check.Result, error) {
 		started := time.Now()
@@ -345,30 +334,42 @@ func (engine *pipeline) extraBuildRun(
 			Timing:          engine.timing,
 		})
 	}
-	result, checkError := runRules(loaded)
-	// As the host's lint does (reloadedPass), a question that reached a package the cache restored, with no answer
-	// stored, has the build loaded again with that package checked from source, until none does. So does a package
-	// restored from the host's run whose facts or answers do not hold here (check.Result.Reloads).
-	for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
-		reloads := strings.Join(result.Reloads, ", ")
-		started := time.Now()
-		loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
-		loading += time.Since(started)
-		if loadError != nil {
-			return buildRun{}, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
-				loadError)
+	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
+	// a build that fails while holding weight gives it back by the same line as one that succeeds, and a test that
+	// shows the weight comes back covers both: a leak on any path would leave every build behind it waiting for good.
+	// It comes back before the build's end, which a test may hold until other builds have ended, and they may be
+	// waiting for this weight.
+	result, lintError := func() (*check.Result, error) {
+		defer func() {
+			engine.lintStepped(extra, lintStepGiving, weight)
+			gate.giveBack(weight)
+		}()
+		result, checkError := runRules(loaded)
+		// As the host's lint does (reloadedPass), a question that reached a package the cache restored, with no
+		// answer stored, has the build loaded again with that package checked from source, until none does. So does a
+		// package restored from the host's run whose facts or answers do not hold here (check.Result.Reloads).
+		for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
+			reloads := strings.Join(result.Reloads, ", ")
+			started := time.Now()
+			loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
+			loading += time.Since(started)
+			if loadError != nil {
+				return nil, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
+					loadError)
+			}
+			if len(loaded.Diagnostics) > 0 {
+				return nil, fmt.Errorf("loading the build %s again to check %s from source found %d type "+
+					"errors the first load did not", extra, reloads, len(loaded.Diagnostics))
+			}
+			result, checkError = runRules(loaded)
 		}
-		if len(loaded.Diagnostics) > 0 {
-			return buildRun{}, fmt.Errorf("loading the build %s again to check %s from source found %d type "+
-				"errors the first load did not", extra, reloads, len(loaded.Diagnostics))
+		if checkError != nil {
+			return nil, fmt.Errorf("running the rules over the build %s: %w", extra, checkError)
 		}
-		result, checkError = runRules(loaded)
-	}
-	// The rules have ended, so the weight goes back before the build's end, which a test may hold until other builds
-	// have ended, and they may be waiting for this weight.
-	giveBack()
-	if checkError != nil {
-		return buildRun{}, fmt.Errorf("running the rules over the build %s: %w", extra, checkError)
+		return result, nil
+	}()
+	if lintError != nil {
+		return buildRun{}, lintError
 	}
 	for _, problem := range result.Cache.Problems {
 		noteTo(notes, "the findings cache of the build %s: %s", extra, problem)
