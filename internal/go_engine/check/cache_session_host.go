@@ -546,7 +546,7 @@ func (session *CacheSession) throughEntry(
 		}
 		encoded.exportData = exportData
 	}
-	entry.Reads, entry.ReadsIncomplete = session.readsInBuild(entry.Reads, entry.ReadsIncomplete)
+	entry.Reads, entry.ReadsIncomplete = session.readsInBuild(saved.ID, entry.Reads, entry.ReadsIncomplete)
 	encoded.positionDependent = positionDependent(saved, entry.Analyzers, knownFiles)
 	var entryBytes bytes.Buffer
 	if gobError := gob.NewEncoder(&entryBytes).Encode(entry); gobError != nil {
@@ -556,21 +556,31 @@ func (session *CacheSession) throughEntry(
 	return encoded, true, nil
 }
 
-// readsInBuild are reads, a host's entry's, each naming its owner by the owner's first key in this build rather than
-// the host's, which the build's next run compares a read's owner by (readsHold), and whether one could not be named:
-// incomplete as it was, or set when the build did not key a read's owner. The restore checked every read against the
-// owner as the build has it, so each still says what the owner of that key answers.
-func (session *CacheSession) readsInBuild(reads []storedRead, incomplete bool) ([]storedRead, bool) {
+// readsInBuild are reads, the entry of the package written through as written's, each naming its owner by the
+// owner's first key in this build rather than the host's, which the build's next run compares a read's owner by
+// (readsHold), and whether one could not be named: incomplete as it was, or set when the build has no owner or no key
+// for a read. The restore checked every read against the owner as the build has it, so each still says what the owner
+// of that key answers.
+//
+// Neither can happen to an entry written through, so each is a problem the run reports, and the entry is still marked
+// incomplete so a next run never trusts it. Its restore held, and a restore holds only while readsHold finds every
+// read's owner among the build's packages by identifier; a write-through runs only with a store, and with a store the
+// session keys every package it reaches (cache.Keys keys all of them or fails), the same packages byIdentifier names.
+func (session *CacheSession) readsInBuild(written string, reads []storedRead, incomplete bool) ([]storedRead, bool) {
 	inBuild := make([]storedRead, 0, len(reads))
 	unnamed := incomplete
 	for _, read := range reads {
 		owner := session.byIdentifier[read.Owner]
 		if owner == nil {
+			session.problem(fmt.Sprintf("writing %s through: the build has no package %s, whose answer it read",
+				written, read.Owner))
 			unnamed = true
 			continue
 		}
 		key, keyed := session.keys[owner]
 		if !keyed {
+			session.problem(fmt.Sprintf("writing %s through: the build keyed no %s, whose answer it read", written,
+				read.Owner))
 			unnamed = true
 			continue
 		}

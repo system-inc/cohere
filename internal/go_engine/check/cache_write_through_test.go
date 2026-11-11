@@ -156,6 +156,10 @@ func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) 
 		test.Fatalf("windows wrote %d entries through of the %d it restored, want every one",
 			through.Cache.WrittenThrough, len(through.FromHost.Restored))
 	}
+	// A held restore names every read's owner in the build (readsInBuild), so writing it through reports no problem.
+	if len(through.Cache.Problems) > 0 {
+		test.Errorf("windows reported problems writing through: %q", through.Cache.Problems)
+	}
 	for _, path := range []string{throughBasePath, throughUserPath} {
 		written, writtenKey := throughEntry(test, throughSession, path)
 		checked, checkedKey := throughEntry(test, sourceSession, path)
@@ -165,6 +169,11 @@ func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) 
 		if !written.hasOutput || !checked.hasOutput || !bytes.Equal(written.output[:], checked.output[:]) {
 			test.Errorf("%s: written through with output %x (held %t), checked from source with %x (held %t), want "+
 				"the same digest", path, written.output[:], written.hasOutput, checked.output[:], checked.hasOutput)
+		}
+		// user reads Double's purity, an answer of base, so its entry holds that read, named in this build.
+		if written.readsIncomplete || path == throughUserPath && len(written.reads) == 0 {
+			test.Errorf("%s: written through with %d reads, incomplete %t, want every read named", path,
+				len(written.reads), written.readsIncomplete)
 		}
 		if !reflect.DeepEqual(written, checked) {
 			test.Errorf("%s: the entry written through\n%+v\nthe entry checked from source\n%+v", path, written,
