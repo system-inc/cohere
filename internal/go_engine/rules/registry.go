@@ -62,6 +62,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_no_write_only_collection"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_checked_assertion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_declared_walk"
+	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_drained_child_output"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_handled_error"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_invariant_reason"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_response_status_check"
@@ -614,6 +615,7 @@ func House() []rule.Rule {
 		correctness_no_write_only_collection.Rule,
 		correctness_require_checked_assertion.Rule,
 		correctness_require_declared_walk.Rule,
+		correctness_require_drained_child_output.Rule,
 		correctness_require_handled_error.Rule,
 		correctness_require_invariant_reason.Rule,
 		correctness_require_response_status_check.Rule,
