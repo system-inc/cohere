@@ -78,10 +78,6 @@ var listedCrossPackageReads = map[string]listedRead{
 	},
 	"unused_write/analyzer.go:Check": {class: readDirectImports},
 	"vet/atomic/analyzer.go:imports": {class: readDirectImports},
-	"vet/cgo_call/analyzer.go:importsPath": {
-		class:  readDirectImports,
-		reason: "and a package importing runtime/cgo is marked never",
-	},
 	"vet/defers/analyzer.go:importsPackage": {class: readDirectImports},
 	"vet/host_port/analyzer.go:isJudged":    {class: readDirectImports},
 	"vet/http_response/analyzer.go:imports": {class: readDirectImports},

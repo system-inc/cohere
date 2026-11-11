@@ -21,6 +21,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
+	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )
 
 // loader parses and type-checks a graph from source, every package once its imports are, as many at once as
@@ -685,9 +686,9 @@ func (loader *loader) recordReads(current *node) {
 		reads.MarkNever("checked for its types only")
 	case len(current.listed.CgoFiles) > 0:
 		reads.MarkNever("it has cgo files, which vet's cgocall type-checks again, unrecorded")
-	case slices.ContainsFunc(loaded.Types.Imports(), func(imported *types.Package) bool {
-		return imported.Path() == "runtime/cgo"
-	}):
+	// The same predicate vet's cgocall judges by, so a package it judges is never restored, which is what lets the
+	// restore leave cgocall's property out of a foreign field's rendering.
+	case type_predicates.UsesCgo(loaded.Types):
 		reads.MarkNever("it imports runtime/cgo, so vet's cgocall type-checks its cgo files again, unrecorded")
 	}
 }
