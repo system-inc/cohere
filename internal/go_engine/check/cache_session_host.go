@@ -192,14 +192,14 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 		readingKept = append(readingKept, kept)
 	}
 	// The host's run encodes an entry the first time a build asks for it (lazyEntry), so the entries are read, and
-	// decoded, on every core at once, as readHits reads the store's, and made hits in reachable's order after.
+	// decoded, on every core at once, as readHits reads the store's, and made hits in reachable's order after. Their
+	// export data is written only when the load reads it, in the package's own turn.
 	read := make([]*restoredPackage, len(reading))
 	readErrors := make([]error, len(reading))
 	bounded.ForEach(len(reading), false, func(index int) {
-		entry, exportData, readError := readingKept[index].contents()
+		entry, readExportData, readError := readingKept[index].contents()
 		if readError == nil {
-			read[index], readError = decodeEntry(session.known, reading[index], entry,
-				func() ([]byte, error) { return exportData, nil })
+			read[index], readError = decodeEntry(session.known, reading[index], entry, readExportData)
 		}
 		readErrors[index] = readError
 	})
@@ -508,13 +508,15 @@ func (session *CacheSession) keepForBuilds(
 		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage]}
 		if session.written[keptPackage] {
 			key := session.keys[keptPackage]
-			kept.contents = func() ([]byte, []byte, error) {
+			kept.contents = func() ([]byte, func() ([]byte, error), error) {
 				entry, stored := session.caching.Store.Get(key)
 				if !stored {
 					return nil, nil, fmt.Errorf("the store holds no entry of %s", keptPackage.ID)
 				}
-				exportData, _ := session.caching.Store.Get(exportDataKey(key))
-				return entry, exportData, nil
+				return entry, func() ([]byte, error) {
+					exportData, _ := session.caching.Store.Get(exportDataKey(key))
+					return exportData, nil
+				}, nil
 			}
 			host.entries[keptPackage.ID] = kept
 			continue
@@ -526,10 +528,10 @@ func (session *CacheSession) keepForBuilds(
 			host.entries[keptPackage.ID] = kept
 		}
 	}
-	// Only what an entry reads of the resolver is taken here, since the resolver goes below; the entry itself, and the
-	// export data that is most of its cost, is encoded the first time a build asks for it, once however many ask at
-	// once, and never for a package no build asks about (lazyEntry). Until the last build has decided, the host's
-	// actions and types live on for it.
+	// Only what an entry reads of the resolver is taken here, since the resolver goes below; the entry itself is encoded
+	// the first time a build asks for it, and the export data that is most of its cost the first time a load reads it,
+	// each once however many ask at once, and never for a package no build asks about or restores (lazyEntry). Until
+	// the last build has decided, the host's actions and types live on for it.
 	knownFiles := session.allFiles()
 	demanded := make([]entryDemand, len(encoding))
 	bounded.ForEach(len(encoding), false, func(index int) {
@@ -538,8 +540,8 @@ func (session *CacheSession) keepForBuilds(
 	for index, saved := range encoding {
 		host.entries[saved.ID].contents = lazyEntry(func() (encodedEntry, error) {
 			return encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved], withheld[saved],
-				demanded[index], files[saved], knownFiles)
-		})
+				demanded[index], files[saved], knownFiles, false)
+		}, func() ([]byte, error) { return writeExportData(saved) })
 	}
 	// What the analysis built to answer questions, every package's intermediate representation, syntax and type maps,
 	// is the session's to keep only for its next save; a run under `--no-cache` has none, and the extra builds that run
@@ -555,17 +557,24 @@ func (session *CacheSession) keepForBuilds(
 	return host
 }
 
-// lazyEntry is an entry's contents encoded by encode the first time they are asked for and held from then on, so two
-// builds asking at once encode it once. An entry gob refuses is an error wrapping errorUnstorable, which the build
-// that asked counts as no entry, as the host's run counted it when it encoded every entry itself.
-func lazyEntry(encode func() (encodedEntry, error)) func() ([]byte, []byte, error) {
+// lazyEntry is an entry's contents made the first time they are asked for and held from then on, so two builds asking
+// at once make them once: the entry by encode when a build asks for it, and the export data by writeExportData when
+// a load reads it, which a load does only for a package whose late decision held. An entry gob refuses is an error
+// wrapping errorUnstorable, which the build that asked counts as no entry, as the host's run counted it when it
+// encoded every entry itself; export data that cannot be written is the load's to decline, as export data that did
+// not read.
+func lazyEntry(
+	encode func() (encodedEntry, error),
+	writeExportData func() ([]byte, error),
+) func() ([]byte, func() ([]byte, error), error) {
 	encodeOnce := sync.OnceValues(encode)
-	return func() ([]byte, []byte, error) {
+	readExportData := sync.OnceValues(writeExportData)
+	return func() ([]byte, func() ([]byte, error), error) {
 		encoded, encodeError := encodeOnce()
 		if encodeError != nil {
 			return nil, nil, encodeError
 		}
-		return encoded.entry, encoded.exportData, nil
+		return encoded.entry, readExportData, nil
 	}
 }
 

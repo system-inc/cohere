@@ -713,7 +713,7 @@ func (session *CacheSession) saveMisses(
 			defer func() { <-slots }()
 			demanded := session.demandOf(saved, session.previous[saved])
 			entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-				withheld[saved], demanded, files[saved], knownFiles)
+				withheld[saved], demanded, files[saved], knownFiles, true)
 			var putError error
 			// The export data goes first, so an entry is never in the store before what it needs to be read.
 			if encodeError == nil && entry.exportData != nil {

@@ -44,13 +44,15 @@ func (host *HostRun) Keeping() time.Duration {
 }
 
 // hostEntry is one package the host's run kept: what a verdict judges it by, its portable digest, and its entry and
-// export data, read from the store when the run wrote them there, or, under `--no-cache`, which never stores them,
-// encoded from the host's analysis the first time a build asks for them and held in memory from then on, so a package
-// no build asks about is never encoded (#b2t9xmf). contents may be called from several goroutines at once.
+// export data, read from the store when the run wrote them there, or, under `--no-cache`, which never stores them, made
+// from the host's analysis the first time a build asks for them and held in memory from then on (lazyEntry): the
+// entry when a build first decides which packages to restore, and the export data, most of the cost, only when a
+// load reads it, after the package's late decision held, so a package no build restores never has it written
+// (#b2t9xmf). contents and the reader it returns may be called from several goroutines at once.
 type hostEntry struct {
 	restoring Restoring
 	portable  cache.Key
-	contents  func() (entry []byte, exportData []byte, readError error)
+	contents  func() (entry []byte, readExportData func() ([]byte, error), readError error)
 }
 
 // restoringOf is kept, a package of the host's run, as a verdict judges it: its path, its imports' paths, its reads,

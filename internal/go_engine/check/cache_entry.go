@@ -182,7 +182,8 @@ func factTypeName(factType reflect.Type) string {
 // analysis read of other packages (demanded), and, for a package Analyze was given, its files' walk, with its
 // export data beside it, its output digest, and whether a finding of it names a file outside it, among loadFiles,
 // every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact the package exported, or
-// factValueDigest cannot read one, or its types cannot be written as export data.
+// factValueDigest cannot read one, or its types cannot be written as export data. Without writesExportData the entry
+// is encoded alone, for a caller that writes the export data itself only if it is ever read (lazyEntry).
 func encodeEntry(
 	known *cacheAnalyzers,
 	ruleOf map[*analysis.Analyzer]rule.Rule,
@@ -192,6 +193,7 @@ func encodeEntry(
 	demanded entryDemand,
 	files []storedFile,
 	loadFiles *knownFiles,
+	writesExportData bool,
 ) (encodedEntry, error) {
 	entry := cacheEntry{
 		Version:         CacheFormatVersion,
@@ -260,11 +262,13 @@ func encodeEntry(
 		entry.Analyzers[slot] = stored
 		digested[slot] = facts
 	}
-	exportData, exportError := writeExportData(saved)
-	if exportError != nil {
-		return encodedEntry{}, exportError
+	if writesExportData {
+		exportData, exportError := writeExportData(saved)
+		if exportError != nil {
+			return encodedEntry{}, exportError
+		}
+		encoded.exportData = exportData
 	}
-	encoded.exportData = exportData
 	if saved.Types != nil {
 		for _, imported := range saved.Types.Imports() {
 			entry.Imports = append(entry.Imports, imported.Path())
