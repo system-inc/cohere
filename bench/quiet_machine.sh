@@ -268,6 +268,12 @@ measure() {
   local log=$logs/$mode-$round.log
   run_cohere $log "$@"
   local after=$(load) idle_after=$(idle_over 1)
+  # A run the machine was quiet before and not after names who held the cores, so a night of loaded runs says
+  # whether the load was the run's own tail (the kernel freeing its memory, fseventsd reading what it touched)
+  # or something else that started (#8sqsgee: every run of the guard's first night read 90% idle before and 77
+  # to 88% after). ps's CPU share is a recent average, which the run's own processes, gone by now, are not in.
+  at_floor $idle_after ||
+    ps -A -o %cpu=,pid=,comm= | sort -rn | head -12 > $logs/$mode-$round.busy-after 2> /dev/null
   # One build per round: a run that ran any Swift engine but the pinned one measured another (#ywx8zgd).
   local other_swift=$(swift_engine_named_otherwise $log)
   [[ -z $other_swift ]] ||
