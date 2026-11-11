@@ -5,6 +5,7 @@
 //	go run ./command/cohere-dev test --fast           the edit loop: all but the landing gate's own (fast.go)
 //	go run ./command/cohere-dev build|vet [packages]  go build or go vet
 //	go run ./command/cohere-dev exec -- <command>     any other heavy command: a bench, a cohere run, clang
+//	go run ./command/cohere-dev test --bounded <pkg>  under a process limit and a deadline, for a mutant (bound.go)
 //	go run ./command/cohere-dev land                  one merge commit onto main, gated, one landing at a time
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //	go run ./command/cohere-dev quiet on|off          a quiet window: the cache trim holds off until off (quiet.go)
@@ -28,7 +29,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -77,9 +77,11 @@ func runCommandLine() int {
 
 // usage says how cohere-dev is run, and returns the exit code of a command line it refused.
 func usage() int {
-	fmt.Fprintln(streams.Errors, "usage: cohere-dev test [--fast] [--full-priority] [go test flags] [packages]\n"+
-		"       cohere-dev build|vet [--full-priority] [go flags] [packages]\n"+
-		"       cohere-dev exec [--full-priority] -- <command> [arguments]\n"+
+	fmt.Fprintln(streams.Errors, "usage: cohere-dev test [--fast] [--full-priority] [bounded] [go test flags] "+
+		"[packages]\n"+
+		"       cohere-dev build|vet [--full-priority] [bounded] [go flags] [packages]\n"+
+		"       cohere-dev exec [--full-priority] [bounded] -- <command> [arguments]\n"+
+		"         bounded: --bounded, --bounded-margin <processes> (512), --bounded-deadline <duration> (15m)\n"+
 		"       cohere-dev land [--task <id>] [--message <what landed>]\n"+
 		"       cohere-dev status\n"+
 		"       cohere-dev quiet [on [--for <duration>] [why] | off]\n"+
@@ -130,9 +132,25 @@ func run(verb string, arguments []string) int {
 		}
 	}
 
-	switch verb {
-	case "land":
+	if verb == "land" {
 		return land(commandArguments)
+	}
+	commandArguments, limit, boundedError := withoutBoundedFlags(commandArguments, verb == "exec")
+	if boundedError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", boundedError)
+		return 2
+	}
+	// The bound begins once the run holds its token, so the account's count is read as its work starts, and the
+	// deadline does not run while it waits in line.
+	bounded := func(work func() int) int {
+		if beginError := limit.begin(); beginError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", beginError)
+			return 1
+		}
+		return work()
+	}
+
+	switch verb {
 	case "exec":
 		commandLine := commandArguments
 		if len(commandArguments) > 0 && commandArguments[0] == "--" {
@@ -142,15 +160,24 @@ func run(verb string, arguments []string) int {
 			return usage()
 		}
 		return withToken(strings.Join(commandLine, " "), func(environment []string) int {
-			return runCommand(environment, commandLine[0], commandLine[1:])
+			return bounded(func() int { return runAttached(limit, environment, commandLine[0], commandLine[1:]) })
 		})
 	case "build":
 		return withToken("go build "+strings.Join(commandArguments, " "), func(environment []string) int {
-			return runCommand(environment, "go", append([]string{"build"}, commandArguments...))
+			return bounded(func() int {
+				return runAttached(limit, environment, "go", append([]string{"build"}, commandArguments...))
+			})
 		})
 	case "vet":
 		return withToken("go vet "+strings.Join(commandArguments, " "), func(environment []string) int {
-			return runCommand(withoutVcsStamping(environment), "go", append([]string{"vet"}, commandArguments...))
+			return bounded(func() int {
+				return runAttached(
+					limit,
+					withoutVcsStamping(environment),
+					"go",
+					append([]string{"vet"}, commandArguments...),
+				)
+			})
 		})
 	}
 
@@ -168,7 +195,7 @@ func run(verb string, arguments []string) int {
 			return 2
 		}
 		return withToken("go test --fast "+strings.Join(testArguments, " "), func(environment []string) int {
-			return fastTest(withoutVcsStamping(environment), testArguments)
+			return bounded(func() int { return fastTest(withoutVcsStamping(environment), testArguments, limit) })
 		})
 	}
 	if wholeModule(testArguments) && countsOnce(testArguments) {
@@ -190,7 +217,7 @@ func run(verb string, arguments []string) int {
 		testArguments = expanded
 	}
 	return withToken("go test "+strings.Join(testArguments, " "), func(environment []string) int {
-		return goTest(withoutVcsStamping(environment), testArguments)
+		return bounded(func() int { return goTest(withoutVcsStamping(environment), testArguments, limit) })
 	})
 }
 
@@ -333,46 +360,15 @@ func countsOnce(arguments []string) bool {
 	return false
 }
 
-// goTest runs go test with the caller's terminal and returns its exit code.
-func goTest(base []string, arguments []string) int {
+// goTest runs go test with the caller's terminal, under the bound when there is one, and returns its exit code.
+func goTest(base []string, arguments []string, limit *bound) int {
 	environment, uncovered, testEnvironmentError := testEnvironment(base)
 	if testEnvironmentError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
 		return 2
 	}
-	command := exec.Command("go", append([]string{"test"}, arguments...)...)
-	command.Env = environment
-	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-	// go test writes to the terminal itself, so what this run said first is delivered first.
-	streams.Show(streams.Output)
-	streams.Show(streams.Errors)
 	defer printUncovered(streams.Errors, uncovered)
-	if runError := command.Run(); runError != nil {
-		if exited, ok := runError.(*exec.ExitError); ok {
-			return exited.ExitCode()
-		}
-		fmt.Fprintf(streams.Errors, "cohere-dev: running go test: %v\n", runError)
-		return 1
-	}
-	return 0
-}
-
-// runCommand runs a command with the caller's terminal in the environment given, and returns its exit code.
-func runCommand(environment []string, name string, arguments []string) int {
-	command := exec.Command(name, arguments...)
-	command.Env = environment
-	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-	// The command writes to the terminal itself, so what this run said first is delivered first.
-	streams.Show(streams.Output)
-	streams.Show(streams.Errors)
-	if runError := command.Run(); runError != nil {
-		if exited, ok := runError.(*exec.ExitError); ok {
-			return exited.ExitCode()
-		}
-		fmt.Fprintf(streams.Errors, "cohere-dev: running %s: %v\n", name, runError)
-		return 1
-	}
-	return 0
+	return runAttached(limit, environment, "go", append([]string{"test"}, arguments...))
 }
 
 // holderLine describes the run holding a token: who, where, since when and what it runs.
