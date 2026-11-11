@@ -63,8 +63,10 @@ func parseCall(text string) (Call, bool) {
 	quoted := false
 	for index := 0; index < len(body); index++ {
 		switch character := body[index]; {
-		case quoted && character == '\\':
-			// An escaped byte is the string's, a quote included.
+		case character == '\\':
+			// An escaped byte is the text's, a quote included, inside a quoted string or out of one:
+			// strace writes a bare backslash nowhere else, and a decoded descriptor path spells a quote
+			// `\"` outside every string, as `AT_FDCWD</d/q\"uote>`.
 			index++
 		case character == '"':
 			quoted = !quoted
@@ -123,7 +125,8 @@ func parseResult(text string) (Result, bool) {
 	return result, true
 }
 
-// isErrnoCharacter is a byte of an errno's name after its E: a capital letter or a digit.
+// isErrnoCharacter is a byte of an errno's name after its E: a capital letter, a digit or an
+// underscore, as ERESTART_RESTARTBLOCK's.
 func isErrnoCharacter(character byte) bool {
-	return isDigit(character) || 'A' <= character && character <= 'Z'
+	return isDigit(character) || 'A' <= character && character <= 'Z' || character == '_'
 }
