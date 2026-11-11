@@ -10069,7 +10069,10 @@
                     "set": "cohere:typescript",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Port"
+            }
         },
         {
             "name": "nexus/correctness-require-response-status-check",
