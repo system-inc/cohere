@@ -1044,6 +1044,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "off"
+            },
+            {
                 "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
@@ -2505,6 +2509,10 @@
             {
                 "name": "nexus/correctness-require-child-process-error-listener",
                 "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "off"
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
@@ -5327,6 +5335,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "off"
+            },
+            {
                 "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
@@ -7029,6 +7041,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "off"
+            },
+            {
                 "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
@@ -8677,6 +8693,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "off"
+            },
+            {
                 "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
@@ -10126,6 +10146,10 @@
             {
                 "name": "nexus/correctness-require-child-process-error-listener",
                 "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "off"
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
