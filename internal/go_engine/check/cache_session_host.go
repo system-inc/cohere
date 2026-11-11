@@ -61,8 +61,10 @@ type hostRestore struct {
 type hostState struct {
 	host *HostRun
 
-	// lock guards the session's hits, trusted and restoring while the load declines packages from its goroutines.
-	lock sync.Mutex
+	// lock guards the session's hits, trusted and restoring while the load declines packages from its goroutines. A
+	// verdict only reads restoring, under the read lock, so the verdicts deciding a load at once never queue on each
+	// other, only on a decline.
+	lock sync.RWMutex
 
 	// deciding is the time TypesHold and FactsHold took over every load, in nanoseconds, summed across goroutines.
 	deciding atomic.Int64
@@ -237,11 +239,10 @@ func (session *CacheSession) restoredBelow(
 	candidate *packages.Package,
 	closure map[string]*types.Package,
 ) map[*types.Package]bool {
-	state := session.host
-	restored := map[*types.Package]bool{}
+	// The load set every package's imports before it decided any, so the walk reads them without the lock; only
+	// whether each reached package is still among the restores is asked under it.
 	visited := map[*packages.Package]bool{}
-	state.lock.Lock()
-	defer state.lock.Unlock()
+	var reached []*packages.Package
 	var collect func(importer *packages.Package)
 	collect = func(importer *packages.Package) {
 		for _, imported := range importer.Imports {
@@ -249,14 +250,21 @@ func (session *CacheSession) restoredBelow(
 				continue
 			}
 			visited[imported] = true
-			if _, fromHost := state.restoring[imported]; fromHost && imported.Types != nil &&
-				closure[imported.PkgPath] == imported.Types {
-				restored[imported.Types] = true
-			}
+			reached = append(reached, imported)
 			collect(imported)
 		}
 	}
 	collect(candidate)
+	state := session.host
+	restored := map[*types.Package]bool{}
+	state.lock.RLock()
+	defer state.lock.RUnlock()
+	for _, imported := range reached {
+		if _, fromHost := state.restoring[imported]; fromHost && imported.Types != nil &&
+			closure[imported.PkgPath] == imported.Types {
+			restored[imported.Types] = true
+		}
+	}
 	return restored
 }
 
