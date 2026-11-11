@@ -26,6 +26,16 @@ import (
 // the run that checks its Swift says which engine it is.
 const projectEngineVariable = "COHERE_PROJECT_ENGINE"
 
+// runDepthVariable marks a run another cohere run started to check one of its projects (#excff9x).
+//
+// A project's run is this same binary, given `--directory` and its engine (projectEngineVariable), and a child whose
+// guard against discovering failed would find the same projects and start a run for each, without end: on Nov 10 a
+// review mutant that removed one such guard forked about 7,700 copies and filled the machine's process table. So the
+// parent marks every child, and a run that finds the mark refuses to start runs of its own, which ends any recursion
+// one level down, as a named refusal rather than a hang, however discovery is broken. The guard stays: this is the
+// wall behind it.
+const runDepthVariable = "COHERE_RUN_DEPTH"
+
 // projectLabelVariable names the project a child run checks, by its path under the root, so the run's own
 // footer can say which project it is about (#ytqqv8v).
 const projectLabelVariable = "COHERE_PROJECT_LABEL"
@@ -325,6 +335,14 @@ type projectRun struct {
 // TanStack Query's 95 projects started at once were 95 graphs in memory, and more children than that buys no
 // time the cores do not already give one.
 func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
+	if depth := os.Getenv(runDepthVariable); depth != "" {
+		// Exit 2, "did not run", so the run above reports this project as not checked.
+		failRunProjects(out, fmt.Errorf("this run was started by another cohere run to check one project (%s=%s) "+
+			"and was about to start runs for %d projects of its own, so it refused, and nothing was checked: its "+
+			"discovery found several projects where it was given one, which is a cohere bug to report",
+			runDepthVariable, depth, len(found.Projects)))
+		return 2
+	}
 	executable, executableError := os.Executable()
 	if executableError != nil {
 		failRunProjects(out, fmt.Errorf("finding this binary to run each project: %w", executableError))
@@ -567,7 +585,7 @@ func runProject(
 	// The verdict descriptor is this run's: a child's verdict reaches this process as its exit code, and
 	// only the merged one may answer the caller.
 	child.Env = append(withoutVariable(withoutVariable(os.Environ(), VerdictVariable), projectYieldVariable),
-		projectEngineVariable+"="+string(project.Engine), projectLabelVariable+"="+label)
+		projectEngineVariable+"="+string(project.Engine), projectLabelVariable+"="+label, runDepthVariable+"=1")
 	if yieldFile != "" {
 		child.Env = append(child.Env, projectYieldVariable+"="+yieldFile)
 	}

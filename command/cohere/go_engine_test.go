@@ -703,3 +703,36 @@ func TestAChildRunAtADirectoryOfSeveralProjectsChecksItsOwnAlone(test *testing.T
 			labels, output)
 	}
 }
+
+// TestARunAProjectsRunStartedNeverStartsRunsOfItsOwn: a run marked as one another run started (runDepthVariable)
+// that discovery hands several projects, here a tsconfig.json beside a go.work, refuses to start a run for any, by
+// name, with exit 2, and writes no project's summary (#excff9x). It is the wall behind every guard that keeps a child
+// from discovering: on Nov 10 one such guard removed forked about 7,700 copies, and with this wall a broken guard
+// ends one level down.
+func TestARunAProjectsRunStartedNeverStartsRunsOfItsOwn(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"tsconfig.json": discoveryTsconfig,
+		"source/a.ts":   "export const a = 1;\n",
+		"go.work":       "go 1.27\n\nuse .\n",
+		"go.mod":        "module example.com/mixed\n\ngo 1.27\n",
+		"sep/sep.go":    "// Package sep joins.\npackage sep\n\n// Separator joins.\nconst Separator = \"/\"\n",
+	})
+	output, exitCode := runCohereWithEnvironment(test, binary, root, []string{runDepthVariable + "=1"},
+		"--no-fix", "--no-cache", "--json")
+	summaries := 0
+	for _, line := range strings.Split(output, "\n") {
+		var record struct {
+			Kind  string `json:"kind"`
+			Label string `json:"label"`
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" && record.Label != "" {
+			summaries++
+		}
+	}
+	if exitCode != 2 || summaries != 0 || !strings.Contains(output, "was about to start runs for 2 projects") {
+		test.Errorf("the marked run exited %d with %d project summaries, want 2, none, and the refusal named:\n%s",
+			exitCode, summaries, output)
+	}
+}
