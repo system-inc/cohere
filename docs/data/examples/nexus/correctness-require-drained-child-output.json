@@ -1,0 +1,30 @@
+{
+    "rule": "nexus/correctness-require-drained-child-output",
+    "firing": {
+        "file": "/repository/source/CorrectnessRequireDrainedChildOutput.ts",
+        "source": "import * as NodeChildProcess from 'node:child_process';\nimport { spawn } from 'node:child_process';\nimport { once } from 'node:events';\nimport * as NodeReadline from 'node:readline';\ndeclare const verbose: boolean;\ndeclare const chunks: unknown[];\ndeclare const logStream: NodeJS.WritableStream;\ndeclare function read(chunk: unknown): void;\ndeclare function done(): void;\ndeclare function wire(child: NodeChildProcess.ChildProcess): void;\ndeclare namespace NodeJS { interface WritableStream { write(chunk: unknown): boolean } }\n\nconst child = spawn('ps', ['-eo', 'pid']);\nawait once(child, 'close');\n",
+        "findings": [
+            {
+                "line": 14,
+                "column": 7,
+                "endLine": 14,
+                "endColumn": 27,
+                "messageId": "childOutputNeverDrained",
+                "message": "stdout of this child is never read before its close is awaited, so output past the pipe buffer blocks the child and close never fires. Read it (`child.stdout.on('data', ...)`, or pipe it), or pass `'ignore'` or `'inherit'` in stdio."
+            },
+            {
+                "line": 14,
+                "column": 7,
+                "endLine": 14,
+                "endColumn": 27,
+                "messageId": "childOutputNeverDrained",
+                "message": "stderr of this child is never read before its close is awaited, so output past the pipe buffer blocks the child and close never fires. Read it (`child.stderr.on('data', ...)`, or pipe it), or pass `'ignore'` or `'inherit'` in stdio."
+            }
+        ]
+    },
+    "clean": {
+        "file": "/repository/source/CorrectnessRequireDrainedChildOutput.ts",
+        "source": "import * as NodeChildProcess from 'node:child_process';\nimport { spawn } from 'node:child_process';\nimport { once } from 'node:events';\nimport * as NodeReadline from 'node:readline';\ndeclare const verbose: boolean;\ndeclare const chunks: unknown[];\ndeclare const logStream: NodeJS.WritableStream;\ndeclare function read(chunk: unknown): void;\ndeclare function done(): void;\ndeclare function wire(child: NodeChildProcess.ChildProcess): void;\ndeclare namespace NodeJS { interface WritableStream { write(chunk: unknown): boolean } }\n\nconst child = spawn('ps');\nawait once(child, 'close');\n"
+    },
+    "assertedMessageIds": ["childOutputNeverDrained"]
+}

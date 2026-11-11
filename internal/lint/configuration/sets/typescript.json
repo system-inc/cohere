@@ -176,6 +176,7 @@
         "nexus/correctness-no-test-on-global-regex": "error",
         "nexus/correctness-no-uncleared-race-timeout": "error",
         "nexus/correctness-require-child-process-error-listener": "error",
+        "nexus/correctness-require-drained-child-output": "off",
         "nexus/security-no-interpolated-shell-command": "error",
         "nexus/security-no-interpolated-sql-string": "error",
         "nexus/correctness-require-blocking-standard-streams": "error",
@@ -240,6 +241,7 @@
     "reasons": {
         "@typescript-eslint/no-redeclare": "Ruled by Kirk on 2026-11-07: tsc reports every real redeclaration (TS2300, TS2451); what this rule adds is a type and a value sharing a name, which is valid declaration merging, as lib.es5.d.ts's own `interface Array<T>` plus `declare var Array: ArrayConstructor` and a zod schema's `const User` plus `type User` (#3vfxajt).",
         "@typescript-eslint/no-unsafe-type-assertion": "adamic/no-unchecked-cast reports a superset under tsc: with its runtimeChecksEmitted option false it reports every assertion this rule does (measured on ahra, www-phi-health, api-phi-health and www-ahra-ai: 2,752 sites both, 71 this rule alone, all union downcasts the strict option reports) (#mdccedj).",
+        "nexus/correctness-require-drained-child-output": "Off until a census turns it on (#pte6ec9). Measured 2026-11-10: 3 findings, all true, across ahra, www-connected-app, api-phi-health, www-phi-health and www-ahra-ai, each a piped stdout or stderr nothing reads before the child's close is awaited.",
         "nexus/correctness-no-process-exit-after-output": "Off on purpose, by @system_cohere's ruling of 2026-10-03 (#h1jwmmz). Its findings are true, but every process entry blocks stdout and stderr, which correctness-require-blocking-standard-streams requires, so an exit after a write has nothing queued to lose. Turn it on only for a project whose entries don't block.",
         "no-unused-private-class-members": "The core rule sees only #private names. @typescript-eslint/no-unused-private-class-members, on here, is the typed rule that supersedes it.",
         "no-invalid-this": "@typescript-eslint/no-invalid-this, on here, is the same rule taught TypeScript's this parameters.",

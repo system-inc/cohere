@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/go_engine/rules)"
     },
-    "count": 795,
+    "count": 796,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -10035,6 +10035,15 @@
             "swift": {
                 "verdict": "Compiler"
             }
+        },
+        {
+            "name": "nexus/correctness-require-drained-child-output",
+            "language": "TypeScript",
+            "namespace": "nexus",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true,
+            "messageIds": ["childOutputNeverDrained"]
         },
         {
             "name": "nexus/correctness-require-response-status-check",

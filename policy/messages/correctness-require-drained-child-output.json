@@ -1,0 +1,10 @@
+{
+    "rules": {
+        "TypeScript": "nexus/correctness-require-drained-child-output"
+    },
+    "messages": {
+        "childOutputNeverDrained": {
+            "text": "{{stream}} of this child is never read before its {{event}} is awaited, so output past the pipe buffer blocks the child and {{event}} never fires. Read it (`child.{{stream}}.on('data', ...)`, or pipe it), or pass `'ignore'` or `'inherit'` in stdio."
+        }
+    }
+}
