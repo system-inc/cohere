@@ -137,7 +137,7 @@ func TestShoutingUppercaseGatePreservesTokens(test *testing.T) {
 		if !HasAdjacentUppercaseLetters(body) {
 			return nil
 		}
-		return TokensInMasked(MaskCodeAndCommands(body))
+		return distinctShoutedWords(MaskCodeAndCommands(body))
 	}
 
 	for _, comment := range comments {

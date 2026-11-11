@@ -103,8 +103,9 @@ var landingGateOnly = []landingGateEntry{
 	},
 }
 
-// fastTest runs the fast tier in the environment given and returns go test's exit code.
-func fastTest(base []string, arguments []string) int {
+// fastTest runs the fast tier in the environment given, under the bound when there is one, and returns go
+// test's exit code.
+func fastTest(base []string, arguments []string, limit *bound) int {
 	fmt.Fprintf(streams.Errors, "cohere-dev: fast tier, at load %s\n", machineLoad())
 	// Listing the module's packages takes a moment, and a person watches for the run to begin.
 	streams.Show(streams.Errors)
@@ -143,21 +144,12 @@ func fastTest(base []string, arguments []string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
 		return 2
 	}
-	command := exec.Command("go", append(append([]string{"test"}, arguments...), selected...)...)
-	command.Env = append(environment, fastTierVariable+"=1")
-	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-	// go test writes to the terminal itself, so what this run said first is delivered first.
-	streams.Show(streams.Output)
-	streams.Show(streams.Errors)
-	code := 0
-	if runError := command.Run(); runError != nil {
-		exited, ok := runError.(*exec.ExitError)
-		if !ok {
-			fmt.Fprintf(streams.Errors, "cohere-dev: running go test: %v\n", runError)
-			return 1
-		}
-		code = exited.ExitCode()
-	}
+	code := runAttached(
+		limit,
+		append(environment, fastTierVariable+"=1"),
+		"go",
+		append(append([]string{"test"}, arguments...), selected...),
+	)
 
 	fmt.Fprintln(streams.Errors, "cohere-dev: the fast tier left these to the landing gate:")
 	for _, entry := range landingGateOnly {

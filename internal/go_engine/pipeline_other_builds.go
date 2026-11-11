@@ -238,7 +238,7 @@ func (engine *pipeline) extraBuildRun(
 			Bodiless:       over.Bodiless,
 			// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
 			ReleaseAnalyzed: true,
-			ReadFile:        engine.sourceReader(nil),
+			ReadFile:        engine.sourceReader(nil, over.Rewritten),
 			Timing:          engine.timing,
 		})
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_buffered_wait_delay"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_kill_by_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_require_escape_hatch_reason"
+	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_require_joined_pipe_reader"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_file_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_ambiguous_identifier"
@@ -62,6 +63,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_no_write_only_collection"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_checked_assertion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_declared_walk"
+	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_drained_child_output"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_handled_error"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_invariant_reason"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_response_status_check"
@@ -573,6 +575,7 @@ func House() []rule.Rule {
 		concurrency_no_buffered_wait_delay.Rule,
 		concurrency_no_kill_by_name.Rule,
 		concurrency_require_escape_hatch_reason.Rule,
+		concurrency_require_joined_pipe_reader.Rule,
 		consistency_no_abbreviated_file_name.Rule,
 		consistency_no_abbreviated_identifier.Rule,
 		consistency_no_ambiguous_identifier.Rule,
@@ -614,6 +617,7 @@ func House() []rule.Rule {
 		correctness_no_write_only_collection.Rule,
 		correctness_require_checked_assertion.Rule,
 		correctness_require_declared_walk.Rule,
+		correctness_require_drained_child_output.Rule,
 		correctness_require_handled_error.Rule,
 		correctness_require_invariant_reason.Rule,
 		correctness_require_response_status_check.Rule,

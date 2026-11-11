@@ -208,13 +208,18 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 	})
 	// The host's reads, recorded only when the run has extra builds to restore packages into (recordsReads), walked in
 	// the load's slots below its work.
-	return engine.lintPackages(analyzed, check.Options{Withheld: loaded.Withheld, Bodiless: loaded.Bodiless,
-		Reads: loaded.Reads, WalkSlots: loaded.WalkSlots})
+	return engine.lintPackages(analyzed, loaded.Rewritten, check.Options{Withheld: loaded.Withheld,
+		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots})
 }
 
 // lintPackages is lint over the packages to analyze, with what the load gives the run in options: its Withheld once
-// it has returned, or the Ready and Abandon of a pass beside it.
-func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check.Options) lintPass {
+// it has returned, or the Ready and Abandon of a pass beside it. rewritten is the load's rewritten cgo outputs, which
+// the rules read in place of the build cache's (see sourceReader).
+func (engine *pipeline) lintPackages(
+	analyzed []*packages.Package,
+	rewritten *load.Rewritten,
+	options check.Options,
+) lintPass {
 	started := time.Now()
 	enabled, turnedOff := engine.enabledRules()
 	session := engine.session
@@ -228,7 +233,7 @@ func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check
 	// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 	// and what follows reads the files' contents the project description holds, and the types.
 	options.ReleaseAnalyzed = true
-	options.ReadFile = engine.sourceReader(nil)
+	options.ReadFile = engine.sourceReader(nil, rewritten)
 	options.Timing = engine.timing
 	options.Counted = engine.described.countedAsWalked
 	if engine.duplicatesRequested() {

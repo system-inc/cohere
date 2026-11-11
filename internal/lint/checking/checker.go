@@ -245,6 +245,21 @@ func IsTypeUnknownArrayType(
 		IsTypeUnknownType(checker.Checker_getTypeArguments(typeChecker, subjectType)[0])
 }
 
+// IsTypeReferenceType is upstream's isTypeReferenceType: an object type carrying the Reference flag,
+// deferred or not.
+//
+// A deferred reference is one the checker builds lazily, and it builds one for every type written as a
+// type alias's whole body: `type HistoriesType = Map<string, ReadingInterface[]>` gives a Map reference
+// whose arguments resolve on first ask. Its target and its type arguments are those of the same reference
+// written inline, so the comparison in IsUnsafeAssignment reads it the same way. Asking for a non-deferred
+// reference here, as this file once did, stopped the comparison at any aliased type, and so the unsafe rules
+// missed an `any` inside the type arguments of every parameter, variable or return typed through an alias
+// (#chvhz8t).
+func IsTypeReferenceType(subjectType *checker.Type) bool {
+	return subjectType.Flags()&checker.TypeFlagsObject != 0 &&
+		subjectType.ObjectFlags()&checker.ObjectFlagsReference != 0
+}
+
 // CanBeUnsafeAssignment answers whether IsUnsafeAssignment could find this sender unsafe against any
 // receiver at all. It finds one unsafe only at an `any`, reached either directly or through the type
 // arguments of type references, so a sender with no `any` on any such path is safe whatever the
@@ -266,7 +281,7 @@ func canBeUnsafeAssignmentWorker(
 		return true
 	}
 	// A type already visited had its arguments searched in full, so reaching it again adds nothing.
-	if !checker.IsNonDeferredTypeReference(subjectType) || visited[subjectType] {
+	if !IsTypeReferenceType(subjectType) || visited[subjectType] {
 		return false
 	}
 	visited[subjectType] = true
@@ -336,7 +351,7 @@ func isUnsafeAssignmentWorker(
 		visited[subjectType] = NewSetFromItems(receiver)
 	}
 
-	if checker.IsNonDeferredTypeReference(subjectType) && checker.IsNonDeferredTypeReference(receiver) {
+	if IsTypeReferenceType(subjectType) && IsTypeReferenceType(receiver) {
 		// Upstream leaves open how to handle cases like this,
 		// where the types are assignable, but not the same type
 		/*

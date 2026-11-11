@@ -27,6 +27,9 @@ type Overlap struct {
 	// they never displace its chain (see Loaded.WalkSlots).
 	WalkSlots *WalkSlots
 
+	// Rewritten is Loaded.Rewritten as the load fills it, which holds a package's rewritten files once Ready closes.
+	Rewritten *Rewritten
+
 	nodes map[*packages.Package]*node
 
 	// ended is closed when the load returns, whatever it returns.

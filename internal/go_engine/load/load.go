@@ -131,6 +131,10 @@ type Loaded struct {
 	// check.Options.WalkSlots), free once the load has ended.
 	WalkSlots *WalkSlots
 
+	// Rewritten is the bytes the load parsed each cgo output from whose `//line` directives it rewrote, which a
+	// reader of a file's source reads in place of the disk's (see Rewritten).
+	Rewritten *Rewritten
+
 	// testFunctions is each test variant to analyze's refused test functions, judged as it was checked, for the
 	// diagnostics, one Caching.Analyzes turned down included, since go test refuses them all the same.
 	testFunctions map[*packages.Package][]Diagnostic
@@ -418,8 +422,15 @@ func fromSource(
 		for _, current := range reachable {
 			nodes[current.loaded] = current
 		}
-		caching.Begin(&Overlap{Packages: analyzedPackages, Reads: typeChecker.reads, Bodiless: typeChecker.bodiless,
-			WalkSlots: &WalkSlots{slots: typeChecker.slots}, nodes: nodes, ended: ended})
+		caching.Begin(&Overlap{
+			Packages:  analyzedPackages,
+			Reads:     typeChecker.reads,
+			Bodiless:  typeChecker.bodiless,
+			WalkSlots: &WalkSlots{slots: typeChecker.slots},
+			Rewritten: typeChecker.rewritten,
+			nodes:     nodes,
+			ended:     ended,
+		})
 	}
 	typeChecker.load(reachable)
 
@@ -469,6 +480,7 @@ func fromSource(
 		Reads:                             typeChecker.reads,
 		ReadsRecorded:                     len(typeChecker.reads),
 		WalkSlots:                         &WalkSlots{slots: typeChecker.slots},
+		Rewritten:                         typeChecker.rewritten,
 		testFunctions:                     typeChecker.testFunctions,
 	}, nil
 }

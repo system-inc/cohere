@@ -761,6 +761,9 @@
                 "nexus/correctness-require-child-process-error-listener": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/correctness-require-drained-child-output": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/correctness-require-response-status-check": {
                     "$ref": "#/$defs/ruleSetting"
                 },

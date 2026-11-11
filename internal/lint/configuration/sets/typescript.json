@@ -176,6 +176,7 @@
         "nexus/correctness-no-test-on-global-regex": "error",
         "nexus/correctness-no-uncleared-race-timeout": "error",
         "nexus/correctness-require-child-process-error-listener": "error",
+        "nexus/correctness-require-drained-child-output": "error",
         "nexus/security-no-interpolated-shell-command": "error",
         "nexus/security-no-interpolated-sql-string": "error",
         "nexus/correctness-require-blocking-standard-streams": "error",

@@ -178,7 +178,7 @@
         "name": "cohere:next",
         "extends": ["cohere:typescript"],
         "plugins": ["@next"],
-        "rulesOn": 306,
+        "rulesOn": 307,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1044,6 +1044,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
@@ -1733,7 +1737,7 @@
         "name": "cohere:react",
         "extends": ["cohere:typescript"],
         "plugins": ["react", "react-hooks"],
-        "rulesOn": 371,
+        "rulesOn": 372,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2504,6 +2508,10 @@
             },
             {
                 "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-drained-child-output",
                 "severity": "error"
             },
             {
@@ -4301,7 +4309,7 @@
     {
         "name": "cohere:system-inc/base",
         "extends": ["cohere:typescript"],
-        "rulesOn": 297,
+        "rulesOn": 298,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5327,6 +5335,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
@@ -6127,7 +6139,7 @@
         "name": "cohere:system-inc/structure",
         "extends": ["cohere:typescript"],
         "plugins": ["@typescript-eslint"],
-        "rulesOn": 305,
+        "rulesOn": 306,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7029,6 +7041,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
@@ -7855,7 +7871,7 @@
     {
         "name": "cohere:tailwind",
         "extends": ["cohere:typescript"],
-        "rulesOn": 295,
+        "rulesOn": 296,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8677,6 +8693,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-drained-child-output",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
@@ -9354,7 +9374,7 @@
     {
         "name": "cohere:typescript",
         "extends": ["cohere:adamic", "cohere:style"],
-        "rulesOn": 283,
+        "rulesOn": 284,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -10125,6 +10145,10 @@
             },
             {
                 "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-drained-child-output",
                 "severity": "error"
             },
             {

@@ -149,6 +149,7 @@
 {"kind":"rule","name":"cohere-go/concurrency-no-buffered-wait-delay","severity":"error"}
 {"kind":"rule","name":"cohere-go/concurrency-no-kill-by-name","severity":"error"}
 {"kind":"rule","name":"cohere-go/concurrency-require-escape-hatch-reason","severity":"error"}
+{"kind":"rule","name":"cohere-go/concurrency-require-joined-pipe-reader","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-abbreviated-file-name","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-abbreviated-identifier","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-ambiguous-identifier","severity":"error"}
@@ -194,6 +195,7 @@
 {"kind":"rule","name":"cohere-go/correctness-no-write-only-collection","severity":"error"}
 {"kind":"rule","name":"cohere-go/correctness-require-checked-assertion","severity":"error"}
 {"kind":"rule","name":"cohere-go/correctness-require-declared-walk","severity":"error"}
+{"kind":"rule","name":"cohere-go/correctness-require-drained-child-output","severity":"error"}
 {"kind":"rule","name":"cohere-go/correctness-require-handled-error","severity":"error"}
 {"kind":"rule","name":"cohere-go/correctness-require-invariant-reason","severity":"error"}
 {"kind":"rule","name":"cohere-go/correctness-require-response-status-check","severity":"error"}
