@@ -187,6 +187,7 @@ func TestTheBuildsWidthReachesNoKey(test *testing.T) {
 		return func(engine *pipeline) {
 			engine.keepsHostRestoreOff = true
 			engine.buildsWidthForced = width
+			engine.buildsWidthUnguarded = true
 		}
 	}
 	one, oneRaw := runOverConfigured(test, root, exitFindings, configure(1), "--other-builds")
@@ -317,5 +318,24 @@ func TestTheBuildsWidth(test *testing.T) {
 		if got != each.want {
 			test.Errorf("%s: the width is %d, want %d", each.name, got, each.want)
 		}
+	}
+}
+
+// Builds that restore nothing from the host's run run one at a time, whatever width is asked: each checks every
+// package, and two of those side by side under the cap made a run slower (extraBuildsWidth). With the restore off, a
+// run asked for three at once over three extra builds runs one at a time and says so.
+func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
+	test.Parallel()
+
+	engine, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
+		engine.keepsHostRestoreOff = true
+		engine.buildsWidthForced = 3
+	}, "--no-cache", "--other-builds")
+	if len(engine.buildRuns) != 4 || engine.buildsAtOnce != 1 {
+		test.Fatalf("with the restore off the run ran %d builds beside the host's, %d at once, want 3, one at a time",
+			len(engine.buildRuns)-1, engine.buildsAtOnce)
+	}
+	if !strings.Contains(raw, `"buildsAtOnce":1`) {
+		test.Errorf("the lint record does not say one build at a time:\n%s", raw)
 	}
 }

@@ -72,12 +72,14 @@ type pipeline struct {
 
 	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once as they started
 	// (extraBuildsWidth), 0 until they did, for the lint record. buildsWidthForced, set only by a test, is the width
-	// in place of that decision, and extraBuildEnds, also a test's alone, is called as each extra build's run ends
-	// with the build's own notes, and fails the build when it returns an error, so a test can note from a build and
-	// fail one by name.
-	buildsAtOnce      int
-	buildsWidthForced int
-	extraBuildEnds    func(extra project.Build, notes io.Writer) error
+	// in place of that decision for builds that restore from the host, and buildsWidthUnguarded, a test's too, lets it
+	// apply to builds that restore nothing, so a test can show the width reaches no key with builds that each check
+	// every package. extraBuildEnds, also a test's alone, is called as each extra build's run ends with the build's own
+	// notes, and fails the build when it returns an error, so a test can note from a build and fail one by name.
+	buildsAtOnce         int
+	buildsWidthForced    int
+	buildsWidthUnguarded bool
+	extraBuildEnds       func(extra project.Build, notes io.Writer) error
 
 	// hostLoading and hostLinting are the host's build's wall time loading the workspace and running the rules over it,
 	// in nanoseconds, over every load and pass, its build record's (buildRun). A load or a pass beside another runs on

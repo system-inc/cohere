@@ -4,6 +4,7 @@ import (
 	"runtime"
 	"runtime/metrics"
 
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 )
 
@@ -11,10 +12,18 @@ import (
 const liveHeapMetric = "/gc/heap/live:bytes"
 
 // extraBuildsWidth is how many of the run's extras extra builds run side by side, decided once as they start
-// (#b2t9xmf): a test's forced width when it set one, and otherwise buildsWidth over this process's cores, memory
-// decision and live heap now. The width never reaches a key or the verdict, only the lint record's buildsAtOnce: the
-// builds' results and notes are taken in build order whatever it is (extraBuildRuns).
-func (engine *pipeline) extraBuildsWidth(extras int) int {
+// (#b2t9xmf): one at a time unless the builds restore packages from host, the host's run (restoresFromHost), then a
+// test's forced width when it set one, and otherwise buildsWidth over this process's cores, memory decision and live
+// heap now. The width never reaches a key or the verdict, only the lint record's buildsAtOnce: the builds' results and
+// notes are taken in build order whatever it is (extraBuildRuns).
+//
+// Builds that restore nothing each check every package, about what the host's did: two of those side by side under
+// the cap drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
+// builds that restore most of their packages from the host ran 22% faster side by side.
+func (engine *pipeline) extraBuildsWidth(extras int, host *check.HostRun) int {
+	if !engine.restoresFromHost(host) && !engine.buildsWidthUnguarded {
+		return 1
+	}
 	if engine.buildsWidthForced > 0 {
 		return min(engine.buildsWidthForced, max(extras, 1))
 	}
@@ -26,6 +35,13 @@ func (engine *pipeline) extraBuildsWidth(extras int) int {
 	}
 	return buildsWidth(extras, runtime.GOMAXPROCS(0), engine.request.switches["single-threaded"], engine.memory,
 		liveHeapBytes())
+}
+
+// restoresFromHost reports whether the extra builds will restore packages from host, the host's run: it kept entries
+// for them, and nothing keeps the builds from reading them, a test turning the restore off or a run whose rename wrote,
+// whose builds read no findings cache. A run under `--timing` keeps no entries.
+func (engine *pipeline) restoresFromHost(host *check.HostRun) bool {
+	return host.EntriesKept() > 0 && !engine.keepsHostRestoreOff && !engine.renamed
 }
 
 // buildsWidth is how many of extras extra builds run side by side: the fewest of the builds, a quarter of processors,
