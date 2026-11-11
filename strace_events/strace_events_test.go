@@ -39,7 +39,8 @@ func TestAPidReadsInEveryFormStracePrints(test *testing.T) {
 }
 
 // A call's arguments end at the parenthesis a result follows outside every quoted string: a `)` or a
-// whole `) = 1` inside a path or a shell's command line is the argument's own text.
+// whole `) = 1` inside a path or a shell's command line is the argument's own text, and a quote a
+// decoded descriptor path escapes opens no string.
 func TestArgumentsEndOutsideEveryQuotedString(test *testing.T) {
 	test.Parallel()
 	for _, want := range []struct{ text, arguments string }{
@@ -56,6 +57,7 @@ func TestArgumentsEndOutsideEveryQuotedString(test *testing.T) {
 			`AT_FDCWD, "fake) = 7<x>", O_RDONLY`,
 		},
 		{`12 openat(AT_FDCWD, "quote\") = 1", O_RDONLY) = 3`, `AT_FDCWD, "quote\") = 1", O_RDONLY`},
+		{`9 openat(AT_FDCWD</d/q\"uote>, "in", O_RDONLY) = 3`, `AT_FDCWD</d/q\"uote>, "in", O_RDONLY`},
 		{
 			`12 newfstatat(AT_FDCWD, "x", {st_mode=S_IFREG|0644, ...}, 0) = 0`,
 			`AT_FDCWD, "x", {st_mode=S_IFREG|0644, ...}, 0`,
@@ -74,7 +76,7 @@ func TestArgumentsEndOutsideEveryQuotedString(test *testing.T) {
 }
 
 // A result is a number, with the path a returned descriptor decodes to and an errno, or strace's
-// unknown `?`, which is never a number.
+// unknown `?`, which is never a number. An errno is read whole, an underscore in its name included.
 func TestAResultIsANumberOrUnknown(test *testing.T) {
 	test.Parallel()
 	for text, want := range map[string]strace_events.Result{
@@ -103,6 +105,12 @@ func TestAResultIsANumberOrUnknown(test *testing.T) {
 			Raw:    "?",
 			Errno:  "ERESTARTSYS",
 			Detail: "(To be restarted if SA_RESTART is set)",
+		},
+		`9 openat(AT_FDCWD</tree/p>, "data.txt", O_RDONLY|O_CLOEXEC) = ? ERESTART_RESTARTBLOCK (Interrupted by signal)`: {
+			Kind:   strace_events.UnknownResult,
+			Raw:    "?",
+			Errno:  "ERESTART_RESTARTBLOCK",
+			Detail: "(Interrupted by signal)",
 		},
 		`1 openat(AT_FDCWD, "x", O_RDONLY) = 99999999999999999999`: {
 			Kind: strace_events.UnknownResult,
@@ -299,5 +307,55 @@ func TestTheArgumentHelpersReadEachArgument(test *testing.T) {
 	}
 	if next := strace_events.NextArgument(` , AT_FDCWD</w>, "b" `); next != `AT_FDCWD</w>, "b"` {
 		test.Errorf("NextArgument reads %q", next)
+	}
+}
+
+// Every name Loom's tracer spells into a decoded descriptor path (ebpftrace.QuoteDescriptor, the names
+// of Loom's TestEveryDecoratedNameReadsAsItself) reads back as itself, well formed, wherever strace
+// decorates a descriptor: an argument's, which Loom joins with the quoted path after it, as `/d/q"uote`
+// and "in" read /d/q"uote/in, a returned one's, and the one a call is made on. An escaped angle bracket
+// closes no decoration, and an escaped quote opens no string.
+func TestEveryDecoratedPathReadsAsItself(test *testing.T) {
+	test.Parallel()
+	for name, spelled := range map[string]string{
+		"/d/a>":         `/d/a\76`,
+		"/d/<b>":        `/d/\74b\76`,
+		`/d/q"uote`:     `/d/q\"uote`,
+		`/d/back\slash`: `/d/back\\slash`,
+		"/d/\x018":      `/d/\0018`,
+		"/d/\x01a":      `/d/\1a`,
+		"/d/end\xff":    `/d/end\377`,
+		"/d/\x7f>":      `/d/\177\76`,
+		"/d/a,>, x":     `/d/a,\76, x`,
+	} {
+		decorated := strace_events.ParseLine(`9 openat(AT_FDCWD<` + spelled + `>, "in", O_RDONLY) = 3`)
+		descriptor, rest, isDescriptor := strace_events.DescriptorArgument(decorated.Call.Arguments)
+		relative, _, isQuoted := strace_events.QuotedArgument(rest)
+		if decorated.Kind != strace_events.CallLine ||
+			!isDescriptor ||
+			descriptor.Path != (strace_events.Text{Raw: spelled, Unescaped: name}) ||
+			!isQuoted ||
+			relative.Unescaped != "in" {
+			test.Errorf("%q decorating AT_FDCWD reads as %+v, %+v and %+v", name, decorated, descriptor, relative)
+		}
+		opened := strace_events.ParseLine(
+			`9 openat(AT_FDCWD</>, "/proc/self/fd/7", O_RDONLY) = 8<` + spelled + `/via>`,
+		)
+		if opened.Kind != strace_events.CallLine ||
+			opened.Call.Result.Opened != (strace_events.Text{Raw: spelled + "/via", Unescaped: name + "/via"}) {
+			test.Errorf("%q decorating a returned descriptor reads as %+v", name, opened)
+		}
+		stat := strace_events.ParseLine(
+			`9 newfstatat(8<` + spelled + `/via>, "", {st_mode=S_IFREG|0644, st_size=0, ...}, AT_EMPTY_PATH) = 0`,
+		)
+		statDescriptor, statRest, isStatDescriptor := strace_events.DescriptorArgument(stat.Call.Arguments)
+		empty, _, isEmptyQuoted := strace_events.QuotedArgument(statRest)
+		if stat.Kind != strace_events.CallLine ||
+			!isStatDescriptor ||
+			statDescriptor.Path != (strace_events.Text{Raw: spelled + "/via", Unescaped: name + "/via"}) ||
+			!isEmptyQuoted ||
+			empty.Unescaped != "" {
+			test.Errorf("%q decorating a stat's descriptor reads as %+v, %+v and %+v", name, stat, statDescriptor, empty)
+		}
 	}
 }
