@@ -387,12 +387,12 @@ func correctnessRequireDrainedChildOutputEventName(ruleContext rule.Context, arg
 	if argument == nil {
 		return ""
 	}
-	argument = ast.SkipParentheses(argument)
-	switch argument.Kind {
+	unwrapped := ast.SkipParentheses(argument)
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return argument.Text()
+		return unwrapped.Text()
 	}
-	argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
+	argumentType := ruleContext.TypeChecker.GetTypeAtLocation(unwrapped)
 	if argumentType == nil || type_checking.IsUnionType(argumentType) ||
 		!type_checking.IsTypeFlagSet(argumentType, checker.TypeFlagsStringLiteral) {
 		return ""
