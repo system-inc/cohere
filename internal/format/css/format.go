@@ -14,6 +14,7 @@ package css
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
@@ -117,9 +118,10 @@ func printSettingsOf(options *printerOptions) printSettings {
 	return options.Settings
 }
 
-// Format is Prettier's format for a CSS file: parse, print to a doc, lay it out. Byte order marks and
-// line endings are normalized by the shared layer, not here. textToDoc formats yaml front matter with the
-// yaml printer, as upstream's embed does; with none, a file holding yaml front matter is refused.
+// Format is Prettier's format for a CSS file: parse, print to a doc, lay it out. A leading byte order mark
+// is taken off before parsing and is not put back, and line endings are the shared layer's to normalize.
+// textToDoc formats yaml front matter with the yaml printer, as upstream's embed does; with none, a file
+// holding yaml front matter is refused.
 func Format(text string, prettierOptions format_options.Options, textToDoc printing.TextToDoc) (string, error) {
 	return formatWithParser(text, prettierOptions, "css", textToDoc)
 }
@@ -142,7 +144,20 @@ func formatWithParser(
 		}
 	}()
 
-	document, formatWithParserError := printToDoc(text, prettierOptions, parser, textToDoc)
+	// core.js's normalizeInputAndOptions takes a leading `U+FEFF` off before the parser and the printer see
+	// the text. postcss drops it too, so a printer handed it would slice comments from originalText one
+	// character off the offsets postcss gave. The shared layer puts the mark back on a file; this entry
+	// leaves it off. Only here: upstream's textToDoc strips nothing, so CSS embedded in another language
+	// keeps its mark in originalText, in printToDoc as in the fork.
+	unmarkedText := strings.TrimPrefix(text, "\ufeff")
+	// core.js's coreFormat: empty or whitespace-only text, by String.prototype.trim (so a lone `U+00A0`
+	// counts), formats to nothing before any parser sees it. postcss would call `U+00A0` an unknown word.
+	// textToDoc has no such shortcut, so this is not in printToDoc either.
+	if trim(unmarkedText) == "" {
+		return "", nil
+	}
+
+	document, formatWithParserError := printToDoc(unmarkedText, prettierOptions, parser, textToDoc)
 	if formatWithParserError != nil {
 		return "", formatWithParserError
 	}
@@ -150,7 +165,7 @@ func formatWithParser(
 		PrintWidth:     prettierOptions.PrintWidth,
 		TabWidth:       prettierOptions.TabWidth,
 		UseTabs:        prettierOptions.UseTabs,
-		ExpectedLength: len(text),
+		ExpectedLength: len(unmarkedText),
 	}), nil
 }
 
