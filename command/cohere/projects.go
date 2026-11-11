@@ -57,9 +57,10 @@ func discoveryApplies(given map[string]bool, arguments []string) bool {
 
 // namedDirectoryHoldsSeveral reports whether a run names a directory with `--directory`, and nothing else that
 // narrows it, and that directory is more than one engine's project, as adamic's root holds a tsconfig.json and a
-// go.work (#pswhv5q). `--directory` is a `cd`, and discovery at that directory runs each of its projects, so a
-// run named there checks each, as one standing there would, where it once read the directory as TypeScript's alone
-// and checked nothing else, in silence. A child run, which names its engine, is one project as ever.
+// go.work (#pswhv5q). `--directory` is a `cd`, so such a run discovers from that directory and checks every project
+// discovery finds there, nested ones included, as `cd` there and `cohere` would, where it once read the directory as
+// TypeScript's alone and checked nothing else, in silence. A child run, which names its engine, is one project as
+// ever: it never discovers, so a project's run never starts runs of its own.
 func namedDirectoryHoldsSeveral(
 	given map[string]bool,
 	arguments []string,
@@ -116,12 +117,6 @@ func checkDiscoveredProjects(
 	found, discoverProjectsError := discoverProjects(root, configuration.IgnorePatternsFrom(ignoreEntries))
 	if discoverProjectsError != nil {
 		return 0, false, discoverProjectsError
-	}
-	if atNamedDirectory {
-		// The directory named is the run's, and the projects below it are each a directory of their own to name.
-		found.Projects = slices.DeleteFunc(found.Projects, func(project discoveredProject) bool {
-			return project.Directory != "."
-		})
 	}
 	var resolveOwnershipError error
 	if found.Ownership, resolveOwnershipError = resolveOwnership(&found); resolveOwnershipError != nil {
