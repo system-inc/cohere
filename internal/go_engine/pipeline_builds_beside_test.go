@@ -465,8 +465,15 @@ func withinBesideWait(test *testing.T, what string, run func()) {
 // awaitStep waits for ready to close, and fails test when besideWait passes first, which only a gate that never lets
 // the awaited step come reaches. It is called from a build's own goroutine, so it reports with Errorf and returns.
 func awaitStep(test *testing.T, ready <-chan struct{}, what string) {
+	awaitStepUnlessBroken(test, ready, nil, what)
+}
+
+// awaitStepUnlessBroken is awaitStep that also returns when broken closes, which a test closes once it has failed for
+// a reason the awaited step can never come after, so the test ends at once with that reason, not at besideWait.
+func awaitStepUnlessBroken(test *testing.T, ready <-chan struct{}, broken <-chan struct{}, what string) {
 	select {
 	case <-ready:
+	case <-broken:
 	case <-time.After(besideWait):
 		test.Errorf("%s never came within %s", what, besideWait)
 	}
@@ -564,6 +571,10 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 	windowsInLine := make(chan struct{})
 	secondAsked := make(chan struct{})
 	var secondAskedOnce sync.Once
+	// misweighed closes when a build comes with the wrong weight, windows light or another build near full: the order
+	// the test plants can then never come, so every wait ends at once and the test fails with the weights it saw.
+	misweighed := make(chan struct{})
+	var misweighedOnce sync.Once
 	role := func(name string) (bool, bool) {
 		rolesLock.Lock()
 		defer rolesLock.Unlock()
@@ -577,8 +588,14 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 			heavy := weight >= lintBudget
 			switch step {
 			case lintStepReady:
+				if heavy != (extra.OperatingSystem == "windows") {
+					test.Errorf("%s came to the gate weighing %d of %d, want windows alone near full", name, weight,
+						lintBudget)
+					misweighedOnce.Do(func() { close(misweighed) })
+					return
+				}
 				if heavy {
-					awaitStep(test, firstHolding, "the first light build holding weight")
+					awaitStepUnlessBroken(test, firstHolding, misweighed, "the first light build holding weight")
 					return
 				}
 				rolesLock.Lock()
@@ -590,10 +607,10 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 				}
 				rolesLock.Unlock()
 				if !first {
-					awaitStep(test, windowsInLine, "windows in line")
+					awaitStepUnlessBroken(test, windowsInLine, misweighed, "windows in line")
 				}
 			case lintStepQueued:
-				if heavy {
+				if heavy && extra.OperatingSystem == "windows" {
 					close(windowsInLine)
 				}
 				if _, second := role(name); second {
@@ -607,7 +624,7 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 				// The first light build holds its weight until the second has asked for its own, in line or taken.
 				if first {
 					close(firstHolding)
-					awaitStep(test, secondAsked, "the second light build asking for weight")
+					awaitStepUnlessBroken(test, secondAsked, misweighed, "the second light build asking for weight")
 				}
 			case lintStepGiving:
 			}
