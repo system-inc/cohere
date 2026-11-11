@@ -42,9 +42,11 @@ func VersionLine(stamp string, size int) string {
 	return VersionPrefix + "none, a local build, so a run computes it"
 }
 
-// ReadVersionLine is the release stamp and table size a `--version` output's line says the binary carries, and
-// whether it carries one it reads. An output with no such line, from a binary older than the line, carries none.
-func ReadVersionLine(output string) (string, int, bool) {
+// ReadVersionLine is the release stamp and table size a `--version` output's line says the binary carries, whether it
+// carries one it reads, and whether the output has the line at all. A binary older than the line says nothing either
+// way, though a release candidate among them carries a table, so its caller refuses it rather than reading it as a
+// local build.
+func ReadVersionLine(output string) (string, int, bool, bool) {
 	for line := range strings.SplitSeq(output, "\n") {
 		described, found := strings.CutPrefix(strings.TrimSpace(line), VersionPrefix)
 		if !found {
@@ -53,10 +55,10 @@ func ReadVersionLine(output string) (string, int, bool) {
 		var stamp string
 		var size int
 		if _, scanError := fmt.Sscanf(described, "release %s %d bytes", &stamp, &size); scanError != nil {
-			return "", 0, false
+			return "", 0, false, true
 		}
 		stamp = strings.TrimSuffix(stamp, ",")
-		return stamp, size, stamp != "" && size > 0
+		return stamp, size, stamp != "" && size > 0, true
 	}
-	return "", 0, false
+	return "", 0, false, false
 }

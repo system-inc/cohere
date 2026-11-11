@@ -293,6 +293,12 @@ func Validate(record Record) error {
 	if record.Engine != "" && !slices.Contains(Engines, record.Engine) {
 		return fmt.Errorf("the record names engine %q, and a run is narrowed only to one of %v", record.Engine, Engines)
 	}
+	// A run of the host's build alone checks one build, so a record that checked more is wrong on its face. An
+	// every-build run that checked one is not: a tree whose files name no other platform has no other build.
+	if !record.EveryBuild && len(record.Builds) > 1 {
+		return fmt.Errorf("the record says its runs asked for the host's build alone, and they checked %d: %s",
+			len(record.Builds), strings.Join(record.Builds, BuildsSeparator))
+	}
 	measured := MeasuredModesOf(record)
 	if knownModesError := knownModes(measured); knownModesError != nil {
 		return knownModesError

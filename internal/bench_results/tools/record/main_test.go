@@ -61,3 +61,18 @@ func TestReadRunsKeepsTheBuildsTheColdRunsChecked(test *testing.T) {
 		})
 	}
 }
+
+// A cohere whose --version says nothing of a standard library table, any binary from before the line, a release
+// candidate carrying one among them, is refused rather than recorded as a local build, which it may not be (#ccqee0e).
+func TestARecordRefusesACohereSilentOnItsTable(test *testing.T) {
+	test.Parallel()
+	engine := filepath.Join(test.TempDir(), "cohere")
+	script := "#!/bin/sh\nprintf 'cohere 0.2.0\\n  commit:         e51c6a1e819b\\n  swift contract: 3\\n'\n"
+	if writeError := os.WriteFile(engine, []byte(script), 0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	_, table, provenanceError := engineProvenance(engine)
+	if provenanceError == nil || !strings.Contains(provenanceError.Error(), "does not say whether it carries") {
+		test.Errorf("a cohere silent on its table read as table %v with %v, want refused", table, provenanceError)
+	}
+}

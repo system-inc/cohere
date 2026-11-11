@@ -162,8 +162,16 @@ func engineProvenance(engine string) (bench_results.Cohere, *bench_results.Stand
 	if outputError != nil {
 		return bench_results.Cohere{}, nil, fmt.Errorf("%s --version: %w", engine, outputError)
 	}
+	stamp, size, carries, found := standard_library_table.ReadVersionLine(string(output))
+	if !found {
+		// A release candidate from before the line carries a table and says nothing, so read as a local build it
+		// would be compared with a local build's number.
+		return bench_results.Cohere{}, nil, fmt.Errorf("%s does not say whether it carries a standard library "+
+			"table (no %q line in its --version), so its record could not say what its cold runs computed",
+			engine, strings.TrimSpace(standard_library_table.VersionPrefix))
+	}
 	var table *bench_results.StandardLibraryTable
-	if stamp, size, carries := standard_library_table.ReadVersionLine(string(output)); carries {
+	if carries {
 		table = &bench_results.StandardLibraryTable{ReleaseStamp: stamp, Bytes: size}
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")

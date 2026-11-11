@@ -3,6 +3,8 @@ package bench_results
 import (
 	"fmt"
 	"math"
+	"slices"
+	"strings"
 )
 
 // GuardVerdict is what the nightly speed guard says of tonight's cold run against the baseline of record.
@@ -44,11 +46,11 @@ type GuardResult struct {
 //
 // Records of different projects or machines are refused, since their numbers measure different work or different
 // hardware, and so are a record of the whole root and one narrowed to one engine's project (Record.Engine), which
-// measure different work on the same project, a host-only record and an every-build one (Record.EveryBuild), and a
-// local build's record and a release binary's (Record.StandardLibraryTable). A baseline with no quiet cold number, or
-// from a modified engine, is refused too: a baseline is a number someone can reproduce. A tonight with neither is
-// Unmeasured, not an error, because a loaded night is the machine's doing, not the record's, and the guard must still
-// say the night was lost.
+// measure different work on the same project, a host-only record and an every-build one (Record.EveryBuild), two that
+// checked different builds (Record.Builds), and a local build's record and a release binary's
+// (Record.StandardLibraryTable). A baseline with no quiet cold number, or from a modified engine, is refused too: a
+// baseline is a number someone can reproduce. A tonight with neither is Unmeasured, not an error, because a loaded
+// night is the machine's doing, not the record's, and the guard must still say the night was lost.
 func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, error) {
 	// A NaN threshold compares false with everything, so every night would pass; refuse it with the negatives.
 	if !(threshold >= 0) {
@@ -80,6 +82,15 @@ func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, err
 			"the baseline checked %s and tonight %s, and runs of different builds are never compared",
 			buildsKind(baseline.EveryBuild),
 			buildsKind(tonight.EveryBuild),
+		)
+	}
+	// The label says what a run asked for and the builds what it did: a run labelled every-build whose forwarding
+	// broke checks the host's build alone, in about a second of the bar, and only its builds show it.
+	if len(baseline.Builds) > 0 && len(tonight.Builds) > 0 && !sameBuilds(baseline.Builds, tonight.Builds) {
+		return GuardResult{}, fmt.Errorf(
+			"the baseline checked the builds %s and tonight %s, and runs of different builds are never compared",
+			strings.Join(baseline.Builds, BuildsSeparator),
+			strings.Join(tonight.Builds, BuildsSeparator),
 		)
 	}
 	if (baseline.StandardLibraryTable == nil) != (tonight.StandardLibraryTable == nil) {
@@ -158,6 +169,11 @@ func coldKind(noFix bool) string {
 		return "checked without fixing"
 	}
 	return "fixed"
+}
+
+// sameBuilds reports whether two records checked the same builds, in any order.
+func sameBuilds(left []string, right []string) bool {
+	return slices.Equal(slices.Sorted(slices.Values(left)), slices.Sorted(slices.Values(right)))
 }
 
 // buildsKind says which builds a record's runs asked to check, for a refusal to name.

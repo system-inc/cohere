@@ -18,13 +18,13 @@ func TestTheVersionLineReadsBackAsTheTableItNames(test *testing.T) {
 		{"", 0, false, ""},
 	} {
 		output := "cohere dev\n  swift contract: 3\n  " + VersionLine(testCase.stamp, testCase.size) + "\n"
-		stamp, size, carries := ReadVersionLine(output)
-		if carries != testCase.carries || stamp != testCase.readBack || carries && size != testCase.size {
+		stamp, size, carries, found := ReadVersionLine(output)
+		if !found || carries != testCase.carries || stamp != testCase.readBack || carries && size != testCase.size {
 			test.Errorf("stamp %q, %d bytes reads back as %q, %d bytes, carrying %t, want %q, carrying %t",
 				testCase.stamp, testCase.size, stamp, size, carries, testCase.readBack, testCase.carries)
 		}
 	}
-	if _, _, carries := ReadVersionLine("cohere 0.1.0\n  swift contract: 3\n"); carries {
-		test.Errorf("a version with no table line reads as carrying a table")
+	if _, _, carries, found := ReadVersionLine("cohere 0.1.0\n  swift contract: 3\n"); carries || found {
+		test.Errorf("a version with no table line reads as found %t, carrying %t, want neither", found, carries)
 	}
 }
