@@ -174,6 +174,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		}
 		record.Builds = verdict.records
 		record.BuildsAtOnce = engine.buildsAtOnce
+		record.BuildsWidthLiveBytes = engine.buildsWidthLiveBytes
 	}
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true

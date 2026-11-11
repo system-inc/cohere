@@ -71,7 +71,8 @@ type pipeline struct {
 	keepsHostRestoreOff bool
 
 	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once as they started
-	// (extraBuildsWidth), 0 until they did, for the lint record. buildsWidthForced, set only by a test, is the width
+	// (extraBuildsWidth), 0 until they did, for the lint record, and buildsWidthLiveBytes the host's live heap that
+	// decision was given, 0 when it needed none. buildsWidthForced, set only by a test, is the width
 	// in place of that decision for builds that restore from the host, and buildsWidthUnguarded, a test's too, lets it
 	// apply to builds that restore nothing, so a test can show the width reaches no key with builds that each check
 	// every package. extraBuildEnds, also a test's alone, is called as each extra build's run ends with the build's own
@@ -80,6 +81,7 @@ type pipeline struct {
 	// (lintStep), on the build's own goroutine, so a test can count the lints holding weight and hold a build at a
 	// step.
 	buildsAtOnce         int
+	buildsWidthLiveBytes uint64
 	buildsWidthForced    int
 	buildsWidthUnguarded bool
 	extraBuildEnds       func(extra project.Build, notes io.Writer) error

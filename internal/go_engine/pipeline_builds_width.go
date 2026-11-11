@@ -12,29 +12,42 @@ import (
 const liveHeapMetric = "/gc/heap/live:bytes"
 
 // extraBuildsWidth is how many of the run's extras extra builds run side by side, decided once as they start
-// (#b2t9xmf): one at a time unless the builds restore packages from host, the host's run (restoresFromHost), then a
-// test's forced width when it set one, and otherwise buildsWidth over this process's cores, memory decision and live
-// heap now. The width never reaches a key or the verdict, only the lint record's buildsAtOnce: the builds' results and
-// notes are taken in build order whatever it is (extraBuildRuns).
+// (#b2t9xmf), and the host's live heap it was decided by, 0 when it needed none: one at a time unless the builds
+// restore packages from host, the host's run (restoresFromHost), then a test's forced width when it set one, and
+// otherwise buildsWidth over this process's cores, memory decision and the host's live heap (hostLiveHeapBytes). The
+// width never reaches a key or the verdict, only the lint record's buildsAtOnce and buildsWidthLiveBytes: the builds'
+// results and notes are taken in build order whatever it is (extraBuildRuns).
 //
 // Builds that restore nothing each check every package, about what the host's did: two of those side by side under
 // the cap drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
 // builds that restore most of their packages from the host ran 22% faster side by side.
-func (engine *pipeline) extraBuildsWidth(extras int, host *check.HostRun) int {
-	if !engine.restoresFromHost(host) && !engine.buildsWidthUnguarded {
-		return 1
+func (engine *pipeline) extraBuildsWidth(extras int, host *check.HostRun) (int, uint64) {
+	return engine.extraBuildsWidthOver(extras, host, runtime.GOMAXPROCS(0))
+}
+
+// extraBuildsWidthOver is extraBuildsWidth over processors, which a test sets, since the pool its tests run in caps
+// this process's.
+func (engine *pipeline) extraBuildsWidthOver(extras int, host *check.HostRun, processors int) (int, uint64) {
+	if !engine.buildsWidthUnguarded && !engine.restoresFromHost(host) {
+		return 1, 0
 	}
 	if engine.buildsWidthForced > 0 {
-		return min(engine.buildsWidthForced, max(extras, 1))
+		return min(engine.buildsWidthForced, max(extras, 1)), 0
 	}
 	// The release's standard-library child collects every entry its sessions save into one map, which each session
 	// writes under a lock of its own, so two builds saving at once would write it together. That child checks no
 	// extra build today; one at a time keeps it safe if it ever does.
 	if engine.request.standardLibrary.collected != nil {
-		return 1
+		return 1, 0
 	}
-	return buildsWidth(extras, runtime.GOMAXPROCS(0), engine.request.switches["single-threaded"], engine.memory,
-		liveHeapBytes())
+	singleThreaded := engine.request.switches["single-threaded"]
+	// A live heap of one byte is the smallest any heap can be, so the widest the cores, the builds and the limit allow:
+	// when even that is one at a time, no heap can widen it, and the run pays no collection to measure one.
+	if buildsWidth(extras, processors, singleThreaded, engine.memory, 1) == 1 {
+		return 1, 0
+	}
+	live := hostLiveHeapBytes()
+	return buildsWidth(extras, processors, singleThreaded, engine.memory, live), live
 }
 
 // restoresFromHost reports whether the extra builds will restore packages from host, the host's run: it kept entries
@@ -77,6 +90,15 @@ func buildsWidth(
 	// Bounded by extras before it is an int, so a tiny live heap never overflows it.
 	byMemory := int(min((capBytes-liveBytes)/liveBytes, uint64(max(extras, 0))))
 	return max(min(extras, processors/4, byMemory), 1)
+}
+
+// hostLiveHeapBytes is the host's live heap as the extra builds start, measured by a collection run for it, so the
+// width is decided by what the host's run holds at one fixed point, once its reads are whole (otherBuilds), and two
+// runs of one workspace are given the same heap. The runtime's last collection, read without one, says the heap at
+// whatever moment the collector last ran, which across three runs of one workspace gave the widths 1, 1 and 4.
+func hostLiveHeapBytes() uint64 {
+	runtime.GC()
+	return liveHeapBytes()
 }
 
 // liveHeapBytes is the live heap at the runtime's last collection, 0 when it reports none.

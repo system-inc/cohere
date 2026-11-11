@@ -386,6 +386,47 @@ func TestTheBuildsWidth(test *testing.T) {
 	}
 }
 
+// The width is decided by the host's live heap measured as the builds start, never by whenever the collector last
+// ran, so two decisions over one heap agree whatever state the collector is in: one right after a collection, one
+// after a collection that counted 512 MiB the decision no longer holds, which a read of the last collection would
+// count as live. The limit is set so that heap, counted, would allow one build at a time and the heap itself four.
+//
+// Not parallel: it measures this process's live heap, which another test's run would move.
+func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
+	const garbageBytes = 512 << 20
+	runtime.GC()
+	baseline := liveHeapBytes()
+	// Twice the heap with the garbage counted holds one build beside it, and the heap without it many.
+	limit := int64(2 * (baseline + garbageBytes))
+	engine := &pipeline{buildsWidthUnguarded: true, memory: &engineMemory{record: contract.Memory{LimitBytes: limit,
+		CapBytes: limit, Source: contract.MemorySourceCap}}}
+
+	runtime.GC()
+	collectedWidth, collectedLive := engine.extraBuildsWidthOver(8, nil, 16)
+
+	garbage := make([]byte, garbageBytes)
+	for index := range garbage {
+		garbage[index] = 1
+	}
+	runtime.GC()
+	runtime.KeepAlive(garbage)
+	// garbage is unreachable from here, and no collection has run since the last one counted it.
+	staleWidth, staleLive := engine.extraBuildsWidthOver(8, nil, 16)
+
+	if collectedWidth != staleWidth {
+		test.Errorf("the width is %d after a collection and %d after one that counted garbage, want one width",
+			collectedWidth, staleWidth)
+	}
+	if collectedWidth != 4 {
+		test.Errorf("the width is %d, want 4, the cores' quarter, which the measured heap leaves room for",
+			collectedWidth)
+	}
+	if difference := max(collectedLive, staleLive) - min(collectedLive, staleLive); difference > 64<<20 {
+		test.Errorf("the decision was given %d and %d live bytes, %d apart, want the same heap measured both times",
+			collectedLive, staleLive, difference)
+	}
+}
+
 // Builds that restore nothing from the host's run run one at a time, whatever width is asked: each checks every
 // package, and two of those side by side under the cap made a run slower (extraBuildsWidth). With the restore off, a
 // run asked for three at once over three extra builds runs one at a time and says so.

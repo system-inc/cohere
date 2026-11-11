@@ -1011,10 +1011,13 @@ reads as one. The host's record writes none of the four, and none reaches a key 
 
 Beside `builds` the Go engine writes `"buildsAtOnce":3`, additive within contract 3: how many of the builds beside
 the host's ran side by side, decided once as they started (#b2t9xmf), from a quarter of the cores, the memory cap
-and the host's live heap at its last collection, and one at a time under `--single-threaded` or a limit other than
-the cap. Each build notes into its own buffer, and once every build has ended their results and notes are taken in
-build order, up to and including the first that failed, so the records and stderr are those of a run one build at a
-time, byte for byte, but this field, which no key and no verdict reads. It is absent when `builds` is.
+and the host's live heap, and one at a time under `--single-threaded` or a limit other than the cap. Beside it,
+`"buildsWidthLiveBytes":2147483648` is that live heap, measured by a collection once the host's reads are whole, so
+two runs of one workspace are given the same heap; it is absent when the decision needed none, because nothing could
+make the builds more than one at a time. Each build notes into its own buffer, and once every build has ended their
+results and notes are taken in build order, up to and including the first that failed, so the records and stderr are
+those of a run one build at a time, byte for byte, but these two fields, which no key and no verdict reads. Both are
+absent when `builds` is.
 
 ### `phase`
 

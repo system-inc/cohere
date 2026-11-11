@@ -68,7 +68,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		runs[0].files = engine.session.Files()
 	}
 
-	engine.buildsAtOnce = engine.extraBuildsWidth(len(extras), pass.result.Host)
+	engine.buildsAtOnce, engine.buildsWidthLiveBytes = engine.extraBuildsWidth(len(extras), pass.result.Host)
 	extraRuns, extraError := engine.extraBuildRuns(extras, ours, pass.result.Host, engine.buildsAtOnce)
 	if extraError != nil {
 		engine.otherBuildsFailed(extraError)
