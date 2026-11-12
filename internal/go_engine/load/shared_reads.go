@@ -21,8 +21,10 @@ import (
 // from its held bytes first (Held), which follow every write, and the engine never adds or removes a file, so a
 // directory's entries hold for the run. A nil SharedReads shares nothing, and each listing reads the disk itself.
 type SharedReads struct {
-	// pastHead counts the readers that read on past a file's shared head, opening it on disk.
-	pastHead atomic.Int64
+	// pastHead counts the readers that read on past a file's shared head, opening it on disk, and directoryReads
+	// every directory read asked of them, each listing's first read of a directory once.
+	pastHead       atomic.Int64
+	directoryReads atomic.Int64
 
 	mutex       sync.Mutex
 	directories map[string]*sharedDirectory
@@ -52,6 +54,7 @@ func NewSharedReads() *SharedReads {
 // listing. go/build reads only an entry's name, whether it is a directory and its type, so an entry is given as
 // that, with no stat of its own (entryInfo).
 func (shared *SharedReads) readDirectory(directory string) ([]fs.FileInfo, error) {
+	shared.directoryReads.Add(1)
 	shared.mutex.Lock()
 	read := shared.directories[directory]
 	if read == nil {
@@ -96,4 +99,15 @@ func (shared *SharedReads) openFile(held Held) func(path string) (io.ReadCloser,
 		return &headReader{shared: shared, path: path, head: bytes.NewReader(read.head), offset: int64(len(read.head)),
 			complete: read.complete, size: read.size, modified: read.modified}, nil
 	}
+}
+
+// Held is how many directories the reads hold and how many reads of them were asked, all zero for nil: a directory
+// read more often than once was read by a second listing, which shared the first's read.
+func (shared *SharedReads) Held() (int, int64) {
+	if shared == nil {
+		return 0, 0
+	}
+	shared.mutex.Lock()
+	defer shared.mutex.Unlock()
+	return len(shared.directories), shared.directoryReads.Load()
 }
