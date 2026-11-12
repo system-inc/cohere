@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -79,6 +80,16 @@ func loadSummary(test *testing.T, directory string, environment []string, listin
 	return summary, loaded.ListingKept
 }
 
+// anotherTarget is a target other than host's, as the environment that names it: linux on amd64, or darwin on arm64
+// where the host is linux on amd64, so the edit always asks for a target the first load did not list. Both are targets
+// the in-process lister answers for, so the case reads the lister's key and not go list's.
+func anotherTarget(hostOperatingSystem string, hostArchitecture string) []string {
+	if hostOperatingSystem == "linux" && hostArchitecture == "amd64" {
+		return []string{"GOOS=darwin", "GOARCH=arm64"}
+	}
+	return []string{"GOOS=linux", "GOARCH=amd64"}
+}
+
 // listingEdit is one change to the project after go list's answer was kept, and whether the answer may be kept
 // through it.
 type listingEdit struct {
@@ -150,7 +161,7 @@ var listingEdits = []listingEdit{
 	{name: "a go.work use added", workspace: true, files: map[string]string{
 		"project/go.work": "go 1.24\n\nuse (\n\t.\n\t../outside\n)\n",
 	}},
-	{name: "another target", environment: []string{"GOOS=linux", "GOARCH=amd64"}},
+	{name: "another target", environment: anotherTarget(runtime.GOOS, runtime.GOARCH)},
 	// Flags that change only what go prints, or how many packages it builds at once, keep the answer, as cohere-dev's
 	// pool sets -p to each token's share; a flag that changes what it lists, a build tag, does not. Each keeps the
 	// process's other flags, -buildvcs among them, so it changes only what it names.
@@ -215,6 +226,19 @@ func TestGoListsAnswerIsKeptUntilWhatItReadsMoves(test *testing.T) {
 					strings.Join(fresh, "\n"))
 			}
 		})
+	}
+}
+
+// The case for another target asks for one other than the host's on every host the in-process lister answers for, so
+// it reads the same on the Mac and on Home: a target equal to the host's is no other target, and its answer is kept.
+func TestAnotherTargetIsNeverTheHosts(test *testing.T) {
+	test.Parallel()
+
+	for _, host := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
+		other := anotherTarget(host[0], host[1])
+		if slices.Equal(other, []string{"GOOS=" + host[0], "GOARCH=" + host[1]}) {
+			test.Errorf("want a target other than %s/%s, got %q", host[0], host[1], other)
+		}
 	}
 }
 
