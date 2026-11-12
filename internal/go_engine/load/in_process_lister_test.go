@@ -139,7 +139,8 @@ func requireGoListsAnswer(test *testing.T, directory string, extra []string, pat
 	if doubt != "" {
 		test.Fatalf("the in-process lister did not answer: %s", doubt)
 	}
-	goList, listError := listWithGoList(directory, goEnvironment.fullEnvironment, patterns, nil)
+	goList, listError := listWithGoList(goEnvironment.guard, directory, goEnvironment.fullEnvironment, patterns,
+		nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

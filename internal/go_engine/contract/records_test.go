@@ -401,7 +401,7 @@ func populatedRecords() []Record {
 			MeasuredCalls:            2300,
 			MeasuringCpuMicroseconds: 230,
 		},
-		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1},
+		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1, UnguardedWorkspaceSums: []string{"/work/go.work.sum"}},
 	}
 }
 

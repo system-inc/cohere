@@ -106,7 +106,8 @@ func list(
 		listed.inProcess = true
 		return listed, nil
 	}
-	listed, listError := listWithGoList(goEnvironment.workspace, goEnvironment.fullEnvironment, patterns, collector)
+	listed, listError := listWithGoList(goEnvironment.guard, goEnvironment.workspace, goEnvironment.fullEnvironment,
+		patterns, collector)
 	if listError != nil {
 		return nil, listError
 	}
@@ -114,16 +115,17 @@ func list(
 	return listed, nil
 }
 
-// listWithGoList is list by `go list -deps -json -e` alone, the one go command a runner of prebuilt tests answers.
-// go list -deps follows no test's imports, and -test is refused there, so what only the tests import is listed a
-// second time by name, and added after.
+// listWithGoList is list by `go list -deps -json -e` alone, the one go command a runner of prebuilt tests answers,
+// beside guard's copy of the go.work. go list -deps follows no test's imports, and -test is refused there, so what
+// only the tests import is listed a second time by name, and added after.
 func listWithGoList(
+	guard *workspaceSumGuard,
 	workspace string,
 	environment []string,
 	patterns []string,
 	collector *timing.Collector,
 ) (*listing, error) {
-	listed, listError := runList(workspace, environment, patterns, collector)
+	listed, listError := runList(guard, workspace, environment, patterns, collector)
 	if listError != nil {
 		return nil, listError
 	}
@@ -150,7 +152,7 @@ func listWithGoList(
 		return result, nil
 	}
 	slices.Sort(testImports)
-	extra, extraError := runList(workspace, environment, testImports, collector)
+	extra, extraError := runList(guard, workspace, environment, testImports, collector)
 	if extraError != nil {
 		return nil, extraError
 	}
@@ -180,8 +182,10 @@ func (listing *listing) add(listed []*listedPackage) {
 	}
 }
 
-// runList runs go list once and reads what it printed, dependencies first, adding go list's CPU to collector.
+// runList runs go list once beside guard's copy of the go.work and reads what it printed, dependencies first, adding go
+// list's CPU to collector.
 func runList(
+	guard *workspaceSumGuard,
 	workspace string,
 	environment []string,
 	patterns []string,
@@ -194,14 +198,13 @@ func runList(
 	// PWD names the directory as this process spells it, so the positions go list writes relative to it are
 	// relative to the workspace as the load names it, through a symbolic link too (/tmp is /private/tmp on a Mac).
 	command.Env = append(slices.Clone(environment), "PWD="+workspace)
-	var standardError bytes.Buffer
-	command.Stderr = &standardError
 	var output []byte
+	var standardError []byte
 	var runError error
-	measureGoCommands(collector, func() { output, runError = command.Output() })
+	measureGoCommands(collector, func() { output, standardError, runError = guard.output(command) })
 	if runError != nil {
 		return nil, fmt.Errorf("listing %s with go list in %s: %w: %s", strings.Join(patterns, " "), workspace,
-			runError, strings.TrimSpace(standardError.String()))
+			runError, strings.TrimSpace(string(standardError)))
 	}
 	var listed []*listedPackage
 	decoder := json.NewDecoder(bytes.NewReader(output))
@@ -241,8 +244,14 @@ func runList(
 // import path. environment is the whole environment, the one translatedEnvironment gives, and -pgo=off is asked as
 // go/packages asks it, so a command with a default.pgo profile is not listed twice. No -deps and no -test: the graph,
 // its test variants among it, is the plain listing's, and only the compiled files are read from this one. Nothing of
-// it is kept with go list's kept answer, whose shape stays the plain listing's, so the translation runs every run.
-func listCompiled(workspace string, environment []string, listed *listing) (map[string]*compiledPackage, error) {
+// it is kept with go list's kept answer, whose shape stays the plain listing's, so the translation runs every run. It
+// runs beside guard's copy of the go.work, as every go list of a load does.
+func listCompiled(
+	guard *workspaceSumGuard,
+	workspace string,
+	environment []string,
+	listed *listing,
+) (map[string]*compiledPackage, error) {
 	var paths []string
 	compiled := map[string]*compiledPackage{}
 	for _, listedPackage := range listed.packages {
@@ -260,12 +269,10 @@ func listCompiled(workspace string, environment []string, listed *listing) (map[
 	command.Dir = workspace
 	// PWD as in runList, so a position go list writes relative to the workspace is relative to it as the load names it.
 	command.Env = append(slices.Clone(environment), "PWD="+workspace)
-	var standardError bytes.Buffer
-	command.Stderr = &standardError
-	output, runError := command.Output()
-	if runError != nil && !cgoFailureOnly(standardError.String()) {
+	output, standardError, runError := guard.output(command)
+	if runError != nil && !cgoFailureOnly(string(standardError)) {
 		return nil, fmt.Errorf("translating the cgo files of %s with go list -compiled in %s: %w: %s",
-			strings.Join(paths, " "), workspace, runError, strings.TrimSpace(standardError.String()))
+			strings.Join(paths, " "), workspace, runError, strings.TrimSpace(string(standardError)))
 	}
 	decoder := json.NewDecoder(bytes.NewReader(output))
 	for {
@@ -299,7 +306,7 @@ func listCompiled(workspace string, environment []string, listed *listing) (map[
 	// A package go list neither translated nor gave an error for, as one it left out of its answer when a dependency's
 	// C compiler failed, is a translation that failed all the same, and says so, with what go printed, rather than
 	// being checked with its package "C" faked and nothing said.
-	said := strings.TrimSpace(standardError.String())
+	said := strings.TrimSpace(string(standardError))
 	for _, path := range paths {
 		if each := compiled[path]; each.Error == nil && !each.translated(listed.byPath[path]) {
 			each.Error = &listedError{Message: "go list -compiled gave no translation of the package's cgo files"}

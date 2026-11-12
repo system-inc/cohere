@@ -827,6 +827,13 @@
                             },
                             "description": "Why each file of a run that checked nothing was left out, one entry per reason. Present only when nothingToCheck is set and the project had files of its language: such a run fails, since it checked nothing. A project with no file of its language at all has none, and passes with the warning alone."
                         },
+                        "unguardedWorkspaceSums": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Each go.work.sum a Go run's go list ran beside with no side copy of its go.work, since none could answer exactly as the tree's, as beside a vendor directory, so go may have rewritten it. A gap, not a failure: every file was checked. Absent when every go list ran under a copy."
+                        },
                         "indexFallback": {
                             "type": "string",
                             "description": "Why a format walk read no tracked path from its repository's index: a split or sparse index, one git did not write, or none yet. The walk decided by the ignore files alone, so a file git tracks under a pattern that matches it went unformatted, counted ignored. Absent when the index was read or the root is in no repository."

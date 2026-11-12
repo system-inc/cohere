@@ -330,6 +330,12 @@ func uncheckedMarkers(summary runSummary) []string {
 	if marker := withheldCgoMarker(gaps.WithheldInDependencyCgo, gaps.WithheldDependencyCgoDeclarations); marker != "" {
 		markers = append(markers, marker)
 	}
+	switch count := len(gaps.UnguardedWorkspaceSums); {
+	case count == 1:
+		markers = append(markers, "⚠ go list may rewrite go.work.sum")
+	case count > 1:
+		markers = append(markers, fmt.Sprintf("⚠ go list may rewrite %d go.work.sum files", count))
+	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
 	}

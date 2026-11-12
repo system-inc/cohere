@@ -199,6 +199,12 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   checks nothing. A typo or a rule from a newer cohere loaded, applied to nothing and read green, and only
   `--verbose` said so, as `config: key "..." matches no registered rule`, a line that is gone. `unused-disable`
   is a setting and still loads. `--format-only` reads no rules, so it is unchanged.
+- A Go check leaves a workspace's go.work.sum as it was. go list in workspace mode writes every sum it reads that
+  go.work.sum lacks, and drops every one a module's go.sum holds, whatever `-mod` says, so a `--no-fix` run over a
+  workspace whose go.work.sum was stale rewrote a tracked file. Every go list now runs with `GOWORK` at a copy of the
+  go.work outside the tree, and what go prints is spelled as it spells it from the tree, so every finding is the
+  same. Where that can't be made exact, as beside a vendor directory, go list runs in the tree as before, and the
+  footer says `⚠ go list may rewrite go.work.sum`, naming the file, as `--json`'s `gaps.unguardedWorkspaceSums` does.
 
 ## 0.1.1 (2026-11-03)
 
