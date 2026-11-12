@@ -156,6 +156,9 @@ func loadAt(test *testing.T, root string) *load.Loaded {
 // equates only when both are nil.
 func comparableRestored(restored *restoredPackage) restoredPackage {
 	compared := *restored
+	// Where the body is kept is not what it says: gob writes a map in no set order, so two encodings of one body name
+	// two digests (#fq7dxvx).
+	compared.bodyDigest = nil
 	types := *restored.types
 	types.ReadExportData = nil
 	compared.types = &types

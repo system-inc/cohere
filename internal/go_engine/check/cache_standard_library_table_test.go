@@ -176,7 +176,7 @@ func TestATableEntryRestoresAsTheStoreEntryItWasWrittenFrom(test *testing.T) {
 	facts, withheld := 0, 0
 	for key, entry := range collected {
 		restoring := &packages.Package{ID: entry.PackagePath, PkgPath: entry.PackagePath}
-		fromStore, storeError := decodeEntry(known, restoring, entry.Entry, nil)
+		fromStore, storeError := decodeWholeEntry(known, restoring, entry.Entry)
 		if storeError != nil {
 			test.Fatalf("%s: decoding the store's entry: %v", entry.PackagePath, storeError)
 		}
