@@ -200,11 +200,11 @@ func standardLibraryRequests(
 
 // verifyStandardLibrary is `cohere go-engine verify-std-facts`, the release's check of table, the one the binary
 // embeds: for every variant it holds for this binary's own target, the generator recomputes that variant's standard
-// library with no table read, and each package's export digest and output digest must equal, by value, those of the
-// table's entry under the same key. It fails on any difference, on a key it computed that the table does not hold, on
-// a variant whose package count is not the table's, on a variant it could not recompute, on any entry of the table no
-// variant recomputed, and on a table that holds no variant for this target. It prints a line for each variant with
-// the count it checked, so a run that checked nothing cannot pass.
+// library with no table read, and each package's export digest, output digest and persisted reads must equal, by value,
+// those of the table's entry under the same key. It fails on any difference, on a key it computed that the table does
+// not hold, on a variant whose package count is not the table's, on a variant it could not recompute, on any entry of
+// the table no variant recomputed, and on a table that holds no variant for this target. It prints a line for each
+// variant with the count it checked, so a run that checked nothing cannot pass.
 func verifyStandardLibrary(
 	arguments []string,
 	standardOutput io.Writer,
@@ -287,7 +287,7 @@ func verifyStandardLibrary(
 }
 
 // differenceFrom is how the entry table holds under key differs from computed, the entry a check recomputed under the
-// same key, by package, export digest and output digest, or empty when it does not.
+// same key, by package, export digest, output digest and persisted reads, or empty when it does not.
 func differenceFrom(table *cache.StandardLibraryTable, key cache.Key, computed cache.StandardLibraryEntry) string {
 	computedDigests, computedError := check.StandardLibraryDigestsOf(computed)
 	if computedError != nil {
@@ -308,6 +308,8 @@ func differenceFrom(table *cache.StandardLibraryTable, key cache.Key, computed c
 		return computedDigests.PackagePath + ": its export digest differs"
 	case !bytes.Equal(shippedDigests.Output, computedDigests.Output):
 		return computedDigests.PackagePath + ": its output digest differs"
+	case shippedDigests.Reads != computedDigests.Reads:
+		return computedDigests.PackagePath + ": its persisted reads differ"
 	}
 	return ""
 }

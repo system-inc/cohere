@@ -35,6 +35,13 @@ type persistedReads struct {
 	// Assembly is whether the package has assembly files, whose reads were digested whole (Restoring.Assembly).
 	Assembly bool
 
+	// WordSize and MaximumAlignment are the sizes the host's memo measured another package's unexported fields by
+	// (typeGraph.measureBy), as measuredSizes reads them. A digest that reaches such a field holds its size and
+	// alignment, so a build measured by other sizes never renders it alike, and the verdict declines the record as
+	// unknown rather than compare it (persistedTypesHold).
+	WordSize         int64
+	MaximumAlignment int64
+
 	// Owners are the paths of the packages the reads name, each once, and FactTypes the fact types, by factTypeName,
 	// each once.
 	Owners    []string

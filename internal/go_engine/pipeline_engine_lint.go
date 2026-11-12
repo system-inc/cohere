@@ -84,6 +84,12 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		return lintedLoad
 	}
 	result, outcome := pass.result, pass.outcome
+	// A run collecting the standard library's entries for the release's table persists each one's reads beside it once
+	// every type-read walk has ended, so the table carries them and a host restoring a package from it can keep it for
+	// its extra builds (#pcv6eff).
+	if engine.request.standardLibrary.collected != nil && engine.session != nil {
+		engine.session.PersistCollectedReads(wholeReads(pass.result))
+	}
 	var verdict *buildsVerdict
 	if engine.request.switches["other-builds"] {
 		// The host's reads, pass.result.Reads, are what an extra build will restore a package by (#b2t9xmf). Their
@@ -209,8 +215,8 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 	analyzed := slices.DeleteFunc(slices.Clone(loaded.Packages), func(each *packages.Package) bool {
 		return !engine.described.hasFileInScope(each)
 	})
-	// The host's reads, recorded only when the run has extra builds to restore packages into (recordsReads), walked in
-	// the load's slots below its work.
+	// The host's reads, recorded only when the run has extra builds to restore packages into or collects the standard
+	// library's table (recordsReads), walked in the load's slots below its work.
 	return engine.lintPackages(analyzed, loaded.Rewritten, check.Options{Withheld: loaded.Withheld,
 		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots})
 }
@@ -232,7 +238,7 @@ func (engine *pipeline) lintPackages(
 	options.SingleThreaded = engine.request.switches["single-threaded"]
 	options.Cache = session
 	// The host's run keeps its packages' entries for the extra builds to restore from, only when there are any.
-	options.KeepForBuilds = session != nil && options.Reads != nil && engine.recordsReads()
+	options.KeepForBuilds = session != nil && options.Reads != nil && engine.keepsForBuilds()
 	// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 	// and what follows reads the files' contents the project description holds, and the types.
 	options.ReleaseAnalyzed = true
@@ -343,7 +349,7 @@ func (engine *pipeline) cacheSession(
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}
-	if caching == nil && cachingError == nil && engine.recordsReads() {
+	if caching == nil && cachingError == nil && engine.keepsForBuilds() {
 		// Nothing is stored or read from a store: the session keeps entries in memory for the extra builds alone.
 		caching = &check.Caching{ExtraInputs: newStaticcheckConfigurationInputs().inputs}
 	}

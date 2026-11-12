@@ -19,14 +19,19 @@ type readsWriter struct {
 }
 
 // persistReads is restoring's reads, a package the host checked this run, as an entry persists them, their digests
-// taken by host, the host's memo, under version, the renderer's, and false for reads that can never hold or were never
-// recorded, which no record can promise anything of. A package with assembly files is digested by the memo's whole
-// twin, as the verdict judges it (TypesHold).
+// taken by host, the host's memo, under version, the renderer's, and the sizes host measures by, and false for reads
+// that can never hold or were never recorded, which no record can promise anything of, and for a memo never measured,
+// whose digests render every field whole, which no build's measured memo matches. A package with assembly files is
+// digested by the memo's whole twin, as the verdict judges it (TypesHold).
 func persistReads(restoring Restoring, host *ReadsBuild, version string) (persistedReads, bool) {
 	if restoring.Reads == nil {
 		return persistedReads{}, false
 	}
 	if restorable, _ := restoring.Reads.Restorable(); !restorable {
+		return persistedReads{}, false
+	}
+	wordSize, maximumAlignment, measured := host.measuredSizes()
+	if !measured {
 		return persistedReads{}, false
 	}
 	writer := &readsWriter{host: host, version: version, owners: map[string]int{}, objects: map[types.Object]int{},
@@ -35,6 +40,7 @@ func persistReads(restoring Restoring, host *ReadsBuild, version string) (persis
 		writer.host = host.wholeTwin()
 	}
 	writer.record.Renderer, writer.record.Assembly = version, restoring.Assembly
+	writer.record.WordSize, writer.record.MaximumAlignment = wordSize, maximumAlignment
 	for _, object := range restoring.Reads.Objects() {
 		writer.record.Types = append(writer.record.Types, writer.object(object, true))
 	}

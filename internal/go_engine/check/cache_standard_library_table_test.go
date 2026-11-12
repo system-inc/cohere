@@ -184,7 +184,7 @@ func TestATableEntryRestoresAsTheStoreEntryItWasWrittenFrom(test *testing.T) {
 		if !held {
 			test.Fatalf("%s: want it in the table", entry.PackagePath)
 		}
-		fromTable, tableError := restoreBinaryEntry(known, restoring, tableEntry, rename)
+		fromTable, _, tableError := restoreBinaryEntry(known, restoring, tableEntry, rename)
 		if tableError != nil {
 			test.Fatalf("%s: restoring the table's entry: %v", entry.PackagePath, tableError)
 		}

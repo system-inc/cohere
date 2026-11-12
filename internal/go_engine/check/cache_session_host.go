@@ -36,8 +36,8 @@ import (
 // HostRestoreCounts is what an extra build restored from the host's run: the packages restored, by ID, sorted, how many
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
 // facts or answers did not hold), how many times the build was loaded again for those, and every decline and every
-// package never a candidate by the first word of why: inputs, noEntry, never, unknown, unpersisted, export, T, L, F, D
-// or A.
+// package never a candidate by the first word of why: inputs, noEntry, never, unknown, unpersisted, unreadable, export,
+// T, L, F, D or A.
 // Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
 // wall time it ran within.
@@ -130,6 +130,9 @@ var declineKeys = map[string]string{
 
 	// A package whose entry persisted no reads, counted apart from reads never recorded.
 	"unpersisted": "readsNotPersisted",
+
+	// A package whose persisted reads name something the record does not hold.
+	"unreadable": "readsUnreadable",
 }
 
 // reasonWord is why a package was not restored from the host, as the record counts it: the reason's first word,
@@ -185,6 +188,17 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 			continue
 		case kept.portable != portable[candidate]:
 			state.loadDeclines[declineKeys["inputs"]]++
+			continue
+		}
+		// A package kept with persisted reads, as a table hit is, has its record judged by the verdict, which declines
+		// a record it cannot read or match before any read; one kept with none is declined here.
+		if kept.restoring.Reads == nil {
+			if kept.restoring.persisted == nil {
+				state.loadDeclines[reasonWord(unpersistedReads)]++
+				continue
+			}
+			reading = append(reading, candidate)
+			readingKept = append(readingKept, kept)
 			continue
 		}
 		if restorable, why := kept.restoring.Reads.Restorable(); !restorable {
@@ -629,10 +643,12 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 }
 
 // keepForBuilds is what the host's run keeps of each package it analyzed from source, among analyzed and what they
-// reach, whose reads can hold, for its extra builds to restore from (#b2t9xmf): the package's entry, read back from
-// the store when the run wrote one there, or else encoded here, as saveMisses encodes it, and held in memory, which a
-// run under `--no-cache` never stores. Each package's portable digest is the one Restore keyed it by, before the load
-// gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run without pays nothing.
+// reach, whose reads can hold, for its extra builds to restore from (#b2t9xmf): the package's entry, read back from the
+// store when the run wrote one there, or else encoded here, as saveMisses encodes it, and held in memory, which a run
+// under `--no-cache` never stores. A package restored from the binary's table is kept from the table's entry, with the
+// reads the table persisted beside it (keepBinaryHit, #pcv6eff). Each package's portable digest is the one Restore
+// keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
+// without pays nothing.
 func (session *CacheSession) keepForBuilds(
 	graphs []*checker.Graph,
 	analyzed []*packages.Package,
@@ -674,6 +690,16 @@ func (session *CacheSession) keepForBuilds(
 	}
 	var encoding []*packages.Package
 	for keptPackage := range keyed.Portable {
+		// A package restored from the binary's table is kept from the table's entry and the reads it persisted.
+		if hit, fromTable := session.binaryHits[keptPackage]; fromTable && session.fromBinary[keptPackage] {
+			kept, keepError := session.keepBinaryHit(keptPackage, hit, keyed.Portable[keptPackage])
+			if keepError != nil {
+				session.problem(keepError.Error())
+				continue
+			}
+			host.entries[keptPackage.ID] = kept
+			continue
+		}
 		packageReads := reads[keptPackage]
 		if packageReads == nil || packageReads.Never() != "" || session.restored(keptPackage) {
 			continue

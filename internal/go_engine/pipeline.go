@@ -241,7 +241,7 @@ func (engine *pipeline) run() int {
 		engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{},
 			engine.standardError)
 		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
-		if engine.session != nil && engine.recordsReads() {
+		if engine.session != nil && engine.keepsForBuilds() {
 			engine.session.KeepForBuilds()
 		}
 	}
