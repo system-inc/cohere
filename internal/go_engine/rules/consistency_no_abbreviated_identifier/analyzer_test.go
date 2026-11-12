@@ -168,6 +168,41 @@ func TestRenameExportsChangesNoFinding(test *testing.T) {
 		"lookalike", "errorcalls", "contextcalls", "namesake")
 }
 
+// The verdict counts a build's new candidate for an unanswered Method lookup only where the rule could take it as
+// fixing the name, and leaves out a concrete type's method with an unexported name when our method is not an
+// interface's (methodLookupHolds, #swv3jbw). That rests on fixingMethod letting a concrete foreign method fix only an
+// interface method's name. unexportedmethods reaches an unexported concrete type's cmd with the name and signature of
+// a concrete type's cmd and a generic type's of ours, and both stay findings, so a rule that let such a method fix
+// either name fails on its want.
+func TestAnUnexportedConcreteForeignMethodNeverFixesAName(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_abbreviated_identifier.Analyzer,
+		"unexportedmethods")
+}
+
+// The verdict's method index leaves out an alias, as declaredMethodsOf does (#swv3jbw). An alias of a named type
+// adds nothing, since that type's package is in the closure and declares the same methods, so the alias that matters
+// names an interface written in place, which no named type declares. aliasedmethods reaches only such an alias
+// carrying Cmd, and its Cmd on a concrete type that has all of it and on an interface of its own stay findings, so a
+// rule that read an alias's interface would fail on their wants.
+func TestAnAliasNeverFixesAName(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_abbreviated_identifier.Analyzer,
+		"aliasedmethods")
+}
+
+// The verdict's method index reads a concrete type's declared methods only, as declaredMethodsOf does (#swv3jbw). A
+// promoted method comes from an embedded field, and an embedded named type is declared in a package of the closure,
+// which declares the method itself, so promotion adds a method no package declares only from an embedded alias of an
+// interface written in place. promotedmethods reaches foreign.Runner, which has Cmd by that promotion alone, and an
+// interface method of ours with its signature stays a finding, so a rule that read Runner's method set, where any
+// foreign method of the signature fixes an interface method's name, would fail on its want.
+func TestOnlyDeclaredMethodsFixAName(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_abbreviated_identifier.Analyzer,
+		"promotedmethods")
+}
+
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
 // command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
 // Loading the fixtures needs only go list.
