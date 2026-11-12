@@ -140,15 +140,18 @@ func goLanguage(container string) engineLanguage {
 		CompilerLabel: "go",
 		VersionLines:  goVersionLines,
 		// The project record's reasons, from the census and the build constraints (internal/go_engine's
-		// describeProject): only what git ignores is a file nobody expects checked. What go never reads (testdata, a
-		// directory starting with `.` or `_`, a nested module, below vendor/) the census never lists, so it has no
-		// reason here. Every other reason is a gap, and so is whatever sentence comes next: a file only another
-		// platform builds, `excluded by build constraints on darwin/arm64`, and one that imports "C" while cgo is off.
+		// describeProject): what git ignores, and what lies in a repository of its own below a module, a submodule's
+		// checkout or a vendored clone that no ignore file of ours governs (#hd5bsqh), are files nobody expects
+		// checked. What go never reads (testdata, a directory starting with `.` or `_`, a nested module, below
+		// vendor/) the census never lists, so it has no reason here. Every other reason is a gap, and so is whatever
+		// sentence comes next: a file only another platform builds, `excluded by build constraints on darwin/arm64`,
+		// and one that imports "C" while cgo is off.
 		// Those are files of the project that someone builds, and a run without `--other-builds` checks the host's
 		// build alone, so a run on a Mac never loaded the `_windows.go` file it would otherwise read green over
 		// (#72n9mq0).
 		ExpectedExclusionReasons: map[string]bool{
-			project.IgnoredByGit: true,
+			project.IgnoredByGit:         true,
+			project.InRepositoryOfItsOwn: true,
 		},
 		// Under `--other-builds` a file only another build compiles is checked by that build, and the record says
 		// which, "checked by the windows/arm64 build" (project.CheckedByBuild), so the reason is matched by how it

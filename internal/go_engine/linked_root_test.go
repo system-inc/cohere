@@ -2,10 +2,14 @@ package go_engine
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
 // A root reached through a symbolic link checks what its real path does (#yyv7nr2): the census walks the root, which
@@ -159,5 +163,150 @@ func TestAModuleAGoWorkUsesThroughALinkIsCounted(test *testing.T) {
 		if !strings.Contains(stream, `"kind":"finding"`) || !strings.Contains(stream, `"file":"`+file+`"`) {
 			test.Errorf("want a finding in %s:\n%s", file, stream)
 		}
+	}
+}
+
+// writeTreeAt writes files under base, each name slash separated, making their directories, and runs git init in each
+// of repositories, so a fixture holds the repositories its ignore files and nested clones need.
+func writeTreeAt(test *testing.T, base string, files map[string]string, repositories ...string) {
+	test.Helper()
+	for name, contents := range files {
+		path := filepath.Join(base, filepath.FromSlash(name))
+		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	for _, repository := range repositories {
+		initialize := exec.Command("git", "init", "--quiet")
+		initialize.Dir = filepath.Join(base, filepath.FromSlash(repository))
+		if output, initializeError := initialize.CombinedOutput(); initializeError != nil {
+			test.Fatalf("git init in %s: %v\n%s", repository, initializeError, output)
+		}
+	}
+}
+
+// A repository of its own below a module, with no go.mod, as a vendored clone or a checked-out submodule is, holds
+// packages go reads as the module's (#hd5bsqh): the census counts their files and excludes them as in a repository of
+// their own, so the run is complete, never read incomplete for files it was never meant to check, and the clone's
+// finding is not the project's.
+func TestARepositoryOfItsOwnBelowAModuleIsCountedAndExcluded(test *testing.T) {
+	test.Parallel()
+
+	root, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatalf("resolving the temporary directory: %v", resolveError)
+	}
+	writeTreeAt(test, root, map[string]string{
+		"go.mod":               "module example.com/nested\n\ngo 1.27\n",
+		"nested.go":            "// Package nested is one.\npackage nested\n",
+		"clone/inner/inner.go": "// Package inner is two.\npackage inner\n\n// INNER_ONE shouts.\nconst INNER_ONE = 1\n",
+	}, ".", "clone")
+	engine, stream := runOverRaw(test, root, exitClean, "--no-cache", "--no-fix")
+	inner := filepath.Join(root, "clone", "inner", "inner.go")
+	if len(engine.censusMissed) != 0 || !strings.Contains(stream, `"complete":true`) {
+		test.Errorf("want nothing missed and the run complete, got %v:\n%s", engine.censusMissed, stream)
+	}
+	if !slices.ContainsFunc(engine.described.record.Excluded, func(excluded contract.ExcludedFile) bool {
+		return excluded.File == inner && excluded.Reason == project.InRepositoryOfItsOwn
+	}) {
+		test.Errorf("want %s excluded as in a repository of its own, got %+v", inner, engine.described.record.Excluded)
+	}
+}
+
+// A linked use's files are judged by the ignore files of the repository holding their real path, as git judges them,
+// never by the root's at the path through the link, below which git never looks (#hd5bsqh). Over a root whose
+// .gitignore names `linked/kept.go` and a linked module whose own repository ignores `ignored.go`, both with a
+// finding: the root's pattern governs nothing through the link, so kept.go is ours and its finding stands, and the
+// real repository's rule excludes ignored.go, named by its ignore file.
+func TestALinkedUsesFilesAreJudgedByTheRepositoryHoldingTheirRealPath(test *testing.T) {
+	test.Parallel()
+
+	base, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatalf("resolving the temporary directory: %v", resolveError)
+	}
+	shouting := func(name string) string {
+		return "package linked\n\n// " + name + " shouts.\nconst " + name + " = 1\n"
+	}
+	writeTreeAt(test, base, map[string]string{
+		"root/go.work":         "go 1.27\n\nuse (\n\t./real\n\t./linked\n)\n",
+		"root/.gitignore":      "linked/kept.go\n",
+		"root/real/go.mod":     "module example.com/real\n\ngo 1.27\n",
+		"root/real/real.go":    "// Package real is one.\npackage real\n",
+		"elsewhere/go.mod":     "module example.com/linked\n\ngo 1.27\n",
+		"elsewhere/.gitignore": "ignored.go\n",
+		"elsewhere/linked.go":  "// Package linked is two.\npackage linked\n",
+		"elsewhere/kept.go":    shouting("KEPT_ONE"),
+		"elsewhere/ignored.go": shouting("IGNORED_ONE"),
+	}, "root", "elsewhere")
+	root := filepath.Join(base, "root")
+	if linkError := os.Symlink(filepath.Join(base, "elsewhere"), filepath.Join(root, "linked")); linkError != nil {
+		test.Fatalf("linking the module: %v", linkError)
+	}
+	engine, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--no-fix")
+	kept, ignored := filepath.Join(root, "linked", "kept.go"), filepath.Join(root, "linked", "ignored.go")
+	if len(engine.censusMissed) != 0 || !strings.Contains(stream, `"complete":true`) {
+		test.Errorf("want nothing missed and the run complete, got %v:\n%s", engine.censusMissed, stream)
+	}
+	if !slices.Contains(engine.described.census.Ours, kept) || !strings.Contains(stream, `"file":"`+kept+`"`) {
+		test.Errorf("want %s ours, the root's pattern governing nothing through the link, and its finding:\n%s",
+			kept, stream)
+	}
+	if !slices.ContainsFunc(engine.described.record.Excluded, func(excluded contract.ExcludedFile) bool {
+		return excluded.File == ignored && excluded.Reason == project.IgnoredByGit &&
+			strings.HasSuffix(excluded.Source, "elsewhere/.gitignore:1")
+	}) {
+		test.Errorf("want %s ignored by its own repository's .gitignore, got %+v", ignored,
+			engine.described.record.Excluded)
+	}
+}
+
+// A linked use into the same repository is judged at its real path too (#hd5bsqh), where a judgment at the path
+// through the link goes wrong both ways: the root's .gitignore names `vendored/ignored.go`, which git ignores at the
+// real path, and `linked/kept.go`, which git never applies, since it never looks below a link. So ignored.go is
+// excluded and its finding is never the project's, and kept.go is ours and its finding stands.
+func TestALinkedUseIntoTheSameRepositoryIsJudgedAtItsRealPath(test *testing.T) {
+	test.Parallel()
+
+	root, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatalf("resolving the temporary directory: %v", resolveError)
+	}
+	shouting := func(name string) string {
+		return "package vendored\n\n// " + name + " shouts.\nconst " + name + " = 1\n"
+	}
+	writeTreeAt(test, root, map[string]string{
+		"go.work":              "go 1.27\n\nuse (\n\t./real\n\t./linked\n)\n",
+		".gitignore":           "vendored/ignored.go\nlinked/kept.go\n",
+		"real/go.mod":          "module example.com/real\n\ngo 1.27\n",
+		"real/real.go":         "// Package real is one.\npackage real\n",
+		"vendored/go.mod":      "module example.com/vendored\n\ngo 1.27\n",
+		"vendored/vendored.go": "// Package vendored is two.\npackage vendored\n",
+		"vendored/kept.go":     shouting("KEPT_ONE"),
+		"vendored/ignored.go":  shouting("IGNORED_ONE"),
+	}, ".")
+	if linkError := os.Symlink(filepath.Join(root, "vendored"), filepath.Join(root, "linked")); linkError != nil {
+		test.Fatalf("linking the module: %v", linkError)
+	}
+	engine, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--no-fix")
+	kept, ignored := filepath.Join(root, "linked", "kept.go"), filepath.Join(root, "linked", "ignored.go")
+	// A finding names its file, as the project record's excluded files do too, so a finding is read by its kind.
+	foundIn := func(file string) bool {
+		return slices.ContainsFunc(strings.Split(stream, "\n"), func(line string) bool {
+			return strings.HasPrefix(line, `{"kind":"finding"`) && strings.Contains(line, `"file":"`+file+`"`)
+		})
+	}
+	if !slices.Contains(engine.described.census.Ours, kept) || !foundIn(kept) {
+		test.Errorf("want %s ours, its link-named pattern governing nothing, and its finding:\n%s", kept, stream)
+	}
+	if foundIn(ignored) || !slices.ContainsFunc(engine.described.record.Excluded,
+		func(excluded contract.ExcludedFile) bool {
+			return excluded.File == ignored && excluded.Reason == project.IgnoredByGit
+		}) {
+		test.Errorf("want %s ignored at its real path and no finding of it, got %+v:\n%s", ignored,
+			engine.described.record.Excluded, stream)
 	}
 }
