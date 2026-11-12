@@ -99,10 +99,10 @@ const (
 type methodLookupOf func(host methodWorld) build_reads.Lookup
 
 // A Method or Interface lookup holds in another build when its rule's one bit cannot have flipped there, and is
-// declined when it can. Each step's build is windows, its host darwin. The closure judgment, which compares every type
-// name with a method of the name, would decline every step whose build adds or changes one; the steps marked so hold
-// under the one-bit judgment, and the two kept on the closure judgment, a generic candidate of the subject's shape and
-// a receiver embedding a foreign type, decline as it does.
+// declined when it can. Each step's build is windows unless it names another, its host darwin. The closure judgment,
+// which compares every type name with a method of the name, would decline every step whose build adds or changes one;
+// the steps marked so hold under the one-bit judgment, and the two kept on the closure judgment, a generic candidate
+// of the subject's shape and a receiver embedding a foreign type, decline as it does.
 func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 	test.Parallel()
 
@@ -124,12 +124,17 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 		}
 	}
 	closer := "package foreign\n\ntype Closer interface{ Close() error }\n"
+	// Closer gains Flush on windows, which Mine, closing alone, lacks: its Close still answers the Method lookup, but
+	// Mine implements Closer on the host alone, which abbreviated's concrete subject needs of the answer's interface.
+	closerGainsFlush := map[string]string{"foreign.go": methodForeign, "closer_darwin.go": closer,
+		"closer_windows.go": "package foreign\n\ntype Closer interface {\n\tClose() error\n\tFlush()\n}\n"}
 	pool := "package foreign\n\ntype Pool[Item any] struct{ items []Item }\n\n" +
 		"func (Pool[Item]) Close() error { return nil }\n"
 	for _, step := range []struct {
 		name   string
 		files  map[string]string
 		user   string
+		build  string
 		lookup methodLookupOf
 		want   string
 	}{
@@ -203,6 +208,19 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			lookup: interfaceAnswered,
 			want:   "L lookup Interface Close: 2 type names have the method on the host, 3 in the build",
 		},
+		{
+			name:   "a concrete subject's answer whose interface gains a method it lacks",
+			files:  closerGainsFlush,
+			lookup: methodAnswered("Closer", "Close"),
+			want: "L lookup Method Close: " + methodForeignPath + ".Closer, whose method is its answer, has other " +
+				"methods in the build",
+		},
+		{
+			name:   "the same answer on a darwin build, where the interface is the host's",
+			files:  closerGainsFlush,
+			build:  "darwin",
+			lookup: methodAnswered("Closer", "Close"),
+		},
 	} {
 		test.Run(step.name, func(test *testing.T) {
 			test.Parallel()
@@ -212,12 +230,16 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				user = step.user
 			}
 			host := checkedMethodWorld(test, "darwin", step.files, user)
-			windows := checkedMethodWorld(test, "windows", step.files, user)
+			buildGoos := "windows"
+			if step.build != "" {
+				buildGoos = step.build
+			}
+			built := checkedMethodWorld(test, buildGoos, step.files, user)
 			reads := &build_reads.Reads{}
 			reads.RecordTypes(host.user, &types.Info{})
 			reads.AddLookup(step.lookup(host))
 			restoring := Restoring{Path: methodUserPath, Imports: []string{methodForeignPath}, Reads: reads}
-			closure := map[string]*types.Package{methodForeignPath: windows.foreign}
+			closure := map[string]*types.Package{methodForeignPath: built.foreign}
 			holds, why := TypesHold(restoring, closure, nil, NewReadsBuild(), NewReadsBuild())
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
