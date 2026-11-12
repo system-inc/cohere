@@ -1,10 +1,13 @@
 package go_engine
 
 import (
+	"encoding/json"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
@@ -135,5 +138,94 @@ func TestTheWidthChangesNothingUnderTheOnePool(test *testing.T) {
 	if streams[1] != streams[4] {
 		test.Errorf("the stream at width 4 differs from one at a time's:\nwidth 4\n%s\nwidth 1\n%s", streams[4],
 			streams[1])
+	}
+}
+
+// The width the memory decides is measured as the first build's load ends (#rmzehfg): over the fixture's three builds
+// beside the host's under the memory cap, the first build runs alone to its load's end, its holding is read, the lint
+// record names the host's live heap, the holding and the peak factor the width was decided by, and the stream is the
+// one a run one build at a time writes, but for the width.
+func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
+	test.Parallel()
+
+	underCap := func() *engineMemory {
+		return &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
+			Source: contract.MemorySourceCap}}
+	}
+	measured := threeExtraBuilds(test)
+	engine, raw := runOverConfigured(test, measured, exitFindings, func(engine *pipeline) {
+		engine.memory = underCap()
+	}, "--no-cache", "--other-builds")
+	if engine.buildsWidthBuildBytes == 0 || engine.buildsWidthLiveBytes == 0 || engine.buildsAtOnce < 1 {
+		test.Fatalf("the width %d was decided by a live heap of %d and a holding of %d, want both measured",
+			engine.buildsAtOnce, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes)
+	}
+	for _, field := range []string{`"buildsWidthLiveBytes":`, `"buildsWidthBuildBytes":`,
+		`"buildsWidthPeakFactor":3.5`} {
+		if !strings.Contains(raw, field) {
+			test.Errorf("the lint record names no %s the width was decided by:\n%s", field, raw)
+		}
+	}
+	one := threeExtraBuilds(test)
+	_, oneStream := runOverConfigured(test, one, exitFindings, func(engine *pipeline) {
+		engine.memory = underCap()
+		engine.buildsWidthForced = 1
+	}, "--no-cache", "--other-builds")
+	if normalize(raw, measured) != normalize(oneStream, one) {
+		test.Errorf("the stream at the measured width differs from one at a time's:\nmeasured\n%s\nwidth 1\n%s",
+			normalize(raw, measured), normalize(oneStream, one))
+	}
+}
+
+// Under `--timing` every extra build runs alone, and its record writes what it held beyond the host's live heap as
+// its load ended and the most it held while its rules ran, the ratio the width's factor stands for, so a tree that
+// breaks the factor shows in one run (#rmzehfg); the host's record writes neither. The builds start on another
+// platform first, as every run's do.
+func TestTimingRecordsEachBuildsHoldings(test *testing.T) {
+	test.Parallel()
+	root := threeExtraBuilds(test)
+	var startedLock sync.Mutex
+	var started []string
+	engine, raw := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.lintSteps = func(extra project.Build, step lintStep, _ int) {
+			if step == lintStepReady {
+				startedLock.Lock()
+				started = append(started, extra.String())
+				startedLock.Unlock()
+			}
+		}
+	}, "--no-cache", "--other-builds", "--timing")
+	startedLock.Lock()
+	defer startedLock.Unlock()
+	if engine.buildsAtOnce != 1 {
+		test.Errorf("the builds ran %d at once under --timing, want one at a time", engine.buildsAtOnce)
+	}
+	var lint contract.LintRecord
+	for line := range strings.SplitSeq(raw, "\n") {
+		if strings.HasPrefix(line, `{"kind":"lint"`) {
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+		}
+	}
+	if len(lint.Builds) < 3 {
+		test.Fatalf("the lint record holds %d builds, want the host's and at least two more:\n%s", len(lint.Builds),
+			raw)
+	}
+	for _, build := range lint.Builds {
+		if build.Host {
+			if build.HeldAtLoadEndBytes != 0 || build.HeldAtLintPeakBytes != 0 {
+				test.Errorf("the host's record holds %d and %d bytes, want neither", build.HeldAtLoadEndBytes,
+					build.HeldAtLintPeakBytes)
+			}
+			continue
+		}
+		if build.HeldAtLoadEndBytes == 0 || build.HeldAtLintPeakBytes < build.HeldAtLoadEndBytes {
+			test.Errorf("the build %s held %d bytes as its load ended and %d at its lint's peak, want both, the "+
+				"peak no less", build.Target, build.HeldAtLoadEndBytes, build.HeldAtLintPeakBytes)
+		}
+	}
+	if len(started) == 0 || strings.HasPrefix(started[0], runtime.GOOS+"/"+runtime.GOARCH) {
+		test.Errorf("the builds started in the order %v, want another platform's first", started)
 	}
 }

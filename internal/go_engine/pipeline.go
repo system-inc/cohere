@@ -73,9 +73,10 @@ type pipeline struct {
 	// from the host's run, so the test can compare the two (#b2t9xmf).
 	keepsHostRestoreOff bool
 
-	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once as they started
-	// (extraBuildsWidth), 0 until they did, for the lint record, and buildsWidthLiveBytes the host's live heap that
-	// decision was given, 0 when it needed none. buildsWidthForced, set only by a test, is the width
+	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once (fixedBuildsWidth, or
+	// measuredBuildsWidth as the first build's load ends), 0 until it was, for the lint record, and
+	// buildsWidthLiveBytes and buildsWidthBuildBytes the host's live heap that decision was given and what the first
+	// build held beyond it, 0 when it needed none. buildsWidthForced, set only by a test, is the width
 	// in place of that decision for builds that restore from the host, and buildsWidthUnguarded, a test's too, lets it
 	// apply to builds that restore nothing, so a test can show the width reaches no key with builds that each check
 	// every package. extraBuildEnds, also a test's alone, is called as each extra build's run ends with the build's own
@@ -83,12 +84,17 @@ type pipeline struct {
 	// lintSteps, a test's alone too, is told each step of an extra build's lint at the gate with the weight it takes
 	// (lintStep), on the build's own goroutine, so a test can count the lints holding weight and hold a build at a
 	// step.
-	buildsAtOnce         int
-	buildsWidthLiveBytes uint64
-	buildsWidthForced    int
-	buildsWidthUnguarded bool
-	extraBuildEnds       func(extra project.Build, notes io.Writer) error
-	lintSteps            func(extra project.Build, step lintStep, weight int)
+	buildsAtOnce          int
+	buildsWidthLiveBytes  uint64
+	buildsWidthBuildBytes uint64
+	buildsWidthForced     int
+	buildsWidthUnguarded  bool
+	extraBuildEnds        func(extra project.Build, notes io.Writer) error
+	lintSteps             func(extra project.Build, step lintStep, weight int)
+
+	// timedHostLiveBytes is the host's live heap as the extra builds start under `--timing`, measured by a forced
+	// collection, which each build's holdings are measured beyond (extraBuildRun), 0 in any other run.
+	timedHostLiveBytes uint64
 
 	// pool is the run's one set of slots, every load and check of the run sharing it, the host's and every extra
 	// build's (#ckm0hsp), made on first use (workPool). poolSizeForced, set only by a test, is its size in place of one
@@ -352,7 +358,8 @@ func (engine *pipeline) note(template string, values ...any) {
 }
 
 // noteTo writes a line of prose to notes as note writes it to stderr, for an extra build, which notes into a buffer
-// of its own that otherBuilds writes to stderr in build order once every build has ended (extraBuildRuns).
+// of its own that otherBuilds writes to stderr in the order the builds started once every build has ended
+// (extraBuildRuns).
 func noteTo(notes io.Writer, template string, values ...any) {
 	// Ignored: a note that cannot reach stderr changes no record, and the records carry the verdict.
 	_, _ = fmt.Fprintf(notes, "cohere-go: "+template+"\n", values...)

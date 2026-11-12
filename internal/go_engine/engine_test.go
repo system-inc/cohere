@@ -839,19 +839,21 @@ var (
 	cachePackagesPattern   = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped|waves)":\d+`)
 	panicFramesPattern     = regexp.MustCompile(`, at [^"]*"`)
 	buildTargetPattern     = regexp.MustCompile(`"target":"[^"]*"`)
-	// buildTimingPattern is a build record's times, each written only when not 0, so one that took under a
-	// millisecond on one run and more on the next would appear and vanish: each is normalized to 0, which the record
-	// writes by leaving it out.
-	buildTimingPattern = regexp.MustCompile(`,"(load|lint|decide|keep|wait|lintWait)Milliseconds":\d+`)
+	// buildTimingPattern is a build record's times and, under `--timing`, its heap holdings, each written only when not
+	// 0, so one that took under a millisecond on one run and more on the next would appear and vanish: each is
+	// normalized to 0, which the record writes by leaving it out.
+	buildTimingPattern = regexp.MustCompile(
+		`,"((load|lint|decide|keep|wait|lintWait)Milliseconds|heldAt(LoadEnd|LintPeak)Bytes)":\d+`)
 	// lintWaitedPattern is whether an extra build's lint waited for its weight at the gate, which turns on how the
 	// builds side by side fall in time and never reaches the verdict, so it is left out as the times are.
 	lintWaitedPattern     = regexp.MustCompile(`,"lintWaited":true`)
 	checkedByBuildPattern = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
-	// buildsAtOncePattern is how many extra builds ran side by side, the live heap that was decided by, and the run's
-	// pool's size, one slot per core, which the machine decides and the verdict never reads, so they are left out as
-	// the times are.
+	// buildsAtOncePattern is how many extra builds ran side by side, the host's live heap, the first build's holding
+	// and the peak factor that was decided by, and the run's pool's size, one slot per core, which the machine decides
+	// and the verdict never reads, so they are left out as the times are.
 	buildsAtOncePattern = regexp.MustCompile(
-		`,"buildsAtOnce":\d+(,"buildsWidthLiveBytes":\d+)?(,"buildsPoolSize":\d+)?`)
+		`,"buildsAtOnce":\d+(,"buildsWidthLiveBytes":\d+,"buildsWidthBuildBytes":\d+,"buildsWidthPeakFactor":[\d.]+)?` +
+			`(,"buildsPoolSize":\d+)?`)
 	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",

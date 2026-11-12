@@ -26,10 +26,10 @@ import (
 // when the builds could not be read, which it notes, and the run is incomplete.
 //
 // The host's run is its lint pass as it is. Each extra build loads the workspace under its own environment and runs
-// the enabled rules over every package, through its own findings cache (extraBuildRun). The extra builds run side by
-// side, as many at once as extraBuildsWidth decides when they start, and are taken in build order whatever their width
-// (extraBuildRuns). A file no build the toolchain targets compiles (project.Unbuilt) stays the gap the types phase
-// names.
+// the enabled rules over every package, through its own findings cache (extraBuildRun). The extra builds start heaviest
+// first (heaviestFirst) and run side by side, as many at once as the width allows (fixedBuildsWidth,
+// measuredBuildsWidth), and their runs are taken in build order whatever their width (extraBuildRuns). A file no build
+// the toolchain targets compiles (project.Unbuilt) stays the gap the types phase names.
 func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []buildRun {
 	host, extras, buildsError := engine.buildsBeside()
 	if buildsError != nil {
@@ -68,8 +68,26 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		runs[0].files = engine.session.Files()
 	}
 
-	engine.buildsAtOnce, engine.buildsWidthLiveBytes = engine.extraBuildsWidth(len(extras), pass.result.Host)
-	extraRuns, extraError := engine.extraBuildRuns(extras, ours, pass.result.Host, engine.buildsAtOnce)
+	// A width the memory decides is measured as the first build's load ends, against the host's live heap measured
+	// here, as the builds start, with nothing else running.
+	width, fixed := engine.fixedBuildsWidth(len(extras), pass.result.Host)
+	// Under `--timing` each build's heap is measured as its own (extraBuildRun), which holds only with every build
+	// running alone: a timed run keeps nothing for its builds, so they restore nothing and run one at a time already.
+	if engine.timing != nil {
+		width, fixed = 1, true
+		engine.timedHostLiveBytes = forcedLiveHeapBytes()
+	}
+	var measure func() int
+	if !fixed {
+		hostLive := forcedLiveHeapBytes()
+		measure = func() int {
+			measured, holding := engine.measuredBuildsWidth(len(extras), hostLive)
+			engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes = hostLive, holding
+			return measured
+		}
+	}
+	extraRuns, extraError := engine.extraBuildRuns(extras, heaviestFirst(host, extras), ours, pass.result.Host, width,
+		measure)
 	if extraError != nil {
 		engine.otherBuildsFailed(extraError)
 		return nil
@@ -78,56 +96,109 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 }
 
 // extraBuildRuns is every extra build's run, in build order, at most width of them at once, each into a slot of its
-// own, so the merge reads the runs in the order a run one build at a time hands it, or the first build in that order
-// that failed, and its error.
+// own, so the merge reads the runs in build order whatever order they ran in, or the first build that failed in
+// order, the order they start in, and its error. order is a permutation of extras' indexes (heaviestFirst). With
+// measure, the width is the memory's to decide by what the first build to start holds: it runs alone until its load
+// has ended, when measure decides the width with nothing else running, and the rest start then, as many at once as it
+// allows (#rmzehfg). A first build whose load failed decides one at a time. The width it ran at is
+// engine.buildsAtOnce.
 //
-// One at a time, a build that fails stops the run before any later build starts, so their notes are never written. Side
-// by side, a later build may already have ended, so each build notes into a buffer of its own, and once every build has
-// ended the buffers are written to stderr in build order, up to and including the first build that failed, and the rest
-// are dropped with the runs after it: the stream and stderr are a run one at a time's, byte for byte, at any width. A
-// build after one known to have failed is never started, as it never would be one at a time.
+// One at a time, a build that fails stops the run before any later build in order starts, so their notes are never
+// written. Side by side, a later build may already have ended, so each build notes into a buffer of its own, and once
+// every build has ended the buffers are written to stderr in order, up to and including the first build that failed,
+// and the rest are dropped with the runs after it: the stream and stderr are a run one at a time's, byte for byte, at
+// any width. A build after one known to have failed is never started, as it never would be one at a time.
 //
 // The builds' lints share one gate (lintGate), a budget of one whole build that each takes its weight of once its first
 // load has ended, holding its slot while it waits. At width 1 the gate never waits: the one build running holds no
 // more than the budget, and gives its weight back before it returns and hands its slot on.
 func (engine *pipeline) extraBuildRuns(
 	extras []project.Build,
+	order []int,
 	ours map[string]bool,
 	host *check.HostRun,
 	width int,
+	measure func() int,
 ) ([]buildRun, error) {
 	runs := make([]buildRun, len(extras))
 	failures := make([]error, len(extras))
 	notes := make([]bytes.Buffer, len(extras))
-	// firstFailed is the earliest build in build order known to have failed, len(extras) while none has.
+	// firstFailed is the earliest position in order of a build known to have failed, len(extras) while none has.
 	var firstFailed atomic.Int64
 	firstFailed.Store(int64(len(extras)))
-	slots := make(chan struct{}, width)
+	// running counts the builds started and not yet ended against limit, the width, one until measure decides it.
+	var admitLock sync.Mutex
+	admitting := sync.NewCond(&admitLock)
+	running, limit := 0, width
+	var deciding sync.Once
+	// A width that needs no measuring is decided already, and the first build's end changes nothing of it.
+	decide := func(loaded bool) {
+		if measure == nil {
+			return
+		}
+		deciding.Do(func() {
+			decided := 1
+			if loaded {
+				decided = measure()
+			}
+			admitLock.Lock()
+			limit = decided
+			admitting.Broadcast()
+			admitLock.Unlock()
+		})
+	}
+	var afterFirstLoad func(loaded bool)
+	if measure != nil {
+		limit = 1
+		afterFirstLoad = decide
+	}
 	gate := newLintGate(lintBudget)
 	var group sync.WaitGroup
-	for index, extra := range extras {
-		slots <- struct{}{}
-		if int64(index) > firstFailed.Load() {
-			<-slots
+	for position, index := range order {
+		extra := extras[index]
+		admitLock.Lock()
+		for running >= limit {
+			admitting.Wait()
+		}
+		running++
+		admitLock.Unlock()
+		if int64(position) > firstFailed.Load() {
+			admitLock.Lock()
+			running--
+			admitLock.Unlock()
 			break
+		}
+		var afterLoad func(loaded bool)
+		if position == 0 {
+			afterLoad = afterFirstLoad
 		}
 		group.Go(func() {
 			// A build hands its slot back only once its failure is known, so at width 1 the next build is never
 			// started after one that failed.
-			defer func() { <-slots }()
-			runs[index], failures[index] = engine.extraBuildRun(extra, ours, host, gate, &notes[index])
+			defer func() {
+				// The first build decides when it never reached its load's end, so the rest are never held.
+				decide(false)
+				admitLock.Lock()
+				running--
+				admitting.Broadcast()
+				admitLock.Unlock()
+			}()
+			runs[index], failures[index] = engine.extraBuildRun(extra, ours, host, gate, &notes[index], afterLoad)
 			if failures[index] == nil {
 				return
 			}
-			for earliest := firstFailed.Load(); int64(index) < earliest; earliest = firstFailed.Load() {
-				if firstFailed.CompareAndSwap(earliest, int64(index)) {
+			for earliest := firstFailed.Load(); int64(position) < earliest; earliest = firstFailed.Load() {
+				if firstFailed.CompareAndSwap(earliest, int64(position)) {
 					break
 				}
 			}
 		})
 	}
 	group.Wait()
-	for index := range extras {
+	admitLock.Lock()
+	engine.buildsAtOnce = min(limit, max(len(extras), 1))
+	admitLock.Unlock()
+	for _, index := range order {
 		// Ignored: a note that cannot reach stderr changes no record, as note says.
 		_, _ = engine.standardError.Write(notes[index].Bytes())
 		if failures[index] != nil {
@@ -258,6 +329,7 @@ func (engine *pipeline) extraBuildRun(
 	host *check.HostRun,
 	gate *lintGate,
 	notes io.Writer,
+	afterLoad func(loaded bool),
 ) (buildRun, error) {
 	environment := append(slices.Clone(engine.described.workspace.Environment()), extra.Environment()...)
 	var session *check.CacheSession
@@ -294,8 +366,17 @@ func (engine *pipeline) extraBuildRun(
 	started := time.Now()
 	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 	loading += time.Since(started)
+	// The first build's load has ended and its rules have not started: it holds none of the run's slots, and nothing
+	// else of the run is running, so the width is measured here, before any other build starts (extraBuildRuns).
+	if afterLoad != nil {
+		afterLoad(loadError == nil)
+	}
 	if loadError != nil {
 		return buildRun{}, fmt.Errorf("loading the build %s: %w", extra, loadError)
+	}
+	var heldAtLoadEnd uint64
+	if engine.timing != nil {
+		heldAtLoadEnd = holdingAbove(forcedLiveHeapBytes(), engine.timedHostLiveBytes)
 	}
 	run := buildRun{
 		build:      extra,
@@ -306,6 +387,9 @@ func (engine *pipeline) extraBuildRun(
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
 		loading:    loading,
+		// What it held as its load ended is the build's own under `--timing` with any load: a load with type errors
+		// holds its packages too.
+		heldAtLoadEnd: heldAtLoadEnd,
 	}
 	if session != nil {
 		run.files = session.Files()
@@ -357,6 +441,10 @@ func (engine *pipeline) extraBuildRun(
 	// shows the weight comes back covers both: a leak on any path would leave every build behind it waiting for good.
 	// It comes back before the build's end, which a test may hold until other builds have ended, and they may be
 	// waiting for this weight.
+	var stopSampling func() uint64
+	if engine.timing != nil {
+		stopSampling = heldWhileLinting(lintPeakSampleInterval)
+	}
 	result, lintError := func() (*check.Result, error) {
 		defer func() {
 			engine.lintStepped(extra, lintStepGiving, weight)
@@ -386,6 +474,10 @@ func (engine *pipeline) extraBuildRun(
 		}
 		return result, nil
 	}()
+	if stopSampling != nil {
+		run.heldAtLintPeak = holdingAbove(max(stopSampling(), heldAtLoadEnd+engine.timedHostLiveBytes),
+			engine.timedHostLiveBytes)
+	}
 	if lintError != nil {
 		return buildRun{}, lintError
 	}
@@ -468,6 +560,9 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			// An extra build's alone: the host's run counts neither, so its record writes neither.
 			CheckedFromSource: run.checkedFromSource,
 			PackagesLoaded:    run.packagesLoaded,
+			// An extra build's alone, and under `--timing` alone: 0 otherwise, which the record leaves out.
+			HeldAtLoadEndBytes:  run.heldAtLoadEnd,
+			HeldAtLintPeakBytes: run.heldAtLintPeak,
 		}
 		recordTimes(&record, run)
 		if run.result != nil {

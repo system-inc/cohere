@@ -193,6 +193,10 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		record.BuildsAtOnce = engine.buildsAtOnce
 		record.BuildsPoolSize = engine.workPool().Size()
 		record.BuildsWidthLiveBytes = engine.buildsWidthLiveBytes
+		record.BuildsWidthBuildBytes = engine.buildsWidthBuildBytes
+		if engine.buildsWidthBuildBytes > 0 {
+			record.BuildsWidthPeakFactor = buildPeakOverLoadEnd
+		}
 	}
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true

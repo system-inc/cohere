@@ -55,4 +55,8 @@ type buildRun struct {
 	packagesLoaded    int
 	lintWait          time.Duration
 	lintWaited        bool
+	// heldAtLoadEnd and heldAtLintPeak are an extra build's alone, measured only under `--timing`: what it held beyond
+	// the host's live heap as its load ended, and the most it held while its rules ran (heldWhileLinting).
+	heldAtLoadEnd  uint64
+	heldAtLintPeak uint64
 }
