@@ -228,6 +228,14 @@ func land(arguments []string) int {
 			return 2
 		}
 		code, gated := gate(worktree, gating)
+		if code == quietRefusedExitCode {
+			// Only the wall exits 75 here (quiet.go): go vet and go test never do. A held landing is not a red one, so
+			// it does not say failed, and it keeps 75, try again later, so a script can tell the two apart (#vq5b7fs).
+			restore()
+			fmt.Fprintf(streams.Errors, "cohere-dev: held by the quiet window, so nothing landed; %s is back where it "+
+				"was. Land again once it closes: go run ./command/cohere-dev quiet wait\n", worktree)
+			return code
+		}
 		if code != 0 {
 			restore()
 			fmt.Fprintf(streams.Errors, "cohere-dev: the gate failed, so nothing landed; %s is back where it was\n",

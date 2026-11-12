@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -634,6 +635,15 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 		!strings.Contains(output, docsDataRecapture) ||
 		!strings.Contains(output, "stale: docs/data/example.txt") {
 		test.Fatalf("a stale example did not refuse the landing, naming the recapture (%v):\n%s", landError, output)
+	}
+	// A red gate says it failed, and never exits 75, which says a quiet window held the landing (#vq5b7fs).
+	output, landError := land()
+	var exited *exec.ExitError
+	if !strings.Contains(output, "the gate failed, so nothing landed") ||
+		strings.Contains(output, "held by the quiet window") || !errors.As(landError, &exited) ||
+		exited.ExitCode() == quietRefusedExitCode {
+		test.Errorf("a red gate ended with %v, want it to say it failed, and an exit other than %d:\n%s",
+			landError, quietRefusedExitCode, output)
 	}
 	write(map[string]string{"docs/data/example.txt": "fresh\n"})
 	fixture.git(worktreeA, "add", "docs/data/example.txt")
