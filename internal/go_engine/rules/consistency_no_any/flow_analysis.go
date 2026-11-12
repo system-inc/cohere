@@ -679,6 +679,7 @@ func (flows *flowAnalysis) matchesForeignMethod(method *types.Func) bool {
 		Subject: method,
 		Found:   matched != nil,
 		Answer:  matched,
+		Rule:    flows.context.RuleName(),
 	})
 	return matched != nil
 }
