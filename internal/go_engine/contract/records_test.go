@@ -378,6 +378,7 @@ func populatedRecords() []Record {
 		},
 		TimingRecord{
 			Unavailable:            "this platform has no per-thread CPU clock",
+			ExtraBuildsFromSource:  2,
 			ProcessCpuMicroseconds: 80000,
 			Load: LoadTiming{
 				ListCpuMicroseconds:         2000,

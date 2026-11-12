@@ -304,7 +304,9 @@ func (engine *pipeline) run() int {
 	engine.writeDuplicates()
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
 	if engine.timing != nil {
-		engine.write(engine.timing.Record(timingKinds(engine.registered)))
+		record := engine.timing.Record(timingKinds(engine.registered))
+		record.ExtraBuildsFromSource = extraBuildsFromSource(engine.buildRuns)
+		engine.write(record)
 	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
@@ -326,6 +328,24 @@ func (engine *pipeline) run() int {
 		return broken(engine.standardError, engine.writeError)
 	}
 	return exitCode
+}
+
+// extraBuildsFromSource is how many of runs' extra builds, every run after the host's, took nothing from the host's
+// run, read from what each says it restored and left untouched, so the timing record's sentence can only say what
+// happened (#4y4qd3z). A timed run keeps nothing for its builds (cacheSession), so each counts today; were a later
+// change to let one restore, it would drop out of the count rather than be printed as checked from source. A build
+// whose run has no result, which failed, is not counted.
+func extraBuildsFromSource(runs []buildRun) int {
+	count := 0
+	for index, run := range runs {
+		if index == 0 || run.result == nil {
+			continue
+		}
+		if len(run.result.FromHost.Restored) == 0 && len(run.result.FromHost.Untouched) == 0 {
+			count++
+		}
+	}
+	return count
 }
 
 // censusMissedPackages is the packages the load reached in the workspace when its census counted no Go file there,
