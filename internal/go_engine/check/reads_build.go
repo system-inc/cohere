@@ -214,14 +214,21 @@ type Restoring struct {
 	// as the host's while its own inputs are.
 	Imports []string
 
-	// Reads are its reads on the host's run.
+	// Reads are its reads on the host's run, for a package the host checked this run.
 	Reads *build_reads.Reads
+
+	// persisted are its reads as the entry it was restored from persisted them (persistReads), which a verdict judges
+	// in place of Reads, for a package the host restored rather than checked. A package with neither is declined.
+	persisted *heldReads
 
 	// Assembly is whether it has assembly files, whose frames vet's asmdecl lays out field by field: the name, offset,
 	// size and kind of every field of each argument's type, another package's unexported ones too, which no property
 	// stands for. Its types' reads are judged by every type they reach rendered whole, every field's type entered.
 	Assembly bool
 }
+
+// unpersistedReads is why a package with no reads, neither recorded this run nor persisted by its entry, is declined.
+const unpersistedReads = "unpersisted: its reads were not persisted"
 
 // deprecatedFactType is the deprecated analyzer's fact, which its result gathers for SA1019 from every fact of the
 // import closure, so a Deprecated lookup is that fact asked of the build.
@@ -239,7 +246,8 @@ var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 // unexported field rendered by its properties.
 //
 // Every read fails closed: an object with no objectpath, a package the build lacks, and a lookup of a kind it does not
-// know each fail it.
+// know each fail it. Persisted reads are judged by the same rules (persistedTypesHold), and a package with no reads at
+// all, recorded or persisted, is declined as unpersisted.
 func TypesHold(
 	restoring Restoring,
 	closure map[string]*types.Package,
@@ -247,6 +255,12 @@ func TypesHold(
 	host *ReadsBuild,
 	build *ReadsBuild,
 ) (bool, string) {
+	switch {
+	case restoring.persisted != nil:
+		return persistedTypesHold(restoring, closure, restored, build)
+	case restoring.Reads == nil:
+		return false, unpersistedReads
+	}
 	if restorable, why := restoring.Reads.Restorable(); !restorable {
 		if restoring.Reads.Never() != "" {
 			return false, "never: " + why
@@ -289,6 +303,12 @@ func FactsHold(
 	fact FactLookup,
 	factTypes map[reflect.Type]bool,
 ) (bool, string) {
+	switch {
+	case restoring.persisted != nil:
+		return persistedFactsHold(restoring, closure, build, fact, factTypes)
+	case restoring.Reads == nil:
+		return false, unpersistedReads
+	}
 	judged := verdict{host: host, build: build, closure: closure, fact: fact}
 	for _, read := range restoring.Reads.Facts() {
 		if !factTypes[read.FactType] {
@@ -315,6 +335,12 @@ func FactsHold(
 // ReadFactTypes are the fact types restoring's fact reads asked, and the deprecated fact's when it looked up a
 // deprecation, every type FactsHold must be asked of before its fact reads are all decided.
 func ReadFactTypes(restoring Restoring) map[reflect.Type]bool {
+	switch {
+	case restoring.persisted != nil:
+		return persistedFactTypes(restoring.persisted)
+	case restoring.Reads == nil:
+		return map[reflect.Type]bool{}
+	}
 	asked := map[reflect.Type]bool{}
 	for _, read := range restoring.Reads.Facts() {
 		asked[read.FactType] = true

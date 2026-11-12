@@ -14,8 +14,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
-// The restored fixture's paths: hidden declares an unexported type with a Close method that nothing exported reaches,
-// so its export data leaves the type out, and its user asks which type names of its closure have a Close method.
+// The restored fixture's paths: hidden declares an unexported type with a Close method, and an unexported close, that
+// nothing exported reaches, so its export data leaves the type out, and its user asks which type names of its closure
+// have a Close method.
 const (
 	restoredHiddenPath = "example.com/restored/hidden"
 	restoredUserPath   = "example.com/restored/user"
@@ -24,9 +25,10 @@ const (
 // restoredSources are hidden and its user, by path.
 var restoredSources = map[string]string{
 	restoredHiddenPath: "package hidden\n\ntype closer struct{}\n\nfunc (closer) Close() error { return nil }\n\n" +
-		"func Count() int { return 1 }\n",
+		"func (closer) close() {}\n\nfunc Count() int { return 1 }\n",
 	restoredUserPath: "package user\n\nimport \"example.com/restored/hidden\"\n\n" +
-		"type Mine struct{}\n\nfunc (Mine) Close() error { return nil }\n\nfunc Use() int { return hidden.Count() }\n",
+		"type Mine struct{}\n\nfunc (Mine) Close() error { return nil }\n\nfunc (Mine) close() {}\n\n" +
+		"func Use() int { return hidden.Count() }\n",
 }
 
 // restoredWorld is the fixture on the host, hidden and its user checked from source, the user's type reads recorded

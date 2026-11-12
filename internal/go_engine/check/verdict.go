@@ -3,12 +3,14 @@ package check
 import (
 	"fmt"
 	"go/types"
+	"reflect"
 	"strings"
 
 	"golang.org/x/tools/go/types/objectpath"
 	"honnef.co/go/tools/analysis/facts/deprecated"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
 // verdict is one package's reads judged in another build: the host's memo and the build's, the packages the judged
@@ -121,23 +123,40 @@ func (judged verdict) factHolds(fact build_reads.Fact) (bool, string) {
 		}
 		path = objectPath
 	}
-	name := "fact " + fact.FactType.String() + " of " + named
+	hostValue := func() (cache.Key, error) { return factValueDigest(fact.Value) }
+	return judged.buildFactHolds("fact "+fact.FactType.String()+" of "+named, fact.Package.Path(), path,
+		fact.FactType, fact.Found, hostValue, func(digest cache.Key) cache.Key { return digest })
+}
+
+// buildFactHolds is a fact read's build half, which a read of this run and a persisted read share: the build's fact of
+// factType on the object at path in the package at owner, or on that package itself when path is empty, found when
+// the host's was, hostFound, and when found, of a value whose digest, mixed as the host's was (mixed), is hostValue's.
+// name is how a reason names the read.
+func (judged verdict) buildFactHolds(
+	name string,
+	owner string,
+	path objectpath.Path,
+	factType reflect.Type,
+	hostFound bool,
+	hostValue func() (cache.Key, error),
+	mixed func(cache.Key) cache.Key,
+) (bool, string) {
 	if judged.fact == nil {
 		return false, name + ": the build has no facts to ask"
 	}
-	value, found := judged.fact(fact.Package.Path(), path, fact.FactType)
+	value, found := judged.fact(owner, path, factType)
 	switch {
-	case found != fact.Found:
-		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", fact.Found, found)
+	case found != hostFound:
+		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", hostFound, found)
 	case !found:
 		return true, ""
 	}
-	hostDigest, hostError := factValueDigest(fact.Value)
+	hostDigest, hostError := hostValue()
 	buildDigest, buildError := factValueDigest(value)
 	if hostError != nil || buildError != nil {
 		return false, name + ": its value does not encode"
 	}
-	if hostDigest != buildDigest {
+	if hostDigest != mixed(buildDigest) {
 		return false, name + ": its value differs"
 	}
 	return true, ""
@@ -159,39 +178,21 @@ func (judged verdict) factHolds(fact build_reads.Fact) (bool, string) {
 // A deprecation is a fact, asked at check time (deprecationHolds).
 func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring) (bool, string) {
 	name := "lookup " + lookup.Query + " " + strings.Trim(lookup.Path+"."+lookup.Name, ".")
-	roots := make([]*types.Package, 0, len(restoring.Imports))
-	for _, imported := range restoring.Imports {
-		if judged.closure[imported] == nil {
-			return false, name + ": the build has no package " + imported
-		}
-		roots = append(roots, judged.closure[imported])
+	roots, why := judged.importRoots(restoring.Imports)
+	if why != "" {
+		return false, name + ": " + why
 	}
 	switch lookup.Query {
-	case build_reads.QueryScope:
-		declaring := judged.closure[lookup.Path]
-		if declaring == nil {
-			return false, name + ": the build has no package " + lookup.Path
+	case build_reads.QueryScope, build_reads.QueryClosure:
+		answer, why := judged.buildAnswer(lookup.Query, lookup.Path, lookup.Name, roots)
+		if why != "" {
+			return false, name + ": " + why
 		}
-		return judged.answerHolds(name, lookup, declaring.Scope().Lookup(lookup.Name))
-	case build_reads.QueryClosure:
-		_, declared := build_reads.ClosureInterface(roots, lookup.Path, lookup.Name)
-		var answer types.Object
-		if declared != nil {
-			answer = declared
-		}
-		return judged.answerHolds(name, lookup, answer)
+		return answerHolds(name, lookup.Found, answer, func(answer types.Object) bool {
+			return judged.sameObject(lookup.Answer, answer)
+		})
 	case build_reads.QueryPackageName:
-		taken := false
-		for reached := range build_reads.ClosurePackages(roots) {
-			if reached.Name() == lookup.Name {
-				taken = true
-				break
-			}
-		}
-		if taken != lookup.Found {
-			return false, name + fmt.Sprintf(": found %t on the host, %t in the build", lookup.Found, taken)
-		}
-		return true, ""
+		return packageNameHolds(name, lookup.Found, roots, lookup.Name)
 	case build_reads.QueryInterface, build_reads.QueryMethod:
 		if lookup.Subject == nil || lookup.Subject.Pkg() == nil {
 			return false, name + ": it has no subject to find the host's closure by"
@@ -210,13 +211,8 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 				buildCandidates = append(buildCandidates, indexed.typeNames...)
 			}
 		}
-		for _, indexed := range judged.build.methodsNamed(lookup.Name) {
-			if !buildClosure.reached[indexed.owner] ||
-				judged.restored[indexed.owner] && hostClosure.byPath[indexed.owner.Path()] != nil {
-				continue
-			}
-			buildCandidates = append(buildCandidates, indexed.typeNames...)
-		}
+		buildCandidates = append(buildCandidates, judged.buildCandidates(lookup.Name, roots,
+			func(owner *types.Package) bool { return hostClosure.byPath[owner.Path()] != nil })...)
 		sortTypeNames(hostCandidates)
 		sortTypeNames(buildCandidates)
 		if len(hostCandidates) != len(buildCandidates) {
@@ -234,14 +230,87 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 	}
 }
 
-// answerHolds reports whether answer, the build's, is the answer lookup recorded on the host.
-func (judged verdict) answerHolds(name string, lookup build_reads.Lookup, answer types.Object) (bool, string) {
+// importRoots are the build's packages at imports, the judged package's imports, the roots of the import closure its
+// lookups ask of, and why not when the build has no package at one of them.
+func (judged verdict) importRoots(imports []string) ([]*types.Package, string) {
+	roots := make([]*types.Package, 0, len(imports))
+	for _, imported := range imports {
+		if judged.closure[imported] == nil {
+			return nil, "the build has no package " + imported
+		}
+		roots = append(roots, judged.closure[imported])
+	}
+	return roots, ""
+}
+
+// buildAnswer is the build's answer to a Scope or Closure lookup of name in the package at path, nil for none, and why
+// the build cannot be asked: Scope asks the build's package at path, and Closure the build's import closure from
+// roots, as the rule asked (ClosureInterface).
+func (judged verdict) buildAnswer(
+	query string,
+	path string,
+	name string,
+	roots []*types.Package,
+) (types.Object, string) {
+	if query == build_reads.QueryScope {
+		declaring := judged.closure[path]
+		if declaring == nil {
+			return nil, "the build has no package " + path
+		}
+		return declaring.Scope().Lookup(name), ""
+	}
+	_, declared := build_reads.ClosureInterface(roots, path, name)
+	if declared == nil {
+		// A nil *types.TypeName in the interface would read as an answer.
+		return nil, ""
+	}
+	return declared, ""
+}
+
+// packageNameHolds reports whether a PackageName lookup of name, which found a package so named on the host when
+// hostFound, finds one in the build's import closure from roots as the rule's walk does, named in a reason as name.
+func packageNameHolds(name string, hostFound bool, roots []*types.Package, packageName string) (bool, string) {
+	taken := false
+	for reached := range build_reads.ClosurePackages(roots) {
+		if reached.Name() == packageName {
+			taken = true
+			break
+		}
+	}
+	if taken != hostFound {
+		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", hostFound, taken)
+	}
+	return true, ""
+}
+
+// buildCandidates are the build's type names with a method named name in its import closure from roots, read from
+// its index, unsorted, but for those of a package the build restored from the host's run that the host's side stands
+// for (hostHas), which the caller gives as the host's own type names.
+func (judged verdict) buildCandidates(
+	name string,
+	roots []*types.Package,
+	hostHas func(owner *types.Package) bool,
+) []*types.TypeName {
+	buildClosure := judged.buildClosure(roots)
+	var candidates []*types.TypeName
+	for _, indexed := range judged.build.methodsNamed(name) {
+		if !buildClosure.reached[indexed.owner] || judged.restored[indexed.owner] && hostHas(indexed.owner) {
+			continue
+		}
+		candidates = append(candidates, indexed.typeNames...)
+	}
+	return candidates
+}
+
+// answerHolds reports whether answer, the build's, is the answer a lookup named name recorded on the host: found when
+// the host's was, hostFound, and then the same object, as same judges it.
+func answerHolds(name string, hostFound bool, answer types.Object, same func(types.Object) bool) (bool, string) {
 	switch {
-	case lookup.Found != (answer != nil):
-		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", lookup.Found, answer != nil)
+	case hostFound != (answer != nil):
+		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", hostFound, answer != nil)
 	case answer == nil:
 		return true, ""
-	case !judged.sameObject(lookup.Answer, answer):
+	case !same(answer):
 		return false, name + ": the answer differs"
 	}
 	return true, ""
@@ -289,18 +358,32 @@ func (judged verdict) deprecationHolds(lookup build_reads.Lookup) (bool, string)
 		path = subjectPath
 		name += " of " + objectName(lookup.Subject)
 	}
+	return judged.buildDeprecationHolds(name, lookup.Path, path, lookup.Found, lookup.Text)
+}
+
+// buildDeprecationHolds is a Deprecated lookup's build half, which a read of this run and a persisted read share: the
+// build's deprecated fact of the object at path in the package at owner, or of that package itself when path is empty,
+// found when the host's was, hostFound, and when found, with the host's message, hostText. name is how a reason names
+// the lookup.
+func (judged verdict) buildDeprecationHolds(
+	name string,
+	owner string,
+	path objectpath.Path,
+	hostFound bool,
+	hostText string,
+) (bool, string) {
 	if judged.fact == nil {
 		return false, name + ": the build has no facts to ask"
 	}
-	value, found := judged.fact(lookup.Path, path, deprecatedFactType)
-	if found != lookup.Found {
-		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", lookup.Found, found)
+	value, found := judged.fact(owner, path, deprecatedFactType)
+	if found != hostFound {
+		return false, name + fmt.Sprintf(": found %t on the host, %t in the build", hostFound, found)
 	}
 	if !found {
 		return true, ""
 	}
 	deprecation, isDeprecation := value.(*deprecated.IsDeprecated)
-	if !isDeprecation || deprecation.Msg != lookup.Text {
+	if !isDeprecation || deprecation.Msg != hostText {
 		return false, name + ": its message differs"
 	}
 	return true, ""
