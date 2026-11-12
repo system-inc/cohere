@@ -464,11 +464,11 @@ func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key)
 	if !found {
 		return storeHit{}
 	}
-	restored, decodeError := decodeEntry(session.known, restoring, contents,
-		session.exportDataReader(restoring, storedKey))
+	restored, decodeError := decodeEntry(session.known, restoring, contents, nil)
 	if decodeError != nil {
 		return storeHit{}
 	}
+	restored.types.ReadExportData = session.exportDataReader(restoring, restored.exportDigest)
 	return storeHit{restored: restored, storedKey: storedKey}
 }
 
@@ -493,16 +493,26 @@ func aliasKey(key cache.Key) cache.Key {
 	return sha256.Sum256(append([]byte("alias "), key[:]...))
 }
 
-// exportDataReader reads the export data of the package under key from the store, for the load.
-func (session *CacheSession) exportDataReader(keyed *packages.Package, key cache.Key) func() ([]byte, error) {
+// exportDataReader reads from the store the export data an entry of keyed names by digest, for the load. Export data
+// that is not there, or not whole, is the load's to decline, and the package is checked from source: an entry whose
+// export data went from under it is a miss, never an error and never a half restore.
+func (session *CacheSession) exportDataReader(keyed *packages.Package, digest []byte) func() ([]byte, error) {
 	return func() ([]byte, error) {
 		session.exportDataReads.Add(1)
-		exportData, stored := session.caching.Store.Get(exportDataKey(key))
-		if !stored {
-			return nil, fmt.Errorf("the store holds no export data for %s", keyed.ID)
-		}
-		return exportData, nil
+		return readExportDataByDigest(session.caching.Store, keyed, digest)
 	}
+}
+
+// readExportDataByDigest is the export data whose sha256 is digest, read from store, for keyed, whose entry names it.
+func readExportDataByDigest(store *cache.Store, keyed *packages.Package, digest []byte) ([]byte, error) {
+	if digest == nil {
+		return nil, fmt.Errorf("the entry of %s names no export data", keyed.ID)
+	}
+	exportData, stored := store.Get(exportDataKey(digest))
+	if !stored {
+		return nil, fmt.Errorf("the store holds no export data for %s", keyed.ID)
+	}
+	return exportData, nil
 }
 
 // dropShortHits makes a miss of every hit that does not hold what the run can ask of it, and reports whether there
@@ -784,10 +794,13 @@ func (session *CacheSession) saveMisses(
 }
 
 // putEntry writes entry under key, its export data first, so an entry is never in the store before what it needs to be
-// read. saveMisses runs it with no slot of the run's pool held (fanOutWriting).
+// read. saveMisses and writeThrough run it with no slot of the run's pool held (fanOutWriting). The export data is
+// kept by its digest, and not written again when the store holds it whole, as it does for a package another build
+// wrote with the same types.
 func (session *CacheSession) putEntry(key cache.Key, entry encodedEntry) error {
 	if entry.exportData != nil {
-		if putError := session.caching.Store.Put(exportDataKey(key), entry.exportData); putError != nil {
+		digest := exportDataDigest(entry.exportData)
+		if putError := session.caching.Store.PutAbsent(exportDataKey(digest), entry.exportData); putError != nil {
 			return putError
 		}
 	}
