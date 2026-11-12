@@ -71,8 +71,8 @@ func readGoState(goEnvironment *GoEnvironment, collector *timing.Collector) (goS
 		for index, arguments := range commands {
 			group.Go(func() {
 				measureListing(collector, func() {
-					outputs[index], failures[index] = goOutput(goEnvironment.workspace, goEnvironment.fullEnvironment,
-						arguments)
+					outputs[index], failures[index] = goOutput(goEnvironment.guard, goEnvironment.workspace,
+						goEnvironment.fullEnvironment, arguments)
 				})
 			})
 		}
@@ -116,19 +116,18 @@ func readGoState(goEnvironment *GoEnvironment, collector *timing.Collector) (goS
 	return state, ""
 }
 
-// goOutput runs go with arguments in workspace, as list runs go list, and returns what it printed.
-func goOutput(workspace string, environment []string, arguments []string) ([]byte, error) {
+// goOutput runs go with arguments in workspace, as list runs go list, beside guard's copy of the go.work, and returns
+// what it printed.
+func goOutput(guard *workspaceSumGuard, workspace string, environment []string, arguments []string) ([]byte, error) {
 	command := exec.Command("go", arguments...)
 	command.Dir = workspace
 	// PWD as in runList, so the directories go prints are spelled as the load spells the workspace.
 	command.Env = append(slices.Clone(environment), "PWD="+workspace)
-	var standardError bytes.Buffer
-	command.Stderr = &standardError
-	output, runError := command.Output()
+	output, standardError, runError := guard.output(command)
 	if runError != nil {
-		return nil, fmt.Errorf("%w: %s", runError, strings.TrimSpace(standardError.String()))
+		return nil, fmt.Errorf("%w: %s", runError, strings.TrimSpace(string(standardError)))
 	}
-	if said := strings.TrimSpace(standardError.String()); said != "" {
+	if said := strings.TrimSpace(string(standardError)); said != "" {
 		// go list -e says what is wrong on standard error and still exits cleanly, and anything it says is a doubt.
 		return nil, errors.New(said)
 	}

@@ -119,7 +119,9 @@ func pathWithin(path string, directory string) bool {
 // own records show a requested phase that did not run, a crash, a file with no compiler record or a file it could
 // not read, so complete is every phase ran and nothing went unchecked, held to the records rather than taken on
 // the engine's word. And a run whose fix phase rewrote a file is declined, as a TypeScript run that rewrote one
-// is: its verdict describes the tree it read, and the record would sign the tree it wrote.
+// is: its verdict describes the tree it read, and the record would sign the tree it wrote. So is a run whose go list
+// ran beside a go.work.sum with no side copy (#34r3v1y): go may have rewritten that file after the run read it, and a
+// replay would print the gap again over a run in which no go command ran.
 func engineRunUnrecordable(run *engineRun, exitCode int) string {
 	switch {
 	case exitCode != 0 && exitCode != 1:
@@ -131,6 +133,9 @@ func engineRunUnrecordable(run *engineRun, exitCode int) string {
 	case run.filesRewritten > 0:
 		return fmt.Sprintf("the fix phase rewrote %s, so the tree it read is not the tree on disk",
 			counted(run.filesRewritten, "file", "files"))
+	case len(run.summary.UnguardedWorkspaceSums) > 0:
+		return fmt.Sprintf("go list may have rewritten %s of the tree, so the next run checks again",
+			counted(len(run.summary.UnguardedWorkspaceSums), "go.work.sum", "go.work.sum files"))
 	}
 	return ""
 }

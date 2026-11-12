@@ -330,6 +330,13 @@ func uncheckedMarkers(summary runSummary) []string {
 	if marker := withheldCgoMarker(gaps.WithheldInDependencyCgo, gaps.WithheldDependencyCgoDeclarations); marker != "" {
 		markers = append(markers, marker)
 	}
+	// A file of the user's tree go may have written, which a run that only checks must say where everyone sees it.
+	switch count := len(gaps.UnguardedWorkspaceSums); {
+	case count == 1:
+		markers = append(markers, "⚠ go list may have rewritten go.work.sum")
+	case count > 1:
+		markers = append(markers, fmt.Sprintf("⚠ go list may have rewritten %d go.work.sum files", count))
+	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
 	}

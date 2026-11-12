@@ -222,6 +222,9 @@ func TestGoRunUnrecordableKeepsAllButAVerdict(test *testing.T) {
 	}
 	rewrote := ended(true, 0)
 	rewrote.filesRewritten = 2
+	// Complete, since every file was checked, but go list ran beside a go.work.sum with no side copy (#34r3v1y).
+	unguarded := ended(true, 0)
+	unguarded.summary.UnguardedWorkspaceSums = []string{"/work/go.work.sum"}
 	cases := []struct {
 		name     string
 		run      *engineRun
@@ -234,6 +237,8 @@ func TestGoRunUnrecordableKeepsAllButAVerdict(test *testing.T) {
 		{"a run that fell short", ended(false, 1), 1, "did not check everything"},
 		{"a run with no summary", &engineRun{}, 0, "without a summary"},
 		{"a run whose fix phase rewrote files", rewrote, 0, "the fix phase rewrote 2 files"},
+		{"a run whose go list may have rewritten a go.work.sum", unguarded, 0,
+			"go list may have rewritten 1 go.work.sum of the tree"},
 	}
 	for _, testCase := range cases {
 		reason := engineRunUnrecordable(testCase.run, testCase.exitCode)
