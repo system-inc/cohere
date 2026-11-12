@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // A command a test ran has exited, but its captured output never closes: exec's Wait sits in
@@ -120,8 +124,12 @@ func heldOutputReport(stack string, waited time.Duration) string {
 
 // pipeHolders lists, as "pid <pid> <command>: <parent, start and command line>", every process holding the
 // far end of a pipe this process has open past its standard streams, leaving out this process's own running children: a
-// command another test is still running holds its pipe as it should, and so does the lsof asking.
+// command another test is still running holds its pipe as it should, and so does the lsof asking. On Linux it reads
+// /proc rather than lsof (procPipeHolders).
 func pipeHolders() ([]string, error) {
+	if runtime.GOOS == "linux" {
+		return procPipeHolders("/proc")
+	}
 	own, outputError := exec.Command("lsof", "-n", "-P", "-F", "pftdn", "-p", strconv.Itoa(os.Getpid())).Output()
 	if outputError != nil {
 		return nil, fmt.Errorf("lsof on this process: %w", outputError)
@@ -161,6 +169,64 @@ func pipeHolders() ([]string, error) {
 			holders,
 			fmt.Sprintf("pid %s %s: %s", open.pid, open.command, strings.TrimSpace(string(started))),
 		)
+	}
+	return holders, nil
+}
+
+// procPipeHolders is pipeHolders on Linux, read from the proc filesystem under root: there both ends of a pipe
+// read as one `pipe:[inode]` link in /proc/<pid>/fd, which lsof prints with no far end to match, so the lsof
+// reading named no holder on Home (#acdf5mc). A process whose descriptors can't be read, another account's or
+// one that has exited, holds nothing this test can name.
+func procPipeHolders(root string) ([]string, error) {
+	self := strconv.Itoa(os.Getpid())
+	ownPipes := map[string]bool{}
+	ownDescriptors, readDirectoryError := os.ReadDir(root + "/" + self + "/fd")
+	if readDirectoryError != nil {
+		return nil, fmt.Errorf("reading this process's descriptors: %w", readDirectoryError)
+	}
+	for _, descriptor := range ownDescriptors {
+		// Not this process's own standard streams, which are pipes to whatever ran it.
+		if descriptor.Name() == "0" || descriptor.Name() == "1" || descriptor.Name() == "2" {
+			continue
+		}
+		// Ignored: a descriptor closed since the listing holds no pipe.
+		target, _ := os.Readlink(root + "/" + self + "/fd/" + descriptor.Name())
+		if strings.HasPrefix(target, "pipe:") {
+			ownPipes[target] = true
+		}
+	}
+	if len(ownPipes) == 0 {
+		return nil, nil
+	}
+	processes, readDirectoryError := os.ReadDir(root)
+	if readDirectoryError != nil {
+		return nil, fmt.Errorf("listing processes: %w", readDirectoryError)
+	}
+	var holders []string
+	for _, process := range processes {
+		pid := process.Name()
+		if _, notNumber := strconv.Atoi(pid); notNumber != nil || pid == self {
+			continue
+		}
+		// Ignored: a process that exited, or another account's, has no descriptors this test can read.
+		descriptors, _ := os.ReadDir(root + "/" + pid + "/fd")
+		holds := slices.ContainsFunc(descriptors, func(descriptor os.DirEntry) bool {
+			// Ignored: a descriptor closed since the listing holds no pipe.
+			target, _ := os.Readlink(root + "/" + pid + "/fd/" + descriptor.Name())
+			return ownPipes[target]
+		})
+		if !holds {
+			continue
+		}
+		// Ignored: a process that exited since holds nothing, and its empty name reads as gone below.
+		command, _ := os.ReadFile(root + "/" + pid + "/comm")
+		// Ignored: ps exits nonzero for a pid it no longer finds, and its empty answer is read below.
+		started, _ := exec.Command("ps", "-o", "ppid=,lstart=,command=", "-p", pid).Output()
+		if fields := strings.Fields(string(started)); len(fields) == 0 || fields[0] == self {
+			continue
+		}
+		holders = append(holders, fmt.Sprintf("pid %s %s: %s", pid, strings.TrimSpace(string(command)),
+			strings.TrimSpace(string(started))))
 	}
 	return holders, nil
 }
@@ -237,6 +303,9 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 	if runtime.GOOS == "windows" {
 		test.Skip("lsof names a pipe's holders, and Windows has no lsof")
 	}
+	if runtime.GOOS != "linux" {
+		needs.Tool(test, "lsof", "lsof names a pipe's holders here")
+	}
 
 	helper := exec.Command(os.Args[0], "-test.run=^TestAHeldOutputNamesItsHolder$", "-test.count=1")
 	helper.Env = append(os.Environ(), "COHERE_HELD_OUTPUT_HELPER=1")
@@ -272,5 +341,46 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 	}
 	if bytes.Contains(output, []byte(" lsof:")) {
 		test.Errorf("the report names the lsof that asked, which is this process's own running child:\n%s", output)
+	}
+}
+
+// On Linux the holders are read from /proc, where both ends of a pipe are one `pipe:[inode]` link. Shown on a proc
+// tree built here, so it runs on any Unix: the process holding the far end of this process's pipe is named with
+// its command, one holding another pipe is not, and neither are this process's standard streams. The holder is
+// this test's parent, a process ps finds that is not this one's child.
+func TestTheHoldersOfAPipeAreReadFromProc(test *testing.T) {
+	test.Parallel()
+	if runtime.GOOS == "windows" {
+		test.Skip("ps reads a holder's parent and start, and Windows has no ps")
+	}
+	root := test.TempDir()
+	self, parent := strconv.Itoa(os.Getpid()), strconv.Itoa(os.Getppid())
+	links := map[string]string{
+		self + "/fd/0":   "pipe:[7]",
+		self + "/fd/5":   "pipe:[42]",
+		parent + "/fd/1": "pipe:[42]",
+		"1/fd/1":         "pipe:[7]",
+		"1/fd/3":         "pipe:[99]",
+	}
+	for link, target := range links {
+		if makeError := os.MkdirAll(filepath.Join(root, filepath.Dir(link)), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if linkError := os.Symlink(target, filepath.Join(root, link)); linkError != nil {
+			test.Fatal(linkError)
+		}
+	}
+	for pid, command := range map[string]string{parent: "holder", "1": "init"} {
+		writeError := os.WriteFile(filepath.Join(root, pid, "comm"), []byte(command+"\n"), 0o644)
+		if writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	holders, holdersError := procPipeHolders(root)
+	if holdersError != nil {
+		test.Fatal(holdersError)
+	}
+	if len(holders) != 1 || !strings.HasPrefix(holders[0], "pid "+parent+" holder: ") {
+		test.Errorf("the holders are %q, want this test's parent alone, named as holder", holders)
 	}
 }

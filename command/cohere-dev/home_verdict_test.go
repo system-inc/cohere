@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // Home's run is read from its marker and its `go test -json`: the commit and platform it names, each package that
@@ -89,7 +90,7 @@ func TestTheTestsLinuxNeverCompilesAreFoundFromTheSyntax(test *testing.T) {
 		writeFixtureFile(test, filepath.Join(root, name), contents)
 	}
 	found, foundError := testsNeverCompiledOn(root, []project.Module{{Directory: ".", Path: "example.com/fixture"}},
-		"linux", "amd64")
+		"darwin", "arm64", "linux", "amd64")
 	if foundError != nil {
 		test.Fatal(foundError)
 	}
@@ -98,6 +99,16 @@ func TestTheTestsLinuxNeverCompilesAreFoundFromTheSyntax(test *testing.T) {
 	if !reflect.DeepEqual(found, want) {
 		test.Errorf("found %v, want %v", found, want)
 	}
+	// The other way round, so the lander's platform is read from its arguments wherever this runs: a Linux lander
+	// against a darwin box finds the Linux-only test.
+	found, foundError = testsNeverCompiledOn(root, []project.Module{{Directory: ".", Path: "example.com/fixture"}},
+		"linux", "amd64", "darwin", "arm64")
+	if foundError != nil {
+		test.Fatal(foundError)
+	}
+	if want := map[string][]string{"example.com/fixture/alpha": {"TestLinux"}}; !reflect.DeepEqual(found, want) {
+		test.Errorf("a Linux lander against darwin found %v, want %v", found, want)
+	}
 }
 
 // Through a real landing with Home stood in for: a test Home skipped and a test in a file Linux never compiles both
@@ -105,6 +116,8 @@ func TestTheTestsLinuxNeverCompilesAreFoundFromTheSyntax(test *testing.T) {
 // verdict, unreachable or answering about another tree, sends the whole test run to the Mac and says why (#acdf5mc).
 func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 	test.Parallel()
+	needs.Platform(test, "darwin", "its fixture's darwin-only test runs in a landing's Mac half, which a lander "+
+		"on any other platform never compiles")
 	for _, testCase := range []struct {
 		name   string
 		home   func(commit string) string
