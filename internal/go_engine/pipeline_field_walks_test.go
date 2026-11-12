@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
@@ -144,12 +143,12 @@ func TestEveryWalkOfAnotherPackagesTypeStartsFromAWholeRead(test *testing.T) {
 				test.Errorf("%s walked a value sized hands to a non-empty interface", row.rule)
 			}
 		}
-		// A rule's Method lookup still judges each type name of the closure with a method of the name by its whole
-		// rendering, which kinds of use leave alone, so sized may be declined on windows by a lookup, never by a read
-		// of a type.
-		if why := windows.result.FromHost.Declined[fieldWalksModule+"/sized"]; strings.HasPrefix(why, "T ") {
-			test.Errorf("windows declined sized by a read of a type, %q, though its reads are the method sets alone, "+
-				"the same there", why)
+		// Its reads are the method sets alone, the same on windows, and the rule's Method lookup of Size is judged
+		// by whether a method of another package could fix the name there (#qqzg1w8), which nothing windows declares
+		// differently can, so windows restores it.
+		if !slices.Contains(windows.result.FromHost.Restored, fieldWalksModule+"/sized") {
+			test.Errorf("windows did not restore sized, whose reads are the same there: %q",
+				windows.result.FromHost.Declined[fieldWalksModule+"/sized"])
 		}
 	})
 }
