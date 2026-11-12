@@ -759,14 +759,14 @@ func (session *CacheSession) keepForBuilds(
 	}
 	host.kept = len(host.entries)
 	// What the analysis built to answer questions, every package's intermediate representation, syntax and type maps,
-	// is the session's to keep only for its next save; a run under `--no-cache` has none, and the extra builds that run
-	// next read only the entries, so it goes now rather than outlive the host's pass through every build (#b2t9xmf).
-	if session.caching.Store == nil {
-		session.resolver = nil
-		session.answering.lock.Lock()
-		session.answering.byTypes = nil
-		session.answering.lock.Unlock()
-	}
+	// goes now rather than outlive the host's pass through every build (#b2t9xmf), with a store or without: the keep is
+	// the last of the run to read it, after the save and the reload's decision, the extra builds read only the entries,
+	// and the session's next Restore starts both afresh. Kept with a store, it held about 3.3 GB at cohere's root as
+	// the builds started, so a cold run with the findings cache ran them one at a time (#px1yxq8).
+	session.resolver = nil
+	session.answering.lock.Lock()
+	session.answering.byTypes = nil
+	session.answering.lock.Unlock()
 	session.keeping += time.Since(started)
 	host.keeping = session.keeping
 	return host
