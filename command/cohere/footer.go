@@ -144,6 +144,12 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	if summary.PackageCache != nil && summary.PackageCache.FromBinary > 0 {
 		line += " • " + summary.PackageCache.segment()
 	}
+	// A Go run whose findings cache could not be read or written, which stderr says one by one, says how many where
+	// people look (#27r8r24). Marked as a warning, since the next run pays for it, but apart from the markers of what
+	// went unchecked: a problem never changes a finding.
+	if summary.PackageCache != nil && summary.PackageCache.Problems > 0 {
+		line += " • ⚠ " + summary.PackageCache.problemsSegment()
+	}
 	// Said apart from the time, which leaves them out, so a build is never read as checking (#ket0hrp).
 	for _, segment := range engineBuildSegments(summary.EngineBuilds) {
 		line += " • " + segment

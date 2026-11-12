@@ -198,6 +198,13 @@ func TestFooterGolden(test *testing.T) {
 			want:    "✓ 💎 2.4s (480 rules • 3,926 checked)",
 		},
 		{
+			name: "a Go run whose findings cache could not be written",
+			summary: func(summary *runSummary) {
+				summary.PackageCache = &packageCacheUse{On: true, Missed: 3, Problems: 2}
+			},
+			want: "✓ 💎 2.4s (480 rules • 3,926 checked) • ⚠ 2 findings cache problems",
+		},
+		{
 			name: "a Go run that checked its files under two builds",
 			summary: func(summary *runSummary) {
 				summary.Builds = []checkedBuild{{Target: "darwin/arm64 cgo", Host: true}, {Target: "windows/arm64"}}

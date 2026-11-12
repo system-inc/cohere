@@ -323,7 +323,7 @@ func exportDataKey(key cache.Key) cache.Key {
 // whose types are the type checker's own. The writer panics on what it cannot carry, as types a faked package "C" left
 // invalid may be, so a panic is a package the entry cannot hold.
 func writeExportData(saved *packages.Package) (exportData []byte, exportError error) {
-	if saved.PkgPath == "unsafe" {
+	if !carriesExportData(saved) {
 		return nil, nil
 	}
 	if saved.Types == nil {
@@ -340,6 +340,13 @@ func writeExportData(saved *packages.Package) (exportData []byte, exportError er
 		return nil, fmt.Errorf("writing the export data of %s: %w: %w", saved.ID, errorUnstorable, writeError)
 	}
 	return written.Bytes(), nil
+}
+
+// carriesExportData reports whether an entry of saved holds export data beside it: every package's does but unsafe's,
+// whose types are the type checker's own, which the load gives it without reading any (see load.Restored). An entry a
+// build writes of a package, from source or through from the host's run (throughEntry), follows this one rule.
+func carriesExportData(saved *packages.Package) bool {
+	return saved.PkgPath != "unsafe"
 }
 
 // storedFiles is the walk of a package's syntax, as walk, generatedFiles and copiedFiles read it.

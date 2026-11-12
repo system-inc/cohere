@@ -160,6 +160,9 @@ type BuildRecord struct {
 // on demand the lint phase answered by replaying the push's walk of a package, which a cold run makes too; it is
 // written only when it is not 0. On is false under `--no-cache`, and every count 0
 // but FromBinary, which the binary's entries can still give, FactsSkipped of what they restored, and Reloads of them.
+// Problems counts what kept the cache from being read or written, the host's build's and every other build's alike,
+// each of which the engine also notes on stderr, so a run read through `--json` alone still shows it (#27r8r24); it
+// is written only when it is not 0.
 type LintCache struct {
 	On           bool `json:"on"`
 	Hit          int  `json:"hit"`
@@ -173,6 +176,7 @@ type LintCache struct {
 	Reloads      int  `json:"reloads,omitempty"`
 	ReloadRounds int  `json:"reloadRounds,omitempty"`
 	Replays      int  `json:"replays,omitempty"`
+	Problems     int  `json:"problems,omitempty"`
 }
 
 func (LintRecord) kind() Kind { return KindLint }

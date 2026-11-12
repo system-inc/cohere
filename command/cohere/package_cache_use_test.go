@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -77,6 +78,36 @@ func TestThePackageCacheLineSaysTheReloads(test *testing.T) {
 		}
 		if carries := strings.Contains(string(encoded), `"reloads"`); carries != (testCase.cache.Reloads > 0) {
 			test.Errorf("want the reloads carried %t in %s", testCase.cache.Reloads > 0, encoded)
+		}
+	}
+}
+
+// The account and the summary `--json` writes name what kept the findings cache from being read or written, which
+// the engine says one by one on stderr alone otherwise (#27r8r24), and carry nothing of it when there was none, so a
+// run without a problem encodes as it always has.
+func TestThePackageCacheNamesItsProblems(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		cache packageCacheUse
+		want  string
+	}{
+		{cache: packageCacheUse{On: true, Missed: 3, Problems: 2},
+			want: "package cache hit 0, missed 3, wrote 0, 2 findings cache problems"},
+		{cache: packageCacheUse{On: true, Missed: 1, Problems: 1},
+			want: "package cache hit 0, missed 1, wrote 0, 1 findings cache problem"},
+		{cache: packageCacheUse{On: true, Hit: 4}, want: "package cache hit 4, missed 0, wrote 0"},
+	} {
+		if got := testCase.cache.line(); got != testCase.want {
+			test.Errorf("got %q, want %q", got, testCase.want)
+		}
+		encoded := jsonLine(summaryAsJson(runSummary{PackageCache: &testCase.cache}))
+		want := fmt.Sprintf(`"problems":%d`, testCase.cache.Problems)
+		if carries := strings.Contains(encoded, want); carries != (testCase.cache.Problems > 0) {
+			test.Errorf("want %s carried %t in %s", want, testCase.cache.Problems > 0, encoded)
+		}
+		if testCase.cache.Problems == 0 && strings.Contains(encoded, `"problems"`) {
+			test.Errorf("want no count when it is 0, got %s", encoded)
 		}
 	}
 }

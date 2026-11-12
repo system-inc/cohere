@@ -516,9 +516,9 @@ func (session *CacheSession) writeThrough(
 
 // throughEntry is the entry writeThrough writes of saved, restored from the host's run as hosted, and whether it is
 // the build's to write: the host's entry as the build restored it, its findings, facts, answers, withheld counts,
-// files, imports, output digest and what it declares without a body, with the export data the build read, as the
-// build would write it had it checked the package itself. Its reads name each owner by its first key in this build,
-// which every read held against when the restore settled.
+// files, imports, output digest and what it declares without a body, with the export data the build read, none for
+// unsafe, as the build would write it had it checked the package itself. Its reads name each owner by its first key
+// in this build, which every read held against when the restore settled.
 //
 // The output digest is the host's, which is the build's own only while the entry holds exactly the analyzers of the
 // build's actions on saved, as encodeEntry's would, since the digest names every one of them; an entry that holds
@@ -557,7 +557,9 @@ func (session *CacheSession) throughEntry(
 		}
 	}
 	encoded := encodedEntry{output: hosted.restored.output, hasOutput: hosted.restored.hasOutput}
-	if hosted.restored.types.ReadExportData != nil {
+	// unsafe's entry holds no export data, as the build's own from source holds none (carriesExportData); the reader of
+	// one kept from the binary's table, which holds none for it, would refuse (#27r8r24).
+	if carriesExportData(saved) && hosted.restored.types.ReadExportData != nil {
 		exportData, exportError := hosted.restored.types.ReadExportData()
 		if exportError != nil {
 			return encodedEntry{}, true, fmt.Errorf("reading the export data the build read: %w", exportError)

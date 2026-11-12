@@ -12,7 +12,8 @@ import "fmt"
 // the run loaded again from source, though the cache held them, to answer a question of a fact computed on demand
 // that no store answered (#w7zmvat wave 3), and ReloadRounds the loads and lints again that took, and Replays the
 // questions of such a fact answered by replaying the push's walk of a package, which a cold run makes too, each absent
-// when 0.
+// when 0. Problems is what kept the cache from being read or written, every build's, which the engine notes on stderr
+// one by one and the footer counts, absent when 0 (#27r8r24).
 // On is false under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as
 // it was.
 type packageCacheUse struct {
@@ -28,6 +29,7 @@ type packageCacheUse struct {
 	Reloads      int  `json:"reloads,omitempty"`
 	ReloadRounds int  `json:"reloadRounds,omitempty"`
 	Replays      int  `json:"replays,omitempty"`
+	Problems     int  `json:"problems,omitempty"`
 }
 
 // line is the cache's clause of the --verbose account, after "lint: ": the three counts every run has, and the ones
@@ -67,6 +69,9 @@ func (cache packageCacheUse) reloads() string {
 	if cache.Replays > 0 {
 		clause += fmt.Sprintf(", %d answers replayed", cache.Replays)
 	}
+	if cache.Problems > 0 {
+		clause += ", " + cache.problemsSegment()
+	}
 	return clause
 }
 
@@ -74,4 +79,10 @@ func (cache packageCacheUse) reloads() string {
 // cold run that reused them reads as such.
 func (cache packageCacheUse) segment() string {
 	return "standard library: " + grouped(cache.FromBinary) + " from the binary"
+}
+
+// problemsSegment is what kept the cache from being read or written, as the footer and the account say it, so a run
+// whose cache could not be written says so where people look, and not on stderr alone.
+func (cache packageCacheUse) problemsSegment() string {
+	return counted(cache.Problems, "findings cache problem", "findings cache problems")
 }
