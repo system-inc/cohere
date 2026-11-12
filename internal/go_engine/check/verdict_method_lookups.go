@@ -28,13 +28,14 @@ import (
 //     narrower than all types: abbreviated instantiates it with type arguments read off the subject's signature and
 //     validates them against its constraints, which a method, a type term or comparable can turn on an argument
 //     type's method set, underlying type or comparability in the build. Under constraints of all types validation
-//     passes for every argument in every build (#8fbkkp4), and the rest of what the rule does with the candidate
-//     reads only its own lines, which carry its type parameters with their constraints (typeParametersLine), so the
-//     ones that decide whether its arguments can be read off the subject at all, and the subject's own signature: such
-//     a candidate is judged as any other, as is an answer whose own lines carry them too (answerLinesOf). No other
-//     rule instantiates (#dscc341): no_any matches a generic candidate by shape alone and initialism a generic
-//     interface by implementsInShape, each by the candidate's own lines, so a generic candidate of theirs is judged as
-//     any other, its answer by its own lines and a new or changed one by its shape.
+//     passes for every argument in every build (#8fbkkp4), and the rest of what the rule does with the candidate reads
+//     its own lines, which carry its type parameters with their constraints (renderedTypeParameters), so which of them
+//     can be read off the subject at all, and the subject's own signature, whose types of other packages are the
+//     package's own type reads, an alias judged by the type it stands for. So such a candidate is judged as any other,
+//     as is an answer whose own lines carry its parameters too (answerLinesOf). No other rule instantiates
+//     (#dscc341): no_any matches a generic candidate by shape alone and initialism a generic interface by
+//     implementsInShape, each by the candidate's own lines, so a generic candidate of theirs is judged as any other,
+//     its answer by its own lines and a new or changed one by its shape.
 //   - A subject whose receiver embeds another package's type, directly or through types of its own package that embed
 //     one: Implements reads the receiver's method set, which holds the methods that type promotes at any depth, and
 //     those can differ by build while the lookup's candidates do not.

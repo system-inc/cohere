@@ -13,7 +13,7 @@ import (
 // methodCandidate is one type name a rule could match for a Method or Interface lookup's name, as either verdict holds
 // it, of this run's types or persisted (methodLookupHolds): whether it is an interface or generic, the shape of its
 // method of the name, the digest of the lines it is compared across builds by, its method's signature, for a generic
-// type its type parameters with their constraints (typeParametersLine) and, for an interface, every method of its
+// type its type parameters with their constraints (renderedTypeParameters) and, for an interface, every method of its
 // method set, and, for an interface, whether its method set holds the lookup's answer. unconstrained is whether it is
 // generic with every type parameter's constraint of all types, which no type argument can fail (#8fbkkp4).
 type methodCandidate struct {
@@ -54,22 +54,6 @@ func signatureLine(method *types.Func) string {
 	return types.TypeString(method.Type(), pathQualifier)
 }
 
-// typeParametersLine is a generic type's type parameters in order, each by name with its constraint, every named type
-// by its package's path and name, and empty for a type with none. Which parameters a method's signature holds bare
-// decides whether a rule can read their type arguments off a subject's signature (abbreviated's typeArgumentsOf), and
-// a constraint decides whether those arguments satisfy it, while the signature renders each parameter by name alone,
-// so two builds can render a generic method alike while a rule takes different paths on it (#8fbkkp4).
-func typeParametersLine(parameters *types.TypeParamList) string {
-	if parameters.Len() == 0 {
-		return ""
-	}
-	written := make([]string, 0, parameters.Len())
-	for parameter := range parameters.TypeParams() {
-		written = append(written, parameter.Obj().Name()+" "+types.TypeString(parameter.Constraint(), pathQualifier))
-	}
-	return "[" + strings.Join(written, ", ") + "]"
-}
-
 // everyConstraintOfAllTypes reports whether every one of parameters has a constraint whose type set is all types, as
 // `any` is, which types.Instantiate's validation passes for every type argument in every build: no method, no type
 // term, no comparable.
@@ -83,12 +67,11 @@ func everyConstraintOfAllTypes(parameters *types.TypeParamList) bool {
 	return true
 }
 
-// receiverTypeParameters are the type parameters method's receiver declares: a generic concrete type's method speaks of
-// its receiver's own, and an interface's method of the interface's, nil when it has none.
+// receiverTypeParameters are the type parameters of the type that declares method, nil when it has none: a generic
+// concrete type's method has its receiver as an instance of that type over its own receiver type parameters, and an
+// interface's method the interface, and either named type gives the declaring type's parameters, which render as the
+// receiver's do.
 func receiverTypeParameters(method *types.Func) *types.TypeParamList {
-	if parameters := method.Signature().RecvTypeParams(); parameters.Len() > 0 {
-		return parameters
-	}
 	receiver := method.Signature().Recv()
 	if receiver == nil {
 		return nil
@@ -123,9 +106,10 @@ func ownLinesDigest(version string, lines ...string) []byte {
 
 // answerLinesOf is the digest of the own lines of a lookup's answer under version, the renderer's, as the verdict
 // compares it across builds: an interface's every method, or a method's signature, each with the type parameters of
-// the generic type that declares it (typeParametersLine), and nil for anything else, which no build can answer alike.
-// A generic answer's parameters are its lines because a rule that matched it by shape alone, none of its parameters
-// bare, matches it by instance in a build where one is, and the signature renders alike in both (#8fbkkp4).
+// the generic type that declares it (renderedTypeParameters), and nil for anything else, which no build can answer
+// alike. A generic answer's parameters are its lines because a rule that matched it by shape alone, none of its
+// parameters bare, matches it by instance in a build where one is, and the signature renders alike in both
+// (#8fbkkp4).
 func answerLinesOf(answer types.Object, version string) []byte {
 	switch declared := answer.(type) {
 	case *types.TypeName:
@@ -134,11 +118,12 @@ func answerLinesOf(answer types.Object, version string) []byte {
 			if named, isNamed := types.Unalias(declared.Type()).(*types.Named); isNamed {
 				parameters = named.TypeParams()
 			}
-			return ownLinesDigest(version, "interface", interfaceLine(interfaceType), typeParametersLine(parameters))
+			return ownLinesDigest(version, "interface", interfaceLine(interfaceType),
+				renderedTypeParameters(parameters))
 		}
 	case *types.Func:
 		return ownLinesDigest(version, "method", signatureLine(declared),
-			typeParametersLine(receiverTypeParameters(declared)))
+			renderedTypeParameters(receiverTypeParameters(declared)))
 	}
 	return nil
 }
@@ -170,7 +155,7 @@ func methodCandidateOf(
 			if method.Name() == name {
 				return methodCandidate{isInterface: true, isGeneric: isGeneric, unconstrained: unconstrained,
 					shape: shapeOf(method.Signature()), lines: ownLinesDigest(version, signatureLine(method),
-						interfaceLine(interfaceType), typeParametersLine(parameters)),
+						interfaceLine(interfaceType), renderedTypeParameters(parameters)),
 					holdsAnswer: answer != nil && slices.ContainsFunc(slices.Collect(interfaceType.Methods()),
 						func(held *types.Func) bool { return types.Object(held) == answer })}, true
 			}
@@ -184,7 +169,7 @@ func methodCandidateOf(
 		if method.Name() == name {
 			return methodCandidate{isGeneric: isGeneric, unconstrained: unconstrained,
 				shape: shapeOf(method.Signature()),
-				lines: ownLinesDigest(version, signatureLine(method), typeParametersLine(parameters))}, true
+				lines: ownLinesDigest(version, signatureLine(method), renderedTypeParameters(parameters))}, true
 		}
 	}
 	return methodCandidate{}, false
