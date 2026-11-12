@@ -83,8 +83,9 @@ func TestThePackageCacheLineSaysTheReloads(test *testing.T) {
 }
 
 // The account and the summary `--json` writes name what kept the findings cache from being read or written, which
-// the engine says one by one on stderr alone otherwise (#27r8r24), and carry nothing of it when there was none, so a
-// run without a problem encodes as it always has.
+// the engine says one by one on stderr alone otherwise, and every write that failed, of which stderr says only the
+// first (#27r8r24), and carry nothing of either when there was none, so a run without a problem encodes as it always
+// has.
 func TestThePackageCacheNamesItsProblems(test *testing.T) {
 	test.Parallel()
 
@@ -94,6 +95,8 @@ func TestThePackageCacheNamesItsProblems(test *testing.T) {
 	}{
 		{cache: packageCacheUse{On: true, Missed: 3, Problems: 2},
 			want: "package cache hit 0, missed 3, wrote 0, 2 findings cache problems"},
+		{cache: packageCacheUse{On: true, Missed: 412, Problems: 1, WriteFailed: 412},
+			want: "package cache hit 0, missed 412, wrote 0, 1 findings cache problem, 412 writes failed"},
 		{cache: packageCacheUse{On: true, Missed: 1, Problems: 1},
 			want: "package cache hit 0, missed 1, wrote 0, 1 findings cache problem"},
 		{cache: packageCacheUse{On: true, Hit: 4}, want: "package cache hit 4, missed 0, wrote 0"},
@@ -108,6 +111,10 @@ func TestThePackageCacheNamesItsProblems(test *testing.T) {
 		}
 		if testCase.cache.Problems == 0 && strings.Contains(encoded, `"problems"`) {
 			test.Errorf("want no count when it is 0, got %s", encoded)
+		}
+		failed := fmt.Sprintf(`"writeFailed":%d`, testCase.cache.WriteFailed)
+		if carries := strings.Contains(encoded, failed); carries != (testCase.cache.WriteFailed > 0) {
+			test.Errorf("want %s carried %t in %s", failed, testCase.cache.WriteFailed > 0, encoded)
 		}
 	}
 }

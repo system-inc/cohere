@@ -939,7 +939,9 @@ the host's build's and every other build's alike (#27r8r24): keys that could not
 entry that could not be encoded, a write that failed, or an entry an extra build could not write
 through. The engine says each one on stderr, as `the findings cache: ...`, and the count carries
 them into the record, so a run read only through `--json` still shows its cache could not be
-written. A problem never changes a finding. It is written only when it is not 0.
+written. A problem never changes a finding. Of the misses whose write failed, only the first is a
+problem, so `"writeFailed":412` counts every one, every build's, and a store that refused 412
+writes says 412. Each is written only when it is not 0.
 
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
 which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive

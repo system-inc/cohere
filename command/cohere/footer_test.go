@@ -200,9 +200,17 @@ func TestFooterGolden(test *testing.T) {
 		{
 			name: "a Go run whose findings cache could not be written",
 			summary: func(summary *runSummary) {
-				summary.PackageCache = &packageCacheUse{On: true, Missed: 3, Problems: 2}
+				summary.PackageCache = &packageCacheUse{On: true, Missed: 412, Problems: 1, WriteFailed: 412}
 			},
-			want: "✓ 💎 2.4s (480 rules • 3,926 checked) • ⚠ 2 findings cache problems",
+			want: "✓ 💎 2.4s (480 rules • 3,926 checked) • ⚠ 1 findings cache problem, 412 writes failed",
+		},
+		{
+			// As TestAStoreThatRefusesAWriteCountsItsProblems's store, which refuses two writes and more, notes one.
+			name: "a Go run whose store refused two writes",
+			summary: func(summary *runSummary) {
+				summary.PackageCache = &packageCacheUse{On: true, Missed: 2, Problems: 1, WriteFailed: 2}
+			},
+			want: "✓ 💎 2.4s (480 rules • 3,926 checked) • ⚠ 1 findings cache problem, 2 writes failed",
 		},
 		{
 			name: "a Go run that checked its files under two builds",

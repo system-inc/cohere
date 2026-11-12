@@ -13,7 +13,8 @@ import "fmt"
 // that no store answered (#w7zmvat wave 3), and ReloadRounds the loads and lints again that took, and Replays the
 // questions of such a fact answered by replaying the push's walk of a package, which a cold run makes too, each absent
 // when 0. Problems is what kept the cache from being read or written, every build's, which the engine notes on stderr
-// one by one and the footer counts, absent when 0 (#27r8r24).
+// one by one and the footer counts, and WriteFailed every entry whose write failed, every build's, of which stderr
+// notes only the first, each absent when 0 (#27r8r24).
 // On is false under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as
 // it was.
 type packageCacheUse struct {
@@ -30,6 +31,7 @@ type packageCacheUse struct {
 	ReloadRounds int  `json:"reloadRounds,omitempty"`
 	Replays      int  `json:"replays,omitempty"`
 	Problems     int  `json:"problems,omitempty"`
+	WriteFailed  int  `json:"writeFailed,omitempty"`
 }
 
 // line is the cache's clause of the --verbose account, after "lint: ": the three counts every run has, and the ones
@@ -69,7 +71,7 @@ func (cache packageCacheUse) reloads() string {
 	if cache.Replays > 0 {
 		clause += fmt.Sprintf(", %d answers replayed", cache.Replays)
 	}
-	if cache.Problems > 0 {
+	if cache.Problems > 0 || cache.WriteFailed > 0 {
 		clause += ", " + cache.problemsSegment()
 	}
 	return clause
@@ -82,7 +84,12 @@ func (cache packageCacheUse) segment() string {
 }
 
 // problemsSegment is what kept the cache from being read or written, as the footer and the account say it, so a run
-// whose cache could not be written says so where people look, and not on stderr alone.
+// whose cache could not be written says so where people look, and not on stderr alone: the problems, and every write
+// that failed, since stderr notes only the first of those.
 func (cache packageCacheUse) problemsSegment() string {
-	return counted(cache.Problems, "findings cache problem", "findings cache problems")
+	segment := counted(cache.Problems, "findings cache problem", "findings cache problems")
+	if cache.WriteFailed > 0 {
+		segment += ", " + counted(cache.WriteFailed, "write failed", "writes failed")
+	}
+	return segment
 }
