@@ -169,6 +169,8 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 	everyBuild.Builds = []string{"darwin/arm64 cgo", "linux/arm64", "windows/arm64"}
 	everyBuildHostAlone := everyBuild
 	everyBuildHostAlone.Builds = []string{"darwin/arm64 cgo"}
+	everyBuildOtherPlatform := everyBuild
+	everyBuildOtherPlatform.Builds = []string{"darwin/arm64 cgo", "linux/arm64", "freebsd/arm64"}
 	release := goAloneChecking
 	release.StandardLibraryTable = &StandardLibraryTable{ReleaseStamp: "v0.2.0+e51c6a1e", Bytes: 1 << 20}
 	for name, want := range map[string]struct {
@@ -231,6 +233,13 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 			tonight:  everyBuildHostAlone,
 			refusal: "the baseline checked the builds darwin/arm64 cgo; linux/arm64; windows/arm64 and tonight " +
 				"darwin/arm64 cgo, and runs of different builds are never compared",
+		},
+		// Two nights of as many builds, one platform swapped for another when a file's constraint changed, checked
+		// different work: the builds compare as sets, never by their count.
+		"an every-build night that checked another platform": {
+			baseline: everyBuild,
+			tonight:  everyBuildOtherPlatform,
+			refusal:  "and tonight darwin/arm64 cgo; linux/arm64; freebsd/arm64, and runs of different builds",
 		},
 		// A release binary's night is never judged against a local build's baseline, either way round (#ccqee0e).
 		"a release night against a local build's baseline": {
