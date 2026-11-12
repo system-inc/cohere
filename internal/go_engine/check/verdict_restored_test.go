@@ -15,8 +15,9 @@ import (
 )
 
 // The restored fixture's paths: hidden declares an unexported type with a Close method, and an unexported close, that
-// nothing exported reaches, so its export data leaves the type out, and its user asks which type names of its closure
-// have a Close method.
+// nothing exported reaches, so its export data leaves the type out, and its user asks which method of its closure fixes
+// its own Close, which that type's answers for a rule that reads unexported types' methods, and none answers for one
+// that reads only exported ones.
 const (
 	restoredHiddenPath = "example.com/restored/hidden"
 	restoredUserPath   = "example.com/restored/user"
@@ -32,15 +33,16 @@ var restoredSources = map[string]string{
 }
 
 // restoredWorld is the fixture on the host, hidden and its user checked from source, the user's type reads recorded
-// and a Method lookup of Close added, and hidden as a build restores it from the host, read from the export data the
-// host's check of it writes.
+// and a Method lookup of Close added, answered by hidden's closer or by none, and hidden as a build restores it from
+// the host, read from the export data the host's check of it writes.
 type restoredWorld struct {
 	restoring    Restoring
 	exportHidden *types.Package
 }
 
-// checkedRestoredWorld checks the fixture on the host and reads hidden back from its export data.
-func checkedRestoredWorld(test *testing.T) restoredWorld {
+// checkedRestoredWorld checks the fixture on the host and reads hidden back from its export data, the Method lookup of
+// Close answered by closer's Close when answered, and by none otherwise.
+func checkedRestoredWorld(test *testing.T, answered bool) restoredWorld {
 	test.Helper()
 
 	fileSet := token.NewFileSet()
@@ -86,9 +88,14 @@ func checkedRestoredWorld(test *testing.T) restoredWorld {
 		test.Fatal("hidden's export data holds closer, which nothing exported reaches, so the fixture tells nothing")
 	}
 	reads := &build_reads.Reads{}
-	reads.RecordTypes(hostUser, info)
-	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
-		Subject: methodOf(hostUser, "Mine", "Close")})
+	// Without the syntax every read is judged by its closure: the lookup is what this fixture is about.
+	reads.RecordTypes(hostUser, info, nil)
+	lookup := build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close", Subject: methodOf(hostUser, "Mine",
+		"Close")}
+	if answered {
+		lookup.Found, lookup.Answer = true, methodOf(hostHidden, "closer", "Close")
+	}
+	reads.AddLookup(lookup)
 	return restoredWorld{
 		restoring:    Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads},
 		exportHidden: exportHidden,
@@ -96,13 +103,14 @@ func checkedRestoredWorld(test *testing.T) restoredWorld {
 }
 
 // A method lookup holds in a build that restored a package of the closure from the host, though the export data its
-// types were read from lacks an unexported type with the method: the restored package gives the host's own type names,
-// since checked from source it declares what the host's does. The same package checked from source in the build, as
-// its export data stands for here, is scanned there, and the type it lacks fails the lookup.
+// types were read from lacks the unexported type whose method answered it: the restored package's answer is the host's
+// own, since checked from source it declares what the host's does. The same package checked from source in the build,
+// as its export data stands for here, is asked for the answer there, and the type it lacks fails the lookup. The
+// reads persisted as an entry persists them are judged alike.
 func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) {
 	test.Parallel()
 
-	world := checkedRestoredWorld(test)
+	world := checkedRestoredWorld(test, true)
 	closure := map[string]*types.Package{restoredHiddenPath: world.exportHidden}
 	for _, step := range []struct {
 		name     string
@@ -111,14 +119,23 @@ func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) 
 	}{
 		{"restored from the host", map[*types.Package]bool{world.exportHidden: true}, ""},
 		{"checked from source", nil,
-			"L lookup Method Close: 1 type names have the method on the host, 0 in the build"},
+			"L lookup Method Close: its answer " + restoredHiddenPath + ".Close is not in the build: the build's " +
+				restoredHiddenPath + " has no closer.M0"},
 	} {
 		test.Run(step.name, func(test *testing.T) {
 			test.Parallel()
 
-			holds, why := TypesHold(world.restoring, closure, step.restored, NewReadsBuild(), NewReadsBuild())
+			// Measured as a build's memos are, since persisted reads name the sizes they were measured by.
+			host := measuredReadsBuild()
+			holds, why := TypesHold(world.restoring, closure, step.restored, host, measuredReadsBuild())
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
+			}
+			persisted := persistedRestoring(test, world.restoring, host, ReadsRendererVersion)
+			persistedHolds, persistedWhy := TypesHold(persisted, closure, step.restored, host, measuredReadsBuild())
+			if persistedHolds != holds || persistedWhy != why {
+				test.Errorf("persisted, want %t, %q as in memory, got %t, %q", holds, why, persistedHolds,
+					persistedWhy)
 			}
 		})
 	}
@@ -130,7 +147,7 @@ func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) 
 func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
 	test.Parallel()
 
-	world := checkedRestoredWorld(test)
+	world := checkedRestoredWorld(test, false)
 	host, build := NewReadsBuild(), NewReadsBuild()
 	counted := func(counts map[*types.Package]int) func(*types.Package) {
 		return func(counted *types.Package) { counts[counted]++ }
@@ -150,7 +167,7 @@ func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
 			reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name, Subject: subject})
 		}
 		restoring := Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads}
-		reads.RecordTypes(subject.Pkg(), &types.Info{})
+		reads.RecordTypes(subject.Pkg(), &types.Info{}, nil)
 		if holds, why := TypesHold(restoring, closure, map[*types.Package]bool{world.exportHidden: true}, host,
 			build); !holds {
 			test.Fatalf("the lookups of one source do not hold: %s", why)

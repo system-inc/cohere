@@ -529,9 +529,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 
 // recordUnreachedTypes starts, on walks, the walk of the type reads of each package of reads that no action reached,
 // so nothing walked them as its last action finished (checker.Options.Reads): a dependency no analyzer that learns
-// facts runs on, or a root the run does not analyze. Its type information is still whole, since only the checker
-// lets it go, and only for a package it ran on. A package whose walk is claimed already, or marked never, is passed
-// over, and one with no type information, whose types came from export data, is left to the load, which marks it
+// facts runs on, or a root the run does not analyze. Its type information and syntax are still whole, since only the
+// checker lets them go, and only for a package it ran on. A package whose walk is claimed already, or marked never, is
+// passed over, and one with no type information, whose types came from export data, is left to the load, which marks it
 // never. Beside the load, ready is Options.Ready: a package no action reached may still be in its check, as a root the
 // run does not analyze can be, so each is read only once it is final.
 //
@@ -555,7 +555,7 @@ func recordUnreachedTypes(
 			if !packageReads.Claim() || unreached.TypesInfo == nil {
 				return
 			}
-			packageReads.Record(unreached.Types, unreached.TypesInfo)
+			packageReads.Record(unreached.Types, unreached.TypesInfo, unreached.Syntax)
 		})
 	}
 }

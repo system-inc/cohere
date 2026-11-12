@@ -7,12 +7,15 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/deprecated"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
 // updateRenderings has the golden test write the renderings it computes over the golden, after a change that moved
@@ -42,8 +45,8 @@ const renderingsSource = "package rendered\n\n" +
 
 // readsRenderingLines are what a persisted digest is taken of, for a fixed fixture: the version line, then each
 // object of the verdict fixture's darwin platform and of renderingsSource, its closure digest measured by the amd64
-// sizes and whole, each beside the closure it stands for written out (closureRendering), and the value digests of
-// fixed facts.
+// sizes and whole, each beside the closure it stands for written out (closureRendering), the digest of what each kind
+// of use reads of it, measured, beside the lines it reads (useLines), and the value digests of fixed facts.
 func readsRenderingLines(test *testing.T) []string {
 	test.Helper()
 
@@ -68,6 +71,24 @@ func readsRenderingLines(test *testing.T) []string {
 					lines = append(lines, "\t"+line)
 				}
 			}
+			// What each kind of use reads of the object (#mjdf7ah): a type name's name, underlying type and method set,
+			// and anything else's own line, which a selection's member is judged by too.
+			kinds := []build_reads.UseKind{build_reads.UseMember}
+			if _, isTypeName := object.(*types.TypeName); isTypeName {
+				kinds = []build_reads.UseKind{build_reads.UseName, build_reads.UseUnderlying, build_reads.UseMethodSet}
+			}
+			for _, kind := range kinds {
+				digest := measured.useDigest(object, kind)
+				lines = append(lines, "use "+string(kind)+" "+objectName(object)+" "+hex.EncodeToString(digest[:]))
+				for _, line := range measured.useLines(object, kind) {
+					lines = append(lines, "\t"+line)
+				}
+			}
+			// The own lines a Method or Interface lookup's candidate is compared by (#qqzg1w8), for each method a rule
+			// could match it by.
+			if typeName, isTypeName := object.(*types.TypeName); isTypeName {
+				lines = append(lines, methodCandidateLines(typeName)...)
+			}
 		}
 	}
 	for _, fact := range []analysis.Fact{
@@ -80,6 +101,33 @@ func readsRenderingLines(test *testing.T) []string {
 			test.Fatal(digestError)
 		}
 		lines = append(lines, "fact "+factTypeName(reflect.TypeOf(fact))+" "+hex.EncodeToString(digest[:]))
+	}
+	return lines
+}
+
+// methodCandidateLines are typeName's own lines as a Method lookup's candidate, for each method a rule could match it
+// by, an interface's every one and a named type's declared ones: the digest, then its method's signature and, for an
+// interface, every method of its method set.
+func methodCandidateLines(typeName *types.TypeName) []string {
+	var methods []*types.Func
+	if interfaceType, isInterface := typeName.Type().Underlying().(*types.Interface); isInterface {
+		methods = slices.Collect(interfaceType.Methods())
+	} else if named, isNamed := types.Unalias(typeName.Type()).(*types.Named); isNamed {
+		methods = slices.Collect(named.Methods())
+	}
+	var lines []string
+	for _, method := range methods {
+		candidate, isCandidate := methodCandidateOf(typeName, build_reads.QueryMethod, method.Name(), nil,
+			ReadsRendererVersion)
+		if !isCandidate {
+			continue
+		}
+		lines = append(lines,
+			"candidate "+objectName(typeName)+"."+method.Name()+" "+hex.EncodeToString(candidate.lines),
+			"\t"+signatureLine(method))
+		if interfaceType, isInterface := typeName.Type().Underlying().(*types.Interface); isInterface {
+			lines = append(lines, "\t"+strings.ReplaceAll(interfaceLine(interfaceType), "\n", "\n\t"))
+		}
 	}
 	return lines
 }

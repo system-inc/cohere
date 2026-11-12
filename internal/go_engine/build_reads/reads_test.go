@@ -35,7 +35,7 @@ func TestReadsFromManyGoroutinesKeepEachReadOnceInOrder(test *testing.T) {
 	for range 8 {
 		group.Go(func() {
 			for _, object := range objects {
-				reads.AddObject(object)
+				reads.AddUse(object, UseMember)
 				reads.AddFact(Fact{Object: object, Package: object.Pkg(), FactType: factType, Found: true})
 			}
 			reads.AddFact(Fact{Package: other, FactType: factType})
@@ -46,12 +46,16 @@ func TestReadsFromManyGoroutinesKeepEachReadOnceInOrder(test *testing.T) {
 	reads.MarkNever("second")
 
 	var names []string
-	for _, object := range reads.Objects() {
-		names = append(names, object.Pkg().Path()+"."+object.Name())
+	for _, use := range reads.Uses() {
+		names = append(names, use.Object.Pkg().Path()+"."+use.Object.Name()+" "+string(use.Kind))
 	}
-	want := []string{"example.com/other.Beta", "example.com/other.Zeta", "example.com/second.Alpha"}
+	want := []string{
+		"example.com/other.Beta Member",
+		"example.com/other.Zeta Member",
+		"example.com/second.Alpha Member",
+	}
 	if !slices.Equal(names, want) {
-		test.Fatalf("want the objects\n%q\ngot\n%q", want, names)
+		test.Fatalf("want the uses\n%q\ngot\n%q", want, names)
 	}
 	facts := reads.Facts()
 	if len(facts) != 4 || facts[0].Object != nil || facts[0].Package != other {
@@ -72,7 +76,7 @@ func TestUnknownReadsAreNeverRestorable(test *testing.T) {
 		test.Fatalf("want unknown reads unrestorable, never recorded, got %t, %q", restorable, why)
 	}
 	recorded := &Reads{}
-	recorded.RecordTypes(types.NewPackage("example.com/own", "own"), &types.Info{})
+	recorded.RecordTypes(types.NewPackage("example.com/own", "own"), &types.Info{}, nil)
 	if restorable, why := recorded.Restorable(); !restorable || !recorded.Recorded() {
 		test.Fatalf("want recorded empty reads restorable, got %t, %q", restorable, why)
 	}

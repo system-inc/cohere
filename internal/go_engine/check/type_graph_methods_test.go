@@ -110,7 +110,8 @@ func checkedTargets(test *testing.T, goos string, fixture targetFixture) map[str
 
 // readsHoldAcross is the load's verdict, in fixture's linux build, on a user package checked on its darwin host from
 // source, which imports the package at importedPath and reads what source reads of it, each build's memo told sizes,
-// nil for none, and the user judged as a package with assembly files when assembly is set.
+// nil for none, and the user judged as a package with assembly files when assembly is set. The reads are recorded
+// without the user's syntax, so every read is judged by its object's closure, the rendering these tests are about.
 func readsHoldAcross(
 	test *testing.T,
 	fixture targetFixture,
@@ -146,7 +147,7 @@ func readsHoldAcross(
 		test.Fatal(checkError)
 	}
 	reads := &build_reads.Reads{}
-	reads.RecordTypes(user, info)
+	reads.RecordTypes(user, info, nil)
 	restoring := Restoring{Path: user.Path(), Imports: []string{importedPath}, Reads: reads, Assembly: assembly}
 	host, build := NewReadsBuild(), NewReadsBuild()
 	host.measureBy(sizes)

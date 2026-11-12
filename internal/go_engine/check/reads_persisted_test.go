@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"go/types"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -140,10 +141,11 @@ type persistedComparison struct {
 	otherSizes bool
 }
 
-// The differential: on the verdict fixture's darwin host and three builds, darwin again, linux and freebsd, every user
-// package's verdict from its persisted reads, and from them as the release's table carries them, is the verdict from
-// its reads of this run, holds and reason alike, with reads that hold and reads that do not of every kind: types that
-// change by target, a fact found in one build and missing in another, a package fact of another value, lookups
+// The differential: on the verdict fixture's darwin host and three builds, darwin again, linux and freebsd, and on the
+// kind-of-use fixture's darwin host, windows and darwin again, every user package's verdict from its persisted reads,
+// and from them as the release's table carries them, is the verdict from its reads of this run, holds and reason
+// alike, with reads that hold and reads that do not of every kind: types that change by target, every kind of use and
+// selections (#mjdf7ah), a fact found in one build and missing in another, a package fact of another value, lookups
 // answered differently and deprecations of another message. The restored fixture adds Interface and Method lookups
 // over a package the build restored from the host, whose export data drops an unexported type with the methods, and
 // over a restored package the host's closure lacks. A fourth build, darwin again measured by 386's sizes, declines
@@ -315,6 +317,29 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 			wantStated: true,
 		})
 	}
+	// The kind-of-use fixture (#mjdf7ah): every kind of use, and selections, judged on windows, where each user's read
+	// differs, and on the host's twin, where each holds, so the persisted kinds, and the table's, decline and hold as
+	// the kinds of this run do.
+	for user := range kindUsers {
+		restoring := kindRestoring(test, user)
+		persisted := persistedRestoring(test, restoring, host, ReadsRendererVersion)
+		tabled := tableRestoring(test, restoring, host)
+		for _, goos := range []string{"windows", "darwin"} {
+			closure, buildMemo := kindPackages(test, goos), measuredReadsBuild()
+			judged = append(judged, persistedComparison{
+				name: "the " + user + " kind user in " + goos,
+				inMemory: func() (bool, string) {
+					return TypesHold(restoring, closure, nil, host, buildMemo)
+				},
+				persisted: func() (bool, string) {
+					return TypesHold(persisted, closure, nil, host, buildMemo)
+				},
+				table: func() (bool, string) {
+					return TypesHold(tabled, closure, nil, host, buildMemo)
+				},
+			})
+		}
+	}
 	verdicts := make([][3]struct {
 		holds bool
 		why   string
@@ -328,7 +353,7 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 		}
 	}
 	waiting.Wait()
-	holding, declined, otherSizesHolding := 0, map[string]int{}, 0
+	holding, declined, otherSizesHolding, reasons := 0, map[string]int{}, 0, []string{}
 	for index, each := range judged {
 		inMemory, persisted, table := verdicts[index][0], verdicts[index][1], verdicts[index][2]
 		if each.otherSizes {
@@ -347,6 +372,7 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 			holding++
 		} else {
 			declined[strings.Fields(inMemory.why)[0]]++
+			reasons = append(reasons, inMemory.why)
 		}
 		if persisted != inMemory || table != inMemory || each.wantStated && inMemory.why != each.want {
 			test.Errorf("%s: want %q, in memory %t, %q, persisted %t, %q, table %t, %q", each.name, each.want,
@@ -368,15 +394,23 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 	if holding == 0 {
 		test.Errorf("none of the %d verdicts held, so the fixture tells nothing", compared)
 	}
+	// Nor of a kind of use, or a selection, that never declines.
+	for _, kind := range []string{" renders differently", ": its name or kind differs", ": its own line differs",
+		": its underlying type differs", ": its method set differs", "T selection "} {
+		if !slices.ContainsFunc(reasons, func(why string) bool { return strings.Contains(why, kind) }) {
+			test.Errorf("no verdict of the %d declined by %q, so the fixture tells nothing of it", compared, kind)
+		}
+	}
 	test.Logf("%d verdicts judged, %d held, declined by %v, %d of this run held in the build of other sizes", compared,
 		holding, declined, otherSizesHolding)
 }
 
 // persistedRestoredSteps are the restored fixture's verdicts on its user, whose Method lookup of Close and Interface
-// lookup of close ask of hidden, each with the reason it is to give: restored from the host, whose export data drops
-// closer with its exported Close and its unexported close, so the host's type names stand for the build's; read from
-// that export data without being restored, where closer is missing; and checked from source with an import of its
-// own the host's closure lacks, which the build restored from the host, so its Opener's Close counts in the build.
+// lookup of close ask of hidden, neither answered, each with the reason it is to give: restored from the host, whose
+// export data drops closer with its exported Close and its unexported close, so the host's type names stand for the
+// build's; read from that export data without being restored, where closer is missing, which no rule's answer can
+// gain from (methodLookupHolds); and checked from source with an import of its own the host's closure lacks, which the
+// build restored from the host, so its Opener's Close is a new candidate of the subject's shape in the build.
 func persistedRestoredSteps(test *testing.T) []struct {
 	name      string
 	restoring Restoring
@@ -388,7 +422,7 @@ func persistedRestoredSteps(test *testing.T) []struct {
 } {
 	test.Helper()
 
-	world := checkedRestoredWorld(test)
+	world := checkedRestoredWorld(test, false)
 	subject := world.restoring.Reads.Lookups()[0].Subject
 	world.restoring.Reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "close",
 		Subject: methodOf(subject.Pkg(), "Mine", "close")})
@@ -413,11 +447,11 @@ func persistedRestoredSteps(test *testing.T) []struct {
 			map[*types.Package]bool{world.exportHidden: true}, host, measuredReadsBuild(), ""},
 		{"checked from source", world.restoring,
 			map[string]*types.Package{restoredHiddenPath: world.exportHidden}, nil, host, measuredReadsBuild(),
-			"L lookup Interface close: 1 type names have the method on the host, 0 in the build"},
+			""},
 		{"with a restored import the host lacks", world.restoring,
 			map[string]*types.Package{restoredHiddenPath: withExtra},
 			map[*types.Package]bool{withExtra.Imports()[0]: true}, host, measuredReadsBuild(),
-			"L lookup Method Close: 1 type names have the method on the host, 2 in the build"},
+			"L lookup Method Close: " + extraPath + ".Opener.Close is new in the build, of the subject's shape"},
 	}
 }
 
@@ -433,7 +467,7 @@ func TestPersistedReadsOfAnotherRendererAreDeclined(test *testing.T) {
 
 	misses, hostWorld := hostReads(test, "name")
 	onlyMisses := &build_reads.Reads{}
-	onlyMisses.RecordTypes(hostWorld.user, &types.Info{})
+	onlyMisses.RecordTypes(hostWorld.user, &types.Info{}, nil)
 	onlyMisses.AddFact(build_reads.Fact{Object: hostWorld.platform.Scope().Lookup("NewStable"),
 		Package: hostWorld.platform, FactType: reflect.TypeFor[*valueFact]()})
 	misses.Reads = onlyMisses
@@ -460,8 +494,9 @@ func TestPersistedReadsOfAnotherRendererAreDeclined(test *testing.T) {
 	relabeled := persistedRestoring(test, stable, host, older)
 	relabeled.persisted.record.Renderer = ReadsRendererVersion
 	holds, why = holdsIn(relabeled, host, again)
-	if holds || !strings.HasPrefix(why, "T object ") || !strings.HasSuffix(why, " renders differently") {
-		test.Errorf("want digests of an older renderer declined as rendering differently, got %t, %q", holds, why)
+	// The stable user's first read is a member use of Identity, judged by its own line's digest (#mjdf7ah).
+	if want := "T object " + verdictPlatform + ".Identity: its own line differs"; holds || why != want {
+		test.Errorf("want digests of an older renderer declined as differing, %q, got %t, %q", want, holds, why)
 	}
 }
 

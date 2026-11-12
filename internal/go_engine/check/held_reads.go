@@ -3,7 +3,14 @@ package check
 import (
 	"fmt"
 	"reflect"
+	"slices"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
+
+// judgedKinds are the kinds of use a verdict judges, each by its own digest (persistedUseHolds).
+var judgedKinds = []build_reads.UseKind{build_reads.UseName, build_reads.UseMember, build_reads.UseUnderlying,
+	build_reads.UseMethodSet, build_reads.UseWhole}
 
 // heldReads are a package's persisted reads as a build judges them: the record, each of its fact types as this
 // build's analyzers learn it, by place, nil for a type none of them learns, whose reads the verdict declines, and why
@@ -16,8 +23,8 @@ type heldReads struct {
 
 // newHeldReads is record as a build holds it, its fact types read by learned, every fact type the build's analyzers
 // learn by its factTypeName. A record read from the binary's table or a store is checked here, once, so a reference
-// past what it holds declines the package as unreadable (declined) rather than reach an accessor, which trusts every
-// reference it is handed.
+// past what it holds, or a use of a kind no verdict judges, declines the package as unreadable (declined) rather than
+// reach an accessor, which trusts every reference it is handed.
 func newHeldReads(record persistedReads, learned map[string]reflect.Type) *heldReads {
 	held := &heldReads{record: record, unreadable: unreadableReads(record)}
 	if held.unreadable != "" {
@@ -43,8 +50,9 @@ func heldReadsOf(contents []byte, learned map[string]reflect.Type) *heldReads {
 // unreadableReads is why record names something it does not hold, the first such reference, or empty when every
 // reference names something it holds: an owner of Owners or an object of Objects by its place counted from one, zero
 // for none where a read may have none, and a fact type of FactTypes by its place counted from zero. A reference of each
-// kind is checked where it is held: every object's owner, every type read, every fact read's owner, object and type,
-// and every lookup's package, answer, subject and candidates.
+// kind is checked where it is held: every object's owner, every use's object and kind (#mjdf7ah), every selection's
+// receiver and member, every fact read's owner, object and type, and every lookup's package, answer, subject,
+// candidates and rule candidates (#qqzg1w8).
 func unreadableReads(record persistedReads) string {
 	owners, objects, factTypes := len(record.Owners), len(record.Objects), len(record.FactTypes)
 	// held is how many the record holds of what reference names, which it may name from least to most.
@@ -58,8 +66,16 @@ func unreadableReads(record persistedReads) string {
 	for _, object := range record.Objects {
 		reasons = append(reasons, past("object's owner", object.Owner, 0, owners, owners))
 	}
-	for _, reference := range record.Types {
-		reasons = append(reasons, past("type read", reference, 1, objects, objects))
+	for _, use := range record.Uses {
+		reasons = append(reasons, past("use's object", use.Object, 1, objects, objects))
+		if !slices.Contains(judgedKinds, use.Kind) {
+			reasons = append(reasons, fmt.Sprintf("unreadable: its use's kind is %q, which no verdict judges",
+				use.Kind))
+		}
+	}
+	for _, selection := range record.Selections {
+		reasons = append(reasons, past("selection's receiver", selection.Receiver, 1, objects, objects),
+			past("selection's member", selection.Selected, 1, objects, objects))
 	}
 	for _, fact := range record.Facts {
 		reasons = append(reasons, past("fact read's owner", fact.Owner, 1, owners, owners),
@@ -72,6 +88,9 @@ func unreadableReads(record persistedReads) string {
 			past("lookup's subject", lookup.Subject, 0, objects, objects))
 		for _, candidate := range lookup.Candidates {
 			reasons = append(reasons, past("lookup's candidate", candidate, 1, objects, objects))
+		}
+		for _, candidate := range lookup.RuleCandidates {
+			reasons = append(reasons, past("lookup's rule candidate", candidate.TypeName, 1, objects, objects))
 		}
 	}
 	for _, reason := range reasons {
