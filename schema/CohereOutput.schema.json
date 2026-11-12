@@ -844,9 +844,21 @@
                             "type": "string",
                             "description": "Files the run could not check for any other reason, as the run said it."
                         },
-                        "censusMissedPackages": {
-                            "type": "integer",
-                            "description": "The packages an engine's load reached in its project while its census counted no file there, as a census that never walked the tree does. The run checked nothing it should have, and fails. Absent when 0."
+                        "censusMissed": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["package", "file"],
+                                "properties": {
+                                    "package": {
+                                        "type": "string",
+                                        "description": "The import path of the package that holds the file."
+                                    },
+                                    "file": { "type": "string", "description": "The file, absolute." }
+                                }
+                            },
+                            "description": "Each file an engine's load reached in its project that its census never counted, as at a root or a go.work use reached through a symbolic link. No count of the run accounts for it, so the run fails. Absent when none."
                         },
                         "nestedUnread": {
                             "type": "string",

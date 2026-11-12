@@ -41,7 +41,7 @@ var additiveFields = map[Kind][]string{
 	KindFix:  {"notWritten"},
 	KindLint: {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds", "offReasons"},
 	KindTypes: {
-		"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation", "censusMissedPackages",
+		"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation", "censusMissed",
 	},
 }
 
@@ -307,12 +307,12 @@ func populatedRecords() []Record {
 			NotWritten: []NotWrittenFile{{File: "/project/shared/b.go", RealPath: "/elsewhere/shared/b.go"}},
 		},
 		TypesRecord{
-			Diagnostics:          1,
-			Files:                2,
-			ElapsedMilliseconds:  900,
-			FilesWithoutRecord:   []string{"/project/d.go"},
-			Build:                "go list -deps -test",
-			CensusMissedPackages: 2,
+			Diagnostics:         1,
+			Files:               2,
+			ElapsedMilliseconds: 900,
+			FilesWithoutRecord:  []string{"/project/d.go"},
+			Build:               "go list -deps -test",
+			CensusMissed:        []CensusMissedFile{{Package: "example.com/b", File: "/project/b/b.go"}},
 			WithheldInDependencyCgo: []WithheldFile{
 				{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 1},
 			},
