@@ -71,13 +71,13 @@ import (
 var update = flag.Bool("update", false, "rewrite each case's expected.jsonl and expected.stderr from the engine")
 
 // fixtureOnlyFiles are a case directory's files that describe the case rather than belong to its project. A
-// platform's own expected stream, expected.<GOOS>.jsonl (expectedStreamPath), is one too, by platformStreamPattern.
+// platform's own expected stream, `expected.<GOOS>.jsonl` (expectedStreamPath), is one too, by platformStreamPattern.
 var fixtureOnlyFiles = []string{"expected.jsonl", "expected.stderr", "gitlinks"}
 
 // platformStreamPattern is the name of a platform's own expected stream.
 var platformStreamPattern = regexp.MustCompile(`^expected\.[a-z0-9]+\.jsonl$`)
 
-// expectedStreamPath is the expected stream of the case named name on this machine's platform: expected.<GOOS>.jsonl
+// expectedStreamPath is the expected stream of the case named name on this machine's platform: `expected.<GOOS>.jsonl`
 // when the case has one, and expected.jsonl otherwise. A case keeps one per platform only where its stream honestly
 // differs by platform, as generated-rules-withheld's does: its generated file must call net/http, the one package the
 // response-status rule reads, and on linux net compiles cgo_unix.go, a dependency's cgo the record names as withheld,
@@ -856,6 +856,16 @@ var (
 	}
 )
 
+// toolchainRoot is the `GOROOT` go env names for this process, asked once, or "" when go env can't say, in which
+// case no path is normalized for it and a stream naming the toolchain's files compares unnormalized.
+var toolchainRoot = sync.OnceValue(func() string {
+	output, runError := exec.Command("go", "env", "GOROOT").Output()
+	if runError != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+})
+
 // normalize makes a stream comparable across runs: the copy's root reads /project, every elapsed time 0, the
 // provenance fixed, the inputs held to the copy's own paths (the toolchain's, the module cache's and the temporary
 // directory's move with the machine), the standard library's package count (which moves with the toolchain) N, a
@@ -893,16 +903,6 @@ func normalize(stream string, root string) string {
 	normalized = checkedByBuildPattern.ReplaceAllString(normalized, `"reason":"checked by the target build"`)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
 }
-
-// toolchainRoot is the GOROOT go env names for this process, asked once, or "" when go env can't say, in which
-// case no path is normalized for it and a stream naming the toolchain's files compares unnormalized.
-var toolchainRoot = sync.OnceValue(func() string {
-	output, runError := exec.Command("go", "env", "GOROOT").Output()
-	if runError != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(output))
-})
 
 // inputsInside is an inputs record's line with only the paths at or below root kept, or the line as it was when it
 // does not decode, so the comparison shows it.
