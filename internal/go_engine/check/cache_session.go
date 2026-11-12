@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -161,6 +160,9 @@ type CacheSession struct {
 	// stored is where each hit's entry is: under its key, or the key an alias led to.
 	stored map[*packages.Package]cache.Key
 
+	// aliases is the build's alias table (aliasTable), nil for a session without a store.
+	aliases *aliasTable
+
 	// secondKeyHits are the packages the second key restored.
 	secondKeyHits map[*packages.Package]bool
 
@@ -261,6 +263,9 @@ func NewCacheSession(caching *Caching, rules []rule.Rule, reports ...*analysis.A
 		return session
 	}
 	session.known = known
+	if caching.Store != nil {
+		session.aliases = newAliasTable(caching.Store, caching.Context)
+	}
 	return session
 }
 
@@ -483,19 +488,15 @@ func (session *CacheSession) entryAt(key cache.Key) ([]byte, cache.Key, bool) {
 	if contents, stored := session.caching.Store.Get(key); stored {
 		return contents, key, true
 	}
-	target, aliased := session.caching.Store.Get(aliasKey(key))
-	if !aliased || len(target) != len(cache.Key{}) {
+	if session.aliases == nil {
 		return nil, cache.Key{}, false
 	}
-	storedKey := cache.Key(target)
+	storedKey, aliased := session.aliases.target(key)
+	if !aliased {
+		return nil, cache.Key{}, false
+	}
 	contents, stored := session.caching.Store.Get(storedKey)
 	return contents, storedKey, stored
-}
-
-// aliasKey is where the store keeps the key of the entry another key stands for: a second key, or the first key of a
-// package the second key restored, so the next run with the same inputs hits on its first.
-func aliasKey(key cache.Key) cache.Key {
-	return sha256.Sum256(append([]byte("alias "), key[:]...))
 }
 
 // exportDataReader reads from the store the export data an entry of keyed names by digest, for the load. Export data
@@ -859,19 +860,17 @@ func storedEntryAt(store *cache.Store, key cache.Key) (cacheEntry, entryRecord, 
 	return entry, record, true
 }
 
-// alias keeps under each key's alias the key of the entry it stands for, as many at once as there are cores: on
-// cohere's own root a cold run writes about a thousand, which one at a time took 0.2s, while hashing every second
-// key took 5ms. A failed write is a problem, never a finding: the next run misses where it would have hit.
+// alias keeps each alias, a second key or the first key of a package a second key restored, with the key of the entry
+// it stands for, in the build's alias table, one write for the round (#m7w1ncy), so the next run with the same inputs
+// hits on it. The table keeps the newest four times as many as the packages the run keyed, or aliasTableFloor. A
+// failed write is a problem, never a finding: the next run misses where it would have hit.
 func (session *CacheSession) alias(aliases map[cache.Key]cache.Key) {
-	keys := slices.Collect(maps.Keys(aliases))
-	session.fanOutWriting(len(keys), func(index int) func() {
-		target := aliases[keys[index]]
-		return func() {
-			if putError := session.caching.Store.Put(aliasKey(keys[index]), target[:]); putError != nil {
-				session.problem(putError.Error())
-			}
-		}
-	})
+	if session.aliases == nil {
+		return
+	}
+	if addError := session.aliases.add(aliases, max(aliasTableFloor, 4*len(session.keys))); addError != nil {
+		session.problem(addError.Error())
+	}
 }
 
 // fanOut runs work for every index below count, as many at once as there are cores: on the run's pool when the session
