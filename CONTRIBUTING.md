@@ -90,6 +90,14 @@ binary about 7,700 times on 2026-11-10 and filled the machine's process table (#
 is the wrong recipe: the kernel counts every process the account owns, about 900 on Kirk's Mac, so a limit
 of 512 refuses every fork.
 
+A measurement holds the machine quiet with `cohere-dev quiet on --for <duration> --through <name> <why>`, and
+releases it with `cohere-dev quiet off` (#1rh8dav). While the window is open no test, build, vet, exec or land
+starts, exiting 75 with the window's close time, and no running job borrows an idle token. The one exception
+is the run the window is for, started with `--through <name>`, and everything it starts. A job already
+running finishes at its width, and `cohere-dev status` names it as running inside the window. To wait for a
+window, run `cohere-dev quiet wait`. Broadcasts could not hold the machine: a Circle's hands never hear one, and
+three times on 2026-11-11 a hand ran heavy work inside a hold, so its pairs were rerun.
+
 Work lands on main through `go run ./command/cohere-dev land`, run in the worktree being landed, with
 its work committed (#fz6xejy). It takes the machine's one land lock in arrival order and holds it from
 merge to fast-forward. It makes one merge commit of the worktree's head onto current main, first parent
