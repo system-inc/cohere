@@ -143,8 +143,9 @@ func TestTheWidthChangesNothingUnderTheOnePool(test *testing.T) {
 
 // The width the memory decides is measured as the first build's load ends (#rmzehfg): over the fixture's three builds
 // beside the host's under the memory cap, the first build runs alone to its load's end, its holding is read, the lint
-// record names the host's live heap, the holding and the peak factor the width was decided by, and the stream is the
-// one a run one build at a time writes, but for the width.
+// record names the host's live heap, the holding and the peak factor the width was decided by, 2.5 under `--no-cache`
+// and 3.5 with a findings store (#hv090f4), and the stream is the one a run one build at a time writes, but for the
+// width.
 func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	test.Parallel()
 
@@ -161,10 +162,17 @@ func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 			engine.buildsAtOnce, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes)
 	}
 	for _, field := range []string{`"buildsWidthLiveBytes":`, `"buildsWidthBuildBytes":`,
-		`"buildsWidthPeakFactor":3.5`} {
+		`"buildsWidthPeakFactor":2.5`} {
 		if !strings.Contains(raw, field) {
 			test.Errorf("the lint record names no %s the width was decided by:\n%s", field, raw)
 		}
+	}
+	stored := threeExtraBuilds(test)
+	_, storedStream := runOverConfigured(test, stored, exitFindings, func(engine *pipeline) {
+		engine.memory = underCap()
+	}, "--other-builds")
+	if !strings.Contains(storedStream, `"buildsWidthPeakFactor":3.5`) {
+		test.Errorf("a run with a findings store names no peak factor of 3.5:\n%s", storedStream)
 	}
 	one := threeExtraBuilds(test)
 	_, oneStream := runOverConfigured(test, one, exitFindings, func(engine *pipeline) {

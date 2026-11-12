@@ -1026,7 +1026,8 @@ host's ran side by side, decided once (#b2t9xmf, #rmzehfg) by what the heaviest 
 platforms first, then the host's own, each in build order, and the first runs alone until its load has ended; there,
 with nothing else running, a collection measures the live heap, and the build's holding is that heap less the host's,
 measured the same way as the builds started. A build is taken to hold `"buildsWidthPeakFactor":3.5` times that at its
-lint's peak, the largest ratio measured across 14 builds of two trees rounded up to the next half, and the width is
+lint's peak in a run with a findings store, and 2.5 times under `--no-cache` (#hv090f4), each the largest ratio
+measured in its mode across 14 builds of two trees rounded up to the next half, and the width is
 `floor((limit - live) / (holding * factor))`, no more than the builds and at least one, and one at a time under
 `--single-threaded` or a limit other than the cap. Beside it, `"buildsWidthLiveBytes":2147483648` is the host's live
 heap and `"buildsWidthBuildBytes":536870912` the first build's holding, so a reader redoes the arithmetic with the

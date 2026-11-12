@@ -342,7 +342,8 @@ func TestBuildsSideBySideNeverPassTheCapPlusOneAllowance(test *testing.T) {
 }
 
 // The width is as many builds as the memory cap holds beside the host's live heap, each taken at its lint's peak,
-// floor((cap - live) / (holding * 3.5)), no more than the builds and at least one, and one at a time under
+// floor((cap - live) / (holding * factor)), the factor 3.5 with a findings store and 2.5 without one (#hv090f4), no
+// more than the builds and at least one, and one at a time under
 // `--single-threaded`, without a memory decision, a live heap or a holding read, and under any limit but the cap
 // (#rmzehfg). The cap here is 8 GiB.
 func TestTheBuildsWidth(test *testing.T) {
@@ -361,11 +362,16 @@ func TestTheBuildsWidth(test *testing.T) {
 		memory         *engineMemory
 		live           uint64
 		holding        uint64
+		withoutStore   bool
 		want           int
 	}{
 		// 7 GiB of room over peaks of 3.5 GiB: without the factor, the holding alone would make it seven.
 		{name: "each build taken at its peak", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte,
 			want: 2},
+		// Peaks of 2.625 GiB with a store and 1.875 GiB without one, in 7 GiB of room.
+		{name: "a store's peak", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte * 3 / 4, want: 2},
+		{name: "a peak without a store", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte * 3 / 4,
+			withoutStore: true, want: 3},
 		{name: "memory holds every build", extras: 6, memory: underCap, live: gibibyte / 2, holding: gibibyte / 4,
 			want: 6},
 		{name: "builds are two", extras: 2, memory: underCap, live: gibibyte, holding: gibibyte / 4, want: 2},
@@ -387,7 +393,8 @@ func TestTheBuildsWidth(test *testing.T) {
 		{name: "no memory read", extras: 6, memory: underSource(contract.MemorySourceUnreadable), live: gibibyte,
 			holding: gibibyte / 4, want: 1},
 	} {
-		got := buildsWidth(each.extras, each.singleThreaded, each.memory, each.live, each.holding)
+		got := buildsWidth(each.extras, each.singleThreaded, each.memory, each.live, each.holding,
+			buildPeakOverLoadEnd(!each.withoutStore))
 		if got != each.want {
 			test.Errorf("%s: the width is %d, want %d", each.name, got, each.want)
 		}
@@ -427,8 +434,9 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	const garbageBytes = 512 << 20
 	const buildBytes = 256 << 20
 	hostLive := forcedLiveHeapBytes()
-	// Room for two peaks of the build, 3.5 times its holding each, and half a holding more.
-	limit := int64(hostLive + 7*buildBytes + buildBytes/2)
+	// Room for two peaks of the build, 2.5 times its holding each, since the engine here has no findings store, and
+	// half a holding more.
+	limit := int64(hostLive + 5*buildBytes + buildBytes/2)
 	engine := &pipeline{memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
 		Source: contract.MemorySourceCap}}}
 	build := make([]byte, buildBytes)

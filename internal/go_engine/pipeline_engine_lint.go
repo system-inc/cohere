@@ -195,7 +195,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		record.BuildsWidthLiveBytes = engine.buildsWidthLiveBytes
 		record.BuildsWidthBuildBytes = engine.buildsWidthBuildBytes
 		if engine.buildsWidthBuildBytes > 0 {
-			record.BuildsWidthPeakFactor = buildPeakOverLoadEnd
+			record.BuildsWidthPeakFactor = engine.buildPeakFactor()
 		}
 	}
 	if len(record.Crashes) > 0 {

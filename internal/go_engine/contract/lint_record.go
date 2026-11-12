@@ -57,9 +57,10 @@ type LintRecord struct {
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
 	// BuildsWidthBuildBytes is additive within contract 3, and the Go engine's alone: what the first extra build to
 	// start, the heaviest, held beyond that heap as its load ended, measured the same way. With
-	// BuildsWidthPeakFactor, the times that holding a build is taken to reach at its lint's peak, and the memory
-	// record's limit, a reader redoes the arithmetic: floor((limit - live) / (holding * factor)), no more than the
-	// builds and at least one (#rmzehfg). Both are absent when BuildsWidthLiveBytes is.
+	// BuildsWidthPeakFactor, the times that holding a build is taken to reach at its lint's peak, 3.5 in a run with a
+	// findings store and 2.5 without one (#hv090f4), and the memory record's limit, a reader redoes the arithmetic:
+	// floor((limit - live) / (holding * factor)), no more than the builds and at least one (#rmzehfg). Both are absent
+	// when BuildsWidthLiveBytes is.
 	BuildsWidthBuildBytes uint64  `json:"buildsWidthBuildBytes,omitempty"`
 	BuildsWidthPeakFactor float64 `json:"buildsWidthPeakFactor,omitempty"`
 	// BuildsPoolSize is additive within contract 3, and the Go engine's alone: how many slots the run's one pool holds,

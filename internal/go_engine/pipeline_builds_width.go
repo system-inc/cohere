@@ -50,7 +50,8 @@ func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun) (int, 
 	}
 	// A heap of one byte held by each build is the least any can be, so the widest the builds and the limit allow:
 	// when even that is one at a time, no heap can widen it, and the run pays no collection to measure one.
-	if buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, 1, 1) == 1 {
+	if buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, 1, 1,
+		engine.buildPeakFactor()) == 1 {
 		return 1, true
 	}
 	return 0, false
@@ -64,7 +65,8 @@ func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun) (int, 
 // (extraBuildRuns).
 func (engine *pipeline) measuredBuildsWidth(extras int, hostLive uint64) (int, uint64) {
 	holding := holdingAbove(forcedLiveHeapBytes(), hostLive)
-	return buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding), holding
+	return buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding,
+		engine.buildPeakFactor()), holding
 }
 
 // holdingAbove is what a build holds of live, the live heap measured with it loaded, beyond hostLive, the host's
@@ -104,23 +106,43 @@ func (engine *pipeline) restoresFromHost(host *check.HostRun) bool {
 	return host.EntriesKept() > 0 && !engine.keepsHostRestoreOff && !engine.renamed
 }
 
-// buildPeakOverLoadEnd is how many times what a build holds as its load ends it is taken to hold at its lint's peak,
-// when the rules have built each package's intermediate representation over the types its load holds: the width is
-// sized by that peak, since what builds hold while they lint side by side is what drove the collector (#rmzehfg). A
-// build's load end is a fixed point the width can be measured at, which its peak is not.
+// buildPeakOverLoadEndWithStore and buildPeakOverLoadEndWithoutStore are how many times what a build holds as its load
+// ends it is taken to hold at its lint's peak, when the rules have built each package's intermediate representation
+// over the types its load holds, in a run with a findings store and in one without (`--no-cache`): the width is sized
+// by that peak, since what builds hold while they lint side by side is what drove the collector (#rmzehfg). A build's
+// load end is a fixed point the width can be measured at, which its peak is not. The two modes are measured apart
+// because a load without a store holds more at its end for the same peak, so one factor for both narrowed `--no-cache`,
+// the bar's own path, to width 2 at cohere's root where main had run 4 and 1.4 s faster (#hv090f4).
 //
-// It is the largest ratio measured, 3.22, rounded up to the next half. On Nov 11, the 14 extra builds of cohere's
-// root and deeafbf4 were each run alone, their live heap taken by a forced collection at the load's end and sampled
-// through the lint: 2.63 to 3.22 at the root and 1.89 to 2.57 at deeafbf4 with the findings cache on, 1.12 to 2.16
-// under `--no-cache`, where a load checks more from source and holds more at its end. A tree whose ratio passes it
-// shows in one run under `--timing`, whose build records carry each build's holding at both points, and the constant
-// changes only on such a record.
-const buildPeakOverLoadEnd = 3.5
+// Each is the largest ratio measured in its mode, rounded up to the next half. On Nov 11, the 14 extra builds of
+// cohere's root and deeafbf4 were each run alone, their live heap taken by a forced collection at the load's end and
+// sampled through the lint: with the findings store, 2.63 to 3.22 at the root and 1.89 to 2.57 at deeafbf4; under
+// `--no-cache`, 1.31 to 2.09 at the root and 1.12 to 2.16 at deeafbf4. A tree whose ratio passes its factor shows in
+// one run under `--timing`, whose build records carry each build's holding at both points, and a constant changes only
+// on such a record.
+const (
+	buildPeakOverLoadEndWithStore    = 3.5
+	buildPeakOverLoadEndWithoutStore = 2.5
+)
+
+// buildPeakOverLoadEnd is the factor for a run with a findings store when withStore is true, and for one without.
+func buildPeakOverLoadEnd(withStore bool) float64 {
+	if withStore {
+		return buildPeakOverLoadEndWithStore
+	}
+	return buildPeakOverLoadEndWithoutStore
+}
+
+// buildPeakFactor is the factor the run's width takes: the host's findings cache reads a store, or it has none, under
+// `--no-cache` or when the store could not be opened.
+func (engine *pipeline) buildPeakFactor() float64 {
+	return buildPeakOverLoadEnd(engine.session != nil && engine.session.HasStore())
+}
 
 // buildsWidth is how many of extras extra builds run side by side: as many as the memory cap holds beside the host's
-// live heap, each build taken at its lint's peak, floor((cap - hostLive) / (holding * buildPeakOverLoadEnd)), with no
-// more than the builds and at least one (#rmzehfg). Cores are no measure of it: the run's one pool bounds every build's
-// work to them (#ckm0hsp).
+// live heap, each build taken at its lint's peak, holding times factor (buildPeakFactor), floor((cap - hostLive) /
+// (holding * factor)), with no more than the builds and at least one (#rmzehfg). Cores are no measure of it: the run's
+// one pool bounds every build's work to them (#ckm0hsp).
 //
 // hostLiveBytes is the host's live heap as the builds start, which stays live until the last build ends (otherBuilds),
 // and holdingBytes what the heaviest build holds beyond it as its load ends, the bound taken for each build: an extra
@@ -142,6 +164,7 @@ func buildsWidth(
 	memory *engineMemory,
 	hostLiveBytes uint64,
 	holdingBytes uint64,
+	factor float64,
 ) int {
 	if singleThreaded || memory == nil || memory.record.Source != contract.MemorySourceCap || hostLiveBytes == 0 ||
 		holdingBytes == 0 {
@@ -152,7 +175,7 @@ func buildsWidth(
 		return 1
 	}
 	// A peak past what a uint64 holds is past any cap, which the division reads as no room.
-	peak := math.Ceil(float64(holdingBytes) * buildPeakOverLoadEnd)
+	peak := math.Ceil(float64(holdingBytes) * factor)
 	if peak >= math.MaxUint64 {
 		return 1
 	}
