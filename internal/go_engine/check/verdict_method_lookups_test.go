@@ -24,10 +24,13 @@ const (
 	methodUserPath    = "example.com/methods/user"
 )
 
-// methodWorld is one build of a method fixture: foreign as goos's build context matches its files, and user over it.
+// methodWorld is one build of a method fixture: foreign as goos's build context matches its files, and user over it,
+// with user's type information and syntax, which a step that records user's type reads walks.
 type methodWorld struct {
-	foreign *types.Package
-	user    *types.Package
+	foreign    *types.Package
+	user       *types.Package
+	userInfo   *types.Info
+	userSyntax []*ast.File
 }
 
 // checkedMethodWorld type-checks foreign from foreignFiles, by file name, for goos, and user from userSource over it.
@@ -73,11 +76,14 @@ func checkedMethodWorld(test *testing.T, goos string, foreignFiles map[string]st
 		}
 		return nil, fmt.Errorf("no package %s", path)
 	})}
-	user, checkError := configuration.Check(methodUserPath, fileSet, []*ast.File{userSyntax}, nil)
+	info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{},
+		Uses: map[*ast.Ident]types.Object{}, Implicits: map[ast.Node]types.Object{},
+		Selections: map[*ast.SelectorExpr]*types.Selection{}, Instances: map[*ast.Ident]types.Instance{}}
+	user, checkError := configuration.Check(methodUserPath, fileSet, []*ast.File{userSyntax}, info)
 	if checkError != nil {
 		test.Fatalf("type-checking user for %s: %v", goos, checkError)
 	}
-	return methodWorld{foreign: foreign, user: user}
+	return methodWorld{foreign: foreign, user: user, userInfo: info, userSyntax: []*ast.File{userSyntax}}
 }
 
 // methodUser is the user package every method fixture shares but where a step says otherwise: Mine, whose Close and
@@ -96,6 +102,33 @@ const (
 	closerBase   = "package foreign\n\ntype inner struct{}\n\nfunc (inner) Close() error { return nil }\n"
 	promotedOnly = "package foreign\n\ntype Handle struct{ inner }\n"
 )
+
+// constrainedPool is foreign's generic Pool, whose Close has the subject's shape, with its type parameter constrained
+// by constraint.
+func constrainedPool(constraint string) string {
+	return "package foreign\n\ntype Pool[Item " + constraint + "] struct{ items []Item }\n\n" +
+		"func (Pool[Item]) Close() error { return nil }\n"
+}
+
+// putter is foreign's generic interface Putter, with parameters as its type parameter list, whose Put takes the first
+// parameter bare and gives a string: abbreviated reads Item off a subject's Put when Item is its only parameter, and
+// instantiates nothing when another parameter appears nowhere bare, judging by shape alone.
+func putter(parameters string) string {
+	return "package foreign\n\ntype Putter[" + parameters + "] interface{ Put(Item) string }\n"
+}
+
+// box is foreign's generic concrete Box, with parameters as its type parameter list and receiver as its methods'
+// receiver's, whose Put takes Item bare and gives a string: abbreviated matches an interface method of ours to it by
+// instance when Item is its only parameter, and by shape alone when another appears nowhere bare.
+func box(parameters string, receiver string) string {
+	return "package foreign\n\ntype Box[" + parameters + "] struct{}\n\n" +
+		"func (Box[" + receiver + "]) Put(value Item) string { return \"\" }\n"
+}
+
+// putUser is the user package of the Putter fixtures: Mine's Put takes an int and gives an error, the shape of
+// Putter's Put, but no instance of it.
+const putUser = "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{}\n\n" +
+	"func (Mine) Put(value int) error { return nil }\n\nfunc Use() int { return foreign.Count() }\n"
 
 // methodLookupOf is the lookup of query a rule records about the method named method of user's Mine on the host:
 // found when answer names something of the host's foreign, as a type name, or as type name and method.
@@ -165,7 +198,10 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 		build  string
 		before methodLookupOf
 		lookup methodLookupOf
-		want   string
+		// typeReads records user's type reads, as a run does, where every other step records none, so its lookup is
+		// all it is judged by.
+		typeReads bool
+		want      string
 	}{
 		{
 			name: "a windows-only interface of the subject's shape",
@@ -219,11 +255,126 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"the build",
 		},
 		{
-			name: "a generic candidate of the subject's shape keeps the closure judgment",
+			name: "a generic candidate of the subject's shape under constraints of all types, held where the closure " +
+				"declines",
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer, "pool.go": pool,
 				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
 			lookup: methodAnswered("Closer", "Close"),
+		},
+		{
+			name: "a generic candidate whose constraint has a method keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go": constrainedPool("interface{ Close() error }"), "inner.go": closerBase,
+				"promoted_windows.go": promotedOnly},
+			lookup: methodAnswered("Closer", "Close"),
 			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
+		},
+		{
+			name: "a generic candidate constrained by comparable keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go": constrainedPool("comparable"), "inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
+		},
+		{
+			name: "a generic candidate constrained by a union keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go": constrainedPool("~int | ~string"), "inner.go": closerBase,
+				"promoted_windows.go": promotedOnly},
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
+		},
+		{
+			name: "a constraint of all types on the host that gains a method in the build keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go":             constrainedPool("Flushing"),
+				"flushing_darwin.go":  "package foreign\n\ntype Flushing interface{}\n",
+				"flushing_windows.go": "package foreign\n\ntype Flushing interface{ Flush() }\n",
+				"inner.go":            closerBase},
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: " + methodForeignPath + ".Pool differs in the build",
+		},
+		{
+			name: "a constraint with a method on the host that is of all types in the build keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go":             constrainedPool("Flushing"),
+				"flushing_darwin.go":  "package foreign\n\ntype Flushing interface{ Flush() }\n",
+				"flushing_windows.go": "package foreign\n\ntype Flushing interface{}\n",
+				"inner.go":            closerBase},
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: " + methodForeignPath + ".Pool differs in the build",
+		},
+		{
+			// abbreviated reads Item off the subject's first parameter, foreign.ID, so the instance Pair[ID] has
+			// Put(ID, ID): Mine's Put(ID, First) matches it where ID stands for First and not where it stands for
+			// Second, both structs, so of one kind. Every line the lookup is judged by renders ID by name, so it is
+			// the user package's own read of ID, by the type it stands for, that declines it.
+			name: "an unconstrained generic whose type argument the subject names by an alias that differs by " +
+				"build, declined by the subject's type reads",
+			files: map[string]string{"foreign.go": methodForeign,
+				"pair.go":       "package foreign\n\ntype Pair[Item any] interface{ Put(a Item, b Item) string }\n",
+				"pair_types.go": "package foreign\n\ntype First struct{}\n\ntype Second struct{}\n",
+				"id_darwin.go":  "package foreign\n\ntype ID = First\n",
+				"id_windows.go": "package foreign\n\ntype ID = Second\n"},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{}\n\n" +
+				"func (Mine) Put(a foreign.ID, b foreign.First) string { return \"\" }\n\n" +
+				"func Use() int { return foreign.Count() }\n",
+			lookup:    methodAnswered("Pair", "Put"),
+			typeReads: true,
+			want:      "T object " + methodForeignPath + ".ID: its name or kind differs",
+		},
+		{
+			name: "an unanswered generic interface whose type parameters change under the same signature",
+			files: map[string]string{"foreign.go": methodForeign,
+				"putter_darwin.go":  putter("Item any"),
+				"putter_windows.go": putter("Item, Extra any")},
+			user:   putUser,
+			lookup: unanswered(build_reads.QueryMethod, "Put"),
+			want: "L lookup Method Put: " + methodForeignPath + ".Putter.Put is changed in the build, of the " +
+				"subject's shape",
+		},
+		{
+			name: "an unanswered generic concrete type whose type parameters change under the same signature, beside " +
+				"an interface method of ours",
+			files: map[string]string{"foreign.go": methodForeign,
+				"box_darwin.go":  box("Item any", "Item"),
+				"box_windows.go": box("Item, Extra any", "Item, Extra")},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\n" +
+				"type Mine interface{ Put(value int) error }\n\nfunc Use() int { return foreign.Count() }\n",
+			lookup: func(host methodWorld) build_reads.Lookup {
+				return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Put",
+					Subject: methodSetMember(host.user, "Mine", "Put")})
+			},
+			want: "L lookup Method Put: " + methodForeignPath + ".Box.Put is changed in the build, of the subject's " +
+				"shape",
+		},
+		{
+			// Box[Item, Extra any] holds Extra nowhere bare, so abbreviated matches Mine's interface method to its Put
+			// by shape alone; Box[Item any] reads Item off it, and Put(int) string is not Put(int) error.
+			name: "a generic concrete type's method as the answer, whose type parameters change under the same " +
+				"signature",
+			files: map[string]string{"foreign.go": methodForeign,
+				"box_darwin.go":  box("Item, Extra any", "Item, Extra"),
+				"box_windows.go": box("Item any", "Item")},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\n" +
+				"type Mine interface{ Put(value int) error }\n\nfunc Use() int { return foreign.Count() }\n",
+			lookup: func(host methodWorld) build_reads.Lookup {
+				return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Put",
+					Subject: methodSetMember(host.user, "Mine", "Put"), Found: true,
+					Answer: methodSetMember(host.foreign, "Box", "Put")})
+			},
+			want: "L lookup Method Put: its answer " + methodForeignPath + ".Put has another signature in the " +
+				"build",
+		},
+		{
+			name: "a generic answer whose type parameters change under the same signature",
+			files: map[string]string{"foreign.go": methodForeign,
+				"putter_darwin.go":  putter("Item, Extra any"),
+				"putter_windows.go": putter("Item any")},
+			user:   putUser,
+			lookup: methodAnswered("Putter", "Put"),
+			want: "L lookup Method Put: its answer " + methodForeignPath + ".Put has another signature in the " +
+				"build",
 		},
 		{
 			name: "the same generic candidate beside no_any's lookup, which instantiates nothing, held where the " +
@@ -308,8 +459,13 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			}
 			built := checkedMethodWorld(test, buildGoos, step.files, user)
 			reads := &build_reads.Reads{}
-			// No syntax and no type information: Mine's reads are none, and the lookup is what each step is about.
-			reads.RecordTypes(host.user, &types.Info{}, nil)
+			// No syntax and no type information: Mine's reads are none, and the lookup is what each step is about,
+			// unless the step is about what the type reads catch.
+			if step.typeReads {
+				reads.RecordTypes(host.user, host.userInfo, host.userSyntax)
+			} else {
+				reads.RecordTypes(host.user, &types.Info{}, nil)
+			}
 			if step.before != nil {
 				reads.AddLookup(step.before(host))
 			}
