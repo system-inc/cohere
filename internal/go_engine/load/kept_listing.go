@@ -65,10 +65,11 @@ func cachedList(
 	patterns []string,
 	listings ListingStore,
 	held Held,
+	shared *SharedReads,
 	collector *timing.Collector,
 ) (*listing, bool, error) {
 	if listings == nil {
-		listed, listError := list(workspace, environment, patterns, held, collector)
+		listed, listError := list(workspace, environment, patterns, held, shared, collector)
 		return listed, false, listError
 	}
 	key, goEnvironment, keyError := listingKey(workspace, environment, patterns)
@@ -84,7 +85,7 @@ func cachedList(
 			}
 		}
 	}
-	listed, listError := list(workspace, environment, patterns, held, collector)
+	listed, listError := list(workspace, environment, patterns, held, shared, collector)
 	if listError != nil {
 		return nil, false, listError
 	}

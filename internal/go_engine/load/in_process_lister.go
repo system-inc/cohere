@@ -113,16 +113,18 @@ var (
 )
 
 // listInProcess is list without go list: the same listing, in the same order, with the same fields, read in this
-// process (see inProcessLister), each file held holds read from its held bytes, adding its CPU to collector. It returns
+// process (see inProcessLister), each file held holds read from its held bytes, and every other read through shared
+// when it is set, adding its CPU to collector. It returns
 // why it could not answer when it could not, and then the listing is nil and go list answers instead.
 func listInProcess(
 	workspace string,
 	environment []string,
 	patterns []string,
 	held Held,
+	shared *SharedReads,
 	collector *timing.Collector,
 ) (*listing, string) {
-	lister, doubt := newInProcessLister(workspace, environment, held, collector)
+	lister, doubt := newInProcessLister(workspace, environment, held, shared, collector)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -207,12 +209,14 @@ func (lister *inProcessLister) list(patterns []string) (*listing, string) {
 
 // newInProcessLister reads the build list, the build context and the go environment, and says why it cannot list
 // at all when something in them is beyond what it carries. Its build context opens a file held holds from its held
-// bytes, and any other on disk, so go/build reads no file the run already holds again. What it and its listing spend
-// is added to collector.
+// bytes, and any other on disk, so go/build reads no file the run already holds again, or from shared, which every
+// listing of the run reads its directories and files through when it is set (SharedReads). What it and its listing
+// spend is added to collector.
 func newInProcessLister(
 	workspace string,
 	environment []string,
 	held Held,
+	shared *SharedReads,
 	collector *timing.Collector,
 ) (*inProcessLister, string) {
 	read, doubt := readGoState(workspace, environment, collector)
@@ -220,6 +224,10 @@ func newInProcessLister(
 		return nil, doubt
 	}
 	read.context.OpenFile = held.openFile()
+	if shared != nil {
+		read.context.ReadDir = shared.readDirectory
+		read.context.OpenFile = shared.openFile(held)
+	}
 	lister := &inProcessLister{
 		workspace:     workspace,
 		environment:   environment,

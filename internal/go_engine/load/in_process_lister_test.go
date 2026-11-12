@@ -138,7 +138,7 @@ func requireGoListsAnswer(test *testing.T, directory string, extra []string, pat
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
-	inProcess, doubt := listInProcess(directory, environment, patterns, nil, nil)
+	inProcess, doubt := listInProcess(directory, environment, patterns, nil, nil, nil)
 	if doubt != "" {
 		test.Fatalf("the in-process lister did not answer: %s", doubt)
 	}
@@ -261,7 +261,7 @@ func TestInProcessListingDoubtsWhatItDoesNotCarry(test *testing.T) {
 			if environmentError != nil {
 				test.Fatal(environmentError)
 			}
-			listed, doubt := listInProcess(directory, environment, []string{"./..."}, nil, nil)
+			listed, doubt := listInProcess(directory, environment, []string{"./..."}, nil, nil, nil)
 			if doubt == "" {
 				test.Fatalf("the lister answered with %d packages", len(listed.packages))
 			}
@@ -295,7 +295,7 @@ func TestAPatternTheListerCannotMatchIsDoubted(test *testing.T) {
 		{"example.com/patterned/missing/...", "matched no packages"},
 	}
 	for _, each := range cases {
-		listed, doubt := listInProcess(directory, environment, []string{each.pattern}, nil, nil)
+		listed, doubt := listInProcess(directory, environment, []string{each.pattern}, nil, nil, nil)
 		if doubt == "" {
 			test.Errorf("the lister answered %s with %d packages", each.pattern, len(listed.packages))
 			continue
@@ -305,7 +305,7 @@ func TestAPatternTheListerCannotMatchIsDoubted(test *testing.T) {
 		}
 	}
 	// Through list, the directory pattern is go list's to answer, and it names the package below it.
-	listed, listError := list(directory, environment, []string{"./sub/..."}, nil, nil)
+	listed, listError := list(directory, environment, []string{"./sub/..."}, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
@@ -328,7 +328,7 @@ func TestADoubtIsGoListsToAnswer(test *testing.T) {
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
-	listed, listError := list(directory, environment, []string{"./..."}, nil, nil)
+	listed, listError := list(directory, environment, []string{"./..."}, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

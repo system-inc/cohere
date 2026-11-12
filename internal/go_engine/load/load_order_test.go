@@ -88,7 +88,7 @@ func TestTheLoadParsesTheLongestPathFirst(test *testing.T) {
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
-	listed, listError := list(workspace, environment, []string{"./..."}, nil, nil)
+	listed, listError := list(workspace, environment, []string{"./..."}, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

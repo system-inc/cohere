@@ -70,7 +70,7 @@ func TestTheListerReadsTheHeldBytes(test *testing.T) {
 		test.Fatal(environmentError)
 	}
 	held := heldFor(filepath.Join(directory, "held.go"), heldSource)
-	listed, doubt := listInProcess(directory, environment, []string{"./..."}, held, nil)
+	listed, doubt := listInProcess(directory, environment, []string{"./..."}, held, nil, nil)
 	if doubt != "" {
 		test.Fatalf("the lister did not answer: %s", doubt)
 	}
@@ -129,7 +129,7 @@ func TestThePrefetchEndsWithTheListing(test *testing.T) {
 		}
 		return nil, false
 	})
-	built, doubt := newInProcessLister(directory, environment, held, nil)
+	built, doubt := newInProcessLister(directory, environment, held, nil, nil)
 	if doubt != "" {
 		test.Fatalf("the lister could not be built: %s", doubt)
 	}
