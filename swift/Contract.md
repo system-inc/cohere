@@ -124,9 +124,11 @@ TypeScript.
 }
 ```
 
-`sourceTreeModified` drives the same warning the TypeScript run prints: this binary was built from a
-modified tree, so no commit reproduces these findings. `--version` prints exactly this record and
-nothing else.
+`sourceTreeModified` drives the same warning the TypeScript run prints: no commit reproduces these
+findings. For this engine it covers the engine's own inputs, `swift/Package.swift`, `swift/Package.resolved`
+and `swift/Sources/`, the files the launcher's cache key reads: true when any of them differs from the
+commit, tracked or untracked, and never for a change elsewhere in the repository. `--version` prints
+exactly this record and nothing else.
 
 ### `project`, the Swift counterpart of `graph built in`
 

@@ -22,18 +22,20 @@
 import PackageDescription
 
 /*
- Whether the repository this engine is built from had uncommitted changes when it was built.
+ Whether this engine's own inputs differed from their commit when it was built: `Package.swift`,
+ `Package.resolved` and `Sources/`, the files the launcher's cache key reads. Gitignored files never count.
 
- Read from the manifest's own git context, the same signal Go's build info gives the TypeScript engine,
- so a binary carrying code no commit holds says so on every run instead of only under `--version`. It
- covers the whole cohere repository, as Go's does. In a tree where other work is in flight that is
- usually true, and the warning is true with it. Gitignored files never count.
+ It is the engine's side of the signal Go's build info gives the TypeScript engine, so a binary carrying
+ code no commit holds says so on every run instead of only under `--version`.
 
- The development launcher states the answer instead, as COHERE_SWIFT_SOURCE_TREE_MODIFIED ("true" or
- "false"), because it names the engine it caches by that same answer, read once: an engine whose answer
- was read again here could disagree with its own name (#50wtb2s). Without the variable, as for a release
- or a committed build, git is read, and a package with no git context reads as modified. A git that fails,
- as on a worktree whose submodule is a symlink, reads as clean (measured 2026-11-12).
+ The development launcher states the answer, as COHERE_SWIFT_SOURCE_TREE_MODIFIED ("true" or "false"),
+ read once from git under those paths, because it names the engine it caches by that same answer: an
+ engine whose answer was read again here could disagree with its own name (#50wtb2s).
+
+ The fallback below reads the whole repository, not only those paths. It is reached only by a committed or
+ release build, whose tree is a clean worktree at the commit or a checkout the release requires to be clean,
+ so the two meanings agree there. A package with no git context reads as modified. A git that fails, as on a
+ worktree whose submodule is a symlink, reads as clean (measured 2026-11-12).
 
  SwiftPM caches a manifest's evaluation by the manifest's own text and the environment, not git's state,
  so with the default cache the git answer is whatever it was the last time this manifest was evaluated.
@@ -44,6 +46,7 @@ let sourceTreeModified =
     switch Context.environment["COHERE_SWIFT_SOURCE_TREE_MODIFIED"] {
     case "true": true
     case "false": false
+    // Committed and release builds only, whose trees are clean: see above.
     default: Context.gitInformation?.hasUncommittedChanges ?? true
     }
 

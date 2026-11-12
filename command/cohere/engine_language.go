@@ -120,7 +120,8 @@ func swiftVersionLines(provenance *engineProvenanceRecord, engineSourceCommit st
 		provenance.Engine, provenance.Version, provenance.Commit,
 		provenance.Toolchain, provenance.SwiftSyntax, provenance.SwiftFormat)}
 	if provenance.SourceTreeModified {
-		lines = append(lines, "  the Swift engine was built from a modified tree, so no commit reproduces it")
+		lines = append(lines, "  the Swift engine was built from uncommitted changes to its own sources under swift/, "+
+			"so no commit reproduces it")
 	}
 	if engineSourceCommit != "" {
 		lines = append(lines, fmt.Sprintf("  the Swift engine was built from Swift sources identical to commit %s, "+
