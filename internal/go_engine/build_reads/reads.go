@@ -444,13 +444,20 @@ func (reads *Reads) Lookups() []Lookup {
 }
 
 // compareObjects orders two objects by their package's path, then their name, then how go/types writes them, which
-// tells apart two fields or methods of one name on different types, and last by position, for two written alike.
+// tells apart two fields or methods of one name on different types, and last by position, for two written alike. One
+// object compared with itself is equal before anything is written: the selections a package makes through one
+// receiver all compare that receiver with itself, as do the uses of one object in several kinds, and writing a large
+// struct twice for each of those comparisons doubled every build's decide on deeafbf4 (#p1s9gdk).
 func compareObjects(left types.Object, right types.Object) int {
+	if left == right {
+		return 0
+	}
 	order := cmp.Or(cmp.Compare(left.Pkg().Path(), right.Pkg().Path()), cmp.Compare(left.Name(), right.Name()))
 	if order != 0 {
 		return order
 	}
-	// Written only for two of one package and name, which is rare, so a sort writes almost nothing.
+	// Written only for two distinct objects of one package and name, two fields or methods of one name on different
+	// types, which is rare, so a sort writes almost nothing.
 	return cmp.Or(
 		cmp.Compare(types.ObjectString(left, nil), types.ObjectString(right, nil)),
 		cmp.Compare(left.Pos(), right.Pos()),
