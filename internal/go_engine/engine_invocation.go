@@ -144,6 +144,7 @@ func parseInvocation(arguments []string) (invocation, error) {
 	if checkError := request.check(); checkError != nil {
 		return invocation{}, checkError
 	}
+	request.resolveRoot()
 	return request, nil
 }
 
