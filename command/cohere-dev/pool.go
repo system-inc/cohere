@@ -199,6 +199,13 @@ func withSteppedToken(what string, steps func(step func(name string) []string) i
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", waitInLineError)
 		return 1
 	}
+	// A window opened while this job waited in line is met again here: waiting is not running (quiet.go).
+	// The held token is this job's own now, so only the name it passed lets it through.
+	if refusal := quietRefusal(directory, time.Now(), "", os.Getenv(quietThroughVariable)); refusal != "" {
+		held.release()
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
+		return quietRefusedExitCode
+	}
 	run := &tokenRun{directory: directory, shape: shape, held: held, what: what}
 	code := steps(run.step)
 	run.giveBack()
@@ -209,11 +216,16 @@ func withSteppedToken(what string, steps func(step func(name string) []string) i
 }
 
 // borrowTokens takes, for a run that holds token own, every other free token but one, when no one waits in
-// line, and returns them held. Nothing is borrowed while anyone waits: the tokens are theirs, in arrival
-// order. A token taken by someone else between the count and the take is simply not borrowed, and when the
-// borrowing would leave none free, because another run took one meanwhile, the last borrowed goes back.
+// line and no quiet window is open, and returns them held. Nothing is borrowed while anyone waits: the tokens
+// are theirs, in arrival order. A token taken by someone else between the count and the take is simply not
+// borrowed, and when the borrowing would leave none free, because another run took one meanwhile, the last
+// borrowed goes back.
 func borrowTokens(directory string, shape poolShape, own int, what string) []*heldSlot {
 	if len(waiters(directory)) > 0 {
+		return nil
+	}
+	// Nothing is borrowed inside a quiet window, so a job running when it opened stays at its width (#1rh8dav).
+	if holds, _ := quietHolds(directory, time.Now()); holds {
 		return nil
 	}
 	free := 0
@@ -407,10 +419,14 @@ func status() int {
 		testNiceness,
 		directory,
 	)
+	quietNow, _ := quietHolds(directory, time.Now())
 	for token := 1; token <= shape.tokens; token++ {
 		holder := "free"
 		if held := heldBy(directory, token); held != "" {
 			holder = held
+			if quietNow {
+				holder += " (running inside the quiet window)"
+			}
 		}
 		fmt.Fprintf(streams.Output, "  token %d: %s\n", token, holder)
 	}
