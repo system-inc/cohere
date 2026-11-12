@@ -90,8 +90,8 @@ func checkedRestoredWorld(test *testing.T, answered bool) restoredWorld {
 	reads := &build_reads.Reads{}
 	// Without the syntax every read is judged by its closure: the lookup is what this fixture is about.
 	reads.RecordTypes(hostUser, info, nil)
-	lookup := build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close", Subject: methodOf(hostUser, "Mine",
-		"Close")}
+	lookup := askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
+		Subject: methodOf(hostUser, "Mine", "Close")})
 	if answered {
 		lookup.Found, lookup.Answer = true, methodOf(hostHidden, "closer", "Close")
 	}
@@ -231,9 +231,9 @@ func TestALaterVerdictIndexesAPackageAnEarlierOneSkipped(test *testing.T) {
 	}), info)
 	reads := &build_reads.Reads{}
 	reads.RecordTypes(hostUser, info, nil)
-	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
+	reads.AddLookup(askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
 		Subject: methodOf(hostUser, "Mine", "Close"), Found: true,
-		Answer: methodSetMember(hostClosers, "Closer", "Close")})
+		Answer: methodSetMember(hostClosers, "Closer", "Close")}))
 	restoring := Restoring{Path: seamUserPath, Imports: []string{seamClosersPath}, Reads: reads}
 	closure := map[string]*types.Package{seamClosersPath: buildClosers}
 	host := measuredReadsBuild()
@@ -291,7 +291,8 @@ func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
 				reads.AddLookup(lookup)
 			}
 			for _, name := range []string{"Close", "Count", "Missing", "Close"} {
-				reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name, Subject: subject})
+				reads.AddLookup(askedBy(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name,
+					Subject: subject}))
 			}
 			restoring := Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads}
 			reads.RecordTypes(subject.Pkg(), &types.Info{}, nil)

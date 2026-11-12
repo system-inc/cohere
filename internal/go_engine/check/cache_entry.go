@@ -29,8 +29,10 @@ import (
 // (#jfvhbj7). At 7, an entry holds the answers a standard-library package was computed whole in (#w7zmvat wave 3).
 // At 8, it holds the answers its package's analysis read of other packages (#w7zmvat wave 3b). At 9, a standard-library
 // package's entry holds every answer of its package whenever a run writes it, so an entry of 8 may hold only some. At
-// 10, every package's entry does, so an entry of 9 may hold only some for a package outside the standard library.
-const CacheFormatVersion = "go-engine-cache-10"
+// 10, every package's entry does, so an entry of 9 may hold only some for a package outside the standard library. At
+// 11, an entry names its export data by the digest of its bytes (ExportData), which the store keeps once under that
+// digest however many entries name it, where an entry of 10 found its own beside it under its key (#5s1x2hg).
+const CacheFormatVersion = "go-engine-cache-11"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.
@@ -39,8 +41,8 @@ var errorUnstorable = errors.New("what the entry cannot hold")
 // cacheEntry is one package as the cache holds it, gob-encoded: by slot, what each analyzer that a later run could
 // ask for reported and exported on the package, and what the load needs to give the package's types without
 // parsing it. An analyzer's slot is its rule's name, or for an analyzer no rule runs, its name and its fact types
-// (see newCacheAnalyzers). The package's export data is beside it, under exportDataKey, since it is most of a
-// package's bytes and the load reads it only for a package something that missed imports.
+// (see newCacheAnalyzers). The package's export data is apart from it, under exportDataKey of its digest, since it is
+// most of a package's bytes and the load reads it only for a package something that missed imports.
 type cacheEntry struct {
 	// Version is CacheFormatVersion as it was when the entry was written, read back as a check on the key's.
 	Version string
@@ -81,6 +83,13 @@ type cacheEntry struct {
 	// reloads as it always did, so they need no new CacheFormatVersion.
 	Bodiless       []objectpath.Path
 	BodiesRecorded bool
+
+	// ExportData is the sha256 of the package's export data, which the store keeps under exportDataKey of it, nil for
+	// a package that carries none (carriesExportData) and for an entry encoded without it, which only a run's memory
+	// holds (lazyExportData). Every entry of a package whose types read the same names the same bytes, so an extra
+	// build writing a package through from the host's run (#b2t9xmf) names the host's copy rather than write its own:
+	// one cold run at cohere's root wrote 562 MB of export data through, 98 MB of it distinct (#5s1x2hg).
+	ExportData []byte
 }
 
 // storedRead is one read (see fact_resolver.Read): the kind, the owner's ID and its first key when the read was
@@ -137,13 +146,14 @@ type restoredPackage struct {
 	output    cache.Key
 	hasOutput bool
 
-	// answers are the entry's Answers, reads and readsIncomplete its Reads and ReadsIncomplete, and bodiless and
-	// bodiesRecorded its Bodiless and BodiesRecorded.
+	// answers are the entry's Answers, reads and readsIncomplete its Reads and ReadsIncomplete, bodiless and
+	// bodiesRecorded its Bodiless and BodiesRecorded, and exportDigest its ExportData.
 	answers         []kindAnswers
 	reads           []storedRead
 	readsIncomplete bool
 	bodiless        []objectpath.Path
 	bodiesRecorded  bool
+	exportDigest    []byte
 }
 
 // encodedEntry is one package's entry as encodeEntry makes it, with what the session needs of it beside the bytes.
@@ -283,6 +293,7 @@ func encodeEntry(
 			return encodedEntry{}, exportError
 		}
 		encoded.exportData = exportData
+		entry.ExportData = exportDataDigest(exportData)
 	}
 	if saved.Types != nil {
 		for _, imported := range saved.Types.Imports() {
@@ -313,10 +324,29 @@ func holdsFacts(known *cacheAnalyzers, stored map[string]storedAnalysis) bool {
 	return true
 }
 
-// exportDataKey is where the store keeps the export data of the package whose entry is under key, beside the entry
-// and apart from every other key.
-func exportDataKey(key cache.Key) cache.Key {
-	return sha256.Sum256(append([]byte("export data "), key[:]...))
+// exportDataKey is where the store keeps the export data whose sha256 is digest, apart from every entry's key: one
+// copy of the bytes, however many entries name it (cacheEntry.ExportData).
+func exportDataKey(digest []byte) cache.Key {
+	return sha256.Sum256(append([]byte("export data by content "), digest...))
+}
+
+// exportDataDigest is the digest an entry names exportData by, nil for none.
+func exportDataDigest(exportData []byte) []byte {
+	if exportData == nil {
+		return nil
+	}
+	digest := sha256.Sum256(exportData)
+	return digest[:]
+}
+
+// entryExportDigest is the ExportData an encoded entry names, decoded alone, for a reader that holds the entry's bytes
+// and has not decoded the rest.
+func entryExportDigest(contents []byte) ([]byte, error) {
+	var named struct{ ExportData []byte }
+	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&named); decodeError != nil {
+		return nil, fmt.Errorf("decoding the export data an entry names: %w", decodeError)
+	}
+	return named.ExportData, nil
 }
 
 // writeExportData is a package's types as gcexportdata writes them with the package's positions, nothing for unsafe,
@@ -435,6 +465,7 @@ func restoredOf(
 		readsIncomplete: entry.ReadsIncomplete,
 		bodiless:        entry.Bodiless,
 		bodiesRecorded:  entry.BodiesRecorded,
+		exportDigest:    entry.ExportData,
 	}
 	if len(entry.Output) == len(restored.output) {
 		copy(restored.output[:], entry.Output)
