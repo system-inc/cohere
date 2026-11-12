@@ -44,9 +44,11 @@ func VersionLine(stamp string, size int) string {
 }
 
 // ReadVersionLine is the release stamp and table size a `--version` output's line says the binary carries, whether it
-// carries one it reads, and whether the output has the line at all. A binary older than the line says nothing either
-// way, though a release candidate among them carries a table, so its caller refuses it rather than reading it as a
-// local build.
+// carries one it reads, and whether the line says either way. A binary older than the line says nothing, though a
+// release candidate among them carries a table, so its caller refuses it rather than reading it as a local build, and
+// so does a line it cannot read: only a `none` line, as VersionLine writes each of its three, reads as no table, and a
+// line in any other shape, a `release` line without its size among them, says nothing, so a change to the line's
+// shape fails closed rather than reading every release as a local build (#ccqee0e).
 func ReadVersionLine(output string) (string, int, bool, bool) {
 	for line := range strings.SplitSeq(output, "\n") {
 		described, found := strings.CutPrefix(strings.TrimSpace(line), VersionPrefix)
@@ -55,17 +57,21 @@ func ReadVersionLine(output string) (string, int, bool, bool) {
 		}
 		// A release's stamp holds spaces, `0.2.0 <commit> go1.27.0`, so the line is cut at its last comma, after which
 		// only the size is written (VersionLine).
-		released, found := strings.CutPrefix(described, "release ")
-		cut := strings.LastIndex(released, ", ")
-		if !found || cut < 0 {
+		if strings.HasPrefix(described, "none") {
 			return "", 0, false, true
+		}
+		released, isRelease := strings.CutPrefix(described, "release ")
+		cut := strings.LastIndex(released, ", ")
+		if !isRelease || cut < 0 {
+			return "", 0, false, false
 		}
 		stamp := released[:cut]
-		size, sizeError := strconv.Atoi(strings.TrimSuffix(released[cut+len(", "):], " bytes"))
-		if sizeError != nil {
-			return "", 0, false, true
+		sized, isSized := strings.CutSuffix(released[cut+len(", "):], " bytes")
+		size, sizeError := strconv.Atoi(sized)
+		if !isSized || sizeError != nil || stamp == "" || size <= 0 {
+			return "", 0, false, false
 		}
-		return stamp, size, stamp != "" && size > 0, true
+		return stamp, size, true, true
 	}
 	return "", 0, false, false
 }
