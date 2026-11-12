@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
@@ -125,10 +126,14 @@ func runInstalled(test *testing.T, binary string, directory string, arguments ..
 	)
 }
 
+// swiftShipsForMacOnly is why a test of a shipped Swift engine runs on macOS alone.
+const swiftShipsForMacOnly = "cohere-swift ships for macOS alone, and elsewhere a Swift package is refused by name"
+
 // A released cohere runs the engine its package ships beside it, with no checkout anywhere, reached
 // through a symlink the way a package manager's `bin` link reaches it.
 func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 	test.Parallel()
+	needs.Platform(test, "darwin", swiftShipsForMacOnly)
 
 	binary := installCohere(test, "1.0.0")
 	invoked := placeSiblingEngine(test, binary)
@@ -174,6 +179,7 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 // release's version.
 func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
 	test.Parallel()
+	needs.Platform(test, "darwin", swiftShipsForMacOnly)
 
 	binary := installCohere(test, "1.0.0")
 	checkout := test.TempDir()
@@ -209,6 +215,7 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
 // `go build -o` cannot run in place of the checkout's. Outside a checkout it has none, and says so.
 func TestADevelopmentCohereIgnoresAnEngineBesideIt(test *testing.T) {
 	test.Parallel()
+	needs.Platform(test, "darwin", swiftShipsForMacOnly)
 
 	binary := installCohere(test, "")
 	invoked := placeSiblingEngine(test, binary)

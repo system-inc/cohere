@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	release "github.com/system-inc/cohere/internal/release/packaging"
 )
@@ -33,6 +34,7 @@ func resetEngineBuilds(test *testing.T) {
 // Not parallel: it swaps resolveDevelopmentSwiftEngine and swiftEnginePlatform, and the package's record of
 // builds, which every Swift resolve in this process reads.
 func TestAnEngineBuildIsRecordedAndLeftOutOfTheCheck(test *testing.T) {
+	needs.Tool(test, "swift", "a Swift run asks the toolchain its version before it checks anything")
 	keptResolve, keptPlatform := resolveDevelopmentSwiftEngine, swiftEnginePlatform
 	test.Cleanup(func() { resolveDevelopmentSwiftEngine, swiftEnginePlatform = keptResolve, keptPlatform })
 	swiftEnginePlatform = release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}

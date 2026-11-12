@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // coldArgumentsScript is bench/cold_arguments.zsh, which quiet_machine.sh sources for its cold and idle runs'
@@ -19,10 +21,7 @@ var coldArgumentsScript = filepath.Join("..", "..", "bench", "cold_arguments.zsh
 // one only zsh opened would let an edit to the script replay a cached pass.
 func benchArguments(test *testing.T, function string, argument string) []string {
 	test.Helper()
-	zsh, lookError := exec.LookPath("zsh")
-	if lookError != nil {
-		test.Fatalf("the benchmark is a zsh script, and zsh is not on the path: %v", lookError)
-	}
+	zsh := needs.Tool(test, "zsh", "the benchmark is a zsh script")
 	script, readError := os.ReadFile(coldArgumentsScript)
 	if readError != nil {
 		test.Fatal(readError)
