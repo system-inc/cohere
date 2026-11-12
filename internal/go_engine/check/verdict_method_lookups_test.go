@@ -111,6 +111,14 @@ func putter(parameters string) string {
 	return "package foreign\n\ntype Putter[" + parameters + "] interface{ Put(Item) string }\n"
 }
 
+// box is foreign's generic concrete Box, with parameters as its type parameter list and receiver as its methods'
+// receiver's, whose Put takes Item bare and gives a string: abbreviated matches an interface method of ours to it by
+// instance when Item is its only parameter, and by shape alone when another appears nowhere bare.
+func box(parameters string, receiver string) string {
+	return "package foreign\n\ntype Box[" + parameters + "] struct{}\n\n" +
+		"func (Box[" + receiver + "]) Put(value Item) string { return \"\" }\n"
+}
+
 // putUser is the user package of the Putter fixtures: Mine's Put takes an int and gives an error, the shape of
 // Putter's Put, but no instance of it.
 const putUser = "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{}\n\n" +
@@ -286,6 +294,21 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			lookup: unanswered(build_reads.QueryMethod, "Put"),
 			want: "L lookup Method Put: " + methodForeignPath + ".Putter.Put is changed in the build, of the " +
 				"subject's shape",
+		},
+		{
+			name: "an unanswered generic concrete type whose type parameters change under the same signature, beside " +
+				"an interface method of ours",
+			files: map[string]string{"foreign.go": methodForeign,
+				"box_darwin.go":  box("Item any", "Item"),
+				"box_windows.go": box("Item, Extra any", "Item, Extra")},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\n" +
+				"type Mine interface{ Put(value int) error }\n\nfunc Use() int { return foreign.Count() }\n",
+			lookup: func(host methodWorld) build_reads.Lookup {
+				return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Put",
+					Subject: methodSetMember(host.user, "Mine", "Put")})
+			},
+			want: "L lookup Method Put: " + methodForeignPath + ".Box.Put is changed in the build, of the subject's " +
+				"shape",
 		},
 		{
 			name: "a generic answer whose type parameters change under the same signature",
