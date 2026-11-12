@@ -3,7 +3,6 @@
 package main
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -11,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/needs"
 )
@@ -178,7 +178,7 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 			if strings.Contains(testCase.name, "unreachable") {
 				script += "exit 255\n"
 			}
-			if writeError := os.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
+			if writeError := executable_testing.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
 				test.Fatal(writeError)
 			}
 			before := fixture.git(fixture.repository, "rev-parse", "main")

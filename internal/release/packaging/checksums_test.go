@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // Every check here is shown failing on a tampered binary as well as passing on an intact one, because a
@@ -448,7 +450,7 @@ func stageFixturePlatform(test *testing.T, output string, target Target) {
 func writeFixtureExecutable(test *testing.T, path string) {
 	test.Helper()
 	writeExecutable(test, path, 0o755)
-	if writeError := os.WriteFile(path, []byte(fixtureScript), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(path, []byte(fixtureScript), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 }
@@ -466,7 +468,7 @@ func flipByte(test *testing.T, path string) {
 		index = len(contents) / 2
 	}
 	contents[index] ^= 0x20
-	if writeError := os.WriteFile(path, contents, 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(path, contents, 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 }

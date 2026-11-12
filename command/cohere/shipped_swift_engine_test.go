@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
@@ -42,7 +43,7 @@ func installCohere(test *testing.T, version string) string {
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		if writeError := os.WriteFile(binary, contents, 0o755); writeError != nil {
+		if writeError := executable_testing.WriteFile(binary, contents, 0o755); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}
@@ -86,7 +87,7 @@ func placeSiblingEngine(test *testing.T, binary string) string {
 	}
 	invoked := filepath.Join(test.TempDir(), "invoked")
 	script := "#!/bin/sh\necho \"$@\" > '" + invoked + "'\ncat '" + clean + "'\n"
-	if writeError := os.WriteFile(
+	if writeError := executable_testing.WriteFile(
 		filepath.Join(filepath.Dir(binary), release.SwiftEngineFileName),
 		[]byte(script),
 		0o755,
