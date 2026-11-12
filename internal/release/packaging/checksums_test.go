@@ -266,14 +266,20 @@ func TestLauncherRefusesWithoutItsChecksums(test *testing.T) {
 func TestLauncherRefusesChecksumsThatDoNotListThisPlatform(test *testing.T) {
 	test.Parallel()
 
+	// Every platform but the one running the test, so the sums are a release's in all but this platform. A fixed
+	// list once named linux-x64 and refused to run there, testing nothing on Linux (#8ktz3ny).
 	installation := stageInstalledRelease(test)
-	writeFile(test, installation.checksums, string(placeholderChecksums))
-	if strings.Contains(string(placeholderChecksums), installation.directoryName+"/") {
-		test.Fatalf(
-			"the placeholder lists %s, so this would not test a platform the sums leave out",
-			installation.directoryName,
-		)
+	var others strings.Builder
+	for _, target := range Targets {
+		if target.DirectoryName() != installation.directoryName {
+			others.WriteString(strings.Repeat("0", 64) + "  " + target.DirectoryName() + "/bin/cohere\n")
+		}
 	}
+	if others.Len() == 0 || strings.Contains(others.String(), installation.directoryName+"/") {
+		test.Fatalf("the planted sums list %s or nothing at all, so this would test no platform they leave out",
+			installation.directoryName)
+	}
+	writeFile(test, installation.checksums, others.String())
 	installation.run(test, "--version").requireRefused(test, installation.checksums, "lists no binary for")
 }
 
