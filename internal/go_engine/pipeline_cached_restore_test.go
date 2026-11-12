@@ -4,6 +4,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -41,5 +42,22 @@ func TestACachedColdRunsBuildDeclinesAndReloadsAsUnderNoCache(test *testing.T) {
 	if withoutCache(cachedStream) != withoutCache(plainStream) {
 		test.Errorf("the cached cold run's stream differs from the one under --no-cache:\ncached\n%s\nno cache\n%s",
 			cachedStream, plainStream)
+	}
+}
+
+// A fixing run with the findings cache and extra builds whose rename rounds come after the first lint reads nothing of
+// the host's resolver after its keep (#px1yxq8): over rename-platforms, the first lint pass keeps the host's packages
+// for the builds and lets the resolver go, the rename then loads and proves its rewrite under each platform, and the
+// run lints the written tree, renamed, with no findings cache. None of it reports a read after the keep.
+func TestARenameAfterTheKeepReadsNothingTheKeepLetGo(test *testing.T) {
+	test.Parallel()
+
+	engine, _, noted := runOverNoted(test, copyFixture(test, filepath.Join("testdata", "rename-platforms")),
+		exitClean, nil, "--other-builds")
+	if !engine.renamed {
+		test.Fatal("the run renamed nothing, so it tells nothing of the rounds after the first lint")
+	}
+	if strings.Contains(noted, "after the run kept its packages") {
+		test.Errorf("the run read what its keep let go:\n%s", noted)
 	}
 }

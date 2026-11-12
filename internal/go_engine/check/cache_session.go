@@ -227,6 +227,11 @@ type CacheSession struct {
 
 	// host is the restore from the host's run of an extra build's session, nil for any other (see RestoreFromHost).
 	host *hostState
+
+	// kept is set once keepForBuilds has let go of the resolver and the answer memo, and cleared by the next Restore,
+	// which starts both afresh. A read of either while it is set is a problem the run reports (readAfterKeep), never
+	// a quiet empty answer (#px1yxq8).
+	kept atomic.Bool
 }
 
 // NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
@@ -294,6 +299,7 @@ func (session *CacheSession) Restore(
 	session.answering.lock.Lock()
 	session.answering.byTypes = nil
 	session.answering.lock.Unlock()
+	session.kept.Store(false)
 	// The counts are of the run over this load, the one whose result stands, which is the last: a load again to check
 	// a package from source to answer a question drops the pass before it (see Reload), and its packages that pass
 	// saved are this one's hits. The problems stay, since every one of them was met.
@@ -709,7 +715,8 @@ func (session *CacheSession) saveMisses(
 		session.attempted[keyed] = true
 		// A package whose analysis was handed a placeholder ran on a guess (fact_resolver.Unsure), and is analyzed
 		// again by the round that loads what the placeholder stood for.
-		unsure := session.resolver != nil && keyed.Types != nil && session.resolver.Unsure(keyed.Types)
+		unsure := !session.readAfterKeep("saveMisses, asking whether "+keyed.ID+" ran on a guess") &&
+			session.resolver != nil && keyed.Types != nil && session.resolver.Unsure(keyed.Types)
 		if len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actionsOf[keyed]) && !unsure {
 			saving = append(saving, keyed)
 		}

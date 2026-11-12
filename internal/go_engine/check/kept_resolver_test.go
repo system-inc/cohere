@@ -3,7 +3,10 @@ package check
 import (
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // The host's run lets go of what its analysis built to answer questions once it has kept its packages for the extra
@@ -32,5 +35,30 @@ func TestTheHostLetsItsResolverGoOnceItHasKeptWithAStore(test *testing.T) {
 	through, _ := throughBuild(test, root, filepath.Join(stores, "build"), host)
 	if !slices.Contains(through.FromHost.Restored, throughUserPath) {
 		test.Errorf("windows restored %q from the host, want %s among them", through.FromHost.Restored, throughUserPath)
+	}
+}
+
+// Once the host's run has kept its packages for the builds and let its resolver go, a save that reads it is a problem
+// the run reports, naming the reader, never an entry quietly written with fewer answers (#px1yxq8): the host's run
+// itself reports none, and a save of user after the keep, as one added after it would be, reports the save's read.
+func TestASaveAfterTheKeepIsAProblem(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	writeFiles(test, root, throughFiles)
+	_, session := throughHostSession(test, root, test.TempDir())
+	if len(session.counts.Problems) > 0 {
+		test.Fatalf("the host's run reported problems before any save after its keep: %q", session.counts.Problems)
+	}
+	user := throughPackage(test, session, throughUserPath)
+	// The run attempted every miss once; user is saved again as a save after the keep would save it.
+	delete(session.attempted, user)
+	session.saveMisses(nil, []*packages.Package{user}, nil, nil)
+	if !slices.ContainsFunc(session.counts.Problems, func(problem string) bool {
+		return strings.HasPrefix(problem, "saveMisses, asking whether "+throughUserPath+" ran on a guess: it read "+
+			"the resolver or its answer memo after the run kept")
+	}) {
+		test.Errorf("a save of user after the keep reported %q, want the save's read of the resolver named",
+			session.counts.Problems)
 	}
 }

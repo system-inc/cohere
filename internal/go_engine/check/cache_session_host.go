@@ -767,6 +767,7 @@ func (session *CacheSession) keepForBuilds(
 	session.answering.lock.Lock()
 	session.answering.byTypes = nil
 	session.answering.lock.Unlock()
+	session.kept.Store(true)
 	session.keeping += time.Since(started)
 	host.keeping = session.keeping
 	return host
@@ -788,7 +789,8 @@ func lazyExportData(kept *packages.Package) func() ([]byte, error) {
 // packages. An extra build that asks one it does not hold reloads the package, as a run restoring a partial entry does
 // (see Reload).
 func (session *CacheSession) recordedDemandOf(saved *packages.Package) entryDemand {
-	if session.resolver == nil || saved.Types == nil {
+	if session.readAfterKeep("recordedDemandOf, the kept answers of "+saved.ID) || session.resolver == nil ||
+		saved.Types == nil {
 		return entryDemand{}
 	}
 	demanded := entryDemand{answers: sortedAnswers(session.resolver.Recorded(saved.Types), false)}
