@@ -37,24 +37,32 @@ type verdict struct {
 
 // verdictClosures are a verdict's import closures as its Interface and Method lookups ask them: the host's, by the
 // package whose import closure it is, which is the subject's, and the build's, from the judged package's imports
-// there, nil until a lookup first asks.
+// there, nil until a lookup first asks, with buildUnindexed, the packages of the build's not yet indexed for this
+// verdict (indexBuildCandidates).
 type verdictClosures struct {
-	host  map[*types.Package]*gatheredClosure
-	build *gatheredClosure
+	host           map[*types.Package]*gatheredClosure
+	build          *gatheredClosure
+	buildUnindexed []*types.Package
 }
 
-// gatheredClosure is one import closure, the union of its roots' (ReadsBuild.closureOf): its packages, and each by its
-// path, one package of a path in any closure.
+// gatheredClosure is one import closure, the union of its roots' (ReadsBuild.closureOf): its packages, in the order
+// the walks reached them and as a set, and each by its path, one package of a path in any closure.
 type gatheredClosure struct {
+	ordered []*types.Package
 	reached map[*types.Package]bool
 	byPath  map[string]*types.Package
 }
 
-// gatherClosure is the import closure of roots in memo, every package of it indexed by its methods' names there.
-func gatherClosure(memo *ReadsBuild, roots []*types.Package) *gatheredClosure {
+// gatherClosure is the import closure of roots, each root's as closureOf gives it: the host's indexed whole
+// (ReadsBuild.indexedClosureOf), the build's walked alone (ReadsBuild.closureOf).
+func gatherClosure(closureOf func(*types.Package) []*types.Package, roots []*types.Package) *gatheredClosure {
 	gathered := &gatheredClosure{reached: map[*types.Package]bool{}, byPath: map[string]*types.Package{}}
 	for _, root := range roots {
-		for _, reached := range memo.closureOf(root) {
+		for _, reached := range closureOf(root) {
+			if gathered.reached[reached] {
+				continue
+			}
+			gathered.ordered = append(gathered.ordered, reached)
 			gathered.reached[reached] = true
 			gathered.byPath[reached.Path()] = reached
 		}
@@ -67,16 +75,17 @@ func (judged verdict) hostClosure(subjectPackage *types.Package) *gatheredClosur
 	if gathered, known := judged.methods.host[subjectPackage]; known {
 		return gathered
 	}
-	gathered := gatherClosure(judged.host, subjectPackage.Imports())
+	gathered := gatherClosure(judged.host.indexedClosureOf, subjectPackage.Imports())
 	judged.methods.host[subjectPackage] = gathered
 	return gathered
 }
 
 // buildClosure is the build's import closure of roots, the judged package's imports there, gathered once for the
-// verdict.
+// verdict, none of it indexed until a lookup reads it (indexBuildCandidates).
 func (judged verdict) buildClosure(roots []*types.Package) *gatheredClosure {
 	if judged.methods.build == nil {
-		judged.methods.build = gatherClosure(judged.build, roots)
+		judged.methods.build = gatherClosure(judged.build.closureOf, roots)
+		judged.methods.buildUnindexed = slices.Clone(judged.methods.build.ordered)
 	}
 	return judged.methods.build
 }
@@ -370,6 +379,7 @@ func (judged verdict) buildCandidates(
 	hostHas func(owner *types.Package) bool,
 ) []*types.TypeName {
 	buildClosure := judged.buildClosure(roots)
+	judged.indexBuildCandidates(hostHas)
 	var candidates []*types.TypeName
 	for _, indexed := range judged.build.methodsNamed(name) {
 		if !buildClosure.reached[indexed.owner] || judged.restored[indexed.owner] && hostHas(indexed.owner) {
@@ -378,6 +388,29 @@ func (judged verdict) buildCandidates(
 		candidates = append(candidates, indexed.typeNames...)
 	}
 	return candidates
+}
+
+// indexBuildCandidates indexes, in the build's memo, every package of the verdict's build closure that buildCandidates
+// takes candidates from under hostHas: all but a package the build restored from the host's run that the host's side
+// stands for, which the walk left unindexed (ReadsBuild.closureOf). It is exact: every package buildCandidates returns
+// candidates of passes that filter, and every such package is indexed before it reads the index, so it returns what
+// an index of the whole closure gives. The filter after methodsNamed stays, since another verdict may have indexed a
+// package this one skips. hostHas differs by caller, the host's closure for a lookup of this run and the host's
+// candidates' owners for a persisted one, which is why the indexing is decided here by the same hostHas, never ahead
+// of it.
+//
+// A package once indexed for the verdict leaves buildUnindexed, so after the first lookup each later one passes over
+// only the restored packages the host stood for so far, whichever lookup asks.
+func (judged verdict) indexBuildCandidates(hostHas func(owner *types.Package) bool) {
+	skipped := judged.methods.buildUnindexed[:0]
+	for _, owner := range judged.methods.buildUnindexed {
+		if judged.restored[owner] && hostHas(owner) {
+			skipped = append(skipped, owner)
+			continue
+		}
+		judged.build.indexPackage(owner)
+	}
+	judged.methods.buildUnindexed = skipped
 }
 
 // answerHolds reports whether answer, the build's, is the answer a lookup named name recorded on the host: found when
