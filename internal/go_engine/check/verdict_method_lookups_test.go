@@ -169,11 +169,12 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 		return "package user\n\nimport \"example.com/methods/foreign\"\n\n" + mine +
 			"\n\nfunc Use() int { return foreign.Count() }\n"
 	}
-	// addOf is the unanswered Method lookup of Mine's method named method, an interface's or a concrete type's.
+	// addOf is abbreviated's unanswered Method lookup of Mine's method named method, an interface's or a concrete
+	// type's.
 	addOf := func(method string) methodLookupOf {
 		return func(host methodWorld) build_reads.Lookup {
-			return build_reads.Lookup{Query: build_reads.QueryMethod, Name: method,
-				Subject: methodSetMember(host.user, "Mine", method)}
+			return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: method,
+				Subject: methodSetMember(host.user, "Mine", method)})
 		}
 	}
 	for _, step := range []struct {
@@ -253,7 +254,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			name:   "the same of an exported name, which no-any lets fix a concrete type's method",
 			files:  poolAdds("Add"),
 			user:   adding("type Mine struct{}\n\nfunc (Mine) Add(value int) {}"),
-			lookup: addOf("Add"),
+			lookup: askedByNoAny(addOf("Add")),
 			want: "L lookup Method Add: " + methodForeignPath + ".pool.Add is new in the build, of the subject's " +
 				"shape",
 		},
