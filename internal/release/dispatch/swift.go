@@ -76,7 +76,7 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int, versionOutput 
 		return resolveCommittedSwiftEngine(paths, commit, toolchain, contract)
 	}
 
-	modified := workingTreeModified(paths.ModuleDirectory, swiftEngineInputs...)
+	modified := SwiftEngineTreeModified(paths.ModuleDirectory)
 	hash, swiftEngineHashError := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain, modified)
 	if swiftEngineHashError != nil {
 		return "", false, swiftEngineHashError

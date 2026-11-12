@@ -43,17 +43,20 @@ func TestSwiftRunCacheFactsMoveWithTheToolchainAndTheEngine(test *testing.T) {
 		readLink    func(string) (string, error)
 		yield       string
 		choice      string
+		modified    bool
 	}
 	key := func(given facts) string {
 		test.Helper()
+		treeModified := func() bool { return given.modified }
 		parts, partsError := program.RunCacheKeyPartsOf(nil, anchor.Resolved(), swiftRunCacheFacts(anchor,
-			settingsFile, false, given.yield, given.choice, given.environment, given.lookPath, given.readLink)...)
+			settingsFile, false, given.yield, given.choice, treeModified, given.environment, given.lookPath,
+			given.readLink)...)
 		if partsError != nil {
 			test.Fatal(partsError)
 		}
 		return parts.Key()
 	}
-	baseline := facts{base, found(firstSwift), selected(firstXcode), "", swiftEngineFromWorkingTree}
+	baseline := facts{base, found(firstSwift), selected(firstXcode), "", swiftEngineFromWorkingTree, false}
 	with := func(change func(*facts)) facts {
 		changed := baseline
 		changed.environment = slices.Clone(base)
@@ -100,6 +103,9 @@ func TestSwiftRunCacheFactsMoveWithTheToolchainAndTheEngine(test *testing.T) {
 		{"an engine named by the override", with(func(given *facts) { given.choice = "named /tmp/cohere-swift" })},
 		{"an engine built from a commit", with(func(given *facts) { given.choice = "built from commit 0123abcd" })},
 		{"a released engine", with(func(given *facts) { given.choice = "shipped beside this cohere" })},
+		// The engine built from the working tree is built and stamped with its state, and reports it as the run's
+		// modified-build gap, so a replay across the state would show another engine's (#s5z3n30).
+		{"the working tree now has uncommitted changes", with(func(given *facts) { given.modified = true })},
 	}
 	for _, moved := range moves {
 		if key(moved.facts) == key(baseline) {
@@ -125,6 +131,30 @@ func TestSwiftRunCacheFactsMoveWithTheToolchainAndTheEngine(test *testing.T) {
 		if key(stayed.facts) != key(baseline) {
 			test.Errorf("%s and the key moved, so an unchanged run would never replay", stayed.name)
 		}
+	}
+}
+
+// TestOnlyAnEngineBuiltFromTheWorkingTreeAsksTheTreesState: the tree's clean or dirty state is a fact only for an
+// engine built from the working tree, whose bit follows it (#s5z3n30). A named, shipped or committed engine's bit is
+// fixed in its bytes, and its binary is an input, so the state is never asked for one, since asking is a git process
+// a replay would pay for nothing.
+func TestOnlyAnEngineBuiltFromTheWorkingTreeAsksTheTreesState(test *testing.T) {
+	test.Parallel()
+	anchor := program.NewPathAnchor(test.TempDir())
+	none := func(string) (string, error) { return "", os.ErrNotExist }
+	others := []string{"named /tmp/cohere-swift", "shipped beside this cohere", "built from commit 0123abcd"}
+	for _, choice := range others {
+		asked := false
+		swiftRunCacheFacts(anchor, "", false, "", choice, func() bool { asked = true; return true }, nil, none, none)
+		if asked {
+			test.Errorf("an engine %s asked for the tree's state, which its bit does not follow", choice)
+		}
+	}
+	asked := false
+	swiftRunCacheFacts(anchor, "", false, "", swiftEngineFromWorkingTree, func() bool { asked = true; return false },
+		nil, none, none)
+	if !asked {
+		test.Error("an engine built from the working tree never asked for the tree's state, which its bit follows")
 	}
 }
 

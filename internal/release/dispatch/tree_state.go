@@ -12,6 +12,14 @@ import (
 // built clean and claim a clean build that never happened. So the state is read fresh on every resolve,
 // keyed into the binary's name, and handed to the build, and the binary reports what its name holds.
 
+// SwiftEngineTreeModified reports whether the Swift engine's own inputs, swiftEngineInputs, have uncommitted changes in
+// the checkout at moduleDirectory: the state an engine built from that working tree is built and stamped with, and
+// reports as `sourceTreeModified`. The one call site of that meaning, so the resolver that builds the engine and the
+// run cache that keys a replay on it ask the same question (#s5z3n30).
+func SwiftEngineTreeModified(moduleDirectory string) bool {
+	return workingTreeModified(moduleDirectory, swiftEngineInputs...)
+}
+
 // workingTreeModified reports whether repository has uncommitted changes, tracked or untracked, ignored
 // files never counting, under pathspecs when any are given and in the whole repository otherwise.
 //
