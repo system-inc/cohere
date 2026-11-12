@@ -19,6 +19,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
@@ -96,6 +97,11 @@ type Options struct {
 	// type-read walk takes one of below every package's work, so a walk beside the load never displaces its chain.
 	// Nil, the walks take slots of their own, as many as there are cores.
 	WalkSlots build_reads.Slots
+
+	// Pool is the run's one set of slots, which every load and check of the run shares, the host's and every extra
+	// build's (#ckm0hsp): the checker runs each action under one of them (checker.Options.Pool). Nil, the checker's
+	// workers alone bound the actions, one per core.
+	Pool *bounded.Pool
 
 	// KeepForBuilds has the run keep, in Result.Host, the entry of each package it analyzed from source whose reads can
 	// hold, for its extra builds to restore from (#b2t9xmf). It needs Cache and Reads, and only a run with extra builds
@@ -296,6 +302,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
 	checkerOptions.Reads = options.Reads
+	checkerOptions.Pool = options.Pool
 	// The walks run beside the rules, and on past Run's return, so no package's walk sits at the end of the run's
 	// chain; whoever reads the reads waits for them (Result.ReadWalks).
 	var walks *build_reads.Walks

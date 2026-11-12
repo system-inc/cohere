@@ -218,7 +218,7 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 	// (lazyExportData).
 	read := make([]*restoredPackage, len(reading))
 	readErrors := make([]error, len(reading))
-	bounded.ForEach(len(reading), false, func(index int) {
+	session.fanOut(len(reading), func(index int) {
 		entry, readExportData, readError := readingKept[index].contents()
 		if readError == nil {
 			read[index], readError = decodeEntry(session.known, reading[index], entry, readExportData)
@@ -254,6 +254,13 @@ func (session *CacheSession) typesHoldFunction(
 		// The load set the package's sizes, the build's, before deciding any package, so the first verdict tells
 		// the memo its build before it renders anything.
 		session.host.renderings.measureBy(candidate.TypesSizes)
+		// A verdict is the run's work as a load's or a check's is, so it runs under one of the run's slots, at the top
+		// of the scale: the package's load waits on it. The load's goroutine asks it before it takes a slot of its own
+		// for the package, so it holds none here.
+		if session.caching.Pool != nil {
+			session.caching.Pool.Acquire(bounded.PriorityScale)
+			defer session.caching.Pool.Release()
+		}
 		started := time.Now()
 		holds, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
 			session.host.host.renderings, session.host.renderings)
@@ -482,7 +489,7 @@ func (session *CacheSession) writeThrough(
 	encoded := make([]encodedEntry, len(through))
 	writable := make([]bool, len(through))
 	writeErrors := make([]error, len(through))
-	bounded.ForEach(len(through), false, func(index int) {
+	session.fanOut(len(through), func(index int) {
 		saved := through[index]
 		encoded[index], writable[index], writeErrors[index] = session.throughEntry(saved, throughHosted[index],
 			actionsOf[saved], knownFiles)
@@ -737,7 +744,7 @@ func (session *CacheSession) keepForBuilds(
 	knownFiles := session.allFiles()
 	encoded := make([]encodedEntry, len(encoding))
 	encodeErrors := make([]error, len(encoding))
-	bounded.ForEach(len(encoding), false, func(index int) {
+	session.fanOut(len(encoding), func(index int) {
 		saved := encoding[index]
 		encoded[index], encodeErrors[index] = encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
 			withheld[saved], session.withBodiless(saved, session.recordedDemandOf(saved)), files[saved], knownFiles,

@@ -31,6 +31,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -190,6 +191,11 @@ type Caching struct {
 	// SharedReads is the directory and file reads every load of the run that lists in process shares, nil for none
 	// (see SharedReads): set on the loads that follow every write of the run, the host's and each extra build's.
 	SharedReads *SharedReads
+
+	// Pool is the run's one set of slots, which every load and check of the run shares, the host's and every extra
+	// build's, so the run never runs more work at once than it has cores (#ckm0hsp). Nil, the load has slots of its
+	// own, one per core.
+	Pool *bounded.Pool
 
 	// GoEnvironment is go env's answer the run already has, from its census, which the load reads in place of asking
 	// again when it is for the load's workspace and environment (see GoEnvironment).
@@ -396,6 +402,9 @@ func fromSource(
 	}
 	withheld := newWithheldErrors()
 	typeChecker := newLoader(built, sizes, withheld, overlay, caching.Held, caching.Timing)
+	if caching.Pool != nil {
+		typeChecker.slots = caching.Pool
+	}
 	reachable := typeChecker.connect()
 	if caching.rootSyntaxOnly {
 		for _, current := range reachable {

@@ -55,6 +55,11 @@ type LintRecord struct {
 	// Absent when the decision needed none: under `--single-threaded`, a limit other than the cap, builds that restore
 	// nothing from the host, or too few cores or builds for more than one at a time.
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
+	// BuildsPoolSize is additive within contract 3, and the Go engine's alone: how many slots the run's one pool holds,
+	// which every load and check of the run shares, the host's and every extra build's, so however many builds run side
+	// by side the run never runs more of that work at once (#ckm0hsp). One per core, one under `--single-threaded`.
+	// Absent when Builds is.
+	BuildsPoolSize int `json:"buildsPoolSize,omitempty"`
 	// OffReasons is additive within contract 3, and the Go engine's alone: why the settings turn each rule off, for
 	// every off the go block's reasons explain (#v11k0g2), which the front door prints beside the rule in coverage.
 	// Always written, `{}` when no off is explained, so a reader tells an engine that explains its offs, where a rule

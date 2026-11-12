@@ -19,6 +19,7 @@ import (
 	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
@@ -32,14 +33,17 @@ type loader struct {
 	fileSet *token.FileSet
 	sizes   types.Sizes
 
-	// slots holds one slot per core; a read, a parse, a type check or a read of export data holds one while it runs
-	// and never waits on anything else, so nothing waits on a slot forever. They are granted longest path first, by
-	// priorities.
-	slots *prioritySlots
+	// slots holds one slot per core, the run's pool when the caller gives one (Caching.Pool), shared with every other
+	// load and check of the run; a read, a parse, a type check or a read of export data holds one while it runs and
+	// never waits on anything else, so nothing waits on a slot forever. They are granted longest path first, by
+	// priorities, put on the pool's scale against longest (bounded.ScaledPriority).
+	slots *bounded.Pool
 
 	// priorities is each reachable package's longest path to the end of the graph (see prioritize), which every slot
-	// taken for its work carries. It is written before any work starts and only read after.
+	// taken for its work carries, and longest the largest of them. Both are written before any work starts and only
+	// read after.
 	priorities map[*node]int
+	longest    int
 
 	// observeGrant, nil outside tests, is told of every slot granted, while it is held: the ID of the package the
 	// work is for, and the kind of work.
@@ -195,6 +199,9 @@ func identifiersOf(stack []*node) string {
 func (loader *loader) load(reachable []*node) {
 	needed := loader.needed(reachable)
 	loader.priorities = loader.prioritize(reachable)
+	for _, priority := range loader.priorities {
+		loader.longest = max(loader.longest, priority)
+	}
 	// Every package checked from source claims its files before any parse starts, in reachable's order, which connect
 	// fixes, so which package parses a file two packages share, as p and "p [p.test]" do, is the same every run.
 	claims := map[*node]*claim{}
@@ -243,7 +250,7 @@ func (loader *loader) load(reachable []*node) {
 				syntax, parseErrors := loader.parseClaimed(taken, current)
 				loader.acquire(current, slotWorkCheck)
 				loader.check(current, syntax, parseErrors)
-				loader.slots.release()
+				loader.slots.Release()
 			}()
 			continue
 		}
@@ -257,7 +264,7 @@ func (loader *loader) load(reachable []*node) {
 			}
 			loader.acquire(current, slotWorkCheck)
 			loader.check(current, syntax, parseErrors)
-			loader.slots.release()
+			loader.slots.Release()
 		}()
 	}
 	group.Wait()
@@ -276,7 +283,7 @@ func (loader *loader) restoreTypes(current *node, restored *Restored) bool {
 	}
 	loader.acquire(current, slotWorkExportData)
 	readError := loader.readExportData(current, restored, closure)
-	loader.slots.release()
+	loader.slots.Release()
 	if readError != nil {
 		loader.decline(current, restored)
 		return false
@@ -399,7 +406,7 @@ func (loader *loader) prioritize(reachable []*node) map[*node]int {
 
 // acquire takes a slot for work on current's behalf, at its priority, and tells observeGrant once it holds it.
 func (loader *loader) acquire(current *node, work slotWork) {
-	loader.slots.acquire(loader.priorities[current])
+	loader.slots.Acquire(bounded.ScaledPriority(loader.priorities[current], loader.longest))
 	if loader.observeGrant != nil {
 		loader.observeGrant(current.loaded.ID, work)
 	}
@@ -491,7 +498,7 @@ func (loader *loader) parseClaimed(taken *claim, current *node) ([]*ast.File, []
 		loader.filesParsed.Add(1)
 		reads.Go(func() {
 			loader.acquire(current, slotWorkRead)
-			defer loader.slots.release()
+			defer loader.slots.Release()
 			// The file is counted here, once, as filesParsed counts it, and its parse below adds CPU alone.
 			loader.timing.Parse(loader.timing.Measure(func() {
 				contents[index], readErrors[index] = loader.readFile(file)
@@ -525,7 +532,7 @@ func (loader *loader) parseClaimed(taken *claim, current *node) ([]*ast.File, []
 		go func() {
 			defer close(parse.done)
 			loader.acquire(current, slotWorkParse)
-			defer loader.slots.release()
+			defer loader.slots.Release()
 			loader.timing.Parse(loader.timing.Measure(func() {
 				parse.file, parse.parseError = loader.parseInto(
 					taken.files[index],
@@ -795,7 +802,7 @@ func newLoader(
 		graph:         built,
 		fileSet:       token.NewFileSet(),
 		sizes:         sizes,
-		slots:         newPrioritySlots(runtime.GOMAXPROCS(0)),
+		slots:         bounded.NewPool(runtime.GOMAXPROCS(0)),
 		parsed:        map[string]*parsedFile{},
 		withheld:      withheld,
 		overlay:       overlay,

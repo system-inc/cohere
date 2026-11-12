@@ -847,9 +847,11 @@ var (
 	// builds side by side fall in time and never reaches the verdict, so it is left out as the times are.
 	lintWaitedPattern     = regexp.MustCompile(`,"lintWaited":true`)
 	checkedByBuildPattern = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
-	// buildsAtOncePattern is how many extra builds ran side by side, and the live heap that was decided by, which the
-	// machine decides and the verdict never reads, so they are left out as the times are.
-	buildsAtOncePattern  = regexp.MustCompile(`,"buildsAtOnce":\d+(,"buildsWidthLiveBytes":\d+)?`)
+	// buildsAtOncePattern is how many extra builds ran side by side, the live heap that was decided by, and the run's
+	// pool's size, one slot per core, which the machine decides and the verdict never reads, so they are left out as
+	// the times are.
+	buildsAtOncePattern = regexp.MustCompile(
+		`,"buildsAtOnce":\d+(,"buildsWidthLiveBytes":\d+)?(,"buildsPoolSize":\d+)?`)
 	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",

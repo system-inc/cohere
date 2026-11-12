@@ -342,6 +342,7 @@ func (engine *pipeline) extraBuildRun(
 		defer func() { linting += time.Since(started) }()
 		return check.Run(over.Packages, enabled, check.Options{
 			SingleThreaded: engine.request.switches["single-threaded"],
+			Pool:           engine.workPool(),
 			Cache:          session,
 			Withheld:       over.Withheld,
 			Bodiless:       over.Bodiless,

@@ -5,14 +5,17 @@ import (
 	"io"
 	"maps"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/duplicate_functions"
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -86,6 +89,17 @@ type pipeline struct {
 	buildsWidthUnguarded bool
 	extraBuildEnds       func(extra project.Build, notes io.Writer) error
 	lintSteps            func(extra project.Build, step lintStep, weight int)
+
+	// pool is the run's one set of slots, every load and check of the run sharing it, the host's and every extra
+	// build's (#ckm0hsp), made on first use (workPool). poolSizeForced, set only by a test, is its size in place of one
+	// per core, and poolObserve, a test's too, is told of each slot taken, +1, and each given back, -1.
+	pool           *bounded.Pool
+	poolMaking     sync.Once
+	poolSizeForced int
+	poolObserve    func(change int)
+
+	// poolsMade counts the pools the run made, one, which a test reads.
+	poolsMade int
 
 	// hostLoading and hostLinting are the host's build's wall time loading the workspace and running the rules over it,
 	// in nanoseconds, over every load and pass, its build record's (buildRun). A load or a pass beside another runs on
@@ -781,4 +795,25 @@ func (engine *pipeline) filesWithoutRecord(loaded *load.Loaded) []string {
 // oneLine is an error on one line, for a phase record's detail, which prints inside one line.
 func oneLine(cause error) string {
 	return strings.Join(strings.Fields(cause.Error()), " ")
+}
+
+// workPool is the run's one set of slots, which every load and check of the run shares, the host's and every extra
+// build's, so builds side by side never run more work at once than the run has cores (#ckm0hsp): one slot per core,
+// or one under `--single-threaded`, which asks for one thing at a time.
+func (engine *pipeline) workPool() *bounded.Pool {
+	engine.poolMaking.Do(func() {
+		size := runtime.GOMAXPROCS(0)
+		switch {
+		case engine.poolSizeForced > 0:
+			size = engine.poolSizeForced
+		case engine.request.switches["single-threaded"]:
+			size = 1
+		}
+		engine.pool = bounded.NewPool(size)
+		engine.poolsMade++
+		if engine.poolObserve != nil {
+			engine.pool.Observe(engine.poolObserve)
+		}
+	})
+	return engine.pool
 }

@@ -191,6 +191,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 			}
 		}
 		record.BuildsAtOnce = engine.buildsAtOnce
+		record.BuildsPoolSize = engine.workPool().Size()
 		record.BuildsWidthLiveBytes = engine.buildsWidthLiveBytes
 	}
 	if len(record.Crashes) > 0 {
@@ -250,6 +251,7 @@ func (engine *pipeline) lintPackages(
 	options.Cache = session
 	// The host's run keeps its packages' entries for the extra builds to restore from, only when there are any.
 	options.KeepForBuilds = session != nil && options.Reads != nil && engine.keepsForBuilds()
+	options.Pool = engine.workPool()
 	// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 	// and what follows reads the files' contents the project description holds, and the types.
 	options.ReleaseAnalyzed = true
@@ -368,6 +370,8 @@ func (engine *pipeline) cacheSession(
 		return nil
 	}
 	caching.Files = files
+	// The session's own work on every core runs under the run's one pool's slots, as its loads and checks do.
+	caching.Pool = engine.workPool()
 	// The editor's save loads its buffer in place of the file (held), so its keys are of the buffer: keyed by the
 	// disk's bytes, its entries would be restored by the next run over the file on disk as what that file holds.
 	if engine.request.stdinPath != "" {
