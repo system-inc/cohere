@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // A real run at a root holding a TypeScript program and a Swift package ends its default view on one footer line,
@@ -24,7 +26,11 @@ func TestAMixedRootEndsOnOneFooterLine(test *testing.T) {
 		test.Fatal(absoluteError)
 	}
 	engine := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := os.WriteFile(engine, []byte("#!/bin/sh\ncat '"+fixture+"'\n"), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(
+		engine,
+		[]byte("#!/bin/sh\ncat '"+fixture+"'\n"),
+		0o755,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	root := test.TempDir()

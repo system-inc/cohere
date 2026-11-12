@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/streams"
+	"golang.org/x/mod/modfile"
 )
 
 // The landing gate's tests run on Home, Loom's day box, and only what Home could not run runs on the Mac (#acdf5mc).
@@ -39,14 +41,22 @@ import (
 // Home failing a test refuses the landing. Home unreachable, refusing, out of its window or saying it tested another
 // tree is no verdict at all, and the whole test run happens on the Mac, as it always did, said on the land line.
 
-// homeGateVariable turns the real Home on with "on", or names a command run in place of her whole run, the push and
-// the gap, for a test. Unset or "off", every landing tests on the Mac. Home is opt-in until a real landing has been
-// proven on her (#acdf5mc): a script that fails there for its own reasons would read as a red for every lander.
+// homeGateVariable is "off" to test a landing on the Mac alone, the escape hatch, or names a command run in place of
+// Home's whole run, the push and the gap, for a test. Unset or "on", the landing's tests run on Home: the default since
+// main's first whole pass on her, both halves, came back green at e74fbf79 (Nov 12, #acdf5mc).
 const homeGateVariable = "COHERE_DEV_HOME_GATE"
 
 // homeMarker opens the line Home's run prints before its tests: the commit it checked out and the platform it tests
 // on, which the Mac reads to know whose verdict it holds and which files that platform never compiles.
 const homeMarker = "cohere-dev-home: tested "
+
+// homeRaceMarker is the line Home's run prints before its -race run of the raceGated packages, which the Mac reads
+// apart from the module's run before it (#bnabymg).
+const homeRaceMarker = "cohere-dev-home: race"
+
+// homeRaceVariable carries the raceGated packages, comma-separated, to a stand-in for Home, as Home's script gets them
+// as its third argument.
+const homeRaceVariable = "COHERE_DEV_HOME_RACE"
 
 // homeBox is the box the gate's tests run on.
 const homeBox = "Home"
@@ -74,6 +84,8 @@ type homeVerdict struct {
 	failedTests                           []string
 	failedOutput                          map[string][]string
 	skipped                               map[string][]string
+	// race is what Home's -race run of the raceGated packages said, nil when none was asked for.
+	race *homeVerdict
 }
 
 // testEvent is one line of `go test -json`.
@@ -112,7 +124,8 @@ func readTestJson(output []byte) homeVerdict {
 			verdict.packagesFailed = append(verdict.packagesFailed, event.Package)
 		case event.Action == "fail":
 			verdict.failedTests = append(verdict.failedTests, key)
-		case event.Action == "skip":
+		// A package-level skip is a package with no test files, which has nothing to run again on the Mac.
+		case event.Action == "skip" && event.Test != "":
 			// A subtest skipped is its top-level test run again whole, since -run names top-level tests.
 			name, _, _ := strings.Cut(event.Test, "/")
 			if !slices.Contains(verdict.skipped[event.Package], name) {
@@ -177,9 +190,12 @@ func testsNeverCompiledOn(
 			if relativeError != nil {
 				return relativeError
 			}
-			importPath := module.Path
+			// The workspace leaves the root module's path empty, since its pattern is ./..., so it is read from the
+			// module's go.mod: an empty one named the root's packages by their directory alone, which go test can't
+			// load (command/cohere [setup failed], Nov 12).
+			importPath := modulePath(moduleRoot, module.Path)
 			if relative != "." {
-				importPath = path.Join(module.Path, filepath.ToSlash(relative))
+				importPath = path.Join(importPath, filepath.ToSlash(relative))
 			}
 			for _, declaration := range parsed.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
@@ -196,6 +212,18 @@ func testsNeverCompiledOn(
 		}
 	}
 	return found, nil
+}
+
+// modulePath is a module's import path: the one the workspace recorded, or, when it recorded none, the one its
+// go.mod at moduleRoot declares.
+func modulePath(moduleRoot string, recorded string) string {
+	if recorded != "" {
+		return recorded
+	}
+	// Ignored: a module with no readable go.mod has no path to read, and its tests are named by an empty one, which
+	// go test refuses by name.
+	goMod, _ := os.ReadFile(filepath.Join(moduleRoot, "go.mod"))
+	return modfile.ModulePath(goMod)
 }
 
 func fileExists(file string) bool {
@@ -230,13 +258,21 @@ func macRemainder(skipped map[string][]string, neverCompiled map[string][]string
 }
 
 // runHomeGate runs the module's tests on Home and returns what Home said, or why there is no verdict from Home, which
-// sends the whole test run to the Mac. A verdict about another tree than commit is no verdict.
-func runHomeGate(worktree string, commit string, patterns []string, now time.Time) (homeVerdict, string) {
-	standIn := os.Getenv(homeGateVariable)
+// sends the whole test run to the Mac. A verdict about another tree than commit is no verdict. setting is what
+// homeGateVariable says.
+func runHomeGate(
+	worktree string,
+	commit string,
+	patterns []string,
+	races []string,
+	now time.Time,
+	setting string,
+) (homeVerdict, string) {
+	standIn := setting
 	switch standIn {
-	case "", "off":
-		return homeVerdict{}, "Home is opt-in until her first landing is proven (" + homeGateVariable + "=on)"
-	case "on":
+	case "off":
+		return homeVerdict{}, "Home is off for this landing (" + homeGateVariable + "=off)"
+	case "", "on":
 		standIn = ""
 	}
 	var output []byte
@@ -246,16 +282,23 @@ func runHomeGate(worktree string, commit string, patterns []string, now time.Tim
 		// A stand-in is no box, so Home's window is not its to keep.
 		command := exec.Command(standIn, append([]string{commit}, patterns...)...)
 		command.Dir = worktree
+		command.Env = append(os.Environ(), homeRaceVariable+"="+strings.Join(races, ","))
 		output, runError = command.CombinedOutput()
 	case inWitnessWindow(now):
 		return homeVerdict{}, "it is the witness's window on Home, 09:00 to 15:00 UTC"
 	default:
-		output, runError = runOnHome(worktree, commit, patterns)
+		output, runError = runOnHome(worktree, commit, patterns, races)
 		if runError != nil && len(output) == 0 {
 			return homeVerdict{}, "Home could not be reached: " + runError.Error()
 		}
 	}
-	verdict := readTestJson(output)
+	moduleOutput, raceOutput, raced := bytes.Cut(output, []byte("\n"+homeRaceMarker+"\n"))
+	verdict := readTestJson(moduleOutput)
+	if raced {
+		race := readTestJson(raceOutput)
+		verdict.race = &race
+	}
+	raceFailed := verdict.race != nil && verdict.race.failed()
 	switch {
 	case verdict.commit == "":
 		return homeVerdict{}, fmt.Sprintf("Home's run never said what it tested (%s)",
@@ -264,10 +307,16 @@ func runHomeGate(worktree string, commit string, patterns []string, now time.Tim
 		return homeVerdict{}, fmt.Sprintf("Home tested %s, not %s", shortCommit(verdict.commit), shortCommit(commit))
 	case verdict.operatingSystem == "" || verdict.architecture == "":
 		return homeVerdict{}, "Home's run never said which platform it tested on"
-	case runError != nil && !verdict.failed():
+	case runError != nil && !verdict.failed() && !raceFailed:
 		return homeVerdict{}, fmt.Sprintf("Home's run ended %s with no test failing", describeEnd(runError))
 	case verdict.packagesPassed == 0 && !verdict.failed():
 		return homeVerdict{}, "Home's run passed no package"
+	// A module run that passed is followed by the -race run, so one that passed with no -race run after it was cut
+	// short, and says nothing of the races it was asked about.
+	case len(races) > 0 && !verdict.failed() && verdict.race == nil:
+		return homeVerdict{}, "Home's run said nothing of its -race run"
+	case verdict.race != nil && verdict.race.packagesPassed == 0 && !raceFailed:
+		return homeVerdict{}, "Home's -race run passed no package"
 	}
 	return verdict, ""
 }
@@ -287,9 +336,11 @@ const (
 // change what tests it. It fetches the commit and its TypeScript pin from the feed into a clone of its own that lasts
 // across landings, checks them out in one tree at one path, so Go's test cache stays warm and keyed honestly, says
 // which commit and platform it tests, and runs the module's tests as JSON, leaving out the events that only say a test
-// started. Its own Go cache is trimmed past 30 GB, as Home's disk floor asks of every scratch user.
+// started. Once they pass, it runs the raceGated packages under -race, after homeRaceMarker, its third argument
+// naming them comma-separated (#bnabymg). Its own Go cache is trimmed past 30 GB, as Home's disk floor asks of every
+// scratch user.
 const homeScript = `set -euo pipefail
-commit="$1"; pin="$2"; shift 2
+commit="$1"; pin="$2"; races="$3"; shift 3
 . ~/adamic-tools/env.sh
 base=~/scratch/system_cohere_tools
 mkdir -p "$base"; cd "$base"
@@ -312,11 +363,16 @@ if [ "${size:-0}" -gt 31457280 ]; then GOCACHE="$base/gocache" go clean -cache; 
 echo "` + homeMarker + `$(git -C tree rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 cd tree
 GOCACHE="$base/gocache" GOFLAGS="-buildvcs=false -trimpath" go test -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
+if [ -n "$races" ]; then
+  echo "` + homeRaceMarker + `"
+  GOCACHE="$base/gocache" GOFLAGS="-buildvcs=false -trimpath" go test -json -race $(echo "$races" | tr , ' ') |
+    grep -vE '"Action":"(start|run|pause|cont)"'
+fi
 `
 
 // runOnHome pushes commit and the TypeScript pin it records to the feed, then runs the module's tests on Home through
 // gap, retrying a bounded while when another job holds her, and returns everything gap printed.
-func runOnHome(worktree string, commit string, patterns []string) ([]byte, error) {
+func runOnHome(worktree string, commit string, patterns []string, races []string) ([]byte, error) {
 	if _, pushError := gitOutput(worktree, "push", "-q", homeFeed+"/cohere.git",
 		commit+":refs/builds/"+commit); pushError != nil {
 		return nil, fmt.Errorf("pushing %s to the feed: %w", shortCommit(commit), pushError)
@@ -336,7 +392,7 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 	ahraDirectory := filepath.Join(home, "Projects", "ahra")
 	// Encoded, so nothing in the script is read by a shell before Home's bash: gap's command is one argument to ssh.
 	remote := "echo " + base64.StdEncoding.EncodeToString([]byte(homeScript)) + " | base64 -d | bash -s -- " +
-		commit + " '" + pin + "' " + strings.Join(patterns, " ")
+		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' " + strings.Join(patterns, " ")
 	for attempt := 1; ; attempt++ {
 		gap := exec.Command(filepath.Join(ahraDirectory, "node_modules", ".bin", "ahra"), "loom", "gap",
 			"--box", homeBox, "--within", homeGapBound, "--", "ssh", homeBox, remote)
@@ -344,9 +400,7 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 		output, runError := gap.CombinedOutput()
 		// Gap says "Home holds hand job <id> (<mind>, ...): one job per box" when another job has her, and "is held
 		// by" for another hand's gap (LoomGapCommandLineInterface.ts); any other refusal is not worth asking again.
-		held := exitCodeOf(runError) == gapRefusedExitCode && (strings.Contains(string(output), "holds hand job") ||
-			strings.Contains(string(output), "is held by"))
-		if !held || attempt == homeHeldRetries {
+		if !gapHeld(runError, output) || attempt == homeHeldRetries {
 			return output, runError
 		}
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s is held by another job; asking again in %s (%d of %d)\n",
@@ -354,6 +408,17 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 		streams.Show(streams.Errors)
 		time.Sleep(homeHeldRetryWait)
 	}
+}
+
+// gapHeld reports whether gap refused a job because another holds Home: it exits gapRefusedExitCode and says "Home
+// holds hand job <id> (<mind>, ...): one job per box" for a hand job, and "is held by" for another hand's gap
+// (LoomGapCommandLineInterface.ts); any other refusal is not worth asking again. It reads the exit from the error
+// itself, since exitCodeOf reports an error it can't read and a gap that ran has none: it printed "cohere-dev: <nil>"
+// on every landing Home took (Nov 12).
+func gapHeld(runError error, output []byte) bool {
+	var exited *exec.ExitError
+	return errors.As(runError, &exited) && exited.ExitCode() == gapRefusedExitCode &&
+		(bytes.Contains(output, []byte("holds hand job")) || bytes.Contains(output, []byte("is held by")))
 }
 
 // terminalColor is a terminal's color sequence, which gap writes around its verdict words.
@@ -387,11 +452,18 @@ func runModuleTests(
 	now time.Time,
 ) (int, string) {
 	patterns := covered.Patterns()
-	verdict, unavailable := runHomeGate(worktree, commit, patterns, now)
+	races := racePatterns(worktree)
+	verdict, unavailable := runHomeGate(worktree, commit, patterns, races, now, os.Getenv(homeGateVariable))
 	if unavailable != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no tests on Home (%s), so they run here\n", unavailable)
-		return runTestsHere(worktree, testing, append([]string{"test"}, patterns...)),
-			"on the Mac, since " + unavailable
+		where := "on the Mac, since " + unavailable
+		if len(races) > 0 {
+			// -race is Home's to run (race_gated.go), so a landing with no verdict from her names what it skipped.
+			fmt.Fprintf(streams.Errors, "cohere-dev: the -race run of %d packages is Home's, so it does not run "+
+				"for this landing\n", len(races))
+			where += fmt.Sprintf("; no -race run of its %d packages", len(races))
+		}
+		return runTestsHere(worktree, testing, append([]string{"test"}, patterns...)), where
 	}
 	platform := verdict.operatingSystem + "/" + verdict.architecture
 	if verdict.failed() {
@@ -407,6 +479,17 @@ func runModuleTests(
 		}
 		return 1, ""
 	}
+	if verdict.race != nil && verdict.race.failed() {
+		fmt.Fprintf(streams.Errors, "cohere-dev: Home's -race run on %s failed, so nothing landed:\n", platform)
+		for _, failure := range slices.Concat(verdict.race.failedTests, verdict.race.packagesFailed) {
+			fmt.Fprintf(streams.Errors, "  %s\n", failure)
+			output := verdict.race.failedOutput
+			for _, line := range slices.Concat(output[failure], output[failure+" "]) {
+				fmt.Fprintf(streams.Errors, "    %s", line)
+			}
+		}
+		return 1, ""
+	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: Home's tests on %s passed, %d packages\n", platform,
 		verdict.packagesPassed)
 	neverCompiled, neverCompiledError := testsNeverCompiledOn(worktree, covered.Modules, runtime.GOOS, runtime.GOARCH,
@@ -417,6 +500,10 @@ func runModuleTests(
 	}
 	packages, names := macRemainder(verdict.skipped, neverCompiled)
 	where := fmt.Sprintf("on Home (%s, %d packages)", platform, verdict.packagesPassed)
+	if verdict.race != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: Home's -race run passed, %d packages\n", verdict.race.packagesPassed)
+		where += fmt.Sprintf(", %d of them again under -race", verdict.race.packagesPassed)
+	}
 	if len(names) == 0 {
 		return 0, where + ", nothing it skipped"
 	}

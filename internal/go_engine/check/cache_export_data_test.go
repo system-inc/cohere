@@ -113,30 +113,17 @@ func TestAStoredFactOnAnObjectTheExportDataLacksIsSkipped(test *testing.T) {
 	caching := testCaching(test, rules)
 	cold := runWithSession(test, root, caching, rules)
 	baseKey := sessionKey(test, cold.session, "example.com/fixture/base")
-	contents, stored := caching.Store.Get(baseKey)
-	if !stored {
-		test.Fatalf("want base's entry written by the cold run")
-	}
-	var entry cacheEntry
-	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
-		test.Fatalf("decoding base's entry: %v", decodeError)
-	}
 	slot := rule.Namespace + "test-marked"
-	planted := entry.Analyzers[slot]
-	if len(planted.ObjectFacts) != 1 {
-		test.Fatalf("want base's one fact on Marked stored, got %+v", planted.ObjectFacts)
-	}
-	gone := planted.ObjectFacts[0]
-	gone.Path = "NoSuchObject"
-	planted.ObjectFacts = append(planted.ObjectFacts, gone)
-	entry.Analyzers[slot] = planted
-	var encoded bytes.Buffer
-	if encodeError := gob.NewEncoder(&encoded).Encode(entry); encodeError != nil {
-		test.Fatalf("encoding base's entry: %v", encodeError)
-	}
-	if putError := caching.Store.Put(baseKey, encoded.Bytes()); putError != nil {
-		test.Fatalf("writing base's entry: %v", putError)
-	}
+	rewriteStoredEntry(test, caching.Store, baseKey, func(entry *cacheEntry) {
+		planted := entry.Analyzers[slot]
+		if len(planted.ObjectFacts) != 1 {
+			test.Fatalf("want base's one fact on Marked stored, got %+v", planted.ObjectFacts)
+		}
+		gone := planted.ObjectFacts[0]
+		gone.Path = "NoSuchObject"
+		planted.ObjectFacts = append(planted.ObjectFacts, gone)
+		entry.Analyzers[slot] = planted
+	})
 	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
 	if putError := caching.Store.Put(userKey, []byte("corrupt")); putError != nil {
 		test.Fatalf("corrupting user's entry: %v", putError)
@@ -249,11 +236,8 @@ func TestAPackageStoredWithoutFactsMissesOnceARootImportsIt(test *testing.T) {
 		test.Fatalf("the load reached no plain base")
 		return nil
 	}
-	stored, held := caching.Store.Get(first.session.keys[plainBase(first.session)])
-	if !held {
-		test.Fatalf("want plain base written by the first run")
-	}
-	restored, decodeError := decodeEntry(first.session.known, plainBase(first.session), stored, nil)
+	restored, decodeError := decodedStoredEntry(test, caching.Store, first.session.known, plainBase(first.session),
+		first.session.keys[plainBase(first.session)])
 	if decodeError != nil || covers(restored, first.session.known.facts) {
 		test.Fatalf("want plain base stored without facts, got %v", decodeError)
 	}
@@ -297,13 +281,9 @@ func TestAnEntryWhoseExportDataIsGoneHasItsPackageCheckedFromSource(test *testin
 	caching := cachingAt(directory, rules)
 	cold := runWithSession(test, root, caching, rules)
 
-	baseEntry, stored := caching.Store.Get(sessionKey(test, cold.session, "example.com/fixture/base"))
-	if !stored {
-		test.Fatal("the cold run wrote no entry of base")
-	}
-	digest, digestError := entryExportDigest(baseEntry)
-	if digestError != nil || digest == nil {
-		test.Fatalf("want base's entry to name its export data, got %x (%v)", digest, digestError)
+	digest := storedRecordAt(test, caching.Store, sessionKey(test, cold.session, "example.com/fixture/base")).ExportData
+	if digest == nil {
+		test.Fatal("want base's record to name its export data")
 	}
 	blob := exportDataKey(digest).String()
 	if removeError := os.Remove(
@@ -329,10 +309,10 @@ func TestAnEntryWhoseExportDataIsGoneHasItsPackageCheckedFromSource(test *testin
 	}
 }
 
-// An entry of format 10, which found its export data under its own key rather than by digest, is a miss under a key of
-// this format, never read: were a store of 10's entries ever under these keys, its packages would be checked from
-// source and their entries written again, with the cold run's result (#5s1x2hg).
-func TestAnEntryOfTheFormatBeforeExportDataByDigestIsAMiss(test *testing.T) {
+// A whole entry of format 11, as a key held one before records (#fq7dxvx), is a miss under a key of this format, never
+// read: were a store of 11's entries ever under these keys, its packages would be checked from source and their
+// entries written again, with the cold run's result.
+func TestAnEntryOfTheFormatBeforeRecordsIsAMiss(test *testing.T) {
 	test.Parallel()
 
 	root := loadedFixtures(test)
@@ -340,15 +320,11 @@ func TestAnEntryOfTheFormatBeforeExportDataByDigestIsAMiss(test *testing.T) {
 	caching := testCaching(test, rules)
 	cold := runWithSession(test, root, caching, rules)
 	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
-	contents, stored := caching.Store.Get(userKey)
+	entry, _, stored := storedEntryAt(caching.Store, userKey)
 	if !stored {
 		test.Fatal("the cold run wrote no entry of user")
 	}
-	var entry cacheEntry
-	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	entry.Version, entry.ExportData = "go-engine-cache-10", nil
+	entry.Version = "go-engine-cache-11"
 	var older bytes.Buffer
 	if encodeError := gob.NewEncoder(&older).Encode(entry); encodeError != nil {
 		test.Fatal(encodeError)

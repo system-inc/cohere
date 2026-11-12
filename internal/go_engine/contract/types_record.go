@@ -10,6 +10,13 @@ type TypesRecord struct {
 	// Build says in words how the type information was had.
 	Build string `json:"build"`
 
+	// CensusMissed is additive within contract 3 (#yyv7nr2, #hd5bsqh): each file a package the load reached in the
+	// workspace holds that the census never counted, with that package, sorted by file, and absent when there is none.
+	// The census and the load read one tree, so a file the load reached and the census never counted is one no count
+	// of the run accounts for, as at a root or a go.work use reached through a symbolic link, where the census once
+	// walked nothing. Such a run is never complete: the front door refuses a summary that calls it complete.
+	CensusMissed []CensusMissedFile `json:"censusMissed,omitempty"`
+
 	// WithheldInDependencyCgo is additive within contract 3. It names each file of a dependency whose type errors
 	// the run did not report, since no cgo tool ran and the faked package "C" is what they are about, sorted by
 	// file, each with at least one error. The front door counts them in a sentence under the types line, then names
@@ -71,6 +78,13 @@ type Memory struct {
 type CgoTranslation struct {
 	Packages     int `json:"packages"`
 	Milliseconds int `json:"milliseconds"`
+}
+
+// CensusMissedFile is one file a package the load reached holds that the census never counted, with that package's
+// import path.
+type CensusMissedFile struct {
+	Package string `json:"package"`
+	File    string `json:"file"`
 }
 
 // WithheldFile is one file whose type errors a run withheld, with the package it is in and how many there were.

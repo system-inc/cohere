@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 )
 
 // invocation is one command line, read and checked.
 type invocation struct {
-	// root is the absolute directory of the go.work or the go.mod.
+	// root is the absolute directory of the go.work or the go.mod, as its real path once the command line is read
+	// (resolveRoot).
 	root string
 
 	// lintConfiguration is the settings file `--lint-config` named, absolute, or empty for the one beside the root.
@@ -77,6 +79,35 @@ func (request invocation) check() error {
 		}
 	}
 	return nil
+}
+
+// resolveRoot makes the root its real path, every symbolic link on the way resolved, and moves each path the command
+// line named under the root as given, and the save's file, to the same place under the real one (#yyv7nr2). Every
+// path the run compares with the root is then of one form: the census walks the root, which a walk enters only
+// as a directory and never as a link to one, so a root given as a link held no file, and go, run from the real
+// root, names real paths. A root that does not resolve is left as given, for describeProject to refuse in its own
+// words; a path outside the root as given is left as given too, for the scope to refuse.
+func (request *invocation) resolveRoot() {
+	resolved, resolveError := filepath.EvalSymlinks(request.root)
+	if resolveError != nil || resolved == request.root {
+		return
+	}
+	given := filepath.Clean(request.root)
+	beneath := func(path string) string {
+		if relative, inside := strings.CutPrefix(path, given); inside &&
+			(relative == "" || strings.HasPrefix(relative, string(filepath.Separator))) {
+			return resolved + relative
+		}
+		return path
+	}
+	for index, path := range request.paths {
+		request.paths[index] = beneath(filepath.Clean(path))
+	}
+	if request.stdinPath != "" {
+		// Cleaned as each path is, though parseInvocation stores it clean, so the prefix test never rests on that.
+		request.stdinPath = beneath(filepath.Clean(request.stdinPath))
+	}
+	request.root = resolved
 }
 
 // checkStdin refuses a save's command line that asks more than a save answers: what `--fix` writes for the one file,

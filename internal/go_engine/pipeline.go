@@ -64,6 +64,10 @@ type pipeline struct {
 	// compiler record, a file the formatter could not format, a rule that crashed.
 	incomplete bool
 
+	// censusMissed is each file the load reached that the census never counted (missedByCensus), read once after the
+	// load, for the types record and the run's completeness alike.
+	censusMissed []contract.CensusMissedFile
+
 	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, under
 	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads,
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
@@ -263,8 +267,8 @@ func (engine *pipeline) run() int {
 	// reads the types.
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
-		engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{},
-			engine.standardError)
+		engine.session = engine.cacheSession(engine.described.workspace.Environment(),
+			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError)
 		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
 		if engine.session != nil && engine.keepsForBuilds() {
 			engine.session.KeepForBuilds()
@@ -295,7 +299,9 @@ func (engine *pipeline) run() int {
 		// has.
 		loaded, loadError = nil, nil
 	}
+	engine.censusMissed = engine.missedByCensus(loaded)
 	engine.runTypes(loaded, loadError)
+	engine.checkCensusAgainstLoad()
 	// The inputs are those of the load the lint ran over, the final round's when a reload ran it again, and the first
 	// load is let go before a reload loads again.
 	loaded = engine.runLint(loaded, loadError, linted)
@@ -303,7 +309,9 @@ func (engine *pipeline) run() int {
 	engine.writeDuplicates()
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
 	if engine.timing != nil {
-		engine.write(engine.timing.Record(timingKinds(engine.registered)))
+		record := engine.timing.Record(timingKinds(engine.registered))
+		record.ExtraBuildsFromSource = extraBuildsFromSource(engine.buildRuns)
+		engine.write(record)
 	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
@@ -325,6 +333,70 @@ func (engine *pipeline) run() int {
 		return broken(engine.standardError, engine.writeError)
 	}
 	return exitCode
+}
+
+// extraBuildsFromSource is how many of runs' extra builds, every run after the host's, took nothing from the host's
+// run, read from what each says it restored and left untouched, so the timing record's sentence can only say what
+// happened (#4y4qd3z). A timed run keeps nothing for its builds (cacheSession), so each counts today; were a later
+// change to let one restore, it would drop out of the count rather than be printed as checked from source. A build
+// whose run has no result, which failed, is not counted.
+func extraBuildsFromSource(runs []buildRun) int {
+	count := 0
+	for index, run := range runs {
+		if index == 0 || run.result == nil {
+			continue
+		}
+		if len(run.result.FromHost.Restored) == 0 && len(run.result.FromHost.Untouched) == 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// missedByCensus is each file a package the load reached holds that the census never counted, with that package, once
+// and sorted by file (#hd5bsqh): every Go file a root of the load holds, a test variant's included, and every one its
+// build constraints left out, is a file go reads in the workspace, and the census counts every such file, those git
+// ignores and those for another platform included, so one it never counted is one nothing of the run accounts for. The
+// files left out count too, so a module whose every file builds only elsewhere, which holds no file here, is seen. A
+// census of nothing beside a load of something, as at a root reached through a symbolic link, misses every file
+// (#yyv7nr2). A load that failed, or that no phase asked for, has nothing to set beside the census.
+func (engine *pipeline) missedByCensus(loaded *load.Loaded) []contract.CensusMissedFile {
+	if loaded == nil {
+		return nil
+	}
+	counted := make(map[string]bool, len(engine.described.census.Files))
+	for _, file := range engine.described.census.Files {
+		counted[file] = true
+	}
+	var missed []contract.CensusMissedFile
+	for _, root := range loaded.Roots {
+		// IgnoredFiles holds the package's other files the constraints left out too, a C or assembly file under cgo
+		// off, which the census, of Go files alone, never counts.
+		for _, file := range slices.Concat(root.GoFiles, root.IgnoredFiles) {
+			if !strings.HasSuffix(file, ".go") || counted[file] {
+				continue
+			}
+			// Marked counted, so a file several variants hold is named once, under the first that holds it.
+			counted[file] = true
+			missed = append(missed, contract.CensusMissedFile{Package: root.PkgPath, File: file})
+		}
+	}
+	slices.SortFunc(missed, func(left contract.CensusMissedFile, right contract.CensusMissedFile) int {
+		return strings.Compare(left.File, right.File)
+	})
+	return missed
+}
+
+// checkCensusAgainstLoad marks the run incomplete, and says why, when the load reached a file the census never counted
+// (missedByCensus), so such a run never calls itself complete.
+func (engine *pipeline) checkCensusAgainstLoad() {
+	if len(engine.censusMissed) == 0 {
+		return
+	}
+	engine.incomplete = true
+	engine.note("the load reached %d Go files in the workspace at %s that its census never counted, %s in %s first, "+
+		"so the run checked none of them", len(engine.censusMissed), engine.described.record.Root,
+		engine.censusMissed[0].File, engine.censusMissed[0].Package)
 }
 
 // write writes one record, counting findings, unless an earlier record already could not be written.
@@ -717,6 +789,7 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 		FilesWithoutRecord:  withoutRecord,
 		Build: fmt.Sprintf("%s: %d packages, %d in the workspace", build,
 			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
+		CensusMissed:                      engine.censusMissed,
 		WithheldInDependencyCgo:           withheld,
 		WithheldDependencyCgoDeclarations: loaded.WithheldDependencyCgoDeclarations,
 		CgoTranslation: contract.CgoTranslation{

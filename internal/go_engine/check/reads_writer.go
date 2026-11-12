@@ -168,8 +168,8 @@ func (writer *readsWriter) methodJudgment(
 		}
 		persisted.RuleCandidates = append(persisted.RuleCandidates, persistedMethodCandidate{
 			TypeName: writer.object(typeName, true), Interface: candidate.isInterface, Generic: candidate.isGeneric,
-			Shape: persistedShape{Parameters: candidate.shape.parameters, Results: candidate.shape.results,
-				Variadic: candidate.shape.variadic},
+			Unconstrained: candidate.unconstrained, Shape: persistedShape{Parameters: candidate.shape.parameters,
+				Results: candidate.shape.results, Variadic: candidate.shape.variadic},
 			Lines: candidate.lines, HoldsAnswer: candidate.holdsAnswer})
 	}
 }

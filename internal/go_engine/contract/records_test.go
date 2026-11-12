@@ -38,9 +38,11 @@ var fieldsNotWritten = map[Kind][]string{
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
-	KindFix:   {"notWritten"},
-	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds", "offReasons"},
-	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation"},
+	KindFix:  {"notWritten"},
+	KindLint: {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds", "offReasons"},
+	KindTypes: {
+		"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation", "censusMissed",
+	},
 }
 
 // dictionaryFields are objects keyed by data (a reason, a rule name) rather than by field names, so their
@@ -310,6 +312,7 @@ func populatedRecords() []Record {
 			ElapsedMilliseconds: 900,
 			FilesWithoutRecord:  []string{"/project/d.go"},
 			Build:               "go list -deps -test",
+			CensusMissed:        []CensusMissedFile{{Package: "example.com/b", File: "/project/b/b.go"}},
 			WithheldInDependencyCgo: []WithheldFile{
 				{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 1},
 			},
@@ -375,6 +378,7 @@ func populatedRecords() []Record {
 		},
 		TimingRecord{
 			Unavailable:            "this platform has no per-thread CPU clock",
+			ExtraBuildsFromSource:  2,
 			ProcessCpuMicroseconds: 80000,
 			Load: LoadTiming{
 				ListCpuMicroseconds:         2000,

@@ -24,7 +24,7 @@ func TestALoadReadsTheGoEnvironmentItIsHanded(test *testing.T) {
 	environment := []string{"GOWORK=off"}
 	planted := filepath.Join(root, "planted-go.env")
 
-	answer, answerError := readGoEnvironment(project, environment, nil)
+	answer, answerError := ReadGoEnvironment(project, environment, nil)
 	if answerError != nil {
 		test.Fatal(answerError)
 	}
@@ -63,7 +63,7 @@ func TestEachLoadOfOneAnswerReadsItsOwnHeldBytes(test *testing.T) {
 	}
 	writeListingFiles(test, root, listingFiles)
 	project := filepath.Join(root, "project")
-	answer, answerError := readGoEnvironment(project, []string{"GOWORK=off"}, nil)
+	answer, answerError := ReadGoEnvironment(project, []string{"GOWORK=off"}, nil)
 	if answerError != nil {
 		test.Fatal(answerError)
 	}
@@ -101,4 +101,15 @@ func TestEachLoadOfOneAnswerReadsItsOwnHeldBytes(test *testing.T) {
 	if got := readThrough(second); got != "package second\n" {
 		test.Errorf("the second load read %q through its own context, want its own held bytes", got)
 	}
+}
+
+// goEnvironmentOf is go env's answer in directory under the current environment plus environment, failing the test
+// when go env fails.
+func goEnvironmentOf(test *testing.T, directory string, environment []string) *GoEnvironment {
+	test.Helper()
+	goEnvironment, environmentError := ReadGoEnvironment(directory, environment, nil)
+	if environmentError != nil {
+		test.Fatal(environmentError)
+	}
+	return goEnvironment
 }

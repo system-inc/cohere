@@ -134,15 +134,12 @@ func TestInProcessListingIsGoListsAnswerOnCohere(test *testing.T) {
 // returns go list's.
 func requireGoListsAnswer(test *testing.T, directory string, extra []string, patterns []string) *listing {
 	test.Helper()
-	environment, environmentError := sourceEnvironment(directory, extra)
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
-	inProcess, doubt := listInProcess(directory, environment, patterns, nil, nil, nil)
+	goEnvironment := goEnvironmentOf(test, directory, extra)
+	inProcess, doubt := listInProcess(goEnvironment, patterns, nil, nil, nil)
 	if doubt != "" {
 		test.Fatalf("the in-process lister did not answer: %s", doubt)
 	}
-	goList, listError := listWithGoList(directory, environment, patterns, nil)
+	goList, listError := listWithGoList(directory, goEnvironment.fullEnvironment, patterns, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
@@ -256,12 +253,9 @@ func TestInProcessListingDoubtsWhatItDoesNotCarry(test *testing.T) {
 			test.Parallel()
 			directory := test.TempDir()
 			writeListingFiles(test, directory, each.files)
-			environment, environmentError := sourceEnvironment(directory, append([]string{"GOWORK=off"},
+			goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"},
 				each.environment...))
-			if environmentError != nil {
-				test.Fatal(environmentError)
-			}
-			listed, doubt := listInProcess(directory, environment, []string{"./..."}, nil, nil, nil)
+			listed, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, nil, nil)
 			if doubt == "" {
 				test.Fatalf("the lister answered with %d packages", len(listed.packages))
 			}
@@ -282,10 +276,7 @@ func TestAPatternTheListerCannotMatchIsDoubted(test *testing.T) {
 		"a.go":     "package a\n",
 		"sub/b.go": "package b\n",
 	})
-	environment, environmentError := sourceEnvironment(directory, []string{"GOWORK=off"})
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
+	goEnvironment := goEnvironmentOf(test, directory, []string{"GOWORK=off"})
 	cases := []struct {
 		pattern string
 		reason  string
@@ -295,7 +286,7 @@ func TestAPatternTheListerCannotMatchIsDoubted(test *testing.T) {
 		{"example.com/patterned/missing/...", "matched no packages"},
 	}
 	for _, each := range cases {
-		listed, doubt := listInProcess(directory, environment, []string{each.pattern}, nil, nil, nil)
+		listed, doubt := listInProcess(goEnvironment, []string{each.pattern}, nil, nil, nil)
 		if doubt == "" {
 			test.Errorf("the lister answered %s with %d packages", each.pattern, len(listed.packages))
 			continue
@@ -305,7 +296,7 @@ func TestAPatternTheListerCannotMatchIsDoubted(test *testing.T) {
 		}
 	}
 	// Through list, the directory pattern is go list's to answer, and it names the package below it.
-	listed, listError := list(directory, environment, []string{"./sub/..."}, nil, nil, nil)
+	listed, listError := list(goEnvironment, []string{"./sub/..."}, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
@@ -324,11 +315,8 @@ func TestADoubtIsGoListsToAnswer(test *testing.T) {
 		"go.mod": "module example.com/doubted\n\ngo 1.27\n",
 		"a.go":   "package a\n\nimport _ \"example.com/missing\"\n",
 	})
-	environment, environmentError := sourceEnvironment(directory, []string{"GOWORK=off"})
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
-	listed, listError := list(directory, environment, []string{"./..."}, nil, nil, nil)
+	goEnvironment := goEnvironmentOf(test, directory, []string{"GOWORK=off"})
+	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
