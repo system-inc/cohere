@@ -342,16 +342,18 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 	return enabled, turnedOff
 }
 
-// cacheSession is the findings cache for the run's enabled rules over a load under environment, made before the load
-// so the load restores what it holds, whose keys read files' digests rather than hashing those files again, and nil
-// when lintCache gives none, as under `--no-cache` in a binary with no standard-library entries, or when what every key
-// shares cannot be read, which the run says on stderr, and always under `--timing`. A run with extra builds gets a
+// cacheSession is the findings cache for the run's enabled rules over a load under environment, whose go env answer
+// is goEnvironment, the one the load reads (lintCache), made before the load so the load restores what it holds, whose
+// keys read files' digests rather than hashing those files again, and nil when lintCache gives none, as under
+// `--no-cache` in a binary with no standard-library entries, or when what every key shares cannot be read, which the
+// run says on stderr, and always under `--timing`. A run with extra builds gets a
 // session without a store when lintCache gives none, since the host's keeps its packages' entries for the extra
 // builds and theirs restore from them (#b2t9xmf); under `--timing` it gets none, so nothing is restored from the host.
 // files must be of the files as they are on disk when the load runs (see extraBuildRun). Why the cache sat out is
 // noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns).
 func (engine *pipeline) cacheSession(
 	environment []string,
+	goEnvironment *load.GoEnvironment,
 	files cache.FileDigests,
 	notes io.Writer,
 ) *check.CacheSession {
@@ -362,7 +364,8 @@ func (engine *pipeline) cacheSession(
 		return nil
 	}
 	enabled, _ := engine.enabledRules()
-	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, enabled)
+	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
+		enabled)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}
