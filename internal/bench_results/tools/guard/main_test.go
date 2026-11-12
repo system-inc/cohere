@@ -330,3 +330,78 @@ func TestALostNightRefusesABadProject(test *testing.T) {
 		})
 	}
 }
+
+// writeCheckingRecord is writeRecord with its cold runs checking without fixing, as the nightly guard's are since
+// #8sqsgee moved them to `--no-fix`.
+func writeCheckingRecord(test *testing.T, directory string, name string, medianSeconds float64, quiet bool) string {
+	test.Helper()
+	path := writeRecord(test, directory, name, medianSeconds, quiet)
+	record, readRecordError := readRecord(path)
+	if readRecordError != nil {
+		test.Fatal(readRecordError)
+	}
+	record.NoFix = true
+	encoded, encodeError := bench_results.Encode(record)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if writeError := os.WriteFile(path, encoded, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	return path
+}
+
+// The guard's cold runs moved from fixing to checking (#8sqsgee), and the two are never compared. A checking night
+// against a fixing baseline is not an error that loses every night from then on: a loaded one is Unmeasured, saying the
+// fixing baseline is never compared with it, and leaves the baseline alone; the first quiet one becomes the new
+// baseline, the move on record with why. The other direction, a fixing night against a checking baseline, is no change
+// the guard was told of, and is still refused.
+func TestACheckingNightReplacesAFixingBaseline(test *testing.T) {
+	test.Parallel()
+	state := test.TempDir()
+	records := test.TempDir()
+	fixingPath := writeRecord(test, records, "fixing.json", 26, true)
+	if exit, _, said := runGuard("-state", state, "-accept", fixingPath, "-because", "the fixing start"); exit != 0 {
+		test.Fatalf("accepting the fixing baseline exited %d:\n%s", exit, said)
+	}
+	baselinePath := filepath.Join(state, "baseline-ahra.json")
+	judged := func(recordPath string) printedResult {
+		test.Helper()
+		exit, printed, said := runGuard("-state", state, "-tonight", recordPath)
+		if exit != 0 {
+			test.Fatalf("judging %s exited %d:\n%s%s", filepath.Base(recordPath), exit, printed, said)
+		}
+		var result printedResult
+		if decodeError := json.Unmarshal([]byte(printed), &result); decodeError != nil {
+			test.Fatalf("printed %q: %v", printed, decodeError)
+		}
+		return result
+	}
+
+	loaded := judged(writeCheckingRecord(test, records, "checking-loaded.json", 20, false))
+	if loaded.Verdict != bench_results.GuardVerdictUnmeasured ||
+		!strings.Contains(loaded.Reason, "is never compared with them") {
+		test.Errorf("a loaded checking night against a fixing baseline printed %+v", loaded)
+	}
+	if baseline, readRecordError := readRecord(baselinePath); readRecordError != nil || baseline.NoFix {
+		test.Fatalf("a loaded checking night moved the fixing baseline (%v)", readRecordError)
+	}
+
+	quiet := judged(writeCheckingRecord(test, records, "checking-quiet.json", 20, true))
+	if quiet.Verdict != bench_results.GuardVerdictPass || quiet.Reason != checkingBaselineReason ||
+		quiet.BaselineMedianSeconds != 20 {
+		test.Errorf("the first quiet checking night printed %+v", quiet)
+	}
+	if baseline, readRecordError := readRecord(baselinePath); readRecordError != nil || !baseline.NoFix {
+		test.Fatalf("the first quiet checking night is not the baseline (%v)", readRecordError)
+	}
+	if moves := lines(test, filepath.Join(state, "baselines-ahra.jsonl")); len(moves) != 2 ||
+		!strings.Contains(moves[1], "the instrument changed") {
+		test.Errorf("the baseline moves on record are %q", moves)
+	}
+
+	exit, _, said := runGuard("-state", state, "-tonight", writeRecord(test, records, "fixing-again.json", 26, true))
+	if exit != 1 || !strings.Contains(said, "a fixing run is never compared with a checking one") {
+		test.Errorf("a fixing night against the checking baseline exited %d and said %q, want refused", exit, said)
+	}
+}

@@ -165,10 +165,11 @@ func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...st
 // whether they exist; a directory among them that holds no file the run read and is not among
 // extraDirectories is recorded ExistenceOnly.
 //
-// readSince is when the run began reading its inputs. An input changed after it may have been read before
-// the change, so the stat taken here would sign the new bytes against a verdict computed from the old ones,
-// and the next run would replay that verdict over a tree it does not describe: a file saved in an editor
-// while cohere runs is exactly this. Such a run is not recorded. The zero time checks nothing.
+// readSince is when the run began reading its inputs, as the filesystem stamps time. An input changed at or
+// after it may have been read before the change, so the stat taken here would sign the new bytes against a
+// verdict computed from the old ones, and the next run would replay that verdict over a tree it does not
+// describe: a file saved in an editor while cohere runs is exactly this. Such a run is not recorded. The zero
+// time checks nothing.
 func RecordRunCache(
 	key string,
 	files []string,
@@ -305,7 +306,10 @@ func RecordRunCacheWithin(
 			if input.ExistenceOnly || input.Directory && !holdsARead[input.Path] && !listingsRead[input.Path] {
 				continue
 			}
-			if max(input.ModifiedNanoseconds, input.ChangedNanoseconds) > readSince.UnixNano() {
+			// At or after, not only after: a filesystem that stamps from a coarse clock (Linux) gives a change made
+			// in the same tick as the clock the clock's own time, and that change is one the run may not have seen.
+			// Its cost is a run whose input was written in the tick just before it began, which is not recorded.
+			if max(input.ModifiedNanoseconds, input.ChangedNanoseconds) >= readSince.UnixNano() {
 				return nil, fmt.Errorf(
 					"%s changed after the run began reading, so what the run saw of it is not known",
 					input.Path,

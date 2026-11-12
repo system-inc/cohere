@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // The Swift engine a gate runs must come from the commit the gate's cohere was built from. These tests
@@ -179,6 +181,9 @@ type swiftFixture struct {
 	repository     string
 	paths          Paths
 	reportModified bool
+	// stated is what each build was told about its tree, in order: the value of
+	// release.SwiftSourceTreeModifiedVariable it was handed, or empty when it was handed none.
+	stated []string
 }
 
 func newSwiftFixture(test *testing.T) *swiftFixture {
@@ -206,17 +211,34 @@ func newSwiftFixture(test *testing.T) *swiftFixture {
 }
 
 // fakeBuild writes an engine that prints the rule it was built from and the provenance the real
-// manifest would compute for packageDirectory.
-func (fixture *swiftFixture) fakeBuild(packageDirectory string, scratchDirectory string, binaryPath string) error {
+// manifest would compute for packageDirectory: the state the build was handed when it was handed one, and
+// git's answer otherwise.
+func (fixture *swiftFixture) fakeBuild(
+	packageDirectory string,
+	scratchDirectory string,
+	binaryPath string,
+	environment []string,
+) error {
 	rule, readError := os.ReadFile(filepath.Join(packageDirectory, "Sources", "Rule.swift"))
 	if readError != nil {
 		return readError
 	}
-	status, gitOutputError := gitOutput(packageDirectory, "status", "--porcelain")
-	if gitOutputError != nil {
-		return gitOutputError
+	stated := ""
+	for _, variable := range environment {
+		if value, found := strings.CutPrefix(variable, release.SwiftSourceTreeModifiedVariable+"="); found {
+			stated = value
+		}
 	}
-	modified := strings.TrimSpace(status) != "" || fixture.reportModified
+	fixture.stated = append(fixture.stated, stated)
+	modified := stated == "true"
+	if stated == "" {
+		status, gitOutputError := gitOutput(packageDirectory, "status", "--porcelain")
+		if gitOutputError != nil {
+			return gitOutputError
+		}
+		modified = strings.TrimSpace(status) != ""
+	}
+	modified = modified || fixture.reportModified
 
 	script := fmt.Sprintf(
 		"#!/bin/sh\nif [ \"$3\" = \"--version\" ]; then\n  echo '{\"kind\":\"provenance\",\"sourceTreeModified\":%t}'\n  exit 0\nfi\necho 'rule=%s'\n",

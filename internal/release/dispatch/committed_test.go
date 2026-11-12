@@ -208,7 +208,9 @@ func newCommittedFixture(test *testing.T) committedFixture {
 	writeFile(test, filepath.Join(superproject, "go.work"), "go 1.27\n\nuse (\n\t.\n\t./TypeScript/tsc\n)\n")
 	writeFile(test, filepath.Join(superproject, "rules", "rules.go"), "package rules\n\nconst Value = \"one\"\n")
 	writeFile(test, filepath.Join(superproject, "internal", "release", "packaging", "stamp.go"),
-		"package packaging\n\nvar (\n\tselfCommit     string\n\tcompilerCommit string\n)\n\nfunc SelfCommit() string { return selfCommit }\n")
+		"package packaging\n\nvar (\n\tselfCommit         string\n\tcompilerCommit     string\n"+
+			"\tsourceTreeModified string\n)\n\n"+
+			"func SelfCommit() string { return selfCommit }\n\nfunc SourceTreeModified() bool { return sourceTreeModified == \"true\" }\n")
 	writeFile(test, filepath.Join(superproject, "command", "cohere", "main.go"), `package main
 
 import (
@@ -225,6 +227,9 @@ func main() {
 		fmt.Println("cohere dev")
 		if commit := packaging.SelfCommit(); len(commit) >= 12 {
 			fmt.Println("  commit:         " + commit[:12])
+		}
+		if packaging.SourceTreeModified() {
+			fmt.Println("  source:         built from a tree with uncommitted changes")
 		}
 		return
 	}

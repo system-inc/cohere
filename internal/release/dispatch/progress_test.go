@@ -196,6 +196,7 @@ func TestSwiftPmSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 			test.TempDir(),
 			test.TempDir(),
 			filepath.Join(test.TempDir(), "bin", "cohere-swift"),
+			nil,
 		)
 		return out.String(), buildSwiftProductWithSwiftPmError
 	}

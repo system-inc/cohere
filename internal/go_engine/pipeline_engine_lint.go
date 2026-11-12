@@ -169,6 +169,8 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		Reloads:      result.Cache.Reloads,
 		ReloadRounds: result.Cache.ReloadRounds,
 		Replays:      result.Replays,
+		Problems:     len(result.Cache.Problems),
+		WriteFailed:  result.Cache.WriteFailed,
 	}
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)
@@ -179,8 +181,22 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 			record.Crashes = append(record.Crashes, contract.Crash{File: crash.File, Error: crash.Error})
 		}
 		record.Builds = verdict.records
+		// The host's problems and failed writes are counted above, from its result, the first run's; each other
+		// build's problems are noted under its name as it ends (extraBuildRun), and they and its failed writes are
+		// counted here, so the record holds every note the cache made and every write it lost.
+		for _, run := range engine.buildRuns[1:] {
+			if run.result != nil {
+				record.Cache.Problems += len(run.result.Cache.Problems)
+				record.Cache.WriteFailed += run.result.Cache.WriteFailed
+			}
+		}
 		record.BuildsAtOnce = engine.buildsAtOnce
+		record.BuildsPoolSize = engine.workPool().Size()
 		record.BuildsWidthLiveBytes = engine.buildsWidthLiveBytes
+		record.BuildsWidthBuildBytes = engine.buildsWidthBuildBytes
+		if engine.buildsWidthBuildBytes > 0 {
+			record.BuildsWidthPeakFactor = engine.buildPeakFactor()
+		}
 	}
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true
@@ -239,6 +255,7 @@ func (engine *pipeline) lintPackages(
 	options.Cache = session
 	// The host's run keeps its packages' entries for the extra builds to restore from, only when there are any.
 	options.KeepForBuilds = session != nil && options.Reads != nil && engine.keepsForBuilds()
+	options.Pool = engine.workPool()
 	// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 	// and what follows reads the files' contents the project description holds, and the types.
 	options.ReleaseAnalyzed = true
@@ -357,6 +374,8 @@ func (engine *pipeline) cacheSession(
 		return nil
 	}
 	caching.Files = files
+	// The session's own work on every core runs under the run's one pool's slots, as its loads and checks do.
+	caching.Pool = engine.workPool()
 	// The editor's save loads its buffer in place of the file (held), so its keys are of the buffer: keyed by the
 	// disk's bytes, its entries would be restored by the next run over the file on disk as what that file holds.
 	if engine.request.stdinPath != "" {

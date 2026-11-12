@@ -88,6 +88,10 @@ func TestHashChangesWithEachInput(test *testing.T) {
 			func(inputs *Inputs) { inputs.TypeScriptGoCommit = "0000000000000000000000000000000000000000" },
 		},
 		{"different build flags", func(inputs *Inputs) { inputs.BuildFlags = []string{"-trimpath"} }},
+		// The binary is stamped with both and reports them, so a key without them serves a binary built in
+		// one state to a tree in another (#50wtb2s).
+		{"a different commit", func(inputs *Inputs) { inputs.SelfCommit = "508863131ed19b76776da9cd08862e4ef39d00b0" }},
+		{"a modified tree", func(inputs *Inputs) { inputs.SourceTreeModified = true }},
 	}
 
 	for _, testCase := range tests {

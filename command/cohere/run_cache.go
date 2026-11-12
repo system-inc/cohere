@@ -62,6 +62,10 @@ var activeRunCache *runCacheSession
 // since. Set by startRunCacheClock.
 var runCacheClock time.Time
 
+// runCacheClockUnstamped is why runCacheClock is the process's clock rather than a filesystem stamp, empty when it
+// is a stamp. A run whose clock is not a stamp is never recorded (see runCacheSession.record).
+var runCacheClockUnstamped string
+
 // pendingTypes is the types section of a run the run cache does not record, nil for every other run.
 var pendingTypes *typesRecord
 
@@ -293,7 +297,8 @@ func beginRunCacheSession(
 		anchor:     anchor,
 		recorder:   program.NewInputRecorder(),
 		// See startRunCacheClock: before discovery reads anything, after the cache directory exists.
-		readSince: runCacheClock,
+		readSince:      runCacheClock,
+		clockUnstamped: runCacheClockUnstamped,
 	}
 	if startError := session.stdout.start(&os.Stdout, streams.Output); startError != nil {
 		return nil
@@ -338,7 +343,8 @@ var prepareCacheDirectoryOnce sync.Once
 // (TestAFileCreatedAfterDiscoveryIsNeverReplayedOver). An earlier clock costs only a run whose inputs change in
 // that moment, which is then not recorded.
 func startRunCacheClock(location projectLocation, locateError error) {
-	if locateError == nil && runCacheEligible() {
+	eligible := locateError == nil && runCacheEligible()
+	if eligible {
 		prepareCacheDirectory(location.Root)
 	}
 	// Any run that keeps a cache may read the libraries' records, eligible for replay or not.
@@ -346,6 +352,82 @@ func startRunCacheClock(location projectLocation, locateError error) {
 		prepareNestedCacheDirectories(writeRepositoryRoot(location.ArgumentBase, location.Root))
 	}
 	runCacheClock = time.Now()
+	if !eligible {
+		return
+	}
+	directory := cacheDirectory(location.Root)
+	// A test instrument: a directory no stamp can be taken in, as a cache directory that can't be written is.
+	// See TestARunWhoseClockIsNoStampIsNeverRecorded.
+	if os.Getenv("COHERE_TEST_NO_CLOCK_STAMP") != "" {
+		directory = filepath.Join(directory, "no-clock-stamp-here")
+	}
+	stamp, filesystemClockError := filesystemClock(directory)
+	if filesystemClockError != nil {
+		runCacheClockUnstamped = filesystemClockError.Error()
+		return
+	}
+	runCacheClock = stamp
+}
+
+// clockTickLongest is how long filesystemClock waits for the filesystem's time to move: past the 4 to 10ms tick
+// Linux stamps with, short of a filesystem that stamps whole seconds, whose runs then go unrecorded rather than
+// wait.
+const clockTickLongest = 25 * time.Millisecond
+
+// filesystemClock is the run cache's clock as the filesystem stamps time, on a tick of its own, or an error when no
+// stamp can be taken in directory. There is no fallback to the process's clock: that is the clock this replaced,
+// which lags a Linux stamp, so a run whose clock is no stamp goes unrecorded instead.
+//
+// The inputs a recording must not have changed since are judged by their stamps, so the clock comes from the same
+// source. Linux stamps a file from a coarse kernel clock that can lag the process's by a tick, so a directory a
+// file was added to just after a process clock started carried a time from before it, and the run was recorded
+// over the file and replayed the next time (#6cmmpm1, on Home). A change in the clock's own tick carries the
+// clock's own time, so the record refuses an input stamped at the clock, not only after it (RecordRunCache).
+//
+// The clock is the first stamp later than one taken just before it, so everything this run wrote while preparing,
+// a project's first `.cache` among it, is stamped before the clock rather than in its tick, where it would refuse
+// the run's own record. On a filesystem with nanosecond stamps the second is later at once; on Linux the wait is
+// at most a tick.
+func filesystemClock(directory string) (time.Time, error) {
+	first, filesystemStampError := filesystemStamp(directory)
+	if filesystemStampError != nil {
+		return time.Time{}, filesystemStampError
+	}
+	deadline := time.Now().Add(clockTickLongest)
+	for {
+		next, filesystemStampError := filesystemStamp(directory)
+		if filesystemStampError != nil {
+			return time.Time{}, filesystemStampError
+		}
+		if next.After(first) || time.Now().After(deadline) {
+			return next, nil
+		}
+		time.Sleep(500 * time.Microsecond)
+	}
+}
+
+// filesystemStamp is the time directory's filesystem gives a file created now, read from one created for the
+// purpose and removed. A file of this run's own, rather than one every run shares, so another run writing at the
+// same moment can't move this run's clock later than its start.
+func filesystemStamp(directory string) (time.Time, error) {
+	stamp, createError := os.CreateTemp(directory, ".clock-*")
+	if createError != nil {
+		return time.Time{}, fmt.Errorf("no file could be created in %s to read the filesystem's time from: %w",
+			directory, createError)
+	}
+	information, statError := stamp.Stat()
+	// Ignored: the stamp was read or it wasn't, and a file left behind is one empty file in the cache directory.
+	_ = stamp.Close()
+	// Ignored: as above, a stamp that stays is an empty file in the cache directory, which nothing reads.
+	_ = os.Remove(stamp.Name())
+	if statError != nil {
+		return time.Time{}, fmt.Errorf(
+			"the file created in %s to read the filesystem's time from could not be read: %w",
+			directory,
+			statError,
+		)
+	}
+	return information.ModTime(), nil
 }
 
 func prepareCacheDirectory(root string) {

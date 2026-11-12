@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,6 +14,7 @@ import (
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
@@ -38,6 +39,11 @@ type Caching struct {
 	// cache.Keys), nil for a run whose load read every file as it is on disk. The editor's save sets it, whose one file
 	// is the buffer, so its entries are keyed by what it checked rather than by the file the editor has not saved.
 	Held func(file string) ([]byte, bool)
+
+	// Pool is the run's one set of slots, which every load and check of the run shares (#ckm0hsp): the session's own
+	// work on every core, reading its hits, saving its misses, deciding a restore from the host, runs under its slots
+	// (fanOut, typesHoldFunction). Nil, that work takes a goroutine per core of its own.
+	Pool *bounded.Pool
 
 	// AnswersInPart names, by import path, the packages whose entry the run writes with only the answers its
 	// questions computed in them, never whole, as an entry from a build before format 10 holds them: an entry a later
@@ -227,6 +233,11 @@ type CacheSession struct {
 
 	// host is the restore from the host's run of an extra build's session, nil for any other (see RestoreFromHost).
 	host *hostState
+
+	// kept is set once keepForBuilds has let go of the resolver and the answer memo, and cleared by the next Restore,
+	// which starts both afresh. A read of either while it is set is a problem the run reports (readAfterKeep), never
+	// a quiet empty answer (#px1yxq8).
+	kept atomic.Bool
 }
 
 // NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
@@ -294,6 +305,7 @@ func (session *CacheSession) Restore(
 	session.answering.lock.Lock()
 	session.answering.byTypes = nil
 	session.answering.lock.Unlock()
+	session.kept.Store(false)
 	// The counts are of the run over this load, the one whose result stands, which is the last: a load again to check
 	// a package from source to answer a question drops the pass before it (see Reload), and its packages that pass
 	// saved are this one's hits. The problems stay, since every one of them was met.
@@ -415,20 +427,9 @@ func (session *CacheSession) readHits(reachable []*packages.Package) {
 		keys = append(keys, key)
 	}
 	read := make([]storeHit, len(reading))
-	indexes := make(chan int)
-	var workers sync.WaitGroup
-	for range min(runtime.GOMAXPROCS(0), max(len(reading), 1)) {
-		workers.Go(func() {
-			for index := range indexes {
-				read[index] = session.readHit(reading[index], keys[index])
-			}
-		})
-	}
-	for index := range reading {
-		indexes <- index
-	}
-	close(indexes)
-	workers.Wait()
+	session.fanOut(len(reading), func(index int) {
+		read[index] = session.readHit(reading[index], keys[index])
+	})
 	for index, restoring := range reading {
 		if read[index].restored != nil {
 			session.hits[restoring] = read[index].restored
@@ -680,8 +681,9 @@ func (session *CacheSession) save(
 // saveMisses writes the entry of each of missed that no wave tried to save, has no load error, and on which every
 // action of graphs finished without one, from those actions, its types and what the load withheld of it, and returns
 // each one's encoded entry. A written entry whose package names no file outside it in a finding gets an alias under
-// its second key, once every output below it is known. The entries are encoded and written as many at once as there
-// are cores: writing a package's export data is most of a cold run's save, and each package's is its own.
+// its second key, once every output below it is known. The entries are encoded as many at once as there are cores, and
+// written with no core held (fanOutWriting): writing a package's export data is most of a cold run's save, each
+// package's is its own, and a write blocked in the file system leaves its core to the run's other work (#g2e4mz8).
 func (session *CacheSession) saveMisses(
 	graphs []*checker.Graph,
 	missed []*packages.Package,
@@ -709,7 +711,8 @@ func (session *CacheSession) saveMisses(
 		session.attempted[keyed] = true
 		// A package whose analysis was handed a placeholder ran on a guess (fact_resolver.Unsure), and is analyzed
 		// again by the round that loads what the placeholder stood for.
-		unsure := session.resolver != nil && keyed.Types != nil && session.resolver.Unsure(keyed.Types)
+		unsure := !session.readAfterKeep("saveMisses, asking whether "+keyed.ID+" ran on a guess") &&
+			session.resolver != nil && keyed.Types != nil && session.resolver.Unsure(keyed.Types)
 		if len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actionsOf[keyed]) && !unsure {
 			saving = append(saving, keyed)
 		}
@@ -717,24 +720,16 @@ func (session *CacheSession) saveMisses(
 	encoded := map[*packages.Package]encodedEntry{}
 	var written []*packages.Package
 	var countsLock sync.Mutex
-	var group sync.WaitGroup
-	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
-	for _, saved := range saving {
-		group.Add(1)
-		slots <- struct{}{}
-		go func() {
-			defer group.Done()
-			defer func() { <-slots }()
-			demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
-			entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-				withheld[saved], demanded, files[saved], knownFiles, true)
+	session.fanOutWriting(len(saving), func(index int) func() {
+		saved := saving[index]
+		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
+		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
+			withheld[saved], demanded, files[saved], knownFiles, true)
+		// The writes and their counting run with no slot held: the counting is a map's and a counter's, under a lock.
+		return func() {
 			var putError error
-			// The export data goes first, so an entry is never in the store before what it needs to be read.
-			if encodeError == nil && entry.exportData != nil {
-				putError = session.caching.Store.Put(exportDataKey(session.keys[saved]), entry.exportData)
-			}
-			if encodeError == nil && putError == nil {
-				putError = session.caching.Store.Put(session.keys[saved], entry.entry)
+			if encodeError == nil {
+				putError = session.putEntry(session.keys[saved], entry)
 			}
 			countsLock.Lock()
 			defer countsLock.Unlock()
@@ -761,9 +756,8 @@ func (session *CacheSession) saveMisses(
 				session.written[saved] = true
 				written = append(written, saved)
 			}
-		}()
-	}
-	group.Wait()
+		}
+	})
 	// The packages restored from the host's run that have settled are written beside the misses, by the same rule of
 	// what is settled below them, and given an alias under their second key with them.
 	throughPositionDependent := session.writeThrough(actionsOf, unsettled, knownFiles)
@@ -789,24 +783,58 @@ func (session *CacheSession) saveMisses(
 	return encoded
 }
 
+// putEntry writes entry under key, its export data first, so an entry is never in the store before what it needs to be
+// read. saveMisses runs it with no slot of the run's pool held (fanOutWriting).
+func (session *CacheSession) putEntry(key cache.Key, entry encodedEntry) error {
+	if entry.exportData != nil {
+		if putError := session.caching.Store.Put(exportDataKey(key), entry.exportData); putError != nil {
+			return putError
+		}
+	}
+	return session.caching.Store.Put(key, entry.entry)
+}
+
 // alias keeps under each key's alias the key of the entry it stands for, as many at once as there are cores: on
 // cohere's own root a cold run writes about a thousand, which one at a time took 0.2s, while hashing every second
 // key took 5ms. A failed write is a problem, never a finding: the next run misses where it would have hit.
 func (session *CacheSession) alias(aliases map[cache.Key]cache.Key) {
-	var group sync.WaitGroup
-	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
-	for key, target := range aliases {
-		group.Add(1)
-		slots <- struct{}{}
-		go func() {
-			defer group.Done()
-			defer func() { <-slots }()
-			if putError := session.caching.Store.Put(aliasKey(key), target[:]); putError != nil {
+	keys := slices.Collect(maps.Keys(aliases))
+	session.fanOutWriting(len(keys), func(index int) func() {
+		target := aliases[keys[index]]
+		return func() {
+			if putError := session.caching.Store.Put(aliasKey(keys[index]), target[:]); putError != nil {
 				session.problem(putError.Error())
 			}
-		}()
+		}
+	})
+}
+
+// fanOut runs work for every index below count, as many at once as there are cores: on the run's pool when the session
+// has one (Caching.Pool), under its slots at the priority below every load's and check's work, so the session's own
+// work beside another build's never runs more at once than the run's cores; otherwise on a goroutine per core of its
+// own. work must keep what it makes in its own index's place.
+func (session *CacheSession) fanOut(count int, work func(index int)) {
+	if session.caching.Pool != nil {
+		session.caching.Pool.ForEach(count, 0, work)
+		return
 	}
-	group.Wait()
+	bounded.ForEach(count, false, work)
+}
+
+// fanOutWriting is fanOut for work that writes to the store: compute runs for every index as fanOut runs work, and the
+// writes it returns run with no slot of the run's pool held (bounded.Pool.ForEachWriting), so a write blocked in the
+// file system holds none of the run's cores (#g2e4mz8). Without a pool, each index's writes run straight after its
+// compute. Every write has run when it returns, so what the session counts of them is whole.
+func (session *CacheSession) fanOutWriting(count int, compute func(index int) (write func())) {
+	if session.caching.Pool != nil {
+		session.caching.Pool.ForEachWriting(count, 0, compute)
+		return
+	}
+	bounded.ForEach(count, false, func(index int) {
+		if write := compute(index); write != nil {
+			write()
+		}
+	})
 }
 
 // allFiles is every file of every package the load reached, made on first use.

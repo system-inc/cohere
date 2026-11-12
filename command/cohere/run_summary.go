@@ -57,6 +57,8 @@ type runSummary struct {
 	// BuildsAtOnce is how many of Builds beside the host's ran side by side, 0 when Builds is nil. A replay keeps it
 	// with them, as the record of the run that checked them.
 	BuildsAtOnce int
+	// BuildsWidthLiveBytes is the host's live heap BuildsAtOnce was decided from, 0 when the decision needed none.
+	BuildsWidthLiveBytes uint64
 
 	TypeErrors int
 	Findings   int

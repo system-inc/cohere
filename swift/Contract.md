@@ -124,9 +124,11 @@ TypeScript.
 }
 ```
 
-`sourceTreeModified` drives the same warning the TypeScript run prints: this binary was built from a
-modified tree, so no commit reproduces these findings. `--version` prints exactly this record and
-nothing else.
+`sourceTreeModified` drives the same warning the TypeScript run prints: no commit reproduces these
+findings. For this engine it covers the engine's own inputs, `swift/Package.swift`, `swift/Package.resolved`
+and `swift/Sources/`, the files the launcher's cache key reads: true when any of them differs from the
+commit, tracked or untracked, and never for a change elsewhere in the repository. `--version` prints
+exactly this record and nothing else.
 
 ### `project`, the Swift counterpart of `graph built in`
 
@@ -934,6 +936,15 @@ already. `"reloads":2` counts the packages so loaded and `"reloadRounds":1` the 
 Beside them, `"replays":35` counts the questions answered by replaying the order the push walked a
 package in, which a cold run makes too; it is written only when it is not 0. A package loaded again that still cannot answer is a crash naming it, never a quiet answer.
 
+`"problems":2` counts what kept the findings cache from being read or written in the lint phase,
+the host's build's and every other build's alike (#27r8r24): keys that could not be computed, an
+entry that could not be encoded, a write that failed, or an entry an extra build could not write
+through. The engine says each one on stderr, as `the findings cache: ...`, and the count carries
+them into the record, so a run read only through `--json` still shows its cache could not be
+written. A problem never changes a finding. Of the misses whose write failed, only the first is a
+problem, so `"writeFailed":412` counts every one, every build's, and a store that refused 412
+writes says 412. Each is written only when it is not 0.
+
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
 which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive
 within contract 3, the host's first:
@@ -1004,23 +1015,42 @@ encoded when a build first asks for them, and the host's `"waitMilliseconds":40`
 waited after its lint for its walks of what each package read of others to end, before any could start.
 
 An extra build's record also says what weighed its lint (#b2t9xmf): `"checkedFromSource":120` the packages of its
-whole graph its first load checked from source rather than restored, and `"packagesLoaded":1400` every package that
-load loaded, dependencies and test variants included, so their ratio is the share it checked. The extra builds' lints
+whole graph its loads checked from source rather than restored, summed over every load, and `"packagesLoaded":1400`
+every package its first load loaded, dependencies and test variants included. A build loaded again after a decline
+also writes `"checkedFromSourceRounds":[20,100]`, each load's count in order (#k8gty9e); the first load's count over
+`packagesLoaded` is the share that weighs its lint. The extra builds' lints
 share a budget of one whole build: each takes that share of it once its load has ended, or all of it at or above one
 half, so no two near-full builds lint at once, and they are admitted in the order they became ready, a light build
 never passing a heavy one already waiting. `"lintWaitMilliseconds":850` is how long its lint waited for that weight,
 written only when it is not 0, and `"lintWaited":true` whether it waited at all, so a wait under a millisecond still
 reads as one. The host's record writes none of the four, and none reaches a key or the verdict.
 
-Beside `builds` the Go engine writes `"buildsAtOnce":3`, additive within contract 3: how many of the builds beside
-the host's ran side by side, decided once as they started (#b2t9xmf), from a quarter of the cores, the memory cap
-and the host's live heap, and one at a time under `--single-threaded` or a limit other than the cap. Beside it,
-`"buildsWidthLiveBytes":2147483648` is that live heap, measured by a collection once the host's reads are whole, so
-two runs of one workspace are given the same heap; it is absent when the decision needed none, because nothing could
-make the builds more than one at a time. Each build notes into its own buffer, and once every build has ended their
-results and notes are taken in build order, up to and including the first that failed, so the records and stderr are
-those of a run one build at a time, byte for byte, but these two fields, which no key and no verdict reads. Both are
-absent when `builds` is.
+Beside `builds` the Go engine writes `"buildsAtOnce":3`, additive within contract 3: how many of the builds beside the
+host's ran side by side, decided once (#b2t9xmf, #rmzehfg) by what the heaviest build holds. The first build on another
+platform starts first, then every other in build order, the host's own before the other platforms, so heavy builds
+never start side by side ahead of the light ones (#awbzy9y), and the first runs alone until its load has ended; there,
+with nothing else running, a collection measures the live heap, and the build's holding is that heap less the host's,
+measured the same way as the builds started. A build is taken to hold `"buildsWidthPeakFactor":3.5` times that at its
+lint's peak in a run with a findings store, and 2.5 times under `--no-cache` (#hv090f4), each the largest ratio
+measured in its mode across 14 builds of two trees rounded up to the next half, and the width is
+`floor((limit - live) / (holding * factor))`, no more than the builds and at least one, and one at a time under
+`--single-threaded` or a limit other than the cap. Beside it, `"buildsWidthLiveBytes":2147483648` is the host's live
+heap and `"buildsWidthBuildBytes":536870912` the first build's holding, so a reader redoes the arithmetic with the
+memory record's limit, and two runs of one workspace are given the same width; all three are absent when the decision
+needed none, because nothing could make the builds more than one at a time. `"buildsPoolSize":16` is how many slots the
+run's one pool holds, which every load and check of the run shares, the host's and every extra build's, so however many
+builds run side by side the run never runs more of that work at once (#ckm0hsp): one per core, one under
+`--single-threaded`. Each build notes into its own buffer, and once every build has ended their results are taken in
+build order and their notes in the order they started, up to and including the first that failed in that order, so the
+records and stderr are those of a run one build at a time, byte for byte, but these five fields, which no key and no
+verdict reads. All five are absent when `builds` is.
+
+Under `--timing`, whose builds run one at a time, each extra build's record writes `"heldAtLoadEndBytes":1170372464`,
+what it held beyond the host's live heap as its load ended, measured by a forced collection, and
+`"heldAtLintPeakBytes":3555149280`, the most it held while its rules ran, sampled by one every quarter of a second. Their
+ratio is what `buildsWidthPeakFactor` stands for, so a tree whose ratio passes it shows in one run. A build under
+`--timing` restores nothing from the host's run, so it holds more as its load ends than one that restores, and its ratio
+reads lower than the width's case.
 
 ### `phase`
 

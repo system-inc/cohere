@@ -18,9 +18,9 @@ import (
 // The verdict on persisted reads (#b2t9xmf). A package the host restored rather than checked has no reads of this run,
 // only those its entry persisted (persistReads): each names what it read by its owner's path and objectpath, and holds
 // the digest of the host's rendering, made by the binary that wrote it. The build's side is judged by the very code
-// that judges a read of this run (find, closureDigest, buildAnswer, buildCandidates, buildFactHolds,
-// buildDeprecationHolds), its digest mixed with this binary's renderer version, and every reason is the one the same
-// read of this run would give, so the two verdicts agree on every package.
+// that judges a read of this run (find, closureDigest, useDigest, buildAnswer, buildCandidates, methodLookupHolds,
+// buildFactHolds, buildDeprecationHolds), its digest mixed with this binary's renderer version, and every reason is the
+// one the same read of this run would give, so the two verdicts agree on every package.
 
 // errorUnencodable is a persisted fact whose value did not digest on the host.
 var errorUnencodable = errors.New("the host's value did not digest")
@@ -42,8 +42,13 @@ func persistedTypesHold(
 		judgedBuild = build.wholeTwin()
 	}
 	judged := verdict{build: judgedBuild, closure: closure, restored: restored, methods: &verdictClosures{}}
-	for _, reference := range held.record.Types {
-		if holds, why := judged.persistedObjectHolds(held, reference); !holds {
+	for _, use := range held.record.Uses {
+		if holds, why := judged.persistedUseHolds(held, use); !holds {
+			return false, "T " + why
+		}
+	}
+	for _, selection := range held.record.Selections {
+		if holds, why := judged.persistedSelectionHolds(held, selection); !holds {
 			return false, "T " + why
 		}
 	}
@@ -64,8 +69,9 @@ func (judged verdict) persistedObjectHolds(held *heldReads, reference int) (bool
 	stored := held.object(reference)
 	name := held.objectName(reference)
 	owner := held.owner(stored.Owner)
-	// unsafe's objects are the type checker's own, the same in every build (counterpart).
-	if owner == types.Unsafe.Path() {
+	// unsafe's objects are the type checker's own, and the universe's, of no package, the same in every build
+	// (counterpart).
+	if stored.Owner == 0 || owner == types.Unsafe.Path() {
 		return true, ""
 	}
 	if stored.Path == "" {
@@ -77,6 +83,73 @@ func (judged verdict) persistedObjectHolds(held *heldReads, reference int) (bool
 	}
 	if !bytes.Equal(stored.Digest, persistedDigest(ReadsRendererVersion, judged.build.closureDigest(found))) {
 		return false, "object " + name + " renders differently"
+	}
+	return true, ""
+}
+
+// persistedUseHolds is useHolds of a persisted use (#mjdf7ah): a whole use by the object's closure digest
+// (persistedObjectHolds), and every other kind by the digest of what the kind reads of the build's object at the
+// host's object's place, against the one the host's persisted. A use of a package judged by closure alone was
+// persisted as a use of the whole.
+func (judged verdict) persistedUseHolds(held *heldReads, use persistedUse) (bool, string) {
+	if use.Kind == build_reads.UseWhole {
+		return judged.persistedObjectHolds(held, use.Object)
+	}
+	stored := held.object(use.Object)
+	name := held.objectName(use.Object)
+	owner := held.owner(stored.Owner)
+	// unsafe's objects are the type checker's own, and the universe's, of no package, the same in every build, and
+	// read alike (counterpart).
+	if stored.Owner == 0 || owner == types.Unsafe.Path() {
+		return true, ""
+	}
+	if stored.Path == "" {
+		return false, "object " + name + ": object " + name + " has no objectpath"
+	}
+	found, why := judged.find(owner, stored.Path)
+	if found == nil {
+		return false, "object " + name + ": " + why
+	}
+	if !bytes.Equal(use.Digest, persistedDigest(ReadsRendererVersion, judged.build.useDigest(found, use.Kind))) {
+		return false, "object " + name + ": " + useDiffers[use.Kind]
+	}
+	return true, ""
+}
+
+// persistedSelectionHolds is selectionHolds of a persisted selection: the build's lookup of its name from the build's
+// type at the receiver's place finds a member at the host's index path, whose own line digests to the host's member's.
+// A selection of a package judged by closure alone is judged by its receiver's and its member's closure digests.
+func (judged verdict) persistedSelectionHolds(held *heldReads, selection persistedSelection) (bool, string) {
+	if held.record.ClosureOnly {
+		if holds, why := judged.persistedObjectHolds(held, selection.Receiver); !holds {
+			return false, why
+		}
+		return judged.persistedObjectHolds(held, selection.Selected)
+	}
+	receiver := held.object(selection.Receiver)
+	receiverName := held.objectName(selection.Receiver)
+	name := "selection " + receiverName + "." + selection.Name
+	if receiver.Path == "" {
+		return false, name + ": object " + receiverName + " has no objectpath"
+	}
+	found, why := judged.find(held.owner(receiver.Owner), receiver.Path)
+	if found == nil {
+		return false, name + ": " + why
+	}
+	// A lookup of an unexported name finds it only in its own package, the build's of the member's path.
+	var namedIn *types.Package
+	if member := held.object(selection.Selected); member.Owner != 0 {
+		namedIn = judged.closure[held.owner(member.Owner)]
+	}
+	selected, index, _ := types.LookupFieldOrMethod(found.Type(), true, namedIn, selection.Name)
+	switch {
+	case selected == nil:
+		return false, name + ": the build finds no one member of the name"
+	case !slices.Equal(index, selection.Index):
+		return false, name + fmt.Sprintf(": the build finds it at %v, the host at %v", index, selection.Index)
+	case !bytes.Equal(selection.Digest, persistedDigest(ReadsRendererVersion,
+		judged.build.useDigest(declaredOrigin(selected), build_reads.UseMember))):
+		return false, name + ": the member it selects differs"
 	}
 	return true, ""
 }
@@ -103,6 +176,10 @@ func (judged verdict) persistedLookupHolds(held *heldReads, lookup persistedLook
 	case build_reads.QueryInterface, build_reads.QueryMethod:
 		if lookup.NoSubject {
 			return false, name + ": it has no subject to find the host's closure by"
+		}
+		judgment := judged.persistedMethodJudgment(held, lookup, roots)
+		if holds, why, decided := methodLookupHolds(name, judgment); decided {
+			return holds, why
 		}
 		return judged.persistedCandidatesHold(held, lookup, name, roots)
 	default:
@@ -175,6 +252,69 @@ func (judged verdict) persistedCandidatesHold(
 		}
 	}
 	return true, ""
+}
+
+// persistedMethodJudgment is what methodLookupHolds reads of a persisted Interface or Method lookup, as
+// methodJudgmentOf reads it of a lookup of this run: the host's side is the candidates the record persisted, and the
+// build's, as persistedCandidatesHold gathers it, the host's candidates of each package the build restored from the
+// host and the build's own of every other package of its closure from roots. The answer is found in the build at its
+// owner's path and objectpath (find), the universe's by its name, as counterpart finds one of this run.
+func (judged verdict) persistedMethodJudgment(
+	held *heldReads,
+	lookup persistedLookup,
+	roots []*types.Package,
+) methodJudgment {
+	judgment := methodJudgment{query: lookup.Query, name: lookup.Name, found: lookup.Found,
+		subjectIsMethod: lookup.SubjectIsMethod, subjectShape: shapeOfPersisted(lookup.SubjectShape),
+		receiverInterface: lookup.ReceiverInterface, embedsForeign: lookup.EmbedsForeign,
+		host: map[string]methodCandidate{}, build: map[string]methodCandidate{}}
+	buildClosure := judged.buildClosure(roots)
+	hostOwners := map[string]bool{}
+	for _, reference := range lookup.Candidates {
+		hostOwners[held.owner(held.object(reference).Owner)] = true
+	}
+	for _, persisted := range lookup.RuleCandidates {
+		candidate := methodCandidate{isInterface: persisted.Interface, isGeneric: persisted.Generic,
+			shape: shapeOfPersisted(persisted.Shape), lines: persisted.Lines, holdsAnswer: persisted.HoldsAnswer}
+		key := held.objectName(persisted.TypeName)
+		judgment.host[key] = candidate
+		if judged.restored[buildClosure.byPath[held.owner(held.object(persisted.TypeName).Owner)]] {
+			judgment.build[key] = candidate
+		}
+	}
+	for _, typeName := range judged.buildCandidates(lookup.Name, roots, func(owner *types.Package) bool {
+		return hostOwners[owner.Path()]
+	}) {
+		if candidate, isCandidate := methodCandidateOf(typeName, lookup.Query, lookup.Name, nil,
+			ReadsRendererVersion); isCandidate {
+			judgment.build[objectName(typeName)] = candidate
+		}
+	}
+	switch {
+	case !lookup.Found:
+	case lookup.Answer == 0:
+		judgment.answer.absent = true
+	default:
+		stored := held.object(lookup.Answer)
+		owner := held.owner(stored.Owner)
+		judgment.answer = answerInBuild{name: held.objectName(lookup.Answer), isMethod: lookup.AnswerIsMethod,
+			hostLines: lookup.AnswerLines, restored: stored.Owner != 0 && judged.restored[judged.closure[owner]]}
+		switch {
+		case judgment.answer.restored:
+		case stored.Owner == 0:
+			judgment.answer.counterpart = types.Universe.Lookup(held.bareName(lookup.Answer))
+		case stored.Path == "":
+			judgment.answer.missing = "object " + held.objectName(lookup.Answer) + " has no objectpath"
+		default:
+			judgment.answer.counterpart, judgment.answer.missing = judged.find(owner, stored.Path)
+		}
+	}
+	return judgment
+}
+
+// shapeOfPersisted is a persisted shape as the judgment reads one.
+func shapeOfPersisted(shape persistedShape) signatureShape {
+	return signatureShape{parameters: shape.Parameters, results: shape.Results, variadic: shape.Variadic}
 }
 
 // samePersisted is sameObject of the host's object reference names in held and buildObject, the build's: one object

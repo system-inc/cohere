@@ -1,6 +1,7 @@
 package build_reads
 
 import (
+	"fmt"
 	"go/token"
 	"go/types"
 	"reflect"
@@ -35,7 +36,7 @@ func TestReadsFromManyGoroutinesKeepEachReadOnceInOrder(test *testing.T) {
 	for range 8 {
 		group.Go(func() {
 			for _, object := range objects {
-				reads.AddObject(object)
+				reads.AddUse(object, UseMember)
 				reads.AddFact(Fact{Object: object, Package: object.Pkg(), FactType: factType, Found: true})
 			}
 			reads.AddFact(Fact{Package: other, FactType: factType})
@@ -46,12 +47,16 @@ func TestReadsFromManyGoroutinesKeepEachReadOnceInOrder(test *testing.T) {
 	reads.MarkNever("second")
 
 	var names []string
-	for _, object := range reads.Objects() {
-		names = append(names, object.Pkg().Path()+"."+object.Name())
+	for _, use := range reads.Uses() {
+		names = append(names, use.Object.Pkg().Path()+"."+use.Object.Name()+" "+string(use.Kind))
 	}
-	want := []string{"example.com/other.Beta", "example.com/other.Zeta", "example.com/second.Alpha"}
+	want := []string{
+		"example.com/other.Beta Member",
+		"example.com/other.Zeta Member",
+		"example.com/second.Alpha Member",
+	}
 	if !slices.Equal(names, want) {
-		test.Fatalf("want the objects\n%q\ngot\n%q", want, names)
+		test.Fatalf("want the uses\n%q\ngot\n%q", want, names)
 	}
 	facts := reads.Facts()
 	if len(facts) != 4 || facts[0].Object != nil || facts[0].Package != other {
@@ -72,12 +77,48 @@ func TestUnknownReadsAreNeverRestorable(test *testing.T) {
 		test.Fatalf("want unknown reads unrestorable, never recorded, got %t, %q", restorable, why)
 	}
 	recorded := &Reads{}
-	recorded.RecordTypes(types.NewPackage("example.com/own", "own"), &types.Info{})
+	recorded.RecordTypes(types.NewPackage("example.com/own", "own"), &types.Info{}, nil)
 	if restorable, why := recorded.Restorable(); !restorable || !recorded.Recorded() {
 		test.Fatalf("want recorded empty reads restorable, got %t, %q", restorable, why)
 	}
 	recorded.MarkNever(RestoredFromCache)
 	if restorable, why := recorded.Restorable(); restorable || why != RestoredFromCache {
 		test.Fatalf("want reads marked never unrestorable for the mark, got %t, %q", restorable, why)
+	}
+}
+
+// Sorting a package's selections through one receiver, and its uses of one object in several kinds, compares that
+// object with itself and writes nothing: rendering a large struct twice for each such comparison doubled every extra
+// build's decide on deeafbf4 (#p1s9gdk). Sorting two hundred selections through a struct of two hundred fields, and two
+// hundred objects each used in two kinds, allocates the result's slice and nothing per comparison.
+//
+// Not parallel: testing.AllocsPerRun counts the whole process's allocations, so another test running beside it would
+// be counted too.
+func TestSortingReadsOfOneObjectWritesNothing(test *testing.T) {
+	other := types.NewPackage("example.com/other", "other")
+	fields := make([]*types.Var, 0, 200)
+	for index := range 200 {
+		fields = append(fields, types.NewField(token.NoPos, other, fmt.Sprintf("Field%d", index), types.Typ[types.Int],
+			false))
+	}
+	receiver := types.NewTypeName(token.NoPos, other, "Wide", nil)
+	types.NewNamed(receiver, types.NewStruct(fields, nil), nil)
+	reads := &Reads{}
+	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[string]Selection{}}
+	for index, field := range fields {
+		selection := Selection{Receiver: receiver, Name: field.Name(), Index: []int{index}, Selected: field}
+		collected.selections[selectionKey(selection)] = selection
+		collected.uses[ObjectUse{Object: field, Kind: UseMember}] = true
+		collected.uses[ObjectUse{Object: field, Kind: UseWhole}] = true
+	}
+	reads.publishTypes(collected)
+
+	if allocations := testing.AllocsPerRun(5, func() { reads.Selections() }); allocations > 1 {
+		test.Errorf("sorting %d selections through one receiver allocated %.0f times, want the result's slice alone",
+			len(fields), allocations)
+	}
+	if allocations := testing.AllocsPerRun(5, func() { reads.Uses() }); allocations > 1 {
+		test.Errorf("sorting %d objects each used in two kinds allocated %.0f times, want the result's slice alone",
+			len(fields), allocations)
 	}
 }

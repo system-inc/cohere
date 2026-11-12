@@ -262,6 +262,7 @@ import (
 	// cohere: x/tools' internal/analysis/driverutil, copied beside this file, and
 	// go/analysis/internal, copied beside this package, since this module cannot
 	// import x/tools' internal packages.
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker/driverutil"
 	"github.com/system-inc/cohere/internal/go_engine/check/internal"
 	// cohere: the reads Options.Reads records into, and the collector
@@ -384,6 +385,13 @@ type Options struct {
 	// for: a reader of the reads waits on Walks. Unset, the walk runs
 	// inline, as the last action on the package finishes.
 	Walks *build_reads.Walks
+
+	// cohere: Pool, when set, is the run's one set of slots, which every
+	// load and check of the run shares (#ckm0hsp): a worker holds one of
+	// them while it runs an action, taken at the action's group's priority
+	// on the pool's scale, so builds side by side never run more actions
+	// at once than the run has cores. Unset, the workers alone bound them.
+	Pool *bounded.Pool
 
 	// cohere: Recorded, when Reads is set too, keys in every pass's
 	// ResultOf the reads Reads holds of the pass's package, nil for a
@@ -995,8 +1003,9 @@ func (act *Action) releaseSyntax() {
 		act.syntax.finished(act.Package)
 	}
 	// cohere: under Options.Reads, the package's type reads, walked once,
-	// while its type information is whole, a given package's too, and
-	// only then let go of (see Options.Walks).
+	// while its type information and syntax are whole, a given package's
+	// too, and only then let go of (see Options.Walks): the walk reads
+	// each use's kind from where it sits in the syntax.
 	letGo := func() {
 		if !keeps {
 			act.letGoOfSyntax()
@@ -1008,12 +1017,12 @@ func (act *Action) releaseSyntax() {
 		return
 	}
 	if act.opts.Walks == nil {
-		reads.Record(act.Package.Types, act.Package.TypesInfo)
+		reads.Record(act.Package.Types, act.Package.TypesInfo, act.Package.Syntax)
 		letGo()
 		return
 	}
 	act.opts.Walks.Go(act.Package, nil, func() {
-		reads.Record(act.Package.Types, act.Package.TypesInfo)
+		reads.Record(act.Package.Types, act.Package.TypesInfo, act.Package.Syntax)
 		letGo()
 	})
 }

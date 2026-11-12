@@ -36,7 +36,8 @@ import (
 // rather than forced, because forcing would discard something without knowing what it was.
 
 // swiftEngineInputs are what decide the engine, as `commit:path` objects: the same three the
-// working-tree hash reads, so a commit that changes only tests reuses the binary.
+// working-tree hash reads, so a commit that changes only tests reuses the binary. They are also the
+// pathspecs a development engine's `sourceTreeModified` is read under (ResolveSwiftEngine).
 var swiftEngineInputs = []string{"swift/Package.swift", "swift/Package.resolved", "swift/Sources"}
 
 // resolveCommittedSwiftEngine returns the engine for commit, building it when the cache has none.
@@ -81,10 +82,13 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	// failure path is removed by the prune once its writer has been gone for the hour.
 	defer os.Remove(temporary)
 
+	// Nothing stated about the tree: the manifest reads git in a worktree nobody edits, and the proof below
+	// checks what it read.
 	if buildSwiftProductError := buildSwiftProduct(
 		filepath.Join(worktree, "swift"),
 		paths.SwiftCommittedBuildDirectory(),
 		temporary,
+		nil,
 	); buildSwiftProductError != nil {
 		return "", false, buildSwiftProductError
 	}

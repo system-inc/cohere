@@ -10,6 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/write_root"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -58,7 +59,8 @@ func TestARenameReachingACgoPackageIsProvenAcrossItsTranslationsNewNames(test *t
 	if reloadError != nil {
 		test.Fatal(reloadError)
 	}
-	if moved := cacheFiles(loaded.Roots); len(moved) == 0 || moved == cacheFiles(reloaded.Roots) {
+	if moved := cacheFiles(test, fixture.root, loaded.Roots); len(moved) == 0 ||
+		moved == cacheFiles(test, fixture.root, reloaded.Roots) {
 		test.Fatalf("cgo's translations are read under the same names %q after the rewrite, so this proves nothing",
 			moved)
 	}
@@ -68,13 +70,26 @@ func TestARenameReachingACgoPackageIsProvenAcrossItsTranslationsNewNames(test *t
 	}
 }
 
-// cacheFiles is every file of roots read from outside a module of the fixture, the build cache's, sorted and joined.
-func cacheFiles(roots []*packages.Package) string {
+// cacheFiles is every file of roots read from outside fixtureRoot, sorted and joined: cgo's translations, which go list
+// reads from the build cache wherever `GOCACHE` puts it. Each file is judged by where it really is, never by the
+// cache's name. Go's default cache directory is named go-build, but Home's land gate gives `GOCACHE` a directory of
+// its own, and a match on that name found no translation there, so this test failed on Linux for its cache path alone
+// (#k3kn30s).
+func cacheFiles(test *testing.T, fixtureRoot string, roots []*packages.Package) string {
+	test.Helper()
+	writeRoot, newError := write_root.New(fixtureRoot)
+	if newError != nil {
+		test.Fatal(newError)
+	}
 	var names []string
 	for _, root := range roots {
 		for _, file := range root.Syntax {
 			name := root.Fset.PositionFor(file.Pos(), false).Filename
-			if strings.Contains(name, "go-build") && !slices.Contains(names, name) {
+			_, inside, insideError := writeRoot.Inside(name)
+			if insideError != nil {
+				test.Fatal(insideError)
+			}
+			if !inside && !slices.Contains(names, name) {
 				names = append(names, name)
 			}
 		}

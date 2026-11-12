@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 )
 
 // slotsPerProcessor is how many packages hold a slot at once for each processor the runtime runs goroutines on.
@@ -76,6 +78,10 @@ type scheduler struct {
 	slots   int
 	workers int
 	groups  []*packageGroup
+
+	// longest is the largest group priority, which a pool's slot puts an action's group's priority on its scale
+	// against (bounded.ScaledPriority). It is written before the first group starts and only read after.
+	longest int
 
 	// waiting is, for each action an action on another package inherits facts from, the groups that wait on it.
 	// It is written before the first group starts and only read after.
@@ -202,6 +208,9 @@ func schedule(groups []*syntaxReaders, options *Options) {
 		scheduler.groups = append(scheduler.groups, group)
 	}
 	scheduler.prioritize()
+	for _, group := range scheduler.groups {
+		scheduler.longest = max(scheduler.longest, group.priority)
+	}
 	scheduler.remaining = len(scheduler.groups)
 	scheduler.awaiting = len(finals)
 	for index, final := range finals {
@@ -342,7 +351,15 @@ func (scheduler *scheduler) work() {
 			next := scheduler.queue.take()
 			scheduler.executing++
 			scheduler.lock.Unlock()
+			// The run's pool, when there is one, bounds the actions of every build at once; a worker holds no other
+			// slot, and its action never waits on one (see schedule), so taking it here cannot deadlock.
+			if pool := scheduler.options.Pool; pool != nil {
+				pool.Acquire(bounded.ScaledPriority(next.group.priority, scheduler.longest))
+			}
 			next.action.exec()
+			if pool := scheduler.options.Pool; pool != nil {
+				pool.Release()
+			}
 			scheduler.lock.Lock()
 			scheduler.executing--
 			scheduler.finish(next)

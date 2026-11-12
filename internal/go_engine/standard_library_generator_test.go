@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -321,19 +322,31 @@ func TestTheCheckRecomputesEveryEntryOfTheTable(test *testing.T) {
 		test.Fatalf("want the generated table to pass with %q, exit %d\n%s\n%s", want, exitCode, standardOutput,
 			standardError)
 	}
+	// Two entries with export data and persisted reads, picked in key order so no case depends on map order: the
+	// first, then the first after it whose export data and reads both differ from its own. Entries often share reads,
+	// which the table holds once by digest, and a pair that shared them would swap nothing, so its case would pass the
+	// check and fail here on about one run in 25 (#3eg0c9r).
 	var firstKey cache.Key
 	var secondKey cache.Key
-	for key, entry := range entries {
-		// Two entries with export data and persisted reads, so either can be given the other's.
-		if entry.ExportData == nil || entry.Reads == nil {
-			continue
-		}
+	var firstFound bool
+	var secondFound bool
+	for _, key := range slices.SortedFunc(maps.Keys(entries), func(left cache.Key, right cache.Key) int {
+		return bytes.Compare(left[:], right[:])
+	}) {
 		switch {
-		case firstKey == cache.Key{}:
-			firstKey = key
-		case secondKey == cache.Key{}:
-			secondKey = key
+		case entries[key].ExportData == nil || entries[key].Reads == nil:
+		case !firstFound:
+			firstKey, firstFound = key, true
+		case !bytes.Equal(entries[key].Reads, entries[firstKey].Reads) &&
+			!bytes.Equal(entries[key].ExportData, entries[firstKey].ExportData):
+			secondKey, secondFound = key, true
 		}
+		if secondFound {
+			break
+		}
+	}
+	if !secondFound {
+		test.Fatalf("want two entries whose export data and persisted reads both differ, among %d", len(entries))
 	}
 	changed := func(change func(map[cache.Key]cache.StandardLibraryEntry, *[]cache.StandardLibraryVariant)) []byte {
 		copied, copiedVariants := tableParts(test, table)

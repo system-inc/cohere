@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -13,8 +14,9 @@ import (
 )
 
 // typeReadsFiles are a module whose package user reads another package, base, every way the type check records: a
-// call of os.Getpid, a field of base reached through a field base embeds and user never names, so only the selection's
-// path holds it, and base's generic, instantiated. user's own struct and its field are its own, never a read.
+// call of os.Getpid, a parameter of base's Outer by value, a field of base reached through a field base embeds and user
+// never names, so only the selection's path holds it, and base's generic, instantiated. user's own struct and its
+// field are its own, never a read.
 var typeReadsFiles = map[string]string{
 	"go.mod": "module example.com/reads\n\ngo 1.21\n",
 	"base/base.go": "package base\n\ntype inner struct{ Value int }\n\n// Outer embeds inner.\n" +
@@ -66,8 +68,10 @@ func readsOfPath(test *testing.T, reads map[*packages.Package]*build_reads.Reads
 }
 
 // A package's type reads, walked by the run once its last action has finished, are every object of another package
-// its check reached, the field it reached only through a selection's path and the generic it instantiated among them,
-// and never an object of its own or of the universe.
+// its check reached, each with the kind of use it made of it, the field it reached only through a selection's path and
+// the generic it instantiated among them, and the selection itself, from the first named type of base on its way, with
+// the embedded field it passes through selected by its own name from there too, and never an object of its own or of
+// the universe. Outer is named and taken by value, a use of it whole.
 func TestAPackagesTypeReadsAreEveryForeignObjectItReached(test *testing.T) {
 	test.Parallel()
 
@@ -83,18 +87,28 @@ func TestAPackagesTypeReadsAreEveryForeignObjectItReached(test *testing.T) {
 		test.Fatalf("user is not restorable: %s", why)
 	}
 	var names []string
-	for _, object := range reads.Objects() {
-		names = append(names, object.Pkg().Path()+"."+object.Name())
+	for _, use := range reads.Uses() {
+		names = append(names, use.Object.Pkg().Path()+"."+use.Object.Name()+" "+string(use.Kind))
 	}
 	want := []string{
-		"example.com/reads/base.Identity",
-		"example.com/reads/base.Outer",
-		"example.com/reads/base.Value",
-		"example.com/reads/base.inner",
-		"os.Getpid",
+		"example.com/reads/base.Identity Member",
+		"example.com/reads/base.Outer Name",
+		"example.com/reads/base.Outer Whole",
+		"example.com/reads/base.Value Member",
+		"example.com/reads/base.inner Member",
+		"os.Getpid Member",
 	}
 	if !slices.Equal(names, want) {
 		test.Fatalf("want user's reads\n%q\ngot\n%q", want, names)
+	}
+	var selections []string
+	for _, selection := range reads.Selections() {
+		selections = append(selections, fmt.Sprintf("%s.%s.%s %v", selection.Receiver.Pkg().Path(),
+			selection.Receiver.Name(), selection.Name, selection.Index))
+	}
+	want = []string{"example.com/reads/base.Outer.Value [0 0]", "example.com/reads/base.Outer.inner [0]"}
+	if !slices.Equal(selections, want) {
+		test.Fatalf("want user's selections\n%q\ngot\n%q", want, selections)
 	}
 }
 

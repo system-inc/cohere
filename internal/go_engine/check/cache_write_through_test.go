@@ -57,6 +57,13 @@ func throughRules() []rule.Rule {
 // the engine's host does, once every read of them is whole.
 func throughHost(test *testing.T, root string, storeDirectory string) *HostRun {
 	test.Helper()
+	host, _ := throughHostSession(test, root, storeDirectory)
+	return host
+}
+
+// throughHostSession is throughHost with the host's session.
+func throughHostSession(test *testing.T, root string, storeDirectory string) (*HostRun, *CacheSession) {
+	test.Helper()
 	rules := throughRules()
 	session := NewCacheSession(cachingAt(storeDirectory, rules), rules)
 	session.KeepForBuilds()
@@ -72,7 +79,7 @@ func throughHost(test *testing.T, root string, storeDirectory string) *HostRun {
 	}
 	// The builds judge the host's reads, which are whole only once their walks end, as the engine waits for them.
 	result.ReadWalks.Wait()
-	return result.Host
+	return result.Host, session
 }
 
 // throughBuild is windows's run over root, with its store in storeDirectory, restoring from host when it is not nil,

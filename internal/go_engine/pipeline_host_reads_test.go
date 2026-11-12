@@ -25,7 +25,7 @@ func TestTheExtraBuildsReadTheHostsReadsWhole(test *testing.T) {
 	walks := build_reads.NewWalks(1, nil, nil, release)
 	walks.Go(walked, nil, func() {
 		<-hold
-		reads.RecordTypes(walked.Types, &types.Info{})
+		reads.RecordTypes(walked.Types, &types.Info{}, nil)
 	})
 	whole := wholeReads(&check.Result{Reads: map[*packages.Package]*build_reads.Reads{walked: reads}, ReadWalks: walks})
 	restorable, why := whole[walked].Restorable()

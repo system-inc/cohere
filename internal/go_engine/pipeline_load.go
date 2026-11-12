@@ -52,6 +52,8 @@ func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) 
 // watchedCaching is caching as it is, unless a test watches inside its loads (engineMemory.duringLoad): then its held
 // reader calls the watch before each lookup, which is during the load.
 func (engine *pipeline) watchedCaching(caching load.Caching) load.Caching {
+	// Every cached load of the run, the host's and every extra build's, takes its slots from the run's one pool.
+	caching.Pool = engine.workPool()
 	if engine.memory == nil || engine.memory.duringLoad == nil {
 		return caching
 	}

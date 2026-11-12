@@ -14,9 +14,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // SwiftEngineOverrideVariable points cohere at a specific Swift engine binary, the counterpart of
@@ -28,7 +31,9 @@ import (
 // then come from a binary no hash vouches for.
 const SwiftEngineOverrideVariable = "COHERE_SWIFT_ENGINE"
 
-// buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath.
+// buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath,
+// with environment added to the build's own. A development build states the tree's state there; a
+// committed build states nothing, so its manifest reads git, and its proof checks what it read.
 //
 // A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,
 // measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
@@ -43,12 +48,15 @@ var buildSwiftProduct = buildSwiftProductWithSwiftPm
 // in the hash because the engine links its libraries and reads its compiler's serialized diagnostics,
 // so the same sources under a new Xcode are a different engine.
 //
-// What the hash does not cover is the one bit the manifest reads from git: whether the repository had
-// uncommitted changes when the engine was built, which the engine reports as `sourceTreeModified`.
-// Asking git on every run would cost more than the rest of the resolve together, and Go's own build
-// stamp behaves the same way for the cohere binary. So a binary built from a modified tree goes on
-// saying so after the change is committed, until its sources move. That errs toward the warning,
-// which is the direction to err.
+// The hash also holds the bit the engine reports as `sourceTreeModified`: whether its own inputs, the
+// files swiftEngineInputs names, differ from the commit, tracked or untracked. Nothing else in the
+// repository counts, so the bit and the hash cover the same files. It was once left out of the hash, on the
+// argument that a stale bit errs toward the warning. It errs both ways. A clean tree was served an engine
+// built while an unrelated file was dirty, which reported a modified build and was refused at land, and a
+// dirty tree could be served one built clean, claiming a clean build that never happened (#50wtb2s). So the
+// bit is read fresh on every resolve (workingTreeModified, 14 ms on cohere's checkout), named into the hash
+// so each state has its own binary, and handed to the build, so the engine reports the state its name holds
+// rather than whatever SwiftPM reads from git a moment later.
 //
 // That is the working-tree half. When commit is not empty the engine is built from that commit
 // instead, which is what a gate gets: see resolveCommittedSwiftEngine. The contract is the one the
@@ -68,7 +76,8 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int, versionOutput 
 		return resolveCommittedSwiftEngine(paths, commit, toolchain, contract)
 	}
 
-	hash, swiftEngineHashError := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain)
+	modified := SwiftEngineTreeModified(paths.ModuleDirectory)
+	hash, swiftEngineHashError := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain, modified)
 	if swiftEngineHashError != nil {
 		return "", false, swiftEngineHashError
 	}
@@ -82,6 +91,7 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int, versionOutput 
 		paths.SwiftEngineDirectory(),
 		paths.SwiftBuildDirectory(),
 		binaryPath,
+		[]string{release.SwiftSourceTreeModifiedVariable + "=" + strconv.FormatBool(modified)},
 	); buildSwiftProductError != nil {
 		return "", false, buildSwiftProductError
 	}
@@ -121,8 +131,9 @@ func swiftToolchain(versionOutput string) (string, error) {
 //
 // `Package.swift` and `Package.resolved` pin the package graph, and every file under `Sources/` is
 // compiled in. Tests are left out because they are not in the binary, and `.build` because it is
-// output. Contents are hashed, never times, for the reason Inputs.Compute gives.
-func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
+// output. Contents are hashed, never times, for the reason Inputs.Compute gives. modified is the tree's
+// state the build is handed, which the engine compiles in and reports (see ResolveSwiftEngine).
+func swiftEngineHash(engineDirectory string, toolchain string, modified bool) (string, error) {
 	files := []string{
 		filepath.Join(engineDirectory, "Package.swift"),
 		filepath.Join(engineDirectory, "Package.resolved"),
@@ -151,6 +162,7 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 	digest := sha256.New()
 	fmt.Fprintf(digest, "toolchain\x00%s\x00", toolchain)
 	fmt.Fprintf(digest, "platform\x00%s/%s\x00", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(digest, "sourceTreeModified\x00%t\x00", modified)
 	for _, path := range files {
 		contents, readError := os.ReadFile(path)
 		if readError != nil {
@@ -240,7 +252,12 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 // Copied rather than linked to SwiftPM's product, because the next build replaces the product in place,
 // and a link would turn every hash-named binary into whichever engine was built last. The copy is
 // installed without replacing a binary already at binaryPath, for the reason copyExecutable gives.
-func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory string, binaryPath string) error {
+func buildSwiftProductWithSwiftPm(
+	packageDirectory string,
+	scratchDirectory string,
+	binaryPath string,
+	environment []string,
+) error {
 	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
 	}
@@ -250,11 +267,13 @@ func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory stri
 		packageDirectory,
 	)
 
-	// `--manifest-cache none`, because the manifest reads the tree's git state into the engine's
-	// `sourceTreeModified`, and SwiftPM's shared manifest cache answers it from an earlier evaluation of
-	// the same commit, whatever the scratch path. An engine rebuilt after an edit to a tracked file would
-	// then say it was built from a clean tree. Measured by @system_cohere_release, whose release build
-	// passes the same flag.
+	// `--manifest-cache none`, because a committed build's manifest reads the tree's git state into the
+	// engine's `sourceTreeModified`, and SwiftPM's shared manifest cache answers it from an earlier
+	// evaluation of the same commit, whatever the scratch path. An engine rebuilt after an edit to a tracked
+	// file would then say it was built from a clean tree. Measured by @system_cohere_release, whose release
+	// build passes the same flag. A development build states the bit in its environment, which the cache
+	// does key on (measured 2026-11-12), so it is kept for the committed build; it costs about 0.4 s of
+	// manifest evaluation per build, measured on a stand-in package.
 	arguments := []string{
 		"build", "-c", "release",
 		"--package-path", packageDirectory,
@@ -264,7 +283,12 @@ func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory stri
 	}
 	// SwiftPM's own lines stream under --verbose. Otherwise they are kept, so a default run prints cohere's
 	// report alone (#ytqqv8v), and a build that fails quotes their end in its error.
+	// The tree's state comes from the caller alone. One inherited from this process's environment would be a
+	// stated answer nobody here computed.
+	inherited := release.WithoutVariable(os.Environ(), release.SwiftSourceTreeModifiedVariable)
+	buildEnvironment := append(inherited, environment...)
 	build := exec.Command("swift", arguments...)
+	build.Env = buildEnvironment
 	var kept bytes.Buffer
 	build.Stdout, build.Stderr = &kept, &kept
 	if stream := Report.ToolOutput(); stream != nil {
@@ -279,7 +303,9 @@ func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory stri
 		)
 	}
 
-	binPath, outputError := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
+	showBinPath := exec.Command("swift", append(arguments, "--show-bin-path")...)
+	showBinPath.Env = buildEnvironment
+	binPath, outputError := showBinPath.Output()
 	if outputError != nil {
 		return fmt.Errorf("asking SwiftPM where it put the Swift engine: %w", outputError)
 	}

@@ -14,6 +14,13 @@ const processNoun = "processes"
 // macOS and Linux do, the machines the house develops and tests on.
 var errorUnbounded = errors.New("a bounded run runs on macOS and Linux, which count an account's processes")
 
+// backstopFactor is unused here, where a bounded run is refused.
+const backstopFactor = 1
+
+func groupProcessCount(int) (int, error) {
+	return 0, errorUnbounded
+}
+
 func accountProcessCount() (int, error) {
 	return 0, errorUnbounded
 }

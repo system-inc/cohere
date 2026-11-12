@@ -55,6 +55,41 @@ func TestARunIsNotRecordedOverAFileChangedWhileItRan(test *testing.T) {
 	}
 }
 
+// An input stamped at the very time the run began reading is refused, and one stamped a nanosecond before it is
+// not. Linux stamps from a coarse clock, so a file added in the same tick as the run's clock carries the clock's
+// own time; refused only when stamped after it, that file was replayed over on Home (#6cmmpm1).
+func TestAnInputStampedAtTheClockIsRefused(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	file := filepath.Join(directory, "a.ts")
+	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	recorded, recordRunCacheError := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatal(recordRunCacheError)
+	}
+	// The latest stamp among the inputs, a.ts and the directory holding it, which this test's clock lands on.
+	var latest int64
+	for _, input := range recorded.Inputs {
+		latest = max(latest, input.ModifiedNanoseconds, input.ChangedNanoseconds)
+	}
+	if latest == 0 {
+		test.Fatal("no input carries a stamp, so the boundary below is not about one")
+	}
+	if _, recordRunCacheError := program.RecordRunCache(
+		"key", []string{file}, nil, nil, nil, nil, 0, time.Unix(0, latest),
+	); recordRunCacheError == nil ||
+		!strings.Contains(recordRunCacheError.Error(), "changed after the run began reading") {
+		test.Fatalf("an input stamped at the clock's own time was recorded (%v)", recordRunCacheError)
+	}
+	if _, recordRunCacheError := program.RecordRunCache(
+		"key", []string{file}, nil, nil, nil, nil, 0, time.Unix(0, latest+1),
+	); recordRunCacheError != nil {
+		test.Fatalf("inputs stamped before the clock were refused: %v", recordRunCacheError)
+	}
+}
+
 // Different bytes of the same size under the old modification time, as cp -p, rsync -t and touch -r leave
 // a file, are a miss. Only the change time moved.
 func TestASameSizeEditUnderARestoredModificationTimeIsAMiss(test *testing.T) {

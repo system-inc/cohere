@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
+
 	"golang.org/x/tools/go/packages"
 )
 
@@ -101,7 +103,7 @@ func TestTheLoadParsesTheLongestPathFirst(test *testing.T) {
 	if len(reachable) != orderLeaves+orderChain {
 		test.Fatalf("want %d packages reachable, got %d", orderLeaves+orderChain, len(reachable))
 	}
-	typeChecker.slots = newPrioritySlots(1)
+	typeChecker.slots = bounded.NewPool(1)
 	var grantedLock sync.Mutex
 	var parsed []string
 	var read []string
@@ -115,17 +117,17 @@ func TestTheLoadParsesTheLongestPathFirst(test *testing.T) {
 			read = append(read, strings.TrimPrefix(identifier, "example.com/order/"))
 		}
 	}
-	typeChecker.slots.acquire(0)
+	typeChecker.slots.Acquire(0)
 	loaded := make(chan struct{})
 	go func() {
 		defer close(loaded)
 		typeChecker.load(reachable)
 	}()
 	// Every package has one file, whose read is the first slot it asks for.
-	for typeChecker.slots.waiters() < len(reachable) {
+	for typeChecker.slots.Waiters() < len(reachable) {
 		runtime.Gosched()
 	}
-	typeChecker.slots.release()
+	typeChecker.slots.Release()
 	<-loaded
 	for _, current := range reachable {
 		if len(current.loaded.Errors) > 0 {

@@ -111,6 +111,9 @@ type summaryJson struct {
 	Builds []checkedBuild `json:"builds,omitempty"`
 	// BuildsAtOnce is how many of those builds beside the host's ran side by side, absent when builds is.
 	BuildsAtOnce int `json:"buildsAtOnce,omitempty"`
+	// BuildsWidthLiveBytes is the host's live heap buildsAtOnce was decided from, absent when the decision needed none
+	// and for every other run, so a reader sees why the width was chosen without running the engine alone (#qwb6ns8).
+	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
 
 	TypeErrors     int `json:"typeErrors"`
 	Findings       int `json:"findings"`
@@ -198,6 +201,7 @@ func summaryAsJson(summary runSummary) summaryJson {
 		MemoryRaisedToBytes:         summary.MemoryRaisedToBytes,
 		Builds:                      summary.Builds,
 		BuildsAtOnce:                summary.BuildsAtOnce,
+		BuildsWidthLiveBytes:        summary.BuildsWidthLiveBytes,
 		TypeErrors:                  summary.TypeErrors,
 		Findings:                    summary.Findings,
 		FilesFixed:                  summary.filesFixed(),

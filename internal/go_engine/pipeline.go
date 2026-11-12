@@ -5,14 +5,17 @@ import (
 	"io"
 	"maps"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/duplicate_functions"
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -70,9 +73,10 @@ type pipeline struct {
 	// from the host's run, so the test can compare the two (#b2t9xmf).
 	keepsHostRestoreOff bool
 
-	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once as they started
-	// (extraBuildsWidth), 0 until they did, for the lint record, and buildsWidthLiveBytes the host's live heap that
-	// decision was given, 0 when it needed none. buildsWidthForced, set only by a test, is the width
+	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once (fixedBuildsWidth, or
+	// measuredBuildsWidth as the first build's load ends), 0 until it was, for the lint record, and
+	// buildsWidthLiveBytes and buildsWidthBuildBytes the host's live heap that decision was given and what the first
+	// build held beyond it, 0 when it needed none. buildsWidthForced, set only by a test, is the width
 	// in place of that decision for builds that restore from the host, and buildsWidthUnguarded, a test's too, lets it
 	// apply to builds that restore nothing, so a test can show the width reaches no key with builds that each check
 	// every package. extraBuildEnds, also a test's alone, is called as each extra build's run ends with the build's own
@@ -80,12 +84,28 @@ type pipeline struct {
 	// lintSteps, a test's alone too, is told each step of an extra build's lint at the gate with the weight it takes
 	// (lintStep), on the build's own goroutine, so a test can count the lints holding weight and hold a build at a
 	// step.
-	buildsAtOnce         int
-	buildsWidthLiveBytes uint64
-	buildsWidthForced    int
-	buildsWidthUnguarded bool
-	extraBuildEnds       func(extra project.Build, notes io.Writer) error
-	lintSteps            func(extra project.Build, step lintStep, weight int)
+	buildsAtOnce          int
+	buildsWidthLiveBytes  uint64
+	buildsWidthBuildBytes uint64
+	buildsWidthForced     int
+	buildsWidthUnguarded  bool
+	extraBuildEnds        func(extra project.Build, notes io.Writer) error
+	lintSteps             func(extra project.Build, step lintStep, weight int)
+
+	// timedHostLiveBytes is the host's live heap as the extra builds start under `--timing`, measured by a forced
+	// collection, which each build's holdings are measured beyond (extraBuildRun), 0 in any other run.
+	timedHostLiveBytes uint64
+
+	// pool is the run's one set of slots, every load and check of the run sharing it, the host's and every extra
+	// build's (#ckm0hsp), made on first use (workPool). poolSizeForced, set only by a test, is its size in place of one
+	// per core, and poolObserve, a test's too, is told of each slot taken, +1, and each given back, -1.
+	pool           *bounded.Pool
+	poolMaking     sync.Once
+	poolSizeForced int
+	poolObserve    func(change int)
+
+	// poolsMade counts the pools the run made, one, which a test reads.
+	poolsMade int
 
 	// hostLoading and hostLinting are the host's build's wall time loading the workspace and running the rules over it,
 	// in nanoseconds, over every load and pass, its build record's (buildRun). A load or a pass beside another runs on
@@ -338,7 +358,8 @@ func (engine *pipeline) note(template string, values ...any) {
 }
 
 // noteTo writes a line of prose to notes as note writes it to stderr, for an extra build, which notes into a buffer
-// of its own that otherBuilds writes to stderr in build order once every build has ended (extraBuildRuns).
+// of its own that otherBuilds writes to stderr in the order the builds started once every build has ended
+// (extraBuildRuns).
 func noteTo(notes io.Writer, template string, values ...any) {
 	// Ignored: a note that cannot reach stderr changes no record, and the records carry the verdict.
 	_, _ = fmt.Fprintf(notes, "cohere-go: "+template+"\n", values...)
@@ -781,4 +802,25 @@ func (engine *pipeline) filesWithoutRecord(loaded *load.Loaded) []string {
 // oneLine is an error on one line, for a phase record's detail, which prints inside one line.
 func oneLine(cause error) string {
 	return strings.Join(strings.Fields(cause.Error()), " ")
+}
+
+// workPool is the run's one set of slots, which every load and check of the run shares, the host's and every extra
+// build's, so builds side by side never run more work at once than the run has cores (#ckm0hsp): one slot per core,
+// or one under `--single-threaded`, which asks for one thing at a time.
+func (engine *pipeline) workPool() *bounded.Pool {
+	engine.poolMaking.Do(func() {
+		size := runtime.GOMAXPROCS(0)
+		switch {
+		case engine.poolSizeForced > 0:
+			size = engine.poolSizeForced
+		case engine.request.switches["single-threaded"]:
+			size = 1
+		}
+		engine.pool = bounded.NewPool(size)
+		engine.poolsMade++
+		if engine.poolObserve != nil {
+			engine.pool.Observe(engine.poolObserve)
+		}
+	})
+	return engine.pool
 }

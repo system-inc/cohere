@@ -234,7 +234,7 @@ func TestEveryCaseReadsTheSameWithTheLintBesideTheLoad(test *testing.T) {
 			overlapped := runOverlapCase(test, endToEnd, true)
 			sequential := runOverlapCase(test, endToEnd, false)
 			sameRuns(test, overlapped, sequential)
-			expected, readError := os.ReadFile(filepath.Join("testdata", endToEnd.name, "expected.jsonl"))
+			expected, readError := os.ReadFile(expectedStreamPath(endToEnd.name))
 			if readError != nil {
 				test.Fatalf("reading the expected stream: %v", readError)
 			}

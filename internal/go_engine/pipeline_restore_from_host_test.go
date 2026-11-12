@@ -81,6 +81,48 @@ func TestAnExtraBuildRestoresWhatReadsTheSameAndChecksTheRest(test *testing.T) {
 	}
 }
 
+// A build loaded again after a check-time decline counts what each load checked from source, and its record sums
+// them (#k8gty9e): over the fixture whose windows build declines two packages at its check and reloads once, the
+// windows record names both rounds, the reload's checking the declined packages from source, and its
+// checkedFromSource is their sum, not the first load's alone.
+func TestAReloadsChecksFromSourceReachTheRecord(test *testing.T) {
+	test.Parallel()
+
+	// The stream as written, since normalize blanks each build's target.
+	_, stream := runOverRaw(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), exitFindings,
+		"--no-cache", "--other-builds")
+	var lint contract.LintRecord
+	for line := range strings.SplitSeq(stream, "\n") {
+		if strings.HasPrefix(line, `{"kind":"lint"`) {
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+		}
+	}
+	index := slices.IndexFunc(lint.Builds, func(build contract.BuildRecord) bool {
+		return strings.HasPrefix(build.Target, "windows/")
+	})
+	if index < 0 {
+		test.Fatalf("the lint record names no windows build:\n%s", stream)
+	}
+	windows := lint.Builds[index]
+	if len(windows.CheckedFromSourceRounds) != 2 || windows.CheckedFromSourceRounds[1] == 0 {
+		test.Fatalf("windows records the rounds %v checked from source, want two, the reload's above zero",
+			windows.CheckedFromSourceRounds)
+	}
+	sum := windows.CheckedFromSourceRounds[0] + windows.CheckedFromSourceRounds[1]
+	if windows.CheckedFromSource != sum {
+		test.Errorf("windows records %d checked from source, want %d, the sum of its rounds %v",
+			windows.CheckedFromSource, sum, windows.CheckedFromSourceRounds)
+	}
+	for _, build := range lint.Builds {
+		if build.Target != windows.Target && len(build.CheckedFromSourceRounds) != 0 {
+			test.Errorf("%s, loaded once, records the rounds %v, want none", build.Target,
+				build.CheckedFromSourceRounds)
+		}
+	}
+}
+
 // The merged verdict is the same whether the extra builds restore from the host's run or check every package
 // themselves, byte for byte but for each build's counts of the restore, without the findings cache and with it.
 func TestTheMergeIsTheSameWhetherTheBuildsRestoreFromTheHostOrNot(test *testing.T) {
@@ -110,10 +152,10 @@ const restoreInferrer = "example.com/restoreinstance/inferrer"
 
 // An extra build declines a package whose instance of another package's generic has a type argument it inferred and
 // never named, when that type's definition differs in the build: inferrer passes platform.Get's Handle through
-// generic.Identity, and only windows' Handle holds a lock, so only windows finds copylocks' copy of it. An instance is
-// no read of its own (collectTypeReads): the read that covers its type argument is Get, whose closure digest reaches
-// Handle, so windows declines inferrer at its load by Get, finds the copy, and the merge is the one a run checking
-// every package itself writes (#b2t9xmf).
+// generic.Identity, and only windows' Handle holds a lock, so only windows finds copylocks' copy of it. Get itself is
+// read as a member, by its own line, which every build writes alike; the copy of its result into handle, and the
+// instance's type argument, are uses of Handle whole (#mjdf7ah), so windows declines inferrer at its load by Handle,
+// finds the copy, and the merge is the one a run checking every package itself writes (#b2t9xmf).
 func TestAnExtraBuildDeclinesAnInstanceWhoseInferredTypeArgumentDiffers(test *testing.T) {
 	test.Parallel()
 
@@ -125,9 +167,9 @@ func TestAnExtraBuildDeclinesAnInstanceWhoseInferredTypeArgumentDiffers(test *te
 	engine, on := runOver(test, copyFixture(test, fixture), exitFindings, "--other-builds")
 	host, windows := engine.buildRuns[0], windowsRun(test, engine)
 	if why := windows.result.FromHost.Declined[restoreInferrer]; !strings.HasPrefix(why,
-		"T object example.com/restoreinstance/platform.Get ") {
-		test.Errorf("windows declined %s for %q, want by Get, the object whose result the type argument is inferred "+
-			"from", restoreInferrer, why)
+		"T object example.com/restoreinstance/platform.Handle renders differently") {
+		test.Errorf("windows declined %s for %q, want by Handle, the type argument inferred and copied whole",
+			restoreInferrer, why)
 	}
 	if foundIn(host, "inferrer.go") || !foundIn(windows, "inferrer.go") {
 		test.Errorf("want the copy of Handle found by windows alone, got the host %t and windows %t",

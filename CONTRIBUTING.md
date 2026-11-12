@@ -83,8 +83,9 @@ arrival order and names who holds them; `cohere-dev status` shows the pool and t
 nothing more is held back: its packages and `t.Parallel` tests use the whole share.
 
 A mutant or probe in code that starts processes runs bounded: `cohere-dev test --bounded <package>`, or
-`cohere-dev exec --bounded -- <command>` (#fp1td9e). The run may start 512 processes beyond the account's
-count when it begins (`--bounded-margin`), and its whole process group is stopped after 15 minutes
+`cohere-dev exec --bounded -- <command>` (#fp1td9e). The run's process group may hold 512 processes at
+once (`--bounded-margin`), counted by a watchdog that stops the group the moment it holds more, behind a
+wider account-wide backstop; and its whole process group is stopped after 15 minutes
 (`--bounded-deadline`) and whenever its command ends. A review mutant with a guard removed forked its own
 binary about 7,700 times on 2026-11-10 and filled the machine's process table (#excff9x). A fixed `ulimit -u`
 is the wrong recipe: the kernel counts every process the account owns, about 900 on Kirk's Mac, so a limit

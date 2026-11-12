@@ -16,6 +16,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -127,16 +128,21 @@ func (verdict homeVerdict) failed() bool {
 	return len(verdict.packagesFailed) > 0 || len(verdict.failedTests) > 0
 }
 
-// testsNeverCompiledOn is every top-level test, by import path, in a file of modules that the Mac compiles and the
-// platform operatingSystem/architecture never does, by its name or its build constraint: Home cannot report a test
-// that does not exist there, so the Mac runs it.
+// testsNeverCompiledOn is every top-level test, by import path, in a file of modules that the lander's platform
+// (landerSystem/landerArchitecture, the Mac's) compiles and the platform operatingSystem/architecture never does,
+// by its name or its build constraint: Home cannot report a test that does not exist there, so the Mac runs it.
+// The lander's platform is named rather than read from the build context, so a test of this runs the same on Home
+// as on the Mac (#acdf5mc).
 func testsNeverCompiledOn(
 	root string,
 	modules []project.Module,
+	landerSystem string,
+	landerArchitecture string,
 	operatingSystem string,
 	architecture string,
 ) (map[string][]string, error) {
 	mac := build.Default
+	mac.GOOS, mac.GOARCH = landerSystem, landerArchitecture
 	other := build.Default
 	other.GOOS, other.GOARCH = operatingSystem, architecture
 	found := map[string][]string{}
@@ -410,8 +416,8 @@ func runModuleTests(
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: Home's tests on %s passed, %d packages\n", platform,
 		verdict.packagesPassed)
-	neverCompiled, neverCompiledError := testsNeverCompiledOn(worktree, covered.Modules, verdict.operatingSystem,
-		verdict.architecture)
+	neverCompiled, neverCompiledError := testsNeverCompiledOn(worktree, covered.Modules, runtime.GOOS, runtime.GOARCH,
+		verdict.operatingSystem, verdict.architecture)
 	if neverCompiledError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", neverCompiledError)
 		return 2, ""

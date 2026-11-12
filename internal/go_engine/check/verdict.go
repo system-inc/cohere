@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/types"
 	"reflect"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/types/objectpath"
@@ -12,6 +13,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
+
+// useDiffers is what a reason says of a use of each kind but the whole that does not hold.
+var useDiffers = map[build_reads.UseKind]string{
+	build_reads.UseName:       "its name or kind differs",
+	build_reads.UseMember:     "its own line differs",
+	build_reads.UseUnderlying: "its underlying type differs",
+	build_reads.UseMethodSet:  "its method set differs",
+}
 
 // verdict is one package's reads judged in another build: the host's memo and the build's, the packages the judged
 // package reaches in the build by path, its closure, those of them the build restored from the host's run, at check
@@ -86,9 +95,11 @@ func (judged verdict) find(ownerPath string, path objectpath.Path) (types.Object
 }
 
 // counterpart is the build's object at the place of hostObject, the host's, by its package's path and objectpath, and
-// why not when there is none. unsafe's objects are the type checker's own, the same in every build.
+// why not when there is none. unsafe's objects are the type checker's own, and the universe's, of no package, the same
+// in every build: a selection of Error through another package's interface that embeds error selects the universe's,
+// which a package judged by closure alone reads whole.
 func (judged verdict) counterpart(hostObject types.Object) (types.Object, string) {
-	if hostObject.Pkg() == types.Unsafe {
+	if hostObject.Pkg() == nil || hostObject.Pkg() == types.Unsafe {
 		return hostObject, ""
 	}
 	path, hasPath := judged.host.pathOf(hostObject)
@@ -96,6 +107,68 @@ func (judged verdict) counterpart(hostObject types.Object) (types.Object, string
 		return nil, "object " + objectName(hostObject) + " has no objectpath"
 	}
 	return judged.find(hostObject.Pkg().Path(), path)
+}
+
+// useHolds reports whether use, a read of the host's object, reads the same in the build, judged by its kind of use
+// (#mjdf7ah): a whole use by the object's closure, as every read was before kinds (objectHolds), and every other kind
+// by what of the object that kind read (ReadsBuild.useDigest). closureOnly judges every use as a whole one.
+func (judged verdict) useHolds(use build_reads.ObjectUse, closureOnly bool) (bool, string) {
+	if closureOnly || use.Kind == build_reads.UseWhole {
+		return judged.objectHolds(use.Object)
+	}
+	found, why := judged.counterpart(use.Object)
+	if found == nil {
+		return false, "object " + objectName(use.Object) + ": " + why
+	}
+	if judged.host.useDigest(use.Object, use.Kind) != judged.build.useDigest(found, use.Kind) {
+		return false, "object " + objectName(use.Object) + ": " + useDiffers[use.Kind]
+	}
+	return true, ""
+}
+
+// selectionHolds reports whether selection, one the host's check made through another package's named type, selects
+// the same in the build: the build's lookup of its name from the receiver finds a member at the same index path, so
+// nothing shallower shadows it and no twin at its depth makes it ambiguous, whose own line is the host's member's.
+// closureOnly judges it by the receiver's and the member's closures instead.
+func (judged verdict) selectionHolds(selection build_reads.Selection, closureOnly bool) (bool, string) {
+	if closureOnly {
+		if holds, why := judged.objectHolds(selection.Receiver); !holds {
+			return false, why
+		}
+		return judged.objectHolds(selection.Selected)
+	}
+	name := "selection " + objectName(selection.Receiver) + "." + selection.Name
+	found, why := judged.counterpart(selection.Receiver)
+	if found == nil {
+		return false, name + ": " + why
+	}
+	// A lookup of an unexported name finds it only in its own package, the build's of the member's path.
+	var namedIn *types.Package
+	if selection.Selected.Pkg() != nil {
+		namedIn = judged.closure[selection.Selected.Pkg().Path()]
+	}
+	selected, index, _ := types.LookupFieldOrMethod(found.Type(), true, namedIn, selection.Name)
+	switch {
+	case selected == nil:
+		return false, name + ": the build finds no one member of the name"
+	case !slices.Equal(index, selection.Index):
+		return false, name + fmt.Sprintf(": the build finds it at %v, the host at %v", index, selection.Index)
+	case judged.host.useDigest(selection.Selected, build_reads.UseMember) !=
+		judged.build.useDigest(declaredOrigin(selected), build_reads.UseMember):
+		return false, name + ": the member it selects differs"
+	}
+	return true, ""
+}
+
+// declaredOrigin is object as its package declares it, the generic one for a field or method of an instance.
+func declaredOrigin(object types.Object) types.Object {
+	switch instantiated := object.(type) {
+	case *types.Func:
+		return instantiated.Origin()
+	case *types.Var:
+		return instantiated.Origin()
+	}
+	return object
 }
 
 // objectHolds reports whether hostObject, the host's, is in the build at the same place and renders alike there.
@@ -169,11 +242,12 @@ func (judged verdict) buildFactHolds(
 //   - Closure asks the build's import closure, from the package's imports, as the rule asked (ClosureInterface).
 //   - PackageName asks whether a package of that closure has the name, as the rule's walk does.
 //   - Interface and Method answer by the subject, the package's own method, which is the host's in the build, and by
-//     the closure's type names with a method of the name: so they hold when those type names are the same in both
-//     builds, rendered alike. That errs wide, failing when a type name the rule would not have matched changes. A
-//     package the build restored from the host's run gives the host's own type names: its types there are read from
-//     export data, which holds only what its exported declarations reach, so its unexported types would go missing,
-//     while its source and its reads are the host's, so checked from source it declares what the host's does.
+//     the closure's type names with a method of the name, judged by the one bit their rules read of them
+//     (methodLookupHolds), or, where that bit can flip with nothing it reads changing, by those type names being the
+//     same in both builds, rendered alike. A package the build restored from the host's run gives the host's own type
+//     names: its types there are read from export data, which holds only what its exported declarations reach, so its
+//     unexported types would go missing, while its source and its reads are the host's, so checked from source it
+//     declares what the host's does.
 //
 // A deprecation is a fact, asked at check time (deprecationHolds).
 func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring) (bool, string) {
@@ -215,6 +289,10 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 			func(owner *types.Package) bool { return hostClosure.byPath[owner.Path()] != nil })...)
 		sortTypeNames(hostCandidates)
 		sortTypeNames(buildCandidates)
+		judgment := judged.methodJudgmentOf(lookup, hostCandidates, buildCandidates)
+		if holds, why, decided := methodLookupHolds(name, judgment); decided {
+			return holds, why
+		}
 		if len(hostCandidates) != len(buildCandidates) {
 			return false, name + fmt.Sprintf(": %d type names have the method on the host, %d in the build",
 				len(hostCandidates), len(buildCandidates))

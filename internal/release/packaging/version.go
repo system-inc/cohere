@@ -54,6 +54,12 @@ var (
 	// formatterIdentity names everything that can change what the formatter prints, stamped by the
 	// launcher when it builds (see dispatch.FormatterIdentity). Empty for a build nobody stamped.
 	formatterIdentity = ""
+
+	// sourceTreeModified is "true" or "false" when the launcher stamps the state of the tree it built
+	// from, as a `--dev` build does. That build turns VCS stamping off and reads the state itself, once,
+	// for the binary's cached name and for this stamp, so the binary reports the state its name holds
+	// (dispatch.ResolveWorkingTree, #50wtb2s). Empty otherwise, and Go's own `vcs.modified` is read.
+	sourceTreeModified = ""
 )
 
 // Current returns this binary's provenance.
@@ -133,11 +139,18 @@ func resolveSelfCommit() string {
 
 // resolveSourceTreeModified reports whether the build tree carried uncommitted changes.
 //
-// Go's linker writes this stamp itself, so it observes the tree at the moment of the build and
+// A stamp from the launcher wins, as resolveSelfCommit's does, for the reason sourceTreeModified gives.
+// Otherwise Go's linker writes this stamp itself, so it observes the tree at the moment of the build and
 // cannot be wrong about it the way a value computed afterwards could. A binary with no build info
 // at all reports false rather than true: absent evidence is not evidence of a dirty tree, and
 // claiming otherwise would put a warning on every binary that predates this field.
 func resolveSourceTreeModified() bool {
+	switch sourceTreeModified {
+	case "true":
+		return true
+	case "false":
+		return false
+	}
 	information, available := debug.ReadBuildInfo()
 	if !available {
 		return false

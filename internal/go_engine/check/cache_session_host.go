@@ -218,7 +218,7 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 	// (lazyExportData).
 	read := make([]*restoredPackage, len(reading))
 	readErrors := make([]error, len(reading))
-	bounded.ForEach(len(reading), false, func(index int) {
+	session.fanOut(len(reading), func(index int) {
 		entry, readExportData, readError := readingKept[index].contents()
 		if readError == nil {
 			read[index], readError = decodeEntry(session.known, reading[index], entry, readExportData)
@@ -254,6 +254,13 @@ func (session *CacheSession) typesHoldFunction(
 		// The load set the package's sizes, the build's, before deciding any package, so the first verdict tells
 		// the memo its build before it renders anything.
 		session.host.renderings.measureBy(candidate.TypesSizes)
+		// A verdict is the run's work as a load's or a check's is, so it runs under one of the run's slots, at the top
+		// of the scale: the package's load waits on it. The load's goroutine asks it before it takes a slot of its own
+		// for the package, so it holds none here.
+		if session.caching.Pool != nil {
+			session.caching.Pool.Acquire(bounded.PriorityScale)
+			defer session.caching.Pool.Release()
+		}
 		started := time.Now()
 		holds, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
 			session.host.host.renderings, session.host.renderings)
@@ -482,20 +489,23 @@ func (session *CacheSession) writeThrough(
 	encoded := make([]encodedEntry, len(through))
 	writable := make([]bool, len(through))
 	writeErrors := make([]error, len(through))
-	bounded.ForEach(len(through), false, func(index int) {
+	session.fanOutWriting(len(through), func(index int) func() {
 		saved := through[index]
 		encoded[index], writable[index], writeErrors[index] = session.throughEntry(saved, throughHosted[index],
 			actionsOf[saved], knownFiles)
-		if !writable[index] {
-			return
+		if !writable[index] || writeErrors[index] != nil {
+			return nil
 		}
 		key := session.keys[saved]
-		// The export data goes first, so an entry is never in the store before what it needs to be read.
-		if writeErrors[index] == nil && encoded[index].exportData != nil {
-			writeErrors[index] = session.caching.Store.Put(exportDataKey(key), encoded[index].exportData)
-		}
-		if writeErrors[index] == nil {
-			writeErrors[index] = session.caching.Store.Put(key, encoded[index].entry)
+		// The writes run with no slot held (fanOutWriting), the export data first, so an entry is never in the store
+		// before what it needs to be read.
+		return func() {
+			if encoded[index].exportData != nil {
+				writeErrors[index] = session.caching.Store.Put(exportDataKey(key), encoded[index].exportData)
+			}
+			if writeErrors[index] == nil {
+				writeErrors[index] = session.caching.Store.Put(key, encoded[index].entry)
+			}
 		}
 	})
 	positionDependent := map[*packages.Package]bool{}
@@ -516,9 +526,9 @@ func (session *CacheSession) writeThrough(
 
 // throughEntry is the entry writeThrough writes of saved, restored from the host's run as hosted, and whether it is
 // the build's to write: the host's entry as the build restored it, its findings, facts, answers, withheld counts,
-// files, imports, output digest and what it declares without a body, with the export data the build read, as the
-// build would write it had it checked the package itself. Its reads name each owner by its first key in this build,
-// which every read held against when the restore settled.
+// files, imports, output digest and what it declares without a body, with the export data the build read, none for
+// unsafe, as the build would write it had it checked the package itself. Its reads name each owner by its first key
+// in this build, which every read held against when the restore settled.
 //
 // The output digest is the host's, which is the build's own only while the entry holds exactly the analyzers of the
 // build's actions on saved, as encodeEntry's would, since the digest names every one of them; an entry that holds
@@ -557,7 +567,9 @@ func (session *CacheSession) throughEntry(
 		}
 	}
 	encoded := encodedEntry{output: hosted.restored.output, hasOutput: hosted.restored.hasOutput}
-	if hosted.restored.types.ReadExportData != nil {
+	// unsafe's entry holds no export data, as the build's own from source holds none (carriesExportData); the reader of
+	// one kept from the binary's table, which holds none for it, would refuse (#27r8r24).
+	if carriesExportData(saved) && hosted.restored.types.ReadExportData != nil {
 		exportData, exportError := hosted.restored.types.ReadExportData()
 		if exportError != nil {
 			return encodedEntry{}, true, fmt.Errorf("reading the export data the build read: %w", exportError)
@@ -735,7 +747,7 @@ func (session *CacheSession) keepForBuilds(
 	knownFiles := session.allFiles()
 	encoded := make([]encodedEntry, len(encoding))
 	encodeErrors := make([]error, len(encoding))
-	bounded.ForEach(len(encoding), false, func(index int) {
+	session.fanOut(len(encoding), func(index int) {
 		saved := encoding[index]
 		encoded[index], encodeErrors[index] = encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
 			withheld[saved], session.withBodiless(saved, session.recordedDemandOf(saved)), files[saved], knownFiles,
@@ -757,14 +769,15 @@ func (session *CacheSession) keepForBuilds(
 	}
 	host.kept = len(host.entries)
 	// What the analysis built to answer questions, every package's intermediate representation, syntax and type maps,
-	// is the session's to keep only for its next save; a run under `--no-cache` has none, and the extra builds that run
-	// next read only the entries, so it goes now rather than outlive the host's pass through every build (#b2t9xmf).
-	if session.caching.Store == nil {
-		session.resolver = nil
-		session.answering.lock.Lock()
-		session.answering.byTypes = nil
-		session.answering.lock.Unlock()
-	}
+	// goes now rather than outlive the host's pass through every build (#b2t9xmf), with a store or without: the keep is
+	// the last of the run to read it, after the save and the reload's decision, the extra builds read only the entries,
+	// and the session's next Restore starts both afresh. Kept with a store, it held about 3.3 GB at cohere's root as
+	// the builds started, so a cold run with the findings cache ran them one at a time (#px1yxq8).
+	session.resolver = nil
+	session.answering.lock.Lock()
+	session.answering.byTypes = nil
+	session.answering.lock.Unlock()
+	session.kept.Store(true)
 	session.keeping += time.Since(started)
 	host.keeping = session.keeping
 	return host
@@ -786,7 +799,8 @@ func lazyExportData(kept *packages.Package) func() ([]byte, error) {
 // packages. An extra build that asks one it does not hold reloads the package, as a run restoring a partial entry does
 // (see Reload).
 func (session *CacheSession) recordedDemandOf(saved *packages.Package) entryDemand {
-	if session.resolver == nil || saved.Types == nil {
+	if session.readAfterKeep("recordedDemandOf, the kept answers of "+saved.ID) || session.resolver == nil ||
+		saved.Types == nil {
 		return entryDemand{}
 	}
 	demanded := entryDemand{answers: sortedAnswers(session.resolver.Recorded(saved.Types), false)}

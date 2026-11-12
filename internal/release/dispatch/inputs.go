@@ -33,6 +33,13 @@ type Inputs struct {
 	// transitively from the entry point. Contents are hashed, not names: a rule edited in place
 	// keeps its filename, and a hash over names alone would miss it entirely.
 	SourceFiles []string
+
+	// SelfCommit and SourceTreeModified are the working tree's state, which a `--dev` build is stamped with
+	// and reports about itself. A key without them served a binary built in one state to a tree in the
+	// other: built dirty, it went on saying so after the work was committed, and built clean, it said clean
+	// beside an uncommitted edit outside the Go sources, a Swift rule's included (#50wtb2s).
+	SelfCommit         string
+	SourceTreeModified bool
 }
 
 // Compute returns the hash naming the binary these inputs build.
@@ -51,6 +58,8 @@ func (inputs Inputs) Compute() (string, error) {
 	for _, flag := range inputs.BuildFlags {
 		fmt.Fprintf(digest, "buildFlag\x00%s\x00", flag)
 	}
+	fmt.Fprintf(digest, "selfCommit\x00%s\x00", inputs.SelfCommit)
+	fmt.Fprintf(digest, "sourceTreeModified\x00%t\x00", inputs.SourceTreeModified)
 
 	// Sorted so the digest does not depend on the order the toolchain happened to list packages in.
 	files := append([]string(nil), inputs.SourceFiles...)

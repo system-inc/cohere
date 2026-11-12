@@ -26,6 +26,9 @@ import (
 // with every read the run's analysis of saved made, each naming its owner by ID and the owner's first key in this run,
 // sorted, and whether one could not be named, an object with no objectpath or an owner this run did not key.
 func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) ([]storedRead, bool) {
+	if session.readAfterKeep("readsOf, the reads of " + saved.ID) {
+		return held.reads, held.readsIncomplete
+	}
 	type readIdentity struct {
 		kind  string
 		owner string
@@ -154,7 +157,7 @@ func (session *CacheSession) currentAnswer(owner *packages.Package, read storedR
 		}
 		return nil, false
 	}
-	if session.resolver == nil || owner.Types == nil {
+	if session.readAfterKeep("currentAnswer, an answer of "+owner.ID) || session.resolver == nil || owner.Types == nil {
 		return nil, false
 	}
 	return session.resolver.Probe(read.Kind, owner.Types, read.Path)
