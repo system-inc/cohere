@@ -49,12 +49,14 @@ type buildRun struct {
 	waited time.Duration
 	// checkedFromSource and packagesLoaded are an extra build's alone: the packages of its whole graph its first load
 	// checked from source, and every package that load loaded, whose ratio weighs its lint at the gate (lintWeight).
+	// checkedFromSourceRounds is every load's count, the first's and each reload's, which the record sums (#k8gty9e).
 	// lintWait is how long its lint waited for that weight, and lintWaited whether it waited at all, so a wait under a
 	// millisecond still reads as one.
-	checkedFromSource int
-	packagesLoaded    int
-	lintWait          time.Duration
-	lintWaited        bool
+	checkedFromSource       int
+	checkedFromSourceRounds []int
+	packagesLoaded          int
+	lintWait                time.Duration
+	lintWaited              bool
 	// heldAtLoadEnd and heldAtLintPeak are an extra build's alone, measured only under `--timing`: what it held beyond
 	// the host's live heap as its load ended, and the most it held while its rules ran (heldWhileLinting).
 	heldAtLoadEnd  uint64

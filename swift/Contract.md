@@ -1015,8 +1015,10 @@ encoded when a build first asks for them, and the host's `"waitMilliseconds":40`
 waited after its lint for its walks of what each package read of others to end, before any could start.
 
 An extra build's record also says what weighed its lint (#b2t9xmf): `"checkedFromSource":120` the packages of its
-whole graph its first load checked from source rather than restored, and `"packagesLoaded":1400` every package that
-load loaded, dependencies and test variants included, so their ratio is the share it checked. The extra builds' lints
+whole graph its loads checked from source rather than restored, summed over every load, and `"packagesLoaded":1400`
+every package its first load loaded, dependencies and test variants included. A build loaded again after a decline
+also writes `"checkedFromSourceRounds":[20,100]`, each load's count in order (#k8gty9e); the first load's count over
+`packagesLoaded` is the share that weighs its lint. The extra builds' lints
 share a budget of one whole build: each takes that share of it once its load has ended, or all of it at or above one
 half, so no two near-full builds lint at once, and they are admitted in the order they became ready, a light build
 never passing a heavy one already waiting. `"lintWaitMilliseconds":850` is how long its lint waited for that weight,
