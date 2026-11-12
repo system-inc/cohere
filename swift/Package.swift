@@ -29,12 +29,23 @@ import PackageDescription
  covers the whole cohere repository, as Go's does. In a tree where other work is in flight that is
  usually true, and the warning is true with it. Gitignored files never count.
 
- SwiftPM caches a manifest's evaluation by the manifest's own text, git state included, so with the default
- cache this answer is whatever it was the last time this manifest was evaluated. Measured 2026-10-03: a
- modified tracked file read as clean. A build whose stamp matters (a release) passes
- `--manifest-cache none`, which evaluates it fresh.
+ The development launcher states the answer instead, as COHERE_SWIFT_SOURCE_TREE_MODIFIED ("true" or
+ "false"), because it names the engine it caches by that same answer, read once: an engine whose answer
+ was read again here could disagree with its own name (#50wtb2s). Without the variable, as for a release
+ or a committed build, git is read, and a package with no git context reads as modified. A git that fails,
+ as on a worktree whose submodule is a symlink, reads as clean (measured 2026-11-12).
+
+ SwiftPM caches a manifest's evaluation by the manifest's own text and the environment, not git's state,
+ so with the default cache the git answer is whatever it was the last time this manifest was evaluated.
+ Measured 2026-10-03: a modified tracked file read as clean. A build whose stamp matters passes
+ `--manifest-cache none`, which evaluates it fresh. A stated answer is keyed (measured 2026-11-12).
  */
-let sourceTreeModified = Context.gitInformation?.hasUncommittedChanges ?? true
+let sourceTreeModified =
+    switch Context.environment["COHERE_SWIFT_SOURCE_TREE_MODIFIED"] {
+    case "true": true
+    case "false": false
+    default: Context.gitInformation?.hasUncommittedChanges ?? true
+    }
 
 /*
  The compiler checks cohere-swift's own `toolchain-require-upcoming-features` asks of every Swift target, held to here too.

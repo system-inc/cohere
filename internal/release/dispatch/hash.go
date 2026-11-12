@@ -31,6 +31,9 @@ const hashLength = 16
 // and excludes tests. A directory walk would both miss inputs reached through an import we did not
 // think of and include files that never compile in, and either error produces a hash that is wrong
 // in a way nothing would catch.
+//
+// The tree's commit and state are read here too, from git, because the binary is stamped with them and
+// reports them (developmentTreeState).
 func CollectInputs(moduleDirectory string, packagePath string, buildFlags []string) (Inputs, error) {
 	goVersion, goEnvironmentError := goEnvironment(moduleDirectory)
 	if goEnvironmentError != nil {
@@ -53,11 +56,14 @@ func CollectInputs(moduleDirectory string, packagePath string, buildFlags []stri
 		return Inputs{}, fmt.Errorf("go list reported no source files for %s, which cannot be right", packagePath)
 	}
 
+	selfCommit, sourceTreeModified := developmentTreeState(moduleDirectory, commit)
 	return Inputs{
 		GoVersion:          goVersion,
 		TypeScriptGoCommit: commit,
 		BuildFlags:         buildFlags,
 		SourceFiles:        sourceFiles,
+		SelfCommit:         selfCommit,
+		SourceTreeModified: sourceTreeModified,
 	}, nil
 }
 

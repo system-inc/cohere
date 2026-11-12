@@ -20,6 +20,25 @@ import (
 // ran it.
 const MinimumSwiftEngineMacOs = "15.0"
 
+// SwiftSourceTreeModifiedVariable states the engine's `sourceTreeModified` to its manifest, "true" or
+// "false", in place of the manifest reading git (swift/Package.swift).
+//
+// The development launcher states it, because it names the engine it caches by the same answer, read
+// once, so the engine it serves reports the state its name holds (#50wtb2s). A release states nothing:
+// its manifest reads git, and an inherited value is taken out of its environment.
+const SwiftSourceTreeModifiedVariable = "COHERE_SWIFT_SOURCE_TREE_MODIFIED"
+
+// WithoutVariable is environment with every entry for name taken out.
+func WithoutVariable(environment []string, name string) []string {
+	kept := make([]string, 0, len(environment))
+	for _, variable := range environment {
+		if variableName, _, _ := strings.Cut(variable, "="); variableName != name {
+			kept = append(kept, variable)
+		}
+	}
+	return kept
+}
+
 // swiftArchitecture is Swift's name for a Go architecture, which is what `swift build --arch` takes.
 func swiftArchitecture(goArchitecture string) (string, error) {
 	switch goArchitecture {
@@ -92,6 +111,9 @@ func buildSwiftEngine(
 	arguments := append([]string{"build", "-c", "release", "--arch", architecture, "--product", SwiftEngineFileName,
 		"--disable-automatic-resolution", "-Xswiftc", "-DCOHERE_RELEASE_STAMP"}, location...)
 	build := exec.Command("swift", arguments...)
+	// The manifest reads git for a release. A stated answer inherited from whoever ran the release would be
+	// compiled into the engine instead.
+	build.Env = WithoutVariable(os.Environ(), SwiftSourceTreeModifiedVariable)
 	build.Stdout = os.Stderr
 	build.Stderr = os.Stderr
 	if runError := build.Run(); runError != nil {

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -76,7 +77,7 @@ func ResolveWorkingTree(paths Paths, packagePath string) (string, bool, error) {
 		return binaryPath, false, nil
 	}
 
-	if buildError := build(paths, packagePath, binaryPath, inputs.GoVersion); buildError != nil {
+	if buildError := build(paths, packagePath, binaryPath, inputs); buildError != nil {
 		return "", false, buildError
 	}
 	if recordDevelopmentHashError := recordDevelopmentHash(paths, hash); recordDevelopmentHashError != nil {
@@ -126,17 +127,34 @@ func recordDevelopmentHash(paths Paths, hash string) error {
 // build compiles the binary to binaryPath, stamped with the formatter's identity as a committed build is, so
 // a `--dev` run reads and keeps the same format record. It builds through the Go cache every other `go`
 // command uses (see ReleaseBuildFlags).
-func build(paths Paths, packagePath string, binaryPath string, goVersion string) error {
+//
+// VCS stamping is off, and the tree's state is stamped from inputs instead: the commit, whether anything
+// compiled in is uncommitted, and the compiler's commit, every one of them held by the hash. Go's own stamp
+// was read at link time, a moment apart from the hash that names the binary, and was left out of that hash,
+// so a binary built in one state was served to a tree in another (#50wtb2s). Stamped from inputs, it
+// reports exactly what its name holds.
+// Turning stamping off also lets `--dev` build in a worktree whose TypeScript is a symlink, where Go's own
+// git status fails.
+func build(paths Paths, packagePath string, binaryPath string, inputs Inputs) error {
 	if createDirectoryError := os.MkdirAll(paths.BinaryDirectory(), 0o755); createDirectoryError != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
 	}
 
-	formatter, formatterIdentityError := FormatterIdentity(paths.ModuleDirectory, goVersion, nil)
+	const packagingPath = "github.com/system-inc/cohere/internal/release/packaging"
+	formatter, formatterIdentityError := FormatterIdentity(paths.ModuleDirectory, inputs.GoVersion, nil)
 	if formatterIdentityError != nil {
 		return formatterIdentityError
 	}
-	stamp := "-X github.com/system-inc/cohere/internal/release/packaging.formatterIdentity=" + formatter
-	arguments := []string{"build"}
+	stamps := []string{
+		"-X", packagingPath + ".formatterIdentity=" + formatter,
+		"-X", packagingPath + ".sourceTreeModified=" + strconv.FormatBool(inputs.SourceTreeModified),
+		"-X", packagingPath + ".compilerCommit=" + inputs.TypeScriptGoCommit,
+	}
+	if inputs.SelfCommit != "" {
+		stamps = append(stamps, "-X", packagingPath+".selfCommit="+inputs.SelfCommit)
+	}
+	stamp := strings.Join(stamps, " ")
+	arguments := []string{"build", "-buildvcs=false"}
 	stamped := false
 	for _, flag := range ReleaseBuildFlags {
 		// Joined onto the release flags' own `-ldflags`, since Go keeps only the last one given.

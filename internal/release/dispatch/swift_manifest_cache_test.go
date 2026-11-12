@@ -58,6 +58,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 			packageDirectory,
 			scratch,
 			binaryPath,
+			nil,
 		); buildSwiftProductWithSwiftPmError != nil {
 			test.Fatal(buildSwiftProductWithSwiftPmError)
 		}
