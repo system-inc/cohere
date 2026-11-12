@@ -73,6 +73,28 @@ func TestAnUnexportedConcreteForeignMethodNeverFixesAName(test *testing.T) {
 		"unexportedmethods")
 }
 
+// The verdict's method index leaves out an alias of a type that is not an interface (#swv3jbw), and this rule reads
+// interfaces alone, so an alias of a concrete type fixes no name here. An alias of a named type always reaches a
+// package already in the closure, which declares the same methods. aliasedconcrete reaches foreign.Runner, an alias
+// of a concrete type with HomeURL, and a HomeURL of ours stays a finding, so a rule that read a concrete alias's
+// methods would fail on its want.
+func TestAnAliasOfAConcreteTypeNeverFixesAName(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_uppercase_initialism.Analyzer,
+		"aliasedconcrete")
+}
+
+// An alias of an interface stays in the verdict's method index (#swv3jbw) because this rule reads one: build passes
+// every type name to add, and add reads through an alias to its interface, which may have no other name.
+// aliasedinterface reaches foreign.Located, an alias of an interface written in place, and place, which implements it,
+// keeps its HomeURL silent, while shop, which implements nothing, stays a finding. A rule that skipped aliases fails on
+// place, and the verdict would then index more than the rule reads, which is sound but no longer the rule's own.
+func TestAnAliasOfAnInterfaceFixesAName(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_uppercase_initialism.Analyzer,
+		"aliasedinterface")
+}
+
 // The verdict's method index reads an interface's whole method set and a concrete type's declared methods only
 // (#swv3jbw). This rule reads interfaces alone, so its part of that is two things: an interface's methods are its
 // whole method set, embedded ones included, and a concrete type fixes no name, by a method it declares or one
