@@ -147,10 +147,9 @@ type BuildRecord struct {
 	// CheckedFromSourceRounds is each load's count in order, written only when the build was loaded more than once
 	// (#k8gty9e). The first load's count over PackagesLoaded is the share that weighs its lint, which takes the whole
 	// of a budget of one build the extra builds share once the share is at or above one half, so no two near-full
-	// builds lint at once. LintWaitMilliseconds is the wall time its lint
-	// waited for that weight, and LintWaited whether it waited at all, so a wait under a millisecond still reads as
-	// one. None of them reaches a key or the verdict, and each is written only when not 0 or false, so the host's
-	// record writes none.
+	// builds lint at once. LintWaitMilliseconds is the wall time its lint waited for that weight, and LintWaited
+	// whether it waited at all, so a wait under a millisecond still reads as one. None of them reaches a key or the
+	// verdict, and each is written only when not 0 or false, so the host's record writes none.
 	CheckedFromSource       int   `json:"checkedFromSource,omitempty"`
 	CheckedFromSourceRounds []int `json:"checkedFromSourceRounds,omitempty"`
 	PackagesLoaded          int   `json:"packagesLoaded,omitempty"`

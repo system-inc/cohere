@@ -343,7 +343,7 @@ func populatedRecords() []Record {
 					ReloadRounds: 1, ReloadRoundsBy: map[string]int{"hostDecline": 1}, WrittenThrough: 1,
 					LoadMilliseconds: 30, LintMilliseconds: 50, DecideMilliseconds: 12,
 					CheckedFromSource: 3, CheckedFromSourceRounds: []int{1, 2}, PackagesLoaded: 3,
-					LintWaitMilliseconds: 8, LintWaited: true,
+					LintWaitMilliseconds: 8, LintWaited: true, HeldAtLoadEndBytes: 64, HeldAtLintPeakBytes: 128,
 				},
 			},
 			OffReasons: map[string]string{"cohere-go/printf": "a reason"},
