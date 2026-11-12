@@ -49,14 +49,15 @@ func TestAnUnexportedConcreteForeignMethodNeverFixesAName(test *testing.T) {
 	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_any.Analyzer, "unexportedmethods")
 }
 
-// The verdict's method index leaves out an alias, as buildForeignMethods does (#swv3jbw). An alias of a named type
-// adds nothing, since that type's package is in the closure and declares the same methods, so the alias that matters
-// names an interface written in place, which no named type declares. aliasedmethods reaches only such an alias
-// carrying Store, and the anys of its Store on a concrete type that has all of it and on an interface of its own stay
-// findings, so a rule that read an alias's interface would fail on their wants.
-func TestAnAliasNeverFixesAName(test *testing.T) {
+// The verdict's method index leaves out an alias of a type that is not an interface, and buildForeignMethods skips
+// every alias (#swv3jbw). An alias of a named type adds nothing, since that type's package is in the closure and
+// declares the same methods, so the alias that matters names a concrete type written in place, a struct with a method
+// only by promotion. aliasedconcrete reaches foreign.Vault, such an alias, the only type carrying Store, and the any
+// of a Store of ours with its signature stays a finding, so a rule that read a concrete alias's method set would fail
+// on its want.
+func TestAnAliasOfAConcreteTypeNeverFixesAName(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_any.Analyzer, "aliasedmethods")
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_any.Analyzer, "aliasedconcrete")
 }
 
 // The verdict's method index reads a concrete type's declared methods only, as foreignMethods.add does (#swv3jbw). A
