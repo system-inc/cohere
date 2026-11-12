@@ -69,8 +69,9 @@ func (judged verdict) persistedObjectHolds(held *heldReads, reference int) (bool
 	stored := held.object(reference)
 	name := held.objectName(reference)
 	owner := held.owner(stored.Owner)
-	// unsafe's objects are the type checker's own, the same in every build (counterpart).
-	if owner == types.Unsafe.Path() {
+	// unsafe's objects are the type checker's own, and the universe's, of no package, the same in every build
+	// (counterpart).
+	if stored.Owner == 0 || owner == types.Unsafe.Path() {
 		return true, ""
 	}
 	if stored.Path == "" {
@@ -97,8 +98,9 @@ func (judged verdict) persistedUseHolds(held *heldReads, use persistedUse) (bool
 	stored := held.object(use.Object)
 	name := held.objectName(use.Object)
 	owner := held.owner(stored.Owner)
-	// unsafe's objects are the type checker's own, the same in every build, and read alike (counterpart).
-	if owner == types.Unsafe.Path() {
+	// unsafe's objects are the type checker's own, and the universe's, of no package, the same in every build, and
+	// read alike (counterpart).
+	if stored.Owner == 0 || owner == types.Unsafe.Path() {
 		return true, ""
 	}
 	if stored.Path == "" {

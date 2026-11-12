@@ -35,7 +35,8 @@ var kindFiles = map[string]string{
 		"func Consume(Record) {}\n\n" +
 		"type Base struct{}\n\nfunc (Base) Close() error { return nil }\n\n" +
 		"type T struct{ common }\n\ntype common struct {\n\tstart stamp\n\tname  string\n}\n\n" +
-		"func (*common) Errorf(format string, arguments ...any) {}\n",
+		"func (*common) Errorf(format string, arguments ...any) {}\n\n" +
+		"type Failure interface{ error }\n",
 	"dependency/dependency_windows.go": "package dependency\n\n" +
 		"type Record struct {\n\tName    string\n\tlock    mutex\n\thandles []uintptr\n}\n\n" +
 		"type Wrapper struct {\n\tBase\n\tClose int\n}\n\n" +
@@ -68,6 +69,8 @@ var kindUsers = map[string]string{
 	"stringOption": "type Holder struct {\n\tCount *dependency.Count `json:\",string\"`\n}\n",
 	"underlying":   "func Size(names *dependency.Names) int { return len(*names) }\n",
 	"methodSet":    "func Hand(sizer *dependency.Sizer) interface{ Size() int } { return sizer }\n",
+	"linknamed": "import _ \"unsafe\"\n\n//go:linkname now runtime.nanotime\nfunc now() int64\n\n" +
+		"func Say(failure dependency.Failure) string { return failure.Error() }\n",
 }
 
 // kindPackages are dependency and format type-checked for goos from the files its build context matches, by path.
@@ -146,8 +149,9 @@ func kindRestoring(test *testing.T, user string) Restoring {
 	}
 	reads := &build_reads.Reads{}
 	reads.RecordTypes(checked, info, []*ast.File{file})
-	if why := reads.ClosureOnly(); why != "" {
-		test.Fatalf("the %s user's reads are judged by closure alone, so the fixture tells nothing: %s", user, why)
+	if closureOnly := reads.ClosureOnly() != ""; closureOnly != (user == "linknamed") {
+		test.Fatalf("the %s user's reads are judged by closure alone %t, %q, want %t", user, closureOnly,
+			reads.ClosureOnly(), user == "linknamed")
 	}
 	imports := make([]string, 0, len(checked.Imports()))
 	for _, imported := range checked.Imports() {
@@ -212,6 +216,21 @@ func TestAMemberUseOfATypeWhoseUnexportedFieldDiffersIsRestored(test *testing.T)
 	for _, goos := range []string{"windows", "darwin"} {
 		if holds, why := kindHolds(test, "member", goos); !holds {
 			test.Errorf("on %s, want the member user restored, got %q", goos, why)
+		}
+	}
+}
+
+// A package that names a symbol by go:linkname is judged by closure alone, every selection by its receiver's and its
+// member's closures, and a selection of Error through another package's interface that embeds error selects the
+// universe's Error, of no package and no objectpath, the same in every build: it holds on windows and on the host's
+// twin, as such a package held before kinds, where crypto/tls, which links by name and calls Error so, was declined
+// by every tag build once selections were read.
+func TestAClosureOnlySelectionOfTheUniversesErrorHolds(test *testing.T) {
+	test.Parallel()
+
+	for _, goos := range []string{"windows", "darwin"} {
+		if holds, why := kindHolds(test, "linknamed", goos); !holds {
+			test.Errorf("on %s, want the linknamed user restored, got %q", goos, why)
 		}
 	}
 }

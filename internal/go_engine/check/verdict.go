@@ -95,9 +95,11 @@ func (judged verdict) find(ownerPath string, path objectpath.Path) (types.Object
 }
 
 // counterpart is the build's object at the place of hostObject, the host's, by its package's path and objectpath, and
-// why not when there is none. unsafe's objects are the type checker's own, the same in every build.
+// why not when there is none. unsafe's objects are the type checker's own, and the universe's, of no package, the same
+// in every build: a selection of Error through another package's interface that embeds error selects the universe's,
+// which a package judged by closure alone reads whole.
 func (judged verdict) counterpart(hostObject types.Object) (types.Object, string) {
-	if hostObject.Pkg() == types.Unsafe {
+	if hostObject.Pkg() == nil || hostObject.Pkg() == types.Unsafe {
 		return hostObject, ""
 	}
 	path, hasPath := judged.host.pathOf(hostObject)
