@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/cache_directory"
 )
 
 // The run cache's half every engine that declares its inputs shares, Go's (go_run_cache.go) and Swift's
@@ -88,8 +90,8 @@ func engineInputsUnreplayable(engine string, inputs *engineInputsRecord, roots [
 		for _, path := range paths {
 			for _, root := range roots {
 				named := scratch != "" && !slices.Contains(inputs.Directories, path) &&
-					pathWithin(path, filepath.Join(cacheDirectory(root), scratch))
-				if pathWithin(path, cacheDirectory(root)) && !named {
+					pathWithin(path, filepath.Join(cache_directory.Of(root), scratch))
+				if pathWithin(path, cache_directory.Of(root)) && !named {
 					return fmt.Sprintf("%s named %s, inside the cache directory the run writes, so "+
 						"no later run could replay it", engine, path)
 				}

@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/system-inc/cohere/internal/cache_directory"
 )
 
 // Store is the directory of entries, one file per key under a directory named for the key's first two hex
@@ -21,12 +23,18 @@ type Store struct {
 	// store rather than once per entry: a cold run at cohere's root writes about 31,000 files into 256 directories,
 	// and a MkdirAll before each cost 2.5 s of stat and lstat calls summed (#m8hcs4n).
 	made sync.Map
+
+	// cacheRoot is made once per store, before the first shard, through cache_directory.Make, so a store that
+	// creates the project's `.cache/cohere` leaves it ignoring itself (#6vhp0vd).
+	cacheRoot sync.Once
+	// cacheRootError is the error making the cache root ended with, which every Put that needs it returns.
+	cacheRootError error
 }
 
 // Open is the store under root, at `<root>/.cache/cohere/go`, beside the TypeScript cache in `.cache/cohere`.
 // Nothing is made until the first Put.
 func Open(root string) *Store {
-	return &Store{directory: filepath.Join(root, ".cache", "cohere", "go")}
+	return &Store{directory: filepath.Join(cache_directory.Of(root), "go")}
 }
 
 // Get is the entry under key. Any failure to read it whole is a miss, never an error: the package is analyzed
@@ -88,8 +96,12 @@ func (store *Store) Put(key Key, entry []byte) error {
 		}
 	}
 	temporary, createError := os.CreateTemp(directory, filepath.Base(path)+".*.temporary")
-	// A directory removed while the store runs, by someone clearing the cache, is made again once.
+	// A directory removed while the store runs, by someone clearing the cache, is made again once, the cache root
+	// through Make again so a root this store makes a second time ignores itself too.
 	if errors.Is(createError, fs.ErrNotExist) {
+		if makeError := cache_directory.Make(filepath.Dir(store.directory)); makeError != nil {
+			return fmt.Errorf("making the cache directory %s: %w", filepath.Dir(store.directory), makeError)
+		}
 		if makeError := store.makeDirectory(directory); makeError != nil {
 			return makeError
 		}
@@ -115,8 +127,15 @@ func (store *Store) Put(key Key, entry []byte) error {
 	return nil
 }
 
-// makeDirectory makes directory and every parent it needs, and remembers it made.
+// makeDirectory makes directory and every parent it needs, and remembers it made. The project's cache directory, the
+// store's parent, is made first by cache_directory.Make, so the run that creates it writes its ignore file.
 func (store *Store) makeDirectory(directory string) error {
+	store.cacheRoot.Do(func() {
+		store.cacheRootError = cache_directory.Make(filepath.Dir(store.directory))
+	})
+	if store.cacheRootError != nil {
+		return fmt.Errorf("making the cache directory %s: %w", filepath.Dir(store.directory), store.cacheRootError)
+	}
 	if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
 		return fmt.Errorf("making the cache directory %s: %w", directory, makeError)
 	}

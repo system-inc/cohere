@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -32,7 +33,7 @@ func openContentPack(root string) *program.ContentPack {
 	}
 	// Created before anything is read, for the reason prepareCacheDirectory gives.
 	prepareCacheDirectory(root)
-	pack, openContentPackError := program.OpenContentPack(cacheDirectory(root))
+	pack, openContentPackError := program.OpenContentPack(cache_directory.Of(root))
 	if openContentPackError != nil {
 		// A fact about this invocation, never about the tree, so a replay never says it again.
 		printInvocation(accountOutput(streams.Errors), "note: %v\n", openContentPackError)
@@ -63,7 +64,7 @@ func saveContentPack() {
 		return
 	}
 	activeContentPack = nil
-	directory := cacheDirectory(activeContentPackRoot)
+	directory := cache_directory.Of(activeContentPackRoot)
 	if _, _, damaged := pack.Counts(); damaged > 0 {
 		cacheNote(directory, fmt.Sprintf(
 			"%d files in the content pack failed their checksum or bounds and were read from disk; the pack is rewritten without them",

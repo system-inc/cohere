@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/gitignore"
@@ -233,7 +234,7 @@ func beginRunCacheSession(
 	key := keyParts.Key()
 
 	prepareCacheDirectory(root)
-	directory := cacheDirectory(root)
+	directory := cache_directory.Of(root)
 	printPreviousNotes(directory)
 	// The run before this one may still be writing the table after answering its caller, and reading
 	// before its renames would miss what it recorded, or see its run beside the findings before them. So the
@@ -311,18 +312,6 @@ func beginRunCacheSession(
 	return session
 }
 
-// cacheDirectory is where cohere keeps what it caches for one project, the cache table's files among it:
-// `<root>/.cache/cohere/`.
-//
-// It lived in the user cache under a hash of the root path, which nothing ever reclaimed. A moved or
-// deleted project left its table behind for good, and 38 of them had piled up by 2026-10-02. In the
-// project it is one folder per project that deleting is always a correct answer for, and a worktree has
-// its own because it is its own root. Every eligible invocation shares it; their recorded runs sit side
-// by side, each in its own file, and their findings are the same findings.
-func cacheDirectory(root string) string {
-	return filepath.Join(root, ".cache", "cohere")
-}
-
 // prepareCacheDirectory creates the project's cache directory before anything is read or recorded, and
 // warns once when the project's .gitignore does not ignore it.
 //
@@ -331,8 +320,10 @@ func cacheDirectory(root string) string {
 // the first replay of every project a miss that looks merely cold. Writes inside `.cache/cohere` move only
 // that directory's time, which no tsconfig enumerates, since a wildcard never matches a dot directory.
 //
-// The warning is a warning rather than a refusal: the cache is still the project's to keep, and the line
-// to add is named so it is one edit away. What it must never be is a silent write into tracked space.
+// A directory this run creates ignores itself (cache_directory.Make), so the warning is said only of one that
+// was there already without that file, as an older cohere made it. The warning is a warning rather than a
+// refusal: the cache is still the project's to keep, and the line to add is named so it is one edit away. What
+// it must never be is a silent write into tracked space.
 var prepareCacheDirectoryOnce sync.Once
 
 // startRunCacheClock starts the run cache's clock: after the cache directory exists, since creating it moves the
@@ -355,7 +346,7 @@ func startRunCacheClock(location projectLocation, locateError error) {
 	if !eligible {
 		return
 	}
-	directory := cacheDirectory(location.Root)
+	directory := cache_directory.Of(location.Root)
 	// A test instrument: a directory no stamp can be taken in, as a cache directory that can't be written is.
 	// See TestARunWhoseClockIsNoStampIsNeverRecorded.
 	if os.Getenv("COHERE_TEST_NO_CLOCK_STAMP") != "" {
@@ -432,11 +423,11 @@ func filesystemStamp(directory string) (time.Time, error) {
 
 func prepareCacheDirectory(root string) {
 	prepareCacheDirectoryOnce.Do(func() {
-		if createDirectoryError := os.MkdirAll(cacheDirectory(root), 0o755); createDirectoryError != nil {
+		if createDirectoryError := cache_directory.Make(cache_directory.Of(root)); createDirectoryError != nil {
 			fmt.Fprintf(
 				accountOutput(streams.Errors),
 				"note: the cache directory %s could not be created: %v\n",
-				cacheDirectory(root),
+				cache_directory.Of(root),
 				firstLine(createDirectoryError.Error()),
 			)
 			showWarning()
@@ -464,7 +455,7 @@ func prepareCacheDirectory(root string) {
 				accountOutput(streams.Errors),
 				"note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
 				ignoreFile,
-				cacheDirectory(root),
+				cache_directory.Of(root),
 			)
 			showWarning()
 		}
@@ -491,11 +482,11 @@ func readFormatSection(root string) *program.FormatSection {
 	if cacheOff {
 		return nil
 	}
-	release, _ := holdTableReadLock(cacheDirectory(root), tableWriterWait)
+	release, _ := holdTableReadLock(cache_directory.Of(root), tableWriterWait)
 	// Ignored: a table missing or unreadable holds no format record, which is the nil this answers, and costs the
 	// run a format of files already formatted, never a skip; beginRunCache is where a discarded table is said.
 	table, _ := program.ReadCacheTable(
-		cacheDirectory(root),
+		cache_directory.Of(root),
 		cacheTableIdentity(),
 		program.CacheTableSections{Formatted: true},
 		program.NewPathAnchor(root),
@@ -513,7 +504,7 @@ func writeFormatSection(root string, section *program.FormatSection) error {
 		return nil
 	}
 	prepareCacheDirectory(root)
-	directory := cacheDirectory(root)
+	directory := cache_directory.Of(root)
 	release := holdTableLock(directory)
 	defer release()
 	return program.WriteCacheTable(directory, &program.CacheTable{Formatted: section}, cacheTableIdentity(),
@@ -523,7 +514,7 @@ func writeFormatSection(root string, section *program.FormatSection) error {
 // dumpCacheTable is `--cache-dump`: what this project's table holds, read by the same build that would use
 // it, so a table this binary would discard says so rather than printing as though it were in use.
 func dumpCacheTable(location projectLocation) error {
-	directory := cacheDirectory(location.Root)
+	directory := cache_directory.Of(location.Root)
 	release, _ := holdTableReadLock(directory, tableWriterWait)
 	table, readCacheTableError := program.ReadCacheTable(
 		directory,
@@ -1133,7 +1124,7 @@ func attachTypesCache(graph *program.Graph, location projectLocation) {
 		return
 	}
 	prepareCacheDirectory(location.Root)
-	directory := cacheDirectory(location.Root)
+	directory := cache_directory.Of(location.Root)
 	release, _ := holdTableReadLock(directory, tableWriterWait)
 	anchor := program.NewPathAnchor(location.Root)
 	// Ignored: a table missing or unreadable reads as empty, so the types section and the shapes start cold and are

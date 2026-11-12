@@ -352,8 +352,12 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(test *testing.T) {
 	if readDirectoryError != nil {
 		test.Fatal(readDirectoryError)
 	}
-	if len(entries) != 1 {
-		test.Errorf("the directory holds %d entries, want only the manifest: a temporary was left behind", len(entries))
+	// The writer created the directory, so beside the manifest it holds the ignore file it wrote there (#6vhp0vd).
+	if len(entries) != 2 || entries[0].Name() != ".gitignore" || !strings.HasPrefix(entries[1].Name(), "run-") {
+		test.Errorf(
+			"the directory holds %v, want the ignore file and the manifest only: a temporary was left behind",
+			entries,
+		)
 	}
 }
 

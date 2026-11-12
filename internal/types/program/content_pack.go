@@ -15,6 +15,8 @@ import (
 	"unsafe"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+
+	"github.com/system-inc/cohere/internal/cache_directory"
 )
 
 // The content pack: the bytes of every file recent runs read, kept in one file beside the cache table, so
@@ -257,7 +259,7 @@ func (pack *ContentPack) Save() error {
 	if len(pack.added) == 0 && pack.damaged == 0 {
 		return nil
 	}
-	if createDirectoryError := os.MkdirAll(pack.directory, 0o755); createDirectoryError != nil {
+	if createDirectoryError := cache_directory.Make(pack.directory); createDirectoryError != nil {
 		return createDirectoryError
 	}
 

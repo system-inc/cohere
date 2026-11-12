@@ -387,8 +387,9 @@ paths to check only those. Without `--no-fix`, `cohere --format-only` formats an
 
 cohere keeps its cache in `.cache/cohere` at the project root, so a run reuses what an earlier run
 already established. When your tsconfig sets `incremental`, it also keeps TypeScript's build information
-where the tsconfig says, and a `--no-fix` run leaves that file untouched. Add `.cache/` to your
-`.gitignore`. `--no-cache` reads nothing from those caches and writes nothing to them; use it when
+where the tsconfig says, and a `--no-fix` run leaves that file untouched. The run that creates
+`.cache/cohere` writes a `.gitignore` in it holding `*`, so the cache ignores itself and `git status` stays as it
+was, whatever your own `.gitignore` says. `--no-cache` reads nothing from those caches and writes nothing to them; use it when
 you suspect the cache, or to time a run from scratch. Leave the files in `.cache/cohere` to cohere: it
 reads source text straight from the ones it mapped, so a tool that truncated one in place while a run
 was reading it would end that run with a memory fault. Deleting the directory between runs is always

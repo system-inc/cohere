@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
@@ -611,7 +612,7 @@ func TestAGoRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 // line, so a run that wrote any of them reads differently. The lock is left out: taking it writes nothing.
 func cacheDirectoryState(test *testing.T, root string) string {
 	test.Helper()
-	entries, readError := os.ReadDir(cacheDirectory(root))
+	entries, readError := os.ReadDir(cache_directory.Of(root))
 	if readError != nil {
 		test.Fatal(readError)
 	}
@@ -677,7 +678,7 @@ func TestAnUnchangedGoModuleReplays(test *testing.T) {
 func goEngineCacheEntries(test *testing.T, root string) int {
 	test.Helper()
 	entries := 0
-	walkError := filepath.WalkDir(filepath.Join(cacheDirectory(root), "go"),
+	walkError := filepath.WalkDir(filepath.Join(cache_directory.Of(root), "go"),
 		func(path string, entry os.DirEntry, pathError error) error {
 			if pathError != nil {
 				return pathError

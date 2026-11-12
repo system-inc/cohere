@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/format/format_files"
 )
 
@@ -259,7 +260,7 @@ func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 
 	// An unreadable table is the same answer, never an error.
 	if writeError := os.WriteFile(
-		filepath.Join(cacheDirectory(fixture.root), "format.gob"),
+		filepath.Join(cache_directory.Of(fixture.root), "format.gob"),
 		[]byte("not a cache table"),
 		0o644,
 	); writeError != nil {

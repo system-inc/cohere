@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -259,7 +260,7 @@ func TestASwiftRecordMayNameItsScratchsPinsAndNothingElseOfTheCache(test *testin
 	test.Parallel()
 	root := "/work/App"
 	roots := []string{root}
-	pins := filepath.Join(cacheDirectory(root), "swift", "xcode-Package.resolved")
+	pins := filepath.Join(cache_directory.Of(root), "swift", "xcode-Package.resolved")
 	scratch := swiftLanguage.NamedScratch
 	inputs := func(files []string, directories []string) *engineInputsRecord {
 		return &engineInputsRecord{Files: files, Directories: directories}
@@ -272,7 +273,7 @@ func TestASwiftRecordMayNameItsScratchsPinsAndNothingElseOfTheCache(test *testin
 		name   string
 		inputs *engineInputsRecord
 	}{
-		{"the table", inputs([]string{filepath.Join(cacheDirectory(root), "run-0123.gob")}, []string{root})},
+		{"the table", inputs([]string{filepath.Join(cache_directory.Of(root), "run-0123.gob")}, []string{root})},
 		{"a directory in the scratch", inputs([]string{pins}, []string{root, filepath.Dir(pins)})},
 	}
 	for _, refusal := range refused {

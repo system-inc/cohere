@@ -206,6 +206,11 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   same. Where that can't be made exact, as beside a vendor directory, go list runs in the tree as before, and the
   footer says `⚠ go list may have rewritten go.work.sum`, and the file is named under `--verbose` and in `--json`'s
   `gaps.unguardedWorkspaceSums`.
+- cohere's cache directory ignores itself. The run that creates `.cache/cohere` writes a `.gitignore` in it holding
+  `*`, so a run in a repository whose rules say nothing of `.cache/` leaves `git status` as it found it, where a cold
+  run left `.cache/` untracked. The front door, the Go engine's store and the Swift engine's scratch each write it,
+  whichever creates the directory first, and never over a file that is there. A `.cache/cohere` an older cohere made
+  is left as it was, and `--verbose` still says when the project's own `.gitignore` doesn't ignore it.
 
 ## 0.1.1 (2026-11-03)
 

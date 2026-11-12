@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/replace"
 )
 
@@ -560,7 +561,7 @@ func WriteCacheTable(
 	anchor PathAnchor,
 ) error {
 	anchored := table.anchored(anchor)
-	if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+	if createDirectoryError := cache_directory.Make(directory); createDirectoryError != nil {
 		return fmt.Errorf("creating %s: %w", directory, createDirectoryError)
 	}
 	invocations := sections.Runs

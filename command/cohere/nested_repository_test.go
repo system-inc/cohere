@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -195,10 +196,10 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 		check("a check before either repository keeps a cache", 4, drifted...)
 	}
 	for _, repository := range []string{library, inner} {
-		if _, statError := os.Stat(cacheDirectory(repository)); !errors.Is(statError, os.ErrNotExist) {
+		if _, statError := os.Stat(cache_directory.Of(repository)); !errors.Is(statError, os.ErrNotExist) {
 			test.Fatalf("a check that only reads %s made its cache directory (%v)", repository, statError)
 		}
-		if createDirectoryError := os.MkdirAll(cacheDirectory(repository), 0o755); createDirectoryError != nil {
+		if createDirectoryError := os.MkdirAll(cache_directory.Of(repository), 0o755); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
 	}
@@ -296,7 +297,7 @@ func TestASignedEntryStillReadsAnEditedFile(test *testing.T) {
 	test.Parallel()
 	root := nestedTree(test)
 	library := filepath.Join(root, "library")
-	if createDirectoryError := os.MkdirAll(cacheDirectory(library), 0o755); createDirectoryError != nil {
+	if createDirectoryError := os.MkdirAll(cache_directory.Of(library), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
 	engine := prettierLike()
@@ -491,10 +492,10 @@ func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 	}
 
 	prepareNestedCacheDirectories(root)
-	if information, statError := os.Stat(cacheDirectory(library)); statError != nil || !information.IsDir() {
+	if information, statError := os.Stat(cache_directory.Of(library)); statError != nil || !information.IsDir() {
 		test.Fatalf("the library, whose .gitignore ignores .cache, has no cache after the run's start (%v)", statError)
 	}
-	if _, statError := os.Stat(cacheDirectory(inner)); !errors.Is(statError, os.ErrNotExist) {
+	if _, statError := os.Stat(cache_directory.Of(inner)); !errors.Is(statError, os.ErrNotExist) {
 		test.Fatalf("the inner library, whose .gitignore does not ignore .cache, got a cache directory (%v)", statError)
 	}
 

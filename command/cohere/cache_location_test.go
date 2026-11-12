@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/cache_directory"
 )
 
 // TestTheCacheLivesInTheProjectAndNoCacheTouchesNone holds where cohere keeps a project's cache and what
@@ -68,6 +70,11 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 		test.Fatalf("a project run wrote to the user cache: %v", entries)
 	}
 	second := project("tsconfig.tsbuildinfo\n")
+	// The cache directory as an older cohere made it, without the ignore file a run that creates it writes
+	// (#6vhp0vd): the one the note is still said of.
+	if createDirectoryError := os.MkdirAll(cache_directory.Of(second), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
 	if _, stderr := run(second, "--no-fix"); !strings.Contains(stderr, "does not ignore .cache/, so cohere's cache") ||
 		!strings.Contains(stderr, "add the line `.cache/`") {
 		test.Errorf("a project that does not ignore .cache/ was not told:\n%s", stderr)

@@ -1327,13 +1327,26 @@ public struct Pipeline {
      file set's walk skips this scratch by its path (`FileSet.buildScratches`), whatever the project's
      `.gitignore` says, so nothing here is ever read as source. `--no-fix` writes no source file; this cache is cohere's.
      */
-    /* This run's scratch: its own under `--no-cache`, the package's otherwise. */
+    /*
+     This run's scratch: its own under `--no-cache`, the package's otherwise, whose parent is made first through
+     `CacheDirectory.make`, so the run that creates the project's `.cache/cohere` leaves it ignoring itself.
+     */
     private func runScratch(for root: URL) -> URL {
-        freshScratch ?? Self.scratchPath(for: root)
+        if let freshScratch {
+            return freshScratch
+        }
+        let scratch = Self.scratchPath(for: root)
+        do {
+            try CacheDirectory.make(scratch.deletingLastPathComponent())
+        }
+        catch {
+            /* The scratch's own creation, by whatever writes there first, says why the directory could not be made. */
+        }
+        return scratch
     }
 
     public static func scratchPath(for root: URL) -> URL {
-        root.appendingPathComponent(".cache/cohere/swift", isDirectory: true)
+        CacheDirectory.of(root: root).appendingPathComponent("swift", isDirectory: true)
     }
 
     static func milliseconds(since start: Date) -> Int {
