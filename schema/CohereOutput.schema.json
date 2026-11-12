@@ -678,6 +678,11 @@
                     "minimum": 1,
                     "description": "How many of the builds beside the host's ran side by side, decided once as they started from the machine's cores, the memory cap and the live heap. It changes no finding: the builds' results are merged in the order of builds whatever it is. Absent when builds is, and kept by a replay with them."
                 },
+                "buildsWidthLiveBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The host's live heap, in bytes, buildsAtOnce was decided from, measured by a collection once the host's reads were whole. Absent when the decision needed none: one build at a time under --single-threaded or a limit other than the cap, builds that restore nothing from the host, or too few cores or builds for more than one at a time."
+                },
                 "typeErrors": { "type": "integer" },
                 "findings": { "type": "integer", "description": "Rule findings, type errors not included." },
                 "filesFixed": { "type": "integer" },
