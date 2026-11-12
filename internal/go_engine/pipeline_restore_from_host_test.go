@@ -81,6 +81,48 @@ func TestAnExtraBuildRestoresWhatReadsTheSameAndChecksTheRest(test *testing.T) {
 	}
 }
 
+// A build loaded again after a check-time decline counts what each load checked from source, and its record sums
+// them (#k8gty9e): over the fixture whose windows build declines two packages at its check and reloads once, the
+// windows record names both rounds, the reload's checking the declined packages from source, and its
+// checkedFromSource is their sum, not the first load's alone.
+func TestAReloadsChecksFromSourceReachTheRecord(test *testing.T) {
+	test.Parallel()
+
+	// The stream as written, since normalize blanks each build's target.
+	_, stream := runOverRaw(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), exitFindings,
+		"--no-cache", "--other-builds")
+	var lint contract.LintRecord
+	for line := range strings.SplitSeq(stream, "\n") {
+		if strings.HasPrefix(line, `{"kind":"lint"`) {
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+		}
+	}
+	index := slices.IndexFunc(lint.Builds, func(build contract.BuildRecord) bool {
+		return strings.HasPrefix(build.Target, "windows/")
+	})
+	if index < 0 {
+		test.Fatalf("the lint record names no windows build:\n%s", stream)
+	}
+	windows := lint.Builds[index]
+	if len(windows.CheckedFromSourceRounds) != 2 || windows.CheckedFromSourceRounds[1] == 0 {
+		test.Fatalf("windows records the rounds %v checked from source, want two, the reload's above zero",
+			windows.CheckedFromSourceRounds)
+	}
+	sum := windows.CheckedFromSourceRounds[0] + windows.CheckedFromSourceRounds[1]
+	if windows.CheckedFromSource != sum {
+		test.Errorf("windows records %d checked from source, want %d, the sum of its rounds %v",
+			windows.CheckedFromSource, sum, windows.CheckedFromSourceRounds)
+	}
+	for _, build := range lint.Builds {
+		if build.Target != windows.Target && len(build.CheckedFromSourceRounds) != 0 {
+			test.Errorf("%s, loaded once, records the rounds %v, want none", build.Target,
+				build.CheckedFromSourceRounds)
+		}
+	}
+}
+
 // The merged verdict is the same whether the extra builds restore from the host's run or check every package
 // themselves, byte for byte but for each build's counts of the restore, without the findings cache and with it.
 func TestTheMergeIsTheSameWhetherTheBuildsRestoreFromTheHostOrNot(test *testing.T) {

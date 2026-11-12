@@ -402,15 +402,9 @@ func (engine *pipeline) extraBuildRun(
 	}
 	run.said = compiledFiles(loaded.Packages, ours)
 	run.packagesLoaded = loaded.PackagesLoaded
-	// A package the load checked from source has type maps, which the loader's check sets first on every package it
-	// checks, while one whose types came from export data, the build's own findings cache's or the host's run's, or
-	// that the load never needed, has none: check.Run's walks of type reads tell the two apart the same way. Its
-	// syntax would not, since a package checked from source none of whose files parsed has none either.
-	packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
-		if each.TypesInfo != nil {
-			run.checkedFromSource++
-		}
-	})
+	// The first load's count weighs the lint at the gate; every load's, a reload's included, reaches the record.
+	run.checkedFromSource = checkedFromSource(loaded.Roots)
+	run.checkedFromSourceRounds = []int{run.checkedFromSource}
 	weight := lintWeight(run.checkedFromSource, run.packagesLoaded)
 	engine.lintStepped(extra, lintStepReady, weight)
 	waitStarted := time.Now()
@@ -467,6 +461,7 @@ func (engine *pipeline) extraBuildRun(
 				return nil, fmt.Errorf("loading the build %s again to check %s from source found %d type "+
 					"errors the first load did not", extra, reloads, len(loaded.Diagnostics))
 			}
+			run.checkedFromSourceRounds = append(run.checkedFromSourceRounds, checkedFromSource(loaded.Roots))
 			result, checkError = runRules(loaded)
 		}
 		if checkError != nil {
@@ -558,8 +553,10 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			FindingsAdded:    verdict.merged.added[index],
 			FindingsDropped:  verdict.merged.dropped[index],
 			// An extra build's alone: the host's run counts neither, so its record writes neither.
-			CheckedFromSource: run.checkedFromSource,
-			PackagesLoaded:    run.packagesLoaded,
+			CheckedFromSource: sumOf(run.checkedFromSourceRounds),
+			// Each load's count, written only for a build loaded more than once.
+			CheckedFromSourceRounds: roundsIfReloaded(run.checkedFromSourceRounds),
+			PackagesLoaded:          run.packagesLoaded,
 			// An extra build's alone, and under `--timing` alone: 0 otherwise, which the record leaves out.
 			HeldAtLoadEndBytes:  run.heldAtLoadEnd,
 			HeldAtLintPeakBytes: run.heldAtLintPeak,
@@ -588,6 +585,38 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 	}
 	engine.recordBuildCoverage(runs, verdict.records)
 	return verdict
+}
+
+// checkedFromSource is how many packages of roots' whole graph a load checked from source. A package the load checked
+// from source has type maps, which the loader's check sets first on every package it checks, while one whose types
+// came from export data, the build's own findings cache's or the host's run's, or that the load never needed, has
+// none: check.Run's walks of type reads tell the two apart the same way. Its syntax would not, since a package checked
+// from source none of whose files parsed has none either.
+func checkedFromSource(roots []*packages.Package) int {
+	count := 0
+	packages.Visit(roots, nil, func(each *packages.Package) {
+		if each.TypesInfo != nil {
+			count++
+		}
+	})
+	return count
+}
+
+// roundsIfReloaded is rounds when there are more than one, and nil for a build loaded once, whose one round is its sum.
+func roundsIfReloaded(rounds []int) []int {
+	if len(rounds) < 2 {
+		return nil
+	}
+	return rounds
+}
+
+// sumOf is the sum of counts.
+func sumOf(counts []int) int {
+	sum := 0
+	for _, count := range counts {
+		sum += count
+	}
+	return sum
 }
 
 // recordTimes writes into record where run's time went: its load and its lint, every reload's included, the host's wait
