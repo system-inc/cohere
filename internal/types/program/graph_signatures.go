@@ -204,6 +204,21 @@ func (graph *Graph) GraduateSignatures(
 	deadline time.Time,
 	abandonAfter time.Duration,
 ) (graduated int, abandoned string) {
+	timer := time.NewTimer(time.Until(deadline))
+	defer timer.Stop()
+	return graph.graduateSignaturesUntil(shapes, timer.C, abandonAfter)
+}
+
+// graduateSignaturesUntil is GraduateSignatures with its deadline as the moment deadline delivers, so a test can
+// say when the deadline passes rather than race the wall clock for it: a 200ms deadline on a loaded 64-core box
+// once passed before the first file's emit finished (#3sz36vs).
+//
+// Mutates: shapes takes each graduated entry and the abandoned one, for the caller to write to the table
+func (graph *Graph) graduateSignaturesUntil(
+	shapes map[string]SignatureEntry,
+	deadline <-chan time.Time,
+	abandonAfter time.Duration,
+) (graduated int, abandoned string) {
 	var candidates []*ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
 		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
@@ -266,8 +281,6 @@ func (graph *Graph) GraduateSignatures(
 		}
 	}()
 
-	timer := time.NewTimer(time.Until(deadline))
-	defer timer.Stop()
 	for {
 		select {
 		case result, open := <-results:
@@ -276,7 +289,7 @@ func (graph *Graph) GraduateSignatures(
 			}
 			shapes[result.fileName] = result.entry
 			graduated++
-		case <-timer.C:
+		case <-deadline:
 			// What finished before now is kept, the file in progress included if it finished while this read.
 			current := inProgress.Load()
 			for drained := false; !drained; {
