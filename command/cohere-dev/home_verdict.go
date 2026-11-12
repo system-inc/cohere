@@ -42,8 +42,8 @@ import (
 // tree is no verdict at all, and the whole test run happens on the Mac, as it always did, said on the land line.
 
 // homeGateVariable is "off" to test a landing on the Mac alone, the escape hatch, or names a command run in place of
-// Home's whole run, the push and the gap, for a test. Unset or "on", the landing's tests run on Home: the default
-// since her first real landings were proven, red and green (#acdf5mc).
+// Home's whole run, the push and the gap, for a test. Unset or "on", the landing's tests run on Home: the default since
+// main's first whole pass on her, both halves, came back green at e74fbf79 (Nov 12, #acdf5mc).
 const homeGateVariable = "COHERE_DEV_HOME_GATE"
 
 // homeMarker opens the line Home's run prints before its tests: the commit it checked out and the platform it tests

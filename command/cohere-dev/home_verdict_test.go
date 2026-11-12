@@ -100,8 +100,8 @@ func TestTheWitnessWindowIsHomesFromNineToThreeUtc(test *testing.T) {
 	}
 }
 
-// Home is the default (#acdf5mc): unset or "on", a landing goes to Home, which inside the witness's window stops
-// there before anything reaches her, and says so; "off" is the escape hatch, the Mac alone.
+// Home is the default (#acdf5mc): unset or "on", a landing goes to Home, which inside the witness's window stops there
+// before anything reaches her, and says so; "off" is the escape hatch, the Mac alone, saying why.
 func TestALandingTestsOnHomeUnlessItSaysOff(test *testing.T) {
 	test.Parallel()
 	inside := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
