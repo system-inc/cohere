@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 func TestWholeModuleAndCountOnceAreReadFromTheArguments(test *testing.T) {
@@ -83,7 +84,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 	bin := test.TempDir()
 	started := filepath.Join(bin, "started")
 	script := "#!/bin/sh\ntouch '" + started + "'\nsleep 2\necho tested \"$@\"\n"
-	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(script), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(filepath.Join(bin, "go"), []byte(script), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	home := privatePool(test)
@@ -194,7 +195,7 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 
 	// A go that records which run reached it and takes a second to test. The first run's waits for a release
 	// file too, so the line forms behind it before anyone can move.
-	if writeError := os.WriteFile(
+	if writeError := executable_testing.WriteFile(
 		filepath.Join(bin, "go"),
 		[]byte("#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN\" >> '"+order+"'\n"+
 			"[ \"$COHERE_DEV_TEST_RUN\" = A ] && while [ ! -e '"+order+".release' ]; do sleep 0.05; done\nsleep 1\n"),
@@ -276,7 +277,7 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 	}
 	// A go that says how nice it is and what it was asked.
 	bin := test.TempDir()
-	if writeError := os.WriteFile(
+	if writeError := executable_testing.WriteFile(
 		filepath.Join(bin, "go"),
 		[]byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"),
 		0o755,
@@ -438,7 +439,11 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 		log +
 		"'\n"
 	for _, name := range []string{"go", "tool"} {
-		if writeError := os.WriteFile(filepath.Join(bin, name), []byte(stand), 0o755); writeError != nil {
+		if writeError := executable_testing.WriteFile(
+			filepath.Join(bin, name),
+			[]byte(stand),
+			0o755,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}

@@ -48,25 +48,31 @@ const contextTemplate = "{{context.GOOS}}\n{{context.GOARCH}}\n{{context.Compile
 	"{{context.GOROOT}}\n{{join context.BuildTags \",\"}}\n{{join context.ToolTags \",\"}}\n" +
 	"{{join context.ReleaseTags \",\"}}"
 
-// readGoState runs the three go commands the lister needs, at once, in workspace under environment, and reads what
-// they print, or says why it cannot list from them. What the commands spend, and what starting them and reading their
-// answers costs this process, is added to collector.
-func readGoState(workspace string, environment []string, collector *timing.Collector) (goState, string) {
+// readGoState runs the two go commands the lister needs, at once, in goEnvironment's workspace under its whole
+// environment, reads the go environment from goEnvironment, as go env reports it under that environment, and says why
+// it cannot list from them when it cannot. What the commands spend, and what starting them and reading their answers
+// costs this process, is added to collector.
+//
+// go env was the third command here, asked beside the two with `PWD` set to the workspace, and goEnvironment asks
+// with the process's own (askGoEnvironment): of what the lister reads, only `GOWORK` reads the working directory, and
+// it names the same go.work either way, spelled through a symbolic link or not, which the lister only opens and
+// names in a doubt (#4rpt1jh).
+func readGoState(goEnvironment *GoEnvironment, collector *timing.Collector) (goState, string) {
 	commands := [][]string{
 		{"list", "-m", "-json", "all"},
 		{"list", "-e", "-f", contextTemplate, "unsafe"},
-		{"env", "-json", "GOVERSION", "GODEBUG", "GOFLAGS", "GOWORK", "GOFIPS140"},
 	}
 	outputs := make([][]byte, len(commands))
 	failures := make([]error, len(commands))
-	// The three run at once, so their children's CPU is read once around all three, which a read around each would
-	// count up to three times.
+	// The two run at once, so their children's CPU is read once around both, which a read around each would count
+	// twice.
 	measureGoCommands(collector, func() {
 		var group sync.WaitGroup
 		for index, arguments := range commands {
 			group.Go(func() {
 				measureListing(collector, func() {
-					outputs[index], failures[index] = goOutput(workspace, environment, arguments)
+					outputs[index], failures[index] = goOutput(goEnvironment.workspace, goEnvironment.fullEnvironment,
+						arguments)
 				})
 			})
 		}
@@ -78,30 +84,20 @@ func readGoState(workspace string, environment []string, collector *timing.Colle
 		}
 	}
 
-	var goEnvironment struct {
-		Version   string `json:"GOVERSION"`
-		Debug     string `json:"GODEBUG"`
-		Flags     string `json:"GOFLAGS"`
-		Workspace string `json:"GOWORK"`
-		Fips140   string `json:"GOFIPS140"`
-	}
-	if decodeError := json.Unmarshal(outputs[2], &goEnvironment); decodeError != nil {
-		return goState{}, fmt.Sprintf("reading go env: %v", decodeError)
-	}
-	if goEnvironment.Version != runtime.Version() {
+	if goVersion := goEnvironment.value("GOVERSION"); goVersion != runtime.Version() {
 		// go/build is the engine's, and go list reads files with the toolchain's own copy of it.
-		return goState{}, fmt.Sprintf("the go command is %s and the engine was built with %s", goEnvironment.Version,
+		return goState{}, fmt.Sprintf("the go command is %s and the engine was built with %s", goVersion,
 			runtime.Version())
 	}
-	if goEnvironment.Debug != "" {
+	if goEnvironment.value("GODEBUG") != "" {
 		return goState{}, "GODEBUG is set, and go list reads some of its settings"
 	}
-	if goEnvironment.Fips140 != "" && goEnvironment.Fips140 != "off" {
+	if fips140 := goEnvironment.value("GOFIPS140"); fips140 != "" && fips140 != "off" {
 		// A `GOFIPS140` snapshot of the cryptographic module moves the standard library's crypto/internal/fips140
 		// imports to a versioned copy.
-		return goState{}, fmt.Sprintf("GOFIPS140 is %s", goEnvironment.Fips140)
+		return goState{}, fmt.Sprintf("GOFIPS140 is %s", fips140)
 	}
-	if doubt := listerFlagsOnly(goEnvironment.Flags); doubt != "" {
+	if doubt := listerFlagsOnly(goEnvironment.value("GOFLAGS")); doubt != "" {
 		return goState{}, doubt
 	}
 
@@ -114,8 +110,8 @@ func readGoState(workspace string, environment []string, collector *timing.Colle
 		return goState{}, doubt
 	}
 	state := goState{modules: modules, context: context}
-	if goEnvironment.Workspace != "off" {
-		state.workspaceFile = goEnvironment.Workspace
+	if workspaceFile := goEnvironment.value("GOWORK"); workspaceFile != "off" {
+		state.workspaceFile = workspaceFile
 	}
 	return state, ""
 }

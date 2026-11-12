@@ -87,6 +87,50 @@ func TestUnknownReadsAreNeverRestorable(test *testing.T) {
 	}
 }
 
+// Two rules' Method lookups of one subject are two reads, each with its own answer, since each rule answers by its own
+// measure: no_any found a method of the signature where abbreviated, asking whether the receiver implements an
+// interface, found none (#dscc341). A Method or Interface lookup that names no rule could be taken for another's, so
+// it marks the package never, while a Scope lookup, which has one measure, needs none.
+func TestEachRulesMethodLookupIsItsOwnRead(test *testing.T) {
+	test.Parallel()
+
+	other := types.NewPackage("example.com/other", "other")
+	own := types.NewPackage("example.com/own", "own")
+	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	subject := types.NewFunc(token.NoPos, own, "Close", signature)
+	answer := types.NewFunc(token.NoPos, other, "Close", signature)
+	reads := &Reads{}
+	reads.RecordTypes(own, &types.Info{}, nil)
+	reads.AddLookup(Lookup{Query: QueryMethod, Name: "Close", Subject: subject, Found: true, Answer: answer,
+		Rule: "no-any"})
+	reads.AddLookup(Lookup{Query: QueryMethod, Name: "Close", Subject: subject, Rule: "abbreviated",
+		Instantiates: true})
+	reads.AddLookup(Lookup{Query: QueryScope, Path: other.Path(), Name: "Close", Found: true, Answer: answer})
+
+	var lines []string
+	for _, lookup := range reads.Lookups() {
+		lines = append(lines, fmt.Sprintf("%s %s %s found=%t instantiates=%t", lookup.Query, lookup.Name,
+			lookup.Rule, lookup.Found, lookup.Instantiates))
+	}
+	want := []string{
+		"Method Close abbreviated found=false instantiates=true",
+		"Method Close no-any found=true instantiates=false",
+		"Scope Close  found=true instantiates=false",
+	}
+	if !slices.Equal(lines, want) {
+		test.Fatalf("want the lookups\n%q\ngot\n%q", want, lines)
+	}
+	if restorable, why := reads.Restorable(); !restorable {
+		test.Fatalf("want reads whose Method lookups name their rules restorable, got %q", why)
+	}
+
+	reads.AddLookup(Lookup{Query: QueryInterface, Name: "Close", Subject: subject})
+	wantNever := "its Interface lookup of Close names no asking rule"
+	if restorable, why := reads.Restorable(); restorable || why != wantNever {
+		test.Fatalf("want an Interface lookup naming no rule to mark the reads never, got %t, %q", restorable, why)
+	}
+}
+
 // Sorting a package's selections through one receiver, and its uses of one object in several kinds, compares that
 // object with itself and writes nothing: rendering a large struct twice for each such comparison doubled every extra
 // build's decide on deeafbf4 (#p1s9gdk). Sorting two hundred selections through a struct of two hundred fields, and two

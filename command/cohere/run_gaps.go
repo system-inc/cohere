@@ -28,6 +28,11 @@ type runGaps struct {
 	// footer names each reason and the rule that decided it: a run that checked nothing never reads as a pass
 	// (#08cv2mp). A project with no file of its language at all has none, and keeps the warning alone.
 	Excluded []excludedReason `json:"excluded,omitempty"`
+	// CensusMissed is each file an engine's load reached in its project that its census never counted, with its
+	// package (#yyv7nr2, #hd5bsqh), as at a root or a go.work use reached through a symbolic link, where the census
+	// once walked nothing. No count of the run accounts for such a file, SourceFiles included, so it fails the run,
+	// and the footer says so in place of a project with no file to check.
+	CensusMissed []censusMissedFile `json:"censusMissed,omitempty"`
 	// IndexFallback is why a format walk read no tracked path from its repository's index (#14skmqy): it decided by
 	// the ignore files alone, so a file git tracks under a pattern that matches it went unformatted, counted ignored.
 	// A gap, not a failure: which files those are is the index's to say, and it could not be read.

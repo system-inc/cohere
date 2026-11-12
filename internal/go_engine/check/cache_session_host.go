@@ -1,8 +1,6 @@
 package check
 
 import (
-	"bytes"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"go/types"
@@ -254,9 +252,9 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 	read := make([]*restoredPackage, len(reading))
 	readErrors := make([]error, len(reading))
 	session.fanOut(len(reading), func(index int) {
-		entry, readExportData, readError := readingKept[index].contents()
+		body, record, readExportData, readError := readingKept[index].contents()
 		if readError == nil {
-			read[index], readError = decodeEntry(session.known, reading[index], entry, readExportData)
+			read[index], readError = decodeEntry(session.known, reading[index], body, record, readExportData)
 		}
 		readErrors[index] = readError
 	})
@@ -614,15 +612,22 @@ func (session *CacheSession) writeThrough(
 			return nil
 		}
 		key := session.keys[saved]
-		// The writes run with no slot held (fanOutWriting), the export data first, so an entry is never in the store
-		// before what it needs to be read.
+		// The writes run with no slot held (fanOutWriting), as putEntry writes a miss's: the export data first, so an
+		// entry is never in the store before what it needs to be read, and only when the store does not hold it by its
+		// digest already, as it does for every package the host wrote, whose export data the build read.
+		hosted := throughHosted[index]
 		return func() {
-			if encoded[index].exportData != nil {
-				writeErrors[index] = session.caching.Store.Put(exportDataKey(key), encoded[index].exportData)
+			// A record of the host's the store holds, as it holds every one the host wrote there, is named and never
+			// read; a body with none, or whose record is not in this store, is held in the build's own record.
+			if encoded[index].record.BodyAt == nil ||
+				!session.caching.Store.Holds(cache.Key(encoded[index].record.BodyAt)) {
+				encoded[index].record.BodyAt = nil
+				encoded[index].record.Inline, writeErrors[index] = hostBody(hosted)
+				if writeErrors[index] != nil {
+					return
+				}
 			}
-			if writeErrors[index] == nil {
-				writeErrors[index] = session.caching.Store.Put(key, encoded[index].entry)
-			}
+			writeErrors[index] = session.putEntry(key, encoded[index])
 		}
 	})
 	positionDependent := map[*packages.Package]bool{}
@@ -670,24 +675,20 @@ func (session *CacheSession) throughEntry(
 			slots[slot] = true
 		}
 	}
-	contents, _, readError := hosted.kept.contents()
-	if readError != nil {
-		return encodedEntry{}, true, readError
-	}
-	var entry cacheEntry
-	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
-		return encodedEntry{}, true, fmt.Errorf("decoding the host's entry: %w", decodeError)
-	}
 	// An untouched package had no action of its own to compare by. Its entry is the host's for the same rules, and an
 	// entry that falls short of what a later run asks is a miss there (dropShortHits), never a wrong hit.
-	if !untouched && len(entry.Analyzers) != len(slots) {
+	if !untouched && len(hosted.restored.slots) != len(slots) {
 		return encodedEntry{}, false, nil
 	}
-	for slot := range entry.Analyzers {
+	for _, slot := range hosted.restored.slots {
 		if !untouched && !slots[slot] {
 			return encodedEntry{}, false, nil
 		}
 	}
+	// The body is the host's, named in the host's record, which the build's store holds once the host wrote it there;
+	// one it does not hold, kept from the binary's table or written to another store, writeThrough holds in the record
+	// itself, read from the host's entry (hostBody). Nothing of the body is decoded or encoded again: the record alone
+	// is the build's (#fq7dxvx).
 	encoded := encodedEntry{output: hosted.restored.output, hasOutput: hosted.restored.hasOutput}
 	// unsafe's entry holds no export data, as the build's own from source holds none (carriesExportData); the reader of
 	// one kept from the binary's table, which holds none for it, would refuse (#27r8r24).
@@ -698,14 +699,25 @@ func (session *CacheSession) throughEntry(
 		}
 		encoded.exportData = exportData
 	}
-	entry.Reads, entry.ReadsIncomplete = session.readsInBuild(saved.ID, entry.Reads, entry.ReadsIncomplete)
-	encoded.positionDependent = positionDependent(saved, entry.Analyzers, knownFiles)
-	var entryBytes bytes.Buffer
-	if gobError := gob.NewEncoder(&entryBytes).Encode(entry); gobError != nil {
-		return encodedEntry{}, true, fmt.Errorf("encoding the entry: %w", gobError)
+	// The record names the export data the build read by its digest, which is the host's record's own when the host
+	// wrote it, and new for one kept from the binary's table or from the host's memory under `--no-cache`.
+	reads, readsIncomplete := session.readsInBuild(saved.ID, hosted.restored.reads, hosted.restored.readsIncomplete)
+	encoded.record = entryRecord{Version: CacheFormatVersion, Body: hosted.restored.bodyDigest,
+		ExportData: exportDataDigest(encoded.exportData), Reads: reads, ReadsIncomplete: readsIncomplete}
+	if hosted.kept.holdsBodyAt {
+		encoded.record.BodyAt = hosted.kept.bodyAt[:]
 	}
-	encoded.entry = entryBytes.Bytes()
+	encoded.positionDependent = restoredPositionDependent(saved, hosted.restored, knownFiles)
 	return encoded, true, nil
+}
+
+// hostBody is the body of hosted's entry, read from the host's run, for a build whose store does not hold it yet.
+func hostBody(hosted *hostRestore) ([]byte, error) {
+	body, _, _, readError := hosted.kept.contents()
+	if readError != nil {
+		return nil, fmt.Errorf("reading the host's entry: %w", readError)
+	}
+	return body, nil
 }
 
 // readsInBuild are reads, the entry of the package written through as written's, each naming its owner by the
@@ -846,14 +858,20 @@ func (session *CacheSession) keepForBuilds(
 		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage]}
 		if session.written[keptPackage] {
 			key := session.keys[keptPackage]
-			kept.contents = func() ([]byte, func() ([]byte, error), error) {
-				entry, stored := session.caching.Store.Get(key)
+			// The record the run wrote of it holds its body, which a build writing the package through names.
+			kept.bodyAt, kept.holdsBodyAt = key, true
+			kept.contents = func() ([]byte, entryRecord, func() ([]byte, error), error) {
+				contents, stored := session.caching.Store.Get(key)
 				if !stored {
-					return nil, nil, fmt.Errorf("the store holds no entry of %s", keptPackage.ID)
+					return nil, entryRecord{}, nil, fmt.Errorf("the store holds no entry of %s", keptPackage.ID)
 				}
-				return entry, func() ([]byte, error) {
-					exportData, _ := session.caching.Store.Get(exportDataKey(key))
-					return exportData, nil
+				body, record, whole := storedEntry(session.caching.Store, contents)
+				if !whole {
+					return nil, entryRecord{}, nil, fmt.Errorf("the store holds no whole entry of %s", keptPackage.ID)
+				}
+				// The export data is the one the record names by digest, read only when a load asks for it.
+				return body, record, func() ([]byte, error) {
+					return readExportDataByDigest(session.caching.Store, keptPackage, record.ExportData)
 				}, nil
 			}
 			host.entries[keptPackage.ID] = kept
@@ -888,10 +906,10 @@ func (session *CacheSession) keepForBuilds(
 			delete(host.entries, saved.ID)
 			continue
 		}
-		entry := encoded[index].entry
+		body, record := encoded[index].body, encoded[index].record
 		readExportData := lazyExportData(saved)
-		host.entries[saved.ID].contents = func() ([]byte, func() ([]byte, error), error) {
-			return entry, readExportData, nil
+		host.entries[saved.ID].contents = func() ([]byte, entryRecord, func() ([]byte, error), error) {
+			return body, record, readExportData, nil
 		}
 	}
 	host.kept = len(host.entries)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
@@ -248,7 +249,7 @@ func (fixture *swiftFixture) fakeBuild(
 	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
 		return createDirectoryError
 	}
-	return os.WriteFile(binaryPath, []byte(script), 0o755)
+	return executable_testing.WriteFile(binaryPath, []byte(script), 0o755)
 }
 
 func (fixture *swiftFixture) rule() string {

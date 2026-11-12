@@ -99,7 +99,8 @@ func (writer *readsWriter) selection(selection build_reads.Selection, closureOnl
 // lookup is one lookup as the record persists it: a Scope or Closure answer with its digest, an Interface or Method
 // lookup's candidates, as lookupHolds gathers the host's, and a Deprecated lookup's subject by its objectpath.
 func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
-	persisted := persistedLookup{Query: lookup.Query, Name: lookup.Name, Found: lookup.Found, Text: lookup.Text}
+	persisted := persistedLookup{Query: lookup.Query, Name: lookup.Name, Found: lookup.Found, Text: lookup.Text,
+		Instantiates: lookup.Instantiates}
 	if lookup.Path != "" {
 		persisted.Path = writer.owner(lookup.Path)
 	}
@@ -113,7 +114,7 @@ func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
 			persisted.NoSubject = true
 			return persisted
 		}
-		hostClosure := gatherClosure(writer.host, lookup.Subject.Pkg().Imports())
+		hostClosure := gatherClosure(writer.host.indexedClosureOf, lookup.Subject.Pkg().Imports())
 		var candidates []*types.TypeName
 		for _, indexed := range writer.host.methodsNamed(lookup.Name) {
 			if hostClosure.reached[indexed.owner] {
@@ -166,8 +167,8 @@ func (writer *readsWriter) methodJudgment(
 		}
 		persisted.RuleCandidates = append(persisted.RuleCandidates, persistedMethodCandidate{
 			TypeName: writer.object(typeName, true), Interface: candidate.isInterface, Generic: candidate.isGeneric,
-			Shape: persistedShape{Parameters: candidate.shape.parameters, Results: candidate.shape.results,
-				Variadic: candidate.shape.variadic},
+			Unconstrained: candidate.unconstrained, Shape: persistedShape{Parameters: candidate.shape.parameters,
+				Results: candidate.shape.results, Variadic: candidate.shape.variadic},
 			Lines: candidate.lines, HoldsAnswer: candidate.holdsAnswer})
 	}
 }

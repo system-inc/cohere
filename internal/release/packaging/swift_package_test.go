@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // smallMacBinary builds a tiny Go program for macOS on goArchitecture and returns its path. The guards
@@ -151,11 +152,23 @@ func contractPair(test *testing.T, cohereVersion string, engineScript string) (c
 	coherePath = filepath.Join(directory, "cohere")
 	enginePath = filepath.Join(directory, SwiftEngineFileName)
 	writeExecutable(test, coherePath, 0o755)
-	writeFile(test, coherePath, "#!/bin/sh\n[ \"$1\" = --version ] || exit 9\nprintf '%s\\n' '"+
-		strings.ReplaceAll(cohereVersion, "\n", "' '")+
-		"'\n")
+	if writeError := executable_testing.WriteFile(
+		coherePath,
+		[]byte("#!/bin/sh\n[ \"$1\" = --version ] || exit 9\nprintf '%s\\n' '"+
+			strings.ReplaceAll(cohereVersion, "\n", "' '")+
+			"'\n"),
+		0o755,
+	); writeError != nil {
+		test.Fatal(writeError)
+	}
 	writeExecutable(test, enginePath, 0o755)
-	writeFile(test, enginePath, "#!/bin/sh\n"+engineScript+"\n")
+	if writeError := executable_testing.WriteFile(
+		enginePath,
+		[]byte("#!/bin/sh\n"+engineScript+"\n"),
+		0o755,
+	); writeError != nil {
+		test.Fatal(writeError)
+	}
 	return coherePath, enginePath
 }
 

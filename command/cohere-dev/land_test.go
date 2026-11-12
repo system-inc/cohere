@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // landFixture is a repository with main checked out and two worktrees, a and b, each one commit ahead on a
@@ -51,7 +52,7 @@ func newLandFixture(test *testing.T) *landFixture {
 		"flags=$GOFLAGS\" >> '" +
 		fixture.log + "'\nsleep 1\n" +
 		"echo \"end $(basename \"$PWD\")\" >> '" + fixture.log + "'\n"
-	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	home := privatePool(test)
@@ -852,7 +853,7 @@ func TestALandingWhoseLandDiffersFromMainsRunsMains(test *testing.T) {
 	standIn := filepath.Join(test.TempDir(), "main-land")
 	script := "#!/bin/sh\necho \"$PWD $" + landWorktreeVariable + "\" >> '" + log + "'\n" +
 		"exec '" + fixture.wrapper + "' \"$@\"\n"
-	if writeError := os.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	before := fixture.git(fixture.repository, "rev-parse", "main")
@@ -910,7 +911,7 @@ func TestALandingOntoAMainThatCannotTakeItRunsItsOwnLand(test *testing.T) {
 	log := filepath.Join(test.TempDir(), "main-land")
 	standIn := filepath.Join(test.TempDir(), "main-land")
 	script := []byte("#!/bin/sh\necho ran >> '" + log + "'\nexit 1\n")
-	if writeError := os.WriteFile(standIn, script, 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(standIn, script, 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	landing := exec.Command(fixture.wrapper, "land")
@@ -968,7 +969,7 @@ func TestTheGateRefusesALandingCohereDoesNotReadZeroOn(test *testing.T) {
 			standIn := filepath.Join(test.TempDir(), "cohere")
 			given := filepath.Join(test.TempDir(), "given")
 			script := fmt.Sprintf("#!/bin/sh\necho \"$*\" > '%s'\ngrep . '%s'\nexit %d\n", given, records, gate.exit)
-			if writeError := os.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
+			if writeError := executable_testing.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
 				test.Fatal(writeError)
 			}
 			before := fixture.git(fixture.repository, "rev-parse", "main")

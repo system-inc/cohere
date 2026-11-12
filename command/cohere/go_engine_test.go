@@ -18,6 +18,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // typedTrue reads every flag as given and true, the way a caller who typed it would.
@@ -328,7 +330,7 @@ func TestAFrontDoorStartedAsAGoEngineStartsNoOther(test *testing.T) {
 func runFakeGoEngine(test *testing.T, body string) (string, int, error) {
 	test.Helper()
 	path := filepath.Join(test.TempDir(), "cohere")
-	if writeError := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	var out bytes.Buffer

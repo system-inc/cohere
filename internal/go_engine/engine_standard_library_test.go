@@ -2,11 +2,13 @@ package go_engine
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -123,8 +125,30 @@ func TestTheBinaryEntriesChangeNoRecordInACachedRun(test *testing.T) {
 	}
 }
 
+// plantedRecord is the findings cache's record of an entry as gob reads it, field for field by name, holding the
+// entry's body (Inline) when it was written from source, so a test can change what a stored entry holds and write it
+// back whole.
+type plantedRecord struct {
+	Version         string
+	Body            []byte
+	Inline          []byte
+	BodyAt          []byte
+	ExportData      []byte
+	Reads           []plantedRead
+	ReadsIncomplete bool
+}
+
+// plantedRead is one read a plantedRecord holds.
+type plantedRead struct {
+	Kind     string
+	Owner    string
+	OwnerKey []byte
+	Path     string
+	Value    []byte
+}
+
 // plantedEntry is the findings cache's entry as gob reads it, field for field by name, so a test can change what a
-// stored entry holds and write it back whole.
+// stored entry's body holds and write it back.
 type plantedEntry struct {
 	Version   string
 	Analyzers map[string]plantedAnalysis
@@ -172,14 +196,18 @@ func TestOnlyTheBinaryEntriesAreReadUnderNoCache(test *testing.T) {
 	root := copyFixture(test, standardLibraryFixture)
 	collected := map[cache.Key]check.StandardLibraryRunEntry{}
 	runEngineWith(test, root, builtInStandardLibrary{stamp: engineTestsStamp, collected: collected}, rules.All())
-	var unicodeEntry []byte
+	var unicodeEntry plantedEntry
+	found := false
 	for key, entry := range collected {
 		if entry.PackagePath == "unicode/utf8" {
-			unicodeEntry = entry.Entry
+			if decodeError := gob.NewDecoder(bytes.NewReader(entry.Entry)).Decode(&unicodeEntry); decodeError != nil {
+				test.Fatalf("reading unicode/utf8's collected entry: %v", decodeError)
+			}
+			found = true
 			delete(collected, key)
 		}
 	}
-	if unicodeEntry == nil {
+	if !found {
 		test.Fatal("want unicode/utf8 among the collected entries")
 	}
 	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
@@ -189,6 +217,7 @@ func TestOnlyTheBinaryEntriesAreReadUnderNoCache(test *testing.T) {
 
 	store := cache.Open(root)
 	var stored []cache.Key
+	var record plantedRecord
 	walkError := filepath.WalkDir(filepath.Join(root, ".cache", "cohere", "go"),
 		func(path string, entry fs.DirEntry, pathError error) error {
 			if pathError != nil || entry.IsDir() {
@@ -198,24 +227,34 @@ func TestOnlyTheBinaryEntriesAreReadUnderNoCache(test *testing.T) {
 			if decodeError != nil || len(decoded) != len(cache.Key{}) {
 				return nil
 			}
-			if contents, found := store.Get(cache.Key(decoded)); found && bytes.Equal(contents, unicodeEntry) {
-				stored = append(stored, cache.Key(decoded))
+			contents, found := store.Get(cache.Key(decoded))
+			var read plantedRecord
+			if !found || gob.NewDecoder(bytes.NewReader(contents)).Decode(&read) != nil || read.Inline == nil {
+				return nil
+			}
+			var body plantedEntry
+			if gob.NewDecoder(bytes.NewReader(read.Inline)).Decode(&body) == nil && reflect.DeepEqual(body,
+				unicodeEntry) {
+				stored, record = append(stored, cache.Key(decoded)), read
 			}
 			return nil
 		})
 	if walkError != nil || len(stored) != 1 {
 		test.Fatalf("want unicode/utf8's entry in the store once, found it under %v (%v)", stored, walkError)
 	}
-	var planted plantedEntry
-	if decodeError := gob.NewDecoder(bytes.NewReader(unicodeEntry)).Decode(&planted); decodeError != nil {
-		test.Fatalf("reading unicode/utf8's entry: %v", decodeError)
-	}
+	planted := unicodeEntry
 	planted.Withheld.Errors = append(planted.Withheld.Errors, load.WithheldError{
 		File: filepath.Join(root, "planted_by_the_test.go"), Line: 1, Column: 1, Message: "planted by the test",
 	})
+	var body bytes.Buffer
+	if encodeError := gob.NewEncoder(&body).Encode(planted); encodeError != nil {
+		test.Fatalf("writing the planted body: %v", encodeError)
+	}
+	digest := sha256.Sum256(body.Bytes())
+	record.Inline, record.Body = body.Bytes(), digest[:]
 	var encoded bytes.Buffer
-	if encodeError := gob.NewEncoder(&encoded).Encode(planted); encodeError != nil {
-		test.Fatalf("writing the planted entry: %v", encodeError)
+	if encodeError := gob.NewEncoder(&encoded).Encode(record); encodeError != nil {
+		test.Fatalf("writing the planted record: %v", encodeError)
 	}
 	if putError := store.Put(stored[0], encoded.Bytes()); putError != nil {
 		test.Fatalf("planting the entry: %v", putError)

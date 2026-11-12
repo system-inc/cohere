@@ -42,13 +42,14 @@ type ReadsBuild struct {
 	encoderLock sync.Mutex
 
 	// closures are each root's import closure, a []*types.Package by root, the root and every package it reaches,
-	// walked once (closureOf), and methodIndex the type names of every package a walk reached with a method of each
-	// name, by the name, each package's method sets computed once, when it is first indexed (indexed, a package read
-	// as indexed only once its entries are in methodIndex). So no Interface or Method lookup walks a closure or a
-	// method set again.
-	closures    sync.Map
-	methodIndex map[string][]packageMethods
-	indexed     sync.Map
+	// walked once (closureOf), indexedRoots the roots whose whole closure is in the method index (indexedClosureOf),
+	// and methodIndex the type names of every package indexed with a method of each name, by the name, each package's
+	// method sets computed once, when it is first indexed (indexed, a package read as indexed only once its entries are
+	// in methodIndex). So no Interface or Method lookup walks a closure or a method set again.
+	closures     sync.Map
+	indexedRoots sync.Map
+	methodIndex  map[string][]packageMethods
+	indexed      sync.Map
 
 	// whole is the memo's twin told no build, which renders every field of every type whole, for a package with
 	// assembly files (Restoring.Assembly), made the first time one is judged (wholeTwin).
@@ -56,6 +57,10 @@ type ReadsBuild struct {
 
 	// uses are each object's digest as a use of each kind but the whole judges it, a cache.Key by useKey (useDigest).
 	uses sync.Map
+
+	// candidates are each type name's candidate for a Method or Interface lookup of a query and name, a
+	// memoizedCandidate by candidateKey (candidate).
+	candidates sync.Map
 
 	// dependences are each package's dependence set, a DependenceSet by the package's *build_reads.Reads, asked of
 	// the host's memo alone, which every build shares (Dependence), and reaches the packages each type name's closure
@@ -282,8 +287,10 @@ func (build *ReadsBuild) pathOf(object types.Object) (objectpath.Path, bool) {
 	return path, pathError == nil
 }
 
-// closureOf is root's import closure, root and every package it reaches, walked once for the build, each package of
-// it indexed by its methods' names (indexPackage) before it is returned.
+// closureOf is root's import closure, root and every package it reaches, walked once for the build, none of it
+// indexed by the walk. The build's side of a verdict indexes only the packages a lookup reads of it
+// (verdict.indexBuildCandidates): on a platform build most of the closure is restored from the host, whose type names
+// stand for it, and the method sets of thousands of packages nobody reads were most of the verdict's time (#yse6t59).
 func (build *ReadsBuild) closureOf(root *types.Package) []*types.Package {
 	if known, isKnown := build.closures.Load(root); isKnown {
 		closure, isClosure := known.([]*types.Package)
@@ -297,11 +304,24 @@ func (build *ReadsBuild) closureOf(root *types.Package) []*types.Package {
 		build.walking(root)
 	}
 	reached := slices.Collect(build_reads.ClosurePackages([]*types.Package{root}))
+	build.closures.Store(root, reached)
+	return reached
+}
+
+// indexedClosureOf is root's import closure (closureOf), every package of it indexed by its methods' names
+// (indexPackage) before it is returned, as the host's side reads it: every host candidate of a lookup's closure is
+// read, so the host indexes the whole of it. A root is told indexed once, so a later verdict that asks it again
+// spends one load rather than a load per package.
+func (build *ReadsBuild) indexedClosureOf(root *types.Package) []*types.Package {
+	reached := build.closureOf(root)
+	if _, known := build.indexedRoots.Load(root); known {
+		return reached
+	}
 	for _, each := range reached {
 		build.indexPackage(each)
 	}
-	// Stored once every package of it is indexed, so a verdict that reads the closure finds each in the method index.
-	build.closures.Store(root, reached)
+	// Stored once every package of it is indexed, so a verdict that skips the loop finds each in the method index.
+	build.indexedRoots.Store(root, true)
 	return reached
 }
 
@@ -329,7 +349,7 @@ func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 	}
 	build.lock.Lock()
 	defer build.lock.Unlock()
-	// Another verdict's walk may have indexed it meanwhile, and a package is indexed once. It reads as indexed only
+	// Another verdict may have indexed it meanwhile, and a package is indexed once. It reads as indexed only
 	// once its entries are in the method index, so a verdict that skips it finds them there.
 	if _, known := build.indexed.Load(declaring); known {
 		return
@@ -350,6 +370,48 @@ func (build *ReadsBuild) methodsNamed(name string) []packageMethods {
 	build.lock.Lock()
 	defer build.lock.Unlock()
 	return build.methodIndex[name]
+}
+
+// candidateKey is what one memoized candidate is asked by: a type name, for a lookup of query and name.
+type candidateKey struct {
+	typeName *types.TypeName
+	query    string
+	name     string
+}
+
+// memoizedCandidate is methodCandidateOf's answer for a candidateKey under this binary's renderer, asked with no
+// answer, whether the type name is a candidate at all, and its name as a side's candidates are keyed (objectName).
+type memoizedCandidate struct {
+	candidate   methodCandidate
+	isCandidate bool
+	key         string
+}
+
+// candidate is methodCandidateOf of typeName for a lookup of query and name under this binary's renderer, rendered
+// once per type name, query and name in the build, since every lookup of one name asks the same type names: on
+// deeafbf4 hundreds of lookups of Clone rendered every type name with a Clone again for each (#8fbkkp4). answer, which
+// only an interface's holdsAnswer reads, is read past the memo. It is the candidate, its name as a side's candidates
+// are keyed, and false when typeName is no candidate.
+func (build *ReadsBuild) candidate(
+	typeName *types.TypeName,
+	query string,
+	name string,
+	answer types.Object,
+) (methodCandidate, string, bool) {
+	key := candidateKey{typeName: typeName, query: query, name: name}
+	stored, found := build.candidates.Load(key)
+	if !found {
+		candidate, isCandidate := methodCandidateOf(typeName, query, name, nil, ReadsRendererVersion)
+		stored, _ = build.candidates.LoadOrStore(key, memoizedCandidate{candidate: candidate,
+			isCandidate: isCandidate, key: objectName(typeName)})
+	}
+	memoized, _ := stored.(memoizedCandidate)
+	if memoized.isCandidate && memoized.candidate.isInterface && answer != nil {
+		if interfaceType, isInterface := typeName.Type().Underlying().(*types.Interface); isInterface {
+			memoized.candidate.holdsAnswer = holdsAnswer(interfaceType, answer)
+		}
+	}
+	return memoized.candidate, memoized.key, memoized.isCandidate
 }
 
 // Restoring is one package of the host's run whose reads a verdict judges in another build.

@@ -267,7 +267,7 @@ func (judged verdict) persistedMethodJudgment(
 	judgment := methodJudgment{query: lookup.Query, name: lookup.Name, found: lookup.Found,
 		subjectIsMethod: lookup.SubjectIsMethod, subjectShape: shapeOfPersisted(lookup.SubjectShape),
 		receiverInterface: lookup.ReceiverInterface, embedsForeign: lookup.EmbedsForeign,
-		host: map[string]methodCandidate{}, build: map[string]methodCandidate{}}
+		instantiates: lookup.Instantiates, host: map[string]methodCandidate{}, build: map[string]methodCandidate{}}
 	buildClosure := judged.buildClosure(roots)
 	hostOwners := map[string]bool{}
 	for _, reference := range lookup.Candidates {
@@ -275,7 +275,8 @@ func (judged verdict) persistedMethodJudgment(
 	}
 	for _, persisted := range lookup.RuleCandidates {
 		candidate := methodCandidate{isInterface: persisted.Interface, isGeneric: persisted.Generic,
-			shape: shapeOfPersisted(persisted.Shape), lines: persisted.Lines, holdsAnswer: persisted.HoldsAnswer}
+			unconstrained: persisted.Unconstrained, shape: shapeOfPersisted(persisted.Shape), lines: persisted.Lines,
+			holdsAnswer: persisted.HoldsAnswer}
 		key := held.objectName(persisted.TypeName)
 		judgment.host[key] = candidate
 		if judged.restored[buildClosure.byPath[held.owner(held.object(persisted.TypeName).Owner)]] {
@@ -285,9 +286,9 @@ func (judged verdict) persistedMethodJudgment(
 	for _, typeName := range judged.buildCandidates(lookup.Name, roots, func(owner *types.Package) bool {
 		return hostOwners[owner.Path()]
 	}) {
-		if candidate, isCandidate := methodCandidateOf(typeName, lookup.Query, lookup.Name, nil,
-			ReadsRendererVersion); isCandidate {
-			judgment.build[objectName(typeName)] = candidate
+		candidate, key, isCandidate := judged.build.candidate(typeName, lookup.Query, lookup.Name, nil)
+		if isCandidate {
+			judgment.build[key] = candidate
 		}
 	}
 	switch {

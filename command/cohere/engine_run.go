@@ -163,6 +163,9 @@ type engineTypesRecord struct {
 		Packages     int `json:"packages"`
 		Milliseconds int `json:"milliseconds"`
 	} `json:"cgoTranslation"`
+	// CensusMissed is the Go engine's, additive within contract 3 (#yyv7nr2, #hd5bsqh): each file its load reached in
+	// the workspace that its census never counted, with its package, absent when none. A Swift engine sends none.
+	CensusMissed []censusMissedFile `json:"censusMissed"`
 	// SdkIndexSeed is the Swift engine's, additive within contract 3: what the check of its standalone scripts did
 	// with the toolchain's SDK index seed, its key and whether the run's store was seeded from it, absent when no
 	// seed applied. A Go engine sends none.
@@ -346,6 +349,10 @@ type engineRun struct {
 	filesWithoutRecord int
 	crashes            int
 	unreadable         []engineUnreadableRecord
+
+	// censusMissed is each file the types record says the load reached and the census never counted
+	// (censusMissedTheLoad).
+	censusMissed []censusMissedFile
 
 	// notWritten are the files the fix record names as not written, each reached through a link outside the root:
 	// already printed as notes, and a gap that makes the run incomplete.
@@ -872,6 +879,7 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 		)
 	}
 	run.filesWithoutRecord += len(record.FilesWithoutRecord)
+	run.censusMissed = record.CensusMissed
 	// The compiler examined every file it left a record for, at most the files in scope, since it checks the whole
 	// container whatever the scope. A file with no record it did not examine (#1hva1ya).
 	examined := max(record.Files-len(record.FilesWithoutRecord), 0)
@@ -1426,6 +1434,9 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	if gapInRecords && *record.Complete {
 		return fmt.Errorf("the summary calls the run complete, and its own records show what it did not check")
 	}
+	if missed := run.censusMissedTheLoad(); missed != "" && *record.Complete {
+		return fmt.Errorf("the summary calls the run complete, and %s", missed)
+	}
 	// The files nothing checked are named on the line whatever else fell short: a phase that did not run is a gap of
 	// its own, and with it alone the line read as if every file had reached the phases that did (#1hva1ya).
 	if !*record.Complete && namedGaps {
@@ -1437,6 +1448,9 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 			run.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
 		case namedGaps:
 			run.report.incompleteBeyondPhases = notWrittenSentence
+		case run.censusMissedTheLoad() != "":
+			run.report.incompleteBeyondPhases = run.censusMissedTheLoad()
+			activeSummary.Gaps.CensusMissed = run.censusMissed
 		default:
 			run.report.incompleteBeyondPhases = run.language.theEngine() +
 				" reported that it fell short without a record saying where"
@@ -1521,6 +1535,19 @@ func (run *engineRun) finish(engineExit int, ended string) (int, error) {
 		return 1, nil
 	}
 	return *run.summary.ExitCode, nil
+}
+
+// censusMissedTheLoad is why a run is never complete when the engine's types record names files its load reached that
+// its census never counted (#yyv7nr2, #hd5bsqh): the census and the load read one tree, so no count of the run
+// accounts for those files, and a run that checked none of them would read as one that checked everything. Empty
+// when the record names none.
+func (run *engineRun) censusMissedTheLoad() string {
+	if len(run.censusMissed) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("its load reached %s in the %s that its census never counted, %s in %s first",
+		counted(len(run.censusMissed), "file", "files"), run.language.Container, run.censusMissed[0].File,
+		run.censusMissed[0].Package)
 }
 
 // countExcludedWhenNothingChecked fills the summary's reasons for a run that checked none of its files: each file

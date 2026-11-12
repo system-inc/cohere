@@ -94,17 +94,15 @@ func TestARestoreReadsTheSameHitsAsOneAtATime(test *testing.T) {
 	if corrupt == nil || aliased == nil {
 		test.Fatalf("the load reached no p05 or no p09: %v", byPath)
 	}
-	// p09's entry and export data move to a key of their own, which an alias under its key names, and its own key
-	// holds no entry, as when a second key restored it.
+	// p09's entry moves to a key of its own, which an alias under its key names, and its own key holds no entry, as
+	// when a second key restored it. Its export data stays where its entry names it, by digest.
 	moved := cache.Key(sha256.Sum256([]byte("moved p09")))
 	aliasedEntry, entryStored := caching.Store.Get(keyed.Keys[aliased])
-	aliasedExportData, exportDataStored := caching.Store.Get(exportDataKey(keyed.Keys[aliased]))
-	if !entryStored || !exportDataStored {
-		test.Fatal("the cold run wrote no entry or no export data of p09")
+	if !entryStored {
+		test.Fatal("the cold run wrote no entry of p09")
 	}
 	for key, contents := range map[cache.Key][]byte{
 		moved:                         aliasedEntry,
-		exportDataKey(moved):          aliasedExportData,
 		aliasKey(keyed.Keys[aliased]): moved[:],
 		keyed.Keys[corrupt]:           []byte("corrupt"),
 	} {
@@ -158,6 +156,9 @@ func loadAt(test *testing.T, root string) *load.Loaded {
 // equates only when both are nil.
 func comparableRestored(restored *restoredPackage) restoredPackage {
 	compared := *restored
+	// Where the body is kept is not what it says: gob writes a map in no set order, so two encodings of one body name
+	// two digests (#fq7dxvx).
+	compared.bodyDigest = nil
 	types := *restored.types
 	types.ReadExportData = nil
 	compared.types = &types

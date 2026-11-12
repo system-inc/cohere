@@ -118,7 +118,7 @@ func (session *CacheSession) firstWave(
 	// A package whose entry did not encode, or on which an action failed, is analyzed again by the second wave, which
 	// is then what reports it, as a run with one wave would.
 	for saved, entry := range session.saveMisses(graphs, first, withheld, files) {
-		restored, decodeError := decodeEntry(session.known, saved, entry.entry, nil)
+		restored, decodeError := decodeEntry(session.known, saved, entry.body, entry.record, nil)
 		if decodeError != nil {
 			session.problem(decodeError.Error())
 			continue
