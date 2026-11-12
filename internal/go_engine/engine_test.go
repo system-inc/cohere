@@ -79,15 +79,129 @@ var platformStreamPattern = regexp.MustCompile(`^expected\.[a-z0-9]+\.jsonl$`)
 
 // expectedStreamPath is the expected stream of the case named name on this machine's platform: `expected.<GOOS>.jsonl`
 // when the case has one, and expected.jsonl otherwise. A case keeps one per platform only where its stream honestly
-// differs by platform, as generated-rules-withheld's does: its generated file must call net/http, the one package the
-// response-status rule reads, and on linux net compiles cgo_unix.go, a dependency's cgo the record names as withheld,
-// where on darwin net compiles none (#dxn6y2z). Every other line of the two files is the same.
+// differs by platform, each with its reason in platformStreamReasons, which TestEveryPlatformStreamDiffersAndSaysWhy
+// holds every such file to.
 func expectedStreamPath(name string) string {
 	platform := filepath.Join("testdata", name, "expected."+runtime.GOOS+".jsonl")
 	if _, statError := os.Stat(platform); statError == nil {
 		return platform
 	}
 	return filepath.Join("testdata", name, "expected.jsonl")
+}
+
+// platformStreamReasons is why each platform's own expected stream differs from its case's expected.jsonl, by its
+// path under testdata: the platform fact the stream records. A platform stream is an escape from a fixture's one
+// expectation, so each must say what on that platform makes the engine's honest record differ (#gj6rcxs).
+var platformStreamReasons = map[string]string{
+	"generated-rules-withheld/expected.linux.jsonl": "The generated file calls net/http, the one package the " +
+		"response-status rule reads, and on linux net compiles cgo_unix.go, a dependency's cgo the types record " +
+		"names as withheld (1 file, 24 declarations), where darwin's net compiles none (#dxn6y2z).",
+}
+
+// platformStreamProblems is what is wrong with the platform streams under testdata against reasons: a stream with no
+// reason, or a blank one; a stream whose case has no expected.jsonl; a stream byte for byte its case's expected.jsonl,
+// which needs no keeping; and a reason for a stream that no longer exists.
+func platformStreamProblems(testdata string, reasons map[string]string) ([]string, error) {
+	problems := []string{}
+	found := map[string]bool{}
+	cases, readError := os.ReadDir(testdata)
+	if readError != nil {
+		return nil, readError
+	}
+	for _, each := range cases {
+		if !each.IsDir() {
+			continue
+		}
+		files, filesError := os.ReadDir(filepath.Join(testdata, each.Name()))
+		if filesError != nil {
+			return nil, filesError
+		}
+		for _, file := range files {
+			if !platformStreamPattern.MatchString(file.Name()) {
+				continue
+			}
+			relative := each.Name() + "/" + file.Name()
+			found[relative] = true
+			if strings.TrimSpace(reasons[relative]) == "" {
+				problems = append(problems, relative+": no reason in platformStreamReasons")
+			}
+			platform, platformError := os.ReadFile(filepath.Join(testdata, each.Name(), file.Name()))
+			if platformError != nil {
+				return nil, platformError
+			}
+			shared, sharedError := os.ReadFile(filepath.Join(testdata, each.Name(), "expected.jsonl"))
+			switch {
+			case sharedError != nil:
+				problems = append(problems, relative+": its case has no expected.jsonl")
+			case bytes.Equal(platform, shared):
+				problems = append(problems, relative+": the same as expected.jsonl, so delete it")
+			}
+		}
+	}
+	for relative := range reasons {
+		if !found[relative] {
+			problems = append(problems, relative+": a reason for a stream that does not exist")
+		}
+	}
+	slices.Sort(problems)
+	return problems, nil
+}
+
+// Every platform stream in testdata differs from its case's expected.jsonl and has a reason, and every reason has its
+// stream.
+func TestEveryPlatformStreamDiffersAndSaysWhy(test *testing.T) {
+	test.Parallel()
+	problems, problemsError := platformStreamProblems("testdata", platformStreamReasons)
+	if problemsError != nil {
+		test.Fatal(problemsError)
+	}
+	for _, problem := range problems {
+		test.Error(problem)
+	}
+}
+
+// The check finds each kind of problem it names, on streams planted in a testdata of its own: a stream with no
+// reason, one identical to its case's expected.jsonl, one whose case has none, and a reason with no stream. A stream
+// that differs and has its reason is no problem.
+func TestPlatformStreamProblemsFindsEachKind(test *testing.T) {
+	test.Parallel()
+	testdata := test.TempDir()
+	write := func(relative string, contents string) {
+		test.Helper()
+		path := filepath.Join(testdata, filepath.FromSlash(relative))
+		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	write("honest/expected.jsonl", "shared\n")
+	write("honest/expected.linux.jsonl", "linux\n")
+	write("reasonless/expected.jsonl", "shared\n")
+	write("reasonless/expected.windows.jsonl", "windows\n")
+	write("identical/expected.jsonl", "shared\n")
+	write("identical/expected.linux.jsonl", "shared\n")
+	write("orphaned/expected.linux.jsonl", "linux\n")
+	reasons := map[string]string{
+		"honest/expected.linux.jsonl":    "a fact of linux",
+		"identical/expected.linux.jsonl": "a fact of linux",
+		"orphaned/expected.linux.jsonl":  "a fact of linux",
+		"gone/expected.linux.jsonl":      "a fact of linux",
+	}
+	problems, problemsError := platformStreamProblems(testdata, reasons)
+	if problemsError != nil {
+		test.Fatal(problemsError)
+	}
+	want := []string{
+		"gone/expected.linux.jsonl: a reason for a stream that does not exist",
+		"identical/expected.linux.jsonl: the same as expected.jsonl, so delete it",
+		"orphaned/expected.linux.jsonl: its case has no expected.jsonl",
+		"reasonless/expected.windows.jsonl: no reason in platformStreamReasons",
+	}
+	if !slices.Equal(problems, want) {
+		test.Errorf("problems:\n%s\nwant:\n%s", strings.Join(problems, "\n"), strings.Join(want, "\n"))
+	}
 }
 
 // panickingRule is a planted rule that panics on every package, so the crash path has a rule to catch.
