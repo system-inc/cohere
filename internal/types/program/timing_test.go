@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/cpu_clock"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // TestSortedPutsTheExpensiveRuleFirst is what makes an outlier obvious without arithmetic.
@@ -288,6 +289,8 @@ func TestARuleThatPanicsStillBalancesItsFrames(test *testing.T) {
 // spent, so nothing the table prints is a residual it cannot name.
 func TestTheWorkersCpuIsAccountedFor(test *testing.T) {
 	test.Parallel()
+	needs.NoRace(test, "the walk's own share is held to what a 2ms spin spent, and the race detector's "+
+		"instrumentation of the meter bills it several times that (8.8ms on Home, #bnabymg)")
 	timings := NewTimings(nil)
 	meter := startWorkerMeter(timings)
 	if meter == nil {
