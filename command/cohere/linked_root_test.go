@@ -42,10 +42,10 @@ func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 	// The child mark is emptied, since a front door that inherited it would refuse to start the engine at all.
 	environment := []string{goEngineChildVariable + "="}
 	atReal, realExit := runCohereWithEnvironment(test, binary, real, environment, "--no-fix", "--no-cache")
-	// PWD names the link, as a shell that changed into it says: os.Getwd answers with it, and a child given the parent's
-	// PWD would read the kernel's answer instead, which is the real path, and never meet the link at all.
-	atLink, linkExit := runCohereWithEnvironment(test, binary, linked, append(slices.Clone(environment), "PWD="+linked),
-		"--no-fix", "--no-cache")
+	// PWD names the link, as a shell that changed into it says: os.Getwd answers with it, and a child given the
+	// parent's PWD would read the kernel's answer instead, which is the real path, and never meet the link at all.
+	atLink, linkExit := runCohereWithEnvironment(test, binary, linked,
+		append(slices.Clone(environment), "PWD="+linked), "--no-fix", "--no-cache")
 	if realExit != 1 || !strings.Contains(atReal, "consistency-no-screaming-snake-case") {
 		test.Fatalf("the run at the real path exited %d, want 1 with its finding:\n%s", realExit, atReal)
 	}
