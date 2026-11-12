@@ -39,13 +39,15 @@ var resolverAskers = []string{
 // wrap a print, each judged from the function's own body and the facts of what it calls.
 var factLearners = []string{"ctrlflow", "fact_deprecated", "printf"}
 
-// packageStateWriters are the packages a rule's run reaches that write a package-level variable from a function body,
-// outside a sync.Once or sync.OnceValue: state that outlives one package's pass, which a pass on one package could
-// leave for a pass on another to read. The checker's initializer hands upstream's internal package its pass accessor,
-// as upstream's does; fact_resolver's registry is each kind registering as its package initializes;
-// intermediate_representation's are a build census only tests open and a sync.Pool of scratch space a lift empties
-// before it gives it back; and the abbreviation rule's memo is keyed by each load's file set and each declaring
-// package's types, and holds what that package declares, so a reader reads the same whichever package asked first.
+// packageStateWriters are the packages a rule's run reaches that write a package-level variable from a function body:
+// state that outlives one package's pass, which a pass on one package could leave for a pass on another to read. A
+// write inside a once's body counts too when the body captures its caller (see capturesCaller), since the first
+// package to reach the once decides it for every later pass. The checker's initializer hands upstream's internal
+// package its pass accessor, as upstream's does; fact_resolver's registry is each kind registering as its package
+// initializes; intermediate_representation's are a build census only tests open and a sync.Pool of scratch space a
+// lift empties before it gives it back; and the abbreviation rule's memo is keyed by each load's file set and each
+// declaring package's types, and holds what that package declares, so a reader reads the same whichever package asked
+// first.
 var packageStateWriters = []string{
 	"check/checker",
 	"fact_resolver",
@@ -186,7 +188,7 @@ func resolverAskersIn(parsed map[string]*sourcePackage, reach []string) map[stri
 
 // factLearnersOf is each analyzer that declares FactTypes among registered and everything they require, directly or
 // not, by name, with the rules that reach it.
-func factLearnersOf(registered []analysis.Analyzer, ruleNames []string) map[string][]string {
+func factLearnersOf(registered []*analysis.Analyzer, ruleNames []string) map[string][]string {
 	learners := map[string][]string{}
 	for index := range registered {
 		seen := map[*analysis.Analyzer]bool{}
@@ -205,7 +207,7 @@ func factLearnersOf(registered []analysis.Analyzer, ruleNames []string) map[stri
 				visit(required)
 			}
 		}
-		visit(&registered[index])
+		visit(registered[index])
 	}
 	return learners
 }
@@ -270,7 +272,9 @@ func writtenRoot(expression ast.Expr) *ast.Ident {
 }
 
 // isOnceBody reports whether call runs its function argument once for the whole process, as a sync.Once's Do and
-// sync.OnceFunc, sync.OnceValue and sync.OnceValues do, so a write inside it is made once, not once per pass.
+// sync.OnceFunc, sync.OnceValue and sync.OnceValues do. Once is no safety by itself: the first package whose pass
+// reaches the call decides what every later pass reads, so a write inside the body is left out only when the body
+// captures nothing of its caller (see capturesCaller).
 func isOnceBody(call *ast.CallExpr) bool {
 	if selector, isSelector := call.Fun.(*ast.SelectorExpr); isSelector && selector.Sel.Name == "Do" {
 		return true
@@ -287,6 +291,31 @@ func isOnceBody(call *ast.CallExpr) bool {
 		isSelectorOf(function, "sync", "OnceValues")
 }
 
+// capturesCaller reports whether literal, a once's body inside enclosing, the outermost function around it, reads
+// anything enclosing declares outside the literal: a parameter, a receiver or a local, which differ with each pass that
+// calls it. A body that reads only package-level names, imports and its own locals builds the same data whichever pass
+// runs it first. A once at package level has no enclosing function, so it captures nothing.
+func capturesCaller(literal *ast.FuncLit, enclosing ast.Node) bool {
+	if enclosing == nil {
+		return false
+	}
+	captures := false
+	ast.Inspect(literal.Body, func(node ast.Node) bool {
+		identifier, isIdentifier := node.(*ast.Ident)
+		if !isIdentifier || identifier.Obj == nil {
+			return !captures
+		}
+		declared := identifier.Obj.Pos()
+		insideEnclosing := declared >= enclosing.Pos() && declared < enclosing.End()
+		insideLiteral := declared >= literal.Pos() && declared < literal.End()
+		if declared.IsValid() && insideEnclosing && !insideLiteral {
+			captures = true
+		}
+		return !captures
+	})
+	return captures
+}
+
 // isImportQualifier reports whether expression is a bare name of one of a file's imports, which no declaration of the
 // file resolves and no package-level variable of the package shadows.
 func isImportQualifier(expression ast.Expr, imports map[string]bool, names map[string]bool) bool {
@@ -295,7 +324,7 @@ func isImportQualifier(expression ast.Expr, imports map[string]bool, names map[s
 }
 
 // packageStateWritesOf is where the package's non-test files write a package-level variable, its own or an imported
-// package's, from a function body outside a once.
+// package's, from a function body, but inside a once's body that captures nothing of its caller.
 func packageStateWritesOf(source *sourcePackage) []string {
 	names, declarations := packageVariables(source.files)
 	var writes []string
@@ -326,8 +355,11 @@ func packageStateWritesOf(source *sourcePackage) []string {
 		record := func(at ast.Node) {
 			writes = append(writes, source.fileSet.Position(at.Pos()).String())
 		}
-		var inspect func(node ast.Node, inFunction bool)
-		inspect = func(node ast.Node, inFunction bool) {
+		// inspect walks node, inside enclosing, the outermost function around it, nil at package level, where no
+		// write is a function's.
+		var inspect func(node ast.Node, enclosing ast.Node)
+		inspect = func(node ast.Node, enclosing ast.Node) {
+			inFunction := enclosing != nil
 			ast.Inspect(node, func(current ast.Node) bool {
 				if current == node {
 					return true
@@ -335,20 +367,30 @@ func packageStateWritesOf(source *sourcePackage) []string {
 				switch typed := current.(type) {
 				case *ast.FuncDecl:
 					if typed.Body != nil {
-						inspect(typed.Body, true)
+						inspect(typed.Body, typed)
 					}
 					return false
 				case *ast.FuncLit:
-					inspect(typed.Body, true)
+					// A literal at package level, as a variable's initializer, is the outermost function around it.
+					outermost := enclosing
+					if outermost == nil {
+						outermost = typed
+					}
+					inspect(typed.Body, outermost)
 					return false
 				case *ast.CallExpr:
 					if isOnceBody(typed) {
+						// A body that captures its caller is walked as any function's; one that captures nothing
+						// builds constant data, and is left out.
+						for _, argument := range typed.Args {
+							if literal, isLiteral := argument.(*ast.FuncLit); isLiteral &&
+								capturesCaller(literal, enclosing) {
+								inspect(literal.Body, enclosing)
+							}
+						}
 						return false
 					}
 					if !inFunction {
-						return true
-					}
-					if isSelectorOf(typed.Fun, "", "") {
 						return true
 					}
 					if builtin, isIdentifier := typed.Fun.(*ast.Ident); isIdentifier &&
@@ -387,7 +429,7 @@ func packageStateWritesOf(source *sourcePackage) []string {
 				return true
 			})
 		}
-		inspect(file, false)
+		inspect(file, nil)
 	}
 	return writes
 }
@@ -429,10 +471,10 @@ func TestOnlyTheKnownAnalyzersLearnFacts(test *testing.T) {
 	test.Parallel()
 
 	registered := rules.All()
-	analyzers := make([]analysis.Analyzer, len(registered))
+	analyzers := make([]*analysis.Analyzer, len(registered))
 	names := make([]string, len(registered))
 	for index, enabled := range registered {
-		analyzers[index], names[index] = *enabled.Analyzer, enabled.Name
+		analyzers[index], names[index] = enabled.Analyzer, enabled.Name
 	}
 	requireOnlyKnown(test, factLearnersOf(analyzers, names), factLearners, "factLearners",
 		"read that its facts are about its own package's objects and computed from its import closure alone, "+
@@ -441,8 +483,9 @@ func TestOnlyTheKnownAnalyzersLearnFacts(test *testing.T) {
 
 // Every package a rule's run reaches that writes a package-level variable from a function body is one whose state was
 // read: a pass runs once per package in one process, so such a variable outlives the pass and could carry what one
-// package's pass saw into another's, an importer's into its dependency's (#23b2grt). A write inside a sync.Once or
-// sync.OnceValue runs once in the process, whatever package asked first, so it is left out.
+// package's pass saw into another's, an importer's into its dependency's (#23b2grt). A sync.Once or sync.OnceValue
+// does not make a write safe, since the first package to reach it decides it for every pass after: a write in its body
+// counts unless the body reads nothing of the function that calls it, and so builds the same data whoever runs it.
 func TestOnlyTheKnownPackagesWritePackageStateFromAFunction(test *testing.T) {
 	test.Parallel()
 
