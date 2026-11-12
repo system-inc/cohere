@@ -22,6 +22,8 @@ var raceGated = []raceEntry{
 		"(fix_parallel_test.go)"},
 	{"command/cohere-dev", "the pool's tokens, its line, borrowing and the bounded run's watchdog run side by side"},
 	{"internal/edit", "TestConcurrentReadersNeverSeeAPartialFile reads while a write replaces the file"},
+	{"internal/executable_testing", "TestAScriptWrittenWhileOthersForkRunsAtOnce writes and runs scripts while " +
+		"other goroutines fork (#g93ts58)"},
 	{"internal/go_engine/bounded", "its worker pool runs a function on every index at once, as many as there " +
 		"are cores"},
 	{"internal/go_engine/cache", "TestConcurrentPutsOfOneKeyLeaveAWholeEntry writes one key from several goroutines"},
