@@ -193,6 +193,16 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			lookup: interfaceAnswered,
 			want:   "L lookup Interface Close: 2 type names have the method on the host, 3 in the build",
 		},
+		{
+			name: "a receiver embedding a foreign type through a type of its own keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign + "\ntype Base struct{}\n", "closer.go": closer,
+				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype inner struct{ *foreign.Base }\n\n" +
+				"type Mine struct{ inner }\n\nfunc (Mine) Close() error { return nil }\n\n" +
+				"func Use() int { return foreign.Count() }\n",
+			lookup: interfaceAnswered,
+			want:   "L lookup Interface Close: 2 type names have the method on the host, 3 in the build",
+		},
 	} {
 		test.Run(step.name, func(test *testing.T) {
 			test.Parallel()

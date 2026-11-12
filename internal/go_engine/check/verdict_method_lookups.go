@@ -25,8 +25,9 @@ import (
 //   - A Method lookup with a generic candidate of the subject's shape on either side: abbreviated instantiates it with
 //     type arguments read off the subject's signature and validates their constraints, which can turn on an argument
 //     type's method set in the build.
-//   - A subject whose receiver embeds another package's type: Implements reads the receiver's method set, which holds
-//     the methods that type promotes, and those can differ by build while the lookup's candidates do not.
+//   - A subject whose receiver embeds another package's type, directly or through types of its own package that embed
+//     one: Implements reads the receiver's method set, which holds the methods that type promotes at any depth, and
+//     those can differ by build while the lookup's candidates do not.
 //
 // A lookup only these rules ask is judged so, so a fourth rule that records one must be read first
 // (TestOnlyTheRulesReadForOneBitRecordMethodOrInterfaceLookups).

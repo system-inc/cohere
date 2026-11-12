@@ -100,38 +100,47 @@ func methodCandidatesOf(typeNames []*types.TypeName, query string, name string) 
 	return candidates
 }
 
-// receiverEmbedsForeign reports whether subject's receiver embeds a type another package declares, whose promoted
-// methods are in the receiver's method set.
+// receiverEmbedsForeign reports whether subject's receiver embeds a type another package declares, directly or through
+// types of its own package that embed one in turn, since the receiver's method set holds every method an embedded
+// type promotes, at any depth, and those of another package's type can differ by build.
 func receiverEmbedsForeign(subject *types.Func) bool {
 	receiver := subject.Signature().Recv()
 	if receiver == nil {
 		return false
 	}
-	foreign := func(embedded types.Type) bool {
-		pointee := types.Unalias(embedded)
+	// visited are the named types of the subject's package already walked, so a type that embeds itself through a
+	// pointer, or two that embed each other, end the walk.
+	visited := map[*types.Named]bool{}
+	var embedsForeign func(embedding types.Type) bool
+	embedsForeign = func(embedding types.Type) bool {
+		pointee := types.Unalias(embedding)
 		if pointer, isPointer := pointee.(*types.Pointer); isPointer {
 			pointee = types.Unalias(pointer.Elem())
 		}
-		named, isNamed := pointee.(*types.Named)
-		return isNamed && named.Obj().Pkg() != nil && named.Obj().Pkg() != subject.Pkg()
-	}
-	receiverType := types.Unalias(receiver.Type())
-	if pointer, isPointer := receiverType.(*types.Pointer); isPointer {
-		receiverType = types.Unalias(pointer.Elem())
-	}
-	switch underlying := receiverType.Underlying().(type) {
-	case *types.Struct:
-		for field := range underlying.Fields() {
-			if field.Embedded() && foreign(field.Type()) {
+		if named, isNamed := pointee.(*types.Named); isNamed {
+			if named.Obj().Pkg() != nil && named.Obj().Pkg() != subject.Pkg() {
 				return true
 			}
+			if visited[named] {
+				return false
+			}
+			visited[named] = true
 		}
-	case *types.Interface:
-		for embedded := range underlying.EmbeddedTypes() {
-			if foreign(embedded) {
-				return true
+		switch underlying := pointee.Underlying().(type) {
+		case *types.Struct:
+			for field := range underlying.Fields() {
+				if field.Embedded() && embedsForeign(field.Type()) {
+					return true
+				}
+			}
+		case *types.Interface:
+			for embedded := range underlying.EmbeddedTypes() {
+				if embedsForeign(embedded) {
+					return true
+				}
 			}
 		}
+		return false
 	}
-	return false
+	return embedsForeign(receiver.Type())
 }
