@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"
 )
 
@@ -166,8 +167,9 @@ func TestASideCopyAnswersAsTheTreeDoes(test *testing.T) {
 				{"list", "-m", "-json", "all"},
 				{"list", "-e", "-deps", "-json=" + listedFields, "example.com/a/..."},
 			} {
-				aside, standardErrorAside, errorAside := goEnvironment.guard.output(goCommand(goEnvironment, arguments))
-				tree, standardErrorTree, errorTree := runCommand(goCommand(goEnvironment, arguments))
+				aside, standardErrorAside, errorAside := goEnvironment.guard.output(
+					goCommand(test, goEnvironment, arguments))
+				tree, standardErrorTree, errorTree := runCommand(goCommand(test, goEnvironment, arguments))
 				name := strings.Join(arguments[:2], " ")
 				compareAnswers(test, name+"'s output", aside, tree)
 				compareAnswers(test, name+"'s standard error", standardErrorAside, standardErrorTree)
@@ -186,10 +188,11 @@ func TestASideCopyAnswersAsTheTreeDoes(test *testing.T) {
 	}
 }
 
-// goCommand is go with arguments as the load runs it in goEnvironment's workspace.
-func goCommand(goEnvironment *GoEnvironment, arguments []string) *exec.Cmd {
+// goCommand is go with arguments as the load runs it in goEnvironment's workspace, a module the test wrote outside its
+// own, which build_inputs.OutsideModule checks, so Go's test cache has nothing of ours the command reads to miss.
+func goCommand(test *testing.T, goEnvironment *GoEnvironment, arguments []string) *exec.Cmd {
 	command := exec.Command("go", arguments...)
-	command.Dir = goEnvironment.workspace
+	command.Dir = build_inputs.OutsideModule(test, goEnvironment.workspace)
 	command.Env = append(slices.Clone(goEnvironment.fullEnvironment), "PWD="+goEnvironment.workspace)
 	return command
 }
@@ -274,7 +277,7 @@ func TestASideCopyLeavesNothingBehind(test *testing.T) {
 	for _, arguments := range [][]string{{"list", "-m", "-json", "all"}, {"list", "-e", "example.com/nowhere"},
 		{"no-such-command"}} {
 		// Ignored: a command that fails is one of the cases, and what it printed is not what is judged.
-		_, _, _ = goEnvironment.guard.output(goCommand(goEnvironment, arguments))
+		_, _, _ = goEnvironment.guard.output(goCommand(test, goEnvironment, arguments))
 		left, readError := os.ReadDir(goEnvironment.guard.sideRoot)
 		if readError != nil {
 			test.Fatal(readError)
@@ -345,7 +348,8 @@ func TestASideCopyAnswersAsTheTreeDoesFromEveryWorkingDirectory(test *testing.T)
 			label := each.name + " from " + name
 			command := func() *exec.Cmd {
 				listing := exec.Command("go", "list", "-m", "-json", "all")
-				listing.Dir = working.directory
+				// The workspace the test wrote, or a link to it, outside the module (build_inputs.OutsideModule).
+				listing.Dir = build_inputs.OutsideModule(test, working.directory)
 				listing.Env = append(slices.DeleteFunc(slices.Clone(goEnvironment.fullEnvironment),
 					func(variable string) bool { return strings.HasPrefix(variable, "PWD=") }), working.given...)
 				return listing
