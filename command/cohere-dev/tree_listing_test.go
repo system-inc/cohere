@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // A change on main to a package land links, with command/cohere-dev left as it was, hands a landing from a branch
@@ -72,7 +74,7 @@ func TestALandingHandsOnWhenAPackageLandLinksDiffersFromMains(test *testing.T) {
 			log := filepath.Join(test.TempDir(), "main-land")
 			standIn := filepath.Join(test.TempDir(), "main-land")
 			script := "#!/bin/sh\necho ran >> '" + log + "'\nexit 3\n"
-			if writeError := os.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
+			if writeError := executable_testing.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
 				test.Fatal(writeError)
 			}
 			landing := exec.Command(fixture.wrapper, "land", "--message", "a landing")

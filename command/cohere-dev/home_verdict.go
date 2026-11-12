@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/streams"
+	"golang.org/x/mod/modfile"
 )
 
 // The landing gate's tests run on Home, Loom's day box, and only what Home could not run runs on the Mac (#acdf5mc).
@@ -39,9 +41,9 @@ import (
 // Home failing a test refuses the landing. Home unreachable, refusing, out of its window or saying it tested another
 // tree is no verdict at all, and the whole test run happens on the Mac, as it always did, said on the land line.
 
-// homeGateVariable turns the real Home on with "on", or names a command run in place of her whole run, the push and
-// the gap, for a test. Unset or "off", every landing tests on the Mac. Home is opt-in until a real landing has been
-// proven on her (#acdf5mc): a script that fails there for its own reasons would read as a red for every lander.
+// homeGateVariable is "off" to test a landing on the Mac alone, the escape hatch, or names a command run in place of
+// Home's whole run, the push and the gap, for a test. Unset or "on", the landing's tests run on Home: the default
+// since her first real landings were proven, red and green (#acdf5mc).
 const homeGateVariable = "COHERE_DEV_HOME_GATE"
 
 // homeMarker opens the line Home's run prints before its tests: the commit it checked out and the platform it tests
@@ -112,7 +114,8 @@ func readTestJson(output []byte) homeVerdict {
 			verdict.packagesFailed = append(verdict.packagesFailed, event.Package)
 		case event.Action == "fail":
 			verdict.failedTests = append(verdict.failedTests, key)
-		case event.Action == "skip":
+		// A package-level skip is a package with no test files, which has nothing to run again on the Mac.
+		case event.Action == "skip" && event.Test != "":
 			// A subtest skipped is its top-level test run again whole, since -run names top-level tests.
 			name, _, _ := strings.Cut(event.Test, "/")
 			if !slices.Contains(verdict.skipped[event.Package], name) {
@@ -177,9 +180,12 @@ func testsNeverCompiledOn(
 			if relativeError != nil {
 				return relativeError
 			}
-			importPath := module.Path
+			// The workspace leaves the root module's path empty, since its pattern is ./..., so it is read from the
+			// module's go.mod: an empty one named the root's packages by their directory alone, which go test can't
+			// load (command/cohere [setup failed], Nov 12).
+			importPath := modulePath(moduleRoot, module.Path)
 			if relative != "." {
-				importPath = path.Join(module.Path, filepath.ToSlash(relative))
+				importPath = path.Join(importPath, filepath.ToSlash(relative))
 			}
 			for _, declaration := range parsed.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
@@ -196,6 +202,18 @@ func testsNeverCompiledOn(
 		}
 	}
 	return found, nil
+}
+
+// modulePath is a module's import path: the one the workspace recorded, or, when it recorded none, the one its
+// go.mod at moduleRoot declares.
+func modulePath(moduleRoot string, recorded string) string {
+	if recorded != "" {
+		return recorded
+	}
+	// Ignored: a module with no readable go.mod has no path to read, and its tests are named by an empty one, which
+	// go test refuses by name.
+	goMod, _ := os.ReadFile(filepath.Join(moduleRoot, "go.mod"))
+	return modfile.ModulePath(goMod)
 }
 
 func fileExists(file string) bool {
@@ -230,13 +248,20 @@ func macRemainder(skipped map[string][]string, neverCompiled map[string][]string
 }
 
 // runHomeGate runs the module's tests on Home and returns what Home said, or why there is no verdict from Home, which
-// sends the whole test run to the Mac. A verdict about another tree than commit is no verdict.
-func runHomeGate(worktree string, commit string, patterns []string, now time.Time) (homeVerdict, string) {
-	standIn := os.Getenv(homeGateVariable)
+// sends the whole test run to the Mac. A verdict about another tree than commit is no verdict. setting is what
+// homeGateVariable says.
+func runHomeGate(
+	worktree string,
+	commit string,
+	patterns []string,
+	now time.Time,
+	setting string,
+) (homeVerdict, string) {
+	standIn := setting
 	switch standIn {
-	case "", "off":
-		return homeVerdict{}, "Home is opt-in until her first landing is proven (" + homeGateVariable + "=on)"
-	case "on":
+	case "off":
+		return homeVerdict{}, "Home is off for this landing (" + homeGateVariable + "=off)"
+	case "", "on":
 		standIn = ""
 	}
 	var output []byte
@@ -344,9 +369,7 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 		output, runError := gap.CombinedOutput()
 		// Gap says "Home holds hand job <id> (<mind>, ...): one job per box" when another job has her, and "is held
 		// by" for another hand's gap (LoomGapCommandLineInterface.ts); any other refusal is not worth asking again.
-		held := exitCodeOf(runError) == gapRefusedExitCode && (strings.Contains(string(output), "holds hand job") ||
-			strings.Contains(string(output), "is held by"))
-		if !held || attempt == homeHeldRetries {
+		if !gapHeld(runError, output) || attempt == homeHeldRetries {
 			return output, runError
 		}
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s is held by another job; asking again in %s (%d of %d)\n",
@@ -354,6 +377,17 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 		streams.Show(streams.Errors)
 		time.Sleep(homeHeldRetryWait)
 	}
+}
+
+// gapHeld reports whether gap refused a job because another holds Home: it exits gapRefusedExitCode and says "Home
+// holds hand job <id> (<mind>, ...): one job per box" for a hand job, and "is held by" for another hand's gap
+// (LoomGapCommandLineInterface.ts); any other refusal is not worth asking again. It reads the exit from the error
+// itself, since exitCodeOf reports an error it can't read and a gap that ran has none: it printed "cohere-dev: <nil>"
+// on every landing Home took (Nov 12).
+func gapHeld(runError error, output []byte) bool {
+	var exited *exec.ExitError
+	return errors.As(runError, &exited) && exited.ExitCode() == gapRefusedExitCode &&
+		(bytes.Contains(output, []byte("holds hand job")) || bytes.Contains(output, []byte("is held by")))
 }
 
 // terminalColor is a terminal's color sequence, which gap writes around its verdict words.
@@ -387,7 +421,7 @@ func runModuleTests(
 	now time.Time,
 ) (int, string) {
 	patterns := covered.Patterns()
-	verdict, unavailable := runHomeGate(worktree, commit, patterns, now)
+	verdict, unavailable := runHomeGate(worktree, commit, patterns, now, os.Getenv(homeGateVariable))
 	if unavailable != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no tests on Home (%s), so they run here\n", unavailable)
 		return runTestsHere(worktree, testing, append([]string{"test"}, patterns...)),

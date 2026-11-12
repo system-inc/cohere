@@ -24,11 +24,18 @@ import (
 // Two cases keep the whole closure judgment, since the bit there can flip with nothing this reads changing:
 //
 //   - A Method lookup whose rule instantiates generic candidates (build_reads.Lookup.Instantiates, abbreviated's),
-//     with a generic candidate of the subject's shape on either side: abbreviated instantiates it with type arguments
-//     read off the subject's signature and validates their constraints, which can turn on an argument type's method
-//     set in the build. No other rule instantiates (#dscc341): no_any matches a generic candidate by shape alone and
-//     initialism a generic interface by implementsInShape, each by the candidate's own lines, so a generic candidate
-//     of theirs is judged as any other, its answer by its own lines and a new or changed one by its shape.
+//     with a generic candidate of the subject's shape on either side some type parameter of which has a constraint
+//     narrower than all types: abbreviated instantiates it with type arguments read off the subject's signature and
+//     validates them against its constraints, which a method, a type term or comparable can turn on an argument
+//     type's method set, underlying type or comparability in the build. Under constraints of all types validation
+//     passes for every argument in every build (#8fbkkp4), and the rest of what the rule does with the candidate reads
+//     its own lines, which carry its type parameters with their constraints (renderedTypeParameters), so which of them
+//     can be read off the subject at all, and the subject's own signature, whose types of other packages are the
+//     package's own type reads, an alias judged by the type it stands for. So such a candidate is judged as any other,
+//     as is an answer whose own lines carry its parameters too (answerLinesOf). No other rule instantiates
+//     (#dscc341): no_any matches a generic candidate by shape alone and initialism a generic interface by
+//     implementsInShape, each by the candidate's own lines, so a generic candidate of theirs is judged as any other,
+//     its answer by its own lines and a new or changed one by its shape.
 //   - A subject whose receiver embeds another package's type, directly or through types of its own package that embed
 //     one: Implements reads the receiver's method set, which holds the methods that type promotes at any depth, and
 //     those can differ by build while the lookup's candidates do not.
@@ -81,7 +88,7 @@ func methodLookupHolds(name string, judgment methodJudgment) (holds bool, why st
 	if judgment.query == build_reads.QueryMethod && judgment.instantiates {
 		for _, side := range []map[string]methodCandidate{judgment.host, judgment.build} {
 			for _, candidate := range side {
-				if candidate.isGeneric && candidate.shape == judgment.subjectShape {
+				if candidate.isGeneric && !candidate.unconstrained && candidate.shape == judgment.subjectShape {
 					return false, "", false
 				}
 			}
@@ -169,8 +176,8 @@ func (judged verdict) methodJudgmentOf(
 ) methodJudgment {
 	judgment := methodJudgment{query: lookup.Query, name: lookup.Name, found: lookup.Found,
 		instantiates: lookup.Instantiates,
-		host:         methodCandidatesOf(hostTypeNames, lookup.Query, lookup.Name, lookup.Answer),
-		build:        methodCandidatesOf(buildTypeNames, lookup.Query, lookup.Name, nil)}
+		host:         methodCandidatesOf(judged.host, hostTypeNames, lookup.Query, lookup.Name, lookup.Answer),
+		build:        methodCandidatesOf(judged.build, buildTypeNames, lookup.Query, lookup.Name, nil)}
 	subject, isMethod := lookup.Subject.(*types.Func)
 	if !isMethod {
 		return judgment

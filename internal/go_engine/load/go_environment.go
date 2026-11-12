@@ -82,14 +82,15 @@ func ReadGoEnvironment(directory string, environment []string, held Held) (*GoEn
 }
 
 // askGoEnvironment is go env's answer of goEnvironmentNames in workspace under environment, the whole environment,
-// by name: the one go env the engine runs for a run's build (#4rpt1jh). It asks in workspace with the process's own
-// `PWD`, as the census, the kept listing and the findings cache always asked, so the go.mod and go.work it reports
-// are spelled as getcwd spells workspace unless `PWD` is workspace already.
+// by name: the one go env the engine runs for a run's build (#4rpt1jh). It asks with `PWD` set to workspace, as
+// runList does, so the go.mod and go.work it reports, and the modules a go.work uses below it, are spelled under
+// workspace as the load names it, never through a link the caller's working directory went through (#hd5bsqh): a run
+// through a linked root then names its inputs as a run at the real root does.
 func askGoEnvironment(workspace string, environment []string) (map[string]string, error) {
 	goEnvironmentAsked(workspace)
 	command := exec.Command("go", append([]string{"env", "-json"}, goEnvironmentNames...)...)
 	command.Dir = workspace
-	command.Env = environment
+	command.Env = append(slices.Clone(environment), "PWD="+workspace)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
 	output, runError := command.Output()

@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 func TestOpenFlag(test *testing.T) {
@@ -83,7 +84,7 @@ func TestOpenFlag(test *testing.T) {
 			}
 			editor := test.TempDir()
 			log := filepath.Join(editor, "opened")
-			if writeError := os.WriteFile(
+			if writeError := executable_testing.WriteFile(
 				filepath.Join(editor, "code"),
 				[]byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"),
 				0o755,
@@ -96,7 +97,7 @@ func TestOpenFlag(test *testing.T) {
 				}
 			}
 			if testCase.name == "failed editor" {
-				if writeError := os.WriteFile(
+				if writeError := executable_testing.WriteFile(
 					filepath.Join(editor, "code"),
 					[]byte("#!/bin/sh\nexit 42\n"),
 					0o755,
@@ -286,7 +287,7 @@ func TestOpenDiscoveredProjects(test *testing.T) {
 	})
 	editor := test.TempDir()
 	log := filepath.Join(editor, "opened")
-	if writeError := os.WriteFile(
+	if writeError := executable_testing.WriteFile(
 		filepath.Join(editor, "code"),
 		[]byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"),
 		0o755,

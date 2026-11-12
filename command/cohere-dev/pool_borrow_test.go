@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // A run widened by borrowed tokens splits their cores between packages and threads as evenly as they divide,
@@ -60,7 +61,7 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 		"[ \"$COHERE_DEV_TEST_RUN\" = first ] && while [ ! -e '" +
 		release +
 		"' ]; do sleep 0.05; done\nexit 0\n"
-	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	home := privatePool(test)

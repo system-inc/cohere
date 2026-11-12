@@ -575,12 +575,13 @@ the project's and its dependencies' with cgo files alike, and how long that took
 translates nothing, which runs no cgo tool, it is `{"packages":0,"milliseconds":0}`, written and never
 left out, so a front door can always say whether a run built anything.
 
-The Go engine's types record also carries `"censusMissedPackages":673`, additive within contract 3 (#yyv7nr2), only
-when its census counted no Go file while its load reached packages in the workspace: the packages it reached. The
-census and the load read one tree, so this is a census that never walked the tree, as a root reached through a
-symbolic link once was, and the record's other counts read 0 over work never done. Such a run is never complete: the
+The Go engine's types record also carries `censusMissed`, additive within contract 3 (#yyv7nr2, #hd5bsqh), only when
+its load reached a file in the workspace that its census never counted: each such file with its package, sorted by
+file, as `{"package":"example.com/b","file":"<root>/b/b.go"}`. The census counts every file go reads in the
+workspace, those git ignores included, so such a file is one no count of the run accounts for, as at a root or a
+go.work use reached through a symbolic link, where the census once walked nothing. Such a run is never complete: the
 engine notes why and writes `complete` false, and a front door refuses a summary that calls it complete. A run whose
-census and load agree never writes it.
+census holds every file its load reached never writes it.
 
 The Go engine's types record also carries `memory`, additive within contract 3: the memory limit its process
 held its heap under and where it came from, as
@@ -653,6 +654,7 @@ otherwise; a run that asked and ends without one is refused. When the lint phase
 ```json
 {
     "kind": "timing",
+    "extraBuildsFromSource": 2,
     "processCpuMicroseconds": 80000,
     "load": {
         "listCpuMicroseconds": 2000,
@@ -700,6 +702,10 @@ out, said once in `measuringCpuMicroseconds` beside `measuredCalls`, the pieces 
 - `processCpuMicroseconds` is every CPU microsecond the process spent up to the record. The rows (rules, shared, the
   load's own phases and measuring) are said against it, and what they leave is printed as its own line, what no row
   measures, never spread over the rows.
+- `extraBuildsFromSource` is how many builds beside the host's the run checked under `--other-builds`, written only
+  when there were any and absent otherwise. None of them restored anything from the host's run, since a timed run keeps
+  nothing for them, so every package of every build was checked from source and the rows include that work
+  (#4y4qd3z). The front door says so in a sentence beside the table, so the rows are never read as a run that restored.
 
 `rules` and `shared` are `[]` when empty, never left out, and the front door refuses a record missing either. When
 the thread clock cannot be read, `unavailable` says why, every CPU figure is 0 and means nothing, and the counts are

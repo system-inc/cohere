@@ -58,6 +58,10 @@ type ReadsBuild struct {
 	// uses are each object's digest as a use of each kind but the whole judges it, a cache.Key by useKey (useDigest).
 	uses sync.Map
 
+	// candidates are each type name's candidate for a Method or Interface lookup of a query and name, a
+	// memoizedCandidate by candidateKey (candidate).
+	candidates sync.Map
+
 	// dependences are each package's dependence set, a DependenceSet by the package's *build_reads.Reads, asked of
 	// the host's memo alone, which every build shares (Dependence), and reaches the packages each type name's closure
 	// reaches, which the sets are gathered from (typeReach).
@@ -366,6 +370,48 @@ func (build *ReadsBuild) methodsNamed(name string) []packageMethods {
 	build.lock.Lock()
 	defer build.lock.Unlock()
 	return build.methodIndex[name]
+}
+
+// candidateKey is what one memoized candidate is asked by: a type name, for a lookup of query and name.
+type candidateKey struct {
+	typeName *types.TypeName
+	query    string
+	name     string
+}
+
+// memoizedCandidate is methodCandidateOf's answer for a candidateKey under this binary's renderer, asked with no
+// answer, whether the type name is a candidate at all, and its name as a side's candidates are keyed (objectName).
+type memoizedCandidate struct {
+	candidate   methodCandidate
+	isCandidate bool
+	key         string
+}
+
+// candidate is methodCandidateOf of typeName for a lookup of query and name under this binary's renderer, rendered
+// once per type name, query and name in the build, since every lookup of one name asks the same type names: on
+// deeafbf4 hundreds of lookups of Clone rendered every type name with a Clone again for each (#8fbkkp4). answer, which
+// only an interface's holdsAnswer reads, is read past the memo. It is the candidate, its name as a side's candidates
+// are keyed, and false when typeName is no candidate.
+func (build *ReadsBuild) candidate(
+	typeName *types.TypeName,
+	query string,
+	name string,
+	answer types.Object,
+) (methodCandidate, string, bool) {
+	key := candidateKey{typeName: typeName, query: query, name: name}
+	stored, found := build.candidates.Load(key)
+	if !found {
+		candidate, isCandidate := methodCandidateOf(typeName, query, name, nil, ReadsRendererVersion)
+		stored, _ = build.candidates.LoadOrStore(key, memoizedCandidate{candidate: candidate,
+			isCandidate: isCandidate, key: objectName(typeName)})
+	}
+	memoized, _ := stored.(memoizedCandidate)
+	if memoized.isCandidate && memoized.candidate.isInterface && answer != nil {
+		if interfaceType, isInterface := typeName.Type().Underlying().(*types.Interface); isInterface {
+			memoized.candidate.holdsAnswer = holdsAnswer(interfaceType, answer)
+		}
+	}
+	return memoized.candidate, memoized.key, memoized.isCandidate
 }
 
 // Restoring is one package of the host's run whose reads a verdict judges in another build.
