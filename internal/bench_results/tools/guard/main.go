@@ -8,8 +8,11 @@
 //
 // The first form reads <directory>/baseline-<project>.json, appends tonight's verdict to
 // <directory>/verdicts-<project>.jsonl, and prints the result as JSON with how many nights in a row, tonight's
-// included, went unmeasured. With no baseline yet, a quiet tonight becomes the baseline and passes. It exits 0
-// for Pass, Faster and Unmeasured, 3 for Regressed, and 1 when nothing could be judged.
+// included, went unmeasured. With no baseline yet, a quiet tonight becomes the baseline and passes, and so does a
+// quiet tonight whose cold runs check without fixing against a baseline whose runs fixed: the guard moved to
+// checking runs (#8sqsgee), and the one change of instrument it was told of moves its baseline with it, on record,
+// where every other difference between the two is refused. It exits 0 for Pass, Faster and Unmeasured, 3 for
+// Regressed, and 1 when nothing could be judged.
 //
 // The second form makes a quiet record the baseline and appends why to <directory>/baselines-<project>.jsonl,
 // so the baseline only ever moves with a reason on record, never by itself to last night's number, which
@@ -43,6 +46,12 @@ const regressedExit = 3
 
 // firstBaselineReason is the reason on record when a project's first quiet night becomes its baseline.
 const firstBaselineReason = "the first quiet night, now the baseline"
+
+// checkingBaselineReason is the reason on record when a quiet night of checking cold runs replaces a baseline whose
+// cold runs fixed, the change of instrument the guard made on 2026-11-12 (#8sqsgee): a fixing run's work moves with
+// what the tree holds, so the two are never compared, and the first quiet checking night starts the new baseline.
+const checkingBaselineReason = "the instrument changed: the cold runs now check without fixing and the baseline " +
+	"fixed, so this first quiet checking night is the new baseline"
 
 // verdictLine is one night in verdicts-<project>.jsonl.
 type verdictLine struct {
@@ -144,15 +153,29 @@ func judge(state string, tonightPath string, threshold float64, stdout io.Writer
 	baseline, readBaselineError := readRecord(baselinePath)
 	switch {
 	case errors.Is(readBaselineError, os.ErrNotExist):
-		var firstNightError error
-		if result, firstNightError = firstNight(state, tonight); firstNightError != nil {
-			return 1, firstNightError
+		var newBaselineNightError error
+		if result, newBaselineNightError = newBaselineNight(state, tonight, "there is no baseline yet",
+			firstBaselineReason); newBaselineNightError != nil {
+			return 1, newBaselineNightError
 		}
 	case readBaselineError != nil:
 		return 1, readBaselineError
 	default:
 		if validateError := bench_results.Validate(baseline); validateError != nil {
 			return 1, fmt.Errorf("%s: %w", baselinePath, validateError)
+		}
+		if !baseline.NoFix && tonight.NoFix {
+			retired := fmt.Sprintf(
+				"the cold runs now check without fixing, and the baseline of %s fixed, "+
+					"so it is never compared with them",
+				baseline.RecordedAt,
+			)
+			var newBaselineNightError error
+			if result, newBaselineNightError = newBaselineNight(state, tonight, retired,
+				checkingBaselineReason); newBaselineNightError != nil {
+				return 1, newBaselineNightError
+			}
+			break
 		}
 		var guardError error
 		if result, guardError = bench_results.Guard(baseline, tonight, threshold); guardError != nil {
@@ -241,9 +264,15 @@ func recordNight(
 	return 0, nil
 }
 
-// firstNight is the verdict of a project with no baseline: a quiet tonight becomes the baseline and passes
-// against itself, and a tonight with no quiet number is Unmeasured, leaving the project still without one.
-func firstNight(state string, tonight bench_results.Record) (bench_results.GuardResult, error) {
+// newBaselineNight is the verdict of a night with no baseline to be compared with, none yet or one tonight's runs are
+// never compared with, which without says: a quiet tonight becomes the baseline with because on record and passes
+// against itself, and a tonight with no quiet number is Unmeasured, leaving the baseline as it was.
+func newBaselineNight(
+	state string,
+	tonight bench_results.Record,
+	without string,
+	because string,
+) (bench_results.GuardResult, error) {
 	result := bench_results.GuardResult{
 		Project:              tonight.Project.Name,
 		TonightCohereCommit:  tonight.Cohere.Commit,
@@ -257,19 +286,17 @@ func firstNight(state string, tonight bench_results.Record) (bench_results.Guard
 	case tonight.Cohere.Dirty:
 		result.Verdict = bench_results.GuardVerdictUnmeasured
 		result.Reason = fmt.Sprintf(
-			"there is no baseline yet, and tonight's cohere %s was built from a modified tree, which no commit reproduces",
+			"%s, and tonight's cohere %s was built from a modified tree, which no commit reproduces",
+			without,
 			tonight.Cohere.Commit,
 		)
 		return result, nil
 	case tonightQuiet == nil:
 		result.Verdict = bench_results.GuardVerdictUnmeasured
-		result.Reason = fmt.Sprintf(
-			"there is no baseline yet, and no %s run tonight was quiet to start one",
-			bench_results.ModeCold,
-		)
+		result.Reason = fmt.Sprintf("%s, and no %s run tonight was quiet to start one", without, bench_results.ModeCold)
 		return result, nil
 	}
-	if writeBaselineError := writeBaseline(state, tonight, firstBaselineReason); writeBaselineError != nil {
+	if writeBaselineError := writeBaseline(state, tonight, because); writeBaselineError != nil {
 		return result, writeBaselineError
 	}
 	result.Verdict = bench_results.GuardVerdictPass
@@ -278,7 +305,7 @@ func firstNight(state string, tonight bench_results.Record) (bench_results.Guard
 	result.Ratio = 1
 	result.BaselineCohereCommit = tonight.Cohere.Commit
 	result.BaselineProjectCommit = tonight.Project.Commit
-	result.Reason = firstBaselineReason
+	result.Reason = because
 	return result, nil
 }
 
