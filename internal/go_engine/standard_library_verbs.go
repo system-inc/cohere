@@ -19,6 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 )
@@ -343,10 +344,11 @@ func runStandardLibraryVariant(arguments []string, standardError io.Writer, regi
 		return fail(standardError, fmt.Errorf("computing the standard library: the engine exited %d: %s", exitCode,
 			strings.TrimSpace(engineError.String())))
 	}
-	values, valuesError := readGoEnvironment(*root, nil)
-	if valuesError != nil {
-		return fail(standardError, valuesError)
+	goEnvironment, environmentError := load.ReadGoEnvironment(*root, nil, nil)
+	if environmentError != nil {
+		return fail(standardError, environmentError)
 	}
+	values := goEnvironment.Values()
 	imported, importsError := probeImports(*root)
 	if importsError != nil {
 		return fail(standardError, importsError)

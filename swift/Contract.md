@@ -575,6 +575,13 @@ the project's and its dependencies' with cgo files alike, and how long that took
 translates nothing, which runs no cgo tool, it is `{"packages":0,"milliseconds":0}`, written and never
 left out, so a front door can always say whether a run built anything.
 
+The Go engine's types record also carries `"censusMissedPackages":673`, additive within contract 3 (#yyv7nr2), only
+when its census counted no Go file while its load reached packages in the workspace: the packages it reached. The
+census and the load read one tree, so this is a census that never walked the tree, as a root reached through a
+symbolic link once was, and the record's other counts read 0 over work never done. Such a run is never complete: the
+engine notes why and writes `complete` false, and a front door refuses a summary that calls it complete. A run whose
+census and load agree never writes it.
+
 The Go engine's types record also carries `memory`, additive within contract 3: the memory limit its process
 held its heap under and where it came from, as
 `{"limitBytes":8589934592,"capBytes":8589934592,"source":"Cap","availableBytes":44023414784}`. The limit is the

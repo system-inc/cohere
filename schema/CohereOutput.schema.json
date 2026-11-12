@@ -844,6 +844,10 @@
                             "type": "string",
                             "description": "Files the run could not check for any other reason, as the run said it."
                         },
+                        "censusMissedPackages": {
+                            "type": "integer",
+                            "description": "The packages an engine's load reached in its project while its census counted no file there, as a census that never walked the tree does. The run checked nothing it should have, and fails. Absent when 0."
+                        },
                         "nestedUnread": {
                             "type": "string",
                             "description": "Why the nested repositories could not be read for drift. Their files are never the run's to check, so the run went on. Absent when they were read."
