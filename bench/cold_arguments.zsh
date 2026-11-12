@@ -11,12 +11,15 @@
 # Every run takes them, primes, warm and edit runs too, so each mode measures the same run. When every build becomes a
 # plain run's default (#qqyq61s), every prints none here and host prints the switch that asks for the host's alone.
 build_arguments() {
-  [[ $1 == every ]] && print -r -- --other-builds
+  [[ ${1:-} == every ]] && print -r -- --other-builds
   return 0
 }
 
+# Both read their argument as ${1:-}: quiet_machine.sh runs under `set -u`, where reading an unset argument is an
+# error, and a whole-root run names no engine: a bare $1 failed after `--no-cache` was printed, so the cold runs
+# stayed cold only by the order of the two lines.
 cold_arguments() {
   print -r -- --no-cache
-  [[ -n $1 ]] && print -r -- --no-fix
+  [[ -n ${1:-} ]] && print -r -- --no-fix
   return 0
 }
