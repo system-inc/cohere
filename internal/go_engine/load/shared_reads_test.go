@@ -86,6 +86,29 @@ func TestASharedFileReadsOnPastItsHeadAndHeldBytesWin(test *testing.T) {
 	}
 }
 
+// A file saved between its head's read and a read past the head is not spliced: the read past the head fails, naming
+// the file and that it changed, and go/build never parses a header that never existed.
+func TestAFileChangedPastItsHeadIsNeverSpliced(test *testing.T) {
+	test.Parallel()
+	long := filepath.Join(test.TempDir(), "long.go")
+	if writeError := os.WriteFile(long, []byte("package long\n\n// "+strings.Repeat("x", 3*sharedFileHead)+"\n"),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	reader, openError := NewSharedReads().openFile(nil)(long)
+	if openError != nil {
+		test.Fatal(openError)
+	}
+	saved := "package long\n\n// " + strings.Repeat("y", 5*sharedFileHead) + "\n"
+	if writeError := os.WriteFile(long, []byte(saved), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	read, readError := readAllAndClose(reader)
+	if readError == nil || !strings.Contains(readError.Error(), long+" changed while the run read it") {
+		test.Errorf("a file saved past its head read %d bytes with %v, want refused, naming it", len(read), readError)
+	}
+}
+
 // readAllAndClose is everything reader gives, then closed.
 func readAllAndClose(reader io.ReadCloser) (string, error) {
 	read, readError := io.ReadAll(reader)

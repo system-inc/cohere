@@ -2,7 +2,6 @@ package load
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -35,15 +34,6 @@ type sharedDirectory struct {
 	once    sync.Once
 	entries []fs.FileInfo
 	failure error
-}
-
-// sharedFile is the start of one file, read once: its first sharedFileHead bytes, and whether they are the whole
-// file. A reader that wants more reads the rest from the disk itself.
-type sharedFile struct {
-	once     sync.Once
-	head     []byte
-	complete bool
-	failure  error
 }
 
 // sharedFileHead is how much of a file is read once and kept: go/build's own read buffer, and in it a Go file's
@@ -99,30 +89,11 @@ func (shared *SharedReads) openFile(held Held) func(path string) (io.ReadCloser,
 			shared.files[path] = read
 		}
 		shared.mutex.Unlock()
-		read.once.Do(func() { read.head, read.complete, read.failure = readHead(path) })
+		read.once.Do(func() { read.failure = read.readHead(path) })
 		if read.failure != nil {
 			return nil, read.failure
 		}
 		return &headReader{shared: shared, path: path, head: bytes.NewReader(read.head), offset: int64(len(read.head)),
-			complete: read.complete}, nil
+			complete: read.complete, size: read.size, modified: read.modified}, nil
 	}
-}
-
-// readHead is a file's first sharedFileHead bytes, and whether they are all of it.
-func readHead(path string) ([]byte, bool, error) {
-	file, openError := os.Open(path)
-	if openError != nil {
-		return nil, false, openError
-	}
-	defer file.Close() // Ignored: the file was only read, so a failed close loses nothing.
-	head := make([]byte, sharedFileHead)
-	read, readError := io.ReadFull(file, head)
-	switch {
-	case errors.Is(readError, io.EOF) || errors.Is(readError, io.ErrUnexpectedEOF):
-		// A copy of what was read, so a short file holds its own bytes and not a whole head's.
-		return bytes.Clone(head[:read]), true, nil
-	case readError != nil:
-		return nil, false, readError
-	}
-	return head, false, nil
 }
