@@ -106,10 +106,7 @@ func TestACgoProjectLoadsAsGoPackagesLoadsIt(test *testing.T) {
 	if !loaded.CgoTranslated {
 		test.Fatal("a project with cgo of its own was loaded with package \"C\" faked")
 	}
-	environment, environmentError := translatedEnvironment(directory, translationEnvironment)
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
+	environment := translatedEnvironment(goEnvironmentOf(test, directory, translationEnvironment))
 	reference, referenceError := packages.Load(&packages.Config{
 		Mode:  packages.LoadAllSyntax | packages.NeedForTest | packages.NeedModule | packages.NeedEmbedFiles,
 		Tests: true,
@@ -175,19 +172,12 @@ func TestATranslatedDependencyWithholdsNothing(test *testing.T) {
 
 	directory := test.TempDir()
 	writeListingFiles(test, directory, translationFiles)
-	environment, environmentError := sourceEnvironment(directory, translationEnvironment)
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
-	listed, listError := list(directory, environment, []string{"./..."}, nil, nil, nil)
+	goEnvironment := goEnvironmentOf(test, directory, translationEnvironment)
+	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
-	compiledEnvironment, compiledEnvironmentError := translatedEnvironment(directory, translationEnvironment)
-	if compiledEnvironmentError != nil {
-		test.Fatal(compiledEnvironmentError)
-	}
-	compiled, compiledError := listCompiled(directory, compiledEnvironment, listed)
+	compiled, compiledError := listCompiled(directory, translatedEnvironment(goEnvironment), listed)
 	if compiledError != nil {
 		test.Fatal(compiledError)
 	}

@@ -263,8 +263,8 @@ func (engine *pipeline) run() int {
 	// reads the types.
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
-		engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{},
-			engine.standardError)
+		engine.session = engine.cacheSession(engine.described.workspace.Environment(),
+			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError)
 		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
 		if engine.session != nil && engine.keepsForBuilds() {
 			engine.session.KeepForBuilds()

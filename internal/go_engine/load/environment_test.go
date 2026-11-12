@@ -1,7 +1,6 @@
 package load
 
 import (
-	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -12,7 +11,7 @@ import (
 // The load from source's `GOFLAGS` is the one go reads, the environment's or the go env file's, every flag kept
 // in order, -trimpath among them, with -pgo=off last, a flag a runner of prebuilt tests lets through: without it
 // go list prints a second variant of each package a command with a default.pgo profile builds.
-func TestSourceEnvironmentKeepsGoFlagsAndTurnsProfilesOff(test *testing.T) {
+func TestTheWholeEnvironmentKeepsGoFlagsAndTurnsProfilesOff(test *testing.T) {
 	test.Parallel()
 
 	directory := test.TempDir()
@@ -25,16 +24,7 @@ func TestSourceEnvironmentKeepsGoFlagsAndTurnsProfilesOff(test *testing.T) {
 		test.Run(given, func(test *testing.T) {
 			test.Parallel()
 
-			environment, environmentError := sourceEnvironment(directory, []string{given})
-			if environmentError != nil {
-				test.Fatal(environmentError)
-			}
-			var goFlags []string
-			for _, variable := range environment {
-				if strings.HasPrefix(variable, "GOFLAGS=") {
-					goFlags = append(goFlags, variable)
-				}
-			}
+			goFlags := goFlagsOf(goEnvironmentOf(test, directory, []string{given}).fullEnvironment)
 			if !slices.Equal(goFlags, []string{want}) {
 				test.Fatalf("want only %q, got %q", want, goFlags)
 			}
@@ -42,60 +32,81 @@ func TestSourceEnvironmentKeepsGoFlagsAndTurnsProfilesOff(test *testing.T) {
 	}
 }
 
-// One go env gives what two gave one after the other: the whole environment, the build target and the go environment
-// the inputs record names are those of go env asked for `GOFLAGS`, then asked again under the environment that made,
-// whether `GOFLAGS` is the environment's, empty, or the go env file's (#3epjyj2).
-func TestOneGoEnvironmentReadIsTheTwo(test *testing.T) {
+// One go env, asked under the environment as given, answers what go env asked under the whole environment a load runs
+// with answers, and what it asked under go list -compiled's: every variable a reader reads is the same under all
+// three, but `GOFLAGS`, which value reports as the whole environment's own. go env defines no flag of `GOFLAGS` but
+// -n and -x, and skips the rest (cmd/go's envcmd and base.SetFromGOFLAGS), so neither the -pgo=off a load adds nor
+// the -trimpath go list -compiled takes out moves anything else it reports, whether `GOFLAGS` is the environment's,
+// empty, or the go env file's, -trimpath in each but the empty one. The build target and the go environment the inputs
+// record names are those the whole environment's own go env reads (#3epjyj2, #4rpt1jh).
+func TestGoEnvironmentUnderTheWholeEnvironmentIsTheGivenOnes(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
+	writeListingFiles(test, directory, map[string]string{
+		"go.mod":   "module example.com/asked\n\ngo 1.27\n",
+		"go.env":   "GOFLAGS=-tags=fromfile -trimpath\n",
+		"asked.go": "package asked\n",
+	})
 	environmentFile := filepath.Join(directory, "go.env")
-	if writeError := os.WriteFile(
-		environmentFile,
-		[]byte("GOFLAGS=-tags=fromfile -trimpath\n"),
-		0o644,
-	); writeError != nil {
-		test.Fatal(writeError)
-	}
 	cases := map[string][]string{
-		"Given":        {"GOFLAGS=-buildvcs=false -tags=special  -p=4"},
-		"Empty":        {"GOFLAGS="},
+		"Given":        {"GOFLAGS=-buildvcs=false -tags=special  -trimpath -p=4"},
+		"Empty":        {"GOFLAGS=", "GOENV=off"},
 		"FromEnvFile":  {"GOFLAGS=", "GOENV=" + environmentFile},
-		"ProfileAsked": {"GOFLAGS=-pgo=auto"},
-		"WorkspaceOff": {"GOWORK=off"},
+		"ProfileAsked": {"GOFLAGS=-pgo=auto --trimpath=true"},
+		"WorkspaceOff": {"GOWORK=off", "GOFLAGS=-trimpath"},
 	}
 	for name, given := range cases {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			twoFull, twoError := withGoFlags(directory, given, func(flags []string) []string {
-				return append(flags, "-pgo=off")
-			})
-			if twoError != nil {
-				test.Fatal(twoError)
+			goEnvironment := goEnvironmentOf(test, directory, given)
+			if len(goEnvironment.answer) != len(goEnvironmentNames) {
+				test.Fatalf("go env answered %d variables of the %d asked", len(goEnvironment.answer),
+					len(goEnvironmentNames))
 			}
-			twoContext, twoReported, twoContextError := constraintContext(directory, twoFull, nil)
-			if twoContextError != nil {
-				test.Fatal(twoContextError)
+			underWhole, wholeError := askGoEnvironment(goEnvironment.workspace, goEnvironment.fullEnvironment)
+			if wholeError != nil {
+				test.Fatal(wholeError)
 			}
-			oneFull, oneContext, oneReported, oneError := sourceContext(directory, given, nil)
-			if oneError != nil {
-				test.Fatal(oneError)
+			underTranslated, translatedError := askGoEnvironment(goEnvironment.workspace,
+				translatedEnvironment(goEnvironment))
+			if translatedError != nil {
+				test.Fatal(translatedError)
 			}
-			if !slices.Equal(oneFull, twoFull) {
-				test.Errorf("the environment is %q, two reads made %q", goFlagsOf(oneFull), goFlagsOf(twoFull))
+			for _, variable := range goEnvironmentNames {
+				if read := goEnvironment.value(variable); read != underWhole[variable] {
+					test.Errorf("%s reads %q, go env under the whole environment reports %q", variable, read,
+						underWhole[variable])
+				}
+				if variable == "GOFLAGS" {
+					continue
+				}
+				if given := goEnvironment.answer[variable]; given != underTranslated[variable] {
+					test.Errorf("%s is %q under the environment as given, %q under go list -compiled's", variable,
+						given, underTranslated[variable])
+				}
 			}
-			if !reflect.DeepEqual(oneReported, twoReported) {
-				test.Errorf("the go environment is %+v, two reads read %+v", oneReported, twoReported)
+			// Every case but the empty one holds -trimpath, the environment's or the go env file's.
+			if name != "Empty" && !strings.Contains(goEnvironment.answer["GOFLAGS"], "trimpath") {
+				test.Errorf("the given flags %q hold no -trimpath, so the case proves nothing of it",
+					goEnvironment.answer["GOFLAGS"])
 			}
-			if oneContext.GOOS != twoContext.GOOS ||
-				oneContext.GOARCH != twoContext.GOARCH ||
-				oneContext.CgoEnabled != twoContext.CgoEnabled ||
-				!slices.Equal(oneContext.BuildTags, twoContext.BuildTags) {
-				test.Errorf("the build target is %s/%s cgo %t tags %q, two reads read %s/%s cgo %t tags %q",
-					oneContext.GOOS, oneContext.GOARCH, oneContext.CgoEnabled, oneContext.BuildTags,
-					twoContext.GOOS, twoContext.GOARCH, twoContext.CgoEnabled, twoContext.BuildTags)
+			wholeContext, wholeReported, wholeContextError := constraintContext(goEnvironment.workspace, underWhole,
+				nil)
+			if wholeContextError != nil {
+				test.Fatal(wholeContextError)
 			}
-			if len(oneReported.goFlags) == 0 || oneReported.goFlags[len(oneReported.goFlags)-1] != "-pgo=off" {
-				test.Errorf("the flags %q do not end in -pgo=off", oneReported.goFlags)
+			if !reflect.DeepEqual(goEnvironment.reported, wholeReported) {
+				test.Errorf("the go environment is %+v, the whole environment's go env read %+v",
+					goEnvironment.reported, wholeReported)
+			}
+			if goEnvironment.buildContext.GOOS != wholeContext.GOOS ||
+				goEnvironment.buildContext.GOARCH != wholeContext.GOARCH ||
+				goEnvironment.buildContext.CgoEnabled != wholeContext.CgoEnabled ||
+				!slices.Equal(goEnvironment.buildContext.BuildTags, wholeContext.BuildTags) {
+				test.Errorf("the build target is %s/%s cgo %t tags %q, the whole environment's go env read %s/%s "+
+					"cgo %t tags %q", goEnvironment.buildContext.GOOS, goEnvironment.buildContext.GOARCH,
+					goEnvironment.buildContext.CgoEnabled, goEnvironment.buildContext.BuildTags, wholeContext.GOOS,
+					wholeContext.GOARCH, wholeContext.CgoEnabled, wholeContext.BuildTags)
 			}
 		})
 	}

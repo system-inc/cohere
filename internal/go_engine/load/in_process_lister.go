@@ -117,14 +117,13 @@ var (
 // when it is set, adding its CPU to collector. It returns
 // why it could not answer when it could not, and then the listing is nil and go list answers instead.
 func listInProcess(
-	workspace string,
-	environment []string,
+	goEnvironment *GoEnvironment,
 	patterns []string,
 	held Held,
 	shared *SharedReads,
 	collector *timing.Collector,
 ) (*listing, string) {
-	lister, doubt := newInProcessLister(workspace, environment, held, shared, collector)
+	lister, doubt := newInProcessLister(goEnvironment, held, shared, collector)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -207,19 +206,18 @@ func (lister *inProcessLister) list(patterns []string) (*listing, string) {
 	return result, ""
 }
 
-// newInProcessLister reads the build list, the build context and the go environment, and says why it cannot list
-// at all when something in them is beyond what it carries. Its build context opens a file held holds from its held
-// bytes, and any other on disk, so go/build reads no file the run already holds again, or from shared, which every
-// listing of the run reads its directories and files through when it is set (SharedReads). What it and its listing
-// spend is added to collector.
+// newInProcessLister reads the build list and the build context in goEnvironment's workspace under its whole
+// environment, and the go environment from goEnvironment, and says why it cannot list at all when something in them is
+// beyond what it carries. Its build context opens a file held holds from its held bytes, and any other on disk, so
+// go/build reads no file the run already holds again, or from shared, which every listing of the run reads its
+// directories and files through when it is set (SharedReads). What it and its listing spend is added to collector.
 func newInProcessLister(
-	workspace string,
-	environment []string,
+	goEnvironment *GoEnvironment,
 	held Held,
 	shared *SharedReads,
 	collector *timing.Collector,
 ) (*inProcessLister, string) {
-	read, doubt := readGoState(workspace, environment, collector)
+	read, doubt := readGoState(goEnvironment, collector)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -229,8 +227,8 @@ func newInProcessLister(
 		read.context.OpenFile = shared.openFile(held)
 	}
 	lister := &inProcessLister{
-		workspace:     workspace,
-		environment:   environment,
+		workspace:     goEnvironment.workspace,
+		environment:   goEnvironment.fullEnvironment,
 		context:       read.context,
 		modules:       read.modules,
 		inWorkspace:   read.workspaceFile != "",
