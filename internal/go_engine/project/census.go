@@ -89,10 +89,18 @@ func TakeCensus(workspace Workspace) (Census, error) {
 		if directivesError != nil {
 			return Census{}, directivesError
 		}
-		walkError := filepath.WalkDir(moduleDirectory, func(visited string, entry fs.DirEntry, pathError error) error {
+		// A walk never follows a symbolic link, its starting path included, so a module a go.work uses through one is
+		// walked at its real directory, and each file named through the link, as go names it (#hd5bsqh). Go follows a
+		// link at a use and nowhere below it, so neither does the walk.
+		walked, resolveError := filepath.EvalSymlinks(moduleDirectory)
+		if resolveError != nil {
+			return Census{}, fmt.Errorf("resolving the module at %s: %w", module.Directory, resolveError)
+		}
+		walkError := filepath.WalkDir(walked, func(walkedPath string, entry fs.DirEntry, pathError error) error {
 			if pathError != nil {
 				return pathError
 			}
+			visited := moduleDirectory + strings.TrimPrefix(walkedPath, walked)
 			if entry.IsDir() {
 				if visited != moduleDirectory {
 					moduleRelative, relativeError := filepath.Rel(moduleDirectory, visited)

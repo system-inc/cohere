@@ -202,7 +202,9 @@ func constraintContext(
 	command := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOROOT", "GOENV",
 		"GOMOD", "GOWORK", "GOCACHE")
 	command.Dir = workspace
-	command.Env = environment
+	// PWD as in runList, so the go.mod and go.work go names, and the modules a go.work uses below it, are named under
+	// the workspace as the load names it, never through a link the caller's working directory went through (#hd5bsqh).
+	command.Env = append(slices.Clone(environment), "PWD="+workspace)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
 	output, runError := command.Output()

@@ -623,7 +623,8 @@ func withGoFlags(workspace string, environment []string, rewrite func([]string) 
 	given := append(os.Environ(), environment...)
 	command := exec.Command("go", "env", "GOFLAGS")
 	command.Dir = workspace
-	command.Env = given
+	// PWD as in runList, so go reads the go env file of the workspace as the load names it (#hd5bsqh).
+	command.Env = append(slices.Clone(given), "PWD="+workspace)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
 	output, runError := command.Output()

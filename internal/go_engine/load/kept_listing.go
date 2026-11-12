@@ -117,7 +117,8 @@ func listingKey(
 ) ([sha256.Size]byte, map[string]string, error) {
 	command := exec.Command("go", append([]string{"env", "-json"}, listingEnvironment...)...)
 	command.Dir = workspace
-	command.Env = environment
+	// PWD as in runList, so the paths go env names, which the key reads, are named under the workspace (#hd5bsqh).
+	command.Env = append(slices.Clone(environment), "PWD="+workspace)
 	output, runError := command.Output()
 	if runError != nil {
 		return [sha256.Size]byte{}, nil, fmt.Errorf("reading the go environment of %s for its listing: %w",
