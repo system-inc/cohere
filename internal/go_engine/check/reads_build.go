@@ -43,9 +43,10 @@ type ReadsBuild struct {
 
 	// closures are each root's import closure, a []*types.Package by root, the root and every package it reaches,
 	// walked once (closureOf), indexedRoots the roots whose whole closure is in the method index (indexedClosureOf),
-	// and methodIndex the type names of every package indexed with a method of each name, by the name, each package's
-	// method sets computed once, when it is first indexed (indexed, a package read as indexed only once its entries are
-	// in methodIndex). So no Interface or Method lookup walks a closure or a method set again.
+	// and methodIndex the type names of every package indexed with a method of each name, as the rules index them
+	// (indexPackage), by the name, each package's methods read once, when it is first indexed (indexed, a package read
+	// as indexed only once its entries are in methodIndex). So no Interface or Method lookup walks a closure or a
+	// method set again.
 	closures     sync.Map
 	indexedRoots sync.Map
 	methodIndex  map[string][]packageMethods
@@ -70,7 +71,7 @@ type ReadsBuild struct {
 	indexing func(*types.Package)
 }
 
-// packageMethods are the type names of owner with a method of one name in their method sets.
+// packageMethods are the type names of owner with a method of one name, as indexPackage indexes them.
 type packageMethods struct {
 	owner     *types.Package
 	typeNames []*types.TypeName
@@ -321,8 +322,12 @@ func (build *ReadsBuild) indexedClosureOf(root *types.Package) []*types.Package 
 	return reached
 }
 
-// indexPackage adds the type names declaring declares to the method index, by the name of each method in their
-// method sets, promoted ones included, and a pointer's for a type that is not an interface, once for the build.
+// indexPackage adds the type names declaring declares to the method index, once for the build, as the rules that
+// record a Method or Interface lookup index them (methodLookupRules): an interface by each method of its method set,
+// embedded ones included, an alias's too, since initialism reads every interface by its name; and any other named
+// type by each method it declares, of either receiver, never one an embedded field promotes, which no rule reads. An
+// alias of a type that is not an interface is no entry: abbreviated and no-any skip every alias, and initialism reads
+// interfaces alone.
 func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 	if _, known := build.indexed.Load(declaring); known {
 		return
@@ -333,14 +338,20 @@ func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 		if !isTypeName {
 			continue
 		}
-		setOf := typeName.Type()
-		if !types.IsInterface(setOf) {
-			setOf = types.NewPointer(setOf)
+		if types.IsInterface(typeName.Type()) {
+			methods := types.NewMethodSet(typeName.Type())
+			for index := range methods.Len() {
+				methodName := methods.At(index).Obj().Name()
+				byName[methodName] = append(byName[methodName], typeName)
+			}
+			continue
 		}
-		methods := types.NewMethodSet(setOf)
-		for index := range methods.Len() {
-			methodName := methods.At(index).Obj().Name()
-			byName[methodName] = append(byName[methodName], typeName)
+		named, isNamed := typeName.Type().(*types.Named)
+		if typeName.IsAlias() || !isNamed {
+			continue
+		}
+		for method := range named.Methods() {
+			byName[method.Name()] = append(byName[method.Name()], typeName)
 		}
 	}
 	build.lock.Lock()

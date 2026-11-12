@@ -24,6 +24,14 @@ import (
 // or a concrete type's method (countedCandidates), so a rule joining this list must show it never lets a concrete
 // foreign method with an unexported name fix such a subject's name, or that narrowing is wrong for it. Each rule pins
 // it in its own package, red if it ever lets one: TestAnUnexportedConcreteForeignMethodNeverFixesAName.
+//
+// The judgment's candidates come from the verdict's method index (indexPackage), which indexes as the rules do: an
+// interface by its whole method set, an alias's too, and any other named type by the methods it declares, never one
+// promoted to it, nor an alias of it. So a rule joining this list must read a concrete type's declared methods alone,
+// and an alias only of an interface, or the index loses a candidate it reads. Each rule pins its part:
+// TestOnlyDeclaredMethodsFixAName in each, and TestAnAliasNeverFixesAName in abbreviated and no-any, which skip every
+// alias. initialism reads every interface by its name, an alias's among them, so the index keeps an alias of an
+// interface, as TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip's alias of an interface shows.
 var methodLookupRules = []string{
 	"rules/consistency_no_abbreviated_identifier",
 	"rules/consistency_no_any",
