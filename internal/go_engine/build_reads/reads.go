@@ -155,22 +155,32 @@ const (
 // QueryScope and the rest), Path the package asked of, by path, Name the name asked for, and Subject the object asked
 // about, each empty where the question has none. Found says whether there was an answer: Answer is the object found,
 // nil on a miss or when the answer is text, which Text holds.
+//
+// Rule is the name the asking rule was registered under, which a Method or Interface lookup names, since each rule
+// answers those by its own measure, so two rules asking about one subject can answer differently and each answer is
+// its own read (#dscc341). Instantiates says the asking rule matched a generic candidate of a Method lookup by
+// instantiating it and validating its constraints, which can turn on a method set the lookup's candidates do not
+// show, so the verdict keeps such a lookup on the closure judgment when a generic of the subject's shape is there.
 type Lookup struct {
-	Query   string
-	Path    string
-	Name    string
-	Subject types.Object
-	Found   bool
-	Answer  types.Object
-	Text    string
+	Query        string
+	Path         string
+	Name         string
+	Subject      types.Object
+	Found        bool
+	Answer       types.Object
+	Text         string
+	Rule         string
+	Instantiates bool
 }
 
-// lookupKey is what makes two lookups the same question.
+// lookupKey is what makes two lookups the same question: one rule's, since a Method or Interface lookup is answered
+// by its rule's measure.
 type lookupKey struct {
 	query   string
 	path    string
 	name    string
 	subject types.Object
+	rule    string
 }
 
 // factKey is what makes two fact reads the same read.
@@ -229,7 +239,13 @@ func (reads *Reads) AddLookup(lookup Lookup) {
 	if !lookup.Found {
 		lookup.Answer = nil
 	}
-	key := lookupKey{query: lookup.Query, path: lookup.Path, name: lookup.Name, subject: lookup.Subject}
+	// Two rules' Method or Interface lookups of one subject are told apart by their rule alone, so one that names
+	// none could be taken for another rule's, whose answer is by another measure.
+	if (lookup.Query == QueryMethod || lookup.Query == QueryInterface) && lookup.Rule == "" && reads.never == "" {
+		reads.never = "its " + lookup.Query + " lookup of " + lookup.Name + " names no asking rule"
+	}
+	key := lookupKey{query: lookup.Query, path: lookup.Path, name: lookup.Name, subject: lookup.Subject,
+		rule: lookup.Rule}
 	if _, recorded := reads.lookups[key]; !recorded {
 		reads.lookups[key] = lookup
 	}
@@ -417,7 +433,7 @@ func (reads *Reads) Facts() []Fact {
 	return facts
 }
 
-// Lookups are the rules' questions of other packages, sorted by question, package, name and subject.
+// Lookups are the rules' questions of other packages, sorted by question, package, name, subject and rule.
 func (reads *Reads) Lookups() []Lookup {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
@@ -432,13 +448,13 @@ func (reads *Reads) Lookups() []Lookup {
 		}
 		switch {
 		case left.Subject == nil && right.Subject == nil:
-			return 0
+			return cmp.Compare(left.Rule, right.Rule)
 		case left.Subject == nil:
 			return -1
 		case right.Subject == nil:
 			return 1
 		}
-		return compareObjects(left.Subject, right.Subject)
+		return cmp.Or(compareObjects(left.Subject, right.Subject), cmp.Compare(left.Rule, right.Rule))
 	})
 	return lookups
 }

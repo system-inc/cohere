@@ -90,8 +90,8 @@ func checkedRestoredWorld(test *testing.T, answered bool) restoredWorld {
 	reads := &build_reads.Reads{}
 	// Without the syntax every read is judged by its closure: the lookup is what this fixture is about.
 	reads.RecordTypes(hostUser, info, nil)
-	lookup := build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close", Subject: methodOf(hostUser, "Mine",
-		"Close")}
+	lookup := askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
+		Subject: methodOf(hostUser, "Mine", "Close")})
 	if answered {
 		lookup.Found, lookup.Answer = true, methodOf(hostHidden, "closer", "Close")
 	}
@@ -164,7 +164,8 @@ func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
 			reads.AddLookup(lookup)
 		}
 		for _, name := range []string{"Close", "Count", "Missing", "Close"} {
-			reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name, Subject: subject})
+			reads.AddLookup(askedBy(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name,
+				Subject: subject}))
 		}
 		restoring := Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads}
 		reads.RecordTypes(subject.Pkg(), &types.Info{}, nil)

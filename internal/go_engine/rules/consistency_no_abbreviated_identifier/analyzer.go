@@ -232,6 +232,9 @@ func fixedByAnotherPackage(context *rule.Context, reachable reach, method *types
 		Subject: method,
 		Found:   fixing != nil,
 		Answer:  fixing,
+		Rule:    context.RuleName(),
+		// fixingMethod instantiates a generic candidate and validates its constraints.
+		Instantiates: true,
 	})
 	return fixing != nil
 }
