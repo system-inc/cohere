@@ -41,9 +41,9 @@ import (
 // Home failing a test refuses the landing. Home unreachable, refusing, out of its window or saying it tested another
 // tree is no verdict at all, and the whole test run happens on the Mac, as it always did, said on the land line.
 
-// homeGateVariable turns the real Home on with "on", or names a command run in place of her whole run, the push and
-// the gap, for a test. Unset or "off", every landing tests on the Mac. Home is opt-in until a real landing has been
-// proven on her (#acdf5mc): a script that fails there for its own reasons would read as a red for every lander.
+// homeGateVariable is "off" to test a landing on the Mac alone, the escape hatch, or names a command run in place of
+// Home's whole run, the push and the gap, for a test. Unset or "on", the landing's tests run on Home: the default
+// since her first real landings were proven, red and green (#acdf5mc).
 const homeGateVariable = "COHERE_DEV_HOME_GATE"
 
 // homeMarker opens the line Home's run prints before its tests: the commit it checked out and the platform it tests
@@ -248,13 +248,20 @@ func macRemainder(skipped map[string][]string, neverCompiled map[string][]string
 }
 
 // runHomeGate runs the module's tests on Home and returns what Home said, or why there is no verdict from Home, which
-// sends the whole test run to the Mac. A verdict about another tree than commit is no verdict.
-func runHomeGate(worktree string, commit string, patterns []string, now time.Time) (homeVerdict, string) {
-	standIn := os.Getenv(homeGateVariable)
+// sends the whole test run to the Mac. A verdict about another tree than commit is no verdict. setting is what
+// homeGateVariable says.
+func runHomeGate(
+	worktree string,
+	commit string,
+	patterns []string,
+	now time.Time,
+	setting string,
+) (homeVerdict, string) {
+	standIn := setting
 	switch standIn {
-	case "", "off":
-		return homeVerdict{}, "Home is opt-in until her first landing is proven (" + homeGateVariable + "=on)"
-	case "on":
+	case "off":
+		return homeVerdict{}, "Home is off for this landing (" + homeGateVariable + "=off)"
+	case "", "on":
 		standIn = ""
 	}
 	var output []byte
@@ -414,7 +421,7 @@ func runModuleTests(
 	now time.Time,
 ) (int, string) {
 	patterns := covered.Patterns()
-	verdict, unavailable := runHomeGate(worktree, commit, patterns, now)
+	verdict, unavailable := runHomeGate(worktree, commit, patterns, now, os.Getenv(homeGateVariable))
 	if unavailable != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no tests on Home (%s), so they run here\n", unavailable)
 		return runTestsHere(worktree, testing, append([]string{"test"}, patterns...)),

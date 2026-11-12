@@ -100,6 +100,28 @@ func TestTheWitnessWindowIsHomesFromNineToThreeUtc(test *testing.T) {
 	}
 }
 
+// Home is the default (#acdf5mc): unset or "on", a landing goes to Home, which inside the witness's window stops
+// there before anything reaches her, and says so; "off" is the escape hatch, the Mac alone.
+func TestALandingTestsOnHomeUnlessItSaysOff(test *testing.T) {
+	test.Parallel()
+	inside := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	for _, setting := range []string{"", "on"} {
+		if _, unavailable := runHomeGate(
+			"",
+			"",
+			nil,
+			inside,
+			setting,
+		); unavailable != "it is the witness's window on Home, 09:00 to 15:00 UTC" {
+			test.Errorf("with %s=%q a landing did not go to Home: %q", homeGateVariable, setting, unavailable)
+		}
+	}
+	if _, unavailable := runHomeGate("", "", nil, inside, "off"); unavailable != "Home is off for this landing ("+
+		homeGateVariable+"=off)" {
+		test.Errorf("with %s=off a landing did not stay on the Mac and say why: %q", homeGateVariable, unavailable)
+	}
+}
+
 // A test in a file Linux never compiles, by its name or by its build constraint, is found from the syntax, since
 // Home cannot report a test that does not exist there; one Linux compiles, or only Linux does, is not.
 func TestTheTestsLinuxNeverCompilesAreFoundFromTheSyntax(test *testing.T) {
