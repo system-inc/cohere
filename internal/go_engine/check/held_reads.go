@@ -8,6 +8,10 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
+// judgedKinds are the kinds of use a verdict judges, each by its own digest (persistedUseHolds).
+var judgedKinds = []build_reads.UseKind{build_reads.UseName, build_reads.UseMember, build_reads.UseUnderlying,
+	build_reads.UseMethodSet, build_reads.UseWhole}
+
 // heldReads are a package's persisted reads as a build judges them: the record, each of its fact types as this
 // build's analyzers learn it, by place, nil for a type none of them learns, whose reads the verdict declines, and why
 // the record is unreadable, empty when every reference it holds names something it holds.
@@ -93,10 +97,6 @@ func unreadableReads(record persistedReads) string {
 	}
 	return ""
 }
-
-// judgedKinds are the kinds of use a verdict judges, each by its own digest (persistedUseHolds).
-var judgedKinds = []build_reads.UseKind{build_reads.UseName, build_reads.UseMember, build_reads.UseUnderlying,
-	build_reads.UseMethodSet, build_reads.UseWhole}
 
 // owner is the path of the package reference names, empty for none.
 func (held *heldReads) owner(reference int) string {
