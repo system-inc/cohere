@@ -1022,8 +1022,9 @@ written only when it is not 0, and `"lintWaited":true` whether it waited at all,
 reads as one. The host's record writes none of the four, and none reaches a key or the verdict.
 
 Beside `builds` the Go engine writes `"buildsAtOnce":3`, additive within contract 3: how many of the builds beside the
-host's ran side by side, decided once (#b2t9xmf, #rmzehfg) by what the heaviest build holds. The builds start on other
-platforms first, then the host's own, each in build order, and the first runs alone until its load has ended; there,
+host's ran side by side, decided once (#b2t9xmf, #rmzehfg) by what the heaviest build holds. The first build on another
+platform starts first, then every other in build order, the host's own before the other platforms, so heavy builds
+never start side by side ahead of the light ones (#awbzy9y), and the first runs alone until its load has ended; there,
 with nothing else running, a collection measures the live heap, and the build's holding is that heap less the host's,
 measured the same way as the builds started. A build is taken to hold `"buildsWidthPeakFactor":3.5` times that at its
 lint's peak in a run with a findings store, and 2.5 times under `--no-cache` (#hv090f4), each the largest ratio

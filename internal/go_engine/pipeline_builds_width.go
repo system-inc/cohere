@@ -4,6 +4,7 @@ import (
 	"math"
 	"runtime"
 	"runtime/metrics"
+	"slices"
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
@@ -79,24 +80,33 @@ func holdingAbove(live uint64, hostLive uint64) uint64 {
 	return 1
 }
 
-// heaviestFirst is the order the extra builds start in, as indexes of extras: every build on a platform other than
-// host's first, then the builds on host's platform, each in build order, so the first to start, the one the width is
-// measured by (measuredBuildsWidth), is among the heaviest. A build on another platform holds the most, since the
-// standard library's types differ there and its packages restore least from the host's run: on Nov 11 the platform
-// builds of cohere's root held 0.90 to 1.17 GB beyond the host's heap as their loads ended, and its tag builds, which
-// restore nearly every package, 0.13 to 0.14 GB (#rmzehfg). The merge takes the runs in build order whatever order
-// they started in, and stderr their notes in this one (extraBuildRuns).
+// heaviestFirst is the order the extra builds start in, as indexes of extras: the first build on a platform other than
+// host's, alone, then every other build in build order, so the first to start, the one the width is measured by
+// (measuredBuildsWidth), is among the heaviest. A build on another platform holds the most, since the standard
+// library's types differ there and its packages restore least from the host's run: on Nov 11 the platform builds of
+// cohere's root held 0.90 to 1.17 GB beyond the host's heap as their loads ended, and its tag builds, which restore
+// nearly every package, 0.13 to 0.14 GB (#rmzehfg).
+//
+// Only the first goes ahead of build order, which puts the host's own builds, the light ones, before the other
+// platforms: starting every platform build first put linux, windows and freebsd side by side at cohere's root, their
+// lint peaks coincided, the collector's mark doubled, and `--no-cache` every build ran 11.4 to 13.7 s at width 4
+// against 9.0 to 10.3 s in build order (#awbzy9y). A run with no build on another platform starts in build order. The
+// merge takes the runs in build order whatever order they started in, and stderr their notes in this one
+// (extraBuildRuns).
 func heaviestFirst(host project.Build, extras []project.Build) []int {
-	var otherPlatforms []int
-	var hostPlatform []int
-	for index, extra := range extras {
-		if extra.OperatingSystem == host.OperatingSystem && extra.Architecture == host.Architecture {
-			hostPlatform = append(hostPlatform, index)
-		} else {
-			otherPlatforms = append(otherPlatforms, index)
+	heaviest := slices.IndexFunc(extras, func(extra project.Build) bool {
+		return extra.OperatingSystem != host.OperatingSystem || extra.Architecture != host.Architecture
+	})
+	order := make([]int, 0, len(extras))
+	if heaviest >= 0 {
+		order = append(order, heaviest)
+	}
+	for index := range extras {
+		if index != heaviest {
+			order = append(order, index)
 		}
 	}
-	return append(otherPlatforms, hostPlatform...)
+	return order
 }
 
 // restoresFromHost reports whether the extra builds will restore packages from host, the host's run: it kept entries
