@@ -71,11 +71,11 @@ func TestProjectFilesGuardFiresOnMismatch(test *testing.T) {
 	// The defect lives only on a case-insensitive filesystem, where a path key is lowercased and a raw name
 	// keeps its casing. On a case-sensitive one, ext4 on Home among them, a raw name already is its path key,
 	// so there is nothing to reproduce. That is a skip with its reason, never a pass: the land gate reruns
-	// Home's skips on the Mac, whose APFS volume reproduces it. Decided by the graph's own reading of the
+	// Home's skips on the Mac, whose default volume reproduces it. Decided by the graph's own reading of the
 	// disk, the same reading the guard's canonicalization uses.
 	if graph.Configuration.CaseSensitivity() == tspath.CaseSensitive {
 		test.Skip("this filesystem is case-sensitive, so a raw file name is already its path key and the " +
-			"canonicalization defect cannot happen here; a case-insensitive volume, such as the Mac's APFS, tests it")
+			"canonicalization defect cannot happen here; a case-insensitive volume, such as the Mac's default volume, tests it")
 	}
 
 	// The defect: use the raw file name as a path key instead of canonicalizing it.
