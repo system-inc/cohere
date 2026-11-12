@@ -13,13 +13,17 @@ import (
 // The run is Home's, after the module's plain run passes there (home_verdict.go): measured on the Mac on 2026-11-12,
 // the five heaviest of these took 591s of wall and about 1,050 CPU-seconds under -race one after another with their
 // race build cached, against a gate of about seven minutes, so not on every landing on the Mac. A landing Home gives
-// no verdict for runs no -race, and its land line says so.
+// no verdict for runs them on the Mac after its module passes, through the gate's token, since one with no -race run
+// at all let a race land whenever Home was busy: the whole list there, with nothing replayed, took 428s of wall and
+// 1,055 CPU-seconds at a load of 8 to 42 (Nov 12).
 //
 // Every package holding a test whose name or file says it runs code at once is here, which
 // TestEveryConcurrencyTestIsRaceGated holds, and a package may be here for a reason its test names don't show.
 var raceGated = []raceEntry{
 	{"command/cohere", "TestFormatInParallelLeavesTheRulesToTheSerialPath formats files at once " +
 		"(fix_parallel_test.go)"},
+	{"command/cohere-dev", "the pool's tokens, its line, borrowing and the bounded run's watchdog run side by side, " +
+		"and its tests call code that writes the package-wide streams, which raced on Home (#bnabymg)"},
 	{"internal/edit", "TestConcurrentReadersNeverSeeAPartialFile reads while a write replaces the file"},
 	{"internal/executable_testing", "TestAScriptWrittenWhileOthersForkRunsAtOnce writes and runs scripts while " +
 		"other goroutines fork (#g93ts58)"},

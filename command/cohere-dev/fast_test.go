@@ -200,8 +200,10 @@ func TestTheFastTierListsPackagesInTheRunsEnvironment(test *testing.T) {
 
 // The fast tier refuses -count=1 as a whole-module run does, before it runs anything: it would throw away
 // the cache the fast tier rests on, across nearly every package, with no slot.
+//
+// Not parallel: run is the whole command, writing the package-wide streams, which only one goroutine may write; run
+// beside another test that writes them, it raced on Home under -race (#bnabymg, Nov 12).
 func TestTheFastTierRefusesCountOnce(test *testing.T) {
-	test.Parallel()
 	for _, arguments := range [][]string{
 		{"--fast", "-count=1"},
 		{"--fast", "-count", "1"},

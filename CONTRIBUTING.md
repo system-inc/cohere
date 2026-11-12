@@ -122,7 +122,8 @@ every one of those gates compiled a merge that never existed again.
 The gate's `go test` runs on Home, Loom's day box, on the exact commit being landed, and the Mac runs only what
 Home could not: every test Home skipped and every test in a file Linux never compiles (#acdf5mc). A red on Home
 refuses the landing. Home unreachable, held, inside the witness's window (09:00 to 15:00 UTC) or reporting
-another tree gives no verdict, and the whole run happens on the Mac, said on the land line.
+another tree gives no verdict, and the whole run happens on the Mac, said on the land line. Once the module
+passes, the packages `race_gated.go` names run again under `-race`, on whichever machine ran it (#bnabymg).
 `COHERE_DEV_HOME_GATE=off` tests on the Mac alone.
 
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the

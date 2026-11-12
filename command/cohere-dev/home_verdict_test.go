@@ -3,6 +3,7 @@
 package main
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -181,9 +182,11 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 	needs.Platform(test, "darwin", "its fixture's darwin-only test runs in a landing's Mac half, which a lander "+
 		"on any other platform never compiles")
 	for _, testCase := range []struct {
-		name    string
-		home    func(commit string) string
-		raced   bool
+		name  string
+		home  func(commit string) string
+		raced bool
+		// racy makes the -race package's test a real race, for a -race run on the Mac to find.
+		racy    bool
 		lands   bool
 		inBody  []string
 		refusal []string
@@ -227,13 +230,27 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 				return homeMarker + commit + " on linux/amd64\n" +
 					`{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n" +
 					homeRaceMarker + "\n" +
-					`{"Action":"output","Package":"example.com/fixture/internal/edit","Test":"TestPlantedRace",` +
-					`"Output":"WARNING: DATA RACE\\n"}` + "\n" +
+					// test2json gives the report to the test it was framing, here one that passed, as on Home.
+					raceReportEvent("==================") + raceReportEvent("WARNING: DATA RACE") +
+					raceReportEvent("Write at 0x00c000012345 by goroutine 8:") +
+					raceReportEvent("  example.com/fixture/internal/edit.plantedWriter()") +
+					raceReportEvent("==================") +
+					`{"Action":"pass","Package":"example.com/fixture/internal/edit","Test":"TestFramedWhenPrinted"}` +
+					"\n" +
 					`{"Action":"fail","Package":"example.com/fixture/internal/edit","Test":"TestPlantedRace"}` + "\n" +
 					`{"Action":"fail","Package":"example.com/fixture/internal/edit"}` + "\n"
 			},
-			raced:   true,
-			refusal: []string{"Home's -race run on linux/amd64 failed", "TestPlantedRace", "WARNING: DATA RACE"},
+			raced: true,
+			refusal: []string{"Home's -race run on linux/amd64 failed", "TestPlantedRace", "1 races reported",
+				"WARNING: DATA RACE", "edit.plantedWriter()"},
+		},
+		{
+			name:  "Home unreachable, and the Mac's -race run finds a race",
+			home:  func(string) string { return "ssh: connect to host Home: Connection refused\n" },
+			raced: true,
+			racy:  true,
+			refusal: []string{"its 1 -race packages run here too", "WARNING: DATA RACE",
+				"the -race run here failed, so nothing landed"},
 		},
 		{
 			name: "Home passes, and says nothing of its race run",
@@ -243,8 +260,8 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 			},
 			raced: true,
 			lands: true,
-			inBody: []string{"go test of the module on the Mac, since Home's run said nothing of its -race run; " +
-				"no -race run of its 1 packages"},
+			inBody: []string{"go test of the module on the Mac, since Home's run said nothing of its -race run, " +
+				"then 1 packages again under -race"},
 		},
 		{
 			name:  "Home unreachable",
@@ -263,6 +280,11 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			fixture := newLandFixture(test)
+			if testCase.racy {
+				// The real go, since the race is the race detector's to find: the stand-in's directory comes off the
+				// front of PATH.
+				fixture.environment = append(fixture.environment, "PATH="+os.Getenv("PATH"))
+			}
 			worktreeA := fixture.worktree("a")
 			// A module whose one package has a test only the Mac compiles.
 			writeFixtureFile(test, filepath.Join(worktreeA, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
@@ -270,8 +292,15 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 				"package alpha\n\nimport \"testing\"\n\nfunc TestPlantedDarwinOnly(test *testing.T) {}\n")
 			if testCase.raced {
 				// A package at one of raceGated's directories, so the gate asks Home for its -race run.
-				writeFixtureFile(test, filepath.Join(worktreeA, "internal", "edit", "edit_test.go"),
-					"package edit\n\nimport \"testing\"\n\nfunc TestPlantedRace(test *testing.T) {}\n")
+				body := "package edit\n\nimport \"testing\"\n\nfunc TestPlantedRace(test *testing.T) {}\n"
+				if testCase.racy {
+					// Two goroutines write one variable with nothing ordering them, which -race reports.
+					body = "package edit\n\nimport (\n\t\"sync\"\n\t\"testing\"\n)\n\n" +
+						"func TestPlantedRace(test *testing.T) {\n\tshared := 0\n\tvar group sync.WaitGroup\n" +
+						"\tfor range 2 {\n\t\tgroup.Go(func() { shared++ })\n\t}\n\tgroup.Wait()\n" +
+						"\ttest.Log(shared)\n}\n"
+				}
+				writeFixtureFile(test, filepath.Join(worktreeA, "internal", "edit", "edit_test.go"), body)
 			}
 			fixture.git(worktreeA, "add", ".")
 			fixture.git(worktreeA, "commit", "-q", "-m", fixtureSubject("a module"))
@@ -313,4 +342,10 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 			}
 		})
 	}
+}
+
+// raceReportEvent is one line of a race report as test2json gives it, to a test that passed, as a JSON line.
+func raceReportEvent(line string) string {
+	return `{"Action":"output","Package":"example.com/fixture/internal/edit","Test":"TestFramedWhenPrinted",` +
+		`"Output":"` + line + `\n"}` + "\n"
 }

@@ -134,9 +134,9 @@ func quiet(arguments []string) int {
 	}
 	switch arguments[0] {
 	case "on":
-		return quietOn(directory, arguments[1:], time.Now())
+		return quietOn(directory, arguments[1:], time.Now(), streams.Output, streams.Errors)
 	case "off":
-		return quietOff(directory, streams.Output)
+		return quietOff(directory, streams.Output, streams.Errors)
 	case "wait":
 		return quietWait(directory, time.Second*5)
 	}
@@ -144,11 +144,11 @@ func quiet(arguments []string) int {
 }
 
 // quietOff removes the marker, and says to output what it released: the window it was, a marker that could
-// not be read, which off removes all the same, or that none was open.
-func quietOff(directory string, output *bufio.Writer) int {
+// not be read, which off removes all the same, or that none was open. A failure goes to errorStream.
+func quietOff(directory string, output *bufio.Writer, errorStream *bufio.Writer) int {
 	window, present, readQuietError := readQuiet(directory)
 	if removeError := os.Remove(quietPath(directory)); removeError != nil && !os.IsNotExist(removeError) {
-		fmt.Fprintf(streams.Errors, "cohere-dev: releasing the quiet window: %v\n", removeError)
+		fmt.Fprintf(errorStream, "cohere-dev: releasing the quiet window: %v\n", removeError)
 		return 1
 	}
 	switch {
@@ -162,20 +162,23 @@ func quietOff(directory string, output *bufio.Writer) int {
 	return 0
 }
 
-func quietOn(directory string, arguments []string, now time.Time) int {
+// quietOn opens a quiet window at now, as `quiet on` is given in arguments, and says to output what it holds, or
+// to errorStream why it refused. It writes only to the streams it is handed, so tests run it side by side, each
+// with its own: two writing streams.Output at once raced on Home under -race (#bnabymg, Nov 12).
+func quietOn(directory string, arguments []string, now time.Time, output *bufio.Writer, errorStream *bufio.Writer) int {
 	length := quietDefault
 	through := ""
 	reasonWords := arguments
 	for len(reasonWords) > 0 && (reasonWords[0] == "--for" || reasonWords[0] == quietThroughFlag) {
 		if len(reasonWords) < 2 {
-			fmt.Fprintf(streams.Errors, "cohere-dev: %s wants a value: --for 30m, %s engine-pairs\n",
+			fmt.Fprintf(errorStream, "cohere-dev: %s wants a value: --for 30m, %s engine-pairs\n",
 				reasonWords[0], quietThroughFlag)
 			return 2
 		}
 		if reasonWords[0] == quietThroughFlag {
 			through = strings.TrimSpace(reasonWords[1])
 			if through == "" || strings.ContainsAny(through, " \t\n") {
-				fmt.Fprintf(streams.Errors, "cohere-dev: %s is %q, want one word naming the run, like engine-pairs\n",
+				fmt.Fprintf(errorStream, "cohere-dev: %s is %q, want one word naming the run, like engine-pairs\n",
 					quietThroughFlag, reasonWords[1])
 				return 2
 			}
@@ -185,7 +188,7 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 		parsed, parseDurationError := time.ParseDuration(reasonWords[1])
 		if parseDurationError != nil || parsed <= 0 || parsed > quietLongest {
 			fmt.Fprintf(
-				streams.Errors,
+				errorStream,
 				"cohere-dev: --for is %q, want a duration above 0 and at most %s, like 30m\n",
 				reasonWords[1],
 				quietLongest,
@@ -211,11 +214,11 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 		marker += "through: " + through + "\n"
 	}
 	if writeError := os.WriteFile(temporary, []byte(marker), 0o644); writeError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: opening the quiet window: %v\n", writeError)
+		fmt.Fprintf(errorStream, "cohere-dev: opening the quiet window: %v\n", writeError)
 		return 1
 	}
 	if renameError := os.Rename(temporary, quietPath(directory)); renameError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: opening the quiet window: %v\n", renameError)
+		fmt.Fprintf(errorStream, "cohere-dev: opening the quiet window: %v\n", renameError)
 		return 1
 	}
 	lets := "no job starts"
@@ -223,7 +226,7 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 		lets = "no job starts but one run with " + quietThroughFlag + " " + through
 	}
 	fmt.Fprintf(
-		streams.Output,
+		output,
 		"quiet window open until %s: %s, no token is borrowed, and the Go build cache trim holds off; "+
 			"release it with cohere-dev quiet off\n",
 		until.Format("15:04:05"),
@@ -235,8 +238,8 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 // quietRefusal is why a quiet window refuses a job starting now, empty when it lets the job start: no window
 // is open, or the job runs beneath a token, inside a running job's share (heldToken, from heldTokenVariable),
 // or it names the run the window lets through (through, from quietThroughVariable, which run sets from
-// quietThroughFlag). A job let through says so.
-func quietRefusal(directory string, now time.Time, heldToken string, through string) string {
+// quietThroughFlag). A job let through says so, to errorStream.
+func quietRefusal(directory string, now time.Time, heldToken string, through string, errorStream *bufio.Writer) string {
 	if heldToken != "" {
 		return ""
 	}
@@ -248,7 +251,7 @@ func quietRefusal(directory string, now time.Time, heldToken string, through str
 	// let through.
 	window, _, _ := readQuiet(directory)
 	if window.through != "" && through == window.through {
-		fmt.Fprintf(streams.Errors, "cohere-dev: let through the quiet window, the run it is for (%s %s)\n",
+		fmt.Fprintf(errorStream, "cohere-dev: let through the quiet window, the run it is for (%s %s)\n",
 			quietThroughFlag, through)
 		return ""
 	}

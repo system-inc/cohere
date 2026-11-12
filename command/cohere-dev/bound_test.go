@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -48,6 +50,25 @@ func TestBoundedFlagsAreReadBeforeTheCommandsOwn(test *testing.T) {
 	} {
 		if _, _, readError := withoutBoundedFlags(arguments, false); readError == nil {
 			test.Errorf("%q was not refused", arguments)
+		}
+	}
+}
+
+// A process whose /proc status can't be read because it ended, as a missing file or as `ESRCH` caught mid-exit, or
+// because it is another account's, is left out of the count; any other failure of the read fails the count.
+func TestAnEndedOrForeignProcessIsLeftOutOfTheCount(test *testing.T) {
+	test.Parallel()
+	for _, row := range []struct {
+		failure error
+		left    bool
+	}{
+		{&fs.PathError{Op: "open", Path: "/proc/1/status", Err: syscall.ENOENT}, true},
+		{&fs.PathError{Op: "read", Path: "/proc/1/status", Err: syscall.ESRCH}, true},
+		{&fs.PathError{Op: "open", Path: "/proc/1/status", Err: syscall.EACCES}, true},
+		{&fs.PathError{Op: "read", Path: "/proc/1/status", Err: syscall.EIO}, false},
+	} {
+		if left := notThisAccounts(row.failure); left != row.left {
+			test.Errorf("a read failing with %v is left out: %t, want %t", row.failure, left, row.left)
 		}
 	}
 }

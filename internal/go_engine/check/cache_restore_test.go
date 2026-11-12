@@ -102,13 +102,17 @@ func TestARestoreReadsTheSameHitsAsOneAtATime(test *testing.T) {
 		test.Fatal("the cold run wrote no entry of p09")
 	}
 	for key, contents := range map[cache.Key][]byte{
-		moved:                         aliasedEntry,
-		aliasKey(keyed.Keys[aliased]): moved[:],
-		keyed.Keys[corrupt]:           []byte("corrupt"),
+		moved:               aliasedEntry,
+		keyed.Keys[corrupt]: []byte("corrupt"),
 	} {
 		if putError := caching.Store.Put(key, contents); putError != nil {
 			test.Fatal(putError)
 		}
+	}
+	// The alias is kept as a run keeps it, in the build's table, which the session below reads afresh.
+	if addError := newAliasTable(caching.Store, caching.Context).add(
+		map[cache.Key]cache.Key{keyed.Keys[aliased]: moved}, aliasTableFloor); addError != nil {
+		test.Fatal(addError)
 	}
 	aliasedName := keyed.Keys[aliased].String()
 	if removeError := os.Remove(filepath.Join(directory, ".cache", "cohere", "go", aliasedName[:2],
