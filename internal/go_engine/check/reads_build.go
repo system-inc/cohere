@@ -43,9 +43,10 @@ type ReadsBuild struct {
 
 	// closures are each root's import closure, a []*types.Package by root, the root and every package it reaches,
 	// walked once (closureOf), indexedRoots the roots whose whole closure is in the method index (indexedClosureOf),
-	// and methodIndex the type names of every package indexed with a method of each name, by the name, each package's
-	// method sets computed once, when it is first indexed (indexed, a package read as indexed only once its entries are
-	// in methodIndex). So no Interface or Method lookup walks a closure or a method set again.
+	// and methodIndex the type names of every package indexed with a method of each name, both as the rules index them
+	// and by their whole method sets (indexPackage), by the name, each package's methods read once, when it is first
+	// indexed (indexed, a package read as indexed only once its entries are in methodIndex). So no Interface or Method
+	// lookup walks a closure or a method set again.
 	closures     sync.Map
 	indexedRoots sync.Map
 	methodIndex  map[string][]packageMethods
@@ -74,11 +75,20 @@ type ReadsBuild struct {
 	indexing func(*types.Package)
 }
 
-// packageMethods are the type names of owner with a method of one name in their method sets.
+// packageMethods are the type names of owner with a method of one name, as indexPackage indexes them: ruleTypeNames
+// as the rules that record a Method or Interface lookup index them, which the one-bit judgment reads
+// (methodLookupHolds), and methodSetTypeNames by their whole method sets, which the closure judgment reads where that
+// bit can flip with nothing the rules read changing (lookupHolds).
 type packageMethods struct {
-	owner     *types.Package
-	typeNames []*types.TypeName
+	owner              *types.Package
+	ruleTypeNames      []*types.TypeName
+	methodSetTypeNames []*types.TypeName
 }
+
+// ruleTypeNames and methodSetTypeNames pick one of an index entry's two lists, for a reader of the index that takes
+// either (verdict.buildCandidates).
+func ruleTypeNames(indexed packageMethods) []*types.TypeName      { return indexed.ruleTypeNames }
+func methodSetTypeNames(indexed packageMethods) []*types.TypeName { return indexed.methodSetTypeNames }
 
 // useKey is one object judged as one kind of use.
 type useKey struct {
@@ -325,13 +335,23 @@ func (build *ReadsBuild) indexedClosureOf(root *types.Package) []*types.Package 
 	return reached
 }
 
-// indexPackage adds the type names declaring declares to the method index, by the name of each method in their
-// method sets, promoted ones included, and a pointer's for a type that is not an interface, once for the build.
+// indexPackage adds the type names declaring declares to the method index, once for the build, in two lists by each
+// method's name.
+//
+//   - As the rules that record a Method or Interface lookup index them (methodLookupRules), which the one-bit
+//     judgment reads: an interface by each method of its method set, embedded ones included, an alias's too, since
+//     initialism reads every interface by its name; and any other named type by each method it declares, of either
+//     receiver, never one an embedded field promotes, which no rule reads. An alias of a type that is not an interface
+//     is no entry: abbreviated and no-any skip every alias, and initialism reads interfaces alone.
+//   - By every type name's whole method set, a pointer's for a type that is not an interface, promoted methods and
+//     aliases included, which the closure judgment reads: where it is kept, the bit can flip with nothing the rules
+//     read changing, as when abbreviated validates a type argument against a constraint's method, which a method an
+//     embedded field promotes satisfies (#swv3jbw).
 func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 	if _, known := build.indexed.Load(declaring); known {
 		return
 	}
-	byName := map[string][]*types.TypeName{}
+	byName := map[string]packageMethods{}
 	for _, name := range declaring.Scope().Names() {
 		typeName, isTypeName := declaring.Scope().Lookup(name).(*types.TypeName)
 		if !isTypeName {
@@ -341,10 +361,30 @@ func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 		if !types.IsInterface(setOf) {
 			setOf = types.NewPointer(setOf)
 		}
-		methods := types.NewMethodSet(setOf)
-		for index := range methods.Len() {
-			methodName := methods.At(index).Obj().Name()
-			byName[methodName] = append(byName[methodName], typeName)
+		wholeSet := types.NewMethodSet(setOf)
+		for index := range wholeSet.Len() {
+			methodName := wholeSet.At(index).Obj().Name()
+			entry := byName[methodName]
+			entry.methodSetTypeNames = append(entry.methodSetTypeNames, typeName)
+			byName[methodName] = entry
+		}
+		if types.IsInterface(typeName.Type()) {
+			for index := range wholeSet.Len() {
+				methodName := wholeSet.At(index).Obj().Name()
+				entry := byName[methodName]
+				entry.ruleTypeNames = append(entry.ruleTypeNames, typeName)
+				byName[methodName] = entry
+			}
+			continue
+		}
+		named, isNamed := typeName.Type().(*types.Named)
+		if typeName.IsAlias() || !isNamed {
+			continue
+		}
+		for method := range named.Methods() {
+			entry := byName[method.Name()]
+			entry.ruleTypeNames = append(entry.ruleTypeNames, typeName)
+			byName[method.Name()] = entry
 		}
 	}
 	build.lock.Lock()
@@ -357,9 +397,9 @@ func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 	if build.indexing != nil {
 		build.indexing(declaring)
 	}
-	for methodName, typeNames := range byName {
-		build.methodIndex[methodName] = append(build.methodIndex[methodName],
-			packageMethods{owner: declaring, typeNames: typeNames})
+	for methodName, entry := range byName {
+		entry.owner = declaring
+		build.methodIndex[methodName] = append(build.methodIndex[methodName], entry)
 	}
 	build.indexed.Store(declaring, true)
 }

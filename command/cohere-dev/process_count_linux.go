@@ -3,8 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -59,9 +57,7 @@ func accountProcessCount() (int, error) {
 			continue
 		}
 		status, readError := os.ReadFile(filepath.Join("/proc", entry.Name(), "status"))
-		if errors.Is(readError, fs.ErrNotExist) || errors.Is(readError, os.ErrPermission) {
-			// A process that ended between the listing and the read, or one this account can't read, which is
-			// not this account's.
+		if notThisAccounts(readError) {
 			continue
 		}
 		if readError != nil {

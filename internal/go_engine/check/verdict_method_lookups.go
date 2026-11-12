@@ -21,6 +21,9 @@ import (
 //     for no-any and abbreviated, types.Implements for initialism and abbreviated's concrete subjects, whose interface
 //     method must be identical to the subject, and the shape fallbacks themselves.
 //
+// Neither side holds a concrete type whose method's name is unexported when the subject is a function or a concrete
+// type's method: no rule lets one fix such a subject's name (countedCandidates).
+//
 // Two cases keep the whole closure judgment, since the bit there can flip with nothing this reads changing:
 //
 //   - A Method lookup whose rule instantiates generic candidates (build_reads.Lookup.Instantiates, abbreviated's),

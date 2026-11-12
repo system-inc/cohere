@@ -97,7 +97,7 @@ const methodForeign = "package foreign\n\nfunc Count() int { return 1 }\n"
 
 // closerBase is a type of every build with Close declared, and promotedOnly a windows-only type with Close by
 // promotion alone, through its embedded closerBase: the closure judgment counts it among the type names with Close,
-// and no rule indexes it.
+// reading whole method sets (methodSetTypeNames), and no rule indexes it, nor the one-bit judgment (ruleTypeNames).
 const (
 	closerBase   = "package foreign\n\ntype inner struct{}\n\nfunc (inner) Close() error { return nil }\n"
 	promotedOnly = "package foreign\n\ntype Handle struct{ inner }\n"
@@ -191,6 +191,23 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 		"closer_windows.go": "package foreign\n\ntype Closer interface {\n\tClose() error\n\tFlush()\n}\n"}
 	pool := "package foreign\n\ntype Pool[Item any] struct{ items []Item }\n\n" +
 		"func (Pool[Item]) Close() error { return nil }\n"
+	// pool is a windows-only concrete type whose add, or Add, has the shape of Mine's own, which each step declares.
+	poolAdds := func(method string) map[string]string {
+		return map[string]string{"foreign.go": methodForeign + "\ntype Base struct{}\n",
+			"pool_windows.go": "package foreign\n\ntype pool struct{}\n\nfunc (pool) " + method + "(value int) {}\n"}
+	}
+	adding := func(mine string) string {
+		return "package user\n\nimport \"example.com/methods/foreign\"\n\n" + mine +
+			"\n\nfunc Use() int { return foreign.Count() }\n"
+	}
+	// addOf is abbreviated's unanswered Method lookup of Mine's method named method, an interface's or a concrete
+	// type's.
+	addOf := func(method string) methodLookupOf {
+		return func(host methodWorld) build_reads.Lookup {
+			return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: method,
+				Subject: methodSetMember(host.user, "Mine", method)})
+		}
+	}
 	for _, step := range []struct {
 		name   string
 		files  map[string]string
@@ -229,6 +246,72 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			files: map[string]string{"foreign.go": methodForeign, "inner.go": closerBase,
 				"promoted_windows.go": promotedOnly},
 			lookup: unanswered(build_reads.QueryMethod, "Close"),
+		},
+		{
+			name: "a windows-only method of a type of every build, promoted into another, declined by its own entry",
+			files: map[string]string{"foreign.go": methodForeign,
+				"inner.go":         "package foreign\n\ntype inner struct{}\n\ntype Handle struct{ inner }\n",
+				"inner_windows.go": "package foreign\n\nfunc (inner) Close() error { return nil }\n"},
+			lookup: unanswered(build_reads.QueryMethod, "Close"),
+			want: "L lookup Method Close: " + methodForeignPath + ".inner.Close is new in the build, of the " +
+				"subject's shape",
+		},
+		{
+			name: "a windows-only alias of a concrete type of every build, which no rule indexes, held",
+			files: map[string]string{"foreign.go": methodForeign, "inner.go": closerBase,
+				"alias_windows.go": "package foreign\n\ntype Handle = inner\n"},
+			lookup: unanswered(build_reads.QueryMethod, "Close"),
+		},
+		{
+			name: "a windows-only alias of an interface Mine implements, which initialism indexes",
+			files: map[string]string{"foreign.go": methodForeign,
+				"alias_windows.go": "package foreign\n\ntype Closer = interface{ Close() error }\n"},
+			lookup: unanswered(build_reads.QueryInterface, "Close"),
+			want: "L lookup Interface Close: " + methodForeignPath + ".Closer.Close is new in the build, of the " +
+				"subject's shape",
+		},
+		{
+			name:   "a windows-only concrete method of an unexported name, held for a concrete subject",
+			files:  poolAdds("add"),
+			user:   adding("type Mine struct{}\n\nfunc (Mine) add(value int) {}"),
+			lookup: addOf("add"),
+		},
+		{
+			name:   "the same for an interface's method, which abbreviated lets any foreign method fix",
+			files:  poolAdds("add"),
+			user:   adding("type Mine interface{ add(value int) }"),
+			lookup: addOf("add"),
+			want: "L lookup Method add: " + methodForeignPath + ".pool.add is new in the build, of the subject's " +
+				"shape",
+		},
+		{
+			name:   "the same of an exported name, which no-any lets fix a concrete type's method",
+			files:  poolAdds("Add"),
+			user:   adding("type Mine struct{}\n\nfunc (Mine) Add(value int) {}"),
+			lookup: askedByNoAny(addOf("Add")),
+			want: "L lookup Method Add: " + methodForeignPath + ".pool.Add is new in the build, of the subject's " +
+				"shape",
+		},
+		{
+			name: "the same unexported name for a receiver embedding a foreign type, declined by the closure " +
+				"judgment, which counts every type name with the method",
+			files:  poolAdds("add"),
+			user:   adding("type Mine struct{ foreign.Base }\n\nfunc (Mine) add(value int) {}"),
+			lookup: addOf("add"),
+			want:   "L lookup Method add: 0 type names have the method on the host, 1 in the build",
+		},
+		{
+			// The fallback keeps the closure judgment for a receiver embedding a foreign type, and the build's only new
+			// type name with Close has it by promotion alone, which satisfies a constraint's Close as a declared one
+			// does: the closure reads whole method sets, so it declines, red when it reads the rules' index (#swv3jbw).
+			name: "a type with the method by promotion alone, new in the build, declines where the fallback " +
+				"keeps the closure",
+			files: map[string]string{"foreign.go": methodForeign + "\ntype Base struct{}\n", "closer.go": closer,
+				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{ foreign.Base }\n\n" +
+				"func (Mine) Close() error { return nil }\n\nfunc Use() int { return foreign.Count() }\n",
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: 2 type names have the method on the host, 3 in the build",
 		},
 		{
 			name: "an answer still found alike, held where the closure declines",

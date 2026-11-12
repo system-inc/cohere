@@ -143,6 +143,7 @@ func run(verb string, arguments []string) int {
 		time.Now(),
 		os.Getenv(heldTokenVariable),
 		os.Getenv(quietThroughVariable),
+		streams.Errors,
 	); refusal != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
 		return quietRefusedExitCode

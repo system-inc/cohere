@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -294,4 +295,13 @@ func attachedExitCode(name string, runError error) int {
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: running %s: %v\n", name, runError)
 	return 1
+}
+
+// notThisAccounts reports whether a read of a process's /proc status failed because the process is nothing the
+// account's count holds: it ended between the listing and the read, as a missing file, or as `ESRCH` when the read
+// caught it while it exited (TestABoundedRunStopsItsGroupAtTheDeadline on Home, Nov 12, #fp1td9e), or it is another
+// account's, which this account can't read.
+func notThisAccounts(readError error) bool {
+	return errors.Is(readError, fs.ErrNotExist) || errors.Is(readError, syscall.ESRCH) ||
+		errors.Is(readError, os.ErrPermission)
 }
