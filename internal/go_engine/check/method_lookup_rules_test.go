@@ -14,7 +14,11 @@ import (
 )
 
 // methodLookupRules are the packages that record a Method or Interface lookup, each a rule that reads one bit of it,
-// whether a method of another package fixes its subject's name, which is what methodLookupHolds judges it by.
+// whether a method of another package fixes its subject's name, which is what methodLookupHolds judges it by. That
+// judgment also holds an unanswered lookup when the build's new candidates all have another shape than the subject,
+// so each rule's own fixtures pin that a method of another shape never fixes a name, red if its match loosens to the
+// name alone: abbreviated's flagged.go, commanding's Cmd and wideStack's Len; no_any's flagged.go, memoryCache's
+// Save; initialism's flagged.go, record's MarshalJSON. A rule joining this list brings such a fixture.
 var methodLookupRules = []string{
 	"rules/consistency_no_abbreviated_identifier",
 	"rules/consistency_no_any",

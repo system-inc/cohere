@@ -109,6 +109,19 @@ type wideReader struct{}
 
 func (wideReader) Src(name string) int { return 0 } // want `Identifier "Src" abbreviates "Src"\. Use "Source"\.`
 
+// An interface method of ours sharing only the name of foreign.Commander's Cmd, with another shape, is written to accept
+// no type that has Commander's, so the name is ours. The verdict holds an unanswered lookup across builds that gain a
+// method of another shape on this alone (methodLookupHolds).
+type commanding interface {
+	Cmd(name string) string // want `Identifier "Cmd" abbreviates "Cmd"\. Use "Command"\.`
+}
+
+// A generic receiver's method sharing only the name of sort.Interface's Len, with another shape, is not taken as fixed
+// by it, as stack's Len of the same signature is in lookalike.
+type wideStack[Item any] []Item
+
+func (items wideStack[Item]) Len(extra int) int { return len(items) + extra } // want `Identifier "Len" abbreviates "Len"\. Use "Length"\.`
+
 // A segment keeps the name's case shape, so an unexported name stays unexported and an exported one exported.
 func parseCfgFile() {} // want `Identifier "parseCfgFile" abbreviates "Cfg"\. Use "parseConfigurationFile"\.`
 
