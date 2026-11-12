@@ -1467,8 +1467,7 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	// Whatever the run's completeness too: every file was checked, and what fell short is a file go may have written.
 	activeSummary.Gaps.UnguardedWorkspaceSums = record.UnguardedWorkspaceSums
 	for _, sums := range record.UnguardedWorkspaceSums {
-		printInvocation(accountOutput(run.out),
-			"  go list may rewrite %s: no copy of its go.work outside the tree could answer for it\n", sums)
+		printInvocation(accountOutput(run.out), "  go list may have rewritten %s\n", sums)
 	}
 
 	expectedExit := 0

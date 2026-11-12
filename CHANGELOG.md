@@ -204,7 +204,8 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   workspace whose go.work.sum was stale rewrote a tracked file. Every go list now runs with `GOWORK` at a copy of the
   go.work outside the tree, and what go prints is spelled as it spells it from the tree, so every finding is the
   same. Where that can't be made exact, as beside a vendor directory, go list runs in the tree as before, and the
-  footer says `⚠ go list may rewrite go.work.sum`, naming the file, as `--json`'s `gaps.unguardedWorkspaceSums` does.
+  footer says `⚠ go list may have rewritten go.work.sum`, and the file is named under `--verbose` and in `--json`'s
+  `gaps.unguardedWorkspaceSums`.
 
 ## 0.1.1 (2026-11-03)
 

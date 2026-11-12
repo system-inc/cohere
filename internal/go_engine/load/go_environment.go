@@ -77,7 +77,7 @@ func ReadGoEnvironment(directory string, environment []string, held Held) (*GoEn
 		buildContext:    buildContext,
 		reported:        reported,
 		answer:          answer,
-		guard:           newWorkspaceSumGuard(workspace, fullEnvironment, answer),
+		guard:           newWorkspaceSumGuard(fullEnvironment, answer),
 	}, nil
 }
 

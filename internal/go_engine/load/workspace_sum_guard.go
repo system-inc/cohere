@@ -23,12 +23,12 @@ import (
 // The copy names every module root as go joins it, so go reads the same modules, and holds the go.work.sum's bytes.
 // What go prints from the copy's place, the work file's own path and each relative directory replace it spells from
 // the go.work's directory, is spelled back as go spells it from the tree's, so every answer is go's in the tree byte
-// for byte. Where that cannot be made exact, the command runs in the tree as it always did, and the guard says go list
-// may have rewritten the sum (unguardedSum), which the load and the run report.
+// for byte. Where that cannot be made exact, before go runs or because what go printed beside the copy still names the
+// copy's place once spelled back, the command runs in the tree as it always did, so its answer is go's own, and the
+// guard says go list may have rewritten the sum (unguardedSum), which the load and the run report.
 type workspaceSumGuard struct {
-	// workspace is where the commands run, `PWD` too; environment and answer are the whole environment they run under
-	// and go env's answer under it, which name the go.work in use.
-	workspace   string
+	// environment and answer are the whole environment the commands run under and go env's answer under it, which
+	// name the go.work in use.
 	environment []string
 	answer      map[string]string
 
@@ -36,42 +36,64 @@ type workspaceSumGuard struct {
 	// empty. Only a test sets it, to one where nothing can be made, to fail the copy.
 	sideRoot string
 
-	planOnce sync.Once
-	plan     workspaceSumPlan
+	// printedAside, when set, is added to what each command printed beside its copy before it is spelled back, given
+	// the copy's directory. Only a test sets it, to have go print a spelling of the copy's place nothing maps back.
+	printedAside func(sideDirectory string) []byte
 
-	// unguarded is the go.work.sum a command ran beside without a side copy, under unguardedLock.
-	unguardedLock sync.Mutex
-	unguarded     string
+	// plans are the plan for each working directory the commands run in, read once each, and unguarded the
+	// go.work.sum a command ran beside without a side copy, both under lock.
+	lock      sync.Mutex
+	plans     map[string]*workspaceSumPlan
+	unguarded string
 }
 
-// newWorkspaceSumGuard is the guard of the go commands run in workspace under environment, as go env answered there,
-// or nil when go reads no go.work, where -mod=readonly, go's default, refuses any write of go.sum.
-func newWorkspaceSumGuard(workspace string, environment []string, answer map[string]string) *workspaceSumGuard {
+// newWorkspaceSumGuard is the guard of the go commands run under environment, as go env answered under it, or nil
+// when go reads no go.work, where -mod=readonly, go's default, refuses any write of go.sum.
+func newWorkspaceSumGuard(environment []string, answer map[string]string) *workspaceSumGuard {
 	if answer["GOWORK"] == "" || answer["GOWORK"] == "off" {
 		return nil
 	}
-	return &workspaceSumGuard{workspace: workspace, environment: environment, answer: answer}
+	return &workspaceSumGuard{
+		environment: environment,
+		answer:      answer,
+		plans:       map[string]*workspaceSumPlan{},
+	}
 }
 
-// output runs command, a go command in the guard's workspace whose output and standard error nothing has taken, and
-// returns what it printed on each and how it ended: under a side copy of the go.work when one answers exactly, and
-// otherwise in the tree, noted as unguarded. A nil guard runs it as it is.
+// output runs command, a go command whose output and standard error nothing has taken, and returns what it printed on
+// each and how it ended: under a side copy of the go.work when one answers exactly, and otherwise in the tree, noted as
+// unguarded. A nil guard runs it as it is.
 func (guard *workspaceSumGuard) output(command *exec.Cmd) ([]byte, []byte, error) {
 	if guard == nil {
 		return runCommand(command)
 	}
-	guard.planOnce.Do(func() {
-		guard.plan = readWorkspaceSumPlan(guard.workspace, guard.environment, guard.answer)
-	})
-	if guard.plan.unguarded == "" {
-		if answer, answered := guard.runAside(command); answered {
+	environment := command.Env
+	if environment == nil {
+		// A command that inherits this process's environment gets it whole.
+		environment = os.Environ()
+	}
+	plan := guard.planFor(goWorkingDirectory(command.Dir, environment))
+	if plan.unguarded == "" {
+		if answer, answered := guard.runAside(command, environment, plan); answered {
 			return answer.standardOutput, answer.standardError, answer.runError
 		}
 	}
-	guard.unguardedLock.Lock()
+	guard.lock.Lock()
 	guard.unguarded = guard.answer["GOWORK"] + ".sum"
-	guard.unguardedLock.Unlock()
+	guard.lock.Unlock()
 	return runCommand(command)
+}
+
+// planFor is the plan for commands run in workingDirectory, read on its first command there.
+func (guard *workspaceSumGuard) planFor(workingDirectory string) *workspaceSumPlan {
+	guard.lock.Lock()
+	defer guard.lock.Unlock()
+	if plan := guard.plans[workingDirectory]; plan != nil {
+		return plan
+	}
+	plan := readWorkspaceSumPlan(workingDirectory, guard.environment, guard.answer)
+	guard.plans[workingDirectory] = &plan
+	return &plan
 }
 
 // unguardedSum is the go.work.sum a command of the guard ran beside without a side copy, so go list may have rewritten
@@ -80,16 +102,48 @@ func (guard *workspaceSumGuard) unguardedSum() string {
 	if guard == nil {
 		return ""
 	}
-	guard.unguardedLock.Lock()
-	defer guard.unguardedLock.Unlock()
+	guard.lock.Lock()
+	defer guard.lock.Unlock()
 	return guard.unguarded
 }
 
-// runAside runs a copy of command with `GOWORK` at a side copy of the go.work made for it alone, and returns what it
-// printed spelled back as go spells it in the tree, or false when the copy cannot be made, or its answer cannot be
-// spelled back exactly. The side directory holds only the go.work and its go.work.sum, each removed by name once the
-// command ends, a panic included, and then the directory.
-func (guard *workspaceSumGuard) runAside(command *exec.Cmd) (commandOutput, bool) {
+// goWorkingDirectory is the directory go's os.Getwd names when go runs in directory under environment: its `PWD` as
+// given, when that is absolute and names the directory, and otherwise the directory's own path, every link resolved,
+// as the system spells the directory a process is in. Every path go shortens in what it prints is relative to it.
+func goWorkingDirectory(directory string, environment []string) string {
+	runsIn := directory
+	if runsIn == "" {
+		// Ignored: a process with no working directory runs go nowhere it can shorten a path from.
+		runsIn, _ = os.Getwd()
+	}
+	given := environmentValue(environment, "PWD")
+	givenInformation, givenError := os.Stat(given)
+	directoryInformation, directoryError := os.Stat(runsIn)
+	if filepath.IsAbs(given) && givenError == nil && directoryError == nil &&
+		os.SameFile(givenInformation, directoryInformation) {
+		return given
+	}
+	absolute, absoluteError := filepath.Abs(runsIn)
+	if absoluteError != nil {
+		return runsIn
+	}
+	resolved, resolveError := filepath.EvalSymlinks(absolute)
+	if resolveError != nil {
+		return absolute
+	}
+	return resolved
+}
+
+// runAside runs a copy of command under environment with `GOWORK` at a side copy of the go.work made for it alone, from
+// plan, and returns what it printed spelled back as go spells it in the tree, or false when the copy cannot be made, or
+// its answer cannot be spelled back exactly: what go printed still names the copy's place once spelled back. The side
+// directory holds only the go.work and its go.work.sum, each removed by name once the command ends, a panic included,
+// and then the directory.
+func (guard *workspaceSumGuard) runAside(
+	command *exec.Cmd,
+	environment []string,
+	plan *workspaceSumPlan,
+) (commandOutput, bool) {
 	root := guard.sideRoot
 	if root == "" {
 		root = os.TempDir()
@@ -100,14 +154,14 @@ func (guard *workspaceSumGuard) runAside(command *exec.Cmd) (commandOutput, bool
 	}
 	sideWorkFile := filepath.Join(sideDirectory, "go.work")
 	defer removeSide(sideDirectory)
-	contents, pairs, doubt := guard.plan.sideContents(guard.workspace, sideWorkFile)
+	contents, pairs, doubt := plan.sideContents(sideWorkFile)
 	if doubt != "" || !spelledExactly(pairs) {
 		return commandOutput{}, false
 	}
 	if os.WriteFile(sideWorkFile, contents, 0o600) != nil {
 		return commandOutput{}, false
 	}
-	sums, readError := os.ReadFile(guard.plan.workFile + ".sum")
+	sums, readError := os.ReadFile(plan.workFile + ".sum")
 	switch {
 	case readError == nil:
 		if os.WriteFile(sideWorkFile+".sum", sums, 0o600) != nil {
@@ -118,14 +172,12 @@ func (guard *workspaceSumGuard) runAside(command *exec.Cmd) (commandOutput, bool
 	}
 	aside := exec.Command(command.Args[0], command.Args[1:]...)
 	aside.Dir = command.Dir
-	environment := command.Env
-	if environment == nil {
-		// A command that inherits this process's environment gets it whole, `GOWORK` after it.
-		environment = os.Environ()
-	}
 	// exec keeps the last of a name, so this `GOWORK` is the one go reads.
 	aside.Env = append(slices.Clone(environment), "GOWORK="+sideWorkFile)
 	standardOutput, standardError, runError := runCommand(aside)
+	if guard.printedAside != nil {
+		standardOutput = append(standardOutput, guard.printedAside(sideDirectory)...)
+	}
 	answer := commandOutput{
 		standardOutput: spellBack(standardOutput, pairs),
 		standardError:  spellBack(standardError, pairs),

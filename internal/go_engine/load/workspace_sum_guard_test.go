@@ -308,3 +308,85 @@ func TestSpellBackSpellsOnlyWholePaths(test *testing.T) {
 		}
 	}
 }
+
+// A go command run beside the side copy answers what it answers in the tree from whatever directory it runs in, as
+// `PWD` names it or not: every path go shortens, and every module root it joins to the go.work's directory, follows
+// its own working directory, which is the one the side copy is made and spelled back for. So a workspace reached
+// through a symbolic link, with `PWD` the link, without `PWD`, or with a `PWD` that names another directory, answers
+// as the tree does: the module listing, its directories and its replacements, and the error naming go.work's line of
+// a godebug go does not know.
+func TestASideCopyAnswersAsTheTreeDoesFromEveryWorkingDirectory(test *testing.T) {
+	test.Parallel()
+	for _, each := range []struct {
+		name    string
+		changed map[string]string
+		want    string
+	}{
+		{name: "relative replacements", want: `"Path": "./beside"`},
+		{name: "a godebug go does not know", want: "go.work:3", changed: map[string]string{
+			"go.work": "go 1.21\n\ngodebug unknownsetting=1\n\nuse ./a\n\nreplace example.com/beside => ./beside\n",
+		}},
+	} {
+		workspace, environment := writeStaleWorkspace(test, sideWorkspaceFiles, each.changed)
+		link := filepath.Join(test.TempDir(), "link")
+		if linkError := os.Symlink(workspace, link); linkError != nil {
+			test.Fatal(linkError)
+		}
+		goEnvironment := goEnvironmentOf(test, workspace, environment)
+		for name, working := range map[string]struct {
+			directory string
+			given     []string
+		}{
+			"the workspace":                         {directory: workspace, given: []string{"PWD=" + workspace}},
+			"a link to it, named by PWD":            {directory: link, given: []string{"PWD=" + link}},
+			"a link to it, with no PWD":             {directory: link},
+			"the workspace, with PWD another place": {directory: workspace, given: []string{"PWD=" + test.TempDir()}},
+		} {
+			label := each.name + " from " + name
+			command := func() *exec.Cmd {
+				listing := exec.Command("go", "list", "-m", "-json", "all")
+				listing.Dir = working.directory
+				listing.Env = append(slices.DeleteFunc(slices.Clone(goEnvironment.fullEnvironment),
+					func(variable string) bool { return strings.HasPrefix(variable, "PWD=") }), working.given...)
+				return listing
+			}
+			aside, standardErrorAside, errorAside := goEnvironment.guard.output(command())
+			tree, standardErrorTree, errorTree := runCommand(command())
+			compareAnswers(test, label+"'s output", aside, tree)
+			compareAnswers(test, label+"'s standard error", standardErrorAside, standardErrorTree)
+			compareAnswers(test, label+"'s end", []byte(fmt.Sprint(errorAside)), []byte(fmt.Sprint(errorTree)))
+			if !bytes.Contains(append(tree, standardErrorTree...), []byte(each.want)) {
+				test.Errorf("%s printed no %s, so nothing was spelled back", label, each.want)
+			}
+		}
+		if unguarded := goEnvironment.guard.unguardedSum(); unguarded != "" {
+			test.Errorf("a command ran beside %s with no side copy", unguarded)
+		}
+	}
+}
+
+// A command that prints, beside the side copy, a spelling of the copy's place that cannot be spelled back runs again
+// in the tree, so its answer is go's own and never one that names the copy, and the load says go list may have
+// rewritten the go.work.sum, which on a stale tree it did. A test has go print the copy's own directory, as nothing go
+// prints today does.
+func TestAnAnswerBesideTheCopyThatCannotBeSpelledBackRunsInTheTree(test *testing.T) {
+	test.Parallel()
+	workspace, environment := writeStaleWorkspace(test, staleWorkspaceFiles)
+	goEnvironment := goEnvironmentOf(test, workspace, environment)
+	goEnvironment.guard.printedAside = func(sideDirectory string) []byte { return []byte(sideDirectory) }
+	loaded, loadError := PackagesCached(workspace, stalePatterns, environment, nil,
+		Caching{GoEnvironment: goEnvironment})
+	if loadError != nil {
+		test.Fatalf("the load failed, want the answer the tree's run gave: %v", loadError)
+	}
+	sums := filepath.Join(workspace, "go.work.sum")
+	if !sameFile(loaded.UnguardedWorkspaceSum, sums) || loaded.UnguardedWorkspaceSum == "" {
+		test.Errorf("the load says %q may have been rewritten, want %s", loaded.UnguardedWorkspaceSum, sums)
+	}
+	if bytes.Equal(readSums(test, workspace), []byte(staleWorkspaceFiles["go.work.sum"])) {
+		test.Errorf("go.work.sum is as it was, so nothing ran again in the tree")
+	}
+	if len(loaded.Roots) == 0 || loaded.Roots[0].Module == nil || loaded.Roots[0].Module.Path != "example.com/a" {
+		test.Errorf("the load holds no example.com/a, so its answer was not go's in the tree: %v", loaded.Roots)
+	}
+}

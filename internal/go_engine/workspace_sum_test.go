@@ -93,9 +93,14 @@ func TestACheckLeavesAStaleGoWorkSumAsItWasUnderEveryBuild(test *testing.T) {
 			}
 			var want []string
 			if each.rewritten {
-				want = []string{filepath.Join(physical(test, workspace), "go.work.sum")}
+				want = []string{physical(test, filepath.Join(workspace, "go.work.sum"))}
 			}
-			if !slices.Equal(summary.UnguardedWorkspaceSums, want) {
+			named := make([]string, 0, len(summary.UnguardedWorkspaceSums))
+			for _, sums := range summary.UnguardedWorkspaceSums {
+				// Spelled as go env spells the go.work, through whichever link it was asked from.
+				named = append(named, physical(test, sums))
+			}
+			if !slices.Equal(named, want) {
 				test.Errorf("the summary names %q as go may have rewritten, want %q", summary.UnguardedWorkspaceSums,
 					want)
 			}
@@ -109,10 +114,10 @@ func TestACheckLeavesAStaleGoWorkSumAsItWasUnderEveryBuild(test *testing.T) {
 	}
 }
 
-// physical is directory with every symbolic link resolved, as go env spells the go.work it finds.
-func physical(test *testing.T, directory string) string {
+// physical is path with every symbolic link resolved, so two spellings of one file compare.
+func physical(test *testing.T, path string) string {
 	test.Helper()
-	resolved, resolveError := filepath.EvalSymlinks(directory)
+	resolved, resolveError := filepath.EvalSymlinks(path)
 	if resolveError != nil {
 		test.Fatal(resolveError)
 	}

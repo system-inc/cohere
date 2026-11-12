@@ -1376,9 +1376,10 @@ func TestEngineRunSaysNothingWhenAGoRunWithheldNothing(test *testing.T) {
 
 // A Go run whose go list ran beside a go.work with no side copy of it says go may have rewritten its go.work.sum: the
 // file by name in the account `--verbose` prints, one marker in the footer every view ends with, and the file in
-// `--json`'s gaps. It fails nothing: every file was checked (#34r3v1y). A run whose summary names none says nothing.
+// `--json`'s gaps. It fails nothing, since every file was checked (#34r3v1y), and a run whose summary names none says
+// nothing.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
-func TestEngineRunNamesEachGoWorkSumGoListMayRewrite(test *testing.T) {
+func TestEngineRunNamesEachGoWorkSumGoListMayHaveRewritten(test *testing.T) {
 	saved, savedSummary := activeOutput, activeSummary
 	defer func() { activeOutput, activeSummary = saved, savedSummary }()
 	unguarded := contractFixture(test, "GoClean.jsonl")
@@ -1392,15 +1393,14 @@ func TestEngineRunNamesEachGoWorkSumGoListMayRewrite(test *testing.T) {
 		`,"unguardedWorkspaceSums":["/work/go.work.sum"]}`
 
 	verbose, summary := renderGoStreamAs(test, outputVerbose, unguarded)
-	requireLines(test, verbose,
-		"  go list may rewrite /work/go.work.sum: no copy of its go.work outside the tree could answer for it\n")
+	requireLines(test, verbose, "  go list may have rewritten /work/go.work.sum\n")
 	if !slices.Equal(summary.Gaps.UnguardedWorkspaceSums, []string{"/work/go.work.sum"}) {
 		test.Errorf("the gap names %q, want /work/go.work.sum", summary.Gaps.UnguardedWorkspaceSums)
 	}
 	if summary.failed() {
 		test.Errorf("a go.work.sum go may have rewritten failed the run: %+v", summary.Gaps)
 	}
-	const marker = " • ⚠ go list may rewrite go.work.sum"
+	const marker = " • ⚠ go list may have rewritten go.work.sum"
 	requireLines(test, verbose, marker)
 	human, _ := renderGoStreamAs(test, outputHuman, unguarded)
 	requireLines(test, human, marker)

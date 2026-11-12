@@ -27,19 +27,22 @@ type workspaceSumPlan struct {
 	contents []byte
 	parsed   *modfile.WorkFile
 
-	// shortWorkFile is workFile as go prints it in an error, base.ShortPath's spelling from the workspace.
-	shortWorkFile string
+	// workingDirectory is the directory the commands run in as go's working directory names it, which every path go
+	// shortens is relative to, and shortWorkFile is workFile as go prints it in an error, base.ShortPath's spelling
+	// from there.
+	workingDirectory string
+	shortWorkFile    string
 
 	// moduleReplacements are the relative directory replaces of the go.mod files the go.work uses, each as an absolute
 	// directory, which go spells relative to the go.work's directory (modload's canonicalizeReplacePath).
 	moduleReplacements []string
 }
 
-// readWorkspaceSumPlan reads the plan for the go commands run in workspace under environment, as go env answered
-// there (answer), or a plan that names why it cannot guard. A go.work this process cannot read or parse is unguarded
-// too: go may read it otherwise, and then write.
-func readWorkspaceSumPlan(workspace string, environment []string, answer map[string]string) workspaceSumPlan {
-	workFile, doubt := goListWorkFile(workspace, environment, answer)
+// readWorkspaceSumPlan reads the plan for the go commands whose working directory, as go's os.Getwd names it, is
+// workingDirectory, under environment, as go env answered under it (answer), or a plan that names why it cannot guard.
+// A go.work this process cannot read or parse is unguarded too: go may read it otherwise, and then write.
+func readWorkspaceSumPlan(workingDirectory string, environment []string, answer map[string]string) workspaceSumPlan {
+	workFile, doubt := goListWorkFile(workingDirectory, environment, answer)
 	if doubt != "" {
 		return workspaceSumPlan{unguarded: doubt}
 	}
@@ -58,10 +61,11 @@ func readWorkspaceSumPlan(workspace string, environment []string, answer map[str
 		return workspaceSumPlan{unguarded: fmt.Sprintf("%s has a vendor directory beside it", workFile)}
 	}
 	plan := workspaceSumPlan{
-		workFile:      workFile,
-		contents:      contents,
-		parsed:        parsed,
-		shortWorkFile: goShortPath(workspace, workFile),
+		workFile:         workFile,
+		contents:         contents,
+		parsed:           parsed,
+		workingDirectory: workingDirectory,
+		shortWorkFile:    goShortPath(workingDirectory, workFile),
 	}
 	for _, use := range parsed.Use {
 		moduleRoot := use.Path
@@ -88,18 +92,18 @@ func readWorkspaceSumPlan(workspace string, environment []string, answer map[str
 	return plan
 }
 
-// goListWorkFile is the go.work go list reads in workspace under environment, spelled as it spells it, or why that
-// cannot be told. go list reads `GOWORK` from the environment, then from the go env file, and with neither it looks
-// for go.work from its working directory upward, which `PWD` spells as workspace (modload's FindGoWork). go env was
-// asked with this process's own `PWD`, so its answer names the same file, spelled perhaps through another link.
-func goListWorkFile(workspace string, environment []string, answer map[string]string) (string, string) {
+// goListWorkFile is the go.work go list reads from workingDirectory under environment, spelled as it spells it, or why
+// that cannot be told. go list reads `GOWORK` from the environment, then from the go env file, and with neither it
+// looks for go.work from its working directory upward (modload's FindGoWork). go env may have been asked from a
+// working directory spelled another way, so its answer names the same file, spelled perhaps through another link.
+func goListWorkFile(workingDirectory string, environment []string, answer map[string]string) (string, string) {
 	if given := environmentValue(environment, "GOWORK"); given != "" && given != "auto" {
 		if given != answer["GOWORK"] {
 			return "", fmt.Sprintf("GOWORK is %s and go env answered %s", given, answer["GOWORK"])
 		}
 		return given, ""
 	}
-	found := findWorkspaceFile(workspace, answer["GOROOT"])
+	found := findWorkspaceFile(workingDirectory, answer["GOROOT"])
 	if found == "" || found == answer["GOWORK"] {
 		// Without one found, go env's answer came from the go env file, which go list reads as it is.
 		return answer["GOWORK"], ""
@@ -180,10 +184,10 @@ func goDirectoryPath(path string) string {
 // spelling go would print from the copy's place paired with the one it prints from the tree's, or why it cannot be
 // made exact. Every relative use is made absolute, as go joins it, so go reads the same module roots. Every relative
 // directory replace of the go.work is spelled relative to the copy's directory, a spelling go prints nowhere else.
-func (plan workspaceSumPlan) sideContents(workspace string, sideWorkFile string) ([]byte, []spellingPair, string) {
+func (plan workspaceSumPlan) sideContents(sideWorkFile string) ([]byte, []spellingPair, string) {
 	workDirectory := filepath.Dir(plan.workFile)
 	sideDirectory := filepath.Dir(sideWorkFile)
-	pairs := []spellingPair{{side: goShortPath(workspace, sideWorkFile), tree: plan.shortWorkFile}}
+	pairs := []spellingPair{{side: goShortPath(plan.workingDirectory, sideWorkFile), tree: plan.shortWorkFile}}
 	var splices []lineSplice
 	expectedUses := make([]string, 0, len(plan.parsed.Use))
 	for _, use := range plan.parsed.Use {

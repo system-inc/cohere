@@ -433,14 +433,14 @@ var uncheckedConditions = []struct {
 	{
 		name:   "a Go run's go list ran beside a go.work with no side copy",
 		plant:  func(summary *runSummary) { summary.Gaps.UnguardedWorkspaceSums = []string{"/work/go.work.sum"} },
-		marker: "⚠ go list may rewrite go.work.sum",
+		marker: "⚠ go list may have rewritten go.work.sum",
 	},
 	{
 		name: "a Go run's go list ran beside two go.work files with no side copy",
 		plant: func(summary *runSummary) {
 			summary.Gaps.UnguardedWorkspaceSums = []string{"/first/go.work.sum", "/second/go.work.sum"}
 		},
-		marker: "⚠ go list may rewrite 2 go.work.sum files",
+		marker: "⚠ go list may have rewritten 2 go.work.sum files",
 	},
 	{
 		name:   "the binary was built from a modified tree",
