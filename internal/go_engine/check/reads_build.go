@@ -54,6 +54,9 @@ type ReadsBuild struct {
 	// assembly files (Restoring.Assembly), made the first time one is judged (wholeTwin).
 	whole *ReadsBuild
 
+	// uses are each object's digest as a use of each kind but the whole judges it, a cache.Key by useKey (useDigest).
+	uses sync.Map
+
 	// walking and indexing, nil outside tests, are told of each root as its closure is walked and of each package as
 	// it is indexed, so a test can count them.
 	walking  func(*types.Package)
@@ -64,6 +67,12 @@ type ReadsBuild struct {
 type packageMethods struct {
 	owner     *types.Package
 	typeNames []*types.TypeName
+}
+
+// useKey is one object judged as one kind of use.
+type useKey struct {
+	object types.Object
+	kind   build_reads.UseKind
 }
 
 // objectPathResult is an object's objectpath, and whether it has one.
@@ -126,6 +135,127 @@ func (build *ReadsBuild) closureDigest(object types.Object) cache.Key {
 	digest := build.graph.closureDigest(object)
 	build.digests.Store(object, digest)
 	return digest
+}
+
+// useDigest is object's digest as a use of kind judges it (#mjdf7ah), memoized: a whole use's closure digest
+// (closureDigest), and for every other kind the lines of the object that kind reads (useLines), so two builds digest a
+// use alike exactly when what the use read of the object renders alike in both.
+func (build *ReadsBuild) useDigest(object types.Object, kind build_reads.UseKind) cache.Key {
+	if kind == build_reads.UseWhole {
+		return build.closureDigest(object)
+	}
+	key := useKey{object: object, kind: kind}
+	if known, isKnown := build.uses.Load(key); isKnown {
+		digest, isDigest := known.(cache.Key)
+		if !isDigest {
+			// Invariant: useDigest stores only a cache.Key.
+			panic(fmt.Sprintf("check: the use digest of %s is a %T", object.Name(), known))
+		}
+		return digest
+	}
+	lines := build.useLines(object, kind)
+	parts := make([][]byte, 0, len(lines)+1)
+	parts = append(parts, []byte(kind))
+	for _, line := range lines {
+		parts = append(parts, []byte(line))
+	}
+	digest := cache.DigestOf(parts...)
+	build.uses.Store(key, digest)
+	return digest
+}
+
+// useLines are the lines of object a use of kind reads (build_reads.UseKind):
+//   - a member, its own line (ownRendering), and the line of each field of an unnamed struct its own type holds that
+//     the build renders by its properties, as its closure digest's own part writes them;
+//   - a type name named, its path, name, type parameters and kind, and for an alias the type it names;
+//   - its underlying type, that and the underlying type written, every named type in it by name;
+//   - its method set, that and every method of the type and of a pointer to it an importer can see (importerSees), by
+//     name, index, indirection and own line.
+//
+// A kind about a type, asked of an object that is no type name, reads the object's closure, which reads the most.
+func (build *ReadsBuild) useLines(object types.Object, kind build_reads.UseKind) []string {
+	if kind == build_reads.UseMember {
+		step := directTypeNames(rootTypes(object), build.graph.sizesForWalk())
+		return append([]string{ownRendering(object)}, step.observed...)
+	}
+	typeName, isTypeName := object.(*types.TypeName)
+	if !isTypeName {
+		closure := build.closureDigest(object)
+		return []string{"closure " + string(closure[:])}
+	}
+	lines := []string{typeNameLine(typeName)}
+	switch kind {
+	case build_reads.UseUnderlying:
+		lines = append(lines, "underlying "+writtenType(typeName.Type().Underlying()))
+	case build_reads.UseMethodSet:
+		lines = append(lines, methodSetLines(typeName, build.graph.importerSees)...)
+	}
+	return lines
+}
+
+// typeNameLine is a type name as a use of its name reads it: its package's path, its name, its type parameters, its
+// kind, and for an alias the type it names, written.
+func typeNameLine(typeName *types.TypeName) string {
+	line := "type name of " + typeName.Pkg().Path() + " " + typeName.Name()
+	switch declared := typeName.Type().(type) {
+	case *types.Named:
+		line += renderedTypeParameters(declared.TypeParams())
+	case *types.Alias:
+		line += renderedTypeParameters(declared.TypeParams()) + " alias of " + writtenType(declared.Rhs())
+	}
+	return line + " kind " + kindOf(types.Unalias(typeName.Type()).Underlying())
+}
+
+// kindOf is the kind of an underlying type, as a use of a type's name reads it, a basic type's by which basic type it
+// is: SA5008 judges a `json` tag's `string` option by the basic kind a field's pointer points to, through the pointed
+// type's name alone.
+func kindOf(underlying types.Type) string {
+	switch underlying := underlying.(type) {
+	case *types.Basic:
+		return "basic " + underlying.Name()
+	case *types.Pointer:
+		return "pointer"
+	case *types.Array:
+		return "array"
+	case *types.Slice:
+		return "slice"
+	case *types.Map:
+		return "map"
+	case *types.Chan:
+		return "channel"
+	case *types.Struct:
+		return "struct"
+	case *types.Signature:
+		return "function"
+	case *types.Interface:
+		return "interface"
+	default:
+		return "other"
+	}
+}
+
+// methodSetLines are the methods of typeName's type, and of a pointer to it unless it is an interface, that seen keeps,
+// each by the set it is in, its name, its index through embedded fields, whether it is reached through a pointer, and
+// its own line: what an interface's satisfaction, checked statically, reads of the type, promoted methods included.
+func methodSetLines(typeName *types.TypeName, seen func(*types.Func) bool) []string {
+	sets := []types.Type{typeName.Type()}
+	if !types.IsInterface(typeName.Type()) {
+		sets = append(sets, types.NewPointer(typeName.Type()))
+	}
+	var lines []string
+	for _, set := range sets {
+		methods := types.NewMethodSet(set)
+		for index := range methods.Len() {
+			selection := methods.At(index)
+			method, isMethod := selection.Obj().(*types.Func)
+			if !isMethod || !seen(method) {
+				continue
+			}
+			lines = append(lines, fmt.Sprintf("method of %s %s at %v indirect %t %s", writtenType(set), method.Name(),
+				selection.Index(), selection.Indirect(), ownRendering(method)))
+		}
+	}
+	return lines
 }
 
 // pathOf is object's objectpath in its package, and whether it has one.
@@ -248,14 +378,17 @@ var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 
 // TypesHold reports whether what restoring read of other packages' types on the host's run, in host, reads the same in
 // build, whose packages it reaches are closure, by path, restored those of them build restored from the host's run,
-// and when it does not, the first read that differs, named by its row: T for an object its type check reached, L for
-// a rule's lookup of the types, and never or unknown for reads that cannot hold at all. It is the load's half of the
+// and when it does not, the first read that differs, named by its row: T for an object its type check reached, judged
+// by the kind of use it made of it, or a selection it made through another package's type, L for a rule's lookup of
+// the types, and never or unknown for reads that cannot hold at all. It is the load's half of the
 // verdict, decided once the package's imports are done in build and before anything of the package is read there
 // (load.Restored.Holds); FactsHold is check's. A package whose own inputs are the host's and whose reads hold may take
 // the host's results in build (#b2t9xmf).
 //
 // A package with assembly files is judged by the memos' whole twins (Restoring.Assembly), never by another package's
-// unexported field rendered by its properties.
+// unexported field rendered by its properties, and every read of it by the read object's closure, as is every read of
+// a package whose reads say so (build_reads.Reads.ClosureOnly): its frames, laid out field by field, reach past what
+// the type checker records.
 //
 // Every read fails closed: an object with no objectpath, a package the build lacks, and a lookup of a kind it does not
 // know each fail it. Persisted reads are judged by the same rules (persistedTypesHold), and a package with no reads at
@@ -285,8 +418,14 @@ func TypesHold(
 	}
 	judged := verdict{host: judgedHost, build: judgedBuild, closure: closure, restored: restored,
 		methods: &verdictClosures{host: map[*types.Package]*gatheredClosure{}}}
-	for _, object := range restoring.Reads.Objects() {
-		if holds, why := judged.objectHolds(object); !holds {
+	closureOnly := restoring.Assembly || restoring.Reads.ClosureOnly() != ""
+	for _, use := range restoring.Reads.Uses() {
+		if holds, why := judged.useHolds(use, closureOnly); !holds {
+			return false, "T " + why
+		}
+	}
+	for _, selection := range restoring.Reads.Selections() {
+		if holds, why := judged.selectionHolds(selection, closureOnly); !holds {
 			return false, "T " + why
 		}
 	}

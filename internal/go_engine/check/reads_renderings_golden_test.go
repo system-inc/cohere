@@ -13,6 +13,8 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/deprecated"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
 // updateRenderings has the golden test write the renderings it computes over the golden, after a change that moved
@@ -42,8 +44,8 @@ const renderingsSource = "package rendered\n\n" +
 
 // readsRenderingLines are what a persisted digest is taken of, for a fixed fixture: the version line, then each
 // object of the verdict fixture's darwin platform and of renderingsSource, its closure digest measured by the amd64
-// sizes and whole, each beside the closure it stands for written out (closureRendering), and the value digests of
-// fixed facts.
+// sizes and whole, each beside the closure it stands for written out (closureRendering), the digest of what each kind
+// of use reads of it, measured, beside the lines it reads (useLines), and the value digests of fixed facts.
 func readsRenderingLines(test *testing.T) []string {
 	test.Helper()
 
@@ -65,6 +67,19 @@ func readsRenderingLines(test *testing.T) []string {
 				digest := rendering.memo.closureDigest(object)
 				lines = append(lines, rendering.label+" "+objectName(object)+" "+hex.EncodeToString(digest[:]))
 				for _, line := range closureRendering(object, rendering.sizes) {
+					lines = append(lines, "\t"+line)
+				}
+			}
+			// What each kind of use reads of the object (#mjdf7ah): a type name's name, underlying type and method set,
+			// and anything else's own line, which a selection's member is judged by too.
+			kinds := []build_reads.UseKind{build_reads.UseMember}
+			if _, isTypeName := object.(*types.TypeName); isTypeName {
+				kinds = []build_reads.UseKind{build_reads.UseName, build_reads.UseUnderlying, build_reads.UseMethodSet}
+			}
+			for _, kind := range kinds {
+				digest := measured.useDigest(object, kind)
+				lines = append(lines, "use "+string(kind)+" "+objectName(object)+" "+hex.EncodeToString(digest[:]))
+				for _, line := range measured.useLines(object, kind) {
 					lines = append(lines, "\t"+line)
 				}
 			}

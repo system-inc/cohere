@@ -227,15 +227,16 @@ func deepWorld(test *testing.T) (*types.Package, *types.Package, *types.Info) {
 
 // A whole verdict over a package that reads eighty objects of another package, every one reaching one deep chain of
 // types, renders each named type once in each build, however many objects reach it, and the reads hold, since both
-// builds check the same source.
+// builds check the same source. The reads are recorded without the user's syntax, so every read is judged by its
+// object's closure, which is what renders the chain.
 func TestAVerdictRendersEachNamedTypeOncePerBuild(test *testing.T) {
 	test.Parallel()
 
 	_, user, info := deepWorld(test)
 	built, _, _ := deepWorld(test)
 	reads := &build_reads.Reads{}
-	reads.RecordTypes(user, info)
-	if objects := len(reads.Objects()); objects < 80 {
+	reads.RecordTypes(user, info, nil)
+	if objects := len(reads.Uses()); objects < 80 {
 		test.Fatalf("the user read %d objects of deep, want every one of its 80", objects)
 	}
 	host, build := NewReadsBuild(), NewReadsBuild()

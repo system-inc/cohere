@@ -76,11 +76,12 @@ var verdictUsers = map[string]string{
 }
 
 // verdictWorld is one build of the fixture for goos: platform type-checked from the files goos's build context
-// matches, and, when user names one of verdictUsers, the user package over it, with its type information.
+// matches, and, when user names one of verdictUsers, the user package over it, with its type information and syntax.
 type verdictWorld struct {
 	platform *types.Package
 	user     *types.Package
 	info     *types.Info
+	files    []*ast.File
 }
 
 // checkedWorld type-checks the fixture for goos, with the user package of verdictUsers named user, or none when user
@@ -127,7 +128,9 @@ func checkedWorld(test *testing.T, goos string, user string) verdictWorld {
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
+	world.files = []*ast.File{userFile}
 	world.info = &types.Info{
+		Types:      map[ast.Expr]types.TypeAndValue{},
 		Uses:       map[*ast.Ident]types.Object{},
 		Defs:       map[*ast.Ident]types.Object{},
 		Selections: map[*ast.SelectorExpr]*types.Selection{},
@@ -140,21 +143,21 @@ func checkedWorld(test *testing.T, goos string, user string) verdictWorld {
 		}
 		return nil, fmt.Errorf("no package %s", path)
 	})}
-	world.user, checkError = configuration.Check(verdictUser, fileSet, []*ast.File{userFile}, world.info)
+	world.user, checkError = configuration.Check(verdictUser, fileSet, world.files, world.info)
 	if checkError != nil {
 		test.Fatalf("type-checking the %s user for %s: %v", user, goos, checkError)
 	}
 	return world
 }
 
-// hostReads are the reads of the user package named user on the darwin host, its type reads recorded, as the load
-// records them, and the host's world.
+// hostReads are the reads of the user package named user on the darwin host, its type reads recorded from its type
+// information and syntax, as the run records them, and the host's world.
 func hostReads(test *testing.T, user string) (Restoring, verdictWorld) {
 	test.Helper()
 
 	host := checkedWorld(test, "darwin", user)
 	reads := &build_reads.Reads{}
-	reads.RecordTypes(host.user, host.info)
+	reads.RecordTypes(host.user, host.info, host.files)
 	return Restoring{Path: verdictUser, Imports: []string{verdictPlatform}, Reads: reads}, host
 }
 
@@ -195,9 +198,10 @@ func holdsIn(restoring Restoring, host *ReadsBuild, linux linuxWorld) (bool, str
 	return FactsHold(restoring, linux.closure, host, linux.build, linux.fact, ReadFactTypes(restoring))
 }
 
-// A package reads the same in another build when every object it read is there and renders alike, and it does not
-// when one it reached differs in what an importer can observe: an unexported field two types down, a method of a type
-// it uses, a constant's value, or an object the build does not declare. Each fails naming the read. The verdicts share
+// A package reads the same in another build when every object it read is there and reads alike for the kind of use it
+// made of it, and it does not when one differs in what that use can observe: an unexported field two types down of a
+// type it takes by value, a method of a type it takes by value, a constant's value, or an object the build does not
+// declare. Each fails naming the read. The verdicts share
 // one host and one build, as a run's do, so under the race detector they prove the memos safe across goroutines.
 func TestATypeReadHoldsOnlyWhenEveryObjectRendersAlikeInTheBuild(test *testing.T) {
 	test.Parallel()
@@ -210,7 +214,7 @@ func TestATypeReadHoldsOnlyWhenEveryObjectRendersAlikeInTheBuild(test *testing.T
 		{"stable", ""},
 		{"handle", "T object " + verdictPlatform + ".Handle renders differently"},
 		{"method", "T object " + verdictPlatform + ".Shared renders differently"},
-		{"name", "T object " + verdictPlatform + ".Name renders differently"},
+		{"name", "T object " + verdictPlatform + ".Name: its own line differs"},
 		{"darwin", "T object " + verdictPlatform + ".OnlyDarwin: the build's " + verdictPlatform +
 			" has no OnlyDarwin"},
 	} {

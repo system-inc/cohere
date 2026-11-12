@@ -1,4 +1,4 @@
-renderer reads-renderer-1
+renderer reads-renderer-2
 measured example.com/verdict/platform.Box 9ddb1df2d1b478157df129ee01bdd6d20474452692e2fa7681cfa4121da03f84
 	type name of example.com/verdict/platform Box
 	named example.com/verdict/platform.Box
@@ -9,6 +9,13 @@ whole example.com/verdict/platform.Box 9ddb1df2d1b478157df129ee01bdd6d2047445269
 	named example.com/verdict/platform.Box
 	type Box[Value any] struct{Held Value}
 	methods of Box in order 
+use Name example.com/verdict/platform.Box 540e2bdae2c562eeae0c0c3c58657898ec995b5b13aa873f14aab92ffa408f9d
+	type name of example.com/verdict/platform Box[Value any] kind struct
+use Underlying example.com/verdict/platform.Box 656119f55ebb5e71ebee73fa464bbced4d2a084c5a26491cee32102a797c8c5f
+	type name of example.com/verdict/platform Box[Value any] kind struct
+	underlying struct{Held Value}
+use MethodSet example.com/verdict/platform.Box e995121b3b78e0b2cf5a51353249dc2d7139810a54527581684ab18d62adae51
+	type name of example.com/verdict/platform Box[Value any] kind struct
 measured example.com/verdict/platform.Closer 93630436cbf82fefc7ca05c0333b463950e168d32c04cf5c915eb34f3ab44265
 	type name of example.com/verdict/platform Closer
 	named example.com/verdict/platform.Closer
@@ -19,6 +26,14 @@ whole example.com/verdict/platform.Closer 93630436cbf82fefc7ca05c0333b463950e168
 	named example.com/verdict/platform.Closer
 	type Closer interface{Close() error}
 	methods of Closer in order 
+use Name example.com/verdict/platform.Closer 61abce17e0a3a0f7b28b48c5320a14e4461a66765b32de1b34d7c2f8e114fd5e
+	type name of example.com/verdict/platform Closer kind interface
+use Underlying example.com/verdict/platform.Closer 9bc67b7a371043b260793f446713299474d915825b7ebd0e6739e85d14297197
+	type name of example.com/verdict/platform Closer kind interface
+	underlying interface{Close() error}
+use MethodSet example.com/verdict/platform.Closer 0c9fd260bc19517ebc6d3fd0c5e1dc8e4d0828b97792df90154712449a9d2673
+	type name of example.com/verdict/platform Closer kind interface
+	method of example.com/verdict/platform.Closer Close at [0] indirect true func of example.com/verdict/platform Close receiver example.com/verdict/platform.Closer func() error
 measured example.com/verdict/platform.Handle 86d8a81022ff75cc1f799c24fa623a881bf3b2801451b70bc75a22549f3d9aa8
 	type name of example.com/verdict/platform Handle
 	named example.com/verdict/platform.Handle
@@ -33,13 +48,24 @@ whole example.com/verdict/platform.Handle a75daf058d06f39d1b96782fc76a5b4b29ef78
 	named example.com/verdict/platform.state
 	type state struct{descriptor int} where field descriptor of example.com/verdict/platform
 	methods of state in order 
+use Name example.com/verdict/platform.Handle eb3cf0d1a1dd5797efb7cad270435f9625bf1e82f4622839416329146ac77da8
+	type name of example.com/verdict/platform Handle kind struct
+use Underlying example.com/verdict/platform.Handle 863dcae762a6694ae3afafa4d6ed1fac6a92e8dcd7ca724e31a1792050cd8b34
+	type name of example.com/verdict/platform Handle kind struct
+	underlying struct{current *example.com/verdict/platform.state} where field current of example.com/verdict/platform
+use MethodSet example.com/verdict/platform.Handle 9cdc7e87a76b164663d89a025b331553b5551890332a04bf745e8db05b123340
+	type name of example.com/verdict/platform Handle kind struct
 measured example.com/verdict/platform.Identity cc3cf0b896bbe096dbe200603726adea5499efce90ebefa52c949e987310796d
 	func of example.com/verdict/platform Identity receiver none[Value any] func[Value any](value Value) Value
 whole example.com/verdict/platform.Identity cc3cf0b896bbe096dbe200603726adea5499efce90ebefa52c949e987310796d
 	func of example.com/verdict/platform Identity receiver none[Value any] func[Value any](value Value) Value
+use Member example.com/verdict/platform.Identity 6c8720017e67a781872ae49edbe5335e0f3b3f1837ade40bb029dfc8c0ef7664
+	func of example.com/verdict/platform Identity receiver none[Value any] func[Value any](value Value) Value
 measured example.com/verdict/platform.Name 3fa8c8a5099dae4733aed068d94c17baad623b0e1be4739a33453c943962d268
 	const of example.com/verdict/platform Name untyped string = string "darwin"
 whole example.com/verdict/platform.Name 3fa8c8a5099dae4733aed068d94c17baad623b0e1be4739a33453c943962d268
+	const of example.com/verdict/platform Name untyped string = string "darwin"
+use Member example.com/verdict/platform.Name 17b1649d8b48abf0c9e4068060a6da38975a9bc6d12d1c0b9998cd0bf0aaeaff
 	const of example.com/verdict/platform Name untyped string = string "darwin"
 measured example.com/verdict/platform.NewStable 8ccc7b65869398cc0cd0f5ba9946595b6bb88d37e9149359ba6a0a8fc039a2ef
 	func of example.com/verdict/platform NewStable receiver none func() example.com/verdict/platform.Stable
@@ -52,9 +78,13 @@ whole example.com/verdict/platform.NewStable 72a620e0d99997579b1a0f95835bb5b2af5
 	named example.com/verdict/platform.Stable
 	type Stable struct{count int; Label string} where field count of example.com/verdict/platform
 	methods of Stable in order 
+use Member example.com/verdict/platform.NewStable 90ebe810a5676f4de20c3e5390ea1d20586660a9759b8c1fccfa754e68e508ef
+	func of example.com/verdict/platform NewStable receiver none func() example.com/verdict/platform.Stable
 measured example.com/verdict/platform.OnlyDarwin 5bb61dfd5f5a701ae9dbcfb141df7adae8b4c1d75e7844952a479a476fc82530
 	func of example.com/verdict/platform OnlyDarwin receiver none func()
 whole example.com/verdict/platform.OnlyDarwin 5bb61dfd5f5a701ae9dbcfb141df7adae8b4c1d75e7844952a479a476fc82530
+	func of example.com/verdict/platform OnlyDarwin receiver none func()
+use Member example.com/verdict/platform.OnlyDarwin 447da06f0e023a603ee416bca2912a65c360a2c63fe76515f8e47f239fad2662
 	func of example.com/verdict/platform OnlyDarwin receiver none func()
 measured example.com/verdict/platform.Shared 2a628aa69818ca644ab28cd46781bc2cd8ba3eb7fc2c293a7a976f4e95ac4245
 	type name of example.com/verdict/platform Shared
@@ -68,6 +98,15 @@ whole example.com/verdict/platform.Shared 2a628aa69818ca644ab28cd46781bc2cd8ba3e
 	type Shared struct{Value int}
 	method Shared.Size value example.com/verdict/platform.Shared func() int
 	methods of Shared in order Size
+use Name example.com/verdict/platform.Shared 3326270419b55ca28e110e27f6833a1eb64862fb45fd9f04945ca04143cea8a0
+	type name of example.com/verdict/platform Shared kind struct
+use Underlying example.com/verdict/platform.Shared 25b8417ed6b47008a2e1a3affba53a82b790141a27e37905dd80e48f7a897079
+	type name of example.com/verdict/platform Shared kind struct
+	underlying struct{Value int}
+use MethodSet example.com/verdict/platform.Shared 52699dc082f5647cd506bda0f532207119b67fb749dda3bf3498fde64d4f0282
+	type name of example.com/verdict/platform Shared kind struct
+	method of example.com/verdict/platform.Shared Size at [0] indirect false func of example.com/verdict/platform Size receiver example.com/verdict/platform.Shared func() int
+	method of *example.com/verdict/platform.Shared Size at [0] indirect true func of example.com/verdict/platform Size receiver example.com/verdict/platform.Shared func() int
 measured example.com/verdict/platform.Stable a0a49da98f692b45e77823c2e3892cda2963a83b567b20b45c8d8c58d5e11929
 	type name of example.com/verdict/platform Stable
 	named example.com/verdict/platform.Stable
@@ -79,6 +118,13 @@ whole example.com/verdict/platform.Stable 6018ea9d32576be7ff9c2b20bc09a9c450e5e0
 	named example.com/verdict/platform.Stable
 	type Stable struct{count int; Label string} where field count of example.com/verdict/platform
 	methods of Stable in order 
+use Name example.com/verdict/platform.Stable 48180f1deaf61103f21103169444e434b0d474f312c64d7ca2511b9451ba4e67
+	type name of example.com/verdict/platform Stable kind struct
+use Underlying example.com/verdict/platform.Stable 7a2048e6ef48690a38213094c6af64e5bc4d207cb7966a28a8ee9882b10d6464
+	type name of example.com/verdict/platform Stable kind struct
+	underlying struct{count int; Label string} where field count of example.com/verdict/platform
+use MethodSet example.com/verdict/platform.Stable 6d5362bed128d7367bac59cbc60ffcb98e98868fa4721cecd04c1249adbccdfe
+	type name of example.com/verdict/platform Stable kind struct
 measured example.com/verdict/platform.state 0a5af2e99eccd0b1b9ae7ab8c77f2489cc156a92c94e6f6aa7c0b79176d48138
 	type name of example.com/verdict/platform state
 	named example.com/verdict/platform.state
@@ -90,6 +136,13 @@ whole example.com/verdict/platform.state 252bc672f30da19fd1c9e516879019bf9759ecf
 	named example.com/verdict/platform.state
 	type state struct{descriptor int} where field descriptor of example.com/verdict/platform
 	methods of state in order 
+use Name example.com/verdict/platform.state 0e4e6a92488a63e1316fc27f16a8246e753ebb079517155978fdc3f602b55ea8
+	type name of example.com/verdict/platform state kind struct
+use Underlying example.com/verdict/platform.state 9235635a551c3870b15316b11c7b40708f751ba0025a5e89d1681a81979fca07
+	type name of example.com/verdict/platform state kind struct
+	underlying struct{descriptor int} where field descriptor of example.com/verdict/platform
+use MethodSet example.com/verdict/platform.state c63e17ee37a77133f70a1924406236139ee96651db513e33a293f5d4b9101d8a
+	type name of example.com/verdict/platform state kind struct
 measured example.com/rendered.Base 6ea78cab50881f47679226fcfd61565377c34b062ef8e3ac0222ebc3c5097ba3
 	type name of example.com/rendered Base
 	named example.com/rendered.Base
@@ -100,9 +153,18 @@ whole example.com/rendered.Base 6ea78cab50881f47679226fcfd61565377c34b062ef8e3ac
 	named example.com/rendered.Base
 	type Base struct{Count int}
 	methods of Base in order 
+use Name example.com/rendered.Base 32572adfcb2759e8f54bc4bfb2b5b9ddcbd8f63126b23defecef57b0a5915f57
+	type name of example.com/rendered Base kind struct
+use Underlying example.com/rendered.Base d250ac876457cbce2de2a782f139211113a103fdf42b2004a38667b7365d86d3
+	type name of example.com/rendered Base kind struct
+	underlying struct{Count int}
+use MethodSet example.com/rendered.Base 089dcfdaacab8f27b990f94d0fdb7a4890b19621bd4bb9e6e86c255c37836720
+	type name of example.com/rendered Base kind struct
 measured example.com/rendered.Greeting fed163b4db3d8cbc6442cd1964b91215ce63ce4217a8c4615c813097e255b453
 	const of example.com/rendered Greeting untyped string = string "hello"
 whole example.com/rendered.Greeting fed163b4db3d8cbc6442cd1964b91215ce63ce4217a8c4615c813097e255b453
+	const of example.com/rendered Greeting untyped string = string "hello"
+use Member example.com/rendered.Greeting f31c70432ef92304d9fa0cf3059acc17e2623fde650ab81455110dea30600287
 	const of example.com/rendered Greeting untyped string = string "hello"
 measured example.com/rendered.Held 4894e78a74c8f91046cd5acd7564422db0bae59f1ef351f909160ba33bfc737b
 	var of example.com/rendered Held example.com/rendered.hider
@@ -114,9 +176,13 @@ whole example.com/rendered.Held 4894e78a74c8f91046cd5acd7564422db0bae59f1ef351f9
 	named example.com/rendered.hider
 	type hider interface{hidden()} where method hidden of example.com/rendered
 	methods of hider in order 
+use Member example.com/rendered.Held 80fb86a22edfea4bcc197018399a34ad9f1416e5d8f7615d9525daeb40724642
+	var of example.com/rendered Held example.com/rendered.hider
 measured example.com/rendered.Large 13031cf731a92408a41bc286d937e20b874c6cf8c4bd6e940f79e6cf563b4ec6
 	const of example.com/rendered Large untyped int = int 1208925819614629174706176
 whole example.com/rendered.Large 13031cf731a92408a41bc286d937e20b874c6cf8c4bd6e940f79e6cf563b4ec6
+	const of example.com/rendered Large untyped int = int 1208925819614629174706176
+use Member example.com/rendered.Large 3aa9a4e96b3334a47453e2839f4ce89082fbc30df29d044dad7ec0178e141557
 	const of example.com/rendered Large untyped int = int 1208925819614629174706176
 measured example.com/rendered.Named 8952f779ca80375aa2d20299bf1ecc3923605536e433d680697c13b23f88752b
 	type name of example.com/rendered Named
@@ -143,6 +209,16 @@ whole example.com/rendered.Named d879fb6190b480a2c8a5b042fa085d8c48d6e818bd43e84
 	method Outer.Shown pointer *example.com/rendered.Outer func() string
 	method Outer.hidden value example.com/rendered.Outer func()
 	methods of Outer in order hidden Shown
+use Name example.com/rendered.Named 10dfad4181160dfff668915ff17a07f35bf8037dd49a63d033390744cf6bf61c
+	type name of example.com/rendered Named alias of example.com/rendered.Outer kind struct
+use Underlying example.com/rendered.Named efac9fcd085ad306257ab0fbcbeb20e9899df6633dba168fb2a57a6bc51c2742
+	type name of example.com/rendered Named alias of example.com/rendered.Outer kind struct
+	underlying struct{example.com/rendered.Base; label string; Inner *example.com/rendered.Outer} where field label of example.com/rendered
+use MethodSet example.com/rendered.Named ec785eef9be042d309d9cea33e2c9ede5e4990e378db8532ea854adfbc471300
+	type name of example.com/rendered Named alias of example.com/rendered.Outer kind struct
+	method of example.com/rendered.Named hidden at [0] indirect false func of example.com/rendered hidden receiver example.com/rendered.Outer func()
+	method of *example.com/rendered.Named Shown at [1] indirect true func of example.com/rendered Shown receiver *example.com/rendered.Outer func() string
+	method of *example.com/rendered.Named hidden at [0] indirect true func of example.com/rendered hidden receiver example.com/rendered.Outer func()
 measured example.com/rendered.Outer a0a0e8dfa9746c10e5d22e326e09a4c0d14dbba1ae721dfc1a7897280a2adc9a
 	type name of example.com/rendered Outer
 	named example.com/rendered.Base
@@ -164,6 +240,16 @@ whole example.com/rendered.Outer 13a2c5ffb407cbec55f6840cd0d818e1967a95dd6dbc59f
 	method Outer.Shown pointer *example.com/rendered.Outer func() string
 	method Outer.hidden value example.com/rendered.Outer func()
 	methods of Outer in order hidden Shown
+use Name example.com/rendered.Outer bd7418fc172dc7f64d06f239d525964995b0f0319a1656f73e201f902f0552ff
+	type name of example.com/rendered Outer kind struct
+use Underlying example.com/rendered.Outer 756c09dc29dcdaf72cef54d1c7f0c26e5f8f5f8bfd2542ab446dca1a7dd3ae1e
+	type name of example.com/rendered Outer kind struct
+	underlying struct{example.com/rendered.Base; label string; Inner *example.com/rendered.Outer} where field label of example.com/rendered
+use MethodSet example.com/rendered.Outer 338afd4d193ef9c95373037f8e56956343053a326209d82b4add3e6e31ff1251
+	type name of example.com/rendered Outer kind struct
+	method of example.com/rendered.Outer hidden at [0] indirect false func of example.com/rendered hidden receiver example.com/rendered.Outer func()
+	method of *example.com/rendered.Outer Shown at [1] indirect true func of example.com/rendered Shown receiver *example.com/rendered.Outer func() string
+	method of *example.com/rendered.Outer hidden at [0] indirect true func of example.com/rendered hidden receiver example.com/rendered.Outer func()
 measured example.com/rendered.Pair c2971ff4a8471eb06652835353c7174bd811da82dee6576d78a2773d187b8cf1
 	type name of example.com/rendered Pair
 	named example.com/rendered.Pair
@@ -174,13 +260,24 @@ whole example.com/rendered.Pair c2971ff4a8471eb06652835353c7174bd811da82dee6576d
 	named example.com/rendered.Pair
 	type Pair[Left any, Right comparable] struct{Left Left; Right Right}
 	methods of Pair in order 
+use Name example.com/rendered.Pair d767cc5d521bec159509962eb41eeb62e7d6b858c5c0274d1c4dc32db7215e46
+	type name of example.com/rendered Pair[Left any, Right comparable] kind struct
+use Underlying example.com/rendered.Pair 7334c244b7f640fdf9dd44efe6c2a8b11f8f598a82d0dc3baf675ccb2877ac47
+	type name of example.com/rendered Pair[Left any, Right comparable] kind struct
+	underlying struct{Left Left; Right Right}
+use MethodSet example.com/rendered.Pair fc219272409830859272751bb1b4ac9dfac2127a95a860333b970b514bdf1ee1
+	type name of example.com/rendered Pair[Left any, Right comparable] kind struct
 measured example.com/rendered.Pi d4513784c070c44fce8602b42948e6cd81ca4ef4ce3b333a1a108a9a4ed13fe7
 	const of example.com/rendered Pi untyped float = float 5265233861681329527430852685569923513156999664186156825699335632145130833652529926715379955630651875029455043336995646403337241248353639932329607400740841/1675975991242824637446753124775730765934920727574049172215445180465220503759193372100234287270862928461253982273310756356719235351493321243304206125760512
 whole example.com/rendered.Pi d4513784c070c44fce8602b42948e6cd81ca4ef4ce3b333a1a108a9a4ed13fe7
 	const of example.com/rendered Pi untyped float = float 5265233861681329527430852685569923513156999664186156825699335632145130833652529926715379955630651875029455043336995646403337241248353639932329607400740841/1675975991242824637446753124775730765934920727574049172215445180465220503759193372100234287270862928461253982273310756356719235351493321243304206125760512
+use Member example.com/rendered.Pi 19909073c83ca5e940ed5cfd75f60a1feb9751560e498b983b48b138ac47d628
+	const of example.com/rendered Pi untyped float = float 5265233861681329527430852685569923513156999664186156825699335632145130833652529926715379955630651875029455043336995646403337241248353639932329607400740841/1675975991242824637446753124775730765934920727574049172215445180465220503759193372100234287270862928461253982273310756356719235351493321243304206125760512
 measured example.com/rendered.Rotation a2a29a5fe08dc2261fff3487baf670048571b0afdc6d1f611b624a08a6bc6995
 	const of example.com/rendered Rotation untyped complex = complex 3/2 2
 whole example.com/rendered.Rotation a2a29a5fe08dc2261fff3487baf670048571b0afdc6d1f611b624a08a6bc6995
+	const of example.com/rendered Rotation untyped complex = complex 3/2 2
+use Member example.com/rendered.Rotation 8a17ac342ea535222db352be61209c4b673776853314f38694a409af7cc2ed94
 	const of example.com/rendered Rotation untyped complex = complex 3/2 2
 measured example.com/rendered.Same c6677872aa9376df0c09ed5bfa6e2d7e522820443f01cfc6b54965f91b90603f
 	type name of example.com/rendered Same
@@ -196,6 +293,13 @@ whole example.com/rendered.Same c6677872aa9376df0c09ed5bfa6e2d7e522820443f01cfc6
 	methods of Pair in order 
 	named example.com/rendered.Same
 	alias Same[Value comparable] = example.com/rendered.Pair[Value, Value] is example.com/rendered.Pair[Value, Value]
+use Name example.com/rendered.Same 9336da9d58dfdf0793ade5c8b869fe7e13d09343cf3bf5aee7cc809bc122a215
+	type name of example.com/rendered Same[Value comparable] alias of example.com/rendered.Pair[Value, Value] kind struct
+use Underlying example.com/rendered.Same 9a1ad2f190821e9c0389d319aab50715663ca6222a150617a5246cb4ce2dc34b
+	type name of example.com/rendered Same[Value comparable] alias of example.com/rendered.Pair[Value, Value] kind struct
+	underlying struct{Left Value; Right Value}
+use MethodSet example.com/rendered.Same da55015203ef194135f1314814056b2eff0c8c4c93e7d58d8c5f69bce7b4b152
+	type name of example.com/rendered Same[Value comparable] alias of example.com/rendered.Pair[Value, Value] kind struct
 measured example.com/rendered.hider a9ef2ecb3465a5d429330e945df34cd73ec5faf6a4cb399c0b9aeb57b99c6e67
 	type name of example.com/rendered hider
 	named example.com/rendered.hider
@@ -206,5 +310,13 @@ whole example.com/rendered.hider a9ef2ecb3465a5d429330e945df34cd73ec5faf6a4cb399
 	named example.com/rendered.hider
 	type hider interface{hidden()} where method hidden of example.com/rendered
 	methods of hider in order 
+use Name example.com/rendered.hider 8a7a7a15915eb6aefd5f4d9c0ffce766d86b98762c5948169e0a4b9174d3c5d7
+	type name of example.com/rendered hider kind interface
+use Underlying example.com/rendered.hider 45570943f1954cca1e755412df7d36145f2fd2250142e2dcd35e84b457a70ea1
+	type name of example.com/rendered hider kind interface
+	underlying interface{hidden()} where method hidden of example.com/rendered
+use MethodSet example.com/rendered.hider d077980c9a5045c64e7f07c9c18e44b2155636f2d534176bf2c35c944e658cd8
+	type name of example.com/rendered hider kind interface
+	method of example.com/rendered.hider hidden at [0] indirect true func of example.com/rendered hidden receiver example.com/rendered.hider func()
 fact github.com/system-inc/cohere/internal/go_engine/check.valueFact 9d19cf2c5c7c6c66342cb24eefdd85cdeb38d853bdeeb8541cc5b963e772a092
 fact honnef.co/go/tools/analysis/facts/deprecated.IsDeprecated 973a18435b7ee7a6da383dbf3cef1d04c20d2a2aeee911c68e06143896448387

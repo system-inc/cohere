@@ -86,7 +86,8 @@ func checkedRestoredWorld(test *testing.T) restoredWorld {
 		test.Fatal("hidden's export data holds closer, which nothing exported reaches, so the fixture tells nothing")
 	}
 	reads := &build_reads.Reads{}
-	reads.RecordTypes(hostUser, info)
+	// Without the syntax every read is judged by its closure: the lookup is what this fixture is about.
+	reads.RecordTypes(hostUser, info, nil)
 	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
 		Subject: methodOf(hostUser, "Mine", "Close")})
 	return restoredWorld{
@@ -150,7 +151,7 @@ func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
 			reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name, Subject: subject})
 		}
 		restoring := Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads}
-		reads.RecordTypes(subject.Pkg(), &types.Info{})
+		reads.RecordTypes(subject.Pkg(), &types.Info{}, nil)
 		if holds, why := TypesHold(restoring, closure, map[*types.Package]bool{world.exportHidden: true}, host,
 			build); !holds {
 			test.Fatalf("the lookups of one source do not hold: %s", why)

@@ -39,10 +39,14 @@ func persistReads(restoring Restoring, host *ReadsBuild, version string) (persis
 	if restoring.Assembly {
 		writer.host = host.wholeTwin()
 	}
-	writer.record.Renderer, writer.record.Assembly = version, restoring.Assembly
+	closureOnly := restoring.Assembly || restoring.Reads.ClosureOnly() != ""
+	writer.record.Renderer, writer.record.Assembly, writer.record.ClosureOnly = version, restoring.Assembly, closureOnly
 	writer.record.WordSize, writer.record.MaximumAlignment = wordSize, maximumAlignment
-	for _, object := range restoring.Reads.Objects() {
-		writer.record.Types = append(writer.record.Types, writer.object(object, true))
+	for _, use := range restoring.Reads.Uses() {
+		writer.record.Uses = append(writer.record.Uses, writer.use(use, closureOnly))
+	}
+	for _, selection := range restoring.Reads.Selections() {
+		writer.record.Selections = append(writer.record.Selections, writer.selection(selection, closureOnly))
 	}
 	for _, fact := range restoring.Reads.Facts() {
 		persisted := persistedFact{Owner: writer.owner(fact.Package.Path()), FactType: writer.factType(fact.FactType),
@@ -63,6 +67,33 @@ func persistReads(restoring Restoring, host *ReadsBuild, version string) (persis
 		writer.record.Lookups = append(writer.record.Lookups, writer.lookup(lookup))
 	}
 	return writer.record, true
+}
+
+// use is one use as the record persists it, a use of the whole, as the verdict judges every use of a package judged
+// by closure alone, when closureOnly: its object, its kind, and for a kind but the whole, its digest of what the kind
+// reads, unless the object has no objectpath, which the verdict declines before it would render anything.
+func (writer *readsWriter) use(use build_reads.ObjectUse, closureOnly bool) persistedUse {
+	kind := use.Kind
+	if closureOnly {
+		kind = build_reads.UseWhole
+	}
+	persisted := persistedUse{Object: writer.object(use.Object, kind == build_reads.UseWhole), Kind: kind}
+	if kind != build_reads.UseWhole && writer.record.Objects[persisted.Object-1].Path != "" {
+		persisted.Digest = persistedDigest(writer.version, writer.host.useDigest(use.Object, kind))
+	}
+	return persisted
+}
+
+// selection is one selection as the record persists it: its receiver and member, each with its closure digest when
+// closureOnly, and otherwise the digest of the member's own line, which the build's lookup must find again.
+func (writer *readsWriter) selection(selection build_reads.Selection, closureOnly bool) persistedSelection {
+	persisted := persistedSelection{Receiver: writer.object(selection.Receiver, closureOnly), Name: selection.Name,
+		Index: selection.Index, Selected: writer.object(selection.Selected, closureOnly)}
+	if !closureOnly {
+		persisted.Digest = persistedDigest(writer.version, writer.host.useDigest(selection.Selected,
+			build_reads.UseMember))
+	}
+	return persisted
 }
 
 // lookup is one lookup as the record persists it: a Scope or Closure answer with its digest, an Interface or Method

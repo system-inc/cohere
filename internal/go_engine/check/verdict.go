@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/types"
 	"reflect"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/types/objectpath"
@@ -12,6 +13,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
+
+// useDiffers is what a reason says of a use of each kind but the whole that does not hold.
+var useDiffers = map[build_reads.UseKind]string{
+	build_reads.UseName:       "its name or kind differs",
+	build_reads.UseMember:     "its own line differs",
+	build_reads.UseUnderlying: "its underlying type differs",
+	build_reads.UseMethodSet:  "its method set differs",
+}
 
 // verdict is one package's reads judged in another build: the host's memo and the build's, the packages the judged
 // package reaches in the build by path, its closure, those of them the build restored from the host's run, at check
@@ -96,6 +105,68 @@ func (judged verdict) counterpart(hostObject types.Object) (types.Object, string
 		return nil, "object " + objectName(hostObject) + " has no objectpath"
 	}
 	return judged.find(hostObject.Pkg().Path(), path)
+}
+
+// useHolds reports whether use, a read of the host's object, reads the same in the build, judged by its kind of use
+// (#mjdf7ah): a whole use by the object's closure, as every read was before kinds (objectHolds), and every other kind
+// by what of the object that kind read (ReadsBuild.useDigest). closureOnly judges every use as a whole one.
+func (judged verdict) useHolds(use build_reads.ObjectUse, closureOnly bool) (bool, string) {
+	if closureOnly || use.Kind == build_reads.UseWhole {
+		return judged.objectHolds(use.Object)
+	}
+	found, why := judged.counterpart(use.Object)
+	if found == nil {
+		return false, "object " + objectName(use.Object) + ": " + why
+	}
+	if judged.host.useDigest(use.Object, use.Kind) != judged.build.useDigest(found, use.Kind) {
+		return false, "object " + objectName(use.Object) + ": " + useDiffers[use.Kind]
+	}
+	return true, ""
+}
+
+// selectionHolds reports whether selection, one the host's check made through another package's named type, selects
+// the same in the build: the build's lookup of its name from the receiver finds a member at the same index path, so
+// nothing shallower shadows it and no twin at its depth makes it ambiguous, whose own line is the host's member's.
+// closureOnly judges it by the receiver's and the member's closures instead.
+func (judged verdict) selectionHolds(selection build_reads.Selection, closureOnly bool) (bool, string) {
+	if closureOnly {
+		if holds, why := judged.objectHolds(selection.Receiver); !holds {
+			return false, why
+		}
+		return judged.objectHolds(selection.Selected)
+	}
+	name := "selection " + objectName(selection.Receiver) + "." + selection.Name
+	found, why := judged.counterpart(selection.Receiver)
+	if found == nil {
+		return false, name + ": " + why
+	}
+	// A lookup of an unexported name finds it only in its own package, the build's of the member's path.
+	var namedIn *types.Package
+	if selection.Selected.Pkg() != nil {
+		namedIn = judged.closure[selection.Selected.Pkg().Path()]
+	}
+	selected, index, _ := types.LookupFieldOrMethod(found.Type(), true, namedIn, selection.Name)
+	switch {
+	case selected == nil:
+		return false, name + ": the build finds no one member of the name"
+	case !slices.Equal(index, selection.Index):
+		return false, name + fmt.Sprintf(": the build finds it at %v, the host at %v", index, selection.Index)
+	case judged.host.useDigest(selection.Selected, build_reads.UseMember) !=
+		judged.build.useDigest(declaredOrigin(selected), build_reads.UseMember):
+		return false, name + ": the member it selects differs"
+	}
+	return true, ""
+}
+
+// declaredOrigin is object as its package declares it, the generic one for a field or method of an instance.
+func declaredOrigin(object types.Object) types.Object {
+	switch instantiated := object.(type) {
+	case *types.Func:
+		return instantiated.Origin()
+	case *types.Var:
+		return instantiated.Origin()
+	}
+	return object
 }
 
 // objectHolds reports whether hostObject, the host's, is in the build at the same place and renders alike there.

@@ -63,7 +63,8 @@ func TestUnreadablePersistedReadsAreDeclined(test *testing.T) {
 			Owners:           []string{verdictPlatform},
 			FactTypes:        []string{factTypeName(reflect.TypeFor[*valueFact]())},
 			Objects:          []persistedObject{{Owner: 1, Path: "NewStable"}},
-			Types:            []int{1},
+			Uses:             []persistedUse{{Object: 1, Kind: build_reads.UseMember}},
+			Selections:       []persistedSelection{{Receiver: 1, Name: "NewStable", Selected: 1}},
 			Facts:            []persistedFact{{Owner: 1, Object: 1}},
 			Lookups: []persistedLookup{
 				{Query: build_reads.QueryScope, Path: 1, Name: "NewStable", Found: true, Answer: 1},
@@ -117,8 +118,13 @@ func TestUnreadablePersistedReadsAreDeclined(test *testing.T) {
 		damage func(record *persistedReads)
 	}{
 		{"object's owner", func(record *persistedReads) { record.Objects[0].Owner = 2 }},
-		{"type read", func(record *persistedReads) { record.Types[0] = 0 }},
-		{"type read", func(record *persistedReads) { record.Types[0] = 2 }},
+		{"use's object", func(record *persistedReads) { record.Uses[0].Object = 0 }},
+		{"use's object", func(record *persistedReads) { record.Uses[0].Object = 2 }},
+		{"use's kind", func(record *persistedReads) { record.Uses[0].Kind = "Planted" }},
+		{"selection's receiver", func(record *persistedReads) { record.Selections[0].Receiver = 0 }},
+		{"selection's receiver", func(record *persistedReads) { record.Selections[0].Receiver = 2 }},
+		{"selection's member", func(record *persistedReads) { record.Selections[0].Selected = 0 }},
+		{"selection's member", func(record *persistedReads) { record.Selections[0].Selected = 2 }},
 		{"fact read's owner", func(record *persistedReads) { record.Facts[0].Owner = 0 }},
 		{"fact read's owner", func(record *persistedReads) { record.Facts[0].Owner = 2 }},
 		{"fact read's object", func(record *persistedReads) { record.Facts[0].Object = 2 }},

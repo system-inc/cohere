@@ -995,8 +995,9 @@ func (act *Action) releaseSyntax() {
 		act.syntax.finished(act.Package)
 	}
 	// cohere: under Options.Reads, the package's type reads, walked once,
-	// while its type information is whole, a given package's too, and
-	// only then let go of (see Options.Walks).
+	// while its type information and syntax are whole, a given package's
+	// too, and only then let go of (see Options.Walks): the walk reads
+	// each use's kind from where it sits in the syntax.
 	letGo := func() {
 		if !keeps {
 			act.letGoOfSyntax()
@@ -1008,12 +1009,12 @@ func (act *Action) releaseSyntax() {
 		return
 	}
 	if act.opts.Walks == nil {
-		reads.Record(act.Package.Types, act.Package.TypesInfo)
+		reads.Record(act.Package.Types, act.Package.TypesInfo, act.Package.Syntax)
 		letGo()
 		return
 	}
 	act.opts.Walks.Go(act.Package, nil, func() {
-		reads.Record(act.Package.Types, act.Package.TypesInfo)
+		reads.Record(act.Package.Types, act.Package.TypesInfo, act.Package.Syntax)
 		letGo()
 	})
 }

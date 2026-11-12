@@ -19,7 +19,7 @@ func TestPersistReadsRefusesReadsThatCanNeverHold(test *testing.T) {
 	own := types.NewPackage("example.com/own", "own")
 	recorded := func() *build_reads.Reads {
 		reads := &build_reads.Reads{}
-		reads.RecordTypes(own, &types.Info{})
+		reads.RecordTypes(own, &types.Info{}, nil)
 		return reads
 	}
 	if _, persisted := persistReads(Restoring{Path: own.Path(), Reads: recorded()}, measuredReadsBuild(),

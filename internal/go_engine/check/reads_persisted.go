@@ -8,17 +8,19 @@ import (
 
 	"golang.org/x/tools/go/types/objectpath"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
 // ReadsRendererVersion is the version of what a persisted read's digests are taken of: the closure digest of an
-// object (ReadsBuild.closureDigest, every rendering it is made of) and the digest of a fact's value (factValueDigest).
+// object (ReadsBuild.closureDigest, every rendering it is made of), the digest of what each kind of use reads of one
+// (ReadsBuild.useDigest, #mjdf7ah), and the digest of a fact's value (factValueDigest).
 // A persisted digest compares a rendering one binary made against one this binary makes, so the version enters every
 // persisted digest, and a record's header names it: a record of another renderer is declined, never matched. It
 // changes whenever either digest would change for the same types or the same fact, which the golden of a fixed
 // fixture's renderings catches (testdata/reads_renderings.golden). The store's keys hold the executable's identity
 // already, but the binary's table of standard-library entries outlives a store, so the version stands on its own.
-const ReadsRendererVersion = "reads-renderer-1"
+const ReadsRendererVersion = "reads-renderer-2"
 
 // persistedReads are one package's reads of other packages as an entry persists them (#b2t9xmf), so a build can judge
 // a package the host restored rather than checked, whose reads were recorded by the run that wrote its entry. Each
@@ -42,6 +44,10 @@ type persistedReads struct {
 	WordSize         int64
 	MaximumAlignment int64
 
+	// ClosureOnly is whether every read of the package is judged by its closure, as a package with assembly files is
+	// and one whose reads say so (build_reads.Reads.ClosureOnly), each use persisted as a use of the whole.
+	ClosureOnly bool
+
 	// Owners are the paths of the packages the reads name, each once, and FactTypes the fact types, by factTypeName,
 	// each once.
 	Owners    []string
@@ -50,8 +56,10 @@ type persistedReads struct {
 	// Objects are the host's objects the reads name, each once.
 	Objects []persistedObject
 
-	// Types are the foreign objects the package's type check reached, as Reads.Objects orders them.
-	Types []int
+	// Uses are the uses the package's type check made of foreign objects, each with its kind, as Reads.Uses orders
+	// them, and Selections the selections it made through foreign named types, as Reads.Selections orders them.
+	Uses       []persistedUse
+	Selections []persistedSelection
 
 	// Facts are the fact reads, as Reads.Facts orders them.
 	Facts []persistedFact
@@ -68,6 +76,27 @@ type persistedObject struct {
 	Path   objectpath.Path
 	Name   string
 	Digest []byte
+}
+
+// persistedUse is one use the package's type check made of a host object (build_reads.ObjectUse): the object, by
+// reference to Objects, the kind of use, and for a kind but the whole, the persisted digest of what that kind reads of
+// the object (ReadsBuild.useDigest). A whole use is judged by the object's closure digest, which Objects holds.
+type persistedUse struct {
+	Object int
+	Kind   build_reads.UseKind
+	Digest []byte
+}
+
+// persistedSelection is one selection through a foreign named type (build_reads.Selection): its receiver and the member
+// its lookup found, by reference to Objects, the name looked up, the index path the host's lookup found it at, and the
+// persisted digest of the member's own line. A selection of a package judged by closure alone keeps no digest of its
+// own: it is judged by its receiver's and its member's closure digests, which Objects holds.
+type persistedSelection struct {
+	Receiver int
+	Name     string
+	Index    []int
+	Selected int
+	Digest   []byte
 }
 
 // persistedFact is one fact read: its owner, by reference to Owners; the object it is of, by reference to Objects,
