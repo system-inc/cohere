@@ -28,14 +28,21 @@
 # the processes using the most CPU right after the bench, which inside the window ran outside the pool.
 #
 # For each project, in order:
-#   bench    bench/quiet_machine.sh, cold only, at most 5 rounds, its record kept in the state directory
-#            rather than bench/results, which holds only records someone chose to commit
+#   bench    bench/quiet_machine.sh, cold only, checking without fixing (`--no-fix`), at most 5 rounds, its
+#            record kept in the state directory rather than bench/results, which holds only records someone chose to
+#            commit. Checking, because a fixing run's work moves with whatever the tree holds that night, and a
+#            tree with a fix pending was rewritten under the bench on 2026-11-12, losing the night (#8sqsgee); the
+#            guard moved its baseline to the first quiet checking night (internal/bench_results/tools/guard)
 #   guard    the record against the baseline (Pass, Regressed, Faster or Unmeasured), or the lost night
 #   timing   one more cold run of the bench's pinned engine in the bench's copy, outside the timed runs,
 #            with --timing, whose rule table says which rules a slower night spent its time in: on a
 #            regressed night the ten rules whose CPU grew most against the baseline's timing
 #   tonight  <state>/tonight-<project>.json: the guard's result, the commits between the baseline and tonight
 #            in cohere and in the project on a night that is not a pass, the timing growth, the bench's log
+#   kept     a copy of each night's tonight file in <state>/nights, and the bench's busy-after samples (top's
+#            busiest processes after a run that turned the machine loaded) in <state>/busy/<night>-<project>, so a
+#            week of what the machine holds at night outlives the temporary copy, for choosing the idle floor from
+#            the nights rather than from one (#8sqsgee). Each run's idleness before and after is in its record.
 #
 # usage: nightly.zsh [options]
 #   --state DIR          where the baselines, verdicts, records, logs and timings live
@@ -283,7 +290,7 @@ measure_project() {
     mkdir -p $records || { print -u2 "$name: $project: could not make $records"; return 1; }
     # The run the window is for: a cohere-dev job the bench starts passes the wall as this guard's own.
     COHERE_DEV_QUIET_THROUGH=$window_through zsh $repository/bench/quiet_machine.sh $bench_arguments \
-      --modes cold --runs 5 --record-to $records --cohere $cohere --idle-floor $idle_floor > $log 2>&1
+      --modes cold --no-fix --runs 5 --record-to $records --cohere $cohere --idle-floor $idle_floor > $log 2>&1
     bench_exit=$?
     # 0 is a quiet number and 3 is none; either way the bench recorded the run. The record is the newest of
     # this project's in this run's own directory, so it was written after the run started.
@@ -327,6 +334,13 @@ measure_project() {
   local timing_note= timing_growth_json='[]'
   local copy=$(sed -n 's/^# copy     //p' $log | head -1)
   local logs=$(sed -n 's/^runs and logs: //p' $log | head -1)
+  # The busy-after samples live in the copy, which a reboot or the next copy clears; kept, they are the nights' answer
+  # to what held the cores.
+  local busy=($logs/*.busy-after(N))
+  if (( ${#busy} > 0 )); then
+    mkdir -p $state/busy/$night-$project && cp $busy $state/busy/$night-$project/ ||
+      print -u2 "$name: $project: could not keep the busy-after samples in $state/busy"
+  fi
   if [[ -z $record ]]; then
     timing_note="no timing: the night left no record to time against"
   elif [[ ! -d $copy || ! -x $logs/cohere-engine ]]; then
@@ -460,4 +474,10 @@ if [[ -n $window_opened_at ]]; then
       { print -u2 "$name: could not write when the window closed into $tonight_file"; outcome=1; }
   done
 fi
+# Each night's tonight file kept by its night, since the next night writes over it. See kept, at the top.
+mkdir -p $state/nights || outcome=1
+for tonight_file in $tonight_files; do
+  cp $tonight_file $state/nights/$night-${${tonight_file:t:r}#tonight-}.json ||
+    { print -u2 "$name: could not keep $tonight_file in $state/nights"; outcome=1; }
+done
 exit $outcome

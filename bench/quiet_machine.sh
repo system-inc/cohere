@@ -111,6 +111,10 @@
 #   --cohere PATH        the cohere launcher, or an engine binary, to run (default: `cohere` on PATH)
 #   --engine NAME        check only this engine's project at the copy's root, as COHERE_PROJECT_ENGINE
 #                        names it: Go (default: the whole root, every project discovery finds)
+#   --no-fix             the cold and idle runs check without fixing, `cohere --no-fix --no-cache`, as a run narrowed
+#                        to the Go engine always does: the same work every night whatever the tree holds, never
+#                        rewriting the copy. The record keeps which (noFix), and the guard never compares the two
+#                        (default: a whole-root run fixes)
 #   --builds WHICH       the Go builds every run checks: host, the machine's own build alone, or every, each build
 #                        the Go files name (`--other-builds`, cold_arguments.zsh's build_arguments). The record keeps
 #                        which, and the builds the cold runs checked, and the guard never compares the two (default host)
@@ -152,6 +156,7 @@ work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
 record_directory=
 project_engine=
+no_fix=false
 builds=host
 
 while (( $# > 0 )); do
@@ -166,6 +171,7 @@ while (( $# > 0 )); do
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
     --engine) project_engine=$2; shift 2 ;;
+    --no-fix) no_fix=true; shift ;;
     --builds) builds=$2; shift 2 ;;
     --generate) generate=$2; shift 2 ;;
     --commit) commit=$2; shift 2 ;;
@@ -185,7 +191,7 @@ done
 (( ${+COHERE_PROJECT_ENGINE} )) &&
   fail "COHERE_PROJECT_ENGINE is set ($COHERE_PROJECT_ENGINE), which every run would inherit; unset it, and name an engine with --engine"
 # The cold and idle runs' arguments, and the record's noFix, which reads them rather than the engine.
-cold=(${(f)"$(cold_arguments "$project_engine")"})
+cold=(${(f)"$(cold_arguments "$project_engine" "$no_fix")"})
 # The arguments every run takes for the builds it checks, cold and idle runs among them.
 build_arguments=(${(f)"$(build_arguments "$builds")"})
 modes=(${(s:,:)modes_asked})
