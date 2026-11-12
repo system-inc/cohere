@@ -96,8 +96,24 @@ const (
 	reloadForHostDecline   = "hostDecline"
 )
 
+// readAfterKeep reports whether the session has let go of its resolver and its answer memo (keepForBuilds), and when
+// it has, records as a problem that caller read one of them after, naming caller. Read then, either is empty, so a
+// save would write an entry with fewer answers or reads than the run computed, and nothing would say so; the keep is
+// the run's last reader, and only the next Restore makes them anew (#px1yxq8).
+func (session *CacheSession) readAfterKeep(caller string) bool {
+	if !session.kept.Load() {
+		return false
+	}
+	session.problem(caller + ": it read the resolver or its answer memo after the run kept its packages for the " +
+		"extra builds, which let them go")
+	return true
+}
+
 // know adds each package of known whose types are set, which the run's questions may reach.
 func (session *CacheSession) know(known ...*packages.Package) {
+	if session.readAfterKeep("know") {
+		return
+	}
 	session.answering.lock.Lock()
 	defer session.answering.lock.Unlock()
 	if session.answering.byTypes == nil {
@@ -112,6 +128,9 @@ func (session *CacheSession) know(known ...*packages.Package) {
 
 // packageOf is the package whose types are packageTypes, or nil for one the session was never told of.
 func (session *CacheSession) packageOf(packageTypes *types.Package) *packages.Package {
+	if session.readAfterKeep("packageOf, the package of " + packageTypes.Path()) {
+		return nil
+	}
 	session.answering.lock.Lock()
 	defer session.answering.lock.Unlock()
 	return session.answering.byTypes[packageTypes]
@@ -223,6 +242,9 @@ func (session *CacheSession) reloading(restoring *packages.Package) bool {
 
 // reloadsOf is the IDs of the packages a question reached restored, with no answer stored, sorted.
 func (session *CacheSession) reloadsOf(resolver *fact_resolver.Resolver) []string {
+	if session.readAfterKeep("reloadsOf") {
+		return nil
+	}
 	var reloads []string
 	for _, packageTypes := range resolver.Reloads() {
 		if asked := session.packageOf(packageTypes); asked != nil {
@@ -284,7 +306,8 @@ func (session *CacheSession) withBodiless(saved *packages.Package, demanded entr
 // name it; otherwise those held before, the entry's before a reload or the first wave's (held), with every answer the
 // run computed in it. Its reads are those held before with every read the run's analysis of it made.
 func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand) entryDemand {
-	if session.resolver == nil || saved.Types == nil {
+	if session.readAfterKeep("demandOf, the saved answers of "+saved.ID) || session.resolver == nil ||
+		saved.Types == nil {
 		return held
 	}
 	demanded := entryDemand{}
@@ -321,6 +344,9 @@ func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand)
 // holds, as many at once as there are cores. A failed write is a problem, never a finding: the next run loads from
 // source what the entry would have answered, and misses what its reads would have held.
 func (session *CacheSession) rewriteEarlier() {
+	if len(session.earlier) > 0 && session.readAfterKeep("rewriteEarlier") {
+		return
+	}
 	var group sync.WaitGroup
 	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
 	for saved, restored := range session.earlier {

@@ -1021,15 +1021,30 @@ never passing a heavy one already waiting. `"lintWaitMilliseconds":850` is how l
 written only when it is not 0, and `"lintWaited":true` whether it waited at all, so a wait under a millisecond still
 reads as one. The host's record writes none of the four, and none reaches a key or the verdict.
 
-Beside `builds` the Go engine writes `"buildsAtOnce":3`, additive within contract 3: how many of the builds beside
-the host's ran side by side, decided once as they started (#b2t9xmf), from a quarter of the cores, the memory cap
-and the host's live heap, and one at a time under `--single-threaded` or a limit other than the cap. Beside it,
-`"buildsWidthLiveBytes":2147483648` is that live heap, measured by a collection once the host's reads are whole, so
-two runs of one workspace are given the same heap; it is absent when the decision needed none, because nothing could
-make the builds more than one at a time. Each build notes into its own buffer, and once every build has ended their
-results and notes are taken in build order, up to and including the first that failed, so the records and stderr are
-those of a run one build at a time, byte for byte, but these two fields, which no key and no verdict reads. Both are
-absent when `builds` is.
+Beside `builds` the Go engine writes `"buildsAtOnce":3`, additive within contract 3: how many of the builds beside the
+host's ran side by side, decided once (#b2t9xmf, #rmzehfg) by what the heaviest build holds. The builds start on other
+platforms first, then the host's own, each in build order, and the first runs alone until its load has ended; there,
+with nothing else running, a collection measures the live heap, and the build's holding is that heap less the host's,
+measured the same way as the builds started. A build is taken to hold `"buildsWidthPeakFactor":3.5` times that at its
+lint's peak, the largest ratio measured across 14 builds of two trees rounded up to the next half, and the width is
+`floor((limit - live) / (holding * factor))`, no more than the builds and at least one, and one at a time under
+`--single-threaded` or a limit other than the cap. Beside it, `"buildsWidthLiveBytes":2147483648` is the host's live
+heap and `"buildsWidthBuildBytes":536870912` the first build's holding, so a reader redoes the arithmetic with the
+memory record's limit, and two runs of one workspace are given the same width; all three are absent when the decision
+needed none, because nothing could make the builds more than one at a time. `"buildsPoolSize":16` is how many slots the
+run's one pool holds, which every load and check of the run shares, the host's and every extra build's, so however many
+builds run side by side the run never runs more of that work at once (#ckm0hsp): one per core, one under
+`--single-threaded`. Each build notes into its own buffer, and once every build has ended their results are taken in
+build order and their notes in the order they started, up to and including the first that failed in that order, so the
+records and stderr are those of a run one build at a time, byte for byte, but these five fields, which no key and no
+verdict reads. All five are absent when `builds` is.
+
+Under `--timing`, whose builds run one at a time, each extra build's record writes `"heldAtLoadEndBytes":1170372464`,
+what it held beyond the host's live heap as its load ended, measured by a forced collection, and
+`"heldAtLintPeakBytes":3555149280`, the most it held while its rules ran, sampled by one every quarter of a second. Their
+ratio is what `buildsWidthPeakFactor` stands for, so a tree whose ratio passes it shows in one run. A build under
+`--timing` restores nothing from the host's run, so it holds more as its load ends than one that restores, and its ratio
+reads lower than the width's case.
 
 ### `phase`
 

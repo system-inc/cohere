@@ -1,5 +1,7 @@
 package load
 
+import "github.com/system-inc/cohere/internal/go_engine/bounded"
+
 // walkPriority is a type-read walk's priority for a load's slot: below every package's work, whose priority is its
 // longest path, 1 or more (see prioritize), so a waiting walk is granted a slot only once no package's work waits.
 const walkPriority = 0
@@ -8,15 +10,15 @@ const walkPriority = 0
 // at a priority below every package's, so a walk never displaces the load's chain, and at once once the load has
 // ended, when nothing else holds them. They are build_reads.Slots.
 type WalkSlots struct {
-	slots *prioritySlots
+	slots *bounded.Pool
 }
 
 // Acquire takes one of the load's slots for a walk, waiting until no package's work waits before it.
 func (walkSlots *WalkSlots) Acquire() {
-	walkSlots.slots.acquire(walkPriority)
+	walkSlots.slots.Acquire(walkPriority)
 }
 
 // Release gives the walk's slot back.
 func (walkSlots *WalkSlots) Release() {
-	walkSlots.slots.release()
+	walkSlots.slots.Release()
 }

@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"reflect"
-	"runtime"
 	"slices"
 	"sync"
 
@@ -71,27 +71,23 @@ func (session *CacheSession) restoreFromBinary(
 		return
 	}
 	rename := renameFromGoRootMarker(shared.Goroot)
-	var group sync.WaitGroup
 	var hitsLock sync.Mutex
-	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
-	for restoring, entry := range held {
-		slots <- struct{}{}
-		group.Go(func() {
-			defer func() { <-slots }()
-			restored, hit, restoreError := restoreBinaryEntry(session.known, restoring, entry, rename)
-			if restoreError != nil {
-				return
-			}
-			hitsLock.Lock()
-			defer hitsLock.Unlock()
-			session.hits[restoring] = restored
-			session.fromBinary[restoring] = true
-			if session.keepsForBuilds {
-				session.binaryHits[restoring] = hit
-			}
-		})
-	}
-	group.Wait()
+	restorings := slices.Collect(maps.Keys(held))
+	session.fanOut(len(restorings), func(index int) {
+		restoring := restorings[index]
+		entry := held[restoring]
+		restored, hit, restoreError := restoreBinaryEntry(session.known, restoring, entry, rename)
+		if restoreError != nil {
+			return
+		}
+		hitsLock.Lock()
+		defer hitsLock.Unlock()
+		session.hits[restoring] = restored
+		session.fromBinary[restoring] = true
+		if session.keepsForBuilds {
+			session.binaryHits[restoring] = hit
+		}
+	})
 }
 
 // restoreBinaryEntry is one standard-library package's entry from the binary's table decoded whole, with every file

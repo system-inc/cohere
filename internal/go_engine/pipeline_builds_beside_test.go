@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/metrics"
 	"slices"
 	"strings"
 	"sync"
@@ -340,9 +341,10 @@ func TestBuildsSideBySideNeverPassTheCapPlusOneAllowance(test *testing.T) {
 	}
 }
 
-// The width is the fewest of the extra builds, a quarter of the cores and how many builds the memory cap holds beside
-// the live heap, with at least one, and one at a time under `--single-threaded`, without a memory decision or a live
-// heap read, and under any limit but the cap.
+// The width is as many builds as the memory cap holds beside the host's live heap, each taken at its lint's peak,
+// floor((cap - live) / (holding * 3.5)), no more than the builds and at least one, and one at a time under
+// `--single-threaded`, without a memory decision, a live heap or a holding read, and under any limit but the cap
+// (#rmzehfg). The cap here is 8 GiB.
 func TestTheBuildsWidth(test *testing.T) {
 	test.Parallel()
 	underCap := &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
@@ -355,54 +357,87 @@ func TestTheBuildsWidth(test *testing.T) {
 	for _, each := range []struct {
 		name           string
 		extras         int
-		processors     int
 		singleThreaded bool
 		memory         *engineMemory
 		live           uint64
+		holding        uint64
 		want           int
 	}{
-		{name: "memory holds three", extras: 6, processors: 16, memory: underCap, live: 2 * gibibyte, want: 3},
-		{name: "cores hold four", extras: 6, processors: 16, memory: underCap, live: gibibyte, want: 4},
-		{name: "builds are two", extras: 2, processors: 16, memory: underCap, live: gibibyte, want: 2},
-		{name: "cores hold two", extras: 6, processors: 8, memory: underCap, live: gibibyte, want: 2},
-		{name: "cores hold none", extras: 6, processors: 2, memory: underCap, live: gibibyte, want: 1},
-		{name: "a tiny live heap", extras: 6, processors: 16, memory: underCap, live: 1, want: 4},
-		{name: "the live heap past the cap", extras: 6, processors: 16, memory: underCap, live: 9 * gibibyte, want: 1},
-		{name: "single-threaded", extras: 6, processors: 16, singleThreaded: true, memory: underCap,
-			live: gibibyte, want: 1},
-		{name: "no memory decision", extras: 6, processors: 16, live: gibibyte, want: 1},
-		{name: "no live heap read", extras: 6, processors: 16, memory: underCap, want: 1},
-		{name: "half the memory available", extras: 6, processors: 16,
-			memory: underSource(contract.MemorySourceAvailable), live: gibibyte, want: 1},
-		{name: "the environment's limit", extras: 6, processors: 16,
-			memory: underSource(contract.MemorySourceEnvironment), live: gibibyte, want: 1},
-		{name: "no memory read", extras: 6, processors: 16, memory: underSource(contract.MemorySourceUnreadable),
-			live: gibibyte, want: 1},
+		// 7 GiB of room over peaks of 3.5 GiB: without the factor, the holding alone would make it seven.
+		{name: "each build taken at its peak", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte,
+			want: 2},
+		{name: "memory holds every build", extras: 6, memory: underCap, live: gibibyte / 2, holding: gibibyte / 4,
+			want: 6},
+		{name: "builds are two", extras: 2, memory: underCap, live: gibibyte, holding: gibibyte / 4, want: 2},
+		{name: "room for one peak", extras: 6, memory: underCap, live: 4 * gibibyte, holding: gibibyte, want: 1},
+		{name: "a peak past the room", extras: 6, memory: underCap, live: gibibyte, holding: 3 * gibibyte, want: 1},
+		{name: "a tiny holding", extras: 6, memory: underCap, live: gibibyte, holding: 1, want: 6},
+		{name: "a holding past any peak", extras: 6, memory: underCap, live: gibibyte, holding: 1 << 63, want: 1},
+		{name: "the live heap past the cap", extras: 6, memory: underCap, live: 9 * gibibyte, holding: gibibyte,
+			want: 1},
+		{name: "single-threaded", extras: 6, singleThreaded: true, memory: underCap, live: gibibyte,
+			holding: gibibyte / 4, want: 1},
+		{name: "no memory decision", extras: 6, live: gibibyte, holding: gibibyte / 4, want: 1},
+		{name: "no live heap read", extras: 6, memory: underCap, holding: gibibyte / 4, want: 1},
+		{name: "no holding read", extras: 6, memory: underCap, live: gibibyte, want: 1},
+		{name: "half the memory available", extras: 6, memory: underSource(contract.MemorySourceAvailable),
+			live: gibibyte, holding: gibibyte / 4, want: 1},
+		{name: "the environment's limit", extras: 6, memory: underSource(contract.MemorySourceEnvironment),
+			live: gibibyte, holding: gibibyte / 4, want: 1},
+		{name: "no memory read", extras: 6, memory: underSource(contract.MemorySourceUnreadable), live: gibibyte,
+			holding: gibibyte / 4, want: 1},
 	} {
-		got := buildsWidth(each.extras, each.processors, each.singleThreaded, each.memory, each.live)
+		got := buildsWidth(each.extras, each.singleThreaded, each.memory, each.live, each.holding)
 		if got != each.want {
 			test.Errorf("%s: the width is %d, want %d", each.name, got, each.want)
 		}
 	}
 }
 
-// The width is decided by the host's live heap measured as the builds start, never by whenever the collector last
-// ran, so two decisions over one heap agree whatever state the collector is in: one right after a collection, one
-// after a collection that counted 512 MiB the decision no longer holds, which a read of the last collection would
-// count as live. The limit is set so that heap, counted, would allow one build at a time and the heap itself four.
+// The builds start on other platforms first and the host's own after them, each in build order, so the build the
+// width is measured by is a platform's, which holds the most, never a tag build on the host's (#rmzehfg).
+func TestTheBuildsStartHeaviestFirst(test *testing.T) {
+	test.Parallel()
+	host := project.Build{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true}
+	extras := []project.Build{
+		{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true, Tags: []string{"first"}},
+		{OperatingSystem: "darwin", Architecture: "arm64"},
+		{OperatingSystem: "linux", Architecture: "arm64"},
+		{OperatingSystem: "windows", Architecture: "arm64"},
+		{OperatingSystem: "darwin", Architecture: "amd64"},
+		{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true, Tags: []string{"second"}},
+	}
+	if got, want := heaviestFirst(host, extras), []int{2, 3, 4, 0, 1, 5}; !slices.Equal(got, want) {
+		test.Errorf("the builds start in the order %v, want %v", got, want)
+	}
+	if got := heaviestFirst(host, nil); len(got) != 0 {
+		test.Errorf("no builds start in the order %v, want none", got)
+	}
+}
+
+// The width is decided by what the first build holds, the live heap measured as its load ends less the host's,
+// never by whenever the collector last ran, so two decisions over one heap agree whatever state the collector is in:
+// one right after a collection, one after a collection that counted 512 MiB the decision no longer holds, which a read
+// of the last collection would count as the build's (#rmzehfg). A retained 256 MiB stands for the first build, and the
+// limit is set so that holding, taken at its peak, leaves room for two builds, and the holding with the garbage
+// counted for none beside the host's heap.
 //
 // Not parallel: it measures this process's live heap, which another test's run would move.
 func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	const garbageBytes = 512 << 20
-	runtime.GC()
-	baseline := liveHeapBytes()
-	// Twice the heap with the garbage counted holds one build beside it, and the heap without it many.
-	limit := int64(2 * (baseline + garbageBytes))
-	engine := &pipeline{buildsWidthUnguarded: true, memory: &engineMemory{record: contract.Memory{LimitBytes: limit,
-		CapBytes: limit, Source: contract.MemorySourceCap}}}
+	const buildBytes = 256 << 20
+	hostLive := forcedLiveHeapBytes()
+	// Room for two peaks of the build, 3.5 times its holding each, and half a holding more.
+	limit := int64(hostLive + 7*buildBytes + buildBytes/2)
+	engine := &pipeline{memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
+		Source: contract.MemorySourceCap}}}
+	build := make([]byte, buildBytes)
+	for index := range build {
+		build[index] = 1
+	}
 
 	runtime.GC()
-	collectedWidth, collectedLive := engine.extraBuildsWidthOver(8, nil, 16)
+	collectedWidth, collectedHolding := engine.measuredBuildsWidth(8, hostLive)
 
 	garbage := make([]byte, garbageBytes)
 	for index := range garbage {
@@ -411,19 +446,20 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	runtime.GC()
 	runtime.KeepAlive(garbage)
 	// garbage is unreachable from here, and no collection has run since the last one counted it.
-	staleWidth, staleLive := engine.extraBuildsWidthOver(8, nil, 16)
+	staleWidth, staleHolding := engine.measuredBuildsWidth(8, hostLive)
+	runtime.KeepAlive(build)
 
 	if collectedWidth != staleWidth {
 		test.Errorf("the width is %d after a collection and %d after one that counted garbage, want one width",
 			collectedWidth, staleWidth)
 	}
-	if collectedWidth != 4 {
-		test.Errorf("the width is %d, want 4, the cores' quarter, which the measured heap leaves room for",
+	if collectedWidth != 2 {
+		test.Errorf("the width is %d, want 2, the builds at their peaks the limit holds beside the host's heap",
 			collectedWidth)
 	}
-	if difference := max(collectedLive, staleLive) - min(collectedLive, staleLive); difference > 64<<20 {
-		test.Errorf("the decision was given %d and %d live bytes, %d apart, want the same heap measured both times",
-			collectedLive, staleLive, difference)
+	if difference := max(collectedHolding, staleHolding) - min(collectedHolding, staleHolding); difference > 64<<20 {
+		test.Errorf("the decision was given holdings of %d and %d bytes, %d apart, want the same holding measured "+
+			"both times", collectedHolding, staleHolding, difference)
 	}
 }
 
@@ -774,5 +810,39 @@ func TestALintsWeightIsItsShareCheckedFromSource(test *testing.T) {
 		if got := lintWeight(each.checked, each.loaded); got != each.want {
 			test.Errorf("%d of %d checked from source weighs %d, want %d", each.checked, each.loaded, got, each.want)
 		}
+	}
+}
+
+// The sampler under `--timing` keeps the largest live heap it saw while the rules ran, not the last (#rmzehfg): 256 MiB
+// held across two of its collections and let go before it stops is still in the peak it returns.
+//
+// Not parallel: it measures this process's live heap, which another test's run would move.
+func TestTheLintPeakIsTheLargestHeapSampled(test *testing.T) {
+	const heldBytes = 256 << 20
+	stop := heldWhileLinting(time.Millisecond)
+	held := make([]byte, heldBytes)
+	for index := range held {
+		held[index] = 1
+	}
+	forced := []metrics.Sample{{Name: forcedCyclesMetric}}
+	metrics.Read(forced)
+	since, counted := forcedCycles(forced)
+	if !counted {
+		test.Skip("this runtime counts no forced collections, so the test cannot tell when the sampler has sampled")
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for cycles := since; cycles < since+2; cycles, _ = forcedCycles(forced) {
+		if time.Now().After(deadline) {
+			test.Fatal("the sampler forced no two collections in 30 s")
+		}
+		time.Sleep(time.Millisecond)
+		metrics.Read(forced)
+	}
+	runtime.KeepAlive(held)
+	held = nil
+	peak := stop()
+	if after := forcedLiveHeapBytes(); peak < heldBytes || peak <= after+heldBytes/2 {
+		test.Errorf("the sampled peak is %d bytes, with %d live once it was let go, want at least the %d held, "+
+			"well above the heap after", peak, after, heldBytes)
 	}
 }

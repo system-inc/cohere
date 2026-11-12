@@ -46,15 +46,27 @@ type LintRecord struct {
 	// (#72n9mq0). It is absent for a run of one build, so such a run writes the record it always has.
 	Builds []BuildRecord `json:"builds,omitempty"`
 	// BuildsAtOnce is additive within contract 3, and the Go engine's alone: how many of the extra builds ran side by
-	// side, decided once as they started from the cores, the memory cap and the host's live heap (#b2t9xmf). It changes
-	// no finding, no note and no key: a run one build at a time writes the same records but this one. Absent when
-	// Builds is.
+	// side, decided once from the memory cap, the host's live heap and what the heaviest build holds as its load ends
+	// (#b2t9xmf, #rmzehfg). It changes no finding, no note and no key: a run one build at a time writes the same
+	// records but this one. Absent when Builds is.
 	BuildsAtOnce int `json:"buildsAtOnce,omitempty"`
 	// BuildsWidthLiveBytes is additive within contract 3, and the Go engine's alone: the host's live heap that decision
-	// was given, measured by a collection once the host's reads are whole, so a reader sees why a width was chosen.
-	// Absent when the decision needed none: under `--single-threaded`, a limit other than the cap, builds that restore
-	// nothing from the host, or too few cores or builds for more than one at a time.
+	// was given, measured by a collection as the extra builds started with nothing else running, so a reader sees why a
+	// width was chosen. Absent when the decision needed none: under `--single-threaded`, a limit other than the cap,
+	// builds that restore nothing from the host, or one build alone, which no heap can widen.
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
+	// BuildsWidthBuildBytes is additive within contract 3, and the Go engine's alone: what the first extra build to
+	// start, the heaviest, held beyond that heap as its load ended, measured the same way. With
+	// BuildsWidthPeakFactor, the times that holding a build is taken to reach at its lint's peak, and the memory
+	// record's limit, a reader redoes the arithmetic: floor((limit - live) / (holding * factor)), no more than the
+	// builds and at least one (#rmzehfg). Both are absent when BuildsWidthLiveBytes is.
+	BuildsWidthBuildBytes uint64  `json:"buildsWidthBuildBytes,omitempty"`
+	BuildsWidthPeakFactor float64 `json:"buildsWidthPeakFactor,omitempty"`
+	// BuildsPoolSize is additive within contract 3, and the Go engine's alone: how many slots the run's one pool holds,
+	// which every load and check of the run shares, the host's and every extra build's, so however many builds run side
+	// by side the run never runs more of that work at once (#ckm0hsp). One per core, one under `--single-threaded`.
+	// Absent when Builds is.
+	BuildsPoolSize int `json:"buildsPoolSize,omitempty"`
 	// OffReasons is additive within contract 3, and the Go engine's alone: why the settings turn each rule off, for
 	// every off the go block's reasons explain (#v11k0g2), which the front door prints beside the rule in coverage.
 	// Always written, `{}` when no off is explained, so a reader tells an engine that explains its offs, where a rule
@@ -118,6 +130,15 @@ type BuildRecord struct {
 	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
 	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
 	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
+
+	// HeldAtLoadEndBytes and HeldAtLintPeakBytes are an extra build's alone, and written only under `--timing`, whose
+	// builds run one at a time: what the build held beyond the host's live heap as its load ended, measured by a
+	// forced collection, and the most it held while its rules ran, sampled by one every quarter of a second (#rmzehfg).
+	// Their ratio is what the width's buildsWidthPeakFactor stands for, so a tree whose ratio passes it shows in one
+	// run. A build under `--timing` restores nothing from the host's run, so it holds more at its load's end than one
+	// that restores, and its ratio reads lower.
+	HeldAtLoadEndBytes  uint64 `json:"heldAtLoadEndBytes,omitempty"`
+	HeldAtLintPeakBytes uint64 `json:"heldAtLintPeakBytes,omitempty"`
 
 	// CheckedFromSource and PackagesLoaded are an extra build's alone (#b2t9xmf): the packages of its whole graph its
 	// first load checked from source rather than restored, from its own findings cache or the host's run, and every
