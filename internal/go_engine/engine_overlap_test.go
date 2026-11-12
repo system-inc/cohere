@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -211,6 +212,10 @@ func writeLateFold(root string) error {
 	return os.WriteFile(filepath.Join(late, "late.go"), []byte(contents), 0o644)
 }
 
+// writtenThroughCount is a build record's count of the entries it wrote through to its own store, which a run with
+// the findings cache writes and one under `--no-cache` never does.
+var writtenThroughCount = regexp.MustCompile(`,"writtenThrough":[0-9]+`)
+
 // Every end-to-end case writes, under `--no-cache`, exactly what it writes with the lint phase after the load, and
 // what its expected stream holds but for the cache being off: a run that lints beside its load, one whose wrap or
 // rename writes and so drops or takes that pass, and one whose rules never run.
@@ -233,8 +238,10 @@ func TestEveryCaseReadsTheSameWithTheLintBesideTheLoad(test *testing.T) {
 			if readError != nil {
 				test.Fatalf("reading the expected stream: %v", readError)
 			}
-			// The expected stream is of a run with the cache, which a run that renamed has turned off already.
-			cacheOff := strings.ReplaceAll(string(expected), `"cache":{"on":true`, `"cache":{"on":false`)
+			// The expected stream is of a run with the cache, which a run that renamed has turned off already, and
+			// whose extra builds wrote through to their stores what a run without one never writes.
+			cacheOff := writtenThroughCount.ReplaceAllString(
+				strings.ReplaceAll(string(expected), `"cache":{"on":true`, `"cache":{"on":false`), "")
 			expectedLines := strings.Split(cacheOff, "\n")
 			actualLines := strings.Split(overlapped.stream, "\n")
 			for index := range max(len(expectedLines), len(actualLines)) {

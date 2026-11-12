@@ -988,7 +988,10 @@ what they read of types did not hold, and `"declinedAtCheck":3` those its check 
 read did not. `"declinedBy"` counts each decline, and each package never restored, by why: `ownInputs` (its own files differ), `noHostEntry`, `neverRestorable` (what it read cannot be recorded, as with cgo), `readsUnknown`, `exportData` (its export data did not read), `typeReads` (a type it read), `lookups` (a rule's lookup), `factReads` (a fact), `deprecations` (a deprecation) or `answers` (an answer).
 `"reloadRounds":2` counts every time the build was loaded again, and `"reloadRoundsBy"` each of those under every
 reason it had: `hostDecline` (a package its check declined, at most 2 such rounds) or `missingAnswer` (a question
-reached a restored package with no answer of it kept). Under `--timing` nothing is restored from the host, so every
+reached a restored package with no answer of it kept). `"writtenThrough":301` counts the packages it restored whose
+entry it then wrote to its own findings cache, once their restore held, so its next run hits them there rather than
+check them from source, since the host, hitting its own store then, keeps nothing to restore them from; under
+`--no-cache` nothing is written, and it is absent. Under `--timing` nothing is restored from the host, so every
 figure is of work that ran.
 
 Each build's record also says where its time went, each figure in wall milliseconds and written only when it is not

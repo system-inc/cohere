@@ -340,7 +340,7 @@ func populatedRecords() []Record {
 					Target: "windows/arm64", CompiledFiles: 2, AnalyzedPackages: 1, FindingsAdded: 1,
 					RestoredFromHost: 1, DeclinedAtLoad: 1, DeclinedAtCheck: 1,
 					DeclinedBy:   map[string]int{"typeReads": 1},
-					ReloadRounds: 1, ReloadRoundsBy: map[string]int{"hostDecline": 1},
+					ReloadRounds: 1, ReloadRoundsBy: map[string]int{"hostDecline": 1}, WrittenThrough: 1,
 					LoadMilliseconds: 30, LintMilliseconds: 50, DecideMilliseconds: 12,
 					CheckedFromSource: 1, PackagesLoaded: 3, LintWaitMilliseconds: 8, LintWaited: true,
 				},

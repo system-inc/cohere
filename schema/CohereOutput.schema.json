@@ -617,6 +617,10 @@
                                 "additionalProperties": { "type": "integer" },
                                 "description": "Each time this build was loaded again, under every reason it had: hostDecline or missingAnswer. Absent when empty."
                             },
+                            "writtenThrough": {
+                                "type": "integer",
+                                "description": "The packages this build restored from the host's run whose entry it wrote to its own findings cache once their restore held, so its next run hits them there rather than check them from source. Absent when 0, and always under --no-cache, which writes nothing."
+                            },
                             "loadMilliseconds": {
                                 "type": "integer",
                                 "description": "This build's wall time loading the workspace, every reload included. Absent when 0."

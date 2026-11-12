@@ -272,9 +272,8 @@ func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 // With the findings cache on, each extra build keeps its own entries, keyed on its own target, cgo and flags: a first
 // run over the fixture hits nothing another build wrote and writes an entry for every package of every build, and a
 // second over the same tree restores every package of every build from them, writing nothing, as the host's build
-// does. Its verdict is the first run's. The extra builds restore nothing from the host's run here: a package a build
-// restores from it gets no entry in the build's own store, which restoring a warm build from is the next unit's
-// (#b2t9xmf).
+// does. Its verdict is the first run's. The extra builds restore nothing from the host's run here, so every entry of
+// theirs is one they checked from source (TestTheRunAfterAColdOneHitsEveryBuildsOwnStore covers the restore).
 func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
@@ -423,12 +422,12 @@ func withoutCache(stream string) string {
 	return strings.Join(lines, "\n")
 }
 
-// hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds and what each restored
-// from it (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source,
-// which are what it did not restore.
+// hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds, what each restored
+// from it and what each wrote through to its own store (contract.BuildRecord), each written only when not 0, with the
+// packages an extra build checked from source, which are what it did not restore.
 var hostRestoreCounts = regexp.MustCompile(
-	`,"(entriesKept|restoredFromHost|declinedAtLoad|declinedAtCheck|reloadRounds|checkedFromSource)":[0-9]+` +
-		`|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}`)
+	`,"(entriesKept|restoredFromHost|declinedAtLoad|declinedAtCheck|reloadRounds|writtenThrough|checkedFromSource)` +
+		`":[0-9]+|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}`)
 
 // withoutHostRestore is stream with every build record's counts of the restore from the host's run left out, the one
 // thing a run that restores writes otherwise than one that checks every package of every build.

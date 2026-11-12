@@ -1,6 +1,8 @@
 package check
 
 import (
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"go/types"
@@ -27,7 +29,9 @@ import (
 // once the package's imports are done and before anything is read (TypesHold through load.Restored.Holds); what it
 // read of their facts as each action on it is restored (FactsHold), and the answers it read once the analysis is
 // over (readsHold). A package restored by the load whose facts or answers do not hold has no syntax to analyze, so
-// the build is loaded again with it, and every package above it, never restored from the host again.
+// the build is loaded again with it, and every package above it, never restored from the host again. A package whose
+// restore held is written through to the build's own store under its own key (writeThrough), so the build's next run
+// hits it there, even when the host, hitting its own store, keeps nothing to restore it from.
 
 // HostRestoreCounts is what an extra build restored from the host's run: the packages restored, by ID, sorted, how many
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
@@ -417,6 +421,173 @@ func (session *CacheSession) unsettledBelow() map[*packages.Package]bool {
 		return nil
 	}
 	return session.packagesAbove(unsettled)
+}
+
+// writeThrough writes, under the build's own first key, the entry of each package restored from the host's run whose
+// restore has settled and held, with nothing declined below it (outside unsettled), no reload pending, every action
+// on it restored without an error and an entry the build would write (throughEntry), so the build's next run hits it
+// in its own store rather than check it from source once the host, hitting its own, keeps nothing to restore from
+// (#b2t9xmf). It returns whether each package written has a finding that names a file outside it (see
+// positionDependent), which keeps its second key from an alias. actionsOf are the actions of the run's graphs on each
+// package and knownFiles every file the load reached.
+//
+// The entry is exactly as sound as the restore, and no sounder. It persists a verdict that held because what the
+// package read of other packages read the same in this run: its types' reads at the load, its facts' and answers' at
+// the check. Under the build's key that verdict stands for every later run that hits the key only because the key
+// covers everything those reads were judged against: the package's own inputs, by the portable digest the restore
+// matched; every dependency's key in this build, which holds that dependency's files, and so its types, facts and
+// answers, and everything below it; and the build's context, its target, flags and rule set. A dependency whose
+// output did not change but whose key did, as a comment edited, changes this key too, so the entry is not hit by it
+// again: the second key, or a check from source, decides it then, as for any entry the build wrote itself.
+func (session *CacheSession) writeThrough(
+	actionsOf map[*packages.Package][]*checker.Action,
+	unsettled map[*packages.Package]bool,
+	knownFiles *knownFiles,
+) map[*packages.Package]bool {
+	if session.host == nil || session.caching.Store == nil {
+		return nil
+	}
+	var through []*packages.Package
+	var throughHosted []*hostRestore
+	for candidate, hosted := range session.host.restoring {
+		hosted.lock.Lock()
+		held := hosted.settled && hosted.declined == ""
+		hosted.lock.Unlock()
+		// A package pending a reload is checked from source by the next load, which writes its entry as a miss.
+		if _, keyed := session.keys[candidate]; !held || !keyed || unsettled[candidate] ||
+			session.reloading(candidate) || !finishedClean(actionsOf[candidate]) {
+			continue
+		}
+		through = append(through, candidate)
+		throughHosted = append(throughHosted, hosted)
+	}
+	encoded := make([]encodedEntry, len(through))
+	writable := make([]bool, len(through))
+	writeErrors := make([]error, len(through))
+	bounded.ForEach(len(through), false, func(index int) {
+		saved := through[index]
+		encoded[index], writable[index], writeErrors[index] = session.throughEntry(saved, throughHosted[index],
+			actionsOf[saved], knownFiles)
+		if !writable[index] {
+			return
+		}
+		key := session.keys[saved]
+		// The export data goes first, so an entry is never in the store before what it needs to be read.
+		if writeErrors[index] == nil && encoded[index].exportData != nil {
+			writeErrors[index] = session.caching.Store.Put(exportDataKey(key), encoded[index].exportData)
+		}
+		if writeErrors[index] == nil {
+			writeErrors[index] = session.caching.Store.Put(key, encoded[index].entry)
+		}
+	})
+	positionDependent := map[*packages.Package]bool{}
+	for index, saved := range through {
+		if writeErrors[index] != nil {
+			// A failed write is a problem, never a finding: the next run checks the package from source.
+			session.problem(fmt.Sprintf("writing through the entry of %s restored from the host: %v", saved.ID,
+				writeErrors[index]))
+			continue
+		}
+		if writable[index] {
+			session.counts.WrittenThrough++
+			positionDependent[saved] = encoded[index].positionDependent
+		}
+	}
+	return positionDependent
+}
+
+// throughEntry is the entry writeThrough writes of saved, restored from the host's run as hosted, and whether it is
+// the build's to write: the host's entry as the build restored it, its findings, facts, answers, withheld counts,
+// files, imports, output digest and what it declares without a body, with the export data the build read, as the
+// build would write it had it checked the package itself. Its reads name each owner by its first key in this build,
+// which every read held against when the restore settled.
+//
+// The output digest is the host's, which is the build's own only while the entry holds exactly the analyzers of the
+// build's actions on saved, as encodeEntry's would, since the digest names every one of them; an entry that holds
+// another set is not written. With that set the two are the same by construction: the digest is of the package's API
+// by value, rendered from its types checked from source (exportDigest), and of its facts by value, and the restore
+// holding is the verdict that the build's check from source would give the package the host's types and facts. It
+// cannot be computed again from the types the build read, since export data drops the package's Go version, which the
+// rendering holds, so a digest of those would differ from the build's own and have importers flap between a hit and a
+// miss across runs.
+func (session *CacheSession) throughEntry(
+	saved *packages.Package,
+	hosted *hostRestore,
+	actions []*checker.Action,
+	knownFiles *knownFiles,
+) (encodedEntry, bool, error) {
+	slots := map[string]bool{}
+	for _, action := range actions {
+		if slot, held := session.known.slot(action.Analyzer); held {
+			slots[slot] = true
+		}
+	}
+	contents, _, readError := hosted.kept.contents()
+	if readError != nil {
+		return encodedEntry{}, true, readError
+	}
+	var entry cacheEntry
+	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
+		return encodedEntry{}, true, fmt.Errorf("decoding the host's entry: %w", decodeError)
+	}
+	if len(entry.Analyzers) != len(slots) {
+		return encodedEntry{}, false, nil
+	}
+	for slot := range entry.Analyzers {
+		if !slots[slot] {
+			return encodedEntry{}, false, nil
+		}
+	}
+	encoded := encodedEntry{output: hosted.restored.output, hasOutput: hosted.restored.hasOutput}
+	if hosted.restored.types.ReadExportData != nil {
+		exportData, exportError := hosted.restored.types.ReadExportData()
+		if exportError != nil {
+			return encodedEntry{}, true, fmt.Errorf("reading the export data the build read: %w", exportError)
+		}
+		encoded.exportData = exportData
+	}
+	entry.Reads, entry.ReadsIncomplete = session.readsInBuild(saved.ID, entry.Reads, entry.ReadsIncomplete)
+	encoded.positionDependent = positionDependent(saved, entry.Analyzers, knownFiles)
+	var entryBytes bytes.Buffer
+	if gobError := gob.NewEncoder(&entryBytes).Encode(entry); gobError != nil {
+		return encodedEntry{}, true, fmt.Errorf("encoding the entry: %w", gobError)
+	}
+	encoded.entry = entryBytes.Bytes()
+	return encoded, true, nil
+}
+
+// readsInBuild are reads, the entry of the package written through as written's, each naming its owner by the
+// owner's first key in this build rather than the host's, which the build's next run compares a read's owner by
+// (readsHold), and whether one could not be named: incomplete as it was, or set when the build has no owner or no key
+// for a read. The restore checked every read against the owner as the build has it, so each still says what the owner
+// of that key answers.
+//
+// Neither can happen to an entry written through, so each is a problem the run reports, and the entry is still marked
+// incomplete so a next run never trusts it. Its restore held, and a restore holds only while readsHold finds every
+// read's owner among the build's packages by identifier; a write-through runs only with a store, and with a store the
+// session keys every package it reaches (cache.Keys keys all of them or fails), the same packages byIdentifier names.
+func (session *CacheSession) readsInBuild(written string, reads []storedRead, incomplete bool) ([]storedRead, bool) {
+	inBuild := make([]storedRead, 0, len(reads))
+	unnamed := incomplete
+	for _, read := range reads {
+		owner := session.byIdentifier[read.Owner]
+		if owner == nil {
+			session.problem(fmt.Sprintf("writing %s through: the build has no package %s, whose answer it read",
+				written, read.Owner))
+			unnamed = true
+			continue
+		}
+		key, keyed := session.keys[owner]
+		if !keyed {
+			session.problem(fmt.Sprintf("writing %s through: the build keyed no %s, whose answer it read", written,
+				read.Owner))
+			unnamed = true
+			continue
+		}
+		read.OwnerKey = key[:]
+		inBuild = append(inBuild, read)
+	}
+	return inBuild, unnamed
 }
 
 // hostCounts is what the session restored from the host's run over its last load, and what check declined over every
