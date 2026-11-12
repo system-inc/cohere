@@ -19,6 +19,11 @@ import (
 // so each rule's own fixtures pin that a method of another shape never fixes a name, red if its match loosens to the
 // name alone: abbreviated's flagged.go, commanding's Cmd and wideStack's Len; no_any's flagged.go, memoryCache's
 // Save; initialism's flagged.go, record's MarshalJSON. A rule joining this list brings such a fixture.
+//
+// Neither side of the judgment counts a concrete type whose method's name is unexported when the subject is a function
+// or a concrete type's method (countedCandidates), so a rule joining this list must show it never lets a concrete
+// foreign method with an unexported name fix such a subject's name, or that narrowing is wrong for it. Each rule pins
+// it in its own package, red if it ever lets one: TestAnUnexportedConcreteForeignMethodNeverFixesAName.
 var methodLookupRules = []string{
 	"rules/consistency_no_abbreviated_identifier",
 	"rules/consistency_no_any",

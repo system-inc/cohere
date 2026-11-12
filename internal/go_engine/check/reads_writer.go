@@ -117,7 +117,8 @@ func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
 		var candidates []*types.TypeName
 		for _, indexed := range writer.host.methodsNamed(lookup.Name) {
 			if hostClosure.reached[indexed.owner] {
-				candidates = append(candidates, indexed.typeNames...)
+				candidates = append(candidates, countedCandidates(indexed.typeNames, lookup.Name,
+					concreteSubject(lookup.Subject))...)
 			}
 		}
 		sortTypeNames(candidates)

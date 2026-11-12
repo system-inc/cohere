@@ -2,6 +2,7 @@ package check
 
 import (
 	"bytes"
+	"go/token"
 	"go/types"
 	"slices"
 	"strings"
@@ -143,6 +144,30 @@ func methodCandidatesOf(
 		}
 	}
 	return candidates
+}
+
+// concreteSubject reports whether subject, a Method or Interface lookup's, is a function or a concrete type's method,
+// whose name no rule lets a concrete type's method of an unexported name fix (countedCandidates).
+func concreteSubject(subject types.Object) bool {
+	function, isFunction := subject.(*types.Func)
+	return isFunction && !receiverIsInterface(function)
+}
+
+// countedCandidates are those of typeNames, type names with a method named name, that a rule could let fix the name of
+// a lookup's subject, concrete when subjectConcrete (concreteSubject), every one for any other subject. No rule lets a
+// concrete type's method of an unexported name fix a concrete subject's: abbreviated lets a concrete type's method fix
+// an interface method's name alone, no-any indexes exported methods alone, and initialism interfaces alone
+// (methodLookupRules). So such a type name is no candidate on either side, in the one-bit judgment
+// (methodLookupHolds) and the closure judgment alike, and a build that gains one, as an extra build checking a
+// standard package from source gains the unexported types the host's export data left out, holds (#swv3jbw).
+func countedCandidates(typeNames []*types.TypeName, name string, subjectConcrete bool) []*types.TypeName {
+	counted := make([]*types.TypeName, 0, len(typeNames))
+	for _, typeName := range typeNames {
+		if !subjectConcrete || token.IsExported(name) || types.IsInterface(typeName.Type()) {
+			counted = append(counted, typeName)
+		}
+	}
+	return counted
 }
 
 // receiverIsInterface reports whether subject is a method of an interface, whose implementers a rule matches it
