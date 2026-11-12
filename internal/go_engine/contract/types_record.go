@@ -10,6 +10,12 @@ type TypesRecord struct {
 	// Build says in words how the type information was had.
 	Build string `json:"build"`
 
+	// CensusMissedPackages is additive within contract 3 (#yyv7nr2): the packages of the workspace the load reached
+	// when the census counted no Go file there, as a census that never walked the tree does, and absent otherwise. The
+	// two read one tree, so such a run checked nothing it should have and is never complete: the front door refuses a
+	// summary that calls it complete.
+	CensusMissedPackages int `json:"censusMissedPackages,omitempty"`
+
 	// WithheldInDependencyCgo is additive within contract 3. It names each file of a dependency whose type errors
 	// the run did not report, since no cgo tool ran and the faked package "C" is what they are about, sorted by
 	// file, each with at least one error. The front door counts them in a sentence under the types line, then names

@@ -263,8 +263,8 @@ func (engine *pipeline) run() int {
 	// reads the types.
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
-		engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{},
-			engine.standardError)
+		engine.session = engine.cacheSession(engine.described.workspace.Environment(),
+			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError)
 		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
 		if engine.session != nil && engine.keepsForBuilds() {
 			engine.session.KeepForBuilds()
@@ -296,6 +296,7 @@ func (engine *pipeline) run() int {
 		loaded, loadError = nil, nil
 	}
 	engine.runTypes(loaded, loadError)
+	engine.checkCensusAgainstLoad(loaded)
 	// The inputs are those of the load the lint ran over, the final round's when a reload ran it again, and the first
 	// load is let go before a reload loads again.
 	loaded = engine.runLint(loaded, loadError, linted)
@@ -303,7 +304,9 @@ func (engine *pipeline) run() int {
 	engine.writeDuplicates()
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
 	if engine.timing != nil {
-		engine.write(engine.timing.Record(timingKinds(engine.registered)))
+		record := engine.timing.Record(timingKinds(engine.registered))
+		record.ExtraBuildsFromSource = extraBuildsFromSource(engine.buildRuns)
+		engine.write(record)
 	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
@@ -325,6 +328,48 @@ func (engine *pipeline) run() int {
 		return broken(engine.standardError, engine.writeError)
 	}
 	return exitCode
+}
+
+// extraBuildsFromSource is how many of runs' extra builds, every run after the host's, took nothing from the host's
+// run, read from what each says it restored and left untouched, so the timing record's sentence can only say what
+// happened (#4y4qd3z). A timed run keeps nothing for its builds (cacheSession), so each counts today; were a later
+// change to let one restore, it would drop out of the count rather than be printed as checked from source. A build
+// whose run has no result, which failed, is not counted.
+func extraBuildsFromSource(runs []buildRun) int {
+	count := 0
+	for index, run := range runs {
+		if index == 0 || run.result == nil {
+			continue
+		}
+		if len(run.result.FromHost.Restored) == 0 && len(run.result.FromHost.Untouched) == 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// censusMissedPackages is the packages the load reached in the workspace when its census counted no Go file there,
+// and 0 when the census counted any or the load reached none (#yyv7nr2). The two read one tree, so a census of nothing
+// beside a load of something is a census that never walked it, and every count it feeds, the scope and the files
+// checked and linted, would read 0 over work never done. A load that failed, or that no phase asked for, has nothing
+// to set beside the census.
+func (engine *pipeline) censusMissedPackages(loaded *load.Loaded) int {
+	if loaded == nil || len(engine.described.census.Files) > 0 {
+		return 0
+	}
+	return loaded.PackagesInWorkspace
+}
+
+// checkCensusAgainstLoad marks the run incomplete, and says why, when its census missed the packages its load reached
+// (censusMissedPackages), so such a run never calls itself complete.
+func (engine *pipeline) checkCensusAgainstLoad(loaded *load.Loaded) {
+	missed := engine.censusMissedPackages(loaded)
+	if missed == 0 {
+		return
+	}
+	engine.incomplete = true
+	engine.note("the load reached %d packages in the workspace at %s, and its census counted no Go file there, so "+
+		"the run checked none of them", missed, engine.described.record.Root)
 }
 
 // write writes one record, counting findings, unless an earlier record already could not be written.
@@ -717,6 +762,7 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 		FilesWithoutRecord:  withoutRecord,
 		Build: fmt.Sprintf("%s: %d packages, %d in the workspace", build,
 			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
+		CensusMissedPackages:              engine.censusMissedPackages(loaded),
 		WithheldInDependencyCgo:           withheld,
 		WithheldDependencyCgoDeclarations: loaded.WithheldDependencyCgoDeclarations,
 		CgoTranslation: contract.CgoTranslation{

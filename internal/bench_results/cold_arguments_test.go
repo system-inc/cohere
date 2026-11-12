@@ -80,10 +80,7 @@ func TestAWholeRootColdRunChecksWithoutFixingWhenAsked(test *testing.T) {
 // of the order of its two lines, and every bench log opened with the error.
 func TestEachArgumentFunctionTakesNoArgumentUnderNounset(test *testing.T) {
 	test.Parallel()
-	zsh, lookError := exec.LookPath("zsh")
-	if lookError != nil {
-		test.Fatalf("the benchmark is a zsh script, and zsh is not on the path: %v", lookError)
-	}
+	zsh := needs.Tool(test, "zsh", "the benchmark is a zsh script")
 	script, readError := os.ReadFile(coldArgumentsScript)
 	if readError != nil {
 		test.Fatal(readError)

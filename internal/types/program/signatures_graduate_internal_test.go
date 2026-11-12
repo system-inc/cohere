@@ -87,6 +87,9 @@ func TestGraduationGivesEachContentKeyedShapeTheSignatureAnEmitComputes(test *te
 // progress at the deadline is abandoned, the files before it graduated, the files after it are left for the next
 // run untouched, and an abandoned file is never emitted again while its bytes are the same.
 //
+// The deadline passes when the planted file's emit begins, said by the emit hook, never by the wall clock: a 200ms
+// deadline once passed on Home, a loaded 64-core box, before the first file's emit finished (#3sz36vs).
+//
 // Not parallel: it sets beforeSignatureEmit, the package's emit hook.
 func TestGraduationStopsAtItsDeadlineAndNeverRetriesTheFileItAbandoned(test *testing.T) {
 	graph, sources := graduationProject(test, "alpha", "beta", "gamma")
@@ -94,21 +97,24 @@ func TestGraduationStopsAtItsDeadlineAndNeverRetriesTheFileItAbandoned(test *tes
 	shapes, _ := graph.Signatures(context.Background(), nil)
 
 	release := make(chan struct{})
+	deadline := make(chan time.Time, 1)
+	var deadlinePassed time.Time
 	test.Cleanup(func() {
 		close(release)
 		beforeSignatureEmit = nil
 	})
 	beforeSignatureEmit = func(fileName string) {
 		if fileName == planted.AsString() {
+			deadlinePassed = time.Now()
+			deadline <- deadlinePassed
 			<-release
 		}
 	}
-	started := time.Now()
-	graduated, abandoned := graph.GraduateSignatures(shapes, started.Add(200*time.Millisecond), 0)
-	// Timing assertion: the bound is 25 times the 200ms deadline, and the planted file blocks until cleanup,
-	// so the only run it can catch is one that honored the deadline late, never one slowed by load.
-	if elapsed := time.Since(started); elapsed > 5*time.Second {
-		test.Fatalf("graduating returned after %s, so the deadline did not stop it", elapsed)
+	graduated, abandoned := graph.graduateSignaturesUntil(shapes, deadline, 0)
+	// Timing assertion: the planted file blocks until cleanup, so a return at all means the deadline stopped it,
+	// and 5 seconds after it passed catches only a run that honored it late, never one slowed by load.
+	if elapsed := time.Since(deadlinePassed); deadlinePassed.IsZero() || elapsed > 5*time.Second {
+		test.Fatalf("graduating returned %s after the deadline passed, so the deadline did not stop it", elapsed)
 	}
 	if abandoned != planted.AsString() || graduated != 1 {
 		test.Fatalf("graduated %d and abandoned %q; want 1 and the planted %s", graduated, abandoned, planted)
@@ -154,7 +160,8 @@ func TestGraduationStopsAtItsDeadlineAndNeverRetriesTheFileItAbandoned(test *tes
 }
 
 // A file the deadline catches before its emit has run for abandonAfter is innocent: it is left keyed on content
-// and unmarked, for the next run to try first, never abandoned for the bad luck of starting last.
+// and unmarked, for the next run to try first, never abandoned for the bad luck of starting last. The deadline
+// passes when the caught file's emit begins, said by the emit hook, as in the test above.
 //
 // Not parallel: it sets beforeSignatureEmit, the package's emit hook.
 func TestGraduationLeavesAFileTheDeadlineCaughtEarlyForTheNextRun(test *testing.T) {
@@ -163,16 +170,18 @@ func TestGraduationLeavesAFileTheDeadlineCaughtEarlyForTheNextRun(test *testing.
 	shapes, _ := graph.Signatures(context.Background(), nil)
 
 	release := make(chan struct{})
+	deadline := make(chan time.Time, 1)
 	test.Cleanup(func() {
 		close(release)
 		beforeSignatureEmit = nil
 	})
 	beforeSignatureEmit = func(fileName string) {
 		if fileName == caught.AsString() {
+			deadline <- time.Now()
 			<-release
 		}
 	}
-	graduated, abandoned := graph.GraduateSignatures(shapes, time.Now().Add(200*time.Millisecond), time.Hour)
+	graduated, abandoned := graph.graduateSignaturesUntil(shapes, deadline, time.Hour)
 	if graduated != 1 || abandoned != "" {
 		test.Fatalf(
 			"graduated %d and abandoned %q; want 1 and none, since the caught emit ran for less than abandonAfter",
