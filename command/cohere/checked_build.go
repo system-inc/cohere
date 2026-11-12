@@ -11,19 +11,23 @@ import "fmt"
 // load and by its check, every decline by why, the loads again it took, by why, and the packages it wrote through to
 // its own findings cache. A run of one build writes none, and neither does a Swift run, so their output is as it was.
 type checkedBuild struct {
-	Target           string         `json:"target"`
-	Host             bool           `json:"host"`
-	CompiledFiles    int            `json:"compiledFiles"`
-	AnalyzedPackages int            `json:"analyzedPackages"`
-	FindingsAdded    int            `json:"findingsAdded"`
-	FindingsDropped  int            `json:"findingsDropped"`
-	EntriesKept      int            `json:"entriesKept,omitempty"`
-	RestoredFromHost int            `json:"restoredFromHost,omitempty"`
-	DeclinedAtLoad   int            `json:"declinedAtLoad,omitempty"`
-	DeclinedAtCheck  int            `json:"declinedAtCheck,omitempty"`
-	DeclinedBy       map[string]int `json:"declinedBy,omitempty"`
-	ReloadRounds     int            `json:"reloadRounds,omitempty"`
-	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
+	Target           string `json:"target"`
+	Host             bool   `json:"host"`
+	CompiledFiles    int    `json:"compiledFiles"`
+	AnalyzedPackages int    `json:"analyzedPackages"`
+	FindingsAdded    int    `json:"findingsAdded"`
+	FindingsDropped  int    `json:"findingsDropped"`
+	EntriesKept      int    `json:"entriesKept,omitempty"`
+	RestoredFromHost int    `json:"restoredFromHost,omitempty"`
+	// Untouched and Visited are the packages the host kept that its walk left untouched, handed the host's findings,
+	// and those it visited and judged, each absent when 0.
+	Untouched       int            `json:"untouched,omitempty"`
+	Visited         int            `json:"visited,omitempty"`
+	DeclinedAtLoad  int            `json:"declinedAtLoad,omitempty"`
+	DeclinedAtCheck int            `json:"declinedAtCheck,omitempty"`
+	DeclinedBy      map[string]int `json:"declinedBy,omitempty"`
+	ReloadRounds    int            `json:"reloadRounds,omitempty"`
+	ReloadRoundsBy  map[string]int `json:"reloadRoundsBy,omitempty"`
 	// WrittenThrough is the packages it restored from the host's run whose entry it wrote to its own findings cache,
 	// so its next run hits them there, absent when 0.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
@@ -67,6 +71,11 @@ func (build checkedBuild) line() string {
 			line += ", " + counted(build.FindingsDropped, "finding", "findings") + " dropped by the merge"
 		}
 		return line
+	}
+	// An untouched package is the host's checked package, never analyzed here, so its count stands beside the packages
+	// analyzed, which leave it out.
+	if build.Untouched > 0 {
+		covered += ", " + counted(build.Untouched, "package untouched", "packages untouched")
 	}
 	line := fmt.Sprintf("build %s: %s, %s, %s dropped by the merge", build.Target, covered,
 		counted(build.FindingsAdded, "finding added", "findings added"), grouped(build.FindingsDropped))

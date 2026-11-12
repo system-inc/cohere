@@ -994,6 +994,9 @@ objects its type check reached, the rules' lookups, the facts its analyzers read
 compared by what an importer can observe of it, never by bytes. Its findings and facts are then the host's, so the
 merge is the one checking it would give. Each count below is written only when it is not 0: the host's
 `"entriesKept":349` counts the packages it kept an entry of for the other builds, and an extra build's
+`"untouched":280` the packages the host kept that its walk left untouched, restored unjudged and never analyzed,
+since nothing they read changed in the build, their findings the host's and their files the host's checked files,
+never a gap, `"visited":21` those its walk visited, each judged,
 `"restoredFromHost":301` the packages it restored, `"declinedAtLoad":12` those its load checked after all, since
 what they read of types did not hold, and `"declinedAtCheck":3` those its check declined, since a fact or answer they
 read did not. `"declinedBy"` counts each decline, and each package never restored, by why: `ownInputs` (its own files differ), `noHostEntry`, `neverRestorable` (what it read cannot be recorded, as with cgo), `readsUnknown`, `exportData` (its export data did not read), `typeReads` (a type it read), `lookups` (a rule's lookup), `factReads` (a fact), `deprecations` (a deprecation) or `answers` (an answer).

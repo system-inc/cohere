@@ -603,6 +603,14 @@
                                 "type": "integer",
                                 "description": "The packages this build restored from the host's run rather than checked: its own findings cache did not hold them, their own inputs were the host's, and everything they read of other packages read the same here. Absent when 0."
                             },
+                            "untouched": {
+                                "type": "integer",
+                                "description": "The packages the host kept that this build's walk left untouched: restored unjudged and never analyzed, since nothing they read changed here, and handed the host's findings, their files counting as the host's checked files. Absent when 0."
+                            },
+                            "visited": {
+                                "type": "integer",
+                                "description": "The packages the host kept that this build's walk visited, since something they read changed here: each judged, then restored or declined. Absent when 0."
+                            },
                             "declinedAtLoad": {
                                 "type": "integer",
                                 "description": "The packages this build's load checked from source after all, since what they read of other packages' types did not hold here. Absent when 0."

@@ -43,6 +43,10 @@ type Loaded struct {
 	// Caching.Analyzes turned down. Their Imports reach the whole graph, as go/packages would have loaded it.
 	Packages []*packages.Package
 
+	// Untouched are the packages to analyze the Restorer restored untouched (Restored.Untouched), left out of
+	// Packages, in the graph's order.
+	Untouched []*packages.Package
+
 	// Roots are what go/packages would return with Tests set: each package the patterns matched, and each test variant
 	// go test builds of it, "p [p.test]" beside p and "p_test [p.test]", less go test's synthesized main. Packages
 	// are chosen from them; a driver that analyzes every variant, as the copy of analysistest does, takes them all.
@@ -441,6 +445,16 @@ func fromSource(
 		}
 		typeChecker.restored = caching.Restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
 	}
+	// A package restored untouched is analyzed by nothing, and has no say on its files.
+	var untouched []*packages.Package
+	analyzedPackages = slices.DeleteFunc(slices.Clone(analyzedPackages), func(analyzedPackage *packages.Package) bool {
+		restored, held := typeChecker.restored[analyzedPackage]
+		if held && restored.Untouched {
+			untouched = append(untouched, analyzedPackage)
+			return true
+		}
+		return false
+	})
 	if caching.Begin != nil {
 		nodes := make(map[*packages.Package]*node, len(reachable))
 		for _, current := range reachable {
@@ -494,6 +508,7 @@ func fromSource(
 	}
 	return roots, &Loaded{
 		Packages:                          analyzedPackages,
+		Untouched:                         untouched,
 		PackagesInWorkspace:               len(toAnalyze),
 		WithheldInDependencyCgo:           withheld.sorted(),
 		WithheldDependencyCgoDeclarations: len(distinct),
