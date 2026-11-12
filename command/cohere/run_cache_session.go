@@ -35,9 +35,14 @@ type runCacheSession struct {
 	// findingsKeyParts is the findings key's parts, recorded with the section. See keyParts.
 	findingsKeyParts program.RunCacheKeyParts
 
-	// readSince is when the run began reading its inputs. An input changed after it keeps the run from
+	// readSince is when the run began reading its inputs. An input changed at or after it keeps the run from
 	// being recorded.
 	readSince time.Time
+
+	// clockUnstamped is why readSince is the process's clock rather than a filesystem stamp, empty when it is a
+	// stamp. Such a run is never recorded: the process's clock lags a Linux stamp, so a file added just after it
+	// could carry a time from before it (#6cmmpm1).
+	clockUnstamped string
 
 	// declared is set once the build succeeds and the inputs are known. A session that never declares
 	// is never recorded.
@@ -100,6 +105,11 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	// no footer. Refused here, once, rather than resting on every verdict path remembering writeRunEnd.
 	if session.summary == nil {
 		session.note("a run that recorded no summary is not recorded: its replay would print a verdict with no footer")
+		return nil
+	}
+	if session.clockUnstamped != "" {
+		session.note("the run cache did not record this run: its clock is no filesystem stamp, so a file added " +
+			"just after it began could look older than it (#6cmmpm1): " + firstLine(session.clockUnstamped))
 		return nil
 	}
 	present, absent, probed := session.recorder.Inputs()
