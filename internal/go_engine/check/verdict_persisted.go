@@ -275,7 +275,8 @@ func (judged verdict) persistedMethodJudgment(
 	}
 	for _, persisted := range lookup.RuleCandidates {
 		candidate := methodCandidate{isInterface: persisted.Interface, isGeneric: persisted.Generic,
-			shape: shapeOfPersisted(persisted.Shape), lines: persisted.Lines, holdsAnswer: persisted.HoldsAnswer}
+			unconstrained: persisted.Unconstrained, shape: shapeOfPersisted(persisted.Shape), lines: persisted.Lines,
+			holdsAnswer: persisted.HoldsAnswer}
 		key := held.objectName(persisted.TypeName)
 		judgment.host[key] = candidate
 		if judged.restored[buildClosure.byPath[held.owner(held.object(persisted.TypeName).Owner)]] {

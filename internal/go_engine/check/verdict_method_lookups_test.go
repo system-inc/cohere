@@ -97,6 +97,25 @@ const (
 	promotedOnly = "package foreign\n\ntype Handle struct{ inner }\n"
 )
 
+// constrainedPool is foreign's generic Pool, whose Close has the subject's shape, with its type parameter constrained
+// by constraint.
+func constrainedPool(constraint string) string {
+	return "package foreign\n\ntype Pool[Item " + constraint + "] struct{ items []Item }\n\n" +
+		"func (Pool[Item]) Close() error { return nil }\n"
+}
+
+// putter is foreign's generic interface Putter, with parameters as its type parameter list, whose Put takes the first
+// parameter bare and gives a string: abbreviated reads Item off a subject's Put when Item is its only parameter, and
+// instantiates nothing when another parameter appears nowhere bare, judging by shape alone.
+func putter(parameters string) string {
+	return "package foreign\n\ntype Putter[" + parameters + "] interface{ Put(Item) string }\n"
+}
+
+// putUser is the user package of the Putter fixtures: Mine's Put takes an int and gives an error, the shape of
+// Putter's Put, but no instance of it.
+const putUser = "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{}\n\n" +
+	"func (Mine) Put(value int) error { return nil }\n\nfunc Use() int { return foreign.Count() }\n"
+
 // methodLookupOf is the lookup of query a rule records about the method named method of user's Mine on the host:
 // found when answer names something of the host's foreign, as a type name, or as type name and method.
 type methodLookupOf func(host methodWorld) build_reads.Lookup
@@ -219,11 +238,64 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"the build",
 		},
 		{
-			name: "a generic candidate of the subject's shape keeps the closure judgment",
+			name: "a generic candidate of the subject's shape under constraints of all types, held where the closure " +
+				"declines",
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer, "pool.go": pool,
 				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
 			lookup: methodAnswered("Closer", "Close"),
+		},
+		{
+			name: "a generic candidate whose constraint has a method keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go": constrainedPool("interface{ Close() error }"), "inner.go": closerBase,
+				"promoted_windows.go": promotedOnly},
+			lookup: methodAnswered("Closer", "Close"),
 			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
+		},
+		{
+			name: "a generic candidate constrained by comparable keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go": constrainedPool("comparable"), "inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
+		},
+		{
+			name: "a generic candidate constrained by a union keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go": constrainedPool("~int | ~string"), "inner.go": closerBase,
+				"promoted_windows.go": promotedOnly},
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
+		},
+		{
+			name: "a constraint of all types on the host that gains a method in the build keeps the closure judgment",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go":             constrainedPool("Flushing"),
+				"flushing_darwin.go":  "package foreign\n\ntype Flushing interface{}\n",
+				"flushing_windows.go": "package foreign\n\ntype Flushing interface{ Flush() }\n",
+				"inner.go":            closerBase},
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: " + methodForeignPath + ".Pool differs in the build",
+		},
+		{
+			name: "an unanswered generic interface whose type parameters change under the same signature",
+			files: map[string]string{"foreign.go": methodForeign,
+				"putter_darwin.go":  putter("Item any"),
+				"putter_windows.go": putter("Item, Extra any")},
+			user:   putUser,
+			lookup: unanswered(build_reads.QueryMethod, "Put"),
+			want: "L lookup Method Put: " + methodForeignPath + ".Putter.Put is changed in the build, of the " +
+				"subject's shape",
+		},
+		{
+			name: "a generic answer whose type parameters change under the same signature",
+			files: map[string]string{"foreign.go": methodForeign,
+				"putter_darwin.go":  putter("Item, Extra any"),
+				"putter_windows.go": putter("Item any")},
+			user:   putUser,
+			lookup: methodAnswered("Putter", "Put"),
+			want: "L lookup Method Put: its answer " + methodForeignPath + ".Put has another signature in the " +
+				"build",
 		},
 		{
 			name: "the same generic candidate beside no_any's lookup, which instantiates nothing, held where the " +
