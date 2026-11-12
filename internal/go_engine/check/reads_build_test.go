@@ -31,7 +31,8 @@ const (
 // packages, each reading platform one way. Stable is the same in both builds, unexported fields and all. Handle reaches
 // state, whose unexported field differs by target and nothing else does. Shared's Size method differs by target, Name
 // is a constant of a value per target, Identity is a generic the stable user instantiates over Stable, OnlyDarwin is
-// declared on darwin alone, and Flusher, with its Flush method, on linux alone.
+// declared on darwin alone, and Flusher, with its Flush method, on linux alone. freebsd lays state out as darwin does
+// and sizes Shared as linux does.
 var verdictFiles = map[string]string{
 	"platform/platform.go": "package platform\n\n" +
 		"type Stable struct {\n\tcount int\n\tLabel string\n}\n\n" +
@@ -52,6 +53,10 @@ var verdictFiles = map[string]string{
 		"func (Shared) Size() int64 { return 0 }\n\n" +
 		"type Flusher struct{}\n\n" +
 		"func (Flusher) Flush() {}\n",
+	"platform/platform_freebsd.go": "package platform\n\n" +
+		"const Name = \"freebsd\"\n\n" +
+		"type state struct{ descriptor int }\n\n" +
+		"func (Shared) Size() int64 { return 0 }\n",
 }
 
 // verdictUsers are the user packages' sources, by the way each reads platform. A darwin-only one is checked on the

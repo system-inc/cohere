@@ -36,7 +36,8 @@ import (
 // HostRestoreCounts is what an extra build restored from the host's run: the packages restored, by ID, sorted, how many
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
 // facts or answers did not hold), how many times the build was loaded again for those, and every decline and every
-// package never a candidate by the first word of why: inputs, noEntry, never, unknown, export, T, L, F, D or A.
+// package never a candidate by the first word of why: inputs, noEntry, never, unknown, unpersisted, export, T, L, F, D
+// or A.
 // Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
 // wall time it ran within.
@@ -126,6 +127,9 @@ var declineKeys = map[string]string{
 	"export":  "exportData",
 	"inputs":  "ownInputs",
 	"noEntry": "noHostEntry",
+
+	// A package whose entry persisted no reads, counted apart from reads never recorded.
+	"unpersisted": "readsNotPersisted",
 }
 
 // reasonWord is why a package was not restored from the host, as the record counts it: the reason's first word,

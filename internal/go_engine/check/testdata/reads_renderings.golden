@@ -1,0 +1,210 @@
+renderer reads-renderer-1
+measured example.com/verdict/platform.Box 9ddb1df2d1b478157df129ee01bdd6d20474452692e2fa7681cfa4121da03f84
+	type name of example.com/verdict/platform Box
+	named example.com/verdict/platform.Box
+	type Box[Value any] struct{Held Value}
+	methods of Box in order 
+whole example.com/verdict/platform.Box 9ddb1df2d1b478157df129ee01bdd6d20474452692e2fa7681cfa4121da03f84
+	type name of example.com/verdict/platform Box
+	named example.com/verdict/platform.Box
+	type Box[Value any] struct{Held Value}
+	methods of Box in order 
+measured example.com/verdict/platform.Closer 93630436cbf82fefc7ca05c0333b463950e168d32c04cf5c915eb34f3ab44265
+	type name of example.com/verdict/platform Closer
+	named example.com/verdict/platform.Closer
+	type Closer interface{Close() error}
+	methods of Closer in order 
+whole example.com/verdict/platform.Closer 93630436cbf82fefc7ca05c0333b463950e168d32c04cf5c915eb34f3ab44265
+	type name of example.com/verdict/platform Closer
+	named example.com/verdict/platform.Closer
+	type Closer interface{Close() error}
+	methods of Closer in order 
+measured example.com/verdict/platform.Handle 86d8a81022ff75cc1f799c24fa623a881bf3b2801451b70bc75a22549f3d9aa8
+	type name of example.com/verdict/platform Handle
+	named example.com/verdict/platform.Handle
+	type Handle struct{current *example.com/verdict/platform.state} where field current of example.com/verdict/platform
+	methods of Handle in order 
+	observed field 1.0 current *example.com/verdict/platform.state: size 8 align 8; comparable true; lock none; printf 228 fails "", 12 fails "", 132 fails "", 96 fails "", 128 matches "", 28 fails "", 16 fails "", 1 fails "", 252 fails "", 26 fails "", 4 fails "", stringer false; binary false false; float false; basic false
+whole example.com/verdict/platform.Handle a75daf058d06f39d1b96782fc76a5b4b29ef78595d0225df0a1a7ad98c4660a2
+	type name of example.com/verdict/platform Handle
+	named example.com/verdict/platform.Handle
+	type Handle struct{current *example.com/verdict/platform.state} where field current of example.com/verdict/platform
+	methods of Handle in order 
+	named example.com/verdict/platform.state
+	type state struct{descriptor int} where field descriptor of example.com/verdict/platform
+	methods of state in order 
+measured example.com/verdict/platform.Identity cc3cf0b896bbe096dbe200603726adea5499efce90ebefa52c949e987310796d
+	func of example.com/verdict/platform Identity receiver none[Value any] func[Value any](value Value) Value
+whole example.com/verdict/platform.Identity cc3cf0b896bbe096dbe200603726adea5499efce90ebefa52c949e987310796d
+	func of example.com/verdict/platform Identity receiver none[Value any] func[Value any](value Value) Value
+measured example.com/verdict/platform.Name 3fa8c8a5099dae4733aed068d94c17baad623b0e1be4739a33453c943962d268
+	const of example.com/verdict/platform Name untyped string = string "darwin"
+whole example.com/verdict/platform.Name 3fa8c8a5099dae4733aed068d94c17baad623b0e1be4739a33453c943962d268
+	const of example.com/verdict/platform Name untyped string = string "darwin"
+measured example.com/verdict/platform.NewStable 8ccc7b65869398cc0cd0f5ba9946595b6bb88d37e9149359ba6a0a8fc039a2ef
+	func of example.com/verdict/platform NewStable receiver none func() example.com/verdict/platform.Stable
+	named example.com/verdict/platform.Stable
+	type Stable struct{count int; Label string} where field count of example.com/verdict/platform
+	methods of Stable in order 
+	observed field 1.0 count int: size 8 align 8; comparable true; lock none; printf 228 matches "", 12 matches "", 132 matches "", 96 fails "", 128 fails "", 28 matches "", 16 fails "", 1 fails "", 252 matches "", 26 fails "", 4 matches "", stringer false; binary false false; float false; basic true
+whole example.com/verdict/platform.NewStable 72a620e0d99997579b1a0f95835bb5b2af536c81722891d41e4594a12a11d587
+	func of example.com/verdict/platform NewStable receiver none func() example.com/verdict/platform.Stable
+	named example.com/verdict/platform.Stable
+	type Stable struct{count int; Label string} where field count of example.com/verdict/platform
+	methods of Stable in order 
+measured example.com/verdict/platform.OnlyDarwin 5bb61dfd5f5a701ae9dbcfb141df7adae8b4c1d75e7844952a479a476fc82530
+	func of example.com/verdict/platform OnlyDarwin receiver none func()
+whole example.com/verdict/platform.OnlyDarwin 5bb61dfd5f5a701ae9dbcfb141df7adae8b4c1d75e7844952a479a476fc82530
+	func of example.com/verdict/platform OnlyDarwin receiver none func()
+measured example.com/verdict/platform.Shared 2a628aa69818ca644ab28cd46781bc2cd8ba3eb7fc2c293a7a976f4e95ac4245
+	type name of example.com/verdict/platform Shared
+	named example.com/verdict/platform.Shared
+	type Shared struct{Value int}
+	method Shared.Size value example.com/verdict/platform.Shared func() int
+	methods of Shared in order Size
+whole example.com/verdict/platform.Shared 2a628aa69818ca644ab28cd46781bc2cd8ba3eb7fc2c293a7a976f4e95ac4245
+	type name of example.com/verdict/platform Shared
+	named example.com/verdict/platform.Shared
+	type Shared struct{Value int}
+	method Shared.Size value example.com/verdict/platform.Shared func() int
+	methods of Shared in order Size
+measured example.com/verdict/platform.Stable a0a49da98f692b45e77823c2e3892cda2963a83b567b20b45c8d8c58d5e11929
+	type name of example.com/verdict/platform Stable
+	named example.com/verdict/platform.Stable
+	type Stable struct{count int; Label string} where field count of example.com/verdict/platform
+	methods of Stable in order 
+	observed field 1.0 count int: size 8 align 8; comparable true; lock none; printf 228 matches "", 12 matches "", 132 matches "", 96 fails "", 128 fails "", 28 matches "", 16 fails "", 1 fails "", 252 matches "", 26 fails "", 4 matches "", stringer false; binary false false; float false; basic true
+whole example.com/verdict/platform.Stable 6018ea9d32576be7ff9c2b20bc09a9c450e5e0b5d7b8458a10076829f5773282
+	type name of example.com/verdict/platform Stable
+	named example.com/verdict/platform.Stable
+	type Stable struct{count int; Label string} where field count of example.com/verdict/platform
+	methods of Stable in order 
+measured example.com/verdict/platform.state 0a5af2e99eccd0b1b9ae7ab8c77f2489cc156a92c94e6f6aa7c0b79176d48138
+	type name of example.com/verdict/platform state
+	named example.com/verdict/platform.state
+	type state struct{descriptor int} where field descriptor of example.com/verdict/platform
+	methods of state in order 
+	observed field 1.0 descriptor int: size 8 align 8; comparable true; lock none; printf 228 matches "", 12 matches "", 132 matches "", 96 fails "", 128 fails "", 28 matches "", 16 fails "", 1 fails "", 252 matches "", 26 fails "", 4 matches "", stringer false; binary false false; float false; basic true
+whole example.com/verdict/platform.state 252bc672f30da19fd1c9e516879019bf9759ecff4165efec1c20a68e40cc5fe4
+	type name of example.com/verdict/platform state
+	named example.com/verdict/platform.state
+	type state struct{descriptor int} where field descriptor of example.com/verdict/platform
+	methods of state in order 
+measured example.com/rendered.Base 6ea78cab50881f47679226fcfd61565377c34b062ef8e3ac0222ebc3c5097ba3
+	type name of example.com/rendered Base
+	named example.com/rendered.Base
+	type Base struct{Count int}
+	methods of Base in order 
+whole example.com/rendered.Base 6ea78cab50881f47679226fcfd61565377c34b062ef8e3ac0222ebc3c5097ba3
+	type name of example.com/rendered Base
+	named example.com/rendered.Base
+	type Base struct{Count int}
+	methods of Base in order 
+measured example.com/rendered.Greeting fed163b4db3d8cbc6442cd1964b91215ce63ce4217a8c4615c813097e255b453
+	const of example.com/rendered Greeting untyped string = string "hello"
+whole example.com/rendered.Greeting fed163b4db3d8cbc6442cd1964b91215ce63ce4217a8c4615c813097e255b453
+	const of example.com/rendered Greeting untyped string = string "hello"
+measured example.com/rendered.Held 4894e78a74c8f91046cd5acd7564422db0bae59f1ef351f909160ba33bfc737b
+	var of example.com/rendered Held example.com/rendered.hider
+	named example.com/rendered.hider
+	type hider interface{hidden()} where method hidden of example.com/rendered
+	methods of hider in order 
+whole example.com/rendered.Held 4894e78a74c8f91046cd5acd7564422db0bae59f1ef351f909160ba33bfc737b
+	var of example.com/rendered Held example.com/rendered.hider
+	named example.com/rendered.hider
+	type hider interface{hidden()} where method hidden of example.com/rendered
+	methods of hider in order 
+measured example.com/rendered.Large 13031cf731a92408a41bc286d937e20b874c6cf8c4bd6e940f79e6cf563b4ec6
+	const of example.com/rendered Large untyped int = int 1208925819614629174706176
+whole example.com/rendered.Large 13031cf731a92408a41bc286d937e20b874c6cf8c4bd6e940f79e6cf563b4ec6
+	const of example.com/rendered Large untyped int = int 1208925819614629174706176
+measured example.com/rendered.Named 8952f779ca80375aa2d20299bf1ecc3923605536e433d680697c13b23f88752b
+	type name of example.com/rendered Named
+	named example.com/rendered.Base
+	type Base struct{Count int}
+	methods of Base in order 
+	named example.com/rendered.Named
+	alias Named = example.com/rendered.Outer is example.com/rendered.Outer
+	named example.com/rendered.Outer
+	type Outer struct{example.com/rendered.Base; label string; Inner *example.com/rendered.Outer} where field label of example.com/rendered
+	method Outer.Shown pointer *example.com/rendered.Outer func() string
+	method Outer.hidden value example.com/rendered.Outer func()
+	methods of Outer in order hidden Shown
+	observed field 1.1 label string: size 16 align 8; comparable true; lock none; printf 228 fails "", 12 fails "", 132 fails "", 96 fails "", 128 fails "", 28 matches "", 16 matches "", 1 fails "", 252 matches "", 26 matches "", 4 fails "", stringer false; binary false false; float false; basic true
+whole example.com/rendered.Named d879fb6190b480a2c8a5b042fa085d8c48d6e818bd43e840c5d5f5aeb8035d12
+	type name of example.com/rendered Named
+	named example.com/rendered.Base
+	type Base struct{Count int}
+	methods of Base in order 
+	named example.com/rendered.Named
+	alias Named = example.com/rendered.Outer is example.com/rendered.Outer
+	named example.com/rendered.Outer
+	type Outer struct{example.com/rendered.Base; label string; Inner *example.com/rendered.Outer} where field label of example.com/rendered
+	method Outer.Shown pointer *example.com/rendered.Outer func() string
+	method Outer.hidden value example.com/rendered.Outer func()
+	methods of Outer in order hidden Shown
+measured example.com/rendered.Outer a0a0e8dfa9746c10e5d22e326e09a4c0d14dbba1ae721dfc1a7897280a2adc9a
+	type name of example.com/rendered Outer
+	named example.com/rendered.Base
+	type Base struct{Count int}
+	methods of Base in order 
+	named example.com/rendered.Outer
+	type Outer struct{example.com/rendered.Base; label string; Inner *example.com/rendered.Outer} where field label of example.com/rendered
+	method Outer.Shown pointer *example.com/rendered.Outer func() string
+	method Outer.hidden value example.com/rendered.Outer func()
+	methods of Outer in order hidden Shown
+	observed field 1.1 label string: size 16 align 8; comparable true; lock none; printf 228 fails "", 12 fails "", 132 fails "", 96 fails "", 128 fails "", 28 matches "", 16 matches "", 1 fails "", 252 matches "", 26 matches "", 4 fails "", stringer false; binary false false; float false; basic true
+whole example.com/rendered.Outer 13a2c5ffb407cbec55f6840cd0d818e1967a95dd6dbc59f6f9f401736cca764a
+	type name of example.com/rendered Outer
+	named example.com/rendered.Base
+	type Base struct{Count int}
+	methods of Base in order 
+	named example.com/rendered.Outer
+	type Outer struct{example.com/rendered.Base; label string; Inner *example.com/rendered.Outer} where field label of example.com/rendered
+	method Outer.Shown pointer *example.com/rendered.Outer func() string
+	method Outer.hidden value example.com/rendered.Outer func()
+	methods of Outer in order hidden Shown
+measured example.com/rendered.Pair c2971ff4a8471eb06652835353c7174bd811da82dee6576d78a2773d187b8cf1
+	type name of example.com/rendered Pair
+	named example.com/rendered.Pair
+	type Pair[Left any, Right comparable] struct{Left Left; Right Right}
+	methods of Pair in order 
+whole example.com/rendered.Pair c2971ff4a8471eb06652835353c7174bd811da82dee6576d78a2773d187b8cf1
+	type name of example.com/rendered Pair
+	named example.com/rendered.Pair
+	type Pair[Left any, Right comparable] struct{Left Left; Right Right}
+	methods of Pair in order 
+measured example.com/rendered.Pi d4513784c070c44fce8602b42948e6cd81ca4ef4ce3b333a1a108a9a4ed13fe7
+	const of example.com/rendered Pi untyped float = float 5265233861681329527430852685569923513156999664186156825699335632145130833652529926715379955630651875029455043336995646403337241248353639932329607400740841/1675975991242824637446753124775730765934920727574049172215445180465220503759193372100234287270862928461253982273310756356719235351493321243304206125760512
+whole example.com/rendered.Pi d4513784c070c44fce8602b42948e6cd81ca4ef4ce3b333a1a108a9a4ed13fe7
+	const of example.com/rendered Pi untyped float = float 5265233861681329527430852685569923513156999664186156825699335632145130833652529926715379955630651875029455043336995646403337241248353639932329607400740841/1675975991242824637446753124775730765934920727574049172215445180465220503759193372100234287270862928461253982273310756356719235351493321243304206125760512
+measured example.com/rendered.Rotation a2a29a5fe08dc2261fff3487baf670048571b0afdc6d1f611b624a08a6bc6995
+	const of example.com/rendered Rotation untyped complex = complex 3/2 2
+whole example.com/rendered.Rotation a2a29a5fe08dc2261fff3487baf670048571b0afdc6d1f611b624a08a6bc6995
+	const of example.com/rendered Rotation untyped complex = complex 3/2 2
+measured example.com/rendered.Same c6677872aa9376df0c09ed5bfa6e2d7e522820443f01cfc6b54965f91b90603f
+	type name of example.com/rendered Same
+	named example.com/rendered.Pair
+	type Pair[Left any, Right comparable] struct{Left Left; Right Right}
+	methods of Pair in order 
+	named example.com/rendered.Same
+	alias Same[Value comparable] = example.com/rendered.Pair[Value, Value] is example.com/rendered.Pair[Value, Value]
+whole example.com/rendered.Same c6677872aa9376df0c09ed5bfa6e2d7e522820443f01cfc6b54965f91b90603f
+	type name of example.com/rendered Same
+	named example.com/rendered.Pair
+	type Pair[Left any, Right comparable] struct{Left Left; Right Right}
+	methods of Pair in order 
+	named example.com/rendered.Same
+	alias Same[Value comparable] = example.com/rendered.Pair[Value, Value] is example.com/rendered.Pair[Value, Value]
+measured example.com/rendered.hider a9ef2ecb3465a5d429330e945df34cd73ec5faf6a4cb399c0b9aeb57b99c6e67
+	type name of example.com/rendered hider
+	named example.com/rendered.hider
+	type hider interface{hidden()} where method hidden of example.com/rendered
+	methods of hider in order 
+whole example.com/rendered.hider a9ef2ecb3465a5d429330e945df34cd73ec5faf6a4cb399c0b9aeb57b99c6e67
+	type name of example.com/rendered hider
+	named example.com/rendered.hider
+	type hider interface{hidden()} where method hidden of example.com/rendered
+	methods of hider in order 
+fact github.com/system-inc/cohere/internal/go_engine/check.valueFact 9d19cf2c5c7c6c66342cb24eefdd85cdeb38d853bdeeb8541cc5b963e772a092
+fact honnef.co/go/tools/analysis/facts/deprecated.IsDeprecated 973a18435b7ee7a6da383dbf3cef1d04c20d2a2aeee911c68e06143896448387
