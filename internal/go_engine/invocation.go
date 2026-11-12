@@ -104,7 +104,8 @@ func (request *invocation) resolveRoot() {
 		request.paths[index] = beneath(filepath.Clean(path))
 	}
 	if request.stdinPath != "" {
-		request.stdinPath = beneath(request.stdinPath)
+		// Cleaned as each path is, though parseInvocation stores it clean, so the prefix test never rests on that.
+		request.stdinPath = beneath(filepath.Clean(request.stdinPath))
 	}
 	request.root = resolved
 }
