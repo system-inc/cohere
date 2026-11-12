@@ -165,6 +165,35 @@ func (pool *Pool) ForEach(count int, priority int, work func(index int)) {
 	group.Wait()
 }
 
+// ForEachWriting is ForEach for work that writes to the file system (#g2e4mz8): compute runs for every index under a
+// slot taken at priority and returns what is left of that index's work, its writes, which then run with the slot given
+// back, so a write blocked in the kernel holds none of the run's cores and other work runs on them. It runs on twice as
+// many goroutines as the pool has slots, so while every slot's holder has gone on to write, as many more can compute,
+// and no more than that many ever write at once, however slow the disk. Like ForEach it returns once every index's
+// writes have, so whatever it wrote is in place when it returns, and no goroutine holds two slots. compute may return
+// nil, an index with nothing to write.
+func (pool *Pool) ForEachWriting(count int, priority int, compute func(index int) (write func())) {
+	var next atomic.Int64
+	var group sync.WaitGroup
+	for range min(count, 2*pool.size) {
+		group.Go(func() {
+			for {
+				index := int(next.Add(1) - 1)
+				if index >= count {
+					return
+				}
+				pool.Acquire(priority)
+				write := compute(index)
+				pool.Release()
+				if write != nil {
+					write()
+				}
+			}
+		})
+	}
+	group.Wait()
+}
+
 // Waiters is how many askers wait for a slot now.
 func (pool *Pool) Waiters() int {
 	pool.lock.Lock()
