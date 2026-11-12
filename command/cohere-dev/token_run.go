@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/system-inc/cohere/internal/streams"
 )
@@ -47,9 +48,14 @@ func (run *tokenRun) step(name string) []string {
 			wide.threads,
 		)
 	case run.stepped && len(run.borrowed) < before:
+		why := "the pool is busy now"
+		if quietNow, _ := quietHolds(run.directory, time.Now()); quietNow {
+			why = "a quiet window opened"
+		}
 		fmt.Fprintf(
 			streams.Errors,
-			"cohere-dev: the pool is busy now, so %s gives back %d borrowed tokens and runs %d packages at a time on %d threads\n",
+			"cohere-dev: %s, so %s gives back %d borrowed tokens and runs %d packages at a time on %d threads\n",
+			why,
 			subject,
 			before-len(run.borrowed),
 			wide.packages,

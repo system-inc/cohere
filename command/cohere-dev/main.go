@@ -8,7 +8,7 @@
 //	go run ./command/cohere-dev test --bounded <pkg>  under a process limit and a deadline, for a mutant (bound.go)
 //	go run ./command/cohere-dev land                  one merge commit onto main, gated, one landing at a time
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
-//	go run ./command/cohere-dev quiet on|off          a quiet window: the cache trim holds off until off (quiet.go)
+//	go run ./command/cohere-dev quiet on|off|wait     a quiet window: no job starts but the one it is for (quiet.go)
 //	go run ./command/cohere-dev worktree <name>       a hand's worktree, made or moved to main by git (worktree.go)
 //	go run ./command/cohere-dev worktree remove <x>   retire one, refusing as a move does
 //
@@ -84,7 +84,8 @@ func usage() int {
 		"         bounded: --bounded, --bounded-margin <processes> (512), --bounded-deadline <duration> (15m)\n"+
 		"       cohere-dev land [--task <id>] [--message <what landed>]\n"+
 		"       cohere-dev status\n"+
-		"       cohere-dev quiet [on [--for <duration>] [why] | off]\n"+
+		"       cohere-dev quiet [on [--for <duration>] [--through <name>] [why] | off | wait]\n"+
+		"         every job but status, quiet and worktree takes --through <name>, for the run a window lets through\n"+
 		"       cohere-dev worktree <name> [--branch <branch>]   "+
 		"a name per hand, not per member: system_cohere_tools_1\n"+
 		"       cohere-dev worktree remove <name>")
@@ -120,6 +121,32 @@ func niceness() (int, error) {
 // run runs a heavy command, niced, through a token: go test, go build, go vet, or any command with exec.
 func run(verb string, arguments []string) int {
 	commandArguments, fullPriority := withoutFlag(arguments, fullPriorityFlag)
+	commandArguments, through, throughError := withoutThroughFlag(commandArguments, verb == "exec")
+	if throughError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", throughError)
+		return 2
+	}
+	if through != "" {
+		if setError := os.Setenv(quietThroughVariable, through); setError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: naming this run %s: %v\n", through, setError)
+			return 1
+		}
+	}
+	// A quiet window is a wall where a job starts (quiet.go), met before anything else is done.
+	directory, poolDirectoryError := poolDirectory()
+	if poolDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", poolDirectoryError)
+		return 1
+	}
+	if refusal := quietRefusal(
+		directory,
+		time.Now(),
+		os.Getenv(heldTokenVariable),
+		os.Getenv(quietThroughVariable),
+	); refusal != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
+		return quietRefusedExitCode
+	}
 	if !fullPriority {
 		level, nicenessError := niceness()
 		if nicenessError != nil {
