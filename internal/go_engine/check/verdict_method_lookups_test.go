@@ -154,6 +154,13 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			lookup: unanswered(build_reads.QueryInterface, "Close"),
 		},
 		{
+			name: "a windows-only method of another shape, held where the closure declines",
+			files: map[string]string{"foreign.go": methodForeign,
+				"handle_windows.go": "package foreign\n\ntype Handle struct{}\n\n" +
+					"func (Handle) Close(force bool) error { return nil }\n"},
+			lookup: unanswered(build_reads.QueryMethod, "Close"),
+		},
+		{
 			name: "a windows-only method promoted alone, held where the closure declines",
 			files: map[string]string{"foreign.go": methodForeign, "inner.go": closerBase,
 				"promoted_windows.go": promotedOnly},
