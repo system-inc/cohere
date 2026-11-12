@@ -228,7 +228,9 @@ func TestAnExtraBuildAnswersABodilessFunctionWithoutLoadingAgain(test *testing.T
 
 // A timed run restores nothing from the host's run, so its timing record says so (#4y4qd3z): over the restore
 // fixture, `--timing --other-builds` writes extraBuildsFromSource as the count of builds beside the host's, and
-// `--timing` alone, which checks no extra build, leaves it out of the line.
+// `--timing` alone, which checks no extra build, leaves it out of the line. Each build's own result is read too, so the
+// record's claim is held by what happened: under `--no-cache` the host's session keeps its entries in memory for the
+// builds, and there windows restores a package from the host whenever a timed run is let keep one.
 func TestATimedRunWithExtraBuildsSaysTheyRestoredNothing(test *testing.T) {
 	test.Parallel()
 
@@ -243,22 +245,45 @@ func TestATimedRunWithExtraBuildsSaysTheyRestoredNothing(test *testing.T) {
 		return ""
 	}
 	fixture := filepath.Join("testdata", "restore-from-host")
-	engine, stream := runOverRaw(test, copyFixture(test, fixture), exitFindings, "--timing", "--other-builds")
-	if len(engine.buildRuns) < 2 {
-		test.Fatalf("the run checked %d builds, want the host's and at least one more", len(engine.buildRuns))
-	}
-	var record contract.TimingRecord
-	if decodeError := json.Unmarshal([]byte(timingLine(stream)), &record); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	if want := len(engine.buildRuns) - 1; record.ExtraBuildsFromSource != want {
-		test.Errorf("the timing record says %d extra builds checked from source, want %d", record.ExtraBuildsFromSource,
-			want)
+	for _, flags := range [][]string{{"--timing", "--other-builds"}, {"--timing", "--other-builds", "--no-cache"}} {
+		engine, stream := runOverRaw(test, copyFixture(test, fixture), exitFindings, flags...)
+		checkTimedRunRestoredNothing(test, engine, timingLine(stream), strings.Join(flags, " "))
 	}
 
 	_, alone := runOverRaw(test, copyFixture(test, fixture), exitFindings, "--timing")
 	if line := timingLine(alone); strings.Contains(line, `"extraBuildsFromSource"`) {
 		test.Errorf("a timed run with no extra builds wrote extraBuildsFromSource: %s", line)
+	}
+}
+
+// checkTimedRunRestoredNothing holds a timed run with extra builds, run under flags, to its record's claim: no extra
+// build restored or left untouched anything of the host's run, by its own result, and timingLine, its timing record,
+// counts every one of them as checked from source.
+func checkTimedRunRestoredNothing(test *testing.T, engine *pipeline, timingLine string, flags string) {
+	test.Helper()
+	if len(engine.buildRuns) < 2 {
+		test.Fatalf("%s: the run checked %d builds, want the host's and at least one more", flags,
+			len(engine.buildRuns))
+	}
+	// The sentence's claim itself, read from each build's own result: a change that let a timed build restore turns
+	// this red rather than leave the record saying it checked from source (#4y4qd3z).
+	for _, run := range engine.buildRuns[1:] {
+		if run.result == nil {
+			test.Fatalf("%s: the %s build has no result", flags, run.build)
+		}
+		if restored, untouched := len(run.result.FromHost.Restored), len(run.result.FromHost.Untouched); restored+
+			untouched != 0 {
+			test.Errorf("%s: the timed %s build restored %d and left %d untouched from the host's run, want none",
+				flags, run.build, restored, untouched)
+		}
+	}
+	var record contract.TimingRecord
+	if decodeError := json.Unmarshal([]byte(timingLine), &record); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	if want := len(engine.buildRuns) - 1; record.ExtraBuildsFromSource != want {
+		test.Errorf("%s: the timing record says %d extra builds checked from source, want %d", flags,
+			record.ExtraBuildsFromSource, want)
 	}
 }
 

@@ -304,11 +304,7 @@ func (engine *pipeline) run() int {
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
 	if engine.timing != nil {
 		record := engine.timing.Record(timingKinds(engine.registered))
-		// The host's run is the first of buildRuns, and each run after it an extra build's, none of which restored
-		// anything from the host's run, since a timed run keeps nothing for them (cacheSession).
-		if len(engine.buildRuns) > 1 {
-			record.ExtraBuildsFromSource = len(engine.buildRuns) - 1
-		}
+		record.ExtraBuildsFromSource = extraBuildsFromSource(engine.buildRuns)
 		engine.write(record)
 	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
@@ -331,6 +327,24 @@ func (engine *pipeline) run() int {
 		return broken(engine.standardError, engine.writeError)
 	}
 	return exitCode
+}
+
+// extraBuildsFromSource is how many of runs' extra builds, every run after the host's, took nothing from the host's
+// run, read from what each says it restored and left untouched, so the timing record's sentence can only say what
+// happened (#4y4qd3z). A timed run keeps nothing for its builds (cacheSession), so each counts today; were a later
+// change to let one restore, it would drop out of the count rather than be printed as checked from source. A build
+// whose run has no result, which failed, is not counted.
+func extraBuildsFromSource(runs []buildRun) int {
+	count := 0
+	for index, run := range runs {
+		if index == 0 || run.result == nil {
+			continue
+		}
+		if len(run.result.FromHost.Restored) == 0 && len(run.result.FromHost.Untouched) == 0 {
+			count++
+		}
+	}
+	return count
 }
 
 // write writes one record, counting findings, unless an earlier record already could not be written.
