@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -69,8 +70,25 @@ import (
 
 var update = flag.Bool("update", false, "rewrite each case's expected.jsonl and expected.stderr from the engine")
 
-// fixtureOnlyFiles are a case directory's files that describe the case rather than belong to its project.
+// fixtureOnlyFiles are a case directory's files that describe the case rather than belong to its project. A
+// platform's own expected stream, expected.<GOOS>.jsonl (expectedStreamPath), is one too, by platformStreamPattern.
 var fixtureOnlyFiles = []string{"expected.jsonl", "expected.stderr", "gitlinks"}
+
+// platformStreamPattern is the name of a platform's own expected stream.
+var platformStreamPattern = regexp.MustCompile(`^expected\.[a-z0-9]+\.jsonl$`)
+
+// expectedStreamPath is the expected stream of the case named name on this machine's platform: expected.<GOOS>.jsonl
+// when the case has one, and expected.jsonl otherwise. A case keeps one per platform only where its stream honestly
+// differs by platform, as generated-rules-withheld's does: its generated file must call net/http, the one package the
+// response-status rule reads, and on linux net compiles cgo_unix.go, a dependency's cgo the record names as withheld,
+// where on darwin net compiles none (#dxn6y2z). Every other line of the two files is the same.
+func expectedStreamPath(name string) string {
+	platform := filepath.Join("testdata", name, "expected."+runtime.GOOS+".jsonl")
+	if _, statError := os.Stat(platform); statError == nil {
+		return platform
+	}
+	return filepath.Join("testdata", name, "expected.jsonl")
+}
 
 // panickingRule is a planted rule that panics on every package, so the crash path has a rule to catch.
 var panickingRule = rule.Rule{
@@ -736,7 +754,7 @@ func runCase(test *testing.T, endToEnd endToEndCase) {
 	if exitCode != endToEnd.exitCode {
 		test.Errorf("exit %d, want %d; stderr:\n%s", exitCode, endToEnd.exitCode, prose)
 	}
-	compareExpected(test, filepath.Join("testdata", endToEnd.name, "expected.jsonl"), stream)
+	compareExpected(test, expectedStreamPath(endToEnd.name), stream)
 	compareExpected(test, filepath.Join("testdata", endToEnd.name, "expected.stderr"), prose)
 	if endToEnd.verify != nil {
 		endToEnd.verify(test, root)
@@ -859,6 +877,10 @@ func normalize(stream string, root string) string {
 	}
 	normalized := strings.Join(lines, "")
 	normalized = strings.ReplaceAll(normalized, root, "/project")
+	// The toolchain's own files, as a dependency's cgo the record names as withheld, sit where the machine keeps Go.
+	if goroot := toolchainRoot(); goroot != "" {
+		normalized = strings.ReplaceAll(normalized, goroot+string(filepath.Separator), "/goroot/")
+	}
 	normalized = elapsedPattern.ReplaceAllString(normalized, `"elapsedMilliseconds":0`)
 	normalized = packagesLoaded.ReplaceAllString(normalized, "$1: N packages")
 	normalized = cachePackagesPattern.ReplaceAllString(normalized, `"$1":0`)
@@ -871,6 +893,16 @@ func normalize(stream string, root string) string {
 	normalized = checkedByBuildPattern.ReplaceAllString(normalized, `"reason":"checked by the target build"`)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
 }
+
+// toolchainRoot is the GOROOT go env names for this process, asked once, or "" when go env can't say, in which
+// case no path is normalized for it and a stream naming the toolchain's files compares unnormalized.
+var toolchainRoot = sync.OnceValue(func() string {
+	output, runError := exec.Command("go", "env", "GOROOT").Output()
+	if runError != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+})
 
 // inputsInside is an inputs record's line with only the paths at or below root kept, or the line as it was when it
 // does not decode, so the comparison shows it.
@@ -925,7 +957,8 @@ func copyFixture(test *testing.T, fixture string) string {
 		if entry.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
-		if relative == entry.Name() && slices.Contains(fixtureOnlyFiles, entry.Name()) {
+		if relative == entry.Name() &&
+			(slices.Contains(fixtureOnlyFiles, entry.Name()) || platformStreamPattern.MatchString(entry.Name())) {
 			return nil
 		}
 		contents, readError := os.ReadFile(path)
