@@ -117,7 +117,8 @@ func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
 		hostClosure := gatherClosure(writer.host.indexedClosureOf, lookup.Subject.Pkg().Imports())
 		// The closure judgment's candidates by their whole method sets, and the one-bit judgment's as the rules index
 		// them, of those a rule could let fix the subject's (countedCandidates), as lookupHolds gathers each.
-		var candidates, ruleCandidates []*types.TypeName
+		var candidates []*types.TypeName
+		var ruleCandidates []*types.TypeName
 		for _, indexed := range writer.host.methodsNamed(lookup.Name) {
 			if hostClosure.reached[indexed.owner] {
 				candidates = append(candidates, indexed.methodSetTypeNames...)

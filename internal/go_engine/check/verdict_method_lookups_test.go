@@ -293,8 +293,8 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"shape",
 		},
 		{
-			name: "the same unexported name for a receiver embedding a foreign type, declined by the closure judgment, " +
-				"which counts every type name with the method",
+			name: "the same unexported name for a receiver embedding a foreign type, declined by the closure " +
+				"judgment, which counts every type name with the method",
 			files:  poolAdds("add"),
 			user:   adding("type Mine struct{ foreign.Base }\n\nfunc (Mine) add(value int) {}"),
 			lookup: addOf("add"),
@@ -304,8 +304,8 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			// The fallback keeps the closure judgment for a receiver embedding a foreign type, and the build's only new
 			// type name with Close has it by promotion alone, which satisfies a constraint's Close as a declared one
 			// does: the closure reads whole method sets, so it declines, red when it reads the rules' index (#swv3jbw).
-			name: "a type with the method by promotion alone, new in the build, declines where the fallback keeps the " +
-				"closure",
+			name: "a type with the method by promotion alone, new in the build, declines where the fallback " +
+				"keeps the closure",
 			files: map[string]string{"foreign.go": methodForeign + "\ntype Base struct{}\n", "closer.go": closer,
 				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
 			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{ foreign.Base }\n\n" +
