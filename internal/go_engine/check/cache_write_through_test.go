@@ -142,7 +142,8 @@ func throughEntry(test *testing.T, session *CacheSession, path string) (restored
 }
 
 // The differential of a write-through (#b2t9xmf): the entry windows writes of a package it restored from the host's
-// run decodes to the entry it writes when it checks the package from source itself, with the restore off and a store
+// run, judged or left untouched by its walk (#qbvtkfm), decodes to the entry it writes when it checks the package from
+// source itself, with the restore off and a store
 // of its own: the same findings, facts, answers, reads and output digest, byte for byte. A digest that differed would
 // have the package's importers hit after one run and miss after the other.
 func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) {
@@ -159,15 +160,19 @@ func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) 
 			test.Fatalf("windows restored %q from the host, want %s among them", through.FromHost.Restored, path)
 		}
 	}
-	if through.Cache.WrittenThrough != len(through.FromHost.Restored) {
-		test.Fatalf("windows wrote %d entries through of the %d it restored, want every one",
-			through.Cache.WrittenThrough, len(through.FromHost.Restored))
+	// What the walk left untouched is written through as what it restored and judged (#qbvtkfm).
+	if through.Cache.WrittenThrough != len(through.FromHost.Restored)+len(through.FromHost.Untouched) {
+		test.Fatalf("windows wrote %d entries through of the %d it restored and the %d it left untouched, want "+
+			"every one", through.Cache.WrittenThrough, len(through.FromHost.Restored), len(through.FromHost.Untouched))
+	}
+	if len(through.FromHost.Untouched) == 0 {
+		test.Fatal("windows left nothing untouched, so no untouched entry is compared with its own")
 	}
 	// A held restore names every read's owner in the build (readsInBuild), so writing it through reports no problem.
 	if len(through.Cache.Problems) > 0 {
 		test.Errorf("windows reported problems writing through: %q", through.Cache.Problems)
 	}
-	for _, path := range []string{throughBasePath, throughUserPath} {
+	for _, path := range append([]string{throughBasePath, throughUserPath}, through.FromHost.Untouched...) {
 		written, writtenKey := throughEntry(test, throughSession, path)
 		checked, checkedKey := throughEntry(test, sourceSession, path)
 		if writtenKey != checkedKey {

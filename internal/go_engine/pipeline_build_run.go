@@ -25,6 +25,10 @@ type buildRun struct {
 	// said is every file of ours the build compiled into a package it analyzed, by path: the files it has a say on,
 	// which the merge reads, made where the load is known.
 	said map[string]bool
+	// untouchedFiles are an extra build's alone: every file of ours its walk left untouched, compiled into a package
+	// restored from the host's run unjudged and never analyzed (load.Loaded.Untouched), on which the build has no say,
+	// so the host's findings stand there, and which the host checked.
+	untouchedFiles map[string]bool
 	// result is check.Run's over the analyzed packages: their findings before suppression and scope, the rules that
 	// ran, and every crash.
 	result *check.Result

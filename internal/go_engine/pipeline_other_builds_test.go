@@ -106,7 +106,8 @@ func runOverNoted(
 
 // Under `--other-builds` a module with a file only windows builds and one only the cohere_extra tag builds is
 // checked under three builds, the host's first, and mergeBuildRuns is handed a run for each: every extra build
-// analyzes every package its load holds, as the host's does, and has a say on every file it compiles, and every run
+// analyzes every package its load holds but those its walk left untouched, which the host's run analyzed, and has a
+// say on every file it compiles but theirs, and every run
 // carries the inputs its load read. Only windows's run finds the else after a return planted in its windows file.
 // Without the switch nothing is handed over and the run is clean, as it was.
 func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
@@ -156,14 +157,21 @@ func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 			test.Errorf("%s ran no rules (%t) or found type errors: %v", extra.build, extra.result == nil,
 				extra.typeErrors)
 		}
-		if !maps.Equal(extra.analyzed, host.analyzed) || !extra.analyzed[separatorPackage] ||
-			!extra.analyzed[labelPackage] {
-			test.Errorf("%s analyzed %s, want every package its load holds, %s", extra.build,
-				sortedKeys(extra.analyzed), sortedKeys(host.analyzed))
+		covered := maps.Clone(extra.analyzed)
+		for _, identifier := range extra.result.FromHost.Untouched {
+			if covered[identifier] {
+				test.Errorf("%s both analyzed and left untouched %s", extra.build, identifier)
+			}
+			covered[identifier] = true
+		}
+		if !maps.Equal(covered, host.analyzed) || !covered[separatorPackage] || !covered[labelPackage] {
+			test.Errorf("%s analyzed %s and left untouched %s, want every package its load holds, %s", extra.build,
+				sortedKeys(extra.analyzed), extra.result.FromHost.Untouched, sortedKeys(host.analyzed))
 		}
 		for file := range extra.compiled {
-			if !extra.said[file] {
-				test.Errorf("%s compiles %s and has no say on it", extra.build, file)
+			if extra.said[file] == extra.untouchedFiles[file] {
+				test.Errorf("%s compiles %s, says on it %t and left it untouched %t, want one of the two",
+					extra.build, file, extra.said[file], extra.untouchedFiles[file])
 			}
 		}
 	}
@@ -423,16 +431,22 @@ func withoutCache(stream string) string {
 }
 
 // hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds, what each restored
-// from it and what each wrote through to its own store (contract.BuildRecord), each written only when not 0, with the
-// packages an extra build checked from source, which are what it did not restore, and that count load by load.
+// from it, what its walk left untouched and visited, and what each wrote through to its own store
+// (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source, which are
+// what it did not restore, and that count load by load.
 var hostRestoreCounts = regexp.MustCompile(
-	`,"(entriesKept|restoredFromHost|declinedAtLoad|declinedAtCheck|reloadRounds|writtenThrough|checkedFromSource)` +
-		`":[0-9]+|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}|,"checkedFromSourceRounds":\[[0-9,]*\]`)
+	`,"(entriesKept|restoredFromHost|untouched|visited|declinedAtLoad|declinedAtCheck|reloadRounds|writtenThrough|` +
+		`checkedFromSource)":[0-9]+|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}|,"checkedFromSourceRounds":\[[0-9,]*\]`)
 
-// withoutHostRestore is stream with every build record's counts of the restore from the host's run left out, the one
-// thing a run that restores writes otherwise than one that checks every package of every build.
+// extraAnalyzedPackages is an extra build's record's count of the packages it analyzed, which its walk's untouched
+// packages leave out (#qbvtkfm), so a run that restores counts fewer than one that checks every package.
+var extraAnalyzedPackages = regexp.MustCompile(`("host":false,"compiledFiles":[0-9]+,"analyzedPackages":)[0-9]+`)
+
+// withoutHostRestore is stream with every build record's counts of the restore from the host's run left out, and an
+// extra build's packages analyzed, the one thing a run that restores writes otherwise than one that checks every
+// package of every build.
 func withoutHostRestore(stream string) string {
-	return hostRestoreCounts.ReplaceAllString(stream, "")
+	return extraAnalyzedPackages.ReplaceAllString(hostRestoreCounts.ReplaceAllString(stream, ""), "${1}N")
 }
 
 // A module whose every file the host builds needs no other build, so `--other-builds` hands the merge nothing, and the
@@ -489,9 +503,10 @@ func TestOtherBuildsWriteTheMergedVerdict(test *testing.T) {
 		if engine.buildRuns[index].build.OperatingSystem == "windows" {
 			wantAdded = 1
 		}
-		if build.AnalyzedPackages != len(engine.buildRuns[0].analyzed) {
-			test.Errorf("the build %s analyzed %d packages, want every one of the %d its load holds",
-				engine.buildRuns[index].build, build.AnalyzedPackages, len(engine.buildRuns[0].analyzed))
+		if build.AnalyzedPackages+build.Untouched != len(engine.buildRuns[0].analyzed) {
+			test.Errorf("the build %s analyzed %d packages and left %d untouched, want every one of the %d its load "+
+				"holds", engine.buildRuns[index].build, build.AnalyzedPackages, build.Untouched,
+				len(engine.buildRuns[0].analyzed))
 		}
 		if build.FindingsAdded != wantAdded || build.FindingsDropped != 0 {
 			test.Errorf("the build %s added %d and dropped %d, want %d and 0", engine.buildRuns[index].build,
