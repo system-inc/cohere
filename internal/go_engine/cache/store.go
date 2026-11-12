@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // Store is the directory of entries, one file per key under a directory named for the key's first two hex
@@ -14,6 +16,11 @@ import (
 // cut short, or written over by something else, no longer matches its sum, and reads as a miss.
 type Store struct {
 	directory string
+
+	// made holds each shard directory this store has made or found, by path, so a Put stats its directory once per
+	// store rather than once per entry: a cold run at cohere's root writes about 31,000 files into 256 directories,
+	// and a MkdirAll before each cost 2.5 s of stat and lstat calls summed (#m8hcs4n).
+	made sync.Map
 }
 
 // Open is the store under root, at `<root>/.cache/cohere/go`, beside the TypeScript cache in `.cache/cohere`.
@@ -42,10 +49,19 @@ func (store *Store) Get(key Key) ([]byte, bool) {
 func (store *Store) Put(key Key, entry []byte) error {
 	path := store.path(key)
 	directory := filepath.Dir(path)
-	if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
-		return fmt.Errorf("making the cache directory %s: %w", directory, makeError)
+	if _, known := store.made.Load(directory); !known {
+		if makeError := store.makeDirectory(directory); makeError != nil {
+			return makeError
+		}
 	}
 	temporary, createError := os.CreateTemp(directory, filepath.Base(path)+".*.temporary")
+	// A directory removed while the store runs, by someone clearing the cache, is made again once.
+	if errors.Is(createError, fs.ErrNotExist) {
+		if makeError := store.makeDirectory(directory); makeError != nil {
+			return makeError
+		}
+		temporary, createError = os.CreateTemp(directory, filepath.Base(path)+".*.temporary")
+	}
 	if createError != nil {
 		return fmt.Errorf("creating a temporary entry in %s: %w", directory, createError)
 	}
@@ -63,6 +79,15 @@ func (store *Store) Put(key Key, entry []byte) error {
 		_ = os.Remove(temporary.Name())
 		return fmt.Errorf("renaming the entry into place at %s: %w", path, renameError)
 	}
+	return nil
+}
+
+// makeDirectory makes directory and every parent it needs, and remembers it made.
+func (store *Store) makeDirectory(directory string) error {
+	if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
+		return fmt.Errorf("making the cache directory %s: %w", directory, makeError)
+	}
+	store.made.Store(directory, true)
 	return nil
 }
 

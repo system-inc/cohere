@@ -71,11 +71,12 @@ const swiftEngineFromWorkingTree = "built from the working tree's sources"
 // chosen (swiftEngineChoice), so a run of a named engine never replays one built from sources, nor one built from a
 // commit one built from the working tree.
 //
-// For an engine built from the working tree, also whether that tree has uncommitted changes, as the engine it would be
-// served is built and stamped by it (dispatch.WorkingTreeModified): that engine reports the state as
-// `sourceTreeModified`, the run's modified-build gap, and nothing the run reads records it, so a replay would
-// otherwise show the state of whichever engine wrote the record (#s5z3n30). It is the one fact a subprocess answers,
-// about 116 ms of git on cohere's checkout, and it is asked only for that choice: a named, shipped or committed
+// For an engine built from the working tree, also whether the engine's own inputs there have uncommitted changes, the
+// state the engine it would be served is built and stamped with (dispatch.SwiftEngineTreeModified). That engine
+// reports it as `sourceTreeModified`, the run's modified-build gap, and the declared sources record their bytes but
+// not whether git calls them changed, so a replay would otherwise show the state of whichever engine wrote the record
+// (#s5z3n30). It is the one fact a subprocess answers,
+// about 14 ms of git on cohere's checkout, and it is asked only for that choice: a named, shipped or committed
 // engine's bit is fixed in its bytes, and its binary is an input.
 //
 // Then which toolchain answers, which a replay never asks. The `swift`, `xcrun`, `xcodebuild` and `xcodegen` PATH
@@ -134,13 +135,13 @@ func swiftRunCacheFacts(
 
 // workingTreeModified is whether the checkout an engine built from the working tree comes from has uncommitted changes,
 // the state that engine is built and stamped with. A checkout that can't be found reads as modified, as a git that
-// can't answer does in dispatch.WorkingTreeModified: nothing then vouches for the tree.
+// can't answer does in dispatch.SwiftEngineTreeModified: nothing then vouches for the tree.
 func workingTreeModified() bool {
 	moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
 	if findModuleDirectoryError != nil {
 		return true
 	}
-	return dispatch.WorkingTreeModified(moduleDirectory)
+	return dispatch.SwiftEngineTreeModified(moduleDirectory)
 }
 
 // swiftEngineChoice is how this run will choose its engine, in the order resolveSwiftEngineBinary chooses, read with

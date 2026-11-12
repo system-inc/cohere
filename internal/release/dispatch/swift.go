@@ -48,14 +48,15 @@ var buildSwiftProduct = buildSwiftProductWithSwiftPm
 // in the hash because the engine links its libraries and reads its compiler's serialized diagnostics,
 // so the same sources under a new Xcode are a different engine.
 //
-// The hash also holds the one bit the manifest would read from git: whether the repository has uncommitted
-// changes, which the engine reports as `sourceTreeModified`. It was once left out, on the argument that a
-// stale bit errs toward the warning. It errs both ways. A clean tree was served an engine built while an
-// unrelated file was dirty, which reported a modified build and was refused at land, and a dirty tree could
-// be served one built clean, claiming a clean build that never happened (#50wtb2s). So the bit is read fresh
-// on every resolve (WorkingTreeModified, about 120 ms on cohere's checkout), named into the hash so each state
-// has its own binary, and handed to the build, so the engine reports the state its name holds rather than
-// whatever SwiftPM reads from git a moment later.
+// The hash also holds the bit the engine reports as `sourceTreeModified`: whether its own inputs, the
+// files swiftEngineInputs names, differ from the commit, tracked or untracked. Nothing else in the
+// repository counts, so the bit and the hash cover the same files. It was once left out of the hash, on the
+// argument that a stale bit errs toward the warning. It errs both ways. A clean tree was served an engine
+// built while an unrelated file was dirty, which reported a modified build and was refused at land, and a
+// dirty tree could be served one built clean, claiming a clean build that never happened (#50wtb2s). So the
+// bit is read fresh on every resolve (workingTreeModified, 14 ms on cohere's checkout), named into the hash
+// so each state has its own binary, and handed to the build, so the engine reports the state its name holds
+// rather than whatever SwiftPM reads from git a moment later.
 //
 // That is the working-tree half. When commit is not empty the engine is built from that commit
 // instead, which is what a gate gets: see resolveCommittedSwiftEngine. The contract is the one the
@@ -75,7 +76,7 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int, versionOutput 
 		return resolveCommittedSwiftEngine(paths, commit, toolchain, contract)
 	}
 
-	modified := WorkingTreeModified(paths.ModuleDirectory)
+	modified := SwiftEngineTreeModified(paths.ModuleDirectory)
 	hash, swiftEngineHashError := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain, modified)
 	if swiftEngineHashError != nil {
 		return "", false, swiftEngineHashError
