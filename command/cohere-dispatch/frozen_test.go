@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/streams"
 )
 
@@ -37,7 +38,11 @@ func writeFrozenModule(test *testing.T) string {
 		test.Fatal(createDirectoryError)
 	}
 	stub := "#!/bin/sh\necho 'the stub engine on stdout'\necho 'the stub engine on stderr' >&2\n"
-	if writeError := os.WriteFile(filepath.Join(binaries, stagedBinaryName), []byte(stub), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(
+		filepath.Join(binaries, stagedBinaryName),
+		[]byte(stub),
+		0o755,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	return root

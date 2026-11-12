@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // fakeGo is a go that says CGO_ENABLED is FAKE_CGO and answers go list as FAKE_LIST says: "compiles", "refuses"
@@ -26,7 +28,11 @@ esac
 // Not parallel: each case puts its own go first on PATH, which the whole process shares.
 func TestTranslationUnavailableSkipsOnlyWhereGoCannotTranslate(test *testing.T) {
 	directory := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(directory, "go"), []byte(fakeGo), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(
+		filepath.Join(directory, "go"),
+		[]byte(fakeGo),
+		0o755,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	test.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))

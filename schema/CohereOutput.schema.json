@@ -145,6 +145,11 @@
                     "type": "string",
                     "description": "Why no CPU was measured, when the thread clock cannot be read. Every CPU figure is then 0 and means nothing; the counts are still real. Absent when the CPU was measured."
                 },
+                "extraBuildsFromSource": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "How many builds beside the host's the run checked under --other-builds, none of which restored anything from the host's run, since a timed run keeps nothing for them: every package of every build was checked from source, and the rows include that work. Absent when the run had no extra builds."
+                },
                 "processCpuMicroseconds": {
                     "type": "integer",
                     "description": "The engine process's user and system CPU from its start to the record."
@@ -838,6 +843,10 @@
                         "unread": {
                             "type": "string",
                             "description": "Files the run could not check for any other reason, as the run said it."
+                        },
+                        "censusMissedPackages": {
+                            "type": "integer",
+                            "description": "The packages an engine's load reached in its project while its census counted no file there, as a census that never walked the tree does. The run checked nothing it should have, and fails. Absent when 0."
                         },
                         "nestedUnread": {
                             "type": "string",

@@ -5,16 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"go/parser"
 	"go/token"
 	"hash"
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -47,7 +44,8 @@ type keptListing struct {
 	TestOnly  []string
 }
 
-// cachedList is list, answered from listings when nothing go list reads has moved since it last answered.
+// cachedList is list in goEnvironment's workspace under its whole environment, answered from listings when nothing
+// go list reads has moved since it last answered.
 //
 // go list's answer is a function of the go environment, the patterns, the module files, and of each package
 // directory's file names and each Go file's header: its build constraints, package clause and imports, which end
@@ -60,8 +58,7 @@ type keptListing struct {
 // the fingerprint and the lister alike. The listing adds its CPU to collector; a kept answer's fingerprint adds nothing
 // but what the caller measures on its own goroutine, since a run under `--timing` keeps no listing.
 func cachedList(
-	workspace string,
-	environment []string,
+	goEnvironment *GoEnvironment,
 	patterns []string,
 	listings ListingStore,
 	held Held,
@@ -69,13 +66,10 @@ func cachedList(
 	collector *timing.Collector,
 ) (*listing, bool, error) {
 	if listings == nil {
-		listed, listError := list(workspace, environment, patterns, held, shared, collector)
+		listed, listError := list(goEnvironment, patterns, held, shared, collector)
 		return listed, false, listError
 	}
-	key, goEnvironment, keyError := listingKey(workspace, environment, patterns)
-	if keyError != nil {
-		return nil, false, keyError
-	}
+	key := listingKey(goEnvironment, patterns)
 	if contents, stored := listings.Kept(key); stored {
 		var kept keptListing
 		if gob.NewDecoder(bytes.NewReader(contents)).Decode(&kept) == nil {
@@ -85,11 +79,12 @@ func cachedList(
 			}
 		}
 	}
-	listed, listError := list(workspace, environment, patterns, held, shared, collector)
+	listed, listError := list(goEnvironment, patterns, held, shared, collector)
 	if listError != nil {
 		return nil, false, listError
 	}
-	kept, keepable := keepListing(workspace, goEnvironment["GOMODCACHE"], goEnvironment["GOROOT"], listed, held)
+	kept, keepable := keepListing(goEnvironment.workspace, goEnvironment.value("GOMODCACHE"),
+		goEnvironment.value("GOROOT"), listed, held)
 	var encoded bytes.Buffer
 	if keepable && gob.NewEncoder(&encoded).Encode(kept) == nil {
 		// Ignored: a listing that cannot be kept is asked of go list again next run, which is all its keeping saves.
@@ -109,29 +104,14 @@ var listingEnvironment = []string{
 
 // listingKey is where a workspace's listing is kept: one per workspace, patterns and go environment (see
 // listingEnvironment), so another target, toolchain or flag never reads it, but for the flags VerdictFlags leaves out,
-// which change only what go prints. It returns the go environment too, as go env reported it.
-func listingKey(
-	workspace string,
-	environment []string,
-	patterns []string,
-) ([sha256.Size]byte, map[string]string, error) {
-	command := exec.Command("go", append([]string{"env", "-json"}, listingEnvironment...)...)
-	command.Dir = workspace
-	command.Env = environment
-	output, runError := command.Output()
-	if runError != nil {
-		return [sha256.Size]byte{}, nil, fmt.Errorf("reading the go environment of %s for its listing: %w",
-			workspace, runError)
-	}
-	goEnvironment := map[string]string{}
-	if decodeError := json.Unmarshal(output, &goEnvironment); decodeError != nil {
-		return [sha256.Size]byte{}, nil, fmt.Errorf("reading the go environment of %s for its listing: %w",
-			workspace, decodeError)
-	}
+// which change only what go prints. The go environment is goEnvironment's, as go env reports it under the whole
+// environment go list runs with, `GOFLAGS` with its -pgo=off, so the key is the one a go env of its own asked there
+// made (see GoEnvironment.value).
+func listingKey(goEnvironment *GoEnvironment, patterns []string) [sha256.Size]byte {
 	digest := sha256.New()
-	writeParts(digest, []string{listingFormatVersion, workspace})
+	writeParts(digest, []string{listingFormatVersion, goEnvironment.workspace})
 	for _, name := range listingEnvironment {
-		value := goEnvironment[name]
+		value := goEnvironment.value(name)
 		// What go list answers never depends on the flags VerdictFlags leaves out, -p among them, which cohere-dev's
 		// pool sets to each token's share: with them in the key, a run under another share missed every listing.
 		if name == "GOFLAGS" {
@@ -140,7 +120,7 @@ func listingKey(
 		writeParts(digest, []string{name, value})
 	}
 	writeParts(digest, patterns)
-	return [sha256.Size]byte(digest.Sum(nil)), goEnvironment, nil
+	return [sha256.Size]byte(digest.Sum(nil))
 }
 
 // keepListing is listed as the store keeps it: the roots the patterns walk, every directory of a listed package

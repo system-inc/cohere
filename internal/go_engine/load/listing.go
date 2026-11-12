@@ -90,24 +90,23 @@ type listing struct {
 	goListReason string
 }
 
-// list lists the patterns in workspace under environment, the whole environment, as `go list -deps -json -e` lists
+// list lists the patterns in goEnvironment's workspace under its whole environment, as `go list -deps -json -e` lists
 // them: read in this process when the lister can answer exactly, each file held holds read from its held bytes, and by
 // go list itself, which reads the disk, when it has any doubt. The go commands either runs add their CPU to collector,
 // and so do the lister's goroutines.
 func list(
-	workspace string,
-	environment []string,
+	goEnvironment *GoEnvironment,
 	patterns []string,
 	held Held,
 	shared *SharedReads,
 	collector *timing.Collector,
 ) (*listing, error) {
-	listed, doubt := listInProcess(workspace, environment, patterns, held, shared, collector)
+	listed, doubt := listInProcess(goEnvironment, patterns, held, shared, collector)
 	if doubt == "" {
 		listed.inProcess = true
 		return listed, nil
 	}
-	listed, listError := listWithGoList(workspace, environment, patterns, collector)
+	listed, listError := listWithGoList(goEnvironment.workspace, goEnvironment.fullEnvironment, patterns, collector)
 	if listError != nil {
 		return nil, listError
 	}

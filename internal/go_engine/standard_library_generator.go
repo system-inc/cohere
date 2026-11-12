@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // The hidden verbs a generator starts its children with, after its own prefix (see standardLibraryGenerator).
@@ -102,11 +103,12 @@ func (generator standardLibraryGenerator) variantTable(
 	// Ignored: the directory is a temporary one of this call's own, and a failure to remove it changes no table.
 	defer func() { _ = os.RemoveAll(directory) }()
 	environment := generator.variantEnvironment(request)
-	values, valuesError := readGoEnvironment(directory, environment)
-	if valuesError != nil {
+	goEnvironment, environmentError := load.ReadGoEnvironment(directory, environment, nil)
+	if environmentError != nil {
 		return nil, cache.StandardLibraryVariant{}, fmt.Errorf("fetching the toolchain %s with GOTOOLCHAIN: %w",
-			request.goVersion, valuesError)
+			request.goVersion, environmentError)
 	}
+	values := goEnvironment.Values()
 	if reported := (standardLibraryVariantRequest{goVersion: values["GOVERSION"], target: values["GOOS"] + "/" +
 		values["GOARCH"], cgoEnabled: values["CGO_ENABLED"]}); reported != request {
 		return nil, cache.StandardLibraryVariant{}, fmt.Errorf("generating %s: go env reports %s instead",

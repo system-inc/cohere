@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
@@ -269,14 +270,15 @@ func TestALintDirectiveIsInItsPackagesKey(test *testing.T) {
 	}
 }
 
-// goEnvironmentIn is what readGoEnvironment reads in root under environment, failing the test when go env fails.
+// goEnvironmentIn is go env's answer in root under environment as the findings cache reads it
+// (load.GoEnvironment.Values), failing the test when go env fails.
 func goEnvironmentIn(test *testing.T, root string, environment []string) map[string]string {
 	test.Helper()
-	values, valuesError := readGoEnvironment(root, environment)
-	if valuesError != nil {
-		test.Fatalf("reading the build context under %q: %v", environment, valuesError)
+	goEnvironment, environmentError := load.ReadGoEnvironment(root, environment, nil)
+	if environmentError != nil {
+		test.Fatalf("reading the build context under %q: %v", environment, environmentError)
 	}
-	return values
+	return goEnvironment.Values()
 }
 
 // The build context names the process's own `GOOS`, `GOARCH` and `BURNTSUSHI_TOML_110`, set or unset, apart from what

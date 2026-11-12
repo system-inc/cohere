@@ -17,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // swiftReplayFixture is a tiny Swift package the real cohere binary checks, through a stand-in engine named by the
@@ -111,7 +113,7 @@ func (fixture *swiftReplayFixture) write(name string, contents string) {
 // script writes an executable /bin/sh script at path.
 func (fixture *swiftReplayFixture) script(path string, body string) {
 	fixture.test.Helper()
-	if writeError := os.WriteFile(path, []byte("#!/bin/sh\n"+body), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(path, []byte("#!/bin/sh\n"+body), 0o755); writeError != nil {
 		fixture.test.Fatal(writeError)
 	}
 }

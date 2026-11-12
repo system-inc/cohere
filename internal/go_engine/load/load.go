@@ -18,12 +18,10 @@
 package load
 
 import (
-	"bytes"
 	"fmt"
 	"go/build"
 	"go/types"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -282,13 +280,12 @@ func loadWorkspace(
 	if !goEnvironment.answers(workspace, environment) {
 		var environmentError error
 		measureListingCommand(caching.Timing, func() {
-			goEnvironment, environmentError = readGoEnvironment(workspace, environment, caching.Held)
+			goEnvironment, environmentError = ReadGoEnvironment(workspace, environment, caching.Held)
 		})
 		if environmentError != nil {
 			return nil, environmentError
 		}
 	}
-	fullEnvironment, reported := goEnvironment.fullEnvironment, goEnvironment.reported
 	buildContext := goEnvironment.contextFor(caching.Held)
 	var listed *listing
 	var listingKept bool
@@ -297,8 +294,7 @@ func loadWorkspace(
 	// for, is measured where it runs.
 	measureListing(caching.Timing, func() {
 		listed, listingKept, listError = cachedList(
-			workspace,
-			fullEnvironment,
+			goEnvironment,
 			patterns,
 			caching.Listings,
 			caching.Held,
@@ -318,14 +314,7 @@ func loadWorkspace(
 			return nil, fmt.Errorf("loading %s with an overlay: the project has cgo files of its own, which the cgo "+
 				"tool reads from disk", workspace)
 		}
-		var compiledEnvironment []string
-		var environmentError error
-		measureListingCommand(caching.Timing, func() {
-			compiledEnvironment, environmentError = translatedEnvironment(workspace, environment)
-		})
-		if environmentError != nil {
-			return nil, environmentError
-		}
+		compiledEnvironment := translatedEnvironment(goEnvironment)
 		translationStarted := time.Now()
 		var compiledError error
 		// go list -compiled is billed to the listing, the cgo tool's compiles among its children, since it is a go list
@@ -363,7 +352,7 @@ func loadWorkspace(
 		return nil, excludedError
 	}
 	loaded.Excluded, loaded.Unseen = excluded, unseen
-	loaded.Inputs = collectInputs(workspace, reported, roots, census)
+	loaded.Inputs = collectInputs(workspace, goEnvironment.reported, roots, census)
 	loaded.Elapsed = time.Since(started)
 	return loaded, nil
 }
@@ -562,82 +551,23 @@ func analyzedOfGraph(built *graph) []*packages.Package {
 	return chosen
 }
 
-// sourceEnvironment is the whole environment every go command of the load runs with in workspace but go list
-// -compiled: `GOFLAGS` as go reads it there (see withGoFlags), every flag kept, with -pgo=off last, as go/packages
-// lists: a command with a default.pgo profile would otherwise have go list print a second variant of every package
-// the command builds. -trimpath stays as given, since no cgo tool runs and go list prints nothing differently for it.
-func sourceEnvironment(workspace string, environment []string) ([]string, error) {
-	fullEnvironment, _, _, contextError := sourceContext(workspace, environment, nil)
-	return fullEnvironment, contextError
-}
-
-// sourceContext is sourceEnvironment with the build target and the go environment the inputs record names, as
-// constraintContext reads them under it, from one go command where two ran one after the other (#3epjyj2). go env
-// is asked once under the environment as given, and the whole environment follows from its `GOFLAGS`: the same
-// flags, -pgo=off last. Asked again under that, go env would print the same target and paths, since -pgo=off moves
-// none of them, and that `GOFLAGS` exactly, so it is not asked.
-func sourceContext(
-	workspace string,
-	environment []string,
-	held Held,
-) ([]string, *build.Context, reportedEnvironment, error) {
-	given := append(os.Environ(), environment...)
-	buildContext, reported, contextError := constraintContext(workspace, given, held)
-	if contextError != nil {
-		return nil, nil, reportedEnvironment{}, contextError
-	}
-	reported.goFlags = append(reported.goFlags, "-pgo=off")
-	fullEnvironment := []string{}
-	for _, variable := range given {
-		if !strings.HasPrefix(variable, "GOFLAGS=") {
-			fullEnvironment = append(fullEnvironment, variable)
+// translatedEnvironment is the whole environment go list -compiled runs with in goEnvironment's workspace when it
+// translates the cgo files of a project with cgo of its own: `GOFLAGS` as go reads it there, from the environment or
+// the go env file when that is empty, with every `-trimpath` taken out and `-trimpath=false` put last. Analysis needs
+// real source paths: under -trimpath go keys a cgo package's translation without its directory, so a load is served
+// the translation cached for the same bytes in another directory, whose `//line` paths name that directory's files,
+// gone once it is, and cgocall, which reads the raw file those paths name, fails. The value is never empty, since an
+// empty `GOFLAGS` would hand go the go env file's flags, -trimpath among them. The flags are go env's answer under the
+// environment as given, without the -pgo=off a load from source adds, as they always were.
+func translatedEnvironment(goEnvironment *GoEnvironment) []string {
+	kept := []string{}
+	for _, flag := range strings.Fields(goEnvironment.answer["GOFLAGS"]) {
+		name, _, _ := strings.Cut(strings.TrimLeft(flag, "-"), "=")
+		if name != "trimpath" {
+			kept = append(kept, flag)
 		}
 	}
-	fullEnvironment = append(fullEnvironment, "GOFLAGS="+strings.Join(reported.goFlags, " "))
-	return fullEnvironment, buildContext, reported, nil
-}
-
-// translatedEnvironment is the whole environment go list -compiled runs with in workspace when it translates the
-// cgo files of a project with cgo of its own: `GOFLAGS` as go reads it there (see withGoFlags) with every
-// `-trimpath` taken out and `-trimpath=false` put last. Analysis needs real source paths: under -trimpath go keys a
-// cgo package's translation without its directory, so a load is served the translation cached for the same bytes in
-// another directory, whose `//line` paths name that directory's files, gone once it is, and cgocall, which reads the
-// raw file those paths name, fails. The value is never empty, since an empty `GOFLAGS` would hand go the go env file's
-// flags, -trimpath among them.
-func translatedEnvironment(workspace string, environment []string) ([]string, error) {
-	return withGoFlags(workspace, environment, func(flags []string) []string {
-		kept := []string{}
-		for _, flag := range flags {
-			name, _, _ := strings.Cut(strings.TrimLeft(flag, "-"), "=")
-			if name != "trimpath" {
-				kept = append(kept, flag)
-			}
-		}
-		return append(kept, "-trimpath=false")
-	})
-}
-
-// withGoFlags is the current environment, then environment, then `GOFLAGS` as go reads it in workspace (from the
-// environment, or the go env file when that is empty), its flags rewritten by rewrite.
-func withGoFlags(workspace string, environment []string, rewrite func([]string) []string) ([]string, error) {
-	given := append(os.Environ(), environment...)
-	command := exec.Command("go", "env", "GOFLAGS")
-	command.Dir = workspace
-	command.Env = given
-	var standardError bytes.Buffer
-	command.Stderr = &standardError
-	output, runError := command.Output()
-	if runError != nil {
-		return nil, fmt.Errorf("reading GOFLAGS with go env in %s: %w: %s",
-			workspace, runError, strings.TrimSpace(standardError.String()))
-	}
-	result := []string{}
-	for _, variable := range given {
-		if !strings.HasPrefix(variable, "GOFLAGS=") {
-			result = append(result, variable)
-		}
-	}
-	return append(result, "GOFLAGS="+strings.Join(rewrite(strings.Fields(string(output))), " ")), nil
+	return withGoFlags(goEnvironment.fullEnvironment, append(kept, "-trimpath=false"))
 }
 
 // exists reports whether file can be read about.

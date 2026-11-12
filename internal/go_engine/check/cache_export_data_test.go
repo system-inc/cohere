@@ -113,30 +113,17 @@ func TestAStoredFactOnAnObjectTheExportDataLacksIsSkipped(test *testing.T) {
 	caching := testCaching(test, rules)
 	cold := runWithSession(test, root, caching, rules)
 	baseKey := sessionKey(test, cold.session, "example.com/fixture/base")
-	contents, stored := caching.Store.Get(baseKey)
-	if !stored {
-		test.Fatalf("want base's entry written by the cold run")
-	}
-	var entry cacheEntry
-	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
-		test.Fatalf("decoding base's entry: %v", decodeError)
-	}
 	slot := rule.Namespace + "test-marked"
-	planted := entry.Analyzers[slot]
-	if len(planted.ObjectFacts) != 1 {
-		test.Fatalf("want base's one fact on Marked stored, got %+v", planted.ObjectFacts)
-	}
-	gone := planted.ObjectFacts[0]
-	gone.Path = "NoSuchObject"
-	planted.ObjectFacts = append(planted.ObjectFacts, gone)
-	entry.Analyzers[slot] = planted
-	var encoded bytes.Buffer
-	if encodeError := gob.NewEncoder(&encoded).Encode(entry); encodeError != nil {
-		test.Fatalf("encoding base's entry: %v", encodeError)
-	}
-	if putError := caching.Store.Put(baseKey, encoded.Bytes()); putError != nil {
-		test.Fatalf("writing base's entry: %v", putError)
-	}
+	rewriteStoredEntry(test, caching.Store, baseKey, func(entry *cacheEntry) {
+		planted := entry.Analyzers[slot]
+		if len(planted.ObjectFacts) != 1 {
+			test.Fatalf("want base's one fact on Marked stored, got %+v", planted.ObjectFacts)
+		}
+		gone := planted.ObjectFacts[0]
+		gone.Path = "NoSuchObject"
+		planted.ObjectFacts = append(planted.ObjectFacts, gone)
+		entry.Analyzers[slot] = planted
+	})
 	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
 	if putError := caching.Store.Put(userKey, []byte("corrupt")); putError != nil {
 		test.Fatalf("corrupting user's entry: %v", putError)
@@ -249,11 +236,8 @@ func TestAPackageStoredWithoutFactsMissesOnceARootImportsIt(test *testing.T) {
 		test.Fatalf("the load reached no plain base")
 		return nil
 	}
-	stored, held := caching.Store.Get(first.session.keys[plainBase(first.session)])
-	if !held {
-		test.Fatalf("want plain base written by the first run")
-	}
-	restored, decodeError := decodeEntry(first.session.known, plainBase(first.session), stored, nil)
+	restored, decodeError := decodedStoredEntry(test, caching.Store, first.session.known, plainBase(first.session),
+		first.session.keys[plainBase(first.session)])
 	if decodeError != nil || covers(restored, first.session.known.facts) {
 		test.Fatalf("want plain base stored without facts, got %v", decodeError)
 	}
@@ -281,5 +265,80 @@ func TestAPackageStoredWithoutFactsMissesOnceARootImportsIt(test *testing.T) {
 	}
 	if !fired {
 		test.Fatalf("want user's call to Marked reported from base's fact, got %+v", second.result.Findings)
+	}
+}
+
+// An entry whose export data is gone from under it, as when files are removed from the store by hand, is read the long
+// way and never an error: with user's entry corrupt so user needs base's types, base's export data, kept by its digest
+// apart from base's entry (#5s1x2hg), does not read, so the load checks base from source too, and the result is the
+// cold run's, with no problem said.
+func TestAnEntryWhoseExportDataIsGoneHasItsPackageCheckedFromSource(test *testing.T) {
+	test.Parallel()
+
+	root := loadedFixtures(test)
+	rules := []rule.Rule{houseRule(markedAnalyzer), houseRule(targetAnalyzer)}
+	directory := test.TempDir()
+	caching := cachingAt(directory, rules)
+	cold := runWithSession(test, root, caching, rules)
+
+	digest := storedRecordAt(test, caching.Store, sessionKey(test, cold.session, "example.com/fixture/base")).ExportData
+	if digest == nil {
+		test.Fatal("want base's record to name its export data")
+	}
+	blob := exportDataKey(digest).String()
+	if removeError := os.Remove(
+		filepath.Join(directory, ".cache", "cohere", "go", blob[:2], blob),
+	); removeError != nil {
+		test.Fatalf("removing base's export data: %v", removeError)
+	}
+	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
+	if putError := caching.Store.Put(userKey, []byte("corrupt")); putError != nil {
+		test.Fatalf("corrupting user's entry: %v", putError)
+	}
+
+	edited := runWithSession(test, root, caching, rules)
+	if edited.loaded.FilesParsed != 2 || edited.loaded.PackagesFromExportData != 0 {
+		test.Fatalf("want base and user both checked from source, got %d parsed and %d read from export data",
+			edited.loaded.FilesParsed, edited.loaded.PackagesFromExportData)
+	}
+	if len(edited.result.Cache.Problems) != 0 {
+		test.Fatalf("want no problem said, got %v", edited.result.Cache.Problems)
+	}
+	if !reflect.DeepEqual(withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result)) {
+		test.Fatalf("edited\n%+v\ncold\n%+v", withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result))
+	}
+}
+
+// A whole entry of format 11, as a key held one before records (#fq7dxvx), is a miss under a key of this format, never
+// read: were a store of 11's entries ever under these keys, its packages would be checked from source and their
+// entries written again, with the cold run's result.
+func TestAnEntryOfTheFormatBeforeRecordsIsAMiss(test *testing.T) {
+	test.Parallel()
+
+	root := loadedFixtures(test)
+	rules := []rule.Rule{houseRule(markedAnalyzer), houseRule(targetAnalyzer)}
+	caching := testCaching(test, rules)
+	cold := runWithSession(test, root, caching, rules)
+	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
+	entry, _, stored := storedEntryAt(caching.Store, userKey)
+	if !stored {
+		test.Fatal("the cold run wrote no entry of user")
+	}
+	entry.Version = "go-engine-cache-11"
+	var older bytes.Buffer
+	if encodeError := gob.NewEncoder(&older).Encode(entry); encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if putError := caching.Store.Put(userKey, older.Bytes()); putError != nil {
+		test.Fatal(putError)
+	}
+
+	edited := runWithSession(test, root, caching, rules)
+	if edited.result.Cache.Hit != 1 || edited.loaded.FilesParsed != 1 {
+		test.Fatalf("want user a miss checked from source and base a hit, got %d parsed and %+v",
+			edited.loaded.FilesParsed, edited.result.Cache)
+	}
+	if !reflect.DeepEqual(withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result)) {
+		test.Fatalf("edited\n%+v\ncold\n%+v", withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result))
 	}
 }

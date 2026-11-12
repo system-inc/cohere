@@ -166,3 +166,34 @@ func TestAReloadRoundForAMissingAnswerIsCountedByItsReason(test *testing.T) {
 			want, again.Cache.ReloadRounds, again.Cache.ReloadRoundsBy, again.Reloads)
 	}
 }
+
+// An entry the first wave wrote with only the answers it asked, rewritten once the second wave asked more (see
+// rewriteEarlier), is a record whole for the next run (#fq7dxvx): it holds its new body and names the export data it
+// named before, so with top edited the run hits bottom, reads its types from that export data and its answer from the
+// rewritten body, and asks for no reload.
+func TestAnEntryRewrittenWithItsAnswersIsReadWhole(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	rules := []rule.Rule{houseRule(purityProbe)}
+	caching := testCaching(test, rules)
+	caching.AnswersInPart = map[string]bool{"example.com/answers/bottom": true}
+	answerModule(test, directory, "func Use() int {\n\treturn bottom.Double(2)\n}\n")
+	cold := runWithSession(test, directory, caching, rules)
+	bottomKey := sessionKey(test, cold.session, "example.com/answers/bottom")
+	written, _, stored := storedEntryAt(caching.Store, bottomKey)
+	if !stored || answerCount(written.Answers) == 0 {
+		test.Fatalf("want bottom's entry rewritten with Double's answer, got %+v (stored %t)", written.Answers, stored)
+	}
+
+	caching.AnswersInPart = nil
+	answerModule(test, directory, "func Use() int {\n\treturn bottom.Double(3)\n}\n")
+	edited := runWithSession(test, directory, caching, rules)
+	if edited.result.Cache.Hit != 1 || edited.result.Cache.Reloads != 0 || edited.loaded.PackagesFromExportData != 1 {
+		test.Fatalf("want bottom hit, read from its export data, with no reload, got %d read from export data and "+
+			"%+v", edited.loaded.PackagesFromExportData, edited.result.Cache)
+	}
+	if len(edited.result.Findings) != 1 ||
+		edited.result.Findings[0].Message != "example.com/answers/bottom.Double pure true" {
+		test.Fatalf("want bottom.Double answered pure, got %+v", edited.result.Findings)
+	}
+}

@@ -214,22 +214,22 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 				Found: true}
 		},
 		"an interface method": func(_ *testing.T, host verdictWorld) (build_reads.Fact, build_reads.Lookup) {
-			return build_reads.Fact{}, build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Close",
+			return build_reads.Fact{}, askedBy(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Close",
 				Subject: methodOf(host.user, "Mine", "Close"), Found: true,
-				Answer: host.platform.Scope().Lookup("Closer")}
+				Answer: host.platform.Scope().Lookup("Closer")})
 		},
 		"a method of linux's alone": func(_ *testing.T, host verdictWorld) (build_reads.Fact, build_reads.Lookup) {
-			return build_reads.Fact{}, build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Flush",
-				Subject: methodOf(host.user, "Mine", "Flush")}
+			return build_reads.Fact{}, askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Flush",
+				Subject: methodOf(host.user, "Mine", "Flush")})
 		},
 		"a method of a type every build declares": func(_ *testing.T, host verdictWorld) (build_reads.Fact,
 			build_reads.Lookup,
 		) {
-			return build_reads.Fact{}, build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Size",
-				Subject: methodOf(host.user, "Mine", "Flush")}
+			return build_reads.Fact{}, askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Size",
+				Subject: methodOf(host.user, "Mine", "Flush")})
 		},
 		"a method with no subject": func(*testing.T, verdictWorld) (build_reads.Fact, build_reads.Lookup) {
-			return build_reads.Fact{}, build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Flush"}
+			return build_reads.Fact{}, askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Flush"})
 		},
 		"a deprecation": func(_ *testing.T, host verdictWorld) (build_reads.Fact, build_reads.Lookup) {
 			return build_reads.Fact{}, build_reads.Lookup{Query: build_reads.QueryDeprecated, Path: verdictPlatform,
@@ -424,8 +424,8 @@ func persistedRestoredSteps(test *testing.T) []struct {
 
 	world := checkedRestoredWorld(test, false)
 	subject := world.restoring.Reads.Lookups()[0].Subject
-	world.restoring.Reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "close",
-		Subject: methodOf(subject.Pkg(), "Mine", "close")})
+	world.restoring.Reads.AddLookup(askedBy(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "close",
+		Subject: methodOf(subject.Pkg(), "Mine", "close")}))
 	const extraPath = "example.com/restored/extra"
 	withExtra := checkedInMemory(test, restoredHiddenPath, "package hidden\n\nimport \""+extraPath+"\"\n\n"+
 		"var Held extra.Opener\n\ntype closer struct{}\n\nfunc (closer) Close() error { return nil }\n\n"+

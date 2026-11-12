@@ -86,11 +86,8 @@ func TestTheLoadParsesTheLongestPathFirst(test *testing.T) {
 	directory := test.TempDir()
 	writeListingFiles(test, directory, orderFixture())
 	workspace := directory + "/order"
-	environment, environmentError := sourceEnvironment(workspace, []string{"GOWORK=off"})
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
-	listed, listError := list(workspace, environment, []string{"./..."}, nil, nil, nil)
+	goEnvironment := goEnvironmentOf(test, workspace, []string{"GOWORK=off"})
+	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
@@ -129,7 +130,9 @@ func TestTheSwiftBuildIsHandedOnlyTheStatedTreeState(test *testing.T) {
 	writeFile(test, filepath.Join(product, "cohere-swift"), "#!/bin/sh\n")
 	fake := "#!/bin/sh\ncase \"$*\" in\n*--show-bin-path*) echo " + product + " ;;\n" +
 		"*) printf '%s' \"${" + release.SwiftSourceTreeModifiedVariable + "-unset}\" > " + recorded + " ;;\nesac\n"
-	writeFile(test, filepath.Join(bin, "swift"), fake)
+	if writeError := executable_testing.WriteFile(filepath.Join(bin, "swift"), []byte(fake), 0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
 	if chmodError := os.Chmod(filepath.Join(bin, "swift"), 0o755); chmodError != nil {
 		test.Fatal(chmodError)
 	}

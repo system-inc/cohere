@@ -15,7 +15,9 @@ type foreignInterfaces struct {
 	current *types.Package
 	// reads is the reads of current, which each question fix answers is recorded in, nil when the run records none:
 	// the answer depends on every interface of the import closure, which no type read of current holds (#b2t9xmf).
-	reads    *build_reads.Reads
+	reads *build_reads.Reads
+	// rule is the name the rule was registered under, which each question names.
+	rule     string
 	byMethod map[string][]indexedInterface
 	// genericByMethod holds the generic interfaces apart, since one is implemented only through an instantiation
 	// whose type arguments the rule cannot know, and so is matched by shape rather than by types.Implements.
@@ -39,6 +41,7 @@ func (interfaces *foreignInterfaces) fix(method *types.Func) bool {
 		Subject: method,
 		Found:   fixedBy != nil,
 		Answer:  fixedBy,
+		Rule:    interfaces.rule,
 	})
 	return fixedBy != nil
 }

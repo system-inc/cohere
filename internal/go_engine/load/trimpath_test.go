@@ -88,10 +88,7 @@ func TestTranslatedEnvironmentTakesTrimpathOutOfGoFlags(test *testing.T) {
 		test.Run(given, func(test *testing.T) {
 			test.Parallel()
 
-			environment, environmentError := translatedEnvironment(directory, []string{given})
-			if environmentError != nil {
-				test.Fatal(environmentError)
-			}
+			environment := translatedEnvironment(goEnvironmentOf(test, directory, []string{given}))
 			var goFlags []string
 			for _, variable := range environment {
 				if strings.HasPrefix(variable, "GOFLAGS=") {

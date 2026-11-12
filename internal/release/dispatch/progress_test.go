@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // To a pipe or a file, a step and a note print nothing; a failure always prints (#ytqqv8v).
@@ -181,7 +182,7 @@ func TestSwiftPmSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 	writeFile(test, filepath.Join(product, "cohere-swift"), "#!/bin/sh\n")
 	fake := "#!/bin/sh\ncase \"$*\" in\n*--show-bin-path*) echo " + product + " ;;\n" +
 		"*) echo 'Building for production...'; echo '[Computing dependencies]'; exit ${FAKE_SWIFT_EXIT:-0} ;;\nesac\n"
-	if writeError := os.WriteFile(filepath.Join(bin, "swift"), []byte(fake), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(filepath.Join(bin, "swift"), []byte(fake), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	test.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
