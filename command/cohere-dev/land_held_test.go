@@ -55,7 +55,13 @@ func TestALandingAQuietWindowHoldsSaysHeldNotFailed(test *testing.T) {
 			test.Fatalf("waited a minute for the landing to queue for a token:\n%s", output.String())
 		}
 	}
-	if code := quietOn(slots, []string{"--for", "10m", "a measurement"}, time.Now()); code != 0 {
+	if code := quietOn(
+		slots,
+		[]string{"--for", "10m", "a measurement"},
+		time.Now(),
+		discarded(),
+		discarded(),
+	); code != 0 {
 		test.Fatalf("opening a quiet window exited %d", code)
 	}
 	release()

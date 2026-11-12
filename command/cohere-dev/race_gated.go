@@ -22,6 +22,8 @@ import (
 var raceGated = []raceEntry{
 	{"command/cohere", "TestFormatInParallelLeavesTheRulesToTheSerialPath formats files at once " +
 		"(fix_parallel_test.go)"},
+	{"command/cohere-dev", "the pool's tokens, its line, borrowing and the bounded run's watchdog run side by side, " +
+		"and its tests call code that writes the package-wide streams, which raced on Home (#bnabymg)"},
 	{"internal/edit", "TestConcurrentReadersNeverSeeAPartialFile reads while a write replaces the file"},
 	{"internal/executable_testing", "TestAScriptWrittenWhileOthersForkRunsAtOnce writes and runs scripts while " +
 		"other goroutines fork (#g93ts58)"},
