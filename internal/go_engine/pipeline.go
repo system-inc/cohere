@@ -64,6 +64,10 @@ type pipeline struct {
 	// compiler record, a file the formatter could not format, a rule that crashed.
 	incomplete bool
 
+	// censusMissed is each file the load reached that the census never counted (missedByCensus), read once after the
+	// load, for the types record and the run's completeness alike.
+	censusMissed []contract.CensusMissedFile
+
 	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, under
 	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads,
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
@@ -295,8 +299,9 @@ func (engine *pipeline) run() int {
 		// has.
 		loaded, loadError = nil, nil
 	}
+	engine.censusMissed = engine.missedByCensus(loaded)
 	engine.runTypes(loaded, loadError)
-	engine.checkCensusAgainstLoad(loaded)
+	engine.checkCensusAgainstLoad()
 	// The inputs are those of the load the lint ran over, the final round's when a reload ran it again, and the first
 	// load is let go before a reload loads again.
 	loaded = engine.runLint(loaded, loadError, linted)
@@ -348,28 +353,50 @@ func extraBuildsFromSource(runs []buildRun) int {
 	return count
 }
 
-// censusMissedPackages is the packages the load reached in the workspace when its census counted no Go file there,
-// and 0 when the census counted any or the load reached none (#yyv7nr2). The two read one tree, so a census of nothing
-// beside a load of something is a census that never walked it, and every count it feeds, the scope and the files
-// checked and linted, would read 0 over work never done. A load that failed, or that no phase asked for, has nothing
-// to set beside the census.
-func (engine *pipeline) censusMissedPackages(loaded *load.Loaded) int {
-	if loaded == nil || len(engine.described.census.Files) > 0 {
-		return 0
+// missedByCensus is each file a package the load reached holds that the census never counted, with that package, once
+// and sorted by file (#hd5bsqh): every Go file a root of the load holds, a test variant's included, and every one its
+// build constraints left out, is a file go reads in the workspace, and the census counts every such file, those git
+// ignores and those for another platform included, so one it never counted is one nothing of the run accounts for. The
+// files left out count too, so a module whose every file builds only elsewhere, which holds no file here, is seen. A
+// census of nothing beside a load of something, as at a root reached through a symbolic link, misses every file
+// (#yyv7nr2). A load that failed, or that no phase asked for, has nothing to set beside the census.
+func (engine *pipeline) missedByCensus(loaded *load.Loaded) []contract.CensusMissedFile {
+	if loaded == nil {
+		return nil
 	}
-	return loaded.PackagesInWorkspace
+	counted := make(map[string]bool, len(engine.described.census.Files))
+	for _, file := range engine.described.census.Files {
+		counted[file] = true
+	}
+	var missed []contract.CensusMissedFile
+	for _, root := range loaded.Roots {
+		// IgnoredFiles holds the package's other files the constraints left out too, a C or assembly file under cgo
+		// off, which the census, of Go files alone, never counts.
+		for _, file := range slices.Concat(root.GoFiles, root.IgnoredFiles) {
+			if !strings.HasSuffix(file, ".go") || counted[file] {
+				continue
+			}
+			// Marked counted, so a file several variants hold is named once, under the first that holds it.
+			counted[file] = true
+			missed = append(missed, contract.CensusMissedFile{Package: root.PkgPath, File: file})
+		}
+	}
+	slices.SortFunc(missed, func(left contract.CensusMissedFile, right contract.CensusMissedFile) int {
+		return strings.Compare(left.File, right.File)
+	})
+	return missed
 }
 
-// checkCensusAgainstLoad marks the run incomplete, and says why, when its census missed the packages its load reached
-// (censusMissedPackages), so such a run never calls itself complete.
-func (engine *pipeline) checkCensusAgainstLoad(loaded *load.Loaded) {
-	missed := engine.censusMissedPackages(loaded)
-	if missed == 0 {
+// checkCensusAgainstLoad marks the run incomplete, and says why, when the load reached a file the census never counted
+// (missedByCensus), so such a run never calls itself complete.
+func (engine *pipeline) checkCensusAgainstLoad() {
+	if len(engine.censusMissed) == 0 {
 		return
 	}
 	engine.incomplete = true
-	engine.note("the load reached %d packages in the workspace at %s, and its census counted no Go file there, so "+
-		"the run checked none of them", missed, engine.described.record.Root)
+	engine.note("the load reached %d Go files in the workspace at %s that its census never counted, %s in %s first, "+
+		"so the run checked none of them", len(engine.censusMissed), engine.described.record.Root,
+		engine.censusMissed[0].File, engine.censusMissed[0].Package)
 }
 
 // write writes one record, counting findings, unless an earlier record already could not be written.
@@ -762,7 +789,7 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 		FilesWithoutRecord:  withoutRecord,
 		Build: fmt.Sprintf("%s: %d packages, %d in the workspace", build,
 			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
-		CensusMissedPackages:              engine.censusMissedPackages(loaded),
+		CensusMissed:                      engine.censusMissed,
 		WithheldInDependencyCgo:           withheld,
 		WithheldDependencyCgoDeclarations: loaded.WithheldDependencyCgoDeclarations,
 		CgoTranslation: contract.CgoTranslation{

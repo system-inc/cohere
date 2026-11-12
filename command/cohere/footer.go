@@ -103,9 +103,9 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	if summary.Gaps.nothingChecked() {
 		line += " • " + style.red(nothingCheckedSentence(summary.Gaps.Excluded))
 	}
-	if summary.Gaps.CensusMissedPackages > 0 {
-		line += " • " + style.red("no files checked: the census counted no file of the "+
-			counted(summary.Gaps.CensusMissedPackages, "package", "packages")+" the load reached")
+	if len(summary.Gaps.CensusMissed) > 0 {
+		line += " • " + style.red(counted(len(summary.Gaps.CensusMissed), "file", "files")+
+			" the load reached and the census never counted")
 	}
 
 	if cohered := summary.cohered(); cohered > 0 {
@@ -251,7 +251,7 @@ func uncheckedMarkers(summary runSummary) []string {
 	var markers []string
 	// A run that excluded every file it had says so among what it found, and fails; this marker is the project
 	// with no file of its language at all.
-	if gaps.NothingToCheck && !gaps.nothingChecked() && gaps.CensusMissedPackages == 0 {
+	if gaps.NothingToCheck && !gaps.nothingChecked() && len(gaps.CensusMissed) == 0 {
 		markers = append(markers, "⚠ no files to check")
 	}
 	if len(gaps.MissingGenerated) > 0 {

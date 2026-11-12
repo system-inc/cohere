@@ -163,9 +163,9 @@ type engineTypesRecord struct {
 		Packages     int `json:"packages"`
 		Milliseconds int `json:"milliseconds"`
 	} `json:"cgoTranslation"`
-	// CensusMissedPackages is the Go engine's, additive within contract 3 (#yyv7nr2): the packages of the workspace its
-	// load reached when its census counted no file there, absent otherwise. A Swift engine sends none.
-	CensusMissedPackages int `json:"censusMissedPackages"`
+	// CensusMissed is the Go engine's, additive within contract 3 (#yyv7nr2, #hd5bsqh): each file its load reached in
+	// the workspace that its census never counted, with its package, absent when none. A Swift engine sends none.
+	CensusMissed []censusMissedFile `json:"censusMissed"`
 	// SdkIndexSeed is the Swift engine's, additive within contract 3: what the check of its standalone scripts did
 	// with the toolchain's SDK index seed, its key and whether the run's store was seeded from it, absent when no
 	// seed applied. A Go engine sends none.
@@ -350,9 +350,9 @@ type engineRun struct {
 	crashes            int
 	unreadable         []engineUnreadableRecord
 
-	// censusMissedPackages is the packages the types record says the load reached while the census counted no file,
-	// a census that never walked the tree (censusMissedTheLoad).
-	censusMissedPackages int
+	// censusMissed is each file the types record says the load reached and the census never counted
+	// (censusMissedTheLoad).
+	censusMissed []censusMissedFile
 
 	// notWritten are the files the fix record names as not written, each reached through a link outside the root:
 	// already printed as notes, and a gap that makes the run incomplete.
@@ -879,7 +879,7 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 		)
 	}
 	run.filesWithoutRecord += len(record.FilesWithoutRecord)
-	run.censusMissedPackages = record.CensusMissedPackages
+	run.censusMissed = record.CensusMissed
 	// The compiler examined every file it left a record for, at most the files in scope, since it checks the whole
 	// container whatever the scope. A file with no record it did not examine (#1hva1ya).
 	examined := max(record.Files-len(record.FilesWithoutRecord), 0)
@@ -1450,7 +1450,7 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 			run.report.incompleteBeyondPhases = notWrittenSentence
 		case run.censusMissedTheLoad() != "":
 			run.report.incompleteBeyondPhases = run.censusMissedTheLoad()
-			activeSummary.Gaps.CensusMissedPackages = run.censusMissedPackages
+			activeSummary.Gaps.CensusMissed = run.censusMissed
 		default:
 			run.report.incompleteBeyondPhases = run.language.theEngine() +
 				" reported that it fell short without a record saying where"
@@ -1537,16 +1537,17 @@ func (run *engineRun) finish(engineExit int, ended string) (int, error) {
 	return *run.summary.ExitCode, nil
 }
 
-// censusMissedTheLoad is why a run is never complete when the engine's types record says its load reached packages in
-// the workspace that its census counted no file of (#yyv7nr2): the census and the load read one tree, so the census
-// never walked it, and a scope of nothing would read as a project with nothing to check. Empty when the record says
-// none, as for a project with no file of its language, whose load reaches no package of its own.
+// censusMissedTheLoad is why a run is never complete when the engine's types record names files its load reached that
+// its census never counted (#yyv7nr2, #hd5bsqh): the census and the load read one tree, so no count of the run
+// accounts for those files, and a run that checked none of them would read as one that checked everything. Empty
+// when the record names none.
 func (run *engineRun) censusMissedTheLoad() string {
-	if run.censusMissedPackages == 0 {
+	if len(run.censusMissed) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("its load reached %d packages in the %s while its census counted no %s there, so nothing "+
-		"was checked", run.censusMissedPackages, run.language.Container, run.language.FileNoun)
+	return fmt.Sprintf("its load reached %s in the %s that its census never counted, %s in %s first",
+		counted(len(run.censusMissed), "file", "files"), run.language.Container, run.censusMissed[0].File,
+		run.censusMissed[0].Package)
 }
 
 // countExcludedWhenNothingChecked fills the summary's reasons for a run that checked none of its files: each file

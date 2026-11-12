@@ -223,6 +223,13 @@ type notWrittenFile struct {
 	RealPath string `json:"realPath"`
 }
 
+// censusMissedFile is a file an engine's load reached that its census never counted, with its package (#hd5bsqh):
+// the same fields the Go engine's types record writes (internal/go_engine/contract.CensusMissedFile).
+type censusMissedFile struct {
+	Package string `json:"package"`
+	File    string `json:"file"`
+}
+
 // withheldCgoFile is one file of a dependency with cgo files whose type errors a Go run withheld: its package,
 // the file as the engine names it, and how many errors it held. The same fields the Go engine's types record
 // writes (internal/go_engine/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.
@@ -257,7 +264,7 @@ func (summary runSummary) phasesNotRun() []string {
 func (summary runSummary) failed() bool {
 	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
 		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0 ||
-		summary.Gaps.nothingChecked() || summary.Gaps.CensusMissedPackages > 0
+		summary.Gaps.nothingChecked() || len(summary.Gaps.CensusMissed) > 0
 }
 
 // swiftSummary is what only a Swift run says of itself.
