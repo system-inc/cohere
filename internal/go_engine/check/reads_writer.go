@@ -124,6 +124,7 @@ func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
 		for _, candidate := range candidates {
 			persisted.Candidates = append(persisted.Candidates, writer.object(candidate, true))
 		}
+		writer.methodJudgment(&persisted, lookup, candidates)
 	case build_reads.QueryDeprecated:
 		if lookup.Subject != nil {
 			persisted.Subject = writer.object(lookup.Subject, false)
@@ -133,6 +134,42 @@ func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
 		}
 	}
 	return persisted
+}
+
+// methodJudgment adds to persisted, an Interface or Method lookup with a subject, what the one-bit judgment reads of
+// lookup (methodJudgmentOf), from candidates, the host's type names with a method of its name, sorted.
+//
+// Mutates: persisted gains the answer's own lines, the subject's shape and receiver, and the rule's candidates
+func (writer *readsWriter) methodJudgment(
+	persisted *persistedLookup,
+	lookup build_reads.Lookup,
+	candidates []*types.TypeName,
+) {
+	if lookup.Answer != nil {
+		persisted.Answer = writer.object(lookup.Answer, false)
+		_, persisted.AnswerIsMethod = lookup.Answer.(*types.Func)
+		persisted.AnswerLines = answerLinesOf(lookup.Answer, writer.version)
+	}
+	if subject, isMethod := lookup.Subject.(*types.Func); isMethod {
+		shape := shapeOf(subject.Signature())
+		persisted.SubjectIsMethod = true
+		persisted.SubjectShape = persistedShape{Parameters: shape.parameters, Results: shape.results,
+			Variadic: shape.variadic}
+		persisted.ReceiverInterface = receiverIsInterface(subject)
+		persisted.EmbedsForeign = receiverEmbedsForeign(subject)
+	}
+	for _, typeName := range candidates {
+		candidate, isCandidate := methodCandidateOf(typeName, lookup.Query, lookup.Name, lookup.Answer,
+			writer.version)
+		if !isCandidate {
+			continue
+		}
+		persisted.RuleCandidates = append(persisted.RuleCandidates, persistedMethodCandidate{
+			TypeName: writer.object(typeName, true), Interface: candidate.isInterface, Generic: candidate.isGeneric,
+			Shape: persistedShape{Parameters: candidate.shape.parameters, Results: candidate.shape.results,
+				Variadic: candidate.shape.variadic},
+			Lines: candidate.lines, HoldsAnswer: candidate.holdsAnswer})
+	}
 }
 
 // owner is the reference to the package at path in the record's owners, interned the first time it is named.

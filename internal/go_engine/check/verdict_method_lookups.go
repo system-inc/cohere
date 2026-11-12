@@ -1,6 +1,7 @@
 package check
 
 import (
+	"bytes"
 	"go/types"
 	"slices"
 
@@ -30,53 +31,77 @@ import (
 //     those can differ by build while the lookup's candidates do not.
 //
 // A lookup only these rules ask is judged so, so a fourth rule that records one must be read first
-// (TestOnlyTheRulesReadForOneBitRecordMethodOrInterfaceLookups).
+// (TestOnlyTheRulesReadForOneBitRecordMethodOrInterfaceLookups). The judgment is one, methodLookupHolds, over what
+// either verdict holds of a lookup (methodJudgment): the reads of this run (methodJudgmentOf) and those an entry
+// persisted (persistedMethodJudgment), so the two verdicts agree on every lookup.
 
-// methodLookupHolds is the judgment of a Method or Interface lookup by the one bit its rules read, over each side's
-// type names with a method of the name, a package the build restored from the host giving the host's. It reports
-// false for decided when the lookup keeps the closure judgment instead (see the cases above).
-func (judged verdict) methodLookupHolds(
-	name string,
-	lookup build_reads.Lookup,
-	hostTypeNames []*types.TypeName,
-	buildTypeNames []*types.TypeName,
-) (holds bool, why string, decided bool) {
-	subject, isMethod := lookup.Subject.(*types.Func)
-	if !isMethod || receiverEmbedsForeign(subject) {
+// methodJudgment is what methodLookupHolds reads of a Method or Interface lookup, from the reads of this run or from
+// those an entry persisted: its query and name, whether the host's rule found an answer, the subject's method shape,
+// whether its receiver is an interface and whether it embeds another package's type at any depth, and each side's
+// candidates by their package's path and name, a package the build restored from the host giving the host's. answer
+// is the host's answer as the build finds it, when the host found one.
+type methodJudgment struct {
+	query             string
+	name              string
+	found             bool
+	subjectIsMethod   bool
+	subjectShape      signatureShape
+	receiverInterface bool
+	embedsForeign     bool
+	host              map[string]methodCandidate
+	build             map[string]methodCandidate
+	answer            answerInBuild
+}
+
+// answerInBuild is a lookup's answer as the build finds it: absent when the host found one but recorded none to ask,
+// its name, as a reason names it, whether it is a method, the digest of its own lines on the host (answerLinesOf),
+// whether it is the host's own object in the build, of a package the build restored from the host, and otherwise the
+// build's counterpart, nil with why there is none.
+type answerInBuild struct {
+	absent      bool
+	name        string
+	isMethod    bool
+	hostLines   []byte
+	restored    bool
+	counterpart types.Object
+	missing     string
+}
+
+// methodLookupHolds is the judgment of a Method or Interface lookup, named name, by the one bit its rules read. It
+// reports false for decided when the lookup keeps the closure judgment instead (see the cases above).
+func methodLookupHolds(name string, judgment methodJudgment) (holds bool, why string, decided bool) {
+	if !judgment.subjectIsMethod || judgment.embedsForeign {
 		return false, "", false
 	}
-	host := methodCandidatesOf(hostTypeNames, lookup.Query, lookup.Name)
-	build := methodCandidatesOf(buildTypeNames, lookup.Query, lookup.Name)
-	shape := shapeOf(subject.Signature())
-	if lookup.Query == build_reads.QueryMethod {
-		for _, side := range []map[string]methodCandidate{host, build} {
+	if judgment.query == build_reads.QueryMethod {
+		for _, side := range []map[string]methodCandidate{judgment.host, judgment.build} {
 			for _, candidate := range side {
-				if candidate.isGeneric && shapeOf(candidate.method.Signature()) == shape {
+				if candidate.isGeneric && candidate.shape == judgment.subjectShape {
 					return false, "", false
 				}
 			}
 		}
 	}
-	if lookup.Found {
-		holds, why = judged.answerStillFixes(name, lookup, subject, host, build)
+	if judgment.found {
+		holds, why = answerStillFixes(name, judgment)
 		return holds, why, true
 	}
-	keys := make([]string, 0, len(build))
-	for key := range build {
+	keys := make([]string, 0, len(judgment.build))
+	for key := range judgment.build {
 		keys = append(keys, key)
 	}
 	slices.Sort(keys)
 	for _, key := range keys {
-		candidate := build[key]
-		hostCandidate, onHost := host[key]
-		if onHost && hostCandidate.sameLines(candidate) || shapeOf(candidate.method.Signature()) != shape {
+		candidate := judgment.build[key]
+		hostCandidate, onHost := judgment.host[key]
+		if onHost && hostCandidate.sameLines(candidate) || candidate.shape != judgment.subjectShape {
 			continue
 		}
 		change := "new"
 		if onHost {
 			change = "changed"
 		}
-		return false, name + ": " + key + "." + lookup.Name + " is " + change + " in the build, of the subject's " +
+		return false, name + ": " + key + "." + judgment.name + " is " + change + " in the build, of the subject's " +
 			"shape", true
 	}
 	return true, "", true
@@ -91,50 +116,74 @@ func (judged verdict) methodLookupHolds(
 // must have a counterpart in the build, at its objectpath or, for the predeclared error, itself (counterpart), and
 // render alike by its own lines; for an interface's method a concrete subject must implement, so must every interface
 // of the host's closure whose method set holds it, since Implements reads the whole interface.
-func (judged verdict) answerStillFixes(
-	name string,
-	lookup build_reads.Lookup,
-	subject *types.Func,
-	host map[string]methodCandidate,
-	build map[string]methodCandidate,
-) (bool, string) {
-	answer := lookup.Answer
-	if answer == nil {
+func answerStillFixes(name string, judgment methodJudgment) (bool, string) {
+	answer := judgment.answer
+	switch {
+	case answer.absent:
 		return false, name + ": it was found on the host with no answer to ask of the build"
-	}
-	if answer.Pkg() != nil && judged.restored[judged.closure[answer.Pkg().Path()]] {
+	case answer.restored:
 		return true, ""
 	}
-	counterpart, missing := judged.counterpart(answer)
-	if counterpart == nil {
-		return false, name + ": its answer " + objectName(answer) + " is not in the build: " + missing
+	if answer.counterpart == nil {
+		return false, name + ": its answer " + answer.name + " is not in the build: " + answer.missing
 	}
-	switch hostAnswer := answer.(type) {
-	case *types.TypeName:
-		hostInterface, hostIsInterface := hostAnswer.Type().Underlying().(*types.Interface)
-		buildInterface, buildIsInterface := counterpart.Type().Underlying().(*types.Interface)
-		if !hostIsInterface || !buildIsInterface || interfaceLine(hostInterface) != interfaceLine(buildInterface) {
-			return false, name + ": its answer " + objectName(hostAnswer) + " has other methods in the build"
-		}
-		return true, ""
-	case *types.Func:
-		buildMethod, isMethod := counterpart.(*types.Func)
-		if !isMethod || signatureLine(hostAnswer) != signatureLine(buildMethod) {
-			return false, name + ": its answer " + objectName(hostAnswer) + " has another signature in the build"
-		}
-		if types.IsInterface(subject.Signature().Recv().Type()) {
-			return true, ""
-		}
-		for key, candidate := range host {
-			if candidate.interfaceType == nil || !slices.Contains(slices.Collect(candidate.interfaceType.Methods()),
-				hostAnswer) {
-				continue
-			}
-			if buildCandidate, inBuild := build[key]; !inBuild || !buildCandidate.sameLines(candidate) {
-				return false, name + ": " + key + ", whose method is its answer, has other methods in the build"
-			}
-		}
+	buildLines := answerLinesOf(answer.counterpart, ReadsRendererVersion)
+	_, buildIsMethod := answer.counterpart.(*types.Func)
+	switch {
+	case !answer.isMethod && (buildIsMethod || buildLines == nil || !bytes.Equal(buildLines, answer.hostLines)):
+		return false, name + ": its answer " + answer.name + " has other methods in the build"
+	case answer.isMethod && (!buildIsMethod || !bytes.Equal(buildLines, answer.hostLines)):
+		return false, name + ": its answer " + answer.name + " has another signature in the build"
+	}
+	if !answer.isMethod || judgment.receiverInterface {
 		return true, ""
 	}
-	return false, name + ": its answer " + objectName(answer) + " is neither a type name nor a method"
+	keys := make([]string, 0, len(judgment.host))
+	for key := range judgment.host {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		candidate := judgment.host[key]
+		if !candidate.holdsAnswer {
+			continue
+		}
+		if buildCandidate, inBuild := judgment.build[key]; !inBuild || !buildCandidate.sameLines(candidate) {
+			return false, name + ": " + key + ", whose method is its answer, has other methods in the build"
+		}
+	}
+	return true, ""
+}
+
+// methodJudgmentOf is what methodLookupHolds reads of lookup, a lookup of this run, over each side's type names with a
+// method of its name, a package the build restored from the host giving the host's.
+func (judged verdict) methodJudgmentOf(
+	lookup build_reads.Lookup,
+	hostTypeNames []*types.TypeName,
+	buildTypeNames []*types.TypeName,
+) methodJudgment {
+	judgment := methodJudgment{query: lookup.Query, name: lookup.Name, found: lookup.Found,
+		host:  methodCandidatesOf(hostTypeNames, lookup.Query, lookup.Name, lookup.Answer),
+		build: methodCandidatesOf(buildTypeNames, lookup.Query, lookup.Name, nil)}
+	subject, isMethod := lookup.Subject.(*types.Func)
+	if !isMethod {
+		return judgment
+	}
+	judgment.subjectIsMethod, judgment.subjectShape = true, shapeOf(subject.Signature())
+	judgment.receiverInterface = receiverIsInterface(subject)
+	judgment.embedsForeign = receiverEmbedsForeign(subject)
+	switch answer := lookup.Answer; {
+	case !lookup.Found:
+	case answer == nil:
+		judgment.answer.absent = true
+	default:
+		_, isMethod := answer.(*types.Func)
+		judgment.answer = answerInBuild{name: objectName(answer), isMethod: isMethod,
+			hostLines: answerLinesOf(answer, ReadsRendererVersion),
+			restored:  answer.Pkg() != nil && judged.restored[judged.closure[answer.Pkg().Path()]]}
+		if !judgment.answer.restored {
+			judgment.answer.counterpart, judgment.answer.missing = judged.counterpart(answer)
+		}
+	}
+	return judgment
 }

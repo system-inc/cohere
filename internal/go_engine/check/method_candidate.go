@@ -1,27 +1,30 @@
 package check
 
 import (
+	"bytes"
 	"go/types"
 	"slices"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
-// methodCandidate is one type name a rule could match for a lookup's name: its method of that name, its interface
-// type when it is one, nil otherwise, whether it is generic, and the lines it is compared across builds by, its
-// method's signature and, for an interface, every method of its method set.
+// methodCandidate is one type name a rule could match for a Method or Interface lookup's name, as either verdict holds
+// it, of this run's types or persisted (methodLookupHolds): whether it is an interface or generic, the shape of its
+// method of the name, the digest of the lines it is compared across builds by, its method's signature and, for an
+// interface, every method of its method set, and, for an interface, whether its method set holds the lookup's answer.
 type methodCandidate struct {
-	method        *types.Func
-	interfaceType *types.Interface
-	isGeneric     bool
-	signatureLine string
-	interfaceLine string
+	isInterface bool
+	isGeneric   bool
+	shape       signatureShape
+	lines       []byte
+	holdsAnswer bool
 }
 
 // sameLines reports whether two builds' candidates of one type name render alike by their own lines.
 func (candidate methodCandidate) sameLines(other methodCandidate) bool {
-	return candidate.signatureLine == other.signatureLine && candidate.interfaceLine == other.interfaceLine
+	return bytes.Equal(candidate.lines, other.lines)
 }
 
 // signatureShape is what every rule's match of a method needs at least: as many parameters and results, variadic the
@@ -58,11 +61,44 @@ func interfaceLine(interfaceType *types.Interface) string {
 	return strings.Join(lines, "\n")
 }
 
+// ownLinesDigest is the digest of lines, mixed with version, the renderer's, as a persisted read holds a digest
+// (persistedDigest), so a candidate of this run and one persisted by a binary of the same renderer compare alike, and
+// one of another renderer never does.
+func ownLinesDigest(version string, lines ...string) []byte {
+	parts := make([][]byte, 0, len(lines))
+	for _, line := range lines {
+		parts = append(parts, []byte(line))
+	}
+	return persistedDigest(version, cache.DigestOf(parts...))
+}
+
+// answerLinesOf is the digest of the own lines of a lookup's answer under version, the renderer's, as the verdict
+// compares it across builds: an interface's every method, or a method's signature, and nil for anything else, which no
+// build can answer alike.
+func answerLinesOf(answer types.Object, version string) []byte {
+	switch declared := answer.(type) {
+	case *types.TypeName:
+		if interfaceType, isInterface := declared.Type().Underlying().(*types.Interface); isInterface {
+			return ownLinesDigest(version, "interface", interfaceLine(interfaceType))
+		}
+	case *types.Func:
+		return ownLinesDigest(version, "method", signatureLine(declared))
+	}
+	return nil
+}
+
 // methodCandidateOf is typeName as the rules index it for a lookup of query and name, and false when no rule could
 // match it: an interface by the method of its method set, which Interface takes only of an interface a type can
 // implement, and for Method a named type by the method it declares, never one an embedded field promotes, which no
-// rule indexes.
-func methodCandidateOf(typeName *types.TypeName, query string, name string) (methodCandidate, bool) {
+// rule indexes. answer is the lookup's answer, nil for none, which an interface's method set may hold, and version the
+// renderer's the lines are digested under.
+func methodCandidateOf(
+	typeName *types.TypeName,
+	query string,
+	name string,
+	answer types.Object,
+	version string,
+) (methodCandidate, bool) {
 	named, isNamed := types.Unalias(typeName.Type()).(*types.Named)
 	isGeneric := isNamed && named.TypeParams().Len() > 0
 	if interfaceType, isInterface := typeName.Type().Underlying().(*types.Interface); isInterface {
@@ -71,8 +107,10 @@ func methodCandidateOf(typeName *types.TypeName, query string, name string) (met
 		}
 		for method := range interfaceType.Methods() {
 			if method.Name() == name {
-				return methodCandidate{method: method, interfaceType: interfaceType, isGeneric: isGeneric,
-					signatureLine: signatureLine(method), interfaceLine: interfaceLine(interfaceType)}, true
+				return methodCandidate{isInterface: true, isGeneric: isGeneric, shape: shapeOf(method.Signature()),
+					lines: ownLinesDigest(version, signatureLine(method), interfaceLine(interfaceType)),
+					holdsAnswer: answer != nil && slices.ContainsFunc(slices.Collect(interfaceType.Methods()),
+						func(held *types.Func) bool { return types.Object(held) == answer })}, true
 			}
 		}
 		return methodCandidate{}, false
@@ -82,22 +120,36 @@ func methodCandidateOf(typeName *types.TypeName, query string, name string) (met
 	}
 	for method := range named.Methods() {
 		if method.Name() == name {
-			return methodCandidate{method: method, isGeneric: isGeneric, signatureLine: signatureLine(method)}, true
+			return methodCandidate{isGeneric: isGeneric, shape: shapeOf(method.Signature()),
+				lines: ownLinesDigest(version, signatureLine(method))}, true
 		}
 	}
 	return methodCandidate{}, false
 }
 
 // methodCandidatesOf are the candidates among typeNames, a side's type names with a method of the name, by their
-// package's path and name.
-func methodCandidatesOf(typeNames []*types.TypeName, query string, name string) map[string]methodCandidate {
+// package's path and name, their lines digested under this binary's renderer.
+func methodCandidatesOf(
+	typeNames []*types.TypeName,
+	query string,
+	name string,
+	answer types.Object,
+) map[string]methodCandidate {
 	candidates := map[string]methodCandidate{}
 	for _, typeName := range typeNames {
-		if candidate, isCandidate := methodCandidateOf(typeName, query, name); isCandidate {
+		if candidate, isCandidate := methodCandidateOf(typeName, query, name, answer,
+			ReadsRendererVersion); isCandidate {
 			candidates[objectName(typeName)] = candidate
 		}
 	}
 	return candidates
+}
+
+// receiverIsInterface reports whether subject is a method of an interface, whose implementers a rule matches it
+// against, rather than a concrete type's.
+func receiverIsInterface(subject *types.Func) bool {
+	receiver := subject.Signature().Recv()
+	return receiver != nil && types.IsInterface(receiver.Type())
 }
 
 // receiverEmbedsForeign reports whether subject's receiver embeds a type another package declares, directly or through

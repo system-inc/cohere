@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -83,6 +84,11 @@ func readsRenderingLines(test *testing.T) []string {
 					lines = append(lines, "\t"+line)
 				}
 			}
+			// The own lines a Method or Interface lookup's candidate is compared by (#qqzg1w8), for each method a rule
+			// could match it by.
+			if typeName, isTypeName := object.(*types.TypeName); isTypeName {
+				lines = append(lines, methodCandidateLines(typeName)...)
+			}
 		}
 	}
 	for _, fact := range []analysis.Fact{
@@ -95,6 +101,33 @@ func readsRenderingLines(test *testing.T) []string {
 			test.Fatal(digestError)
 		}
 		lines = append(lines, "fact "+factTypeName(reflect.TypeOf(fact))+" "+hex.EncodeToString(digest[:]))
+	}
+	return lines
+}
+
+// methodCandidateLines are typeName's own lines as a Method lookup's candidate, for each method a rule could match it
+// by, an interface's every one and a named type's declared ones: the digest, then its method's signature and, for an
+// interface, every method of its method set.
+func methodCandidateLines(typeName *types.TypeName) []string {
+	var methods []*types.Func
+	if interfaceType, isInterface := typeName.Type().Underlying().(*types.Interface); isInterface {
+		methods = slices.Collect(interfaceType.Methods())
+	} else if named, isNamed := types.Unalias(typeName.Type()).(*types.Named); isNamed {
+		methods = slices.Collect(named.Methods())
+	}
+	var lines []string
+	for _, method := range methods {
+		candidate, isCandidate := methodCandidateOf(typeName, build_reads.QueryMethod, method.Name(), nil,
+			ReadsRendererVersion)
+		if !isCandidate {
+			continue
+		}
+		lines = append(lines,
+			"candidate "+objectName(typeName)+"."+method.Name()+" "+hex.EncodeToString(candidate.lines),
+			"\t"+signatureLine(method))
+		if interfaceType, isInterface := typeName.Type().Underlying().(*types.Interface); isInterface {
+			lines = append(lines, "\t"+strings.ReplaceAll(interfaceLine(interfaceType), "\n", "\n\t"))
+		}
 	}
 	return lines
 }

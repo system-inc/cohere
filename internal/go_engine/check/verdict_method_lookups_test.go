@@ -102,7 +102,8 @@ type methodLookupOf func(host methodWorld) build_reads.Lookup
 // declined when it can. Each step's build is windows unless it names another, its host darwin. The closure judgment,
 // which compares every type name with a method of the name, would decline every step whose build adds or changes one;
 // the steps marked so hold under the one-bit judgment, and the two kept on the closure judgment, a generic candidate
-// of the subject's shape and a receiver embedding a foreign type, decline as it does.
+// of the subject's shape and a receiver embedding a foreign type, decline as it does. Each step's reads, persisted as
+// an entry persists them, are judged alike.
 func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 	test.Parallel()
 
@@ -252,9 +253,17 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			reads.AddLookup(step.lookup(host))
 			restoring := Restoring{Path: methodUserPath, Imports: []string{methodForeignPath}, Reads: reads}
 			closure := map[string]*types.Package{methodForeignPath: built.foreign}
-			holds, why := TypesHold(restoring, closure, nil, NewReadsBuild(), NewReadsBuild())
+			hostMemo := measuredReadsBuild()
+			holds, why := TypesHold(restoring, closure, nil, hostMemo, measuredReadsBuild())
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
+			}
+			// The same reads as an entry persists them are judged alike, by the same judgment (methodLookupHolds).
+			persisted := persistedRestoring(test, restoring, hostMemo, ReadsRendererVersion)
+			persistedHolds, persistedWhy := TypesHold(persisted, closure, nil, hostMemo, measuredReadsBuild())
+			if persistedHolds != holds || persistedWhy != why {
+				test.Errorf("persisted, want %t, %q as in memory, got %t, %q", holds, why, persistedHolds,
+					persistedWhy)
 			}
 		})
 	}

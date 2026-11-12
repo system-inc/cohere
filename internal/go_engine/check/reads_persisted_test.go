@@ -406,10 +406,11 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 }
 
 // persistedRestoredSteps are the restored fixture's verdicts on its user, whose Method lookup of Close and Interface
-// lookup of close ask of hidden, each with the reason it is to give: restored from the host, whose export data drops
-// closer with its exported Close and its unexported close, so the host's type names stand for the build's; read from
-// that export data without being restored, where closer is missing; and checked from source with an import of its
-// own the host's closure lacks, which the build restored from the host, so its Opener's Close counts in the build.
+// lookup of close ask of hidden, neither answered, each with the reason it is to give: restored from the host, whose
+// export data drops closer with its exported Close and its unexported close, so the host's type names stand for the
+// build's; read from that export data without being restored, where closer is missing, which no rule's answer can
+// gain from (methodLookupHolds); and checked from source with an import of its own the host's closure lacks, which the
+// build restored from the host, so its Opener's Close is a new candidate of the subject's shape in the build.
 func persistedRestoredSteps(test *testing.T) []struct {
 	name      string
 	restoring Restoring
@@ -421,7 +422,7 @@ func persistedRestoredSteps(test *testing.T) []struct {
 } {
 	test.Helper()
 
-	world := checkedRestoredWorld(test)
+	world := checkedRestoredWorld(test, false)
 	subject := world.restoring.Reads.Lookups()[0].Subject
 	world.restoring.Reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "close",
 		Subject: methodOf(subject.Pkg(), "Mine", "close")})
@@ -446,11 +447,11 @@ func persistedRestoredSteps(test *testing.T) []struct {
 			map[*types.Package]bool{world.exportHidden: true}, host, measuredReadsBuild(), ""},
 		{"checked from source", world.restoring,
 			map[string]*types.Package{restoredHiddenPath: world.exportHidden}, nil, host, measuredReadsBuild(),
-			"L lookup Interface close: 1 type names have the method on the host, 0 in the build"},
+			""},
 		{"with a restored import the host lacks", world.restoring,
 			map[string]*types.Package{restoredHiddenPath: withExtra},
 			map[*types.Package]bool{withExtra.Imports()[0]: true}, host, measuredReadsBuild(),
-			"L lookup Method Close: 1 type names have the method on the host, 2 in the build"},
+			"L lookup Method Close: " + extraPath + ".Opener.Close is new in the build, of the subject's shape"},
 	}
 }
 

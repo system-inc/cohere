@@ -289,7 +289,8 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 			func(owner *types.Package) bool { return hostClosure.byPath[owner.Path()] != nil })...)
 		sortTypeNames(hostCandidates)
 		sortTypeNames(buildCandidates)
-		if holds, why, decided := judged.methodLookupHolds(name, lookup, hostCandidates, buildCandidates); decided {
+		judgment := judged.methodJudgmentOf(lookup, hostCandidates, buildCandidates)
+		if holds, why, decided := methodLookupHolds(name, judgment); decided {
 			return holds, why
 		}
 		if len(hostCandidates) != len(buildCandidates) {
