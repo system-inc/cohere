@@ -61,6 +61,31 @@ func TestRenameExportsChangesNoFinding(test *testing.T) {
 		"lookalike")
 }
 
+// The verdict counts a build's new candidate for an unanswered Interface lookup only where the rule could take it as
+// fixing the name, and leaves out a concrete type's method with an unexported name when our method is not an
+// interface's (methodLookupHolds, #swv3jbw). That rests on foreignInterfaces indexing interfaces only, so no concrete
+// method of another package fixes a name. unexportedmethods reaches an unexported concrete type's parseURL with the
+// name and signature of a concrete type's parseURL and a generic type's of ours, and both stay findings, so a rule
+// that let such a method fix either by its name and signature fails on its want.
+func TestAnUnexportedConcreteForeignMethodNeverFixesAName(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_uppercase_initialism.Analyzer,
+		"unexportedmethods")
+}
+
+// The verdict's method index reads an interface's whole method set and a concrete type's declared methods only
+// (#swv3jbw). This rule reads interfaces alone, so its part of that is two things: an interface's methods are its
+// whole method set, embedded ones included, and a concrete type fixes no name, by a method it declares or one
+// promoted to it. promotedmethods' place implements foreign.Located, which has HomeURL only by embedding an interface
+// written in place, and its HomeURL stays silent; its shop has the HomeURL foreign.Runner has by promotion, and stays
+// a finding. A rule that read an interface's explicit methods alone fails on place, and one that read a concrete
+// type's method set fails on shop.
+func TestOnlyDeclaredMethodsFixAName(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_uppercase_initialism.Analyzer,
+		"promotedmethods")
+}
+
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
 // command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
 // Loading the fixtures needs only go list.
