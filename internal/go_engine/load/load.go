@@ -219,6 +219,13 @@ type Caching struct {
 	// Loaded.Reads and Overlap.Reads are nil.
 	RecordReads bool
 
+	// AnalyzedRootsOnly leaves out of the load every root no action reaches: a package whose in-package test variant
+	// "p [p.test]" is analyzed in its place (analyzedOfGraph) and which no package of the graph imports, as a command
+	// main with tests is. The variant holds every file of it, so nothing goes unanalyzed, and the files a load reports
+	// as compiled through its Roots are the same. An extra build asks for it (#ws2ptvf): the host type-checks such a
+	// package as a root of its patterns, and each build would check it again for nothing. Unset, every root is loaded.
+	AnalyzedRootsOnly bool
+
 	// rootSyntaxOnly has every dependency type-checked with no type maps and left without its syntax (see
 	// PackagesWithRootSyntax).
 	rootSyntaxOnly bool
@@ -379,6 +386,9 @@ func fromSource(
 			buildContext.GOARCH)
 	}
 	built := newGraph(listed, workspace, compiled)
+	if caching.AnalyzedRootsOnly {
+		built.roots = reachedRoots(built)
+	}
 	withheld := newWithheldErrors()
 	typeChecker := newLoader(built, sizes, withheld, overlay, caching.Held, caching.Timing)
 	reachable := typeChecker.connect()
@@ -483,6 +493,27 @@ func fromSource(
 		Rewritten:                         typeChecker.rewritten,
 		testFunctions:                     typeChecker.testFunctions,
 	}, nil
+}
+
+// reachedRoots is built's roots less each one no action reaches: a package whose in-package test variant is
+// analyzed in its place (see analyzedOfGraph) and which no package of the graph imports. A root some package imports
+// stays, since connect would reach it through the importer all the same.
+func reachedRoots(built *graph) []*node {
+	imported := map[string]bool{}
+	for _, each := range built.nodes {
+		for _, identifier := range each.imports {
+			imported[identifier] = true
+		}
+	}
+	kept := make([]*node, 0, len(built.roots))
+	for _, root := range built.roots {
+		withTests := built.nodes[root.loaded.ID+" ["+root.loaded.ID+".test]"]
+		if root.loaded.ForTest == "" && withTests != nil && !imported[root.loaded.ID] {
+			continue
+		}
+		kept = append(kept, root)
+	}
+	return kept
 }
 
 // analyzedOfGraph is the roots of the load to analyze, as a driver of go/packages would choose them from its roots,

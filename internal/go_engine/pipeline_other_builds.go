@@ -264,8 +264,15 @@ func (engine *pipeline) extraBuildRun(
 			session.RestoreFromHost(host)
 		}
 	}
-	// As the host's load does (loadWorkspace), a package with no file in scope is loaded and never analyzed.
-	caching := load.Caching{Held: engine.held, Timing: engine.timing, Analyzes: engine.described.hasFileInScope}
+	// As the host's load does (loadWorkspace), a package with no file in scope is loaded and never analyzed. A root no
+	// action reaches, a command main whose test variant is analyzed in its place, is left out of the build's load
+	// (#ws2ptvf): the host checked it, and its variant carries its files here.
+	caching := load.Caching{
+		Held:              engine.held,
+		Timing:            engine.timing,
+		Analyzes:          engine.described.hasFileInScope,
+		AnalyzedRootsOnly: true,
+	}
 	if session != nil {
 		caching.Restorer = session
 		if session.HasStore() {
