@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // TestAMixedRunUnderJsonWritesOnlyRecordsToStdout: a repository holding a TypeScript program and a Swift
@@ -27,7 +29,11 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 		test.Fatal(absoluteError)
 	}
 	engine := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := os.WriteFile(engine, []byte("#!/bin/sh\ncat '"+fixture+"'\n"), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(
+		engine,
+		[]byte("#!/bin/sh\ncat '"+fixture+"'\n"),
+		0o755,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	root := test.TempDir()

@@ -17,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // goReplayFixture is a tiny Go module, in a directory of its own so an ancestor go.work can be planted beside it,
@@ -504,7 +506,11 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			}
 			toolchain := fixture.test.TempDir()
 			script := "#!/bin/sh\nexec '" + realGo + "' \"$@\"\n"
-			if writeError := os.WriteFile(filepath.Join(toolchain, "go"), []byte(script), 0o755); writeError != nil {
+			if writeError := executable_testing.WriteFile(
+				filepath.Join(toolchain, "go"),
+				[]byte(script),
+				0o755,
+			); writeError != nil {
 				fixture.test.Fatal(writeError)
 			}
 			fixture.setVariable("PATH", toolchain+string(os.PathListSeparator)+os.Getenv("PATH"))

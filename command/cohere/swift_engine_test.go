@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // fakeSwiftEngine writes a shell script standing in for cohere-swift, so the process boundary can be driven
@@ -23,7 +25,7 @@ import (
 func fakeSwiftEngine(test *testing.T, body string) string {
 	test.Helper()
 	path := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	return path
