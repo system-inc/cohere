@@ -62,6 +62,42 @@ func (cache *memoryCache) Save(key string, value any) error { // want "as .any."
 // lastStore brings elsewhere.Store into the import graph, so Save is compared with its method and does not match.
 var lastStore elsewhere.Store
 
+// localRegistry's Lookup has the name and signature of elsewhere.Registry's, a concrete method, which fixes nothing of
+// a concrete method of ours: only an interface fixes what implements it, so the signature is this package's.
+type localRegistry struct {
+	entries map[string]string
+}
+
+func (registry *localRegistry) Lookup(key string) any { // want "as .any."
+	return registry.entries[key]
+}
+
+// cachedRegistry embeds elsewhere.Registry and declares a Lookup of its own, which shadows the embedded one. Go lets a
+// shadowing method take any signature, so the embedded method fixes nothing of it, and with no interface asking for
+// it the signature is this package's choice.
+type cachedRegistry struct {
+	elsewhere.Registry
+	cache map[string]string
+}
+
+func (registry *cachedRegistry) Lookup(key string) any { // want "as .any."
+	return registry.cache[key]
+}
+
+// lastRegistry and lastShelf bring elsewhere.Registry and elsewhere.Shelf into the import graph.
+var (
+	lastRegistry elsewhere.Registry
+	lastShelf    elsewhere.Shelf[int]
+)
+
+// localShelf's Place has the shape of elsewhere.Shelf's, a generic concrete method, which no more fixes a concrete
+// method of ours than a plain one does.
+type localShelf struct{}
+
+func (shelf localShelf) Place(item any) { // want "as .any."
+	fmt.Println(item)
+}
+
 type pairHolder struct{}
 
 // Hold takes two values where elsewhere.Holder's method takes one, so no instantiation of it is what this matches.

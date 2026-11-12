@@ -665,12 +665,15 @@ func (flows *flowAnalysis) anyFixed(declarations []flowKey) bool {
 	return false
 }
 
-// matchesForeignMethod is whether a method of another package in the import graph has method's name and signature.
-// Implementing an interface takes exactly its method's signature, and an interface written here to be satisfied by
-// another package's type copies that type's method, so in both cases the signature is that package's. A near miss,
-// a generic type's method with as many parameters and results, is left alone too, since some instantiation may be
-// what it matches. The question and the method that answers it, or none, are recorded in the context's reads, since
-// the answer depends on every method of the import closure, which no type read of the package holds (#b2t9xmf).
+// matchesForeignMethod is whether a method of another package in the import graph has method's name and signature
+// and fixes it. Implementing an interface takes exactly its method's signature, and an interface written here to be
+// satisfied by another package's type copies that type's method, so in both cases the signature is that package's.
+// Those are the only two: a concrete method of another package fixes nothing of a concrete method here, which Go
+// relates to it by no rule, not even when ours shadows it through an embedded field, since a shadowing method may
+// take any signature (#9bm8bdt). A near miss, a generic type's method with as many parameters and results, is left
+// alone too, since some instantiation may be what it matches. The question and the method that answers it, or none,
+// are recorded in the context's reads, since the answer depends on every method of the import closure, which no type
+// read of the package holds (#b2t9xmf).
 func (flows *flowAnalysis) matchesForeignMethod(method *types.Func) bool {
 	matched := flows.matchingForeignMethod(method)
 	flows.context.Reads().AddLookup(build_reads.Lookup{
@@ -690,12 +693,21 @@ func (flows *flowAnalysis) matchingForeignMethod(method *types.Func) *types.Func
 	if flows.foreign == nil {
 		flows.foreign = buildForeignMethods(flows.context.Package)
 	}
+	// Only an interface fixes a concrete method of ours, and a concrete method of another package only an interface
+	// method of ours.
+	ours := types.IsInterface(method.Signature().Recv().Type())
 	for _, foreignMethod := range flows.foreign.byName[method.Name()] {
+		if !ours && !types.IsInterface(foreignMethod.Signature().Recv().Type()) {
+			continue
+		}
 		if types.Identical(method.Signature(), foreignMethod.Signature()) {
 			return foreignMethod
 		}
 	}
 	for _, foreignMethod := range flows.foreign.genericByName[method.Name()] {
+		if !ours && !types.IsInterface(foreignMethod.Signature().Recv().Type()) {
+			continue
+		}
 		if sameShape(method.Signature(), foreignMethod.Signature()) {
 			return foreignMethod
 		}
