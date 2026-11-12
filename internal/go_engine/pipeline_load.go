@@ -1,6 +1,11 @@
 package go_engine
 
-import "github.com/system-inc/cohere/internal/go_engine/load"
+import (
+	"maps"
+	"slices"
+
+	"github.com/system-inc/cohere/internal/go_engine/load"
+)
 
 // loadRequest is what differs between the engine's loads of the workspace: every one reads the workspace's root and
 // patterns, and counts its readable files of ours (loadPackages).
@@ -46,7 +51,26 @@ func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) 
 		loaded, loadError = load.Packages(workspace.Root, patterns, request.environment, census)
 	}
 	engine.loads.end()
+	if loaded != nil && loaded.UnguardedWorkspaceSum != "" {
+		engine.unguardedSumsLock.Lock()
+		if engine.unguardedSums == nil {
+			engine.unguardedSums = map[string]bool{}
+		}
+		engine.unguardedSums[loaded.UnguardedWorkspaceSum] = true
+		engine.unguardedSumsLock.Unlock()
+	}
 	return loaded, loadError
+}
+
+// unguardedWorkspaceSums are the go.work.sum files any load of the run ran go list beside with no side copy of the
+// go.work, sorted, nil for none, for the summary.
+func (engine *pipeline) unguardedWorkspaceSums() []string {
+	engine.unguardedSumsLock.Lock()
+	defer engine.unguardedSumsLock.Unlock()
+	if len(engine.unguardedSums) == 0 {
+		return nil
+	}
+	return slices.Sorted(maps.Keys(engine.unguardedSums))
 }
 
 // watchedCaching is caching as it is, unless a test watches inside its loads (engineMemory.duringLoad): then its held

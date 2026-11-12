@@ -1119,6 +1119,20 @@ note goes to stderr, as it does for TypeScript.
   engine that says it fell short where no record shows it is taken at its word.
 - `exitCode` is what the engine will exit with.
 
+The Go engine's summary also carries `unguardedWorkspaceSums`, additive within contract 3 (#34r3v1y), only when one
+of the run's go list commands ran beside a go.work with no side copy of it: each go.work.sum go may have rewritten,
+sorted. In workspace mode go writes every sum it read that go.work.sum lacks, whatever `-mod` says, so the engine runs
+every go list with `GOWORK` at a copy of the go.work outside the tree, and spells what go prints from the copy's place
+back as go spells it from the tree's. Where that cannot be made exact, as beside a vendor directory, the command runs
+in the tree, and the summary names the file. It is a gap, never a failure: every file was checked, `complete` does not
+move, and the front door names each file under `--verbose`, as `go list may have rewritten <path>`, marks the footer
+`⚠ go list may have rewritten go.work.sum`, and names each in `--json`'s
+`gaps.unguardedWorkspaceSums`.
+
+```json
+{ "kind": "summary", "findings": 0, "complete": true, "exitCode": 0, "unguardedWorkspaceSums": ["/work/go.work.sum"] }
+```
+
 ## Exit codes
 
 | Engine exit      | Meaning                                                                                                                                           | Front door                                                                                               |

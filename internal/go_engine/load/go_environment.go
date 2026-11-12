@@ -32,6 +32,11 @@ type GoEnvironment struct {
 	// answer is go env's answer of goEnvironmentNames under the environment as given, by name, `GOFLAGS` as given
 	// too (see value).
 	answer map[string]string
+
+	// guard runs every go list of a load under it beside a side copy of the go.work in use, so none rewrites the
+	// tree's go.work.sum, nil when go reads no go.work (see workspaceSumGuard). go env runs without it: it reads the
+	// go.work's path and never its sums, and every reader of `GOWORK` reads the tree's own.
+	guard *workspaceSumGuard
 }
 
 // goEnvironmentNames are every variable a reader of a GoEnvironment reads, asked of go env in one command: the kept
@@ -64,13 +69,15 @@ func ReadGoEnvironment(directory string, environment []string, held Held) (*GoEn
 		return nil, contextError
 	}
 	reported.goFlags = append(reported.goFlags, "-pgo=off")
+	fullEnvironment := withGoFlags(given, reported.goFlags)
 	return &GoEnvironment{
 		workspace:       workspace,
 		environment:     slices.Clone(environment),
-		fullEnvironment: withGoFlags(given, reported.goFlags),
+		fullEnvironment: fullEnvironment,
 		buildContext:    buildContext,
 		reported:        reported,
 		answer:          answer,
+		guard:           newWorkspaceSumGuard(fullEnvironment, answer),
 	}, nil
 }
 
