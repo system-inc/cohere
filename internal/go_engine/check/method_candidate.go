@@ -156,8 +156,7 @@ func methodCandidateOf(
 				return methodCandidate{isInterface: true, isGeneric: isGeneric, unconstrained: unconstrained,
 					shape: shapeOf(method.Signature()), lines: ownLinesDigest(version, signatureLine(method),
 						interfaceLine(interfaceType), renderedTypeParameters(parameters)),
-					holdsAnswer: answer != nil && slices.ContainsFunc(slices.Collect(interfaceType.Methods()),
-						func(held *types.Func) bool { return types.Object(held) == answer })}, true
+					holdsAnswer: holdsAnswer(interfaceType, answer)}, true
 			}
 		}
 		return methodCandidate{}, false
@@ -175,19 +174,25 @@ func methodCandidateOf(
 	return methodCandidate{}, false
 }
 
+// holdsAnswer reports whether answer, a lookup's answer, nil for none, is a method of interfaceType's method set.
+func holdsAnswer(interfaceType *types.Interface, answer types.Object) bool {
+	return answer != nil && slices.ContainsFunc(slices.Collect(interfaceType.Methods()),
+		func(held *types.Func) bool { return types.Object(held) == answer })
+}
+
 // methodCandidatesOf are the candidates among typeNames, a side's type names with a method of the name, by their
-// package's path and name, their lines digested under this binary's renderer.
+// package's path and name, their lines digested under this binary's renderer, each rendered once in build (candidate).
 func methodCandidatesOf(
+	build *ReadsBuild,
 	typeNames []*types.TypeName,
 	query string,
 	name string,
 	answer types.Object,
 ) map[string]methodCandidate {
-	candidates := map[string]methodCandidate{}
+	candidates := make(map[string]methodCandidate, len(typeNames))
 	for _, typeName := range typeNames {
-		if candidate, isCandidate := methodCandidateOf(typeName, query, name, answer,
-			ReadsRendererVersion); isCandidate {
-			candidates[objectName(typeName)] = candidate
+		if candidate, key, isCandidate := build.candidate(typeName, query, name, answer); isCandidate {
+			candidates[key] = candidate
 		}
 	}
 	return candidates

@@ -286,9 +286,9 @@ func (judged verdict) persistedMethodJudgment(
 	for _, typeName := range judged.buildCandidates(lookup.Name, roots, func(owner *types.Package) bool {
 		return hostOwners[owner.Path()]
 	}) {
-		if candidate, isCandidate := methodCandidateOf(typeName, lookup.Query, lookup.Name, nil,
-			ReadsRendererVersion); isCandidate {
-			judgment.build[objectName(typeName)] = candidate
+		candidate, key, isCandidate := judged.build.candidate(typeName, lookup.Query, lookup.Name, nil)
+		if isCandidate {
+			judgment.build[key] = candidate
 		}
 	}
 	switch {

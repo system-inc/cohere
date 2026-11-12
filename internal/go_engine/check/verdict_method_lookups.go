@@ -176,8 +176,8 @@ func (judged verdict) methodJudgmentOf(
 ) methodJudgment {
 	judgment := methodJudgment{query: lookup.Query, name: lookup.Name, found: lookup.Found,
 		instantiates: lookup.Instantiates,
-		host:         methodCandidatesOf(hostTypeNames, lookup.Query, lookup.Name, lookup.Answer),
-		build:        methodCandidatesOf(buildTypeNames, lookup.Query, lookup.Name, nil)}
+		host:         methodCandidatesOf(judged.host, hostTypeNames, lookup.Query, lookup.Name, lookup.Answer),
+		build:        methodCandidatesOf(judged.build, buildTypeNames, lookup.Query, lookup.Name, nil)}
 	subject, isMethod := lookup.Subject.(*types.Func)
 	if !isMethod {
 		return judgment
