@@ -185,9 +185,9 @@ done
 (( ${+COHERE_PROJECT_ENGINE} )) &&
   fail "COHERE_PROJECT_ENGINE is set ($COHERE_PROJECT_ENGINE), which every run would inherit; unset it, and name an engine with --engine"
 # The cold and idle runs' arguments, and the record's noFix, which reads them rather than the engine.
-cold=(${(f)"$(cold_arguments $project_engine)"})
+cold=(${(f)"$(cold_arguments "$project_engine")"})
 # The arguments every run takes for the builds it checks, cold and idle runs among them.
-build_arguments=(${(f)"$(build_arguments $builds)"})
+build_arguments=(${(f)"$(build_arguments "$builds")"})
 modes=(${(s:,:)modes_asked})
 (( ${#modes} > 0 )) || fail "--modes names no mode"
 for mode in $modes; do

@@ -50,6 +50,41 @@ func TestTheGoEnginesColdRunChecksWithoutFixing(test *testing.T) {
 	}
 }
 
+// quiet_machine.sh runs under `set -u` and a whole-root run names no engine, so each function, called with no
+// argument at all, prints what it prints for an empty one and says nothing on standard error. Until 2026-11-12
+// cold_arguments read $1 bare and failed after printing `--no-cache`, so the cold runs were still cold only because
+// of the order of its two lines, and every bench log opened with the error.
+func TestEachArgumentFunctionTakesNoArgumentUnderNounset(test *testing.T) {
+	test.Parallel()
+	zsh, lookError := exec.LookPath("zsh")
+	if lookError != nil {
+		test.Fatalf("the benchmark is a zsh script, and zsh is not on the path: %v", lookError)
+	}
+	script, readError := os.ReadFile(coldArgumentsScript)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	for function, want := range map[string][]string{
+		"cold_arguments":  {"--no-cache"},
+		"build_arguments": nil,
+	} {
+		test.Run(function, func(test *testing.T) {
+			test.Parallel()
+			command := exec.Command(zsh, "-c", "set -u\n"+string(script)+"\n"+function)
+			var errors strings.Builder
+			command.Stderr = &errors
+			printed, runError := command.Output()
+			if runError != nil || errors.Len() > 0 {
+				test.Fatalf("%s with no argument under set -u: %v, standard error %q",
+					function, runError, errors.String())
+			}
+			if arguments := strings.Fields(string(printed)); !slices.Equal(arguments, want) {
+				test.Errorf("%s with no argument printed %q, want %q", function, arguments, want)
+			}
+		})
+	}
+}
+
 // Every run of a bench asked for every build checks every build the Go files name, `--other-builds`, and a bench of
 // the host's build alone passes nothing, as every record before #ccqee0e measured.
 func TestTheBenchAsksForEveryBuildWhenToldTo(test *testing.T) {
