@@ -93,6 +93,12 @@ type pipeline struct {
 	hostLoading atomic.Int64
 	hostLinting atomic.Int64
 
+	// reads are the directory and file reads every in-process listing of the run shares, the host's and each extra
+	// build's, so an extra build's listing reads nothing the host's already did (#yyvstj6). Every load of the run may
+	// share them: each reads a file the run holds from its held bytes, which follow every write, and the run adds or
+	// removes no file.
+	reads *load.SharedReads
+
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
 	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
 	renamed bool
@@ -159,6 +165,7 @@ func newPipeline(
 		loads:         newLoadMemory(memory, request.switches["single-threaded"]),
 		overlaps:      true,
 		timing:        newTiming(request),
+		reads:         load.NewSharedReads(),
 	}
 }
 

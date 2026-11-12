@@ -745,3 +745,22 @@ func TestATargetTheToolchainDoesNotListIsRefusedAtLoad(test *testing.T) {
 		test.Errorf("a target the toolchain lists was refused: %v", describeError)
 	}
 }
+
+// The host's load and every extra build's share one set of directory reads (#yyvstj6): after a run of the fixture's
+// three builds, the reads were asked for more directories than they hold, so a later build's listing read through
+// what an earlier one read. Each listing reads a directory once, so reads given to the host's listing alone are asked
+// exactly as often as they hold. How many each listing reaches varies with how far the standard library's prefetch
+// got before the listing ended, so the count is held to more than one listing's, never to an exact multiple.
+func TestTheBuildsOfARunShareTheirDirectoryReads(test *testing.T) {
+	test.Parallel()
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings,
+		"--other-builds")
+	if len(engine.buildRuns) != 3 {
+		test.Fatalf("the run checked %d builds, want 3", len(engine.buildRuns))
+	}
+	directories, reads := engine.reads.Held()
+	if directories == 0 || reads <= int64(directories) {
+		test.Errorf("the run's shared reads hold %d directories, asked %d times, so the extra builds did not read "+
+			"through the host's", directories, reads)
+	}
+}

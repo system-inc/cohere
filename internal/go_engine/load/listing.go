@@ -99,9 +99,10 @@ func list(
 	environment []string,
 	patterns []string,
 	held Held,
+	shared *SharedReads,
 	collector *timing.Collector,
 ) (*listing, error) {
-	listed, doubt := listInProcess(workspace, environment, patterns, held, collector)
+	listed, doubt := listInProcess(workspace, environment, patterns, held, shared, collector)
 	if doubt == "" {
 		listed.inProcess = true
 		return listed, nil

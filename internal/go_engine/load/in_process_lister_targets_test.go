@@ -141,7 +141,7 @@ func requireDoubted(test *testing.T, directory string, extra []string, reason st
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
-	listed, doubt := listInProcess(directory, environment, []string{"./..."}, nil, nil)
+	listed, doubt := listInProcess(directory, environment, []string{"./..."}, nil, nil, nil)
 	if doubt == "" {
 		test.Fatalf("the lister answered with %d packages", len(listed.packages))
 	}

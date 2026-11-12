@@ -42,6 +42,7 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 		GoEnvironment: engine.described.goEnvironment,
 		Timing:        engine.timing,
 		Analyzes:      engine.described.hasFileInScope,
+		SharedReads:   engine.reads,
 	}
 	if engine.session != nil {
 		caching.Restorer = engine.session

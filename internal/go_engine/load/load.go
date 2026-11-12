@@ -187,6 +187,10 @@ type Caching struct {
 	Restorer Restorer
 	Listings ListingStore
 
+	// SharedReads is the directory and file reads every load of the run that lists in process shares, nil for none
+	// (see SharedReads): set on the loads that follow every write of the run, the host's and each extra build's.
+	SharedReads *SharedReads
+
 	// GoEnvironment is go env's answer the run already has, from its census, which the load reads in place of asking
 	// again when it is for the load's workspace and environment (see GoEnvironment).
 	GoEnvironment *GoEnvironment
@@ -288,6 +292,7 @@ func loadWorkspace(
 			patterns,
 			caching.Listings,
 			caching.Held,
+			caching.SharedReads,
 			caching.Timing,
 		)
 	})
