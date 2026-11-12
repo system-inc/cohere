@@ -101,10 +101,13 @@ func rootTypes(object types.Object) []types.Type {
 
 // closureStep is what one step of a closure walk finds in some types before it stops at each named type: the type
 // names they name (directTypeNames), and a line for each field whose type the walk does not enter, rendered by what
-// an importer can observe of it (type_predicates.Observe).
+// an importer can observe of it (type_predicates.Observe), with the type each line observes, by the same index. A
+// dependence set reads those types whole (dependenceReach), since a line's properties, a size or a lock, are computed
+// from all of its type.
 type closureStep struct {
-	typeNames []*types.TypeName
-	observed  []string
+	typeNames     []*types.TypeName
+	observed      []string
+	observedTypes []types.Type
 }
 
 // directTypeNames is the step of a closure walk from roots: the named types and aliases they name, each once, in the
@@ -119,6 +122,13 @@ type closureStep struct {
 // never a read. Its line is its position, name and type as written, and every property a rule can read of it,
 // computed in this build (type_predicates.Observe). Without sizes, as a memo told no build, every field is entered.
 func directTypeNames(roots []types.Type, sizes types.Sizes) closureStep {
+	return closureWalkStep(roots, sizes, true)
+}
+
+// closureWalkStep is directTypeNames' step, with each observed field's line written when rendered: a dependence set
+// reads only which fields are observed and their types (dependenceReach), and computing every property of a field's
+// type for a line nothing reads would cost the set more than the rest of it.
+func closureWalkStep(roots []types.Type, sizes types.Sizes, rendered bool) closureStep {
 	seen := map[*types.TypeName]bool{}
 	var step closureStep
 	structs := 0
@@ -185,8 +195,11 @@ func directTypeNames(roots []types.Type, sizes types.Sizes) closureStep {
 				// of two struct types' identity never meets two copies of this field built apart; the importer reaches
 				// the field's type through a walk of the struct alone, whose every answer is rendered here. Adding the
 				// edge back to be safe would only check every importer of a type such as os.File again in each build.
-				step.observed = append(step.observed, fmt.Sprintf("observed field %d.%d %s %s: %s", structs, index,
-					field.Name(), writtenType(field.Type()), type_predicates.Observe(field.Type(), sizes)))
+				if rendered {
+					step.observed = append(step.observed, fmt.Sprintf("observed field %d.%d %s %s: %s", structs,
+						index, field.Name(), writtenType(field.Type()), type_predicates.Observe(field.Type(), sizes)))
+				}
+				step.observedTypes = append(step.observedTypes, field.Type())
 			}
 		case *types.Interface:
 			for method := range composite.ExplicitMethods() {

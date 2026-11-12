@@ -302,6 +302,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
 	checkerOptions.Reads = options.Reads
+	checkerOptions.ListingsRead = listingsRead
 	checkerOptions.Pool = options.Pool
 	// The walks run beside the rules, and on past Run's return, so no package's walk sits at the end of the run's
 	// chain; whoever reads the reads waits for them (Result.ReadWalks).

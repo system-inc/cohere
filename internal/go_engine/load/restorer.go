@@ -49,6 +49,11 @@ type Restored struct {
 	// checked from source after all: Holds said no, or its export data did not read. Its findings and facts are then
 	// the run's own, never the restored ones.
 	Declined func()
+	// Untouched, set with no Holds, is a package an extra build's walk restores from the host's run unjudged, since
+	// nothing it read changed in the build (#qbvtkfm): the load leaves it out of the packages to analyze, so no rule
+	// runs on it and the build has no say on its files, and reads its types, as any restored package's, only when a
+	// package the load checks or decides late imports it.
+	Untouched bool
 }
 
 // PackageWithheld is what the load withheld of one package outside the workspace with cgo files (see Withheld and

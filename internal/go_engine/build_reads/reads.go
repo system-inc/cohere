@@ -443,6 +443,17 @@ func (reads *Reads) Lookups() []Lookup {
 	return lookups
 }
 
+// Unordered are the reads in no order, each kind as Uses, Selections, Facts and Lookups give it unsorted, for a reader
+// whose answer does not depend on the order, as a dependence set's does not: sorting writes out objects of one package
+// and name to tell them apart, each type name with all of its type, which cost a set of every package of a large
+// workspace more than the rest of it.
+func (reads *Reads) Unordered() ([]ObjectUse, []Selection, []Fact, []Lookup) {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	return slices.Collect(maps.Keys(reads.uses)), slices.Collect(maps.Values(reads.selections)),
+		slices.Collect(maps.Values(reads.facts)), slices.Collect(maps.Values(reads.lookups))
+}
+
 // compareObjects orders two objects by their package's path, then their name, then how go/types writes them, which
 // tells apart two fields or methods of one name on different types, and last by position, for two written alike. One
 // object compared with itself is equal before anything is written: the selections a package makes through one

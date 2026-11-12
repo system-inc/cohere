@@ -56,14 +56,17 @@ type packageTypeGraph struct {
 	nodes map[*types.TypeName]*typeNode
 }
 
-// typeNode is one type name of the graph: its rendered lines, the type names they name, and its component's digest
-// once it is known.
+// typeNode is one type name of the graph: its rendered lines, the type names they name, the types of the fields its
+// lines render by their properties (closureStep.observedTypes), and its component's digest once it is known. Its
+// edges and observed types are what its rendering visited, which a dependence set follows (dependenceReach), set once
+// as the node is made and never changed after.
 type typeNode struct {
-	typeName *types.TypeName
-	lines    []string
-	edges    []*types.TypeName
-	digest   cache.Key
-	digested bool
+	typeName      *types.TypeName
+	lines         []string
+	edges         []*types.TypeName
+	observedTypes []types.Type
+	digest        cache.Key
+	digested      bool
 }
 
 // newTypeGraph is an empty graph of one build's type names.
@@ -152,12 +155,23 @@ func (graph *typeGraph) nodeOf(part *packageTypeGraph, typeName *types.TypeName,
 	}
 	step := directTypeNames(declarationTypes(typeName, graph.importerSees), sizes)
 	node := &typeNode{
-		typeName: typeName,
-		lines:    append(renderedTypeName(typeName, graph.importerSees), step.observed...),
-		edges:    step.typeNames,
+		typeName:      typeName,
+		lines:         append(renderedTypeName(typeName, graph.importerSees), step.observed...),
+		edges:         step.typeNames,
+		observedTypes: step.observedTypes,
 	}
 	part.nodes[typeName] = node
 	return node
+}
+
+// renderedNode is typeName's node, rendered under its package's lock the first time it is asked (nodeOf). Its edges and
+// observed types are read after the lock is let go, which is safe since they are set before the node is stored and
+// never changed.
+func (graph *typeGraph) renderedNode(typeName *types.TypeName, sizes types.Sizes) *typeNode {
+	part := graph.packageOf(typeName.Pkg())
+	part.lock.Lock()
+	defer part.lock.Unlock()
+	return graph.nodeOf(part, typeName, sizes)
 }
 
 // digestOf is the digest of the component start belongs to. Under its package's lock it renders every node of that

@@ -13,8 +13,9 @@ import (
 // the build's own store as the build writes it from source, with no export data (#27r8r24): a cold run with the
 // findings cache on over a fixture that imports it, with the standard library from the binary's table and a file only
 // another target compiles, says nothing on stderr, where the note of an entry not written through would go, counts no
-// problem of the cache, and has every extra build write through every package it restored from the host. Without the
-// rule, the table, which holds no export data for unsafe, refuses the write, and each build notes it.
+// problem of the cache, and has every extra build write through every package it restored from the host, judged or left
+// untouched by its walk. Without the rule, the table, which holds no export data for unsafe, refuses the write, and
+// each build notes it.
 func TestUnsafeFromATableHitIsWrittenThrough(test *testing.T) {
 	test.Parallel()
 
@@ -41,12 +42,15 @@ func TestUnsafeFromATableHitIsWrittenThrough(test *testing.T) {
 		test.Errorf("the run counted %d problems of the findings cache, want none", cold.counts.Problems)
 	}
 	for _, build := range extraBuildRecords(test, cold.stream) {
-		if build.RestoredFromHost == 0 {
+		// A package the walk left untouched is restored from the host's run and written through as one it judged
+		// (#qbvtkfm).
+		restored := build.RestoredFromHost + build.Untouched
+		if restored == 0 {
 			test.Fatalf("%s restored nothing from the host, so it tells nothing", build.Target)
 		}
-		if build.WrittenThrough != build.RestoredFromHost {
-			test.Errorf("%s wrote %d entries through of the %d it restored from the host, want every one",
-				build.Target, build.WrittenThrough, build.RestoredFromHost)
+		if build.WrittenThrough != restored {
+			test.Errorf("%s wrote %d entries through of the %d it restored from the host or left untouched, want "+
+				"every one", build.Target, build.WrittenThrough, restored)
 		}
 	}
 }

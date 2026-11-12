@@ -112,6 +112,13 @@ type BuildRecord struct {
 	ReloadRounds     int            `json:"reloadRounds,omitempty"`
 	ReloadRoundsBy   map[string]int `json:"reloadRoundsBy,omitempty"`
 
+	// Untouched, additive within contract 3, counts the packages the host kept that an extra build's walk left
+	// untouched (#qbvtkfm), restored unjudged and never analyzed, since nothing they read changed in the build, and
+	// handed the host's findings, and Visited those it visited, each judged, then held or declined. Their files count
+	// as the host's checked files, never as a gap. Each is written only when not 0.
+	Untouched int `json:"untouched,omitempty"`
+	Visited   int `json:"visited,omitempty"`
+
 	// WrittenThrough counts the packages an extra build restored from the host's run whose entry it wrote under its
 	// own key once their restore held, with a findings cache to write to, so its next run hits them in its own store
 	// rather than check them from source: the host, hitting its own store, keeps nothing to restore them from then.

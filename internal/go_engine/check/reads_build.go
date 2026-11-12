@@ -57,6 +57,12 @@ type ReadsBuild struct {
 	// uses are each object's digest as a use of each kind but the whole judges it, a cache.Key by useKey (useDigest).
 	uses sync.Map
 
+	// dependences are each package's dependence set, a DependenceSet by the package's *build_reads.Reads, asked of
+	// the host's memo alone, which every build shares (Dependence), and reaches the packages each type name's closure
+	// reaches, which the sets are gathered from (typeReach).
+	dependences sync.Map
+	reaches     typeReach
+
 	// walking and indexing, nil outside tests, are told of each root as its closure is walked and of each package as
 	// it is indexed, so a test can count them.
 	walking  func(*types.Package)
@@ -356,6 +362,11 @@ type Restoring struct {
 	// as the host's while its own inputs are.
 	Imports []string
 
+	// Name is the package's name, which a PackageName lookup of an importer reads, the same in every build its own
+	// inputs are the host's, and which tells the walk whether a package that changed in a build changed its closure's
+	// names (untouchedOf).
+	Name string
+
 	// Reads are its reads on the host's run, for a package the host checked this run.
 	Reads *build_reads.Reads
 
@@ -371,6 +382,16 @@ type Restoring struct {
 
 // unpersistedReads is why a package with no reads, neither recorded this run nor persisted by its entry, is declined.
 const unpersistedReads = "unpersisted: its reads were not persisted"
+
+// listingsRead are the analyzers whose listings of every inherited fact are read one recorded question at a time
+// (checker.Options.ListingsRead). It is no carve-out from the listing's rule but the rule's own soundness argument,
+// met: the deprecated facts analyzer lists every deprecation of the import closure into its result (honnef.co/go/tools
+// v0.8.1, analysis/facts/deprecated/deprecated.go:146-151), and the one rule that reads the result, deprecated_use,
+// records a Deprecated lookup for every question it asks of it, found or not (its deprecationOf and
+// packageDeprecationOf), so every read the listing could give is a recorded read. It cannot rot silently:
+// TestOnlyTheDeprecatedFactsAreListed fails as soon as a second rule's source imports the deprecated facts, where it
+// would take the result, and as soon as any other registered analyzer lists.
+var listingsRead = map[*analysis.Analyzer]bool{deprecated.Analyzer: true}
 
 // deprecatedFactType is the deprecated analyzer's fact, which its result gathers for SA1019 from every fact of the
 // import closure, so a Deprecated lookup is that fact asked of the build.
