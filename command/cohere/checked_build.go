@@ -34,13 +34,16 @@ type checkedBuild struct {
 	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
 	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
 	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
-	// CheckedFromSource of PackagesLoaded is the share of its graph another build's first load checked from source,
-	// which weighs its lint, and LintWaitMilliseconds and LintWaited how long and whether that lint waited for its
-	// weight (#b2t9xmf), each absent when 0 or false, and the host's never written.
-	CheckedFromSource    int  `json:"checkedFromSource,omitempty"`
-	PackagesLoaded       int  `json:"packagesLoaded,omitempty"`
-	LintWaitMilliseconds int  `json:"lintWaitMilliseconds,omitempty"`
-	LintWaited           bool `json:"lintWaited,omitempty"`
+	// CheckedFromSource is the packages another build checked from source over every load, a reload's included, and
+	// CheckedFromSourceRounds each load's count in order, written only when it was loaded more than once (#k8gty9e).
+	// PackagesLoaded is every package its first load loaded, whose share checked from source weighs its lint, and
+	// LintWaitMilliseconds and LintWaited how long and whether that lint waited for its weight (#b2t9xmf), each absent
+	// when 0 or false, and the host's never written.
+	CheckedFromSource       int   `json:"checkedFromSource,omitempty"`
+	CheckedFromSourceRounds []int `json:"checkedFromSourceRounds,omitempty"`
+	PackagesLoaded          int   `json:"packagesLoaded,omitempty"`
+	LintWaitMilliseconds    int   `json:"lintWaitMilliseconds,omitempty"`
+	LintWaited              bool  `json:"lintWaited,omitempty"`
 	// FilesAlone, NotLinted and NotLintedReason are the files of ours only this build compiled and linted, and those it
 	// compiled that no rule ran on, with why (#ytnvt8k), each absent when there is nothing to count.
 	FilesAlone      int      `json:"filesAlone,omitempty"`
