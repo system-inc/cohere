@@ -114,7 +114,7 @@ func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
 			persisted.NoSubject = true
 			return persisted
 		}
-		hostClosure := gatherClosure(writer.host, lookup.Subject.Pkg().Imports())
+		hostClosure := gatherClosure(writer.host.indexedClosureOf, lookup.Subject.Pkg().Imports())
 		var candidates []*types.TypeName
 		for _, indexed := range writer.host.methodsNamed(lookup.Name) {
 			if hostClosure.reached[indexed.owner] {
