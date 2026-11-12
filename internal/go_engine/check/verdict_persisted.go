@@ -273,7 +273,7 @@ func (judged verdict) persistedMethodJudgment(
 	judgment := methodJudgment{query: lookup.Query, name: lookup.Name, found: lookup.Found,
 		subjectIsMethod: lookup.SubjectIsMethod, subjectShape: shapeOfPersisted(lookup.SubjectShape),
 		receiverInterface: lookup.ReceiverInterface, embedsForeign: lookup.EmbedsForeign,
-		host: map[string]methodCandidate{}, build: map[string]methodCandidate{}}
+		instantiates: lookup.Instantiates, host: map[string]methodCandidate{}, build: map[string]methodCandidate{}}
 	buildClosure := judged.buildClosure(roots)
 	hostOwners := map[string]bool{}
 	for _, reference := range lookup.Candidates {

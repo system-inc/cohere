@@ -283,3 +283,86 @@ func TestAPackageStoredWithoutFactsMissesOnceARootImportsIt(test *testing.T) {
 		test.Fatalf("want user's call to Marked reported from base's fact, got %+v", second.result.Findings)
 	}
 }
+
+// An entry whose export data is gone from under it, as when files are removed from the store by hand, is read the long
+// way and never an error: with user's entry corrupt so user needs base's types, base's export data, kept by its digest
+// apart from base's entry (#5s1x2hg), does not read, so the load checks base from source too, and the result is the
+// cold run's, with no problem said.
+func TestAnEntryWhoseExportDataIsGoneHasItsPackageCheckedFromSource(test *testing.T) {
+	test.Parallel()
+
+	root := loadedFixtures(test)
+	rules := []rule.Rule{houseRule(markedAnalyzer), houseRule(targetAnalyzer)}
+	directory := test.TempDir()
+	caching := cachingAt(directory, rules)
+	cold := runWithSession(test, root, caching, rules)
+
+	baseEntry, stored := caching.Store.Get(sessionKey(test, cold.session, "example.com/fixture/base"))
+	if !stored {
+		test.Fatal("the cold run wrote no entry of base")
+	}
+	digest, digestError := entryExportDigest(baseEntry)
+	if digestError != nil || digest == nil {
+		test.Fatalf("want base's entry to name its export data, got %x (%v)", digest, digestError)
+	}
+	blob := exportDataKey(digest).String()
+	if removeError := os.Remove(
+		filepath.Join(directory, ".cache", "cohere", "go", blob[:2], blob),
+	); removeError != nil {
+		test.Fatalf("removing base's export data: %v", removeError)
+	}
+	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
+	if putError := caching.Store.Put(userKey, []byte("corrupt")); putError != nil {
+		test.Fatalf("corrupting user's entry: %v", putError)
+	}
+
+	edited := runWithSession(test, root, caching, rules)
+	if edited.loaded.FilesParsed != 2 || edited.loaded.PackagesFromExportData != 0 {
+		test.Fatalf("want base and user both checked from source, got %d parsed and %d read from export data",
+			edited.loaded.FilesParsed, edited.loaded.PackagesFromExportData)
+	}
+	if len(edited.result.Cache.Problems) != 0 {
+		test.Fatalf("want no problem said, got %v", edited.result.Cache.Problems)
+	}
+	if !reflect.DeepEqual(withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result)) {
+		test.Fatalf("edited\n%+v\ncold\n%+v", withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result))
+	}
+}
+
+// An entry of format 10, which found its export data under its own key rather than by digest, is a miss under a key of
+// this format, never read: were a store of 10's entries ever under these keys, its packages would be checked from
+// source and their entries written again, with the cold run's result (#5s1x2hg).
+func TestAnEntryOfTheFormatBeforeExportDataByDigestIsAMiss(test *testing.T) {
+	test.Parallel()
+
+	root := loadedFixtures(test)
+	rules := []rule.Rule{houseRule(markedAnalyzer), houseRule(targetAnalyzer)}
+	caching := testCaching(test, rules)
+	cold := runWithSession(test, root, caching, rules)
+	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
+	contents, stored := caching.Store.Get(userKey)
+	if !stored {
+		test.Fatal("the cold run wrote no entry of user")
+	}
+	var entry cacheEntry
+	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	entry.Version, entry.ExportData = "go-engine-cache-10", nil
+	var older bytes.Buffer
+	if encodeError := gob.NewEncoder(&older).Encode(entry); encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if putError := caching.Store.Put(userKey, older.Bytes()); putError != nil {
+		test.Fatal(putError)
+	}
+
+	edited := runWithSession(test, root, caching, rules)
+	if edited.result.Cache.Hit != 1 || edited.loaded.FilesParsed != 1 {
+		test.Fatalf("want user a miss checked from source and base a hit, got %d parsed and %+v",
+			edited.loaded.FilesParsed, edited.result.Cache)
+	}
+	if !reflect.DeepEqual(withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result)) {
+		test.Fatalf("edited\n%+v\ncold\n%+v", withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result))
+	}
+}

@@ -361,16 +361,16 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 		{
 			name: "an interface method whose candidates are the same",
 			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
-				return build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Close",
+				return askedBy(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Close",
 					Subject: methodOf(host.user, "Mine", "Close"), Found: true,
-					Answer: host.platform.Scope().Lookup("Closer")}
+					Answer: host.platform.Scope().Lookup("Closer")})
 			},
 		},
 		{
 			name: "a method a type of the build alone declares",
 			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
-				return build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Flush",
-					Subject: methodOf(host.user, "Mine", "Flush")}
+				return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Flush",
+					Subject: methodOf(host.user, "Mine", "Flush")})
 			},
 			want: "L lookup Method Flush: " + verdictPlatform + ".Flusher.Flush is new in the build, of the " +
 				"subject's shape",

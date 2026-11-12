@@ -20,8 +20,10 @@ import (
 // persisted digest, and a record's header names it: a record of another renderer is declined, never matched. It
 // changes whenever either digest would change for the same types or the same fact, which the golden of a fixed
 // fixture's renderings catches (testdata/reads_renderings.golden). The store's keys hold the executable's identity
-// already, but the binary's table of standard-library entries outlives a store, so the version stands on its own.
-const ReadsRendererVersion = "reads-renderer-3"
+// already, but the binary's table of standard-library entries outlives a store, so the version stands on its own. It
+// changes too when a record gains a field whose zero value, as gob decodes an older record without it, would judge
+// a read more loosely than its writer meant: reads-renderer-4 added a lookup's Instantiates (#dscc341).
+const ReadsRendererVersion = "reads-renderer-4"
 
 // persistedReads are one package's reads of other packages as an entry persists them (#b2t9xmf), so a build can judge
 // a package the host restored rather than checked, whose reads were recorded by the run that wrote its entry. Each
@@ -119,8 +121,8 @@ type persistedFact struct {
 // import closure that a rule could let fix the subject's (countedCandidates), sorted, each by reference to Objects,
 // and NoSubject when it had no subject to find the closure by; and what the one-bit judgment reads of it
 // (methodJudgment): its answer's own lines, whether the answer is a method, whether the subject is a method, its
-// shape, whether its receiver is an interface and embeds another package's type, and those of the candidates a rule
-// could match, as methodCandidateOf makes them.
+// shape, whether its receiver is an interface and embeds another package's type, whether its rule instantiates
+// generic candidates, and those of the candidates a rule could match, as methodCandidateOf makes them.
 type persistedLookup struct {
 	Query             string
 	Path              int
@@ -139,6 +141,7 @@ type persistedLookup struct {
 	ReceiverInterface bool
 	EmbedsForeign     bool
 	RuleCandidates    []persistedMethodCandidate
+	Instantiates      bool
 }
 
 // persistedShape is a method's signature shape (signatureShape).

@@ -99,7 +99,8 @@ func (writer *readsWriter) selection(selection build_reads.Selection, closureOnl
 // lookup is one lookup as the record persists it: a Scope or Closure answer with its digest, an Interface or Method
 // lookup's candidates, as lookupHolds gathers the host's, and a Deprecated lookup's subject by its objectpath.
 func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
-	persisted := persistedLookup{Query: lookup.Query, Name: lookup.Name, Found: lookup.Found, Text: lookup.Text}
+	persisted := persistedLookup{Query: lookup.Query, Name: lookup.Name, Found: lookup.Found, Text: lookup.Text,
+		Instantiates: lookup.Instantiates}
 	if lookup.Path != "" {
 		persisted.Path = writer.owner(lookup.Path)
 	}

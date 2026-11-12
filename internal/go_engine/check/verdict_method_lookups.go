@@ -26,9 +26,12 @@ import (
 //
 // Two cases keep the whole closure judgment, since the bit there can flip with nothing this reads changing:
 //
-//   - A Method lookup with a generic candidate of the subject's shape on either side: abbreviated instantiates it with
-//     type arguments read off the subject's signature and validates their constraints, which can turn on an argument
-//     type's method set in the build.
+//   - A Method lookup whose rule instantiates generic candidates (build_reads.Lookup.Instantiates, abbreviated's),
+//     with a generic candidate of the subject's shape on either side: abbreviated instantiates it with type arguments
+//     read off the subject's signature and validates their constraints, which can turn on an argument type's method
+//     set in the build. No other rule instantiates (#dscc341): no_any matches a generic candidate by shape alone and
+//     initialism a generic interface by implementsInShape, each by the candidate's own lines, so a generic candidate
+//     of theirs is judged as any other, its answer by its own lines and a new or changed one by its shape.
 //   - A subject whose receiver embeds another package's type, directly or through types of its own package that embed
 //     one: Implements reads the receiver's method set, which holds the methods that type promotes at any depth, and
 //     those can differ by build while the lookup's candidates do not.
@@ -40,9 +43,10 @@ import (
 
 // methodJudgment is what methodLookupHolds reads of a Method or Interface lookup, from the reads of this run or from
 // those an entry persisted: its query and name, whether the host's rule found an answer, the subject's method shape,
-// whether its receiver is an interface and whether it embeds another package's type at any depth, and each side's
-// candidates by their package's path and name, a package the build restored from the host giving the host's. answer
-// is the host's answer as the build finds it, when the host found one.
+// whether its receiver is an interface and whether it embeds another package's type at any depth, whether its rule
+// instantiates generic candidates (build_reads.Lookup.Instantiates), and each side's candidates by their package's
+// path and name, a package the build restored from the host giving the host's. answer is the host's answer as the
+// build finds it, when the host found one.
 type methodJudgment struct {
 	query             string
 	name              string
@@ -51,6 +55,7 @@ type methodJudgment struct {
 	subjectShape      signatureShape
 	receiverInterface bool
 	embedsForeign     bool
+	instantiates      bool
 	host              map[string]methodCandidate
 	build             map[string]methodCandidate
 	answer            answerInBuild
@@ -76,7 +81,7 @@ func methodLookupHolds(name string, judgment methodJudgment) (holds bool, why st
 	if !judgment.subjectIsMethod || judgment.embedsForeign {
 		return false, "", false
 	}
-	if judgment.query == build_reads.QueryMethod {
+	if judgment.query == build_reads.QueryMethod && judgment.instantiates {
 		for _, side := range []map[string]methodCandidate{judgment.host, judgment.build} {
 			for _, candidate := range side {
 				if candidate.isGeneric && candidate.shape == judgment.subjectShape {
@@ -166,8 +171,9 @@ func (judged verdict) methodJudgmentOf(
 	buildTypeNames []*types.TypeName,
 ) methodJudgment {
 	judgment := methodJudgment{query: lookup.Query, name: lookup.Name, found: lookup.Found,
-		host:  methodCandidatesOf(hostTypeNames, lookup.Query, lookup.Name, lookup.Answer),
-		build: methodCandidatesOf(buildTypeNames, lookup.Query, lookup.Name, nil)}
+		instantiates: lookup.Instantiates,
+		host:         methodCandidatesOf(hostTypeNames, lookup.Query, lookup.Name, lookup.Answer),
+		build:        methodCandidatesOf(buildTypeNames, lookup.Query, lookup.Name, nil)}
 	subject, isMethod := lookup.Subject.(*types.Func)
 	if !isMethod {
 		return judgment

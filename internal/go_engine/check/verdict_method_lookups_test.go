@@ -12,6 +12,9 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_identifier"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_any"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_uppercase_initialism"
 )
 
 // The method fixture's paths: foreign declares what a rule's Method or Interface lookup could match, some of it on
@@ -100,30 +103,54 @@ const (
 // found when answer names something of the host's foreign, as a type name, or as type name and method.
 type methodLookupOf func(host methodWorld) build_reads.Lookup
 
+// askedBy is lookup as the rule that asks its query records it: an Interface lookup initialism's, a Method lookup
+// abbreviated's, which instantiates generic candidates.
+func askedBy(lookup build_reads.Lookup) build_reads.Lookup {
+	switch lookup.Query {
+	case build_reads.QueryInterface:
+		lookup.Rule = consistency_no_uppercase_initialism.Name
+	case build_reads.QueryMethod:
+		lookup.Rule, lookup.Instantiates = consistency_no_abbreviated_identifier.Name, true
+	}
+	return lookup
+}
+
+// askedByNoAny is a Method lookup as no_any records it, which matches a generic candidate by shape and instantiates
+// nothing.
+func askedByNoAny(lookup methodLookupOf) methodLookupOf {
+	return func(host methodWorld) build_reads.Lookup {
+		asked := lookup(host)
+		asked.Rule, asked.Instantiates = consistency_no_any.Name, false
+		return asked
+	}
+}
+
 // A Method or Interface lookup holds in another build when its rule's one bit cannot have flipped there, and is
 // declined when it can. Each step's build is windows unless it names another, its host darwin. The closure judgment,
 // which compares every type name with a method of the name, would decline every step whose build adds or changes one;
 // the steps marked so hold under the one-bit judgment, and the two kept on the closure judgment, a generic candidate
-// of the subject's shape and a receiver embedding a foreign type, decline as it does. Each step's reads, persisted as
-// an entry persists them, are judged alike.
+// of the subject's shape beside the rule that instantiates it and a receiver embedding a foreign type, decline as it
+// does. Each lookup is abbreviated's for Method and initialism's for Interface unless the step names no_any's, and a
+// step's earlier lookup is another rule's of the same subject. Each step's reads, persisted as an entry persists them,
+// are judged alike.
 func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 	test.Parallel()
 
 	closerAnswer := func(host methodWorld) types.Object { return host.foreign.Scope().Lookup("Closer") }
 	unanswered := func(query string, method string) methodLookupOf {
 		return func(host methodWorld) build_reads.Lookup {
-			return build_reads.Lookup{Query: query, Name: method, Subject: methodOf(host.user, "Mine", method)}
+			return askedBy(build_reads.Lookup{Query: query, Name: method, Subject: methodOf(host.user, "Mine", method)})
 		}
 	}
 	interfaceAnswered := func(host methodWorld) build_reads.Lookup {
-		return build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Close",
-			Subject: methodOf(host.user, "Mine", "Close"), Found: true, Answer: closerAnswer(host)}
+		return askedBy(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Close",
+			Subject: methodOf(host.user, "Mine", "Close"), Found: true, Answer: closerAnswer(host)})
 	}
 	methodAnswered := func(typeName string, method string) methodLookupOf {
 		return func(host methodWorld) build_reads.Lookup {
-			return build_reads.Lookup{Query: build_reads.QueryMethod, Name: method,
+			return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: method,
 				Subject: methodOf(host.user, "Mine", method), Found: true,
-				Answer: methodSetMember(host.foreign, typeName, method)}
+				Answer: methodSetMember(host.foreign, typeName, method)})
 		}
 	}
 	closer := "package foreign\n\ntype Closer interface{ Close() error }\n"
@@ -154,6 +181,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 		files  map[string]string
 		user   string
 		build  string
+		before methodLookupOf
 		lookup methodLookupOf
 		want   string
 	}{
@@ -267,6 +295,30 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
 		},
 		{
+			name: "the same generic candidate beside no_any's lookup, which instantiates nothing, held where the " +
+				"closure declines",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer, "pool.go": pool,
+				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			lookup: askedByNoAny(methodAnswered("Closer", "Close")),
+		},
+		{
+			name:   "a windows-only generic of the subject's shape beside no_any's miss",
+			files:  map[string]string{"foreign.go": methodForeign, "pool_windows.go": pool},
+			lookup: askedByNoAny(unanswered(build_reads.QueryMethod, "Close")),
+			want: "L lookup Method Close: " + methodForeignPath + ".Pool.Close is new in the build, of the subject's " +
+				"shape",
+		},
+		{
+			name: "abbreviated's miss beside no_any's answer of one subject, judged as its own",
+			files: map[string]string{"foreign.go": methodForeign,
+				"base.go":           "package foreign\n\ntype Base struct{}\n\nfunc (Base) Close() error { return nil }\n",
+				"closer_windows.go": closer},
+			before: askedByNoAny(methodAnswered("Base", "Close")),
+			lookup: unanswered(build_reads.QueryMethod, "Close"),
+			want: "L lookup Method Close: " + methodForeignPath + ".Closer.Close is new in the build, of the " +
+				"subject's shape",
+		},
+		{
 			name: "a receiver embedding a foreign type keeps the closure judgment",
 			files: map[string]string{"foreign.go": methodForeign + "\ntype Base struct{}\n", "closer.go": closer,
 				"inner.go": closerBase, "promoted_windows.go": promotedOnly, "socket_windows.go": socketOnly},
@@ -292,8 +344,9 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{}\n\n" +
 				"func (Mine) Error() string { return \"\" }\n\nfunc Use() int { return foreign.Count() }\n",
 			lookup: func(host methodWorld) build_reads.Lookup {
-				return build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Error",
-					Subject: methodOf(host.user, "Mine", "Error"), Found: true, Answer: types.Universe.Lookup("error")}
+				return askedBy(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Error",
+					Subject: methodOf(host.user, "Mine", "Error"), Found: true,
+					Answer: types.Universe.Lookup("error")})
 			},
 		},
 		{
@@ -326,6 +379,9 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			reads := &build_reads.Reads{}
 			// No syntax and no type information: Mine's reads are none, and the lookup is what each step is about.
 			reads.RecordTypes(host.user, &types.Info{}, nil)
+			if step.before != nil {
+				reads.AddLookup(step.before(host))
+			}
 			reads.AddLookup(step.lookup(host))
 			restoring := Restoring{Path: methodUserPath, Imports: []string{methodForeignPath}, Reads: reads}
 			closure := map[string]*types.Package{methodForeignPath: built.foreign}

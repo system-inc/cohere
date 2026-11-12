@@ -465,8 +465,8 @@ func TestReadsTheSetCannotFollowAreTheWholeClosure(test *testing.T) {
 		{"reads judged by closure alone", func(test *testing.T, host dependenceWorld) Restoring {
 			return dependenceRestoring(test, host, "linknamed")
 		}},
-		{"an Interface lookup", lookupOf(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Size"})},
-		{"a Method lookup", lookupOf(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Size"})},
+		{"an Interface lookup", lookupOf(askedBy(build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Size"}))},
+		{"a Method lookup", lookupOf(askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Size"}))},
 		{"a lookup of a kind the set does not know", lookupOf(build_reads.Lookup{Query: "Planted", Name: "Anything"})},
 	} {
 		test.Run(step.name, func(test *testing.T) {

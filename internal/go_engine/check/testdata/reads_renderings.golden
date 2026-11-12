@@ -1,4 +1,4 @@
-renderer reads-renderer-3
+renderer reads-renderer-4
 measured example.com/verdict/platform.Box 9ddb1df2d1b478157df129ee01bdd6d20474452692e2fa7681cfa4121da03f84
 	type name of example.com/verdict/platform Box
 	named example.com/verdict/platform.Box
@@ -34,7 +34,7 @@ use Underlying example.com/verdict/platform.Closer 9bc67b7a371043b260793f4467132
 use MethodSet example.com/verdict/platform.Closer 0c9fd260bc19517ebc6d3fd0c5e1dc8e4d0828b97792df90154712449a9d2673
 	type name of example.com/verdict/platform Closer kind interface
 	method of example.com/verdict/platform.Closer Close at [0] indirect true func of example.com/verdict/platform Close receiver example.com/verdict/platform.Closer func() error
-candidate example.com/verdict/platform.Closer.Close 10d3e03305960fc418c5c275e4f4fef17e73c7f7d3b3fada7ec3f6e20bf0e938
+candidate example.com/verdict/platform.Closer.Close bb45959964b1ee2c96dead10191688acb8e599212b00b555799d1adf4c33d8e0
 	func() error
 	Close func() error
 measured example.com/verdict/platform.Handle 86d8a81022ff75cc1f799c24fa623a881bf3b2801451b70bc75a22549f3d9aa8
@@ -110,7 +110,7 @@ use MethodSet example.com/verdict/platform.Shared 52699dc082f5647cd506bda0f53220
 	type name of example.com/verdict/platform Shared kind struct
 	method of example.com/verdict/platform.Shared Size at [0] indirect false func of example.com/verdict/platform Size receiver example.com/verdict/platform.Shared func() int
 	method of *example.com/verdict/platform.Shared Size at [0] indirect true func of example.com/verdict/platform Size receiver example.com/verdict/platform.Shared func() int
-candidate example.com/verdict/platform.Shared.Size 0182c166fb03db5f6c9065e15881d73d1cb5560e4772f4ff3ddb01bb8967f9de
+candidate example.com/verdict/platform.Shared.Size add9334085498f0715f81996af0d5a46eea89c20ca8dba2242a941109a6eca53
 	func() int
 measured example.com/verdict/platform.Stable a0a49da98f692b45e77823c2e3892cda2963a83b567b20b45c8d8c58d5e11929
 	type name of example.com/verdict/platform Stable
@@ -224,9 +224,9 @@ use MethodSet example.com/rendered.Named ec785eef9be042d309d9cea33e2c9ede5e4990e
 	method of example.com/rendered.Named hidden at [0] indirect false func of example.com/rendered hidden receiver example.com/rendered.Outer func()
 	method of *example.com/rendered.Named Shown at [1] indirect true func of example.com/rendered Shown receiver *example.com/rendered.Outer func() string
 	method of *example.com/rendered.Named hidden at [0] indirect true func of example.com/rendered hidden receiver example.com/rendered.Outer func()
-candidate example.com/rendered.Named.hidden 8d314ebc7fb92339d6606558000da04bdb105e4c670909237cbead27d07f694f
+candidate example.com/rendered.Named.hidden 51943e87f57d5c09ab7339fa5ee3a7c8c79cab0f987e96f0b91ef14c0f1eaaee
 	func()
-candidate example.com/rendered.Named.Shown 2965a9e757a03a23f55d1d26dbea11afc87a09ac475bb8cd4f0e69d2d1a6fedf
+candidate example.com/rendered.Named.Shown b38390a7d2a5bba988de96829df19363af560066bb7c6cc2ece9802ca52a4006
 	func() string
 measured example.com/rendered.Outer a0a0e8dfa9746c10e5d22e326e09a4c0d14dbba1ae721dfc1a7897280a2adc9a
 	type name of example.com/rendered Outer
@@ -259,9 +259,9 @@ use MethodSet example.com/rendered.Outer 338afd4d193ef9c95373037f8e56956343053a3
 	method of example.com/rendered.Outer hidden at [0] indirect false func of example.com/rendered hidden receiver example.com/rendered.Outer func()
 	method of *example.com/rendered.Outer Shown at [1] indirect true func of example.com/rendered Shown receiver *example.com/rendered.Outer func() string
 	method of *example.com/rendered.Outer hidden at [0] indirect true func of example.com/rendered hidden receiver example.com/rendered.Outer func()
-candidate example.com/rendered.Outer.hidden 8d314ebc7fb92339d6606558000da04bdb105e4c670909237cbead27d07f694f
+candidate example.com/rendered.Outer.hidden 51943e87f57d5c09ab7339fa5ee3a7c8c79cab0f987e96f0b91ef14c0f1eaaee
 	func()
-candidate example.com/rendered.Outer.Shown 2965a9e757a03a23f55d1d26dbea11afc87a09ac475bb8cd4f0e69d2d1a6fedf
+candidate example.com/rendered.Outer.Shown b38390a7d2a5bba988de96829df19363af560066bb7c6cc2ece9802ca52a4006
 	func() string
 measured example.com/rendered.Pair c2971ff4a8471eb06652835353c7174bd811da82dee6576d78a2773d187b8cf1
 	type name of example.com/rendered Pair
@@ -331,7 +331,7 @@ use Underlying example.com/rendered.hider 45570943f1954cca1e755412df7d36145f2fd2
 use MethodSet example.com/rendered.hider d077980c9a5045c64e7f07c9c18e44b2155636f2d534176bf2c35c944e658cd8
 	type name of example.com/rendered hider kind interface
 	method of example.com/rendered.hider hidden at [0] indirect true func of example.com/rendered hidden receiver example.com/rendered.hider func()
-candidate example.com/rendered.hider.hidden 6e9a974e6cdc7b3f6aa1d38119685867e7830a2e7dc620db0aeed98b56200241
+candidate example.com/rendered.hider.hidden d7fdff58f296d46c508ca81e96da16706c36f9e2ad59460b3cc6026f6065d70e
 	func()
 	hidden func()
 fact github.com/system-inc/cohere/internal/go_engine/check.valueFact 9d19cf2c5c7c6c66342cb24eefdd85cdeb38d853bdeeb8541cc5b963e772a092
