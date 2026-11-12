@@ -25,15 +25,18 @@ import (
 // Restoring a package from the host's run in an extra build (#b2t9xmf). The host's run keeps, for each package it
 // analyzed from source whose reads can hold, the entry the findings cache writes for it (keepForBuilds). An extra
 // build's session restores each package its own store does not hold whose own inputs are the host's (the portable
-// digest) and whose reads hold there, in two halves: what it read of other packages' types is decided by the load,
-// once the package's imports are done and before anything is read (TypesHold through load.Restored.Holds); what it
-// read of their facts as each action on it is restored (FactsHold), and the answers it read once the analysis is
-// over (readsHold). A package restored by the load whose facts or answers do not hold has no syntax to analyze, so
-// the build is loaded again with it, and every package above it, never restored from the host again. A package whose
-// restore held is written through to the build's own store under its own key (writeThrough), so the build's next run
-// hits it there, even when the host, hitting its own store, keeps nothing to restore it from.
+// digest) and whose reads hold there, in two halves: what it read of other packages' types is decided by the load, once
+// the package's imports are done and before anything is read (TypesHold through load.Restored.Holds); what it read of
+// their facts as each action on it is restored (FactsHold), and the answers it read once the analysis is over
+// (readsHold). A package restored by the load whose facts or answers do not hold has no syntax to analyze, so the build
+// is loaded again with it checked from source, never restored from the host again, and every package above it decided
+// again in the reload, against it as checked there (decideHostRestores). A package whose restore held is written
+// through to the build's own store under its own key (writeThrough), so the build's next run hits it there, even when
+// the host, hitting its own store, keeps nothing to restore it from.
 
-// HostRestoreCounts is what an extra build restored from the host's run: the packages restored, by ID, sorted, how many
+// HostRestoreCounts is what an extra build restored from the host's run: the packages the walk left untouched, by ID,
+// sorted, and how many it visited, among the ones the host kept, over the last load (untouchedOf), the packages
+// restored, by ID, sorted, how many
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
 // facts or answers did not hold), how many times the build was loaded again for those, and every decline and every
 // package never a candidate by the first word of why: inputs, noEntry, never, unknown, unpersisted, unreadable, export,
@@ -42,6 +45,8 @@ import (
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
 // wall time it ran within.
 type HostRestoreCounts struct {
+	Untouched       []string
+	Visited         int
 	Restored        []string
 	DeclinedAtLoad  int
 	DeclinedAtCheck int
@@ -74,13 +79,24 @@ type hostState struct {
 	// deciding is the time TypesHold and FactsHold took over every load, in nanoseconds, summed across goroutines.
 	deciding atomic.Int64
 
-	// restoring are this load's packages restored from the host's run, and renderings the verdicts' memo of this load's
-	// types.
+	// restoring are this load's packages restored from the host's run and decided late, and renderings the verdicts'
+	// memo of this load's types. untouched are this load's packages restored from the host's run that the walk left
+	// untouched, never judged (untouchedOf), and visited counts the packages the host kept that the walk visited, each
+	// judged, held or declined.
 	restoring  map[*packages.Package]*hostRestore
 	renderings *ReadsBuild
+	untouched  map[*packages.Package]*hostRestore
+	visited    int
 
-	// excluded are the IDs never restored from the host again: each package check declined, and every package above
-	// it, whose types the load judged against the restored ones. They outlive a load, as the reloads do.
+	// visitsEvery has the walk visit every package the host kept, leaving none untouched (VisitEvery).
+	visitsEvery bool
+
+	// writtenThrough are this load's packages written through to the build's own store (writeThrough), each once: an
+	// untouched package is settled from the start, so the first wave's save would write it, and every later one again.
+	writtenThrough map[*packages.Package]bool
+
+	// excluded are the IDs never restored from the host again: each package check declined, which the reload checks
+	// from source. They outlive a load, as the reloads do.
 	excluded map[string]bool
 
 	// rounds counts the loads check's declines asked for; past one, the session restores nothing more from the host.
@@ -111,6 +127,15 @@ func (session *CacheSession) RestoreFromHost(host *HostRun) {
 	}
 	session.host = &hostState{host: host, excluded: map[string]bool{}, checkDeclines: map[string]int{},
 		checkReasons: map[string]string{}}
+}
+
+// VisitEvery has the session's restore from the host's run visit and judge every package it restores, leaving none
+// untouched, as before the walk (#qbvtkfm), so a run can be compared with the walk's. It holds only after
+// RestoreFromHost.
+func (session *CacheSession) VisitEvery() {
+	if session.host != nil {
+		session.host.visitsEvery = true
+	}
 }
 
 // declineKeys spell out, for the record people read, the first word of each reason a package was not restored from the
@@ -148,15 +173,20 @@ func reasonWord(reason string) string {
 
 // restoreFromHost makes a hit of each package among reachable the session holds nothing of, with no list error and no
 // reload pending, whose own inputs, by the portable digest, are those of the package of the same ID the host's run
-// kept, and whose reads can hold, decoded from the host's entry. Each is decided late by the load (load.Restored.Holds)
-// and dropped from the hits when it declines. keyed is the build's keys, nil for a session without a store, which keys
-// reachable here for the portable digests alone.
+// kept, decoded from the host's entry. Of those, the walk (untouchedOf) leaves untouched each whose dependence set
+// misses what changed: a hit with no late decision and no say, handed the host's findings. Each other is visited, and
+// one whose reads can hold is decided late by the load (load.Restored.Holds) and dropped from the hits when it
+// declines. keyed is the build's keys, nil for a session without a store, which keys reachable here for the portable
+// digests alone.
 func (session *CacheSession) restoreFromHost(loader string, reachable []*packages.Package, keyed *cache.Keyed) {
 	state := session.host
 	if state == nil || state.off || session.known == nil {
 		return
 	}
 	state.restoring = map[*packages.Package]*hostRestore{}
+	state.untouched = map[*packages.Package]*hostRestore{}
+	state.visited = 0
+	state.writtenThrough = map[*packages.Package]bool{}
 	state.renderings = NewReadsBuild()
 	state.loadDeclines = map[string]int{}
 	state.loadReasons = map[string]string{}
@@ -174,40 +204,45 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 		}
 		portable = ownKeys.Portable
 	}
+	// changes are D, by path, and those of it whose own files, or imports or name, may differ from the host's
+	// (walkChanges), listed every path of the listing, and ownHits the packages outside D the build's own findings
+	// cache holds, which the walk takes by their whole import closure.
+	changes := walkChanges{changed: map[string]bool{}, rewritten: map[string]bool{}, reshaped: map[string]bool{}}
+	listed := make(map[string]bool, len(reachable))
+	var ownHits []*packages.Package
 	var reading []*packages.Package
 	var readingKept []*hostEntry
 	for _, candidate := range reachable {
-		if _, hit := session.hits[candidate]; hit || len(candidate.Errors) > 0 || session.reloading(candidate) ||
-			state.excluded[candidate.ID] {
-			continue
-		}
+		listed[candidate.PkgPath] = true
+		_, hit := session.hits[candidate]
 		kept := state.host.entries[candidate.ID]
 		switch {
+		case len(candidate.Errors) > 0:
+			changes.changed[candidate.PkgPath], changes.rewritten[candidate.PkgPath] = true, true
+			changes.reshaped[candidate.PkgPath] = true
+			continue
+		// A package with a reload pending, or that an earlier load's check declined, has the host's own inputs, so its
+		// files, imports and name.
+		case session.reloading(candidate) || state.excluded[candidate.ID]:
+			changes.changed[candidate.PkgPath] = true
+			continue
 		case kept == nil:
-			state.loadDeclines[declineKeys["noEntry"]]++
+			changes.changed[candidate.PkgPath], changes.rewritten[candidate.PkgPath] = true, true
+			changes.reshaped[candidate.PkgPath] = true
+			if !hit {
+				state.loadDeclines[declineKeys["noEntry"]]++
+			}
 			continue
 		case kept.portable != portable[candidate]:
-			state.loadDeclines[declineKeys["inputs"]]++
-			continue
-		}
-		// A package kept with persisted reads, as a table hit is, has its record judged by the verdict, which declines
-		// a record it cannot read or match before any read; one kept with none is declined here.
-		if kept.restoring.Reads == nil {
-			if kept.restoring.persisted == nil {
-				state.loadDeclines[reasonWord(unpersistedReads)]++
-				continue
+			changes.changed[candidate.PkgPath], changes.rewritten[candidate.PkgPath] = true, true
+			changes.reshaped[candidate.PkgPath] = kept.restoring.Name != candidate.Name ||
+				!slices.Equal(kept.restoring.Imports, importPaths(candidate))
+			if !hit {
+				state.loadDeclines[declineKeys["inputs"]]++
 			}
-			reading = append(reading, candidate)
-			readingKept = append(readingKept, kept)
 			continue
-		}
-		if restorable, why := kept.restoring.Reads.Restorable(); !restorable {
-			if kept.restoring.Reads.Never() != "" {
-				why = "never: " + why
-			} else {
-				why = "unknown: " + why
-			}
-			state.loadDeclines[reasonWord(why)]++
+		case hit:
+			ownHits = append(ownHits, candidate)
 			continue
 		}
 		reading = append(reading, candidate)
@@ -215,7 +250,7 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 	}
 	// The entries are read, and decoded, on every core at once, as readHits reads the store's, and made hits in
 	// reachable's order after. Their export data is written only when the load reads it, in the package's own turn
-	// (lazyExportData).
+	// (lazyExportData). Each is decoded before the walk, which reads the answers it holds.
 	read := make([]*restoredPackage, len(reading))
 	readErrors := make([]error, len(reading))
 	session.fanOut(len(reading), func(index int) {
@@ -225,20 +260,71 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 		}
 		readErrors[index] = readError
 	})
+	candidates := make([]walkCandidate, 0, len(reading)+len(ownHits))
+	for _, ownHit := range ownHits {
+		candidates = append(candidates, walkCandidate{candidate: ownHit, dependence: DependenceSet{WholeClosure: true}})
+	}
 	for index, candidate := range reading {
-		kept, restored, readError := readingKept[index], read[index], readErrors[index]
-		if readError != nil {
-			session.problem(fmt.Sprintf("restoring %s from the host: %v", candidate.ID, readError))
+		if readErrors[index] != nil {
+			session.problem(fmt.Sprintf("restoring %s from the host: %v", candidate.ID, readErrors[index]))
 			state.loadDeclines[declineKeys["noEntry"]]++
+			changes.changed[candidate.PkgPath] = true
 			continue
 		}
+		candidates = append(candidates, walkCandidate{candidate: candidate, dependence: unitedDependence(
+			state.host.renderings.Dependence(readingKept[index].restoring),
+			answersDependence(read[index], session.byIdentifier))})
+	}
+	untouched := map[*packages.Package]bool{}
+	if !state.visitsEvery {
+		untouched = untouchedOf(candidates, changes, listed)
+	}
+	for index, candidate := range reading {
+		if readErrors[index] != nil {
+			continue
+		}
+		kept, restored := readingKept[index], read[index]
 		hosted := &hostRestore{kept: kept, restored: restored}
+		if untouched[candidate] {
+			// Its reads are never judged: by the walk's induction they read as on the host, so its restore is settled.
+			restored.types.Untouched = true
+			hosted.settled = true
+			session.hits[candidate] = restored
+			session.trusted[candidate] = true
+			state.untouched[candidate] = hosted
+			continue
+		}
+		state.visited++
+		if why := unrestorableReads(kept.restoring); why != "" {
+			state.loadDeclines[reasonWord(why)]++
+			continue
+		}
 		restored.types.Holds = session.typesHoldFunction(candidate, hosted)
 		restored.types.Declined = func() { session.declineAtLoad(candidate, hosted) }
 		session.hits[candidate] = restored
 		session.trusted[candidate] = true
 		state.restoring[candidate] = hosted
 	}
+}
+
+// unrestorableReads is why a visited package's reads can never hold, as a reason the record counts by its first word,
+// empty for reads a verdict judges: a package kept with persisted reads, as a table hit is, has its record judged by
+// the verdict, which declines a record it cannot read or match before any read; one kept with none, or whose reads
+// are marked never or were never recorded, is declined here.
+func unrestorableReads(restoring Restoring) string {
+	if restoring.Reads == nil {
+		if restoring.persisted == nil {
+			return unpersistedReads
+		}
+		return ""
+	}
+	if restorable, why := restoring.Reads.Restorable(); !restorable {
+		if restoring.Reads.Never() != "" {
+			return "never: " + why
+		}
+		return "unknown: " + why
+	}
+	return ""
 }
 
 // typesHoldFunction is the load's late decision of hosted, candidate's restore (load.Restored.Holds): its types' reads
@@ -275,8 +361,9 @@ func (session *CacheSession) typesHoldFunction(
 }
 
 // restoredBelow are the types of the packages of closure, what candidate reaches by path, that this load restored from
-// the host's run. Each is done when candidate's restore is decided, its types set and its decline, if any, counted
-// (declineAtLoad), so a package still among the restores is one whose types were read from the host's export data.
+// the host's run, decided late or left untouched. Each is done when candidate's restore is decided, its types set and
+// its decline, if any, counted (declineAtLoad), so a package still among the restores is one whose types were read from
+// the host's export data.
 func (session *CacheSession) restoredBelow(
 	candidate *packages.Package,
 	closure map[string]*types.Package,
@@ -302,8 +389,9 @@ func (session *CacheSession) restoredBelow(
 	state.lock.RLock()
 	defer state.lock.RUnlock()
 	for _, imported := range reached {
-		if _, fromHost := state.restoring[imported]; fromHost && imported.Types != nil &&
-			closure[imported.PkgPath] == imported.Types {
+		_, judged := state.restoring[imported]
+		_, untouched := state.untouched[imported]
+		if (judged || untouched) && imported.Types != nil && closure[imported.PkgPath] == imported.Types {
 			restored[imported.Types] = true
 		}
 	}
@@ -340,6 +428,12 @@ func (session *CacheSession) dropShortHostHits() {
 			delete(session.trusted, candidate)
 		}
 	}
+	for candidate := range session.host.untouched {
+		if _, hit := session.hits[candidate]; !hit {
+			delete(session.host.untouched, candidate)
+			delete(session.trusted, candidate)
+		}
+	}
 }
 
 // fromHost is the package's restore from the host's run, nil for any other package.
@@ -353,10 +447,20 @@ func (session *CacheSession) fromHost(restoring *packages.Package) *hostRestore 
 // decideHostRestores settles every package restored from the host's run once the analysis of graphs is over, with no
 // pass running: one whose fact reads, deprecation lookups included, do not read the same in what the build's packages
 // exported (buildFacts), whose answers read of other packages could not all be named, or one of which no longer holds
-// (readsHold), is declined. It returns the IDs declined, sorted, which the run asks to load again, and excludes each
-// of them, and every package above one, from the host's restores from then on: the load judged those above against
-// the declined package's restored types, and their analysis read its restored facts. A second load's worth of declines
-// turns the restore from the host off, so the build loads again at most twice for it.
+// (readsHold), is declined. It returns the IDs declined, sorted, which the run asks to load again, and excludes each of
+// them from the host's restores from then on: the reload checks it from source, and it is of what changed for the
+// reload's walk.
+//
+// The packages above a decline are not excluded (#axbw09w). This load judged them against the declined package's
+// restored types and analyzed them over its restored facts and answers, but the reload judges and analyzes everything
+// again, so nothing of this load's judgment survives into it. In the reload, one whose dependence set meets the
+// declined package is visited, and decided late again by TypesHold, FactsHold and readsHold against the declined
+// package as the reload checks it from source, and restored only if every read holds there; the rest stay untouched.
+// So a package re-judged above the decline holds only against the declined package's rendering from source, its facts
+// and its answers as the reload computes them, by the walk's induction (untouchedOf): every package its set reaches is
+// either untouched, rendering as on the host, or judged in the reload, or checked from source there, and it is held
+// only where each read of it reads alike against that. A second load's worth of declines turns the restore from the
+// host off, so the build loads again at most twice for it.
 func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []string {
 	state := session.host
 	if state == nil || len(state.restoring) == 0 {
@@ -394,8 +498,8 @@ func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []strin
 	for _, candidate := range declined {
 		identifiers = append(identifiers, candidate.ID)
 	}
-	for above := range session.packagesAbove(declined) {
-		state.excluded[above.ID] = true
+	for _, candidate := range declined {
+		state.excluded[candidate.ID] = true
 	}
 	slices.Sort(identifiers)
 	return identifiers
@@ -464,6 +568,14 @@ func (session *CacheSession) unsettledBelow() map[*packages.Package]bool {
 // answers, and everything below it; and the build's context, its target, flags and rule set. A dependency whose
 // output did not change but whose key did, as a comment edited, changes this key too, so the entry is not hit by it
 // again: the second key, or a check from source, decides it then, as for any entry the build wrote itself.
+//
+// A package the walk left untouched (untouchedOf) is written through too, and its entry is sound otherwise: no verdict
+// judged its reads, so it persists the walk's induction instead, that every package its dependence set reaches was
+// outside what changed and so renders, declares and answers as on the host. Under the build's key that stands for
+// every later run that hits it for the same reason a judged entry does: the key covers the package's own inputs and
+// every dependency's key, so a later run in which anything the induction rested on moved has another key, and decides
+// the package again. A build that wrote it nowhere would check it from source on its next run, once the host, hitting
+// its own store, keeps nothing to restore it from.
 func (session *CacheSession) writeThrough(
 	actionsOf map[*packages.Package][]*checker.Action,
 	unsettled map[*packages.Package]bool,
@@ -474,12 +586,16 @@ func (session *CacheSession) writeThrough(
 	}
 	var through []*packages.Package
 	var throughHosted []*hostRestore
-	for candidate, hosted := range session.host.restoring {
+	// An untouched package is written through as a held one is, on the walk's induction (see above).
+	settledRestores := maps.Clone(session.host.restoring)
+	maps.Copy(settledRestores, session.host.untouched)
+	for candidate, hosted := range settledRestores {
 		hosted.lock.Lock()
 		held := hosted.settled && hosted.declined == ""
 		hosted.lock.Unlock()
 		// A package pending a reload is checked from source by the next load, which writes its entry as a miss.
 		if _, keyed := session.keys[candidate]; !held || !keyed || unsettled[candidate] ||
+			session.host.writtenThrough[candidate] ||
 			session.reloading(candidate) || !finishedClean(actionsOf[candidate]) {
 			continue
 		}
@@ -491,8 +607,9 @@ func (session *CacheSession) writeThrough(
 	writeErrors := make([]error, len(through))
 	session.fanOutWriting(len(through), func(index int) func() {
 		saved := through[index]
+		_, untouched := session.host.untouched[saved]
 		encoded[index], writable[index], writeErrors[index] = session.throughEntry(saved, throughHosted[index],
-			actionsOf[saved], knownFiles)
+			actionsOf[saved], knownFiles, untouched)
 		if !writable[index] || writeErrors[index] != nil {
 			return nil
 		}
@@ -517,6 +634,7 @@ func (session *CacheSession) writeThrough(
 			continue
 		}
 		if writable[index] {
+			session.host.writtenThrough[saved] = true
 			session.counts.WrittenThrough++
 			positionDependent[saved] = encoded[index].positionDependent
 		}
@@ -537,12 +655,14 @@ func (session *CacheSession) writeThrough(
 // holding is the verdict that the build's check from source would give the package the host's types and facts. It
 // cannot be computed again from the types the build read, since export data drops the package's Go version, which the
 // rendering holds, so a digest of those would differ from the build's own and have importers flap between a hit and a
-// miss across runs.
+// miss across runs. An untouched package (untouched), which no action of the build's ran on, is written with the host's
+// analyzers, those of the same rules.
 func (session *CacheSession) throughEntry(
 	saved *packages.Package,
 	hosted *hostRestore,
 	actions []*checker.Action,
 	knownFiles *knownFiles,
+	untouched bool,
 ) (encodedEntry, bool, error) {
 	slots := map[string]bool{}
 	for _, action := range actions {
@@ -558,11 +678,13 @@ func (session *CacheSession) throughEntry(
 	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
 		return encodedEntry{}, true, fmt.Errorf("decoding the host's entry: %w", decodeError)
 	}
-	if len(entry.Analyzers) != len(slots) {
+	// An untouched package had no action of its own to compare by. Its entry is the host's for the same rules, and an
+	// entry that falls short of what a later run asks is a miss there (dropShortHits), never a wrong hit.
+	if !untouched && len(entry.Analyzers) != len(slots) {
 		return encodedEntry{}, false, nil
 	}
 	for slot := range entry.Analyzers {
-		if !slots[slot] {
+		if !untouched && !slots[slot] {
 			return encodedEntry{}, false, nil
 		}
 	}
@@ -628,6 +750,7 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 		return HostRestoreCounts{}
 	}
 	counts := HostRestoreCounts{
+		Visited:         state.visited,
 		DeclinedAtLoad:  len(state.loadReasons),
 		DeclinedAtCheck: len(state.checkReasons),
 		ReloadRounds:    state.rounds,
@@ -643,6 +766,10 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 		hosted.lock.Unlock()
 	}
 	slices.Sort(counts.Restored)
+	for candidate := range state.untouched {
+		counts.Untouched = append(counts.Untouched, candidate.ID)
+	}
+	slices.Sort(counts.Untouched)
 	for _, reasons := range []map[string]string{state.loadReasons, state.checkReasons} {
 		maps.Copy(counts.Declined, reasons)
 	}

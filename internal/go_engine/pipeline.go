@@ -73,6 +73,11 @@ type pipeline struct {
 	// from the host's run, so the test can compare the two (#b2t9xmf).
 	keepsHostRestoreOff bool
 
+	// keepsWalkOff, set only by a test, has every extra build visit and judge every package it restores from the host's
+	// run, as it did before the walk, rather than leave untouched the ones whose reads nothing changed (#qbvtkfm), so
+	// the test can compare the two.
+	keepsWalkOff bool
+
 	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once (fixedBuildsWidth, or
 	// measuredBuildsWidth as the first build's load ends), 0 until it was, for the lint record, and
 	// buildsWidthLiveBytes and buildsWidthBuildBytes the host's live heap that decision was given and what the first

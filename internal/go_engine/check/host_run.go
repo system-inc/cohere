@@ -68,14 +68,19 @@ type hostEntry struct {
 	contents  func() (entry []byte, readExportData func() ([]byte, error), readError error)
 }
 
-// restoringOf is kept, a package of the host's run, as a verdict judges it: its path, its imports' paths, its reads,
-// and whether it has assembly files, as asmdecl finds them among its other files.
+// restoringOf is kept, a package of the host's run, as a verdict judges it: its path, its imports' paths, its name, its
+// reads, and whether it has assembly files, as asmdecl finds them among its other files.
 func restoringOf(kept *packages.Package, reads *build_reads.Reads) Restoring {
-	imports := make([]string, 0, len(kept.Imports))
-	for _, imported := range kept.Imports {
-		imports = append(imports, imported.PkgPath)
-	}
-	slices.Sort(imports)
 	assembly := slices.ContainsFunc(kept.OtherFiles, func(file string) bool { return strings.HasSuffix(file, ".s") })
-	return Restoring{Path: kept.PkgPath, Imports: imports, Reads: reads, Assembly: assembly}
+	return Restoring{Path: kept.PkgPath, Imports: importPaths(kept), Name: kept.Name, Reads: reads, Assembly: assembly}
+}
+
+// importPaths are the paths of the packages importer imports, sorted.
+func importPaths(importer *packages.Package) []string {
+	paths := make([]string, 0, len(importer.Imports))
+	for _, each := range importer.Imports {
+		paths = append(paths, each.PkgPath)
+	}
+	slices.Sort(paths)
+	return paths
 }

@@ -315,7 +315,9 @@ func checkingBuild(builds []project.Build, file string, contents []byte) (projec
 //
 // host is what the host's run kept for the extra builds, nil when it kept nothing: the build restores from it each
 // package its own findings cache does not hold whose own inputs are the host's and whose reads hold here (#b2t9xmf),
-// unless the run renamed, whose build reads no cache, or measures under `--timing`, whose build has no session.
+// unless the run renamed, whose build reads no cache, or measures under `--timing`, whose build has no session. Of
+// those, the walk leaves untouched each whose dependence set misses what changed in the build (#qbvtkfm): restored
+// unjudged and never analyzed, so the build has no say on its files and the host's findings stand there.
 //
 // gate is the extra builds' lint gate, which the build takes its weight of once its first load has ended, by the share
 // of its packages that load checked from source (lintWeight), and gives back once its rules end, every reload's
@@ -342,6 +344,9 @@ func (engine *pipeline) extraBuildRun(
 		session = engine.cacheSession(environment, hostFiles, notes)
 		if session != nil && !engine.keepsHostRestoreOff {
 			session.RestoreFromHost(host)
+			if engine.keepsWalkOff {
+				session.VisitEvery()
+			}
 		}
 	}
 	// As the host's load does (loadWorkspace), a package with no file in scope is loaded and never analyzed. A root no
@@ -397,10 +402,6 @@ func (engine *pipeline) extraBuildRun(
 	if len(loaded.Diagnostics) > 0 {
 		return run, nil
 	}
-	for _, each := range loaded.Packages {
-		run.analyzed[each.ID] = true
-	}
-	run.said = compiledFiles(loaded.Packages, ours)
 	run.packagesLoaded = loaded.PackagesLoaded
 	// The first load's count weighs the lint at the gate; every load's, a reload's included, reaches the record.
 	run.checkedFromSource = checkedFromSource(loaded.Roots)
@@ -479,6 +480,13 @@ func (engine *pipeline) extraBuildRun(
 	for _, problem := range result.Cache.Problems {
 		noteTo(notes, "the findings cache of the build %s: %s", extra, problem)
 	}
+	// What the build analyzed, and so has a say on, is the last load's, whose result stands: a load again for a
+	// question can check from source a package an earlier load's walk left untouched.
+	for _, each := range loaded.Packages {
+		run.analyzed[each.ID] = true
+	}
+	run.said = compiledFiles(loaded.Packages, ours)
+	run.untouchedFiles = compiledFiles(loaded.Untouched, ours)
 	run.result = result
 	run.loading, run.linting = loading, linting
 	if engine.extraBuildEnds != nil {
@@ -566,6 +574,7 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.EntriesKept = run.result.Host.EntriesKept()
 			fromHost := run.result.FromHost
 			record.RestoredFromHost = len(fromHost.Restored)
+			record.Untouched, record.Visited = len(fromHost.Untouched), fromHost.Visited
 			record.WrittenThrough = run.result.Cache.WrittenThrough
 			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
 			record.DeclinedAtCheck = fromHost.DeclinedAtCheck

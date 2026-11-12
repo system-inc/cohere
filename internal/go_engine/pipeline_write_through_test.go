@@ -7,10 +7,10 @@ import (
 )
 
 // A cold run with the findings cache has each extra build write through, to its own store, every package it restored
-// from the host's run (#b2t9xmf), so the unchanged run right after hits every package of every build in its own store
-// by its first key: the host, hitting its own store, keeps nothing to restore from then, and without the write-through
-// each extra build would check every one of those packages from source. Its stream is the cold run's but for the
-// counts of the cache and the restore.
+// from the host's run (#b2t9xmf), those its walk left untouched included (#qbvtkfm), so the unchanged run right after
+// hits every package of every build in its own store by its first key: the host, hitting its own store, keeps nothing
+// to restore from then, and without the write-through each extra build would check every one of those packages from
+// source. Its stream is the cold run's but for the counts of the cache and the restore.
 func TestTheRunAfterAColdOneHitsEveryBuildsOwnStore(test *testing.T) {
 	test.Parallel()
 
@@ -22,13 +22,14 @@ func TestTheRunAfterAColdOneHitsEveryBuildsOwnStore(test *testing.T) {
 	}
 	restoring := 0
 	for _, coldRun := range cold.buildRuns[1:] {
-		restored := len(coldRun.result.FromHost.Restored)
+		// A package its walk left untouched is written through as one it restored and judged (#qbvtkfm).
+		restored := len(coldRun.result.FromHost.Restored) + len(coldRun.result.FromHost.Untouched)
 		if restored > 0 {
 			restoring++
 		}
 		if written := coldRun.result.Cache.WrittenThrough; written != restored {
-			test.Errorf("%s's cold run wrote %d entries through of the %d it restored, want every one",
-				coldRun.build, written, restored)
+			test.Errorf("%s's cold run wrote %d entries through of the %d it restored or left untouched, want "+
+				"every one", coldRun.build, written, restored)
 		}
 	}
 	if restoring < 2 {
@@ -39,7 +40,8 @@ func TestTheRunAfterAColdOneHitsEveryBuildsOwnStore(test *testing.T) {
 	}
 	for _, warmRun := range warm.buildRuns[1:] {
 		counts := warmRun.result.Cache
-		if restored := len(warmRun.result.FromHost.Restored); restored != 0 || warmRun.checkedFromSource != 0 {
+		if restored := len(warmRun.result.FromHost.Restored) + len(warmRun.result.FromHost.Untouched); restored != 0 ||
+			warmRun.checkedFromSource != 0 {
 			test.Errorf("%s's warm run restored %d from the host and checked %d from source, want none of either",
 				warmRun.build, restored, warmRun.checkedFromSource)
 		}
@@ -63,7 +65,7 @@ func TestNoBuildWritesThroughWithoutTheCache(test *testing.T) {
 		"--other-builds")
 	restored := 0
 	for _, run := range engine.buildRuns {
-		restored += len(run.result.FromHost.Restored)
+		restored += len(run.result.FromHost.Restored) + len(run.result.FromHost.Untouched)
 		if written := run.result.Cache.WrittenThrough; written != 0 {
 			test.Errorf("%s wrote %d entries through under --no-cache, want none", run.build, written)
 		}

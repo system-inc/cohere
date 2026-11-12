@@ -379,6 +379,14 @@ type Options struct {
 	// it is nil, records nothing.
 	Reads map[*packages.Package]*build_reads.Reads
 
+	// cohere: ListingsRead are the analyzers whose listings of every fact
+	// an action inherited (Pass.AllObjectFacts, Pass.AllPackageFacts) are
+	// read, by whoever consumes them, one recorded question at a time. A
+	// listing by any other analyzer reads facts of the whole import
+	// closure that no single read names, so it marks its package's reads
+	// never (see markFactListing).
+	ListingsRead map[*analysis.Analyzer]bool
+
 	// cohere: Walks, when set, runs each type-read walk under Reads on a
 	// goroutine of its own, and the package's syntax and type information
 	// are let go of only once its walk ends, which Analyze does not wait
@@ -893,8 +901,16 @@ func (act *Action) execOnce() {
 		ExportObjectFact:  act.exportObjectFact,
 		ImportPackageFact: act.PackageFact,
 		ExportPackageFact: act.exportPackageFact,
-		AllObjectFacts:    act.AllObjectFacts,
-		AllPackageFacts:   act.AllPackageFacts,
+		// cohere: a listing of every fact inherited is a read of the
+		// whole import closure (see markFactListing).
+		AllObjectFacts: func() []analysis.ObjectFact {
+			act.markFactListing()
+			return act.AllObjectFacts()
+		},
+		AllPackageFacts: func() []analysis.PackageFact {
+			act.markFactListing()
+			return act.AllPackageFacts()
+		},
 	}
 	readFile := os.ReadFile
 	// cohere: Options.ReadFile, the field upstream's TODO asks to expose.
@@ -1376,6 +1392,22 @@ func (act *Action) readFact(obj types.Object, pkg *types.Package, typ reflect.Ty
 		act.factReads = make(map[factReadKey]build_reads.Fact)
 	}
 	act.factReads[key] = read
+}
+
+// cohere: markFactListing marks act's package's reads under Options.Reads
+// never, when act's analyzer lists every fact the action inherited and is
+// not among Options.ListingsRead: the listing holds the facts of every
+// package of the import closure, and what the analyzer makes of them is
+// no read the run can name, so neither a verdict nor a dependence set
+// could judge it. A read never recorded would let another build restore
+// the package, or the walk leave it untouched, over facts that changed.
+func (act *Action) markFactListing() {
+	reads := act.opts.Reads[act.Package]
+	if reads == nil || act.opts.ListingsRead[act.Analyzer] {
+		return
+	}
+	reads.MarkNever("its analyzer " + act.Analyzer.Name + " lists every fact of its import closure, which no read " +
+		"names")
 }
 
 // cohere: publishFactReads publishes the fact reads act gathered to its
