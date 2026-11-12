@@ -257,7 +257,7 @@ func (summary runSummary) phasesNotRun() []string {
 func (summary runSummary) failed() bool {
 	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
 		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0 ||
-		summary.Gaps.nothingChecked()
+		summary.Gaps.nothingChecked() || summary.Gaps.CensusMissedPackages > 0
 }
 
 // swiftSummary is what only a Swift run says of itself.
