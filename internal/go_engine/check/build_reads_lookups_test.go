@@ -21,13 +21,14 @@ import (
 // named by base's interface Sizer and URLText by no interface, which the initialism rule asks the import closure; it
 // uses base's deprecated Old and its current New, which SA1019 asks the deprecated facts; and it calls errors.As,
 // which vet's errors_as port looks up in package errors' scope. Its method Put takes an any, which no_any and
-// abbreviated each ask the closure for a method fixing, base's Store.Put for no_any, whose match is the signature
-// alone, and none for abbreviated, since page implements no interface of base's with Put.
+// abbreviated each ask the closure for a method fixing: base's Store.Put for no_any, an interface method whose
+// signature is all no_any's match reads, and none for abbreviated, since page lacks Store's Flush and so implements
+// no interface of base's with Put.
 var lookupFiles = map[string]string{
 	"go.mod": "module example.com/lookups\n\ngo 1.21\n",
 	"base/base.go": "package base\n\n// Sizer is what a sized thing implements.\n" +
-		"type Sizer interface{ HTTPSize() int }\n\n// Store keeps values.\ntype Store struct{}\n\n" +
-		"// Put keeps value.\nfunc (Store) Put(value any) {}\n\n" +
+		"type Sizer interface{ HTTPSize() int }\n\n// Store keeps values.\n" +
+		"type Store interface {\n\tPut(value any)\n\tFlush()\n}\n\n" +
 		"// Old is one.\n//\n// Deprecated: use New.\nfunc Old() int { return 1 }\n\n// New is one.\n" +
 		"func New() int { return 1 }\n",
 	"user/user.go": "package user\n\nimport (\n\t\"errors\"\n\n\t\"example.com/lookups/base\"\n)\n\n" +
