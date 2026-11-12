@@ -614,16 +614,10 @@ func (session *CacheSession) writeThrough(
 			return nil
 		}
 		key := session.keys[saved]
-		// The writes run with no slot held (fanOutWriting), the export data first, so an entry is never in the store
-		// before what it needs to be read.
-		return func() {
-			if encoded[index].exportData != nil {
-				writeErrors[index] = session.caching.Store.Put(exportDataKey(key), encoded[index].exportData)
-			}
-			if writeErrors[index] == nil {
-				writeErrors[index] = session.caching.Store.Put(key, encoded[index].entry)
-			}
-		}
+		// The writes run with no slot held (fanOutWriting), as putEntry writes a miss's: the export data first, so an
+		// entry is never in the store before what it needs to be read, and only when the store does not hold it by its
+		// digest already, as it does for every package the host wrote, whose export data the build read.
+		return func() { writeErrors[index] = session.putEntry(key, encoded[index]) }
 	})
 	positionDependent := map[*packages.Package]bool{}
 	for index, saved := range through {
@@ -698,6 +692,9 @@ func (session *CacheSession) throughEntry(
 		}
 		encoded.exportData = exportData
 	}
+	// The entry names the export data the build read by its digest, which is the host's entry's own when the host
+	// wrote it, and new for one kept from the binary's table or from the host's memory under `--no-cache`.
+	entry.ExportData = exportDataDigest(encoded.exportData)
 	entry.Reads, entry.ReadsIncomplete = session.readsInBuild(saved.ID, entry.Reads, entry.ReadsIncomplete)
 	encoded.positionDependent = positionDependent(saved, entry.Analyzers, knownFiles)
 	var entryBytes bytes.Buffer
@@ -851,9 +848,13 @@ func (session *CacheSession) keepForBuilds(
 				if !stored {
 					return nil, nil, fmt.Errorf("the store holds no entry of %s", keptPackage.ID)
 				}
+				// The export data is the one the entry names by digest, read only when a load asks for it.
 				return entry, func() ([]byte, error) {
-					exportData, _ := session.caching.Store.Get(exportDataKey(key))
-					return exportData, nil
+					digest, digestError := entryExportDigest(entry)
+					if digestError != nil {
+						return nil, digestError
+					}
+					return readExportDataByDigest(session.caching.Store, keptPackage, digest)
 				}, nil
 			}
 			host.entries[keptPackage.ID] = kept
