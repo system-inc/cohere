@@ -226,6 +226,42 @@ func TestAnExtraBuildAnswersABodilessFunctionWithoutLoadingAgain(test *testing.T
 	}
 }
 
+// A timed run restores nothing from the host's run, so its timing record says so (#4y4qd3z): over the restore
+// fixture, `--timing --other-builds` writes extraBuildsFromSource as the count of builds beside the host's, and
+// `--timing` alone, which checks no extra build, leaves it out of the line.
+func TestATimedRunWithExtraBuildsSaysTheyRestoredNothing(test *testing.T) {
+	test.Parallel()
+
+	timingLine := func(stream string) string {
+		test.Helper()
+		for line := range strings.SplitSeq(stream, "\n") {
+			if strings.HasPrefix(line, `{"kind":"timing"`) {
+				return line
+			}
+		}
+		test.Fatalf("the timed run wrote no timing record:\n%s", stream)
+		return ""
+	}
+	fixture := filepath.Join("testdata", "restore-from-host")
+	engine, stream := runOverRaw(test, copyFixture(test, fixture), exitFindings, "--timing", "--other-builds")
+	if len(engine.buildRuns) < 2 {
+		test.Fatalf("the run checked %d builds, want the host's and at least one more", len(engine.buildRuns))
+	}
+	var record contract.TimingRecord
+	if decodeError := json.Unmarshal([]byte(timingLine(stream)), &record); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	if want := len(engine.buildRuns) - 1; record.ExtraBuildsFromSource != want {
+		test.Errorf("the timing record says %d extra builds checked from source, want %d", record.ExtraBuildsFromSource,
+			want)
+	}
+
+	_, alone := runOverRaw(test, copyFixture(test, fixture), exitFindings, "--timing")
+	if line := timingLine(alone); strings.Contains(line, `"extraBuildsFromSource"`) {
+		test.Errorf("a timed run with no extra builds wrote extraBuildsFromSource: %s", line)
+	}
+}
+
 // Each build says where its time went: over the restore fixture, the host's load, lint and keeping its packages for
 // the others, and windows' load, lint and deciding which packages restore, each measured, and each written into the
 // build's record as its milliseconds.

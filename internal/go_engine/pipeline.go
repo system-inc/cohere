@@ -303,7 +303,13 @@ func (engine *pipeline) run() int {
 	engine.writeDuplicates()
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
 	if engine.timing != nil {
-		engine.write(engine.timing.Record(timingKinds(engine.registered)))
+		record := engine.timing.Record(timingKinds(engine.registered))
+		// The host's run is the first of buildRuns, and each run after it an extra build's, none of which restored
+		// anything from the host's run, since a timed run keeps nothing for them (cacheSession).
+		if len(engine.buildRuns) > 1 {
+			record.ExtraBuildsFromSource = len(engine.buildRuns) - 1
+		}
+		engine.write(record)
 	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load

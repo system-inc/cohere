@@ -18,6 +18,13 @@ type TimingRecord struct {
 	// field is then 0 and means nothing; the counts are still real. Empty when the CPU was measured.
 	Unavailable string `json:"unavailable,omitempty"`
 
+	// ExtraBuildsFromSource is how many builds beside the host's the run checked, each of which restored nothing from
+	// the host's run: a timed run keeps nothing for its extra builds (#3apgjer), so every package of every build was
+	// checked from source, and the rows include that work (#4y4qd3z). A count rather than a flag, so the front door's
+	// sentence says how many builds the rows were summed over. Written only when the run had extra builds, and
+	// omitted otherwise.
+	ExtraBuildsFromSource int `json:"extraBuildsFromSource,omitempty"`
+
 	// ProcessCpuMicroseconds is the process's user and system CPU from its start to this record.
 	ProcessCpuMicroseconds int64 `json:"processCpuMicroseconds"`
 
