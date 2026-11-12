@@ -19,6 +19,22 @@ import (
 // so each rule's own fixtures pin that a method of another shape never fixes a name, red if its match loosens to the
 // name alone: abbreviated's flagged.go, commanding's Cmd and wideStack's Len; no_any's flagged.go, memoryCache's
 // Save; initialism's flagged.go, record's MarshalJSON. A rule joining this list brings such a fixture.
+//
+// Neither side of the judgment counts a concrete type whose method's name is unexported when the subject is a function
+// or a concrete type's method (countedCandidates), so a rule joining this list must show it never lets a concrete
+// foreign method with an unexported name fix such a subject's name, or that narrowing is wrong for it. Each rule pins
+// it in its own package, red if it ever lets one: TestAnUnexportedConcreteForeignMethodNeverFixesAName.
+//
+// The judgment's candidates come from the verdict's method index (indexPackage), which indexes as the rules do: an
+// interface by its whole method set, an alias's too, and any other named type by the methods it declares, never one
+// promoted to it, nor an alias of it. So a rule joining this list must read a concrete type's declared methods alone,
+// and an alias only of an interface, or the index loses a candidate it reads. Each rule pins its part, red if it ever
+// reads more: TestOnlyDeclaredMethodsFixAName and TestAnAliasOfAConcreteTypeNeverFixesAName. An alias of an interface
+// stays in the index because initialism reads it: its foreignInterfaces adds every type name of an imported scope
+// with no alias check, and `type Closer = interface{ Close() error }` is the one name its interface has, so a build
+// that gains it can fix a name the host left unfixed (TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip's alias of an
+// interface). abbreviated and no-any skip every alias, so for them it is a candidate they never read, which costs a
+// restore and never a stale one.
 var methodLookupRules = []string{
 	"rules/consistency_no_abbreviated_identifier",
 	"rules/consistency_no_any",

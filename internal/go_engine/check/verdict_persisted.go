@@ -187,6 +187,12 @@ func (judged verdict) persistedLookupHolds(held *heldReads, lookup persistedLook
 	}
 }
 
+// persistedConcreteSubject reports whether a persisted lookup's subject is a function or a concrete type's method, as
+// concreteSubject tells one of this run.
+func persistedConcreteSubject(lookup persistedLookup) bool {
+	return lookup.SubjectIsMethod && !lookup.ReceiverInterface
+}
+
 // persistedCandidate is one type name of the build's side of an Interface or Method lookup: a host candidate the
 // record persisted, by reference to its objects, for a package the build restored from the host's run, which gives the
 // host's own type names, or else one of the build's own.
@@ -224,9 +230,8 @@ func (judged verdict) persistedCandidatesHold(
 				name: held.bareName(reference)})
 		}
 	}
-	for _, typeName := range judged.buildCandidates(lookup.Name, roots, func(owner *types.Package) bool {
-		return hostOwners[owner.Path()]
-	}) {
+	for _, typeName := range judged.buildCandidates(lookup.Name, roots,
+		func(owner *types.Package) bool { return hostOwners[owner.Path()] }, methodSetTypeNames) {
 		buildSide = append(buildSide, persistedCandidate{object: typeName, path: typeName.Pkg().Path(),
 			name: typeName.Name()})
 	}
@@ -283,9 +288,9 @@ func (judged verdict) persistedMethodJudgment(
 			judgment.build[key] = candidate
 		}
 	}
-	for _, typeName := range judged.buildCandidates(lookup.Name, roots, func(owner *types.Package) bool {
-		return hostOwners[owner.Path()]
-	}) {
+	for _, typeName := range countedCandidates(judged.buildCandidates(lookup.Name, roots,
+		func(owner *types.Package) bool { return hostOwners[owner.Path()] }, ruleTypeNames), lookup.Name,
+		persistedConcreteSubject(lookup)) {
 		candidate, key, isCandidate := judged.build.candidate(typeName, lookup.Query, lookup.Name, nil)
 		if isCandidate {
 			judgment.build[key] = candidate
