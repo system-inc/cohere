@@ -21,19 +21,21 @@ func TestAQuietWindowRefusesEveryJobButTheRunItIsFor(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	opened := time.Date(2026, 11, 11, 20, 5, 0, 0, time.Local)
-	if refusal := quietRefusal(directory, opened, "", ""); refusal != "" {
+	if refusal := quietRefusal(directory, opened, "", "", discarded()); refusal != "" {
 		test.Errorf("with no window a job was refused: %s", refusal)
 	}
 	if code := quietOn(
 		directory,
 		[]string{"--for", "45m", "--through", "engine-pairs", "engine's timing pairs"},
 		opened,
+		discarded(),
+		discarded(),
 	); code != 0 {
 		test.Fatalf("opening a quiet window exited %d", code)
 	}
 	inside := opened.Add(10 * time.Minute)
 	for _, through := range []string{"", "staticcheck-census"} {
-		refusal := quietRefusal(directory, inside, "", through)
+		refusal := quietRefusal(directory, inside, "", through, discarded())
 		for _, want := range []string{
 			"holds until 20:50:00",
 			"engine's timing pairs",
@@ -46,18 +48,18 @@ func TestAQuietWindowRefusesEveryJobButTheRunItIsFor(test *testing.T) {
 			}
 		}
 	}
-	if refusal := quietRefusal(directory, inside, "", "engine-pairs"); refusal != "" {
+	if refusal := quietRefusal(directory, inside, "", "engine-pairs", discarded()); refusal != "" {
 		test.Errorf("the run the window is for was refused: %s", refusal)
 	}
-	if refusal := quietRefusal(directory, inside, "3", ""); refusal != "" {
+	if refusal := quietRefusal(directory, inside, "3", "", discarded()); refusal != "" {
 		test.Errorf("a job beneath a running job's token was refused: %s", refusal)
 	}
-	if refusal := quietRefusal(directory, opened.Add(46*time.Minute), "", ""); refusal != "" {
+	if refusal := quietRefusal(directory, opened.Add(46*time.Minute), "", "", discarded()); refusal != "" {
 		test.Errorf("a job after the window expired was refused: %s", refusal)
 	}
 
 	unnamed := test.TempDir()
-	if code := quietOn(unnamed, []string{"--for", "10m"}, opened); code != 0 {
+	if code := quietOn(unnamed, []string{"--for", "10m"}, opened, discarded(), discarded()); code != 0 {
 		test.Fatalf("opening an unnamed quiet window exited %d", code)
 	}
 	if refusal := quietRefusal(
@@ -65,6 +67,7 @@ func TestAQuietWindowRefusesEveryJobButTheRunItIsFor(test *testing.T) {
 		inside.Add(-5*time.Minute),
 		"",
 		"engine-pairs",
+		discarded(),
 	); !strings.Contains(refusal, "it lets no run through") {
 		test.Errorf("a window naming no run let a named job through, or did not say it lets none: %q", refusal)
 	}
@@ -76,10 +79,17 @@ func TestAQuietWindowRefusesEveryJobButTheRunItIsFor(test *testing.T) {
 		inside,
 		"",
 		"",
+		discarded(),
 	); !strings.Contains(refusal, "does not start with when it ends") {
 		test.Errorf("a marker that can't be read refused nothing, or did not say why: %q", refusal)
 	}
-	if code := quietOn(test.TempDir(), []string{"--through", "two words"}, opened); code != 2 {
+	if code := quietOn(
+		test.TempDir(),
+		[]string{"--through", "two words"},
+		opened,
+		discarded(),
+		discarded(),
+	); code != 2 {
 		test.Errorf("a --through of two words was not refused: exited %d", code)
 	}
 }
@@ -130,7 +140,13 @@ func TestNothingIsBorrowedInsideAQuietWindow(test *testing.T) {
 		test.Fatalf("taking a token for the test: %v", takeSlotError)
 	}
 	defer own.release()
-	if code := quietOn(directory, []string{"--for", "10m", "a measurement"}, time.Now()); code != 0 {
+	if code := quietOn(
+		directory,
+		[]string{"--for", "10m", "a measurement"},
+		time.Now(),
+		discarded(),
+		discarded(),
+	); code != 0 {
 		test.Fatalf("opening a quiet window exited %d", code)
 	}
 	if borrowed := borrowTokens(directory, shape, own.number, "a gate"); len(borrowed) != 0 {

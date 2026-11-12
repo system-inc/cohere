@@ -201,7 +201,13 @@ func withSteppedToken(what string, steps func(step func(name string) []string) i
 	}
 	// A window opened while this job waited in line is met again here: waiting is not running (quiet.go).
 	// The held token is this job's own now, so only the name it passed lets it through.
-	if refusal := quietRefusal(directory, time.Now(), "", os.Getenv(quietThroughVariable)); refusal != "" {
+	if refusal := quietRefusal(
+		directory,
+		time.Now(),
+		"",
+		os.Getenv(quietThroughVariable),
+		streams.Errors,
+	); refusal != "" {
 		held.release()
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
 		return quietRefusedExitCode

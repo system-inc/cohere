@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -27,7 +28,13 @@ func TestAQuietWindowHoldsUntilItEnds(test *testing.T) {
 	if holds, line := quietHolds(directory, opened); holds || line != "" {
 		test.Fatalf("no marker held, or was described: %q", line)
 	}
-	if code := quietOn(directory, []string{"--for", "30m", "a cold measurement"}, opened); code != 0 {
+	if code := quietOn(
+		directory,
+		[]string{"--for", "30m", "a cold measurement"},
+		opened,
+		discarded(),
+		discarded(),
+	); code != 0 {
 		test.Fatalf("opening a quiet window exited %d", code)
 	}
 	if holds, line := quietHolds(directory, opened.Add(29*time.Minute)); !holds ||
@@ -40,10 +47,10 @@ func TestAQuietWindowHoldsUntilItEnds(test *testing.T) {
 	); holds || !strings.Contains(line, "expired at 04:30:00") {
 		test.Errorf("a minute after a 30 minute window ended it holds, or does not say it expired: %q", line)
 	}
-	if code := quietOn(directory, []string{"--for"}, opened); code != 2 {
+	if code := quietOn(directory, []string{"--for"}, opened, discarded(), discarded()); code != 2 {
 		test.Errorf("a --for with no duration was not refused: exited %d", code)
 	}
-	if code := quietOn(directory, []string{"--for", "5h"}, opened); code != 2 {
+	if code := quietOn(directory, []string{"--for", "5h"}, opened, discarded(), discarded()); code != 2 {
 		test.Errorf("a five hour window was not refused: exited %d", code)
 	}
 	if writeError := os.WriteFile(quietPath(directory), []byte("tomorrow\n"), 0o644); writeError != nil {
@@ -67,7 +74,7 @@ func TestQuietOffReleasesAMarkerItCannotRead(test *testing.T) {
 	}
 	var said bytes.Buffer
 	output := bufio.NewWriter(&said)
-	if code := quietOff(directory, output); code != 0 {
+	if code := quietOff(directory, output, discarded()); code != 0 {
 		test.Fatalf("quiet off exited %d", code)
 	}
 	if flushError := output.Flush(); flushError != nil {
@@ -250,4 +257,10 @@ func TestAQuietWindowOpenedWhileTheTrimWaitsHoldsToo(test *testing.T) {
 		!strings.Contains(log, "lint_rules' pairs") {
 		test.Errorf("the trim's log does not say the window stopped it after it took its token:\n%s", log)
 	}
+}
+
+// discarded is a stream that keeps nothing, one per call, for code under test that writes to the streams it is
+// handed: the package-wide ones are written only from one goroutine, and these tests run side by side.
+func discarded() *bufio.Writer {
+	return bufio.NewWriter(io.Discard)
 }
