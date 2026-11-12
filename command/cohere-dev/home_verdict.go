@@ -86,7 +86,20 @@ type homeVerdict struct {
 	skipped                               map[string][]string
 	// race is what Home's -race run of the raceGated packages said, nil when none was asked for.
 	race *homeVerdict
+	// raceReports is each race the run reported, whole, in the order it printed them. test2json gives a report to
+	// whichever test it was framing when the report was printed, often one that passed, so a report is read from the
+	// stream itself: printing only the failed tests' output dropped every stack (#bnabymg, Nov 12).
+	raceReports []string
 }
+
+// raceReportStart and raceReportEnd are the race detector's lines around each report it prints.
+const (
+	raceReportStart = "WARNING: DATA RACE"
+	raceReportEnd   = "=================="
+)
+
+// raceReportsShown is how many race reports a refused landing prints whole; the rest are counted.
+const raceReportsShown = 3
 
 // testEvent is one line of `go test -json`.
 type testEvent struct {
@@ -102,6 +115,8 @@ func readTestJson(output []byte) homeVerdict {
 	verdict := homeVerdict{failedOutput: map[string][]string{}, skipped: map[string][]string{}}
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	// reading is whether the stream is inside a race report, from its first line to the rule that ends it.
+	reading := false
 	for scanner.Scan() {
 		line := scanner.Text()
 		if rest, isMarker := strings.CutPrefix(line, homeMarker); isMarker {
@@ -118,6 +133,16 @@ func readTestJson(output []byte) homeVerdict {
 		switch {
 		case event.Action == "output":
 			verdict.failedOutput[key] = append(verdict.failedOutput[key], event.Output)
+			text := strings.TrimSpace(event.Output)
+			switch {
+			case text == raceReportStart:
+				reading = true
+				verdict.raceReports = append(verdict.raceReports, event.Output)
+			case reading && text == raceReportEnd:
+				reading = false
+			case reading:
+				verdict.raceReports[len(verdict.raceReports)-1] += event.Output
+			}
 		case event.Test == "" && event.Action == "pass":
 			verdict.packagesPassed++
 		case event.Test == "" && event.Action == "fail":
@@ -442,8 +467,8 @@ func describeEnd(runError error) string {
 }
 
 // runModuleTests runs the module's tests for the gate: on Home, then on the Mac what Home could not run, or all of it
-// on the Mac when Home gives no verdict. It returns the exit code and where they ran, as the land line says it after
-// what was tested: "on Home (...)" or "on the Mac, since ...".
+// on the Mac when Home gives no verdict, the -race run included, so no landing goes without one. It returns the exit
+// code and where they ran, as the land line says it after what was tested: "on Home (...)" or "on the Mac, since ...".
 func runModuleTests(
 	worktree string,
 	commit string,
@@ -457,13 +482,19 @@ func runModuleTests(
 	if unavailable != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no tests on Home (%s), so they run here\n", unavailable)
 		where := "on the Mac, since " + unavailable
-		if len(races) > 0 {
-			// -race is Home's to run (race_gated.go), so a landing with no verdict from her names what it skipped.
-			fmt.Fprintf(streams.Errors, "cohere-dev: the -race run of %d packages is Home's, so it does not run "+
-				"for this landing\n", len(races))
-			where += fmt.Sprintf("; no -race run of its %d packages", len(races))
+		code := runTestsHere(worktree, testing, append([]string{"test"}, patterns...))
+		if code != 0 || len(races) == 0 {
+			return code, where
 		}
-		return runTestsHere(worktree, testing, append([]string{"test"}, patterns...)), where
+		// Home's -race run is the Mac's when she gives none, after the module passes as hers is, through the gate's
+		// token: a landing with no -race run at all let a race land whenever Home was busy (bef28c8e8, Nov 12).
+		fmt.Fprintf(streams.Errors, "cohere-dev: the module passed, so its %d -race packages run here too\n",
+			len(races))
+		if raceCode := runTestsHere(worktree, testing, append([]string{"test", "-race"}, races...)); raceCode != 0 {
+			fmt.Fprintf(streams.Errors, "cohere-dev: the -race run here failed, so nothing landed\n")
+			return raceCode, ""
+		}
+		return 0, where + fmt.Sprintf(", then %d packages again under -race", len(races))
 	}
 	platform := verdict.operatingSystem + "/" + verdict.architecture
 	if verdict.failed() {
@@ -488,6 +519,7 @@ func runModuleTests(
 				fmt.Fprintf(streams.Errors, "    %s", line)
 			}
 		}
+		printRaceReports(verdict.race.raceReports)
 		return 1, ""
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: Home's tests on %s passed, %d packages\n", platform,
@@ -541,6 +573,24 @@ func runModuleTests(
 		where += "; skipped on the Mac too: " + strings.Join(stillSkipped, ", ")
 	}
 	return 0, where
+}
+
+// printRaceReports prints the first raceReportsShown of a run's race reports whole, and counts the rest, so a refused
+// landing shows where each race is without a lander pulling the stacks from Home by hand.
+func printRaceReports(reports []string) {
+	if len(reports) == 0 {
+		return
+	}
+	fmt.Fprintf(streams.Errors, "cohere-dev: %d races reported, the first %d whole:\n", len(reports),
+		min(len(reports), raceReportsShown))
+	for _, report := range reports[:min(len(reports), raceReportsShown)] {
+		for _, line := range strings.SplitAfter(strings.TrimRight(report, "\n"), "\n") {
+			fmt.Fprintf(streams.Errors, "    %s", strings.TrimRight(line, "\n")+"\n")
+		}
+	}
+	if len(reports) > raceReportsShown {
+		fmt.Fprintf(streams.Errors, "cohere-dev: and %d more races, not shown\n", len(reports)-raceReportsShown)
+	}
 }
 
 // runTestsHere runs a go test on the Mac, in the gate's environment, writing to the terminal, and returns its exit
