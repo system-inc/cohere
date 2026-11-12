@@ -1,3 +1,6 @@
+//go:build unix
+
+// The stand-in Go engine here is a /bin/sh script, as go_engine_test.go's are, so the file builds on Unix.
 package main
 
 import (
@@ -5,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -38,12 +42,27 @@ func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 	// The child mark is emptied, since a front door that inherited it would refuse to start the engine at all.
 	environment := []string{goEngineChildVariable + "="}
 	atReal, realExit := runCohereWithEnvironment(test, binary, real, environment, "--no-fix", "--no-cache")
-	atLink, linkExit := runCohereWithEnvironment(test, binary, linked, environment, "--no-fix", "--no-cache")
+	// PWD names the link, as a shell that changed into it says: os.Getwd answers with it, and a child given the parent's
+	// PWD would read the kernel's answer instead, which is the real path, and never meet the link at all.
+	atLink, linkExit := runCohereWithEnvironment(test, binary, linked, append(slices.Clone(environment), "PWD="+linked),
+		"--no-fix", "--no-cache")
 	if realExit != 1 || !strings.Contains(atReal, "consistency-no-screaming-snake-case") {
 		test.Fatalf("the run at the real path exited %d, want 1 with its finding:\n%s", realExit, atReal)
 	}
+	// What each run checked: the module's line, each finding and the footer, each without how long it took. The rest
+	// of the account names what the machine had, as its memory, which moves between two runs.
 	durations := regexp.MustCompile(`[0-9]+(\.[0-9]+)?(ms|s)\b`)
-	if linkExit != realExit || durations.ReplaceAllString(atLink, "") != durations.ReplaceAllString(atReal, "") {
+	checked := func(output string) string {
+		var lines []string
+		for line := range strings.SplitSeq(output, "\n") {
+			if strings.Contains(line, "Go files in the module") || strings.Contains(line, ".go:") ||
+				strings.HasPrefix(line, "✗") || strings.HasPrefix(line, "✓") {
+				lines = append(lines, durations.ReplaceAllString(line, ""))
+			}
+		}
+		return strings.Join(lines, "\n")
+	}
+	if linkExit != realExit || checked(atLink) != checked(atReal) || checked(atReal) == "" {
 		test.Errorf("at the link, exit %d:\n%s\nat the real path, exit %d:\n%s", linkExit, atLink, realExit, atReal)
 	}
 }
