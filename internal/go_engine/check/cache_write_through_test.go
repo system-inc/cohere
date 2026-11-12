@@ -2,6 +2,7 @@ package check
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -130,11 +131,7 @@ func throughEntry(test *testing.T, session *CacheSession, path string) (restored
 	test.Helper()
 	keyed := throughPackage(test, session, path)
 	key := session.keys[keyed]
-	contents, stored := session.caching.Store.Get(key)
-	if !stored {
-		test.Fatalf("the build's store holds no entry of %s under its key", path)
-	}
-	restored, decodeError := decodeEntry(session.known, keyed, contents, nil)
+	restored, decodeError := decodedStoredEntry(test, session.caching.Store, session.known, keyed, key)
 	if decodeError != nil {
 		test.Fatalf("decoding the entry of %s: %v", path, decodeError)
 	}
@@ -232,5 +229,80 @@ func TestAWrittenThroughEntryMissesOnceADependencysKeyMoves(test *testing.T) {
 		return strings.HasSuffix(finding.File, "user.go") && finding.Rule == throughRules()[0].Name
 	}) {
 		test.Errorf("windows found no printf finding in user.go, which the fixture plants: %+v", reference.Findings)
+	}
+}
+
+// An extra build writing through a package whose record the host wrote to the same store writes a record holding no
+// body of its own (#fq7dxvx): windows's records of base and user name the host's records, by their keys, and the
+// bodies those hold, by their digests, and name the host's export data, so the store keeps one body and one export
+// data for each, however many builds write the package through (#5s1x2hg).
+func TestARecordWrittenThroughNamesTheHostsBody(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	writeFiles(test, root, throughFiles)
+	store := filepath.Join(test.TempDir(), "shared")
+	host, hostSession := throughHostSession(test, root, store)
+	through, throughSession := throughBuild(test, root, store, host)
+	if through.Cache.WrittenThrough == 0 {
+		test.Fatal("windows wrote nothing through, so it tells nothing")
+	}
+	for _, path := range []string{throughBasePath, throughUserPath} {
+		hostKey := hostSession.keys[throughPackage(test, hostSession, path)]
+		hostRecord := storedRecordAt(test, hostSession.caching.Store, hostKey)
+		_, throughKey := throughEntry(test, throughSession, path)
+		throughRecord := storedRecordAt(test, throughSession.caching.Store, throughKey)
+		if throughRecord.Inline != nil || !bytes.Equal(throughRecord.BodyAt, hostKey[:]) ||
+			!bytes.Equal(throughRecord.Body, hostRecord.Body) {
+			test.Errorf("%s: windows's record holds %d bytes of body and names %x at %x, want none held and the "+
+				"host's %x at %x", path, len(throughRecord.Inline), throughRecord.Body, throughRecord.BodyAt,
+				hostRecord.Body, hostKey[:])
+		}
+		if !bytes.Equal(throughRecord.ExportData, hostRecord.ExportData) {
+			test.Errorf("%s: windows's record names the export data %x, the host's %x, want the host's", path,
+				throughRecord.ExportData, hostRecord.ExportData)
+		}
+	}
+}
+
+// A record written through whose host's record is gone from the store, or holds another body, as the host's next run
+// may rewrite it with more answers, is a miss, never an error and never a half restore (#fq7dxvx): windows's next run
+// checks base from source, still hits user, whose host record stands, and finds what its first run found, with no
+// problem said.
+func TestARecordWrittenThroughWhoseHostRecordMovedIsAMiss(test *testing.T) {
+	test.Parallel()
+
+	for name, move := range map[string]func(test *testing.T, store *cache.Store, key cache.Key, path string){
+		"removed": func(test *testing.T, _ *cache.Store, key cache.Key, path string) {
+			name := key.String()
+			if removeError := os.Remove(
+				filepath.Join(path, ".cache", "cohere", "go", name[:2], name),
+			); removeError != nil {
+				test.Fatal(removeError)
+			}
+		},
+		"holding another body": func(test *testing.T, store *cache.Store, key cache.Key, _ string) {
+			rewriteStoredEntry(test, store, key, func(entry *cacheEntry) { entry.Answers = nil })
+		},
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+
+			root := test.TempDir()
+			writeFiles(test, root, throughFiles)
+			store := filepath.Join(test.TempDir(), "shared")
+			host, hostSession := throughHostSession(test, root, store)
+			first, _ := throughBuild(test, root, store, host)
+			hostBase := hostSession.keys[throughPackage(test, hostSession, throughBasePath)]
+			move(test, hostSession.caching.Store, hostBase, store)
+
+			again, _ := throughBuild(test, root, store, nil)
+			if again.Cache.Missed != 1 || len(again.Cache.Problems) != 0 {
+				test.Fatalf("want base alone a miss and no problem, got %+v", again.Cache)
+			}
+			if !reflect.DeepEqual(again.Findings, first.Findings) {
+				test.Fatalf("the run after\n%+v\nthe first run\n%+v", again.Findings, first.Findings)
+			}
+		})
 	}
 }

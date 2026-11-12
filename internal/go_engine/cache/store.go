@@ -58,6 +58,13 @@ func (store *Store) forget(path string) {
 	_ = os.Remove(path)
 }
 
+// Holds reports whether a file is under key, whole or not: a reader that finds it damaged removes it (Get), so a
+// writer that names it rather than write it names it at worst as a miss.
+func (store *Store) Holds(key Key) bool {
+	information, statError := os.Stat(store.path(key))
+	return statError == nil && information.Mode().IsRegular()
+}
+
 // PutAbsent keeps entry under key unless a file of exactly its size is there already, for a key named by its entry's
 // own digest, whose file holds the same bytes whoever wrote it: an export data's (#5s1x2hg). A file of that size that
 // is not whole reads as a miss, and Get removes it, so the next PutAbsent writes it again. Two writers of one key at

@@ -1,8 +1,6 @@
 package check
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -142,18 +140,21 @@ func restoreBinaryEntry(
 func (session *CacheSession) keepBinaryHit(kept *packages.Package, hit binaryHit, portable cache.Key) (*hostEntry,
 	error,
 ) {
-	var encoded bytes.Buffer
-	if encodeError := gob.NewEncoder(&encoded).Encode(cacheEntryOf(hit.entry)); encodeError != nil {
+	whole := cacheEntryOf(hit.entry)
+	body, encodeError := encodeBody(whole)
+	if encodeError != nil {
 		return nil, fmt.Errorf("keeping %s, restored from the binary's table: %w", kept.ID, encodeError)
 	}
+	// The table names no export data by digest: a build writing the package through names what it read.
+	record := entryRecord{Version: whole.Version, Body: contentDigest(body), Reads: whole.Reads,
+		ReadsIncomplete: whole.ReadsIncomplete}
 	restoring := restoringOf(kept, nil)
 	if hit.reads != nil {
 		restoring.persisted = heldReadsOf(hit.reads, learnedFactTypes(session.known))
 	}
-	entry := encoded.Bytes()
 	return &hostEntry{restoring: restoring, portable: portable,
-		contents: func() ([]byte, func() ([]byte, error), error) {
-			return entry, func() ([]byte, error) {
+		contents: func() ([]byte, entryRecord, func() ([]byte, error), error) {
+			return body, record, func() ([]byte, error) {
 				if hit.exportData == nil {
 					return nil, fmt.Errorf("the binary's table holds no export data for %s", kept.ID)
 				}
@@ -221,9 +222,16 @@ func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry
 	if !standard {
 		return
 	}
+	// The table is written from whole entries, reads and body together, as the run collects them only when a release
+	// writes the table.
+	whole, wholeError := wholeEntry(entry)
+	if wholeError != nil {
+		session.problem(fmt.Sprintf("collecting %s for the standard library's table: %v", saved.ID, wholeError))
+		return
+	}
 	standardLibrary.Collected[key] = StandardLibraryRunEntry{
 		PackagePath: saved.PkgPath,
-		Entry:       entry.entry,
+		Entry:       whole,
 		ExportData:  entry.exportData,
 	}
 }
