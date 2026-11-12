@@ -100,25 +100,26 @@ func TestTheWitnessWindowIsHomesFromNineToThreeUtc(test *testing.T) {
 	}
 }
 
-// Home is the default (#acdf5mc): unset or "on", a landing goes to Home, which inside the witness's window stops
-// there before anything reaches her, and says so; "off" is the escape hatch, the Mac alone.
-func TestALandingTestsOnHomeUnlessItSaysOff(test *testing.T) {
+// Home is opt-in again until main is green on her (#acdf5mc): "on" sends a landing to Home, which inside the witness's
+// window stops there before anything reaches her, and says so; unset or "off" stays on the Mac and says why.
+func TestALandingTestsOnHomeOnlyWhenItSaysOn(test *testing.T) {
 	test.Parallel()
 	inside := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
-	for _, setting := range []string{"", "on"} {
-		if _, unavailable := runHomeGate(
-			"",
-			"",
-			nil,
-			inside,
-			setting,
-		); unavailable != "it is the witness's window on Home, 09:00 to 15:00 UTC" {
-			test.Errorf("with %s=%q a landing did not go to Home: %q", homeGateVariable, setting, unavailable)
-		}
+	if _, unavailable := runHomeGate(
+		"",
+		"",
+		nil,
+		inside,
+		"on",
+	); unavailable != "it is the witness's window on Home, 09:00 to 15:00 UTC" {
+		test.Errorf("with %s=on a landing did not go to Home: %q", homeGateVariable, unavailable)
 	}
-	if _, unavailable := runHomeGate("", "", nil, inside, "off"); unavailable != "Home is off for this landing ("+
-		homeGateVariable+"=off)" {
-		test.Errorf("with %s=off a landing did not stay on the Mac and say why: %q", homeGateVariable, unavailable)
+	for _, setting := range []string{"", "off"} {
+		if _, unavailable := runHomeGate("", "", nil, inside, setting); unavailable != "Home is opt-in until main is "+
+			"green on her ("+homeGateVariable+"=on)" {
+			test.Errorf("with %s=%q a landing did not stay on the Mac and say why: %q", homeGateVariable, setting,
+				unavailable)
+		}
 	}
 }
 

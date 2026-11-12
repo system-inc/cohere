@@ -41,9 +41,10 @@ import (
 // Home failing a test refuses the landing. Home unreachable, refusing, out of its window or saying it tested another
 // tree is no verdict at all, and the whole test run happens on the Mac, as it always did, said on the land line.
 
-// homeGateVariable is "off" to test a landing on the Mac alone, the escape hatch, or names a command run in place of
-// Home's whole run, the push and the gap, for a test. Unset or "on", the landing's tests run on Home: the default
-// since her first real landings were proven, red and green (#acdf5mc).
+// homeGateVariable is "on" to test a landing's module on Home, or names a command run in place of Home's whole run, the
+// push and the gap, for a test. Unset or "off", every landing tests on the Mac. Home was the default from 95d17c7f
+// until her first whole pass of main, both halves, found main red there (TestARunIsNiceUnlessItAsksForFullPriority on
+// linux/amd64, Nov 12), so she is opt-in again until main is green on her (#acdf5mc).
 const homeGateVariable = "COHERE_DEV_HOME_GATE"
 
 // homeMarker opens the line Home's run prints before its tests: the commit it checked out and the platform it tests
@@ -259,9 +260,9 @@ func runHomeGate(
 ) (homeVerdict, string) {
 	standIn := setting
 	switch standIn {
-	case "off":
-		return homeVerdict{}, "Home is off for this landing (" + homeGateVariable + "=off)"
-	case "", "on":
+	case "", "off":
+		return homeVerdict{}, "Home is opt-in until main is green on her (" + homeGateVariable + "=on)"
+	case "on":
 		standIn = ""
 	}
 	var output []byte
