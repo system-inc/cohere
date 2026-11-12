@@ -1,12 +1,10 @@
 package go_engine
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"slices"
 	"strings"
 
@@ -41,10 +39,16 @@ var embeddedStandardLibrary = builtInStandardLibrary{
 // binary carries a table, a Caching with that table alone, since the standard library's entries are part of cohere
 // itself and nothing of the project's tree. It is nil with an error when what every key shares cannot be read, which
 // the run says on stderr and runs without it. environment is what the load the cache serves runs under, the
-// workspace's own for the host's build and with an extra build's target after it for that build, so go env reads the
-// build context every key shares for the build the load is of.
+// workspace's own for the host's build and with an extra build's target after it for that build, and goEnvironment
+// is go env's answer the load reads there, so the build context every key shares is the one of the build the load is
+// of, read from the go env the load asked rather than from one of its own (#4rpt1jh). goEnvironment is nil only for a
+// host whose census judged no file, which asked go env nothing; then it is read here.
 func lintCache(
-	request invocation, workspace project.Workspace, environment []string, enabled []rule.Rule,
+	request invocation,
+	workspace project.Workspace,
+	environment []string,
+	goEnvironment *load.GoEnvironment,
+	enabled []rule.Rule,
 ) (*check.Caching, error) {
 	builtIn := request.standardLibrary
 	holdsTable := builtIn.table != nil && !builtIn.table.Empty()
@@ -53,10 +57,15 @@ func lintCache(
 	if noCache && (!readsBuiltIn || !holdsTable) {
 		return nil, nil
 	}
-	values, valuesError := readGoEnvironment(workspace.Root, environment)
-	if valuesError != nil {
-		return nil, valuesError
+	answered := goEnvironment
+	if answered == nil {
+		var environmentError error
+		answered, environmentError = load.ReadGoEnvironment(workspace.Root, environment, nil)
+		if environmentError != nil {
+			return nil, environmentError
+		}
 	}
+	values := answered.Values()
 	var standardLibrary *check.StandardLibraryCaching
 	if readsBuiltIn {
 		standardLibrary = &check.StandardLibraryCaching{
@@ -99,35 +108,16 @@ func lintCache(
 // staticcheck.conf, reads `BURNTSUSHI_TOML_110`.
 var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110"}
 
-// buildNames are what go env reports that every key's build context holds, in its order.
+// buildNames are what go env reports that every key's build context holds, in its order, each among what
+// load.GoEnvironment asks go env (a test holds it to that).
 var buildNames = []string{"GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOVERSION", "GOEXPERIMENT"}
 
-// readGoEnvironment is what go env reports in root, under the process's environment and then environment, of
-// buildNames and `GOROOT`, by name. `GOROOT` is in neither build context: the standard library's keys name each file
-// below it, and the engine's keys name every file whole.
-func readGoEnvironment(root string, environment []string) (map[string]string, error) {
-	command := exec.Command("go", append([]string{"env", "-json", "GOROOT"}, buildNames...)...)
-	command.Dir = root
-	command.Env = append(os.Environ(), environment...)
-	var standardError bytes.Buffer
-	command.Stderr = &standardError
-	output, runError := command.Output()
-	if runError != nil {
-		return nil, fmt.Errorf("reading the build context with go env in %s: %w: %s", root, runError,
-			strings.TrimSpace(standardError.String()))
-	}
-	values := map[string]string{}
-	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
-		return nil, fmt.Errorf("reading the build context with go env in %s: %w", root, decodeError)
-	}
-	return values, nil
-}
-
-// cacheBuild is the build context every key shares, in a fixed order: of values, what readGoEnvironment read, the
-// target, cgo, the flags with their build tags, the toolchain and its experiments, then the process's own variables
-// an analyzer reads. The cache session adds which loader ran, which only the load knows: a project with cgo of its
-// own has every package with cgo files type-checked from the cgo tool's outputs, other files than the load that
-// translates nothing gives them.
+// cacheBuild is the build context every key shares, in a fixed order: of values, go env's answer under the
+// environment as given (load.GoEnvironment.Values), its `GOFLAGS` without the -pgo=off a load adds, the target, cgo,
+// the flags with their build tags, the toolchain and its experiments, then the process's own variables an analyzer
+// reads. The cache session adds which loader ran, which only the load knows: a project with cgo of its own has every
+// package with cgo files type-checked from the cgo tool's outputs, other files than the load that translates nothing
+// gives them.
 func cacheBuild(values map[string]string) []string {
 	build := make([]string, 0, len(buildNames)+len(processEnvironment))
 	for _, name := range buildNames {
@@ -159,7 +149,7 @@ func cacheBuild(values map[string]string) []string {
 var flagsNoStandardLibraryReads = []string{"trimpath", "mod", "modfile", "modcacherw"}
 
 // standardLibraryBuild is the build context every standard-library key shares, in cacheBuild's order: of values,
-// what readGoEnvironment read, the target, cgo, the flags narrowed for the standard library (see
+// go env's answer as cacheBuild reads it, the target, cgo, the flags narrowed for the standard library (see
 // flagsNoStandardLibraryReads), the toolchain and its experiments. It holds none of the process's own variables, since
 // nothing on the fact path reads them: asmdecl and framepointer, which read the process's target, have no facts, and
 // no fact analyzer reads staticcheck's config, whose reading `BURNTSUSHI_TOML_110` changes.

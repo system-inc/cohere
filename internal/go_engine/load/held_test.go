@@ -65,12 +65,9 @@ func TestTheListerReadsTheHeldBytes(test *testing.T) {
 
 	directory := test.TempDir()
 	writeListingFiles(test, directory, heldModule)
-	environment, environmentError := sourceEnvironment(directory, []string{"GOWORK=off"})
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
+	goEnvironment := goEnvironmentOf(test, directory, []string{"GOWORK=off"})
 	held := heldFor(filepath.Join(directory, "held.go"), heldSource)
-	listed, doubt := listInProcess(directory, environment, []string{"./..."}, held, nil, nil)
+	listed, doubt := listInProcess(goEnvironment, []string{"./..."}, held, nil, nil)
 	if doubt != "" {
 		test.Fatalf("the lister did not answer: %s", doubt)
 	}
@@ -97,10 +94,7 @@ func TestThePrefetchEndsWithTheListing(test *testing.T) {
 
 	directory := test.TempDir()
 	writeListingFiles(test, directory, heldModule)
-	environment, environmentError := sourceEnvironment(directory, []string{"GOWORK=off"})
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
+	goEnvironment := goEnvironmentOf(test, directory, []string{"GOWORK=off"})
 	// abandoned frees the first read when the test ends, so a listing that never stops the prefetch leaves nothing
 	// waiting on it.
 	abandoned := make(chan struct{})
@@ -129,7 +123,7 @@ func TestThePrefetchEndsWithTheListing(test *testing.T) {
 		}
 		return nil, false
 	})
-	built, doubt := newInProcessLister(directory, environment, held, nil, nil)
+	built, doubt := newInProcessLister(goEnvironment, held, nil, nil)
 	if doubt != "" {
 		test.Fatalf("the lister could not be built: %s", doubt)
 	}

@@ -91,7 +91,7 @@ func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 	if portsError != nil {
 		test.Fatal(portsError)
 	}
-	goEnvironment, environmentError := readGoEnvironment(workspace.Root, workspace.Environment(), nil)
+	goEnvironment, environmentError := ReadGoEnvironment(workspace.Root, workspace.Environment(), nil)
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
@@ -137,11 +137,8 @@ func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 // that holds reason.
 func requireDoubted(test *testing.T, directory string, extra []string, reason string) {
 	test.Helper()
-	environment, environmentError := sourceEnvironment(directory, extra)
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
-	listed, doubt := listInProcess(directory, environment, []string{"./..."}, nil, nil, nil)
+	goEnvironment := goEnvironmentOf(test, directory, extra)
+	listed, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, nil, nil)
 	if doubt == "" {
 		test.Fatalf("the lister answered with %d packages", len(listed.packages))
 	}
@@ -156,11 +153,8 @@ func requireDoubted(test *testing.T, directory string, extra []string, reason st
 func requireExternallyLinked(test *testing.T, directory string, extra []string, command string) {
 	test.Helper()
 	requireDoubted(test, directory, extra, "links externally")
-	environment, environmentError := sourceEnvironment(directory, extra)
-	if environmentError != nil {
-		test.Fatal(environmentError)
-	}
-	goList, listError := listWithGoList(directory, environment, []string{"./..."}, nil)
+	goEnvironment := goEnvironmentOf(test, directory, extra)
+	goList, listError := listWithGoList(directory, goEnvironment.fullEnvironment, []string{"./..."}, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

@@ -1,15 +1,12 @@
 package load
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"go/build"
 	"go/parser"
 	"go/token"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -42,7 +39,7 @@ func ExcludedByConstraints(
 	if len(files) == 0 {
 		return nil, nil, nil
 	}
-	goEnvironment, environmentError := readGoEnvironment(directory, environment, held)
+	goEnvironment, environmentError := ReadGoEnvironment(directory, environment, held)
 	if environmentError != nil {
 		return nil, nil, environmentError
 	}
@@ -188,62 +185,34 @@ func reasonFor(buildContext *build.Context) string {
 	return "excluded by build constraints on " + buildContext.GOOS + "/" + buildContext.GOARCH
 }
 
-// constraintContext is the build context go uses in workspace under environment, the whole environment, as go
-// env reports it: the target, whether cgo is on, and the `-tags` of `GOFLAGS`, each of which a value given to
-// the load or a go.env setting can change from the host's. The same go env call reports where the toolchain and
-// its settings live, which go.mod and go.work go found, and where go writes its build cache, which the inputs record
-// needs (see inputs.go), so learning them costs no second command. The context opens a file held holds from its
-// held bytes, and any other on disk.
+// constraintContext is the build context go uses in workspace, as answer, go env's answer there (askGoEnvironment),
+// reports it: the target, whether cgo is on, and the `-tags` of `GOFLAGS`, each of which a value given to the load or
+// a go.env setting can change from the host's. The same answer reports where the toolchain and its settings live,
+// which go.mod and go.work go found, and where go writes its build cache, which the inputs record needs (see
+// inputs.go), so learning them costs no second command. The context opens a file held holds from its held bytes, and
+// any other on disk.
 func constraintContext(
 	workspace string,
-	environment []string,
+	answer map[string]string,
 	held Held,
 ) (*build.Context, reportedEnvironment, error) {
-	command := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOROOT", "GOENV",
-		"GOMOD", "GOWORK", "GOCACHE")
-	command.Dir = workspace
-	// PWD as in runList, so the go.mod and go.work go names, and the modules a go.work uses below it, are named under
-	// the workspace as the load names it, never through a link the caller's working directory went through (#hd5bsqh).
-	command.Env = append(slices.Clone(environment), "PWD="+workspace)
-	var standardError bytes.Buffer
-	command.Stderr = &standardError
-	output, runError := command.Output()
-	if runError != nil {
-		return nil, reportedEnvironment{}, fmt.Errorf("reading the build target with go env in %s: %w: %s",
-			workspace, runError, strings.TrimSpace(standardError.String()))
-	}
-	var values struct {
-		Goos       string `json:"GOOS"`
-		Goarch     string `json:"GOARCH"`
-		CgoEnabled string `json:"CGO_ENABLED"`
-		Goflags    string `json:"GOFLAGS"`
-		Goroot     string `json:"GOROOT"`
-		Goenv      string `json:"GOENV"`
-		Gomod      string `json:"GOMOD"`
-		Gowork     string `json:"GOWORK"`
-		Gocache    string `json:"GOCACHE"`
-	}
-	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
-		return nil, reportedEnvironment{}, fmt.Errorf("reading the build target with go env in %s: %w", workspace,
-			decodeError)
-	}
-	if values.Goos == "" || values.Goarch == "" {
+	if answer["GOOS"] == "" || answer["GOARCH"] == "" {
 		return nil, reportedEnvironment{}, fmt.Errorf("reading the build target with go env in %s: no GOOS or GOARCH "+
-			"in %q", workspace, output)
+			"in %q", workspace, answer)
 	}
 	buildContext := build.Default
-	buildContext.GOOS = values.Goos
-	buildContext.GOARCH = values.Goarch
-	buildContext.CgoEnabled = values.CgoEnabled == "1"
-	buildContext.BuildTags = tagsOf(values.Goflags)
+	buildContext.GOOS = answer["GOOS"]
+	buildContext.GOARCH = answer["GOARCH"]
+	buildContext.CgoEnabled = answer["CGO_ENABLED"] == "1"
+	buildContext.BuildTags = tagsOf(answer["GOFLAGS"])
 	buildContext.OpenFile = held.openFile()
 	reported := reportedEnvironment{
-		goRoot:          values.Goroot,
-		environmentFile: values.Goenv,
-		moduleFile:      values.Gomod,
-		workspaceFile:   values.Gowork,
-		buildCache:      values.Gocache,
-		goFlags:         strings.Fields(values.Goflags),
+		goRoot:          answer["GOROOT"],
+		environmentFile: answer["GOENV"],
+		moduleFile:      answer["GOMOD"],
+		workspaceFile:   answer["GOWORK"],
+		buildCache:      answer["GOCACHE"],
+		goFlags:         strings.Fields(answer["GOFLAGS"]),
 	}
 	return &buildContext, reported, nil
 }
