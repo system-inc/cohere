@@ -141,6 +141,9 @@ func generateStandardLibraryTables(
 			return nil, fmt.Errorf("generating the standard library's table for %s: %w", target, runError)
 		}
 
+		if sizeError := reportTableSize(progress, target, tablePath); sizeError != nil {
+			return nil, sizeError
+		}
 		overlay, overlayError := standardLibraryOverlay(options.ModuleDirectory, tablePath)
 		if overlayError != nil {
 			return nil, overlayError
@@ -152,4 +155,17 @@ func generateStandardLibraryTables(
 		overlays[target] = overlayPath
 	}
 	return overlays, nil
+}
+
+// reportTableSize writes the size of target's generated table at tablePath to progress, so every release says what
+// each target's table weighs and the next growth is seen where it happens (#pcv6eff): Kirk approved about 2.2 MB per
+// target, and the table grew past it when it began carrying each entry's persisted reads.
+func reportTableSize(progress io.Writer, target Target, tablePath string) error {
+	information, statError := os.Stat(tablePath)
+	if statError != nil {
+		return fmt.Errorf("reading the size of the standard library's table for %s: %w", target, statError)
+	}
+	// Ignored: the line reports a size, and a failed write to progress changes no table.
+	_, _ = fmt.Fprintf(progress, "the standard library's table for %s is %d bytes\n", target, information.Size())
+	return nil
 }

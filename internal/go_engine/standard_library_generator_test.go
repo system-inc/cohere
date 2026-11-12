@@ -167,6 +167,65 @@ func TestAGeneratedTableIsReadByARun(test *testing.T) {
 	}
 }
 
+// A table the generator writes carries the persisted reads of the packages it holds, and a host that restores the
+// standard library from it keeps those packages for its extra builds as a host that checked them does (#pcv6eff): over
+// the fixture with a file only another target compiles, that build checks from source exactly the packages it checks
+// when the host computed the standard library itself, and the run's findings are that run's. Without the keep, the
+// build checks every standard-library package of its graph from source.
+func TestATableHitIsKeptForTheExtraBuilds(test *testing.T) {
+	test.Parallel()
+
+	table := localTable(test)
+	entries, _ := tableParts(test, table)
+	withReads := 0
+	for _, entry := range entries {
+		if entry.Reads != nil {
+			withReads++
+		}
+	}
+	if withReads == 0 {
+		test.Fatalf("none of the table's %d entries carries persisted reads", len(entries))
+	}
+	root := copyFixture(test, standardLibraryFixture)
+	// A file of another target than this machine's, so the run has one extra build.
+	other := map[bool]string{true: "freebsd", false: "linux"}[runtime.GOOS == "linux"]
+	if writeError := os.WriteFile(filepath.Join(root, "library_"+other+".go"), []byte("package library\n"),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	computed := runCachedEngine(test, root, "--no-cache", "--other-builds")
+	fromTable := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache",
+		"--other-builds")
+	if fromTable.counts.FromBinary == 0 {
+		test.Fatalf("want the host to restore the standard library from the table, got %+v", fromTable.counts)
+	}
+	computedBuild, tableBuild := extraBuildRecords(test, computed.stream)[0], extraBuildRecords(test,
+		fromTable.stream)[0]
+	if computedBuild.PackagesLoaded == 0 {
+		test.Fatalf("the extra build %s loaded nothing, so it tells nothing", computedBuild.Target)
+	}
+	if tableBuild.CheckedFromSource != computedBuild.CheckedFromSource {
+		test.Errorf("%s checked %d of %d packages from source with the host's standard library from the table, "+
+			"want %d of %d, as with it computed (%d of the table's %d entries carry reads)", tableBuild.Target,
+			tableBuild.CheckedFromSource, tableBuild.PackagesLoaded, computedBuild.CheckedFromSource,
+			computedBuild.PackagesLoaded, withReads, len(entries))
+	}
+	findings := func(stream string) []string {
+		var lines []string
+		for line := range strings.Lines(stream) {
+			if strings.Contains(line, `"kind":"finding"`) {
+				lines = append(lines, line)
+			}
+		}
+		return lines
+	}
+	if computedFindings, tableFindings := findings(computed.stream), findings(fromTable.stream); !slices.Equal(
+		tableFindings, computedFindings) {
+		test.Errorf("the findings with the table\n%s\nwant those with the standard library computed\n%s",
+			strings.Join(tableFindings, ""), strings.Join(computedFindings, ""))
+	}
+}
+
 // Two generations of the same variant, each a generator process of its own with children of their own, write the
 // same bytes: the canonical child writes every entry again in one order, its facts sorted and numbered alike.
 func TestAGeneratedTableIsTheSameEveryTime(test *testing.T) {
@@ -249,8 +308,8 @@ func verifiedTable(test *testing.T, table []byte) (int, string, string) {
 
 // The check passes on the table the generator wrote, saying how many entries it checked, and fails on a table whose
 // entry's output digest was changed, whose entry holds another package's export data, that lacks one entry, that holds
-// an entry no variant computes, that holds nothing, that names a variant no toolchain here can recompute, or that
-// holds no variant for this machine's target.
+// an entry no variant computes, that holds nothing, that names a variant no toolchain here can recompute, that holds
+// no variant for this machine's target, or whose entry holds another package's persisted reads.
 func TestTheCheckRecomputesEveryEntryOfTheTable(test *testing.T) {
 	test.Parallel()
 
@@ -265,7 +324,8 @@ func TestTheCheckRecomputesEveryEntryOfTheTable(test *testing.T) {
 	var firstKey cache.Key
 	var secondKey cache.Key
 	for key, entry := range entries {
-		if entry.ExportData == nil {
+		// Two entries with export data and persisted reads, so either can be given the other's.
+		if entry.ExportData == nil || entry.Reads == nil {
 			continue
 		}
 		switch {
@@ -297,13 +357,18 @@ func TestTheCheckRecomputesEveryEntryOfTheTable(test *testing.T) {
 				test.Fatal(encodeError)
 			}
 			copied[firstKey] = cache.StandardLibraryEntry{Entry: encoded.Bytes(),
-				ExportData: copied[firstKey].ExportData}
+				ExportData: copied[firstKey].ExportData, Reads: copied[firstKey].Reads}
 		}), says: "its output digest differs"},
 		"another package's export data": {table: changed(func(copied map[cache.Key]cache.StandardLibraryEntry,
 			_ *[]cache.StandardLibraryVariant) {
 			copied[firstKey] = cache.StandardLibraryEntry{Entry: copied[firstKey].Entry,
-				ExportData: copied[secondKey].ExportData}
+				ExportData: copied[secondKey].ExportData, Reads: copied[firstKey].Reads}
 		}), says: "1 differ"},
+		"another package's persisted reads": {table: changed(func(copied map[cache.Key]cache.StandardLibraryEntry,
+			_ *[]cache.StandardLibraryVariant) {
+			copied[firstKey] = cache.StandardLibraryEntry{Entry: copied[firstKey].Entry,
+				ExportData: copied[firstKey].ExportData, Reads: copied[secondKey].Reads}
+		}), says: "its persisted reads differ"},
 		"an entry missing": {table: changed(func(copied map[cache.Key]cache.StandardLibraryEntry,
 			_ *[]cache.StandardLibraryVariant) {
 			delete(copied, firstKey)

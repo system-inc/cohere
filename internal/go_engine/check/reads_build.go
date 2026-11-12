@@ -95,6 +95,18 @@ func (build *ReadsBuild) measureBy(sizes types.Sizes) {
 	}
 }
 
+// measuredSizes are the word size and the maximum alignment of the sizes the memo measures another package's unexported
+// fields by (measureBy), and false for a memo never told its build, which renders every field whole. The maximum
+// alignment is int64's, which the gc compiler's sizes, the only ones a load gives, cap at it, and which no target
+// aligns past 8.
+func (build *ReadsBuild) measuredSizes() (int64, int64, bool) {
+	sizes := build.graph.measuredSizes()
+	if sizes == nil {
+		return 0, 0, false
+	}
+	return sizes.Sizeof(types.Typ[types.Uintptr]), sizes.Alignof(types.Typ[types.Int64]), true
+}
+
 // closureDigest is object's closure digest (typeGraph.closureDigest), memoized: what an importer can observe of
 // object, another package's, its own line and every named type its type reaches, each type as exportRendering writes
 // it, unexported fields included, and unexported methods only where an importer sees them (importerSeesMethod), so two

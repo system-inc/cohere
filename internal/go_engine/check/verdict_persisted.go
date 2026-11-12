@@ -34,7 +34,7 @@ func persistedTypesHold(
 	build *ReadsBuild,
 ) (bool, string) {
 	held := restoring.persisted
-	if why := held.rendererDeclined(); why != "" {
+	if why := held.typesDeclined(build); why != "" {
 		return false, why
 	}
 	judgedBuild := build
@@ -212,7 +212,7 @@ func persistedFactsHold(
 	factTypes map[reflect.Type]bool,
 ) (bool, string) {
 	held := restoring.persisted
-	if why := held.rendererDeclined(); why != "" {
+	if why := held.declined(); why != "" {
 		return false, why
 	}
 	judged := verdict{build: build, closure: closure, fact: fact}
@@ -287,6 +287,10 @@ func (judged verdict) persistedDeprecationHolds(held *heldReads, lookup persiste
 // fact's when it looked up a deprecation (ReadFactTypes).
 func persistedFactTypes(held *heldReads) map[reflect.Type]bool {
 	asked := map[reflect.Type]bool{}
+	// An unreadable record's fact types are never read: its types' verdict declines it first.
+	if held.unreadable != "" {
+		return asked
+	}
 	for _, read := range held.record.Facts {
 		if factType := held.factTypes[read.FactType]; factType != nil {
 			asked[factType] = true

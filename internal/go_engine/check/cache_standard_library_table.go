@@ -36,6 +36,13 @@ type standardLibraryEntry struct {
 	// Answers are the package's answers of every fact kind computed on demand, each computed whole (see
 	// cacheEntry's), sorted by kind and objectpath.
 	Answers []kindAnswers
+
+	// Reads and ReadsIncomplete are the cacheEntry's, the answers the package's analysis read of other packages, each
+	// without its owner's key, which names the generating run's store: a read is judged by its owner's answer
+	// (readsHold), which an extra build restoring the package from the host asks, so a table hit kept for the builds is
+	// judged as a package the host checked is (#pcv6eff).
+	Reads           []storedRead
+	ReadsIncomplete bool
 }
 
 // slotAnalysis is one analyzer's analysis in a standardLibraryEntry, under its slot.
@@ -80,12 +87,14 @@ func cacheEntryOf(entry standardLibraryEntry) cacheEntry {
 		analyzers[analysis.Slot] = analysis.Analysis
 	}
 	return cacheEntry{
-		Version:   entry.Version,
-		Analyzers: analyzers,
-		Imports:   entry.Imports,
-		Withheld:  entry.Withheld,
-		Output:    entry.Output,
-		Answers:   entry.Answers,
+		Version:         entry.Version,
+		Analyzers:       analyzers,
+		Imports:         entry.Imports,
+		Withheld:        entry.Withheld,
+		Output:          entry.Output,
+		Answers:         entry.Answers,
+		Reads:           entry.Reads,
+		ReadsIncomplete: entry.ReadsIncomplete,
 	}
 }
 
@@ -95,8 +104,9 @@ func cacheEntryOf(entry standardLibraryEntry) cacheEntry {
 // goRootMarker (see renameToGoRootMarker), and its findings left out, since no run reads a finding of a package it
 // restores from the table, which it never restores when Analyze was given it, and a finding names this machine's
 // files. It refuses an entry that names a file outside goRoot, which no other machine could resolve, an entry in
-// another format, and one that holds the walk of its files, which only a package Analyze was given has. Its facts are
-// still gob's bytes from the process that ran, which CanonicalStandardLibraryTable writes again.
+// another format, and one that holds the walk of its files, which only a package Analyze was given has. Its facts and
+// its persisted reads are still gob's bytes from the process that ran, which CanonicalStandardLibraryTable writes
+// again.
 func StandardLibraryTableOf(
 	entries map[cache.Key]StandardLibraryRunEntry,
 	goRoot string,
@@ -126,12 +136,18 @@ func StandardLibraryTableOf(
 				renameError)
 		}
 		tableEntry := standardLibraryEntry{
-			PackagePath: collected.PackagePath,
-			Version:     entry.Version,
-			Imports:     entry.Imports,
-			Withheld:    withheld,
-			Output:      entry.Output,
-			Answers:     entry.Answers,
+			PackagePath:     collected.PackagePath,
+			Version:         entry.Version,
+			Imports:         entry.Imports,
+			Withheld:        withheld,
+			Output:          entry.Output,
+			Answers:         entry.Answers,
+			ReadsIncomplete: entry.ReadsIncomplete,
+		}
+		for _, read := range entry.Reads {
+			// The owner's key names the generating run's store, which no run that reads the table holds.
+			read.OwnerKey = nil
+			tableEntry.Reads = append(tableEntry.Reads, read)
 		}
 		for _, slot := range slices.Sorted(maps.Keys(entry.Analyzers)) {
 			stored := entry.Analyzers[slot]
@@ -150,7 +166,7 @@ func StandardLibraryTableOf(
 			}
 			exportData = renamed
 		}
-		portable[key] = cache.StandardLibraryEntry{Entry: encoded, ExportData: exportData}
+		portable[key] = cache.StandardLibraryEntry{Entry: encoded, ExportData: exportData, Reads: collected.Reads}
 	}
 	return cache.WriteStandardLibraryTable(portable, variants), nil
 }
@@ -160,12 +176,13 @@ func StandardLibraryTableOf(
 // encoded anew and sorted, so the same tables give the same bytes in any fresh process. A fact's gob bytes hold the
 // number gob gave its type in the process that encoded it, which is the order the process first met each type: a run
 // encodes entries as many at once as there are cores, so the same fact comes out of two runs numbered apart, and the
-// same package's entry under two variants would be held twice. The checker hands a package's facts over from a map,
-// in no order, so they are sorted too. Written again here, in one order, gob numbers every
-// type alike each time, and an entry two variants share by value is held once. The caller runs it in a process that
-// has encoded nothing with gob before, as the release's generator does in a child of its own. A fact is decoded by
-// its type's name, among the fact types of registered's analyzers and everything they require. Two tables that hold
-// the same key, or the same variant, are refused, and so is a table that holds nothing or does not parse.
+// same package's entry under two variants would be held twice. The checker hands a package's facts over from a map, in
+// no order, so they are sorted too. Written again here, in one order, gob numbers every type alike each time, and an
+// entry two variants share by value is held once. Each entry's persisted reads are gob's bytes too, and are decoded and
+// encoded again after it, so a record two variants share is held once as well. The caller runs it in a process that has
+// encoded nothing with gob before, as the release's generator does in a child of its own. A fact is decoded by its
+// type's name, among the fact types of registered's analyzers and everything they require. Two tables that hold the
+// same key, or the same variant, are refused, and so is a table that holds nothing or does not parse.
 func CanonicalStandardLibraryTable(tables [][]byte, registered []rule.Rule) ([]byte, error) {
 	factTypes := factTypesByName(registered)
 	merged := map[cache.Key]cache.StandardLibraryEntry{}
@@ -229,7 +246,18 @@ func CanonicalStandardLibraryTable(tables [][]byte, registered []rule.Rule) ([]b
 		if encodeError != nil {
 			return nil, fmt.Errorf("writing the canonical table: %w", encodeError)
 		}
-		canonical[key] = cache.StandardLibraryEntry{Entry: encoded, ExportData: merged[key].ExportData}
+		var reads []byte
+		if merged[key].Reads != nil {
+			record, readsError := decodePersistedReads(merged[key].Reads)
+			if readsError == nil {
+				reads, readsError = encodePersistedReads(record)
+			}
+			if readsError != nil {
+				return nil, fmt.Errorf("writing the canonical table: the entry of %s: %w", entry.PackagePath,
+					readsError)
+			}
+		}
+		canonical[key] = cache.StandardLibraryEntry{Entry: encoded, ExportData: merged[key].ExportData, Reads: reads}
 	}
 	return cache.WriteStandardLibraryTable(canonical, variants), nil
 }
@@ -280,13 +308,15 @@ func reencodeFact(factTypes map[string]reflect.Type, stored storedFact) (storedF
 }
 
 // StandardLibraryDigests are what the release's check compares of a table's entry with one it recomputed: the
-// package's import path, the digest of its API by value (see exportDigest), read from its export data, and its output
-// digest (see outputDigest), nil when the entry holds none. Each is by value, so two processes that computed the same
+// package's import path, the digest of its API by value (see exportDigest), read from its export data, its output
+// digest (see outputDigest), nil when the entry holds none, and the digest of its persisted reads by value, encoded
+// again in this process, the zero key when it holds none. Each is by value, so two processes that computed the same
 // package alike give the same digests, while their bytes may differ.
 type StandardLibraryDigests struct {
 	PackagePath string
 	Export      cache.Key
 	Output      []byte
+	Reads       cache.Key
 }
 
 // StandardLibraryDigestsOf is the digests of one of a table's entries, or an error for an entry that does not
@@ -297,6 +327,19 @@ func StandardLibraryDigestsOf(entry cache.StandardLibraryEntry) (StandardLibrary
 		return StandardLibraryDigests{}, decodeError
 	}
 	digests := StandardLibraryDigests{PackagePath: decoded.PackagePath, Output: decoded.Output}
+	if entry.Reads != nil {
+		record, readsError := decodePersistedReads(entry.Reads)
+		if readsError != nil {
+			return StandardLibraryDigests{}, fmt.Errorf("reading the table's entry of %s: %w", decoded.PackagePath,
+				readsError)
+		}
+		// Encoded again here, gob numbers its types as this process does, the same for two records of one value.
+		encoded, encodeError := encodePersistedReads(record)
+		if encodeError != nil {
+			return StandardLibraryDigests{}, encodeError
+		}
+		digests.Reads = cache.DigestOf(encoded)
+	}
 	if decoded.PackagePath == "unsafe" {
 		digests.Export = exportDigest(types.Unsafe)
 		return digests, nil

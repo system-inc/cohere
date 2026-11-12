@@ -16,14 +16,16 @@ import (
 
 // standardLibraryTableMagic opens every table, and names its format, so bytes of another format, or of none, are a
 // table that does not parse rather than entries read wrong.
-const standardLibraryTableMagic = "cohere standard library table 2\n"
+const standardLibraryTableMagic = "cohere standard library table 3\n"
 
 // StandardLibraryEntry is one standard-library package as a table holds it: its cache entry as the checker encodes
-// it, and its export data, nil for unsafe, whose types are the type checker's own. An entry read from a table shares
-// the table's bytes, which nothing may change.
+// it, its export data, nil for unsafe, whose types are the type checker's own, and its reads of other packages as the
+// checker persists them, nil for a package whose reads could not be persisted, which an extra build declines to restore
+// from the host (#pcv6eff). An entry read from a table shares the table's bytes, which nothing may change.
 type StandardLibraryEntry struct {
 	Entry      []byte
 	ExportData []byte
+	Reads      []byte
 }
 
 // StandardLibraryVariant is one build a table holds the standard library of: the target, `GOOS/GOARCH`, the
@@ -43,19 +45,19 @@ func compareVariants(left StandardLibraryVariant, right StandardLibraryVariant) 
 		cmp.Compare(left.CgoEnabled, right.CgoEnabled), cmp.Compare(left.Packages, right.Packages))
 }
 
-// StandardLibraryTable is the standard library's entries a release builds into the binary, read-only, by each
-// package's StandardLibraryKeys key. It is content-addressed: an entry or export data that several keys share, as
-// most do across Go's patch releases and across `CGO_ENABLED`, is held once. It is parsed whole on the first Lookup
-// and never again. An empty table holds nothing, and so does one that does not parse, which Problem then says: a
-// table never crashes a run and never changes a finding, since every package it does not hold is computed.
+// StandardLibraryTable is the standard library's entries a release builds into the binary, read-only, by each package's
+// StandardLibraryKeys key. It is content-addressed: an entry, export data or reads that several keys share, as most do
+// across Go's patch releases and across `CGO_ENABLED`, are held once. It is parsed whole on the first Lookup and never
+// again. An empty table holds nothing, and so does one that does not parse, which Problem then says: a table never
+// crashes a run and never changes a finding, since every package it does not hold is computed.
 //
 // The table is gzip, which Go's standard library reads and whose checksum catches bytes changed in it. Inside, after
 // standardLibraryTableMagic, are the variants, the contents and then the index, every number an unsigned varint and
 // every text its length and its bytes: the count of the variants, then each one as its target, `CGO_ENABLED`, Go
 // version and package count, in compareVariants' order; the count of the contents, then each one as its length and its
 // bytes, in the order of their sha256, no two alike; then the count of the keys, then each key as its 32 bytes, the
-// position of its entry among the contents, and the position of its export data plus one, 0 for none, in the order of
-// the keys.
+// position of its entry among the contents, the position of its export data plus one, 0 for none, and the position of
+// its reads plus one, 0 for none, in the order of the keys.
 type StandardLibraryTable struct {
 	contents []byte
 
@@ -205,12 +207,20 @@ func parseStandardLibraryTable(compressed []byte) (map[Key]StandardLibraryEntry,
 		if exportError != nil {
 			return nil, nil, exportError
 		}
-		if entryIndex >= uint64(len(contents)) || exportIndex > uint64(len(contents)) {
+		readsIndex, readsError := next()
+		if readsError != nil {
+			return nil, nil, readsError
+		}
+		if entryIndex >= uint64(len(contents)) || exportIndex > uint64(len(contents)) ||
+			readsIndex > uint64(len(contents)) {
 			return nil, nil, fmt.Errorf("the key %s names content past the %d it holds", key, len(contents))
 		}
 		entry := StandardLibraryEntry{Entry: contents[entryIndex]}
 		if exportIndex > 0 {
 			entry.ExportData = contents[exportIndex-1]
+		}
+		if readsIndex > 0 {
+			entry.Reads = contents[readsIndex-1]
 		}
 		entries[key] = entry
 	}
@@ -230,6 +240,9 @@ func WriteStandardLibraryTable(entries map[Key]StandardLibraryEntry, variants []
 		byDigest[sha256.Sum256(entry.Entry)] = entry.Entry
 		if entry.ExportData != nil {
 			byDigest[sha256.Sum256(entry.ExportData)] = entry.ExportData
+		}
+		if entry.Reads != nil {
+			byDigest[sha256.Sum256(entry.Reads)] = entry.Reads
 		}
 	}
 	digests := slices.SortedFunc(maps.Keys(byDigest), compareKeys)
@@ -261,6 +274,11 @@ func WriteStandardLibraryTable(entries map[Key]StandardLibraryEntry, variants []
 			exportPosition = position[sha256.Sum256(entries[key].ExportData)] + 1
 		}
 		plain.Write(binary.AppendUvarint(nil, exportPosition))
+		readsPosition := uint64(0)
+		if entries[key].Reads != nil {
+			readsPosition = position[sha256.Sum256(entries[key].Reads)] + 1
+		}
+		plain.Write(binary.AppendUvarint(nil, readsPosition))
 	}
 	var compressed bytes.Buffer
 	// Ignored: the level is one gzip knows, so it returns no error.

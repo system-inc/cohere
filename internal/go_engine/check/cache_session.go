@@ -57,12 +57,15 @@ type StandardLibraryCaching struct {
 	Collected map[cache.Key]StandardLibraryRunEntry
 }
 
-// StandardLibraryRunEntry is one standard-library package a run saved: its import path, and its entry and export data
-// as saveMisses encoded them, which still name this machine's files.
+// StandardLibraryRunEntry is one standard-library package a run saved: its import path, its entry and export data as
+// saveMisses encoded them, which still name this machine's files, and its reads of other packages as persistReads
+// persisted them once the run's reads were whole (PersistCollectedReads), nil until then and for reads that cannot be
+// persisted.
 type StandardLibraryRunEntry struct {
 	PackagePath string
 	Entry       []byte
 	ExportData  []byte
+	Reads       []byte
 }
 
 // CacheCounts is what the cache did in one run, by package: every package the load reached is a hit, restored from
@@ -177,8 +180,10 @@ type CacheSession struct {
 	// run reads no table and collects nothing.
 	standardLibraryKeys map[*packages.Package]cache.Key
 
-	// fromBinary are the hits restored from the binary's table, which are never written to the store.
+	// fromBinary are the hits restored from the binary's table, which are never written to the store, and binaryHits
+	// what the host's session of a run with extra builds holds of each, which it keeps for them (keepBinaryHit).
 	fromBinary map[*packages.Package]bool
+	binaryHits map[*packages.Package]binaryHit
 
 	counts       CacheCounts
 	factsSkipped atomic.Int64
@@ -278,6 +283,7 @@ func (session *CacheSession) Restore(
 	session.buildKeys = nil
 	session.standardLibraryKeys = nil
 	session.fromBinary = map[*packages.Package]bool{}
+	session.binaryHits = map[*packages.Package]binaryHit{}
 	session.given = make(map[*packages.Package]bool, len(analyzed))
 	for _, analyzedPackage := range analyzed {
 		session.given[analyzedPackage] = true

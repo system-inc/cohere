@@ -7,20 +7,22 @@ import (
 	"testing"
 )
 
-// sampleStandardLibraryEntries are three keys, two of which share an entry and its export data, as the same package
-// does under two Go patch releases, and one with no export data, as unsafe has.
+// sampleStandardLibraryEntries are three keys, two of which share an entry, its export data and its reads, as the same
+// package does under two Go patch releases, and one with no export data and no reads, as unsafe has.
 func sampleStandardLibraryEntries() map[Key]StandardLibraryEntry {
-	shared := StandardLibraryEntry{Entry: []byte("strings, its facts"), ExportData: []byte("strings, its types")}
+	shared := StandardLibraryEntry{Entry: []byte("strings, its facts"), ExportData: []byte("strings, its types"),
+		Reads: []byte("strings, its reads")}
 	return map[Key]StandardLibraryEntry{
 		{0x01}: shared,
-		{0x02}: {Entry: bytes.Clone(shared.Entry), ExportData: bytes.Clone(shared.ExportData)},
+		{0x02}: {Entry: bytes.Clone(shared.Entry), ExportData: bytes.Clone(shared.ExportData),
+			Reads: bytes.Clone(shared.Reads)},
 		{0x03}: {Entry: []byte("unsafe, its facts")},
 	}
 }
 
-// A table written is read back key for key, an entry without export data among them, and a key it was not written
-// with is not held. The same entries always write the same bytes, and an entry two keys share is held once: the table
-// of both keys is no bigger than the table of one by more than the second key's row.
+// A table written is read back key for key, an entry without export data or reads among them, and a key it was not
+// written with is not held. The same entries always write the same bytes, and an entry two keys share is held once: the
+// table of both keys is no bigger than the table of one by more than the second key's row.
 func TestAStandardLibraryTableReadsBackWhatItWasWrittenWith(test *testing.T) {
 	test.Parallel()
 
@@ -29,12 +31,13 @@ func TestAStandardLibraryTableReadsBackWhatItWasWrittenWith(test *testing.T) {
 	table := NewStandardLibraryTable(written)
 	for key, want := range entries {
 		got, held := table.Lookup(key)
-		if !held || !bytes.Equal(got.Entry, want.Entry) || !bytes.Equal(got.ExportData, want.ExportData) {
-			test.Errorf("key %s: want %q and %q, got %q and %q (held %t)", key, want.Entry, want.ExportData,
-				got.Entry, got.ExportData, held)
+		if !held || !bytes.Equal(got.Entry, want.Entry) || !bytes.Equal(got.ExportData, want.ExportData) ||
+			!bytes.Equal(got.Reads, want.Reads) {
+			test.Errorf("key %s: want %q, %q and %q, got %q, %q and %q (held %t)", key, want.Entry, want.ExportData,
+				want.Reads, got.Entry, got.ExportData, got.Reads, held)
 		}
-		if want.ExportData == nil && got.ExportData != nil {
-			test.Errorf("key %s: want no export data, got %q", key, got.ExportData)
+		if want.ExportData == nil && got.ExportData != nil || want.Reads == nil && got.Reads != nil {
+			test.Errorf("key %s: want no export data and no reads, got %q and %q", key, got.ExportData, got.Reads)
 		}
 	}
 	if _, held := table.Lookup(Key{0x04}); held {
@@ -59,12 +62,12 @@ func TestAStandardLibraryTableReadsBackWhatItWasWrittenWith(test *testing.T) {
 		return plain.Len()
 	}
 	one := map[Key]StandardLibraryEntry{{0x01}: entries[Key{0x01}]}
-	// A row is the key, and two one-byte positions.
+	// A row is the key, and three one-byte positions.
 	if both, single := plainSize(WriteStandardLibraryTable(map[Key]StandardLibraryEntry{{0x01}: entries[Key{0x01}],
 		{0x02}: entries[Key{0x02}]}, nil)), plainSize(WriteStandardLibraryTable(one, nil)); both !=
-		single+len(Key{})+2 {
+		single+len(Key{})+3 {
 		test.Errorf("want the shared entry held once, a row of %d bytes more, got %d bytes for one key and %d for "+
-			"both", len(Key{})+2, single, both)
+			"both", len(Key{})+3, single, both)
 	}
 }
 
@@ -97,13 +100,17 @@ func TestAStandardLibraryTableThatDoesNotParseHoldsNothing(test *testing.T) {
 		"of another format": gzipped("some other table\n"),
 		// No variants, no contents, and one key whose entry is the first content.
 		"past its contents": gzipped(standardLibraryTableMagic + "\x00\x00\x01" + string(make([]byte, len(Key{}))) +
-			"\x00\x00"),
+			"\x00\x00\x00"),
+		// No variants, one content, and one key whose reads are past it.
+		"reads past its contents": gzipped(standardLibraryTableMagic + "\x00\x01\x01e\x01" +
+			string(make([]byte, len(Key{}))) + "\x00\x00\x02"),
 		// No variants, no contents, no keys, and then a byte.
 		"with a byte after its keys": gzipped(standardLibraryTableMagic + "\x00\x00\x00x"),
 		// One variant whose target says it is longer than the table.
 		"inside a variant": gzipped(standardLibraryTableMagic + "\x01\x7f"),
-		// The first format, which held no variants.
-		"of the first format": gzipped("cohere standard library table 1\n\x00\x00"),
+		// The first format, which held no variants, and the second, which held no reads.
+		"of the first format":  gzipped("cohere standard library table 1\n\x00\x00"),
+		"of the second format": gzipped("cohere standard library table 2\n\x00\x00\x00"),
 	} {
 		table := NewStandardLibraryTable(contents)
 		if table.Empty() {

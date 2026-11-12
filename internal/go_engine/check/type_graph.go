@@ -98,6 +98,14 @@ func (graph *typeGraph) sizesForWalk() types.Sizes {
 	return graph.sizes
 }
 
+// measuredSizes are the build's sizes the graph measures by (measureBy), nil when it renders every field whole. It
+// marks no walk, so asking never keeps the sizes from being set.
+func (graph *typeGraph) measuredSizes() types.Sizes {
+	graph.lock.Lock()
+	defer graph.lock.Unlock()
+	return graph.sizes
+}
+
 // packageOf is the part of the graph holding declaring's type names, made the first time it is asked.
 func (graph *typeGraph) packageOf(declaring *types.Package) *packageTypeGraph {
 	graph.lock.Lock()

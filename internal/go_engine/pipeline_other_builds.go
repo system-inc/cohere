@@ -150,10 +150,18 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 	return engine.described.builds[0], engine.described.builds[1:], nil
 }
 
-// recordsReads is whether the host's load and lint record what each package read of other packages (#b2t9xmf): only
-// when the run checks extra builds and the census needs at least one, since a build restores a package from the host's
-// run by those reads, and a run with none to restore into would pay for reads nothing reads.
+// recordsReads is whether the load and lint record what each package read of other packages (#b2t9xmf): when the host
+// keeps its packages for extra builds (keepsForBuilds), and when the run collects the standard library's entries for
+// the release's table, which persists each one's reads beside it (#pcv6eff), so a host restoring the package from the
+// table keeps it for its builds as it keeps a package it checked. A run that does neither would pay for reads nothing
+// reads.
 func (engine *pipeline) recordsReads() bool {
+	return engine.keepsForBuilds() || engine.request.standardLibrary.collected != nil
+}
+
+// keepsForBuilds is whether the host's run keeps its packages' entries for its extra builds to restore from (#b2t9xmf):
+// only when the run checks extra builds and the census needs at least one.
+func (engine *pipeline) keepsForBuilds() bool {
 	_, extras, buildsError := engine.buildsBeside()
 	return engine.request.switches["other-builds"] && buildsError == nil && len(extras) > 0
 }

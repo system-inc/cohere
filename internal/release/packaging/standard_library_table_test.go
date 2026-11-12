@@ -221,3 +221,26 @@ func TestABuildThroughTheOverlayEmbedsTheGeneratedTableAndTheStamp(test *testing
 		test.Errorf("the committed table.bin reads %q after the builds (%v), want it untouched", contents, readError)
 	}
 }
+
+// Every generated table's size is written to the release's progress, by target, so the next growth past Kirk's
+// budget is seen where it happens (#pcv6eff); a table that cannot be read fails the release.
+func TestEveryTablesSizeIsReported(test *testing.T) {
+	test.Parallel()
+
+	tablePath := filepath.Join(test.TempDir(), "darwin-arm64.table.bin")
+	if writeError := os.WriteFile(tablePath, make([]byte, 2973677), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	var progress strings.Builder
+	target := Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
+	if reportError := reportTableSize(&progress, target, tablePath); reportError != nil {
+		test.Fatal(reportError)
+	}
+	want := "the standard library's table for " + target.String() + " is 2973677 bytes\n"
+	if progress.String() != want {
+		test.Errorf("the progress reads %q, want %q", progress.String(), want)
+	}
+	if reportError := reportTableSize(&progress, target, filepath.Join(test.TempDir(), "missing")); reportError == nil {
+		test.Error("a table that cannot be read was reported, want the release failed")
+	}
+}

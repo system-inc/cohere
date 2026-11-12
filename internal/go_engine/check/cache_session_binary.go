@@ -1,17 +1,30 @@
 package check
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"reflect"
 	"runtime"
 	"slices"
 	"sync"
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
+
+// binaryHit is what the host's session holds of one package it restored from the binary's table, for its extra builds
+// to restore from (keepBinaryHit): the table's entry decoded, its export data renamed to the run's `GOROOT`, and its
+// persisted reads as the table holds them, nil for none.
+type binaryHit struct {
+	entry      standardLibraryEntry
+	exportData []byte
+	reads      []byte
+}
 
 // restoreFromBinary keys every standard-library package among reachable (see cache.StandardLibraryKeys), reading the
 // digest of each file hashed holds rather than hashing it again, and makes a hit of each one the binary's table holds
@@ -21,7 +34,8 @@ import (
 // Analyze was given is never restored from the table, which holds no findings, and neither is one with a list error,
 // nor one the run reloads to answer a question (see Reload). A
 // table that does not parse, or keys that cannot be computed, are a problem, and every standard-library package is
-// then computed.
+// then computed. The host's session of a run with extra builds holds what it restored of each, which it keeps for the
+// builds as it keeps a package it checked (keepBinaryHit, #pcv6eff).
 func (session *CacheSession) restoreFromBinary(
 	loader string,
 	reachable []*packages.Package,
@@ -64,7 +78,7 @@ func (session *CacheSession) restoreFromBinary(
 		slots <- struct{}{}
 		group.Go(func() {
 			defer func() { <-slots }()
-			restored, restoreError := restoreBinaryEntry(session.known, restoring, entry, rename)
+			restored, hit, restoreError := restoreBinaryEntry(session.known, restoring, entry, rename)
 			if restoreError != nil {
 				return
 			}
@@ -72,51 +86,132 @@ func (session *CacheSession) restoreFromBinary(
 			defer hitsLock.Unlock()
 			session.hits[restoring] = restored
 			session.fromBinary[restoring] = true
+			if session.keepsForBuilds {
+				session.binaryHits[restoring] = hit
+			}
 		})
 	}
 	group.Wait()
 }
 
 // restoreBinaryEntry is one standard-library package's entry from the binary's table decoded whole, with every file
-// its Withheld and its export data name renamed by rename, or an error, which is a miss, as is an entry of another
-// package than restoring.
+// its Withheld and its export data name renamed by rename, and what the host keeps of it for its extra builds, or an
+// error, which is a miss, as is an entry of another package than restoring.
 func restoreBinaryEntry(
 	known *cacheAnalyzers,
 	restoring *packages.Package,
 	entry cache.StandardLibraryEntry,
 	rename func(string) (string, error),
-) (*restoredPackage, error) {
+) (*restoredPackage, binaryHit, error) {
 	var exportData []byte
 	if entry.ExportData != nil {
 		renamed, renameError := renameExportDataFiles(entry.ExportData, restoring.PkgPath, rename)
 		if renameError != nil {
-			return nil, renameError
+			return nil, binaryHit{}, renameError
 		}
 		exportData = renamed
 	}
 	tableEntry, decodeError := decodeStandardLibraryEntry(entry.Entry)
 	if decodeError != nil {
-		return nil, decodeError
+		return nil, binaryHit{}, decodeError
 	}
 	if tableEntry.PackagePath != restoring.PkgPath {
-		return nil, fmt.Errorf("the binary's table holds %s under the key of %s", tableEntry.PackagePath,
+		return nil, binaryHit{}, fmt.Errorf("the binary's table holds %s under the key of %s", tableEntry.PackagePath,
 			restoring.PkgPath)
 	}
-	restored, restoreError := restoredOf(known, restoring, cacheEntryOf(tableEntry), func() ([]byte, error) {
+	readExportData := func() ([]byte, error) {
 		if exportData == nil {
 			return nil, fmt.Errorf("the binary's table holds no export data for %s", restoring.ID)
 		}
 		return exportData, nil
-	})
+	}
+	restored, restoreError := restoredOf(known, restoring, cacheEntryOf(tableEntry), readExportData)
 	if restoreError != nil {
-		return nil, restoreError
+		return nil, binaryHit{}, restoreError
 	}
 	withheld, renameError := renameWithheldFiles(restored.types.Withheld, rename)
 	if renameError != nil {
-		return nil, renameError
+		return nil, binaryHit{}, renameError
 	}
 	restored.types.Withheld = withheld
-	return restored, nil
+	tableEntry.Withheld = withheld
+	return restored, binaryHit{entry: tableEntry, exportData: exportData, reads: entry.Reads}, nil
+}
+
+// keepBinaryHit is what the host's run keeps for its extra builds of kept, a package it restored from the binary's
+// table as hit, whose portable digest is portable: the table's entry as the store would hold it, its export data, and
+// its reads as the table persisted them, read by the analyzers' fact types (heldReadsOf), so a build judges it as it
+// judges a package the host checked (#pcv6eff). A package the table persisted no reads of is kept with none, and a
+// build declines it as unpersisted.
+func (session *CacheSession) keepBinaryHit(kept *packages.Package, hit binaryHit, portable cache.Key) (*hostEntry,
+	error,
+) {
+	var encoded bytes.Buffer
+	if encodeError := gob.NewEncoder(&encoded).Encode(cacheEntryOf(hit.entry)); encodeError != nil {
+		return nil, fmt.Errorf("keeping %s, restored from the binary's table: %w", kept.ID, encodeError)
+	}
+	restoring := restoringOf(kept, nil)
+	if hit.reads != nil {
+		restoring.persisted = heldReadsOf(hit.reads, learnedFactTypes(session.known))
+	}
+	entry := encoded.Bytes()
+	return &hostEntry{restoring: restoring, portable: portable,
+		contents: func() ([]byte, func() ([]byte, error), error) {
+			return entry, func() ([]byte, error) {
+				if hit.exportData == nil {
+					return nil, fmt.Errorf("the binary's table holds no export data for %s", kept.ID)
+				}
+				return hit.exportData, nil
+			}, nil
+		}}, nil
+}
+
+// learnedFactTypes are the fact types of every analyzer known learns facts of, by factTypeName, as persisted reads
+// name them.
+func learnedFactTypes(known *cacheAnalyzers) map[string]reflect.Type {
+	learned := map[string]reflect.Type{}
+	for _, byName := range known.factTypes {
+		for name, factType := range byName {
+			learned[name] = factType
+		}
+	}
+	return learned
+}
+
+// PersistCollectedReads gives each standard-library package the run collected an entry of (collect) its reads of
+// other packages, reads, persisted by a memo measured by the run's sizes, its target's, as the release's table carries
+// them beside each entry (#pcv6eff). The caller hands the reads once every type-read walk has ended. A package whose
+// reads cannot be persisted, never recorded or marked never, keeps none, and a build declines it as unpersisted.
+func (session *CacheSession) PersistCollectedReads(reads map[*packages.Package]*build_reads.Reads) {
+	standardLibrary := session.caching.StandardLibrary
+	if standardLibrary == nil || standardLibrary.Collected == nil {
+		return
+	}
+	memo := NewReadsBuild()
+	// Every package of one load has the load's sizes, the target's.
+	for keyed := range session.standardLibraryKeys {
+		if keyed.TypesSizes != nil {
+			memo.measureBy(keyed.TypesSizes)
+			break
+		}
+	}
+	for keyed, key := range session.standardLibraryKeys {
+		collected, held := standardLibrary.Collected[key]
+		if !held {
+			continue
+		}
+		record, persisted := persistReads(restoringOf(keyed, reads[keyed]), memo, ReadsRendererVersion)
+		if !persisted {
+			continue
+		}
+		encoded, encodeError := encodePersistedReads(record)
+		if encodeError != nil {
+			session.problem(fmt.Sprintf("persisting the reads of %s: %v", keyed.ID, encodeError))
+			continue
+		}
+		collected.Reads = encoded
+		standardLibrary.Collected[key] = collected
+	}
 }
 
 // collect adds a standard-library package the run just encoded to the entries the run collects, when it collects
