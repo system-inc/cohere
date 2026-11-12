@@ -401,21 +401,40 @@ func TestTheBuildsWidth(test *testing.T) {
 	}
 }
 
-// The builds start on other platforms first and the host's own after them, each in build order, so the build the
-// width is measured by is a platform's, which holds the most, never a tag build on the host's (#rmzehfg).
+// The first build on another platform starts first, so the build the width is measured by is a platform's, which
+// holds the most, never a tag build on the host's (#rmzehfg), and every other build follows in build order, so the
+// host's own light builds start before the other platforms and no two platform builds start side by side ahead of
+// them, which stacked their lint peaks (#awbzy9y).
 func TestTheBuildsStartHeaviestFirst(test *testing.T) {
 	test.Parallel()
 	host := project.Build{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true}
+	// In the order BuildsFor gives them: the host's platform first, then the others.
 	extras := []project.Build{
 		{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true, Tags: []string{"first"}},
 		{OperatingSystem: "darwin", Architecture: "arm64"},
+		{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true, Tags: []string{"second"}},
 		{OperatingSystem: "linux", Architecture: "arm64"},
 		{OperatingSystem: "windows", Architecture: "arm64"},
-		{OperatingSystem: "darwin", Architecture: "amd64"},
-		{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true, Tags: []string{"second"}},
+		{OperatingSystem: "freebsd", Architecture: "arm64"},
 	}
-	if got, want := heaviestFirst(host, extras), []int{2, 3, 4, 0, 1, 5}; !slices.Equal(got, want) {
+	got := heaviestFirst(host, extras)
+	if want := []int{3, 0, 1, 2, 4, 5}; !slices.Equal(got, want) {
 		test.Errorf("the builds start in the order %v, want %v", got, want)
+	}
+	// However the order is reached, no second platform build starts before the host's first.
+	platformsAhead := 0
+	for _, index := range got {
+		if extras[index].OperatingSystem == host.OperatingSystem {
+			break
+		}
+		platformsAhead++
+	}
+	if platformsAhead != 1 {
+		test.Errorf("%d platform builds start before the host's own, want the one measured", platformsAhead)
+	}
+	hostOnly := extras[:3]
+	if got := heaviestFirst(host, hostOnly); !slices.Equal(got, []int{0, 1, 2}) {
+		test.Errorf("builds all on the host's platform start in the order %v, want build order", got)
 	}
 	if got := heaviestFirst(host, nil); len(got) != 0 {
 		test.Errorf("no builds start in the order %v, want none", got)
