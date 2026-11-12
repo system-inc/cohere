@@ -116,6 +116,11 @@ type Loaded struct {
 	// Elapsed is how long the whole load took.
 	Elapsed time.Duration
 
+	// UnguardedWorkspaceSum is the go.work.sum a go command of the load ran beside with no side copy of the go.work,
+	// since none could answer exactly as the tree's (see workspaceSumGuard), so go list may have rewritten it, or
+	// empty when every one ran under a copy, or none ran. A load that fails says it in its error.
+	UnguardedWorkspaceSum string
+
 	// Inputs are what the load read to decide what it returned, for the inputs record (see inputs.go).
 	Inputs Inputs
 
@@ -286,6 +291,32 @@ func loadWorkspace(
 			return nil, environmentError
 		}
 	}
+	loaded, loadError := loadUnder(goEnvironment, patterns, census, translateOwnCgo, caching, overlay, ended)
+	unguarded := goEnvironment.guard.unguardedSum()
+	if loadError != nil {
+		if unguarded != "" {
+			return nil, fmt.Errorf("%w; go list ran without a side copy of go.work, so it may have rewritten %s",
+				loadError, unguarded)
+		}
+		return nil, loadError
+	}
+	loaded.UnguardedWorkspaceSum = unguarded
+	loaded.Elapsed = time.Since(started)
+	return loaded, nil
+}
+
+// loadUnder is loadWorkspace once goEnvironment is had: the listing, the cgo tool's translation when the project has
+// cgo files of its own, the load from source, its diagnostics and its inputs.
+func loadUnder(
+	goEnvironment *GoEnvironment,
+	patterns []string,
+	census []string,
+	translateOwnCgo bool,
+	caching Caching,
+	overlay map[string][]byte,
+	ended <-chan struct{},
+) (*Loaded, error) {
+	workspace := goEnvironment.workspace
 	buildContext := goEnvironment.contextFor(caching.Held)
 	var listed *listing
 	var listingKept bool
@@ -320,7 +351,7 @@ func loadWorkspace(
 		// go list -compiled is billed to the listing, the cgo tool's compiles among its children, since it is a go list
 		// the load runs and no other row would show what it cost.
 		measureListingCommand(caching.Timing, func() {
-			compiled, compiledError = listCompiled(workspace, compiledEnvironment, listed)
+			compiled, compiledError = listCompiled(goEnvironment.guard, workspace, compiledEnvironment, listed)
 		})
 		if compiledError != nil {
 			return nil, compiledError
@@ -353,7 +384,6 @@ func loadWorkspace(
 	}
 	loaded.Excluded, loaded.Unseen = excluded, unseen
 	loaded.Inputs = collectInputs(workspace, goEnvironment.reported, roots, census)
-	loaded.Elapsed = time.Since(started)
 	return loaded, nil
 }
 

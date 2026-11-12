@@ -1374,6 +1374,45 @@ func TestEngineRunSaysNothingWhenAGoRunWithheldNothing(test *testing.T) {
 	forbidLines(test, summaryJsonOf(test, jsonOutput), "withheldInDependencyCgo", "withheldDependencyCgoDeclarations")
 }
 
+// A Go run whose go list ran beside a go.work with no side copy of it says go may have rewritten its go.work.sum: the
+// file by name in the account `--verbose` prints, one marker in the footer every view ends with, and the file in
+// `--json`'s gaps. It fails nothing, since every file was checked (#34r3v1y), and a run whose summary names none says
+// nothing.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
+func TestEngineRunNamesEachGoWorkSumGoListMayHaveRewritten(test *testing.T) {
+	saved, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	unguarded := contractFixture(test, "GoClean.jsonl")
+	summaryIndex := slices.IndexFunc(unguarded, func(line string) bool {
+		return strings.HasPrefix(line, `{"kind":"summary"`)
+	})
+	if summaryIndex < 0 {
+		test.Fatal("GoClean.jsonl holds no summary record")
+	}
+	unguarded[summaryIndex] = strings.TrimSuffix(unguarded[summaryIndex], "}") +
+		`,"unguardedWorkspaceSums":["/work/go.work.sum"]}`
+
+	verbose, summary := renderGoStreamAs(test, outputVerbose, unguarded)
+	requireLines(test, verbose, "  go list may have rewritten /work/go.work.sum\n")
+	if !slices.Equal(summary.Gaps.UnguardedWorkspaceSums, []string{"/work/go.work.sum"}) {
+		test.Errorf("the gap names %q, want /work/go.work.sum", summary.Gaps.UnguardedWorkspaceSums)
+	}
+	if summary.failed() {
+		test.Errorf("a go.work.sum go may have rewritten failed the run: %+v", summary.Gaps)
+	}
+	const marker = " • ⚠ go list may have rewritten go.work.sum"
+	requireLines(test, verbose, marker)
+	human, _ := renderGoStreamAs(test, outputHuman, unguarded)
+	requireLines(test, human, marker)
+	jsonOutput, _ := renderGoStreamAs(test, outputJson, unguarded)
+	requireLines(test, summaryJsonOf(test, jsonOutput), `"unguardedWorkspaceSums":["/work/go.work.sum"]`)
+
+	clean, _ := renderGoStreamAs(test, outputVerbose, contractFixture(test, "GoClean.jsonl"))
+	forbidLines(test, clean, "go.work.sum")
+	cleanJson, _ := renderGoStreamAs(test, outputJson, contractFixture(test, "GoClean.jsonl"))
+	forbidLines(test, summaryJsonOf(test, cleanJson), "unguardedWorkspaceSums")
+}
+
 // swiftStreamSeeded is the clean Swift stream with these fields added to its types record.
 func swiftStreamSeeded(test *testing.T, seedFields string) []string {
 	test.Helper()

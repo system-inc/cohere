@@ -154,7 +154,8 @@ func requireExternallyLinked(test *testing.T, directory string, extra []string, 
 	test.Helper()
 	requireDoubted(test, directory, extra, "links externally")
 	goEnvironment := goEnvironmentOf(test, directory, extra)
-	goList, listError := listWithGoList(directory, goEnvironment.fullEnvironment, []string{"./..."}, nil)
+	goList, listError := listWithGoList(goEnvironment.guard, directory, goEnvironment.fullEnvironment,
+		[]string{"./..."}, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
