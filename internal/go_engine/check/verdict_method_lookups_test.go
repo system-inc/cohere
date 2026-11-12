@@ -324,6 +324,29 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			want:      "T object " + methodForeignPath + ".ID: its name or kind differs",
 		},
 		{
+			// Pool's constraint names Flush, not the lookup's Close. abbreviated reads Item off Mine's Close as
+			// foreign.Thing and instantiates Pool[Thing], which the constraint refuses on darwin, where Thing has no
+			// Flush, and admits on windows, where it does, and there Close(Thing) error is Mine's: the rule finds no
+			// match on the host and one in the build. Nothing with a Close changes, so no list of the lookup's
+			// candidates sees it: the user package's own read of Thing, named by value in its signature, declines
+			// it, since that read renders Thing's methods.
+			name: "a constrained generic whose constraint names another method than the lookup's, which the type " +
+				"argument gains in the build",
+			files: map[string]string{"foreign.go": methodForeign,
+				"pool.go": "package foreign\n\ntype Pool[Item interface{ Flush() }] struct{}\n\n" +
+					"func (Pool[Item]) Close(item Item) error { return nil }\n",
+				"thing_darwin.go":  "package foreign\n\ntype Thing struct{}\n",
+				"thing_windows.go": "package foreign\n\ntype Thing struct{}\n\nfunc (Thing) Flush() {}\n"},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\n" +
+				"type Mine interface{ Close(item foreign.Thing) error }\n\nfunc Use() int { return foreign.Count() }\n",
+			lookup: func(host methodWorld) build_reads.Lookup {
+				return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
+					Subject: methodSetMember(host.user, "Mine", "Close")})
+			},
+			typeReads: true,
+			want:      "T object " + methodForeignPath + ".Thing renders differently",
+		},
+		{
 			name: "an unanswered generic interface whose type parameters change under the same signature",
 			files: map[string]string{"foreign.go": methodForeign,
 				"putter_darwin.go":  putter("Item any"),
