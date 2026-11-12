@@ -12,7 +12,7 @@ import (
 // built clean and claim a clean build that never happened. So the state is read fresh on every resolve,
 // keyed into the binary's name, and handed to the build, and the binary reports what its name holds.
 
-// workingTreeModified reports whether repository has uncommitted changes, tracked or untracked, ignored
+// WorkingTreeModified reports whether repository has uncommitted changes, tracked or untracked, ignored
 // files never counting. It is the meaning of the Swift manifest's `hasUncommittedChanges` and of Go's
 // `vcs.modified`, both of which cover the whole repository.
 //
@@ -27,7 +27,10 @@ import (
 // 17 ms and 16 ms limited to `swift/`.
 //
 // No optional locks, so a run never takes the index lock from a member staging a commit beside it.
-func workingTreeModified(repository string) bool {
+//
+// Exported for the Swift run cache, whose key takes the same answer for an engine built from the working tree, so a
+// replay never shows another state's engine (#s5z3n30).
+func WorkingTreeModified(repository string) bool {
 	status, gitOutputError := gitOutput(
 		repository,
 		"--no-optional-locks",
@@ -42,7 +45,7 @@ func workingTreeModified(repository string) bool {
 // developmentTreeState is the state a `--dev` cohere is stamped with: the commit `HEAD` names, empty when it
 // cannot be read, and whether anything compiled in could differ from that commit.
 //
-// The vendored compiler is compiled in, so it counts here where workingTreeModified leaves submodules out: a
+// The vendored compiler is compiled in, so it counts here where WorkingTreeModified leaves submodules out: a
 // checkout at another commit than the one `HEAD` pins, or with changes of its own. These are the facts Go's
 // `vcs.revision` and `vcs.modified` stamped before the build turned VCS stamping off, which it did so the
 // binary reports what its name holds (ResolveWorkingTree). The three questions run at once: measured on
@@ -54,9 +57,9 @@ func developmentTreeState(moduleDirectory string, compilerCommit string) (string
 	}
 
 	treeModified := make(chan bool, 1)
-	go func() { treeModified <- workingTreeModified(moduleDirectory) }()
+	go func() { treeModified <- WorkingTreeModified(moduleDirectory) }()
 	compilerChanged := make(chan bool, 1)
-	go func() { compilerChanged <- workingTreeModified(filepath.Join(moduleDirectory, "TypeScript")) }()
+	go func() { compilerChanged <- WorkingTreeModified(filepath.Join(moduleDirectory, "TypeScript")) }()
 	pinned, gitOutputError := gitOutput(moduleDirectory, "rev-parse", "HEAD:TypeScript")
 	compilerMoved := gitOutputError != nil || strings.TrimSpace(pinned) != compilerCommit
 

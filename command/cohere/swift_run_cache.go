@@ -28,7 +28,8 @@ import (
 // here would be a second copy of all three to keep in step, and the copy that drifted would replay stale verdicts.
 //
 // The replay is decided before the engine is resolved, so a run with nothing changed hashes no engine source, asks no
-// toolchain anything and starts no process: one stat of each recorded input.
+// toolchain anything and starts no process: one stat of each recorded input. The one exception is an engine built from
+// the working tree, whose key takes the tree's clean or dirty state from git (see swiftRunCacheFacts).
 
 // beginSwiftRunCache replays a recorded Swift run and exits when every input is unchanged, and otherwise starts
 // recording this one. It does nothing for a run the run cache does not admit, `--no-cache` among them.
@@ -39,7 +40,7 @@ func beginSwiftRunCache(location projectLocation) {
 	anchor := program.NewPathAnchor(location.Root)
 	facts := swiftRunCacheFacts(anchor, location.LintConfigFileName, activeOutput.Style.color,
 		activeProjectYieldFingerprint(), swiftEngineChoice(os.Getenv(dispatch.SwiftEngineOverrideVariable),
-			release.Current()), os.Environ(), exec.LookPath, os.Readlink)
+			release.Current()), workingTreeModified, os.Environ(), exec.LookPath, os.Readlink)
 	// No section beyond the run's own: the findings, shapes and types sections serve a TypeScript graph's walk.
 	session := beginRunCacheSession(location.Root, anchor, program.CacheTableSections{}, facts...)
 	if session != nil {
@@ -55,6 +56,10 @@ var swiftKeyedVariables = []string{"DEVELOPER_DIR", "TOOLCHAINS", "SDKROOT", "HO
 // when no variable names one.
 const xcodeSelectLink = "/var/db/xcode_select_link"
 
+// swiftEngineFromWorkingTree is the choice of an engine built from the working tree's sources, the one choice whose
+// binary is decided by files the front door can name.
+const swiftEngineFromWorkingTree = "built from the working tree's sources"
+
 // swiftRunCacheFacts is what a Swift run's verdict depends on that is no file the engine names, each a fact in the
 // run's key. Computed with no subprocess, since a replay pays for them and `swift --version` alone costs more than the
 // whole replay may.
@@ -65,6 +70,13 @@ const xcodeSelectLink = "/var/db/xcode_select_link"
 // projects below it, which arrives by a variable the arguments do not show (see ownership.go). How the engine was
 // chosen (swiftEngineChoice), so a run of a named engine never replays one built from sources, nor one built from a
 // commit one built from the working tree.
+//
+// For an engine built from the working tree, also whether that tree has uncommitted changes, as the engine it would be
+// served is built and stamped by it (dispatch.WorkingTreeModified): that engine reports the state as
+// `sourceTreeModified`, the run's modified-build gap, and nothing the run reads records it, so a replay would
+// otherwise show the state of whichever engine wrote the record (#s5z3n30). It is the one fact a subprocess answers,
+// about 116 ms of git on cohere's checkout, and it is asked only for that choice: a named, shipped or committed
+// engine's bit is fixed in its bytes, and its binary is an input.
 //
 // Then which toolchain answers, which a replay never asks. The `swift`, `xcrun`, `xcodebuild` and `xcodegen` PATH
 // finds, absolute and with their links resolved, since the engine runs each by name through `/usr/bin/env`. The
@@ -80,6 +92,7 @@ func swiftRunCacheFacts(
 	color bool,
 	yield string,
 	engineChoice string,
+	treeModified func() bool,
 	environment []string,
 	lookPath func(string) (string, error),
 	readLink func(string) (string, error),
@@ -91,6 +104,9 @@ func swiftRunCacheFacts(
 		fmt.Sprintf("color=%t", color),
 		"yield=" + yield,
 		"swift-engine=" + engineChoice,
+	}
+	if engineChoice == swiftEngineFromWorkingTree {
+		facts = append(facts, fmt.Sprintf("swift-engine-tree-modified=%t", treeModified()))
 	}
 	for _, tool := range []string{"swift", "xcrun", "xcodebuild", "xcodegen"} {
 		facts = append(facts, tool+"="+toolOnPath(tool, lookPath))
@@ -116,9 +132,16 @@ func swiftRunCacheFacts(
 	return facts
 }
 
-// swiftEngineFromWorkingTree is the choice of an engine built from the working tree's sources, the one choice whose
-// binary is decided by files the front door can name.
-const swiftEngineFromWorkingTree = "built from the working tree's sources"
+// workingTreeModified is whether the checkout an engine built from the working tree comes from has uncommitted changes,
+// the state that engine is built and stamped with. A checkout that can't be found reads as modified, as a git that
+// can't answer does in dispatch.WorkingTreeModified: nothing then vouches for the tree.
+func workingTreeModified() bool {
+	moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
+	if findModuleDirectoryError != nil {
+		return true
+	}
+	return dispatch.WorkingTreeModified(moduleDirectory)
+}
 
 // swiftEngineChoice is how this run will choose its engine, in the order resolveSwiftEngineBinary chooses, read with
 // no hashing and no process: the binary the override names, the one a release ships beside cohere, one built from the

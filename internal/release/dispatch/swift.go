@@ -53,7 +53,7 @@ var buildSwiftProduct = buildSwiftProductWithSwiftPm
 // stale bit errs toward the warning. It errs both ways. A clean tree was served an engine built while an
 // unrelated file was dirty, which reported a modified build and was refused at land, and a dirty tree could
 // be served one built clean, claiming a clean build that never happened (#50wtb2s). So the bit is read fresh
-// on every resolve (workingTreeModified, about 120 ms on cohere's checkout), named into the hash so each state
+// on every resolve (WorkingTreeModified, about 120 ms on cohere's checkout), named into the hash so each state
 // has its own binary, and handed to the build, so the engine reports the state its name holds rather than
 // whatever SwiftPM reads from git a moment later.
 //
@@ -75,7 +75,7 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int, versionOutput 
 		return resolveCommittedSwiftEngine(paths, commit, toolchain, contract)
 	}
 
-	modified := workingTreeModified(paths.ModuleDirectory)
+	modified := WorkingTreeModified(paths.ModuleDirectory)
 	hash, swiftEngineHashError := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain, modified)
 	if swiftEngineHashError != nil {
 		return "", false, swiftEngineHashError

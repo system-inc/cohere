@@ -201,16 +201,16 @@ func TestTheTreeStateReadsInAWorktreeWhoseSubmoduleIsASymlink(test *testing.T) {
 		test.Fatal(symlinkError)
 	}
 
-	if workingTreeModified(fixture.superproject) {
+	if WorkingTreeModified(fixture.superproject) {
 		test.Fatal("a clean worktree whose submodule is a symlink reads as modified")
 	}
 	writeFile(test, filepath.Join(fixture.superproject, "ignored.log"), "ignored\n")
 	writeFile(test, filepath.Join(fixture.superproject, ".git", "info", "exclude"), "ignored.log\n")
-	if workingTreeModified(fixture.superproject) {
+	if WorkingTreeModified(fixture.superproject) {
 		test.Fatal("an ignored file made the tree read as modified")
 	}
 	writeFile(test, filepath.Join(fixture.superproject, "notes.txt"), "uncommitted\n")
-	if !workingTreeModified(fixture.superproject) {
+	if !WorkingTreeModified(fixture.superproject) {
 		test.Fatal("an untracked file left the tree reading clean")
 	}
 }
