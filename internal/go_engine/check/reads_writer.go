@@ -115,18 +115,22 @@ func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
 			return persisted
 		}
 		hostClosure := gatherClosure(writer.host.indexedClosureOf, lookup.Subject.Pkg().Imports())
-		var candidates []*types.TypeName
+		// The closure judgment's candidates by their whole method sets, and the one-bit judgment's as the rules index
+		// them, of those a rule could let fix the subject's (countedCandidates), as lookupHolds gathers each.
+		var candidates, ruleCandidates []*types.TypeName
 		for _, indexed := range writer.host.methodsNamed(lookup.Name) {
 			if hostClosure.reached[indexed.owner] {
-				candidates = append(candidates, countedCandidates(indexed.typeNames, lookup.Name,
+				candidates = append(candidates, indexed.methodSetTypeNames...)
+				ruleCandidates = append(ruleCandidates, countedCandidates(indexed.ruleTypeNames, lookup.Name,
 					concreteSubject(lookup.Subject))...)
 			}
 		}
 		sortTypeNames(candidates)
+		sortTypeNames(ruleCandidates)
 		for _, candidate := range candidates {
 			persisted.Candidates = append(persisted.Candidates, writer.object(candidate, true))
 		}
-		writer.methodJudgment(&persisted, lookup, candidates)
+		writer.methodJudgment(&persisted, lookup, ruleCandidates)
 	case build_reads.QueryDeprecated:
 		if lookup.Subject != nil {
 			persisted.Subject = writer.object(lookup.Subject, false)

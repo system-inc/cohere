@@ -95,14 +95,12 @@ const methodUser = "package user\n\nimport \"example.com/methods/foreign\"\n\n" 
 // methodForeign is foreign's file every method fixture holds, with Count, which user calls.
 const methodForeign = "package foreign\n\nfunc Count() int { return 1 }\n"
 
-// closerBase is a type of every build with Close declared, promotedOnly a windows-only type with Close by promotion
-// alone, through its embedded closerBase, which no rule indexes, nor the verdict's index (indexPackage), and
-// socketOnly a windows-only type that declares a Close of another shape, which the closure judgment counts among the
-// type names with Close.
+// closerBase is a type of every build with Close declared, and promotedOnly a windows-only type with Close by
+// promotion alone, through its embedded closerBase: the closure judgment counts it among the type names with Close,
+// reading whole method sets (methodSetTypeNames), and no rule indexes it, nor the one-bit judgment (ruleTypeNames).
 const (
 	closerBase   = "package foreign\n\ntype inner struct{}\n\nfunc (inner) Close() error { return nil }\n"
 	promotedOnly = "package foreign\n\ntype Handle struct{ inner }\n"
-	socketOnly   = "package foreign\n\ntype Socket struct{}\n\nfunc (Socket) Close(force bool) error { return nil }\n"
 )
 
 // constrainedPool is foreign's generic Pool, whose Close has the subject's shape, with its type parameter constrained
@@ -244,7 +242,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			lookup: unanswered(build_reads.QueryMethod, "Close"),
 		},
 		{
-			name: "a windows-only method promoted alone, which no rule indexes, held",
+			name: "a windows-only method promoted alone, held where the closure declines",
 			files: map[string]string{"foreign.go": methodForeign, "inner.go": closerBase,
 				"promoted_windows.go": promotedOnly},
 			lookup: unanswered(build_reads.QueryMethod, "Close"),
@@ -295,15 +293,30 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"shape",
 		},
 		{
-			name:   "the same unexported name for a receiver embedding a foreign type, held by the closure judgment",
+			name: "the same unexported name for a receiver embedding a foreign type, declined by the closure judgment, " +
+				"which counts every type name with the method",
 			files:  poolAdds("add"),
 			user:   adding("type Mine struct{ foreign.Base }\n\nfunc (Mine) add(value int) {}"),
 			lookup: addOf("add"),
+			want:   "L lookup Method add: 0 type names have the method on the host, 1 in the build",
+		},
+		{
+			// The fallback keeps the closure judgment for a receiver embedding a foreign type, and the build's only new
+			// type name with Close has it by promotion alone, which satisfies a constraint's Close as a declared one
+			// does: the closure reads whole method sets, so it declines, red when it reads the rules' index (#swv3jbw).
+			name: "a type with the method by promotion alone, new in the build, declines where the fallback keeps the " +
+				"closure",
+			files: map[string]string{"foreign.go": methodForeign + "\ntype Base struct{}\n", "closer.go": closer,
+				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{ foreign.Base }\n\n" +
+				"func (Mine) Close() error { return nil }\n\nfunc Use() int { return foreign.Count() }\n",
+			lookup: methodAnswered("Closer", "Close"),
+			want:   "L lookup Method Close: 2 type names have the method on the host, 3 in the build",
 		},
 		{
 			name: "an answer still found alike, held where the closure declines",
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer, "inner.go": closerBase,
-				"promoted_windows.go": promotedOnly, "socket_windows.go": socketOnly},
+				"promoted_windows.go": promotedOnly},
 			lookup: interfaceAnswered,
 		},
 		{
@@ -328,7 +341,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			name: "a generic candidate of the subject's shape under constraints of all types, held where the closure " +
 				"declines",
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer, "pool.go": pool,
-				"inner.go": closerBase, "promoted_windows.go": promotedOnly, "socket_windows.go": socketOnly},
+				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
 			lookup: methodAnswered("Closer", "Close"),
 		},
 		{
@@ -473,7 +486,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 		{
 			name: "a receiver embedding a foreign type keeps the closure judgment",
 			files: map[string]string{"foreign.go": methodForeign + "\ntype Base struct{}\n", "closer.go": closer,
-				"inner.go": closerBase, "promoted_windows.go": promotedOnly, "socket_windows.go": socketOnly},
+				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
 			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{ foreign.Base }\n\n" +
 				"func (Mine) Close() error { return nil }\n\nfunc Use() int { return foreign.Count() }\n",
 			lookup: interfaceAnswered,
@@ -482,7 +495,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 		{
 			name: "a receiver embedding a foreign type through a type of its own keeps the closure judgment",
 			files: map[string]string{"foreign.go": methodForeign + "\ntype Base struct{}\n", "closer.go": closer,
-				"inner.go": closerBase, "promoted_windows.go": promotedOnly, "socket_windows.go": socketOnly},
+				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
 			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype inner struct{ *foreign.Base }\n\n" +
 				"type Mine struct{ inner }\n\nfunc (Mine) Close() error { return nil }\n\n" +
 				"func Use() int { return foreign.Count() }\n",

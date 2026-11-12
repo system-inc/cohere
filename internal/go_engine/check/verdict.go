@@ -251,13 +251,13 @@ func (judged verdict) buildFactHolds(
 //   - Closure asks the build's import closure, from the package's imports, as the rule asked (ClosureInterface).
 //   - PackageName asks whether a package of that closure has the name, as the rule's walk does.
 //   - Interface and Method answer by the subject, the package's own method, which is the host's in the build, and by
-//     the closure's type names with a method of the name that a rule could let fix the subject's
-//     (countedCandidates), judged by the one bit their rules read of them
-//     (methodLookupHolds), or, where that bit can flip with nothing it reads changing, by those type names being the
-//     same in both builds, rendered alike. A package the build restored from the host's run gives the host's own type
-//     names: its types there are read from export data, which holds only what its exported declarations reach, so its
-//     unexported types would go missing, while its source and its reads are the host's, so checked from source it
-//     declares what the host's does.
+//     the closure's type names with a method of the name that a rule could let fix the subject's, as the rules index
+//     them (countedCandidates), judged by the one bit their rules read of them (methodLookupHolds), or, where that bit
+//     can flip with nothing it reads changing, by every type name whose whole method set has a method of the name,
+//     promoted ones included, being the same in both builds, rendered alike (#swv3jbw). A package the build restored
+//     from the host's run gives the host's own type names: its types there are read from export data, which holds
+//     only what its exported declarations reach, so its unexported types would go missing, while its source and its
+//     reads are the host's, so checked from source it declares what the host's does.
 //
 // A deprecation is a fact, asked at check time (deprecationHolds).
 func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring) (bool, string) {
@@ -281,32 +281,21 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 		if lookup.Subject == nil || lookup.Subject.Pkg() == nil {
 			return false, name + ": it has no subject to find the host's closure by"
 		}
-		hostClosure, buildClosure := judged.hostClosure(lookup.Subject.Pkg()), judged.buildClosure(roots)
-		// Every type name of either closure with a method of the name that a rule could let fix the subject's
-		// (countedCandidates), read from each side's index, sorted by package path and name. A package the build
-		// restored from the host gives the host's type names of its path.
 		subjectConcrete := concreteSubject(lookup.Subject)
-		var hostCandidates []*types.TypeName
-		var buildCandidates []*types.TypeName
-		for _, indexed := range judged.host.methodsNamed(lookup.Name) {
-			if !hostClosure.reached[indexed.owner] {
-				continue
-			}
-			counted := countedCandidates(indexed.typeNames, lookup.Name, subjectConcrete)
-			hostCandidates = append(hostCandidates, counted...)
-			if judged.restored[buildClosure.byPath[indexed.owner.Path()]] {
-				buildCandidates = append(buildCandidates, counted...)
-			}
-		}
-		buildCandidates = append(buildCandidates, countedCandidates(judged.buildCandidates(lookup.Name, roots,
-			func(owner *types.Package) bool { return hostClosure.byPath[owner.Path()] != nil }), lookup.Name,
-			subjectConcrete)...)
-		sortTypeNames(hostCandidates)
-		sortTypeNames(buildCandidates)
+		// The type names of either closure with a method of the name that a rule could let fix the subject's, as the
+		// rules index them (countedCandidates), sorted by package path and name, which the one-bit judgment reads.
+		hostCandidates, buildCandidates := judged.closureCandidates(lookup, roots, ruleTypeNames,
+			func(typeNames []*types.TypeName) []*types.TypeName {
+				return countedCandidates(typeNames, lookup.Name, subjectConcrete)
+			})
 		judgment := judged.methodJudgmentOf(lookup, hostCandidates, buildCandidates)
 		if holds, why, decided := methodLookupHolds(name, judgment); decided {
 			return holds, why
 		}
+		// Where that bit can flip with nothing it reads changing, every type name whose whole method set has a method
+		// of the name, promoted ones included: satisfying a constraint reads a type argument's whole method set.
+		hostCandidates, buildCandidates = judged.closureCandidates(lookup, roots, methodSetTypeNames,
+			func(typeNames []*types.TypeName) []*types.TypeName { return typeNames })
 		if len(hostCandidates) != len(buildCandidates) {
 			return false, name + fmt.Sprintf(": %d type names have the method on the host, %d in the build",
 				len(hostCandidates), len(buildCandidates))
@@ -320,6 +309,34 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 	default:
 		return false, name + ": a lookup of this kind cannot be asked again"
 	}
+}
+
+// closureCandidates are the type names of the host's import closure of lookup's subject's package and of the build's
+// from roots with a method of lookup's name, each side's from its index's list that list picks (ruleTypeNames or
+// methodSetTypeNames), each package's passed through kept, sorted by package path and name. A package the build
+// restored from the host gives the host's type names of its path.
+func (judged verdict) closureCandidates(
+	lookup build_reads.Lookup,
+	roots []*types.Package,
+	list func(packageMethods) []*types.TypeName,
+	kept func([]*types.TypeName) []*types.TypeName,
+) (hostCandidates []*types.TypeName, buildCandidates []*types.TypeName) {
+	hostClosure, buildClosure := judged.hostClosure(lookup.Subject.Pkg()), judged.buildClosure(roots)
+	for _, indexed := range judged.host.methodsNamed(lookup.Name) {
+		if !hostClosure.reached[indexed.owner] {
+			continue
+		}
+		counted := kept(list(indexed))
+		hostCandidates = append(hostCandidates, counted...)
+		if judged.restored[buildClosure.byPath[indexed.owner.Path()]] {
+			buildCandidates = append(buildCandidates, counted...)
+		}
+	}
+	buildCandidates = append(buildCandidates, kept(judged.buildCandidates(lookup.Name, roots,
+		func(owner *types.Package) bool { return hostClosure.byPath[owner.Path()] != nil }, list))...)
+	sortTypeNames(hostCandidates)
+	sortTypeNames(buildCandidates)
+	return hostCandidates, buildCandidates
 }
 
 // importRoots are the build's packages at imports, the judged package's imports, the roots of the import closure its
@@ -376,12 +393,14 @@ func packageNameHolds(name string, hostFound bool, roots []*types.Package, packa
 }
 
 // buildCandidates are the build's type names with a method named name in its import closure from roots, read from
-// its index, unsorted, but for those of a package the build restored from the host's run that the host's side stands
-// for (hostHas), which the caller gives as the host's own type names.
+// the list of its index that list picks (ruleTypeNames or methodSetTypeNames), unsorted, but for those of a package
+// the build restored from the host's run that the host's side stands for (hostHas), which the caller gives as the
+// host's own type names.
 func (judged verdict) buildCandidates(
 	name string,
 	roots []*types.Package,
 	hostHas func(owner *types.Package) bool,
+	list func(packageMethods) []*types.TypeName,
 ) []*types.TypeName {
 	buildClosure := judged.buildClosure(roots)
 	judged.indexBuildCandidates(hostHas)
@@ -390,7 +409,7 @@ func (judged verdict) buildCandidates(
 		if !buildClosure.reached[indexed.owner] || judged.restored[indexed.owner] && hostHas(indexed.owner) {
 			continue
 		}
-		candidates = append(candidates, indexed.typeNames...)
+		candidates = append(candidates, list(indexed)...)
 	}
 	return candidates
 }

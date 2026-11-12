@@ -119,12 +119,13 @@ type persistedFact struct {
 // persistedLookup is one rule's lookup (build_reads.Lookup): its question, the package asked of, by reference to
 // Owners, and the name; whether it found an answer, the answer, by reference to Objects, and its text. A Deprecated
 // lookup's subject is by reference to Objects, and InstanceField marks a subject that is a field of an instance,
-// which has no objectpath. An Interface or Method lookup keeps the host's type names with a method of the name in its
-// import closure that a rule could let fix the subject's (countedCandidates), sorted, each by reference to Objects,
-// and NoSubject when it had no subject to find the closure by; and what the one-bit judgment reads of it
+// which has no objectpath. An Interface or Method lookup keeps the host's type names in its import closure whose whole
+// method set has a method of the name, the closure judgment's (methodSetTypeNames), sorted, each by reference to
+// Objects, and NoSubject when it had no subject to find the closure by; and what the one-bit judgment reads of it
 // (methodJudgment): its answer's own lines, whether the answer is a method, whether the subject is a method, its
 // shape, whether its receiver is an interface and embeds another package's type, whether its rule instantiates
-// generic candidates, and those of the candidates a rule could match, as methodCandidateOf makes them.
+// generic candidates, and of the type names as the rules index them (ruleTypeNames) that a rule could let fix the
+// subject's (countedCandidates), those a rule could match, as methodCandidateOf makes them.
 type persistedLookup struct {
 	Query             string
 	Path              int

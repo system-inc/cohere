@@ -230,9 +230,8 @@ func (judged verdict) persistedCandidatesHold(
 				name: held.bareName(reference)})
 		}
 	}
-	for _, typeName := range countedCandidates(judged.buildCandidates(lookup.Name, roots,
-		func(owner *types.Package) bool { return hostOwners[owner.Path()] }), lookup.Name,
-		persistedConcreteSubject(lookup)) {
+	for _, typeName := range judged.buildCandidates(lookup.Name, roots,
+		func(owner *types.Package) bool { return hostOwners[owner.Path()] }, methodSetTypeNames) {
 		buildSide = append(buildSide, persistedCandidate{object: typeName, path: typeName.Pkg().Path(),
 			name: typeName.Name()})
 	}
@@ -290,7 +289,7 @@ func (judged verdict) persistedMethodJudgment(
 		}
 	}
 	for _, typeName := range countedCandidates(judged.buildCandidates(lookup.Name, roots,
-		func(owner *types.Package) bool { return hostOwners[owner.Path()] }), lookup.Name,
+		func(owner *types.Package) bool { return hostOwners[owner.Path()] }, ruleTypeNames), lookup.Name,
 		persistedConcreteSubject(lookup)) {
 		candidate, key, isCandidate := judged.build.candidate(typeName, lookup.Query, lookup.Name, nil)
 		if isCandidate {
