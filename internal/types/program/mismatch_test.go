@@ -68,6 +68,16 @@ func TestProjectFilesGuardFiresOnMismatch(test *testing.T) {
 		test.Fatalf("healthy path should match all %d named files, got %d", len(named), got)
 	}
 
+	// The defect lives only on a case-insensitive filesystem, where a path key is lowercased and a raw name
+	// keeps its casing. On a case-sensitive one, ext4 on Home among them, a raw name already is its path key,
+	// so there is nothing to reproduce. That is a skip with its reason, never a pass: the land gate reruns
+	// Home's skips on the Mac, whose APFS volume reproduces it. Decided by the graph's own reading of the
+	// disk, the same reading the guard's canonicalization uses.
+	if graph.Configuration.CaseSensitivity() == tspath.CaseSensitive {
+		test.Skip("this filesystem is case-sensitive, so a raw file name is already its path key and the " +
+			"canonicalization defect cannot happen here; a case-insensitive volume, such as the Mac's APFS, tests it")
+	}
+
 	// The defect: use the raw file name as a path key instead of canonicalizing it.
 	uncanonicalized := map[tspath.PathKey]struct{}{}
 	for _, fileName := range named {
@@ -81,7 +91,8 @@ func TestProjectFilesGuardFiresOnMismatch(test *testing.T) {
 	}
 
 	// This is the assertion that makes the guard meaningful: the broken comparison really does lose
-	// files, so a guard that counts them really does have something to catch.
+	// files, so a guard that counts them really does have something to catch. It still fires if a
+	// case-insensitive filesystem stops reproducing the defect.
 	if matched == len(named) {
 		test.Fatalf("the uncanonicalized comparison matched all %d files, so this filesystem cannot "+
 			"reproduce the defect and the guard is untested here", len(named))
