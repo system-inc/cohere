@@ -251,6 +251,9 @@ type engineSummaryRecord struct {
 	Findings *int  `json:"findings"`
 	Complete *bool `json:"complete"`
 	ExitCode *int  `json:"exitCode"`
+	// UnguardedWorkspaceSums is the Go engine's, additive within contract 3 (#34r3v1y): each go.work.sum one of its go
+	// list commands ran beside with no side copy of the go.work, so go may have rewritten it.
+	UnguardedWorkspaceSums []string `json:"unguardedWorkspaceSums"`
 }
 
 // engineOutcomes maps the contract's camelCase outcomes onto the ones pipeline_report.go prints.
@@ -1461,6 +1464,11 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	// Whatever the run's completeness, which they never move: the engine calls a run that withheld them complete.
 	activeSummary.Gaps.WithheldInDependencyCgo = run.withheldInDependencyCgo
 	activeSummary.Gaps.WithheldDependencyCgoDeclarations = run.withheldDependencyCgoDeclarations
+	// Whatever the run's completeness too: every file was checked, and what fell short is a file go may have written.
+	activeSummary.Gaps.UnguardedWorkspaceSums = record.UnguardedWorkspaceSums
+	for _, sums := range record.UnguardedWorkspaceSums {
+		printInvocation(accountOutput(run.out), "  go list may have rewritten %s\n", sums)
+	}
 
 	expectedExit := 0
 	if run.findings > 0 || !*record.Complete {

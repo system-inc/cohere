@@ -91,6 +91,11 @@ type runGaps struct {
 	// files above are. Counted and not named because the engine counts them and names none: they are spread
 	// over whole packages, and the count is what says the rules saw less of those dependencies than all of it.
 	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations,omitempty"`
+	// UnguardedWorkspaceSums is each go.work.sum a Go run's go list ran beside with no side copy of its go.work
+	// (#34r3v1y): in workspace mode go writes every sum it read that the file lacks, whatever -mod says, and where no
+	// copy could answer exactly as the tree's go.work, as beside a vendor directory, go list ran in the tree, so go may
+	// have rewritten it. A gap, not a failure: every file was checked. Each is named.
+	UnguardedWorkspaceSums []string `json:"unguardedWorkspaceSums,omitempty"`
 }
 
 // excludedReason is one reason a run that checked nothing left files out: the words the footer prints, how many

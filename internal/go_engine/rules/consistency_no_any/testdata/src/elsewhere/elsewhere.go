@@ -16,6 +16,23 @@ func (printer *Printer) Printf(format string, arguments ...any) {
 	// Prints nothing: only its signature matters to the fixtures.
 }
 
+// Registry is a concrete type of another package. A concrete method of ours with its method's name and signature
+// copies nothing of it: no rule of Go relates two concrete methods, so the signature stays the declaring package's.
+type Registry struct{}
+
+// Lookup is the method a concrete method of ours may share a name and signature with, by coincidence.
+func (registry *Registry) Lookup(key string) any {
+	return key
+}
+
+// Shelf is a generic concrete type of another package, whose method a concrete one of ours may share a shape with.
+type Shelf[Item any] struct{}
+
+// Place takes one item, of the shelf's type parameter.
+func (shelf Shelf[Item]) Place(item Item) {
+	// Places nothing: only its signature matters to the fixtures.
+}
+
 // Holder is generic, so a method set matches it only through an instantiation the rule cannot know.
 type Holder[Value any] interface {
 	Hold(value Value)

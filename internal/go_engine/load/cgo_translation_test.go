@@ -177,7 +177,8 @@ func TestATranslatedDependencyWithholdsNothing(test *testing.T) {
 	if listError != nil {
 		test.Fatal(listError)
 	}
-	compiled, compiledError := listCompiled(directory, translatedEnvironment(goEnvironment), listed)
+	compiled, compiledError := listCompiled(goEnvironment.guard, directory, translatedEnvironment(goEnvironment),
+		listed)
 	if compiledError != nil {
 		test.Fatal(compiledError)
 	}

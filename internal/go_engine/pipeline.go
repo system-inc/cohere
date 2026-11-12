@@ -172,6 +172,12 @@ type pipeline struct {
 	// begins, as runFix starts and returns, and as the lint pass beside a load is abandoned, each on the goroutine that
 	// does it (see pipeline_load_beside_fix.go).
 	watchPrelude func(step preludeStep)
+
+	// unguardedSums are the go.work.sum files a load's go list ran beside with no side copy of the go.work, so go may
+	// have rewritten them (load.Loaded.UnguardedWorkspaceSum), under unguardedSumsLock, since extra builds load at
+	// once. The summary names them.
+	unguardedSumsLock sync.Mutex
+	unguardedSums     map[string]bool
 }
 
 func newPipeline(
@@ -328,6 +334,7 @@ func (engine *pipeline) run() int {
 	}
 	engine.write(contract.SummaryRecord{
 		Findings: engine.findingsWritten, Complete: !engine.incomplete, ExitCode: exitCode,
+		UnguardedWorkspaceSums: engine.unguardedWorkspaceSums(),
 	})
 	if engine.writeError != nil {
 		return broken(engine.standardError, engine.writeError)
