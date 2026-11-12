@@ -28,10 +28,13 @@ import (
 // The judgment's candidates come from the verdict's method index (indexPackage), which indexes as the rules do: an
 // interface by its whole method set, an alias's too, and any other named type by the methods it declares, never one
 // promoted to it, nor an alias of it. So a rule joining this list must read a concrete type's declared methods alone,
-// and an alias only of an interface, or the index loses a candidate it reads. Each rule pins its part:
-// TestOnlyDeclaredMethodsFixAName in each, and TestAnAliasNeverFixesAName in abbreviated and no-any, which skip every
-// alias. initialism reads every interface by its name, an alias's among them, so the index keeps an alias of an
-// interface, as TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip's alias of an interface shows.
+// and an alias only of an interface, or the index loses a candidate it reads. Each rule pins its part, red if it ever
+// reads more: TestOnlyDeclaredMethodsFixAName and TestAnAliasOfAConcreteTypeNeverFixesAName. An alias of an interface
+// stays in the index because initialism reads it: its foreignInterfaces adds every type name of an imported scope
+// with no alias check, and `type Closer = interface{ Close() error }` is the one name its interface has, so a build
+// that gains it can fix a name the host left unfixed (TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip's alias of an
+// interface). abbreviated and no-any skip every alias, so for them it is a candidate they never read, which costs a
+// restore and never a stale one.
 var methodLookupRules = []string{
 	"rules/consistency_no_abbreviated_identifier",
 	"rules/consistency_no_any",

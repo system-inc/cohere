@@ -200,7 +200,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			lookup: unanswered(build_reads.QueryMethod, "Close"),
 		},
 		{
-			name: "a windows-only alias of an interface, which initialism indexes",
+			name: "a windows-only alias of an interface Mine implements, which initialism indexes",
 			files: map[string]string{"foreign.go": methodForeign,
 				"alias_windows.go": "package foreign\n\ntype Closer = interface{ Close() error }\n"},
 			lookup: unanswered(build_reads.QueryInterface, "Close"),
