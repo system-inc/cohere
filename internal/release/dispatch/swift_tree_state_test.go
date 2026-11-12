@@ -137,7 +137,9 @@ func TestTheEngineManifestPrefersTheStatedTreeState(test *testing.T) {
 	start := strings.Index(manifest, "let sourceTreeModified =")
 	end := strings.Index(manifest[max(start, 0):], "\n    }\n")
 	if start < 0 || end < 0 {
-		test.Fatal("swift/Package.swift holds no `let sourceTreeModified =` closed by `    }`, so this test reads nothing")
+		test.Fatal(
+			"swift/Package.swift holds no `let sourceTreeModified =` closed by `    }`, so this test reads nothing",
+		)
 	}
 	expression := manifest[start : start+end+len("\n    }\n")]
 
@@ -145,7 +147,8 @@ func TestTheEngineManifestPrefersTheStatedTreeState(test *testing.T) {
 	packageDirectory := filepath.Join(module, "swift")
 	writeFile(test, filepath.Join(packageDirectory, "Package.swift"), "// swift-tools-version:6.2\n"+
 		"import PackageDescription\n"+expression+
-		"let package = Package(name: \"Stand\", products: [.executable(name: \"cohere-swift\", targets: [\"Stand\"])],\n"+
+		"let package = Package(name: \"Stand\",\n"+
+		"    products: [.executable(name: \"cohere-swift\", targets: [\"Stand\"])],\n"+
 		"    targets: [.executableTarget(name: \"Stand\", swiftSettings: sourceTreeModified ? [.define(\"TREE_MODIFIED\")] : [])])\n")
 	writeFile(test, filepath.Join(packageDirectory, "Sources", "Stand", "main.swift"),
 		"#if TREE_MODIFIED\nprint(\"modified\")\n#else\nprint(\"clean\")\n#endif\n")
@@ -158,7 +161,8 @@ func TestTheEngineManifestPrefersTheStatedTreeState(test *testing.T) {
 	says := func(environment []string) string {
 		test.Helper()
 		binaryPath := filepath.Join(test.TempDir(), "cohere-swift")
-		if buildError := buildSwiftProductWithSwiftPm(packageDirectory, scratch, binaryPath, environment); buildError != nil {
+		buildError := buildSwiftProductWithSwiftPm(packageDirectory, scratch, binaryPath, environment)
+		if buildError != nil {
 			test.Fatal(buildError)
 		}
 		return strings.TrimSpace(run(test, binaryPath))

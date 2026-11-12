@@ -284,7 +284,8 @@ func buildSwiftProductWithSwiftPm(
 	// report alone (#ytqqv8v), and a build that fails quotes their end in its error.
 	// The tree's state comes from the caller alone. One inherited from this process's environment would be a
 	// stated answer nobody here computed.
-	buildEnvironment := append(release.WithoutVariable(os.Environ(), release.SwiftSourceTreeModifiedVariable), environment...)
+	inherited := release.WithoutVariable(os.Environ(), release.SwiftSourceTreeModifiedVariable)
+	buildEnvironment := append(inherited, environment...)
 	build := exec.Command("swift", arguments...)
 	build.Env = buildEnvironment
 	var kept bytes.Buffer

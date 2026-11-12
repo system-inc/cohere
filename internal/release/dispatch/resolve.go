@@ -129,9 +129,10 @@ func recordDevelopmentHash(paths Paths, hash string) error {
 // command uses (see ReleaseBuildFlags).
 //
 // VCS stamping is off, and the tree's state is stamped from inputs instead: the commit, whether anything
-// compiled in is uncommitted, and the compiler's commit, every one of them held by the hash. Go's own stamp was read at link time, a moment
-// apart from the hash that names the binary, and was left out of that hash, so a binary built in one state
-// was served to a tree in another (#50wtb2s). Stamped from inputs, it reports exactly what its name holds.
+// compiled in is uncommitted, and the compiler's commit, every one of them held by the hash. Go's own stamp
+// was read at link time, a moment apart from the hash that names the binary, and was left out of that hash,
+// so a binary built in one state was served to a tree in another (#50wtb2s). Stamped from inputs, it
+// reports exactly what its name holds.
 // Turning stamping off also lets `--dev` build in a worktree whose TypeScript is a symlink, where Go's own
 // git status fails.
 func build(paths Paths, packagePath string, binaryPath string, inputs Inputs) error {

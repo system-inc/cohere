@@ -35,9 +35,10 @@ type Provenance struct {
 	//
 	// Read from Go's own `vcs.modified` stamp rather than computed, because the linker observes the
 	// tree at build time and nothing later can. A `--dev` build is the exception: the launcher reads the
-	// tree once and stamps that answer, because the same answer names the cached binary (#50wtb2s). It answers the question a version number cannot: a
-	// version identifies what was released, and this says whether that release is reproducible from
-	// a fresh clone at all.
+	// tree once and stamps that answer, because the same answer names the cached binary (#50wtb2s).
+	//
+	// It answers the question a version number cannot: a version identifies what was released, and
+	// this says whether that release is reproducible from a fresh clone at all.
 	//
 	// It matters here more than in most projects because the source lives in a worktree several
 	// members edit at once. A release staged while someone is mid-flight embeds their uncommitted
