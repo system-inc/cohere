@@ -81,10 +81,13 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	// failure path is removed by the prune once its writer has been gone for the hour.
 	defer os.Remove(temporary)
 
+	// Nothing stated about the tree: the manifest reads git in a worktree nobody edits, and the proof below
+	// checks what it read.
 	if buildSwiftProductError := buildSwiftProduct(
 		filepath.Join(worktree, "swift"),
 		paths.SwiftCommittedBuildDirectory(),
 		temporary,
+		nil,
 	); buildSwiftProductError != nil {
 		return "", false, buildSwiftProductError
 	}
