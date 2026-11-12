@@ -202,6 +202,40 @@ func TestAGoRunPrintsItsTimingTable(test *testing.T) {
 	}
 }
 
+// TestAGoTimingRecordSaysItsExtraBuildsRestoredNothing: a record of a run with extra builds says, under the table's
+// first line, that they restored nothing from the host's run and the rows include their work (#4y4qd3z), with the
+// clock and without it, and a record of a run with none says nothing of builds.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
+func TestAGoTimingRecordSaysItsExtraBuildsRestoredNothing(test *testing.T) {
+	saved, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+
+	sentence := "  builds: 2 extra builds restored nothing from the host's run, because a timed run keeps nothing " +
+		"for them, so every package of every build was checked from source and the rows include that work\n"
+	for _, unavailable := range []string{"", "this platform has no per-thread CPU clock"} {
+		output, renderError := renderGoTiming(test, outputHuman, true, goTimingStream(test,
+			func(record *contract.TimingRecord) {
+				record.ExtraBuildsFromSource = 2
+				record.Unavailable = unavailable
+			}))
+		if renderError != nil {
+			test.Fatalf("%v\n%s", renderError, output)
+		}
+		table := timingSection(test, output)
+		requireLines(test, table, sentence)
+		// Beside the heading, above the first row, so it qualifies every row a reader reads after it.
+		if strings.Index(table, sentence) > strings.Index(table, "  "+longestRule) {
+			test.Errorf("the sentence is printed below the rows:\n%s", table)
+		}
+	}
+
+	output, renderError := renderGoTiming(test, outputHuman, true, goTimingStream(test, nil))
+	if renderError != nil {
+		test.Fatalf("%v\n%s", renderError, output)
+	}
+	forbidLines(test, timingSection(test, output), "builds:", "restored nothing")
+}
+
 // TestAGoTimingRecordWithNoClockKeepsItsCounts: a record whose CPU could not be measured says why, leaves the CPU
 // columns out rather than printing zeros, and keeps the counts, as printTimings does for TypeScript.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set

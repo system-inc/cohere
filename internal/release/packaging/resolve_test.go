@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // The defect every test here guards is one shape: a resolution that produces something runnable
@@ -231,7 +233,7 @@ func writeExecutable(test *testing.T, path string, mode os.FileMode) {
 	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if writeError := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), mode); writeError != nil {
+	if writeError := executable_testing.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), mode); writeError != nil {
 		test.Fatal(writeError)
 	}
 	// WriteFile's mode is masked by umask, so it is set explicitly. A test that meant to write an

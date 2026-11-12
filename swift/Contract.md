@@ -654,6 +654,7 @@ otherwise; a run that asked and ends without one is refused. When the lint phase
 ```json
 {
     "kind": "timing",
+    "extraBuildsFromSource": 2,
     "processCpuMicroseconds": 80000,
     "load": {
         "listCpuMicroseconds": 2000,
@@ -701,6 +702,10 @@ out, said once in `measuringCpuMicroseconds` beside `measuredCalls`, the pieces 
 - `processCpuMicroseconds` is every CPU microsecond the process spent up to the record. The rows (rules, shared, the
   load's own phases and measuring) are said against it, and what they leave is printed as its own line, what no row
   measures, never spread over the rows.
+- `extraBuildsFromSource` is how many builds beside the host's the run checked under `--other-builds`, written only
+  when there were any and absent otherwise. None of them restored anything from the host's run, since a timed run keeps
+  nothing for them, so every package of every build was checked from source and the rows include that work
+  (#4y4qd3z). The front door says so in a sentence beside the table, so the rows are never read as a run that restored.
 
 `rules` and `shared` are `[]` when empty, never left out, and the front door refuses a record missing either. When
 the thread clock cannot be read, `unavailable` says why, every CPU figure is 0 and means nothing, and the counts are

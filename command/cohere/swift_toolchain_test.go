@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 const fakeSwiftVersion = "Apple Swift version 9.9 (swiftlang-9.9.9.9.9 clang-1)"
@@ -34,7 +36,11 @@ func fakeToolchain(test *testing.T, answering bool) (string, string) {
 	}
 	for name, body := range scripts {
 		script := filepath.Join(directory, name)
-		if writeError := os.WriteFile(script, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
+		if writeError := executable_testing.WriteFile(
+			script,
+			[]byte("#!/bin/sh\n"+body+"\n"),
+			0o755,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}

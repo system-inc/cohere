@@ -22,8 +22,10 @@ import (
 // fixture's renderings catches (testdata/reads_renderings.golden). The store's keys hold the executable's identity
 // already, but the binary's table of standard-library entries outlives a store, so the version stands on its own. It
 // changes too when a record gains a field whose zero value, as gob decodes an older record without it, would judge
-// a read more loosely than its writer meant: reads-renderer-4 added a lookup's Instantiates (#dscc341).
-const ReadsRendererVersion = "reads-renderer-4"
+// a read more loosely than its writer meant: reads-renderer-4 added a lookup's Instantiates (#dscc341), and
+// reads-renderer-5 a generic candidate's type parameters to its own lines and an answer's, with its Unconstrained
+// (#8fbkkp4).
+const ReadsRendererVersion = "reads-renderer-5"
 
 // persistedReads are one package's reads of other packages as an entry persists them (#b2t9xmf), so a build can judge
 // a package the host restored rather than checked, whose reads were recorded by the run that wrote its entry. Each
@@ -152,15 +154,18 @@ type persistedShape struct {
 }
 
 // persistedMethodCandidate is one candidate a rule could match (methodCandidate): its type name, by reference to
-// Objects, whether it is an interface or generic, its method's shape, the digest of its own lines, and whether its
-// method set holds the lookup's answer.
+// Objects, whether it is an interface or generic, and generic with constraints of all types, its method's shape, the
+// digest of its own lines, and whether its method set holds the lookup's answer.
 type persistedMethodCandidate struct {
-	TypeName    int
-	Interface   bool
-	Generic     bool
-	Shape       persistedShape
-	Lines       []byte
-	HoldsAnswer bool
+	TypeName  int
+	Interface bool
+	Generic   bool
+	// Unconstrained is whether every type parameter of a generic candidate has a constraint of all types: false, as
+	// a candidate not generic or constrained is, keeps the closure judgment for a lookup whose rule instantiates.
+	Unconstrained bool
+	Shape         persistedShape
+	Lines         []byte
+	HoldsAnswer   bool
 }
 
 // persistedKey is digest mixed with version, the renderer's, as a persisted read compares it.

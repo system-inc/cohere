@@ -340,9 +340,10 @@ func printCoverage(out *bufio.Writer, timings *program.Timings) {
 const staticcheckIntermediateRepresentation = "buildir"
 
 // printEngineTimings renders a Go run's timing record (#3apgjer) in printTimings' shape, so a Go rule is timed
-// before it lands as a TypeScript one is: the unit first, then a row per rule, most expensive first with its share
-// of the rules' total, then the shared work no single rule owns, the load's phases, what the rows cover of the
-// process's CPU, and what measuring cost.
+// before it lands as a TypeScript one is: the unit first, and that the extra builds restored nothing when the run had
+// any (printExtraBuildsFromSource), then a row per rule, most expensive first with its share of the rules' total, then
+// the shared work no single rule owns, the load's phases, what the rows cover of the process's CPU, and what measuring
+// cost.
 //
 // Every figure is the kernel's thread clock read on a thread held for the work (contract.TimingRecord), so a rule
 // that waits costs nothing, and the first line says so. The shared rows are the intermediate representation builds,
@@ -376,6 +377,7 @@ func printEngineTimings(out *bufio.Writer, record *contract.TimingRecord) {
 
 	if record.Unavailable != "" {
 		printTimingUnavailable(out, record.Unavailable)
+		printExtraBuildsFromSource(out, record.ExtraBuildsFromSource)
 		fmt.Fprintf(out, "  %-*s %9s %9s\n", nameWidth, "rule", "packages", "calls")
 		for _, row := range rules {
 			fmt.Fprintf(out, "  %-*s %9d %9d\n", nameWidth, row.Name, row.Packages, row.Calls)
@@ -402,6 +404,7 @@ func printEngineTimings(out *bufio.Writer, record *contract.TimingRecord) {
 		counted(len(rules), "rule", "rules"), formatMilliseconds(ruleCpu))
 	fmt.Fprintf(out, "  (a rule that waits, sleeps or is descheduled costs nothing here. Compare rules to each other: "+
 		"the measurement makes a --timing run slower than a real one.)\n")
+	printExtraBuildsFromSource(out, record.ExtraBuildsFromSource)
 	fmt.Fprintf(out, "  %-*s %9s %9s %9s\n", nameWidth, "rule", "cpu", "packages", "calls")
 	for _, row := range rules {
 		fmt.Fprintf(out, "  %-*s %9s %9d %9d%s\n",
@@ -446,6 +449,19 @@ func printEngineTimings(out *bufio.Writer, record *contract.TimingRecord) {
 	printEngineTimingCoverage(out, microseconds(record.ProcessCpuMicroseconds), ruleCpu, sharedCpu, loadCpu, measuring)
 	fmt.Fprintf(out, "  measuring: %s cost %s, already taken out of the rows above\n",
 		counted(int(record.MeasuredCalls), "measured call", "measured calls"), formatMilliseconds(measuring))
+}
+
+// printExtraBuildsFromSource says, under a Go table's first line, that the run's extra builds restored nothing from the
+// host's run (#4y4qd3z), so their packages' work is in the rows below: a reader of a timed run with `--other-builds`
+// would otherwise take its lint figures for an untimed run's, where most of each build is restored and runs nothing.
+// A run with no extra builds, whose count is 0, has nothing to say.
+func printExtraBuildsFromSource(out *bufio.Writer, extraBuilds int) {
+	if extraBuilds == 0 {
+		return
+	}
+	fmt.Fprintf(out, "  builds: %s restored nothing from the host's run, because a timed run keeps nothing for them, "+
+		"so every package of every build was checked from source and the rows include that work\n",
+		counted(extraBuilds, "extra build", "extra builds"))
 }
 
 // printEngineTimingCoverage says what the rows sum to against every CPU microsecond the process spent, and names the

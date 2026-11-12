@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // steppedGate is a land fixture whose go stands in for the gate's commands: each logs the share it was
@@ -27,7 +29,7 @@ func newSteppedGate(test *testing.T) steppedGate {
 	gate := steppedGate{fixture: fixture, log: filepath.Join(bin, "log"), release: filepath.Join(bin, "release")}
 	stand := "#!/bin/sh\necho \"$1 flags=$GOFLAGS threads=$GOMAXPROCS\" >> '" + gate.log + "'\n" +
 		"[ \"$1\" = vet ] && while [ ! -e '" + gate.release + "' ]; do sleep 0.05; done\nexit 0\n"
-	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	fixture.environment = append(fixture.environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),

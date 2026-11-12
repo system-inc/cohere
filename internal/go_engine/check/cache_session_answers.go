@@ -1,9 +1,7 @@
 package check
 
 import (
-	"bytes"
 	"cmp"
-	"encoding/gob"
 	"fmt"
 	"go/types"
 	"maps"
@@ -268,13 +266,8 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 		if !keyed || !session.reloading(reloaded) {
 			continue
 		}
-		contents, stored := session.caching.Store.Get(key)
+		entry, _, stored := storedEntryAt(session.caching.Store, key)
 		if !stored {
-			continue
-		}
-		var entry cacheEntry
-		if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil ||
-			entry.Version != CacheFormatVersion {
 			continue
 		}
 		session.previous[reloaded] = entryDemand{answers: entry.Answers, reads: entry.Reads,
@@ -369,23 +362,22 @@ func (session *CacheSession) rewriteEarlier() {
 		slots <- struct{}{}
 		group.Go(func() {
 			defer func() { <-slots }()
-			contents, stored := session.caching.Store.Get(key)
+			entry, record, stored := storedEntryAt(session.caching.Store, key)
 			if !stored {
 				return
 			}
-			var entry cacheEntry
-			if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
-				session.problem(fmt.Sprintf("rewriting the entry of %s with its answers: %v", saved.ID, decodeError))
-				return
-			}
-			entry.Answers, entry.Reads, entry.ReadsIncomplete = demanded.answers, demanded.reads,
-				demanded.readsIncomplete
-			var encoded bytes.Buffer
-			if encodeError := gob.NewEncoder(&encoded).Encode(entry); encodeError != nil {
+			// The answers are the body's, so the record rewritten holds a body of its own; a record of another build
+			// naming the body it held reads a miss from then on, which checks that package from source once.
+			entry.Answers = demanded.answers
+			body, encodeError := encodeBody(entry)
+			if encodeError != nil {
 				session.problem(fmt.Sprintf("rewriting the entry of %s with its answers: %v", saved.ID, encodeError))
 				return
 			}
-			if putError := session.caching.Store.Put(key, encoded.Bytes()); putError != nil {
+			rewritten := encodedEntry{body: body, record: entryRecord{Version: CacheFormatVersion,
+				Body: contentDigest(body), Inline: body, ExportData: record.ExportData, Reads: demanded.reads,
+				ReadsIncomplete: demanded.readsIncomplete}}
+			if putError := session.putEntry(key, rewritten); putError != nil {
 				session.problem(putError.Error())
 			}
 		})

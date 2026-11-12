@@ -1,6 +1,7 @@
 package check
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -464,7 +465,11 @@ func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key)
 	if !found {
 		return storeHit{}
 	}
-	restored, decodeError := decodeEntry(session.known, restoring, contents, nil)
+	body, record, whole := storedEntry(session.caching.Store, contents)
+	if !whole {
+		return storeHit{}
+	}
+	restored, decodeError := decodeEntry(session.known, restoring, body, record, nil)
 	if decodeError != nil {
 		return storeHit{}
 	}
@@ -793,10 +798,10 @@ func (session *CacheSession) saveMisses(
 	return encoded
 }
 
-// putEntry writes entry under key, its export data first, so an entry is never in the store before what it needs to be
-// read. saveMisses and writeThrough run it with no slot of the run's pool held (fanOutWriting). The export data is
-// kept by its digest, and not written again when the store holds it whole, as it does for a package another build
-// wrote with the same types.
+// putEntry writes entry's record under key, its export data first, so a record is never in the store before what it
+// needs to be read. saveMisses and writeThrough run it with no slot of the run's pool held (fanOutWriting). The export
+// data is kept by its digest, and not written again when the store holds it whole, as it does for a package another
+// build wrote with the same types. The record holds its body, or names the record that does (throughEntry).
 func (session *CacheSession) putEntry(key cache.Key, entry encodedEntry) error {
 	if entry.exportData != nil {
 		digest := exportDataDigest(entry.exportData)
@@ -804,7 +809,54 @@ func (session *CacheSession) putEntry(key cache.Key, entry encodedEntry) error {
 			return putError
 		}
 	}
-	return session.caching.Store.Put(key, entry.entry)
+	record, encodeError := encodeRecord(entry.record)
+	if encodeError != nil {
+		return encodeError
+	}
+	return session.caching.Store.Put(key, record)
+}
+
+// storedEntry is the body and the record of an entry whose record's bytes are contents, read from store, and whether
+// both are there whole: a record that does not decode is a miss, and so is one naming a body (BodyAt) whose record is
+// gone from the store, or holds another body there, as the host's next run may rewrite it (#fq7dxvx).
+func storedEntry(store *cache.Store, contents []byte) ([]byte, entryRecord, bool) {
+	record, recordError := decodeRecord(contents)
+	if recordError != nil {
+		return nil, entryRecord{}, false
+	}
+	if record.Inline != nil {
+		return record.Inline, record, true
+	}
+	if len(record.BodyAt) != len(cache.Key{}) {
+		return nil, entryRecord{}, false
+	}
+	holderContents, stored := store.Get(cache.Key(record.BodyAt))
+	if !stored {
+		return nil, entryRecord{}, false
+	}
+	holder, holderError := decodeRecord(holderContents)
+	if holderError != nil || holder.Inline == nil || !bytes.Equal(holder.Body, record.Body) {
+		return nil, entryRecord{}, false
+	}
+	return holder.Inline, record, true
+}
+
+// storedEntryAt is the entry the store keeps under key, decoded from its record and body, with its record, and whether
+// it holds one whole in this format.
+func storedEntryAt(store *cache.Store, key cache.Key) (cacheEntry, entryRecord, bool) {
+	contents, stored := store.Get(key)
+	if !stored {
+		return cacheEntry{}, entryRecord{}, false
+	}
+	body, record, whole := storedEntry(store, contents)
+	if !whole {
+		return cacheEntry{}, entryRecord{}, false
+	}
+	entry, decodeError := entryOf(body, record)
+	if decodeError != nil || entry.Version != CacheFormatVersion {
+		return cacheEntry{}, entryRecord{}, false
+	}
+	return entry, record, true
 }
 
 // alias keeps under each key's alias the key of the entry it stands for, as many at once as there are cores: on

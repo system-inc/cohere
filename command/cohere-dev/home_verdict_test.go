@@ -3,7 +3,6 @@
 package main
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -11,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/needs"
 )
@@ -27,6 +27,8 @@ func TestHomesRunIsReadFromItsMarkerAndItsJson(test *testing.T) {
 		`{"Action":"skip","Package":"example.com/one","Test":"TestSkipsOnLinux"}`,
 		`{"Action":"skip","Package":"example.com/one","Test":"TestParent/a subtest"}`,
 		`{"Action":"skip","Package":"example.com/two","Test":"TestSkipsOnLinux"}`,
+		// A package with no test files: a package-level skip, which is no test to run again.
+		`{"Action":"skip","Package":"example.com/three"}`,
 		`{"Action":"output","Package":"example.com/two","Test":"TestBroken","Output":"broken here\n"}`,
 		`{"Action":"fail","Package":"example.com/two","Test":"TestBroken"}`,
 		`{"Action":"fail","Package":"example.com/two"}`,
@@ -50,6 +52,30 @@ func TestHomesRunIsReadFromItsMarkerAndItsJson(test *testing.T) {
 	}
 	if got := verdict.failedOutput["example.com/two TestBroken"]; !reflect.DeepEqual(got, []string{"broken here\n"}) {
 		test.Errorf("the failed test's output read as %q", got)
+	}
+}
+
+// Only gap's own refusal for a held Home asks again: a gap that ran, with no error, is not held and says nothing
+// (it printed "cohere-dev: <nil>" on every landing Home took), and neither is another refusal or another failure.
+func TestOnlyAHeldHomeIsAskedAgain(test *testing.T) {
+	test.Parallel()
+	refused := exec.Command("sh", "-c", "exit 3").Run()
+	failed := exec.Command("sh", "-c", "exit 1").Run()
+	for _, row := range []struct {
+		name     string
+		runError error
+		output   string
+		held     bool
+	}{
+		{"a gap that ran", nil, "gap Home done", false},
+		{"held by a hand job", refused, "gap Home refused · Home holds hand job 01M (mind, Running)", true},
+		{"held by another gap", refused, "gap Home refused · Home is held by gap-123", true},
+		{"refused for another reason", refused, "gap Home refused · HTTP 403 no mind LOOM_MINDS lists", false},
+		{"a run that failed", failed, "Home holds hand job", false},
+	} {
+		if got := gapHeld(row.runError, []byte(row.output)); got != row.held {
+			test.Errorf("%s read as held %t, want %t", row.name, got, row.held)
+		}
 	}
 }
 
@@ -108,6 +134,16 @@ func TestTheTestsLinuxNeverCompilesAreFoundFromTheSyntax(test *testing.T) {
 	}
 	if want := map[string][]string{"example.com/fixture/alpha": {"TestLinux"}}; !reflect.DeepEqual(found, want) {
 		test.Errorf("a Linux lander against darwin found %v, want %v", found, want)
+	}
+	// The workspace leaves a lone root module's path empty, so its import path is read from its go.mod: named by
+	// the directory alone, go test can't load the package (command/cohere [setup failed], Nov 12).
+	found, foundError = testsNeverCompiledOn(root, []project.Module{{Directory: "."}}, "darwin", "arm64", "linux",
+		"amd64")
+	if foundError != nil {
+		test.Fatal(foundError)
+	}
+	if _, named := found["example.com/fixture/alpha"]; !named {
+		test.Errorf("a root module with no recorded path named its packages %v, want by example.com/fixture", found)
 	}
 }
 
@@ -178,7 +214,7 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 			if strings.Contains(testCase.name, "unreachable") {
 				script += "exit 255\n"
 			}
-			if writeError := os.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
+			if writeError := executable_testing.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
 				test.Fatal(writeError)
 			}
 			before := fixture.git(fixture.repository, "rev-parse", "main")

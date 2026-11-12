@@ -96,6 +96,19 @@ func positionDependent(saved *packages.Package, analyses map[string]storedAnalys
 	return false
 }
 
+// restoredPositionDependent is positionDependent of a restored package's entry, read from its analyses as decoded.
+func restoredPositionDependent(saved *packages.Package, restored *restoredPackage, known *knownFiles) bool {
+	own := ownFiles(saved)
+	for _, analysis := range restored.analyses {
+		for _, finding := range analysis.findings {
+			if namesForeignFile(finding, own, known) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // ownFiles is every file of owner's, of each kind the load lists.
 func ownFiles(owner *packages.Package) map[string]bool {
 	own := map[string]bool{}

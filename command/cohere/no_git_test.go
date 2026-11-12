@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // TestCohereRunsNoGit holds that cohere runs no git process on any path, and that what it reports does
@@ -29,7 +31,11 @@ func TestCohereRunsNoGit(test *testing.T) {
 	fakeGit := test.TempDir()
 	gitLog := filepath.Join(test.TempDir(), "git-calls.log")
 	script := "#!/bin/sh\necho \"git $*\" >> '" + gitLog + "'\nexit 1\n"
-	if writeError := os.WriteFile(filepath.Join(fakeGit, "git"), []byte(script), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(
+		filepath.Join(fakeGit, "git"),
+		[]byte(script),
+		0o755,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 

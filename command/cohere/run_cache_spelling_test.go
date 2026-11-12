@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // runFrom runs the fixture's binary in dir as a shell there would, with PWD naming dir, so the run spells its
@@ -173,7 +175,7 @@ func TestARunThatMissesTheCacheSaysWhy(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	if writeError := os.WriteFile(copied, contents, 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(copied, contents, 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	other := *fixture

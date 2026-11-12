@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/streams"
+	"golang.org/x/mod/modfile"
 )
 
 // The landing gate's tests run on Home, Loom's day box, and only what Home could not run runs on the Mac (#acdf5mc).
@@ -112,7 +114,8 @@ func readTestJson(output []byte) homeVerdict {
 			verdict.packagesFailed = append(verdict.packagesFailed, event.Package)
 		case event.Action == "fail":
 			verdict.failedTests = append(verdict.failedTests, key)
-		case event.Action == "skip":
+		// A package-level skip is a package with no test files, which has nothing to run again on the Mac.
+		case event.Action == "skip" && event.Test != "":
 			// A subtest skipped is its top-level test run again whole, since -run names top-level tests.
 			name, _, _ := strings.Cut(event.Test, "/")
 			if !slices.Contains(verdict.skipped[event.Package], name) {
@@ -177,9 +180,12 @@ func testsNeverCompiledOn(
 			if relativeError != nil {
 				return relativeError
 			}
-			importPath := module.Path
+			// The workspace leaves the root module's path empty, since its pattern is ./..., so it is read from the
+			// module's go.mod: an empty one named the root's packages by their directory alone, which go test can't
+			// load (command/cohere [setup failed], Nov 12).
+			importPath := modulePath(moduleRoot, module.Path)
 			if relative != "." {
-				importPath = path.Join(module.Path, filepath.ToSlash(relative))
+				importPath = path.Join(importPath, filepath.ToSlash(relative))
 			}
 			for _, declaration := range parsed.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
@@ -196,6 +202,18 @@ func testsNeverCompiledOn(
 		}
 	}
 	return found, nil
+}
+
+// modulePath is a module's import path: the one the workspace recorded, or, when it recorded none, the one its
+// go.mod at moduleRoot declares.
+func modulePath(moduleRoot string, recorded string) string {
+	if recorded != "" {
+		return recorded
+	}
+	// Ignored: a module with no readable go.mod has no path to read, and its tests are named by an empty one, which
+	// go test refuses by name.
+	goMod, _ := os.ReadFile(filepath.Join(moduleRoot, "go.mod"))
+	return modfile.ModulePath(goMod)
 }
 
 func fileExists(file string) bool {
@@ -344,9 +362,7 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 		output, runError := gap.CombinedOutput()
 		// Gap says "Home holds hand job <id> (<mind>, ...): one job per box" when another job has her, and "is held
 		// by" for another hand's gap (LoomGapCommandLineInterface.ts); any other refusal is not worth asking again.
-		held := exitCodeOf(runError) == gapRefusedExitCode && (strings.Contains(string(output), "holds hand job") ||
-			strings.Contains(string(output), "is held by"))
-		if !held || attempt == homeHeldRetries {
+		if !gapHeld(runError, output) || attempt == homeHeldRetries {
 			return output, runError
 		}
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s is held by another job; asking again in %s (%d of %d)\n",
@@ -354,6 +370,17 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 		streams.Show(streams.Errors)
 		time.Sleep(homeHeldRetryWait)
 	}
+}
+
+// gapHeld reports whether gap refused a job because another holds Home: it exits gapRefusedExitCode and says "Home
+// holds hand job <id> (<mind>, ...): one job per box" for a hand job, and "is held by" for another hand's gap
+// (LoomGapCommandLineInterface.ts); any other refusal is not worth asking again. It reads the exit from the error
+// itself, since exitCodeOf reports an error it can't read and a gap that ran has none: it printed "cohere-dev: <nil>"
+// on every landing Home took (Nov 12).
+func gapHeld(runError error, output []byte) bool {
+	var exited *exec.ExitError
+	return errors.As(runError, &exited) && exited.ExitCode() == gapRefusedExitCode &&
+		(bytes.Contains(output, []byte("holds hand job")) || bytes.Contains(output, []byte("is held by")))
 }
 
 // terminalColor is a terminal's color sequence, which gap writes around its verdict words.
