@@ -548,6 +548,14 @@
                         "replays": {
                             "type": "integer",
                             "description": "Questions of a fact computed on demand that the lint phase answered by replaying the push's walk of a package, with the cache or without. Absent when zero."
+                        },
+                        "problems": {
+                            "type": "integer",
+                            "description": "What kept the cache from being read or written, every build's, each said on stderr too: keys that could not be computed, an entry that could not be encoded, a write that failed. It never changes a finding. Absent when zero."
+                        },
+                        "writeFailed": {
+                            "type": "integer",
+                            "description": "Entries whose write failed, every build's. Stderr and problems say only the first, so this is how many the store refused. Absent when zero."
                         }
                     }
                 },

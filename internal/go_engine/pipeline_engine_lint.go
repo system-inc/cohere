@@ -169,6 +169,8 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		Reloads:      result.Cache.Reloads,
 		ReloadRounds: result.Cache.ReloadRounds,
 		Replays:      result.Replays,
+		Problems:     len(result.Cache.Problems),
+		WriteFailed:  result.Cache.WriteFailed,
 	}
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)
@@ -179,6 +181,15 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 			record.Crashes = append(record.Crashes, contract.Crash{File: crash.File, Error: crash.Error})
 		}
 		record.Builds = verdict.records
+		// The host's problems and failed writes are counted above, from its result, the first run's; each other
+		// build's problems are noted under its name as it ends (extraBuildRun), and they and its failed writes are
+		// counted here, so the record holds every note the cache made and every write it lost.
+		for _, run := range engine.buildRuns[1:] {
+			if run.result != nil {
+				record.Cache.Problems += len(run.result.Cache.Problems)
+				record.Cache.WriteFailed += run.result.Cache.WriteFailed
+			}
+		}
 		record.BuildsAtOnce = engine.buildsAtOnce
 		record.BuildsWidthLiveBytes = engine.buildsWidthLiveBytes
 	}

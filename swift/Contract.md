@@ -934,6 +934,15 @@ already. `"reloads":2` counts the packages so loaded and `"reloadRounds":1` the 
 Beside them, `"replays":35` counts the questions answered by replaying the order the push walked a
 package in, which a cold run makes too; it is written only when it is not 0. A package loaded again that still cannot answer is a crash naming it, never a quiet answer.
 
+`"problems":2` counts what kept the findings cache from being read or written in the lint phase,
+the host's build's and every other build's alike (#27r8r24): keys that could not be computed, an
+entry that could not be encoded, a write that failed, or an entry an extra build could not write
+through. The engine says each one on stderr, as `the findings cache: ...`, and the count carries
+them into the record, so a run read only through `--json` still shows its cache could not be
+written. A problem never changes a finding. Of the misses whose write failed, only the first is a
+problem, so `"writeFailed":412` counts every one, every build's, and a store that refused 412
+writes says 412. Each is written only when it is not 0.
+
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
 which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive
 within contract 3, the host's first:
