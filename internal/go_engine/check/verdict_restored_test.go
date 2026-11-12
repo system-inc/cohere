@@ -141,9 +141,135 @@ func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) 
 	}
 }
 
+// A package the build restored from the host's run, which the host's side stands for, is never indexed by the build,
+// through either verdict, of this run's reads or of persisted ones: its candidates are the host's own, and the
+// build's index of it would be read by nobody (#yse6t59). The build still walks the closure the lookup asks of.
+func TestTheBuildNeverIndexesARestoredPackageTheHostStandsFor(test *testing.T) {
+	test.Parallel()
+
+	world := checkedRestoredWorld(test, true)
+	closure := map[string]*types.Package{restoredHiddenPath: world.exportHidden}
+	restored := map[*types.Package]bool{world.exportHidden: true}
+	host := measuredReadsBuild()
+	persisted := persistedRestoring(test, world.restoring, host, ReadsRendererVersion)
+	for _, step := range []struct {
+		name      string
+		restoring Restoring
+	}{
+		{"of this run", world.restoring},
+		{"persisted", persisted},
+	} {
+		test.Run(step.name, func(test *testing.T) {
+			test.Parallel()
+
+			build := measuredReadsBuild()
+			walked, indexed := map[*types.Package]int{}, map[*types.Package]int{}
+			build.walking = func(root *types.Package) { walked[root]++ }
+			build.indexing = func(declaring *types.Package) { indexed[declaring]++ }
+			if holds, why := TypesHold(step.restoring, closure, restored, host, build); !holds {
+				test.Fatalf("the lookup does not hold: %s", why)
+			}
+			if walked[world.exportHidden] != 1 {
+				test.Errorf("the build walked %s %d times, want once", restoredHiddenPath, walked[world.exportHidden])
+			}
+			if indexed[world.exportHidden] != 0 {
+				test.Errorf("the build indexed %s %d times, want never", restoredHiddenPath,
+					indexed[world.exportHidden])
+			}
+		})
+	}
+}
+
+// The seam fixture's paths: closers declares an interface whose Close is the answer to its user's Method lookup of
+// Close, which a concrete subject keeps only while the build still has that interface among its candidates.
+const (
+	seamClosersPath = "example.com/seam/closers"
+	seamUserPath    = "example.com/seam/user"
+)
+
+// seamSources are closers and its user, by path.
+var seamSources = map[string]string{
+	seamClosersPath: "package closers\n\ntype Closer interface{ Close() error }\n",
+	seamUserPath: "package user\n\nimport \"example.com/seam/closers\"\n\n" +
+		"type Mine struct{}\n\nfunc (Mine) Close() error { return nil }\n\nvar _ closers.Closer = Mine{}\n",
+}
+
+// The build's filter of which packages a lookup reads is the verdict's, while its index is the build's: a package one
+// verdict skips, restored there with the host's side standing for it, a later verdict of the same build that checked
+// it from source still indexes and reads. Its Closer, whose Close answered the lookup, must be among the later
+// verdict's candidates, or the answer reads as fixing nothing in the build. Of this run's reads and of persisted ones
+// alike.
+func TestALaterVerdictIndexesAPackageAnEarlierOneSkipped(test *testing.T) {
+	test.Parallel()
+
+	fileSet := token.NewFileSet()
+	check := func(path string, importer types.Importer, info *types.Info) *types.Package {
+		parsed, parseError := parser.ParseFile(fileSet, path+".go", seamSources[path], parser.SkipObjectResolution)
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		checked, checkError := (&types.Config{Importer: importer}).Check(path, fileSet, []*ast.File{parsed}, info)
+		if checkError != nil {
+			test.Fatal(checkError)
+		}
+		return checked
+	}
+	// The host's closers and the build's, each checked from source, as a build that does not restore it has it.
+	hostClosers, buildClosers := check(seamClosersPath, nil, nil), check(seamClosersPath, nil, nil)
+	info := &types.Info{
+		Uses:       map[*ast.Ident]types.Object{},
+		Defs:       map[*ast.Ident]types.Object{},
+		Selections: map[*ast.SelectorExpr]*types.Selection{},
+		Implicits:  map[ast.Node]types.Object{},
+		Instances:  map[*ast.Ident]types.Instance{},
+	}
+	hostUser := check(seamUserPath, importerFunction(func(path string) (*types.Package, error) {
+		if path == seamClosersPath {
+			return hostClosers, nil
+		}
+		return nil, fmt.Errorf("no package %s", path)
+	}), info)
+	reads := &build_reads.Reads{}
+	reads.RecordTypes(hostUser, info, nil)
+	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
+		Subject: methodOf(hostUser, "Mine", "Close"), Found: true,
+		Answer: methodSetMember(hostClosers, "Closer", "Close")})
+	restoring := Restoring{Path: seamUserPath, Imports: []string{seamClosersPath}, Reads: reads}
+	closure := map[string]*types.Package{seamClosersPath: buildClosers}
+	host := measuredReadsBuild()
+	persisted := persistedRestoring(test, restoring, host, ReadsRendererVersion)
+	for _, step := range []struct {
+		name      string
+		restoring Restoring
+	}{
+		{"of this run", restoring},
+		{"persisted", persisted},
+	} {
+		test.Run(step.name, func(test *testing.T) {
+			test.Parallel()
+
+			build := measuredReadsBuild()
+			indexed := map[*types.Package]int{}
+			build.indexing = func(declaring *types.Package) { indexed[declaring]++ }
+			if holds, why := TypesHold(step.restoring, closure, map[*types.Package]bool{buildClosers: true}, host,
+				build); !holds {
+				test.Fatalf("the verdict that restored closers does not hold: %s", why)
+			}
+			if indexed[buildClosers] != 0 {
+				test.Fatalf("the verdict that restored closers indexed it %d times, so the later one tells nothing",
+					indexed[buildClosers])
+			}
+			if holds, why := TypesHold(step.restoring, closure, nil, host, build); !holds {
+				test.Errorf("the later verdict, which checked closers from source, does not hold: %s", why)
+			}
+		})
+	}
+}
+
 // Many verdicts, each with many Interface and Method lookups, over packages that share their imports, walk each
-// root's closure once per build and index each package's methods once per build, however many lookups ask: the
-// method index is built once, never per lookup or per verdict.
+// root's closure once per build and index each package's methods at most once per build, however many lookups ask:
+// the method index is built once, never per lookup or per verdict. The build indexes only what its lookups read, so
+// its side counts the dependency once the build stops restoring it.
 func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
 	test.Parallel()
 
@@ -158,19 +284,20 @@ func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
 	host.indexing, build.indexing = counted(hostIndexed), counted(buildIndexed)
 	subject := world.restoring.Reads.Lookups()[0].Subject
 	closure := map[string]*types.Package{restoredHiddenPath: world.exportHidden}
-	for range 3 {
-		reads := &build_reads.Reads{}
-		for _, lookup := range world.restoring.Reads.Lookups() {
-			reads.AddLookup(lookup)
-		}
-		for _, name := range []string{"Close", "Count", "Missing", "Close"} {
-			reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name, Subject: subject})
-		}
-		restoring := Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads}
-		reads.RecordTypes(subject.Pkg(), &types.Info{}, nil)
-		if holds, why := TypesHold(restoring, closure, map[*types.Package]bool{world.exportHidden: true}, host,
-			build); !holds {
-			test.Fatalf("the lookups of one source do not hold: %s", why)
+	for _, restored := range []map[*types.Package]bool{{world.exportHidden: true}, nil} {
+		for range 3 {
+			reads := &build_reads.Reads{}
+			for _, lookup := range world.restoring.Reads.Lookups() {
+				reads.AddLookup(lookup)
+			}
+			for _, name := range []string{"Close", "Count", "Missing", "Close"} {
+				reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryInterface, Name: name, Subject: subject})
+			}
+			restoring := Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads}
+			reads.RecordTypes(subject.Pkg(), &types.Info{}, nil)
+			if holds, why := TypesHold(restoring, closure, restored, host, build); !holds {
+				test.Fatalf("the lookups of one source do not hold, restored %t: %s", restored != nil, why)
+			}
 		}
 	}
 	for side, counts := range map[string]map[*types.Package]int{
