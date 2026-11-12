@@ -84,13 +84,14 @@ func TestALandingTestsOnHomeUnlessItSaysOff(test *testing.T) {
 			"",
 			"",
 			nil,
+			nil,
 			inside,
 			setting,
 		); unavailable != "it is the witness's window on Home, 09:00 to 15:00 UTC" {
 			test.Errorf("with %s=%q a landing did not go to Home: %q", homeGateVariable, setting, unavailable)
 		}
 	}
-	if _, unavailable := runHomeGate("", "", nil, inside, "off"); unavailable != "Home is off for this landing ("+
+	if _, unavailable := runHomeGate("", "", nil, nil, inside, "off"); unavailable != "Home is off for this landing ("+
 		homeGateVariable+"=off)" {
 		test.Errorf("with %s=off a landing did not stay on the Mac and say why: %q", homeGateVariable, unavailable)
 	}
@@ -136,15 +137,20 @@ func TestTheTestsLinuxNeverCompilesAreFoundFromTheSyntax(test *testing.T) {
 // Through a real landing with Home stood in for: a test Home skipped and a test in a file Linux never compiles both
 // run on the Mac in the same landing, named on its land line; a failure on Home refuses the landing; and Home with no
 // verdict, unreachable or answering about another tree, sends the whole test run to the Mac and says why (#acdf5mc).
+// A tree holding a raceGated package has Home run it under -race after the module: a pass is named on the land line, a
+// race refuses the landing, and a run that never reached its -race run is no verdict, which the land line names as no
+// -race run (#bnabymg).
 func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 	test.Parallel()
 	needs.Platform(test, "darwin", "its fixture's darwin-only test runs in a landing's Mac half, which a lander "+
 		"on any other platform never compiles")
 	for _, testCase := range []struct {
-		name   string
-		home   func(commit string) string
-		lands  bool
-		inBody []string
+		name    string
+		home    func(commit string) string
+		raced   bool
+		lands   bool
+		inBody  []string
+		refusal []string
 	}{
 		{
 			name: "Home passes, with a skip",
@@ -164,6 +170,45 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 					`{"Action":"fail","Package":"example.com/fixture/alpha","Test":"TestPlantedFailure"}` + "\n" +
 					`{"Action":"fail","Package":"example.com/fixture/alpha"}` + "\n"
 			},
+			refusal: []string{"Home's tests on linux/amd64 failed", "TestPlantedFailure"},
+		},
+		{
+			name: "Home passes, and its race run passes",
+			home: func(commit string) string {
+				return homeMarker + commit + " on linux/amd64\n" +
+					`{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n" +
+					`{"Action":"pass","Package":"example.com/fixture/internal/edit"}` + "\n" +
+					homeRaceMarker + "\n" +
+					`{"Action":"pass","Package":"example.com/fixture/internal/edit"}` + "\n"
+			},
+			raced:  true,
+			lands:  true,
+			inBody: []string{"go test of the module on Home (linux/amd64, 2 packages), 1 of them again under -race"},
+		},
+		{
+			name: "Home passes, and its race run finds a race",
+			home: func(commit string) string {
+				return homeMarker + commit + " on linux/amd64\n" +
+					`{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n" +
+					homeRaceMarker + "\n" +
+					`{"Action":"output","Package":"example.com/fixture/internal/edit","Test":"TestPlantedRace",` +
+					`"Output":"WARNING: DATA RACE\\n"}` + "\n" +
+					`{"Action":"fail","Package":"example.com/fixture/internal/edit","Test":"TestPlantedRace"}` + "\n" +
+					`{"Action":"fail","Package":"example.com/fixture/internal/edit"}` + "\n"
+			},
+			raced:   true,
+			refusal: []string{"Home's -race run on linux/amd64 failed", "TestPlantedRace", "WARNING: DATA RACE"},
+		},
+		{
+			name: "Home passes, and says nothing of its race run",
+			home: func(commit string) string {
+				return homeMarker + commit + " on linux/amd64\n" +
+					`{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n"
+			},
+			raced: true,
+			lands: true,
+			inBody: []string{"go test of the module on the Mac, since Home's run said nothing of its -race run; " +
+				"no -race run of its 1 packages"},
 		},
 		{
 			name:  "Home unreachable",
@@ -187,6 +232,11 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 			writeFixtureFile(test, filepath.Join(worktreeA, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
 			writeFixtureFile(test, filepath.Join(worktreeA, "alpha", "alpha_darwin_test.go"),
 				"package alpha\n\nimport \"testing\"\n\nfunc TestPlantedDarwinOnly(test *testing.T) {}\n")
+			if testCase.raced {
+				// A package at one of raceGated's directories, so the gate asks Home for its -race run.
+				writeFixtureFile(test, filepath.Join(worktreeA, "internal", "edit", "edit_test.go"),
+					"package edit\n\nimport \"testing\"\n\nfunc TestPlantedRace(test *testing.T) {}\n")
+			}
 			fixture.git(worktreeA, "add", ".")
 			fixture.git(worktreeA, "commit", "-q", "-m", fixtureSubject("a module"))
 			fixture.git(worktreeA, "merge", "-q", "--no-edit", "-m", "Merge main", "main")
@@ -212,9 +262,10 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 				test.Fatalf("landed: %t, want %t (%v):\n%s", landed, testCase.lands, landError, output)
 			}
 			if !testCase.lands {
-				if !strings.Contains(string(output), "Home's tests on linux/amd64 failed") ||
-					!strings.Contains(string(output), "TestPlantedFailure") {
-					test.Errorf("the refusal does not name Home's failure:\n%s", output)
+				for _, want := range testCase.refusal {
+					if !strings.Contains(string(output), want) {
+						test.Errorf("the refusal does not say %q:\n%s", want, output)
+					}
 				}
 				return
 			}
