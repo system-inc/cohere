@@ -25,10 +25,11 @@ const spawnerVariable = "COHERE_DEV_BOUNDED_SPAWNER"
 // the machine carries, so the proof can fail without forking the machine to death.
 const spawnerCeiling = 400
 
-// A bounded run starts no more processes than its margin, however many it tries, and nothing it started is
-// left when it ends (#fp1td9e). The planted spawner starts sleeps until a fork is refused and exits with them
-// still running; bounded to a margin of 32, it is refused long before its ceiling, the account's count is
-// back where it was once the run ends, and every sleep it started is gone with its group.
+// A bounded run's group holds no more processes than its margin, however many it tries, and nothing it started is
+// left when it ends (#fp1td9e). The planted spawner starts sleeps as fast as it can; bounded to a margin of 32, its
+// group is stopped once it holds more than 32, the run says so and exits with the margin's code, and every sleep it
+// started is gone with its group. The account's own count never enters it, so a busy account can't move it: on
+// Home a margin taken against the account's total let all 400 sleeps start (#acdf5mc).
 func TestABoundedRunStartsNoMoreThanItsMargin(test *testing.T) {
 	test.Parallel()
 	if pids := os.Getenv(spawnerVariable); pids != "" {
@@ -62,15 +63,18 @@ func TestABoundedRunStartsNoMoreThanItsMargin(test *testing.T) {
 	started := readPids(test, pids)
 	test.Logf("this account had %d %s before the run; the spawner started %d sleeps\n%s",
 		before, processNoun, len(started), output)
-	if runError == nil {
-		test.Errorf("the bounded spawner exited cleanly, so nothing refused it:\n%s", output)
+	var exited *exec.ExitError
+	if !errors.As(runError, &exited) || exited.ExitCode() != marginExitCode ||
+		!strings.Contains(string(output), "past the bounded run's margin of 32") {
+		test.Errorf("the bounded spawner ended with %v, want exit %d with the margin named:\n%s",
+			runError, marginExitCode, output)
 	}
 	if len(started) >= spawnerCeiling {
 		test.Fatalf("the spawner started all %d sleeps under a margin of 32, so the run was not bounded",
 			spawnerCeiling)
 	}
-	// What other members start and end while this runs moves the count too, so the started sleeps are judged
-	// against the margin with room for that.
+	// The watchdog looks every 10ms, and the spawner starts a sleep about every millisecond, so it may pass the
+	// margin by what it starts between two looks.
 	if len(started) > 32+64 {
 		test.Errorf("the spawner started %d sleeps under a margin of 32", len(started))
 	}
