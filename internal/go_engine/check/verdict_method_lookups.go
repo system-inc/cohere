@@ -82,15 +82,15 @@ func (judged verdict) methodLookupHolds(
 	return true, "", true
 }
 
-// answerStillFixes reports whether the answer a rule found on the host still fixes the subject's name in the build.
-// The predeclared error is the universe's, the same in every build. An answer of a package the build restored from the
-// host is the host's own object there, as the closure judgment gives a restored package's type names: its types were
-// read from export data, which leaves out an unexported type nothing exported reaches, while its source and its reads
-// are the host's. That rests on the package's own restore having held: the load decides it once its imports are done,
-// before any package importing it, the subject's among them, and a decline at check time loads every package above it
-// again, never restored (decideHostRestores). Any other answer must be found at its objectpath and render
-// alike by its own lines; for an interface's method a concrete subject must implement, so must every interface of the
-// host's closure whose method set holds it, since Implements reads the whole interface.
+// answerStillFixes reports whether the answer a rule found on the host still fixes the subject's name in the build. An
+// answer of a package the build restored from the host is the host's own object there, as the closure judgment gives a
+// restored package's type names: its types were read from export data, which leaves out an unexported type nothing
+// exported reaches, while its source and its reads are the host's. That rests on the package's own restore having
+// held: the load decides it once its imports are done, before any package importing it, the subject's among them, and
+// a decline at check time loads every package above it again, never restored (decideHostRestores). Any other answer
+// must have a counterpart in the build, at its objectpath or, for the predeclared error, itself (counterpart), and
+// render alike by its own lines; for an interface's method a concrete subject must implement, so must every interface
+// of the host's closure whose method set holds it, since Implements reads the whole interface.
 func (judged verdict) answerStillFixes(
 	name string,
 	lookup build_reads.Lookup,
@@ -102,7 +102,7 @@ func (judged verdict) answerStillFixes(
 	if answer == nil {
 		return false, name + ": it was found on the host with no answer to ask of the build"
 	}
-	if answer.Pkg() == nil || judged.restored[judged.closure[answer.Pkg().Path()]] {
+	if answer.Pkg() != nil && judged.restored[judged.closure[answer.Pkg().Path()]] {
 		return true, ""
 	}
 	counterpart, missing := judged.counterpart(answer)

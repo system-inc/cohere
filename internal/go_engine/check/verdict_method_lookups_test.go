@@ -209,6 +209,17 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			want:   "L lookup Interface Close: 2 type names have the method on the host, 3 in the build",
 		},
 		{
+			name: "an answer that is the predeclared error, the same in every build",
+			files: map[string]string{"foreign.go": methodForeign, "inner.go": closerBase,
+				"promoted_windows.go": promotedOnly},
+			user: "package user\n\nimport \"example.com/methods/foreign\"\n\ntype Mine struct{}\n\n" +
+				"func (Mine) Error() string { return \"\" }\n\nfunc Use() int { return foreign.Count() }\n",
+			lookup: func(host methodWorld) build_reads.Lookup {
+				return build_reads.Lookup{Query: build_reads.QueryInterface, Name: "Error",
+					Subject: methodOf(host.user, "Mine", "Error"), Found: true, Answer: types.Universe.Lookup("error")}
+			},
+		},
+		{
 			name:   "a concrete subject's answer whose interface gains a method it lacks",
 			files:  closerGainsFlush,
 			lookup: methodAnswered("Closer", "Close"),
@@ -236,7 +247,8 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			}
 			built := checkedMethodWorld(test, buildGoos, step.files, user)
 			reads := &build_reads.Reads{}
-			reads.RecordTypes(host.user, &types.Info{})
+			// No syntax and no type information: Mine's reads are none, and the lookup is what each step is about.
+			reads.RecordTypes(host.user, &types.Info{}, nil)
 			reads.AddLookup(step.lookup(host))
 			restoring := Restoring{Path: methodUserPath, Imports: []string{methodForeignPath}, Reads: reads}
 			closure := map[string]*types.Package{methodForeignPath: built.foreign}
