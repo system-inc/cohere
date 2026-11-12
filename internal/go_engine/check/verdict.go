@@ -242,11 +242,12 @@ func (judged verdict) buildFactHolds(
 //   - Closure asks the build's import closure, from the package's imports, as the rule asked (ClosureInterface).
 //   - PackageName asks whether a package of that closure has the name, as the rule's walk does.
 //   - Interface and Method answer by the subject, the package's own method, which is the host's in the build, and by
-//     the closure's type names with a method of the name: so they hold when those type names are the same in both
-//     builds, rendered alike. That errs wide, failing when a type name the rule would not have matched changes. A
-//     package the build restored from the host's run gives the host's own type names: its types there are read from
-//     export data, which holds only what its exported declarations reach, so its unexported types would go missing,
-//     while its source and its reads are the host's, so checked from source it declares what the host's does.
+//     the closure's type names with a method of the name, judged by the one bit their rules read of them
+//     (methodLookupHolds), or, where that bit can flip with nothing it reads changing, by those type names being the
+//     same in both builds, rendered alike. A package the build restored from the host's run gives the host's own type
+//     names: its types there are read from export data, which holds only what its exported declarations reach, so its
+//     unexported types would go missing, while its source and its reads are the host's, so checked from source it
+//     declares what the host's does.
 //
 // A deprecation is a fact, asked at check time (deprecationHolds).
 func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring) (bool, string) {
@@ -288,6 +289,9 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 			func(owner *types.Package) bool { return hostClosure.byPath[owner.Path()] != nil })...)
 		sortTypeNames(hostCandidates)
 		sortTypeNames(buildCandidates)
+		if holds, why, decided := judged.methodLookupHolds(name, lookup, hostCandidates, buildCandidates); decided {
+			return holds, why
+		}
 		if len(hostCandidates) != len(buildCandidates) {
 			return false, name + fmt.Sprintf(": %d type names have the method on the host, %d in the build",
 				len(hostCandidates), len(buildCandidates))

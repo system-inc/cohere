@@ -298,9 +298,9 @@ func TestAFactReadHoldsOnlyWhenTheBuildReadsTheSameFact(test *testing.T) {
 }
 
 // Each kind of lookup a rule records is asked again of the build: a scope lookup by path and name, the closure's
-// interface, a package name, an Interface or Method question by the type names with a method of the name, and a
-// deprecation by the build's deprecated fact. Each holds when the build answers alike and fails naming itself when it
-// does not.
+// interface, a package name, an Interface or Method question by its answer, or by a candidate of the subject's shape
+// the build gains (methodLookupHolds), and a deprecation by the build's deprecated fact. Each holds when the build
+// answers alike and fails naming itself when it does not.
 func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 	test.Parallel()
 
@@ -372,7 +372,8 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 				return build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Flush",
 					Subject: methodOf(host.user, "Mine", "Flush")}
 			},
-			want: "L lookup Method Flush: 0 type names have the method on the host, 1 in the build",
+			want: "L lookup Method Flush: " + verdictPlatform + ".Flusher.Flush is new in the build, of the " +
+				"subject's shape",
 		},
 		{
 			name: "a deprecation with the same message",

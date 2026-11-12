@@ -15,8 +15,8 @@ import (
 )
 
 // The restored fixture's paths: hidden declares an unexported type with a Close method, and an unexported close, that
-// nothing exported reaches, so its export data leaves the type out, and its user asks which type names of its closure
-// have a Close method.
+// nothing exported reaches, so its export data leaves the type out, and its user asks which method of its closure fixes
+// its own Close, which that type's answers.
 const (
 	restoredHiddenPath = "example.com/restored/hidden"
 	restoredUserPath   = "example.com/restored/user"
@@ -32,8 +32,8 @@ var restoredSources = map[string]string{
 }
 
 // restoredWorld is the fixture on the host, hidden and its user checked from source, the user's type reads recorded
-// and a Method lookup of Close added, and hidden as a build restores it from the host, read from the export data the
-// host's check of it writes.
+// and a Method lookup of Close added, answered by hidden's closer, and hidden as a build restores it from the host,
+// read from the export data the host's check of it writes.
 type restoredWorld struct {
 	restoring    Restoring
 	exportHidden *types.Package
@@ -89,7 +89,7 @@ func checkedRestoredWorld(test *testing.T) restoredWorld {
 	// Without the syntax every read is judged by its closure: the lookup is what this fixture is about.
 	reads.RecordTypes(hostUser, info, nil)
 	reads.AddLookup(build_reads.Lookup{Query: build_reads.QueryMethod, Name: "Close",
-		Subject: methodOf(hostUser, "Mine", "Close")})
+		Subject: methodOf(hostUser, "Mine", "Close"), Found: true, Answer: methodOf(hostHidden, "closer", "Close")})
 	return restoredWorld{
 		restoring:    Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads},
 		exportHidden: exportHidden,
@@ -97,9 +97,9 @@ func checkedRestoredWorld(test *testing.T) restoredWorld {
 }
 
 // A method lookup holds in a build that restored a package of the closure from the host, though the export data its
-// types were read from lacks an unexported type with the method: the restored package gives the host's own type names,
-// since checked from source it declares what the host's does. The same package checked from source in the build, as
-// its export data stands for here, is scanned there, and the type it lacks fails the lookup.
+// types were read from lacks the unexported type whose method answered it: the restored package's answer is the host's
+// own, since checked from source it declares what the host's does. The same package checked from source in the build,
+// as its export data stands for here, is asked for the answer there, and the type it lacks fails the lookup.
 func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) {
 	test.Parallel()
 
@@ -112,7 +112,8 @@ func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) 
 	}{
 		{"restored from the host", map[*types.Package]bool{world.exportHidden: true}, ""},
 		{"checked from source", nil,
-			"L lookup Method Close: 1 type names have the method on the host, 0 in the build"},
+			"L lookup Method Close: its answer " + restoredHiddenPath + ".Close is not in the build: the build's " +
+				restoredHiddenPath + " has no closer.M0"},
 	} {
 		test.Run(step.name, func(test *testing.T) {
 			test.Parallel()
