@@ -7,6 +7,7 @@ package standard_library_table
 import (
 	_ "embed"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -52,12 +53,18 @@ func ReadVersionLine(output string) (string, int, bool, bool) {
 		if !found {
 			continue
 		}
-		var stamp string
-		var size int
-		if _, scanError := fmt.Sscanf(described, "release %s %d bytes", &stamp, &size); scanError != nil {
+		// A release's stamp holds spaces, `0.2.0 <commit> go1.27.0`, so the line is cut at its last comma, after which
+		// only the size is written (VersionLine).
+		released, found := strings.CutPrefix(described, "release ")
+		cut := strings.LastIndex(released, ", ")
+		if !found || cut < 0 {
 			return "", 0, false, true
 		}
-		stamp = strings.TrimSuffix(stamp, ",")
+		stamp := released[:cut]
+		size, sizeError := strconv.Atoi(strings.TrimSuffix(released[cut+len(", "):], " bytes"))
+		if sizeError != nil {
+			return "", 0, false, true
+		}
 		return stamp, size, stamp != "" && size > 0, true
 	}
 	return "", 0, false, false

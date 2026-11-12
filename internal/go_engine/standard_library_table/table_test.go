@@ -13,6 +13,9 @@ func TestTheVersionLineReadsBackAsTheTableItNames(test *testing.T) {
 		readBack string
 	}{
 		{"v0.2.0+3f1c", 4096, true, "v0.2.0+3f1c"},
+		// A release's stamp as the release writes it, spaces and all (#ccqee0e).
+		{"0.2.0 994d39a3d2936e4283b0de5958c088dd99d93eee go1.27.0", 2145372, true,
+			"0.2.0 994d39a3d2936e4283b0de5958c088dd99d93eee go1.27.0"},
 		{"v0.2.0+3f1c", 0, false, ""},
 		{"", 4096, false, ""},
 		{"", 0, false, ""},
