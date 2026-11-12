@@ -489,20 +489,23 @@ func (session *CacheSession) writeThrough(
 	encoded := make([]encodedEntry, len(through))
 	writable := make([]bool, len(through))
 	writeErrors := make([]error, len(through))
-	session.fanOut(len(through), func(index int) {
+	session.fanOutWriting(len(through), func(index int) func() {
 		saved := through[index]
 		encoded[index], writable[index], writeErrors[index] = session.throughEntry(saved, throughHosted[index],
 			actionsOf[saved], knownFiles)
-		if !writable[index] {
-			return
+		if !writable[index] || writeErrors[index] != nil {
+			return nil
 		}
 		key := session.keys[saved]
-		// The export data goes first, so an entry is never in the store before what it needs to be read.
-		if writeErrors[index] == nil && encoded[index].exportData != nil {
-			writeErrors[index] = session.caching.Store.Put(exportDataKey(key), encoded[index].exportData)
-		}
-		if writeErrors[index] == nil {
-			writeErrors[index] = session.caching.Store.Put(key, encoded[index].entry)
+		// The writes run with no slot held (fanOutWriting), the export data first, so an entry is never in the store
+		// before what it needs to be read.
+		return func() {
+			if encoded[index].exportData != nil {
+				writeErrors[index] = session.caching.Store.Put(exportDataKey(key), encoded[index].exportData)
+			}
+			if writeErrors[index] == nil {
+				writeErrors[index] = session.caching.Store.Put(key, encoded[index].entry)
+			}
 		}
 	})
 	positionDependent := map[*packages.Package]bool{}

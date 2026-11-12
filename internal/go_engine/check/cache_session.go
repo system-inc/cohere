@@ -681,8 +681,9 @@ func (session *CacheSession) save(
 // saveMisses writes the entry of each of missed that no wave tried to save, has no load error, and on which every
 // action of graphs finished without one, from those actions, its types and what the load withheld of it, and returns
 // each one's encoded entry. A written entry whose package names no file outside it in a finding gets an alias under
-// its second key, once every output below it is known. The entries are encoded and written as many at once as there
-// are cores: writing a package's export data is most of a cold run's save, and each package's is its own.
+// its second key, once every output below it is known. The entries are encoded as many at once as there are cores, and
+// written with no core held (fanOutWriting): writing a package's export data is most of a cold run's save, each
+// package's is its own, and a write blocked in the file system leaves its core to the run's other work (#g2e4mz8).
 func (session *CacheSession) saveMisses(
 	graphs []*checker.Graph,
 	missed []*packages.Package,
@@ -719,43 +720,42 @@ func (session *CacheSession) saveMisses(
 	encoded := map[*packages.Package]encodedEntry{}
 	var written []*packages.Package
 	var countsLock sync.Mutex
-	session.fanOut(len(saving), func(index int) {
+	session.fanOutWriting(len(saving), func(index int) func() {
 		saved := saving[index]
 		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
 		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
 			withheld[saved], demanded, files[saved], knownFiles, true)
-		var putError error
-		// The export data goes first, so an entry is never in the store before what it needs to be read.
-		if encodeError == nil && entry.exportData != nil {
-			putError = session.caching.Store.Put(exportDataKey(session.keys[saved]), entry.exportData)
-		}
-		if encodeError == nil && putError == nil {
-			putError = session.caching.Store.Put(session.keys[saved], entry.entry)
-		}
-		countsLock.Lock()
-		defer countsLock.Unlock()
-		if encodeError == nil {
-			encoded[saved] = entry
-			if entry.hasOutput {
-				session.outputs[saved] = entry.output
+		// The writes and their counting run with no slot held: the counting is a map's and a counter's, under a lock.
+		return func() {
+			var putError error
+			if encodeError == nil {
+				putError = session.putEntry(session.keys[saved], entry)
 			}
-			session.collect(saved, entry)
-		}
-		switch {
-		case errors.Is(encodeError, errorUnstorable):
-			session.counts.Unstorable++
-		case encodeError != nil:
-			session.problem(encodeError.Error())
-		case putError != nil:
-			if session.counts.WriteFailed == 0 {
-				session.problem(putError.Error())
+			countsLock.Lock()
+			defer countsLock.Unlock()
+			if encodeError == nil {
+				encoded[saved] = entry
+				if entry.hasOutput {
+					session.outputs[saved] = entry.output
+				}
+				session.collect(saved, entry)
 			}
-			session.counts.WriteFailed++
-		default:
-			session.counts.FactsDropped += entry.dropped
-			session.counts.Written++
-			session.written[saved] = true
-			written = append(written, saved)
+			switch {
+			case errors.Is(encodeError, errorUnstorable):
+				session.counts.Unstorable++
+			case encodeError != nil:
+				session.problem(encodeError.Error())
+			case putError != nil:
+				if session.counts.WriteFailed == 0 {
+					session.problem(putError.Error())
+				}
+				session.counts.WriteFailed++
+			default:
+				session.counts.FactsDropped += entry.dropped
+				session.counts.Written++
+				session.written[saved] = true
+				written = append(written, saved)
+			}
 		}
 	})
 	// The packages restored from the host's run that have settled are written beside the misses, by the same rule of
@@ -783,15 +783,28 @@ func (session *CacheSession) saveMisses(
 	return encoded
 }
 
+// putEntry writes entry under key, its export data first, so an entry is never in the store before what it needs to be
+// read. saveMisses runs it with no slot of the run's pool held (fanOutWriting).
+func (session *CacheSession) putEntry(key cache.Key, entry encodedEntry) error {
+	if entry.exportData != nil {
+		if putError := session.caching.Store.Put(exportDataKey(key), entry.exportData); putError != nil {
+			return putError
+		}
+	}
+	return session.caching.Store.Put(key, entry.entry)
+}
+
 // alias keeps under each key's alias the key of the entry it stands for, as many at once as there are cores: on
 // cohere's own root a cold run writes about a thousand, which one at a time took 0.2s, while hashing every second
 // key took 5ms. A failed write is a problem, never a finding: the next run misses where it would have hit.
 func (session *CacheSession) alias(aliases map[cache.Key]cache.Key) {
 	keys := slices.Collect(maps.Keys(aliases))
-	session.fanOut(len(keys), func(index int) {
+	session.fanOutWriting(len(keys), func(index int) func() {
 		target := aliases[keys[index]]
-		if putError := session.caching.Store.Put(aliasKey(keys[index]), target[:]); putError != nil {
-			session.problem(putError.Error())
+		return func() {
+			if putError := session.caching.Store.Put(aliasKey(keys[index]), target[:]); putError != nil {
+				session.problem(putError.Error())
+			}
 		}
 	})
 }
@@ -806,6 +819,22 @@ func (session *CacheSession) fanOut(count int, work func(index int)) {
 		return
 	}
 	bounded.ForEach(count, false, work)
+}
+
+// fanOutWriting is fanOut for work that writes to the store: compute runs for every index as fanOut runs work, and the
+// writes it returns run with no slot of the run's pool held (bounded.Pool.ForEachWriting), so a write blocked in the
+// file system holds none of the run's cores (#g2e4mz8). Without a pool, each index's writes run straight after its
+// compute. Every write has run when it returns, so what the session counts of them is whole.
+func (session *CacheSession) fanOutWriting(count int, compute func(index int) (write func())) {
+	if session.caching.Pool != nil {
+		session.caching.Pool.ForEachWriting(count, 0, compute)
+		return
+	}
+	bounded.ForEach(count, false, func(index int) {
+		if write := compute(index); write != nil {
+			write()
+		}
+	})
 }
 
 // allFiles is every file of every package the load reached, made on first use.

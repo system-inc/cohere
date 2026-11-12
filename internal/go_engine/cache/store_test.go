@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -149,5 +150,58 @@ func TestAPutThatCannotWriteIsAnError(test *testing.T) {
 	}
 	if _, found := store.Get(sampleKey); found {
 		test.Error("a failed Put left an entry")
+	}
+}
+
+// A store remembers each shard directory it made, so a Put stats its directory once per store rather than once per
+// entry (#m8hcs4n): after puts into two shards, many into one, it holds exactly those two.
+func TestAStoreMakesEachShardDirectoryOnce(test *testing.T) {
+	test.Parallel()
+
+	store := Open(test.TempDir())
+	for index := range 20 {
+		if putError := store.Put(Key{0xAB, byte(index)}, []byte("entry")); putError != nil {
+			test.Fatal(putError)
+		}
+	}
+	if putError := store.Put(Key{0x01}, []byte("entry")); putError != nil {
+		test.Fatal(putError)
+	}
+	var made []string
+	store.made.Range(func(directory any, _ any) bool {
+		path, isPath := directory.(string)
+		if !isPath {
+			test.Errorf("the store remembers %v, a %T, want a directory's path", directory, directory)
+			return true
+		}
+		made = append(made, filepath.Base(path))
+		return true
+	})
+	slices.Sort(made)
+	if want := []string{"01", "ab"}; !slices.Equal(made, want) {
+		test.Errorf("the store remembers the directories %v, want %v", made, want)
+	}
+}
+
+// A shard directory removed while the store runs, as someone clearing the cache would, is made again by the next Put
+// into it, which writes its entry rather than fail on the directory the store remembered (#m8hcs4n).
+func TestAShardDirectoryRemovedUnderTheStoreIsMadeAgain(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := Open(root)
+	if putError := store.Put(sampleKey, []byte("first")); putError != nil {
+		test.Fatal(putError)
+	}
+	shard := filepath.Join(root, ".cache", "cohere", "go", "ab")
+	if removeError := os.RemoveAll(shard); removeError != nil {
+		test.Fatal(removeError)
+	}
+	second := Key{0xAB, 0x01}
+	if putError := store.Put(second, []byte("second")); putError != nil {
+		test.Fatalf("a Put into a removed shard directory failed: %v", putError)
+	}
+	if got, found := store.Get(second); !found || string(got) != "second" {
+		test.Errorf("want the second entry back, got %q (found %v)", got, found)
 	}
 }
