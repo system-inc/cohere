@@ -69,7 +69,8 @@ func TestUnreadablePersistedReadsAreDeclined(test *testing.T) {
 			Lookups: []persistedLookup{
 				{Query: build_reads.QueryScope, Path: 1, Name: "NewStable", Found: true, Answer: 1},
 				{Query: build_reads.QueryDeprecated, Path: 1, Subject: 1},
-				{Query: build_reads.QueryMethod, Name: "Close", Candidates: []int{1}},
+				{Query: build_reads.QueryMethod, Name: "Close", Candidates: []int{1},
+					RuleCandidates: []persistedMethodCandidate{{TypeName: 1}}},
 			},
 		}
 	}
@@ -134,6 +135,12 @@ func TestUnreadablePersistedReadsAreDeclined(test *testing.T) {
 		{"lookup's subject", func(record *persistedReads) { record.Lookups[1].Subject = 2 }},
 		{"lookup's candidate", func(record *persistedReads) { record.Lookups[2].Candidates[0] = 0 }},
 		{"lookup's candidate", func(record *persistedReads) { record.Lookups[2].Candidates[0] = 2 }},
+		{"lookup's rule candidate", func(record *persistedReads) {
+			record.Lookups[2].RuleCandidates[0].TypeName = 0
+		}},
+		{"lookup's rule candidate", func(record *persistedReads) {
+			record.Lookups[2].RuleCandidates[0].TypeName = 2
+		}},
 	} {
 		damaged := readable()
 		step.damage(&damaged)

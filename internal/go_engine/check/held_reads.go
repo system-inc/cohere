@@ -51,8 +51,8 @@ func heldReadsOf(contents []byte, learned map[string]reflect.Type) *heldReads {
 // reference names something it holds: an owner of Owners or an object of Objects by its place counted from one, zero
 // for none where a read may have none, and a fact type of FactTypes by its place counted from zero. A reference of each
 // kind is checked where it is held: every object's owner, every use's object and kind (#mjdf7ah), every selection's
-// receiver and member, every fact read's owner, object and type, and every lookup's package, answer, subject and
-// candidates.
+// receiver and member, every fact read's owner, object and type, and every lookup's package, answer, subject,
+// candidates and rule candidates (#qqzg1w8).
 func unreadableReads(record persistedReads) string {
 	owners, objects, factTypes := len(record.Owners), len(record.Objects), len(record.FactTypes)
 	// held is how many the record holds of what reference names, which it may name from least to most.
@@ -88,6 +88,9 @@ func unreadableReads(record persistedReads) string {
 			past("lookup's subject", lookup.Subject, 0, objects, objects))
 		for _, candidate := range lookup.Candidates {
 			reasons = append(reasons, past("lookup's candidate", candidate, 1, objects, objects))
+		}
+		for _, candidate := range lookup.RuleCandidates {
+			reasons = append(reasons, past("lookup's rule candidate", candidate.TypeName, 1, objects, objects))
 		}
 	}
 	for _, reason := range reasons {
