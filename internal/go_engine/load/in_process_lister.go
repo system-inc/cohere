@@ -210,7 +210,8 @@ func (lister *inProcessLister) list(patterns []string) (*listing, string) {
 // environment, and the go environment from goEnvironment, and says why it cannot list at all when something in them is
 // beyond what it carries. Its build context opens a file held holds from its held bytes, and any other on disk, so
 // go/build reads no file the run already holds again, or from shared, which every listing of the run reads its
-// directories and files through when it is set (SharedReads). What it and its listing spend is added to collector.
+// directories and files through when it is set (SharedReads), and asks which directories are below which, and which
+// paths are directories, of too. What it and its listing spend is added to collector.
 func newInProcessLister(
 	goEnvironment *GoEnvironment,
 	held Held,
@@ -225,6 +226,9 @@ func newInProcessLister(
 	if shared != nil {
 		read.context.ReadDir = shared.readDirectory
 		read.context.OpenFile = shared.openFile(held)
+		// Each answer is the one go/build's own default gives, read once for every listing of the run (#5jpss95).
+		read.context.HasSubdir = shared.hasSubdirectory
+		read.context.IsDir = shared.isDirectory
 	}
 	lister := &inProcessLister{
 		workspace:     goEnvironment.workspace,

@@ -128,6 +128,12 @@ type pipeline struct {
 	// removes no file.
 	reads *load.SharedReads
 
+	// fingerprints are the kept listing's directory fingerprints the extra builds share, each directory hashed once
+	// for every build (#5jpss95). Only the extra builds read them: the long-line wrap writes between the host's first
+	// load and the builds, so a fingerprint the host's load read could be of bytes since rewritten, while nothing
+	// writes once the builds start (extraBuildRun).
+	fingerprints *load.Fingerprints
+
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
 	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
 	renamed bool
@@ -201,6 +207,7 @@ func newPipeline(
 		overlaps:      true,
 		timing:        newTiming(request),
 		reads:         load.NewSharedReads(),
+		fingerprints:  load.NewFingerprints(),
 	}
 }
 

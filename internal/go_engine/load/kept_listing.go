@@ -55,14 +55,16 @@ type keptListing struct {
 // edit below a file's imports, the edit nearly every edit is, moves none of it. When the fingerprint of all of that
 // is the one the kept answer was read from, the answer is go list's own; any difference, or anything that cannot be
 // read, asks go list. It reports whether the answer was kept. Every file held holds is read from its held bytes, by
-// the fingerprint and the lister alike. The listing adds its CPU to collector; a kept answer's fingerprint adds nothing
-// but what the caller measures on its own goroutine, since a run under `--timing` keeps no listing.
+// the fingerprint and the lister alike. Each directory's fingerprint is read through fingerprints, once for the run's
+// extra builds, when it is set (Fingerprints). The listing adds its CPU to collector; a kept answer's fingerprint adds
+// nothing but what the caller measures on its own goroutine, since a run under `--timing` keeps no listing.
 func cachedList(
 	goEnvironment *GoEnvironment,
 	patterns []string,
 	listings ListingStore,
 	held Held,
 	shared *SharedReads,
+	fingerprints *Fingerprints,
 	collector *timing.Collector,
 ) (*listing, bool, error) {
 	if listings == nil {
@@ -73,7 +75,8 @@ func cachedList(
 	if contents, stored := listings.Kept(key); stored {
 		var kept keptListing
 		if gob.NewDecoder(bytes.NewReader(contents)).Decode(&kept) == nil {
-			fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, held)
+			fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, held,
+				fingerprints)
 			if certain && fingerprint == kept.Fingerprint {
 				return kept.listing(), true, nil
 			}
@@ -84,7 +87,7 @@ func cachedList(
 		return nil, false, listError
 	}
 	kept, keepable := keepListing(goEnvironment.workspace, goEnvironment.value("GOMODCACHE"),
-		goEnvironment.value("GOROOT"), listed, held)
+		goEnvironment.value("GOROOT"), listed, held, fingerprints)
 	var encoded bytes.Buffer
 	if keepable && gob.NewEncoder(&encoded).Encode(kept) == nil {
 		// Ignored: a listing that cannot be kept is asked of go list again next run, which is all its keeping saves.
@@ -132,13 +135,14 @@ func listingKey(goEnvironment *GoEnvironment, patterns []string) [sha256.Size]by
 // which the cache never rewrites under that version, and one in the toolchain's root that is in no module, the
 // standard library, which moves only with the toolchain's version the key hashes. Anything else there, a replace
 // into the module cache by path, say, is read like any directory of the workspace. Each file held holds is
-// fingerprinted from its held bytes.
+// fingerprinted from its held bytes, and each directory through fingerprints when it is set.
 func keepListing(
 	workspace string,
 	moduleCache string,
 	toolchainRoot string,
 	listed *listing,
 	held Held,
+	fingerprints *Fingerprints,
 ) (keptListing, bool) {
 	roots := []string{workspace}
 	directories := map[string]bool{}
@@ -175,7 +179,7 @@ func keepListing(
 		RootPaths:   sortedKeys(listed.roots),
 		TestOnly:    sortedKeys(listed.testOnly),
 	}
-	fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, held)
+	fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, held, fingerprints)
 	kept.Fingerprint = fingerprint
 	return kept, certain
 }
@@ -218,12 +222,14 @@ func isUnder(path string, roots []string) bool {
 // roots hold, walked as go walks a pattern, and the listed ones. It reports whether it read all of it: a module
 // file that is absent is read as absent, but anything that could not be read, a directory, a Go file or a module
 // file, is a doubt, and a doubt is never taken for nothing having moved. A Go file held holds is read from its held
-// bytes, which are the disk's.
+// bytes, which are the disk's. Each directory's own fingerprint is read through fingerprints, which a nil one reads
+// again (Fingerprints).
 func listingFingerprint(
 	roots []string,
 	directories []string,
 	moduleFiles []string,
 	held Held,
+	fingerprints *Fingerprints,
 ) ([sha256.Size]byte, bool) {
 	digest := sha256.New()
 	certain := true
@@ -263,7 +269,7 @@ func listingFingerprint(
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
-			parts[index], readWhole[index] = directoryFingerprint(directory, held)
+			parts[index], readWhole[index] = fingerprints.directory(directory, held)
 		}()
 	}
 	group.Wait()
