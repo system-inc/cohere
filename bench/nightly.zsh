@@ -367,7 +367,9 @@ run_landing_gate() {
   local log=$state/logs/$night-landing-gate.log report=$state/logs/$night-landing-gate-report.md
   if (
     cd $repository &&
-      COHERE_MEASURE_LANDING_GATE=1 go run ./command/cohere-dev test -count=1 -v \
+      # An hour, against the measurement's 145s at load 29: its inner runs inherit what is left of this deadline, and
+      # at Go's default ten minutes a loaded machine left one 7s and it failed on time, measuring nothing (#6n6nprh).
+      COHERE_MEASURE_LANDING_GATE=1 go run ./command/cohere-dev test -count=1 -v -timeout=1h \
         -run '^TestEveryLandingGateOnlyEntryStillEarnsItsPlace$' ./command/cohere-dev
   ) > $log 2>&1; then
     print "landing gate: every landing-gate-only entry still costs more than the fast tier's bar, log $log"
