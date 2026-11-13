@@ -169,10 +169,10 @@ func TestNoDeprecatedInJsx(test *testing.T) {
 			},
 		},
 		{
-			name:         "invalid:143",
-			sourceText:   "const a = <div aria-grabbed></div>;",
-			jsx:          true,
-			harnessBound: "the deprecation is on @types/react's JSX.IntrinsicElements, and the harness writes its own tsconfig with \"types\": [] after the setup hook runs, so no ambient declaration can reach the program; the intrinsic-attribute arm is proven in TestNoDeprecatedOnIntrinsicJsxAttributes instead",
+			name:           "invalid:143",
+			sourceText:     "const a = <div aria-grabbed></div>;",
+			jsx:            true,
+			withReactTypes: true,
 			expected: []noDeprecatedFinding{
 				{messageId: "deprecatedWithReason", name: "aria-grabbed", reason: "in ARIA 1.1"},
 			},
@@ -194,8 +194,8 @@ func TestNoDeprecatedInJsx(test *testing.T) {
 				"\n" +
 				"const componentDashed = <foo-bar:baz-bam name=\"e\" deprecatedProp=\"oh no\" />;\n" +
 				"      ",
-			jsx:                  true,
-			environmentDependent: true,
+			jsx:      true,
+			asScript: true,
 			expected: []noDeprecatedFinding{
 				{messageId: "deprecated", name: "deprecatedProp", reason: ""},
 			},
@@ -232,17 +232,14 @@ func TestNoDeprecatedInJsx(test *testing.T) {
 	runNoDeprecatedCases(test, cases)
 }
 
-// TestNoDeprecatedOnIntrinsicJsxAttributes covers the arm upstream's corpus cannot reach here.
+// TestNoDeprecatedOnIntrinsicJsxAttributes covers the intrinsic-attribute arm in the harness's own
+// module mode.
 //
-// Two of upstream's cases put the tag on an intrinsic element's attribute, `<div aria-grabbed>` and
-// a custom `<foo-bar>`, and both need a JSX namespace this harness cannot supply: it writes its own
-// tsconfig with `"types": []`, so `@types/react` never loads, and upstream's own fixture writes a
-// bare `declare namespace JSX` that is not global inside a module.
-//
-// The arm is real and was silent until this was written, so it is proven here instead, with the
-// namespace declared global in the fixture. The second row is the control that matters: a rule
-// reaching the intrinsic attribute type but reporting unconditionally would pass the first row and
-// fail only this one.
+// Upstream's two cases for this arm, invalid:143 and invalid:144 above, each pin something to run:
+// the @types/react declarations, and a script program so a bare `declare namespace JSX` is global.
+// These rows need neither, the namespace declared global inside a module. The second row is the
+// control that matters: a rule reaching the intrinsic attribute type but reporting unconditionally
+// would pass the first row and fail only this one.
 func TestNoDeprecatedOnIntrinsicJsxAttributes(test *testing.T) {
 	test.Parallel()
 

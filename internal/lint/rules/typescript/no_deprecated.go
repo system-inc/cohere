@@ -55,8 +55,9 @@ import (
 //
 // `deprecatedWithReason` is a distinct message id and 26 of upstream's cases assert its text, so the
 // reason is part of the contract rather than decoration. It comes off the tag's comment list, which
-// is a NodeList rather than a string because `{@link stat}` parses into its own node. Concatenating
-// the pieces' text reproduces `displayPartsToString`.
+// is a NodeList rather than a string because `{@link stat}` parses into its own node. A link node's
+// own text is only what follows its name, so concatenating the pieces' text renders `{@link stat}`
+// as nothing; `deprecationLinkText` rebuilds it the way `displayPartsToString` does.
 var NoDeprecated = rule.Rule[NoDeprecatedOptions]{
 	Name: "@typescript-eslint/no-deprecated",
 
@@ -204,7 +205,7 @@ func deprecationTagOn(declaration *ast.Node) *ast.Node {
 // The two returns are not redundant: `/** @deprecated */` with no text is a real finding with an
 // empty reason, and it takes the `deprecated` message rather than `deprecatedWithReason`. Collapsing
 // them into a single string would make an untexted tag indistinguishable from no tag.
-func deprecationReasonOnDeclaration(declaration *ast.Node) (string, bool) {
+func deprecationReasonOnDeclaration(ruleContext rule.Context, declaration *ast.Node) (string, bool) {
 	tag := deprecationTagOn(declaration)
 	if tag == nil {
 		return "", false
@@ -217,9 +218,107 @@ func deprecationReasonOnDeclaration(declaration *ast.Node) (string, bool) {
 	// `{@link stat}` is its own node, and 26 of upstream's cases assert the reassembled text.
 	var builder strings.Builder
 	for _, piece := range comment.Nodes {
+		if ast.IsJSDocLink(piece) || ast.IsJSDocLinkCode(piece) || ast.IsJSDocLinkPlain(piece) {
+			builder.WriteString(deprecationLinkText(ruleContext, piece))
+			continue
+		}
 		builder.WriteString(piece.Text())
 	}
 	return strings.TrimSpace(builder.String()), true
+}
+
+// deprecationLinkText is TypeScript's `buildLinkParts`, joined: what `displayPartsToString` makes of
+// an inline `{@link}`, `{@linkcode}` or `{@linkplain}` in a tag's text.
+//
+// The link's node text is only what follows its name, so reading it the way a text piece is read
+// turns `Use {@link stat} instead.` into `Use  instead.`, which is what this rule printed until
+// upstream's invalid:146 ran (#czy3qsc). Whether the name resolves changes the rendering, and the
+// separator rule is upstream's, odd corners included. Measured through TypeScript 6.0.3's
+// `getJsDocTags` and `displayPartsToString`:
+//
+//	{@link stat}         {@link stat}          resolves, nothing follows
+//	{@link nope}         {@link nope }         does not resolve, so a space is written before the empty text
+//	{@link stat|label}   {@link statlabel}     resolves, so the bar is dropped with no space
+//	{@link nope|label}   {@link nope label}
+//	{@link stat()}       {@link stat()}        the call parentheses are part of the name
+func deprecationLinkText(ruleContext rule.Context, link *ast.Node) string {
+	var builder strings.Builder
+	switch {
+	case ast.IsJSDocLinkCode(link):
+		builder.WriteString("{@linkcode ")
+	case ast.IsJSDocLinkPlain(link):
+		builder.WriteString("{@linkplain ")
+	default:
+		builder.WriteString("{@link ")
+	}
+	linkName := link.Name()
+	if linkName == nil {
+		builder.WriteString(link.Text())
+		builder.WriteString("}")
+		return builder.String()
+	}
+	suffix := deprecationLinkNameEnd(link.Text())
+	name := ast.EntityNameToString(linkName, nil) + link.Text()[:suffix]
+	rest := deprecationLinkSkipSeparator(link.Text()[suffix:])
+	builder.WriteString(name)
+	if !deprecationLinkNameResolves(ruleContext, linkName) {
+		// Upstream's `suffix === 0 || text[suffix] === '|' && !name.endsWith(' ')`.
+		if suffix == 0 ||
+			(suffix < len(link.Text()) && link.Text()[suffix] == '|' && !strings.HasSuffix(name, " ")) {
+			builder.WriteString(" ")
+		}
+	}
+	builder.WriteString(rest)
+	builder.WriteString("}")
+	return builder.String()
+}
+
+// deprecationLinkNameResolves is upstream's test for a declaration behind a link's name: the symbol
+// at the name, followed through any alias, with at least one declaration.
+func deprecationLinkNameResolves(ruleContext rule.Context, linkName *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(linkName)
+	if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
+		symbol = checker.Checker_resolveAlias(ruleContext.TypeChecker, symbol)
+	}
+	return symbol != nil && len(symbol.Declarations) > 0
+}
+
+// deprecationLinkNameEnd is upstream's `findLinkNameEnd`: how much of the text after a link's name
+// still belongs to the name, a URL's remainder up to a bar, call parentheses, or a type argument list.
+func deprecationLinkNameEnd(text string) int {
+	if strings.HasPrefix(text, "://") {
+		if bar := strings.IndexByte(text, '|'); bar >= 0 {
+			return bar
+		}
+		return len(text)
+	}
+	if strings.HasPrefix(text, "()") {
+		return 2
+	}
+	if strings.HasPrefix(text, "<") {
+		brackets := 0
+		for index := 0; index < len(text); index++ {
+			switch text[index] {
+			case '<':
+				brackets++
+			case '>':
+				brackets--
+			}
+			if brackets == 0 {
+				return index + 1
+			}
+		}
+	}
+	return 0
+}
+
+// deprecationLinkSkipSeparator is upstream's `skipSeparatorFromLinkText`: a bar and the spaces after
+// it come off the front of a link's label.
+func deprecationLinkSkipSeparator(text string) string {
+	if strings.HasPrefix(text, "|") {
+		return strings.TrimLeft(text[1:], " ")
+	}
+	return text
 }
 
 // deprecationOnSymbol unions across a symbol's declarations, which is what upstream's
@@ -232,7 +331,7 @@ func deprecationOnSymbol(ruleContext rule.Context, symbol *ast.Symbol) (string, 
 		return "", false
 	}
 	for _, declaration := range symbol.Declarations {
-		if reason, found := deprecationReasonOnDeclaration(declaration); found {
+		if reason, found := deprecationReasonOnDeclaration(ruleContext, declaration); found {
 			return reason, true
 		}
 	}
@@ -423,7 +522,7 @@ func deprecationOnSignatureDeclaration(ruleContext rule.Context, callLike *ast.N
 	if signature == nil {
 		return "", false
 	}
-	return deprecationReasonOnDeclaration(signature.Declaration())
+	return deprecationReasonOnDeclaration(ruleContext, signature.Declaration())
 }
 
 // declaresAsFunctionOrMethod reports whether a symbol's first declaration is a function or method.

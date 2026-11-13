@@ -33,6 +33,10 @@ type noDeprecatedCase struct {
 	// need it, and they are the ones that exercise the alias chain.
 	withDeprecatedFixture bool
 
+	// withNodeTypes adds noDeprecatedNodeTypes beside the subject: the cases whose deprecation upstream
+	// reads off @types/node read it off this pinned subset instead, the same on every machine.
+	withNodeTypes bool
+
 	// jsx compiles the subject as .tsx.
 	jsx bool
 
@@ -44,15 +48,19 @@ type noDeprecatedCase struct {
 	//
 	// Some cases take their deprecation from a @types package rather than from their own text, and
 	// without the link they report nothing, which is indistinguishable from the rule declining them.
-	// The link is enough for a named import whose types the fixture reaches directly; it is not
-	// enough for anything the harness's own tsconfig excludes, which writes `"types": []` after the
-	// setup hook runs and so admits no ambient declarations at all. Those cases are marked
-	// harnessBound instead.
+	// The link is enough for a named import whose types the fixture reaches directly; it admits no
+	// ambient declarations, since the harness's tsconfig says `"types": []`. A case that needs those
+	// pins them in its own program instead, withNodeTypes or withReactTypes.
 	withInstalledTypes bool
 
-	// harnessBound marks a case this test harness cannot express, as opposed to one the rule gets
-	// wrong. Skipped with the reason named, and the arm it covers is proven separately.
-	harnessBound string
+	// withReactTypes adds noDeprecatedReactTypes beside the subject, the @types/react declarations
+	// an intrinsic element's attributes come from, pinned.
+	withReactTypes bool
+
+	// asScript builds the program without `"moduleDetection": "force"`, so a subject with no import
+	// or export is a script, as it is in upstream's fixture project, and its `declare namespace JSX`
+	// is global rather than local to a module.
+	asScript bool
 
 	expected []noDeprecatedFinding
 }
@@ -110,15 +118,82 @@ const noDeprecatedSharedFixture = "" +
 	"  foo: 1,\n" +
 	"};\n"
 
+// noDeprecatedNodeTypes is the part of @types/node that upstream's node cases read, pinned.
+//
+// Upstream's expectations come from the @types/node its repository installs, and the installed one
+// moves: 26.x dropped the deprecated `assert.fail(actual, expected, ...)` overload that invalid:75
+// reports. Declaring the modules here, in the shape and with the tag text of the @types/node those
+// expectations were written against, makes each row a statement about the rule rather than about
+// whatever is installed. A `.d.ts` is a script under `"moduleDetection": "force"`, so its
+// `declare module` blocks are ambient, which is also how the `package` allowlist recognizes `fs`.
+const noDeprecatedNodeTypes = "" +
+	"declare module 'assert' {\n" +
+	"  function assert(value: unknown, message?: string | Error): asserts value;\n" +
+	"  namespace assert {\n" +
+	"    function fail(message?: string | Error): never;\n" +
+	"    /** @deprecated since v10.0.0 - use fail([message]) or other assert functions instead. */\n" +
+	"    function fail(\n" +
+	"      actual: unknown,\n" +
+	"      expected: unknown,\n" +
+	"      message?: string | Error,\n" +
+	"      operator?: string,\n" +
+	"      stackStartFn?: Function,\n" +
+	"    ): never;\n" +
+	"  }\n" +
+	"  export = assert;\n" +
+	"}\n" +
+	"declare module 'node:assert' {\n" +
+	"  import assert = require('assert');\n" +
+	"  export = assert;\n" +
+	"}\n" +
+	"declare module 'fs' {\n" +
+	"  type PathLike = string;\n" +
+	"  export function stat(path: PathLike, callback: (error: Error | null) => void): void;\n" +
+	"  export function access(path: PathLike, callback: (error: Error | null) => void): void;\n" +
+	"  /**\n" +
+	"   * @deprecated Since v1.0.0 - Use {@link stat} or {@link access} instead.\n" +
+	"   */\n" +
+	"  export function exists(path: PathLike, callback: (exists: boolean) => void): void;\n" +
+	"}\n"
+
+// noDeprecatedReactTypes is the part of @types/react that upstream's invalid:143 reads, pinned.
+//
+// The tag sits where @types/react puts it: on `AriaAttributes`, which `HTMLAttributes` extends, and
+// which reaches `<div>` through `DetailedHTMLProps`, an intersection with `ClassAttributes`. So the
+// property is found through an inherited interface inside an intersection, the way the real package
+// delivers it, rather than declared on the element directly.
+const noDeprecatedReactTypes = "" +
+	"declare namespace React {\n" +
+	"  interface Attributes {\n" +
+	"    key?: string | number | null | undefined;\n" +
+	"  }\n" +
+	"  interface ClassAttributes<T> extends Attributes {\n" +
+	"    ref?: ((instance: T | null) => void) | undefined;\n" +
+	"  }\n" +
+	"  interface AriaAttributes {\n" +
+	"    /** @deprecated in ARIA 1.1 */\n" +
+	"    'aria-grabbed'?: boolean | 'false' | 'true' | undefined;\n" +
+	"    'aria-hidden'?: boolean | 'false' | 'true' | undefined;\n" +
+	"  }\n" +
+	"  interface HTMLAttributes<T> extends AriaAttributes {\n" +
+	"    id?: string | undefined;\n" +
+	"  }\n" +
+	"  type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = ClassAttributes<T> & E;\n" +
+	"}\n" +
+	"interface HTMLDivElement {}\n" +
+	"declare namespace JSX {\n" +
+	"  interface Element {}\n" +
+	"  interface IntrinsicElements {\n" +
+	"    div: React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;\n" +
+	"  }\n" +
+	"}\n"
+
 // runNoDeprecatedCases runs a block of rows.
 func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 	test.Helper()
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			if testCase.harnessBound != "" {
-				test.Skip(testCase.harnessBound)
-			}
 			if testCase.environmentDependent {
 				test.Skip("depends on the installed @types packages rather than on the rule; " +
 					"upstream's declared expectation is recorded above")
@@ -132,6 +207,12 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 			if testCase.withDeprecatedFixture {
 				files["/repository/source/deprecated.ts"] = noDeprecatedSharedFixture
 			}
+			if testCase.withNodeTypes {
+				files["/repository/types/node.d.ts"] = noDeprecatedNodeTypes
+			}
+			if testCase.withReactTypes {
+				files["/repository/types/react.d.ts"] = noDeprecatedReactTypes
+			}
 
 			var decoded rule.Given[NoDeprecatedOptions]
 			if testCase.options != "" {
@@ -142,10 +223,21 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 				decoded = rule.Configured(parsed)
 			}
 
-			var result rule_testing.Result
+			var setups []func(directory string)
 			if testCase.withInstalledTypes {
+				setups = append(setups, linkInstalledTypesForNoDeprecated(test))
+			}
+			if testCase.asScript {
+				setups = append(setups, writeNoDeprecatedScriptConfiguration(test))
+			}
+			var result rule_testing.Result
+			if len(setups) > 0 {
 				result = rule_testing.RunTypedFilesWithSetupGiven(
-					test, NoDeprecated, files, subjectName, decoded, linkInstalledTypesForNoDeprecated(test))
+					test, NoDeprecated, files, subjectName, decoded, func(directory string) {
+						for _, setup := range setups {
+							setup(directory)
+						}
+					})
 			} else {
 				result = rule_testing.RunTypedFilesGiven(test, NoDeprecated, files, subjectName, decoded)
 			}
@@ -200,6 +292,30 @@ func linkInstalledTypesForNoDeprecated(test *testing.T) func(string) {
 	}
 }
 
+// writeNoDeprecatedScriptConfiguration writes the harness's tsconfig less `"moduleDetection": "force"`.
+//
+// The harness keeps a tsconfig a setup hook wrote, so this is how one case reaches a program whose
+// subject is a script. Everything else is the harness's own, `"types": []` included, so the case
+// still sees nothing from the machine.
+func writeNoDeprecatedScriptConfiguration(test *testing.T) func(string) {
+	test.Helper()
+	return func(directory string) {
+		const configuration = `{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ES2022",
+		"lib": ["ES2022"],
+		"types": []
+	},
+	"include": ["**/*.ts", "**/*.tsx"]
+}`
+		configurationPath := filepath.Join(directory, "tsconfig.json")
+		if writeError := os.WriteFile(configurationPath, []byte(configuration), 0o644); writeError != nil {
+			test.Fatalf("writing the script tsconfig: %v", writeError)
+		}
+	}
+}
+
 // describeNoDeprecated renders a result for a failure message.
 func describeNoDeprecated(result rule_testing.Result) string {
 	if len(result.Diagnostics) == 0 {
@@ -221,8 +337,9 @@ func describeNoDeprecated(result rule_testing.Result) string {
 //
 // Every expectation here was produced by replaying the case through the installed 8.67.0 build with
 // a real type checker, one program per case so no two cases share an interned type, then checked
-// against upstream's own declared expectations. 259 of the 264 agreed; the five that did not are
-// marked environmentDependent where they appear and carry upstream's declaration instead.
+// against upstream's own declared expectations. 259 of the 264 agreed; the five that did not carry
+// upstream's declaration instead. Three of them, valid:79, invalid:75 and invalid:144, now run on the
+// declarations or program mode they needed pinned; the other two are marked environmentDependent.
 func TestNoDeprecatedAgainstUpstreamOrdinaryCases(test *testing.T) {
 	test.Parallel()
 
@@ -232,10 +349,12 @@ func TestNoDeprecatedAgainstUpstreamOrdinaryCases(test *testing.T) {
 
 // TestNoDeprecatedAgainstNodeTypes covers deprecation that comes from a @types package.
 //
-// Every case here is environment dependent: whether `fs.exists` or `assert.fail` is marked
-// deprecated is a property of the installed @types/node, which is not the version upstream pins.
-// They carry upstream's declared expectations and are skipped rather than asserted, because a
-// machine with different types would fail them for a reason that says nothing about the rule.
+// Whether `fs.exists` or `assert.fail` is marked deprecated is a property of the @types/node a
+// machine has installed, so these rows read noDeprecatedNodeTypes instead and assert upstream's
+// declared expectations on every machine. valid:52 and invalid:75 are the same call through two
+// overloads, so a rule that asked the merged symbol rather than the resolved signature fails the
+// first, and valid:79 and invalid:146 are the same call under two allowlists, so a `package`
+// specifier that matched any package, or none, fails one of them.
 func TestNoDeprecatedAgainstNodeTypes(test *testing.T) {
 	test.Parallel()
 
@@ -247,7 +366,8 @@ func TestNoDeprecatedAgainstNodeTypes(test *testing.T) {
 				"\n" +
 				"assert.fail('');\n" +
 				"    ",
-			expected: nil,
+			withNodeTypes: true,
+			expected:      nil,
 		},
 		{
 			name: "valid:79",
@@ -255,9 +375,9 @@ func TestNoDeprecatedAgainstNodeTypes(test *testing.T) {
 				"import { exists } from 'fs';\n" +
 				"exists('/foo');\n" +
 				"      ",
-			options:              "{\"allow\":[{\"from\":\"package\",\"name\":\"exists\",\"package\":\"fs\"}]}",
-			environmentDependent: true,
-			expected:             nil,
+			options:       "{\"allow\":[{\"from\":\"package\",\"name\":\"exists\",\"package\":\"fs\"}]}",
+			withNodeTypes: true,
+			expected:      nil,
 		},
 		{
 			name: "invalid:75",
@@ -266,7 +386,7 @@ func TestNoDeprecatedAgainstNodeTypes(test *testing.T) {
 				"\n" +
 				"assert.fail({}, {});\n" +
 				"      ",
-			environmentDependent: true,
+			withNodeTypes: true,
 			expected: []noDeprecatedFinding{
 				{
 					messageId: "deprecatedWithReason",
@@ -281,8 +401,8 @@ func TestNoDeprecatedAgainstNodeTypes(test *testing.T) {
 				"import { exists } from 'fs';\n" +
 				"exists('/foo');\n" +
 				"      ",
-			options:      "{\"allow\":[{\"from\":\"package\",\"name\":\"exists\",\"package\":\"hoge\"}]}",
-			harnessBound: "the deprecation is on @types/node's fs.exists, which the harness's \"types\": [] excludes; the allowlist arm this case exercises is proven by the other allow cases, and whether fs.exists is marked deprecated differs between @types/node versions anyway",
+			options:       "{\"allow\":[{\"from\":\"package\",\"name\":\"exists\",\"package\":\"hoge\"}]}",
+			withNodeTypes: true,
 			expected: []noDeprecatedFinding{
 				{
 					messageId: "deprecatedWithReason",
@@ -342,4 +462,52 @@ func TestNoDeprecatedFiresAndStaysQuiet(test *testing.T) {
 		result := rule_testing.Run(test, NoDeprecated, "/repository/source/Subject.ts", source+"a();\n")
 		rule_testing.ExpectClean(test, result)
 	})
+}
+
+// TestNoDeprecatedRendersALinkInTheReasonAsUpstreamDoes pins the reason text around an inline link.
+//
+// Each row's want is what TypeScript 6.0.3's `getJsDocTags` and `displayPartsToString` printed for the
+// same declarations, which is the text upstream's message carries. The rule printed every one of these
+// with the link dropped, `Use  instead.`, and nothing ran that could say so until invalid:146 did. The
+// rows in pairs differ only in whether the name resolves, because that is what upstream's spacing turns
+// on.
+func TestNoDeprecatedRendersALinkInTheReasonAsUpstreamDoes(test *testing.T) {
+	test.Parallel()
+
+	rows := []struct {
+		link string
+		want string
+	}{
+		{link: "{@link stat}", want: "{@link stat}"},
+		{link: "{@link nope}", want: "{@link nope }"},
+		{link: "{@link stat the stat}", want: "{@link statthe stat}"},
+		{link: "{@link nope some text}", want: "{@link nope some text}"},
+		{link: "{@link stat|label}", want: "{@link statlabel}"},
+		{link: "{@link nope|label}", want: "{@link nope label}"},
+		{link: "{@linkcode stat}", want: "{@linkcode stat}"},
+		{link: "{@linkplain stat}", want: "{@linkplain stat}"},
+		{link: "{@link https://example.com}", want: "{@link https://example.com}"},
+		{link: "{@link https://example.com|site}", want: "{@link https://example.com site}"},
+		{link: "{@link stat()}", want: "{@link stat()}"},
+		{link: "{@link nope()}", want: "{@link nope()}"},
+		{link: "{@link Thing.member}", want: "{@link Thing.member}"},
+		{link: "{@link Thing.missing}", want: "{@link Thing.missing }"},
+		{link: "{@link}", want: "{@link }"},
+		{link: "{@link   stat   }", want: "{@link stat}"},
+	}
+	cases := make([]noDeprecatedCase, 0, len(rows))
+	for _, row := range rows {
+		cases = append(cases, noDeprecatedCase{
+			name: row.link,
+			sourceText: "declare function stat(): void;\n" +
+				"declare class Thing { member: number }\n" +
+				"/** @deprecated Use " + row.link + " instead. */\n" +
+				"declare function target(): void;\n" +
+				"target();\n",
+			expected: []noDeprecatedFinding{
+				{messageId: "deprecatedWithReason", name: "target", reason: "Use " + row.want + " instead."},
+			},
+		})
+	}
+	runNoDeprecatedCases(test, cases)
 }
