@@ -10,13 +10,17 @@
 //	// cohere:until <what upstream has to do before the copy can go>
 //
 // <module> is a module path and <version> its canonical semantic version, as the module cache spells them, and
-// <path> is the slash-separated path, from the module's root, of the one upstream file this file copies. The until
+// <path> is the slash-separated path, from the module's root, of the one upstream file this file copies. A copy of the
+// Go toolchain's own source names the module std, as go list names the standard library, and a Go release as go
+// spells it, std@go1.27.0, with <path> below the toolchain's src directory, as go/build/read.go. The until
 // text runs on through the lines of its comment below it, to the first blank comment line or the comment's end, and
 // is never empty: a copy says when it goes away.
 //
 // Every line of the file outside its marked changes is upstream's, which a test beside this file holds true
-// against the module cache. A marked change is a run of lines that differ from upstream's and hold a comment with
-// `cohere:` in it, the header among them; lines dropped from upstream are marked by such a comment where they were.
+// against the module cache, or a std copy against the toolchain's source, which the copy's own package also holds to
+// the sources of the release the copy names, so a toolchain that moves past them fails until the copy is bumped. A
+// marked change is a run of lines that differ from upstream's and hold a comment with `cohere:` in it, the header
+// among them; lines dropped from upstream are marked by such a comment where they were.
 // A file we translated rather than copied is ours and declares nothing here.
 //
 // A header that breaks this grammar is an error, never a file read as ours by accident: IsCopied is false for it,
@@ -26,6 +30,7 @@ package copied
 import (
 	"fmt"
 	"go/ast"
+	"go/version"
 	"path"
 	"strings"
 
@@ -39,9 +44,13 @@ const (
 	untilDirective  = "cohere:until"
 )
 
+// StandardLibrary is the module a copy of the Go toolchain's own source names, as go list names the standard library.
+const StandardLibrary = "std"
+
 // Header is what a copy's header declares.
 type Header struct {
-	// Module and Version name the upstream module, as golang.org/x/tools and v0.50.0.
+	// Module and Version name the upstream module, as golang.org/x/tools and v0.50.0, or the toolchain, as std and
+	// go1.27.0.
 	Module  string
 	Version string
 
@@ -107,16 +116,24 @@ func parseCopied(line string) (Header, error) {
 		return Header{}, fmt.Errorf("reading the copy header: %q has %d fields after %s, want <module>@<version> "+
 			"and <path>", line, len(fields), copiedDirective)
 	}
-	modulePath, version, versioned := strings.Cut(fields[0], "@")
-	if !versioned || version == "" {
+	modulePath, release, versioned := strings.Cut(fields[0], "@")
+	if !versioned || release == "" {
 		return Header{}, fmt.Errorf("reading the copy header: %q names no version of %s", line, modulePath)
 	}
-	if checkError := module.Check(modulePath, version); checkError != nil {
-		return Header{}, fmt.Errorf("reading the copy header %q: %w", line, checkError)
-	}
-	if semver.Canonical(version) != version {
-		return Header{}, fmt.Errorf("reading the copy header: %q writes version %s, which the module cache spells %s",
-			line, version, semver.Canonical(version))
+	if modulePath == StandardLibrary {
+		// A release names a patch, as go1.27.0, where go1.27 is a language version that no one toolchain is.
+		if !version.IsValid(release) || version.Lang(release) == release {
+			return Header{}, fmt.Errorf("reading the copy header: %q names %s, which is no Go release, as go1.27.0",
+				line, release)
+		}
+	} else {
+		if checkError := module.Check(modulePath, release); checkError != nil {
+			return Header{}, fmt.Errorf("reading the copy header %q: %w", line, checkError)
+		}
+		if semver.Canonical(release) != release {
+			return Header{}, fmt.Errorf("reading the copy header: %q writes version %s, which the module cache "+
+				"spells %s", line, release, semver.Canonical(release))
+		}
 	}
 	upstreamPath := fields[1]
 	if path.IsAbs(upstreamPath) || path.Clean(upstreamPath) != upstreamPath || upstreamPath == ".." ||
@@ -124,7 +141,7 @@ func parseCopied(line string) (Header, error) {
 		return Header{}, fmt.Errorf("reading the copy header: %q names %s, which is no clean path of a Go file "+
 			"inside the module", line, upstreamPath)
 	}
-	return Header{Module: modulePath, Version: version, Path: upstreamPath}, nil
+	return Header{Module: modulePath, Version: release, Path: upstreamPath}, nil
 }
 
 // readUntil reads the until line, which must be the first of below, and the lines it runs on through.

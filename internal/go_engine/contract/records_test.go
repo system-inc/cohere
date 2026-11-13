@@ -42,6 +42,7 @@ var additiveFields = map[Kind][]string{
 	KindLint: {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds", "offReasons"},
 	KindTypes: {
 		"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation", "censusMissed",
+		"headersUnshared",
 	},
 }
 
@@ -317,6 +318,8 @@ func populatedRecords() []Record {
 				{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 1},
 			},
 			WithheldDependencyCgoDeclarations: 3,
+			HeadersUnshared: "this binary links go/build of go1.28.0, and the copy that reads each Go file's header " +
+				"once a run is of go1.27.0's, so every build's listing parsed every header itself",
 		},
 		LintRecord{
 			Findings:              1,

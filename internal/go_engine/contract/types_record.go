@@ -43,6 +43,12 @@ type TypesRecord struct {
 	// from, so `--verbose` can say why a run collected when it did. Left out when the engine was not started as a
 	// process of its own, as in a test running it in process, since nothing was decided then.
 	Memory *Memory `json:"memory,omitempty"`
+
+	// HeadersUnshared is additive within contract 3, and the Go engine's alone: why the run's listings did not share
+	// each Go file's header, as they do through the engine's copy of go/build's directory read (#tb538na), so every
+	// build's listing parsed every header itself. That happens only in a binary linked by a Go release whose go/build
+	// is not the copy's, which reads the same listing at more CPU. Absent when they shared them.
+	HeadersUnshared string `json:"headersUnshared,omitempty"`
 }
 
 // MemorySource is where the engine's memory limit came from.
