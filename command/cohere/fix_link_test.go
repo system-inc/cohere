@@ -201,8 +201,10 @@ func realPathIn(test *testing.T, base string, name string) string {
 // the walk's offsets there writes `{ beta }` into delta: it parses and type-checks, and renames a property nobody
 // asked for. prefer-const needs the type checker, which the re-lint does not have, so its fix is refused and not
 // made again: the file is left as it is, and named, never written from stale offsets.
+//
+// Not parallel: applyProposedFixes names the changed file on the package's streams, which are the main goroutine's
+// only (showWarning), and two cases at once raced on them under -race.
 func TestAFileChangedDuringTheRunIsFixedFromTheTextItHolds(test *testing.T) {
-	test.Parallel()
 	for _, testCase := range []struct {
 		name, rule, read, changed, want string
 	}{
@@ -221,8 +223,8 @@ func TestAFileChangedDuringTheRunIsFixedFromTheTextItHolds(test *testing.T) {
 			want:    "var other = 2;\nlet alpha = 1;\nexport { alpha, other };\n",
 		},
 	} {
+		// Not parallel: each case writes the package's streams through applyProposedFixes, as the test says above.
 		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
 			graph, directory := buildNarrowFixtureGraph(test, map[string]string{
 				"CohereSettings.json": `{"rules":{"` + testCase.rule + `":"error"}}` + "\n",
 				"Racing.ts":           testCase.read,
