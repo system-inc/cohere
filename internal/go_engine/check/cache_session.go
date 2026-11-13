@@ -320,8 +320,9 @@ func (session *CacheSession) Restore(
 	if session.known == nil {
 		return nil
 	}
-	// The digests of every file Keys hashed, which the standard library's keys read rather than hash again; none
-	// without a store, which keys only the standard library.
+	// The digests of every file the run has hashed, which the standard library's keys read rather than hash again, so
+	// each standard-library file is hashed once a run (#b9f3bg4): this load's keys' when it keys one, the host's in an
+	// extra build that keys none, and none in a run with neither, which keys only the standard library.
 	var hashed cache.FileDigests
 	var keyed *cache.Keyed
 	session.keptKeys = nil
@@ -347,8 +348,20 @@ func (session *CacheSession) Restore(
 		}
 	}
 	if session.caching.Store != nil {
-		session.keys, session.own, hashed = keyed.Keys, keyed.Own, keyed.Files
+		session.keys, session.own = keyed.Keys, keyed.Own
 		session.files = keyed.Files
+	}
+	// An extra build without a store keys its load here for the portable digests its restore from the host reads, as
+	// restoreFromHost would after the binary's, so the standard library's keys read the files those keys hashed rather
+	// than hash every one again. Keys that fail are left to restoreFromHost, which computes them again and says why.
+	if keyed == nil && session.host != nil && !session.host.off {
+		keyed = session.hostPortableKeys(loader, reachable)
+	}
+	switch {
+	case keyed != nil:
+		hashed = keyed.Files
+	case session.host != nil:
+		hashed = session.host.host.files
 	}
 	session.restoreFromBinary(loader, reachable, hashed)
 	session.readHits(reachable)
