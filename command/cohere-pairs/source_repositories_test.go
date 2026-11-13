@@ -80,11 +80,26 @@ func TestCopySourceReadsARepositoryAnotherUserOwns(test *testing.T) {
 		if copyError != nil {
 			test.Fatalf("the copy of %s, another user's, was refused: %v", source, copyError)
 		}
-		// The copy is this user's, but the switch takes it for another's too, so it is read naming every directory
-		// safe.
-		if head := runGit(test, copied, "-c", "safe.directory=*", "rev-parse", "main"); head != commit {
-			test.Errorf("the copy of %s has main at %s, want %s", source, head, commit)
+		// The copy is this user's, and the switch would take it for another's, so it is read with the switch off.
+		head, headError := gitBytesIn(copied, []string{"GIT_TEST_ASSUME_DIFFERENT_OWNER=0"}, "rev-parse", "main")
+		if headError != nil || strings.TrimSpace(string(head)) != commit {
+			test.Errorf("the copy of %s has main at %q, %v, want %s", source, head, headError, commit)
 		}
+	}
+}
+
+// The file copySource hands git names the repository and its .git, and git reads each path back whole: one with a
+// space, a quote, a semicolon, a hash and a backslash in it comes back exactly as written.
+func TestSafeDirectoryConfigurationIsReadBackWhole(test *testing.T) {
+	test.Parallel()
+	repository := filepath.Join(test.TempDir(), `odd name "with" ;semicolon #hash \back`)
+	file := filepath.Join(test.TempDir(), "safe.gitconfig")
+	if writeError := os.WriteFile(file, []byte(safeDirectoryConfiguration(repository)), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	read := runGit(test, test.TempDir(), "config", "--file", file, "--get-all", "safe.directory")
+	if want := repository + "\n" + filepath.Join(repository, ".git"); read != want {
+		test.Errorf("git read back\n%q\nwant\n%q", read, want)
 	}
 }
 

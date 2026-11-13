@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -19,8 +20,17 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 // gitBytes runs git in directory and returns what it printed byte for byte, as a file's contents or a -z listing
 // need it, carrying git's stderr into the error.
 func gitBytes(directory string, arguments ...string) ([]byte, error) {
+	return gitBytesIn(directory, nil, arguments...)
+}
+
+// gitBytesIn is gitBytes with environment added to the process's own, later entries winning, for a git that must read
+// a setting no flag can give it.
+func gitBytesIn(directory string, environment []string, arguments ...string) ([]byte, error) {
 	command := exec.Command("git", arguments...)
 	command.Dir = directory
+	if len(environment) > 0 {
+		command.Env = append(os.Environ(), environment...)
+	}
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
 	output, runError := command.Output()

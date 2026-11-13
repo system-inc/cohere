@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -124,23 +125,44 @@ func copySources(sources sourceRepositories, output string, say progress) (sourc
 
 // copySource clones source, bare or not, into destination as a bare repository with objects of its own, and returns
 // destination. A local clone copies the source's whole object store, so a commit no branch holds, a pin among them,
-// is copied too; --no-hardlinks makes those files this user's rather than links to root's. `-c safe.directory`
-// names the source as one git may open though another user owns it, a root-owned mirror on a rented machine, where
-// git otherwise refuses with "dubious ownership"; given on the command line, it reaches the git the clone starts to
-// read the source as well. It is given twice, the source and its .git, since git checks a bare repository at its own
-// path and a checkout's at its .git as a clone reads it, and with every symbolic link resolved, as git resolves the
-// path it compares the setting to, and macOS's /tmp is a link.
+// is copied too; --no-hardlinks makes those files this user's rather than links to root's. A root-owned mirror on a
+// rented machine is one git refuses to open for anyone else, "dubious ownership", unless safe.directory names it, and
+// git 2.43 reads that setting for the source only from global or system configuration: `-c safe.directory` reaches
+// the clone but not the upload-pack it starts in the source, which refuses (measured on Lunatic and Pupa, git 2.43.0,
+// Loom jobs J-zjmdxxr, J-13pxnxg and J-0fzen3h, Nov 13). So the setting goes in a configuration file of the copy's
+// own, given to the clone as GIT_CONFIG_GLOBAL, which every git the clone starts reads. That file stands in for the
+// user's global configuration for this one local clone, which reads nothing else from it. It names the source and its
+// .git, since git checks a bare repository at its own path and a checkout's at its .git, with every symbolic link
+// resolved, as git resolves the path it compares the setting to, and macOS's /tmp is a link.
 func copySource(source string, destination string, say progress) (string, error) {
 	started := time.Now()
 	resolved, resolveError := filepath.EvalSymlinks(source)
 	if resolveError != nil {
 		return "", fmt.Errorf("reading the source %s: %w", source, resolveError)
 	}
-	if _, cloneError := gitOutput(filepath.Dir(destination), "-c", "safe.directory="+resolved, "-c",
-		"safe.directory="+filepath.Join(resolved, ".git"), "clone", "--quiet", "--bare", "--no-hardlinks", resolved,
-		destination); cloneError != nil {
+	configuration := destination + ".safe-directory.gitconfig"
+	writeError := os.WriteFile(configuration, []byte(safeDirectoryConfiguration(resolved)), 0o644)
+	if writeError != nil {
+		return "", fmt.Errorf("writing %s: %w", configuration, writeError)
+	}
+	_, cloneError := gitBytesIn(filepath.Dir(destination), []string{"GIT_CONFIG_GLOBAL=" + configuration}, "clone",
+		"--quiet", "--bare", "--no-hardlinks", resolved, destination)
+	if removeError := os.Remove(configuration); removeError != nil && cloneError == nil {
+		return "", fmt.Errorf("removing %s: %w", configuration, removeError)
+	}
+	if cloneError != nil {
 		return "", cloneError
 	}
 	say.say("sources: copied %s to %s in %.1f s\n", source, destination, time.Since(started).Seconds())
 	return destination, nil
+}
+
+// safeDirectoryConfiguration is a git configuration naming repository, and its .git, as safe to open whoever owns it.
+// A path is written as a quoted value, so a space, a semicolon or a hash in it stays part of the path.
+func safeDirectoryConfiguration(repository string) string {
+	quoted := func(path string) string {
+		return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(path) + `"`
+	}
+	return "[safe]\n\tdirectory = " + quoted(repository) + "\n\tdirectory = " +
+		quoted(filepath.Join(repository, ".git")) + "\n"
 }
