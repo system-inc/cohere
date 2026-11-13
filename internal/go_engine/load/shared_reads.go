@@ -36,8 +36,10 @@ type SharedReads struct {
 	// resolved is each path's filepath.EvalSymlinks, empty where it failed, a string by path, and isDirectories
 	// whether each path is a directory, a bool by path, which go/build's HasSubdir and IsDir read (hasSubdirectory,
 	// isDirectory): a path's links and kind hold for the run, as its entries do, since the engine adds or removes no
-	// file. Each is a sync.Map, not under mutex: they are filled once and read for every directory of every build
-	// listing at once, so a hit takes no lock.
+	// file. That is an invariant every fixer has to keep: the wrap and the rename rewrite files and the store writes
+	// under a dot directory go never walks, and a fixer that ever adds or removes a file leaves both tables stale.
+	// Each is a sync.Map, not under mutex: they are filled once and read for every directory of every build listing
+	// at once, so a hit takes no lock.
 	resolved      sync.Map
 	isDirectories sync.Map
 }
