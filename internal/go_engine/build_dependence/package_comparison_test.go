@@ -12,22 +12,27 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
-// packageComparison is one package's comparison under way: its two sides, the judgment it reads units by, and what
-// it found so far.
+// packageComparison is one package's comparison under way: its two sides, the judgment it reads units by, the files
+// the build compiles, by name, and what it found so far.
 type packageComparison struct {
-	pair   loweringPair
-	judge  loweringJudge
-	hosted *packages.Package
-	built  *packages.Package
-	tally  *loweringTally
+	pair       loweringPair
+	judge      loweringJudge
+	hosted     *packages.Package
+	built      *packages.Package
+	builtFiles map[string]bool
+	tally      *loweringTally
 }
 
 // comparePackage builds a package both ways and compares every function the host's declares with its counterpart in
 // the build, found by its file and offset, each anonymous function by its index in its parent, and each synthetic
 // function either reaches after it, all counting toward the declared function's unit. The package initializer is
-// compared unit by unit (compareInitializer).
+// compared unit by unit (compareInitializer). A host function with no counterpart is counted by why (unpaired).
+//
+// dropFromBuild, nil but in the test that proves an unpaired function goes red, names functions of the build left out
+// of the counterparts, as though the build had not lowered them.
 func comparePackage(hosted *packages.Package, built *packages.Package, hostFlows *ctrlflow.CFGs,
-	buildFlows *ctrlflow.CFGs, judge loweringJudge) loweringTally {
+	buildFlows *ctrlflow.CFGs, judge loweringJudge,
+	dropFromBuild func(*intermediate_representation.Function) bool) loweringTally {
 	tally := loweringTally{packages: 1, unknownFields: map[string]bool{}}
 	hostPackage, hostPanic := buildPackage(hosted, hostFlows)
 	builtPackage, buildPanic := buildPackage(built, buildFlows)
@@ -41,13 +46,20 @@ func comparePackage(hosted *packages.Package, built *packages.Package, hostFlows
 			host:  &loweringSide{fileSet: hosted.Fset, unknownFields: tally.unknownFields},
 			build: &loweringSide{fileSet: built.Fset, unknownFields: tally.unknownFields},
 		},
-		judge:  judge,
-		hosted: hosted,
-		built:  built,
-		tally:  &tally,
+		judge:      judge,
+		hosted:     hosted,
+		built:      built,
+		builtFiles: map[string]bool{},
+		tally:      &tally,
+	}
+	for _, file := range built.Syntax {
+		comparison.builtFiles[built.Fset.File(file.FileStart).Name()] = true
 	}
 	counterparts := map[string]*intermediate_representation.Function{}
 	for _, function := range builtPackage.Functions {
+		if dropFromBuild != nil && dropFromBuild(function) {
+			continue
+		}
 		if place := syntaxPlace(built.Fset, function); place != "" {
 			counterparts[place] = function
 		}
@@ -60,13 +72,54 @@ func comparePackage(hosted *packages.Package, built *packages.Package, hostFlows
 		place := syntaxPlace(hosted.Fset, function)
 		counterpart, isShared := counterparts[place]
 		if place == "" || !isShared {
-			tally.unpaired++
+			comparison.unpairedFunction(function)
 			continue
 		}
 		unitIndex, isUnit := judge.unitAt(hosted.ID, hosted.Fset, function.Syntax().Pos())
 		comparison.compareFunctions(function, counterpart, unitIndex, isUnit)
 	}
 	return tally
+}
+
+// unpairedFunction counts a host function with no counterpart in the build by why (unpaired): its syntax's file and
+// the unit holding it.
+func (comparison *packageComparison) unpairedFunction(function *intermediate_representation.Function) {
+	name := function.RelativeString(nil)
+	if function.Syntax() == nil {
+		comparison.unpaired(name, "", 0, false)
+		return
+	}
+	position := function.Syntax().Pos()
+	unitIndex, isUnit := comparison.judge.unitAt(comparison.hosted.ID, comparison.hosted.Fset, position)
+	comparison.unpaired(fmt.Sprintf("%s at %s", name, syntaxPlace(comparison.hosted.Fset, function)),
+		comparison.hosted.Fset.File(position).Name(), unitIndex, isUnit)
+}
+
+// unpaired counts what the host lowered and the comparison found no counterpart for, by why: built from no syntax, in
+// a file only the host compiles, both of which the build has no counterpart for by construction; in a unit block 1
+// calls independent, which a shared file's always has, so it is a function the gate would pass uncompared; or
+// anything else, named. The last two fail like a difference (loweringFailures).
+func (comparison *packageComparison) unpaired(name string, file string, unitIndex int, isUnit bool) {
+	tally := comparison.tally
+	switch {
+	case file == "":
+		tally.unpairedNoSyntax++
+	case !comparison.builtFiles[file]:
+		tally.unpairedHostOnly++
+	case isUnit && !comparison.judge.units[unitIndex].Dependent:
+		judgedAgain := ""
+		if comparison.judge.judgedAgain[unitIndex] {
+			judgedAgain = ", judged again for a callee's no-return"
+		}
+		tally.unpairedIndependent = append(tally.unpairedIndependent, fmt.Sprintf("%s %s, in %s%s",
+			comparison.hosted.ID, name, comparison.judge.unitLabel(unitIndex), judgedAgain))
+	case isUnit:
+		tally.unpairedOther = append(tally.unpairedOther, fmt.Sprintf("%s %s, in the dependent unit %s",
+			comparison.hosted.ID, name, comparison.judge.unitLabel(unitIndex)))
+	default:
+		tally.unpairedOther = append(tally.unpairedOther, fmt.Sprintf("%s %s, in a shared file and no unit",
+			comparison.hosted.ID, name))
+	}
 }
 
 // syntaxPlace is the file and offset of the syntax function was built from, empty for a function built from none.
@@ -322,8 +375,11 @@ func (comparison *packageComparison) compareInitializer(hosted *intermediate_rep
 	var reachedFromUnits []reachedFromUnit
 	for _, key := range order {
 		hostSegment, buildSegment := hostSegments[key], buildSegments[key]
-		if strings.HasPrefix(key, "no unit at ") {
-			tally.unpaired++
+		if place, isNoUnit := strings.CutPrefix(key, "no unit at "); isNoUnit {
+			// The key holds the place as file:offset, and a file's name may hold a colon, so the offset is cut at
+			// the last one.
+			file := place[:strings.LastIndex(place, ":")]
+			comparison.unpaired(hosted.RelativeString(nil)+", the segment "+key, file, 0, false)
 			continue
 		}
 		pair.host.reached, pair.build.reached = nil, nil
@@ -386,7 +442,7 @@ func (comparison *packageComparison) compareInitializer(hosted *intermediate_rep
 	for _, anonymous := range hosted.AnonymousFunctions {
 		counterpart, isShared := builtAnonymous[syntaxPlace(pair.host.fileSet, anonymous)]
 		if !isShared {
-			tally.unpaired++
+			comparison.unpairedFunction(anonymous)
 			continue
 		}
 		unitIndex, isUnit := judge.unitAt(comparison.hosted.ID, pair.host.fileSet, anonymous.Syntax().Pos())

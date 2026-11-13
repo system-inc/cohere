@@ -109,9 +109,11 @@ func buildPackage(loaded *packages.Package, graphs *ctrlflow.CFGs) (built *inter
 
 // compareBuilds compares every package host and build both hold that loaded without errors and that ctrlflow ran
 // on to the end in each, a few at once, so only those packages' two lowerings are live together. Each finding says
-// whether judgedAgain, the no-return facts judgment, explains it.
+// whether judgedAgain, the no-return facts judgment, explains it. dropFromBuild is comparePackage's, nil but in the
+// test that proves an unpaired function goes red.
 func compareBuilds(host loadedBuild, build loadedBuild, hostFlows controlFlows, buildFlows controlFlows,
-	dependence *Dependence, judgedAgain []bool) loweringTally {
+	dependence *Dependence, judgedAgain []bool,
+	dropFromBuild func(*intermediate_representation.Function) bool) loweringTally {
 	judge := loweringJudge{dependence: dependence, units: dependence.Units(), judgedAgain: judgedAgain}
 	var tally loweringTally
 	var tallyLock sync.Mutex
@@ -121,7 +123,7 @@ func compareBuilds(host loadedBuild, build loadedBuild, hostFlows controlFlows, 
 		group.Go(func() {
 			for identifier := range work {
 				compared := comparePackage(host[identifier], build[identifier], hostFlows[identifier],
-					buildFlows[identifier], judge)
+					buildFlows[identifier], judge, dropFromBuild)
 				tallyLock.Lock()
 				tally.merge(compared)
 				tallyLock.Unlock()
@@ -148,7 +150,29 @@ func compareBuilds(host loadedBuild, build loadedBuild, hostFlows controlFlows, 
 	slices.SortFunc(tally.packageLevelDiffer, func(first loweringFinding, second loweringFinding) int {
 		return strings.Compare(first.unit, second.unit)
 	})
+	slices.Sort(tally.unpairedIndependent)
+	slices.Sort(tally.unpairedOther)
 	return tally
+}
+
+// loweringFailures are what fails a comparison as a difference does: each difference in a function of a unit block
+// 1 calls independent that no callee's no-return explains, and each host function or initializer segment left without
+// a counterpart that neither its lack of syntax nor a file only the host compiles accounts for, since the gate would
+// pass it uncompared.
+func loweringFailures(tally loweringTally) []string {
+	var failures []string
+	for _, finding := range tally.findings {
+		if !finding.judgedAgain {
+			failures = append(failures, "independent and lowers differently: "+describeFinding(finding))
+		}
+	}
+	for _, unpaired := range tally.unpairedIndependent {
+		failures = append(failures, "in an independent unit and left without a counterpart: "+unpaired)
+	}
+	for _, unpaired := range tally.unpairedOther {
+		failures = append(failures, "left without a counterpart, in a file both builds compile: "+unpaired)
+	}
+	return failures
 }
 
 // describeFinding renders a finding for the log.
@@ -183,20 +207,21 @@ func TestEveryIndependentFunctionLowersTheSameInBothBuilds(test *testing.T) {
 				buildFlows := fixtureControlFlows(test, fixture, build)
 				noReturn := judgeNoReturn(judged.host, judged.build, hostFlows, buildFlows, judged.dependence)
 				tally := compareBuilds(judged.host, judged.build, hostFlows, buildFlows, judged.dependence,
-					noReturn.judgedAgain)
+					noReturn.judgedAgain, nil)
 				test.Logf("compared %d independent functions, %d of them judged again for a callee's no-return, %d "+
 					"instructions, %d synthetic functions reached; %d of %d dependent functions lower differently; "+
 					"no-return differs for %q", tally.independent, tally.judgedAgain, tally.instructions,
 					tally.synthetic, tally.dependentDiffer, tally.dependent, noReturn.differingFunctions)
+				for _, failure := range loweringFailures(tally) {
+					test.Error(failure)
+				}
 				var explained []string
 				for _, finding := range tally.findings {
-					if !finding.judgedAgain {
-						test.Errorf("independent and lowers differently: %s", describeFinding(finding))
-						continue
+					if finding.judgedAgain {
+						test.Logf("independent by block 1 and lowers differently, judged again: %s",
+							describeFinding(finding))
+						explained = append(explained, finding.difference.function)
 					}
-					test.Logf("independent by block 1 and lowers differently, judged again: %s",
-						describeFinding(finding))
-					explained = append(explained, finding.difference.function)
 				}
 				var wantExplained []string
 				if fixture == "lowering" && build.name == linuxBuild.name {
@@ -223,6 +248,37 @@ func TestEveryIndependentFunctionLowersTheSameInBothBuilds(test *testing.T) {
 					test.Error("no dependent function lowers differently, so the comparison sees nothing")
 				}
 			})
+		}
+	}
+}
+
+// A host function left without a counterpart in a file both builds compile fails as a difference does, since the
+// gate would pass it uncompared: on linux, with Named dropped from the build's functions, Named's unit is independent
+// and the comparison names it, and with NewRecord dropped, NewRecord's unit is dependent and it names it apart.
+func TestAnUnpairedFunctionInASharedFileFails(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "lowering", linuxBuild)
+	hostFlows := fixtureControlFlows(test, "lowering", hostBuild)
+	buildFlows := fixtureControlFlows(test, "lowering", linuxBuild)
+	noReturn := judgeNoReturn(judged.host, judged.build, hostFlows, buildFlows, judged.dependence)
+	tally := compareBuilds(judged.host, judged.build, hostFlows, buildFlows, judged.dependence, noReturn.judgedAgain,
+		func(function *intermediate_representation.Function) bool {
+			return function.Name() == "Named" || function.Name() == "NewRecord"
+		})
+	failures := loweringFailures(tally)
+	for _, want := range []struct {
+		unpaired []string
+		name     string
+	}{
+		{tally.unpairedIndependent, "example.com/lowering.Named"},
+		{tally.unpairedOther, "example.com/lowering.NewRecord"},
+	} {
+		if len(want.unpaired) != 1 || !strings.Contains(want.unpaired[0], want.name+" at ") {
+			test.Errorf("want %s alone left without a counterpart in its class, got %q", want.name, want.unpaired)
+		}
+		if !slices.ContainsFunc(failures, func(failure string) bool { return strings.Contains(failure, want.name) }) {
+			test.Errorf("want %s among the failures, got %q", want.name, failures)
 		}
 	}
 }
@@ -343,7 +399,7 @@ func TestEveryIndependentFunctionLowersTheSameInATree(test *testing.T) {
 			}
 		}
 		noReturn := judgeNoReturn(host, built, hostFlows, buildFlows, dependence)
-		tally := compareBuilds(host, built, hostFlows, buildFlows, dependence, noReturn.judgedAgain)
+		tally := compareBuilds(host, built, hostFlows, buildFlows, dependence, noReturn.judgedAgain, nil)
 		explained := 0
 		for _, finding := range tally.findings {
 			if finding.judgedAgain {
@@ -364,15 +420,36 @@ func TestEveryIndependentFunctionLowersTheSameInATree(test *testing.T) {
 			}
 			test.Logf("build %s no-return %d: %s", name, index+1, function)
 		}
-		test.Logf("build %s: %d packages loaded, ctrlflow on %d; %d of %d units dependent; %d packages compared, "+
-			"%d skipped; %d independent functions and initializer segments compared (%d of them segments), %d "+
-			"instructions, %d synthetic functions reached, %d functions or segments without a counterpart; %d "+
-			"differences in independent functions; %d of %d package-level initializer segments differ; %d of %d "+
-			"dependent functions and segments lower differently; %s, peak heap %s",
-			name, len(built), len(buildFlows), dependentUnits, len(dependence.Units()), tally.packages,
-			len(tally.skipped), tally.independent, tally.segments, tally.instructions, tally.synthetic, tally.unpaired,
-			len(tally.findings), len(tally.packageLevelDiffer), tally.packageLevel, tally.dependentDiffer,
-			tally.dependent, time.Since(started).Round(time.Second), heapInUse())
+		test.Logf(
+			"build %s: %d packages loaded, ctrlflow on %d; %d of %d units dependent; %d packages compared, "+
+				"%d skipped; %d independent functions and initializer segments compared (%d of them segments), %d "+
+				"instructions, %d synthetic functions reached; without a counterpart: %d built from no syntax, %d in "+
+				"files only the host compiles, %d in independent units, %d otherwise; %d "+
+				"differences in independent functions; %d of %d package-level initializer segments differ; %d of %d "+
+				"dependent functions and segments lower differently; %s, peak heap %s",
+			name,
+			len(built),
+			len(buildFlows),
+			dependentUnits,
+			len(dependence.Units()),
+			tally.packages,
+			len(tally.skipped),
+			tally.independent,
+			tally.segments,
+			tally.instructions,
+			tally.synthetic,
+			tally.unpairedNoSyntax,
+			tally.unpairedHostOnly,
+			len(tally.unpairedIndependent),
+			len(tally.unpairedOther),
+			len(tally.findings),
+			len(tally.packageLevelDiffer),
+			tally.packageLevel,
+			tally.dependentDiffer,
+			tally.dependent,
+			time.Since(started).Round(time.Second),
+			heapInUse(),
+		)
 		test.Logf("build %s skipped: %q", name, tally.skipped)
 		for index, finding := range tally.findings {
 			if index == wideDifferencesListed {
@@ -389,9 +466,13 @@ func TestEveryIndependentFunctionLowersTheSameInATree(test *testing.T) {
 		for _, unknown := range slices.Sorted(maps.Keys(tally.unknownFields)) {
 			test.Errorf("build %s: an instruction field of a kind the comparison does not render: %s", name, unknown)
 		}
-		if len(tally.findings) > explained {
-			test.Errorf("build %s: %d differences in independent functions that no callee's no-return explains",
-				name, len(tally.findings)-explained)
+		failures := loweringFailures(tally)
+		for index, failure := range failures {
+			if index == wideDifferencesListed {
+				test.Errorf("build %s: %d more failures not listed", name, len(failures)-index)
+				break
+			}
+			test.Errorf("build %s: %s", name, failure)
 		}
 		if dependentUnits > 0 && tally.dependentDiffer == 0 {
 			test.Errorf("build %s: block 1 found %d dependent units and no dependent function lowers differently, "+

@@ -18,13 +18,20 @@ type loweringFinding struct {
 type loweringTally struct {
 	packages        int
 	skipped         []string
-	unpaired        int
 	independent     int
 	instructions    int
 	synthetic       int
 	dependent       int
 	dependentDiffer int
 	findings        []loweringFinding
+
+	// The host's functions and initializer segments with no counterpart in the build, by why
+	// (packageComparison.unpaired): built from no syntax, in a file only the host compiles, in an independent unit,
+	// and anything else, the last two named.
+	unpairedNoSyntax    int
+	unpairedHostOnly    int
+	unpairedIndependent []string
+	unpairedOther       []string
 
 	// judgedAgain are the independent functions and segments compared whose unit the no-return facts judgment sends
 	// to be judged again, counted among independent.
@@ -45,7 +52,10 @@ type loweringTally struct {
 func (tally *loweringTally) merge(other loweringTally) {
 	tally.packages += other.packages
 	tally.skipped = append(tally.skipped, other.skipped...)
-	tally.unpaired += other.unpaired
+	tally.unpairedNoSyntax += other.unpairedNoSyntax
+	tally.unpairedHostOnly += other.unpairedHostOnly
+	tally.unpairedIndependent = append(tally.unpairedIndependent, other.unpairedIndependent...)
+	tally.unpairedOther = append(tally.unpairedOther, other.unpairedOther...)
 	tally.independent += other.independent
 	tally.instructions += other.instructions
 	tally.synthetic += other.synthetic
