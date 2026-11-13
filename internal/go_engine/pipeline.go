@@ -136,6 +136,12 @@ type pipeline struct {
 	// writes once the builds start (extraBuildRun).
 	fingerprints *load.Fingerprints
 
+	// walks are the package directories each pattern's walk finds, which the extra builds share, each walked once for
+	// every build (#tb538na). Only the extra builds read them, as fingerprints: a walk reads directory entries alone,
+	// which no write of the run changes, but the builds are the loads after which nothing writes at all, so no reader
+	// need know which writes a walk reads past.
+	walks *load.PackageWalks
+
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
 	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
 	renamed bool
@@ -217,6 +223,7 @@ func newPipeline(
 		timing:              newTiming(request),
 		reads:               load.NewSharedReads(),
 		fingerprints:        load.NewFingerprints(),
+		walks:               load.NewPackageWalks(),
 	}
 }
 

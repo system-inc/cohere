@@ -72,6 +72,9 @@ type inProcessLister struct {
 	// visited is how far order's walk has got with each package, by import path.
 	visited map[string]visitState
 
+	// walks is each pattern's walk of package directories, shared by the run's extra builds when set (PackageWalks).
+	walks *PackageWalks
+
 	mutex  sync.Mutex
 	byPath map[string]*inProcessPackage
 	reads  map[string]*directoryRead
@@ -113,20 +116,22 @@ var (
 )
 
 // listInProcess is list without go list: the same listing, in the same order, with the same fields, read in this
-// process (see inProcessLister), each file held holds read from its held bytes, and every other read through shared
-// when it is set, adding its CPU to collector. It returns
+// process (see inProcessLister), each file held holds read from its held bytes, every other read through shared when
+// it is set, and each pattern's walk through walks, nil walking each again, adding its CPU to collector. It returns
 // why it could not answer when it could not, and then the listing is nil and go list answers instead.
 func listInProcess(
 	goEnvironment *GoEnvironment,
 	patterns []string,
 	held Held,
 	shared *SharedReads,
+	walks *PackageWalks,
 	collector *timing.Collector,
 ) (*listing, string) {
 	lister, doubt := newInProcessLister(goEnvironment, held, shared, collector)
 	if doubt != "" {
 		return nil, doubt
 	}
+	lister.walks = walks
 	return lister.list(patterns)
 }
 
@@ -325,7 +330,8 @@ func (lister *inProcessLister) matchLocal() ([]string, string) {
 	if owner == nil {
 		return nil, fmt.Sprintf("%s is in no main module", lister.workspace)
 	}
-	directories, doubt := listed_directories.PackageDirectories(lister.workspace, func(string) bool { return true })
+	directories, doubt := lister.walks.directories(packageWalkKey{root: lister.workspace, pattern: "./..."},
+		func(string) bool { return true })
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -360,7 +366,8 @@ func (lister *inProcessLister) matchModules(prefix string) ([]string, string) {
 			return nil, fmt.Sprintf("the pattern %s/... could name packages of %s, which is not a main module",
 				prefix, each.Path)
 		}
-		directories, doubt := listed_directories.PackageDirectories(each.Dir, func(directory string) bool {
+		directories, doubt := lister.walks.directories(packageWalkKey{root: each.Dir, modulePath: each.Path,
+			pattern: prefix + "/..."}, func(directory string) bool {
 			return canMatch(importPathIn(each.Dir, each.Path, directory))
 		})
 		if doubt != "" {

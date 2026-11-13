@@ -51,7 +51,7 @@ func wideGraph(test *testing.T) (func() *graph, string) {
 	writeListingFiles(test, directory, wideFixture())
 	workspace := directory + "/wide"
 	goEnvironment := goEnvironmentOf(test, workspace, []string{"GOWORK=off"})
-	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil)
+	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

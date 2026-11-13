@@ -92,16 +92,18 @@ type listing struct {
 
 // list lists the patterns in goEnvironment's workspace under its whole environment, as `go list -deps -json -e` lists
 // them: read in this process when the lister can answer exactly, each file held holds read from its held bytes, and by
-// go list itself, which reads the disk, when it has any doubt. The go commands either runs add their CPU to collector,
-// and so do the lister's goroutines.
+// go list itself, which reads the disk, when it has any doubt. The lister walks each pattern through walks, which a nil
+// one walks again (PackageWalks). The go commands either runs add their CPU to collector, and so do the lister's
+// goroutines.
 func list(
 	goEnvironment *GoEnvironment,
 	patterns []string,
 	held Held,
 	shared *SharedReads,
+	walks *PackageWalks,
 	collector *timing.Collector,
 ) (*listing, error) {
-	listed, doubt := listInProcess(goEnvironment, patterns, held, shared, collector)
+	listed, doubt := listInProcess(goEnvironment, patterns, held, shared, walks, collector)
 	if doubt == "" {
 		listed.inProcess = true
 		return listed, nil

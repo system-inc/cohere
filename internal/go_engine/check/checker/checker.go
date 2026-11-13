@@ -452,6 +452,11 @@ type Graph struct {
 	// These two kind of edges are called "vertical" and "horizontal",
 	// respectively.
 	Roots []*Action
+
+	// cohere: requiredFacts is what this graph's construction read of
+	// factAnalyzersRequired, kept so a test reads that each analyzer's was
+	// computed once.
+	requiredFacts *factRequirements
 }
 
 // All returns an iterator over the action graph in depth-first postorder.
@@ -563,6 +568,30 @@ func factAnalyzersRequired(a *analysis.Analyzer) []*analysis.Analyzer {
 	return found
 }
 
+// cohere: factRequirements is factAnalyzersRequired of each analyzer one
+// Analyze asks, computed on the first ask and read after (#tb538na): an
+// action on a package restored from the host's run asks it of its analyzer,
+// and an extra build has thousands of such actions over a few dozen
+// analyzers, which computed it again for every one, 0.3 to 0.6 CPU-s a run at
+// cohere's root. The answer is of the analyzer's requirements alone, the same
+// for every package. Only mkAction reads it, on one goroutine, so it needs no
+// lock. computed counts the analyzers computed, which a test reads.
+type factRequirements struct {
+	of       map[*analysis.Analyzer][]*analysis.Analyzer
+	computed int
+}
+
+// cohere: required is factAnalyzersRequired(a), computed once for requirements.
+func (requirements *factRequirements) required(a *analysis.Analyzer) []*analysis.Analyzer {
+	found, known := requirements.of[a]
+	if !known {
+		found = factAnalyzersRequired(a)
+		requirements.of[a] = found
+		requirements.computed++
+	}
+	return found
+}
+
 func (act *Action) String() string {
 	return fmt.Sprintf("%s@%s", act.Analyzer, act.Package)
 }
@@ -602,6 +631,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		pkg *packages.Package
 	}
 	actions := make(map[key]*Action)
+	// cohere: each analyzer's required fact analyzers, computed once for the
+	// whole graph rather than once for each action that asks (factRequirements).
+	requiredFacts := &factRequirements{of: map[*analysis.Analyzer][]*analysis.Analyzer{}}
 
 	var mkAction func(a *analysis.Analyzer, pkg *packages.Package) *Action
 	mkAction = func(a *analysis.Analyzer, pkg *packages.Package) *Action {
@@ -617,7 +649,8 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 					act.Deps = append(act.Deps, mkAction(req, pkg))
 				}
 			} else if opts.FactsBelowRestored != nil && opts.FactsBelowRestored(pkg) {
-				for _, req := range factAnalyzersRequired(a) {
+				// cohere: read through requiredFacts, computed once per analyzer.
+				for _, req := range requiredFacts.required(a) {
 					act.Deps = append(act.Deps, mkAction(req, pkg))
 				}
 			}
@@ -734,7 +767,8 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 	}
 
-	return &Graph{Roots: roots}, nil
+	// cohere: the graph keeps requiredFacts for a test to read.
+	return &Graph{Roots: roots, requiredFacts: requiredFacts}, nil
 }
 
 func init() {

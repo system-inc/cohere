@@ -67,7 +67,7 @@ func TestTheListerReadsTheHeldBytes(test *testing.T) {
 	writeListingFiles(test, directory, heldModule)
 	goEnvironment := goEnvironmentOf(test, directory, []string{"GOWORK=off"})
 	held := heldFor(filepath.Join(directory, "held.go"), heldSource)
-	listed, doubt := listInProcess(goEnvironment, []string{"./..."}, held, nil, nil)
+	listed, doubt := listInProcess(goEnvironment, []string{"./..."}, held, nil, nil, nil)
 	if doubt != "" {
 		test.Fatalf("the lister did not answer: %s", doubt)
 	}

@@ -173,7 +173,7 @@ func TestATranslatedDependencyWithholdsNothing(test *testing.T) {
 	directory := test.TempDir()
 	writeListingFiles(test, directory, translationFiles)
 	goEnvironment := goEnvironmentOf(test, directory, translationEnvironment)
-	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil)
+	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
