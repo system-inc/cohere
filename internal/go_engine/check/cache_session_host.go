@@ -174,8 +174,8 @@ func reasonWord(reason string) string {
 // kept, decoded from the host's entry. Of those, the walk (untouchedOf) leaves untouched each whose dependence set
 // misses what changed: a hit with no late decision and no say, handed the host's findings. Each other is visited, and
 // one whose reads can hold is decided late by the load (load.Restored.Holds) and dropped from the hits when it
-// declines. keyed is the build's keys, nil for a session without a store, which keys reachable here for the portable
-// digests alone.
+// declines. keyed is the build's keys, its store's or the portable digests' Restore keyed (hostPortableKeys), and nil
+// when those failed, which keys reachable here again and says why.
 func (session *CacheSession) restoreFromHost(loader string, reachable []*packages.Package, keyed *cache.Keyed) {
 	state := session.host
 	if state == nil || state.off || session.known == nil {
@@ -192,10 +192,7 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 	if keyed != nil {
 		portable = keyed.Portable
 	} else {
-		keyContext := session.caching.Context
-		keyContext.Build = append(slices.Clone(keyContext.Build), "loader="+loader)
-		ownKeys, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs, state.host.files,
-			session.caching.Held)
+		ownKeys, keysError := session.portableKeys(loader, reachable)
 		if keysError != nil {
 			session.problem(fmt.Sprintf("computing the portable digests to restore from the host: %v", keysError))
 			return
@@ -951,4 +948,22 @@ func (session *CacheSession) recordedDemandOf(saved *packages.Package) entryDema
 	demanded := entryDemand{answers: sortedAnswers(session.resolver.Recorded(saved.Types), false)}
 	demanded.reads, demanded.readsIncomplete = session.readsOf(saved, entryDemand{})
 	return demanded
+}
+
+// portableKeys are reachable's keys as an extra build without a store computes them for the portable digests alone,
+// reading the digests of the files the host's run hashed rather than hash them again.
+func (session *CacheSession) portableKeys(loader string, reachable []*packages.Package) (*cache.Keyed, error) {
+	keyContext := session.caching.Context
+	keyContext.Build = append(slices.Clone(keyContext.Build), "loader="+loader)
+	return cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.host.host.files, session.caching.Held)
+}
+
+// hostPortableKeys are portableKeys, nil when they cannot be computed, which restoreFromHost computes again and says
+// why, so a failure is said once.
+func (session *CacheSession) hostPortableKeys(loader string, reachable []*packages.Package) *cache.Keyed {
+	keyed, keysError := session.portableKeys(loader, reachable)
+	if keysError != nil {
+		return nil
+	}
+	return keyed
 }
