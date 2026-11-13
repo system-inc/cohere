@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // TestCorpus formats a real file list with the shipped engine and writes each result, so the output
@@ -22,11 +24,8 @@ import (
 func TestCorpus(test *testing.T) {
 	test.Parallel()
 
-	listPath := os.Getenv("COHERE_CORPUS_LIST")
-	outDirectory := os.Getenv("COHERE_CORPUS_OUT")
-	if listPath == "" || outDirectory == "" {
-		test.Skip("set COHERE_CORPUS_LIST and COHERE_CORPUS_OUT")
-	}
+	listPath := needs.OptIn(test, "COHERE_CORPUS_LIST", "it measures the engine over a list of files")
+	outDirectory := needs.OptIn(test, "COHERE_CORPUS_OUT", "it writes the measurement's outputs there")
 
 	engine := newTestEngine(test)
 	listBytes, readError := os.ReadFile(listPath)

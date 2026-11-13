@@ -9,7 +9,11 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/needs"
 )
+
+// measureLandingGateVariable opts in to measuring each landing-gate-only entry's CPU, which the nightly sets.
+const measureLandingGateVariable = "COHERE_MEASURE_LANDING_GATE"
 
 // Every entry the fast tier leaves to the landing gate was recorded above fastBudgetCPUSeconds of CPU, and
 // still costs more than fastEvictionCPUSeconds measured alone now. One that got cheap belongs back in the
@@ -20,24 +24,20 @@ import (
 // is a corpus skips naming the corpus's variable when it is unset, since its tests then skip and it would
 // read as free.
 //
-// It is itself the landing gate's: under the fast tier it skips, since measuring three entries costs
-// about 30s of CPU in an edit loop meant to be instant.
+// The measured half is opt-in, run by the nightly (bench/nightly.zsh) with COHERE_MEASURE_LANDING_GATE set:
+// it judges this desk machine's CPU, so it is a measurement, and no gate runs it (#xc29pnd). The half that
+// judges the numbers in this file runs everywhere, since no load moves it. Under the fast tier the whole test
+// skips, since listing the module's packages is the gate's work, not the edit loop's.
 //
-// It measures this desk machine's budget, so where `CI` is set it skips, naming why: on the release's 3-core
-// runner command/cohere alone took 918s, and its inner run died on Go's default ten minutes, failing on time
-// rather than on anything it measures (1.0 dry run 39276248388). A runner's CPU says nothing about the edit
-// loop's budget here.
+// It measures this desk machine's budget, never a runner's: on the release's 3-core runner command/cohere alone
+// took 918s, and its inner run died on Go's default ten minutes, failing on time rather than on anything it
+// measures (1.0 dry run 39276248388). The opt-in keeps it to the desk, where the nightly sets it.
 //
 // Not parallel: the package's other tests beside it would compete for the cores and stretch what it logs.
 func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 	if os.Getenv(fastTierVariable) != "" {
 		test.Skip(
 			"measuring the landing gate's entries is the landing gate's job, left to it by cohere-dev test --fast",
-		)
-	}
-	if os.Getenv("CI") != "" {
-		test.Skip(
-			"CI is set: this measures the desk machine's CPU budget for the edit loop, which a runner's CPU says nothing about, so it runs on the desk",
 		)
 	}
 	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
@@ -65,6 +65,8 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 					float64(fastBudgetCpuSeconds),
 				)
 			}
+			needs.OptIn(test, measureLandingGateVariable, "it measures each entry's CPU on this machine, a "+
+				"measurement the nightly makes, not a gate's check")
 			if entry.reads.Name != "" {
 				entry.reads.Root(test)
 			}

@@ -42,6 +42,9 @@
 #            its date as a number (=tree), both logged in <state>/logs/<night>-isolation.log. A pass prints one line
 #            beside the projects'. A failure posts the seed and the failing lines to #ewgh523 with ahra's tasks
 #            comment, the report kept beside the log, so the failure is run again by its seed.
+#   landing  each entry the fast tier leaves to the landing gate measured on this machine's CPU, the measured half
+#            of TestEveryLandingGateOnlyEntryStillEarnsItsPlace, which is opt-in and no gate's (#xc29pnd), logged in
+#            <state>/logs/<night>-landing-gate.log. A pass prints one line; a failure posts its lines to #crw2hx3.
 #
 # usage: nightly.zsh [options]
 #   --state DIR          where the baselines, verdicts, records, logs and timings live
@@ -50,9 +53,10 @@
 #   --idle-floor PERCENT the share of all cores idle before and after a quiet run (default 90)
 #   --projects LIST      the projects to measure, comma-separated, from the table below (default ahra,cohere)
 #   --isolation on|off   whether the night runs the isolation tier after the benches (default on)
+#   --landing on|off     whether the night measures the landing gate's entries after the benches (default on)
 #
-# Each default can also come from the environment, COHERE_SPEED_GUARD_STATE, _COHERE, _IDLE_FLOOR, _PROJECTS and
-# _ISOLATION,
+# Each default can also come from the environment, COHERE_SPEED_GUARD_STATE, _COHERE, _IDLE_FLOOR, _PROJECTS,
+# _ISOLATION and _LANDING,
 # so a test fire of the AhraOS nerve that runs this script with no arguments (runCohereSpeedGuard) can point
 # it at a scratch state and a planted engine, never the real guard's. A flag still wins over its variable.
 #
@@ -69,6 +73,7 @@ cohere=${COHERE_SPEED_GUARD_COHERE:-cohere}
 idle_floor=${COHERE_SPEED_GUARD_IDLE_FLOOR:-90}
 projects_asked=${COHERE_SPEED_GUARD_PROJECTS:-ahra,cohere}
 isolation=${COHERE_SPEED_GUARD_ISOLATION:-on}
+landing=${COHERE_SPEED_GUARD_LANDING:-on}
 
 while (( $# > 0 )); do
   case $1 in
@@ -77,6 +82,7 @@ while (( $# > 0 )); do
     --idle-floor) idle_floor=$2; shift 2 ;;
     --projects) projects_asked=$2; shift 2 ;;
     --isolation) isolation=$2; shift 2 ;;
+    --landing) landing=$2; shift 2 ;;
     *) fail "unknown argument $1 (see the usage at the top of this script)" ;;
   esac
 done
@@ -98,6 +104,7 @@ for project in $projects; do
   project_arguments $project || fail "--projects: no project $project in the table (ahra, cohere)"
 done
 [[ $isolation == (on|off) ]] || fail "--isolation must be on or off, not $isolation"
+[[ $landing == (on|off) ]] || fail "--landing must be on or off, not $landing"
 
 state=${state:A}
 mkdir -p $state/records $state/logs $state/timing || fail "could not make the state directory $state"
@@ -354,6 +361,33 @@ run_isolation() {
   print "isolation: failed under seed $seed (${(j:, then :)failed}), posted to #ewgh523, log $log"
 }
 
+# run_landing_gate measures each landing-gate-only entry (see landing, at the top) and prints its line, posting a
+# failure's lines to #crw2hx3. It returns nonzero only when a failure could not be posted.
+run_landing_gate() {
+  local log=$state/logs/$night-landing-gate.log report=$state/logs/$night-landing-gate-report.md
+  if (
+    cd $repository &&
+      COHERE_MEASURE_LANDING_GATE=1 go run ./command/cohere-dev test -count=1 -v \
+        -run '^TestEveryLandingGateOnlyEntryStillEarnsItsPlace$' ./command/cohere-dev
+  ) > $log 2>&1; then
+    print "landing gate: every landing-gate-only entry still costs more than the fast tier's bar, log $log"
+    return 0
+  fi
+  {
+    print "Nightly landing-gate measurement (#xc29pnd) failed on $night."
+    print
+    grep -E -e '--- FAIL|fast_test\.go:[0-9]+: ' $log | head -40 | sed 's/^ */- /'
+    print
+    print "The whole log: $log"
+  } > $report
+  if ! (cd $HOME/Projects/ahra && node_modules/.bin/ahra tasks comment crw2hx3 --role Agent --text-file $report) \
+    >> $log 2>&1; then
+    print -u2 "$name: the landing-gate measurement failed, and posting $report to #crw2hx3 failed too; see $log"
+    return 1
+  fi
+  print "landing gate: failed, posted to #crw2hx3, log $log"
+}
+
 outcome=0
 for project in $projects; do
   measure_project $project || outcome=1
@@ -361,6 +395,10 @@ done
 
 if [[ $isolation == on ]]; then
   run_isolation || outcome=1
+fi
+
+if [[ $landing == on ]]; then
+  run_landing_gate || outcome=1
 fi
 
 # Each night's tonight file kept by its night, since the next night writes over it. See kept, at the top.

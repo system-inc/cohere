@@ -74,10 +74,10 @@ func TestTheNightlyGuardOpensNoQuietWindow(test *testing.T) {
 
 	home := test.TempDir()
 	state := test.TempDir()
-	// The isolation tier is off: it runs the real rules over every fixture for minutes, which this test of the
+	// The isolation tier and the landing measurement are off: they run real tests for minutes, which this test of the
 	// bench's quiet window has no use for.
 	night := exec.Command(zsh, filepath.Join(bench, "nightly.zsh"), "--state", state, "--projects", "ahra",
-		"--cohere", "/usr/bin/true", "--isolation", "off")
+		"--cohere", "/usr/bin/true", "--isolation", "off", "--landing", "off")
 	night.Env = append(os.Environ(), "COHERE_DEV_HOME="+home)
 	output, runError := night.CombinedOutput()
 	if runError != nil {
