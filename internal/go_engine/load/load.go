@@ -199,6 +199,11 @@ type Caching struct {
 	// (see SharedReads): set on the loads that follow every write of the run, the host's and each extra build's.
 	SharedReads *SharedReads
 
+	// Fingerprints is the kept listing's directory fingerprints the loads after every write of the run share, nil for
+	// none (see Fingerprints): set on each extra build's load and never on the host's, since the long-line wrap writes
+	// between the host's first load and the builds.
+	Fingerprints *Fingerprints
+
 	// Pool is the run's one set of slots, which every load and check of the run shares, the host's and every extra
 	// build's, so the run never runs more work at once than it has cores (#ckm0hsp). Nil, the load has slots of its
 	// own, one per core.
@@ -330,6 +335,7 @@ func loadUnder(
 			caching.Listings,
 			caching.Held,
 			caching.SharedReads,
+			caching.Fingerprints,
 			caching.Timing,
 		)
 	})

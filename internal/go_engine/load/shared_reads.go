@@ -5,14 +5,17 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
 
 // SharedReads is the disk reads every in-process listing of one run shares: each directory's entries and the start of
-// each file go/build opens (#yyvstj6). A build's listing reads every directory its imports reach and every Go file in
-// them, and those reads were most of its CPU: of an extra build's listing on cohere's root, 83% was the open, close,
-// directory read and lstat system calls, about 1.1 CPU-s a build, every build reading what the host's had just read.
+// each file go/build opens (#yyvstj6), and each path's links and kind, which go/build's HasSubdir and IsDir read
+// (#5jpss95). A build's listing reads every directory its imports reach and every Go file in them, and those reads
+// were most of its CPU: of an extra build's listing on cohere's root, 83% was the open, close, directory read and lstat
+// system calls, about 1.1 CPU-s a build, every build reading what the host's had just read.
 // What a directory holds and what a file says do not change with the build's environment; only which files go/build
 // selects does, and go/build still selects them in each build, through its own context, from what it reads here. So
 // sharing is exact: it changes where the bytes come from, never which.
@@ -29,6 +32,12 @@ type SharedReads struct {
 	mutex       sync.Mutex
 	directories map[string]*sharedDirectory
 	files       map[string]*sharedFile
+
+	// resolved is each path's filepath.EvalSymlinks, empty where it failed, and isDirectories whether each path is a
+	// directory, which go/build's HasSubdir and IsDir read (hasSubdirectory, isDirectory): a path's links and kind
+	// hold for the run, as its entries do, since the engine adds or removes no file. Both are under mutex.
+	resolved      map[string]string
+	isDirectories map[string]bool
 }
 
 // sharedDirectory is one directory's entries, read once.
@@ -47,7 +56,8 @@ const sharedFileHead = 4 << 10
 
 // NewSharedReads is reads no listing has made yet.
 func NewSharedReads() *SharedReads {
-	return &SharedReads{directories: map[string]*sharedDirectory{}, files: map[string]*sharedFile{}}
+	return &SharedReads{directories: map[string]*sharedDirectory{}, files: map[string]*sharedFile{},
+		resolved: map[string]string{}, isDirectories: map[string]bool{}}
 }
 
 // readDirectory is a build.Context's ReadDir: directory's entries as os.ReadDir reads them, read once for every
@@ -110,4 +120,77 @@ func (shared *SharedReads) Held() (int, int64) {
 	shared.mutex.Lock()
 	defer shared.mutex.Unlock()
 	return len(shared.directories), shared.directoryReads.Load()
+}
+
+// hasSubdirectory is a build.Context's HasSubdir, go/build's own default answered from the run's one table of
+// resolved links: the paths as given, then each expanded against the other unexpanded and both expanded, as
+// go/build's Context.hasSubdir tries them (build.go in Go 1.27.0, copied). go/build asks it of the toolchain's source
+// root and every directory a listing reads, which lies outside it but for the standard library's, so nearly every ask
+// resolves both paths' links, a system call per element of each, every build asking what the last one did (#5jpss95).
+func (shared *SharedReads) hasSubdirectory(root string, directory string) (string, bool) {
+	if relative, found := lexicalSubdirectory(root, directory); found {
+		return relative, true
+	}
+	rootResolved, directoryResolved := shared.resolvedLinks(root), shared.resolvedLinks(directory)
+	if relative, found := lexicalSubdirectory(rootResolved, directory); found {
+		return relative, true
+	}
+	if relative, found := lexicalSubdirectory(root, directoryResolved); found {
+		return relative, true
+	}
+	return lexicalSubdirectory(rootResolved, directoryResolved)
+}
+
+// resolvedLinks is path with its symbolic links expanded, read once for the run, and empty where expanding failed, as
+// go/build's Context.hasSubdir reads filepath.EvalSymlinks with its error ignored.
+func (shared *SharedReads) resolvedLinks(path string) string {
+	shared.mutex.Lock()
+	resolved, found := shared.resolved[path]
+	shared.mutex.Unlock()
+	if found {
+		return resolved
+	}
+	// Ignored: go/build ignores it too, and compares the empty path it leaves, which is below no root.
+	resolved, _ = filepath.EvalSymlinks(path)
+	// Resolved with the lock let go, so no listing waits on another's system calls: two asking at once both resolve
+	// it, to the same answer, since nothing in the run moves a link.
+	shared.mutex.Lock()
+	shared.resolved[path] = resolved
+	shared.mutex.Unlock()
+	return resolved
+}
+
+// isDirectory is a build.Context's IsDir, go/build's own default, whether os.Stat reads path as a directory, links
+// followed, so a link to a file is no directory (build.go's Context.isDir in Go 1.27.0, copied), read once for the
+// run. go/build asks it of each directory it imports and of every link among a directory's entries, to leave out a
+// link to a directory.
+func (shared *SharedReads) isDirectory(path string) bool {
+	shared.mutex.Lock()
+	answer, found := shared.isDirectories[path]
+	shared.mutex.Unlock()
+	if found {
+		return answer
+	}
+	info, statError := os.Stat(path)
+	answer = statError == nil && info.IsDir()
+	// As resolvedLinks: stated with the lock let go, and two asking at once store the same answer.
+	shared.mutex.Lock()
+	shared.isDirectories[path] = answer
+	shared.mutex.Unlock()
+	return answer
+}
+
+// lexicalSubdirectory is go/build's hasSubdir (build.go in Go 1.27.0, copied): directory's path below root, slashed,
+// and whether it is below root at all, by their cleaned paths alone.
+func lexicalSubdirectory(root string, directory string) (string, bool) {
+	const separator = string(filepath.Separator)
+	prefix := filepath.Clean(root)
+	if !strings.HasSuffix(prefix, separator) {
+		prefix += separator
+	}
+	after, found := strings.CutPrefix(filepath.Clean(directory), prefix)
+	if !found {
+		return "", false
+	}
+	return filepath.ToSlash(after), true
 }
