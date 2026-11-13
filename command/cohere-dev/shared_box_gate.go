@@ -32,18 +32,34 @@ const sharedBoxGoroot = "$HOME/adamic-tools/go"
 // go.dev's published one, holding 15,639 files and no links (Nov 13). A box on another Go refuses until this moves.
 const sharedBoxToolchainDigest = "aa737bb2de5f152e1bdaad9902816611d1cdbe3298238a2207c71e875df8ceeb"
 
+// sharedBoxNode is where the house lays node on its boxes, root-owned, outside any job's home, as on the Macs
+// (#2tm6axk), and sharedBoxNodeDigest the sha256 of its bin/node: node v24.19.0 linux-x64 as nodejs.org ships it
+// (node-v24.19.0-linux-x64.tar.xz, sha256 14b342e7..., matching its SHASUMS256.txt, Nov 13). A box holding it puts
+// it on the gate's path, so the tests whose oracle is node run on Linux. A box without it skips them by name, and the
+// Mac runs them (#myvcam7).
+const (
+	sharedBoxNode       = "/opt/loom-tools/node-v24.19.0"
+	sharedBoxNodeDigest = "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+)
+
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
-// goroot, digest and races (the raceGated packages, comma-separated) as variables, and the module's test patterns as
-// its arguments. It prints homeMarker before the tests, homeRaceMarker before the -race run once the module passes,
-// and sharedBoxRefusedMarker, ending the run, when it won't trust the box.
+// goroot, digest, node, nodeDigest and races (the raceGated packages, comma-separated) as variables, and the
+// module's test patterns as its arguments. It prints homeMarker before the tests, homeRaceMarker before the -race
+// run once the module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box.
 const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
 [ -x "$goroot/bin/go" ] || refuse "there is no go at $goroot"
 link=$(find -P "$goroot" -type l | head -n 1)
 [ -z "$link" ] || refuse "the Go toolchain at $goroot holds a link, $link, which its digest can't vouch for"
 found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
 [ "$found" = "$digest" ] || refuse "the Go toolchain at $goroot digests to $found, not the pinned $digest"
+nodePath=""
+if [ -e "$node/bin/node" ]; then
+  nodeFound=$(sha256sum "$node/bin/node" | cut -d' ' -f1)
+  [ "$nodeFound" = "$nodeDigest" ] || refuse "the node at $node/bin/node digests to $nodeFound, not the pinned $nodeDigest"
+  nodePath="$node/bin:"
+fi
 unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
-export PATH="$goroot/bin:/usr/bin:/bin" GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
+export PATH="$goroot/bin:$nodePath/usr/bin:/bin" GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
 gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
 trap 'rm -rf "$gocache"' EXIT
 export GOCACHE="$gocache"
