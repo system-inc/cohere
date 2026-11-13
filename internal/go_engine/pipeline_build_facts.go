@@ -3,26 +3,25 @@ package go_engine
 import (
 	"cmp"
 	"fmt"
+	"go/token"
+	"go/types"
 	"maps"
 	"slices"
 	"time"
 
+	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/types/objectpath"
+
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
 // factExamples is how many differing facts of a kind the record names, enough to see what moves without writing every
 // one of thousands.
 const factExamples = 3
-
-// buildJudgment is one extra build's judgment on the host's graph (dependenceOf), and what its facts are compared
-// through: the files both builds compile, by package ID and path as written, and the packages both have by one ID.
-type buildJudgment struct {
-	dependence     *build_dependence.Dependence
-	shared         map[sharedFile]bool
-	sharedPackages map[string]bool
-}
 
 // sharedFile is a file of a package, as written.
 type sharedFile struct {
@@ -45,30 +44,75 @@ type factKey struct {
 
 // factKeyOf is fact's key, and false for a fact about an object with no position, which no other build can match.
 func factKeyOf(fact check.ExportedFact) (factKey, bool) {
+	return factKeyAt(fact, fact.Object, fact.Package.Fset)
+}
+
+// factKeyAt is fact's key with its object named by object, whose position is in fileSet, and false when object has no
+// position there.
+func factKeyAt(fact check.ExportedFact, object types.Object, fileSet *token.FileSet) (factKey, bool) {
 	key := factKey{packageIdentifier: fact.Package.ID, offset: -1, analyzer: fact.Analyzer, factType: fact.FactType}
-	if fact.Object == nil {
+	if object == nil {
 		return key, true
 	}
-	position := fact.Object.Pos()
-	tokenFile := fact.Package.Fset.File(position)
+	position := object.Pos()
+	tokenFile := fileSet.File(position)
 	if !position.IsValid() || tokenFile == nil {
 		return factKey{}, false
 	}
 	key.file = tokenFile.Position(position).Filename
 	key.offset = tokenFile.Offset(position)
-	key.name = fact.Object.Name()
+	key.name = object.Name()
 	return key, true
 }
 
 // indexHostFacts keeps the host's facts by key, for every extra build's to be compared with, when the run judges
-// dependence. A fact whose object no build can match is left out.
-func (engine *pipeline) indexHostFacts(facts []check.ExportedFact) {
+// dependence. A fact whose object no build can match is left out. A package the host restored from the binary's table
+// ran no analyzer, but its restored action holds the table's facts and the resolver its answers, about objects read
+// from export data, whose positions are no offsets in its files: each is keyed by its counterpart in the standard
+// library's graph, loaded from source, so it meets the build's fact about the same object (#ss4t5g6). One with no
+// counterpart is left out, as is every fact of a package the host restored that the graph does not hold. A fact the
+// table holds about an object export data does not hold has its path alone (check.ExportedFact.ObjectPath), by which
+// the graph finds its object. The table's answers of each restored package, restoredAnswers, are kept as they are,
+// for compareFacts to read by objectpath.
+func (engine *pipeline) indexHostFacts(
+	facts []check.ExportedFact,
+	restoredAnswers map[*packages.Package]*fact_resolver.Answers,
+) {
 	if engine.dependence == nil {
 		return
 	}
+	engine.dependence.restoredAnswers = map[string]*fact_resolver.Answers{}
+	for restoredPackage, answers := range restoredAnswers {
+		engine.dependence.restoredAnswers[restoredPackage.ID] = answers
+	}
+	standardLibrary := engine.dependence.standardLibrary
+	var counterparts *build_dependence.Counterparts
+	if standardLibrary != nil && standardLibrary.graph != nil {
+		counterparts = build_dependence.NewCounterparts(standardLibrary.graph, nil)
+	}
 	indexed := make(map[factKey]check.ExportedFact, len(facts))
 	for _, fact := range facts {
-		if key, isKeyed := factKeyOf(fact); isKeyed {
+		key, isKeyed := factKeyOf(fact)
+		if engine.dependence.restored[fact.Package.ID] && (fact.Object != nil || fact.ObjectPath != "") {
+			isKeyed = false
+			var counterpart types.Object
+			isFound := false
+			switch {
+			case counterparts == nil:
+			case fact.Object != nil:
+				counterpart, isFound = counterparts.Counterpart(fact.Object)
+			default:
+				counterpart, isFound = counterparts.ObjectAt(fact.Package.PkgPath, fact.ObjectPath)
+			}
+			if isFound {
+				key, isKeyed = factKeyAt(fact, counterpart, standardLibrary.fileSet)
+			}
+		} else if fact.ObjectPath != "" {
+			// A restored package's fact named by its path alone, of a package the host did not restore, is an extra
+			// build's own restore, which no census key can name.
+			isKeyed = false
+		}
+		if isKeyed {
 			indexed[key] = fact
 		}
 	}
@@ -80,19 +124,31 @@ func (engine *pipeline) indexHostFacts(facts []check.ExportedFact) {
 // build exported counted as different, and each answer the fact resolver computed in both builds, compared by its
 // encoding, one only a build asked counted apart; then the units declaring an object whose fact differs, and the
 // units the judgment calls independent that call those statically, first-order and followed to a fixed point, beside
-// every independent unit that calls a dependent one. Nil when the host's facts were never indexed.
+// every independent unit that calls a dependent one, over both graphs' units (census). Nil when the host's facts were
+// never indexed.
 func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.ExportedFact) *contract.DependenceFacts {
 	if engine.dependence.facts == nil {
 		return nil
 	}
 	started := time.Now()
+	var encoder objectpath.Encoder
 	built := make(map[factKey]check.ExportedFact, len(facts))
 	for _, fact := range facts {
-		if key, isKeyed := factKeyOf(fact); isKeyed {
-			built[key] = fact
+		key, isKeyed := factKeyOf(fact)
+		if !isKeyed {
+			continue
 		}
+		// A fact about an object no objectpath names, a function's local closure say, in a package the host restored
+		// from the binary's table, is one no entry can hold, so the host has no side of it to compare with: it is left
+		// out, where a host that checked the package from source would have compared it.
+		if engine.dependence.restored[fact.Package.ID] && fact.Object != nil {
+			if _, pathError := encoder.For(fact.Object); pathError != nil {
+				continue
+			}
+		}
+		built[key] = fact
 	}
-	units := judged.dependence.Units()
+	units, unitContaining := judged.census()
 	kinds := map[[2]string]*contract.FactKindCounts{}
 	examples := map[[2]string][]string{}
 	differing := map[int]bool{}
@@ -115,7 +171,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 		}
 		unit, isUnit := -1, false
 		if key.file != "" {
-			unit, isUnit = judged.dependence.UnitContaining(key.packageIdentifier, key.file, key.offset)
+			unit, isUnit = unitContaining(key.packageIdentifier, key.file, key.offset)
 		}
 		inWorkspace := isUnit && units[unit].Workspace
 		counts.Compared++
@@ -144,7 +200,8 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 	}
 	for key, builtFact := range built {
 		if _, hostHas := engine.dependence.facts[key]; !hostHas {
-			compare(key, check.ExportedFact{}, false, builtFact, true)
+			hosted, hostHas := engine.restoredAnswer(builtFact, &encoder)
+			compare(key, hosted, hostHas, builtFact, true)
 		}
 	}
 	census := &contract.DependenceFacts{Kinds: []contract.FactKindCounts{}}
@@ -159,6 +216,37 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 	census.Workspace, census.Dependencies = factCallers(units, differing)
 	census.Milliseconds = int(time.Since(started).Milliseconds())
 	return census
+}
+
+// restoredAnswer is the host's answer of builtFact's kind about its object when the host restored the object's package
+// and computed nothing there (#ss4t5g6): the answer its store holds by the object's objectpath, or no fact's answer
+// where the store holds the package computed whole in the kind, and false where it holds neither, a question the host
+// would have had to ask, as one only the build asked is. The host's own run asked only what its rules reached, and the
+// table answers far more, so an answer the build never asked is never compared.
+func (engine *pipeline) restoredAnswer(
+	builtFact check.ExportedFact,
+	encoder *objectpath.Encoder,
+) (check.ExportedFact, bool) {
+	answers := engine.dependence.restoredAnswers[builtFact.Package.ID]
+	if !builtFact.Answer || builtFact.Object == nil || answers == nil {
+		return check.ExportedFact{}, false
+	}
+	path, pathError := encoder.For(builtFact.Object)
+	if pathError != nil {
+		return check.ExportedFact{}, false
+	}
+	encoded, isHeld := answers.Values[builtFact.Analyzer][path]
+	if !isHeld {
+		if !answers.Complete[builtFact.Analyzer] {
+			return check.ExportedFact{}, false
+		}
+		encoded, isHeld = fact_resolver.ZeroAnswer(builtFact.Analyzer)
+		if !isHeld {
+			return check.ExportedFact{}, false
+		}
+	}
+	return check.ExportedFact{Package: builtFact.Package, Analyzer: builtFact.Analyzer, FactType: builtFact.FactType,
+		Object: builtFact.Object, Digest: cache.DigestOf(encoded), Answer: true, Encoded: encoded}, true
 }
 
 // factExample names one differing fact: its package, its object and both builds' values, or that one build has none.

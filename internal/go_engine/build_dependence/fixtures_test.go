@@ -1,6 +1,9 @@
 package build_dependence
 
 import (
+	"bytes"
+	"fmt"
+	"go/ast"
 	"go/token"
 	"go/types"
 	"maps"
@@ -8,6 +11,7 @@ import (
 	"slices"
 	"testing"
 
+	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -103,6 +107,7 @@ func TestLayoutVerdictsOnLinux(test *testing.T) {
 		"func CellOf":            true,
 		"func Cells":             true,
 		"func Labelled":          false,
+		"func CallsWide":         false,
 		"func Mapped":            false,
 		"value Width":            true,
 		"type Cell":              true,
@@ -210,7 +215,7 @@ func TestEveryIndependentUnitRecordsTheSameInBothBuilds(test *testing.T) {
 	}
 }
 
-// The layout fixture's counts on linux: its 28 workspace units and the dependency's 4, those dependent, each package
+// The layout fixture's counts on linux: its 29 workspace units and the dependency's 4, those dependent, each package
 // touched, and the units of the files only linux compiles, counted apart.
 func TestLayoutCountsOnLinux(test *testing.T) {
 	test.Parallel()
@@ -230,7 +235,7 @@ func TestLayoutCountsOnLinux(test *testing.T) {
 		counts ScopeCounts
 		want   ScopeCounts
 	}{
-		{"workspace", counts.Workspace, ScopeCounts{Units: 28, DependentUnits: 17, Nodes: nodes[true], Packages: 1,
+		{"workspace", counts.Workspace, ScopeCounts{Units: 29, DependentUnits: 17, Nodes: nodes[true], Packages: 1,
 			DependentPackages: 1, DependentPackageNodes: nodes[true], BuildOnlyUnits: 2}},
 		{"dependencies", counts.Dependencies, ScopeCounts{Units: 4, DependentUnits: 3, Nodes: nodes[false],
 			Packages: 1, DependentPackages: 1, DependentPackageNodes: nodes[false], BuildOnlyUnits: 1}},
@@ -284,6 +289,123 @@ func TestDependentObjectsAnswerForAPackageTheGraphDoesNotHold(test *testing.T) {
 		if withoutAnswers[name] {
 			test.Errorf("%s: want it independent without the dependency's answers, got dependent", name)
 		}
+	}
+}
+
+// restoredFromExportData is host's workspace packages checked again against the dependency's types read from export
+// data, as the engine's host reads a package it restored from the binary's table: each object the workspace reads of
+// the dependency is another than the one the dependency's own load declares, and a graph of these packages holds
+// nothing of the dependency.
+func restoredFromExportData(test *testing.T, host loadedBuild) loadedBuild {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	imported := map[string]*types.Package{}
+	for _, loaded := range host {
+		if fixtureWorkspace(loaded) {
+			continue
+		}
+		var exportData bytes.Buffer
+		if writeError := gcexportdata.Write(&exportData, loaded.Fset, loaded.Types); writeError != nil {
+			test.Fatal(writeError)
+		}
+		if _, readError := gcexportdata.Read(&exportData, fileSet, imported, loaded.PkgPath); readError != nil {
+			test.Fatal(readError)
+		}
+	}
+	restored := loadedBuild{}
+	for identifier, loaded := range host {
+		if !fixtureWorkspace(loaded) {
+			continue
+		}
+		information := &types.Info{
+			Types:      map[ast.Expr]types.TypeAndValue{},
+			Instances:  map[*ast.Ident]types.Instance{},
+			Defs:       map[*ast.Ident]types.Object{},
+			Uses:       map[*ast.Ident]types.Object{},
+			Implicits:  map[ast.Node]types.Object{},
+			Selections: map[*ast.SelectorExpr]*types.Selection{},
+			Scopes:     map[ast.Node]*types.Scope{},
+		}
+		configuration := types.Config{Importer: importerFunction(func(path string) (*types.Package, error) {
+			if read, isRead := imported[path]; isRead {
+				return read, nil
+			}
+			return nil, fmt.Errorf("the fixture's workspace imports %s, which no export data holds", path)
+		})}
+		checked, checkError := configuration.Check(loaded.PkgPath, loaded.Fset, loaded.Syntax, information)
+		if checkError != nil {
+			test.Fatal(checkError)
+		}
+		restored[identifier] = &packages.Package{ID: loaded.ID, PkgPath: loaded.PkgPath, GoFiles: loaded.GoFiles,
+			Fset: loaded.Fset, Syntax: loaded.Syntax, Types: checked, TypesInfo: information}
+	}
+	return restored
+}
+
+// importerFunction is a function as a types.Importer.
+type importerFunction func(path string) (*types.Package, error)
+
+// Import is the function's answer for path.
+func (importer importerFunction) Import(path string) (*types.Package, error) {
+	return importer(path)
+}
+
+// The engine's host restores the standard library from export data, so its graph holds none of it, and a graph of its
+// own, loaded from source, judges it (#ss4t5g6). Here the workspace is checked against the dependency read from export
+// data, a graph of the dependency alone is judged on linux, and its judgment answers for each object the workspace
+// reads through that object's counterpart, found by its path: every workspace unit's verdict is then the whole
+// graph's, CellOf and Cells dependent through Width and Cell's underlying. With no graph to answer, every object read
+// fails wide, counted, and Labelled, independent in truth, is called dependent with them.
+func TestCounterpartsAnswerForARestoredDependency(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "layout", linuxBuild)
+	restored := restoredFromExportData(test, judged.host)
+	isWorkspace := func(loaded *packages.Package) bool { return fixtureWorkspace(loaded) }
+	dependencyGraph := graphOf(judged.host, isWorkspace)
+	dependencyJudged := dependencyGraph.Against(judged.difference)
+	restoredGraph := graphOf(restored, nil)
+	for _, loaded := range restored {
+		for _, imported := range loaded.Types.Imports() {
+			if judged.host[imported.Path()] != nil && judged.host[imported.Path()].Types == imported {
+				test.Fatalf("%s reads %s as its own load declares it, want it read from export data", loaded.ID,
+					imported.Path())
+			}
+		}
+	}
+
+	counterparts := NewCounterparts(dependencyGraph, dependencyJudged)
+	answered := judged.difference
+	answered.DependentObject = counterparts.DependentObject
+	withCounterparts := verdicts(test, restored, restoredGraph.Against(answered))
+	wholeVerdicts := verdicts(test, judged.host, judged.dependence)
+	for name, dependent := range withCounterparts {
+		if dependent != wholeVerdicts[name] {
+			test.Errorf("%s: want dependent %t as the whole graph judges it, got %t", name, wholeVerdicts[name],
+				dependent)
+		}
+	}
+	for _, name := range []string{"func CellOf", "func Cells"} {
+		if !withCounterparts[name] {
+			test.Errorf("%s: want it dependent through its counterpart's bits, got independent", name)
+		}
+	}
+	if counts := counterparts.Counts(); counts.Answered == 0 || counts.WithoutCounterpart != 0 ||
+		counts.WithoutPackage != 0 {
+		test.Errorf("want every object answered by its counterpart, got %+v", counts)
+	}
+
+	failingWide := NewCounterparts(nil, nil)
+	unanswered := judged.difference
+	unanswered.DependentObject = failingWide.DependentObject
+	withoutGraph := verdicts(test, restored, restoredGraph.Against(unanswered))
+	for _, name := range []string{"func CellOf", "func Cells", "func Labelled"} {
+		if !withoutGraph[name] {
+			test.Errorf("%s: want it dependent, failing wide with no graph to answer, got independent", name)
+		}
+	}
+	if counts := failingWide.Counts(); counts.WithoutPackage == 0 || counts.Answered != 0 {
+		test.Errorf("want every object counted as of a package no graph holds, got %+v", counts)
 	}
 }
 

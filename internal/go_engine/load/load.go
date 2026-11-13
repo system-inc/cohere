@@ -252,6 +252,12 @@ type Caching struct {
 	// package as a root of its patterns, and each build would check it again for nothing. Unset, every root is loaded.
 	AnalyzedRootsOnly bool
 
+	// WithoutTests builds no test variant of any root: the load is of the packages the patterns name, for their
+	// declarations alone, as the standard library's side load under `--build-dependence` is (#ss4t5g6), where every
+	// root's tests would be thousands of packages no reader wants. The listing still names what the tests import, and
+	// nothing reaches it.
+	WithoutTests bool
+
 	// rootSyntaxOnly has every dependency type-checked with no type maps and left without its syntax (see
 	// PackagesWithRootSyntax).
 	rootSyntaxOnly bool
@@ -431,6 +437,9 @@ func fromSource(
 			buildContext.GOARCH)
 	}
 	built := newGraph(listed, workspace, compiled)
+	if caching.WithoutTests {
+		built.dropTestVariants()
+	}
 	if caching.AnalyzedRootsOnly {
 		built.roots = reachedRoots(built)
 	}

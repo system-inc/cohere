@@ -7,7 +7,10 @@ import (
 
 // Dependence is one build's judgment of the graph's units and objects (Against).
 type Dependence struct {
-	resolved      *resolvedGraph
+	resolved *resolvedGraph
+	// judging is the judgment the build was judged by, whose answers ObjectBits reads for an object of a package the
+	// graph does not hold.
+	judging       *judgment
 	unitDependent []bool
 	bits          []bool
 	counts        Counts
@@ -23,23 +26,6 @@ type Bits struct {
 type Counts struct {
 	Workspace    ScopeCounts
 	Dependencies ScopeCounts
-}
-
-// ScopeCounts are one scope's counts in one build. Nodes are syntax nodes, a unit's size. Packages are the packages
-// with units, and DependentPackages those with a dependent unit or a unit only the build compiles, whose nodes
-// DependentPackageNodes are: what a package-wide rule run whole on each of them would have to redo. BuildOnlyUnits and
-// BuildOnlyNodes are the units only the build compiles, in the scope's packages and in packages only the build has,
-// which no total of the host's holds.
-type ScopeCounts struct {
-	Units                 int
-	DependentUnits        int
-	Nodes                 int
-	DependentNodes        int
-	Packages              int
-	DependentPackages     int
-	DependentPackageNodes int
-	BuildOnlyUnits        int
-	BuildOnlyNodes        int
 }
 
 // UnitDependent reports whether the unit of the package packageId that starts at offset is build-dependent: file is the
@@ -75,17 +61,53 @@ func (dependence *Dependence) DependentObjects() map[types.Object]Bits {
 	return dependent
 }
 
+// ObjectBits are object's bits in the build, read as the graph reads a unit's reference to it (resolveReference), so
+// another graph can ask for an object of a package it does not hold (Counterparts): an object a unit declares has its
+// own bits; one of a package the graph holds that no unit declares is read through its type, both bits set when any
+// bit its type reaches is; and one of a package the graph does not hold is answered by the build's DependentObject.
+// It is safe to call from one goroutine at a time, as the judgment it reads asks each object once.
+func (dependence *Dependence) ObjectBits(object types.Object) Bits {
+	resolved := dependence.resolved
+	declared := canonical(object)
+	if node, isNode := resolved.nodes[declared]; isNode {
+		return Bits{Name: dependence.bits[bit(node, false)], Underlying: dependence.bits[bit(node, true)]}
+	}
+	if !resolved.typesPackages[declared.Pkg()] {
+		return Bits{
+			Name:       dependence.judging.answer(reference{object: declared}),
+			Underlying: dependence.judging.answer(reference{object: declared, touchesUnderlying: true}),
+		}
+	}
+	_, isConstant := declared.(*types.Const)
+	walker := &bitWalker{seen: map[walkKey]bool{}}
+	for _, through := range walker.references(declared.Type(), isConstant) {
+		set := false
+		if node, isNode := resolved.nodes[through.object]; isNode {
+			set = dependence.bits[bit(node, through.touchesUnderlying)]
+		} else if !resolved.typesPackages[through.object.Pkg()] {
+			set = dependence.judging.answer(through)
+		}
+		if set {
+			return Bits{Name: true, Underlying: true}
+		}
+	}
+	return Bits{}
+}
+
 // Unit is one unit of the graph as a build judged it: its key, the package ID, the file a reader sees and its start
 // offset in the file the host parsed, as UnitDependent takes them; its size in syntax nodes; whether its package is
-// the workspace's; whether the build makes it dependent; and the units it calls statically, by their index in Units.
+// the workspace's; whether the build makes it dependent; the units it calls statically, by their index in Units; and
+// the functions it calls statically of packages the graph does not hold, each once, which another graph's units may
+// declare (UnitDeclaring).
 type Unit struct {
-	PackageId string
-	File      string
-	Start     int
-	Nodes     int
-	Workspace bool
-	Dependent bool
-	Calls     []int
+	PackageId     string
+	File          string
+	Start         int
+	Nodes         int
+	Workspace     bool
+	Dependent     bool
+	Calls         []int
+	ExternalCalls []types.Object
 }
 
 // Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name.
@@ -101,9 +123,21 @@ func (dependence *Dependence) Units() []Unit {
 			Workspace: dependence.resolved.packages[resolved.packageIndex].workspace,
 			Dependent: dependence.unitDependent[index],
 			Calls:     resolved.calls,
+
+			ExternalCalls: resolved.externalCalls,
 		})
 	}
 	return units
+}
+
+// UnitDeclaring is the index in Units of the unit that declares object, as its generic declares it, and false when
+// no unit of the graph does.
+func (dependence *Dependence) UnitDeclaring(object types.Object) (int, bool) {
+	node, isNode := dependence.resolved.nodes[canonical(object)]
+	if !isNode || dependence.resolved.declaringUnit[node] < 0 {
+		return 0, false
+	}
+	return dependence.resolved.declaringUnit[node], true
 }
 
 // UnitContaining is the index in Units of the unit of the package packageId whose span in file, the one a reader

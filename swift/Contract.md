@@ -1077,13 +1077,25 @@ or when its body reads one by a kind of use the change reaches. `"workspace"` an
 units and the `"dependentPackages"` among them, those with a dependent unit or a unit only the build compiles, with
 their `"dependentPackageNodes"`, and the `"buildOnlyUnits"` and `"buildOnlyNodes"` only the build compiles, which no
 count of the host's holds. `"graphMilliseconds":900` is the host's graph, built once from its load for every build,
-and `"judgmentMilliseconds":40` this build's judgment on it. Such a run checks every package of the host from source,
-reading no findings cache and none of the binary's standard-library entries, and its lint waits for the load to end.
+and `"judgmentMilliseconds":40` this build's judgment on it. Such a run reads the findings cache and the binary's
+standard-library entries as any other run does, and its lint waits for the load to end. The host's graph holds only
+what the host checked from source, so when it restored packages from export data the record writes `"restored"`,
+additive (#ss4t5g6): `"packages"` it restored; the standard library among them is loaded from source once a run, beside
+the host's lint, onto a graph of its own, `"standardLibraryPackages"` that load reached, in `"loadMilliseconds"` for
+its list, parse and type check and `"graphMilliseconds"` for its graph, and judged per build, `"standardLibraryUnits"`
+and `"standardLibraryDependentUnits"`, which `"dependencies"` include, so the totals are those of a host that checked
+every package from source. Each object of a restored package a unit reads is answered by its counterpart in that graph,
+found by its path: `"answered"` counts those, `"withoutCounterpart"` those whose path names nothing alike there, and
+`"withoutPackage"` those of a package no graph holds, a warm store's say, the last two called dependent, failing wide.
 The host's record never writes it, and neither does a run without the switch.
 
 Its `"facts"` is the build's facts census (#0ghk7vj), written once its lint has run. Under the switch every extra build
-checks every package from source and restores nothing from the host's run, so its facts are its own, and such a run
-is far slower than a plain one. Every fact an analyzer exported about an object in a file both builds compile, or about
+restores nothing from the host's run, so its facts are its own, and such a run is slower than a plain one. The standard
+library the host restored from the binary's table is compared through the table: its facts by their objects'
+counterparts in the standard library's graph, its answers by objectpath, an answer the build asked compared with the
+table's, and its units counted beside the host's, a host unit's call into it among the calls. A fact about an object no
+objectpath names, a function's local closure, has no side in the table and is left out, as is every fact of a package
+an extra build restored. Every fact an analyzer exported about an object in a file both builds compile, or about
 a package both have, is compared with the host's by the digest of its value, a fact only one build exported counting as
 different, and so is every answer the fact resolver computed in both builds, by its encoding. `"kinds"` counts them
 by `"analyzer"` and `"factType"`, an answer's type being `"answer"`: `"compared"`, `"equal"` and `"different"`, the

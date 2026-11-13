@@ -250,6 +250,11 @@ type Result struct {
 	// Facts are every fact the run's analyses exported under Options.ExportFacts (exportedFacts), nil without it.
 	Facts []ExportedFact
 
+	// RestoredAnswers are, under Options.ExportFacts, the answers the run's store holds of each package it restored,
+	// as the resolver reads them, so a census can read a restored package's answers by objectpath (#ss4t5g6). Nil
+	// without it, and for a package the store holds none of.
+	RestoredAnswers map[*packages.Package]*fact_resolver.Answers
+
 	// Host is what the run kept for its extra builds under Options.KeepForBuilds, nil without it, and FromHost what an
 	// extra build's session restored from the host's run (CacheSession.RestoreFromHost), all zero without one.
 	Host     *HostRun
@@ -525,6 +530,13 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		}
 		result.Reads = options.Reads
 	}
+	// A restored package's facts by path and its answers are read before the run keeps its packages for the extra
+	// builds, which lets the session's answers go.
+	var unnamedFacts []ExportedFact
+	var restoredAnswers map[*packages.Package]*fact_resolver.Answers
+	if options.ExportFacts && session != nil {
+		unnamedFacts, restoredAnswers = session.unnamedFacts(), session.restoredAnswers()
+	}
 	if session != nil {
 		session.save(graph, options.Withheld, files)
 		result.Cache = session.counts
@@ -535,6 +547,8 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 	if options.ExportFacts {
 		result.Facts = append(exportedFacts(graphs), computedAnswers(resolver, analyzed)...)
+		result.Facts = append(result.Facts, unnamedFacts...)
+		result.RestoredAnswers = restoredAnswers
 	}
 	result.Elapsed = time.Since(started)
 	return result, nil

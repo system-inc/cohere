@@ -1,6 +1,7 @@
 package load
 
 import (
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -68,6 +69,13 @@ func newGraph(listed *listing, workspace string, compiled map[string]*compiledPa
 		}
 	}
 	return built
+}
+
+// dropTestVariants leaves out every test variant newGraph built, the roots and the packages built again for a root's
+// tests alike, each of which names the root it was built for (ForTest), so the graph is the listing's packages alone.
+func (graph *graph) dropTestVariants() {
+	graph.roots = slices.DeleteFunc(graph.roots, func(root *node) bool { return root.loaded.ForTest != "" })
+	maps.DeleteFunc(graph.nodes, func(_ string, each *node) bool { return each.loaded.ForTest != "" })
 }
 
 // add puts one node in the graph, the first of an ID kept.

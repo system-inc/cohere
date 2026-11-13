@@ -31,6 +31,9 @@ import (
 // measuredBuildsWidth), and their runs are taken in build order whatever their width (extraBuildRuns). A file no build
 // the toolchain targets compiles (project.Unbuilt) stays the gap the types phase names.
 func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []buildRun {
+	// The standard library's graph under `--build-dependence` ran beside the host's lint, and is over before anything
+	// of the builds is measured or started.
+	engine.awaitStandardLibrary()
 	host, extras, buildsError := engine.buildsBeside()
 	if buildsError != nil {
 		engine.otherBuildsFailed(buildsError)
@@ -48,7 +51,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waited := time.Since(waitStarted)
 	// The host's facts, which each build's are compared with under `--build-dependence` (#0ghk7vj), indexed before any
 	// build starts.
-	engine.indexHostFacts(pass.result.Facts)
+	engine.indexHostFacts(pass.result.Facts, pass.result.RestoredAnswers)
 	ours := engine.oursSet()
 	analyzed := map[string]bool{}
 	for _, each := range loaded.Packages {

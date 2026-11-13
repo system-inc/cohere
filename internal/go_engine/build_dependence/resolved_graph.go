@@ -53,8 +53,10 @@ type resolvedUnit struct {
 	external     []reference
 
 	// calls are the units the unit's body calls statically (unitRecord.callees), each once, never itself: a callee no
-	// unit of the graph declares, a dependency's checked without syntax, is left out.
-	calls []int
+	// unit of the graph declares is left out, and one of a package the graph does not hold, a dependency's checked
+	// without syntax, is kept in externalCalls, for another graph to find its unit (#ss4t5g6).
+	calls         []int
+	externalCalls []types.Object
 }
 
 // externalEdge is an edge from a bit of the graph to a bit of an object of a package it does not hold.
@@ -205,13 +207,17 @@ func (resolved *resolvedGraph) fixedPoint(seedBits []int32) []bool {
 	return set
 }
 
-// resolveCalls turns each unit's callees into the units that declare them, each once, never the unit itself.
+// resolveCalls turns each unit's callees into the units that declare them, each once, never the unit itself, and
+// keeps each callee of a package the graph does not hold as it is.
 func (resolved *resolvedGraph) resolveCalls() {
 	for index := range resolved.units {
 		unit := &resolved.units[index]
 		for _, callee := range unit.record.callees {
 			node, isNode := resolved.nodes[callee]
 			if !isNode {
+				if !universal(callee) && !resolved.typesPackages[callee.Pkg()] {
+					unit.externalCalls = append(unit.externalCalls, callee)
+				}
 				continue
 			}
 			declaring := resolved.declaringUnit[node]
