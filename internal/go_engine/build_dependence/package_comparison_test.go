@@ -115,9 +115,13 @@ func (comparison *packageComparison) compareFunctions(hosted *intermediate_repre
 		}
 		tally.independent++
 		tally.instructions += instructions
+		if judge.judgedAgain[unitIndex] {
+			tally.judgedAgain++
+		}
 		if isDifferent {
 			tally.findings = append(tally.findings, loweringFinding{unit: judge.unitLabel(unitIndex),
-				difference: difference, calleeDependent: judge.calleeDependent(unitIndex)})
+				difference: difference, calleeDependent: judge.calleeDependent(unitIndex),
+				judgedAgain: judge.judgedAgain[unitIndex]})
 		}
 	}
 }
@@ -350,9 +354,13 @@ func (comparison *packageComparison) compareInitializer(hosted *intermediate_rep
 		tally.independent++
 		tally.segments++
 		tally.instructions += len(hostSegment.instructions)
+		if judge.judgedAgain[hostSegment.unitIndex] {
+			tally.judgedAgain++
+		}
 		if isDifferent {
 			tally.findings = append(tally.findings, loweringFinding{unit: judge.unitLabel(hostSegment.unitIndex),
-				difference: difference, calleeDependent: judge.calleeDependent(hostSegment.unitIndex)})
+				difference: difference, calleeDependent: judge.calleeDependent(hostSegment.unitIndex),
+				judgedAgain: judge.judgedAgain[hostSegment.unitIndex]})
 			continue
 		}
 		for _, reached := range reachedPairs(pair) {

@@ -4,12 +4,14 @@ import (
 	"maps"
 )
 
-// loweringFinding is a difference in a function of a unit block 1 calls independent, with the unit's name, and
-// whether a unit the unit calls statically is dependent, which a callee's facts or no-return can carry.
+// loweringFinding is a difference in a function of a unit block 1 calls independent, with the unit's name, whether a
+// unit the unit calls statically is dependent, and whether the no-return facts judgment sends the unit to be judged
+// again, which explains the difference: such a unit is not in block 4's independent set.
 type loweringFinding struct {
 	unit            string
 	difference      loweringDifference
 	calleeDependent bool
+	judgedAgain     bool
 }
 
 // loweringTally is what comparing one build against the host found.
@@ -23,6 +25,10 @@ type loweringTally struct {
 	dependent       int
 	dependentDiffer int
 	findings        []loweringFinding
+
+	// judgedAgain are the independent functions and segments compared whose unit the no-return facts judgment sends
+	// to be judged again, counted among independent.
+	judgedAgain int
 
 	// segments are the package initializers' segments of independent units compared, counted among independent.
 	segments int
@@ -46,6 +52,7 @@ func (tally *loweringTally) merge(other loweringTally) {
 	tally.dependent += other.dependent
 	tally.dependentDiffer += other.dependentDiffer
 	tally.findings = append(tally.findings, other.findings...)
+	tally.judgedAgain += other.judgedAgain
 	tally.segments += other.segments
 	tally.packageLevel += other.packageLevel
 	tally.packageLevelDiffer = append(tally.packageLevelDiffer, other.packageLevelDiffer...)

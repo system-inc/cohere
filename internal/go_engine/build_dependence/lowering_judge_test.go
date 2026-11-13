@@ -5,10 +5,12 @@ import (
 	"go/token"
 )
 
-// loweringJudge is one build's judgment, read by unit.
+// loweringJudge is one build's judgment, read by unit: block 1's dependence, and which units the no-return facts
+// judgment sends to be judged again (noReturnJudgment), by their index in units.
 type loweringJudge struct {
-	dependence *Dependence
-	units      []Unit
+	dependence  *Dependence
+	units       []Unit
+	judgedAgain []bool
 }
 
 // unitAt is the unit of packageId holding position in fileSet, by the file a reader sees and the offset in the file

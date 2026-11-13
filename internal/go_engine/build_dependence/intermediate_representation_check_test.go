@@ -6,7 +6,10 @@ package build_dependence
 // callee returns, and wrappers, conversions and ranges read a type's layout or method set. This builds each package of
 // each build as production builds it, NewPackage with ctrlflow's no-return predicate over that build's own packages,
 // lifted, with the expression map on, and compares every function of every unit block 1 calls independent with its
-// counterpart in the other build, found by its file and offset, instruction by instruction.
+// counterpart in the other build, found by its file and offset, instruction by instruction. Block 4's independent
+// units are block 1's less those block 2's facts judgment sends to be judged again; for the IR, whose lowering after a
+// call reads the callee's no-return, that judgment is ctrlflow's no-return compared between the builds
+// (noReturnJudgment), and a difference it explains is reported apart from one it doesn't.
 //
 // The ordinary run compares the fixtures. COHERE_GO_BUILD_DEPENDENCE_IR names a tree whose `./...`, tests included,
 // the wide run loads under the host and under each build COHERE_GO_BUILD_DEPENDENCE_IR_BUILDS names.
@@ -105,10 +108,11 @@ func buildPackage(loaded *packages.Package, graphs *ctrlflow.CFGs) (built *inter
 }
 
 // compareBuilds compares every package host and build both hold that loaded without errors and that ctrlflow ran
-// on to the end in each, a few at once, so only those packages' two lowerings are live together.
+// on to the end in each, a few at once, so only those packages' two lowerings are live together. Each finding says
+// whether judgedAgain, the no-return facts judgment, explains it.
 func compareBuilds(host loadedBuild, build loadedBuild, hostFlows controlFlows, buildFlows controlFlows,
-	dependence *Dependence) loweringTally {
-	judge := loweringJudge{dependence: dependence, units: dependence.Units()}
+	dependence *Dependence, judgedAgain []bool) loweringTally {
+	judge := loweringJudge{dependence: dependence, units: dependence.Units(), judgedAgain: judgedAgain}
 	var tally loweringTally
 	var tallyLock sync.Mutex
 	work := make(chan string)
@@ -153,13 +157,19 @@ func describeFinding(finding loweringFinding) string {
 	if finding.calleeDependent {
 		callee = ", a unit it calls is dependent"
 	}
+	if finding.judgedAgain {
+		callee += ", judged again for a callee's no-return"
+	}
 	return fmt.Sprintf("%s, %s%s: %s\n\thost:  %s\n\tbuild: %s", finding.unit, finding.difference.function, callee,
 		finding.difference.where, finding.difference.host, finding.difference.build)
 }
 
-// The IR-level check over the fixtures: for every fixture and build, every function of every unit block 1 calls
-// independent lowers the same in the host and the build, and on linux some dependent function of the layout fixture
-// lowers differently, which shows the comparison can see a difference.
+// The IR-level check over the fixtures: for every fixture and build, every function of every unit block 4 takes as
+// independent, block 1's independent units less those the no-return facts judgment sends to be judged again, lowers
+// the same in the host and the build, and on linux some dependent function of the layout fixture lowers differently,
+// which shows the comparison can see a difference. The lowering fixture pins both views on linux: Guard, independent
+// by block 1, lowers differently, since Halt, which it calls, never returns on darwin and returns on linux, and the
+// facts judgment sends Guard to be judged again, so it is no difference among block 4's independent units.
 func TestEveryIndependentFunctionLowersTheSameInBothBuilds(test *testing.T) {
 	test.Parallel()
 
@@ -169,13 +179,32 @@ func TestEveryIndependentFunctionLowersTheSameInBothBuilds(test *testing.T) {
 				test.Parallel()
 
 				judged := judge(test, fixture, build)
-				tally := compareBuilds(judged.host, judged.build, fixtureControlFlows(test, fixture, hostBuild),
-					fixtureControlFlows(test, fixture, build), judged.dependence)
-				test.Logf("compared %d independent functions, %d instructions, %d synthetic functions reached; %d of "+
-					"%d dependent functions lower differently", tally.independent, tally.instructions, tally.synthetic,
-					tally.dependentDiffer, tally.dependent)
+				hostFlows := fixtureControlFlows(test, fixture, hostBuild)
+				buildFlows := fixtureControlFlows(test, fixture, build)
+				noReturn := judgeNoReturn(judged.host, judged.build, hostFlows, buildFlows, judged.dependence)
+				tally := compareBuilds(judged.host, judged.build, hostFlows, buildFlows, judged.dependence,
+					noReturn.judgedAgain)
+				test.Logf("compared %d independent functions, %d of them judged again for a callee's no-return, %d "+
+					"instructions, %d synthetic functions reached; %d of %d dependent functions lower differently; "+
+					"no-return differs for %q", tally.independent, tally.judgedAgain, tally.instructions,
+					tally.synthetic, tally.dependentDiffer, tally.dependent, noReturn.differingFunctions)
+				var explained []string
 				for _, finding := range tally.findings {
-					test.Errorf("independent and lowers differently: %s", describeFinding(finding))
+					if !finding.judgedAgain {
+						test.Errorf("independent and lowers differently: %s", describeFinding(finding))
+						continue
+					}
+					test.Logf("independent by block 1 and lowers differently, judged again: %s",
+						describeFinding(finding))
+					explained = append(explained, finding.difference.function)
+				}
+				var wantExplained []string
+				if fixture == "lowering" && build.name == linuxBuild.name {
+					wantExplained = []string{"example.com/lowering.Guard"}
+				}
+				if !slices.Equal(explained, wantExplained) {
+					test.Errorf("want exactly %q independent by block 1, lowering differently and judged again for "+
+						"a callee's no-return, got %q", wantExplained, explained)
 				}
 				for _, finding := range tally.packageLevelDiffer {
 					test.Errorf("a package initializer's segment of no unit lowers differently: %s",
@@ -282,8 +311,10 @@ func loadTree(test *testing.T, tree string, environment []string) loadedBuild {
 
 // The wide run: the tree COHERE_GO_BUILD_DEPENDENCE_IR names, loaded under the host and under each build
 // COHERE_GO_BUILD_DEPENDENCE_IR_BUILDS names, one build at a time beside the host, every independent unit's functions
-// compared. It reports the counts, every difference in an independent function (the first 200 listed beside their
-// count), and how many dependent functions differ, and fails on any difference.
+// compared. It reports the counts, every difference in a function block 1 calls independent (the first 200 listed
+// beside their count), each marked when the no-return facts judgment explains it, the differences left among block
+// 4's independent units, the gate, and how many dependent functions differ, and fails on any difference no callee's
+// no-return explains.
 func TestEveryIndependentFunctionLowersTheSameInATree(test *testing.T) {
 	test.Parallel()
 
@@ -311,7 +342,28 @@ func TestEveryIndependentFunctionLowersTheSameInATree(test *testing.T) {
 				dependentUnits++
 			}
 		}
-		tally := compareBuilds(host, built, hostFlows, buildFlows, dependence)
+		noReturn := judgeNoReturn(host, built, hostFlows, buildFlows, dependence)
+		tally := compareBuilds(host, built, hostFlows, buildFlows, dependence, noReturn.judgedAgain)
+		explained := 0
+		for _, finding := range tally.findings {
+			if finding.judgedAgain {
+				explained++
+			}
+		}
+		test.Logf("build %s no-return: %d functions answer differently, declared in %d units; %d units block 1 "+
+			"calls independent are judged again; block 1 alone: %d differences in independent functions, %d of them "+
+			"explained by a callee's no-return; with facts: %d differences among %d independent functions and "+
+			"segments", name, len(noReturn.differingFunctions), len(noReturn.differing),
+			judgedAgainCount(noReturn, dependence.Units()), len(tally.findings), explained,
+			len(tally.findings)-explained, tally.independent-tally.judgedAgain)
+		for index, function := range noReturn.differingFunctions {
+			if index == wideDifferencesListed {
+				test.Logf("build %s: %d more no-return answers not listed", name,
+					len(noReturn.differingFunctions)-index)
+				break
+			}
+			test.Logf("build %s no-return %d: %s", name, index+1, function)
+		}
 		test.Logf("build %s: %d packages loaded, ctrlflow on %d; %d of %d units dependent; %d packages compared, "+
 			"%d skipped; %d independent functions and initializer segments compared (%d of them segments), %d "+
 			"instructions, %d synthetic functions reached, %d functions or segments without a counterpart; %d "+
@@ -337,8 +389,9 @@ func TestEveryIndependentFunctionLowersTheSameInATree(test *testing.T) {
 		for _, unknown := range slices.Sorted(maps.Keys(tally.unknownFields)) {
 			test.Errorf("build %s: an instruction field of a kind the comparison does not render: %s", name, unknown)
 		}
-		if len(tally.findings) > 0 {
-			test.Errorf("build %s: %d differences in independent functions", name, len(tally.findings))
+		if len(tally.findings) > explained {
+			test.Errorf("build %s: %d differences in independent functions that no callee's no-return explains",
+				name, len(tally.findings)-explained)
 		}
 		if dependentUnits > 0 && tally.dependentDiffer == 0 {
 			test.Errorf("build %s: block 1 found %d dependent units and no dependent function lowers differently, "+
