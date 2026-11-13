@@ -7,19 +7,33 @@ import (
 
 // resolvedGraph is the graph's records resolved into nodes: every object a unit declares has a node, and each node two
 // bits, its name bit at twice its index and its underlying bit just after, a non-type object using only the first.
-// It is built once for the packages added so far and read, never written, by every judgment on it, so judgments can
-// run concurrently.
+// A node is keyed by its package's ID and its local name (record.go), so a record decoded from its bytes and one
+// collected from a live package resolve alike (#6a3kjvz). It is built once for the packages added so far and read,
+// never written, by every judgment on it, so judgments can run concurrently.
 type resolvedGraph struct {
 	// packages are the records, in package ID order, so a node's index never hangs on the order packages were added.
 	packages     []*packageRecord
 	packageIndex map[string]int
 
-	// typesPackages are the packages the graph holds by their types, to tell an object no unit of a held package
-	// declares from one of a package the graph does not hold, which only the build's DependentObject can answer.
+	// typesPackages are the live packages the graph holds by their types, for the live object API (ObjectBits), which
+	// asks of an object rather than a name.
 	typesPackages map[*types.Package]bool
 
-	nodes   map[types.Object]int32
-	objects []types.Object
+	// nodes are the nodes by key, keys each node's key, and objects each node's live object, nil for one only a
+	// decoded record declares; objectNodes are the live objects' nodes, for the live object API.
+	nodes       map[nodeKey]int32
+	keys        []nodeKey
+	objects     []types.Object
+	objectNodes map[types.Object]int32
+
+	// pathsHeld are the IDs of the packages the graph holds of each path, and resolvedPaths each path a package's
+	// record names, resolved to an ID through its import closure (packageOf), each once.
+	pathsHeld     map[string][]string
+	resolvedPaths map[pathFrom]string
+
+	// targets are, for each package, each object of its record's table resolved once (resolveTargets), which its
+	// reads, callees and edges name by index.
+	targets [][]objectTarget
 
 	units []resolvedUnit
 
@@ -42,27 +56,55 @@ type resolvedGraph struct {
 	externalEdges []externalEdge
 }
 
-// resolvedUnit is a unit with its declared objects, its receiver and its references as bits: references to objects of
-// packages the graph does not hold stay objects (external), for the build's DependentObject.
+// nodeKey is a node's key: its package's ID and its local name there.
+type nodeKey struct {
+	packageIdentifier string
+	local             string
+}
+
+// objectTarget is one object of a record's table resolved: its node, whether it has one, and whether the graph holds
+// its package.
+type objectTarget struct {
+	node   int32
+	isNode bool
+	isHeld bool
+}
+
+// pathFrom is a path one package's record names, by the package's index.
+type pathFrom struct {
+	packageIndex int
+	path         string
+}
+
+// resolvedUnit is a unit with its declared objects, its receiver and its reads as bits: reads of objects of packages
+// the graph does not hold stay recorded objects (external), for the build's DependentObject.
 type resolvedUnit struct {
 	packageIndex int
-	record       *unitRecord
+	record       *recordedUnit
 	declares     []int32
 	receiver     int32
 	bits         []int32
-	external     []reference
+	external     []externalRead
 
-	// calls are the units the unit's body calls statically (unitRecord.callees), each once, never itself: a callee no
-	// unit of the graph declares is left out, and one of a package the graph does not hold, a dependency's checked
-	// without syntax, is kept in externalCalls, for another graph to find its unit (#ss4t5g6).
+	// calls are the units the unit's body calls statically (recordedUnit.callees), each once, never itself: a callee
+	// no unit of the graph declares is left out, and one of a package the graph does not hold, a dependency's checked
+	// without syntax, is kept in externalCalls when its live object is known, for another graph to find its unit
+	// (#ss4t5g6).
 	calls         []int
 	externalCalls []types.Object
+}
+
+// externalRead is one bit of an object of a package the graph does not hold, which the build's DependentObject
+// answers: the object as a record names it, its live object nil in a decoded record.
+type externalRead struct {
+	object     recordedObject
+	underlying bool
 }
 
 // externalEdge is an edge from a bit of the graph to a bit of an object of a package it does not hold.
 type externalEdge struct {
 	fromBit int32
-	to      reference
+	to      externalRead
 }
 
 // fileKey is a file of a package: its package ID and the file a reader sees.
@@ -93,8 +135,9 @@ func (resolved *resolvedGraph) resolveUnits() {
 		for unitIndex := range record.units {
 			unit := &record.units[unitIndex]
 			declares := make([]int32, 0, len(unit.declares))
-			for _, object := range unit.declares {
-				node := resolved.node(object)
+			for _, declared := range unit.declares {
+				node := resolved.node(nodeKey{packageIdentifier: record.identifier, local: declared.local},
+					declared.object)
 				declares = append(declares, node)
 				resolved.declaringUnit[node] = len(resolved.units)
 			}
@@ -109,84 +152,170 @@ func (resolved *resolvedGraph) resolveUnits() {
 		resolved.packageUnits = append(resolved.packageUnits, [2]int{first, len(resolved.units)})
 	}
 	for index := range resolved.units {
-		receiver := resolved.units[index].record.receiver
-		if receiver == nil {
+		unit := &resolved.units[index]
+		if unit.record.receiver == "" {
 			continue
 		}
-		if node, isNode := resolved.nodes[receiver]; isNode {
-			resolved.units[index].receiver = node
+		key := nodeKey{packageIdentifier: resolved.packages[unit.packageIndex].identifier, local: unit.record.receiver}
+		if node, isNode := resolved.nodes[key]; isNode {
+			unit.receiver = node
 		}
 	}
 }
 
-// node is object's node, made if it has none.
-func (resolved *resolvedGraph) node(object types.Object) int32 {
-	declared := canonical(object)
-	if index, isNode := resolved.nodes[declared]; isNode {
+// node is key's node, made if it has none, with object its live object when one is known.
+func (resolved *resolvedGraph) node(key nodeKey, object types.Object) int32 {
+	if index, isNode := resolved.nodes[key]; isNode {
+		if object != nil && resolved.objects[index] == nil {
+			resolved.objects[index] = object
+			resolved.objectNodes[object] = index
+		}
 		return index
 	}
-	index := int32(len(resolved.objects))
-	resolved.nodes[declared] = index
-	resolved.objects = append(resolved.objects, declared)
+	index := int32(len(resolved.keys))
+	resolved.nodes[key] = index
+	resolved.keys = append(resolved.keys, key)
+	resolved.objects = append(resolved.objects, object)
+	if object != nil {
+		resolved.objectNodes[object] = index
+	}
 	resolved.declaringUnit = append(resolved.declaringUnit, -1)
 	return index
+}
+
+// packageOf is the ID of the package of path in the import closure of the package at packageIndex, and whether the
+// graph holds it. A package's own path is its own. A path the graph holds one package of, which is nearly every path,
+// is that package, unless the closure holds another of the path: a package and its test variants share a path, and a
+// test binary's closure holds one package of each path, so the closure's is the one the record means. It is found by
+// walking the closure through the records' import maps, once for each path a package names; a package the graph does
+// not hold ends that walk, since its imports are not known.
+func (resolved *resolvedGraph) packageOf(packageIndex int, path string) (string, bool) {
+	record := resolved.packages[packageIndex]
+	if path == record.path {
+		return record.identifier, true
+	}
+	from := pathFrom{packageIndex: packageIndex, path: path}
+	if identifier, isResolved := resolved.resolvedPaths[from]; isResolved {
+		_, isHeld := resolved.packageIndex[identifier]
+		return identifier, isHeld && identifier != ""
+	}
+	identifier := resolved.inClosure(record, path)
+	if identifier == "" && len(resolved.pathsHeld[path]) == 1 {
+		identifier = resolved.pathsHeld[path][0]
+	}
+	resolved.resolvedPaths[from] = identifier
+	_, isHeld := resolved.packageIndex[identifier]
+	return identifier, isHeld && identifier != ""
+}
+
+// inClosure is the ID of the package of path in record's import closure, as far as the records the graph holds tell
+// it, and empty when the walk finds none.
+func (resolved *resolvedGraph) inClosure(record *packageRecord, path string) string {
+	seen := map[string]bool{record.identifier: true}
+	pending := []*packageRecord{record}
+	for len(pending) > 0 {
+		current := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		if identifier, isImported := current.imports[path]; isImported {
+			return identifier
+		}
+		for _, identifier := range current.imports {
+			if seen[identifier] {
+				continue
+			}
+			seen[identifier] = true
+			if index, isHeld := resolved.packageIndex[identifier]; isHeld {
+				pending = append(pending, resolved.packages[index])
+			}
+		}
+	}
+	return ""
+}
+
+// resolveTargets resolves every object of every record's table once: the node of the object, as the record of its
+// package names it, whether it has one, and whether the graph holds its package. A record names each object once, so
+// resolution looks each name up once a package rather than once a read.
+func (resolved *resolvedGraph) resolveTargets() {
+	resolved.targets = make([][]objectTarget, len(resolved.packages))
+	for packageIndex, record := range resolved.packages {
+		targets := make([]objectTarget, len(record.objects))
+		for index, object := range record.objects {
+			identifier, isHeld := resolved.packageOf(packageIndex, object.path)
+			if !isHeld {
+				continue
+			}
+			node, isNode := resolved.nodes[nodeKey{packageIdentifier: identifier, local: object.local}]
+			targets[index] = objectTarget{node: node, isNode: isNode, isHeld: true}
+		}
+		resolved.targets[packageIndex] = targets
+	}
 }
 
 // resolveEdges turns every record's kind edges into the bits that depend on each bit. An edge to an object of a
 // package the graph holds that no unit declares is dropped, as the counter dropped every edge to an object without a
 // node, and one to a package the graph does not hold is kept for the build's DependentObject.
 func (resolved *resolvedGraph) resolveEdges() {
-	resolved.dependents = make([][]int32, 2*len(resolved.objects))
-	for _, record := range resolved.packages {
+	resolved.dependents = make([][]int32, 2*len(resolved.keys))
+	for packageIndex, record := range resolved.packages {
 		for _, edge := range record.edges {
-			from, isNode := resolved.nodes[edge.from]
+			from, isNode := resolved.nodes[nodeKey{packageIdentifier: record.identifier, local: edge.from}]
 			if !isNode {
 				continue
 			}
 			fromBit := bit(from, edge.fromUnderlying)
-			if to, isNode := resolved.nodes[edge.to]; isNode {
-				if toBit := bit(to, edge.toUnderlying); toBit != fromBit {
+			to := resolved.targets[packageIndex][edge.to]
+			if to.isNode {
+				if toBit := bit(to.node, edge.toUnderlying); toBit != fromBit {
 					resolved.dependents[toBit] = append(resolved.dependents[toBit], fromBit)
 				}
 				continue
 			}
-			if resolved.typesPackages[edge.to.Pkg()] {
+			if to.isHeld {
 				continue
 			}
-			resolved.externalEdges = append(resolved.externalEdges,
-				externalEdge{fromBit: fromBit, to: reference{object: edge.to, touchesUnderlying: edge.toUnderlying}})
+			resolved.externalEdges = append(resolved.externalEdges, externalEdge{fromBit: fromBit,
+				to: externalRead{object: record.objects[edge.to], underlying: edge.toUnderlying}})
 		}
 	}
 }
 
-// resolveReference adds read to unit as a bit, or as an external reference when its object is of a package the graph
-// does not hold. An object of a package the graph holds that no unit declares, a field of an anonymous struct in a
-// var's initializer or a method of an interface in a type parameter's constraint, is read through its type as the
-// counter read every object without a node, a constant's in full, as a local is (bodyWalk.addObject).
+// resolveRead adds read to unit as bits, or as an external read when its object is of a package the graph does not
+// hold. An object of a package the graph holds that no unit declares, a field of an anonymous struct in a var's
+// initializer or a method of an interface in a type parameter's constraint, is read through its type, as the counter
+// read every object without a node: what its record holds of it (recordedRead.through), each bit of which resolves the
+// same way, one with no node in a package the graph holds dropped.
 //
-// Mutates: unit gains the bits and external references
-func (resolved *resolvedGraph) resolveReference(unit *resolvedUnit, read reference, walker *bitWalker) {
-	if node, isNode := resolved.nodes[read.object]; isNode {
-		unit.bits = append(unit.bits, bit(node, read.touchesUnderlying))
-		return
+// Mutates: unit gains the bits and external reads
+func (resolved *resolvedGraph) resolveRead(unit *resolvedUnit, read recordedRead) {
+	targets := resolved.targets[unit.packageIndex]
+	objects := resolved.packages[unit.packageIndex].objects
+	if read.target >= 0 {
+		target := targets[read.target]
+		if target.isNode {
+			unit.bits = append(unit.bits, bit(target.node, read.underlying))
+			return
+		}
+		if !target.isHeld {
+			unit.external = append(unit.external,
+				externalRead{object: objects[read.target], underlying: read.underlying})
+			return
+		}
 	}
-	if !resolved.typesPackages[read.object.Pkg()] {
-		unit.external = append(unit.external, read)
-		return
-	}
-	_, isConstant := read.object.(*types.Const)
-	for _, through := range walker.references(read.object.Type(), isConstant) {
-		if node, isNode := resolved.nodes[through.object]; isNode {
-			unit.bits = append(unit.bits, bit(node, through.touchesUnderlying))
-		} else if !resolved.typesPackages[through.object.Pkg()] {
-			unit.external = append(unit.external, through)
+	for _, reached := range read.through {
+		target := targets[reached.object]
+		switch {
+		case target.isNode:
+			unit.bits = append(unit.bits, bit(target.node, reached.underlying))
+		case !target.isHeld:
+			unit.external = append(unit.external,
+				externalRead{object: objects[reached.object], underlying: reached.underlying})
 		}
 	}
 }
 
 // fixedPoint spreads the seed bits to every bit that depends on one.
 func (resolved *resolvedGraph) fixedPoint(seedBits []int32) []bool {
-	set := make([]bool, 2*len(resolved.objects))
+	set := make([]bool, 2*len(resolved.keys))
 	pending := make([]int32, 0, len(seedBits))
 	for _, seedBit := range seedBits {
 		if !set[seedBit] {
@@ -208,19 +337,20 @@ func (resolved *resolvedGraph) fixedPoint(seedBits []int32) []bool {
 }
 
 // resolveCalls turns each unit's callees into the units that declare them, each once, never the unit itself, and
-// keeps each callee of a package the graph does not hold as it is.
+// keeps each callee of a package the graph does not hold as it is, when its live object is known.
 func (resolved *resolvedGraph) resolveCalls() {
 	for index := range resolved.units {
 		unit := &resolved.units[index]
 		for _, callee := range unit.record.callees {
-			node, isNode := resolved.nodes[callee]
-			if !isNode {
-				if !universal(callee) && !resolved.typesPackages[callee.Pkg()] {
-					unit.externalCalls = append(unit.externalCalls, callee)
+			target := resolved.targets[unit.packageIndex][callee]
+			if !target.isNode {
+				if object := resolved.packages[unit.packageIndex].objects[callee].object; !target.isHeld &&
+					object != nil {
+					unit.externalCalls = append(unit.externalCalls, object)
 				}
 				continue
 			}
-			declaring := resolved.declaringUnit[node]
+			declaring := resolved.declaringUnit[target.node]
 			if declaring >= 0 && declaring != index && !slices.Contains(unit.calls, declaring) {
 				unit.calls = append(unit.calls, declaring)
 			}

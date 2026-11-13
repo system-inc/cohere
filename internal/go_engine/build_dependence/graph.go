@@ -40,25 +40,41 @@ type Graph struct {
 	// resolved is the graph of nodes Against judges on, nil until it is first resolved and again once a package is
 	// added after.
 	resolved *resolvedGraph
+
+	// paths finds the objectpaths every package's record names objects by (newRecord), searching each package's
+	// API once for the graph.
+	paths *objectPaths
 }
 
 // packageRecord is what the graph keeps of one package: no syntax and no type maps, only its units and the kind edges
-// of the objects they declare.
+// of the objects they declare, every object named (record.go), so a record decoded from its bytes (Graph.AddRecord)
+// resolves as one collected from a live package does. path is the package's import path, imports its import map,
+// path to package ID, and typeNames the names of its scope's type names, in which a method of a build-only file finds
+// its receiver. unnameable counts the objects of other packages it reads that no name can carry, which a record read
+// back could not find (Graph.Unnameable).
 type packageRecord struct {
 	identifier string
+	path       string
 	workspace  bool
+	imports    map[string]string
+	typeNames  []string
 
-	// typesPackage is the package's types, in whose scope a method of a build-only file finds its receiver's type
-	// name. It is nil for a package the loader gave no types.
+	// typesPackage is the package's types, nil for a package the loader gave no types and for a record decoded from
+	// its bytes, which holds no types; the graph's live object API reads it (Counterparts).
 	typesPackage *types.Package
 
-	units []unitRecord
-	edges []kindEdge
+	// objects are every object the record's reads, callees and edges name, each once, in the order of their names,
+	// which those name by index.
+	objects []recordedObject
+
+	units      []recordedUnit
+	edges      []recordedEdge
+	unnameable int
 }
 
-// unitRecord is one unit: the file a reader sees it in, as its start's position names it past any //line directive,
-// its start and end offsets in the file the host parsed, its size in syntax nodes, the objects it declares, and what
-// its body or initializer reads.
+// unitRecord is one unit as the collector finds it in a live package, before newRecord names its objects: the file a
+// reader sees it in, as its start's position names it past any //line directive, its start and end offsets in the file
+// the host parsed, its size in syntax nodes, the objects it declares, and what its body or initializer reads.
 type unitRecord struct {
 	file  string
 	start int
@@ -89,7 +105,7 @@ type unitRecord struct {
 
 // NewGraph is an empty graph.
 func NewGraph() *Graph {
-	return &Graph{packages: map[string]*packageRecord{}}
+	return &Graph{packages: map[string]*packageRecord{}, paths: &objectPaths{}}
 }
 
 // AddPackage records loaded's units and their edges. It is called while loaded's syntax and TypesInfo are live, since
@@ -100,20 +116,73 @@ func NewGraph() *Graph {
 // It is safe to call concurrently for different packages: the walk runs on the caller's goroutine, and only its
 // publication takes the lock.
 func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
-	record := &packageRecord{identifier: loaded.ID, workspace: workspace, typesPackage: loaded.Types}
+	imports := make(map[string]string, len(loaded.Imports))
+	for path, imported := range loaded.Imports {
+		imports[path] = imported.ID
+	}
+	var units []unitRecord
+	var edges []kindEdge
 	if loaded.TypesInfo != nil {
 		collecting := newCollector(loaded.TypesInfo)
 		for _, file := range loaded.Syntax {
 			collecting.collectFile(loaded.Fset.File(file.FileStart), file)
 		}
-		record.units = collecting.units
-		record.edges = collecting.edges
+		units, edges = collecting.units, collecting.edges
 	}
+	var typesPackage *types.Package
+	if loaded.TypesInfo != nil {
+		typesPackage = loaded.Types
+	}
+	record := newRecord(loaded.ID, workspace, typesPackage, imports, graph.paths, units, edges)
+	record.typesPackage = loaded.Types
+	if record.path == "" {
+		record.path = loaded.PkgPath
+	}
+	graph.add(record)
+}
 
+// AddRecord adds the package a record encoded (EncodedRecord), with no syntax and no types, as AddPackage added it
+// from its live package, or says why the bytes hold no record. Its objects meet those of every other package by name.
+func (graph *Graph) AddRecord(encoded []byte) error {
+	record, decodeError := decodeRecord(encoded)
+	if decodeError != nil {
+		return decodeError
+	}
+	graph.add(record)
+	return nil
+}
+
+// add publishes record under one hold of the lock, and lets the last resolution go.
+func (graph *Graph) add(record *packageRecord) {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
 	graph.packages[record.identifier] = record
 	graph.resolved = nil
+}
+
+// EncodedRecord is the record of the package of identifier as AddRecord reads it, and false when the graph holds no
+// such package.
+func (graph *Graph) EncodedRecord(identifier string) ([]byte, bool) {
+	graph.lock.Lock()
+	defer graph.lock.Unlock()
+	record, isHeld := graph.packages[identifier]
+	if !isHeld {
+		return nil, false
+	}
+	return encodeRecord(record), true
+}
+
+// Unnameable counts, over every package added, the objects of other packages a record read that no name can carry:
+// one objectpath cannot name that is no package-level object. A record read back could not find such an object, so
+// persisting records rests on there being none (#6a3kjvz).
+func (graph *Graph) Unnameable() int {
+	graph.lock.Lock()
+	defer graph.lock.Unlock()
+	count := 0
+	for _, record := range graph.packages {
+		count += record.unnameable
+	}
+	return count
 }
 
 // resolve is the graph's resolution, built if a package was added since the last one.
@@ -126,9 +195,12 @@ func (graph *Graph) resolve() *resolvedGraph {
 	resolved := &resolvedGraph{
 		packageIndex:  map[string]int{},
 		typesPackages: map[*types.Package]bool{},
-		nodes:         map[types.Object]int32{},
+		nodes:         map[nodeKey]int32{},
+		objectNodes:   map[types.Object]int32{},
 		unitIndex:     map[unitKey]int{},
 		fileUnits:     map[fileKey][]int{},
+		pathsHeld:     map[string][]string{},
+		resolvedPaths: map[pathFrom]string{},
 	}
 	for _, identifier := range slices.Sorted(maps.Keys(graph.packages)) {
 		record := graph.packages[identifier]
@@ -137,14 +209,15 @@ func (graph *Graph) resolve() *resolvedGraph {
 		if record.typesPackage != nil {
 			resolved.typesPackages[record.typesPackage] = true
 		}
+		resolved.pathsHeld[record.path] = append(resolved.pathsHeld[record.path], identifier)
 	}
 	resolved.resolveUnits()
+	resolved.resolveTargets()
 	resolved.resolveEdges()
 	resolved.resolveCalls()
-	walker := &bitWalker{seen: map[walkKey]bool{}}
 	for index := range resolved.units {
-		for _, read := range resolved.units[index].record.references {
-			resolved.resolveReference(&resolved.units[index], read, walker)
+		for _, read := range resolved.units[index].record.reads {
+			resolved.resolveRead(&resolved.units[index], read)
 		}
 	}
 	graph.resolved = resolved
@@ -164,9 +237,18 @@ func canonical(object types.Object) types.Object {
 
 // local reports whether object is declared inside a function: a local variable, constant or type, or a parameter. No
 // unit declares one, so the counter read a local through its type, and a local type through what lies under it. A
-// struct field or method has no parent scope and is no local, and neither is an object of the universe.
+// struct field or method has no parent scope and is no local, and neither is an object of the universe. go/types puts
+// no blank identifier in a scope, so a blank variable, `for _, x := range` and `_ := f()` in a body among them, has no
+// parent either; it is a local all the same (#6a3kjvz), read through its type as one, which is what resolution read
+// for it before, as an object no unit declares. A package-level blank var is declared by its unit and never read.
 func local(object types.Object) bool {
-	return !universal(object) && object.Parent() != nil && object.Parent() != object.Pkg().Scope()
+	if universal(object) {
+		return false
+	}
+	if variable, isVariable := object.(*types.Var); isVariable && !variable.IsField() && variable.Parent() == nil {
+		return true
+	}
+	return object.Parent() != nil && object.Parent() != object.Pkg().Scope()
 }
 
 // universal reports whether object is of no package: the universe's, `error`'s method among them, the same in every
