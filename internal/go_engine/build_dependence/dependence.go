@@ -50,6 +50,9 @@ func (dependence *Dependence) Counts() Counts {
 func (dependence *Dependence) DependentObjects() map[types.Object]Bits {
 	dependent := map[types.Object]Bits{}
 	for node, object := range dependence.resolved.objects {
+		if object == nil {
+			continue
+		}
 		bits := Bits{
 			Name:       dependence.bits[bit(int32(node), false)],
 			Underlying: dependence.bits[bit(int32(node), true)],
@@ -69,23 +72,25 @@ func (dependence *Dependence) DependentObjects() map[types.Object]Bits {
 func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 	resolved := dependence.resolved
 	declared := canonical(object)
-	if node, isNode := resolved.nodes[declared]; isNode {
+	if node, isNode := resolved.objectNodes[declared]; isNode {
 		return Bits{Name: dependence.bits[bit(node, false)], Underlying: dependence.bits[bit(node, true)]}
 	}
 	if !resolved.typesPackages[declared.Pkg()] {
 		return Bits{
-			Name:       dependence.judging.answer(reference{object: declared}),
-			Underlying: dependence.judging.answer(reference{object: declared, touchesUnderlying: true}),
+			Name: dependence.judging.answer(externalRead{object: recordedObject{object: declared}}),
+			Underlying: dependence.judging.answer(
+				externalRead{object: recordedObject{object: declared}, underlying: true}),
 		}
 	}
 	_, isConstant := declared.(*types.Const)
 	walker := &bitWalker{seen: map[walkKey]bool{}}
 	for _, through := range walker.references(declared.Type(), isConstant) {
 		set := false
-		if node, isNode := resolved.nodes[through.object]; isNode {
+		if node, isNode := resolved.objectNodes[through.object]; isNode {
 			set = dependence.bits[bit(node, through.touchesUnderlying)]
 		} else if !resolved.typesPackages[through.object.Pkg()] {
-			set = dependence.judging.answer(through)
+			set = dependence.judging.answer(externalRead{object: recordedObject{object: through.object},
+				underlying: through.touchesUnderlying})
 		}
 		if set {
 			return Bits{Name: true, Underlying: true}
@@ -133,7 +138,7 @@ func (dependence *Dependence) Units() []Unit {
 // UnitDeclaring is the index in Units of the unit that declares object, as its generic declares it, and false when
 // no unit of the graph does.
 func (dependence *Dependence) UnitDeclaring(object types.Object) (int, bool) {
-	node, isNode := dependence.resolved.nodes[canonical(object)]
+	node, isNode := dependence.resolved.objectNodes[canonical(object)]
 	if !isNode || dependence.resolved.declaringUnit[node] < 0 {
 		return 0, false
 	}

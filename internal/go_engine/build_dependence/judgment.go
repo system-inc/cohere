@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 )
 
 // judgment is one build's judgment on a resolved graph: the build's difference, the units seeded so far, the seed
@@ -48,7 +49,8 @@ func (judging *judgment) seedFiles() {
 
 // seedMethodSets is rule 2: a method in a file only the host compiles, or in one only the build compiles, on a type the
 // host declares, moves that type's method set, which sets its name bit. A build-only file's receiver is found by its
-// base name in the host package's scope, since the file was parsed for its syntax alone.
+// base name among the host package's type names, as its record holds them (packageRecord.typeNames), since the file
+// was parsed for its syntax alone; a package-level type's local name is its name.
 func (judging *judgment) seedMethodSets() {
 	for index := range judging.resolved.units {
 		if unit := &judging.resolved.units[index]; judging.seedUnit[index] && unit.receiver >= 0 {
@@ -57,21 +59,21 @@ func (judging *judgment) seedMethodSets() {
 	}
 	for identifier, differing := range judging.difference.Packages {
 		packageIndex, isHeld := judging.resolved.packageIndex[identifier]
-		if !isHeld || judging.resolved.packages[packageIndex].typesPackage == nil {
+		if !isHeld {
 			continue
 		}
-		scope := judging.resolved.packages[packageIndex].typesPackage.Scope()
+		record := judging.resolved.packages[packageIndex]
 		for _, file := range differing.BuildOnlyFiles {
 			for _, declaration := range file.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
 				if !isFunction || function.Recv == nil || len(function.Recv.List) == 0 {
 					continue
 				}
-				typeName, isTypeName := scope.Lookup(receiverBaseName(function.Recv.List[0].Type)).(*types.TypeName)
-				if !isTypeName {
+				name := receiverBaseName(function.Recv.List[0].Type)
+				if !slices.Contains(record.typeNames, name) {
 					continue
 				}
-				if node, isNode := judging.resolved.nodes[typeName]; isNode {
+				if node, isNode := judging.resolved.nodes[nodeKey{packageIdentifier: identifier, local: name}]; isNode {
 					judging.seedBits = append(judging.seedBits, bit(node, false))
 				}
 			}
@@ -152,17 +154,22 @@ func receiverBaseName(expression ast.Expr) string {
 }
 
 // answer is whether read's bit is set in the build, for an object of a package the graph does not hold, by the
-// build's DependentObject, asked once per object.
-func (judging *judgment) answer(read reference) bool {
+// build's DependentObject, asked once per object. An object a decoded record names has no live object to ask of, so
+// it fails wide: set, unless the build has no DependentObject, which says no such object is dependent.
+func (judging *judgment) answer(read externalRead) bool {
 	if judging.difference.DependentObject == nil {
 		return false
 	}
-	answered, isAsked := judging.answers[read.object]
-	if !isAsked {
-		answered.Name, answered.Underlying = judging.difference.DependentObject(read.object)
-		judging.answers[read.object] = answered
+	object := read.object.object
+	if object == nil {
+		return true
 	}
-	if read.touchesUnderlying {
+	answered, isAsked := judging.answers[object]
+	if !isAsked {
+		answered.Name, answered.Underlying = judging.difference.DependentObject(object)
+		judging.answers[object] = answered
+	}
+	if read.underlying {
 		return answered.Underlying
 	}
 	return answered.Name
