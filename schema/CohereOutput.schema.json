@@ -491,6 +491,11 @@
                         }
                     }
                 },
+                "headersUnshared": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Why a Go run's listings did not share each Go file's header through the engine's copy of go/build: a binary linked by a Go release whose go/build is not the copy's, which reads the same listing at more CPU. Absent when they shared them, from a replay, which started no engine, and for every other run."
+                },
                 "memoryRaisedToBytes": {
                     "type": "array",
                     "items": { "type": "integer", "minimum": 1 },

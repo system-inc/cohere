@@ -51,6 +51,9 @@ type runSummary struct {
 	// MemoryRaisedToBytes is each limit a Go run raised its heap to after its load, in order, nil when it raised
 	// none and for every other run (#5shepvt). A replay raised nothing, so it carries none.
 	MemoryRaisedToBytes []int64
+	// HeadersUnshared is why a Go run's listings did not share each Go file's header (#fnsk1jv), empty when they
+	// shared them and for every other run. A replay started no engine, so it carries none.
+	HeadersUnshared string
 	// Builds is every build a Go run checked when it checked more than one, the host's first, nil for a run of one
 	// build and every other run. A replay keeps them, since the verdict it repeats was merged from them.
 	Builds []checkedBuild
