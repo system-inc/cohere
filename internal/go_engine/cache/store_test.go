@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/cache_directory"
 )
 
 // sampleKey is a key whose entry's path is known: its first byte names its directory.
@@ -203,5 +205,44 @@ func TestAShardDirectoryRemovedUnderTheStoreIsMadeAgain(test *testing.T) {
 	}
 	if got, found := store.Get(second); !found || string(got) != "second" {
 		test.Errorf("want the second entry back, got %q (found %v)", got, found)
+	}
+}
+
+// The store that creates the project's `.cache/cohere` writes the ignore file there, so an engine run on its own leaves
+// no untracked cache in a repository whose rules say nothing of it (#6vhp0vd). A cache directory cleared whole while
+// the store runs is made again with its file, and one that was there already is left without one.
+func TestAStoreThatMakesTheCacheDirectoryLeavesItIgnoringItself(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := Open(root)
+	if putError := store.Put(sampleKey, []byte("first")); putError != nil {
+		test.Fatal(putError)
+	}
+	ignoreFile := filepath.Join(cache_directory.Of(root), ".gitignore")
+	if contents, readError := os.ReadFile(ignoreFile); readError != nil ||
+		string(contents) != cache_directory.IgnoreFileContents {
+		test.Fatalf("the store made the cache directory without its ignore file: %q (%v)", contents, readError)
+	}
+
+	if removeError := os.RemoveAll(filepath.Join(root, ".cache")); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if putError := store.Put(sampleKey, []byte("again")); putError != nil {
+		test.Fatalf("a Put after the cache was cleared failed: %v", putError)
+	}
+	if _, statError := os.Stat(ignoreFile); statError != nil {
+		test.Errorf("the cache directory made again has no ignore file: %v", statError)
+	}
+
+	existing := test.TempDir()
+	if createDirectoryError := os.MkdirAll(cache_directory.Of(existing), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	if putError := Open(existing).Put(sampleKey, []byte("entry")); putError != nil {
+		test.Fatal(putError)
+	}
+	if _, statError := os.Lstat(filepath.Join(cache_directory.Of(existing), ".gitignore")); !os.IsNotExist(statError) {
+		test.Errorf("the store wrote an ignore file in a cache directory it did not make (%v)", statError)
 	}
 }

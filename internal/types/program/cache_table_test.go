@@ -366,10 +366,15 @@ func TestCacheTableSurvivesDisk(test *testing.T) {
 	for _, entry := range entries {
 		names = append(names, entry.Name())
 	}
-	if len(names) != 3 ||
-		names[0] != "findings.gob" ||
-		names[1] != "format.gob" ||
-		!strings.HasPrefix(names[2], "run-") {
-		test.Errorf("the directory holds %v, want exactly findings.gob, format.gob and one run file", names)
+	// The writer created the directory, so it holds the ignore file it wrote there too (#6vhp0vd).
+	if len(names) != 4 ||
+		names[0] != ".gitignore" ||
+		names[1] != "findings.gob" ||
+		names[2] != "format.gob" ||
+		!strings.HasPrefix(names[3], "run-") {
+		test.Errorf(
+			"the directory holds %v, want exactly .gitignore, findings.gob, format.gob and one run file",
+			names,
+		)
 	}
 }

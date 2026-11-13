@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/gitignore"
@@ -117,7 +118,7 @@ func nestedFormatRecord(repositoryRoot string) *formatRecord {
 	if cacheOff {
 		return formatRecordOff("the cache is off (--no-cache)")
 	}
-	if information, statError := os.Stat(cacheDirectory(repositoryRoot)); statError != nil || !information.IsDir() {
+	if information, statError := os.Stat(cache_directory.Of(repositoryRoot)); statError != nil || !information.IsDir() {
 		return formatRecordOff("no cohere cache is kept in " + repositoryRoot)
 	}
 	return loadFormatRecord(repositoryRoot)
@@ -150,7 +151,9 @@ func prepareNestedCacheDirectories(root string) {
 		if inner, declaredBelowError := declaredBelow(root, relative); declaredBelowError == nil {
 			pending = append(pending, inner...)
 		}
-		if information, statError := os.Stat(cacheDirectory(repositoryRoot)); statError == nil && information.IsDir() {
+		if information, statError := os.Stat(
+			cache_directory.Of(repositoryRoot),
+		); statError == nil && information.IsDir() {
 			continue
 		}
 		matcher, newGitignoreError := gitignore.New(repositoryRoot)
@@ -164,7 +167,7 @@ func prepareNestedCacheDirectories(root string) {
 			continue
 		}
 		// Ignored: a directory that could not be made costs this library what it cost before, a whole check.
-		_ = os.MkdirAll(cacheDirectory(repositoryRoot), 0o755)
+		_ = cache_directory.Make(cache_directory.Of(repositoryRoot))
 	}
 }
 

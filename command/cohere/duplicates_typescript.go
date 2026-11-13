@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/canonical_function_hash"
@@ -260,7 +261,7 @@ func readDuplicatesSection(location projectLocation) *program.DuplicatesSection 
 		return empty
 	}
 	prepareCacheDirectory(location.Root)
-	directory := cacheDirectory(location.Root)
+	directory := cache_directory.Of(location.Root)
 	release, _ := holdTableReadLock(directory, tableWriterWait)
 	anchor := program.NewPathAnchor(location.Root)
 	// Ignored: a table missing or unreadable reads as empty, and the section is written whole after the hash.
@@ -310,7 +311,7 @@ func writeDuplicatesSection(
 		}
 		section.Entries[name] = entry
 	}
-	directory := cacheDirectory(location.Root)
+	directory := cache_directory.Of(location.Root)
 	release := holdTableLock(directory)
 	defer release()
 	table := program.NewCacheTable()

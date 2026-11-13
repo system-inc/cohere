@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/format/format_files"
 )
 
@@ -22,7 +23,7 @@ func treeSnapshot(test *testing.T, root string) map[string]string {
 		if pathError == nil && entry.IsDir() && filepath.Base(filepath.Dir(path)) == ".cache" {
 			if owner := filepath.Dir(
 				filepath.Dir(path),
-			); path == cacheDirectory(owner) && (owner == root || format_files.HasOwnRepository(owner)) {
+			); path == cache_directory.Of(owner) && (owner == root || format_files.HasOwnRepository(owner)) {
 				return filepath.SkipDir
 			}
 		}

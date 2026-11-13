@@ -3,8 +3,11 @@ package main
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/cache_directory"
 )
 
 // TestADefaultRunPrintsNoNotes is the default view end to end, golden: a clean run whose cache table was
@@ -78,6 +81,11 @@ func TestADefaultRunPrintsNoNotes(test *testing.T) {
 
 	if output, code := run(); code != 0 {
 		test.Fatalf("exit %d from the first run of a clean project:\n%s", code, output)
+	}
+	// The first run made the cache directory ignoring itself (#6vhp0vd). Without its ignore file it is the cache an
+	// older cohere made, which the tracked-cache note is still said of, so the default run has that note to hide.
+	if removeError := os.Remove(filepath.Join(cache_directory.Of(root), ".gitignore")); removeError != nil {
+		test.Fatal(removeError)
 	}
 	discardTable()
 
