@@ -477,9 +477,10 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(test *testing.T)
 
 // TestAFreshClonesLibrariesGetTheirCacheAtStartup: a checkout where nobody has run cohere inside a library, a
 // fresh clone or a CI machine, kept no cache there, so every check formatted every library file, every run
-// (#v0etgwx). The run's start now makes the cache, only in a library whose own .gitignore ignores it, and the
-// next check reads that library's record. The control is the inner library, whose .gitignore does not ignore
-// .cache: it gets no directory, and every one of its files is still checked.
+// (#v0etgwx). The run's start now makes the cache in every library, and the next check reads each library's record:
+// the library, whose .gitignore ignores .cache, and the inner one, whose rules say nothing of it, since a cache the
+// run makes ignores itself (#f6y78ws). Until it did, the inner library got no cache and every one of its files was
+// checked every time.
 func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 	test.Parallel()
 	root := nestedTree(test)
@@ -495,8 +496,10 @@ func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 	if information, statError := os.Stat(cache_directory.Of(library)); statError != nil || !information.IsDir() {
 		test.Fatalf("the library, whose .gitignore ignores .cache, has no cache after the run's start (%v)", statError)
 	}
-	if _, statError := os.Stat(cache_directory.Of(inner)); !errors.Is(statError, os.ErrNotExist) {
-		test.Fatalf("the inner library, whose .gitignore does not ignore .cache, got a cache directory (%v)", statError)
+	if contents, readError := os.ReadFile(filepath.Join(cache_directory.Of(inner), ".gitignore")); readError != nil ||
+		string(contents) != cache_directory.IgnoreFileContents {
+		test.Fatalf("the inner library, whose rules say nothing of .cache, has no cache ignoring itself: %q (%v)",
+			contents, readError)
 	}
 
 	checked := func(label string) int {
@@ -510,19 +513,19 @@ func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 		}
 		return result.Checked
 	}
-	// The first check formats all four and records the library's. The second takes the library's clean file
-	// on its record's word; its misformatted file and the inner library's two are checked again.
+	// The first check formats all four and records each library's. The second takes each library's clean file
+	// on its record's word; the two misformatted files are checked again.
 	if got := checked("the first check"); got != 4 {
 		test.Fatalf("the first check formatted %d files, want 4", got)
 	}
-	if got := checked("the second check"); got != 3 {
-		test.Fatalf("the second check formatted %d files, want 3: the library's record was not read", got)
+	if got := checked("the second check"); got != 2 {
+		test.Fatalf("the second check formatted %d files, want 2: a library's record was not read", got)
 	}
 
 	// Run again, the start leaves an existing cache as it is.
 	prepareNestedCacheDirectories(root)
-	if got := checked("the third check"); got != 3 {
-		test.Fatalf("after a second start the check formatted %d files, want 3", got)
+	if got := checked("the third check"); got != 2 {
+		test.Fatalf("after a second start the check formatted %d files, want 2", got)
 	}
 }
 
