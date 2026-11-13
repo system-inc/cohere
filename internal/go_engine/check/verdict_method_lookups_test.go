@@ -103,6 +103,13 @@ const (
 	promotedOnly = "package foreign\n\ntype Handle struct{ inner }\n"
 )
 
+// closingMine is the user package with Mine an interface whose Close has the shape of closerBase's: abbreviated and
+// no-any let any foreign method fix an interface method's name, a concrete type's included, so a step about what a
+// concrete candidate does to the bit asks of it. Asked of a concrete Mine, no rule lets a concrete type's method fix
+// the name, and the one-bit judgment counts none (countedCandidates, #njze5c0).
+const closingMine = "package user\n\nimport \"example.com/methods/foreign\"\n\n" +
+	"type Mine interface{ Close() error }\n\nfunc Use() int { return foreign.Count() }\n"
+
 // constrainedPool is foreign's generic Pool, whose Close has the subject's shape, with its type parameter constrained
 // by constraint.
 func constrainedPool(constraint string) string {
@@ -170,7 +177,8 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 	closerAnswer := func(host methodWorld) types.Object { return host.foreign.Scope().Lookup("Closer") }
 	unanswered := func(query string, method string) methodLookupOf {
 		return func(host methodWorld) build_reads.Lookup {
-			return askedBy(build_reads.Lookup{Query: query, Name: method, Subject: methodOf(host.user, "Mine", method)})
+			return askedBy(build_reads.Lookup{Query: query, Name: method,
+				Subject: methodSetMember(host.user, "Mine", method)})
 		}
 	}
 	interfaceAnswered := func(host methodWorld) build_reads.Lookup {
@@ -180,7 +188,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 	methodAnswered := func(typeName string, method string) methodLookupOf {
 		return func(host methodWorld) build_reads.Lookup {
 			return askedBy(build_reads.Lookup{Query: build_reads.QueryMethod, Name: method,
-				Subject: methodOf(host.user, "Mine", method), Found: true,
+				Subject: methodSetMember(host.user, "Mine", method), Found: true,
 				Answer: methodSetMember(host.foreign, typeName, method)})
 		}
 	}
@@ -239,12 +247,14 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			files: map[string]string{"foreign.go": methodForeign,
 				"handle_windows.go": "package foreign\n\ntype Handle struct{}\n\n" +
 					"func (Handle) Close(force bool) error { return nil }\n"},
+			user:   closingMine,
 			lookup: unanswered(build_reads.QueryMethod, "Close"),
 		},
 		{
 			name: "a windows-only method promoted alone, held where the closure declines",
 			files: map[string]string{"foreign.go": methodForeign, "inner.go": closerBase,
 				"promoted_windows.go": promotedOnly},
+			user:   closingMine,
 			lookup: unanswered(build_reads.QueryMethod, "Close"),
 		},
 		{
@@ -252,6 +262,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			files: map[string]string{"foreign.go": methodForeign,
 				"inner.go":         "package foreign\n\ntype inner struct{}\n\ntype Handle struct{ inner }\n",
 				"inner_windows.go": "package foreign\n\nfunc (inner) Close() error { return nil }\n"},
+			user:   closingMine,
 			lookup: unanswered(build_reads.QueryMethod, "Close"),
 			want: "L lookup Method Close: " + methodForeignPath + ".inner.Close is new in the build, of the " +
 				"subject's shape",
@@ -260,6 +271,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			name: "a windows-only alias of a concrete type of every build, which no rule indexes, held",
 			files: map[string]string{"foreign.go": methodForeign, "inner.go": closerBase,
 				"alias_windows.go": "package foreign\n\ntype Handle = inner\n"},
+			user:   closingMine,
 			lookup: unanswered(build_reads.QueryMethod, "Close"),
 		},
 		{
@@ -285,12 +297,11 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"shape",
 		},
 		{
-			name:   "the same of an exported name, which no-any lets fix a concrete type's method",
+			name: "the same of an exported name, held too, since no rule lets a concrete method fix a concrete one's " +
+				"name (#njze5c0)",
 			files:  poolAdds("Add"),
 			user:   adding("type Mine struct{}\n\nfunc (Mine) Add(value int) {}"),
 			lookup: askedByNoAny(addOf("Add")),
-			want: "L lookup Method Add: " + methodForeignPath + ".pool.Add is new in the build, of the subject's " +
-				"shape",
 		},
 		{
 			name: "the same unexported name for a receiver embedding a foreign type, declined by the closure " +
@@ -342,6 +353,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"declines",
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer, "pool.go": pool,
 				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			user:   closingMine,
 			lookup: methodAnswered("Closer", "Close"),
 		},
 		{
@@ -349,13 +361,26 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
 				"pool.go": constrainedPool("interface{ Close() error }"), "inner.go": closerBase,
 				"promoted_windows.go": promotedOnly},
+			user:   closingMine,
 			lookup: methodAnswered("Closer", "Close"),
 			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
+		},
+		{
+			// A constrained generic of the subject's shape keeps the closure judgment only where a rule could let it
+			// fix the name. Beside a concrete Mine none can, abbreviated taking a concrete candidate for an interface
+			// method alone, so the one-bit judgment counts no concrete candidate and holds (#njze5c0).
+			name: "the same constrained generic beside a concrete subject, held, since no rule lets a concrete " +
+				"method fix a concrete one's name",
+			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
+				"pool.go": constrainedPool("interface{ Close() error }"), "inner.go": closerBase,
+				"promoted_windows.go": promotedOnly},
+			lookup: methodAnswered("Closer", "Close"),
 		},
 		{
 			name: "a generic candidate constrained by comparable keeps the closure judgment",
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
 				"pool.go": constrainedPool("comparable"), "inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			user:   closingMine,
 			lookup: methodAnswered("Closer", "Close"),
 			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
 		},
@@ -364,6 +389,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer,
 				"pool.go": constrainedPool("~int | ~string"), "inner.go": closerBase,
 				"promoted_windows.go": promotedOnly},
+			user:   closingMine,
 			lookup: methodAnswered("Closer", "Close"),
 			want:   "L lookup Method Close: 3 type names have the method on the host, 4 in the build",
 		},
@@ -374,6 +400,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"flushing_darwin.go":  "package foreign\n\ntype Flushing interface{}\n",
 				"flushing_windows.go": "package foreign\n\ntype Flushing interface{ Flush() }\n",
 				"inner.go":            closerBase},
+			user:   closingMine,
 			lookup: methodAnswered("Closer", "Close"),
 			want:   "L lookup Method Close: " + methodForeignPath + ".Pool differs in the build",
 		},
@@ -384,6 +411,7 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"flushing_darwin.go":  "package foreign\n\ntype Flushing interface{ Flush() }\n",
 				"flushing_windows.go": "package foreign\n\ntype Flushing interface{}\n",
 				"inner.go":            closerBase},
+			user:   closingMine,
 			lookup: methodAnswered("Closer", "Close"),
 			want:   "L lookup Method Close: " + methodForeignPath + ".Pool differs in the build",
 		},
@@ -487,11 +515,13 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 				"closure declines",
 			files: map[string]string{"foreign.go": methodForeign, "closer.go": closer, "pool.go": pool,
 				"inner.go": closerBase, "promoted_windows.go": promotedOnly},
+			user:   closingMine,
 			lookup: askedByNoAny(methodAnswered("Closer", "Close")),
 		},
 		{
 			name:   "a windows-only generic of the subject's shape beside no_any's miss",
 			files:  map[string]string{"foreign.go": methodForeign, "pool_windows.go": pool},
+			user:   closingMine,
 			lookup: askedByNoAny(unanswered(build_reads.QueryMethod, "Close")),
 			want: "L lookup Method Close: " + methodForeignPath + ".Pool.Close is new in the build, of the subject's " +
 				"shape",

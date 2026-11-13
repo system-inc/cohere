@@ -410,7 +410,8 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 // export data drops closer with its exported Close and its unexported close, so the host's type names stand for the
 // build's; read from that export data without being restored, where closer is missing, which no rule's answer can
 // gain from (methodLookupHolds); and checked from source with an import of its own the host's closure lacks, which the
-// build restored from the host, so its Opener's Close is a new candidate of the subject's shape in the build.
+// build restored from the host, so its Opener's Close is a new candidate of the subject's shape in the build. Opener is
+// an interface, since no rule lets a concrete type's method fix a concrete one's name (#njze5c0).
 func persistedRestoredSteps(test *testing.T) []struct {
 	name      string
 	restoring Restoring
@@ -430,8 +431,7 @@ func persistedRestoredSteps(test *testing.T) []struct {
 	withExtra := checkedInMemory(test, restoredHiddenPath, "package hidden\n\nimport \""+extraPath+"\"\n\n"+
 		"var Held extra.Opener\n\ntype closer struct{}\n\nfunc (closer) Close() error { return nil }\n\n"+
 		"func (closer) close() {}\n\nfunc Count() int { return 1 }\n",
-		map[string]string{extraPath: "package extra\n\ntype Opener struct{}\n\nfunc (Opener) Close() error { " +
-			"return nil }\n"})
+		map[string]string{extraPath: "package extra\n\ntype Opener interface{ Close() error }\n"})
 	host := measuredReadsBuild()
 	return []struct {
 		name      string
