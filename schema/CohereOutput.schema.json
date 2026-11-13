@@ -703,6 +703,10 @@
                             "notLintedReason": {
                                 "type": "string",
                                 "description": "Why no rule ran on notLinted: a build whose load found a type error analyzes no package. Absent when notLinted is."
+                            },
+                            "dependence": {
+                                "type": "object",
+                                "description": "Another build's alone, under the Go engine's --build-dependence: which of the host's package-level declarations the build can change, as units and nodes, dependent and in all, for the workspace and the dependencies, the packages with a dependent unit and their nodes, the units only the build compiles, and the milliseconds the host's graph and this build's judgment took. Observed only, so it changes no finding. Absent otherwise."
                             }
                         }
                     }

@@ -37,7 +37,8 @@ var embeddedStandardLibrary = builtInStandardLibrary{
 // it carries any under a release stamp. An empty stamp reads no table at all, so a build that is no release computes
 // the standard library as it always has. Under `--no-cache` it reads and writes no store: it is nil, or, when the
 // binary carries a table, a Caching with that table alone, since the standard library's entries are part of cohere
-// itself and nothing of the project's tree. It is nil with an error when what every key shares cannot be read, which
+// itself and nothing of the project's tree. Under `--build-dependence` beside `--other-builds` it is nil, the table
+// included (judgesDependence). It is nil with an error when what every key shares cannot be read, which
 // the run says on stderr and runs without it. environment is what the load the cache serves runs under, the
 // workspace's own for the host's build and with an extra build's target after it for that build, and goEnvironment
 // is go env's answer the load reads there, so the build context every key shares is the one of the build the load is
@@ -54,7 +55,9 @@ func lintCache(
 	holdsTable := builtIn.table != nil && !builtIn.table.Empty()
 	readsBuiltIn := builtIn.stamp != "" && (holdsTable || builtIn.collected != nil)
 	noCache := request.switches["no-cache"]
-	if noCache && (!readsBuiltIn || !holdsTable) {
+	// A run judging each build's dependence reads no store and no table, as `--no-cache` in a binary with no table
+	// does, so the host checks every package from source (judgesDependence).
+	if request.judgesDependence() || noCache && (!readsBuiltIn || !holdsTable) {
 		return nil, nil
 	}
 	answered := goEnvironment

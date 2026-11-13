@@ -149,6 +149,11 @@ type pipeline struct {
 	// whose finding still stands is not asked for, and counted, again by the next.
 	refusedRenames map[[3]string]bool
 
+	// dependence is the host's graph of its package-level declarations under `--build-dependence` beside
+	// `--other-builds` (#qkq4gx5), which every extra build is judged on, nil in any other run, so a run without the
+	// switch builds no graph and judges nothing (buildDependenceGraph).
+	dependence *hostDependence
+
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
 	// beside the host's to check.
 	buildRuns []buildRun
@@ -294,6 +299,9 @@ func (engine *pipeline) run() int {
 		}
 	}
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
+	// The host's graph is built from the load's syntax before any rules let go of it, the rename's first pass's
+	// included, for the extra builds to be judged on under `--build-dependence`.
+	engine.buildDependenceGraph(loaded, loadError)
 	// The rename reads the wrapped tree, and needs a sound load as the wrap does. When it writes, a load of what it
 	// wrote is the one the types and lint phases read in place of this one.
 	var linted *lintPass
@@ -308,6 +316,9 @@ func (engine *pipeline) run() int {
 	engine.censusMissed = engine.missedByCensus(loaded)
 	engine.runTypes(loaded, loadError)
 	engine.checkCensusAgainstLoad()
+	// A rename that wrote loaded the written tree again, which the lint phase reads, so the graph is built again from
+	// it.
+	engine.buildDependenceGraph(loaded, loadError)
 	// The inputs are those of the load the lint ran over, the final round's when a reload ran it again, and the first
 	// load is let go before a reload loads again.
 	loaded = engine.runLint(loaded, loadError, linted)

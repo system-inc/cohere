@@ -405,6 +405,8 @@ func (engine *pipeline) extraBuildRun(
 	if session != nil {
 		run.files = session.Files()
 	}
+	// Judged on the host's graph from this first load alone, which a reload for a question never changes the files of.
+	run.dependence = engine.dependenceOf(loaded)
 	if len(loaded.Diagnostics) > 0 {
 		return run, nil
 	}
@@ -574,6 +576,8 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			// An extra build's alone, and under `--timing` alone: 0 otherwise, which the record leaves out.
 			HeldAtLoadEndBytes:  run.heldAtLoadEnd,
 			HeldAtLintPeakBytes: run.heldAtLintPeak,
+			// An extra build's alone, under `--build-dependence`: nil otherwise, which the record leaves out.
+			Dependence: run.dependence,
 		}
 		recordTimes(&record, run)
 		if run.result != nil {

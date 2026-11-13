@@ -8,6 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
@@ -65,4 +66,7 @@ type buildRun struct {
 	// the host's live heap as its load ended, and the most it held while its rules ran (heldWhileLinting).
 	heldAtLoadEnd  uint64
 	heldAtLintPeak uint64
+	// dependence is an extra build's alone, under `--build-dependence`: its judgment on the host's graph from its first
+	// load (dependenceOf), nil otherwise.
+	dependence *contract.BuildDependence
 }

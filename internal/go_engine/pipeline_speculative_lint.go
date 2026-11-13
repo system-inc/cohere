@@ -37,10 +37,11 @@ type speculativeLint struct {
 
 // lintOverlaps is whether this run's lint phase starts beside its load: only on a run that lints without the
 // findings cache's store. A run that wraps long lines or renames overlaps too, since each stops or takes the pass
-// before it writes (see speculativeLint).
+// before it writes (see speculativeLint). A run judging each build's dependence never overlaps, since the host's
+// graph is built from every package's syntax between the load's end and the rules' start (judgesDependence).
 func (engine *pipeline) lintOverlaps() bool {
 	return engine.overlaps && engine.speculation == nil && (engine.session == nil || !engine.session.HasStore()) &&
-		engine.request.requests(contract.PhaseLint)
+		engine.request.requests(contract.PhaseLint) && !engine.request.judgesDependence()
 }
 
 // beginSpeculativeLint starts the lint pass over overlap's packages, each once the load has made it final, as the

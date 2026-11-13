@@ -1068,6 +1068,19 @@ ratio is what `buildsWidthPeakFactor` stands for, so a tree whose ratio passes i
 `--timing` restores nothing from the host's run, so it holds more as its load ends than one that restores, and its ratio
 reads lower than the width's case.
 
+Under `--build-dependence` beside `--other-builds`, each extra build's record writes `"dependence"`, additive within
+contract 3 and the Go engine's alone (#qkq4gx5): which of the host's package-level declarations the build can change,
+observed only, so no finding, key or verdict reads it. A unit is a function, a type spec, or a var or const spec, and
+it is dependent when its file is not one both builds compile, when an object it declares reaches a dependent object,
+or when its body reads one by a kind of use the change reaches. `"workspace"` and `"dependencies"` each count
+`"units"` and `"dependentUnits"`, their `"nodes"` and `"dependentNodes"` in syntax nodes, the `"packages"` with
+units and the `"dependentPackages"` among them, those with a dependent unit or a unit only the build compiles, with
+their `"dependentPackageNodes"`, and the `"buildOnlyUnits"` and `"buildOnlyNodes"` only the build compiles, which no
+count of the host's holds. `"graphMilliseconds":900` is the host's graph, built once from its load for every build,
+and `"judgmentMilliseconds":40` this build's judgment on it. Such a run checks every package of the host from source,
+reading no findings cache and none of the binary's standard-library entries, and its lint waits for the load to end.
+The host's record never writes it, and neither does a run without the switch.
+
 ### `phase`
 
 ```json

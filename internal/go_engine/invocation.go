@@ -161,6 +161,15 @@ func (request invocation) read(file string) ([]byte, error) {
 	return os.ReadFile(file)
 }
 
+// judgesDependence reports whether the run computes each extra build's dependence (#qkq4gx5): `--build-dependence`
+// beside `--other-builds`, which alone has extra builds to judge. Such a run checks every package of the host from
+// source, so every object a unit of the workspace reads is a node of one graph: no findings cache restores a package
+// from export data, the binary's standard-library entries included (lintCache), and the rules wait for the load's end
+// (lintOverlaps), since they let go of each package's syntax as they finish with it.
+func (request invocation) judgesDependence() bool {
+	return request.switches["build-dependence"] && request.switches["other-builds"]
+}
+
 // requests reports whether the command line asks for a phase, read as the front door reads it: no phase switch
 // asks for fix, types and lint; `--fix`, `--types` or `--lint` asks for only the ones named; `--format-only`
 // asks for fix alone. Nothing asks for unused, which is refused until it is implemented.
