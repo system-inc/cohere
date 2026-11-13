@@ -107,8 +107,8 @@ func isAsciiLowercase(character byte) bool {
 // Find answers what the vocabulary reports for a name, if anything, in the phase order the rule has always used:
 // whole word, early prefix, suffix, late prefix, segment.
 //
-// It knows nothing about where the name sits. An engine asks it only after its own skips, and then silences its own
-// exemptions by the form and word it returns.
+// It knows nothing about where the name sits. An engine asks it before or after its own skips, whichever is cheaper,
+// and silences its own exemptions by the form and word it returns.
 //
 // Every name an engine judges meets every entry, and nearly every name matches none, so each form is tested first
 // as the literal text its pattern holds, and only a name that passes costs a regular expression run. A literal test
