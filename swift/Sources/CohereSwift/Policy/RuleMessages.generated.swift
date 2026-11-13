@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "bd219abfc0f352ad4665c3b5df59e55282af5596fcac79ab16c5c92e85b7a48c"
+    static let sourceDigest = "400fbfa831876d437be7efd2c39611e8d3be35183c5ca2e3b04ed03ef82c3fa1"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
@@ -51,6 +51,8 @@ enum RuleMessages {
         "CorrectnessNoIdenticalBranches.identicalBranches",
         "CorrectnessNoUnclearedRaceTimeout.unclearedRaceTimeout",
         "CorrectnessNoWriteOnlyCollection.writeOnlyCollection",
+        "CorrectnessRequireDrainedChildOutput.childOutputNeverDrained",
+        "CorrectnessRequireDrainedChildOutput.childOutputNeverRead",
         "CorrectnessRequireResponseStatusCheck.bodyReadWithoutStatusCheck",
         "CorrectnessRequireResponseStatusCheck.responseDiscarded",
         "ForceCast.forceCast",
@@ -492,6 +494,25 @@ enum RuleMessages {
                 id: "writeOnlyCollection",
                 text:
                     #"This collection is only ever added to: every use of it puts something in or takes something out, and nothing reads what it holds. The work that fills it is thrown away. Either the code that was meant to read it is missing (a value kept for the result and never copied in), or the collection is dead and should be deleted along with its writes."#,
+            )
+        }
+    }
+
+    /* cohere-swift/correctness-require-drained-child-output */
+    enum CorrectnessRequireDrainedChildOutput {
+        static func childOutputNeverDrained(pipe: String, process: String, stream: String) -> Message {
+            Message(
+                id: "childOutputNeverDrained",
+                text:
+                    #"`\#(pipe)`, the pipe `\#(process)` writes its \#(stream) to, is not read to its end on some path before `\#(process).waitUntilExit()`, so output past the pipe buffer blocks the child and the wait never returns. Read it to its end before the wait (`\#(pipe).fileHandleForReading.readDataToEndOfFile()`), or drain it with a `readabilityHandler` set before the wait, or give the stream `FileHandle.nullDevice` when nothing needs it."#,
+            )
+        }
+
+        static func childOutputNeverRead(process: String, stream: String) -> Message {
+            Message(
+                id: "childOutputNeverRead",
+                text:
+                    #"`\#(process)` writes its \#(stream) to a `Pipe()` nothing reads, and some path waits for it at `\#(process).waitUntilExit()`, so output past the pipe buffer blocks the child and the wait never returns. Give the stream `FileHandle.nullDevice` when nothing needs it, or keep the pipe in a `let` and read it to its end before the wait."#,
             )
         }
     }

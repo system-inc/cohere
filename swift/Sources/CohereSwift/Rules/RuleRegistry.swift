@@ -53,6 +53,7 @@ public enum RuleRegistry {
             ConcurrencyNoLostUpdate(),
             ConsistencyNoBooleanOutcome(),
             CorrectnessNoUnclearedRaceTimeout(),
+            CorrectnessRequireDrainedChildOutput(),
             SwiftFormatRule.requireLowerCamelCase(brands: brandVocabulary),
             SwiftFormatRule.noLeadingUnderscores,
         ]

@@ -138,6 +138,11 @@
         "typeAware": true
     },
     {
+        "name": "cohere-swift/correctness-require-drained-child-output",
+        "origin": "house",
+        "typeAware": false
+    },
+    {
         "name": "cohere-swift/correctness-require-response-status-check",
         "origin": "house",
         "typeAware": true
