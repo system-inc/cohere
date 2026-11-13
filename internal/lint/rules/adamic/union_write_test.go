@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 func TestUnionWriteRefused(test *testing.T) {
@@ -98,6 +99,7 @@ func TestUnionWriteRefused(test *testing.T) {
 // exact same program no longer throws, so a runtime check that always fails is caught.
 func TestUnionWriteNodeProbes(test *testing.T) {
 	test.Parallel()
+	needs.Tool(test, "node", "each probe runs under node to show the write it reports really happens")
 	paths, globError := filepath.Glob("testdata/union-write/*.ts")
 	if globError != nil {
 		test.Fatal(globError)
@@ -490,6 +492,7 @@ func TestUnionWriteLegalNeighbours(test *testing.T) {
 
 func TestUnionWriteDeleteStaysQuiet(test *testing.T) {
 	test.Parallel()
+	needs.Tool(test, "node", "the delete runs under node to show it stays quiet at run time too")
 	bytes, readError := os.ReadFile("testdata/union-write-legal/delete.ts")
 	if readError != nil {
 		test.Fatal(readError)

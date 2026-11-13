@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // Every check here is shown failing on a tampered binary as well as passing on an intact one, because a
@@ -340,12 +341,7 @@ func stageInstalledRelease(test *testing.T) installedRelease {
 			"the fixture binary is a shell script; the Windows package is proven by check-platform-package.sh on Windows",
 		)
 	}
-	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
-		test.Fatalf(
-			"node is not installed, and the launcher is a Node script, so it cannot be tested: %v",
-			lookPathError,
-		)
-	}
+	needs.Tool(test, "node", "the launcher is a Node script, so it runs under node")
 
 	// Through every link, as Node resolves the launcher and the package, so the paths its messages name
 	// are the paths this test holds (macOS's temporary directory is under a link).
