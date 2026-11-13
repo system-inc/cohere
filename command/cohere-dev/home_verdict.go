@@ -42,9 +42,10 @@ import (
 // Home failing a test refuses the landing. Home unreachable, refusing, out of its window or saying it tested another
 // tree is no verdict at all, and the whole test run happens on the Mac, as it always did, said on the land line.
 
-// homeGateVariable is "off" to test a landing on the Mac alone, the escape hatch, or names a command run in place of
-// Home's whole run, the push and the gap, for a test. Unset or "on", the landing's tests run on Home: the default since
-// main's first whole pass on her, both halves, came back green at e74fbf79 (Nov 12, #acdf5mc).
+// homeGateVariable is "off" to test a landing on the Mac alone, the escape hatch, "kind" to test it as a Loom job of
+// the land-gate kind (land_gate_job.go), or names a command run in place of Home's whole run, the push and the gap, for
+// a test. Unset or "on", the landing's tests run on Home: the default since main's first whole pass on her, both
+// halves, came back green at e74fbf79 (Nov 12, #acdf5mc).
 const homeGateVariable = "COHERE_DEV_HOME_GATE"
 
 // homeMarker opens the line Home's run prints before its tests: the commit it checked out and the platform it tests
@@ -96,6 +97,16 @@ type homeVerdict struct {
 	// whichever test it was framing when the report was printed, often one that passed, so a report is read from the
 	// stream itself: printing only the failed tests' output dropped every stack (#bnabymg, Nov 12).
 	raceReports []string
+	// job is the land-gate job whose box ran the tests, empty when Home or a stand-in for her did.
+	job string
+}
+
+// box names who ran a verdict's tests, as the gate's lines say it: Home, or the land-gate job Loom placed on a box.
+func (verdict homeVerdict) box() string {
+	if verdict.job == "" {
+		return homeBox
+	}
+	return "land-gate job " + verdict.job
 }
 
 // raceReportStart and raceReportEnd are the race detector's lines around each report it prints.
@@ -312,12 +323,13 @@ func optInNamed(optIn map[string][]string) string {
 	return strings.Join(named, ", ")
 }
 
-// runHomeGate runs the module's tests on Home and returns what Home said, or why there is no verdict from Home, which
-// sends the whole test run to the Mac. A verdict about another tree than commit is no verdict. setting is what
-// homeGateVariable says.
+// runHomeGate runs the module's tests on Home, or as a land-gate job for task, and returns what the box said, or why
+// there is no verdict from it, which sends the whole test run to the Mac from Home and refuses the landing from a job.
+// A verdict about another tree than commit is no verdict. setting is what homeGateVariable says.
 func runHomeGate(
 	worktree string,
 	commit string,
+	task string,
 	patterns []string,
 	races []string,
 	now time.Time,
@@ -327,11 +339,12 @@ func runHomeGate(
 	switch standIn {
 	case "off":
 		return homeVerdict{}, "Home is off for this landing (" + homeGateVariable + "=off)"
-	case "", "on":
+	case "", "on", landGateKindSetting:
 		standIn = ""
 	}
 	var output []byte
 	var runError error
+	job := ""
 	switch {
 	case standIn != "":
 		// A stand-in is no box, so Home's window is not its to keep.
@@ -339,6 +352,17 @@ func runHomeGate(
 		command.Dir = worktree
 		command.Env = append(os.Environ(), homeRaceVariable+"="+strings.Join(races, ","))
 		output, runError = command.CombinedOutput()
+	// Loom places the job on a box of its choosing, never Home, so the witness's window is not its to keep.
+	case setting == landGateKindSetting:
+		var code int
+		var unavailable string
+		output, code, job, unavailable = runLandGateJob(worktree, commit, task, patterns, races)
+		if unavailable != "" {
+			return homeVerdict{}, unavailable
+		}
+		if code != 0 {
+			runError = fmt.Errorf("exit status %d", code)
+		}
 	case inWitnessWindow(now):
 		return homeVerdict{}, "it is the witness's window on Home, 09:00 to 15:00 UTC"
 	default:
@@ -349,6 +373,7 @@ func runHomeGate(
 	}
 	moduleOutput, raceOutput, raced := bytes.Cut(output, []byte("\n"+homeRaceMarker+"\n"))
 	verdict := readTestJson(moduleOutput)
+	verdict.job = job
 	if raced {
 		race := readTestJson(raceOutput)
 		verdict.race = &race
@@ -360,22 +385,24 @@ func runHomeGate(
 	case verdict.refused != "":
 		return verdict, ""
 	case verdict.commit == "":
-		return homeVerdict{}, fmt.Sprintf("Home's run never said what it tested (%s)",
+		return homeVerdict{}, fmt.Sprintf("%s's run never said what it tested (%s)", verdict.box(),
 			lastWords(output, describeEnd(runError)))
 	case verdict.commit != commit:
-		return homeVerdict{}, fmt.Sprintf("Home tested %s, not %s", shortCommit(verdict.commit), shortCommit(commit))
+		return homeVerdict{}, fmt.Sprintf("%s tested %s, not %s", verdict.box(), shortCommit(verdict.commit),
+			shortCommit(commit))
 	case verdict.operatingSystem == "" || verdict.architecture == "":
-		return homeVerdict{}, "Home's run never said which platform it tested on"
+		return homeVerdict{}, verdict.box() + "'s run never said which platform it tested on"
 	case runError != nil && !verdict.failed() && !raceFailed:
-		return homeVerdict{}, fmt.Sprintf("Home's run ended %s with no test failing", describeEnd(runError))
+		return homeVerdict{}, fmt.Sprintf("%s's run ended %s with no test failing", verdict.box(),
+			describeEnd(runError))
 	case verdict.packagesPassed == 0 && !verdict.failed():
-		return homeVerdict{}, "Home's run passed no package"
+		return homeVerdict{}, verdict.box() + "'s run passed no package"
 	// A module run that passed is followed by the -race run, so one that passed with no -race run after it was cut
 	// short, and says nothing of the races it was asked about.
 	case len(races) > 0 && !verdict.failed() && verdict.race == nil:
-		return homeVerdict{}, "Home's run said nothing of its -race run"
+		return homeVerdict{}, verdict.box() + "'s run said nothing of its -race run"
 	case verdict.race != nil && verdict.race.packagesPassed == 0 && !raceFailed:
-		return homeVerdict{}, "Home's -race run passed no package"
+		return homeVerdict{}, verdict.box() + "'s -race run passed no package"
 	}
 	return verdict, ""
 }
@@ -491,18 +518,27 @@ func describeEnd(runError error) string {
 }
 
 // runModuleTests runs the module's tests for the gate: on Home, then on the Mac what Home could not run, or all of it
-// on the Mac when Home gives no verdict, the -race run included, so no landing goes without one. It returns the exit
-// code and where they ran, as the land line says it after what was tested: "on Home (...)" or "on the Mac, since ...".
+// on the Mac when Home gives no verdict, the -race run included, so no landing goes without one. As a land-gate job,
+// no verdict refuses the landing instead. It returns the exit code and where they ran, as the land line says it after
+// what was tested: "on Home (...)", "on a scratch box (...)" or "on the Mac, since ...".
 func runModuleTests(
 	worktree string,
 	commit string,
+	task string,
 	covered project.Workspace,
 	testing []string,
 	now time.Time,
 ) (int, string) {
 	patterns := covered.Patterns()
 	races := racePatterns(worktree)
-	verdict, unavailable := runHomeGate(worktree, commit, patterns, races, now, os.Getenv(homeGateVariable))
+	setting := os.Getenv(homeGateVariable)
+	verdict, unavailable := runHomeGate(worktree, commit, task, patterns, races, now, setting)
+	// A job that gave no verdict refuses the landing rather than sending its tests to the Mac (#1v2shq7, item 2).
+	if unavailable != "" && setting == landGateKindSetting {
+		fmt.Fprintf(streams.Errors, "cohere-dev: no verdict from the land-gate job, so nothing landed, and its tests "+
+			"never fall back to the Mac: %s\n", unavailable)
+		return 1, ""
+	}
 	if unavailable != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no tests on Home (%s), so they run here\n", unavailable)
 		where := "on the Mac, since " + unavailable
@@ -521,13 +557,14 @@ func runModuleTests(
 		return 0, where + fmt.Sprintf(", then %d packages again under -race", len(races))
 	}
 	if verdict.refused != "" {
-		fmt.Fprintf(streams.Errors, "cohere-dev: Home refused to test this landing, so nothing landed: %s\n",
-			verdict.refused)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s refused to test this landing, so nothing landed: %s\n",
+			verdict.box(), verdict.refused)
 		return 1, ""
 	}
 	platform := verdict.operatingSystem + "/" + verdict.architecture
 	if verdict.failed() {
-		fmt.Fprintf(streams.Errors, "cohere-dev: Home's tests on %s failed, so nothing landed:\n", platform)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s failed, so nothing landed:\n", verdict.box(),
+			platform)
 		for _, failure := range slices.Concat(verdict.failedTests, verdict.packagesFailed) {
 			fmt.Fprintf(streams.Errors, "  %s\n", failure)
 			for _, line := range verdict.failedOutput[failure] {
@@ -540,7 +577,8 @@ func runModuleTests(
 		return 1, ""
 	}
 	if verdict.race != nil && verdict.race.failed() {
-		fmt.Fprintf(streams.Errors, "cohere-dev: Home's -race run on %s failed, so nothing landed:\n", platform)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run on %s failed, so nothing landed:\n", verdict.box(),
+			platform)
 		for _, failure := range slices.Concat(verdict.race.failedTests, verdict.race.packagesFailed) {
 			fmt.Fprintf(streams.Errors, "  %s\n", failure)
 			output := verdict.race.failedOutput
@@ -551,7 +589,7 @@ func runModuleTests(
 		printRaceReports(verdict.race.raceReports)
 		return 1, ""
 	}
-	fmt.Fprintf(streams.Errors, "cohere-dev: Home's tests on %s passed, %d packages\n", platform,
+	fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s passed, %d packages\n", verdict.box(), platform,
 		verdict.packagesPassed)
 	neverCompiled, neverCompiledError := testsNeverCompiledOn(worktree, covered.Modules, runtime.GOOS, runtime.GOARCH,
 		verdict.operatingSystem, verdict.architecture)
@@ -561,8 +599,13 @@ func runModuleTests(
 	}
 	packages, names := macRemainder(verdict.skipped, neverCompiled)
 	where := fmt.Sprintf("on Home (%s, %d packages, %s)", platform, verdict.packagesPassed, sharedBoxTrust)
+	if verdict.job != "" {
+		where = fmt.Sprintf("on a scratch box (%s, %d packages, %s; land-gate job %s)", platform,
+			verdict.packagesPassed, sharedBoxTrust, verdict.job)
+	}
 	if verdict.race != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: Home's -race run passed, %d packages\n", verdict.race.packagesPassed)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run passed, %d packages\n", verdict.box(),
+			verdict.race.packagesPassed)
 		where += fmt.Sprintf(", %d of them again under -race", verdict.race.packagesPassed)
 	}
 	optIn := optInNamed(verdict.optIn)
@@ -575,8 +618,8 @@ func runModuleTests(
 		}
 		return 0, where + ", nothing it skipped"
 	}
-	fmt.Fprintf(streams.Errors, "cohere-dev: %d tests Home skipped or never compiled run here: %s\n", len(names),
-		strings.Join(names, ", "))
+	fmt.Fprintf(streams.Errors, "cohere-dev: %d tests %s skipped or never compiled run here: %s\n", len(names),
+		verdict.box(), strings.Join(names, ", "))
 	// Read as Home's run is, so a test the Mac skips too is named, never counted as run.
 	here := exec.Command("go", slices.Concat([]string{"test", "-json", "-run", "^(" + strings.Join(names, "|") + ")$"},
 		packages)...)
@@ -584,8 +627,8 @@ func runModuleTests(
 	output, runError := here.CombinedOutput()
 	mac := readTestJson(output)
 	if mac.failed() || (runError != nil && !mac.failed()) {
-		fmt.Fprintf(streams.Errors, "cohere-dev: the tests Home skipped failed here, so nothing landed (%s):\n",
-			describeEnd(runError))
+		fmt.Fprintf(streams.Errors, "cohere-dev: the tests %s skipped failed here, so nothing landed (%s):\n",
+			verdict.box(), describeEnd(runError))
 		for _, failure := range slices.Concat(mac.failedTests, mac.packagesFailed) {
 			fmt.Fprintf(streams.Errors, "  %s\n", failure)
 			for _, line := range slices.Concat(mac.failedOutput[failure], mac.failedOutput[failure+" "]) {

@@ -110,6 +110,7 @@ func TestALandingTestsOnHomeUnlessItSaysOff(test *testing.T) {
 		if _, unavailable := runHomeGate(
 			"",
 			"",
+			"",
 			nil,
 			nil,
 			inside,
@@ -118,7 +119,15 @@ func TestALandingTestsOnHomeUnlessItSaysOff(test *testing.T) {
 			test.Errorf("with %s=%q a landing did not go to Home: %q", homeGateVariable, setting, unavailable)
 		}
 	}
-	if _, unavailable := runHomeGate("", "", nil, nil, inside, "off"); unavailable != "Home is off for this landing ("+
+	if _, unavailable := runHomeGate(
+		"",
+		"",
+		"",
+		nil,
+		nil,
+		inside,
+		"off",
+	); unavailable != "Home is off for this landing ("+
 		homeGateVariable+"=off)" {
 		test.Errorf("with %s=off a landing did not stay on the Mac and say why: %q", homeGateVariable, unavailable)
 	}
