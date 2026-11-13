@@ -1,0 +1,249 @@
+# Every Go rule's inputs, the one place each rule's are declared (inputs.go, #qr19hvc), as #h350vqr's inventory read
+# them (block3-inventory.md, attached to #h350vqr): one rule per line, its name, its Inputs (PerUnit, FileSyntax or
+# Composes, as inputs.go defines each), and FullKind when the inventory's section 2 found it reading more of a named
+# type than its name. Sorted by name.
+#
+# TestEveryRegisteredRuleHasItsInputsInTheTable holds the registry to this table both ways: a rule with no line here
+# fails, so a new rule is read for its inputs before it lands, and so does a line naming no registered rule. A change
+# here is a change to the inventory, made with the reading behind it, and cohere-dev's land gate isolates every rule a
+# change here widens to PerUnit or FileSyntax.
+#
+# Three lines read otherwise than the attachment, which the unit-isolation test found compose (check's
+# unit_isolation_test.go): SA2002 reads the body of the same-package function a go statement starts, as testinggoroutine
+# does, and scannererr and sqlrowserr judge a package-level variable by its uses in every unit, at PackageExit.
+
+cohere-go/S1000 PerUnit
+cohere-go/S1001 PerUnit FullKind
+cohere-go/S1002 PerUnit
+cohere-go/S1003 PerUnit
+cohere-go/S1004 PerUnit
+cohere-go/S1005 PerUnit
+cohere-go/S1006 PerUnit
+cohere-go/S1007 PerUnit
+cohere-go/S1008 PerUnit
+cohere-go/S1009 PerUnit
+cohere-go/S1010 PerUnit
+cohere-go/S1011 PerUnit FullKind
+cohere-go/S1012 PerUnit
+cohere-go/S1016 PerUnit FullKind
+cohere-go/S1017 PerUnit
+cohere-go/S1018 PerUnit
+cohere-go/S1019 PerUnit
+cohere-go/S1020 PerUnit
+cohere-go/S1021 PerUnit
+cohere-go/S1023 PerUnit
+cohere-go/S1024 PerUnit FullKind
+cohere-go/S1025 PerUnit FullKind
+cohere-go/S1028 PerUnit
+cohere-go/S1029 PerUnit
+cohere-go/S1030 PerUnit
+cohere-go/S1031 PerUnit
+cohere-go/S1032 PerUnit
+cohere-go/S1033 PerUnit
+cohere-go/S1034 PerUnit FullKind
+cohere-go/S1035 PerUnit
+cohere-go/S1036 PerUnit
+cohere-go/S1037 PerUnit FullKind
+cohere-go/S1038 PerUnit
+cohere-go/S1039 PerUnit
+cohere-go/S1040 PerUnit FullKind
+cohere-go/SA1000 PerUnit
+cohere-go/SA1001 PerUnit
+cohere-go/SA1002 PerUnit
+cohere-go/SA1003 PerUnit FullKind
+cohere-go/SA1004 PerUnit
+cohere-go/SA1005 PerUnit
+cohere-go/SA1006 PerUnit
+cohere-go/SA1007 PerUnit
+cohere-go/SA1008 PerUnit
+cohere-go/SA1010 PerUnit
+cohere-go/SA1011 PerUnit
+cohere-go/SA1012 PerUnit
+cohere-go/SA1013 PerUnit FullKind
+cohere-go/SA1014 PerUnit
+cohere-go/SA1015 PerUnit
+cohere-go/SA1016 PerUnit FullKind
+cohere-go/SA1017 PerUnit
+cohere-go/SA1018 PerUnit
+cohere-go/SA1019 PerUnit FullKind
+cohere-go/SA1020 PerUnit
+cohere-go/SA1021 PerUnit FullKind
+cohere-go/SA1023 PerUnit FullKind
+cohere-go/SA1024 PerUnit
+cohere-go/SA1025 PerUnit FullKind
+cohere-go/SA1026 PerUnit FullKind
+cohere-go/SA1027 PerUnit FullKind
+cohere-go/SA1028 PerUnit
+cohere-go/SA1029 PerUnit FullKind
+cohere-go/SA1030 PerUnit
+cohere-go/SA1031 PerUnit
+cohere-go/SA1032 PerUnit
+cohere-go/SA2000 PerUnit FullKind
+cohere-go/SA2001 PerUnit
+cohere-go/SA2002 Composes
+cohere-go/SA2003 PerUnit
+cohere-go/SA3000 PerUnit
+cohere-go/SA3001 PerUnit
+cohere-go/SA4000 PerUnit FullKind
+cohere-go/SA4001 PerUnit
+cohere-go/SA4003 PerUnit FullKind
+cohere-go/SA4004 PerUnit
+cohere-go/SA4005 PerUnit FullKind
+cohere-go/SA4006 PerUnit
+cohere-go/SA4008 PerUnit
+cohere-go/SA4009 PerUnit
+cohere-go/SA4010 PerUnit
+cohere-go/SA4011 PerUnit
+cohere-go/SA4012 PerUnit
+cohere-go/SA4013 PerUnit
+cohere-go/SA4014 PerUnit
+cohere-go/SA4015 PerUnit
+cohere-go/SA4016 PerUnit
+cohere-go/SA4017 PerUnit FullKind
+cohere-go/SA4018 PerUnit FullKind
+cohere-go/SA4019 FileSyntax
+cohere-go/SA4020 PerUnit FullKind
+cohere-go/SA4021 PerUnit
+cohere-go/SA4022 PerUnit
+cohere-go/SA4023 Composes
+cohere-go/SA4024 PerUnit
+cohere-go/SA4025 PerUnit
+cohere-go/SA4026 PerUnit
+cohere-go/SA4027 PerUnit
+cohere-go/SA4028 PerUnit
+cohere-go/SA4029 PerUnit FullKind
+cohere-go/SA4030 PerUnit FullKind
+cohere-go/SA4031 PerUnit
+cohere-go/SA4032 PerUnit
+cohere-go/SA5000 PerUnit
+cohere-go/SA5001 PerUnit FullKind
+cohere-go/SA5002 PerUnit
+cohere-go/SA5003 PerUnit
+cohere-go/SA5004 PerUnit
+cohere-go/SA5005 PerUnit
+cohere-go/SA5007 PerUnit
+cohere-go/SA5008 PerUnit FullKind
+cohere-go/SA5010 PerUnit FullKind
+cohere-go/SA5012 Composes
+cohere-go/SA6000 PerUnit
+cohere-go/SA6001 PerUnit
+cohere-go/SA6002 PerUnit
+cohere-go/SA6003 PerUnit
+cohere-go/SA6005 PerUnit FullKind
+cohere-go/SA6006 PerUnit FullKind
+cohere-go/SA9001 PerUnit
+cohere-go/SA9002 PerUnit
+cohere-go/SA9004 PerUnit FullKind
+cohere-go/SA9005 PerUnit FullKind
+cohere-go/SA9006 PerUnit FullKind
+cohere-go/SA9007 PerUnit
+cohere-go/SA9008 PerUnit
+cohere-go/SA9009 FileSyntax
+cohere-go/SA9010 PerUnit
+cohere-go/ST1001 FileSyntax
+cohere-go/ST1006 PerUnit FullKind
+cohere-go/ST1008 PerUnit
+cohere-go/ST1011 PerUnit FullKind
+cohere-go/ST1012 PerUnit
+cohere-go/ST1013 PerUnit FullKind
+cohere-go/ST1016 Composes FullKind
+cohere-go/ST1017 PerUnit
+cohere-go/ST1018 PerUnit
+cohere-go/ST1019 FileSyntax
+cohere-go/U1000 Composes FullKind
+cohere-go/appends PerUnit
+cohere-go/asmdecl Composes FullKind
+cohere-go/assign PerUnit
+cohere-go/atomic PerUnit
+cohere-go/bools PerUnit
+cohere-go/buildtag FileSyntax
+cohere-go/cgocall PerUnit FullKind
+cohere-go/composites PerUnit FullKind
+cohere-go/concurrency-no-buffered-wait-delay PerUnit FullKind
+cohere-go/concurrency-no-kill-by-name PerUnit
+cohere-go/concurrency-require-escape-hatch-reason PerUnit
+cohere-go/concurrency-require-joined-pipe-reader PerUnit
+cohere-go/consistency-no-abbreviated-file-name FileSyntax
+cohere-go/consistency-no-abbreviated-identifier PerUnit FullKind
+cohere-go/consistency-no-ambiguous-identifier PerUnit FullKind
+cohere-go/consistency-no-any Composes FullKind
+cohere-go/consistency-no-boolean-outcome PerUnit FullKind
+cohere-go/consistency-no-console PerUnit
+cohere-go/consistency-no-dash-punctuation FileSyntax
+cohere-go/consistency-no-else-return PerUnit
+cohere-go/consistency-no-empty-function Composes FullKind
+cohere-go/consistency-no-grouped-var PerUnit
+cohere-go/consistency-no-label PerUnit
+cohere-go/consistency-no-lone-block PerUnit
+cohere-go/consistency-no-lonely-if PerUnit
+cohere-go/consistency-no-long-file FileSyntax
+cohere-go/consistency-no-long-line FileSyntax
+cohere-go/consistency-no-parameter-reassignment PerUnit
+cohere-go/consistency-no-property-alias PerUnit
+cohere-go/consistency-no-redundant-import-alias PerUnit
+cohere-go/consistency-no-screaming-snake-case Composes
+cohere-go/consistency-no-shouting FileSyntax
+cohere-go/consistency-no-stuttering-name PerUnit
+cohere-go/consistency-no-undefined-initializer PerUnit
+cohere-go/consistency-no-uppercase-initialism Composes FullKind
+cohere-go/consistency-no-use-before-define PerUnit
+cohere-go/consistency-no-useless-concatenation PerUnit
+cohere-go/consistency-no-utils-file-name FileSyntax
+cohere-go/consistency-no-utils-folder FileSyntax
+cohere-go/consistency-no-warning-comment FileSyntax
+cohere-go/consistency-require-default-last PerUnit
+cohere-go/consistency-require-error-clause PerUnit
+cohere-go/consistency-require-matching-file-name Composes
+cohere-go/consistency-require-octal-prefix PerUnit
+cohere-go/consistency-require-one-type-per-file Composes
+cohere-go/consistency-require-operator-assignment PerUnit FullKind
+cohere-go/consistency-require-separated-folder-words Composes
+cohere-go/copylocks PerUnit FullKind
+cohere-go/correctness-no-caller-data-mutation PerUnit FullKind
+cohere-go/correctness-no-identical-branches PerUnit
+cohere-go/correctness-no-process-exit-after-output PerUnit
+cohere-go/correctness-no-write-only-collection PerUnit
+cohere-go/correctness-require-checked-assertion PerUnit FullKind
+cohere-go/correctness-require-declared-walk Composes
+cohere-go/correctness-require-drained-child-output PerUnit
+cohere-go/correctness-require-handled-error PerUnit FullKind
+cohere-go/correctness-require-invariant-reason PerUnit
+cohere-go/correctness-require-response-status-check PerUnit
+cohere-go/correctness-require-wrapped-error PerUnit FullKind
+cohere-go/defers PerUnit
+cohere-go/directive FileSyntax
+cohere-go/errorsas PerUnit FullKind
+cohere-go/framepointer FileSyntax
+cohere-go/hostport Composes
+cohere-go/httpresponse PerUnit FullKind
+cohere-go/ifaceassert PerUnit FullKind
+cohere-go/loopclosure PerUnit
+cohere-go/lostcancel PerUnit
+cohere-go/nilfunc PerUnit
+cohere-go/nilness PerUnit
+cohere-go/printf Composes FullKind
+cohere-go/scannererr Composes
+cohere-go/security-no-interpolated-shell-command PerUnit FullKind
+cohere-go/security-no-interpolated-sql-string PerUnit FullKind
+cohere-go/shift PerUnit FullKind
+cohere-go/sigchanyzer Composes
+cohere-go/slog PerUnit FullKind
+cohere-go/sqlrowserr Composes
+cohere-go/stdmethods PerUnit FullKind
+cohere-go/stdversion PerUnit
+cohere-go/stringintconv PerUnit FullKind
+cohere-go/structtag PerUnit FullKind
+cohere-go/testing-no-machine-path PerUnit
+cohere-go/testing-no-timing-assertion PerUnit
+cohere-go/testing-no-uncached-run PerUnit
+cohere-go/testing-require-failure-path PerUnit
+cohere-go/testing-require-parallel Composes
+cohere-go/testinggoroutine Composes FullKind
+cohere-go/tests PerUnit FullKind
+cohere-go/timeformat PerUnit
+cohere-go/unmarshal PerUnit
+cohere-go/unreachable PerUnit
+cohere-go/unsafeptr PerUnit FullKind
+cohere-go/unusedresult PerUnit FullKind
+cohere-go/unusedwrite PerUnit FullKind
+cohere-go/waitgroup PerUnit

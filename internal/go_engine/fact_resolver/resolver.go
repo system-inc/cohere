@@ -83,6 +83,9 @@ type Resolver struct {
 	// unsure counts, by each package's types, the unsure answers its analysis was handed (see Unsure).
 	unsure sync.Map
 
+	// held is a test's hand on the run's answers, nil in every engine run (see HoldAnswers).
+	held Held
+
 	// timing is the run's collector under `--timing`, taken from the first pass that hands the resolver over, nil for
 	// a run that did not ask (see Question).
 	timing atomic.Pointer[timing.Collector]
