@@ -199,8 +199,9 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(test *testing.T) {
 // --format-only asks for the fix phase alone, as TypeScript's does, so the engine's types and lint skipped as
 // not requested are no gap, and its format finding is the verdict (#nqb3mjv, c024df4b). Without it a phase
 // flag would be read as asking for everything, and the format gate would fail on phases it never asked for.
+//
+// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
 func TestFormatOnlyAsksForTheFixPhaseAlone(test *testing.T) {
-	test.Parallel()
 	given, value := flagsOf("no-fix", "format-only")
 	requested := engineRequestedPhases(given, value)
 	if !requested[phaseFix] || requested[phaseTypes] || requested[phaseLint] || requested[phaseUnused] {
