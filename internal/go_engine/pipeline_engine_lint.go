@@ -383,11 +383,15 @@ func (engine *pipeline) cacheSession(
 	caching.Files = files
 	// The session's own work on every core runs under the run's one pool's slots, as its loads and checks do.
 	caching.Pool = engine.workPool()
-	// The editor's save loads its buffer in place of the file (held), so its keys are of the buffer: keyed by the
-	// disk's bytes, its entries would be restored by the next run over the file on disk as what that file holds.
-	if engine.request.stdinPath != "" {
-		caching.Held = engine.held
-	}
+	// Every run keys the bytes it holds for a file in scope (held), the bytes its load parsed, rather than open the
+	// file again (#1sxhadk). A run's held bytes are the disk's as described read them, each write after reread before
+	// the next load, so its keys are of what it checked by construction, and a file changed on disk mid-run is keyed as
+	// it was checked, never as the changed file. The editor's save holds its buffer in place of the file, so its keys
+	// are of the buffer: keyed by the disk's bytes, its entries would be restored by the next run over the file on disk
+	// as what that file holds. The one time held runs ahead of the disk, inside the rename (askedOver), no key is
+	// taken: the rename runs its rules without the findings cache, and a run that renamed reads none. A file the run
+	// holds nothing for, outside the scope or a dependency's, is hashed from disk.
+	caching.Held = engine.held
 	if engine.duplicatesRequested() {
 		return check.NewCacheSession(caching, enabled, canonical_function_hash.Analyzer)
 	}

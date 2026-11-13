@@ -186,6 +186,52 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	}
 }
 
+// A run keys each file in scope by the bytes it holds, the bytes its load parsed, never by the disk's when they part
+// (#1sxhadk). The first run's tree is read, then vet.go is changed on disk before the run starts, so the run checks
+// the bytes it read and the disk holds others. Put back as it was, the next run hits every entry the first wrote: the
+// first keyed vet's package by what it checked. Keyed by the disk's bytes, that package would miss.
+func TestAKeyNamesTheBytesTheRunCheckedNotTheDisks(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "vet-finding"))
+	file := filepath.Join(root, "vet.go")
+	checked, readError := os.ReadFile(file)
+	if readError != nil {
+		test.Fatalf("reading %s: %v", file, readError)
+	}
+	changeDisk := func(*pipeline) {
+		if writeError := os.WriteFile(file, append(slices.Clone(checked),
+			[]byte("\n// Written after the run read the tree.\n")...), 0o644); writeError != nil {
+			test.Fatalf("changing %s: %v", file, writeError)
+		}
+	}
+	_, stream := runOverConfigured(test, root, exitFindings, changeDisk, "--no-fix")
+	var cold contract.LintCache
+	for line := range strings.Lines(stream) {
+		if !strings.HasPrefix(line, `{"kind":"lint"`) {
+			continue
+		}
+		var record struct {
+			Cache contract.LintCache `json:"cache"`
+		}
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatalf("reading the lint record %s: %v", line, decodeError)
+		}
+		cold = record.Cache
+	}
+	if !cold.On || cold.Written == 0 {
+		test.Fatalf("want a cold run that wrote entries, got %+v", cold)
+	}
+	if writeError := os.WriteFile(file, checked, 0o644); writeError != nil {
+		test.Fatalf("putting %s back: %v", file, writeError)
+	}
+	warm := runCachedEngine(test, root)
+	if warm.counts.Hit != cold.Written || warm.counts.Missed != cold.Missed-cold.Written {
+		test.Fatalf("want every entry the first run wrote hit with vet.go put back, cold %+v, warm %+v", cold,
+			warm.counts)
+	}
+}
+
 // A staticcheck.conf in a directory above a package is among the package's inputs, since staticcheck's config
 // analyzer reads every one from the package's directory up: planting one that allows the fixture's dot import
 // misses the package and drops ST1001's finding, and removing it again brings the finding back, each run writing

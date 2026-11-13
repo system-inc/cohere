@@ -36,9 +36,10 @@ type Caching struct {
 	StandardLibrary *StandardLibraryCaching
 	Files           cache.FileDigests
 
-	// Held is the bytes the load parsed in place of a file's on disk, which the keys hash in their place (see
-	// cache.Keys), nil for a run whose load read every file as it is on disk. The editor's save sets it, whose one file
-	// is the buffer, so its entries are keyed by what it checked rather than by the file the editor has not saved.
+	// Held is the bytes the run holds for a file, which its load parsed, and the keys hash in place of the disk's (see
+	// cache.Keys), nil for a caller that holds none. Every run of the engine sets it, so its entries are keyed by what
+	// it checked without a second read of each file (#1sxhadk), and the editor's save, whose one file is the buffer,
+	// keys what it checked rather than the file the editor has not saved.
 	Held func(file string) ([]byte, bool)
 
 	// Pool is the run's one set of slots, which every load and check of the run shares (#ckm0hsp): the session's own
