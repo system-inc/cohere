@@ -14,6 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // TestDumpDifferences is TestCorpora's working copy for a printer port: the same comparison against the
@@ -36,10 +37,12 @@ import (
 // dump costs the candidate's time once the corpus has been measured.
 func TestDumpDifferences(test *testing.T) {
 	test.Parallel()
-	roots, output := os.Getenv("COHERE_FORMAT_CORPORA"), os.Getenv("COHERE_FORMAT_DUMP")
-	if roots == "" || output == "" {
-		test.Skip("set COHERE_FORMAT_CORPORA and COHERE_FORMAT_DUMP to dump every difference")
-	}
+	roots := needs.OptIn(
+		test,
+		"COHERE_FORMAT_CORPORA",
+		"it dumps every difference of the formatter over a corpus of trees",
+	)
+	output := needs.OptIn(test, "COHERE_FORMAT_DUMP", "it dumps every difference of the formatter into that directory")
 	extensions := map[string]bool{}
 	for _, extension := range strings.Split(os.Getenv("COHERE_FORMAT_EXTENSIONS"), ",") {
 		if extension = strings.TrimSpace(extension); extension != "" {

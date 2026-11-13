@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"fmt"
 	"go/types"
-	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -21,6 +20,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rules/odd_slice_argument"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // demandDifferentialVariable names the tree the demand differential runs over: root for cohere's own module, or a
@@ -59,11 +59,11 @@ func TestDemandAnswersAsThePushOnTheFixtures(test *testing.T) {
 // resolver compute against the push's total, which is the saving. Unset, it skips.
 func TestDemandAnswersAsThePushOverATree(test *testing.T) {
 	test.Parallel()
-	directory := os.Getenv(demandDifferentialVariable)
-	if directory == "" {
-		test.Skipf("set %s to root or a directory to run the demand differential over that tree",
-			demandDifferentialVariable)
-	}
+	directory := needs.OptIn(
+		test,
+		demandDifferentialVariable,
+		"a differential of the resolver's answers against the push's over root or a directory",
+	)
 	if directory == "root" {
 		// This package sits four directories below the module root.
 		root, rootError := filepath.Abs(filepath.Join("..", "..", "..", ".."))

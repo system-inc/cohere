@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // valuesParseScript is the oracle: postcss-values-parser 2.0.1 from the fork's node_modules, loaded
@@ -256,10 +257,11 @@ line"`},
 // perfect agreement.
 func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 	test.Parallel()
-	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if corpora == "" {
-		test.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-values-parser")
-	}
+	corpora := needs.OptIn(
+		test,
+		"COHERE_CSS_CORPORA",
+		"a differential of the parser against postcss-values-parser over a corpus",
+	)
 	root := corpus.PrettierFork.Root(test)
 
 	type request struct {

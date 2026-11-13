@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // graphqlParseScript is the oracle: graphql-js 17.0.2 from the fork's node_modules, called the way
@@ -239,10 +240,11 @@ var parseFixtures = []parseFixture{
 // fixtures each say which way graphql-js must go.
 func TestParseAgreesWithGraphqlJs(test *testing.T) {
 	test.Parallel()
-	corpora := os.Getenv("COHERE_GRAPHQL_CORPORA")
-	if corpora == "" {
-		test.Skip("set COHERE_GRAPHQL_CORPORA to compare the parser against graphql-js")
-	}
+	corpora := needs.OptIn(
+		test,
+		"COHERE_GRAPHQL_CORPORA",
+		"a differential of the parser against graphql-js over a corpus",
+	)
 	root := corpus.PrettierFork.Root(test)
 
 	type input struct {

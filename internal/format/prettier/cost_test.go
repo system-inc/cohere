@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // TestCost measures formatting throughput per byte rather than per file.
@@ -18,10 +20,7 @@ import (
 func TestCost(test *testing.T) {
 	test.Parallel()
 
-	listPath := os.Getenv("COHERE_COST_LIST")
-	if listPath == "" {
-		test.Skip("set COHERE_COST_LIST")
-	}
+	listPath := needs.OptIn(test, "COHERE_COST_LIST", "it times the engine over a list of files")
 	listBytes, readError := os.ReadFile(listPath)
 	if readError != nil {
 		test.Fatalf("reading the list: %v", readError)

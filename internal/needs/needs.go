@@ -5,6 +5,7 @@
 package needs
 
 import (
+	"os"
 	"os/exec"
 	"runtime"
 	"testing"
@@ -18,6 +19,23 @@ func Tool(test testing.TB, tool string, why string) string {
 		test.Skipf("%s is not on the path, and %s: %v", tool, why, lookPathError)
 	}
 	return found
+}
+
+// OptInPhrase opens the skip of a test no gate runs, a measurement or a census over a tree of the asker's choosing,
+// which runs only when its variable is set. The land gate reads it in a box's skips: a test that is opt-in is no
+// gate's, so it is named as opt-in on the land line and never run again on the Mac, where it would only skip again
+// (#xc29pnd).
+const OptInPhrase = "opt-in, run with "
+
+// OptIn returns the value of variable, or skips the test when it is unset, naming it opt-in by OptInPhrase and saying
+// what the run is for. It is for tests no gate runs; a test a gate runs, whose input is merely missing, is Tool's.
+func OptIn(test testing.TB, variable string, why string) string {
+	test.Helper()
+	value := os.Getenv(variable)
+	if value == "" {
+		test.Skipf("%s%s set: %s", OptInPhrase, variable, why)
+	}
+	return value
 }
 
 // NoRace skips the test in a binary built with -race, saying why the race detector's cost breaks what it checks:

@@ -15,6 +15,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // prettierParseScript is the oracle: the fork's own parse (parser "typescript", with the file path, so
@@ -59,10 +60,11 @@ process.stdin.on("end", async () => {
 // perfect agreement.
 func TestConvertAgreesWithPrettier(test *testing.T) {
 	test.Parallel()
-	corpora := os.Getenv("COHERE_ESTREE_CORPORA")
-	if corpora == "" {
-		test.Skip("set COHERE_ESTREE_CORPORA to compare the converter against the fork")
-	}
+	corpora := needs.OptIn(
+		test,
+		"COHERE_ESTREE_CORPORA",
+		"a differential of the converter against the fork over a corpus",
+	)
 	root := corpus.PrettierFork.Root(test)
 	seen := map[string]bool{}
 	var files []string

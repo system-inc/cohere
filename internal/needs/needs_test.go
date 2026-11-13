@@ -29,6 +29,10 @@ func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 		}
 		Platform(test, other, "the engine ships there alone")
 		test.Fatal("Platform returned on another platform")
+	case "opt-in":
+		value := OptIn(test, "COHERE_NEEDS_OPT_IN", "it measures a tree of the asker's choosing")
+		test.Logf("opted in with %s", value)
+		return
 	case "race":
 		NoRace(test, "it bounds CPU time")
 		if raceDetector {
@@ -53,13 +57,26 @@ func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 	for _, row := range []struct {
 		child string
 		want  []string
+		// environment is added to the child's, after the opt-in variable is cleared.
+		environment []string
 	}{
-		{"tool", []string{"--- SKIP", "zsh is not on the path, and the benchmark is a zsh script"}},
-		{"platform", []string{"--- SKIP", "this test runs on", "since the engine ships there alone", runtime.GOOS}},
-		{"race", raceWant},
+		{"tool", []string{"--- SKIP", "zsh is not on the path, and the benchmark is a zsh script"}, nil},
+		{
+			"platform",
+			[]string{"--- SKIP", "this test runs on", "since the engine ships there alone", runtime.GOOS},
+			nil,
+		},
+		{"race", raceWant, nil},
+		{
+			"opt-in",
+			[]string{"--- SKIP", OptInPhrase + "COHERE_NEEDS_OPT_IN set: it measures a tree of the asker's choosing"},
+			nil,
+		},
+		{"opt-in", []string{"--- PASS", "opted in with a tree"}, []string{"COHERE_NEEDS_OPT_IN=a tree"}},
 	} {
 		command := exec.Command(executable, "-test.run=^TestAMissingToolOrPlatformIsANamedSkip$", "-test.v")
-		command.Env = append(os.Environ(), needsChildVariable+"="+row.child, "PATH=")
+		command.Env = append(append(os.Environ(), needsChildVariable+"="+row.child, "PATH=", "COHERE_NEEDS_OPT_IN="),
+			row.environment...)
 		output, runError := command.CombinedOutput()
 		if runError != nil {
 			test.Errorf("the %s child failed rather than skipped: %v\n%s", row.child, runError, output)

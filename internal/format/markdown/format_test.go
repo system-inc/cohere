@@ -1,7 +1,6 @@
 package markdown
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // formatFixtures reach the printer's branches the corpora rarely or never do: our markdown is almost all
@@ -308,9 +308,11 @@ func TestFormatOracleCanFail(test *testing.T) {
 // of a run is flanking, and only an exhaustive sweep reaches every combination. A measuring run.
 func TestExhaustiveDelimitersMatchOracle(test *testing.T) {
 	test.Parallel()
-	if os.Getenv("COHERE_MARKDOWN_EXHAUSTIVE") == "" {
-		test.Skip("set COHERE_MARKDOWN_EXHAUSTIVE to run the sweep")
-	}
+	needs.OptIn(
+		test,
+		"COHERE_MARKDOWN_EXHAUSTIVE",
+		"a sweep of every delimiter string up to five long against the oracle",
+	)
 	alphabet := []string{"a", "*", "_", " ", "."}
 	var inputs []string
 	var extend func(prefix string, length int)

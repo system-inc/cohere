@@ -1,13 +1,13 @@
 package function_purity
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"honnef.co/go/tools/analysis/facts/purity"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // factsDifferentialVariable names the tree the fact differential runs over: root for cohere's own module, or a
@@ -21,11 +21,11 @@ const factsDifferentialVariable = "COHERE_GO_IR_FACTS_DIFFERENTIAL"
 // another fact pass runs the same comparison with its own pair. Unset, it skips, since a tree takes minutes.
 func TestPortExportsTheOriginalsFactsOverATree(test *testing.T) {
 	test.Parallel()
-	directory := os.Getenv(factsDifferentialVariable)
-	if directory == "" {
-		test.Skipf("set %s to root or a directory to run the fact differential over that tree",
-			factsDifferentialVariable)
-	}
+	directory := needs.OptIn(
+		test,
+		factsDifferentialVariable,
+		"a differential of the port's facts against the original's over root or a directory",
+	)
 	if directory == "root" {
 		// This package sits four directories below the module root.
 		root, rootError := filepath.Abs(filepath.Join("..", "..", "..", ".."))

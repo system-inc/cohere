@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The glob cases gitignore(5) and fnmatch(3) describe, one per rule, so a regression names the rule it
@@ -124,11 +126,7 @@ func TestGitWildmatchCorpus(test *testing.T) {
 // gitSource is the git checkout the corpus tests read, or a skip when none is named.
 func gitSource(test *testing.T) string {
 	test.Helper()
-	source := os.Getenv("COHERE_GIT_SOURCE")
-	if source == "" {
-		test.Skip("COHERE_GIT_SOURCE does not name a git source checkout")
-	}
-	return source
+	return needs.OptIn(test, "COHERE_GIT_SOURCE", "a differential against the corpus of a git source checkout")
 }
 
 // gitCommit names the commit a git checkout is at, so a run says which corpus it measured.

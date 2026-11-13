@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // postcssParseScript is the oracle: postcss 8.5.16 from the fork's node_modules, called the way
@@ -291,10 +292,7 @@ var parseFixtures = []parseFixture{
 // corpus: an oracle that rejects everything would otherwise read as perfect agreement.
 func TestParseAgreesWithPostcss(test *testing.T) {
 	test.Parallel()
-	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if corpora == "" {
-		test.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss")
-	}
+	corpora := needs.OptIn(test, "COHERE_CSS_CORPORA", "a differential of the parser against postcss over a corpus")
 	root := corpus.PrettierFork.Root(test)
 
 	type input struct {

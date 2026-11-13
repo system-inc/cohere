@@ -14,6 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // TestCorpora is the acceptance test: the native printer against the embedded Prettier, over real trees.
@@ -34,10 +35,11 @@ import (
 // nobody can see is the 08-25 mistake: a root that silently measures half its tree.
 func TestCorpora(test *testing.T) {
 	test.Parallel()
-	roots := os.Getenv("COHERE_FORMAT_CORPORA")
-	if roots == "" {
-		test.Skip("set COHERE_FORMAT_CORPORA to measure; this is a measuring run, not a unit test")
-	}
+	roots := needs.OptIn(
+		test,
+		"COHERE_FORMAT_CORPORA",
+		"a measurement of the formatter against the oracle over a corpus of trees",
+	)
 
 	candidateName := os.Getenv("COHERE_FORMAT_CANDIDATE")
 

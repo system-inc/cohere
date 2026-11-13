@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // TestFormatIsIdempotent checks that formatting formatted output changes nothing.
@@ -13,10 +15,7 @@ import (
 func TestFormatIsIdempotent(test *testing.T) {
 	test.Parallel()
 
-	listPath := os.Getenv("COHERE_IDEM_LIST")
-	if listPath == "" {
-		test.Skip("set COHERE_IDEM_LIST")
-	}
+	listPath := needs.OptIn(test, "COHERE_IDEM_LIST", "it formats a list of files twice and compares them")
 	engine := newTestEngine(test)
 	listBytes, listReadError := os.ReadFile(listPath)
 	if listReadError != nil {

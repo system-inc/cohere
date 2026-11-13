@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // Each snippet goes through this printer and through the embedded Prettier fork, and the two outputs must
@@ -385,10 +386,11 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 // makes the oracle rewrite anything.
 func TestCorpusMatchesTheFork(test *testing.T) {
 	test.Parallel()
-	roots := os.Getenv("COHERE_CSS_CORPUS")
-	if roots == "" {
-		test.Skip("COHERE_CSS_CORPUS is not set")
-	}
+	roots := needs.OptIn(
+		test,
+		"COHERE_CSS_CORPUS",
+		"a differential of the formatter against the fork over a corpus of CSS files",
+	)
 	var files []string
 	for _, root := range filepath.SplitList(roots) {
 		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {

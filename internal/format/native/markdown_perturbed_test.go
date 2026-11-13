@@ -19,6 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/markdown"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The perturbed markdown corpus. Our markdown is almost all already formatted, so the harness tests
@@ -196,10 +197,11 @@ func standInEmbeds(
 
 func TestPerturbedMarkdownCorpus(test *testing.T) {
 	test.Parallel()
-	roots := os.Getenv("COHERE_MARKDOWN_PERTURB_CORPORA")
-	if roots == "" {
-		test.Skip("set COHERE_MARKDOWN_PERTURB_CORPORA to measure; this is a measuring run, not a unit test")
-	}
+	roots := needs.OptIn(
+		test,
+		"COHERE_MARKDOWN_PERTURB_CORPORA",
+		"a measurement of the formatter against the oracle over a perturbed corpus",
+	)
 
 	type job struct {
 		path    string
