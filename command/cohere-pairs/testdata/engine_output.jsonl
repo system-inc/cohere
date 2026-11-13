@@ -1,0 +1,8 @@
+{"kind":"provenance","engine":"go","contract":3}
+{"kind":"project","root":"/corpus","package":"","elapsedMilliseconds":120,"filesInPackage":40,"filesOurs":38,"filesInScope":37,"scopeDescription":"","targets":[],"excluded":[]}
+{"kind":"finding","file":"b.go","line":3,"rule":"go/nilness","message":"impossible condition"}
+{"kind":"finding","file":"a.go","line":9,"rule":"go/receiver-name","message":"receiver name should be consistent"}
+the engine printed this line by mistake
+{"kind":"finding","file":"a.go","line":2,"rule":"go/dot-import","message":"should not use dot imports"}
+{"kind":"lint","findings":3,"rulesRun":235,"filesWalked":36,"nodesVisited":9000,"elapsedMilliseconds":800,"cache":{"on":true,"hit":0,"standardLibraryFromBinary":180,"missed":12},"builds":[{"target":"linux/amd64 cgo","host":true,"compiledFiles":36},{"target":"darwin/amd64","host":false,"restoredFromHost":271,"declinedAtLoad":90,"checkedFromSource":166}],"buildsAtOnce":2,"buildsWidthLiveBytes":436663784}
+{"kind":"summary","exitCode":1}
