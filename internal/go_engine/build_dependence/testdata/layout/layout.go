@@ -87,3 +87,7 @@ func Cells() int { return dependency.Width }
 
 // Labelled uses the dependency's Label, which no build changes: independent.
 func Labelled() string { return dependency.Label }
+
+// CallsWide calls the dependency's Wide, whose body reads Width, and bodies do not propagate: independent, and a
+// static caller of Wide, which the facts census follows (#ss4t5g6).
+func CallsWide() bool { return dependency.Wide() }

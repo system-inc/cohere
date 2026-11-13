@@ -196,12 +196,38 @@ type BuildDependence struct {
 	GraphMilliseconds    int              `json:"graphMilliseconds"`
 	JudgmentMilliseconds int              `json:"judgmentMilliseconds"`
 	Facts                *DependenceFacts `json:"facts,omitempty"`
+
+	// Restored, additive (#ss4t5g6), is what the judgment did for the packages the host restored from export data,
+	// absent when it restored none.
+	Restored *RestoredDependence `json:"restored,omitempty"`
+}
+
+// RestoredDependence is one build's judgment of what the host restored from export data rather than checked from
+// source, which its graph does not hold: the binary's standard-library table's packages, and a warm store's. Packages
+// counts them. The standard library's are judged on a graph of their own, loaded from source beside the host's lint:
+// StandardLibraryPackages counts the packages that load reached, LoadMilliseconds is its list, parse and type check
+// and GraphMilliseconds its graph, both once a run, and StandardLibraryUnits and StandardLibraryDependentUnits are this
+// build's judgment of it, which the dependencies' counts include. Each object of a restored package a unit of the host
+// reads is answered by its counterpart in that graph: Answered counts those, WithoutCounterpart those whose path names
+// nothing alike there, and WithoutPackage those of a package the graph does not hold, a store's or every one when the
+// side load failed, the last two answered dependent, failing wide.
+type RestoredDependence struct {
+	Packages                      int `json:"packages"`
+	StandardLibraryPackages       int `json:"standardLibraryPackages"`
+	LoadMilliseconds              int `json:"loadMilliseconds"`
+	GraphMilliseconds             int `json:"graphMilliseconds"`
+	StandardLibraryUnits          int `json:"standardLibraryUnits"`
+	StandardLibraryDependentUnits int `json:"standardLibraryDependentUnits"`
+	Answered                      int `json:"answered"`
+	WithoutCounterpart            int `json:"withoutCounterpart"`
+	WithoutPackage                int `json:"withoutPackage"`
 }
 
 // DependenceFacts is one build's facts beside the host's: Kinds counts them by analyzer and fact type, and Workspace
 // and Dependencies count, by the scope of the unit, the units a differing fact reaches. Milliseconds is the
-// comparison's wall time. Every build checks every package from source under the census, restoring nothing from the
-// host's run, so its facts are its own.
+// comparison's wall time. Every build restores nothing from the host's run under the census, so its facts are its own.
+// The standard library the host restored from the binary's table is compared through the table's facts and answers
+// (#ss4t5g6), but for a fact about an object no objectpath names, which no table holds.
 type DependenceFacts struct {
 	Kinds        []FactKindCounts `json:"kinds"`
 	Workspace    FactCallers      `json:"workspace"`

@@ -29,7 +29,7 @@ func (graph *Graph) Against(difference Difference) *Dependence {
 	for index := range resolved.units {
 		unitDependent[index] = judging.seedUnit[index] || judging.unitReaches(&resolved.units[index], bits)
 	}
-	dependence := &Dependence{resolved: resolved, unitDependent: unitDependent, bits: bits}
+	dependence := &Dependence{resolved: resolved, judging: judging, unitDependent: unitDependent, bits: bits}
 	dependence.counts = judging.count(unitDependent)
 	return dependence
 }

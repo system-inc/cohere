@@ -20,6 +20,9 @@ type loadRequest struct {
 	// rootSyntaxOnly keeps syntax and type maps for the roots alone (load.PackagesWithRootSyntax), for the rename's
 	// plan and platform loads, which never read a dependency's. It reads overlay, nil for none, and takes no caching.
 	rootSyntaxOnly bool
+	// patterns, when set, are loaded in place of the workspace's, with no census of ours to account for, for a load of
+	// other packages than the workspace's: the standard library's side load under `--build-dependence` (#ss4t5g6).
+	patterns []string
 }
 
 // loadPackages is every load of the workspace the engine makes, the only caller of package load's loads in it (a test
@@ -34,6 +37,9 @@ func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) 
 	patterns, census := workspace.Patterns(), engine.described.readableOurs
 	if engine.request.stdinPath != "" {
 		patterns, census = engine.stdinPackage()
+	}
+	if request.patterns != nil {
+		patterns, census = request.patterns, nil
 	}
 	var loaded *load.Loaded
 	var loadError error

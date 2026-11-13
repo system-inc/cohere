@@ -22,11 +22,16 @@ import (
 // An answer the fact resolver computed on demand (#w7zmvat), purity's, nil-ness's and the rest, is one too: its
 // Analyzer is its kind, FactType is "answer", Answer is set, and Encoded is its JSON, which Digest is of. A question
 // the run never asked has no answer, so an answer only one build holds says nothing of the fact.
+//
+// ObjectPath names the object of a fact a restored package's entry holds about an object its export data does not
+// hold, which has no Object (CacheSession.unnamedFacts): an importer never sees it, but the package's own run exported
+// it, and a census comparing with a run that checked the package from source finds it by its path (#ss4t5g6).
 type ExportedFact struct {
 	Package      *packages.Package
 	Analyzer     string
 	FactType     string
 	Object       types.Object
+	ObjectPath   objectpath.Path
 	Fact         analysis.Fact
 	Digest       cache.Key
 	Undigestable bool
@@ -68,7 +73,8 @@ type actionKey struct {
 // exportedFacts are every fact the actions of graphs exported, of every package they ran on, dependencies included,
 // for the census of facts across builds (#0ghk7vj). A later wave's action on a package is the one that counts, as the
 // findings read it, and an action that failed exported nothing an importer could trust. A package the findings cache
-// restored ran no action, so its facts are not here; the census runs with nothing restored.
+// restored ran its actions from its entry, so its facts here are the entry's, about objects of its export data; the
+// entry's facts about objects export data does not hold are CacheSession.unnamedFacts.
 func exportedFacts(graphs []*checker.Graph) []ExportedFact {
 	byAction := map[actionKey][]ExportedFact{}
 	for _, graph := range graphs {
