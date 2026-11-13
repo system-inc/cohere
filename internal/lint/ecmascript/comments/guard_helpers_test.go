@@ -24,7 +24,7 @@ func realSourceFiles(test *testing.T, limit int) []realSourceFile {
 	test.Helper()
 
 	var files []realSourceFile
-	root := corpus.Structure.Path(test, "source")
+	root := corpus.Structure.At(test, corpus.StructurePin, "source")
 	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
 		if pathError != nil || info.IsDir() || len(files) >= limit {
 			return nil

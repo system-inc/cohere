@@ -2,6 +2,7 @@ package corpus
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -270,5 +271,73 @@ func TestLocateReadsTheVariableThenTheCorporaFile(test *testing.T) {
 	}
 	if _, locateError := locate("arha:app/theme.css", lookupFrom(nil), fromConfiguration); locateError == nil {
 		test.Error("a misspelled corpus was located")
+	}
+}
+
+// At reads a corpus as it stood at a commit, whatever its checkout holds now, and the live checkout only when
+// LiveVariable is set; a checkout without the commit fails, never reads something else (#jf5dz34). Shown through a
+// child of this binary over a repository whose file reads "pinned" at one commit and "live" in its working tree.
+func TestAtReadsTheCommitNotTheCheckout(test *testing.T) {
+	test.Parallel()
+	if probe := os.Getenv("COHERE_CORPUS_PROBE"); strings.HasPrefix(probe, "at ") {
+		mode, commit, _ := strings.Cut(strings.TrimPrefix(probe, "at "), " ")
+		if mode == "live" {
+			// The child is its own process, so its environment is its own to change.
+			if setError := os.Setenv(LiveVariable, "1"); setError != nil {
+				test.Fatal(setError)
+			}
+		}
+		contents, readError := os.ReadFile(Ahra.At(test, commit, "source", "file.ts"))
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		test.Logf("read %q", strings.TrimSpace(string(contents)))
+		return
+	}
+	repository := test.TempDir()
+	git := func(arguments ...string) string {
+		test.Helper()
+		command := exec.Command("git", append([]string{"-C", repository, "-c", "user.name=test", "-c",
+			"user.email=test@example.com"}, arguments...)...)
+		output, gitError := command.CombinedOutput()
+		if gitError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, gitError, output)
+		}
+		return strings.TrimSpace(string(output))
+	}
+	git("init", "-q")
+	writeFile := func(contents string) {
+		test.Helper()
+		if writeError := os.MkdirAll(filepath.Join(repository, "source"), 0o755); writeError != nil {
+			test.Fatal(writeError)
+		}
+		if writeError := os.WriteFile(filepath.Join(repository, "source", "file.ts"), []byte(contents),
+			0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	writeFile("pinned\n")
+	git("add", ".")
+	git("commit", "-q", "-m", "pinned")
+	pinned := git("rev-parse", "HEAD")
+	writeFile("live\n")
+
+	for name, testCase := range map[string]struct {
+		probe string
+		want  []string
+	}{
+		"the pinned commit": {probe: "at pinned " + pinned, want: []string{"--- PASS", `read "pinned"`}},
+		"the live checkout": {probe: "at live " + pinned, want: []string{"--- PASS", `read "live"`}},
+		"a commit it lacks": {
+			probe: "at pinned " + strings.Repeat("1", 40),
+			want:  []string{"--- FAIL", "holds no commit"},
+		},
+	} {
+		output := runProbe(test, "TestAtReadsTheCommitNotTheCheckout", testCase.probe, repository)
+		for _, want := range testCase.want {
+			if !strings.Contains(output, want) {
+				test.Errorf("%s: want %q in:\n%s", name, want, output)
+			}
+		}
 	}
 }
