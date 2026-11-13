@@ -1,16 +1,35 @@
 {
     "rules": {
         "TypeScript": "nexus/correctness-require-drained-child-output",
-        "Go": "cohere-go/correctness-require-drained-child-output"
+        "Go": "cohere-go/correctness-require-drained-child-output",
+        "Swift": "cohere-swift/correctness-require-drained-child-output"
     },
     "messages": {
         "childOutputNeverDrained": {
-            "text": "{{stream}} of this child is never read before its {{event}} is awaited, so output past the pipe buffer blocks the child and {{event}} never fires. Read it (`child.{{stream}}.on('data', ...)`, or pipe it), or pass `'ignore'` or `'inherit'` in stdio.",
-            "languages": ["TypeScript"]
+            "text": "[[undrained]], so output past the pipe buffer blocks the child and [[stuck]]. [[repair]]",
+            "languages": ["TypeScript", "Swift"],
+            "terms": {
+                "undrained": {
+                    "TypeScript": "{{stream}} of this child is never read before its {{event}} is awaited",
+                    "Swift": "`{{pipe}}`, the pipe `{{process}}` writes its {{stream}} to, is not read to its end on some path before `{{process}}.waitUntilExit()`"
+                },
+                "stuck": {
+                    "TypeScript": "{{event}} never fires",
+                    "Swift": "the wait never returns"
+                },
+                "repair": {
+                    "TypeScript": "Read it (`child.{{stream}}.on('data', ...)`, or pipe it), or pass `'ignore'` or `'inherit'` in stdio.",
+                    "Swift": "Read it to its end before the wait (`{{pipe}}.fileHandleForReading.readDataToEndOfFile()`), or drain it with a `readabilityHandler` set before the wait, or give the stream `FileHandle.nullDevice` when nothing needs it."
+                }
+            }
         },
         "pipeUnreadAtWait": {
             "text": "The {{stream}} pipe is not read before `{{wait}}` on some path here, so output past the 64 KB pipe buffer blocks the child and `{{wait}}` never returns. Read it to its end first (`io.ReadAll`, or a goroutine copying it, started before the wait), or give the command a buffer or `os.Stdout` instead of a pipe.",
             "languages": ["Go"]
+        },
+        "childOutputNeverRead": {
+            "text": "`{{process}}` writes its {{stream}} to a `Pipe()` nothing reads, and some path waits for it at `{{process}}.waitUntilExit()`, so output past the pipe buffer blocks the child and the wait never returns. Give the stream `FileHandle.nullDevice` when nothing needs it, or keep the pipe in a `let` and read it to its end before the wait.",
+            "languages": ["Swift"]
         }
     }
 }

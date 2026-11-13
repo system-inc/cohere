@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/go_engine/rules)"
     },
-    "count": 798,
+    "count": 799,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -7337,6 +7337,15 @@
             "typeScriptRules": ["nexus/correctness-no-write-only-collection"]
         },
         {
+            "name": "cohere-swift/correctness-require-drained-child-output",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": false,
+            "typeScriptRules": ["nexus/correctness-require-drained-child-output"]
+        },
+        {
             "name": "cohere-swift/correctness-require-response-status-check",
             "language": "Swift",
             "namespace": "cohere-swift",
@@ -10087,7 +10096,8 @@
                 }
             ],
             "swift": {
-                "verdict": "Port"
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/correctness-require-drained-child-output"
             }
         },
         {
