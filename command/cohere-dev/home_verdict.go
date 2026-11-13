@@ -86,6 +86,8 @@ type homeVerdict struct {
 	skipped                               map[string][]string
 	// race is what Home's -race run of the raceGated packages said, nil when none was asked for.
 	race *homeVerdict
+	// refused is why the box refused to run the tests at all (sharedBoxRefusedMarker), empty when it ran them.
+	refused string
 	// raceReports is each race the run reported, whole, in the order it printed them. test2json gives a report to
 	// whichever test it was framing when the report was printed, often one that passed, so a report is read from the
 	// stream itself: printing only the failed tests' output dropped every stack (#bnabymg, Nov 12).
@@ -119,6 +121,10 @@ func readTestJson(output []byte) homeVerdict {
 	reading := false
 	for scanner.Scan() {
 		line := scanner.Text()
+		if why, isRefusal := strings.CutPrefix(line, sharedBoxRefusedMarker); isRefusal {
+			verdict.refused = strings.TrimSpace(why)
+			continue
+		}
 		if rest, isMarker := strings.CutPrefix(line, homeMarker); isMarker {
 			commit, platform, _ := strings.Cut(rest, " on ")
 			verdict.commit = strings.TrimSpace(commit)
@@ -325,6 +331,10 @@ func runHomeGate(
 	}
 	raceFailed := verdict.race != nil && verdict.race.failed()
 	switch {
+	// A refusal is the box declining to vouch for this landing, read before the cases that would send the tests to
+	// the Mac: a toolchain that isn't the pinned one, or a module cache that doesn't match go.sum, refuses the land.
+	case verdict.refused != "":
+		return verdict, ""
 	case verdict.commit == "":
 		return homeVerdict{}, fmt.Sprintf("Home's run never said what it tested (%s)",
 			lastWords(output, describeEnd(runError)))
@@ -362,11 +372,9 @@ const (
 // across landings, checks them out in one tree at one path, so Go's test cache stays warm and keyed honestly, says
 // which commit and platform it tests, and runs the module's tests as JSON, leaving out the events that only say a test
 // started. Once they pass, it runs the raceGated packages under -race, after homeRaceMarker, its third argument
-// naming them comma-separated (#bnabymg). Its own Go cache is trimmed past 30 GB, as Home's disk floor asks of every
-// scratch user.
+// naming them comma-separated (#bnabymg). The run itself is sharedBoxGate's, which trusts nothing Home kept (#adbkt5t).
 const homeScript = `set -euo pipefail
 commit="$1"; pin="$2"; races="$3"; shift 3
-. ~/adamic-tools/env.sh
 base=~/scratch/system_cohere_tools
 mkdir -p "$base"; cd "$base"
 [ -d cohere.git ] || git init -q --bare cohere.git
@@ -383,17 +391,9 @@ if [ -n "$pin" ]; then
   fi
   git -C tree/TypeScript checkout -q --detach --force "$pin"
 fi
-size=$(du -sk gocache 2>/dev/null | cut -f1 || echo 0)
-if [ "${size:-0}" -gt 31457280 ]; then GOCACHE="$base/gocache" go clean -cache; fi
-echo "` + homeMarker + `$(git -C tree rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 cd tree
-GOCACHE="$base/gocache" GOFLAGS="-buildvcs=false -trimpath" go test -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
-if [ -n "$races" ]; then
-  echo "` + homeRaceMarker + `"
-  GOCACHE="$base/gocache" GOFLAGS="-buildvcs=false -trimpath" go test -json -race $(echo "$races" | tr , ' ') |
-    grep -vE '"Action":"(start|run|pause|cont)"'
-fi
-`
+goroot="` + sharedBoxGoroot + `"; digest="` + sharedBoxToolchainDigest + `"
+` + sharedBoxGate
 
 // runOnHome pushes commit and the TypeScript pin it records to the feed, then runs the module's tests on Home through
 // gap, retrying a bounded while when another job holds her, and returns everything gap printed.
@@ -496,6 +496,11 @@ func runModuleTests(
 		}
 		return 0, where + fmt.Sprintf(", then %d packages again under -race", len(races))
 	}
+	if verdict.refused != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: Home refused to test this landing, so nothing landed: %s\n",
+			verdict.refused)
+		return 1, ""
+	}
 	platform := verdict.operatingSystem + "/" + verdict.architecture
 	if verdict.failed() {
 		fmt.Fprintf(streams.Errors, "cohere-dev: Home's tests on %s failed, so nothing landed:\n", platform)
@@ -531,7 +536,7 @@ func runModuleTests(
 		return 2, ""
 	}
 	packages, names := macRemainder(verdict.skipped, neverCompiled)
-	where := fmt.Sprintf("on Home (%s, %d packages)", platform, verdict.packagesPassed)
+	where := fmt.Sprintf("on Home (%s, %d packages, %s)", platform, verdict.packagesPassed, sharedBoxTrust)
 	if verdict.race != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: Home's -race run passed, %d packages\n", verdict.race.packagesPassed)
 		where += fmt.Sprintf(", %d of them again under -race", verdict.race.packagesPassed)
