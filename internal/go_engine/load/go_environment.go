@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
 )
 
 // GoEnvironment is go env's answer for a workspace under an environment, as ReadGoEnvironment reads it: the whole
@@ -64,6 +66,9 @@ func ReadGoEnvironment(directory string, environment []string, held Held) (*GoEn
 	if askError != nil {
 		return nil, askError
 	}
+	// The build cache holds the cgo tool's outputs a load reads, which the staticcheck.conf a package's rules read is
+	// never found beside, so the config analyzer skips them, and this is where it learns the run's (#sc5qmy7).
+	staticcheck_configuration.AddBuildCache(answer["GOCACHE"])
 	buildContext, reported, contextError := constraintContext(workspace, answer, held)
 	if contextError != nil {
 		return nil, contextError

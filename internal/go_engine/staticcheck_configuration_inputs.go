@@ -11,6 +11,8 @@ import (
 
 	"golang.org/x/tools/go/packages"
 	"honnef.co/go/tools/config"
+
+	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
 )
 
 // staticcheckConfigurationInputs is what the findings cache keys a package on beyond its own files: the
@@ -57,18 +59,19 @@ func (configurationInputs *staticcheckConfigurationInputs) read(directory string
 	return input
 }
 
-// configurationDirectory is the directory the config analyzer starts from for keyed, found as it finds it: config.Dir
-// over the names its files' package clauses are at, `//line` directives followed, which skips files in the user cache
-// directory. Empty is a package the analyzer gives the default configuration without reading any file.
+// configurationDirectory is the directory the config analyzer starts from for keyed, found as it finds it:
+// staticcheck_configuration.Directory over the names its files' package clauses are at, `//line` directives followed,
+// which skips files in a build cache. Empty is a package the analyzer gives the default configuration without reading
+// any file.
 func configurationDirectory(keyed *packages.Package) string {
 	if len(keyed.Syntax) == 0 {
-		return config.Dir(keyed.CompiledGoFiles)
+		return staticcheck_configuration.Directory(keyed.CompiledGoFiles)
 	}
 	names := make([]string, 0, len(keyed.Syntax))
 	for _, file := range keyed.Syntax {
 		names = append(names, keyed.Fset.PositionFor(file.Pos(), true).Filename)
 	}
-	return config.Dir(names)
+	return staticcheck_configuration.Directory(names)
 }
 
 // configurationInput is the staticcheck.conf in directory as the analyzer reads it: absent when there is no regular

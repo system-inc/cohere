@@ -11,7 +11,9 @@
 // nor the inspector of its own the original's pattern matching asks for. The type index finds a call through
 // parentheses and a qualifying package, as SymbolIndex does, and neither function is generic, so the two find the
 // same calls. Like the original, it reads the codes left alone from staticcheck's config pass, whose
-// http_status_code_whitelist a staticcheck.conf can set, by default 200, 400, 404 and 500.
+// http_status_code_whitelist a staticcheck.conf can set, by default 200, 400, 404 and 500. It reads the pass as the
+// engine runs it (staticcheck_configuration), which applies the staticcheck.conf of a project under the user's cache
+// directory where the original's never does, so there alone the port leaves alone what the original reports.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
 // and the engine runs one configuration, so there is nothing for the port to merge.
@@ -31,6 +33,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
+	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
 )
 
 // Name is the original's code, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it
@@ -131,7 +134,7 @@ var statusConstants = map[int64]string{
 // calls, and staticcheck's configuration, which lists the codes left alone.
 var Listener = rule.Listener{
 	FileLocal: true,
-	Requires:  []*analysis.Analyzer{config.Analyzer},
+	Requires:  []*analysis.Analyzer{staticcheck_configuration.Analyzer},
 	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
 	Node:      checkCall,
 }
@@ -161,12 +164,12 @@ func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 	if !isExact {
 		return
 	}
-	configuration, isConfiguration := context.ResultOf(config.Analyzer).(*config.Config)
+	configuration, isConfiguration := context.ResultOf(staticcheck_configuration.Analyzer).(*config.Config)
 	if !isConfiguration {
 		// Invariant: the config pass's result type is *config.Config, which the checker holds it to, so any other is
 		// a mistake in building the pass, and the dispatcher's recover makes it this rule's crash on the package.
-		panic(fmt.Sprintf("reading %s's result: it is %T, where *config.Config was expected", config.Analyzer.Name,
-			context.ResultOf(config.Analyzer)))
+		panic(fmt.Sprintf("reading %s's result: it is %T, where *config.Config was expected",
+			staticcheck_configuration.Analyzer.Name, context.ResultOf(staticcheck_configuration.Analyzer)))
 	}
 	if slices.Contains(configuration.HTTPStatusCodeWhitelist, strconv.FormatInt(code, 10)) {
 		return

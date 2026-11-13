@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
 )
 
 // A load handed go env's answer for its own workspace and environment reads it and asks go env nothing, and a load of
@@ -100,6 +102,35 @@ func TestEachLoadOfOneAnswerReadsItsOwnHeldBytes(test *testing.T) {
 	}
 	if got := readThrough(second); got != "package second\n" {
 		test.Errorf("the second load read %q through its own context, want its own held bytes", got)
+	}
+}
+
+// The build cache go env names for a run is the one whose files staticcheck's config analyzer skips to find the
+// directory a package's staticcheck.conf is read from (#sc5qmy7): a cgo output there, which lives nowhere near the
+// package, is passed over for the package's own file, and a package of build-cache files alone reads no
+// staticcheck.conf. The cache is a fresh directory no other go env in the process names, so only this run's answer can
+// have made it one.
+func TestTheRunsBuildCacheIsSkippedForTheStaticcheckConf(test *testing.T) {
+	test.Parallel()
+	root, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatal(resolveError)
+	}
+	writeListingFiles(test, root, listingFiles)
+	project := filepath.Join(root, "project")
+	buildCache := filepath.Join(root, "build-cache")
+	goEnvironmentOf(test, project, []string{"GOWORK=off", "GOCACHE=" + buildCache})
+
+	// Named as go names a cgo output it writes to the build cache, and never written: the directory is all it reads.
+	cgoOutput := filepath.Join(buildCache, "4f", "4f00c0ffee-d")
+	packageFile := filepath.Join(project, "base", "base.go")
+	directory := staticcheck_configuration.Directory([]string{cgoOutput, packageFile})
+	if directory != filepath.Dir(packageFile) {
+		test.Errorf("a package of a cgo output and %s reads its staticcheck.conf from %q, want the package's directory",
+			packageFile, directory)
+	}
+	if alone := staticcheck_configuration.Directory([]string{cgoOutput}); alone != "" {
+		test.Errorf("a package of a cgo output alone reads its staticcheck.conf from %q, want none", alone)
 	}
 }
 

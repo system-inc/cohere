@@ -5,7 +5,9 @@
 // word for word, over the whole import, with no fix, as the original does, and withholds in a generated file as the
 // original's FilterGenerated does. Like the original, it leaves alone every import in a test file, internal or
 // external, and every import whose path the staticcheck.conf above the package lists in dot_import_whitelist, read
-// through the same config analyzer the original requires. The original reads only each file's imports and the
+// through the original's config analyzer as the engine runs it (staticcheck_configuration). That one applies the
+// staticcheck.conf of a project under the user's cache directory, where the original's never does, so there alone the
+// port leaves alone a dot import the original reports. The original reads only each file's imports and the
 // configuration, as the port does, so neither builds an intermediate representation.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
@@ -24,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
+	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
 )
 
 // Name is the original's code, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it
@@ -41,7 +44,7 @@ const message = "should not use dot imports"
 // paths dot_import_whitelist allows.
 var Listener = rule.Listener{
 	FileLocal: true,
-	Requires:  []*analysis.Analyzer{config.Analyzer},
+	Requires:  []*analysis.Analyzer{staticcheck_configuration.Analyzer},
 	FileEnter: checkFile,
 }
 
@@ -51,12 +54,13 @@ var Analyzer = dispatch.RuleAnalyzer(rule.Namespace+Name, Name, Doc, &Listener)
 // checkFile reports each import of file named with a dot, unless file is a test file or the configuration allows the
 // import's path.
 func checkFile(context *rule.Context, file *ast.File) {
-	configuration, isConfiguration := context.ResultOf(config.Analyzer).(*config.Config)
+	configuration, isConfiguration := context.ResultOf(staticcheck_configuration.Analyzer).(*config.Config)
 	if !isConfiguration {
 		// Invariant: the listener requires the config analyzer, whose result is always a configuration, so anything
 		// else is a mistake in building the rule, which the dispatcher's recover makes this rule's crash on the
 		// package.
-		panic(fmt.Sprintf("reading the configuration: config gave %T", context.ResultOf(config.Analyzer)))
+		panic(fmt.Sprintf("reading the configuration: config gave %T",
+			context.ResultOf(staticcheck_configuration.Analyzer)))
 	}
 	for _, importSpecification := range file.Imports {
 		// The path is the literal with its quotes cut, never unquoted, as the original cuts it, so a path written with

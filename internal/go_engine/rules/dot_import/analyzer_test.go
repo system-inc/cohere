@@ -21,8 +21,9 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 
 // Over staticcheck's fixtures and parity's, the original and the port find the same findings. parity holds every
 // import shape the check reads and every near miss, in a package under no staticcheck.conf and in one under a
-// staticcheck.conf allowing some paths. The port differs from the original nowhere, so there is no differences
-// fixture.
+// staticcheck.conf allowing some paths. The port differs from the original only for a project under the user's cache
+// directory, whose staticcheck.conf the original never reads and the port does (#sc5qmy7, see the package's comment),
+// and no fixture sits there, so there is no differences fixture.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, st1001.Analyzer, Analyzer, analysistest.TestData(), "go1.0", "parity/...")
