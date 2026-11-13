@@ -32,13 +32,14 @@ const sharedBoxGoroot = "$HOME/adamic-tools/go"
 // go.dev's published one, holding 15,639 files and no links (Nov 13). A box on another Go refuses until this moves.
 const sharedBoxToolchainDigest = "aa737bb2de5f152e1bdaad9902816611d1cdbe3298238a2207c71e875df8ceeb"
 
-// sharedBoxNode is where the house lays node on its boxes, root-owned, outside any job's home, as on the Macs
-// (#2tm6axk), and sharedBoxNodeDigest the sha256 of its bin/node: node v24.19.0 linux-x64 as nodejs.org ships it
+// sharedBoxNode is where Machines lays node on the scratch boxes, root-owned, outside any job's home: under
+// /srv/loom-*, since on a scratch box nothing but a release lays anything under /opt, which is in the house stamp
+// (#myvcam7). And sharedBoxNodeDigest is the sha256 of its bin/node: node v24.19.0 linux-x64 as nodejs.org ships it
 // (node-v24.19.0-linux-x64.tar.xz, sha256 14b342e7..., matching its SHASUMS256.txt, Nov 13). A box holding it puts
 // it on the gate's path, so the tests whose oracle is node run on Linux. A box without it skips them by name, and the
 // Mac runs them (#myvcam7).
 const (
-	sharedBoxNode       = "/opt/loom-tools/node-v24.19.0"
+	sharedBoxNode       = "/srv/loom-tools/node-v24.19.0"
 	sharedBoxNodeDigest = "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
 )
 
