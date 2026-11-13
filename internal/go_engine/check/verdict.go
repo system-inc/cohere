@@ -286,7 +286,7 @@ func (judged verdict) lookupHolds(lookup build_reads.Lookup, restoring Restoring
 		// rules index them (countedCandidates), sorted by package path and name, which the one-bit judgment reads.
 		hostCandidates, buildCandidates := judged.closureCandidates(lookup, roots, ruleTypeNames,
 			func(typeNames []*types.TypeName) []*types.TypeName {
-				return countedCandidates(typeNames, lookup.Name, subjectConcrete)
+				return countedCandidates(typeNames, subjectConcrete)
 			})
 		judgment := judged.methodJudgmentOf(lookup, hostCandidates, buildCandidates)
 		if holds, why, decided := methodLookupHolds(name, judgment); decided {

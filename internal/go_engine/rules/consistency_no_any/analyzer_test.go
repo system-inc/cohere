@@ -49,6 +49,15 @@ func TestAnUnexportedConcreteForeignMethodNeverFixesAName(test *testing.T) {
 	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_any.Analyzer, "unexportedmethods")
 }
 
+// The verdict leaves every concrete type's method out of a concrete method's count, exported or not (#njze5c0), which
+// rests on matchingForeignMethod pairing a concrete method of ours with an interface's alone (#9bm8bdt).
+// exportedmethods reaches an exported concrete type's Store with the name and signature of a concrete type's Store and
+// a generic type's of ours, and both anys stay findings, so a rule that let such a method fix either fails on its want.
+func TestAConcreteForeignMethodNeverFixesAConcreteName(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_any.Analyzer, "exportedmethods")
+}
+
 // The verdict's method index leaves out an alias of a type that is not an interface, and buildForeignMethods skips
 // every alias (#swv3jbw). An alias of a named type adds nothing, since that type's package is in the closure and
 // declares the same methods, so the alias that matters names a concrete type written in place, a struct with a method

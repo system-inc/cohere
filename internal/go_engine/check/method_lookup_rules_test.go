@@ -20,10 +20,11 @@ import (
 // name alone: abbreviated's flagged.go, commanding's Cmd and wideStack's Len; no_any's flagged.go, memoryCache's
 // Save; initialism's flagged.go, record's MarshalJSON. A rule joining this list brings such a fixture.
 //
-// Neither side of the judgment counts a concrete type whose method's name is unexported when the subject is a function
-// or a concrete type's method (countedCandidates), so a rule joining this list must show it never lets a concrete
-// foreign method with an unexported name fix such a subject's name, or that narrowing is wrong for it. Each rule pins
-// it in its own package, red if it ever lets one: TestAnUnexportedConcreteForeignMethodNeverFixesAName.
+// Neither side of the judgment counts a concrete type when the subject is a function or a concrete type's method
+// (countedCandidates), so a rule joining this list must show it never lets a concrete foreign method fix such a
+// subject's name, of an unexported name or an exported one, or that narrowing is wrong for it. Each rule pins it in its
+// own package, red if it ever lets one: TestAnUnexportedConcreteForeignMethodNeverFixesAName and
+// TestAConcreteForeignMethodNeverFixesAConcreteName (#njze5c0).
 //
 // The judgment's candidates come from the verdict's method index (indexPackage), which indexes as the rules do: an
 // interface by its whole method set, an alias's too, and any other named type by the methods it declares, never one

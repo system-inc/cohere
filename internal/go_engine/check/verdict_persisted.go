@@ -289,7 +289,7 @@ func (judged verdict) persistedMethodJudgment(
 		}
 	}
 	for _, typeName := range countedCandidates(judged.buildCandidates(lookup.Name, roots,
-		func(owner *types.Package) bool { return hostOwners[owner.Path()] }, ruleTypeNames), lookup.Name,
+		func(owner *types.Package) bool { return hostOwners[owner.Path()] }, ruleTypeNames),
 		persistedConcreteSubject(lookup)) {
 		candidate, key, isCandidate := judged.build.candidate(typeName, lookup.Query, lookup.Name, nil)
 		if isCandidate {

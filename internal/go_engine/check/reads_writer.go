@@ -122,7 +122,7 @@ func (writer *readsWriter) lookup(lookup build_reads.Lookup) persistedLookup {
 		for _, indexed := range writer.host.methodsNamed(lookup.Name) {
 			if hostClosure.reached[indexed.owner] {
 				candidates = append(candidates, indexed.methodSetTypeNames...)
-				ruleCandidates = append(ruleCandidates, countedCandidates(indexed.ruleTypeNames, lookup.Name,
+				ruleCandidates = append(ruleCandidates, countedCandidates(indexed.ruleTypeNames,
 					concreteSubject(lookup.Subject))...)
 			}
 		}
