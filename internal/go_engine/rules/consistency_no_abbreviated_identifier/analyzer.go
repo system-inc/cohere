@@ -175,8 +175,10 @@ func judgeNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 			return
 		}
 		if identifier, isIdentifier := assignment.Lhs[0].(*ast.Ident); isIdentifier {
-			state := rule.State[packageState](context)
-			judge(context, state.reachable, state.writes, identifier)
+			if finding, found := abbreviatedName(identifier); found {
+				state := rule.State[packageState](context)
+				judge(context, state.reachable, state.writes, identifier, finding)
+			}
 		}
 	case *ast.Ident:
 		object, isDefinition := context.TypesInfo.Defs[typed]
@@ -185,11 +187,27 @@ func judgeNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 		if !isDefinition || object == nil {
 			return
 		}
+		// The vocabulary is asked first. Whether another package fixes a method's name can change a finding only for
+		// a name the vocabulary finds abbreviated, and asking it walks the import closure's methods and records a
+		// lookup the package's verdict then depends on (#fbh45hm).
+		finding, found := abbreviatedName(typed)
+		if !found {
+			return
+		}
 		state := rule.State[packageState](context)
 		if isOurs(context, state.reachable, object) {
-			judge(context, state.reachable, state.writes, typed)
+			judge(context, state.reachable, state.writes, typed, finding)
 		}
 	}
+}
+
+// abbreviatedName is what the vocabulary finds abbreviated in a declared name, false when it finds nothing or the
+// name is the blank one, which declares nothing.
+func abbreviatedName(identifier *ast.Ident) (abbreviation.Finding, bool) {
+	if identifier.Name == "_" {
+		return abbreviation.Finding{}, false
+	}
+	return abbreviation.Policy.Find(identifier.Name)
 }
 
 // isOurs is whether a declared object's name is this package's to choose.
@@ -224,7 +242,8 @@ func fixedByAnotherPackage(context *rule.Context, reachable reach, method *types
 		return false
 	}
 	// The answer depends on every method of the import closure, which no type read of the package holds, so the
-	// question and the method that answers it, or none, are recorded in the context's reads (#b2t9xmf).
+	// question and the method that answers it, or none, are recorded in the context's reads (#b2t9xmf). It is asked
+	// only of a name the vocabulary finds abbreviated (judgeNode), the only names whose answer reaches a finding.
 	fixing := fixingMethod(reachable, method)
 	context.Reads().AddLookup(build_reads.Lookup{
 		Query:   build_reads.QueryMethod,
@@ -429,20 +448,14 @@ func declaredMethodsOf(declaring *types.Package) map[string][]foreignMethod {
 	return methodsByName
 }
 
-// judge reports a declared name the vocabulary finds abbreviated.
+// judge reports a declared name the vocabulary finds abbreviated, finding being what it found.
 func judge(
 	context *rule.Context,
 	reachable reach,
 	writes func() map[*types.Var]*variableWrites,
 	identifier *ast.Ident,
+	finding abbreviation.Finding,
 ) {
-	if identifier.Name == "_" {
-		return
-	}
-	finding, found := abbreviation.Policy.Find(identifier.Name)
-	if !found {
-		return
-	}
 	values := finding.Values
 	descriptive := false
 	// The house expands to a descriptive name, never to one Go already gives something else: `ctx` becomes
