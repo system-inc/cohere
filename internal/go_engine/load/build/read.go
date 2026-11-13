@@ -4,10 +4,11 @@
 //
 // cohere: readGoInfo is the header read the copy of build.go shares across a
 // run's builds, and readComments the read of a non-Go file's leading
-// comments it still makes in each build. The code is unchanged but for two
+// comments it still makes in each build. The code is unchanged but for three
 // changes: the linkname dropped, which needs package unsafe imported, and
-// nothing links to this copy; and a directive's literal keyed, since
-// Directive is go/build's here, which vet holds to keyed fields.
+// nothing links to this copy; a directive's literal keyed, since Directive
+// is go/build's here, which vet holds to keyed fields; and an import's
+// literal keyed, since fileImport holds one more field in build.go's copy.
 
 // Copyright 2012 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -358,7 +359,8 @@ func readGoInfo(f io.Reader, info *fileInfo) error {
 			if doc == nil && len(d.Specs) == 1 {
 				doc = d.Doc
 			}
-			info.imports = append(info.imports, fileImport{path, spec.Pos(), doc})
+			// cohere: keyed, since fileImport holds one more field here, the position resolved after the read.
+			info.imports = append(info.imports, fileImport{path: path, pos: spec.Pos(), doc: doc})
 		}
 	}
 

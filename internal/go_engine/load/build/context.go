@@ -105,15 +105,18 @@ func ImportDirectory(
 }
 
 // readGoInfoOnce is what readGoInfo reads of the file at name into fileSet, read once for the run, with the error
-// opening the file and the error reading it apart, as matchFile returns them apart. The first build to ask opens and
-// reads the file, into the file set the run's reads share, and keeps of the read what Import reads (compacted); every
-// build after takes that, so a position the read recorded is read in the set it is in. Without headers it opens and
-// reads the file into fileSet, as upstream's matchFile does.
+// opening the file and the error reading it apart, as matchFile returns them apart, and each import's position
+// resolved (resolved). The first build to finish reading the file keeps of the read what Import reads (compacted),
+// and every build after takes that. A build that finds the file being read by another reads it itself rather than
+// wait, into a file set of its own, and takes whichever read finished first: the two read the same bytes, the held
+// bytes being the ones the shared read was made for (Headers.header), so either answers alike. Without headers it
+// opens and reads the file into fileSet, as upstream's matchFile does.
 //
 // The receiver is named ctxt, as every method of Context in the copied files names it.
 func (ctxt *Context) readGoInfoOnce(name string, fileSet *token.FileSet) (fileInfo, error, error) {
 	if ctxt.headers == nil {
-		return ctxt.openAndReadGoInfo(name, fileSet)
+		read, openError, readError := ctxt.openAndReadGoInfo(name, fileSet)
+		return resolved(read), openError, readError
 	}
 	var source []byte
 	held := false
@@ -121,14 +124,24 @@ func (ctxt *Context) readGoInfoOnce(name string, fileSet *token.FileSet) (fileIn
 		source, held = ctxt.held(name)
 	}
 	shared := ctxt.headers.header(name, held, source)
-	shared.once.Do(func() {
-		read, openError, readError := ctxt.openAndReadGoInfo(name, ctxt.headers.fileSet)
-		shared.info, shared.openError, shared.readError = compacted(read), openError, readError
-		ctxt.headers.parsed.Add(1)
-	})
-	// Every field the read set is one a build reads and never writes, the slices included: Import only appends their
-	// elements to its own Package's lists.
-	return shared.info, shared.openError, shared.readError
+	if finished := shared.read.Load(); finished != nil {
+		return finished.info, finished.openError, finished.readError
+	}
+	if ctxt.headers.reading != nil {
+		ctxt.headers.reading(name)
+	}
+	// A file set of the read's own, which no other build reads a position through: every position Import reads is
+	// resolved before the read is shared.
+	read, openError, readError := ctxt.openAndReadGoInfo(name, token.NewFileSet())
+	ctxt.headers.parsed.Add(1)
+	ours := &sharedRead{info: compacted(resolved(read)), openError: openError, readError: readError}
+	if shared.read.CompareAndSwap(nil, ours) {
+		return ours.info, ours.openError, ours.readError
+	}
+	// Another build finished first. Every field the read set is one a build reads and never writes, the slices
+	// included: Import only appends their elements to its own Package's lists.
+	kept := shared.read.Load()
+	return kept.info, kept.openError, kept.readError
 }
 
 // openAndReadGoInfo opens the file at name and reads it as readGoInfo reads it, into fileSet, then closes it, as
@@ -157,7 +170,22 @@ func compacted(read fileInfo) fileInfo {
 	}
 	imports := make([]fileImport, len(read.imports))
 	for index, each := range read.imports {
-		imports[index] = fileImport{path: each.path, pos: each.pos}
+		imports[index] = fileImport{path: each.path, pos: each.pos, position: each.position}
+	}
+	read.imports = imports
+	// Import reads no position through the file set once each is resolved, so the set and its file go with the read.
+	read.fset = nil
+	return read
+}
+
+// resolved is read with each import's position resolved in the file set read was read into, the one position the
+// copied Import reads through a file set (fileImport's position): the embeds' and the directives' readGoInfo resolves
+// itself. Resolved once by the read, no build reads a position through another's file set, whose file locks to answer.
+func resolved(read fileInfo) fileInfo {
+	imports := make([]fileImport, len(read.imports))
+	for index, each := range read.imports {
+		each.position = read.fset.Position(each.pos)
+		imports[index] = each
 	}
 	read.imports = imports
 	return read

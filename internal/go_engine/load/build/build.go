@@ -24,11 +24,11 @@
 // for byte, and its release to those the binary reads through the copy
 // under (sharedReleases, in context.go). The changes are eight: the
 // imports; the code dropped, each run where it was; Import's head, now
-// importFiles's; the cgo files, sent back to go/build (errorCgoFile); a
-// file's import positions, read in its shared read's file set; NoGoError's
-// literal keyed, since it is go/build's type here; the shared read of a Go
-// file's header in matchFile; and the linkname dropped from
-// parseFileHeader.
+// importFiles's; the cgo files, sent back to go/build (errorCgoFile); each
+// import's position, resolved once by the read and held beside it
+// (fileImport's position); NoGoError's literal keyed, since it is
+// go/build's type here; the shared read of a Go file's header in
+// matchFile; and the linkname dropped from parseFileHeader.
 
 // Copyright 2011 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -320,8 +320,9 @@ func (ctxt *Context) importFiles(p *Package, mode ImportMode) (*Package, error) 
 		*fileList = append(*fileList, name)
 		if importMap != nil {
 			for _, imp := range info.imports {
-				// cohere: imp.pos is in the file set of the read that parsed the file, which may be another build's.
-				importMap[imp.path] = append(importMap[imp.path], info.fset.Position(imp.pos))
+				// cohere: the position the read resolved once, in its own file set (readGoInfoOnce, in context.go), so
+				// cohere: no build reads a position through another build's file set, or locks it to.
+				importMap[imp.path] = append(importMap[imp.path], imp.position)
 			}
 		}
 		if embedMap != nil {
@@ -518,6 +519,8 @@ type fileImport struct {
 	path string
 	pos  token.Pos
 	doc  *ast.CommentGroup
+	// cohere: pos resolved in the file set the file was read into, once, by readGoInfoOnce (context.go).
+	position token.Position
 }
 
 type fileEmbed struct {
