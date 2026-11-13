@@ -17,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The composer oracle: the fork's own eemeli/yaml, run by Node, parsing each input with
@@ -646,10 +647,11 @@ process.stdout.write(JSON.stringify(inputs));`
 // TestCorpusMatchesUpstream compares every .yaml and .yml file under COHERE_YAML_CORPUS, a measuring run.
 func TestCorpusMatchesUpstream(test *testing.T) {
 	test.Parallel()
-	root := os.Getenv("COHERE_YAML_CORPUS")
-	if root == "" {
-		test.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")
-	}
+	root := needs.OptIn(
+		test,
+		"COHERE_YAML_CORPUS",
+		"a differential of every .yaml and .yml file under a directory against upstream",
+	)
 	var paths []string
 	var texts []string
 	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {

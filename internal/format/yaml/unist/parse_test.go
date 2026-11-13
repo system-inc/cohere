@@ -15,6 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // fixtures reach every transform and every branch of attach and updatePositions: each node type with
@@ -611,10 +612,11 @@ const corpusSizeLimit = 1 << 20
 // them: through the engine's ignore layers, into nested repositories. A measuring run.
 func TestCorpusParseMatchesUpstream(test *testing.T) {
 	test.Parallel()
-	roots := os.Getenv("COHERE_YAML_CORPUS")
-	if roots == "" {
-		test.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
-	}
+	roots := needs.OptIn(
+		test,
+		"COHERE_YAML_CORPUS",
+		"a differential of the front matter of every .md file of a corpus against upstream",
+	)
 	enumerator, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)

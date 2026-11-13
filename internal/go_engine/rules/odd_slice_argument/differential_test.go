@@ -2,7 +2,6 @@ package odd_slice_argument
 
 import (
 	"maps"
-	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // factsDifferentialVariable names the tree the fact differential runs over: root for cohere's own module, or a
@@ -23,11 +23,11 @@ const factsDifferentialVariable = "COHERE_GO_IR_FACTS_DIFFERENTIAL"
 // tree takes minutes.
 func differentialTree(test *testing.T) string {
 	test.Helper()
-	directory := os.Getenv(factsDifferentialVariable)
-	if directory == "" {
-		test.Skipf("set %s to root or a directory to run the fact differential over that tree",
-			factsDifferentialVariable)
-	}
+	directory := needs.OptIn(
+		test,
+		factsDifferentialVariable,
+		"a differential of the port's facts against the original's over root or a directory",
+	)
 	if directory != "root" {
 		return directory
 	}

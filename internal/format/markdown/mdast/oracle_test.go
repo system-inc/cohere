@@ -15,6 +15,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The tree oracle: the embedded markdown bundle's own parser, run by goja, the exact code the format
@@ -488,10 +489,11 @@ func TestTreeOracleCanFail(test *testing.T) {
 // TestCorpusTreesMatchUpstream compares every .md file under COHERE_MARKDOWN_CORPUS.
 func TestCorpusTreesMatchUpstream(test *testing.T) {
 	test.Parallel()
-	root := os.Getenv("COHERE_MARKDOWN_CORPUS")
-	if root == "" {
-		test.Skip("set COHERE_MARKDOWN_CORPUS to a directory to compare every .md file under it")
-	}
+	root := needs.OptIn(
+		test,
+		"COHERE_MARKDOWN_CORPUS",
+		"a differential of the tree of every .md file under a directory against upstream",
+	)
 	// The live oracle, not a golden: the corpus is whatever markdown is on disk.
 	oracle := newLiveTreeOracle(test)
 	total, failures := 0, 0

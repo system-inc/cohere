@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // mediaQueryScript is the oracle: postcss-media-query-parser 0.2.3 from the fork's node_modules. Each
@@ -218,10 +219,11 @@ var mediaQueryFixtures = []mediaQueryFixture{
 // corpus that reaches nothing, would otherwise read as agreement.
 func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	test.Parallel()
-	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if corpora == "" {
-		test.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-media-query-parser")
-	}
+	corpora := needs.OptIn(
+		test,
+		"COHERE_CSS_CORPORA",
+		"a differential of the parser against postcss-media-query-parser over a corpus",
+	)
 	root := corpus.PrettierFork.Root(test)
 
 	type input struct {

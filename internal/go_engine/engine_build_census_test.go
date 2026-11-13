@@ -2,12 +2,12 @@ package go_engine
 
 import (
 	"maps"
-	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // buildCensusVariable names the tree the build census runs the engine over: root for cohere's own module, or a
@@ -23,11 +23,7 @@ const buildCensusVariable = "COHERE_GO_IR_BUILD_CENSUS"
 //
 // Not parallel: an open census counts every build in the process, so a test beside it would add its own.
 func TestEachPackageIsBuiltOnceOverATree(test *testing.T) {
-	directory := os.Getenv(buildCensusVariable)
-	if directory == "" {
-		test.Skipf("set %s to root or a directory to count the builds of a cold run over that tree",
-			buildCensusVariable)
-	}
+	directory := needs.OptIn(test, buildCensusVariable, "a census of the builds of a cold run over root or a directory")
 	if directory == "root" {
 		// This package sits two directories below the module root.
 		root, rootError := filepath.Abs(filepath.Join("..", ".."))

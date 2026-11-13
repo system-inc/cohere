@@ -19,6 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // glueParseScript is the oracle: the fork's own parse with parser "css" (prettier.__debug.parse, which
@@ -217,10 +218,11 @@ var glueParseFixtures = []glueParseFixture{
 // say which way the fork must go.
 func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 	test.Parallel()
-	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if corpora == "" {
-		test.Skip("set COHERE_CSS_CORPORA to compare the parser glue against the fork")
-	}
+	corpora := needs.OptIn(
+		test,
+		"COHERE_CSS_CORPORA",
+		"a differential of the parser glue against the fork over a corpus",
+	)
 	root := corpus.PrettierFork.Root(test)
 
 	type input struct {

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The event oracle: the fork's own micromark, run by Node with the extensions parse-markdown.js passes,
@@ -185,10 +186,11 @@ func TestEventOracleCanFail(test *testing.T) {
 // TestCorpusEventsMatchUpstream compares every markdown file under COHERE_MARKDOWN_CORPUS, a measuring run.
 func TestCorpusEventsMatchUpstream(test *testing.T) {
 	test.Parallel()
-	root := os.Getenv("COHERE_MARKDOWN_CORPUS")
-	if root == "" {
-		test.Skip("set COHERE_MARKDOWN_CORPUS to a directory to compare every .md file under it")
-	}
+	root := needs.OptIn(
+		test,
+		"COHERE_MARKDOWN_CORPUS",
+		"a differential of the events of every markdown file under a directory against upstream",
+	)
 	var paths []string
 	var inputs []string
 	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {

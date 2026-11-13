@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 func writeFile(test *testing.T, path string, contents string) {
@@ -589,10 +591,8 @@ func resolveUnremembered(directory string) (Resolution, error) {
 // all identical, 437 of them refusals.
 func TestAResolverAnswersAsResolveDidOnOurTrees(test *testing.T) {
 	test.Parallel()
-	trees := filepath.SplitList(os.Getenv("COHERE_RESOLVE_TREES"))
-	if len(trees) == 0 {
-		test.Skip("COHERE_RESOLVE_TREES names no tree")
-	}
+	trees := filepath.SplitList(needs.OptIn(test, "COHERE_RESOLVE_TREES",
+		"a differential of one shared resolver against a fresh walk over every directory of the trees it lists"))
 	skipped := map[string]bool{
 		".git":         true,
 		"node_modules": true,

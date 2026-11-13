@@ -2,9 +2,10 @@ package differential
 
 import (
 	"context"
-	"os"
 	"sort"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // A live check against a real cohere binary, skipped unless one is named.
@@ -17,12 +18,9 @@ import (
 //	  go test -run TestCompiledRulesAgainstARealBinary ./internal/differential/
 func TestCompiledRulesAgainstARealBinary(test *testing.T) {
 	test.Parallel()
-	binary := os.Getenv("COHERE_BINARY")
-	tree := os.Getenv("COHERE_TREE")
-	explainFile := os.Getenv("COHERE_EXPLAIN_FILE")
-	if binary == "" || tree == "" || explainFile == "" {
-		test.Skip("set COHERE_BINARY, COHERE_TREE and COHERE_EXPLAIN_FILE to run this against a real build")
-	}
+	binary := needs.OptIn(test, "COHERE_BINARY", "it checks the rule list parse against a real cohere build")
+	tree := needs.OptIn(test, "COHERE_TREE", "the real cohere build the rule list parse is checked against runs there")
+	explainFile := needs.OptIn(test, "COHERE_EXPLAIN_FILE", "the real cohere build writes its rule list there")
 
 	names, compiledRulesOfError := CompiledRulesOf(context.Background(), GateCommand{
 		Name: "cohere", Program: binary, Directory: tree,

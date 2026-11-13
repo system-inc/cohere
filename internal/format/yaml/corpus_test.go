@@ -15,6 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The printer's acceptance test: the differential's comparison over every .yaml and .yml file under the
@@ -192,10 +193,7 @@ func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 
 func TestCorpusFormatMatchesOracle(test *testing.T) {
 	test.Parallel()
-	roots := os.Getenv("COHERE_YAML_CORPUS")
-	if roots == "" {
-		test.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
-	}
+	roots := needs.OptIn(test, "COHERE_YAML_CORPUS", "a measurement of the formatter against the oracle over a corpus")
 
 	bundles, bundlesError := prettier.Bundles()
 	if bundlesError != nil {

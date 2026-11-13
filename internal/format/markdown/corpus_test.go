@@ -16,6 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The printer's acceptance test, run from this package: the differential's comparison over every .md
@@ -161,10 +162,11 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 
 func TestCorpusFormatMatchesOracle(test *testing.T) {
 	test.Parallel()
-	roots := os.Getenv("COHERE_MARKDOWN_CORPORA")
-	if roots == "" {
-		test.Skip("set COHERE_MARKDOWN_CORPORA to measure; this is a measuring run, not a unit test")
-	}
+	roots := needs.OptIn(
+		test,
+		"COHERE_MARKDOWN_CORPORA",
+		"a measurement of the formatter against the oracle over a corpus",
+	)
 
 	bundles, bundlesError := prettier.Bundles()
 	if bundlesError != nil {
