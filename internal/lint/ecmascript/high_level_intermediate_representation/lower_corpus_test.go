@@ -43,22 +43,27 @@ import (
 // no `switch` written with a space after the keyword, and the grep used to confirm coverage was
 // itself wrong, so "no unsupported constructs" was measuring a corpus far narrower than intended.
 // Widening it is the cheap fix and it costs about a second.
+//
+// It is the library at corpus.StructurePin, so a landing never reads what was pushed that hour. The nightly
+// reads the live checkout through corpus.LiveVariable, where new code, and so the unanticipated construct, is
+// (#jf5dz34).
 func corpusRoot(test testing.TB) string {
 	test.Helper()
-	return corpus.Structure.Path(test, "source")
+	return corpus.Structure.At(test, corpus.StructurePin, "source")
 }
 
 // pinnedCorpusCommit is a commit in the structure corpus's repository whose files can never change.
 //
-// # Why one test reads a frozen corpus while the rest read the live one
+// # Why the exact counts read a pin of their own
 //
-// The live directory is right for a test that asserts well-formedness: it is looking for a construct
-// nobody anticipated, and new code is where those arrive. It is wrong for a test that asserts exact
-// counts, because the counts then move whenever anyone edits the directory, and our own lint sweeps
-// edit it most. `TestHoistableCorpusDistribution` asserts exact counts on purpose (its comment records
-// the mutants only an exact count can see), and against the live tree it failed after every sweep in
-// both directions, 796 to 800 and then to 773. So it reads the same paths at this commit instead, and
-// its numbers move only when the analysis does.
+// The well-formedness walks read corpus.StructurePin in the gate and the live directory in the nightly:
+// they look for a construct nobody anticipated, and new code is where those arrive, so the nightly is where
+// that hunt runs, and the gate never reads a tree that moves under a landing (#jf5dz34). A pin that moves
+// forward is wrong for a test that asserts exact counts, because the counts then move whenever anyone edits
+// the directory, and our own lint sweeps edit it most. `TestHoistableCorpusDistribution` asserts exact
+// counts on purpose (its comment records the mutants only an exact count can see), and against the live
+// tree it failed after every sweep in both directions, 796 to 800 and then to 773. So it reads the same
+// paths at this commit instead, and its numbers move only when the analysis does.
 const (
 	pinnedCorpusCommit = "9f40ee3e313a9c78b8e98da4cd214d45af4b7495"
 )
@@ -82,7 +87,7 @@ func skipCorpusWalkInFastTier(test *testing.T) {
 func skipWithoutCorpus(test *testing.T) {
 	test.Helper()
 	skipCorpusWalkInFastTier(test)
-	corpusRoot(test)
+	corpus.Structure.Root(test)
 }
 
 // pinnedCorpus is each count's read of the pinned corpus, made once per test binary. About thirty corpus

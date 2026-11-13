@@ -45,6 +45,10 @@
 #   landing  each entry the fast tier leaves to the landing gate measured on this machine's CPU, the measured half
 #            of TestEveryLandingGateOnlyEntryStillEarnsItsPlace, which is opt-in and no gate's (#xc29pnd), logged in
 #            <state>/logs/<night>-landing-gate.log. A pass prints one line; a failure posts its lines to #crw2hx3.
+#   live     the Structure corpus walks the gate runs at corpus.StructurePin, over the live checkout instead
+#            (COHERE_CORPUS_LIVE), where new code and so the unanticipated construct is (#jf5dz34), logged in
+#            <state>/logs/<night>-live-walks.log. A pass prints one line, with the head it walked, which the gate's
+#            pin may move to; a failure posts its lines to lint's #t2ecvap.
 #
 # usage: nightly.zsh [options]
 #   --state DIR          where the baselines, verdicts, records, logs and timings live
@@ -54,9 +58,10 @@
 #   --projects LIST      the projects to measure, comma-separated, from the table below (default ahra,cohere)
 #   --isolation on|off   whether the night runs the isolation tier after the benches (default on)
 #   --landing on|off     whether the night measures the landing gate's entries after the benches (default on)
+#   --live on|off        whether the night walks the live Structure checkout after the benches (default on)
 #
 # Each default can also come from the environment, COHERE_SPEED_GUARD_STATE, _COHERE, _IDLE_FLOOR, _PROJECTS,
-# _ISOLATION and _LANDING,
+# _ISOLATION, _LANDING and _LIVE,
 # so a test fire of the AhraOS nerve that runs this script with no arguments (runCohereSpeedGuard) can point
 # it at a scratch state and a planted engine, never the real guard's. A flag still wins over its variable.
 #
@@ -74,6 +79,7 @@ idle_floor=${COHERE_SPEED_GUARD_IDLE_FLOOR:-90}
 projects_asked=${COHERE_SPEED_GUARD_PROJECTS:-ahra,cohere}
 isolation=${COHERE_SPEED_GUARD_ISOLATION:-on}
 landing=${COHERE_SPEED_GUARD_LANDING:-on}
+live=${COHERE_SPEED_GUARD_LIVE:-on}
 
 while (( $# > 0 )); do
   case $1 in
@@ -83,6 +89,7 @@ while (( $# > 0 )); do
     --projects) projects_asked=$2; shift 2 ;;
     --isolation) isolation=$2; shift 2 ;;
     --landing) landing=$2; shift 2 ;;
+    --live) live=$2; shift 2 ;;
     *) fail "unknown argument $1 (see the usage at the top of this script)" ;;
   esac
 done
@@ -105,6 +112,7 @@ for project in $projects; do
 done
 [[ $isolation == (on|off) ]] || fail "--isolation must be on or off, not $isolation"
 [[ $landing == (on|off) ]] || fail "--landing must be on or off, not $landing"
+[[ $live == (on|off) ]] || fail "--live must be on or off, not $live"
 
 state=${state:A}
 mkdir -p $state/records $state/logs $state/timing || fail "could not make the state directory $state"
@@ -388,6 +396,44 @@ run_landing_gate() {
   print "landing gate: failed, posted to #crw2hx3, log $log"
 }
 
+# liveWalks is the gate's Structure corpus walks, by name, which run_live_walks runs over the live checkout.
+liveWalks='^(TestCommentGuardFindsTheSameComments|TestDependencyDistributionIsReal|'\
+'TestDisjointClassSizesAreNotAllSingletons|TestLowerRealCodebase|TestScopeMatchesTheDisjointSetPartition|'\
+'TestScopeRangesSatisfyUpstreamsInvariant|TestScopeTerminalsRecoverEveryScopeFromTheGraph|'\
+'TestScopeWidthAndMembershipAgree|TestSsaOverRealCodebase|TestShoutingMaskGatesPreserveOutput|'\
+'TestShoutingUppercaseGatePreservesTokens)$'
+
+# run_live_walks runs the gate's Structure walks over the live checkout (see live, at the top) and prints its line,
+# posting a failure's lines to #t2ecvap. It returns nonzero only when a failure could not be posted.
+run_live_walks() {
+  local log=$state/logs/$night-live-walks.log report=$state/logs/$night-live-walks-report.md head
+  if (
+    cd $repository &&
+      COHERE_CORPUS_LIVE=1 go run ./command/cohere-dev test -count=1 -v -run $liveWalks \
+        ./internal/lint/ecmascript/comments ./internal/lint/ecmascript/high_level_intermediate_representation \
+        ./internal/shouting
+  ) > $log 2>&1; then
+    # The head the walks read, from the corpora file cohere-dev filled the variable from, so a green night names
+    # the commit the gate's pin may move to. Ignored when unreadable: the line still says the walks passed.
+    head=$(git -C "$(jq -r '.structure // empty' $HOME/.config/cohere/corpora.json 2>/dev/null)" rev-parse HEAD 2>/dev/null)
+    print "live walks: every Structure walk passed over the live checkout${head:+ at $head}, log $log"
+    return 0
+  fi
+  {
+    print "Nightly live Structure walks (#jf5dz34) failed on $night."
+    print
+    grep -E -e '--- FAIL|_test\.go:[0-9]+: ' $log | head -40 | sed 's/^ */- /'
+    print
+    print "The whole log: $log"
+  } > $report
+  if ! (cd $HOME/Projects/ahra && node_modules/.bin/ahra tasks comment t2ecvap --role Agent --text-file $report) \
+    >> $log 2>&1; then
+    print -u2 "$name: the live walks failed, and posting $report to #t2ecvap failed too; see $log"
+    return 1
+  fi
+  print "live walks: failed, posted to #t2ecvap, log $log"
+}
+
 outcome=0
 for project in $projects; do
   measure_project $project || outcome=1
@@ -399,6 +445,10 @@ fi
 
 if [[ $landing == on ]]; then
   run_landing_gate || outcome=1
+fi
+
+if [[ $live == on ]]; then
+  run_live_walks || outcome=1
 fi
 
 # Each night's tonight file kept by its night, since the next night writes over it. See kept, at the top.
