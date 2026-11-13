@@ -18,9 +18,15 @@ const (
 // package is parsed, Restore is given every package the load reaches, files and imports set, and the packages to
 // analyze, and returns those it holds an entry for. The load parses and type-checks none of those: it reads one's
 // types from its export data, and only when a package it does check imports it, directly or through other restored
-// packages.
+// packages. sizes are the load's, the build's, by which every package it checks is measured: a package checked under
+// other sizes evaluated `unsafe.Sizeof` and its kin to other constants, so its findings are not the build's (#61qj12v).
 type Restorer interface {
-	Restore(loader string, reachable []*packages.Package, analyzed []*packages.Package) map[*packages.Package]*Restored
+	Restore(
+		loader string,
+		sizes types.Sizes,
+		reachable []*packages.Package,
+		analyzed []*packages.Package,
+	) map[*packages.Package]*Restored
 }
 
 // Restored is what the load needs of a package the findings cache holds, in place of its source.
