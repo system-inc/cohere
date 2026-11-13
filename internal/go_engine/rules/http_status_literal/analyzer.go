@@ -11,9 +11,9 @@
 // nor the inspector of its own the original's pattern matching asks for. The type index finds a call through
 // parentheses and a qualifying package, as SymbolIndex does, and neither function is generic, so the two find the
 // same calls. Like the original, it reads the codes left alone from staticcheck's config pass, whose
-// http_status_code_whitelist a staticcheck.conf can set, by default 200, 400, 404 and 500. It reads the pass as the
-// engine runs it (staticcheck_configuration), which applies the staticcheck.conf of a project under the user's cache
-// directory where the original's never does, so there alone the port leaves alone what the original reports.
+// http_status_code_whitelist a staticcheck.conf can set, by default 200, 400, 404 and 500, through the pass as the
+// engine runs it (staticcheck_configuration), which reads it under the user's cache directory too, where the
+// original's never does, a difference the parity fixtures record as dropped (#sc5qmy7).
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
 // and the engine runs one configuration, so there is nothing for the port to merge.

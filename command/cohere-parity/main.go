@@ -65,15 +65,9 @@ type censusPair struct {
 	gains string
 }
 
-// pairs is every port beside its original, by the name the census prints. A new port is one entry here.
-//
-// ST1001's and ST1013's ports differ from their originals on purpose in one place, recorded here rather than in a
-// gains file, since a gain is a finding the port alone makes and this is the reverse: over a tree under the user's
-// cache directory (`~/.cache` on Linux, `~/Library/Caches` on darwin), the originals print, as the original alone, a
-// finding the tree's staticcheck.conf allows. staticcheck's config analyzer skips every file under os.UserCacheDir(),
-// meant for Go's build cache, so it reads no staticcheck.conf for such a tree, and the ports read the configuration
-// through the engine's own, which skips only the build caches go env names (#sc5qmy7). Run the census over a tree
-// kept elsewhere, where the two agree.
+// pairs is every port beside its original, by the name the census prints. A new port is one entry here. Over a tree
+// under the user's cache directory, ST1001's and ST1013's originals alone report what its staticcheck.conf allows,
+// which each port's differences fixture records as dropped (#sc5qmy7), so run the census over a tree kept elsewhere.
 var pairs = []censusPair{
 	{
 		pair:  parity.Pair{Name: "nilness", Original: nilness.Analyzer, Port: nil_ness.Analyzer},

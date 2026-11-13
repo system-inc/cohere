@@ -21,6 +21,7 @@
 // over staticcheck's, RequireIdentical over those and the port's parity fixtures,
 // RequireIdenticalDespiteLoadErrors over those that fail to type-check on purpose, for a pair that runs despite errors,
 // RequireIdenticalFacts over them for a pair that exports facts, RequireOnlyAdjudicated over its differences fixture,
+// RequireOnlyAdjudicatedUnderUserCacheDirectory over one that must sit under the user's cache directory,
 // RequireStaticcheckGolden over staticcheck's golden files for a port that offers fixes, RequirePortWhereOriginalPanics
 // over a fixture the original panics on, RequireNeitherFinds over what both must leave alone, counting what the run
 // handed them there, and RequireIdenticalLeavingAlone over packages holding files both judge beside files both must
@@ -413,7 +414,7 @@ func RequireOnlyAdjudicated(
 	given ...Record,
 ) {
 	test.Helper()
-	requireOnlyAdjudicated(test, Target{}, original, port, testdata, fixture, given)
+	requireOnlyAdjudicated(test, Target{}, original, port, testdata, fixture, "", given)
 }
 
 // Record is a record of a differences fixture's given beside the call, to RequireOnlyAdjudicated or
@@ -428,7 +429,8 @@ type Record struct {
 	Reason string
 }
 
-// requireOnlyAdjudicated is RequireOnlyAdjudicated with the fixtures loaded for target.
+// requireOnlyAdjudicated is RequireOnlyAdjudicated with the fixtures loaded for target, and run with userCacheDirectory
+// as the user's cache directory where it is not empty (see RequireOnlyAdjudicatedUnderUserCacheDirectory).
 func requireOnlyAdjudicated(
 	test testing.TB,
 	target Target,
@@ -436,12 +438,17 @@ func requireOnlyAdjudicated(
 	port *analysis.Analyzer,
 	testdata string,
 	fixture string,
+	userCacheDirectory string,
 	given []Record,
 ) {
 	test.Helper()
 	defer target.held(test)()
 	loads := loadFixturesHoldingFixed(test, target, testdata, []string{fixture}, nil)
-	originalFindings, portFindings := findingsOver(test, original, port, loads)
+	var originalFindings []Finding
+	var portFindings []Finding
+	runUnderUserCacheDirectory(test, userCacheDirectory, loads, func() {
+		originalFindings, portFindings = findingsOver(test, original, port, loads)
+	})
 	folder := recordsFolder(test, loads[0])
 	recorded := adjudicated(test, folder, loads[0].fileName, given)
 	test.Logf("the original found %d, the port %d, and the records withhold %d fixes and omit %d related entries",
