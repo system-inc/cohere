@@ -99,11 +99,28 @@ func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 	return Bits{}
 }
 
+// NameBits are the bits of the object the package of path holds under local, as a record names it (#6a3kjvz), and
+// whether a unit of the graph declares it; a package the graph holds one package of a path is that package, and a path
+// the graph holds several of names none. It is the decoded records' ObjectBits, safe to call from one goroutine at a
+// time as ObjectBits is.
+func (dependence *Dependence) NameBits(path string, local string) (Bits, bool) {
+	resolved := dependence.resolved
+	identifiers := resolved.pathsHeld[path]
+	if len(identifiers) != 1 {
+		return Bits{}, false
+	}
+	node, isNode := resolved.nodes[nodeKey{packageIdentifier: identifiers[0], local: local}]
+	if !isNode {
+		return Bits{}, false
+	}
+	return Bits{Name: dependence.bits[bit(node, false)], Underlying: dependence.bits[bit(node, true)]}, true
+}
+
 // Unit is one unit of the graph as a build judged it: its key, the package ID, the file a reader sees and its start
 // offset in the file the host parsed, as UnitDependent takes them; its size in syntax nodes; whether its package is
 // the workspace's; whether the build makes it dependent; the units it calls statically, by their index in Units; and
-// the functions it calls statically of packages the graph does not hold, each once, which another graph's units may
-// declare (UnitDeclaring).
+// the functions it calls statically of packages the graph does not hold, each once, by name, which another graph's
+// units may declare (UnitDeclaringName).
 type Unit struct {
 	PackageId     string
 	File          string
@@ -112,7 +129,14 @@ type Unit struct {
 	Workspace     bool
 	Dependent     bool
 	Calls         []int
-	ExternalCalls []types.Object
+	ExternalCalls []ObjectName
+}
+
+// ObjectName is an object as a record names it (#6a3kjvz): its package's path and its local name there, its
+// objectpath, or its name for an unexported package-level object.
+type ObjectName struct {
+	Path  string
+	Local string
 }
 
 // Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name.
@@ -135,10 +159,14 @@ func (dependence *Dependence) Units() []Unit {
 	return units
 }
 
-// UnitDeclaring is the index in Units of the unit that declares object, as its generic declares it, and false when
-// no unit of the graph does.
-func (dependence *Dependence) UnitDeclaring(object types.Object) (int, bool) {
-	node, isNode := dependence.resolved.objectNodes[canonical(object)]
+// UnitDeclaringName is the index in Units of the unit that declares the object of the package of path the graph holds
+// under local, and false when no unit of the graph does, or the graph holds more than one package of path.
+func (dependence *Dependence) UnitDeclaringName(path string, local string) (int, bool) {
+	identifiers := dependence.resolved.pathsHeld[path]
+	if len(identifiers) != 1 {
+		return 0, false
+	}
+	node, isNode := dependence.resolved.nodes[nodeKey{packageIdentifier: identifiers[0], local: local}]
 	if !isNode || dependence.resolved.declaringUnit[node] < 0 {
 		return 0, false
 	}

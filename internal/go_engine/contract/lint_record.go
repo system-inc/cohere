@@ -321,7 +321,10 @@ type DependenceCounts struct {
 // Problems counts what kept the cache from being read or written, the host's build's and every other build's alike,
 // each of which the engine also notes on stderr, so a run read through `--json` alone still shows it (#27r8r24).
 // WriteFailed counts every miss whose entry could not be written, every build's, of which the engine notes only the
-// first as a problem, so a store that refused 400 writes says 400 rather than 1. Each is written only when not 0.
+// first as a problem, so a store that refused 400 writes says 400 rather than 1; a dependence record that could not be
+// written beside its entry counts there too. Each is written only when not 0. DependenceRecords, additive within
+// contract 3 and the Go engine's alone, is written only by a run under `--build-dependence` with a store
+// (#6a3kjvz).
 type LintCache struct {
 	On           bool `json:"on"`
 	Hit          int  `json:"hit"`
@@ -337,6 +340,26 @@ type LintCache struct {
 	Replays      int  `json:"replays,omitempty"`
 	Problems     int  `json:"problems,omitempty"`
 	WriteFailed  int  `json:"writeFailed,omitempty"`
+
+	DependenceRecords *DependenceRecords `json:"dependenceRecords,omitempty"`
+}
+
+// DependenceRecords counts what the host's run did with block 1's dependence records, which the findings store keeps
+// beside each package's entry under `--build-dependence` (#6a3kjvz): read, the records found under their packages'
+// keys, each added to the host's graph in place of the package's syntax; written, those written beside their
+// entries; backfilled, the hits by their first key with no record, made a miss once so their records are written;
+// aliasSkipped, the hits by a second key's alias that hold, which go without a record; and unreadable, the records
+// that did not decode, each a problem, whose packages are checked from source so their records are written again, a
+// hit among them counted in backfilled too; and droppedAfterBackfill, the hits made misses in a load that backfilled
+// any, since a backfilled package asks the facts of everything below it, written only when not 0.
+type DependenceRecords struct {
+	Read         int `json:"read"`
+	Written      int `json:"written"`
+	Backfilled   int `json:"backfilled"`
+	AliasSkipped int `json:"aliasSkipped"`
+	Unreadable   int `json:"unreadable"`
+
+	DroppedAfterBackfill int `json:"droppedAfterBackfill,omitempty"`
 }
 
 func (LintRecord) kind() Kind { return KindLint }

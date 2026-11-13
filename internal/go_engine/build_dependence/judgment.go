@@ -15,6 +15,16 @@ type judgment struct {
 	seedUnit   []bool
 	seedBits   []int32
 	answers    map[types.Object]Bits
+
+	// nameAnswers are the build's answers for objects decoded records name, by path and local name, each asked once
+	// (nameAnswer).
+	nameAnswers map[[2]string]nameAnswer
+}
+
+// nameAnswer is DependentName's answer for one object: its bits, and whether a unit declares it.
+type nameAnswer struct {
+	bits     Bits
+	declared bool
 }
 
 // seed makes the unit at index a seed, both bits of everything it declares set.
@@ -154,15 +164,15 @@ func receiverBaseName(expression ast.Expr) string {
 }
 
 // answer is whether read's bit is set in the build, for an object of a package the graph does not hold, by the
-// build's DependentObject, asked once per object. An object a decoded record names has no live object to ask of, so
-// it fails wide: set, unless the build has no DependentObject, which says no such object is dependent.
+// build's DependentObject, asked once per object. An object a decoded record names has no live object, and is
+// answered by its name (answerByName). A build with no DependentObject says no such object is dependent.
 func (judging *judgment) answer(read externalRead) bool {
 	if judging.difference.DependentObject == nil {
 		return false
 	}
 	object := read.object.object
 	if object == nil {
-		return true
+		return judging.answerByName(read)
 	}
 	answered, isAsked := judging.answers[object]
 	if !isAsked {
@@ -173,6 +183,49 @@ func (judging *judgment) answer(read externalRead) bool {
 		return answered.Underlying
 	}
 	return answered.Name
+}
+
+// answerByName is whether read's bit is set in the build, for an object a decoded record names, by the build's
+// DependentName: the object's own bit when a unit of the answering graph declares it, else any bit of what reading it
+// reaches through its type, as read holds that, set, as the answering graph reads an object no unit declares through
+// its type, both bits at once (Dependence.ObjectBits). A build with no DependentName fails it wide.
+func (judging *judgment) answerByName(read externalRead) bool {
+	if judging.difference.DependentName == nil {
+		return true
+	}
+	answered := judging.nameAnswer(read.object)
+	if answered.declared {
+		if read.underlying {
+			return answered.bits.Underlying
+		}
+		return answered.bits.Name
+	}
+	if answered.bits.Name || answered.bits.Underlying {
+		return true
+	}
+	for _, reached := range read.through {
+		reachedAnswer := judging.nameAnswer(reached.object)
+		if reachedAnswer.bits.Name && !reached.underlying || reachedAnswer.bits.Underlying && reached.underlying {
+			return true
+		}
+	}
+	return false
+}
+
+// nameAnswer is DependentName's answer for object, asked once per name.
+func (judging *judgment) nameAnswer(object recordedObject) nameAnswer {
+	key := [2]string{object.path, object.local}
+	if answered, isAsked := judging.nameAnswers[key]; isAsked {
+		return answered
+	}
+	var answered nameAnswer
+	answered.bits.Name, answered.bits.Underlying, answered.declared = judging.difference.DependentName(object.path,
+		object.local)
+	if judging.nameAnswers == nil {
+		judging.nameAnswers = map[[2]string]nameAnswer{}
+	}
+	judging.nameAnswers[key] = answered
+	return answered
 }
 
 // unitReaches is whether a unit that is no seed is dependent: an object it declares has either bit set, or its body

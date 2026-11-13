@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/system-inc/cohere/internal/cache_directory"
 )
@@ -37,10 +38,24 @@ func Open(root string) *Store {
 	return &Store{directory: filepath.Join(cache_directory.Of(root), "go")}
 }
 
+// readObserver, when a test sets it (ObserveReads), is told the key of every Get of every store, nil in every run.
+var readObserver atomic.Pointer[func(Key)]
+
+// ObserveReads has observe told the key of every Get any store makes until stop is called, for a test that counts the
+// store's reads by what they are of: a plain run reads no block 1 dependence record (#6a3kjvz). It changes no read.
+func ObserveReads(observe func(Key)) (stop func()) {
+	observing := observe
+	readObserver.Store(&observing)
+	return func() { readObserver.Store(nil) }
+}
+
 // Get is the entry under key. Any failure to read it whole is a miss, never an error: the package is analyzed
 // again and the entry written over. A file that is there but not whole, cut short or written over, is removed, so a
 // PutAbsent of the same key, which leaves a file that is there alone, writes it again rather than keep the damage.
 func (store *Store) Get(key Key) ([]byte, bool) {
+	if observe := readObserver.Load(); observe != nil {
+		(*observe)(key)
+	}
 	path := store.path(key)
 	contents, readError := os.ReadFile(path)
 	if readError != nil {

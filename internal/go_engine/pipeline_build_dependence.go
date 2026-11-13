@@ -65,9 +65,14 @@ type standardLibraryDependence struct {
 // its test variants included, and every other a dependency. It builds nothing unless the run judges dependence and the
 // lint phase has extra builds to judge, over a load that will be linted: one that failed or found a type error is left
 // alone, and so is the load the graph was built from already, which a rename that wrote nothing hands on. The engine
-// keeps the graph, which every extra build reads. A package the host restored from export data has no type information
-// and is absent from the graph; the standard library's among them are loaded from source onto a graph of their own,
-// beside the host's lint (standardLibraryGraph), once a run, since a rename never changes them.
+// keeps the graph, which every extra build reads. A package whose record the findings store holds, decoded as the
+// session read it, is added from its record (#6a3kjvz), whether the host restored it or checks it, and one the host
+// checks with none from its syntax, its record then written beside its entry
+// (check.CacheSession.DependenceRecordsFrom). A package the host restored from export data with no record has no type
+// information and is absent from the graph; the standard library's among them are loaded from source onto a graph of
+// their own, beside the host's lint (standardLibraryGraph), once a run, since a rename never changes them. A record
+// that does not decode is the session's to say, and its package checked from source, so it has none here
+// (CacheSession.readDependenceRecords).
 func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError error) {
 	if !engine.request.judgesDependence() || !engine.keepsForBuilds() || !engine.request.requests(contract.PhaseLint) ||
 		loadError != nil || loaded == nil || len(loaded.Diagnostics) > 0 ||
@@ -85,10 +90,14 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		restored: map[string]bool{},
 	}
 	var restoredStandardLibrary []string
-	for _, each := range every {
+	records := make([]*build_dependence.Record, len(every))
+	for index, each := range every {
 		host.files[each.ID] = each.GoFiles
 		host.paths[each.ID] = each.PkgPath
-		if each.TypesInfo != nil {
+		if engine.session != nil {
+			records[index], _ = engine.session.DependenceRecord(each)
+		}
+		if each.TypesInfo != nil || records[index] != nil {
 			continue
 		}
 		host.restored[each.ID] = true
@@ -99,10 +108,20 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		}
 	}
 	engine.workPool().ForEach(len(every), 0, func(index int) {
+		if records[index] != nil {
+			host.graph.AddDecoded(records[index])
+			return
+		}
 		if every[index].TypesInfo != nil {
 			host.graph.AddPackage(every[index], engine.described.hasFileInScope(every[index]))
 		}
 	})
+	if engine.session != nil {
+		graph := host.graph
+		engine.session.DependenceRecordsFrom(func(saved *packages.Package) ([]byte, bool) {
+			return graph.EncodedRecord(saved.ID)
+		})
+	}
 	host.elapsed = time.Since(started)
 	switch {
 	case engine.dependence != nil && engine.dependence.standardLibrary != nil:
@@ -265,6 +284,9 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	// judges as block 1 always has.
 	if len(engine.dependence.restored) > 0 {
 		difference.DependentObject = counterparts.DependentObject
+		// A package the host restored hands the graph its record (#6a3kjvz), which names an object of a package the
+		// graph does not hold by its path and local name rather than holding it.
+		difference.DependentName = counterparts.DependentName
 	}
 	judged.dependence = engine.dependence.graph.Against(difference)
 	counts := judged.dependence.Counts()

@@ -144,12 +144,17 @@ func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
 // AddRecord adds the package a record encoded (EncodedRecord), with no syntax and no types, as AddPackage added it
 // from its live package, or says why the bytes hold no record. Its objects meet those of every other package by name.
 func (graph *Graph) AddRecord(encoded []byte) error {
-	record, decodeError := decodeRecord(encoded)
+	record, decodeError := DecodeRecord(encoded)
 	if decodeError != nil {
 		return decodeError
 	}
-	graph.add(record)
+	graph.AddDecoded(record)
 	return nil
+}
+
+// AddDecoded adds the package of a record already decoded (DecodeRecord), as AddRecord adds one from its bytes.
+func (graph *Graph) AddDecoded(decoded *Record) {
+	graph.add(decoded.record)
 }
 
 // add publishes record under one hold of the lock, and lets the last resolution go.

@@ -36,8 +36,9 @@ import (
 // many entries name it, where an entry of 10 found its own beside it under its key (#5s1x2hg). At 12, the store keeps
 // an entry as a record under its key (entryRecord), its reads and export data's digest beside its body, or, for an
 // entry an extra build writes through, a reference to the record of the host's that holds the body (#fq7dxvx); a key
-// of 11 held the whole entry.
-const CacheFormatVersion = "go-engine-cache-12"
+// of 11 held the whole entry. At 13, the store keeps a package's block 1 dependence record beside its entry under a
+// key derived from the entry's (DependenceRecordKey, #6a3kjvz), which no entry of 12 has beside it.
+const CacheFormatVersion = "go-engine-cache-13"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.

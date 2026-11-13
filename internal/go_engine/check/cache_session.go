@@ -122,8 +122,13 @@ type CacheCounts struct {
 	// FactsSkipped is the restored facts whose object the package's export data does not hold (see restore).
 	FactsSkipped int
 
-	// WriteFailed is the misses whose entry could not be written, the first reason among Problems.
+	// WriteFailed is the misses whose entry could not be written, or whose dependence record could not be written
+	// beside it, the first reason among Problems.
 	WriteFailed int
+
+	// DependenceRecords are what the host's session did with block 1's dependence records under
+	// `--build-dependence` (#6a3kjvz), nil for any other session.
+	DependenceRecords *DependenceRecordCounts
 
 	// Reloads is the packages the run loaded from source, though the cache held them, because a question of a fact
 	// computed on demand reached one restored and no store answered it (#w7zmvat wave 3), or, in an extra build, a
@@ -238,6 +243,10 @@ type CacheSession struct {
 
 	// host is the restore from the host's run of an extra build's session, nil for any other (see RestoreFromHost).
 	host *hostState
+
+	// dependence is the host's session's block 1 dependence records, under `--build-dependence`, nil for any other
+	// session (KeepDependenceRecords, #6a3kjvz).
+	dependence *dependenceRecords
 
 	// kept is set once keepForBuilds has let go of the resolver and the answer memo, and cleared by the next Restore,
 	// which starts both afresh. A read of either while it is set is a problem the run reports (readAfterKeep), never
@@ -371,10 +380,17 @@ func (session *CacheSession) Restore(
 	session.readHits(reachable)
 	session.readPrevious(reachable)
 	session.holdAliasHits(reachable)
+	// After holdAliasHits, so an alias hit it drops is a miss here rather than counted as skipped (#6a3kjvz).
+	session.readDependenceRecords(reachable)
+	hitsBeforeDropping := len(session.hits)
 	// Each pass makes a hit that falls short a miss, which can only ask more of the rest.
 	dropping := true
 	for dropping {
 		dropping = session.dropShortHits(reachable)
+	}
+	// A backfilled package is analyzed, so the facts of everything below it are asked: what that drops is counted.
+	if session.dependence != nil && session.dependence.counts.Backfilled > 0 {
+		session.dependence.counts.DroppedAfterBackfill = hitsBeforeDropping - len(session.hits)
 	}
 	// What the build's own store holds is restored by the build's key, exactly; only what it does not hold is restored
 	// from the host's run, by what the package read (#b2t9xmf).
@@ -706,6 +722,10 @@ func (session *CacheSession) save(
 	if session.host != nil {
 		hostRestored = len(session.host.restoring)
 	}
+	if session.dependence != nil {
+		counted := session.dependence.counts
+		session.counts.DependenceRecords = &counted
+	}
 	session.counts.Hit = len(session.hits) - len(session.fromBinary) - hostRestored
 	session.counts.Missed = len(session.keys) - len(session.hits)
 	session.counts.SecondKeyHit = len(session.secondKeyHits)
@@ -758,14 +778,29 @@ func (session *CacheSession) saveMisses(
 		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
 		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
 			withheld[saved], demanded, files[saved], knownFiles, true)
+		record, keepsRecord := session.dependenceRecordToWrite(saved)
 		// The writes and their counting run with no slot held: the counting is a map's and a counter's, under a lock.
 		return func() {
 			var putError error
 			if encodeError == nil {
 				putError = session.putEntry(session.keys[saved], entry)
 			}
+			// A dependence record follows its entry, and only an entry whose write held (#6a3kjvz).
+			var recordError error
+			if keepsRecord && encodeError == nil && putError == nil {
+				recordError = session.caching.Store.Put(DependenceRecordKey(session.keys[saved]), record)
+			}
 			countsLock.Lock()
 			defer countsLock.Unlock()
+			switch {
+			case recordError != nil:
+				if session.counts.WriteFailed == 0 {
+					session.problem(fmt.Sprintf("writing the dependence record of %s: %v", saved.ID, recordError))
+				}
+				session.counts.WriteFailed++
+			case keepsRecord && encodeError == nil && putError == nil:
+				session.dependence.counts.Written++
+			}
 			if encodeError == nil {
 				encoded[saved] = entry
 				if entry.hasOutput {
