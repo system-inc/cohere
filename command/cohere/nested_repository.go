@@ -13,7 +13,6 @@ import (
 	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/format_files"
-	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
@@ -112,8 +111,8 @@ type nestedDriftCheck struct {
 // Only where that repository's cohere cache exists: made by a run inside it, or at the start of a run above it
 // (prepareNestedCacheDirectories). The check itself creates nothing there, since creating the directory mid-run
 // would move the repository's root after the run cache started its clock, which it rightly refuses to record
-// (see program.RecordRunCache's readSince), so the first check after it would never replay. A library whose
-// .gitignore does not ignore .cache gets no cache, and is formatted whole each check, as before the record.
+// (see program.RecordRunCache's readSince), so the first check after it would never replay. A library whose cache
+// could not be made is formatted whole each check, as before the record.
 func nestedFormatRecord(repositoryRoot string) *formatRecord {
 	if cacheOff {
 		return formatRecordOff("the cache is off (--no-cache)")
@@ -133,8 +132,10 @@ func nestedFormatRecord(repositoryRoot string) *formatRecord {
 // (#v0etgwx). Made here, before the run cache starts its clock and before discovery lists the tree, a
 // directory created moves no root a recorded run has read.
 //
-// Only in a repository whose own ignore rules ignore it, so a run never leaves an untracked directory in a
-// library. The record in it is the library's own, the one a run inside the library reads and writes, and an
+// In every library, whatever its own ignore rules say of `.cache`: the directory is made by cache_directory.Make,
+// so it ignores itself, and a run still leaves no untracked directory in a library (#f6y78ws). Until the cache
+// ignored itself (#6vhp0vd) only a library whose rules ignored `.cache` got one. A directory that is there already is
+// left as it is. The record in it is the library's own, the one a run inside the library reads and writes, and an
 // entry still skips only bytes it proved are a fixed point, so drift in a library is reported as before.
 func prepareNestedCacheDirectories(root string) {
 	pending, declaredBelowError := declaredBelow(root, "")
@@ -150,21 +151,6 @@ func prepareNestedCacheDirectories(root string) {
 		}
 		if inner, declaredBelowError := declaredBelow(root, relative); declaredBelowError == nil {
 			pending = append(pending, inner...)
-		}
-		if information, statError := os.Stat(
-			cache_directory.Of(repositoryRoot),
-		); statError == nil && information.IsDir() {
-			continue
-		}
-		matcher, newGitignoreError := gitignore.New(repositoryRoot)
-		if newGitignoreError != nil {
-			continue
-		}
-		if ignored, _, ignoredPathError := matcher.IgnoredPath(
-			".cache/cohere/findings.gob",
-			false,
-		); ignoredPathError != nil || !ignored {
-			continue
 		}
 		// Ignored: a directory that could not be made costs this library what it cost before, a whole check.
 		_ = cache_directory.Make(cache_directory.Of(repositoryRoot))

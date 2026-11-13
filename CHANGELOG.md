@@ -211,6 +211,9 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   run left `.cache/` untracked. The front door, the Go engine's store and the Swift engine's scratch each write it,
   whichever creates the directory first, and never over a file that is there. A `.cache/cohere` an older cohere made
   is left as it was, and `--verbose` still says when the project's own `.gitignore` doesn't ignore it.
+- Every library a run declares, a submodule or a nested repository, gets its own cohere cache at the run's start,
+  where only one whose rules ignored `.cache` did, so each keeps its format record and a check formats only the
+  library files that changed. The directory ignores itself, so the library's `git status` and the root's stay clean.
 
 ## 0.1.1 (2026-11-03)
 
