@@ -36,19 +36,29 @@
 #            week of what the machine holds at night outlives the temporary copy, for choosing the idle floor from
 #            the nights rather than from one (#8sqsgee). Each run's idleness before and after is in its record.
 #
+# Then, once every project's bench is done, so it never loads a timed run:
+#   isolation the unit-isolation tier (#h350vqr), from this script's own checkout through cohere-dev's pool: every
+#            rule's fixtures (COHERE_UNIT_ISOLATION=fixtures), then a sample of cohere's tree under the night's seed,
+#            its date as a number (=tree), both logged in <state>/logs/<night>-isolation.log. A pass prints one line
+#            beside the projects'. A failure posts the seed and the failing lines to #ewgh523 with ahra's tasks
+#            comment, the report kept beside the log, so the failure is run again by its seed.
+#
 # usage: nightly.zsh [options]
 #   --state DIR          where the baselines, verdicts, records, logs and timings live
 #                        (default ~/Library/Application Support/cohere/speed-guard)
 #   --cohere PATH        the cohere launcher, or an engine binary, the bench runs (default: `cohere` on PATH)
 #   --idle-floor PERCENT the share of all cores idle before and after a quiet run (default 90)
 #   --projects LIST      the projects to measure, comma-separated, from the table below (default ahra,cohere)
+#   --isolation on|off   whether the night runs the isolation tier after the benches (default on)
 #
-# Each default can also come from the environment, COHERE_SPEED_GUARD_STATE, _COHERE, _IDLE_FLOOR and _PROJECTS,
+# Each default can also come from the environment, COHERE_SPEED_GUARD_STATE, _COHERE, _IDLE_FLOOR, _PROJECTS and
+# _ISOLATION,
 # so a test fire of the AhraOS nerve that runs this script with no arguments (runCohereSpeedGuard) can point
 # it at a scratch state and a planted engine, never the real guard's. A flag still wins over its variable.
 #
-# Exit status: 0 when every project got its tonight file, whatever its verdict, 1 otherwise. A regressed night
-# is the guard's answer, not the script's failure, and is read from the tonight file.
+# Exit status: 0 when every project got its tonight file, whatever its verdict, and a failing isolation tier was
+# posted, 1 otherwise. A regressed night is the guard's answer, not the script's failure, and is read from the tonight
+# file; a failing isolation tier is the tier's answer, read from #ewgh523.
 set -u
 zmodload zsh/datetime
 name=nightly
@@ -58,6 +68,7 @@ state=${COHERE_SPEED_GUARD_STATE:-$HOME/Library/Application Support/cohere/speed
 cohere=${COHERE_SPEED_GUARD_COHERE:-cohere}
 idle_floor=${COHERE_SPEED_GUARD_IDLE_FLOOR:-90}
 projects_asked=${COHERE_SPEED_GUARD_PROJECTS:-ahra,cohere}
+isolation=${COHERE_SPEED_GUARD_ISOLATION:-on}
 
 while (( $# > 0 )); do
   case $1 in
@@ -65,6 +76,7 @@ while (( $# > 0 )); do
     --cohere) cohere=$2; shift 2 ;;
     --idle-floor) idle_floor=$2; shift 2 ;;
     --projects) projects_asked=$2; shift 2 ;;
+    --isolation) isolation=$2; shift 2 ;;
     *) fail "unknown argument $1 (see the usage at the top of this script)" ;;
   esac
 done
@@ -85,6 +97,7 @@ projects=(${(s:,:)projects_asked})
 for project in $projects; do
   project_arguments $project || fail "--projects: no project $project in the table (ahra, cohere)"
 done
+[[ $isolation == (on|off) ]] || fail "--isolation must be on or off, not $isolation"
 
 state=${state:A}
 mkdir -p $state/records $state/logs $state/timing || fail "could not make the state directory $state"
@@ -292,10 +305,63 @@ measure_project() {
     ", unmeasured streak \(.unmeasuredStreak)"' $tonight_file
 }
 
+# isolation_report writes the report a failing isolation tier posts to #ewgh523: the seed and which runs failed,
+# each failing test and the lines that say what differed, at most 60 of them, and where the whole log is.
+isolation_report() {
+  local log=$1 seed=$2 report=$3 failed=$4
+  {
+    print "Nightly unit isolation (#h350vqr) failed on $night, seed $seed: $failed."
+    print
+    print "Run it again from cohere's root, the fixtures, and the tree by its seed:"
+    print -r -- '- `COHERE_UNIT_ISOLATION=fixtures go run ./command/cohere-dev test -count=1'\
+' -run TestEveryIsolatedRuleFindsTheSameInTheUnitsAVariantKeeps ./internal/go_engine/check`'
+    print -r -- '- `COHERE_UNIT_ISOLATION=tree COHERE_UNIT_ISOLATION_SEED='$seed' go run ./command/cohere-dev test'\
+' -count=1 -run TestASampleOfCoheresTreeFindsTheSameInTheUnitsAVariantKeeps ./internal/go_engine/check`'
+    print
+    grep -E -e '--- FAIL|unit_isolation_test\.go:[0-9]+: ' $log | grep -v -E -e '--- FAIL: .*/fixtures \(' | head -60 |
+      sed 's/^ */- /'
+    print
+    print "The whole log: $log"
+  } > $report
+}
+
+# run_isolation runs the isolation tier (see isolation, at the top) and prints its line, posting a failure's report to
+# #ewgh523. It returns nonzero only when a failure could not be posted.
+run_isolation() {
+  local log=$state/logs/$night-isolation.log report=$state/logs/$night-isolation-report.md seed=${night//-/}
+  local failed=()
+  (
+    cd $repository &&
+      COHERE_UNIT_ISOLATION=fixtures go run ./command/cohere-dev test -count=1 \
+        -run '^TestEveryIsolatedRuleFindsTheSameInTheUnitsAVariantKeeps$' ./internal/go_engine/check
+  ) > $log 2>&1 || failed+=(fixtures)
+  (
+    cd $repository &&
+      COHERE_UNIT_ISOLATION=tree COHERE_UNIT_ISOLATION_SEED=$seed go run ./command/cohere-dev test -count=1 \
+        -run '^TestASampleOfCoheresTreeFindsTheSameInTheUnitsAVariantKeeps$' ./internal/go_engine/check
+  ) >> $log 2>&1 || failed+=("the tree")
+  if (( ${#failed} == 0 )); then
+    print "isolation: passed, every rule's fixtures and the tree under seed $seed, log $log"
+    return 0
+  fi
+  isolation_report $log $seed $report "${(j:, then :)failed}"
+  # ahra resolves only from its own checkout, and the night's PATH may not hold it, so its own launcher there.
+  if ! (cd $HOME/Projects/ahra && node_modules/.bin/ahra tasks comment ewgh523 --role Agent --text-file $report) \
+    >> $log 2>&1; then
+    print -u2 "$name: isolation failed under seed $seed, and posting $report to #ewgh523 failed too; see $log"
+    return 1
+  fi
+  print "isolation: failed under seed $seed (${(j:, then :)failed}), posted to #ewgh523, log $log"
+}
+
 outcome=0
 for project in $projects; do
   measure_project $project || outcome=1
 done
+
+if [[ $isolation == on ]]; then
+  run_isolation || outcome=1
+fi
 
 # Each night's tonight file kept by its night, since the next night writes over it. See kept, at the top.
 mkdir -p $state/nights || outcome=1

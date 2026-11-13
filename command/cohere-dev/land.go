@@ -454,9 +454,9 @@ func checkoutOfMain(worktree string) (string, error) {
 
 // gate runs the landing gate on the worktree through a pool token: go vet, then the rule CPU budget
 // (checkRuleCpu), then the tests of every module go.work names outside a submodule, each in one go
-// invocation (workspace.go), saying which it covered, then the docs data check (checkDocsData), then cohere on
-// the tree itself (checkCohere). With its
-// exit code it returns the line a landing commit carries about it, which says what ran and for how long.
+// invocation (workspace.go), saying which it covered, then the unit isolation of the rules the landing changes
+// (checkUnitIsolation), then the docs data check (checkDocsData), then cohere on the tree itself (checkCohere).
+// With its exit code it returns the line a landing commit carries about it, which says what ran and for how long.
 func gate(worktree string, commit string) (int, string) {
 	covered, readGatedWorkspaceError := readGatedWorkspace(worktree)
 	if readGatedWorkspaceError != nil {
@@ -514,6 +514,14 @@ func gate(worktree string, commit string) (int, string) {
 			return testCode
 		}
 		ran[1] += " " + where
+		code, checked, said := checkUnitIsolation(worktree, commit,
+			func() []string { return gateEnvironment(step("the unit isolation")) })
+		if code != 0 {
+			return code
+		}
+		if checked {
+			ran = append(ran, said)
+		}
 		code, checked = checkDocsData(worktree, func() []string { return gateEnvironment(step("the docs data check")) })
 		if checked {
 			ran = append(ran, "the docs data")

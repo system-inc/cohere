@@ -65,7 +65,8 @@ type answerKey struct {
 // result of one, in a package the run restored: exactly what compute would answer were the package loaded, so the
 // question is answered without loading it again (#b2t9xmf). It is an argument rather than a field of Kind, which knows
 // no Value, so the compiler holds it to the type compute returns. Each answer is asked of compute, bodiless or the
-// store once in a run, and memoized.
+// store once in a run, and memoized; under a test's hand on the run (HoldAnswers), the hand may answer in compute's
+// place.
 func Ask[Value any](
 	resolver *Resolver,
 	reader *Package,
@@ -118,15 +119,7 @@ func answerOf[Value any](
 	path, hasPath := resolver.pathOf(object)
 	if hasPath && resolver.store != nil {
 		if stored, held := resolver.stored(kind, object.Pkg(), path); held {
-			var answer Value
-			if len(stored) > 0 {
-				if decodeError := json.Unmarshal(stored, &answer); decodeError != nil {
-					// Invariant: the store holds what Ask encoded with the same Value type; bytes it cannot read
-					// are a mistake in the store, never an answer of no fact.
-					panic(fmt.Sprintf("fact_resolver: the stored %s answer about %s does not decode: %v",
-						kind.Name, objectName(object), decodeError))
-				}
-			}
+			answer := decodeAnswer[Value](kind, object, stored, "stored")
 			resolver.storeHits.Add(1)
 			resolver.answers.Store(key, answer)
 			return answer, false
@@ -146,6 +139,13 @@ func answerOf[Value any](
 		var placeholder Value
 		return placeholder, true
 	}
+	if resolver.held != nil {
+		if encoded, isHeld := resolver.held.Answer(kind.Name, object); isHeld {
+			answer := decodeAnswer[Value](kind, object, encoded, "held")
+			resolver.answers.Store(key, answer)
+			return answer, false
+		}
+	}
 	// home's computations ask with home as the reader, so a placeholder anywhere below this one marks home unsure.
 	// Once home is unsure, every answer computed in it is: a kind keeps the verdicts it computed in home, and one
 	// made from a placeholder would answer a later question without asking again.
@@ -157,7 +157,26 @@ func answerOf[Value any](
 		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
 	}
 	resolver.answers.Store(key, answer)
+	if resolver.held != nil {
+		resolver.held.Computed(kind.Name, object, encodeAnswer(kind, object, answer))
+	}
 	return answer, false
+}
+
+// decodeAnswer is encoded, the answer of kind about object as Ask encodes it, as a Value: the zero Value for no bytes,
+// a package computed whole holding no answer. from names where the bytes came from, for the panic.
+func decodeAnswer[Value any](kind *Kind, object types.Object, encoded []byte, from string) Value {
+	var answer Value
+	if len(encoded) == 0 {
+		return answer
+	}
+	if decodeError := json.Unmarshal(encoded, &answer); decodeError != nil {
+		// Invariant: the store and a test's hand hold what Ask encoded with the same Value type; bytes it cannot read
+		// are a mistake in whoever held them, never an answer of no fact.
+		panic(fmt.Sprintf("fact_resolver: the %s %s answer about %s does not decode: %v", from, kind.Name,
+			objectName(object), decodeError))
+	}
+	return answer
 }
 
 // isOrigin reports whether object is its own origin, as a declared function or parameter is, and an instance's never.
