@@ -444,6 +444,7 @@ if [ -n "$pin" ]; then
 fi
 cd tree
 goroot="` + sharedBoxGoroot + `"; digest="` + sharedBoxToolchainDigest + `"
+node="` + sharedBoxNode + `"; nodeDigest="` + sharedBoxNodeDigest + `"
 ` + sharedBoxGate
 
 // runOnHome pushes commit and the TypeScript pin it records to the feed, then runs the module's tests on Home through

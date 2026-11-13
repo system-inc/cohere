@@ -29,7 +29,7 @@ mod)
   echo "all modules verified" ;;
 test)
   empty=no; [ -z "$(ls -A "$GOCACHE")" ] && empty=yes
-  echo "test $* | cache $GOCACHE empty $empty | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS" >> "$GATE_LOG"
+  echo "test $* | cache $GOCACHE empty $empty | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
   echo '{"Action":"pass","Package":"example.com/module"}' ;;
 esac
 `
@@ -85,8 +85,16 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 		plant func(test *testing.T, goroot string, environment []string) []string
 		// refusal is what the gate must say when it refuses, empty when it runs the tests.
 		refusal string
+		// node is the box's node: "pinned" by the digest the gate is handed, "absent", or "swapped" after its pin.
+		node string
 	}{
-		{name: "a toolchain as pinned runs the tests"},
+		{name: "a toolchain as pinned runs the tests", node: "pinned"},
+		{name: "a box without node runs the tests with no node on the path", node: "absent"},
+		{
+			name:    "a node changed after its pin is refused before any test",
+			node:    "swapped",
+			refusal: "the node at",
+		},
 		{
 			name: "a toolchain changed after its pin is refused before it runs",
 			plant: func(test *testing.T, goroot string, environment []string) []string {
@@ -150,8 +158,23 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			if row.plant != nil {
 				environment = row.plant(test, goroot, environment)
 			}
-			script := "set -euo pipefail\n" + `goroot="$1"; digest="$2"; races="$3"; shift 3` + "\n" + sharedBoxGate
-			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, "./internal/edit", "./...")
+			// The box's node, pinned by its digest unless the row has it absent or swapped after the pin.
+			node := filepath.Join(test.TempDir(), "node")
+			nodeDigest := strings.Repeat("0", 64)
+			if row.node != "absent" {
+				writeFixtureFile(test, filepath.Join(node, "bin", "node"), "a pinned node\n")
+				sum := sha256.Sum256([]byte("a pinned node\n"))
+				nodeDigest = hex.EncodeToString(sum[:])
+			}
+			if row.node == "swapped" {
+				writeFixtureFile(test, filepath.Join(node, "bin", "node"), "a swapped node\n")
+			}
+			script := "set -euo pipefail\n" +
+				`goroot="$1"; digest="$2"; node="$3"; nodeDigest="$4"; races="$5"; shift 5` +
+				"\n" +
+				sharedBoxGate
+			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, node, nodeDigest, "./internal/edit",
+				"./...")
 			gate.Dir, gate.Env = tree, environment
 			output, gateError := gate.CombinedOutput()
 			// Ignored: a gate that refused before any go ran asked nothing, and its log was never written.
@@ -185,6 +208,12 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			}
 			if !strings.Contains(lines[2], "-race ./internal/edit") {
 				test.Errorf("the -race run is not of the race list: %s", lines[2])
+			}
+			// A pinned node is on the tests' path, before the system's own; an absent one is nowhere on it.
+			onPath := strings.Contains(lines[1], "path "+goroot+"/bin:"+node+"/bin:/usr/bin:/bin")
+			if offPath := strings.Contains(lines[1], "path "+goroot+"/bin:/usr/bin:/bin"); (row.node == "pinned" &&
+				!onPath) || (row.node == "absent" && !offPath) {
+				test.Errorf("with the box's node %s, the tests ran on the wrong path: %s", row.node, lines[1])
 			}
 			left, readError := os.ReadDir(temporary)
 			if readError != nil {
