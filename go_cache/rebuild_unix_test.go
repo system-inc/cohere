@@ -15,7 +15,11 @@ import (
 // A rebuild after a trim recomputes only entries the trim removed, and only the ones it needs: every entry
 // the trim kept is the same file afterward, and the rebuild writes nothing the first build had not
 // (#jc6ca7r). Not every removed entry comes back, since an action whose own result is still cached never
-// asks for its inputs. Kept entries are told by their inode, since Go refreshes the time of an entry it uses.
+// asks for its inputs. Kept entries are told by their inode, since Go refreshes the time of an entry it uses: a
+// rewrite allocates the new file before the old one's inode is freed, so a rewritten kept entry can't keep its
+// number. A removed entry that is back was recomputed by being back, since the trim deleted it (afterTrim lacks it).
+// Its inode proves nothing: Linux hands a freed inode to the next file at once, so a recomputed entry can carry its
+// old number (2 of 176 on a Loom box, J-vvg0ga6, #zva1zrc), and comparing them failed every Linux gate.
 func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 	test.Parallel()
 	if _, lookPathError := exec.LookPath("go"); lookPathError != nil {
@@ -106,7 +110,7 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 	after := entries()
 	recomputed := 0
 	for path, number := range after {
-		original, wasThere := before[path]
+		_, wasThere := before[path]
 		kept, wasKept := afterTrim[path]
 		switch {
 		case !wasThere:
@@ -114,9 +118,6 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 		case wasKept && number != kept:
 			test.Errorf("%s, which the trim kept, was written again", filepath.Base(path))
 		case !wasKept:
-			if number == original {
-				test.Errorf("%s, which the trim removed, has its old inode", filepath.Base(path))
-			}
 			recomputed++
 		}
 	}
