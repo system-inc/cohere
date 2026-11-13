@@ -52,8 +52,11 @@ func TestPositionsReadOnceAreGoBuildsOwn(test *testing.T) {
 			test.Errorf("%s: read\n%+v\nwhere go/build reads\n%+v", target, built, expected)
 		}
 	}
-	// Each import sits where no other does, so one import's position taken for all would move ImportPos.
-	expected, expectedError := build.Default.ImportDir(directory, 0)
+	// Each import sits where no other does, so one import's position taken for all would move ImportPos. The fixture
+	// is read as darwin's, never the host's: positions_darwin.go holds two of its imports, and linux excludes the file.
+	darwin := build.Default
+	darwin.GOOS, darwin.GOARCH, darwin.CgoEnabled = "darwin", "arm64", false
+	expected, expectedError := darwin.ImportDir(directory, 0)
 	if expectedError != nil {
 		test.Fatal(expectedError)
 	}
