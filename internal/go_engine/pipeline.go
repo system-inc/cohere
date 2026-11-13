@@ -87,7 +87,8 @@ type pipeline struct {
 	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once (fixedBuildsWidth, or
 	// measuredBuildsWidth as the first build's load ends), 0 until it was, for the lint record, and
 	// buildsWidthLiveBytes and buildsWidthBuildBytes the host's live heap that decision was given and what the first
-	// build held beyond it, 0 when it needed none. buildsWidthForced, set only by a test, is the width
+	// build held beyond it, 0 when it needed none, and buildsWidthSlack whether the slack added the width's last build
+	// (buildsWidth). buildsWidthForced, set only by a test, is the width
 	// in place of that decision for builds that restore from the host, and buildsWidthUnguarded, a test's too, lets it
 	// apply to builds that restore nothing, so a test can show the width reaches no key with builds that each check
 	// every package. extraBuildEnds, also a test's alone, is called as each extra build's run ends with the build's own
@@ -98,6 +99,7 @@ type pipeline struct {
 	buildsAtOnce          int
 	buildsWidthLiveBytes  uint64
 	buildsWidthBuildBytes uint64
+	buildsWidthSlack      bool
 	buildsWidthForced     int
 	buildsWidthUnguarded  bool
 	extraBuildEnds        func(extra project.Build, notes io.Writer) error

@@ -1050,7 +1050,10 @@ measured the same way as the builds started. A build is taken to hold `"buildsWi
 lint's peak in a run with a findings store, and 2.5 times under `--no-cache` (#hv090f4), each the largest ratio
 measured in its mode across 14 builds of two trees rounded up to the next half, and the width is
 `floor((limit - live) / (holding * factor))`, no more than the builds and at least one, and one at a time under
-`--single-threaded` or a limit other than the cap. Beside it, `"buildsWidthLiveBytes":2147483648` is the host's live
+`--single-threaded` or a limit other than the cap. The slack adds one build past that, never two, when it is fewer than
+the builds and one more fits by the largest ratio measured unrounded, 3.22 with a store and 2.16 without one, with 512
+MiB to spare: `live + (width + 1) * holding * measured + 536870912 <= limit` (#ewkp7w0); `"buildsWidthSlack":true`
+says it did, absent when it did not. Beside it, `"buildsWidthLiveBytes":2147483648` is the host's live
 heap and `"buildsWidthBuildBytes":536870912` the first build's holding, so a reader redoes the arithmetic with the
 memory record's limit, and two runs of one workspace are given the same width; all three are absent when the decision
 needed none, because nothing could make the builds more than one at a time. `"buildsPoolSize":16` is how many slots the
@@ -1058,15 +1061,18 @@ run's one pool holds, which every load and check of the run shares, the host's a
 builds run side by side the run never runs more of that work at once (#ckm0hsp): one per core, one under
 `--single-threaded`. Each build notes into its own buffer, and once every build has ended their results are taken in
 build order and their notes in the order they started, up to and including the first that failed in that order, so the
-records and stderr are those of a run one build at a time, byte for byte, but these five fields, which no key and no
-verdict reads. All five are absent when `builds` is.
+records and stderr are those of a run one build at a time, byte for byte, but these six fields, which no key and no
+verdict reads. All six are absent when `builds` is.
 
 Under `--timing`, whose builds run one at a time, each extra build's record writes `"heldAtLoadEndBytes":1170372464`,
 what it held beyond the host's live heap as its load ended, measured by a forced collection, and
-`"heldAtLintPeakBytes":3555149280`, the most it held while its rules ran, sampled by one every quarter of a second. Their
-ratio is what `buildsWidthPeakFactor` stands for, so a tree whose ratio passes it shows in one run. A build under
-`--timing` restores nothing from the host's run, so it holds more as its load ends than one that restores, and its ratio
-reads lower than the width's case.
+`"heldAtLintPeakBytes":3555149280`, the most it held while its rules ran, sampled by one every quarter of a second, and
+`"lintPeakOverLoadEnd":3.038`, the second over the first to the thousandth. That ratio is what `buildsWidthPeakFactor`
+stands for, so a tree whose ratio passes it shows in one run: a build whose ratio passes the largest measured in the
+run's mode, 2.16 for a timed run, which reads no store, is named with its ratio and the constant in the lint record's
+`"buildsPeakProblems":["the build linux/arm64 held 2.170 times ..."]` and on stderr (#ewkp7w0), absent when none is. A
+build under `--timing` restores nothing from the host's run, so it holds more as its load ends than one that restores,
+and its ratio reads lower than the width's case.
 
 Under `--build-dependence` beside `--other-builds`, each extra build's record writes `"dependence"`, additive within
 contract 3 and the Go engine's alone (#qkq4gx5): which of the host's package-level declarations the build can change,

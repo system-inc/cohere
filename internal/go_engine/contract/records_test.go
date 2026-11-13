@@ -347,6 +347,7 @@ func populatedRecords() []Record {
 					LoadMilliseconds: 30, LintMilliseconds: 50, DecideMilliseconds: 12,
 					CheckedFromSource: 3, CheckedFromSourceRounds: []int{1, 2}, PackagesLoaded: 3,
 					LintWaitMilliseconds: 8, LintWaited: true, HeldAtLoadEndBytes: 64, HeldAtLintPeakBytes: 128,
+					LintPeakOverLoadEnd: 2,
 				},
 			},
 			OffReasons: map[string]string{"cohere-go/printf": "a reason"},

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -342,8 +343,9 @@ func TestBuildsSideBySideNeverPassTheCapPlusOneAllowance(test *testing.T) {
 }
 
 // The width is as many builds as the memory cap holds beside the host's live heap, each taken at its lint's peak,
-// floor((cap - live) / (holding * factor)), the factor 3.5 with a findings store and 2.5 without one (#hv090f4), no
-// more than the builds and at least one, and one at a time under
+// floor((cap - live) / (holding * factor)), the factor 3.5 with a findings store and 2.5 without one (#hv090f4), and
+// one more where the slack fits it (TestTheBuildsWidthSlack), no more than the builds and at least one, and one at a
+// time under
 // `--single-threaded`, without a memory decision, a live heap or a holding read, and under any limit but the cap
 // (#rmzehfg). The cap here is 8 GiB.
 func TestTheBuildsWidth(test *testing.T) {
@@ -368,10 +370,11 @@ func TestTheBuildsWidth(test *testing.T) {
 		// 7 GiB of room over peaks of 3.5 GiB: without the factor, the holding alone would make it seven.
 		{name: "each build taken at its peak", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte,
 			want: 2},
-		// Peaks of 2.625 GiB with a store and 1.875 GiB without one, in 7 GiB of room.
+		// Peaks of 2.625 GiB with a store and 1.875 GiB without one, in 7 GiB of room: two and three by the factors,
+		// and without a store the slack's fourth, four builds at 2.16 times 0.75 GiB and the margin filling 6.98 GiB.
 		{name: "a store's peak", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte * 3 / 4, want: 2},
 		{name: "a peak without a store", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte * 3 / 4,
-			withoutStore: true, want: 3},
+			withoutStore: true, want: 4},
 		{name: "memory holds every build", extras: 6, memory: underCap, live: gibibyte / 2, holding: gibibyte / 4,
 			want: 6},
 		{name: "builds are two", extras: 2, memory: underCap, live: gibibyte, holding: gibibyte / 4, want: 2},
@@ -393,11 +396,113 @@ func TestTheBuildsWidth(test *testing.T) {
 		{name: "no memory read", extras: 6, memory: underSource(contract.MemorySourceUnreadable), live: gibibyte,
 			holding: gibibyte / 4, want: 1},
 	} {
-		got := buildsWidth(each.extras, each.singleThreaded, each.memory, each.live, each.holding,
-			buildPeakOverLoadEnd(!each.withoutStore))
+		got, _ := buildsWidth(each.extras, each.singleThreaded, each.memory, each.live, each.holding,
+			!each.withoutStore)
 		if got != each.want {
 			test.Errorf("%s: the width is %d, want %d", each.name, got, each.want)
 		}
+	}
+}
+
+// The slack adds one build past the width the factor gives, never two, only when that one fits by the largest ratio
+// measured in the run's mode, 2.16 without a findings store and 3.22 with one, with 512 MiB to spare, and only when the
+// width is fewer than the builds (#ewkp7w0). Each bound is met to the byte and missed by one. deeafbf4's measured
+// heaps under `--no-cache` give 3 with and without the 9.5 MB more live heap that tipped its width to 2, and cohere
+// root's, read by the unlabelled release binary, give 5 under `--no-cache`, the slack's fifth, with about 540 MB to
+// spare, and 3 with a store. The cap is 8 GiB but where a case says.
+func TestTheBuildsWidthSlack(test *testing.T) {
+	test.Parallel()
+	underLimit := func(limit uint64) *engineMemory {
+		return &engineMemory{record: contract.Memory{LimitBytes: int64(limit), CapBytes: int64(limit),
+			Source: contract.MemorySourceCap}}
+	}
+	const gibibyte = uint64(1) << 30
+	// fitting is the room, beyond the live heap, in which builds builds of holding fit by measured with the margin
+	// to the byte, as buildsWidth reads it.
+	fitting := func(builds int, holding uint64, measured float64) uint64 {
+		return uint64(math.Ceil(float64(builds)*float64(holding)*measured)) + buildsWidthSlackMarginBytes
+	}
+	// Without a store the factor gives two builds of a GiB in 5 to 7.5 GiB of room, which the third's 6.98 GiB
+	// meets, and with one in 7 to 10.5 GiB, which the third's 10.16 GiB meets.
+	withoutStoreRoom := fitting(3, gibibyte, buildPeakOverLoadEndMeasuredWithoutStore)
+	withStoreRoom := fitting(3, gibibyte, buildPeakOverLoadEndMeasuredWithStore)
+	for _, each := range []struct {
+		name      string
+		extras    int
+		limit     uint64
+		live      uint64
+		holding   uint64
+		withStore bool
+		want      int
+		wantSlack bool
+	}{
+		{name: "a third fits by 2.16 with the margin", extras: 6, limit: gibibyte + withoutStoreRoom, live: gibibyte,
+			holding: gibibyte, want: 3, wantSlack: true},
+		{name: "a third misses by a byte", extras: 6, limit: gibibyte + withoutStoreRoom - 1, live: gibibyte,
+			holding: gibibyte, want: 2},
+		{name: "a third fits by 3.22 with the margin", extras: 6, limit: gibibyte + withStoreRoom, live: gibibyte,
+			holding: gibibyte, withStore: true, want: 3, wantSlack: true},
+		{name: "a third misses by a byte with a store", extras: 6, limit: gibibyte + withStoreRoom - 1,
+			live: gibibyte, holding: gibibyte, withStore: true, want: 2},
+		{name: "a third is the last build", extras: 3, limit: gibibyte + withoutStoreRoom, live: gibibyte,
+			holding: gibibyte, want: 3, wantSlack: true},
+		{name: "the width is the builds already", extras: 2, limit: gibibyte + withoutStoreRoom, live: gibibyte,
+			holding: gibibyte, want: 2},
+		// Six builds of 4 GiB by the factor in 69.75 GiB of room, where eight fit by 2.16 with the margin, 69.62 GiB:
+		// the slack adds the seventh alone.
+		{name: "never two past", extras: 10, limit: 70*gibibyte + 3*gibibyte/4, live: gibibyte,
+			holding: 4 * gibibyte, want: 7, wantSlack: true},
+		{name: "deeafbf4 under --no-cache", extras: 8, limit: uint64(engineMemoryCap), live: 569_200_000,
+			holding: 1_069_200_000, want: 3},
+		{name: "deeafbf4 under --no-cache with 9.5 MB more live", extras: 8, limit: uint64(engineMemoryCap),
+			live: 578_700_000, holding: 1_069_200_000, want: 3, wantSlack: true},
+		{name: "root under --no-cache", extras: 7, limit: uint64(engineMemoryCap), live: 456_300_000,
+			holding: 653_400_000, want: 5, wantSlack: true},
+		{name: "root with a store", extras: 7, limit: uint64(engineMemoryCap), live: 456_300_000,
+			holding: 653_400_000, withStore: true, want: 3},
+		// A phase-labelled throwaway binary inflates root's holding to 701.2 MB, where the fifth build fits by 9.5 MB
+		// and misses with 32 MB less room: a knife edge the release binary does not have, so a pair judging the width
+		// runs unlabelled binaries.
+		{name: "root at a labelled binary's holding", extras: 7, limit: uint64(engineMemoryCap), live: 470_600_000,
+			holding: 701_200_000, want: 5, wantSlack: true},
+		{name: "root at a labelled binary's holding with 32 MB less room", extras: 7,
+			limit: uint64(engineMemoryCap) - 32_000_000, live: 470_600_000, holding: 701_200_000, want: 4},
+	} {
+		got, slack := buildsWidth(each.extras, false, underLimit(each.limit), each.live, each.holding, each.withStore)
+		if got != each.want || slack != each.wantSlack {
+			test.Errorf("%s: the width is %d, the slack's %t, want %d, %t", each.name, got, slack, each.want,
+				each.wantSlack)
+		}
+	}
+}
+
+// A timed run names, in the lint record and on stderr, each build whose lint peaked at more times what it held as its
+// load ended than the largest ratio measured in the run's mode, the build, its ratio and the constant (#ewkp7w0): a
+// build at 2.17 under a timed run, which has no store, passes 2.16, and one at 2.16 does not.
+func TestTimingNamesABuildPastTheMeasuredPeak(test *testing.T) {
+	test.Parallel()
+	var standardError strings.Builder
+	engine := &pipeline{standardError: &standardError}
+	record := contract.LintRecord{Builds: []contract.BuildRecord{
+		{Target: "darwin/arm64 cgo", Host: true},
+		{Target: "linux/arm64", HeldAtLoadEndBytes: 1000, HeldAtLintPeakBytes: 2170,
+			LintPeakOverLoadEnd: lintPeakOverLoadEnd(1000, 2170)},
+		{Target: "windows/arm64", HeldAtLoadEndBytes: 1000, HeldAtLintPeakBytes: 2160,
+			LintPeakOverLoadEnd: lintPeakOverLoadEnd(1000, 2160)},
+	}}
+	engine.recordBuildsPeakProblems(&record)
+	if len(record.BuildsPeakProblems) != 1 {
+		test.Fatalf("the record names %d builds past the measured peak, want linux/arm64 alone: %q",
+			len(record.BuildsPeakProblems), record.BuildsPeakProblems)
+	}
+	problem := record.BuildsPeakProblems[0]
+	for _, part := range []string{"linux/arm64", "2.170", "buildPeakOverLoadEndMeasuredWithoutStore", "2.16"} {
+		if !strings.Contains(problem, part) {
+			test.Errorf("the problem %q does not name %s", problem, part)
+		}
+	}
+	if standardError.String() != "cohere-go: "+problem+"\n" {
+		test.Errorf("stderr reads %q, want the problem noted", standardError.String())
 	}
 }
 
@@ -464,7 +569,7 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	}
 
 	runtime.GC()
-	collectedWidth, collectedHolding := engine.measuredBuildsWidth(8, hostLive)
+	collectedWidth, _, collectedHolding := engine.measuredBuildsWidth(8, hostLive)
 
 	garbage := make([]byte, garbageBytes)
 	for index := range garbage {
@@ -473,7 +578,7 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	runtime.GC()
 	runtime.KeepAlive(garbage)
 	// garbage is unreachable from here, and no collection has run since the last one counted it.
-	staleWidth, staleHolding := engine.measuredBuildsWidth(8, hostLive)
+	staleWidth, _, staleHolding := engine.measuredBuildsWidth(8, hostLive)
 	runtime.KeepAlive(build)
 
 	if collectedWidth != staleWidth {

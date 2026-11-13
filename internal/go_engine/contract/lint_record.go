@@ -63,6 +63,15 @@ type LintRecord struct {
 	// when BuildsWidthLiveBytes is.
 	BuildsWidthBuildBytes uint64  `json:"buildsWidthBuildBytes,omitempty"`
 	BuildsWidthPeakFactor float64 `json:"buildsWidthPeakFactor,omitempty"`
+	// BuildsWidthSlack is additive within contract 3, and the Go engine's alone: whether the width's slack added
+	// BuildsAtOnce's last build, one past that floor, since one more fit by the largest ratio measured in the run's
+	// mode, 3.22 with a findings store and 2.16 without one, with 512 MiB to spare (#ewkp7w0). Absent when it did not.
+	BuildsWidthSlack bool `json:"buildsWidthSlack,omitempty"`
+	// BuildsPeakProblems is additive within contract 3, and the Go engine's alone: a sentence for each extra build of
+	// a run under `--timing` whose LintPeakOverLoadEnd passed the largest ratio measured in the run's mode, which the
+	// slack spends to, naming the build, its ratio and the constant, each also noted on stderr (#ewkp7w0). Absent
+	// when none did.
+	BuildsPeakProblems []string `json:"buildsPeakProblems,omitempty"`
 	// BuildsPoolSize is additive within contract 3, and the Go engine's alone: how many slots the run's one pool holds,
 	// which every load and check of the run shares, the host's and every extra build's, so however many builds run side
 	// by side the run never runs more of that work at once (#ckm0hsp). One per core, one under `--single-threaded`.
@@ -147,6 +156,10 @@ type BuildRecord struct {
 	// that restores, and its ratio reads lower.
 	HeldAtLoadEndBytes  uint64 `json:"heldAtLoadEndBytes,omitempty"`
 	HeldAtLintPeakBytes uint64 `json:"heldAtLintPeakBytes,omitempty"`
+	// LintPeakOverLoadEnd is HeldAtLintPeakBytes over HeldAtLoadEndBytes, to the thousandth, written when both are
+	// (#ewkp7w0): a ratio past the largest measured in the run's mode is named in the lint record's
+	// BuildsPeakProblems.
+	LintPeakOverLoadEnd float64 `json:"lintPeakOverLoadEnd,omitempty"`
 
 	// CheckedFromSource and PackagesLoaded are an extra build's alone (#b2t9xmf): the packages of its whole graph its
 	// loads checked from source rather than restored, from its own findings cache or the host's run, summed over every

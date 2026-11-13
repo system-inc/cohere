@@ -232,6 +232,11 @@ func TestTimingRecordsEachBuildsHoldings(test *testing.T) {
 			test.Errorf("the build %s held %d bytes as its load ended and %d at its lint's peak, want both, the "+
 				"peak no less", build.Target, build.HeldAtLoadEndBytes, build.HeldAtLintPeakBytes)
 		}
+		if want := lintPeakOverLoadEnd(build.HeldAtLoadEndBytes, build.HeldAtLintPeakBytes); want < 1 ||
+			build.LintPeakOverLoadEnd != want {
+			test.Errorf("the build %s records a ratio of %v, want its peak over its load's end, %v", build.Target,
+				build.LintPeakOverLoadEnd, want)
+		}
 	}
 	if len(started) == 0 || strings.HasPrefix(started[0], runtime.GOOS+"/"+runtime.GOARCH) {
 		test.Errorf("the builds started in the order %v, want another platform's first", started)

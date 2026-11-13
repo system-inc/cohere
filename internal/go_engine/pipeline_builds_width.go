@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"fmt"
 	"math"
 	"runtime"
 	"runtime/metrics"
@@ -51,8 +52,8 @@ func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun) (int, 
 	}
 	// A heap of one byte held by each build is the least any can be, so the widest the builds and the limit allow:
 	// when even that is one at a time, no heap can widen it, and the run pays no collection to measure one.
-	if buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, 1, 1,
-		engine.buildPeakFactor()) == 1 {
+	if width, _ := buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, 1, 1,
+		engine.withFindingsStore()); width == 1 {
 		return 1, true
 	}
 	return 0, false
@@ -63,11 +64,12 @@ func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun) (int, 
 // running, measured by a collection run for it (forcedLiveHeapBytes), less hostLive, the host's live heap measured the
 // same way as the builds started. It returns the width and the build's holding, at least one byte. The first build
 // waits for it between its load and its rules, holding none of the run's slots, and the rest start once it is decided
-// (extraBuildRuns).
-func (engine *pipeline) measuredBuildsWidth(extras int, hostLive uint64) (int, uint64) {
+// (extraBuildRuns). Beside the width it returns whether the slack added its last build (buildsWidth).
+func (engine *pipeline) measuredBuildsWidth(extras int, hostLive uint64) (int, bool, uint64) {
 	holding := holdingAbove(forcedLiveHeapBytes(), hostLive)
-	return buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding,
-		engine.buildPeakFactor()), holding
+	width, slack := buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding,
+		engine.withFindingsStore())
+	return width, slack, holding
 }
 
 // holdingAbove is what a build holds of live, the live heap measured with it loaded, beyond hostLive, the host's
@@ -128,12 +130,22 @@ func (engine *pipeline) restoresFromHost(host *check.HostRun) bool {
 // cohere's root and deeafbf4 were each run alone, their live heap taken by a forced collection at the load's end and
 // sampled through the lint: with the findings store, 2.63 to 3.22 at the root and 1.89 to 2.57 at deeafbf4; under
 // `--no-cache`, 1.31 to 2.09 at the root and 1.12 to 2.16 at deeafbf4. A tree whose ratio passes its factor shows in
-// one run under `--timing`, whose build records carry each build's holding at both points, and a constant changes only
-// on such a record.
+// one run under `--timing`, whose build records carry each build's holding at both points and their ratio, and a
+// constant changes only on such a record. buildPeakOverLoadEndMeasuredWithStore and
+// buildPeakOverLoadEndMeasuredWithoutStore are those largest ratios before the rounding, 3.22 and 2.16: the bound the
+// width's slack spends to (buildsWidth), and the bound a timed run checks each build's ratio against
+// (recordBuildsPeakProblems), so a tree that passes one is named the first time it is measured.
 const (
-	buildPeakOverLoadEndWithStore    = 3.5
-	buildPeakOverLoadEndWithoutStore = 2.5
+	buildPeakOverLoadEndWithStore            = 3.5
+	buildPeakOverLoadEndWithoutStore         = 2.5
+	buildPeakOverLoadEndMeasuredWithStore    = 3.22
+	buildPeakOverLoadEndMeasuredWithoutStore = 2.16
 )
+
+// buildsWidthSlackMarginBytes is what the width's slack leaves free under the cap beyond every build at the largest
+// ratio measured in its mode (buildsWidth): 512 MiB, which at deeafbf4, three builds each holding about 1.07 GB as
+// their loads end, leaves room for each to pass the largest ratio measured by about 0.16 (#ewkp7w0).
+const buildsWidthSlackMarginBytes = 512 << 20
 
 // buildPeakOverLoadEnd is the factor for a run with a findings store when withStore is true, and for one without.
 func buildPeakOverLoadEnd(withStore bool) float64 {
@@ -143,16 +155,40 @@ func buildPeakOverLoadEnd(withStore bool) float64 {
 	return buildPeakOverLoadEndWithoutStore
 }
 
-// buildPeakFactor is the factor the run's width takes: the host's findings cache reads a store, or it has none, under
-// `--no-cache` or when the store could not be opened.
+// buildPeakOverLoadEndMeasured is the largest ratio measured in a run with a findings store when withStore is true,
+// and in one without, with the constant's name, which a problem with a build's ratio names (recordBuildsPeakProblems).
+func buildPeakOverLoadEndMeasured(withStore bool) (float64, string) {
+	if withStore {
+		return buildPeakOverLoadEndMeasuredWithStore, "buildPeakOverLoadEndMeasuredWithStore"
+	}
+	return buildPeakOverLoadEndMeasuredWithoutStore, "buildPeakOverLoadEndMeasuredWithoutStore"
+}
+
+// withFindingsStore reports whether the host's findings cache reads a store, which decides the mode the width's
+// factors are taken in: it has none under `--no-cache`, under `--timing`, whose run has no session, or when the store
+// could not be opened.
+func (engine *pipeline) withFindingsStore() bool {
+	return engine.session != nil && engine.session.HasStore()
+}
+
+// buildPeakFactor is the factor the run's width takes, in the run's mode (withFindingsStore).
 func (engine *pipeline) buildPeakFactor() float64 {
-	return buildPeakOverLoadEnd(engine.session != nil && engine.session.HasStore())
+	return buildPeakOverLoadEnd(engine.withFindingsStore())
 }
 
 // buildsWidth is how many of extras extra builds run side by side: as many as the memory cap holds beside the host's
-// live heap, each build taken at its lint's peak, holding times factor (buildPeakFactor), floor((cap - hostLive) /
-// (holding * factor)), with no more than the builds and at least one (#rmzehfg). Cores are no measure of it: the run's
-// one pool bounds every build's work to them (#ckm0hsp).
+// live heap, each build taken at its lint's peak, holding times the factor of the run's mode, with a findings store
+// when withStore is true (buildPeakOverLoadEnd), floor((cap - hostLive) / (holding * factor)), with no more than the
+// builds and at least one (#rmzehfg). Cores are no measure of it: the run's one pool bounds every build's work to them
+// (#ckm0hsp). It returns too whether the slack added the last build.
+//
+// The slack is one build past that width, and never more, when it is fewer than the builds and one more fits by the
+// largest ratio measured in the mode (buildPeakOverLoadEndMeasured) with buildsWidthSlackMarginBytes to spare:
+// hostLive + (width + 1) * holding * measured + margin <= cap (#ewkp7w0). The factor's rounding up to the next half
+// is a margin taken in units of a whole build's holding, about 0.36 GB at deeafbf4, whose `--no-cache` width sat at
+// 3.00 and flipped to 2 about one run in four; the slack spends that margin only where the worst peak measured still
+// fits with 512 MiB free, so the worst peak it permits is under the cap by construction, and passes it only for a tree
+// whose ratio passes the largest measured, which a timed run names (recordBuildsPeakProblems).
 //
 // hostLiveBytes is the host's live heap as the builds start, which stays live until the last build ends (otherBuilds),
 // and holdingBytes what the heaviest build holds beyond it as its load ends, the bound taken for each build: an extra
@@ -174,24 +210,37 @@ func buildsWidth(
 	memory *engineMemory,
 	hostLiveBytes uint64,
 	holdingBytes uint64,
-	factor float64,
-) int {
+	withStore bool,
+) (int, bool) {
 	if singleThreaded || memory == nil || memory.record.Source != contract.MemorySourceCap || hostLiveBytes == 0 ||
 		holdingBytes == 0 {
-		return 1
+		return 1, false
 	}
 	capBytes := uint64(max(memory.record.LimitBytes, 0))
 	if capBytes <= hostLiveBytes {
-		return 1
+		return 1, false
 	}
+	room := capBytes - hostLiveBytes
 	// A peak past what a uint64 holds is past any cap, which the division reads as no room.
-	peak := math.Ceil(float64(holdingBytes) * factor)
+	peak := math.Ceil(float64(holdingBytes) * buildPeakOverLoadEnd(withStore))
 	if peak >= math.MaxUint64 {
-		return 1
+		return 1, false
 	}
 	// Bounded by extras before it is an int, so a tiny holding never overflows it.
-	byMemory := int(min((capBytes-hostLiveBytes)/uint64(peak), uint64(max(extras, 0))))
-	return max(min(extras, byMemory), 1)
+	byMemory := int(min(room/uint64(peak), uint64(max(extras, 0))))
+	width := max(min(extras, byMemory), 1)
+	// A width already the builds' count has no build to add, and one past it would pass them; room under the margin
+	// holds no build with it to spare.
+	if width >= extras || room < buildsWidthSlackMarginBytes {
+		return width, false
+	}
+	measured, _ := buildPeakOverLoadEndMeasured(withStore)
+	// The room is exact in a float64 under 8 PiB, so the margin is spent to the byte.
+	peaks := math.Ceil(float64(width+1) * float64(holdingBytes) * measured)
+	if peaks > float64(room-buildsWidthSlackMarginBytes) {
+		return width, false
+	}
+	return width + 1, true
 }
 
 // forcedLiveHeapBytes is the live heap measured by a collection run for it, so the width is decided by what the run
@@ -256,6 +305,37 @@ func heldWhileLinting(interval time.Duration) func() uint64 {
 	return func() uint64 {
 		close(stop)
 		return <-largest
+	}
+}
+
+// lintPeakOverLoadEnd is an extra build's ratio under `--timing`, what it held at its lint's peak over what it held as
+// its load ended, to the thousandth, the ratio buildPeakOverLoadEnd's factors stand for, and 0 when either was not
+// measured, in any run but a timed one and for the host's build.
+func lintPeakOverLoadEnd(heldAtLoadEnd uint64, heldAtLintPeak uint64) float64 {
+	if heldAtLoadEnd == 0 || heldAtLintPeak == 0 {
+		return 0
+	}
+	return math.Round(float64(heldAtLintPeak)/float64(heldAtLoadEnd)*1000) / 1000
+}
+
+// recordBuildsPeakProblems names, in record's BuildsPeakProblems and on stderr, each build whose ratio
+// (lintPeakOverLoadEnd) passes the largest measured in the run's mode (buildPeakOverLoadEndMeasured), which the
+// width's slack spends its margin to: a tree that breaks the measured maximum is caught the first time a timed run
+// measures it, rather than running its builds past the cap unseen (#ewkp7w0). A timed run has no session, so its builds
+// are checked against the maximum measured without a store, the mode they ran in.
+//
+// Mutates: record gains BuildsPeakProblems
+func (engine *pipeline) recordBuildsPeakProblems(record *contract.LintRecord) {
+	measured, name := buildPeakOverLoadEndMeasured(engine.withFindingsStore())
+	for _, build := range record.Builds {
+		if build.LintPeakOverLoadEnd <= measured {
+			continue
+		}
+		problem := fmt.Sprintf("the build %s held %.3f times at its lint's peak what it held as its load ended, past "+
+			"%s, %.2f, the largest ratio measured, which the builds' width spends its slack to", build.Target,
+			build.LintPeakOverLoadEnd, name, measured)
+		record.BuildsPeakProblems = append(record.BuildsPeakProblems, problem)
+		engine.note("%s", problem)
 	}
 }
 
