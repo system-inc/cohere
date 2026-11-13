@@ -106,6 +106,9 @@ type summaryJson struct {
 	// MemoryRaisedToBytes is each limit a Go run raised its heap to after its load, absent when it raised none, for
 	// a replay, and for every other run.
 	MemoryRaisedToBytes []int64 `json:"memoryRaisedToBytes,omitempty"`
+	// HeadersUnshared is why a Go run's listings did not share each Go file's header, absent when they shared them,
+	// for a replay, and for every other run.
+	HeadersUnshared string `json:"headersUnshared,omitempty"`
 	// Builds is every build a Go run checked when it checked more than one, the host's first, absent for a run of
 	// one build and every other run.
 	Builds []checkedBuild `json:"builds,omitempty"`
@@ -199,6 +202,7 @@ func summaryAsJson(summary runSummary) summaryJson {
 		Cache:                       summary.Cache,
 		PackageCache:                summary.PackageCache,
 		MemoryRaisedToBytes:         summary.MemoryRaisedToBytes,
+		HeadersUnshared:             summary.HeadersUnshared,
 		Builds:                      summary.Builds,
 		BuildsAtOnce:                summary.BuildsAtOnce,
 		BuildsWidthLiveBytes:        summary.BuildsWidthLiveBytes,

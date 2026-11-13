@@ -173,6 +173,10 @@ type engineTypesRecord struct {
 	// Memory is the Go engine's, additive within contract 3: the memory limit its process ran under and where it
 	// came from, printed in the account `--verbose` prints. A Swift engine sends none.
 	Memory *engineMemory `json:"memory"`
+	// HeadersUnshared is the Go engine's, additive within contract 3 (#tb538na): why the run's listings did not
+	// share each Go file's header through the engine's copy of go/build, which happens only in a binary linked by a
+	// Go release whose go/build is not the copy's. Absent when they shared them. A Swift engine sends none.
+	HeadersUnshared string `json:"headersUnshared"`
 }
 
 type engineLintRecord struct {
@@ -906,6 +910,12 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 	// The invocation's, as the types line is: the limit this run's engine held its heap under, and why.
 	if record.Memory != nil {
 		printInvocation(accountOutput(run.out), "  memory: %s\n", record.Memory.line())
+	}
+	// The invocation's too: a binary whose go/build is not the engine's copy reads the same listing at more CPU, and
+	// a reader timing a run needs to know which binary it timed (#fnsk1jv).
+	if record.HeadersUnshared != "" {
+		activeSummary.HeadersUnshared = record.HeadersUnshared
+		printInvocation(accountOutput(run.out), "  headers: not shared, %s\n", record.HeadersUnshared)
 	}
 
 	// Said, so a run that withheld what no cgo tool could settle never reads like one with nothing to withhold:
