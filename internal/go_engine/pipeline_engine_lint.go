@@ -261,6 +261,8 @@ func (engine *pipeline) lintPackages(
 	options.ReleaseAnalyzed = true
 	options.ReadFile = engine.sourceReader(nil, rewritten)
 	options.Timing = engine.timing
+	// Under `--build-dependence` the host's facts are the ones every extra build's are compared with (#0ghk7vj).
+	options.ExportFacts = engine.dependence != nil
 	options.Counted = engine.described.countedAsWalked
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer

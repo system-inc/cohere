@@ -46,6 +46,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
+	// The host's facts, which each build's are compared with under `--build-dependence` (#0ghk7vj), indexed before any
+	// build starts.
+	engine.indexHostFacts(pass.result.Facts)
 	ours := engine.oursSet()
 	analyzed := map[string]bool{}
 	for _, each := range loaded.Packages {
@@ -407,7 +410,7 @@ func (engine *pipeline) extraBuildRun(
 		run.files = session.Files()
 	}
 	// Judged on the host's graph from this first load alone, which a reload for a question never changes the files of.
-	run.dependence = engine.dependenceOf(loaded)
+	run.dependence, run.judged = engine.dependenceOf(loaded)
 	if len(loaded.Diagnostics) > 0 {
 		return run, nil
 	}
@@ -438,6 +441,8 @@ func (engine *pipeline) extraBuildRun(
 			ReleaseAnalyzed: true,
 			ReadFile:        engine.sourceReader(nil, over.Rewritten),
 			Timing:          engine.timing,
+			// Under `--build-dependence` the build's facts are compared with the host's (#0ghk7vj).
+			ExportFacts: engine.dependence != nil,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -497,6 +502,10 @@ func (engine *pipeline) extraBuildRun(
 	run.said = compiledFiles(loaded.Packages, ours)
 	run.untouchedFiles = compiledFiles(loaded.Untouched, ours)
 	run.result = result
+	// The facts census reads the last load's facts, whose result stands, beside the host's (#0ghk7vj).
+	if run.judged != nil && run.dependence != nil {
+		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
+	}
 	run.loading, run.linting = loading, linting
 	if engine.extraBuildEnds != nil {
 		if endError := engine.extraBuildEnds(extra, notes); endError != nil {

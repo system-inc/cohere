@@ -69,4 +69,7 @@ type buildRun struct {
 	// dependence is an extra build's alone, under `--build-dependence`: its judgment on the host's graph from its first
 	// load (dependenceOf), nil otherwise.
 	dependence *contract.BuildDependence
+	// judged is an extra build's alone, under `--build-dependence`: the judgment its record was counted from and the
+	// files it shares with the host's, which its facts are compared through once its lint has run (compareFacts).
+	judged *buildJudgment
 }

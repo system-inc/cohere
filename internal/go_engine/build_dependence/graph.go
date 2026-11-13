@@ -81,6 +81,10 @@ type unitRecord struct {
 	// universeNames are the universe's names the unit's declaration uses, one bit each (universeNameBit), so a
 	// build-only file that declares one of them can seed the units whose meaning it changes.
 	universeNames uint64
+
+	// callees are the functions the unit's body or initializer calls statically (staticCallees), which a judgment
+	// reads as the units declaring them, so a caller of a function whose facts move in a build can be found.
+	callees []types.Object
 }
 
 // NewGraph is an empty graph.
@@ -124,6 +128,7 @@ func (graph *Graph) resolve() *resolvedGraph {
 		typesPackages: map[*types.Package]bool{},
 		nodes:         map[types.Object]int32{},
 		unitIndex:     map[unitKey]int{},
+		fileUnits:     map[fileKey][]int{},
 	}
 	for _, identifier := range slices.Sorted(maps.Keys(graph.packages)) {
 		record := graph.packages[identifier]
@@ -135,6 +140,7 @@ func (graph *Graph) resolve() *resolvedGraph {
 	}
 	resolved.resolveUnits()
 	resolved.resolveEdges()
+	resolved.resolveCalls()
 	walker := &bitWalker{seen: map[walkKey]bool{}}
 	for index := range resolved.units {
 		for _, read := range resolved.units[index].record.references {

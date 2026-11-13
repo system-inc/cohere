@@ -2,6 +2,7 @@ package build_dependence
 
 import (
 	"go/types"
+	"slices"
 )
 
 // resolvedGraph is the graph's records resolved into nodes: every object a unit declares has a node, and each node two
@@ -25,8 +26,13 @@ type resolvedGraph struct {
 	// packageUnits are, for each package, the half-open range of its units.
 	packageUnits [][2]int
 
-	// unitIndex is each unit by its package ID, file and start offset.
+	// unitIndex is each unit by its package ID, file and start offset, and fileUnits each file's units by package ID
+	// and file, in the order of their start offsets, for the unit holding an offset (Dependence.UnitContaining).
 	unitIndex map[unitKey]int
+	fileUnits map[fileKey][]int
+
+	// declaringUnit is, for each node, the unit that declares it.
+	declaringUnit []int
 
 	// dependents are, for each bit, the bits that depend on it (rule 3).
 	dependents [][]int32
@@ -45,12 +51,22 @@ type resolvedUnit struct {
 	receiver     int32
 	bits         []int32
 	external     []reference
+
+	// calls are the units the unit's body calls statically (unitRecord.callees), each once, never itself: a callee no
+	// unit of the graph declares, a dependency's checked without syntax, is left out.
+	calls []int
 }
 
 // externalEdge is an edge from a bit of the graph to a bit of an object of a package it does not hold.
 type externalEdge struct {
 	fromBit int32
 	to      reference
+}
+
+// fileKey is a file of a package: its package ID and the file a reader sees.
+type fileKey struct {
+	packageIdentifier string
+	file              string
 }
 
 // unitKey is a unit's place: its package ID, the file a reader sees it in, and its start offset in the file parsed.
@@ -76,10 +92,15 @@ func (resolved *resolvedGraph) resolveUnits() {
 			unit := &record.units[unitIndex]
 			declares := make([]int32, 0, len(unit.declares))
 			for _, object := range unit.declares {
-				declares = append(declares, resolved.node(object))
+				node := resolved.node(object)
+				declares = append(declares, node)
+				resolved.declaringUnit[node] = len(resolved.units)
 			}
 			resolved.unitIndex[unitKey{packageIdentifier: record.identifier, file: unit.file, offset: unit.start}] =
 				len(resolved.units)
+			// A package's units come in the order of its files' declarations, so each file's are in start order.
+			inFile := fileKey{packageIdentifier: record.identifier, file: unit.file}
+			resolved.fileUnits[inFile] = append(resolved.fileUnits[inFile], len(resolved.units))
 			resolved.units = append(resolved.units,
 				resolvedUnit{packageIndex: packageIndex, record: unit, declares: declares, receiver: -1})
 		}
@@ -105,6 +126,7 @@ func (resolved *resolvedGraph) node(object types.Object) int32 {
 	index := int32(len(resolved.objects))
 	resolved.nodes[declared] = index
 	resolved.objects = append(resolved.objects, declared)
+	resolved.declaringUnit = append(resolved.declaringUnit, -1)
 	return index
 }
 
@@ -181,4 +203,21 @@ func (resolved *resolvedGraph) fixedPoint(seedBits []int32) []bool {
 		}
 	}
 	return set
+}
+
+// resolveCalls turns each unit's callees into the units that declare them, each once, never the unit itself.
+func (resolved *resolvedGraph) resolveCalls() {
+	for index := range resolved.units {
+		unit := &resolved.units[index]
+		for _, callee := range unit.record.callees {
+			node, isNode := resolved.nodes[callee]
+			if !isNode {
+				continue
+			}
+			declaring := resolved.declaringUnit[node]
+			if declaring >= 0 && declaring != index && !slices.Contains(unit.calls, declaring) {
+				unit.calls = append(unit.calls, declaring)
+			}
+		}
+	}
 }
