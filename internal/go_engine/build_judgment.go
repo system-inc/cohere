@@ -19,9 +19,10 @@ type buildJudgment struct {
 }
 
 // census is the units the facts census counts, the host's graph's and then the standard library's, each graph's own
-// static calls by their index here and every call of a host unit into the standard library found through its
-// callee's counterpart, as one graph holding both would have found it; and the unit of a package and file holding an
-// offset, read from the graph that holds the package.
+// static calls by their index here and every call of a host unit into the standard library found by its callee's
+// path and local name, a live record's and one read back from the store alike (#6a3kjvz), as one graph holding both
+// would have found it; and the unit of a package and file holding an offset, read from the graph that holds the
+// package.
 func (judged *buildJudgment) census() ([]build_dependence.Unit, func(string, string, int) (int, bool)) {
 	units := judged.dependence.Units()
 	hostUnits := len(units)
@@ -38,11 +39,7 @@ func (judged *buildJudgment) census() ([]build_dependence.Unit, func(string, str
 	}
 	for index := range hostUnits {
 		for _, callee := range units[index].ExternalCalls {
-			counterpart, isFound := judged.counterparts.Counterpart(callee)
-			if !isFound {
-				continue
-			}
-			declaring, isDeclared := judged.standardLibrary.UnitDeclaring(counterpart)
+			declaring, isDeclared := judged.standardLibrary.UnitDeclaringName(callee.Path, callee.Local)
 			if isDeclared && !slices.Contains(units[index].Calls, hostUnits+declaring) {
 				// A copy, since Units hands every caller the graph's own slice.
 				units[index].Calls = append(slices.Clone(units[index].Calls), hostUnits+declaring)

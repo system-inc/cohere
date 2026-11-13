@@ -23,6 +23,13 @@ type Difference struct {
 	// syntax: whether its name bit, and its underlying bit, are set in the build. nil means no such object is
 	// dependent.
 	DependentObject func(object types.Object) (name bool, underlying bool)
+
+	// DependentName answers the same for such an object as a record read back from the store names it, which has no
+	// live object (#6a3kjvz): by its package's path and its local name there, its bits, and whether a unit of the
+	// answering graph declares it. One the answering graph's package holds but no unit declares is read through its
+	// type, as the record holds that (answered false); one of a package that graph does not hold answers both bits set,
+	// failing wide. nil, with DependentObject set, fails every such object wide.
+	DependentName func(path string, local string) (name bool, underlying bool, declared bool)
 }
 
 // PackageDifference is how one package's files differ between the host and the build.

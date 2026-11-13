@@ -6,6 +6,22 @@ import (
 	"fmt"
 )
 
+// Record is a package's record decoded from its bytes, for a caller that decodes it apart from adding it to a graph
+// (Graph.AddDecoded): the findings cache decodes each record it reads beside the entries, so one that does not decode
+// is its own to say and to write again (#6a3kjvz).
+type Record struct {
+	record *packageRecord
+}
+
+// DecodeRecord is the record encoded holds (EncodedRecord), or why it holds none.
+func DecodeRecord(encoded []byte) (*Record, error) {
+	record, decodeError := decodeRecord(encoded)
+	if decodeError != nil {
+		return nil, decodeError
+	}
+	return &Record{record: record}, nil
+}
+
 // errorRecordShort is a record whose bytes end before it does.
 var errorRecordShort = errors.New("the record ends early")
 

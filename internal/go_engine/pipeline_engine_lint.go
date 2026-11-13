@@ -172,6 +172,11 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		Problems:     len(result.Cache.Problems),
 		WriteFailed:  result.Cache.WriteFailed,
 	}
+	if counted := result.Cache.DependenceRecords; counted != nil {
+		record.Cache.DependenceRecords = &contract.DependenceRecords{Read: counted.Read, Written: counted.Written,
+			Backfilled: counted.Backfilled, AliasSkipped: counted.AliasSkipped, Unreadable: counted.Unreadable,
+			DroppedAfterBackfill: counted.DroppedAfterBackfill}
+	}
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)
 	}

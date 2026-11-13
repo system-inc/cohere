@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // The records' wide run's variables (#6a3kjvz): the tree it loads, and the builds it judges, by name (wideBuilds),
@@ -223,5 +225,82 @@ func TestARecordedGraphIsTheLiveGraphInATree(test *testing.T) {
 		units := expectAlike(test, tree+" under "+name, liveVerdicts, unitVerdicts(recorded.Against(difference)))
 		test.Logf("build %s: %d unit verdicts and counts alike, %s", name, units, liveVerdicts[len(liveVerdicts)-1])
 		test.Logf("build %s: in %s", name, time.Since(started).Round(time.Second))
+	}
+}
+
+// A record read back names an object of a package its graph does not hold by its path and local name, where a live
+// record holds the object, and the other graph's judgment answers the name as it answers the object (#6a3kjvz): the
+// layout fixture's workspace, its graph built from records of packages restored from export data, judges every unit
+// on linux as the live graph does with each object answered by its counterpart. Answered by name with no
+// DependentName, every such read fails wide, and Labelled, independent in truth, is called dependent.
+func TestARecordedGraphAnswersByNameAsTheLiveGraphByObject(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "layout", linuxBuild)
+	restored := restoredFromExportData(test, judged.host)
+	dependencyGraph := graphOf(judged.host, func(loaded *packages.Package) bool { return fixtureWorkspace(loaded) })
+	dependencyJudged := dependencyGraph.Against(judged.difference)
+	live := graphOf(restored, nil)
+	recorded := recordedGraphOf(test, live)
+
+	byObject := judged.difference
+	byObject.DependentObject = NewCounterparts(dependencyGraph, dependencyJudged).DependentObject
+	liveVerdicts := verdicts(test, restored, live.Against(byObject))
+	byName := judged.difference
+	named := NewCounterparts(dependencyGraph, dependencyJudged)
+	byName.DependentObject, byName.DependentName = named.DependentObject, named.DependentName
+	recordedVerdicts := verdicts(test, restored, recorded.Against(byName))
+	for name, dependent := range liveVerdicts {
+		if recordedVerdicts[name] != dependent {
+			test.Errorf("%s: the recorded graph judges dependent %t by name, the live graph %t by object", name,
+				recordedVerdicts[name], dependent)
+		}
+	}
+	if counts := named.Counts(); counts.Answered == 0 || counts.WithoutPackage != 0 {
+		test.Errorf("want every name answered by the dependency's graph, got %+v", counts)
+	}
+
+	failingWide := judged.difference
+	failingWide.DependentObject = named.DependentObject
+	if !verdicts(test, restored, recorded.Against(failingWide))["func Labelled"] {
+		test.Error("func Labelled: want it dependent, every read failing wide with no DependentName, got independent")
+	}
+}
+
+// A record read back keeps each static call into a package its graph does not hold, by the callee's path and local
+// name, as a live record does (#6a3kjvz), so the facts census finds the same callers either way: the layout fixture's
+// workspace, restored from export data, calls functions of its dependency, and every unit of its graph from records
+// carries the calls the live graph's unit carries, each declared by a unit of the dependency's graph.
+func TestARecordedGraphKeepsItsCallsIntoAnotherGraph(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "layout", linuxBuild)
+	restored := restoredFromExportData(test, judged.host)
+	dependencyGraph := graphOf(judged.host, func(loaded *packages.Package) bool { return fixtureWorkspace(loaded) })
+	dependencyJudged := dependencyGraph.Against(judged.difference)
+	live := graphOf(restored, nil)
+	callsOf := func(graph *Graph) map[string][]ObjectName {
+		calls := map[string][]ObjectName{}
+		for _, unit := range graph.Against(judged.difference).Units() {
+			if len(unit.ExternalCalls) > 0 {
+				calls[fmt.Sprintf("%s %s:%d", unit.PackageId, unit.File, unit.Start)] = unit.ExternalCalls
+			}
+		}
+		return calls
+	}
+	liveCalls, recordedCalls := callsOf(live), callsOf(recordedGraphOf(test, live))
+	if len(liveCalls) == 0 {
+		test.Fatal("no unit of the workspace calls its dependency, so the case proves nothing")
+	}
+	for unit, calls := range liveCalls {
+		if !slices.Equal(recordedCalls[unit], calls) {
+			test.Errorf("%s: the recorded graph's unit calls %v outside it, the live graph's %v", unit,
+				recordedCalls[unit], calls)
+		}
+		for _, callee := range calls {
+			if _, isDeclared := dependencyJudged.UnitDeclaringName(callee.Path, callee.Local); !isDeclared {
+				test.Errorf("%s calls %v, which no unit of the dependency's graph declares", unit, callee)
+			}
+		}
 	}
 }

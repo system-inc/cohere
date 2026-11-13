@@ -88,15 +88,25 @@ type resolvedUnit struct {
 
 	// calls are the units the unit's body calls statically (recordedUnit.callees), each once, never itself: a callee
 	// no unit of the graph declares is left out, and one of a package the graph does not hold, a dependency's checked
-	// without syntax, is kept in externalCalls when its live object is known, for another graph to find its unit
-	// (#ss4t5g6).
+	// without syntax, is kept in externalCalls by its path and local name, a live record's and a decoded one's alike,
+	// for another graph to find its unit (#ss4t5g6, #6a3kjvz).
 	calls         []int
-	externalCalls []types.Object
+	externalCalls []ObjectName
 }
 
 // externalRead is one bit of an object of a package the graph does not hold, which the build's DependentObject
-// answers: the object as a record names it, its live object nil in a decoded record.
+// answers for a live object, and its DependentName for an object a decoded record names, which has none: the object
+// as a record names it, its live object nil in a decoded record, and through, what the read reaches through the
+// object's type, which DependentName's graph reads in its place when no unit of it declares the object
+// (judgment.nameAnswer).
 type externalRead struct {
+	object     recordedObject
+	underlying bool
+	through    []externalBit
+}
+
+// externalBit is one bit of an object a decoded record names by path and local name.
+type externalBit struct {
 	object     recordedObject
 	underlying bool
 }
@@ -296,8 +306,12 @@ func (resolved *resolvedGraph) resolveRead(unit *resolvedUnit, read recordedRead
 			return
 		}
 		if !target.isHeld {
-			unit.external = append(unit.external,
-				externalRead{object: objects[read.target], underlying: read.underlying})
+			external := externalRead{object: objects[read.target], underlying: read.underlying}
+			for _, reached := range read.through {
+				external.through = append(external.through,
+					externalBit{object: objects[reached.object], underlying: reached.underlying})
+			}
+			unit.external = append(unit.external, external)
 			return
 		}
 	}
@@ -337,16 +351,16 @@ func (resolved *resolvedGraph) fixedPoint(seedBits []int32) []bool {
 }
 
 // resolveCalls turns each unit's callees into the units that declare them, each once, never the unit itself, and
-// keeps each callee of a package the graph does not hold as it is, when its live object is known.
+// keeps each callee of a package the graph does not hold by its name.
 func (resolved *resolvedGraph) resolveCalls() {
 	for index := range resolved.units {
 		unit := &resolved.units[index]
 		for _, callee := range unit.record.callees {
 			target := resolved.targets[unit.packageIndex][callee]
 			if !target.isNode {
-				if object := resolved.packages[unit.packageIndex].objects[callee].object; !target.isHeld &&
-					object != nil {
-					unit.externalCalls = append(unit.externalCalls, object)
+				if !target.isHeld {
+					named := resolved.packages[unit.packageIndex].objects[callee]
+					unit.externalCalls = append(unit.externalCalls, ObjectName{Path: named.path, Local: named.local})
 				}
 				continue
 			}

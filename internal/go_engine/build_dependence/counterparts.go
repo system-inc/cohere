@@ -74,6 +74,21 @@ func (counterparts *Counterparts) DependentObject(object types.Object) (bool, bo
 	return bits.Name, bits.Underlying
 }
 
+// DependentName is the bits of the object a decoded record names by path and local name, by its counterpart in the
+// other graph, and whether one of the other graph's units declares it (#6a3kjvz): it has Difference.DependentName's
+// shape. An object of a package the other graph does not hold answers both bits set, failing wide, and is counted
+// without its package; one of a package it holds that no unit there declares answers nothing set, for the record's
+// expansion of it to be read in its place, and is counted answered, as ObjectBits answers it through its type.
+func (counterparts *Counterparts) DependentName(path string, local string) (bool, bool, bool) {
+	if _, isHeld := counterparts.packages[path]; !isHeld || counterparts.judged == nil {
+		counterparts.counts.WithoutPackage++
+		return true, true, false
+	}
+	counterparts.counts.Answered++
+	bits, isDeclared := counterparts.judged.NameBits(path, local)
+	return bits.Name, bits.Underlying, isDeclared
+}
+
 // Counterpart is object's counterpart in the other graph's package of its path, found by its objectpath, and false
 // when that graph holds no such package or the path names nothing alike there. It counts nothing, so the facts census
 // can find the objects facts are about and the functions units call (#ss4t5g6).

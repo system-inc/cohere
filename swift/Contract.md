@@ -968,6 +968,18 @@ written. A problem never changes a finding. Of the misses whose write failed, on
 problem, so `"writeFailed":412` counts every one, every build's, and a store that refused 412
 writes says 412. Each is written only when it is not 0.
 
+Under `--build-dependence`, with a store, the Go engine keeps block 1's dependence record of each package the host
+checks beside the package's entry, and reads it back for each package it restores, so its graph of the host is built
+from records rather than syntax (#6a3kjvz); the cache record then writes `"dependenceRecords"`, additive within
+contract 3 and the Go engine's alone, absent from every other run: `{"read":1308, "written":0, "backfilled":0,
+"aliasSkipped":0, "unreadable":0}`. `"read"` counts the records found under their packages' keys, `"written"` those
+written beside their entries, `"backfilled"` the packages restored by their own key with no record, checked once more
+so their records are written, `"aliasSkipped"` those restored by a second key's alias, which go without a record, and
+`"unreadable"` the records that did not decode, each a problem, whose packages are checked from source so their records
+are written again, a restored one counted in `"backfilled"` too. `"droppedAfterBackfill":0`, written only when not 0,
+counts the hits made misses in a load that backfilled any: a backfilled package asks the facts of everything below it. A record that could
+not be written counts in `"writeFailed"`.
+
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
 which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive
 within contract 3, the host's first:
