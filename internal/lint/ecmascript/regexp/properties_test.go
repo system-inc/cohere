@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/unicode_properties"
 )
 
@@ -75,6 +76,7 @@ func propertySource(name, escape string, shape int) string {
 }
 func oracleProperties(test *testing.T, probes []propertyProbe) []propertyAnswer {
 	test.Helper()
+	needs.Tool(test, "node", "node's RegExp is the oracle each property's members are held to")
 	input, encodeError := json.Marshal(probes)
 	if encodeError != nil {
 		test.Fatal(encodeError)
@@ -243,6 +245,7 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 		"p{Script=Greek}",
 		`\p{Script=Greek}`,
 	}
+	needs.Tool(test, "node", "node's RegExp is the oracle each property escape's syntax is held to")
 	input, encodeError := json.Marshal(struct {
 		Fixtures []fixture
 		Subjects []string
