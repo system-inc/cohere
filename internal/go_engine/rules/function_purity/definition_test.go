@@ -8,7 +8,6 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 )
 
@@ -38,23 +37,6 @@ var definitionAnalyzer = &analysis.Analyzer{
 	Requires:   []*analysis.Analyzer{build_intermediate_representation.Analyzer},
 	FactTypes:  []analysis.Fact{new(IsPureByDefinition)},
 	ResultType: reflect.TypeFor[definitionResult](),
-}
-
-// definitionCallees answers judge's question from the set so far, and from the facts for another package's function.
-type definitionCallees struct {
-	pass *analysis.Pass
-	pure map[*types.Func]bool
-}
-
-func (callees definitionCallees) isPure(function *intermediate_representation.Function) bool {
-	if function.Object() == nil {
-		return false
-	}
-	declared := declaredFunction(function)
-	if declared.Pkg() == callees.pass.Pkg {
-		return callees.pure[declared]
-	}
-	return callees.pass.ImportObjectFact(declared, new(IsPureByDefinition))
 }
 
 // runDefinition is the package's least fixed point, exported as facts, and every function the facts hold pure.

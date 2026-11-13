@@ -382,7 +382,11 @@ func probeFixtures(test *testing.T, patterns ...string) probed {
 	if analyzeError != nil {
 		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
 	}
-	all := probed{verdicts: map[string]bool{}, departures: map[string]bool{}, counts: resolver.Counts(function_purity.Kind)}
+	all := probed{
+		verdicts:   map[string]bool{},
+		departures: map[string]bool{},
+		counts:     resolver.Counts(function_purity.Kind),
+	}
 	for _, action := range graph.Roots {
 		found, isFound := action.Result.(probed)
 		if action.Err != nil || !isFound {
