@@ -6,16 +6,20 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	copiedbuild "github.com/system-inc/cohere/internal/go_engine/load/build"
 )
 
 // SharedReads is the disk reads every in-process listing of one run shares: each directory's entries and the start of
-// each file go/build opens (#yyvstj6), and each path's links and kind, which go/build's HasSubdir and IsDir read
-// (#5jpss95). A build's listing reads every directory its imports reach and every Go file in them, and those reads
-// were most of its CPU: of an extra build's listing on cohere's root, 83% was the open, close, directory read and lstat
-// system calls, about 1.1 CPU-s a build, every build reading what the host's had just read.
+// each file go/build opens (#yyvstj6), each path's links and kind, which go/build's HasSubdir and IsDir read
+// (#5jpss95), and each Go file's header as go/build reads and parses it (#tb538na). A build's listing reads every
+// directory its imports reach and every Go file in them, and those reads were most of its CPU: of an extra build's
+// listing on cohere's root, 83% was the open, close, directory read and lstat system calls, about 1.1 CPU-s a build,
+// every build reading what the host's had just read.
 // What a directory holds and what a file says do not change with the build's environment; only which files go/build
 // selects does, and go/build still selects them in each build, through its own context, from what it reads here. So
 // sharing is exact: it changes where the bytes come from, never which.
@@ -42,6 +46,12 @@ type SharedReads struct {
 	// at once, so a hit takes no lock.
 	resolved      sync.Map
 	isDirectories sync.Map
+
+	// headers is each Go file's header as go/build reads and parses it, read once for every listing of the run
+	// through the copy of go/build's directory read (#tb538na), and nil when this binary's go/build is not the copy's,
+	// when headersUnshared says why every listing parses each header itself.
+	headers         *copiedbuild.Headers
+	headersUnshared string
 }
 
 // sharedDirectory is one directory's entries, read once.
@@ -58,9 +68,30 @@ type sharedDirectory struct {
 // 2 KiB 18 MB for 1,055, at about the same CPU (#yyvstj6).
 const sharedFileHead = 4 << 10
 
-// NewSharedReads is reads no listing has made yet.
+// NewSharedReads is reads no listing has made yet, each Go file's header among them when this binary links the
+// release of go/build the copy is of.
 func NewSharedReads() *SharedReads {
-	return &SharedReads{directories: map[string]*sharedDirectory{}, files: map[string]*sharedFile{}}
+	return newSharedReads(runtime.Version())
+}
+
+// newSharedReads is NewSharedReads in a binary linked by the Go release linked, which a test names.
+func newSharedReads(linked string) *SharedReads {
+	shared := &SharedReads{directories: map[string]*sharedDirectory{}, files: map[string]*sharedFile{}}
+	if sharing, unshared := copiedbuild.Sharing(linked); sharing {
+		shared.headers = copiedbuild.NewHeaders()
+	} else {
+		shared.headersUnshared = unshared
+	}
+	return shared
+}
+
+// HeadersUnshared is why the run's listings did not share each Go file's header, every build parsing each one
+// itself, and empty when they shared them, or when shared is nil, which shares no read at all.
+func (shared *SharedReads) HeadersUnshared() string {
+	if shared == nil {
+		return ""
+	}
+	return shared.headersUnshared
 }
 
 // readDirectory is a build.Context's ReadDir: directory's entries as os.ReadDir reads them, read once for every
@@ -92,11 +123,21 @@ func (shared *SharedReads) readDirectory(directory string) ([]fs.FileInfo, error
 }
 
 // openFile is a build.Context's OpenFile: a file held holds from its held bytes, and any other from its start, read
-// once for every listing, then from the disk past it.
+// once for every listing, then from the disk past it. A Go file is opened on disk with no head kept when the run
+// shares each header's read (headers): the copy of go/build opens it once a run, and go/build itself only in a
+// directory with cgo files, so a head kept for every Go file would be held for the run and read once.
 func (shared *SharedReads) openFile(held Held) func(path string) (io.ReadCloser, error) {
 	return func(path string) (io.ReadCloser, error) {
 		if contents, isHeld := held.lookup(path); isHeld {
 			return io.NopCloser(bytes.NewReader(contents)), nil
+		}
+		if shared.headers != nil && strings.HasSuffix(path, ".go") {
+			opened, openError := os.Open(path)
+			if openError != nil {
+				// A nil interface, as go/build's own openFile returns, never a nil *os.File in one.
+				return nil, openError
+			}
+			return opened, nil
 		}
 		shared.mutex.Lock()
 		read := shared.files[path]

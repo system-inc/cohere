@@ -17,6 +17,7 @@ import (
 	"golang.org/x/mod/module"
 	"golang.org/x/tools/go/packages"
 
+	copiedbuild "github.com/system-inc/cohere/internal/go_engine/load/build"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 	"github.com/system-inc/cohere/internal/listed_directories"
 )
@@ -41,6 +42,13 @@ type inProcessLister struct {
 	workspace   string
 	environment []string
 	context     build.Context
+
+	// headers is the run's reads of each Go file's header, which every listing of the run shares, and held the bytes
+	// the run holds, which a held file's header is read from (see readDirectory). headers is nil when the listing
+	// shares no reads, or this binary's go/build is not the copy's (SharedReads.HeadersUnshared), and then go/build
+	// reads every directory itself.
+	headers *copiedbuild.Headers
+	held    Held
 
 	// modules is the build list, the main modules first, as `go list -m -json all` gives it, and mainModules its
 	// main modules.
@@ -235,10 +243,16 @@ func newInProcessLister(
 		read.context.HasSubdir = shared.hasSubdirectory
 		read.context.IsDir = shared.isDirectory
 	}
+	var headers *copiedbuild.Headers
+	if shared != nil {
+		headers = shared.headers
+	}
 	lister := &inProcessLister{
 		workspace:     goEnvironment.workspace,
 		environment:   goEnvironment.fullEnvironment,
 		context:       read.context,
+		headers:       headers,
+		held:          held,
 		modules:       read.modules,
 		inWorkspace:   read.workspaceFile != "",
 		goModDirect:   map[string]bool{},
@@ -730,7 +744,9 @@ func (lister *inProcessLister) locate(importPath string) (string, *packages.Modu
 	return found[0], owner, ""
 }
 
-// readDirectory is go/build's reading of directory under the lister's build context, read once.
+// readDirectory is go/build's reading of directory under the lister's build context, read once: through the copy of
+// go/build's directory read, which reads each Go file's header once for every listing of the run, when the lister has
+// the run's headers, and through go/build otherwise. The two are the same Package and the same error.
 func (lister *inProcessLister) readDirectory(directory string) *directoryRead {
 	lister.mutex.Lock()
 	read := lister.reads[directory]
@@ -743,7 +759,14 @@ func (lister *inProcessLister) readDirectory(directory string) *directoryRead {
 		lister.slots <- struct{}{}
 		defer func() { <-lister.slots }()
 		// Measured once its slot is held, so no measurement holds a thread while it waits for one.
-		measureListing(lister.timing, func() { read.built, read.importError = lister.context.ImportDir(directory, 0) })
+		measureListing(lister.timing, func() {
+			if lister.headers == nil {
+				read.built, read.importError = lister.context.ImportDir(directory, 0)
+				return
+			}
+			read.built, read.importError = copiedbuild.ImportDirectory(lister.context, directory, lister.held,
+				lister.headers)
+		})
 	})
 	return read
 }

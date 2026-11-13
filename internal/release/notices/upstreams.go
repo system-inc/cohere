@@ -61,6 +61,15 @@ var Upstreams = []Upstream{
 		LicenseFile: "go.txt",
 	},
 	{
+		Name:        "The Go standard library go/build",
+		Url:         "https://pkg.go.dev/go/build@go1.27.0",
+		License:     "BSD-3-Clause",
+		Version:     "go1.27.0",
+		Carries:     "go/build's reading of a package directory, the part of Context.Import after the package is found and the header reads it calls, copied into internal/go_engine/load/build, with internal/syslist, which it reads, in internal/go_engine/load/build/syslist.",
+		Reach:       Compiled,
+		LicenseFile: "go.txt",
+	},
+	{
 		// go/ir began as x/tools' go/ssa, so its own LICENSE is BSD-3-Clause, the Go authors' and Dominik
 		// Honnef's, inside a module that is MIT. The text carries both.
 		Name:        "honnef.co/go/tools go/ir",

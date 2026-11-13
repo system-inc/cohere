@@ -592,6 +592,16 @@ smaller of the engine's cap and half the memory available when the run started. 
 memory could not be read, and the cap was set as a bound alone. The front door prints it in the account
 `--verbose` prints. It is left out of a run the engine was not started for as a process of its own.
 
+The Go engine's types record also carries `headersUnshared`, additive within contract 3 (#tb538na), only when its
+listings did not share each Go file's header. Every build of a run lists its packages in process through go/build's
+directory read, and the engine carries a copy of that read which parses each file's header once for the run, every
+build still matching each file to its own target. The copy is used only by a binary linked by a Go release whose
+go/build is the copy's, byte for byte. A binary another release links reads through go/build itself, the same
+listing at more CPU, and says why in words, naming both releases, as `"headersUnshared":"this binary links go/build
+of go1.28.0, and the copy that reads each Go file's header once a run is of go1.27.0's, which only go1.27.0, go1.27.1,
+go1.27.2, go1.27.3 ship, so every build's listing parsed every header itself"`. It changes no finding and no count. A
+run whose listings shared the headers never writes it, and a front door that does not read it loses only the reason.
+
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
 are not. A warning (`variable was never mutated`) is a finding and fails the run, but the code

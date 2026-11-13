@@ -75,6 +75,20 @@ func TestInProcessListingIsGoListsAnswerOnEveryTarget(test *testing.T) {
 // (see the engine's extraBuildRun), so no extra build forks go list.
 func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 	test.Parallel()
+	workspace, builds := coheresBuilds(test)
+	for _, extra := range builds[1:] {
+		test.Run(strings.NewReplacer("/", "_", " ", "_", ",", "_").Replace(extra.String()), func(test *testing.T) {
+			test.Parallel()
+			environment := append(workspace.Environment(), extra.Environment()...)
+			requireGoListsAnswer(test, workspace.Root, environment, workspace.Patterns())
+		})
+	}
+}
+
+// coheresBuilds is cohere's own workspace and the builds the engine checks it under, as `--other-builds` reads them
+// for cohere's census, the host's first: its go block's targets matched to the toolchain's ports.
+func coheresBuilds(test *testing.T) (project.Workspace, []project.Build) {
+	test.Helper()
 	root, absoluteError := filepath.Abs(filepath.Join("..", "..", ".."))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
@@ -124,13 +138,7 @@ func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 	if len(builds) < 2 {
 		test.Fatalf("cohere's census needs %d builds, so no extra build's listing is compared", len(builds))
 	}
-	for _, extra := range builds[1:] {
-		test.Run(strings.NewReplacer("/", "_", " ", "_", ",", "_").Replace(extra.String()), func(test *testing.T) {
-			test.Parallel()
-			environment := append(workspace.Environment(), extra.Environment()...)
-			requireGoListsAnswer(test, workspace.Root, environment, workspace.Patterns())
-		})
-	}
+	return workspace, builds
 }
 
 // requireDoubted fails unless the in-process lister doubts listing directory's ./... under environment, for a reason

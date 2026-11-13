@@ -19,10 +19,13 @@ import (
 )
 
 // A file is a copy only while it is one. This holds every file that declares itself a copy to its upstream file in
-// the module cache: each run of lines where the two differ holds a cohere: comment, and every other line is
-// upstream's, byte for byte. It is a test rather than a lint rule because it reads upstream's source, which only the
-// module cache holds. A module missing from the cache fails, never skips, since a skipped check reads as a copy
-// that matched.
+// the module cache, or in the toolchain's source for a copy of the standard library: each run of lines where the two
+// differ holds a cohere: comment, and every other line is upstream's, byte for byte. It is a test rather than a lint
+// rule because it reads upstream's source, which only the module cache and the toolchain hold. A module missing from
+// the cache fails, never skips, since a skipped check reads as a copy that matched. A copy of the standard library is
+// held to the toolchain's source, whatever release the toolchain is; what keeps the toolchain on the copy's release is
+// the copy's own package's test (load/build's TestTheToolchainsGoBuildIsTheCopys), since only it knows which releases
+// ship the sources it copied.
 
 // skippedDirectories are what the walk leaves out: the TypeScript submodule, which is upstream's own tree rather
 // than a copy in ours; npm's node_modules; and testdata, whose planted copies TestPlantedCopies reads.
@@ -93,6 +96,9 @@ func TestEveryCopyMatchesUpstreamOutsideItsMarkedChanges(test *testing.T) {
 		"internal/go_engine/check/diff/ndiff.go",
 		"internal/go_engine/check/diff/unified.go",
 		"internal/go_engine/check/internal/internal.go",
+		"internal/go_engine/load/build/build.go",
+		"internal/go_engine/load/build/read.go",
+		"internal/go_engine/load/build/syslist/syslist.go",
 	} {
 		if !slices.Contains(copies, expected) {
 			test.Errorf("the walk did not find %s among the copies it found, %q", expected, copies)
@@ -232,9 +238,29 @@ var moduleCache = sync.OnceValues(func() (string, error) {
 	return directory, nil
 })
 
+// toolchainRoot is the toolchain's root, asked of go once per test binary.
+var toolchainRoot = sync.OnceValues(func() (string, error) {
+	output, goError := exec.Command("go", "env", "GOROOT").Output()
+	if goError != nil {
+		return "", fmt.Errorf("asking go env for GOROOT: %w", goError)
+	}
+	root := strings.TrimSpace(string(output))
+	if root == "" {
+		return "", errors.New("asking go env for GOROOT: it printed nothing")
+	}
+	return root, nil
+})
+
 // upstreamFile is where the module cache holds the file header names, in the cache's escaped form of the module
-// path and version.
+// path and version, or for a copy of the standard library where the toolchain's source holds it.
 func upstreamFile(header Header) (string, error) {
+	if header.Module == StandardLibrary {
+		root, rootError := toolchainRoot()
+		if rootError != nil {
+			return "", rootError
+		}
+		return filepath.Join(root, "src", filepath.FromSlash(header.Path)), nil
+	}
 	cache, cacheError := moduleCache()
 	if cacheError != nil {
 		return "", cacheError

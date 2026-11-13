@@ -834,7 +834,8 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 			Packages:     loaded.CgoTranslatedPackages,
 			Milliseconds: int(loaded.CgoTranslationElapsed.Milliseconds()),
 		},
-		Memory: engine.memoryRecord(),
+		Memory:          engine.memoryRecord(),
+		HeadersUnshared: engine.reads.HeadersUnshared(),
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }

@@ -45,19 +45,21 @@ func TestEveryBuildsListingThroughSharedReadsIsItsOwn(test *testing.T) {
 				listingDifferences(through, alone))
 		}
 	}
-	if len(shared.directories) == 0 || len(shared.files) == 0 {
-		test.Errorf("the shared reads hold %d directories and %d files, so nothing was shared", len(shared.directories),
-			len(shared.files))
+	// A Go file's start is kept no longer, since its header's read is (Headers), which a test of its own holds.
+	if len(shared.directories) == 0 || shared.headers.Parsed() == 0 {
+		test.Errorf("the shared reads hold %d directories and read %d headers, so nothing was shared",
+			len(shared.directories), shared.headers.Parsed())
 	}
 }
 
 // A file longer than its shared head reads on from the disk, and a file the run holds is read from its held bytes,
-// never the shared head, so a file written after its head was shared reads as written.
+// never the shared head, so a file written after its head was shared reads as written. The file is assembly, whose
+// start go/build reads in every build; a Go file's header is read once a run (Headers), so no head of it is kept.
 func TestASharedFileReadsOnPastItsHeadAndHeldBytesWin(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
-	long := filepath.Join(directory, "long.go")
-	contents := "package long\n\n// " + strings.Repeat("x", 3*sharedFileHead) + "\n"
+	long := filepath.Join(directory, "long.s")
+	contents := "// " + strings.Repeat("x", 3*sharedFileHead) + "\nTEXT ·long(SB),0,$0\n"
 	if writeError := os.WriteFile(long, []byte(contents), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -72,7 +74,7 @@ func TestASharedFileReadsOnPastItsHeadAndHeldBytesWin(test *testing.T) {
 			test.Fatalf("read %d bytes with %v, want the file's %d", len(read), readError, len(contents))
 		}
 	}
-	written := "package long\n"
+	written := "TEXT ·long(SB),0,$0\n"
 	held := Held(func(file string) ([]byte, bool) { return []byte(written), file == long })
 	reader, openError := shared.openFile(held)(long)
 	if openError != nil {
@@ -87,8 +89,8 @@ func TestASharedFileReadsOnPastItsHeadAndHeldBytesWin(test *testing.T) {
 // the file and that it changed, and go/build never parses a header that never existed.
 func TestAFileChangedPastItsHeadIsNeverSpliced(test *testing.T) {
 	test.Parallel()
-	long := filepath.Join(test.TempDir(), "long.go")
-	if writeError := os.WriteFile(long, []byte("package long\n\n// "+strings.Repeat("x", 3*sharedFileHead)+"\n"),
+	long := filepath.Join(test.TempDir(), "long.s")
+	if writeError := os.WriteFile(long, []byte("// "+strings.Repeat("x", 3*sharedFileHead)+"\n"),
 		0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -96,7 +98,7 @@ func TestAFileChangedPastItsHeadIsNeverSpliced(test *testing.T) {
 	if openError != nil {
 		test.Fatal(openError)
 	}
-	saved := "package long\n\n// " + strings.Repeat("y", 5*sharedFileHead) + "\n"
+	saved := "// " + strings.Repeat("y", 5*sharedFileHead) + "\n"
 	if writeError := os.WriteFile(long, []byte(saved), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}

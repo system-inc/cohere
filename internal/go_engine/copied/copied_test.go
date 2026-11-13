@@ -40,6 +40,23 @@ func TestReadAcceptsAWellFormedHeader(test *testing.T) {
 	}
 }
 
+// TestReadAcceptsACopyOfTheStandardLibrary reads a copy of the toolchain's own source, whose module is std and whose
+// version is the Go release it is of.
+func TestReadAcceptsACopyOfTheStandardLibrary(test *testing.T) {
+	test.Parallel()
+	source := "// cohere:copied std@go1.27.0 go/build/read.go\n// cohere:until go/build shares its reads\n\n" +
+		"package build\n"
+	header, declared, readError := Read(parseSource(test, source))
+	if readError != nil || !declared {
+		test.Fatalf("reading %q: declared %t, error %v, want a header", source, declared, readError)
+	}
+	expected := Header{Module: StandardLibrary, Version: "go1.27.0", Path: "go/build/read.go",
+		Until: "go/build shares its reads"}
+	if header != expected {
+		test.Errorf("reading %q: got %+v, want %+v", source, header, expected)
+	}
+}
+
 // TestReadDeclaresNothingForAFileOfOurs keeps a file that only mentions the directives, or names one after its
 // package clause, ours, so the house rules still judge it.
 func TestReadDeclaresNothingForAFileOfOurs(test *testing.T) {
@@ -93,6 +110,10 @@ func TestReadRefusesAMalformedHeader(test *testing.T) {
 		{"a misspelled directive", "//cohere:copied golang.org/x/tools@v0.50.0 a.go\n" + until, "is not spelled"},
 		{"a misspelled until", "// cohere:copied golang.org/x/tools@v0.50.0 a.go\n// cohere:untilnow\n",
 			"is not spelled"},
+		{"a standard library copy of a language version", "// cohere:copied std@go1.27 a.go\n" + until,
+			"which is no Go release"},
+		{"a standard library copy of a semantic version", "// cohere:copied std@v1.27.0 a.go\n" + until,
+			"which is no Go release"},
 		{"two copies", "// cohere:copied golang.org/x/tools@v0.50.0 a.go\n" + until +
 			"// cohere:copied golang.org/x/tools@v0.50.0 b.go\n" + until, "a second cohere:copied line"},
 	} {
