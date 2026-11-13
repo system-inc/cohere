@@ -227,7 +227,7 @@ func land(arguments []string) int {
 			restore()
 			return 2
 		}
-		code, gated := gate(worktree, gating)
+		code, gated := gate(worktree, gating, task)
 		if code == quietRefusedExitCode {
 			// Only the wall exits 75 here (quiet.go): go vet and go test never do. A held landing is not a red one, so
 			// it does not say failed, and it keeps 75, try again later, so a script can tell the two apart (#vq5b7fs).
@@ -456,8 +456,9 @@ func checkoutOfMain(worktree string) (string, error) {
 // (checkRuleCpu), then the tests of every module go.work names outside a submodule, each in one go
 // invocation (workspace.go), saying which it covered, then the unit isolation of the rules the landing changes
 // (checkUnitIsolation), then the docs data check (checkDocsData), then cohere on the tree itself (checkCohere).
-// With its exit code it returns the line a landing commit carries about it, which says what ran and for how long.
-func gate(worktree string, commit string) (int, string) {
+// task is the landing's, which a land-gate job serves. With its exit code it returns the line a landing commit carries
+// about it, which says what ran and for how long.
+func gate(worktree string, commit string, task string) (int, string) {
 	covered, readGatedWorkspaceError := readGatedWorkspace(worktree)
 	if readGatedWorkspaceError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: reading the modules to gate: %v\n", readGatedWorkspaceError)
@@ -508,8 +509,8 @@ func gate(worktree string, commit string) (int, string) {
 		}
 		defer printUncovered(streams.Errors, uncovered)
 		// On Home, with what Home could not run on the Mac, or all of it here when Home gives no verdict
-		// (home_verdict.go).
-		testCode, where := runModuleTests(worktree, commit, covered, testing, time.Now())
+		// (home_verdict.go), or as a land-gate job, whose no verdict refuses (land_gate_job.go).
+		testCode, where := runModuleTests(worktree, commit, task, covered, testing, time.Now())
 		if testCode != 0 {
 			return testCode
 		}
