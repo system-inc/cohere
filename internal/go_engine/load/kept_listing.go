@@ -55,9 +55,10 @@ type keptListing struct {
 // edit below a file's imports, the edit nearly every edit is, moves none of it. When the fingerprint of all of that
 // is the one the kept answer was read from, the answer is go list's own; any difference, or anything that cannot be
 // read, asks go list. It reports whether the answer was kept. Every file held holds is read from its held bytes, by
-// the fingerprint and the lister alike. Each directory's fingerprint is read through fingerprints, once for the run's
-// extra builds, when it is set (Fingerprints). The listing adds its CPU to collector; a kept answer's fingerprint adds
-// nothing but what the caller measures on its own goroutine, since a run under `--timing` keeps no listing.
+// the fingerprint and the lister alike. Each directory's fingerprint is read through fingerprints, and each pattern's
+// walk through walks, once for the run's extra builds, when each is set (Fingerprints, PackageWalks). The listing
+// adds its CPU to collector; a kept answer's fingerprint adds nothing but what the caller measures on its own
+// goroutine, since a run under `--timing` keeps no listing.
 func cachedList(
 	goEnvironment *GoEnvironment,
 	patterns []string,
@@ -65,10 +66,11 @@ func cachedList(
 	held Held,
 	shared *SharedReads,
 	fingerprints *Fingerprints,
+	walks *PackageWalks,
 	collector *timing.Collector,
 ) (*listing, bool, error) {
 	if listings == nil {
-		listed, listError := list(goEnvironment, patterns, held, shared, collector)
+		listed, listError := list(goEnvironment, patterns, held, shared, walks, collector)
 		return listed, false, listError
 	}
 	key := listingKey(goEnvironment, patterns)
@@ -82,7 +84,7 @@ func cachedList(
 			}
 		}
 	}
-	listed, listError := list(goEnvironment, patterns, held, shared, collector)
+	listed, listError := list(goEnvironment, patterns, held, shared, walks, collector)
 	if listError != nil {
 		return nil, false, listError
 	}

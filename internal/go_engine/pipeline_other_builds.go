@@ -360,7 +360,8 @@ func (engine *pipeline) extraBuildRun(
 	// As the host's load does (loadWorkspace), a package with no file in scope is loaded and never analyzed. A root no
 	// action reaches, a command main whose test variant is analyzed in its place, is left out of the build's load
 	// (#ws2ptvf): the host checked it, and its variant carries its files here. The listing reads through the host's
-	// directory reads (#yyvstj6), and its kept answer's fingerprint through the builds' own (#5jpss95).
+	// directory reads (#yyvstj6), its kept answer's fingerprint through the builds' own (#5jpss95), and its patterns'
+	// walks through the builds' own too (#tb538na).
 	caching := load.Caching{
 		Held:              engine.held,
 		GoEnvironment:     goEnvironment,
@@ -369,6 +370,7 @@ func (engine *pipeline) extraBuildRun(
 		AnalyzedRootsOnly: true,
 		SharedReads:       engine.reads,
 		Fingerprints:      engine.fingerprints,
+		Walks:             engine.walks,
 	}
 	if session != nil {
 		caching.Restorer = session

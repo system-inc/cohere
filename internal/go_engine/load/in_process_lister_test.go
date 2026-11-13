@@ -135,7 +135,7 @@ func TestInProcessListingIsGoListsAnswerOnCohere(test *testing.T) {
 func requireGoListsAnswer(test *testing.T, directory string, extra []string, patterns []string) *listing {
 	test.Helper()
 	goEnvironment := goEnvironmentOf(test, directory, extra)
-	inProcess, doubt := listInProcess(goEnvironment, patterns, nil, nil, nil)
+	inProcess, doubt := listInProcess(goEnvironment, patterns, nil, nil, nil, nil)
 	if doubt != "" {
 		test.Fatalf("the in-process lister did not answer: %s", doubt)
 	}
@@ -256,7 +256,7 @@ func TestInProcessListingDoubtsWhatItDoesNotCarry(test *testing.T) {
 			writeListingFiles(test, directory, each.files)
 			goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"},
 				each.environment...))
-			listed, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, nil, nil)
+			listed, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, nil, nil, nil)
 			if doubt == "" {
 				test.Fatalf("the lister answered with %d packages", len(listed.packages))
 			}
@@ -287,7 +287,7 @@ func TestAPatternTheListerCannotMatchIsDoubted(test *testing.T) {
 		{"example.com/patterned/missing/...", "matched no packages"},
 	}
 	for _, each := range cases {
-		listed, doubt := listInProcess(goEnvironment, []string{each.pattern}, nil, nil, nil)
+		listed, doubt := listInProcess(goEnvironment, []string{each.pattern}, nil, nil, nil, nil)
 		if doubt == "" {
 			test.Errorf("the lister answered %s with %d packages", each.pattern, len(listed.packages))
 			continue
@@ -297,7 +297,7 @@ func TestAPatternTheListerCannotMatchIsDoubted(test *testing.T) {
 		}
 	}
 	// Through list, the directory pattern is go list's to answer, and it names the package below it.
-	listed, listError := list(goEnvironment, []string{"./sub/..."}, nil, nil, nil)
+	listed, listError := list(goEnvironment, []string{"./sub/..."}, nil, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
@@ -317,7 +317,7 @@ func TestADoubtIsGoListsToAnswer(test *testing.T) {
 		"a.go":   "package a\n\nimport _ \"example.com/missing\"\n",
 	})
 	goEnvironment := goEnvironmentOf(test, directory, []string{"GOWORK=off"})
-	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil)
+	listed, listError := list(goEnvironment, []string{"./..."}, nil, nil, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

@@ -32,11 +32,11 @@ func TestEveryBuildsListingThroughSharedReadsIsItsOwn(test *testing.T) {
 	shared := NewSharedReads()
 	for _, target := range sharedListingTargets {
 		goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
-		alone, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, nil, nil)
+		alone, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, nil, nil, nil)
 		if doubt != "" {
 			test.Fatalf("%v: the lister reading for itself did not answer: %s", target, doubt)
 		}
-		through, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, shared, nil)
+		through, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, shared, nil, nil)
 		if doubt != "" {
 			test.Fatalf("%v: the lister reading through the shared reads did not answer: %s", target, doubt)
 		}

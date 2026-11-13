@@ -204,6 +204,10 @@ type Caching struct {
 	// between the host's first load and the builds.
 	Fingerprints *Fingerprints
 
+	// Walks is the package directories the loads after every write of the run share, nil for none (see PackageWalks):
+	// set on each extra build's load and never on the host's, as Fingerprints is.
+	Walks *PackageWalks
+
 	// Pool is the run's one set of slots, which every load and check of the run shares, the host's and every extra
 	// build's, so the run never runs more work at once than it has cores (#ckm0hsp). Nil, the load has slots of its
 	// own, one per core.
@@ -336,6 +340,7 @@ func loadUnder(
 			caching.Held,
 			caching.SharedReads,
 			caching.Fingerprints,
+			caching.Walks,
 			caching.Timing,
 		)
 	})

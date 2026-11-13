@@ -106,9 +106,10 @@ func TestSharedHooksImportEveryDirectoryAsGoBuildsOwn(test *testing.T) {
 
 // Every extra build's listing is the one it makes with nothing shared, its kept answer and that answer's fingerprint
 // included, as the engine lists them (#5jpss95): the host's through the run's reads alone, then each extra build's
-// through the reads and the builds' fingerprints, a first time, keeping its answer, and a second, reading it kept. A
-// fingerprint read once for every build is each build's own, since a directory's fingerprint is of its entries and
-// headers, which no build changes. It holds on a module of targeted files and on the engine's cgo fixture.
+// through the reads, the builds' fingerprints and the builds' walks (#tb538na), a first time, keeping its answer, and
+// a second, reading it kept. A fingerprint read once for every build is each build's own, since a directory's
+// fingerprint is of its entries and headers, which no build changes, and so is a walk, which reads only entries. It
+// holds on a module of targeted files and on the engine's cgo fixture.
 func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
 	test.Parallel()
 	targeted := test.TempDir()
@@ -120,20 +121,22 @@ func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
 	for _, directory := range []string{targeted, cgoFixture} {
 		shared := NewSharedReads()
 		fingerprints := NewFingerprints()
+		walks := NewPackageWalks()
 		ownListings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
 		sharedListings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
 		patterns := []string{"./..."}
 		hostEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, sharedListingTargets[0]...))
-		if _, _, listError := cachedList(hostEnvironment, patterns, sharedListings, nil, shared, nil,
+		if _, _, listError := cachedList(hostEnvironment, patterns, sharedListings, nil, shared, nil, nil,
 			nil); listError != nil {
 			test.Fatalf("%s: the host's listing: %v", directory, listError)
 		}
 		for round := range 2 {
 			for _, target := range sharedListingTargets[1:] {
 				goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
-				alone, aloneKept, aloneError := cachedList(goEnvironment, patterns, ownListings, nil, nil, nil, nil)
+				alone, aloneKept, aloneError := cachedList(goEnvironment, patterns, ownListings, nil, nil, nil, nil,
+					nil)
 				through, throughKept, throughError := cachedList(goEnvironment, patterns, sharedListings, nil, shared,
-					fingerprints, nil)
+					fingerprints, walks, nil)
 				if aloneError != nil || throughError != nil {
 					test.Fatalf("%s %v round %d: listed alone with %v, shared with %v", directory, target, round,
 						aloneError, throughError)
@@ -174,7 +177,7 @@ func TestEachDirectoryIsFingerprintedOnceARun(test *testing.T) {
 		for _, target := range sharedListingTargets[1:] {
 			goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
 			if _, _, listError := cachedList(goEnvironment, []string{"./..."}, listings, nil, NewSharedReads(),
-				fingerprints, nil); listError != nil {
+				fingerprints, nil, nil); listError != nil {
 				test.Fatalf("%v: %v", target, listError)
 			}
 		}
@@ -186,6 +189,40 @@ func TestEachDirectoryIsFingerprintedOnceARun(test *testing.T) {
 	if computed := fingerprints.computed.Load(); computed != int64(len(fingerprints.directories)) {
 		test.Errorf("%d directories were fingerprinted %d times, want once each", len(fingerprints.directories),
 			computed)
+	}
+}
+
+// Each pattern's walk of package directories is walked once a run however many builds list it (#tb538na): five extra
+// builds, keeping no listing, so each lists again, list a local pattern and a module pattern, ten walks asked, and each
+// pattern's is walked once. Each build's listing is the one it makes walking for itself.
+func TestEachPatternIsWalkedOnceARun(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeListingFiles(test, directory, targetedModuleFiles)
+	walks := NewPackageWalks()
+	for _, pattern := range []string{"./...", "example.com/targeted/..."} {
+		for _, target := range sharedListingTargets[1:] {
+			goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
+			alone, aloneError := list(goEnvironment, []string{pattern}, nil, nil, nil, nil)
+			through, throughError := list(goEnvironment, []string{pattern}, nil, NewSharedReads(), walks, nil)
+			if aloneError != nil || throughError != nil {
+				test.Fatalf("%s %v: listed alone with %v, shared with %v", pattern, target, aloneError, throughError)
+			}
+			if !through.inProcess {
+				test.Fatalf("%s %v: go list answered, since %s, so nothing was walked", pattern, target,
+					through.goListReason)
+			}
+			if !reflect.DeepEqual(through, alone) {
+				test.Errorf("%s %v: the listing through the walks differs from its own:\n%s", pattern, target,
+					listingDifferences(through, alone))
+			}
+		}
+	}
+	if len(walks.walks) != 2 {
+		test.Errorf("the builds walked %d patterns, want the local one and the module one", len(walks.walks))
+	}
+	if computed := walks.computed.Load(); computed != int64(len(walks.walks)) {
+		test.Errorf("%d patterns were walked %d times, want once each", len(walks.walks), computed)
 	}
 }
 

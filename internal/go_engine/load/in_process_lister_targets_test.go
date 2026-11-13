@@ -138,7 +138,7 @@ func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 func requireDoubted(test *testing.T, directory string, extra []string, reason string) {
 	test.Helper()
 	goEnvironment := goEnvironmentOf(test, directory, extra)
-	listed, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, nil, nil)
+	listed, doubt := listInProcess(goEnvironment, []string{"./..."}, nil, nil, nil, nil)
 	if doubt == "" {
 		test.Fatalf("the lister answered with %d packages", len(listed.packages))
 	}
