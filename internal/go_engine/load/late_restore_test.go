@@ -67,6 +67,7 @@ type lateRestorer struct {
 // Restore is user's late restore.
 func (restorer *lateRestorer) Restore(
 	_ string,
+	_ types.Sizes,
 	reachable []*packages.Package,
 	_ []*packages.Package,
 ) map[*packages.Package]*Restored {

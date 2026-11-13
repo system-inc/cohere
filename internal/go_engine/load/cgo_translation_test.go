@@ -206,6 +206,7 @@ type heldExportData struct {
 // Restore returns the held packages among reachable, by ID.
 func (holder *heldExportData) Restore(
 	loader string,
+	_ types.Sizes,
 	reachable []*packages.Package,
 	_ []*packages.Package,
 ) map[*packages.Package]*Restored {

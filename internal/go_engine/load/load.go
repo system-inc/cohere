@@ -482,7 +482,7 @@ func fromSource(
 		if compiled != nil {
 			loaderName = LoaderCgoTranslated
 		}
-		typeChecker.restored = caching.Restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
+		typeChecker.restored = caching.Restorer.Restore(loaderName, sizes, loadedOf(reachable), analyzedPackages)
 	}
 	// A package restored untouched is analyzed by nothing, and has no say on its files.
 	var untouched []*packages.Package
