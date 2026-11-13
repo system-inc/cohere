@@ -738,15 +738,16 @@ func (engine *pipeline) reread(file string) {
 
 // held is the bytes the run holds for file, as load.Held asks: described.contents, every readable file in scope as it
 // is on disk, since describeProject read it and each write after was reread (reread). Every reader that would open a
-// file again reads it here instead: gofmt's check, the load, and a rule through sourceReader. The one time the map
-// runs ahead of the disk is inside the rename, whose askedOver sets a file to the rewrite before writeRenamed writes
-// and rereads it, and there the rename's loads read the disk and its rules read the rewrite from the overlay first. The
-// editor's save is the other: its one file is the buffer, and gofmt's and the wrap's output of it, never the disk's.
-// described.contents is written only on the main goroutine, between phases, and the goroutines of gofmt, the load and
-// the rules read it only while that goroutine waits for them, so it is never read while it is written and takes no
-// lock. The rules beside the load (speculativeLint) read it while the main goroutine runs the long-line wrap, which
-// stops them before its first reread, and under `--no-fix` gofmt's check reads it on a goroutine of its own beside the
-// first load and those rules, and writes none of it (loadsBesideFix).
+// file again reads it here instead: gofmt's check, the load, a rule through sourceReader, and the findings cache's keys
+// (cacheSession, #1sxhadk). The one time the map runs ahead of the disk is inside the rename, whose askedOver sets a
+// file to the rewrite before writeRenamed writes and rereads it, and there the rename's loads read the disk and its
+// rules read the rewrite from the overlay first. The editor's save is the other: its one file is the buffer, and
+// gofmt's and the wrap's output of it, never the disk's. described.contents is written only on the main goroutine,
+// between phases, and the goroutines of gofmt, the load and the rules read it only while that goroutine waits for them,
+// so it is never read while it is written and takes no lock. The rules beside the load (speculativeLint) read it while
+// the main goroutine runs the long-line wrap, which stops them before its first reread, and under `--no-fix` gofmt's
+// check reads it on a goroutine of its own beside the first load and those rules, and writes none of it
+// (loadsBesideFix).
 func (engine *pipeline) held(file string) ([]byte, bool) {
 	contents, isHeld := engine.described.contents[file]
 	return contents, isHeld
