@@ -380,3 +380,54 @@ func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 	}
 	test.Fatal("the layout fixture has no unit Mapped")
 }
+
+// Each unit carries the units it calls statically: CallsReadsSize calls ReadsSize, PassesHolder calls Forward,
+// NewHolder and the method Capacity, and Untouched calls nothing. An object's position finds its declaring unit, as
+// another build's fact on it is matched (#0ghk7vj): Length's name sits in Length's unit, and no unit holds the package
+// clause.
+func TestUnitsCarryTheirStaticCallsAndHoldTheirObjects(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "layout", linuxBuild)
+	units := judged.dependence.Units()
+	named := map[string]int{}
+	for _, loaded := range judged.host {
+		for _, file := range loaded.Syntax {
+			tokenFile := loaded.Fset.File(file.FileStart)
+			for _, unit := range unitDeclarations(file) {
+				seen, offset := tokenFile.Position(unit.Pos()).Filename, tokenFile.Offset(unit.Pos())
+				index, isUnit := judged.dependence.UnitContaining(loaded.ID, seen, offset)
+				if !isUnit || units[index].File != seen || units[index].Start != offset {
+					test.Fatalf("%s: want its own unit at %s:%d, got %d (%t)", unitName(unit), seen, offset, index,
+						isUnit)
+				}
+				named[unitName(unit)] = index
+			}
+			if _, isUnit := judged.dependence.UnitContaining(loaded.ID, tokenFile.Name(),
+				tokenFile.Offset(file.Package)); isUnit {
+				test.Errorf("a unit holds the package clause of %s", tokenFile.Name())
+			}
+		}
+	}
+	callsOf := func(name string) []string {
+		var called []string
+		for _, callee := range units[named[name]].Calls {
+			for calleeName, index := range named {
+				if index == callee {
+					called = append(called, calleeName)
+				}
+			}
+		}
+		slices.Sort(called)
+		return called
+	}
+	for name, want := range map[string][]string{
+		"func CallsReadsSize": {"func ReadsSize"},
+		"func PassesHolder":   {"func Forward", "func NewHolder", "method Holder.Capacity"},
+		"func Untouched":      nil,
+	} {
+		if got := callsOf(name); !slices.Equal(got, want) {
+			test.Errorf("%s: want the calls %q, got %q", name, want, got)
+		}
+	}
+}

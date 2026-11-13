@@ -1081,6 +1081,21 @@ and `"judgmentMilliseconds":40` this build's judgment on it. Such a run checks e
 reading no findings cache and none of the binary's standard-library entries, and its lint waits for the load to end.
 The host's record never writes it, and neither does a run without the switch.
 
+Its `"facts"` is the build's facts census (#0ghk7vj), written once its lint has run. Under the switch every extra build
+checks every package from source and restores nothing from the host's run, so its facts are its own, and such a run
+is far slower than a plain one. Every fact an analyzer exported about an object in a file both builds compile, or about
+a package both have, is compared with the host's by the digest of its value, a fact only one build exported counting as
+different, and so is every answer the fact resolver computed in both builds, by its encoding. `"kinds"` counts them
+by `"analyzer"` and `"factType"`, an answer's type being `"answer"`: `"compared"`, `"equal"` and `"different"`, the
+same three for the workspace's objects alone, `"askedInOne"` for answers only one build asked, a question rather than a
+fact that moved, and up to three `"examples"` of a difference. `"workspace"` and `"dependencies"` count, by each unit's
+scope, `"differingUnits"` and `"differingNodes"`, the units declaring an object whose fact differs, `"firstOrderUnits"`
+and `"firstOrderNodes"`, the units the judgment calls independent that call one of those statically, the callers a
+model judging each unit once would judge again, `"boundUnits"` and `"boundNodes"`, the same followed to a fixed point
+that takes each such caller as differing in turn, an upper bound, and `"callerUnits"` and `"callerNodes"`, every
+independent unit that calls a dependent one, the most that facts through call bodies can put in play.
+`"milliseconds"` is the comparison's wall time.
+
 ### `phase`
 
 ```json

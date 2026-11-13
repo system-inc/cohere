@@ -101,6 +101,7 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	defer func() { collecting.units = append(collecting.units, unit) }()
 	if declaration.Body != nil {
 		unit.references = collecting.bodies.references(declaration.Body)
+		unit.callees = staticCallees(collecting.typesInformation, declaration.Body)
 	}
 	function, isFunction := collecting.typesInformation.Defs[declaration.Name].(*types.Func)
 	if !isFunction {
@@ -311,6 +312,7 @@ func (collecting *collector) collectValue(
 	isVariable := keyword == token.VAR
 	if isVariable && len(spec.Values) > 0 {
 		unit.references = collecting.bodies.references(expressionNodes(spec.Values)...)
+		unit.callees = staticCallees(collecting.typesInformation, expressionNodes(spec.Values)...)
 	}
 	var declared []types.Object
 	for _, name := range spec.Names {

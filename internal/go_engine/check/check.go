@@ -109,6 +109,12 @@ type Options struct {
 	// end.
 	KeepForBuilds bool
 
+	// ExportFacts has the run hand back, in Result.Facts, every fact each package's analysis exported, dependencies
+	// included, and every answer the fact resolver computed, for the census of facts across builds under
+	// `--build-dependence` (#0ghk7vj). The findings are the same either way; only that census sets it, since
+	// digesting every fact of a run is work no finding needs.
+	ExportFacts bool
+
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
 	holdWalk func(owner *packages.Package)
@@ -240,6 +246,9 @@ type Result struct {
 
 	// ReadWalks are the type-read walks Run left running, nil when Options.Reads is (see Reads).
 	ReadWalks *build_reads.Walks
+
+	// Facts are every fact the run's analyses exported under Options.ExportFacts (exportedFacts), nil without it.
+	Facts []ExportedFact
 
 	// Host is what the run kept for its extra builds under Options.KeepForBuilds, nil without it, and FromHost what an
 	// extra build's session restored from the host's run (CacheSession.RestoreFromHost), all zero without one.
@@ -523,6 +532,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		if options.KeepForBuilds && options.Reads != nil {
 			result.Host = session.keepForBuilds(graphs, analyzed, options.Reads, options.Withheld, files)
 		}
+	}
+	if options.ExportFacts {
+		result.Facts = append(exportedFacts(graphs), computedAnswers(resolver, analyzed)...)
 	}
 	result.Elapsed = time.Since(started)
 	return result, nil

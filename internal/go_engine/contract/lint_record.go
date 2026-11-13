@@ -187,11 +187,62 @@ type BuildRecord struct {
 // other package the host checked. GraphMilliseconds is the host's graph, built once from its load for every build, and
 // JudgmentMilliseconds this build's judgment on it: its file sets compared with the host's, its build-only files
 // parsed, and the fixed point, each in wall milliseconds.
+//
+// Facts is the build's facts census (#0ghk7vj), absent when the build's lint did not run: every fact the analyzers
+// exported about an object in a file both builds compile, or about a package both have, compared with the host's.
 type BuildDependence struct {
 	Workspace            DependenceCounts `json:"workspace"`
 	Dependencies         DependenceCounts `json:"dependencies"`
 	GraphMilliseconds    int              `json:"graphMilliseconds"`
 	JudgmentMilliseconds int              `json:"judgmentMilliseconds"`
+	Facts                *DependenceFacts `json:"facts,omitempty"`
+}
+
+// DependenceFacts is one build's facts beside the host's: Kinds counts them by analyzer and fact type, and Workspace
+// and Dependencies count, by the scope of the unit, the units a differing fact reaches. Milliseconds is the
+// comparison's wall time. Every build checks every package from source under the census, restoring nothing from the
+// host's run, so its facts are its own.
+type DependenceFacts struct {
+	Kinds        []FactKindCounts `json:"kinds"`
+	Workspace    FactCallers      `json:"workspace"`
+	Dependencies FactCallers      `json:"dependencies"`
+	Milliseconds int              `json:"milliseconds"`
+}
+
+// FactKindCounts are one kind of fact's comparisons: the analyzer and the fact's type, the facts compared, those equal
+// and those different, a fact only one build exported counted as different, and the first few that differ, sorted,
+// each naming its package, object and both values. An answer the fact resolver computed on demand is a kind too, its
+// analyzer the resolver's kind and its type "answer", compared only where both builds asked it: AskedInOne counts
+// those only one build asked, a question rather than a fact that moved. The Workspace counts are those of facts about
+// objects the workspace's units declare.
+type FactKindCounts struct {
+	Analyzer           string   `json:"analyzer"`
+	FactType           string   `json:"factType"`
+	Compared           int      `json:"compared"`
+	Equal              int      `json:"equal"`
+	Different          int      `json:"different"`
+	AskedInOne         int      `json:"askedInOne,omitempty"`
+	WorkspaceCompared  int      `json:"workspaceCompared"`
+	WorkspaceEqual     int      `json:"workspaceEqual"`
+	WorkspaceDifferent int      `json:"workspaceDifferent"`
+	Examples           []string `json:"examples,omitempty"`
+}
+
+// FactCallers are what differing facts reach in one scope, each as units and their syntax nodes. Differing are the
+// units declaring an object whose fact differs. FirstOrder are the units the dependence calls independent that call
+// one of those statically, the callers a model judging each unit once would have to judge again; Bound treats each such
+// caller as differing in turn and follows its callers too, until none is left, an upper bound on the callers to judge
+// again, since judging a caller again can change its own facts but need not. Callers are the units called independent
+// that call any dependent unit statically, the share that facts through call bodies put in play at most.
+type FactCallers struct {
+	DifferingUnits  int `json:"differingUnits"`
+	DifferingNodes  int `json:"differingNodes"`
+	FirstOrderUnits int `json:"firstOrderUnits"`
+	FirstOrderNodes int `json:"firstOrderNodes"`
+	BoundUnits      int `json:"boundUnits"`
+	BoundNodes      int `json:"boundNodes"`
+	CallerUnits     int `json:"callerUnits"`
+	CallerNodes     int `json:"callerNodes"`
 }
 
 // DependenceCounts are one scope's units and nodes, dependent and in all, a unit's nodes being its syntax nodes. Of

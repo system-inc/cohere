@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
@@ -19,8 +20,11 @@ import (
 // host's files of every package as written, and its path, by package ID, the load it was built from, and how long it
 // took.
 type hostDependence struct {
-	graph   *build_dependence.Graph
-	from    *load.Loaded
+	graph *build_dependence.Graph
+	from  *load.Loaded
+	// facts are the host's facts by object and kind (indexHostFacts), indexed once its lint has run, before any extra
+	// build starts, nil until then.
+	facts   map[factKey]check.ExportedFact
 	files   map[string][]string
 	paths   map[string]string
 	elapsed time.Duration
@@ -69,10 +73,11 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 // load leaves out because its in-package test variant is checked in its place (load.Caching's AnalyzedRootsOnly): the
 // variant holds every file of it, so its files are compared with the variant's, and its units are never called
 // dependent for a package the build checks by another name. A build loaded again for a question keeps this judgment,
-// since its files do not change between rounds.
-func (engine *pipeline) dependenceOf(loaded *load.Loaded) *contract.BuildDependence {
+// since its files do not change between rounds. Beside the record it returns the judgment and the files both builds
+// compile of each package both have by one ID, which the facts census compares through (compareFacts).
+func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDependence, *buildJudgment) {
 	if engine.dependence == nil {
-		return nil
+		return nil, nil
 	}
 	started := time.Now()
 	built := map[string]*packages.Package{}
@@ -83,6 +88,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) *contract.BuildDepende
 		BuildOnlyPackages: map[string]bool{},
 	}
 	fileSet := token.NewFileSet()
+	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{}}
 	for identifier, hostFiles := range engine.dependence.files {
 		counterpart, isShared := built[identifier]
 		asVariant := false
@@ -94,10 +100,16 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) *contract.BuildDepende
 			difference.HostOnlyPackages[identifier] = true
 			continue
 		}
+		if !asVariant {
+			judged.sharedPackages[identifier] = true
+		}
 		var differing build_dependence.PackageDifference
 		for _, file := range hostFiles {
-			if !slices.Contains(counterpart.GoFiles, file) {
+			switch {
+			case !slices.Contains(counterpart.GoFiles, file):
 				differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
+			case !asVariant:
+				judged.shared[sharedFile{packageIdentifier: identifier, file: file}] = true
 			}
 		}
 		// A variant's own test files are the variant's, never the package's it stands in for.
@@ -123,13 +135,14 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) *contract.BuildDepende
 		}
 		difference.Packages[identifier] = buildOnly
 	}
-	counts := engine.dependence.graph.Against(difference).Counts()
+	judged.dependence = engine.dependence.graph.Against(difference)
+	counts := judged.dependence.Counts()
 	return &contract.BuildDependence{
 		Workspace:            dependenceCounts(counts.Workspace),
 		Dependencies:         dependenceCounts(counts.Dependencies),
 		GraphMilliseconds:    int(engine.dependence.elapsed.Milliseconds()),
 		JudgmentMilliseconds: int(time.Since(started).Milliseconds()),
-	}
+	}, judged
 }
 
 // appendParsed is files with file's syntax after them, parsed alone, when it parses. A build-only file that does not

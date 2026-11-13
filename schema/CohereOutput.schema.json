@@ -706,7 +706,7 @@
                             },
                             "dependence": {
                                 "type": "object",
-                                "description": "Another build's alone, under the Go engine's --build-dependence: which of the host's package-level declarations the build can change, as units and nodes, dependent and in all, for the workspace and the dependencies, the packages with a dependent unit and their nodes, the units only the build compiles, and the milliseconds the host's graph and this build's judgment took. Observed only, so it changes no finding. Absent otherwise."
+                                "description": "Another build's alone, under the Go engine's --build-dependence: which of the host's package-level declarations the build can change, as units and nodes, dependent and in all, for the workspace and the dependencies, the packages with a dependent unit and their nodes, the units only the build compiles, and the milliseconds the host's graph and this build's judgment took, and its facts census beside the host's: the facts compared, equal and different by kind, and the callers a differing fact reaches. Observed only, so it changes no finding. Absent otherwise."
                             }
                         }
                     }

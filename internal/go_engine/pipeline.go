@@ -73,8 +73,10 @@ type pipeline struct {
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
 
-	// keepsHostRestoreOff, set only by a test, has every extra build check every package itself rather than restore any
-	// from the host's run, so the test can compare the two (#b2t9xmf).
+	// keepsHostRestoreOff has every extra build check every package itself rather than restore any from the host's run,
+	// so a test can compare the two (#b2t9xmf). A run judging each build's dependence sets it too, for the facts census
+	// alone (#0ghk7vj): a build's facts must be its own to be compared with the host's, and a package restored from the
+	// host's run carries the host's. Such a run checks every build from source, so it is far slower than a plain one.
 	keepsHostRestoreOff bool
 
 	// keepsWalkOff, set only by a test, has every extra build visit and judge every package it restores from the host's
@@ -210,9 +212,11 @@ func newPipeline(
 		memory:        memory,
 		loads:         newLoadMemory(memory, request.switches["single-threaded"]),
 		overlaps:      true,
-		timing:        newTiming(request),
-		reads:         load.NewSharedReads(),
-		fingerprints:  load.NewFingerprints(),
+		// The facts census reads each build's own facts, which a restore from the host's run would replace.
+		keepsHostRestoreOff: request.judgesDependence(),
+		timing:              newTiming(request),
+		reads:               load.NewSharedReads(),
+		fingerprints:        load.NewFingerprints(),
 	}
 }
 
