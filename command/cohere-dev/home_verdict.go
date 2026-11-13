@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/internal/streams"
 	"golang.org/x/mod/modfile"
 )
@@ -88,6 +89,9 @@ type homeVerdict struct {
 	race *homeVerdict
 	// refused is why the box refused to run the tests at all (sharedBoxRefusedMarker), empty when it ran them.
 	refused string
+	// optIn is every test or subtest, by import path, whose skip said it is opt-in (needs.OptInPhrase): no gate's
+	// test, so the Mac never runs it again, and the land line names it as opt-in.
+	optIn map[string][]string
 	// raceReports is each race the run reported, whole, in the order it printed them. test2json gives a report to
 	// whichever test it was framing when the report was printed, often one that passed, so a report is read from the
 	// stream itself: printing only the failed tests' output dropped every stack (#bnabymg, Nov 12).
@@ -114,7 +118,8 @@ type testEvent struct {
 // readTestJson reads `go test -json` from output, with Home's marker line before it, and anything else it printed
 // ignored: a gap prints its own lines around the command's.
 func readTestJson(output []byte) homeVerdict {
-	verdict := homeVerdict{failedOutput: map[string][]string{}, skipped: map[string][]string{}}
+	verdict := homeVerdict{failedOutput: map[string][]string{}, skipped: map[string][]string{},
+		optIn: map[string][]string{}}
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	// reading is whether the stream is inside a race report, from its first line to the rule that ends it.
@@ -156,6 +161,13 @@ func readTestJson(output []byte) homeVerdict {
 		case event.Action == "fail":
 			verdict.failedTests = append(verdict.failedTests, key)
 		// A package-level skip is a package with no test files, which has nothing to run again on the Mac.
+		// An opt-in skip, said in the test's own output before its skip, is no gate's test, so it sends nothing to the
+		// Mac: a top-level test with only opt-in skips under it, and its other subtests passed, is done.
+		case event.Action == "skip" && event.Test != "" &&
+			slices.ContainsFunc(verdict.failedOutput[key], func(line string) bool {
+				return strings.Contains(line, needs.OptInPhrase)
+			}):
+			verdict.optIn[event.Package] = append(verdict.optIn[event.Package], event.Test)
 		case event.Action == "skip" && event.Test != "":
 			// A subtest skipped is its top-level test run again whole, since -run names top-level tests.
 			name, _, _ := strings.Cut(event.Test, "/")
@@ -286,6 +298,18 @@ func macRemainder(skipped map[string][]string, neverCompiled map[string][]string
 	}
 	sort.Strings(sortedNames)
 	return sortedPackages, sortedNames
+}
+
+// optInNamed is every opt-in test of a box's run, as "Name (import path)", sorted, or empty when there were none.
+func optInNamed(optIn map[string][]string) string {
+	named := []string{}
+	for importPath, tests := range optIn {
+		for _, test := range tests {
+			named = append(named, test+" ("+importPath+")")
+		}
+	}
+	sort.Strings(named)
+	return strings.Join(named, ", ")
 }
 
 // runHomeGate runs the module's tests on Home and returns what Home said, or why there is no verdict from Home, which
@@ -541,7 +565,14 @@ func runModuleTests(
 		fmt.Fprintf(streams.Errors, "cohere-dev: Home's -race run passed, %d packages\n", verdict.race.packagesPassed)
 		where += fmt.Sprintf(", %d of them again under -race", verdict.race.packagesPassed)
 	}
+	optIn := optInNamed(verdict.optIn)
+	if optIn != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: opt-in, so run by no gate: %s\n", optIn)
+	}
 	if len(names) == 0 {
+		if optIn != "" {
+			return 0, where + ", nothing it skipped but opt-in runs, which no gate runs: " + optIn
+		}
 		return 0, where + ", nothing it skipped"
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: %d tests Home skipped or never compiled run here: %s\n", len(names),
@@ -572,6 +603,9 @@ func runModuleTests(
 	sort.Strings(stillSkipped)
 	where += fmt.Sprintf(", then %d tests it skipped or never compiled on the Mac (%s)", len(names),
 		strings.Join(names, ", "))
+	if optIn != "" {
+		where += "; opt-in, which no gate runs: " + optIn
+	}
 	if len(stillSkipped) > 0 {
 		fmt.Fprintf(streams.Errors, "cohere-dev: skipped on the Mac too, so run nowhere: %s\n",
 			strings.Join(stillSkipped, ", "))

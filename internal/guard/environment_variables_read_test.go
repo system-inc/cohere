@@ -26,7 +26,8 @@ import (
 //     be cohere, the Swift engine, a script or an editor extension;
 //   - read by a Go test with os.Getenv or os.LookupEnv, of the literal or of a constant holding it, the way a
 //     test binary started again as its own helper child reads its marker;
-//   - read as `$NAME` or `${NAME}` inside a string literal of a Go test, a shell script the test writes.
+//   - read as `$NAME` or `${NAME}` inside a string literal of a Go test, a shell script the test writes;
+//   - read by needs.OptIn, whose second argument is the name of the variable it reads (#xc29pnd).
 //
 // testdata is left out on both sides: its files are fixtures some test reads, not tests that run.
 func TestEveryCohereVariableATestSetsIsRead(test *testing.T) {
@@ -119,6 +120,8 @@ func reads() {
 	_ = os.Getenv("COHERE_LITERAL_READ")
 	_, _ = os.LookupEnv(markerVariable)
 	_ = "#!/bin/sh\necho $COHERE_SCRIPT ${COHERE_BRACED}\n"
+	_ = needs.OptIn(nil, "COHERE_OPTED_IN", "a census")
+	_ = other.OptIn(nil, "COHERE_OTHERS_OPT_IN", "not needs")
 }
 `
 	fileSet := token.NewFileSet()
@@ -132,7 +135,8 @@ func reads() {
 	if want := "COHERE_HELPER COHERE_LITERAL COHERE_MARKER COHERE_TESTING_SETENV"; strings.Join(set, " ") != want {
 		test.Errorf("collected as set %v, want %s", set, want)
 	}
-	if want := "COHERE_BRACED COHERE_LITERAL_READ COHERE_MARKER COHERE_SCRIPT"; strings.Join(read, " ") != want {
+	if want := "COHERE_BRACED COHERE_LITERAL_READ COHERE_MARKER COHERE_OPTED_IN COHERE_SCRIPT"; strings.Join(read,
+		" ") != want {
 		test.Errorf("collected as read %v, want %s", read, want)
 	}
 }
@@ -191,6 +195,21 @@ func cohereVariablesOf(fileSet *token.FileSet, file *ast.File, constants map[str
 				found.set[name] = append(found.set[name], fileSet.Position(typed.Pos()))
 			}
 		case *ast.CallExpr:
+			// needs.OptIn(test, name, why) reads its second argument, inside package needs as OptIn alone.
+			if function, isIdentifier := typed.Fun.(*ast.Ident); isIdentifier && function.Name == "OptIn" &&
+				len(typed.Args) > 1 {
+				if name := nameOf(typed.Args[1]); name != "" {
+					found.read[name] = true
+				}
+			}
+			if selector, isSelector := typed.Fun.(*ast.SelectorExpr); isSelector && selector.Sel.Name == "OptIn" &&
+				len(typed.Args) > 1 {
+				if owner, isIdentifier := selector.X.(*ast.Ident); isIdentifier && owner.Name == "needs" {
+					if name := nameOf(typed.Args[1]); name != "" {
+						found.read[name] = true
+					}
+				}
+			}
 			selector, isSelector := typed.Fun.(*ast.SelectorExpr)
 			if !isSelector || len(typed.Args) == 0 {
 				return true

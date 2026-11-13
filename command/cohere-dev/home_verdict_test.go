@@ -204,6 +204,28 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 				"never compiled on the Mac (TestPlantedDarwinOnly, TestPlantedLinuxSkip)"},
 		},
 		{
+			// An opt-in skip is no gate's test: named on the land line as opt-in, never in the Mac's remainder, which
+			// holds only the plain skip and the test Linux never compiles. An opt-in subtest beside a passing one sends
+			// nothing to the Mac either.
+			name: "Home passes, with opt-in skips",
+			home: func(commit string) string {
+				return homeMarker + commit + " on linux/amd64\n" +
+					`{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n" +
+					`{"Action":"output","Package":"example.com/fixture/alpha","Test":"TestPlantedCensus",` +
+					`"Output":"    census_test.go:9: ` + needs.OptInPhrase + `COHERE_CENSUS set: a census\n"}` + "\n" +
+					`{"Action":"skip","Package":"example.com/fixture/alpha","Test":"TestPlantedCensus"}` + "\n" +
+					`{"Action":"output","Package":"example.com/fixture/alpha","Test":"TestPlantedRows/measured",` +
+					`"Output":"    rows_test.go:9: ` + needs.OptInPhrase + `COHERE_ROWS set: a measure\n"}` + "\n" +
+					`{"Action":"skip","Package":"example.com/fixture/alpha","Test":"TestPlantedRows/measured"}` + "\n" +
+					`{"Action":"pass","Package":"example.com/fixture/alpha","Test":"TestPlantedRows/checked"}` + "\n" +
+					`{"Action":"skip","Package":"example.com/fixture/alpha","Test":"TestPlantedLinuxSkip"}` + "\n"
+			},
+			lands: true,
+			inBody: []string{"then 2 tests it skipped or never compiled on the Mac (TestPlantedDarwinOnly, " +
+				"TestPlantedLinuxSkip); opt-in, which no gate runs: TestPlantedCensus (example.com/fixture/alpha), " +
+				"TestPlantedRows/measured (example.com/fixture/alpha)"},
+		},
+		{
 			name: "Home fails a test",
 			home: func(commit string) string {
 				return homeMarker + commit + " on linux/amd64\n" +
