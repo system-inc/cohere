@@ -33,11 +33,13 @@ type SharedReads struct {
 	directories map[string]*sharedDirectory
 	files       map[string]*sharedFile
 
-	// resolved is each path's filepath.EvalSymlinks, empty where it failed, and isDirectories whether each path is a
-	// directory, which go/build's HasSubdir and IsDir read (hasSubdirectory, isDirectory): a path's links and kind
-	// hold for the run, as its entries do, since the engine adds or removes no file. Both are under mutex.
-	resolved      map[string]string
-	isDirectories map[string]bool
+	// resolved is each path's filepath.EvalSymlinks, empty where it failed, a string by path, and isDirectories
+	// whether each path is a directory, a bool by path, which go/build's HasSubdir and IsDir read (hasSubdirectory,
+	// isDirectory): a path's links and kind hold for the run, as its entries do, since the engine adds or removes no
+	// file. Each is a sync.Map, not under mutex: they are filled once and read for every directory of every build
+	// listing at once, so a hit takes no lock.
+	resolved      sync.Map
+	isDirectories sync.Map
 }
 
 // sharedDirectory is one directory's entries, read once.
@@ -56,8 +58,7 @@ const sharedFileHead = 4 << 10
 
 // NewSharedReads is reads no listing has made yet.
 func NewSharedReads() *SharedReads {
-	return &SharedReads{directories: map[string]*sharedDirectory{}, files: map[string]*sharedFile{},
-		resolved: map[string]string{}, isDirectories: map[string]bool{}}
+	return &SharedReads{directories: map[string]*sharedDirectory{}, files: map[string]*sharedFile{}}
 }
 
 // readDirectory is a build.Context's ReadDir: directory's entries as os.ReadDir reads them, read once for every
@@ -144,19 +145,17 @@ func (shared *SharedReads) hasSubdirectory(root string, directory string) (strin
 // resolvedLinks is path with its symbolic links expanded, read once for the run, and empty where expanding failed, as
 // go/build's Context.hasSubdir reads filepath.EvalSymlinks with its error ignored.
 func (shared *SharedReads) resolvedLinks(path string) string {
-	shared.mutex.Lock()
-	resolved, found := shared.resolved[path]
-	shared.mutex.Unlock()
-	if found {
-		return resolved
+	if stored, found := shared.resolved.Load(path); found {
+		// Only resolvedLinks stores here, and only strings, so a value of another type is never met.
+		if resolved, isString := stored.(string); isString {
+			return resolved
+		}
 	}
 	// Ignored: go/build ignores it too, and compares the empty path it leaves, which is below no root.
-	resolved, _ = filepath.EvalSymlinks(path)
-	// Resolved with the lock let go, so no listing waits on another's system calls: two asking at once both resolve
+	resolved, _ := filepath.EvalSymlinks(path)
+	// Resolved before it is stored, so no listing waits on another's system calls: two asking at once both resolve
 	// it, to the same answer, since nothing in the run moves a link.
-	shared.mutex.Lock()
-	shared.resolved[path] = resolved
-	shared.mutex.Unlock()
+	shared.resolved.Store(path, resolved)
 	return resolved
 }
 
@@ -165,18 +164,16 @@ func (shared *SharedReads) resolvedLinks(path string) string {
 // run. go/build asks it of each directory it imports and of every link among a directory's entries, to leave out a
 // link to a directory.
 func (shared *SharedReads) isDirectory(path string) bool {
-	shared.mutex.Lock()
-	answer, found := shared.isDirectories[path]
-	shared.mutex.Unlock()
-	if found {
-		return answer
+	if stored, found := shared.isDirectories.Load(path); found {
+		// Only isDirectory stores here, and only bools, so a value of another type is never met.
+		if answer, isBool := stored.(bool); isBool {
+			return answer
+		}
 	}
 	info, statError := os.Stat(path)
-	answer = statError == nil && info.IsDir()
-	// As resolvedLinks: stated with the lock let go, and two asking at once store the same answer.
-	shared.mutex.Lock()
-	shared.isDirectories[path] = answer
-	shared.mutex.Unlock()
+	answer := statError == nil && info.IsDir()
+	// As resolvedLinks: stated before it is stored, and two asking at once store the same answer.
+	shared.isDirectories.Store(path, answer)
 	return answer
 }
 
