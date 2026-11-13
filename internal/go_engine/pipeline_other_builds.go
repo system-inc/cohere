@@ -87,8 +87,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	if !fixed {
 		hostLive := forcedLiveHeapBytes()
 		measure = func() int {
-			measured, holding := engine.measuredBuildsWidth(len(extras), hostLive)
+			measured, slack, holding := engine.measuredBuildsWidth(len(extras), hostLive)
 			engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes = hostLive, holding
+			engine.buildsWidthSlack = slack
 			return measured
 		}
 	}
@@ -591,6 +592,7 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			// An extra build's alone, and under `--timing` alone: 0 otherwise, which the record leaves out.
 			HeldAtLoadEndBytes:  run.heldAtLoadEnd,
 			HeldAtLintPeakBytes: run.heldAtLintPeak,
+			LintPeakOverLoadEnd: lintPeakOverLoadEnd(run.heldAtLoadEnd, run.heldAtLintPeak),
 			// An extra build's alone, under `--build-dependence`: nil otherwise, which the record leaves out.
 			Dependence: run.dependence,
 		}

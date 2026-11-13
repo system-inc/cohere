@@ -42,9 +42,11 @@ type checkedBuild struct {
 	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
 	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
 	// HeldAtLoadEndBytes and HeldAtLintPeakBytes are what another build held beyond the host's live heap as its load
-	// ended and at its lint's peak, written only under `--timing` (#rmzehfg), each absent when 0.
-	HeldAtLoadEndBytes  uint64 `json:"heldAtLoadEndBytes,omitempty"`
-	HeldAtLintPeakBytes uint64 `json:"heldAtLintPeakBytes,omitempty"`
+	// ended and at its lint's peak, written only under `--timing` (#rmzehfg), and LintPeakOverLoadEnd the second over
+	// the first (#ewkp7w0), each absent when 0.
+	HeldAtLoadEndBytes  uint64  `json:"heldAtLoadEndBytes,omitempty"`
+	HeldAtLintPeakBytes uint64  `json:"heldAtLintPeakBytes,omitempty"`
+	LintPeakOverLoadEnd float64 `json:"lintPeakOverLoadEnd,omitempty"`
 	// CheckedFromSource is the packages another build checked from source over every load, a reload's included, and
 	// CheckedFromSourceRounds each load's count in order, written only when it was loaded more than once (#k8gty9e).
 	// PackagesLoaded is every package its first load loaded, whose share checked from source weighs its lint, and

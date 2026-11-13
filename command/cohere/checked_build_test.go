@@ -17,7 +17,8 @@ func TestABuildsRoundsCheckedFromSourceReachTheJson(test *testing.T) {
 	test.Parallel()
 
 	written, writeError := json.Marshal(contract.BuildRecord{Target: "windows/arm64", CheckedFromSource: 7,
-		CheckedFromSourceRounds: []int{3, 4}, PackagesLoaded: 9, HeldAtLoadEndBytes: 64, HeldAtLintPeakBytes: 128})
+		CheckedFromSourceRounds: []int{3, 4}, PackagesLoaded: 9, HeldAtLoadEndBytes: 64, HeldAtLintPeakBytes: 128,
+		LintPeakOverLoadEnd: 2})
 	if writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -34,9 +35,9 @@ func TestABuildsRoundsCheckedFromSourceReachTheJson(test *testing.T) {
 		test.Fatal(rereadError)
 	}
 	if reread.CheckedFromSource != 7 || !slices.Equal(reread.CheckedFromSourceRounds, []int{3, 4}) ||
-		reread.HeldAtLoadEndBytes != 64 || reread.HeldAtLintPeakBytes != 128 {
+		reread.HeldAtLoadEndBytes != 64 || reread.HeldAtLintPeakBytes != 128 || reread.LintPeakOverLoadEnd != 2 {
 		test.Errorf("the front door wrote %s, want the engine's 7 checked from source over the rounds [3 4], and 64 "+
-			"and 128 bytes held", forwarded)
+			"and 128 bytes held, a ratio of 2", forwarded)
 	}
 }
 
