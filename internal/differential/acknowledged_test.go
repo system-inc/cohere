@@ -3,6 +3,7 @@ package differential
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -193,21 +194,51 @@ func TestWithoutTheSourceEveryAcknowledgementIsStale(test *testing.T) {
 	}
 }
 
+// knownGateDefectProblems is the check over a list of acknowledgements: one problem for each entry
+// that states no reason, and one for each that is not keyed to an exact finding.
+func knownGateDefectProblems(defects []AcknowledgedDifference) []string {
+	var problems []string
+	for _, defect := range defects {
+		if defect.Reason == "" {
+			problems = append(problems, defect.Key()+" has no reason recorded")
+		}
+		if defect.File == "" || defect.Rule == "" || strings.TrimSpace(defect.Anchor) == "" {
+			problems = append(problems,
+				defect.Key()+" is not keyed to an exact finding, so it would excuse more than one")
+		}
+	}
+	return problems
+}
+
 // Every acknowledgement states a reason and an anchor, because one without a reason is
 // indistinguishable from a suppression added to turn a red run green, and one without an anchor would
 // match every line of its file.
+//
+// KnownGateDefects has been empty since #cn8sthd, so the check run over it reads nothing today. It
+// also runs over a fixture list holding one entry without a reason, one without an anchor and one
+// well formed, and must report exactly the first two: a check that could not fail would pass here
+// on an empty list and on a full one alike.
 func TestEveryKnownGateDefectStatesAReasonAndAnAnchor(test *testing.T) {
 	test.Parallel()
-	if len(KnownGateDefects) == 0 {
-		test.Skip("no acknowledgements are recorded, so this proves nothing")
+	for _, problem := range knownGateDefectProblems(KnownGateDefects) {
+		test.Error(problem)
 	}
-	for _, defect := range KnownGateDefects {
-		if defect.Reason == "" {
-			test.Errorf("%s has no reason recorded", defect.Key())
-		}
-		if defect.File == "" || defect.Rule == "" || strings.TrimSpace(defect.Anchor) == "" {
-			test.Errorf("%s is not keyed to an exact finding, so it would excuse more than one", defect.Key())
-		}
+
+	unreasoned := AcknowledgedDifference{
+		File: "app/Probe.tsx", Rule: "storage-no-direct-local-storage", Side: SideCohere,
+		Anchor: "const stored = window.localStorage", Reason: "",
+	}
+	unanchored := AcknowledgedDifference{
+		File: "app/Other.tsx", Rule: "storage-no-direct-local-storage", Side: SideCohere,
+		Anchor: " ", Reason: "the gate cannot see this shape",
+	}
+	problems := knownGateDefectProblems([]AcknowledgedDifference{unreasoned, unanchored, storedAcknowledgement})
+	expected := []string{
+		unreasoned.Key() + " has no reason recorded",
+		unanchored.Key() + " is not keyed to an exact finding, so it would excuse more than one",
+	}
+	if !slices.Equal(problems, expected) {
+		test.Errorf("the fixture list reported %q; expected %q", problems, expected)
 	}
 }
 
