@@ -19,6 +19,11 @@ import (
 // record names each file only such a build compiles as checked by it (#72n9mq0). The front door forwards it to this
 // engine alone, and off changes nothing.
 //
+// `build-dependence` has the engine compute, for every extra build `other-builds` checks, which of the host's
+// package-level declarations the build can change (#qkq4gx5), and write the counts on the build's record, observed
+// only: it changes no finding. Without `other-builds` it does nothing. The engine reads it alone for now, and the
+// census runs the engine directly, so the front door does not forward it.
+//
 // `timing` measures what the run's CPU goes to and writes it as the timing record (pipeline.timing, #3apgjer).
 //
 // `duplicates` asks for the duplicates report (#jfvhbj7): the lint pass hashes every function beside the rules, and
@@ -26,7 +31,7 @@ import (
 // alone: the Swift engine refuses it as a flag it does not know.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing", "duplicates",
+	"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing", "duplicates", "build-dependence",
 }
 
 // notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a

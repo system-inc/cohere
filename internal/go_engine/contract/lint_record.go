@@ -172,6 +172,43 @@ type BuildRecord struct {
 	FilesAlone      int      `json:"filesAlone,omitempty"`
 	NotLinted       []string `json:"notLinted,omitempty"`
 	NotLintedReason string   `json:"notLintedReason,omitempty"`
+
+	// Dependence, additive within contract 3 and the Go engine's alone, is an extra build's under
+	// `--build-dependence` beside `--other-builds` (#qkq4gx5): which of the host's package-level declarations the
+	// build can change, observed only, so it changes no finding. Absent unless the switch was on, and on the host's
+	// record always.
+	Dependence *BuildDependence `json:"dependence,omitempty"`
+}
+
+// BuildDependence is what one extra build can change of the host's package-level declarations, each a unit: a
+// function, a type spec, or a var or const spec. A unit is dependent when its file is not one both builds compile, when
+// an object it declares reaches a dependent object, or when its body reads one by a kind of use the change reaches
+// (#ewgh523). Workspace counts the packages with a file in scope, their test variants included, and Dependencies every
+// other package the host checked. GraphMilliseconds is the host's graph, built once from its load for every build, and
+// JudgmentMilliseconds this build's judgment on it: its file sets compared with the host's, its build-only files
+// parsed, and the fixed point, each in wall milliseconds.
+type BuildDependence struct {
+	Workspace            DependenceCounts `json:"workspace"`
+	Dependencies         DependenceCounts `json:"dependencies"`
+	GraphMilliseconds    int              `json:"graphMilliseconds"`
+	JudgmentMilliseconds int              `json:"judgmentMilliseconds"`
+}
+
+// DependenceCounts are one scope's units and nodes, dependent and in all, a unit's nodes being its syntax nodes. Of
+// the packages with units, DependentPackages are those with a dependent unit or a unit only the build compiles, and
+// DependentPackageNodes their nodes, what a rule run whole on each of them would redo. BuildOnlyUnits and
+// BuildOnlyNodes are the units only the build compiles, of the scope's packages and of packages only the build has,
+// which no count of the host's holds.
+type DependenceCounts struct {
+	Units                 int `json:"units"`
+	DependentUnits        int `json:"dependentUnits"`
+	Nodes                 int `json:"nodes"`
+	DependentNodes        int `json:"dependentNodes"`
+	Packages              int `json:"packages"`
+	DependentPackages     int `json:"dependentPackages"`
+	DependentPackageNodes int `json:"dependentPackageNodes"`
+	BuildOnlyUnits        int `json:"buildOnlyUnits"`
+	BuildOnlyNodes        int `json:"buildOnlyNodes"`
 }
 
 // LintCache counts, by package, what the per-package findings cache did: every package the load reached was hit,

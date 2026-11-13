@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // checkedBuild is one build a Go run checked when it checked more than one, as the lint record's `builds` says it
 // (swift/Contract.md, internal/go_engine/contract.BuildRecord), the host's first: its target as go env would make it,
@@ -57,6 +60,9 @@ type checkedBuild struct {
 	FilesAlone      int      `json:"filesAlone,omitempty"`
 	NotLinted       []string `json:"notLinted,omitempty"`
 	NotLintedReason string   `json:"notLintedReason,omitempty"`
+	// Dependence is another build's dependence counts under the engine's `--build-dependence` (#qkq4gx5), carried as
+	// the engine wrote it, since nothing here reads it, absent unless the engine wrote it.
+	Dependence json.RawMessage `json:"dependence,omitempty"`
 }
 
 // line is the build's clause of the --verbose account, after "lint: ". The host's says what it covered, and the
