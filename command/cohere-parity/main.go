@@ -65,7 +65,9 @@ type censusPair struct {
 	gains string
 }
 
-// pairs is every port beside its original, by the name the census prints. A new port is one entry here.
+// pairs is every port beside its original, by the name the census prints. A new port is one entry here. Over a tree
+// under the user's cache directory, ST1001's and ST1013's originals alone report what its staticcheck.conf allows,
+// which each port's differences fixture records as dropped (#sc5qmy7), so run the census over a tree kept elsewhere.
 var pairs = []censusPair{
 	{
 		pair:  parity.Pair{Name: "nilness", Original: nilness.Analyzer, Port: nil_ness.Analyzer},

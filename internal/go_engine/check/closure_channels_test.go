@@ -47,12 +47,14 @@ var factLearners = []string{"ctrlflow", "fact_deprecated", "printf"}
 // initializes; intermediate_representation's are a build census only tests open and a sync.Pool of scratch space a
 // lift empties before it gives it back; and the abbreviation rule's memo is keyed by each load's file set and each
 // declaring package's types, and holds what that package declares, so a reader reads the same whichever package asked
-// first.
+// first. staticcheck_configuration's build caches are written by go env's answers (load.ReadGoEnvironment), never by a
+// pass, and only grow, each by a directory go writes its own files to, so a pass reads the same whatever ran before it.
 var packageStateWriters = []string{
 	"check/checker",
 	"fact_resolver",
 	"intermediate_representation",
 	"rules/consistency_no_abbreviated_identifier",
+	"staticcheck_configuration",
 }
 
 // engineSource is every package under the go_engine directory, parsed once for the tests that read it.

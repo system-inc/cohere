@@ -136,7 +136,7 @@ func (target Target) RequireOnlyAdjudicated(
 	given ...Record,
 ) {
 	test.Helper()
-	requireOnlyAdjudicated(test, target, original, port, testdata, fixture, given)
+	requireOnlyAdjudicated(test, target, original, port, testdata, fixture, "", given)
 }
 
 // RequireStaticcheckWants is the package's RequireStaticcheckWants with the fixtures loaded for target.

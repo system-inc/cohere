@@ -1,6 +1,7 @@
 package dot_import
 
 import (
+	"path/filepath"
 	"testing"
 
 	"honnef.co/go/tools/stylecheck/st1001"
@@ -21,9 +22,20 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 
 // Over staticcheck's fixtures and parity's, the original and the port find the same findings. parity holds every
 // import shape the check reads and every near miss, in a package under no staticcheck.conf and in one under a
-// staticcheck.conf allowing some paths. The port differs from the original nowhere, so there is no differences
-// fixture.
+// staticcheck.conf allowing some paths. The one place the two differ is held apart, under the user's cache directory
+// (TestPortDropsUnderTheUserCacheDirectory).
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, st1001.Analyzer, Analyzer, analysistest.TestData(), "go1.0", "parity/...")
+}
+
+// The differences fixture sits under a stand-in for the user's cache directory, beside a staticcheck.conf that allows
+// what it holds. The original reads no staticcheck.conf for a file there and reports it, and the port reads the
+// engine's, which skips only Go's build caches, and leaves it alone, each a `drops:` record (#sc5qmy7).
+//
+// Not parallel: the harness moves the process's user cache directory while the two run.
+func TestPortDropsUnderTheUserCacheDirectory(test *testing.T) {
+	userCacheDirectory := filepath.Join(analysistest.TestData(), "user_cache", "Library", "Caches")
+	parity.RequireOnlyAdjudicatedUnderUserCacheDirectory(test, st1001.Analyzer, Analyzer, analysistest.TestData(),
+		"user_cache/Library/Caches/differences", userCacheDirectory)
 }
