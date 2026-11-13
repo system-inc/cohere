@@ -7,54 +7,33 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
-// verdicts is purity's state in one package: each declared function judged, pure or not, by its object, and whether
-// the package was computed whole, the push's way.
+// verdicts is purity's state in one package: each declared function judged, pure or not, by its object. Every verdict
+// is the definition's (see demandWalk), so one kept by any question answers every later one.
 type verdicts struct {
-	pure     map[*types.Func]bool
-	fellBack bool
+	pure map[*types.Func]bool
 }
 
-// fallBack computes every function of home the push's way, in buildir's order with one seen set, and keeps each
-// verdict, for a package where an answer depended on that order (see demandWalk). A verdict kept before is the push's
-// by the reasoning there; one the push contradicts is counted, so the differential can require none.
-func (state *verdicts) fallBack(resolver *fact_resolver.Resolver, home *fact_resolver.Package) {
-	counts := resolver.Counts(Kind)
-	recorded := &resolverFacts{resolver: resolver, home: home, pure: map[*types.Func]bool{}}
-	walk := &pushWalk{facts: recorded, irPackage: home.IntermediateRepresentation(),
-		seen: map[*intermediate_representation.Function]bool{}}
-	functions := home.SourceFunctions()
-	for _, function := range functions {
-		walk.isPure(function)
+// walk is a demand walk over home's verdicts, with state's map made when it is the package's first.
+func (state *verdicts) walk(resolver *fact_resolver.Resolver, home *fact_resolver.Package) *demandWalk {
+	if state.pure == nil {
+		state.pure = map[*types.Func]bool{}
 	}
-	for _, function := range functions {
-		if function.Object() == nil {
-			continue
-		}
-		declared := declaredFunction(function)
-		pure := recorded.pure[declared]
-		if kept, judged := state.pure[declared]; judged {
-			if kept != pure {
-				counts.Contradicted.Add(1)
-			}
-		} else {
-			counts.Computed.Add(1)
-		}
-		state.pure[declared] = pure
-	}
-	state.fellBack = true
+	return &demandWalk{resolver: resolver, home: home, irPackage: home.IntermediateRepresentation(), state: state,
+		stack: map[*intermediate_representation.Function]bool{}}
 }
 
-// whole is every function of home pure, computed whole the push's way, each with its answer, true, for the standard
-// library's table, where a function absent is not pure.
+// whole is every function of home pure, each source function judged, or its verdict kept, each with its answer, true,
+// for the standard library's table, where a function absent is not pure. The order the functions are judged in
+// changes no verdict (see demandWalk).
 func whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object]bool {
 	home.Lock()
 	defer home.Unlock()
 	state := fact_resolver.StateOf[verdicts](home, Kind)
-	if state.pure == nil {
-		state.pure = map[*types.Func]bool{}
-	}
-	if !state.fellBack {
-		state.fallBack(resolver, home)
+	walk := state.walk(resolver, home)
+	for _, function := range home.SourceFunctions() {
+		if function.Object() != nil {
+			walk.verdict(function)
+		}
 	}
 	answers := map[types.Object]bool{}
 	for function, pure := range state.pure {

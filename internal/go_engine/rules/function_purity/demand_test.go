@@ -4,9 +4,11 @@ import (
 	"cmp"
 	"fmt"
 	"go/types"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -34,16 +36,48 @@ const demandDifferentialVariable = "COHERE_GO_IR_DEMAND_DIFFERENTIAL"
 
 // A call through an instance of the package's own pure generic function is the one place the push's answer depends on
 // the order it walks the package in: package after declares the caller first and the push holds it not pure, package
-// before declares it second and the push holds it pure. Asked on demand, each falls back to the push's walk and
-// answers as the push does.
-func TestAnInstanceAnswersInThePushsOrder(test *testing.T) {
+// before declares it second and the push holds it pure. Asked on demand, the instance answers as its declared function
+// does, so the caller is pure in both (#zva1zrc), and after's is the one place the push departs.
+func TestAnInstanceAnswersAsItsDeclaredFunctionInEitherOrder(test *testing.T) {
 	test.Parallel()
 	probed := probeFixtures(test, "demand/order/after", "demand/order/before")
 	requireVerdicts(test, probed, map[string]bool{
-		"demand/order/after.Caller":  false,
+		"demand/order/after.Caller":  true,
 		"demand/order/after.Zero":    true,
 		"demand/order/before.Caller": true,
 		"demand/order/before.Zero":   true,
+	})
+	requireDepartures(test, probed, []string{"demand/order/after.Caller"})
+}
+
+// A function's purity never turns on what else its package declares (#zva1zrc). Packages first and second are one
+// package's two variants, differing only in an unrelated function and in which file comes first, and each calls the
+// package's own pure functions through an instance of a generic function and through a method wrapper. The push holds
+// both callers not pure in first, where it meets the callers first, and pure in second; asked on demand, every
+// function answers the same in both.
+func TestPurityNeverTurnsOnWhatElseThePackageDeclares(test *testing.T) {
+	test.Parallel()
+	probed := probeFixtures(test, "demand/declares/first", "demand/declares/second")
+	want := map[string]bool{
+		"InstanceCaller": true,
+		"WrapperCaller":  true,
+		"Zero":           true,
+		"(Count).Double": true,
+	}
+	for name, pure := range want {
+		for _, variant := range []string{"first", "second"} {
+			full := "demand/declares/" + variant + "." + name
+			if strings.HasPrefix(name, "(") {
+				full = "(demand/declares/" + variant + "." + strings.TrimPrefix(name, "(")
+			}
+			requireVerdicts(test, probed, map[string]bool{full: pure})
+		}
+	}
+	requireVerdicts(test, probed, map[string]bool{"demand/declares/first.Unrelated": true})
+	// The push departs in first alone, which proves the variants differ where the push's order bites.
+	requireDepartures(test, probed, []string{
+		"demand/declares/first.InstanceCaller",
+		"demand/declares/first.WrapperCaller",
 	})
 }
 
@@ -135,30 +169,23 @@ func panicOf(run func()) (panicked string) {
 	return ""
 }
 
-// Each package an order-dependent answer was asked in is computed whole once, and counted; a package with no such
-// answer never is.
-func TestTheFallbackIsCounted(test *testing.T) {
+// Purity never replays a package's walk: no answer of it depends on an order, so none falls back, the packages whose
+// push departs included.
+func TestPurityNeverFallsBack(test *testing.T) {
 	test.Parallel()
-	for _, counted := range []struct {
-		fixture   string
-		fallbacks int64
-	}{
-		{"demand/order/after", 1},
-		{"demand/order/before", 1},
-		{"demand/hops/top", 0},
-	} {
-		probed := probeFixtures(test, counted.fixture)
-		if fallbacks := probed.counts.Fallbacks.Load(); fallbacks != counted.fallbacks {
-			test.Errorf("over %s the resolver fell back %d times, want %d", counted.fixture, fallbacks,
-				counted.fallbacks)
-		}
+	probed := probeFixtures(test, "demand/order/after", "demand/order/before", "demand/declares/first",
+		"demand/declares/second", "demand/hops/top")
+	if fallbacks := probed.counts.Fallbacks.Load(); fallbacks != 0 {
+		test.Errorf("purity fell back %d times, want none", fallbacks)
 	}
 }
 
 // The demand differential (#w7zmvat unit 2): over the whole tree COHERE_GO_IR_DEMAND_DIFFERENTIAL names, and every
-// package it imports, the push judges every function, the readers of purity ask the resolver, and then the resolver is
-// asked of every function the push judged; every answer must be the push's. It logs how many functions the readers had
-// the resolver compute against the push's total, which is the saving. Unset, it skips, since a tree takes minutes.
+// package it imports, the push and the definition judge every function, the readers of purity ask the resolver, and
+// then the resolver is asked of every function the push judged. Every answer must be the definition's, and every
+// function the push holds pure must be pure; the push may hold not pure only what its order alone made so (#zva1zrc),
+// which it counts. It logs how many functions the readers had the resolver compute against the push's total, which is
+// the saving. Unset, it skips, since a tree takes minutes.
 func TestDemandAnswersAsThePushOverATree(test *testing.T) {
 	test.Parallel()
 	directory := needs.OptIn(
@@ -185,13 +212,14 @@ func TestDemandAnswersAsThePushOverATree(test *testing.T) {
 	if len(loaded.Packages) == 0 {
 		test.Fatalf("loading %s found no package, so the comparison would prove nothing", workspace.Root)
 	}
-	requireDemandAnswersAsPush(test, workspace.Root, loaded.Packages)
+	requireDemandAnswersAsTheDefinition(test, workspace.Root, loaded.Packages)
 }
 
-// requireDemandAnswersAsPush runs the push beside the three readers of purity over roots, as the engine runs them,
-// then asks the resolver of every function of every package the push judged, as that package's own reader, and fails
-// on the first answer the push's facts contradict, or on any verdict a fallback contradicted.
-func requireDemandAnswersAsPush(test *testing.T, described string, roots []*packages.Package) {
+// requireDemandAnswersAsTheDefinition runs the push and the definition beside the three readers of purity over roots,
+// as the engine runs them, then asks the resolver of every function of every package the push judged, as that
+// package's own reader, and fails on the first answer the definition's facts contradict, or the first function the
+// push holds pure that the resolver does not.
+func requireDemandAnswersAsTheDefinition(test *testing.T, described string, roots []*packages.Package) {
 	test.Helper()
 	var judged atomic.Int64
 	push := function_purity.NewPushAnalyzer(&judged)
@@ -203,25 +231,29 @@ func requireDemandAnswersAsPush(test *testing.T, described string, roots []*pack
 	if !isResolver {
 		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
 	}
-	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{push, discarded_pure_call.Analyzer,
-		self_assignment.Analyzer, single_append_concatenation.Analyzer}, roots, options)
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{push, function_purity.DefinitionAnalyzer,
+		discarded_pure_call.Analyzer, self_assignment.Analyzer, single_append_concatenation.Analyzer}, roots, options)
 	if analyzeError != nil {
 		test.Fatalf("analyzing %s: %v", described, analyzeError)
 	}
 	counts := resolver.Counts(function_purity.Kind)
-	askedByReaders, fallbacksByReaders := counts.Computed.Load(), counts.Fallbacks.Load()
-	compared, pushPackages := 0, 0
+	askedByReaders := counts.Computed.Load()
+	defined := map[*types.Package]map[*types.Func]bool{}
+	for action := range graph.All() {
+		if action.Analyzer == function_purity.DefinitionAnalyzer && action.Err == nil {
+			defined[action.Package.Types] = ownPure(action)
+		}
+	}
+	compared, pushPackages, departures := 0, 0, 0
 	for action := range graph.All() {
 		if action.Analyzer != push || action.Err != nil {
 			continue
 		}
 		pushPackages++
-		pushed := map[*types.Func]bool{}
-		for _, objectFact := range action.AllObjectFacts() {
-			if function, isFunction := objectFact.Object.(*types.Func); isFunction &&
-				function.Pkg() == action.Package.Types {
-				pushed[function] = true
-			}
+		pushed := ownPure(action)
+		definition, isDefined := defined[action.Package.Types]
+		if !isDefined {
+			test.Fatalf("the definition never judged %s, which the push judged", action.Package.ID)
 		}
 		home := resolver.Package(action.Package.Types)
 		if home == nil {
@@ -233,22 +265,42 @@ func requireDemandAnswersAsPush(test *testing.T, described string, roots []*pack
 				continue
 			}
 			compared++
-			if asked := function_purity.Ask(resolver, home, declared); asked != pushed[declared] {
-				test.Fatalf("on %s, %s (%s): the resolver answers pure %t, the push %t", action.Package.ID,
-					declared.FullName(), objectKey(action.Package, declared), asked, pushed[declared])
+			asked := function_purity.Ask(resolver, home, declared)
+			if asked != definition[declared] {
+				test.Fatalf("on %s, %s (%s): the resolver answers pure %t, the definition %t", action.Package.ID,
+					declared.FullName(), objectKey(action.Package, declared), asked, definition[declared])
+			}
+			if pushed[declared] && !asked {
+				test.Fatalf("on %s, %s (%s): the push holds it pure and the resolver does not", action.Package.ID,
+					declared.FullName(), objectKey(action.Package, declared))
+			}
+			if asked != pushed[declared] {
+				departures++
 			}
 		}
 	}
-	if contradicted := counts.Contradicted.Load(); contradicted != 0 {
-		test.Fatalf("over %s a fallback contradicted %d verdicts the resolver had kept", described, contradicted)
+	if fallbacks := counts.Fallbacks.Load(); fallbacks != 0 {
+		test.Fatalf("over %s purity fell back %d times, want none", described, fallbacks)
 	}
 	if compared == 0 {
 		test.Fatalf("the push judged no function over %s, so the comparison proves nothing", described)
 	}
 	test.Logf("%s: %d packages analyzed, the push ran on %d and judged %d functions; the readers had the resolver "+
-		"compute %d (%.1f%%), with %d fallbacks; every one of the %d functions compared answers as the push",
-		described, len(roots), pushPackages, judged.Load(), askedByReaders,
-		100*float64(askedByReaders)/float64(max(judged.Load(), 1)), fallbacksByReaders, compared)
+		"compute %d (%.1f%%); every one of the %d functions compared answers as the definition, and %d hold pure "+
+		"where the push's order held them not", described, len(roots), pushPackages, judged.Load(), askedByReaders,
+		100*float64(askedByReaders)/float64(max(judged.Load(), 1)), compared, departures)
+}
+
+// ownPure is every function of action's package its facts hold pure.
+func ownPure(action *checker.Action) map[*types.Func]bool {
+	pure := map[*types.Func]bool{}
+	for _, objectFact := range action.AllObjectFacts() {
+		if function, isFunction := objectFact.Object.(*types.Func); isFunction &&
+			function.Pkg() == action.Package.Types {
+			pure[function] = true
+		}
+	}
+	return pure
 }
 
 // objectKey is function's key for a failure: its objectpath, or its position for one with none.
@@ -261,15 +313,18 @@ func objectKey(owner *packages.Package, function *types.Func) string {
 }
 
 // probed is what probing a fixture found: each function's verdict as the root that reaches it asks it, by full name,
-// every place the resolver's answer and the push's result part, and the resolver's counts.
+// every place the resolver's answer and the definition's part, or the push holds pure what the resolver does not, the
+// functions the resolver holds pure where the push's order held them not, and the resolver's counts.
 type probed struct {
 	verdicts    map[string]bool
 	differences []string
+	departures  map[string]bool
 	counts      *fact_resolver.Counts
 }
 
 // probeFixtures runs a probe on each fixture package that asks the resolver of every function in its types' reach and
-// holds each answer to the push's result on the same package, failing the test where the two part.
+// holds each answer to the definition's result on the same package, failing the test where the two part or where the
+// push holds pure what the resolver does not.
 func probeFixtures(test *testing.T, patterns ...string) probed {
 	test.Helper()
 	directory := analysistest.TestData()
@@ -283,23 +338,35 @@ func probeFixtures(test *testing.T, patterns ...string) probed {
 	probe := &analysis.Analyzer{
 		Name:       "purity_probe",
 		Doc:        "asks the resolver of every function in the package's reach, beside the push's result",
-		Requires:   []*analysis.Analyzer{function_purity.Analyzer, push},
+		Requires:   []*analysis.Analyzer{function_purity.Analyzer, push, function_purity.DefinitionAnalyzer},
 		ResultType: reflect.TypeFor[probed](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			asked, isAsked := pass.ResultOf[function_purity.Analyzer].(*function_purity.Result)
 			if !isAsked {
 				return nil, fmt.Errorf("function_purity's result is a %T", pass.ResultOf[function_purity.Analyzer])
 			}
-			found := probed{verdicts: map[string]bool{}}
+			found := probed{verdicts: map[string]bool{}, departures: map[string]bool{}}
 			for _, function := range functionsInReach(pass.Pkg) {
 				answer := asked.IsPure(function)
 				pushed, isPushed := function_purity.PushHoldsPure(pass, push, function)
 				if !isPushed {
 					return nil, fmt.Errorf("the push's result is a %T", pass.ResultOf[push])
 				}
-				if answer != pushed {
+				defined, isDefined := function_purity.DefinitionHoldsPure(pass, function)
+				if !isDefined {
+					return nil, fmt.Errorf("the definition's result is a %T",
+						pass.ResultOf[function_purity.DefinitionAnalyzer])
+				}
+				if answer != defined {
 					found.differences = append(found.differences, fmt.Sprintf("in %s, %s: the resolver answers "+
-						"pure %t, the push %t", pass.Pkg.Path(), function.FullName(), answer, pushed))
+						"pure %t, the definition %t", pass.Pkg.Path(), function.FullName(), answer, defined))
+				}
+				if pushed && !answer {
+					found.differences = append(found.differences, fmt.Sprintf("in %s, %s: the push holds it pure "+
+						"and the resolver does not", pass.Pkg.Path(), function.FullName()))
+				}
+				if answer != pushed {
+					found.departures[function.FullName()] = true
 				}
 				found.verdicts[function.FullName()] = answer
 			}
@@ -315,7 +382,7 @@ func probeFixtures(test *testing.T, patterns ...string) probed {
 	if analyzeError != nil {
 		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
 	}
-	all := probed{verdicts: map[string]bool{}, counts: resolver.Counts(function_purity.Kind)}
+	all := probed{verdicts: map[string]bool{}, departures: map[string]bool{}, counts: resolver.Counts(function_purity.Kind)}
 	for _, action := range graph.Roots {
 		found, isFound := action.Result.(probed)
 		if action.Err != nil || !isFound {
@@ -323,6 +390,9 @@ func probeFixtures(test *testing.T, patterns ...string) probed {
 		}
 		for name, verdict := range found.verdicts {
 			all.verdicts[name] = verdict
+		}
+		for name := range found.departures {
+			all.departures[name] = true
 		}
 		all.differences = append(all.differences, found.differences...)
 	}
@@ -344,6 +414,16 @@ func requireVerdicts(test *testing.T, found probed, want map[string]bool) {
 		if verdict != pure {
 			test.Errorf("%s: the resolver answers pure %t, want %t", name, verdict, pure)
 		}
+	}
+}
+
+// requireDepartures fails unless the functions the resolver holds pure where the push's order held them not are want,
+// by full name, exactly.
+func requireDepartures(test *testing.T, found probed, want []string) {
+	test.Helper()
+	departed := slices.Sorted(maps.Keys(found.departures))
+	if !slices.Equal(departed, slices.Sorted(slices.Values(want))) {
+		test.Errorf("the push departs on %q, want %q", departed, want)
 	}
 }
 
