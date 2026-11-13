@@ -8,8 +8,10 @@
 // judges every source function of every package, dependencies included, in the order buildir lists them, a callee of
 // the same package as it is met, a callee still being judged answering not pure, and marks each function judged pure
 // with a fact its importers read. Here a reader asks instead (#w7zmvat unit 2): Result.IsPure judges a function only
-// when asked, through the run's fact resolver, building only what that judgment reaches, and gives every answer the
-// push gives. demand_walk.go says how; the push walk stays in push_walk.go, for the resolver's fallback and the tests.
+// when asked, through the run's fact resolver, building only what that judgment reaches. Its answers are the push's
+// but for one call, through an instantiation or a method wrapper, where the push's answer turns on the order it walks
+// the package in and this one never does (#zva1zrc); demand_walk.go says how. The push walk stays in
+// push_walk_test.go, the tests' record of what the original answers.
 package function_purity
 
 import (

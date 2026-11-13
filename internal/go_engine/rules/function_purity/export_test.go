@@ -26,6 +26,19 @@ func PushHoldsPure(pass *analysis.Pass, push *analysis.Analyzer, function *types
 	return holds, true
 }
 
+// DefinitionAnalyzer is definitionAnalyzer, the definition's oracle, for the tests outside this package.
+var DefinitionAnalyzer = definitionAnalyzer
+
+// DefinitionHoldsPure is whether the definition's result on pass's package holds function pure, and whether pass holds
+// that result at all.
+func DefinitionHoldsPure(pass *analysis.Pass, function *types.Func) (bool, bool) {
+	held, isHeld := pass.ResultOf[definitionAnalyzer].(definitionResult)
+	if !isHeld {
+		return false, false
+	}
+	return held[function], true
+}
+
 // Ask is ask, whether function is pure as a reader in reader holds it.
 func Ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, function *types.Func) bool {
 	return ask(resolver, reader, function)

@@ -4,7 +4,6 @@ import (
 	"go/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
 // Kind keys purity's verdicts in each package the resolver holds, and its counts.
@@ -41,8 +40,8 @@ func (result *Result) Asking(asking string) *Result {
 	return &Result{resolver: result.resolver, reader: result.reader, asking: asking}
 }
 
-// IsPure is whether function is pure as the push held it for this package: the package's own function judged pure,
-// or another package's whose fact the checker would have carried here (fact_resolver.Visible) and that is pure there.
+// IsPure is whether function is pure as this package's readers hold it: the package's own function judged pure, or
+// another package's whose fact the checker would have carried here (fact_resolver.Visible) and that is pure there.
 func (result *Result) IsPure(function *types.Func) bool {
 	var pure bool
 	result.resolver.Question(result.asking, func() { pure = ask(result.resolver, result.reader, function) })
@@ -65,9 +64,6 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, func
 	home.Lock()
 	defer home.Unlock()
 	state := fact_resolver.StateOf[verdicts](home, Kind)
-	if state.pure == nil {
-		state.pure = map[*types.Func]bool{}
-	}
 	if pure, judged := state.pure[function]; judged {
 		return pure
 	}
@@ -77,14 +73,5 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, func
 		// judged and so never held pure.
 		return false
 	}
-	walk := &demandWalk{resolver: resolver, home: home, irPackage: home.IntermediateRepresentation(), state: state,
-		stack: map[*intermediate_representation.Function]bool{}}
-	pure := walk.verdict(declared)
-	if walk.orderDependent {
-		// A question answered by the push's walk of the package is a replay; a whole package for the store is not.
-		resolver.Counts(Kind).Fallbacks.Add(1)
-		state.fallBack(resolver, home)
-		return state.pure[function]
-	}
-	return pure
+	return state.walk(resolver, home).verdict(declared)
 }
