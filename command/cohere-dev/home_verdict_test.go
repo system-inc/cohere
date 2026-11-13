@@ -199,7 +199,8 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 					`{"Action":"skip","Package":"example.com/fixture/alpha","Test":"TestPlantedLinuxSkip"}` + "\n"
 			},
 			lands: true,
-			inBody: []string{"go test of the module on Home (linux/amd64, 1 packages), then 2 tests it skipped or " +
+			inBody: []string{"go test of the module on Home (linux/amd64, 1 packages, scratch box, shared uid), " +
+				"then 2 tests it skipped or " +
 				"never compiled on the Mac (TestPlantedDarwinOnly, TestPlantedLinuxSkip)"},
 		},
 		{
@@ -212,6 +213,16 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 			refusal: []string{"Home's tests on linux/amd64 failed", "TestPlantedFailure"},
 		},
 		{
+			// A box that won't vouch for itself refuses the landing; it is never a box with no verdict, which would
+			// send the tests to the Mac.
+			name: "Home refuses its toolchain",
+			home: func(commit string) string {
+				return homeMarker + commit + " on linux/amd64\n" + sharedBoxRefusedMarker +
+					"the Go toolchain on the box digests to 0000, not the pinned aa73\n"
+			},
+			refusal: []string{"Home refused to test this landing, so nothing landed", "digests to 0000"},
+		},
+		{
 			name: "Home passes, and its race run passes",
 			home: func(commit string) string {
 				return homeMarker + commit + " on linux/amd64\n" +
@@ -220,9 +231,10 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 					homeRaceMarker + "\n" +
 					`{"Action":"pass","Package":"example.com/fixture/internal/edit"}` + "\n"
 			},
-			raced:  true,
-			lands:  true,
-			inBody: []string{"go test of the module on Home (linux/amd64, 2 packages), 1 of them again under -race"},
+			raced: true,
+			lands: true,
+			inBody: []string{"go test of the module on Home (linux/amd64, 2 packages, scratch box, shared uid), " +
+				"1 of them again under -race"},
 		},
 		{
 			name: "Home passes, and its race run finds a race",

@@ -126,6 +126,12 @@ another tree gives no verdict, and the whole run happens on the Mac, said on the
 passes, the packages `race_gated.go` names run again under `-race`, on whichever machine ran it (#bnabymg).
 `COHERE_DEV_HOME_GATE=off` tests on the Mac alone.
 
+Home is a shared box: every job there runs as one account and writes one Go cache, so her run trusts nothing
+she kept (`shared_box_gate.go`, #adbkt5t). Her Go toolchain must digest to the one pinned there before any of
+it runs. Her account's Go settings are left unread. `go mod verify` passes before any test. Every test runs with
+`-count=1` on a Go cache made empty for the job. A toolchain or module cache she can't vouch for refuses the
+landing, and her verdict's land line says "scratch box, shared uid".
+
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
 body. The area is a folder in the tree, by its name or its path (`go_engine`, `release/dispatch`), or a
 top-level file's name lowercased (`contributing`). Land refuses a landing whose commits break that, naming
@@ -161,10 +167,11 @@ cache in the background, and when it is over the cap it takes every token, trims
 used entries to three quarters of the cap, and gives the tokens back. `cohere-dev status` shows the
 last look. Go alone keeps entries for five days, and the house refilled 200 GB in two and a half hours.
 
-A gate run never passes `-count=1`, and the wrapper refuses one for the whole module. Go's test cache
+A gate run on the Mac never passes `-count=1`, and the wrapper refuses one for the whole module. Go's test cache
 skips every package whose inputs did not change, and after a one-file change `-count=1` cost 81% more
 CPU for the same verdict (1,180 against 2,136 core-seconds). A flaky test is fixed rather than re-run
-around; name its package to re-run it alone.
+around; name its package to re-run it alone. A shared box is the one exception, above: there the cache is
+one any job can write, so the reason the rule holds doesn't.
 
 ## Taking a Go tree to zero
 
