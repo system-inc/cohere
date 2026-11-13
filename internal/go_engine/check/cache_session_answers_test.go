@@ -89,7 +89,7 @@ func answeredRun(test *testing.T, before bool) *Result {
 	if before {
 		session.Reload([]string{"example.com/answers/bottom"})
 	}
-	session.Restore(load.LoaderSource, reachable, analyzed)
+	session.Restore(load.LoaderSource, loadedSizes(reachable), reachable, analyzed)
 	if !before {
 		session.Reload([]string{"example.com/answers/bottom"})
 	}
@@ -148,7 +148,7 @@ func TestAReloadRoundForAMissingAnswerIsCountedByItsReason(test *testing.T) {
 		analyzed := answerModule(test, directory, "func Use() int {\n\treturn bottom.Double(2)\n}\n")
 		var reachable []*packages.Package
 		packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
-		session.Restore(load.LoaderSource, reachable, analyzed)
+		session.Restore(load.LoaderSource, loadedSizes(reachable), reachable, analyzed)
 		result, runError := Run(analyzed, rules, Options{Cache: session})
 		if runError != nil {
 			test.Fatalf("running the probe: %v", runError)

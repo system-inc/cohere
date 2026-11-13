@@ -43,7 +43,7 @@ func TestARestoreWhoseKeysFailLeavesNoKeysOfTheLoadBefore(test *testing.T) {
 	}
 	var reachable []*packages.Package
 	packages.Visit(loaded.Packages, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
-	session.Restore(load.LoaderSource, reachable, loaded.Packages)
+	session.Restore(load.LoaderSource, loadedSizes(reachable), reachable, loaded.Packages)
 	result, runError := Run(loaded.Packages, rules, Options{Cache: session, Withheld: loaded.Withheld})
 	if runError != nil {
 		test.Fatalf("running %d rules: %v", len(rules), runError)
@@ -123,7 +123,7 @@ func TestARestoreReadsTheSameHitsAsOneAtATime(test *testing.T) {
 	session := NewCacheSession(caching, rules)
 	var reachable []*packages.Package
 	packages.Visit(warm.Packages, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
-	session.Restore(load.LoaderSource, reachable, warm.Packages)
+	session.Restore(load.LoaderSource, loadedSizes(reachable), reachable, warm.Packages)
 	if len(session.hits) != importers || session.restored(corrupt) || session.stored[aliased] != moved {
 		test.Fatalf("want %d hits, p05 a miss and p09 stored at its alias's key, got %d hits, p05 hit %t, p09 at %s",
 			importers, len(session.hits), session.restored(corrupt), session.stored[aliased])

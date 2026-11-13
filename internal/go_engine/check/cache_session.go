@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"go/types"
 	"maps"
 	"sync"
 	"sync/atomic"
@@ -277,9 +278,11 @@ func NewCacheSession(caching *Caching, rules []rule.Rule, reports ...*analysis.A
 // findings, and any package a missed package to analyze imports, directly or not, is asked for its facts, since a
 // fact analyzer on that importer runs on everything it imports. So a hit that falls short becomes a miss, which can
 // ask more of the rest, until nothing changes. A package the run reloads to answer a question (see Reload) is never
-// restored, from the store or the table.
+// restored, from the store or the table. sizes are the load's, which only the restore from the host's run reads: the
+// store's and the table's keys hold the build's target already.
 func (session *CacheSession) Restore(
 	loader string,
+	sizes types.Sizes,
 	reachable []*packages.Package,
 	analyzed []*packages.Package,
 ) map[*packages.Package]*load.Restored {
@@ -374,7 +377,7 @@ func (session *CacheSession) Restore(
 	}
 	// What the build's own store holds is restored by the build's key, exactly; only what it does not hold is restored
 	// from the host's run, by what the package read (#b2t9xmf).
-	session.restoreFromHost(loader, reachable, keyed)
+	session.restoreFromHost(loader, sizes, reachable, keyed)
 	for dropping = true; dropping; {
 		dropping = session.dropShortHits(reachable)
 	}

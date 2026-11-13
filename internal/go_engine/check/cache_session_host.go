@@ -37,8 +37,8 @@ import (
 // restored, by ID, sorted, how many
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
 // facts or answers did not hold), how many times the build was loaded again for those, and every decline and every
-// package never a candidate by the first word of why: inputs, noEntry, never, unknown, unpersisted, unreadable, export,
-// T, L, F, D or A.
+// package never a candidate by the first word of why: inputs, noEntry, sizes, never, unknown, unpersisted, unreadable,
+// export, T, L, F, D or A.
 // Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
 // wall time it ran within.
@@ -151,6 +151,9 @@ var declineKeys = map[string]string{
 	"inputs":  "ownInputs",
 	"noEntry": "noHostEntry",
 
+	// A package the host kept, in a build whose sizes are not the host's, which restores nothing from it (#61qj12v).
+	"sizes": "buildSizes",
+
 	// A package whose entry persisted no reads, counted apart from reads never recorded.
 	"unpersisted": "readsNotPersisted",
 
@@ -175,8 +178,14 @@ func reasonWord(reason string) string {
 // misses what changed: a hit with no late decision and no say, handed the host's findings. Each other is visited, and
 // one whose reads can hold is decided late by the load (load.Restored.Holds) and dropped from the hits when it
 // declines. keyed is the build's keys, its store's or the portable digests' Restore keyed (hostPortableKeys), and nil
-// when those failed, which keys reachable here again and says why.
-func (session *CacheSession) restoreFromHost(loader string, reachable []*packages.Package, keyed *cache.Keyed) {
+// when those failed, which keys reachable here again and says why. sizes are the load's: a build measured by other
+// sizes than the host's restores nothing from it (hostSizesDiffer).
+func (session *CacheSession) restoreFromHost(
+	loader string,
+	sizes types.Sizes,
+	reachable []*packages.Package,
+	keyed *cache.Keyed,
+) {
 	state := session.host
 	if state == nil || state.off || session.known == nil {
 		return
@@ -188,6 +197,16 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 	state.renderings = NewReadsBuild()
 	state.loadDeclines = map[string]int{}
 	state.loadReasons = map[string]string{}
+	if why := hostSizesDiffer(state.host, sizes); why != "" {
+		// Every package the host kept and the build's own store does not hold would have been a candidate, so each is
+		// counted, as one with no entry is.
+		for _, candidate := range reachable {
+			if _, hit := session.hits[candidate]; !hit && state.host.entries[candidate.ID] != nil {
+				state.loadDeclines[reasonWord(why)]++
+			}
+		}
+		return
+	}
 	var portable map[*packages.Package]cache.Key
 	if keyed != nil {
 		portable = keyed.Portable
@@ -300,6 +319,37 @@ func (session *CacheSession) restoreFromHost(loader string, reachable []*package
 		session.trusted[candidate] = true
 		state.restoring[candidate] = hosted
 	}
+}
+
+// hostSizesDiffer is why a build measured by sizes, the load's, restores nothing from host, empty when it may. The
+// host's run checked each package under its own sizes, so a package of a build whose word size or maximum alignment
+// differ evaluated `unsafe.Sizeof`, `unsafe.Alignof` and `unsafe.Offsetof` to other constants, and its findings,
+// SA9006's and a shift's among them, turn on them where its reads of other packages do not: a package reading only
+// its own pair of words reads nothing a verdict judges, held or untouched (#61qj12v). Such a package is checked from
+// source, never restored by sizes it was not checked under. A build or a host measured by no sizes is declined too,
+// since nothing says they are alike.
+func hostSizesDiffer(host *HostRun, sizes types.Sizes) string {
+	hostWordSize, hostMaximumAlignment, hostMeasured := host.renderings.measuredSizes()
+	if !hostMeasured || sizes == nil {
+		return "sizes: the host's run or the build is measured by no sizes"
+	}
+	wordSize, maximumAlignment := measureOf(sizes)
+	if wordSize != hostWordSize || maximumAlignment != hostMaximumAlignment {
+		return fmt.Sprintf("sizes: the host's run was checked under word size %d, maximum alignment %d, the build "+
+			"is under %d, %d", hostWordSize, hostMaximumAlignment, wordSize, maximumAlignment)
+	}
+	return ""
+}
+
+// loadedSizes are the sizes the packages of a load were checked by, each package's the load's, nil when none was
+// checked.
+func loadedSizes(loaded []*packages.Package) types.Sizes {
+	for _, each := range loaded {
+		if each.TypesSizes != nil {
+			return each.TypesSizes
+		}
+	}
+	return nil
 }
 
 // unrestorableReads is why a visited package's reads can never hold, as a reason the record counts by its first word,
