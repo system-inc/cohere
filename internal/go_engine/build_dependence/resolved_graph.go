@@ -3,6 +3,7 @@ package build_dependence
 import (
 	"go/types"
 	"slices"
+	"sort"
 )
 
 // resolvedGraph is the graph's records resolved into nodes: every object a unit declares has a node, and each node two
@@ -370,4 +371,34 @@ func (resolved *resolvedGraph) resolveCalls() {
 			}
 		}
 	}
+}
+
+// unitDeclaringName is UnitDeclaringName on the graph's resolution, which every build's judgment shares (CallIndex).
+func (resolved *resolvedGraph) unitDeclaringName(path string, local string) (int, bool) {
+	identifiers := resolved.pathsHeld[path]
+	if len(identifiers) != 1 {
+		return 0, false
+	}
+	node, isNode := resolved.nodes[nodeKey{packageIdentifier: identifiers[0], local: local}]
+	if !isNode || resolved.declaringUnit[node] < 0 {
+		return 0, false
+	}
+	return resolved.declaringUnit[node], true
+}
+
+// unitContaining is UnitContaining on the graph's resolution, which every build's judgment shares (CallIndex).
+func (resolved *resolvedGraph) unitContaining(packageId string, file string, offset int) (int, bool) {
+	inFile := resolved.fileUnits[fileKey{packageIdentifier: packageId, file: file}]
+	// The last unit starting at or before offset is the only one that can hold it, since a file's units never overlap.
+	position := sort.Search(len(inFile), func(index int) bool {
+		return resolved.units[inFile[index]].record.start > offset
+	}) - 1
+	if position < 0 {
+		return 0, false
+	}
+	index := inFile[position]
+	if offset >= resolved.units[index].record.end {
+		return 0, false
+	}
+	return index, true
 }

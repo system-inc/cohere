@@ -124,8 +124,8 @@ func (engine *pipeline) indexHostFacts(
 // build exported counted as different, and each answer the fact resolver computed in both builds, compared by its
 // encoding, one only a build asked counted apart; then the units declaring an object whose fact differs, and the
 // units the judgment calls independent that call those statically, first-order and followed to a fixed point, beside
-// every independent unit that calls a dependent one, over both graphs' units (census). Nil when the host's facts were
-// never indexed.
+// every independent unit that calls a dependent one, over both graphs' units, the run's call index (callIndex) read by
+// the build's verdicts. Nil when the host's facts were never indexed.
 func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.ExportedFact) *contract.DependenceFacts {
 	if engine.dependence.facts == nil {
 		return nil
@@ -148,7 +148,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 		}
 		built[key] = fact
 	}
-	units, unitContaining := judged.census()
+	calls := engine.callIndex()
 	kinds := map[[2]string]*contract.FactKindCounts{}
 	examples := map[[2]string][]string{}
 	differing := map[int]bool{}
@@ -171,9 +171,9 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 		}
 		unit, isUnit := -1, false
 		if key.file != "" {
-			unit, isUnit = unitContaining(key.packageIdentifier, key.file, key.offset)
+			unit, isUnit = calls.UnitContaining(key.packageIdentifier, key.file, key.offset)
 		}
-		inWorkspace := isUnit && units[unit].Workspace
+		inWorkspace := isUnit && calls.Workspace(unit)
 		counts.Compared++
 		if inWorkspace {
 			counts.WorkspaceCompared++
@@ -213,7 +213,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 		counts.Examples = examples[kind][:min(factExamples, len(examples[kind]))]
 		census.Kinds = append(census.Kinds, counts)
 	}
-	census.Workspace, census.Dependencies = factCallers(units, differing)
+	census.Workspace, census.Dependencies = factCallers(calls, judged.dependence, judged.standardLibrary, differing)
 	census.Milliseconds = int(time.Since(started).Milliseconds())
 	return census
 }
@@ -276,21 +276,22 @@ func factExample(
 
 // factCallers counts, in the workspace and in the dependencies by each unit's own scope, the units differing names
 // and what they reach (contract.FactCallers): first the independent units calling one of them, then the fixed point
-// that takes each such caller as differing in turn, and every independent unit that calls a dependent one.
-func factCallers(units []build_dependence.Unit, differing map[int]bool) (contract.FactCallers, contract.FactCallers) {
-	callers := make([][]int, len(units))
-	for index, unit := range units {
-		for _, callee := range unit.Calls {
-			callers[callee] = append(callers[callee], index)
-		}
-	}
+// that takes each such caller as differing in turn, and every independent unit that calls a dependent one. Each unit's
+// verdict is the build's, host its judgment of the host's graph and standardLibrary of the standard library's, nil
+// when calls holds no such graph; everything else is the run's, which every build shares (#f9br7sg).
+func factCallers(
+	calls *build_dependence.CallIndex,
+	host *build_dependence.Dependence,
+	standardLibrary *build_dependence.Dependence,
+	differing map[int]bool,
+) (contract.FactCallers, contract.FactCallers) {
 	firstOrder := map[int]bool{}
-	for index, unit := range units {
-		if unit.Dependent {
+	for unit := range calls.UnitCount() {
+		if calls.Dependent(host, standardLibrary, unit) {
 			continue
 		}
-		if slices.ContainsFunc(unit.Calls, func(callee int) bool { return differing[callee] }) {
-			firstOrder[index] = true
+		if slices.ContainsFunc(calls.Calls(unit), func(callee int) bool { return differing[callee] }) {
+			firstOrder[unit] = true
 		}
 	}
 	bound := map[int]bool{}
@@ -299,8 +300,8 @@ func factCallers(units []build_dependence.Unit, differing map[int]bool) (contrac
 	for len(pending) > 0 {
 		current := pending[len(pending)-1]
 		pending = pending[:len(pending)-1]
-		for _, caller := range callers[current] {
-			if units[caller].Dependent || bound[caller] {
+		for _, caller := range calls.Callers(current) {
+			if calls.Dependent(host, standardLibrary, caller) || bound[caller] {
 				continue
 			}
 			bound[caller] = true
@@ -312,27 +313,30 @@ func factCallers(units []build_dependence.Unit, differing map[int]bool) (contrac
 	}
 	var workspace contract.FactCallers
 	var dependencies contract.FactCallers
-	for index, unit := range units {
+	for unit := range calls.UnitCount() {
 		scope := &dependencies
-		if unit.Workspace {
+		if calls.Workspace(unit) {
 			scope = &workspace
 		}
-		if differing[index] {
+		nodes := calls.Nodes(unit)
+		if differing[unit] {
 			scope.DifferingUnits++
-			scope.DifferingNodes += unit.Nodes
+			scope.DifferingNodes += nodes
 		}
-		if firstOrder[index] {
+		if firstOrder[unit] {
 			scope.FirstOrderUnits++
-			scope.FirstOrderNodes += unit.Nodes
+			scope.FirstOrderNodes += nodes
 		}
-		if bound[index] {
+		if bound[unit] {
 			scope.BoundUnits++
-			scope.BoundNodes += unit.Nodes
+			scope.BoundNodes += nodes
 		}
-		callsDependent := slices.ContainsFunc(unit.Calls, func(callee int) bool { return units[callee].Dependent })
-		if !unit.Dependent && callsDependent {
+		callsDependent := slices.ContainsFunc(calls.Calls(unit), func(callee int) bool {
+			return calls.Dependent(host, standardLibrary, callee)
+		})
+		if !calls.Dependent(host, standardLibrary, unit) && callsDependent {
 			scope.CallerUnits++
-			scope.CallerNodes += unit.Nodes
+			scope.CallerNodes += nodes
 		}
 	}
 	return workspace, dependencies

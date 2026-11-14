@@ -2,7 +2,6 @@ package build_dependence
 
 import (
 	"go/types"
-	"sort"
 )
 
 // Dependence is one build's judgment of the graph's units and objects (Against).
@@ -162,32 +161,12 @@ func (dependence *Dependence) Units() []Unit {
 // UnitDeclaringName is the index in Units of the unit that declares the object of the package of path the graph holds
 // under local, and false when no unit of the graph does, or the graph holds more than one package of path.
 func (dependence *Dependence) UnitDeclaringName(path string, local string) (int, bool) {
-	identifiers := dependence.resolved.pathsHeld[path]
-	if len(identifiers) != 1 {
-		return 0, false
-	}
-	node, isNode := dependence.resolved.nodes[nodeKey{packageIdentifier: identifiers[0], local: local}]
-	if !isNode || dependence.resolved.declaringUnit[node] < 0 {
-		return 0, false
-	}
-	return dependence.resolved.declaringUnit[node], true
+	return dependence.resolved.unitDeclaringName(path, local)
 }
 
 // UnitContaining is the index in Units of the unit of the package packageId whose span in file, the one a reader
 // sees, holds offset, and false when none does. An object's position names its declaring unit this way in every build
 // that compiles the file, since the file's bytes, and so every offset in it, are the same in each.
 func (dependence *Dependence) UnitContaining(packageId string, file string, offset int) (int, bool) {
-	inFile := dependence.resolved.fileUnits[fileKey{packageIdentifier: packageId, file: file}]
-	// The last unit starting at or before offset is the only one that can hold it, since a file's units never overlap.
-	position := sort.Search(len(inFile), func(index int) bool {
-		return dependence.resolved.units[inFile[index]].record.start > offset
-	}) - 1
-	if position < 0 {
-		return 0, false
-	}
-	index := inFile[position]
-	if offset >= dependence.resolved.units[index].record.end {
-		return 0, false
-	}
-	return index, true
+	return dependence.resolved.unitContaining(packageId, file, offset)
 }

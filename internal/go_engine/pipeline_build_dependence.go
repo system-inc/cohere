@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"slices"
+	"sync"
 	"time"
 
 	"golang.org/x/tools/go/packages"
@@ -37,6 +38,25 @@ type hostDependence struct {
 	// restoredAnswers are the answers the host's store holds of each package it restored, by package ID, indexed with
 	// its facts (indexHostFacts), which the facts census reads by objectpath.
 	restoredAnswers map[string]*fact_resolver.Answers
+	// calls is the units of graph and of the standard library's graph and the calls between them, which every build's
+	// facts census counts by its own verdicts (#f9br7sg), built once a run by the first census to ask (callIndex,
+	// under callsOnce), since the builds' censuses run at once.
+	calls     *build_dependence.CallIndex
+	callsOnce sync.Once
+}
+
+// callIndex is the run's call index (hostDependence.calls), built the first time a build's census asks for it,
+// once every build waits for the standard library's graph to end (dependenceOf), so it holds that graph whole, or none
+// of it when its side load failed, as each build's judgment does.
+func (engine *pipeline) callIndex() *build_dependence.CallIndex {
+	engine.dependence.callsOnce.Do(func() {
+		var standardLibrary *build_dependence.Graph
+		if engine.dependence.standardLibrary != nil {
+			standardLibrary = engine.dependence.standardLibrary.graph
+		}
+		engine.dependence.calls = build_dependence.NewCallIndex(engine.dependence.graph, standardLibrary)
+	})
+	return engine.dependence.calls
 }
 
 // standardLibraryDependence is the standard library's own graph (#ss4t5g6): the host restores the standard library
