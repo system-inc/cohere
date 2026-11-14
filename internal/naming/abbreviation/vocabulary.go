@@ -40,9 +40,10 @@ func endsWithCapitalized(name string, abbreviation string) bool {
 	return start >= 0 && name[start] == abbreviation[0]-'a'+'A' && name[start+1:] == abbreviation[1:]
 }
 
-// containsAllowedSegment reports whether a name contains a word that merely holds an abbreviation's letters, like
-// `InnoDb`.
-func (vocabulary *Vocabulary) containsAllowedSegment(name string) bool {
+// ContainsAllowedSegment reports whether a name contains a word that merely holds an abbreviation's letters, like
+// `InnoDb`. internal/file_name_words asks it of a folder's name read with its parent's, so a brand spelled across
+// the two, google/docs, is read as the brand.
+func (vocabulary *Vocabulary) ContainsAllowedSegment(name string) bool {
 	for _, segment := range vocabulary.AllowedSegments {
 		if strings.Contains(name, segment) {
 			return true
@@ -162,7 +163,7 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 		return prefixFinding(entry, name), true
 	}
 
-	if vocabulary.containsAllowedSegment(name) {
+	if vocabulary.ContainsAllowedSegment(name) {
 		return Finding{}, false
 	}
 

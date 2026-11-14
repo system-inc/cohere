@@ -249,7 +249,7 @@ func (reference regexpOnlyFind) find(name string) (Finding, bool) {
 		return prefixFinding(entry, name), true
 	}
 
-	if vocabulary.containsAllowedSegment(name) {
+	if vocabulary.ContainsAllowedSegment(name) {
 		return Finding{}, false
 	}
 

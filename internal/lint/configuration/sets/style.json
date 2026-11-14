@@ -40,6 +40,7 @@
         "nexus/consistency-no-utils-folder": "error",
         "nexus/consistency-no-utils-file-name": "error",
         "nexus/consistency-require-separated-folder-words": "error",
+        "consistency-no-abbreviated-folder-name": "off",
         "nexus/consistency-require-type-suffix": "error",
         "nexus/import-require-module-alias": "error",
         "nexus/import-require-node-namespace": "error",
@@ -194,6 +195,7 @@
         "no-restricted-imports": "off"
     },
     "reasons": {
+        "consistency-no-abbreviated-folder-name": "Off until its census turns it on (#zyq63kk).",
         "dot-notation": "@typescript-eslint/dot-notation runs in its place: the same check, reading types, so a protected member reached through brackets, which TypeScript allows from a subclass or a test, is not reported (#qv7evaa, #79aqact).",
         "@typescript-eslint/consistent-type-definitions": "Interface or type is a deliberate choice the house's Interface and Type name suffixes already mark, and converting one to the other changes behavior: an interface is not assignable to Record<string, unknown>, and interfaces merge declarations (#79aqact).",
         "guard-for-in": "nexus/consistency-no-for-in bans for...in outright, guarded or not, so there is no loop left for this rule to guard.",

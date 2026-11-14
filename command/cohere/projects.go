@@ -128,6 +128,20 @@ func checkDiscoveredProjects(
 	if discoverProjectsError != nil {
 		return 0, false, discoverProjectsError
 	}
+	// The folder check's setting is read only when the walk found a folder to report, so a tree with none pays no
+	// load of its chain, and a run that does not lint reports none (see folder_names.go).
+	if len(found.Folders) > 0 && runLints(given) {
+		var folderCheckSeverityError error
+		if found.FolderSeverity, folderCheckSeverityError = folderCheckSeverity(
+			root,
+			lintConfigFileName,
+		); folderCheckSeverityError != nil {
+			return 0, false, folderCheckSeverityError
+		}
+	}
+	if found.FolderSeverity == configuration.SeverityOff {
+		found.Folders = nil
+	}
 	var resolveOwnershipError error
 	if found.Ownership, resolveOwnershipError = resolveOwnership(&found); resolveOwnershipError != nil {
 		return 0, false, resolveOwnershipError
@@ -162,7 +176,9 @@ func checkDiscoveredProjects(
 		ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root),
 		defaultIgnoreAccounts(found.DefaultMatched)...,
 	)
-	if found.isTheLocatedProject(location, locateError) {
+	// A folder finding is this run's to print and count, after its project's run, which then runs in its own
+	// process as one of several would, so the project's recorded run never holds a folder verdict.
+	if found.isTheLocatedProject(location, locateError) && len(found.Folders) == 0 {
 		// The project runs here, and its build lists the directories discovery just did.
 		discoveredListings = found.Listings
 		for _, note := range found.notes() {
@@ -194,6 +210,16 @@ func childArguments(arguments []string, lintConfigFileName string, atNamedDirect
 	if atNamedDirectory {
 		dropped = append(dropped, "directory")
 	}
+	kept := withoutValuedFlags(arguments, dropped)
+	if lintConfigFileName == "" {
+		return kept
+	}
+	return append(kept, "--lint-config", lintConfigFileName)
+}
+
+// withoutValuedFlags is arguments less each flag named in dropped and its value, joined to it with `=` or the next
+// argument. Every argument is a flag here (see childArguments).
+func withoutValuedFlags(arguments []string, dropped []string) []string {
 	if len(dropped) == 0 {
 		return arguments
 	}
@@ -208,10 +234,59 @@ func childArguments(arguments []string, lintConfigFileName string, atNamedDirect
 		}
 		kept = append(kept, arguments[index])
 	}
-	if lintConfigFileName == "" {
-		return kept
+	return kept
+}
+
+// lintsWholeLocatedProject reports whether a run discovery does not apply to still lints its located project whole:
+// one given `--directory` into one engine's project, `--tsconfig`, or `--profile`, with no path argument, and not
+// one of discovery's children, which its parent already judged, nor a run that only answers, explains one file or
+// formats one from standard input (#zyq63kk). A path argument narrows the run to those files, partial by its nature,
+// so its folders are not judged.
+func lintsWholeLocatedProject(given map[string]bool, arguments []string, locateError error) bool {
+	return locateError == nil && len(arguments) == 0 && os.Getenv(projectEngineVariable) == "" && runLints(given) &&
+		!answersOnly(given) && !given["explain"] && !given["stdin-filepath"]
+}
+
+// checkNarrowedProjectFolders judges the folders of a located project a narrowed run lints whole, as discovery
+// judges a root's (#zyq63kk): the same walk from the project's root, its gaps, and judgeFolder. A person running
+// cohere in their project with `--directory` or `--tsconfig` expects its folders judged, and before this such a run
+// printed green over a docs/. With a finding standing, the project runs in its own process, as one of several
+// projects would, and this run prints the folders, counts them in the footer and fails, exactly as the discovery
+// path does; reported is then true. With none, the run goes on in this process as it always did.
+func checkNarrowedProjectFolders(location projectLocation, lintConfigFileName string) (int, bool, error) {
+	ignoreEntries, rootIgnoreEntriesError := rootIgnoreEntries(location.Root)
+	if rootIgnoreEntriesError != nil {
+		return 0, false, rootIgnoreEntriesError
 	}
-	return append(kept, "--lint-config", lintConfigFileName)
+	walked, discoverProjectsError := discoverProjects(location.Root, configuration.IgnorePatternsFrom(ignoreEntries))
+	if discoverProjectsError != nil {
+		return 0, false, discoverProjectsError
+	}
+	if len(walked.Folders) == 0 {
+		return 0, false, nil
+	}
+	severity, folderCheckSeverityError := folderCheckSeverity(location.Root, location.LintConfigFileName)
+	if folderCheckSeverityError != nil {
+		return 0, false, folderCheckSeverityError
+	}
+	if severity == configuration.SeverityOff {
+		return 0, false, nil
+	}
+	located := discoveredProject{Directory: ".", Engine: location.Engine}
+	if base := filepath.Base(location.ConfigFileName); location.Engine == engineTypeScript && base != projectMarker {
+		located.ConfigFile = base
+	}
+	// Only the located project and the folders: what else the walk found is not this run's to check or name.
+	found := discovery{
+		Root:           location.Root,
+		Projects:       []discoveredProject{located},
+		Folders:        walked.Folders,
+		FolderSeverity: severity,
+	}
+	// The project's run is named by the directory and tsconfig runProject gives it, so this run's own go.
+	arguments := childArguments(withoutValuedFlags(os.Args[1:], []string{"directory", "tsconfig"}),
+		lintConfigFileName, false)
+	return runProjects(found, arguments, streams.Output), true, nil
 }
 
 // goOnlySwitches are the switches only a Go run takes (goFlags): every other engine's child is run without them, so
@@ -469,6 +544,12 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			worst = checked.exitCode
 		}
 	}
+	// The folders are the root's own findings, after every project's, and fail the run as a project's finding does.
+	printFolderFindings(out, found)
+	folderSummary := folderSummaryOf(found)
+	if folderSummary.failed() {
+		worst = max(worst, 1)
+	}
 
 	fmt.Fprintf(account, "projects under %s:\n", found.Root)
 	for _, checked := range runs {
@@ -494,6 +575,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	facts := overallFactsOf(runs, time.Since(processStart))
 	facts.UnusedIgnores = unusedIgnoreCount(discoveredIgnores)
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
+	facts.FolderFindings, facts.FolderWarnings = folderSummary.Findings, folderSummary.WarningFindings
 	facts.EngineBuilds = builtEngines()
 	switch {
 	case oneLine:

@@ -1,0 +1,11 @@
+{
+    "why": "ab06: `docs` is a word of policy/NameWords.json, judged in a name on a path alone, so `expressionDocs` and `docsCount` are clean in an identifier, where the formatter's plurals of Prettier's doc read so (#zyq63kk)",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

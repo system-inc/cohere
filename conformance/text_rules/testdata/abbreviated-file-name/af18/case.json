@@ -1,0 +1,15 @@
+{
+    "why": "af18: `docs`, a word of policy/NameWords.json, is reported in a file's name, `docs_data` read as `docsData`, though no identifier is judged by it (#zyq63kk)",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "docs_data",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

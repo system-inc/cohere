@@ -22,6 +22,9 @@ func TestARuleKeyThatReachesNoRuleIsRefused(test *testing.T) {
 		"unused-disable, the engine's setting, loads at top level and in an override": `{
 			"rules": {"unused-disable": "warn"},
 			"overrides": [{"files": ["**/*.test.ts"], "rules": {"unused-disable": "off"}}]}`,
+		"consistency-no-abbreviated-folder-name, discovery's folder check, loads on and off with a reason": `{
+			"rules": {"consistency-no-abbreviated-folder-name": "off"},
+			"reasons": {"consistency-no-abbreviated-folder-name": "Off until its census turns it on (#zyq63kk)."}}`,
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()

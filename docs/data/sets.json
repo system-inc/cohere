@@ -776,6 +776,10 @@
                 "severity": "off"
             },
             {
+                "name": "consistency-no-abbreviated-folder-name",
+                "severity": "off"
+            },
+            {
                 "name": "consistent-return",
                 "severity": "off"
             },
@@ -2244,6 +2248,10 @@
             },
             {
                 "name": "complexity",
+                "severity": "off"
+            },
+            {
+                "name": "consistency-no-abbreviated-folder-name",
                 "severity": "off"
             },
             {
@@ -3789,6 +3797,10 @@
                 "severity": "off"
             },
             {
+                "name": "consistency-no-abbreviated-folder-name",
+                "severity": "off"
+            },
+            {
                 "name": "consistent-this",
                 "severity": "error"
             },
@@ -5048,6 +5060,10 @@
             },
             {
                 "name": "complexity",
+                "severity": "off"
+            },
+            {
+                "name": "consistency-no-abbreviated-folder-name",
                 "severity": "off"
             },
             {
@@ -6714,6 +6730,10 @@
             },
             {
                 "name": "complexity",
+                "severity": "off"
+            },
+            {
+                "name": "consistency-no-abbreviated-folder-name",
                 "severity": "off"
             },
             {
@@ -8429,6 +8449,10 @@
                 "severity": "off"
             },
             {
+                "name": "consistency-no-abbreviated-folder-name",
+                "severity": "off"
+            },
+            {
                 "name": "consistent-return",
                 "severity": "off"
             },
@@ -9881,6 +9905,10 @@
             },
             {
                 "name": "complexity",
+                "severity": "off"
+            },
+            {
+                "name": "consistency-no-abbreviated-folder-name",
                 "severity": "off"
             },
             {

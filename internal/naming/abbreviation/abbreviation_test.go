@@ -339,3 +339,47 @@ func TestLoadRefusesAnAbbreviationThatIsNotLetters(test *testing.T) {
 		})
 	}
 }
+
+// policy/NameWords.json holds only words policy/Abbreviations.json does not, since a word there is judged in every name
+// already and a second entry would be a second reading of it to drift, and it holds `docs`, judged in names on a path
+// and never in an identifier (#zyq63kk).
+func TestNameWordsHoldOnlyWordsTheSharedVocabularyDoesNot(test *testing.T) {
+	test.Parallel()
+	shared := map[string]bool{}
+	for _, entry := range append(
+		slices.Collect(maps.Values(abbreviation.Policy.WholeByName)),
+		slices.Concat(
+			abbreviation.Policy.EarlyPrefixes,
+			abbreviation.Policy.LatePrefixes,
+			abbreviation.Policy.Suffixes,
+			abbreviation.Policy.Segments,
+		)...,
+	) {
+		shared[entry.Abbreviation] = true
+	}
+	nameWords := map[string]bool{}
+	for _, entry := range slices.Concat(
+		slices.Collect(maps.Values(abbreviation.NameWords.WholeByName)),
+		abbreviation.NameWords.LatePrefixes,
+		abbreviation.NameWords.Segments,
+	) {
+		nameWords[entry.Abbreviation] = true
+		if shared[entry.Abbreviation] {
+			test.Errorf("%q is in both policy/Abbreviations.json and policy/NameWords.json", entry.Abbreviation)
+		}
+	}
+	if !nameWords["docs"] {
+		test.Errorf("policy/NameWords.json holds no docs, Kirk's word on #zyq63kk")
+	}
+	if _, found := abbreviation.Policy.Find("docs"); found {
+		test.Errorf("the shared vocabulary judges docs, so every identifier rule would read it")
+	}
+	finding, found := abbreviation.NameWords.Find("docsData")
+	if !found || finding.Entry.Abbreviation != "docs" ||
+		!slices.Equal(finding.Entry.Expansions, []string{"documentation"}) {
+		test.Errorf("docsData: %+v (found %t), want docs as documentation", finding.Entry, found)
+	}
+	if _, loadError := abbreviation.Load(policy.NameWordsFile(), nil); loadError != nil {
+		test.Errorf("policy/NameWords.json is refused: %v", loadError)
+	}
+}

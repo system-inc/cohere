@@ -330,6 +330,22 @@ func run() error {
 				return writeError
 			}
 		}
+	} else if lintsWholeLocatedProject(given, flag.Args(), locateError) {
+		// A narrowed run of a whole project judges its folders as discovery would (#zyq63kk).
+		namedLintConfiguration := ""
+		if given["lint-config"] {
+			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
+		}
+		exitCode, reported, checkNarrowedProjectFoldersError := checkNarrowedProjectFolders(
+			location,
+			namedLintConfiguration,
+		)
+		if checkNarrowedProjectFoldersError != nil {
+			return checkNarrowedProjectFoldersError
+		}
+		if reported {
+			exitProcess(exitCode)
+		}
 	}
 
 	if locateError == nil && location.Engine == engineSwift {

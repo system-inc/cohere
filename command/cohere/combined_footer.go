@@ -120,6 +120,9 @@ func combinedFooter(runs []projectRun, facts overallFacts, total time.Duration, 
 			named = append(named, marker+" ("+checked.label+")")
 		}
 	}
+	// The folders discovery reported are findings of the run's own, counted with every project's.
+	combined.Findings += facts.FolderFindings
+	combined.WarningFindings += facts.FolderWarnings
 	if facts.UnusedIgnores > 0 {
 		failed = true
 		named = append(

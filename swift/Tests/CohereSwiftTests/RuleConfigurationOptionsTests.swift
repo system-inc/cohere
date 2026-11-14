@@ -29,6 +29,7 @@ struct RuleConfigurationOptionsTests {
         )
         let rules = RuleRegistry.fileRules(
             vocabulary: AbbreviationVocabulary(),
+            nameWords: AbbreviationVocabulary(),
             shoutingVocabulary: ShoutingVocabulary(),
             brandVocabulary: BrandVocabulary(),
             words: WordList(),

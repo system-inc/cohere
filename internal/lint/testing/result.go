@@ -11,7 +11,7 @@ type Result struct {
 	SourceFile  *ast.SourceFile
 
 	// capture is the case the docs capture records when an assertion passes on this result; see
-	// docs_capture.go. Nil unless COHERE_DOCS_CAPTURE is set.
+	// documentation_capture.go. Nil unless COHERE_DOCS_CAPTURE is set.
 	capture *capturedRun
 }
 

@@ -354,6 +354,7 @@ struct TextRulesConformanceTests {
             )
             let registered = RuleRegistry.fileRules(
                 vocabulary: try AbbreviationVocabulary.compiledIn(),
+                nameWords: try AbbreviationVocabulary.nameWordsCompiledIn(),
                 shoutingVocabulary: try ShoutingVocabulary.compiledIn(),
                 brandVocabulary: try BrandVocabulary.compiledIn(),
                 words: try WordList.compiledIn(),

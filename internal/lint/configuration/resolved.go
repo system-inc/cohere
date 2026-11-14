@@ -257,6 +257,18 @@ func (resolved Resolved) MatchedOverrideIndices() []int {
 // UnusedDisable is an engine diagnostic configured in rules, not an AST rule in the registry.
 const UnusedDisable = "unused-disable"
 
+// AbbreviatedFolderName is the folder check discovery makes, configured in rules as UnusedDisable is and no AST rule
+// in the registry either: a folder holds no file a rule could report in, so the walk that reads every directory
+// judges each folder's name, for TypeScript, Go and Swift projects alike (#zyq63kk). Its setting is the chain's
+// top-level one, since a folder is no file an override's patterns could match, and unconfigured it is off.
+const AbbreviatedFolderName = "consistency-no-abbreviated-folder-name"
+
+// IsEngineCheck reports whether a rules key configures one of the engine's own checks, UnusedDisable or
+// AbbreviatedFolderName, rather than a rule in the registry.
+func IsEngineCheck(name string) bool {
+	return name == UnusedDisable || name == AbbreviatedFolderName
+}
+
 // UnusedDisableSeverity honors file overrides and defaults to error, so a dead directive fails the run
 // the way a finding does (#9137dhp, Kirk's call). warn, which reports without failing, and off stay
 // settable; ESLint's own default is warn, so a project that wants its parity sets it.

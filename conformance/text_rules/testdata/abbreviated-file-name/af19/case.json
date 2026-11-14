@@ -1,0 +1,11 @@
+{
+    "why": "af19: Google Docs, the product, is an allowed segment of policy/NameWords.json, so `google_docs_api` read as `googleDocsApi` passes (#zyq63kk)",
+    "expect": [],
+    "options": {},
+    "path": "google_docs_api",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

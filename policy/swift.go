@@ -49,6 +49,9 @@ var swiftPolicyFiles = []struct {
 	{"KeywordTerms.json", "PolicyKeywordTerms", func() ([]byte, error) {
 		return swiftSource("KeywordTerms.json", "PolicyKeywordTerms", keywordTermsFile)
 	}},
+	{"NameWords.json", "PolicyNameWords", func() ([]byte, error) {
+		return swiftSource("NameWords.json", "PolicyNameWords", nameWordsFile)
+	}},
 	{"Shouting.json", "PolicyShouting", func() ([]byte, error) {
 		return swiftSource("Shouting.json", "PolicyShouting", shoutingFile)
 	}},

@@ -8,9 +8,11 @@ import Foundation
  which read cohere's `internal/file_name_words`.
 
  The name's words are `FileNameWords`', read as the one camelCase identifier they spell, so `MsgPrinter.swift` is
- judged as `msgPrinter` would be, and the message names the word and how to spell it out, never a rewritten name. A
- run of words spelling a rule this engine registers is the rule's name and is set aside, so only the words beside it
- are judged (`FileNameWords.withoutRuleName`). A
+ judged as `msgPrinter` would be, and the message names the word and how to spell it out, never a rewritten name. The
+ identifier is judged by the shared vocabulary, then by `policy/NameWords.json`, the words a name on a path spells out
+ and an identifier need not, so `DocsReader.swift` is documentation and `expressionDocs` in code is nothing
+ (#zyq63kk). A run of words spelling a rule this engine registers is the rule's name and is set aside, so only the
+ words beside it are judged (`FileNameWords.withoutRuleName`). A
  generated file, `Package.swift` and `main.swift` are not judged, and nor is a file under a folder whose files are
  someone else's.
 
@@ -24,6 +26,7 @@ public struct ConsistencyNoAbbreviatedFileName: FileRule {
     public let upstreamName: String? = nil
 
     let vocabulary: AbbreviationVocabulary
+    let nameWords: AbbreviationVocabulary
 
     /*
      This engine's registered rule names, read once from `RuleRegistry`, the registry the engine holds. A file named for
@@ -31,20 +34,23 @@ public struct ConsistencyNoAbbreviatedFileName: FileRule {
      */
     static let registeredRuleNames = FileNameWords.ruleNames(RuleRegistry.allNames)
 
-    /* The vocabulary is handed in, loaded by the pipeline before anything is checked, as the identifier rule's is. */
-    public init(vocabulary: AbbreviationVocabulary) {
+    /* Both vocabularies are handed in, loaded by the pipeline before anything is checked, as the identifier rule's. */
+    public init(vocabulary: AbbreviationVocabulary, nameWords: AbbreviationVocabulary) {
         self.vocabulary = vocabulary
+        self.nameWords = nameWords
     }
 
     public func findings(in file: ParsedFile) -> [FindingRecord] {
         guard let words = FileNameWords.words(of: file),
             case let ownWords = FileNameWords.withoutRuleName(words, ruleNames: Self.registeredRuleNames),
             !ownWords.isEmpty,
-            let found = vocabulary.find(FileNameWords.identifier(of: ownWords)),
+            case let identifier = FileNameWords.identifier(of: ownWords),
+            let hit = vocabulary.find(identifier).map({ (found: $0, source: vocabulary) })
+                ?? nameWords.find(identifier).map({ (found: $0, source: nameWords) }),
             let message = FileNameWords.message(
                 fileName: file.url.lastPathComponent,
-                abbreviation: found.abbreviation,
-                in: vocabulary,
+                abbreviation: hit.found.abbreviation,
+                in: hit.source,
             )
         else {
             return []

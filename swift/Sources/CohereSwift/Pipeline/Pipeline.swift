@@ -194,6 +194,21 @@ public struct Pipeline {
                 )
             }
         }
+        /* The file-name rule's own words, by the same reasoning: with none, a `Docs` file would read as clean. */
+        var nameWords = AbbreviationVocabulary()
+        if configuration.severity(of: ConsistencyNoAbbreviatedFileName.ruleName) != .off
+            && (options.proposeFixes || options.runLint)
+        {
+            do {
+                nameWords = try AbbreviationVocabulary.nameWordsCompiledIn()
+            }
+            catch {
+                throw RunFailure(
+                    description:
+                        "the file-name rule's compiled-in words (policy/NameWords.json) could not be loaded, so nothing was checked: \(error)"
+                )
+            }
+        }
         /* The shouting rule's words, by the same reasoning: with none, every acronym with a vowel would read as shouting. */
         var shoutingVocabulary = ShoutingVocabulary()
         if configuration.severity(of: ConsistencyNoShouting.ruleName) != .off
@@ -245,6 +260,7 @@ public struct Pipeline {
         }
         let fileRules = RuleRegistry.fileRules(
             vocabulary: vocabulary,
+            nameWords: nameWords,
             shoutingVocabulary: shoutingVocabulary,
             brandVocabulary: brandVocabulary,
             words: words,

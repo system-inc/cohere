@@ -1,0 +1,33 @@
+/*
+ Generated from cohere's policy/NameWords.json by `go run ./policy/tools/generate`. Do not edit it here:
+ edit the file and run that again. While the two differ, a test in each engine fails.
+ */
+enum PolicyNameWords {
+    /* policy/NameWords.json, byte for byte. */
+    static let file = ##"""
+        {
+            "about": "The words a folder's or a file's name spells out and an identifier need not, beside policy/Abbreviations.json, which every name is judged by. A name on a path is read on every path and every import, and a word in it can be short for a word the house spells out while the same letters inside an identifier are someone else's term: `docs` is documentation as a folder or a file name, and the plural of Prettier's doc in the formatter's `expressionDocs`. So these are judged in folder and file names alone, by the TypeScript and Go file-name rules and the folder check in discovery through internal/file_name_words, and by the Swift engine compiled in as PolicyNameWords. Each entry has Abbreviations.json's shape and is read by its loader, with the forms judged on the name's words read as one camelCase identifier, so `docs_data.go` reads as `docsData`. A word joins here only when it is not in Abbreviations.json, since a word there is judged in every name already. allowedSegments are proper nouns whose letters hold a word here, read as Abbreviations.json reads its own, and across a folder and its parent, so google/docs is Google Docs.",
+            "abbreviations": [
+                {
+                    "abbreviation": "docs",
+                    "expansions": ["documentation"],
+                    "reason": "Kirk's word on #zyq63kk: a folder called docs is documentation. Judged in names on a path only (#zyq63kk, @system_cohere's ruling): as an identifier, the census found 19 of cohere's 39 `docs` names were plurals of the formatter's doc IR and 2 of ahra's were Google Docs. Every form needs a word boundary after it, so `Docstring` never reads as it. `doc` is no entry: Prettier's printer calls its intermediate representation a doc, as cohere's internal/format/doc does, and elsewhere it means a document, so the name is someone else's term rather than this list's.",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                }
+            ],
+            "allowedSegments": [
+                {
+                    "segment": "GoogleDocs",
+                    "reason": "Google's word processor, a proper noun (#zyq63kk). The `Docs` in it is the product's name, not documentation, and `GoogleDocumentation` names a different thing: GoogleDocsCommandLineInterface.ts, and a folder docs/ inside google/."
+                },
+                {
+                    "segment": "googleDocs",
+                    "reason": "`GoogleDocs` as a name's words read it, first word lowercased: GoogleDocsApi.ts is judged as `googleDocsApi`, and google/docs as `googleDocs`."
+                }
+            ]
+        }
+
+        """##
+}
