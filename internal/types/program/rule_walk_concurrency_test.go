@@ -67,7 +67,8 @@ func TestEveryRuleWalksBesideReadersOfTheSameTreeAtOnce(test *testing.T) {
 	if buildError != nil {
 		test.Fatalf("building: %v", buildError)
 	}
-	var cursorFile, totalFile *ast.SourceFile
+	var cursorFile *ast.SourceFile
+	var totalFile *ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
 		switch {
 		case strings.HasSuffix(sourceFile.FileName().AsString(), "/Cursor.ts"):
