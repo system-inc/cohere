@@ -17,29 +17,7 @@ import (
 func TestALibrarysCacheLeavesBothRepositoriesClean(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	root := test.TempDir()
-	library := filepath.Join(root, "library")
-	writeTree(test, library, map[string]string{"Library.ts": "export const library = 1;\n"})
-	commit := func(repository string) {
-		test.Helper()
-		gitInRepository(test, repository, "-c", "user.name=cohere", "-c", "user.email=cohere@example.com",
-			"commit", "--quiet", "-m", "fixture")
-	}
-	gitInRepository(test, library, "init", "--quiet")
-	gitInRepository(test, library, "add", "--all")
-	commit(library)
-	libraryCommit := strings.TrimSpace(gitInRepository(test, library, "rev-parse", "HEAD"))
-
-	writeTree(test, root, map[string]string{
-		"tsconfig.json":       incrementalFixtureConfiguration,
-		"CohereSettings.json": "{ \"rules\": {} }\n",
-		"index.ts":            "export const value = 1;\n",
-		".gitmodules":         "[submodule \"library\"]\n\tpath = library\n\turl = ../library\n",
-	})
-	gitInRepository(test, root, "init", "--quiet")
-	gitInRepository(test, root, "add", "tsconfig.json", "CohereSettings.json", "index.ts", ".gitmodules")
-	gitInRepository(test, root, "update-index", "--add", "--cacheinfo", "160000,"+libraryCommit+",library")
-	commit(root)
+	root, library := libraryFixture(test)
 	status := func(repository string) string {
 		test.Helper()
 		return gitInRepository(test, repository, "status", "--porcelain", "--untracked-files=all")
@@ -88,5 +66,56 @@ func TestALibrarysCacheLeavesBothRepositoriesClean(test *testing.T) {
 	if after := status(root); !strings.Contains(after, "library") {
 		test.Errorf("without the ignore file the root's status does not show the library, so it proves nothing:\n%s",
 			after)
+	}
+}
+
+// libraryFixture is a committed root holding a TypeScript project and a library as a committed submodule, both
+// repositories clean, the library's own rules saying nothing of `.cache`. It returns the root and the library.
+func libraryFixture(test *testing.T) (string, string) {
+	test.Helper()
+	root := test.TempDir()
+	library := filepath.Join(root, "library")
+	writeTree(test, library, map[string]string{"Library.ts": "export const library = 1;\n"})
+	commit := func(repository string) {
+		test.Helper()
+		gitInRepository(test, repository, "-c", "user.name=cohere", "-c", "user.email=cohere@example.com",
+			"commit", "--quiet", "-m", "fixture")
+	}
+	gitInRepository(test, library, "init", "--quiet")
+	gitInRepository(test, library, "add", "--all")
+	commit(library)
+	libraryCommit := strings.TrimSpace(gitInRepository(test, library, "rev-parse", "HEAD"))
+
+	writeTree(test, root, map[string]string{
+		"tsconfig.json":       incrementalFixtureConfiguration,
+		"CohereSettings.json": "{ \"rules\": {} }\n",
+		"index.ts":            "export const value = 1;\n",
+		".gitmodules":         "[submodule \"library\"]\n\tpath = library\n\turl = ../library\n",
+	})
+	gitInRepository(test, root, "init", "--quiet")
+	gitInRepository(test, root, "add", "tsconfig.json", "CohereSettings.json", "index.ts", ".gitmodules")
+	gitInRepository(test, root, "update-index", "--add", "--cacheinfo", "160000,"+libraryCommit+",library")
+	commit(root)
+	return root, library
+}
+
+// A run that only answers, `--version`, a rule list, the resolved configuration or the cache dump, checks nothing,
+// so it makes no cache in any library (#spdcohere). `cohere --version` made each library's `.cache/cohere`, and the
+// quiet bench, which runs it in its copy to pin the engine, read the copy's tree as changed under its runs and lost
+// the night. A checking run still makes it, which TestALibrarysCacheLeavesBothRepositoriesClean holds.
+func TestARunThatOnlyAnswersMakesNoCacheInALibrary(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	for _, flag := range answerOnlyFlags {
+		test.Run(flag, func(test *testing.T) {
+			test.Parallel()
+			root, library := libraryFixture(test)
+			output, _ := runCohereWithEnvironment(test, binary, root, nil, "--"+flag)
+			for _, repository := range []string{library, root} {
+				if _, statError := os.Stat(filepath.Join(repository, ".cache")); statError == nil {
+					test.Errorf("cohere --%s made %s's .cache:\n%s", flag, repository, output)
+				}
+			}
+		})
 	}
 }

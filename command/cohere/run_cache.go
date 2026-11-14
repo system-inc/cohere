@@ -312,6 +312,15 @@ func beginRunCacheSession(
 	return session
 }
 
+// answerOnlyFlags are the flags whose run prints an answer about cohere or its configuration and exits, checking
+// nothing: the version, the rule lists, the resolved configuration and the cache table's dump.
+var answerOnlyFlags = []string{"version", "rules", "rules-enabled", "print-config", "cache-dump"}
+
+// answersOnly reports whether a run was given one of answerOnlyFlags.
+func answersOnly(given map[string]bool) bool {
+	return slices.ContainsFunc(answerOnlyFlags, func(name string) bool { return given[name] })
+}
+
 // prepareCacheDirectory creates the project's cache directory before anything is read or recorded, and
 // warns once when the project's .gitignore does not ignore it.
 //
@@ -333,13 +342,17 @@ var prepareCacheDirectoryOnce sync.Once
 // enumeration while its directory's time already counted it, and the next run replayed over it
 // (TestAFileCreatedAfterDiscoveryIsNeverReplayedOver). An earlier clock costs only a run whose inputs change in
 // that moment, which is then not recorded.
-func startRunCacheClock(location projectLocation, locateError error) {
+//
+// A run that only answers, given one of answerOnlyFlags, checks nothing, so it makes no cache anywhere: `cohere
+// --version` in a checkout with submodules made each library's `.cache/cohere`, which the quiet bench, running it
+// in its copy to pin the engine, read as the copy's tree changing under it (#spdcohere).
+func startRunCacheClock(location projectLocation, locateError error, given map[string]bool) {
 	eligible := locateError == nil && runCacheEligible()
 	if eligible {
 		prepareCacheDirectory(location.Root)
 	}
-	// Any run that keeps a cache may read the libraries' records, eligible for replay or not.
-	if locateError == nil && !cacheOff {
+	// Any run that checks and keeps a cache may read the libraries' records, eligible for replay or not.
+	if locateError == nil && !cacheOff && !answersOnly(given) {
 		prepareNestedCacheDirectories(writeRepositoryRoot(location.ArgumentBase, location.Root))
 	}
 	runCacheClock = time.Now()

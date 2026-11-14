@@ -290,7 +290,7 @@ func run() error {
 		Engine:                  projectEngine(os.Getenv(projectEngineVariable)),
 	})
 
-	startRunCacheClock(location, locateError)
+	startRunCacheClock(location, locateError, given)
 
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
 	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
