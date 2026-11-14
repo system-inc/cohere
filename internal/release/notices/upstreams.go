@@ -56,7 +56,7 @@ var Upstreams = []Upstream{
 		Url:         "https://pkg.go.dev/golang.org/x/tools@v0.50.0/go/analysis/checker",
 		License:     "BSD-3-Clause",
 		Version:     "v0.50.0",
-		Carries:     "The analysis driver copied into internal/go_engine/check/checker, with the helpers it calls from internal/analysis/driverutil, and the analyzers' test driver go/analysis/analysistest copied into internal/go_engine/check/analysistest, with what it calls: go/analysis/internal in internal/go_engine/check/internal, driverutil's fix.go beside the checker's, and internal/diff, internal/diff/lcs and internal/astutil/free in internal/go_engine/check/diff and internal/go_engine/check/astutil/free.",
+		Carries:     "The analysis driver copied into internal/go_engine/check/checker, with the helpers it calls from internal/analysis/driverutil, and the analyzers' test driver go/analysis/analysistest copied into internal/go_engine/check/analysistest, with what it calls: go/analysis/internal in internal/go_engine/check/internal, driverutil's fix.go beside the checker's, and internal/diff, internal/diff/lcs and internal/astutil/free in internal/go_engine/check/diff and internal/go_engine/check/astutil/free; and the shallow export and import of internal/gcimporter copied into internal/go_engine/export_data, iexport.go, iimport.go, predeclared.go and the vestiges of bimport.go they call, with internal/aliases and the parts of internal/typesinternal they call in its subpackages aliases and typesinternal.",
 		Reach:       Compiled,
 		LicenseFile: "go.txt",
 	},

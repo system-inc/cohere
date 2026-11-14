@@ -1,7 +1,6 @@
 package build_dependence
 
 import (
-	"bytes"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -11,8 +10,9 @@ import (
 	"slices"
 	"testing"
 
-	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 )
 
 // judgedFixture is a fixture's host and build loads and the build's dependence, judged on the graph of every package
@@ -300,16 +300,31 @@ func restoredFromExportData(test *testing.T, host loadedBuild) loadedBuild {
 	test.Helper()
 	fileSet := token.NewFileSet()
 	imported := map[string]*types.Package{}
-	for _, loaded := range host {
-		if fixtureWorkspace(loaded) {
-			continue
+	// Shallow export data reads against every package its declarations reach, so each package is read after its
+	// imports, which are read too.
+	var read func(loaded *packages.Package)
+	read = func(loaded *packages.Package) {
+		if _, done := imported[loaded.PkgPath]; done {
+			return
 		}
-		var exportData bytes.Buffer
-		if writeError := gcexportdata.Write(&exportData, loaded.Fset, loaded.Types); writeError != nil {
+		for _, dependency := range loaded.Imports {
+			read(dependency)
+		}
+		if loaded.PkgPath == "unsafe" {
+			imported[loaded.PkgPath] = types.Unsafe
+			return
+		}
+		exportData, writeError := export_data.Write(loaded.Fset, loaded.Types)
+		if writeError != nil {
 			test.Fatal(writeError)
 		}
-		if _, readError := gcexportdata.Read(&exportData, fileSet, imported, loaded.PkgPath); readError != nil {
+		if _, readError := export_data.Read(fileSet, imported, exportData, loaded.PkgPath); readError != nil {
 			test.Fatal(readError)
+		}
+	}
+	for _, loaded := range host {
+		if !fixtureWorkspace(loaded) {
+			read(loaded)
 		}
 	}
 	restored := loadedBuild{}

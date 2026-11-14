@@ -15,8 +15,9 @@ import (
 )
 
 // standardLibraryTableMagic opens every table, and names its format, so bytes of another format, or of none, are a
-// table that does not parse rather than entries read wrong.
-const standardLibraryTableMagic = "cohere standard library table 3\n"
+// table that does not parse rather than entries read wrong. At 4, a table's export data is shallow, which no binary of
+// 3 can read (#z4arggw).
+const standardLibraryTableMagic = "cohere standard library table 4\n"
 
 // StandardLibraryEntry is one standard-library package as a table holds it: its cache entry as the checker encodes
 // it, its export data, nil for unsafe, whose types are the type checker's own, and its reads of other packages as the

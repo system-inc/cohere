@@ -1,7 +1,6 @@
 package go_engine
 
 import (
-	"bytes"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -12,10 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // layoutDependency is the layout fixture's dependency, which stands for a package the host restored.
@@ -47,12 +47,14 @@ func layoutRestored(test *testing.T) (*packages.Package, *packages.Package) {
 	if workspace == nil || dependency == nil || len(workspace.Errors)+len(dependency.Errors) > 0 {
 		test.Fatalf("the layout fixture did not load whole: %v", loaded)
 	}
-	var exportData bytes.Buffer
-	if writeError := gcexportdata.Write(&exportData, dependency.Fset, dependency.Types); writeError != nil {
+	exportData, writeError := export_data.Write(dependency.Fset, dependency.Types)
+	if writeError != nil {
 		test.Fatal(writeError)
 	}
-	imported := map[string]*types.Package{}
-	_, readError := gcexportdata.Read(&exportData, token.NewFileSet(), imported, layoutDependency)
+	// The dependency's own imports keep the types their load checked, as a restored package's do in the engine's
+	// load, and the read adds the dependency itself.
+	imported := load.ClosureTypes(dependency)
+	_, readError := export_data.Read(token.NewFileSet(), imported, exportData, layoutDependency)
 	if readError != nil {
 		test.Fatal(readError)
 	}

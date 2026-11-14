@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -185,30 +186,37 @@ type plantedFile struct {
 	Copied    bool
 }
 
-// Under `--no-cache` the binary's entries are read and nothing else. A store a cached run wrote holds unicode/utf8's
-// entry under the key a cached run reads it by, planted with a withheld error the types record would name, and the
-// table holds every standard-library package but unicode/utf8. The run under `--no-cache` restores the rest from the
-// table and computes unicode/utf8, never reading the planted body, and leaves the store as it was; the cached run
-// after it reads the planted body, so the entry was whole and under the key that matches.
+// Under `--no-cache` the binary's entries are read and nothing else. A store a cached run wrote holds log/slog's entry
+// under the key a cached run reads it by, planted with a withheld error the types record would name, and the table
+// holds every standard-library package but log/slog. The run under `--no-cache` restores the rest from the table and
+// computes log/slog, never reading the planted body, and leaves the store as it was; the cached run after it reads the
+// planted body, so the entry was whole and under the key that matches. log/slog is the one package the table leaves
+// out because no other standard-library package the fixture reaches imports it: export data is shallow, so a package
+// left out of the table leaves every package that reaches it unreadable from the table too.
 func TestOnlyTheBinaryEntriesAreReadUnderNoCache(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, standardLibraryFixture)
 	collected := map[cache.Key]check.StandardLibraryRunEntry{}
 	runEngineWith(test, root, builtInStandardLibrary{stamp: engineTestsStamp, collected: collected}, rules.All())
-	var unicodeEntry plantedEntry
+	var slogEntry plantedEntry
 	found := false
 	for key, entry := range collected {
-		if entry.PackagePath == "unicode/utf8" {
-			if decodeError := gob.NewDecoder(bytes.NewReader(entry.Entry)).Decode(&unicodeEntry); decodeError != nil {
-				test.Fatalf("reading unicode/utf8's collected entry: %v", decodeError)
-			}
+		var decoded plantedEntry
+		if decodeError := gob.NewDecoder(bytes.NewReader(entry.Entry)).Decode(&decoded); decodeError != nil {
+			test.Fatalf("reading %s's collected entry: %v", entry.PackagePath, decodeError)
+		}
+		if slices.Contains(decoded.Imports, "log/slog") {
+			test.Fatalf("want no standard-library package to import log/slog, got %s", entry.PackagePath)
+		}
+		if entry.PackagePath == "log/slog" {
+			slogEntry = decoded
 			found = true
 			delete(collected, key)
 		}
 	}
 	if !found {
-		test.Fatal("want unicode/utf8 among the collected entries")
+		test.Fatal("want log/slog among the collected entries")
 	}
 	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
 	if tableError != nil {
@@ -234,15 +242,15 @@ func TestOnlyTheBinaryEntriesAreReadUnderNoCache(test *testing.T) {
 			}
 			var body plantedEntry
 			if gob.NewDecoder(bytes.NewReader(read.Inline)).Decode(&body) == nil && reflect.DeepEqual(body,
-				unicodeEntry) {
+				slogEntry) {
 				stored, record = append(stored, cache.Key(decoded)), read
 			}
 			return nil
 		})
 	if walkError != nil || len(stored) != 1 {
-		test.Fatalf("want unicode/utf8's entry in the store once, found it under %v (%v)", stored, walkError)
+		test.Fatalf("want log/slog's entry in the store once, found it under %v (%v)", stored, walkError)
 	}
-	planted := unicodeEntry
+	planted := slogEntry
 	planted.Withheld.Errors = append(planted.Withheld.Errors, load.WithheldError{
 		File: filepath.Join(root, "planted_by_the_test.go"), Line: 1, Column: 1, Message: "planted by the test",
 	})
@@ -277,7 +285,7 @@ func TestOnlyTheBinaryEntriesAreReadUnderNoCache(test *testing.T) {
 		test.Fatalf("from the binary\n%s\nplain\n%s", uncached.withoutCounts, plain.withoutCounts)
 	}
 	if cached := runCachedEngine(test, root); !strings.Contains(cached.stream, "planted_by_the_test") {
-		test.Fatalf("want a cached run to read the planted entry, so it is whole and under unicode/utf8's key, got\n%s",
+		test.Fatalf("want a cached run to read the planted entry, so it is whole and under log/slog's key, got\n%s",
 			cached.stream)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,7 +14,6 @@ import (
 
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/analysis/passes/printf"
-	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
@@ -54,12 +52,13 @@ func TestTheCanonicalTableHoldsTheSameEntriesByValue(test *testing.T) {
 		test.Fatalf("want the same keys and the one variant, got %d keys of %d and %+v", len(after.Keys()),
 			len(before.Keys()), after.Variants())
 	}
+	beforeAmong, afterAmong := tableExportData(before), tableExportData(after)
 	for _, key := range before.Keys() {
 		// Ignored: each key is one of both tables'.
 		original, _ := before.Lookup(key)
 		rewritten, _ := after.Lookup(key)
-		originalDigests, originalError := StandardLibraryDigestsOf(original)
-		rewrittenDigests, rewrittenError := StandardLibraryDigestsOf(rewritten)
+		originalDigests, originalError := StandardLibraryDigestsOf(original, beforeAmong)
+		rewrittenDigests, rewrittenError := StandardLibraryDigestsOf(rewritten, afterAmong)
 		if originalError != nil || rewrittenError != nil || !reflect.DeepEqual(originalDigests, rewrittenDigests) {
 			test.Errorf("key %s: want the same digests, got %+v (%v) and %+v (%v)", key, originalDigests,
 				originalError, rewrittenDigests, rewrittenError)
@@ -112,11 +111,29 @@ func factStrings(restored restoredAnalysis) []string {
 	return facts
 }
 
-// declarationPositions are where export data says each package-level object of the package at path is, by name.
-func declarationPositions(test *testing.T, exportData []byte, path string) map[string]string {
+// tableExportData is every entry of table, as the packages its entries' export data is read against.
+func tableExportData(table *cache.StandardLibraryTable) *StandardLibraryExportData {
+	var entries []cache.StandardLibraryEntry
+	for _, key := range table.Keys() {
+		// Ignored: each key is one of the table's own.
+		entry, _ := table.Lookup(key)
+		entries = append(entries, entry)
+	}
+	return StandardLibraryExportDataOf(entries)
+}
+
+// declarationPositions are where export data says each package-level object of the package at path is, by name, read
+// against among, whose packages hold every package imports reach.
+func declarationPositions(
+	test *testing.T,
+	among *StandardLibraryExportData,
+	imports []string,
+	exportData []byte,
+	path string,
+) map[string]string {
 	test.Helper()
 	fileSet := token.NewFileSet()
-	read, readError := gcexportdata.Read(bytes.NewReader(exportData), fileSet, map[string]*types.Package{}, path)
+	read, readError := among.readAgainst(fileSet, path, imports, exportData)
 	if readError != nil {
 		test.Fatalf("reading the export data of %s: %v", path, readError)
 	}
@@ -171,6 +188,7 @@ func TestATableEntryRestoresAsTheStoreEntryItWasWrittenFrom(test *testing.T) {
 		test.Fatalf("writing the canonical table: %v", canonicalError)
 	}
 	table := cache.NewStandardLibraryTable(canonical)
+	among := tableExportData(table)
 	known := cold.session.known
 	rename := renameFromGoRootMarker(goRoot)
 	facts, withheld := 0, 0
@@ -184,7 +202,15 @@ func TestATableEntryRestoresAsTheStoreEntryItWasWrittenFrom(test *testing.T) {
 		if !held {
 			test.Fatalf("%s: want it in the table", entry.PackagePath)
 		}
-		fromTable, _, tableError := restoreBinaryEntry(known, restoring, tableEntry, rename)
+		read, readFileSet, readError := among.readPackage(entry.PackagePath)
+		var renamed renamedExportData
+		if tableEntry.ExportData != nil {
+			renamed.renameError = readError
+			if readError == nil {
+				renamed.exportData, renamed.renameError = renameExportDataFiles(read, readFileSet, rename)
+			}
+		}
+		fromTable, _, tableError := restoreBinaryEntry(known, restoring, tableEntry, renamed, rename)
 		if tableError != nil {
 			test.Fatalf("%s: restoring the table's entry: %v", entry.PackagePath, tableError)
 		}
@@ -218,8 +244,9 @@ func TestATableEntryRestoresAsTheStoreEntryItWasWrittenFrom(test *testing.T) {
 		if readError != nil {
 			test.Fatalf("%s: reading the table's export data: %v", entry.PackagePath, readError)
 		}
-		if want, got := declarationPositions(test, entry.ExportData, entry.PackagePath), declarationPositions(test,
-			exportData, entry.PackagePath); !reflect.DeepEqual(got, want) {
+		if want, got := declarationPositions(test, among, fromStore.types.Imports, entry.ExportData,
+			entry.PackagePath), declarationPositions(test, among, fromStore.types.Imports, exportData,
+			entry.PackagePath); !reflect.DeepEqual(got, want) {
 			test.Errorf("%s: want every declaration where the store's export data has it", entry.PackagePath)
 		}
 	}

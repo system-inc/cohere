@@ -1,7 +1,6 @@
 package check
 
 import (
-	"bytes"
 	"go/ast"
 	"go/importer"
 	"go/parser"
@@ -12,8 +11,9 @@ import (
 	"testing"
 	"weak"
 
-	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 )
 
 // A kept package's export data reader holds the package's types and nothing else of the host's analysis: its syntax
@@ -65,8 +65,9 @@ func TestKeptExportDataHoldsOnlyThePackagesTypes(test *testing.T) {
 		test.Fatalf("16 loads read %d different export data, want one write they all read", len(written))
 	}
 	for exportData := range written {
-		imported, importError := gcexportdata.Read(bytes.NewReader([]byte(exportData)), token.NewFileSet(),
-			map[string]*types.Package{}, "example.com/kept")
+		// The package imports nothing, so it reads against no other package.
+		imported, importError := export_data.Read(token.NewFileSet(), map[string]*types.Package{}, []byte(exportData),
+			"example.com/kept")
 		if importError != nil || imported.Scope().Lookup("Counter") == nil {
 			test.Errorf("the export data imported as %v with %v, want the package with Counter", imported, importError)
 		}

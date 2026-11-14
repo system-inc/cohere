@@ -1,7 +1,6 @@
 package check
 
 import (
-	"bytes"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -13,14 +12,13 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/gcexportdata"
-
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // rebasedPath and rebasedDependencyPath are the package the rename cases write the export data of and the package it
-// imports, whose declarations the export data carries since the first's API names them.
+// imports, whose declarations the first's API names, which shallow export data names by path and never carries.
 const (
 	rebasedPath           = "example.com/rebased"
 	rebasedDependencyPath = "example.com/rebased/dependency"
@@ -38,9 +36,9 @@ const (
 		"\tLabel string\n}\n\nfunc (item Item) Labelled() string { return item.Label }\n"
 )
 
-// rebasedExportData is the export data of rebasedPath as a run would write it, from its source, its file at
-// file and its dependency's at dependencyFile.
-func rebasedExportData(test *testing.T, file string, dependencyFile string) []byte {
+// rebasedExportData is the export data of rebasedPath and of its dependency as a run would write them, from their
+// source, its file at file and its dependency's at dependencyFile.
+func rebasedExportData(test *testing.T, file string, dependencyFile string) ([]byte, []byte) {
 	test.Helper()
 	fileSet := token.NewFileSet()
 	checkedPackage := func(path string, name string, source string, importer types.Importer) *types.Package {
@@ -67,22 +65,34 @@ func rebasedExportData(test *testing.T, file string, dependencyFile string) []by
 			return dependency, nil
 		}),
 	)
-	var written bytes.Buffer
-	if writeError := gcexportdata.Write(&written, fileSet, rebased); writeError != nil {
+	written, writeError := export_data.Write(fileSet, rebased)
+	if writeError != nil {
 		test.Fatalf("writing the export data of %s: %v", rebasedPath, writeError)
 	}
-	return written.Bytes()
+	dependencyWritten, dependencyError := export_data.Write(fileSet, dependency)
+	if dependencyError != nil {
+		test.Fatalf("writing the export data of %s: %v", rebasedDependencyPath, dependencyError)
+	}
+	return written, dependencyWritten
 }
 
-// readPositions is what export data of the package at path reads as: its export digest, and the position, as
-// "file:line:column", of every object it declares and every one of its imports' objects it carries, each field,
-// method, parameter and result included, named by its package path and the names that lead to it.
-func readPositions(test *testing.T, exportData []byte, path string) (cache.Key, map[string]string) {
+// rebasedSet is the two packages' export data as a table holds them, rebasedPath's exportData and its dependency's
+// dependencyExportData, which a read of the first needs read first.
+func rebasedSet(exportData []byte, dependencyExportData []byte) *StandardLibraryExportData {
+	set := newStandardLibraryExportData()
+	set.add(rebasedPath, exportDataSource{imports: []string{rebasedDependencyPath}, exportData: exportData})
+	set.add(rebasedDependencyPath, exportDataSource{exportData: dependencyExportData})
+	return set
+}
+
+// readPositions is what export data of rebasedPath reads as, against its dependency's: its export digest, and the
+// position, as "file:line:column", of every object it declares, each field, method, parameter and result included,
+// named by its package path and the names that lead to it.
+func readPositions(test *testing.T, exportData []byte, dependencyExportData []byte) (cache.Key, map[string]string) {
 	test.Helper()
-	fileSet := token.NewFileSet()
-	read, readError := gcexportdata.Read(bytes.NewReader(exportData), fileSet, map[string]*types.Package{}, path)
+	read, fileSet, readError := rebasedSet(exportData, dependencyExportData).readPackage(rebasedPath)
 	if readError != nil {
-		test.Fatalf("reading the export data of %s: %v", path, readError)
+		test.Fatalf("reading the export data of %s: %v", rebasedPath, readError)
 	}
 	positions := map[string]string{}
 	record := func(name string, object types.Object) {
@@ -96,25 +106,23 @@ func readPositions(test *testing.T, exportData []byte, path string) (cache.Key, 
 			record(fmt.Sprintf("%s(result %d)", name, index), result)
 		}
 	}
-	for _, each := range append([]*types.Package{read}, read.Imports()...) {
-		for _, name := range each.Scope().Names() {
-			object := each.Scope().Lookup(name)
-			named := each.Path() + "." + name
-			record(named, object)
-			switch declared := object.(type) {
-			case *types.Func:
-				recordSignature(named, declared.Signature())
-			case *types.TypeName:
-				if definedType, isDefined := declared.Type().(*types.Named); isDefined {
-					for method := range definedType.Methods() {
-						record(named+"."+method.Name(), method)
-						recordSignature(named+"."+method.Name(), method.Signature())
-					}
+	for _, name := range read.Scope().Names() {
+		object := read.Scope().Lookup(name)
+		named := read.Path() + "." + name
+		record(named, object)
+		switch declared := object.(type) {
+		case *types.Func:
+			recordSignature(named, declared.Signature())
+		case *types.TypeName:
+			if definedType, isDefined := declared.Type().(*types.Named); isDefined {
+				for method := range definedType.Methods() {
+					record(named+"."+method.Name(), method)
+					recordSignature(named+"."+method.Name(), method.Signature())
 				}
-				if structType, isStruct := declared.Type().Underlying().(*types.Struct); isStruct {
-					for field := range structType.Fields() {
-						record(named+"."+field.Name(), field)
-					}
+			}
+			if structType, isStruct := declared.Type().Underlying().(*types.Struct); isStruct {
+				for field := range structType.Fields() {
+					record(named+"."+field.Name(), field)
 				}
 			}
 		}
@@ -122,20 +130,38 @@ func readPositions(test *testing.T, exportData []byte, path string) (cache.Key, 
 	return exportDigest(read), positions
 }
 
-// renamedOrFatal is exportData renamed by rename, failing the test on an error.
-func renamedOrFatal(test *testing.T, exportData []byte, rename func(string) (string, error)) []byte {
+// renamed is exportData, rebasedPath's, read against its dependency's dependencyExportData and renamed by rename.
+func renamed(
+	exportData []byte,
+	dependencyExportData []byte,
+	rename func(string) (string, error),
+) ([]byte, error) {
+	read, readFileSet, readError := rebasedSet(exportData, dependencyExportData).readPackage(rebasedPath)
+	if readError != nil {
+		return nil, readError
+	}
+	return renameExportDataFiles(read, readFileSet, rename)
+}
+
+// renamedOrFatal is renamed's export data, failing the test on an error.
+func renamedOrFatal(
+	test *testing.T,
+	exportData []byte,
+	dependencyExportData []byte,
+	rename func(string) (string, error),
+) []byte {
 	test.Helper()
-	renamed, renameError := renameExportDataFiles(exportData, rebasedPath, rename)
+	written, renameError := renamed(exportData, dependencyExportData, rename)
 	if renameError != nil {
 		test.Fatalf("renaming the files of %s: %v", rebasedPath, renameError)
 	}
-	return renamed
+	return written
 }
 
-// Export data renamed to the marker names every file by it, its dependency's carried declarations included, and
-// renamed back to the same root it reads as the original did: the same API, every object at the same file, line and
-// column. Renamed to another root instead, every position names the file at the same path below that root, on the
-// same line and column.
+// Export data renamed to the marker names every file by it, and renamed back to the same root it reads as the
+// original did: the same API, every object at the same file, line and column. Renamed to another root instead, every
+// position names the file at the same path below that root, on the same line and column. Shallow, it names the
+// package's own file and no other, so the dependency's file is never renamed.
 func TestExportDataRenamedToTheMarkerAndBackReadsAsTheOriginal(test *testing.T) {
 	test.Parallel()
 
@@ -143,17 +169,27 @@ func TestExportDataRenamedToTheMarkerAndBackReadsAsTheOriginal(test *testing.T) 
 	localRoot := filepath.Join(test.TempDir(), "local", "go")
 	file := filepath.Join(releaseRoot, "src", "example.com", "rebased", "rebased.go")
 	dependencyFile := filepath.Join(releaseRoot, "src", "example.com", "rebased", "dependency", "dependency.go")
-	original := rebasedExportData(test, file, dependencyFile)
-	originalDigest, originalPositions := readPositions(test, original, rebasedPath)
-	for _, carried := range []string{rebasedDependencyPath + ".Item.Label", rebasedPath + ".Holder.Count"} {
-		if !strings.HasPrefix(originalPositions[carried], filepath.Dir(file)) {
-			test.Fatalf("want the original export data to place %s under %s, got %q among\n%v", carried,
-				filepath.Dir(file), originalPositions[carried], originalPositions)
+	original, dependency := rebasedExportData(test, file, dependencyFile)
+	originalDigest, originalPositions := readPositions(test, original, dependency)
+	for _, declared := range []string{rebasedPath + ".Holder.Count", rebasedPath + ".Holder.Name"} {
+		if !strings.HasPrefix(originalPositions[declared], file+":") {
+			test.Fatalf("want the original export data to place %s in %s, got %q among\n%v", declared, file,
+				originalPositions[declared], originalPositions)
 		}
 	}
+	_, readFileSet, readError := rebasedSet(original, dependency).readPackage(rebasedPath)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	readFileSet.Iterate(func(named *token.File) bool {
+		if named.Name() != file {
+			test.Errorf("want the export data to name %s alone, got %s too", file, named.Name())
+		}
+		return true
+	})
 
-	marked := renamedOrFatal(test, original, renameToGoRootMarker(releaseRoot))
-	markedDigest, markedPositions := readPositions(test, marked, rebasedPath)
+	marked := renamedOrFatal(test, original, dependency, renameToGoRootMarker(releaseRoot))
+	markedDigest, markedPositions := readPositions(test, marked, dependency)
 	if markedDigest != originalDigest {
 		test.Fatalf("want the marked export data to read as the same API")
 	}
@@ -164,15 +200,15 @@ func TestExportDataRenamedToTheMarkerAndBackReadsAsTheOriginal(test *testing.T) 
 		}
 	}
 
-	back := renamedOrFatal(test, marked, renameFromGoRootMarker(releaseRoot))
-	backDigest, backPositions := readPositions(test, back, rebasedPath)
+	back := renamedOrFatal(test, marked, dependency, renameFromGoRootMarker(releaseRoot))
+	backDigest, backPositions := readPositions(test, back, dependency)
 	if backDigest != originalDigest || !reflect.DeepEqual(backPositions, originalPositions) {
 		test.Fatalf("want the export data renamed back to read as the original\nback     %v\noriginal %v",
 			backPositions, originalPositions)
 	}
 
-	local := renamedOrFatal(test, marked, renameFromGoRootMarker(localRoot))
-	localDigest, localPositions := readPositions(test, local, rebasedPath)
+	local := renamedOrFatal(test, marked, dependency, renameFromGoRootMarker(localRoot))
+	localDigest, localPositions := readPositions(test, local, dependency)
 	want := map[string]string{}
 	for name, position := range originalPositions {
 		want[name] = filepath.Join(localRoot, strings.TrimPrefix(position, releaseRoot))
@@ -181,37 +217,40 @@ func TestExportDataRenamedToTheMarkerAndBackReadsAsTheOriginal(test *testing.T) 
 		test.Fatalf("want every position under %s at its line and column\ngot  %v\nwant %v", localRoot,
 			localPositions, want)
 	}
-	if _, carried := localPositions[rebasedDependencyPath+".Item.Labelled"]; !carried {
-		test.Fatalf("want the dependency's carried method among the positions, got %v", localPositions)
-	}
 }
 
-// A release refuses export data that names a file outside the Go installation, as the dependency's is here; a run
-// refuses export data that names a file without the marker; and bytes that do not read as export data are refused
-// rather than renamed.
+// A release refuses export data that names a file outside the Go installation, as the package's own is here; a run
+// refuses export data that names a file without the marker; and bytes that do not read as export data, or that read
+// only against a dependency the set does not hold, are refused rather than renamed, the second naming it.
 func TestRenamingExportDataRefusesAFileItCannotName(test *testing.T) {
 	test.Parallel()
 
 	root := filepath.Join(test.TempDir(), "go")
 	file := filepath.Join(root, "src", "example.com", "rebased", "rebased.go")
-	outside := filepath.Join(test.TempDir(), "elsewhere", "dependency.go")
-	escaping := rebasedExportData(test, file, outside)
-	if _, renameError := renameExportDataFiles(escaping, rebasedPath, renameToGoRootMarker(root)); renameError == nil ||
+	dependencyFile := filepath.Join(root, "src", "example.com", "rebased", "dependency", "dependency.go")
+	outside := filepath.Join(test.TempDir(), "elsewhere", "rebased.go")
+	escaping, escapingDependency := rebasedExportData(test, outside, dependencyFile)
+	if _, renameError := renamed(escaping, escapingDependency, renameToGoRootMarker(root)); renameError == nil ||
 		!strings.Contains(renameError.Error(), outside) {
-		test.Fatalf("want the dependency's file outside %s refused, got %v", root, renameError)
+		test.Fatalf("want the package's file outside %s refused, got %v", root, renameError)
 	}
 
-	unmarked := rebasedExportData(test, file, filepath.Join(root, "src", "dependency.go"))
-	_, unmarkedError := renameExportDataFiles(unmarked, rebasedPath, renameFromGoRootMarker(root))
-	if unmarkedError == nil {
+	unmarked, dependency := rebasedExportData(test, file, dependencyFile)
+	if _, unmarkedError := renamed(unmarked, dependency, renameFromGoRootMarker(root)); unmarkedError == nil {
 		test.Fatalf("want export data that names no file by %s refused", goRootMarker)
 	}
 
 	for _, corrupt := range [][]byte{nil, []byte("i not export data"), unmarked[:len(unmarked)/2]} {
-		_, corruptError := renameExportDataFiles(corrupt, rebasedPath, renameToGoRootMarker(root))
-		if corruptError == nil {
+		if _, corruptError := renamed(corrupt, dependency, renameToGoRootMarker(root)); corruptError == nil {
 			test.Fatalf("want %d corrupt bytes refused", len(corrupt))
 		}
+	}
+
+	alone := newStandardLibraryExportData()
+	alone.add(rebasedPath, exportDataSource{imports: []string{rebasedDependencyPath}, exportData: unmarked})
+	if _, _, aloneError := alone.readPackage(rebasedPath); aloneError == nil ||
+		!strings.Contains(aloneError.Error(), rebasedDependencyPath) {
+		test.Fatalf("want the read refused for want of %s, named, got %v", rebasedDependencyPath, aloneError)
 	}
 }
 

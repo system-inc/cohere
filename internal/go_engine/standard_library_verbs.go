@@ -251,11 +251,12 @@ func verifyStandardLibrary(
 		}
 		checked, differing := 0, 0
 		fresh := cache.NewStandardLibraryTable(recomputedTable)
+		computedAmong, shippedAmong := variantExportData(table, fresh)
 		for _, key := range fresh.Keys() {
 			recomputed[key] = true
 			// Ignored: the key is one of the table's own.
 			computed, _ := fresh.Lookup(key)
-			difference := differenceFrom(table, key, computed)
+			difference := differenceFrom(table, key, computed, computedAmong, shippedAmong)
 			if difference != "" {
 				reportLine(standardError, variantLabel(request)+": "+difference)
 				differing++
@@ -287,10 +288,37 @@ func verifyStandardLibrary(
 	return exitClean
 }
 
+// variantExportData is what one variant's entries are read against, the export data being shallow: every entry fresh,
+// the variant recomputed, holds, and every entry table holds under one of fresh's keys, the variant as shipped.
+func variantExportData(
+	table *cache.StandardLibraryTable,
+	fresh *cache.StandardLibraryTable,
+) (*check.StandardLibraryExportData, *check.StandardLibraryExportData) {
+	var computed []cache.StandardLibraryEntry
+	var shipped []cache.StandardLibraryEntry
+	for _, key := range fresh.Keys() {
+		// Ignored: the key is one of the table's own.
+		entry, _ := fresh.Lookup(key)
+		computed = append(computed, entry)
+		if held, found := table.Lookup(key); found {
+			shipped = append(shipped, held)
+		}
+	}
+	return check.StandardLibraryExportDataOf(computed), check.StandardLibraryExportDataOf(shipped)
+}
+
 // differenceFrom is how the entry table holds under key differs from computed, the entry a check recomputed under the
-// same key, by package, export digest, output digest and persisted reads, or empty when it does not.
-func differenceFrom(table *cache.StandardLibraryTable, key cache.Key, computed cache.StandardLibraryEntry) string {
-	computedDigests, computedError := check.StandardLibraryDigestsOf(computed)
+// same key, by package, export digest, output digest and persisted reads, or empty when it does not. Each entry's
+// export data is read against its own variant's, computedAmong the recomputed and shippedAmong the shipped
+// (variantExportData).
+func differenceFrom(
+	table *cache.StandardLibraryTable,
+	key cache.Key,
+	computed cache.StandardLibraryEntry,
+	computedAmong *check.StandardLibraryExportData,
+	shippedAmong *check.StandardLibraryExportData,
+) string {
+	computedDigests, computedError := check.StandardLibraryDigestsOf(computed, computedAmong)
 	if computedError != nil {
 		return fmt.Sprintf("the recomputed entry under %s does not read: %v", key, computedError)
 	}
@@ -298,7 +326,7 @@ func differenceFrom(table *cache.StandardLibraryTable, key cache.Key, computed c
 	if !held {
 		return computedDigests.PackagePath + ": the table holds no entry under its key"
 	}
-	shippedDigests, shippedError := check.StandardLibraryDigestsOf(shipped)
+	shippedDigests, shippedError := check.StandardLibraryDigestsOf(shipped, shippedAmong)
 	switch {
 	case shippedError != nil:
 		return fmt.Sprintf("%s: the table's entry does not read: %v", computedDigests.PackagePath, shippedError)

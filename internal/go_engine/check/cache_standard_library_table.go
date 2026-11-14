@@ -12,7 +12,6 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/gcexportdata"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -103,29 +102,38 @@ func cacheEntryOf(entry standardLibraryEntry) cacheEntry {
 // each entry is a standardLibraryEntry, every file its Withheld and export data name renamed below goRoot to
 // goRootMarker (see renameToGoRootMarker), and its findings left out, since no run reads a finding of a package it
 // restores from the table, which it never restores when Analyze was given it, and a finding names this machine's
-// files. It refuses an entry that names a file outside goRoot, which no other machine could resolve, an entry in
-// another format, and one that holds the walk of its files, which only a package Analyze was given has. Its facts and
-// its persisted reads are still gob's bytes from the process that ran, which CanonicalStandardLibraryTable writes
-// again.
+// files. Each package's export data is read against the others', which are every package it reaches, to be renamed
+// (renameExportDataFiles). It refuses an entry that names a file outside goRoot, which no other machine could
+// resolve, an entry in another format, one that holds the walk of its files, which only a package Analyze was given
+// has, and one whose export data does not read among the others. Its facts and its persisted reads are still gob's
+// bytes from the process that ran, which CanonicalStandardLibraryTable writes again.
 func StandardLibraryTableOf(
 	entries map[cache.Key]StandardLibraryRunEntry,
 	goRoot string,
 	variants []cache.StandardLibraryVariant,
 ) ([]byte, error) {
 	rename := renameToGoRootMarker(goRoot)
-	portable := make(map[cache.Key]cache.StandardLibraryEntry, len(entries))
 	// In the keys' order, so the same entries refuse with the same error.
-	for _, key := range slices.SortedFunc(maps.Keys(entries), compareCacheKeys) {
-		collected := entries[key]
+	keys := slices.SortedFunc(maps.Keys(entries), compareCacheKeys)
+	decoded := make(map[cache.Key]cacheEntry, len(entries))
+	exportData := newStandardLibraryExportData()
+	for _, key := range keys {
 		var entry cacheEntry
-		if decodeError := gob.NewDecoder(bytes.NewReader(collected.Entry)).Decode(&entry); decodeError != nil {
+		if decodeError := gob.NewDecoder(bytes.NewReader(entries[key].Entry)).Decode(&entry); decodeError != nil {
 			return nil, fmt.Errorf("writing the standard library's table: decoding the entry of %s: %w",
-				collected.PackagePath, decodeError)
+				entries[key].PackagePath, decodeError)
 		}
 		if entry.Version != CacheFormatVersion {
 			return nil, fmt.Errorf("writing the standard library's table: the entry of %s is in format %q, not %q",
-				collected.PackagePath, entry.Version, CacheFormatVersion)
+				entries[key].PackagePath, entry.Version, CacheFormatVersion)
 		}
+		decoded[key] = entry
+		exportData.add(entries[key].PackagePath, exportDataSource{imports: entry.Imports,
+			exportData: entries[key].ExportData})
+	}
+	portable := make(map[cache.Key]cache.StandardLibraryEntry, len(entries))
+	for _, key := range keys {
+		collected, entry := entries[key], decoded[key]
 		if len(entry.Files) > 0 {
 			return nil, fmt.Errorf("writing the standard library's table: the entry of %s holds the walk of its "+
 				"files, as only a package the run was asked to analyze does", collected.PackagePath)
@@ -158,15 +166,18 @@ func StandardLibraryTableOf(
 		if encodeError != nil {
 			return nil, fmt.Errorf("writing the standard library's table: %w", encodeError)
 		}
-		var exportData []byte
+		var renamed []byte
 		if collected.ExportData != nil {
-			renamed, exportError := renameExportDataFiles(collected.ExportData, collected.PackagePath, rename)
-			if exportError != nil {
-				return nil, fmt.Errorf("writing the standard library's table: %w", exportError)
+			read, readFileSet, readError := exportData.readPackage(collected.PackagePath)
+			if readError != nil {
+				return nil, fmt.Errorf("writing the standard library's table: %w", readError)
 			}
-			exportData = renamed
+			renamed, renameError = renameExportDataFiles(read, readFileSet, rename)
+			if renameError != nil {
+				return nil, fmt.Errorf("writing the standard library's table: %w", renameError)
+			}
 		}
-		portable[key] = cache.StandardLibraryEntry{Entry: encoded, ExportData: exportData, Reads: collected.Reads}
+		portable[key] = cache.StandardLibraryEntry{Entry: encoded, ExportData: renamed, Reads: collected.Reads}
 	}
 	return cache.WriteStandardLibraryTable(portable, variants), nil
 }
@@ -319,9 +330,16 @@ type StandardLibraryDigests struct {
 	Reads       cache.Key
 }
 
-// StandardLibraryDigestsOf is the digests of one of a table's entries, or an error for an entry that does not
-// decode, or whose export data does not read; unsafe, which has none, has the API of the type checker's own.
-func StandardLibraryDigestsOf(entry cache.StandardLibraryEntry) (StandardLibraryDigests, error) {
+// StandardLibraryDigestsOf is the digests of one of a table's entries, its export data read against among, the
+// entries of its variant (StandardLibraryExportDataOf), which hold every package it reaches, or an error for an entry
+// that does not decode, or whose export data does not read; unsafe, which has none, has the API of the type checker's
+// own.
+//
+// Mutates: among reads each package it has not read that the entry's imports reach
+func StandardLibraryDigestsOf(
+	entry cache.StandardLibraryEntry,
+	among *StandardLibraryExportData,
+) (StandardLibraryDigests, error) {
 	decoded, decodeError := decodeStandardLibraryEntry(entry.Entry)
 	if decodeError != nil {
 		return StandardLibraryDigests{}, decodeError
@@ -348,8 +366,7 @@ func StandardLibraryDigestsOf(entry cache.StandardLibraryEntry) (StandardLibrary
 		return StandardLibraryDigests{}, fmt.Errorf("reading the table's entry of %s: it holds no export data",
 			decoded.PackagePath)
 	}
-	read, readError := gcexportdata.Read(bytes.NewReader(entry.ExportData), token.NewFileSet(),
-		map[string]*types.Package{}, decoded.PackagePath)
+	read, readError := among.readAgainst(token.NewFileSet(), decoded.PackagePath, decoded.Imports, entry.ExportData)
 	if readError != nil {
 		return StandardLibraryDigests{}, fmt.Errorf("reading the export data of %s: %w", decoded.PackagePath,
 			readError)

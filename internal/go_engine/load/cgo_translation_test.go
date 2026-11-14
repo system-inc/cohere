@@ -1,7 +1,6 @@
 package load
 
 import (
-	"bytes"
 	"go/types"
 	"maps"
 	"path/filepath"
@@ -10,10 +9,10 @@ import (
 	"sync"
 	"testing"
 
-	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 )
 
 // translationFiles are a project with cgo of its own: native, a cgo package with a plain file, an in-package test and
@@ -241,12 +240,12 @@ func TestACgoProjectsPackageIsRestoredFromExportData(test *testing.T) {
 		if each.PkgPath != "example.com/translation/native" {
 			continue
 		}
-		var exportData bytes.Buffer
-		if writeError := gcexportdata.Write(&exportData, each.Fset, each.Types); writeError != nil {
+		exportData, writeError := export_data.Write(each.Fset, each.Types)
+		if writeError != nil {
 			test.Fatalf("writing the export data of %s: %v", identifier, writeError)
 		}
 		holder.held[identifier] = &Restored{
-			ReadExportData: func() ([]byte, error) { return exportData.Bytes(), nil },
+			ReadExportData: func() ([]byte, error) { return exportData, nil },
 			Imports:        typesImports(each),
 		}
 		for _, file := range each.CompiledGoFiles {
