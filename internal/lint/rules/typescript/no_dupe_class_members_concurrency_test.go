@@ -51,14 +51,16 @@ func TestNoDupeClassMembersLeavesTheClassItReadsUntouched(test *testing.T) {
 		Report: func(rule.Diagnostic) {
 			reports++
 			if seen := class.AsClassDeclaration().Members; seen != parsed || len(seen.Nodes) != 3 {
-				test.Errorf("while the rule ran, the class's members were a list of %d, not the parser's own", len(seen.Nodes))
+				test.Errorf("while the rule ran, the class's members were a list of %d, not the parser's own",
+					len(seen.Nodes))
 			}
 		},
 	}
 	listeners := NoDupeClassMembers.Run(context, rule.Given[rule.NoOptions]{})
 	listeners[ast.KindClassDeclaration](class)
 	if reports != 1 {
-		test.Fatalf("the rule reported %d times, want the one duplicate, so the check above ran against nothing", reports)
+		test.Fatalf("the rule reported %d times, want the one duplicate, so the check above ran against nothing",
+			reports)
 	}
 	if class.AsClassDeclaration().Members != parsed {
 		test.Error("after the rule ran, the class's members were not the parser's own list")
@@ -71,7 +73,12 @@ func TestNoDupeClassMembersLeavesTheClassItReadsUntouched(test *testing.T) {
 func TestNoDupeClassMembersAndACheckerReadTheClassAtOnce(test *testing.T) {
 	test.Parallel()
 	class, _ := parsedClass(test)
-	context := rule.Context{SourceFile: ast.GetSourceFileOfNode(class), Report: func(rule.Diagnostic) {}}
+	context := rule.Context{
+		SourceFile: ast.GetSourceFileOfNode(class),
+		Report: func(rule.Diagnostic) {
+			// The race is in the reading, not the reports, so this test keeps none; the test above counts them.
+		},
+	}
 	listener := NoDupeClassMembers.Run(context, rule.Given[rule.NoOptions]{})[ast.KindClassDeclaration]
 
 	const rounds = 200
