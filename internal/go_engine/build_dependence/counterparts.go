@@ -22,6 +22,12 @@ type Counterparts struct {
 	packages map[string]*types.Package
 	encoder  objectpath.Encoder
 	counts   CounterpartCounts
+
+	// decoded are the paths of the packages the other graph holds by records read back from the store, with no
+	// types (#6a3kjvz), whose objects DependentObject answers by name (objectByName).
+	decoded map[string]bool
+	paths   objectPaths
+	walker  *bitWalker
 }
 
 // CounterpartCounts are the objects a Counterparts was asked of: those answered by their counterpart's bits, those
@@ -38,15 +44,19 @@ type CounterpartCounts struct {
 // package; judged is nil for a caller that only finds counterparts (Counterpart), and then DependentObject fails wide
 // too.
 func NewCounterparts(graph *Graph, judged *Dependence) *Counterparts {
-	counterparts := &Counterparts{judged: judged, packages: map[string]*types.Package{}}
+	counterparts := &Counterparts{judged: judged, packages: map[string]*types.Package{}, decoded: map[string]bool{},
+		walker: &bitWalker{seen: map[walkKey]bool{}}}
 	if graph == nil {
 		return counterparts
 	}
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
 	for _, record := range graph.packages {
-		if record.typesPackage != nil {
+		switch {
+		case record.typesPackage != nil:
 			counterparts.packages[record.typesPackage.Path()] = record.typesPackage
+		case record.path != "":
+			counterparts.decoded[record.path] = true
 		}
 	}
 	return counterparts
@@ -59,6 +69,9 @@ func (counterparts *Counterparts) DependentObject(object types.Object) (bool, bo
 	// from reading a nil package.
 	if universal(object) {
 		return false, false
+	}
+	if counterparts.decoded[object.Pkg().Path()] && counterparts.judged != nil {
+		return counterparts.objectByName(object)
 	}
 	if _, isHeld := counterparts.packages[object.Pkg().Path()]; !isHeld || counterparts.judged == nil {
 		counterparts.counts.WithoutPackage++
@@ -80,13 +93,48 @@ func (counterparts *Counterparts) DependentObject(object types.Object) (bool, bo
 // without its package; one of a package it holds that no unit there declares answers nothing set, for the record's
 // expansion of it to be read in its place, and is counted answered, as ObjectBits answers it through its type.
 func (counterparts *Counterparts) DependentName(path string, local string) (bool, bool, bool) {
-	if _, isHeld := counterparts.packages[path]; !isHeld || counterparts.judged == nil {
+	_, isHeld := counterparts.packages[path]
+	if !isHeld && !counterparts.decoded[path] || counterparts.judged == nil {
 		counterparts.counts.WithoutPackage++
 		return true, true, false
 	}
 	counterparts.counts.Answered++
 	bits, isDeclared := counterparts.judged.NameBits(path, local)
 	return bits.Name, bits.Underlying, isDeclared
+}
+
+// objectByName is a live object's bits, of a package the other graph holds by a record read back from the store
+// (#6a3kjvz): the bits of the object its name names there, as a record names it (localName), or, where no unit there
+// declares it or it has no name, any bit set that reading it reaches through its type, both bits at once, as
+// Dependence.ObjectBits reads an object no unit declares.
+func (counterparts *Counterparts) objectByName(object types.Object) (bool, bool) {
+	declared := canonical(object)
+	if local := localName(&counterparts.paths, declared); local != "" {
+		if bits, isDeclared := counterparts.judged.NameBits(declared.Pkg().Path(), local); isDeclared {
+			counterparts.counts.Answered++
+			return bits.Name, bits.Underlying
+		}
+	}
+	counterparts.counts.Answered++
+	_, isConstant := declared.(*types.Const)
+	for _, reached := range counterparts.walker.references(declared.Type(), isConstant) {
+		local := localName(&counterparts.paths, reached.object)
+		if local == "" {
+			return true, true
+		}
+		bits, isDeclared := counterparts.judged.NameBits(reached.object.Pkg().Path(), local)
+		if !isDeclared {
+			_, isHeld := counterparts.packages[reached.object.Pkg().Path()]
+			if !isHeld && !counterparts.decoded[reached.object.Pkg().Path()] {
+				return true, true
+			}
+			continue
+		}
+		if bits.Name && !reached.touchesUnderlying || bits.Underlying && reached.touchesUnderlying {
+			return true, true
+		}
+	}
+	return false, false
 }
 
 // Counterpart is object's counterpart in the other graph's package of its path, found by its objectpath, and false

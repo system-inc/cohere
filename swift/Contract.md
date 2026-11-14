@@ -977,8 +977,13 @@ written beside their entries, `"backfilled"` the packages restored by their own 
 so their records are written, `"aliasSkipped"` those restored by a second key's alias, which go without a record, and
 `"unreadable"` the records that did not decode, each a problem, whose packages are checked from source so their records
 are written again, a restored one counted in `"backfilled"` too. `"droppedAfterBackfill":0`, written only when not 0,
-counts the hits made misses in a load that backfilled any: a backfilled package asks the facts of everything below it. A record that could
-not be written counts in `"writeFailed"`.
+counts the hits made misses in a load that backfilled any: a backfilled package asks the facts of everything below
+it. A record that could not be written counts in `"writeFailed"`. The standard library the host restores from the
+binary's table has no entry in the store: when the switch loads it from source for its graph, its packages' records
+are written into the store under keys derived from each package's own standard-library key, the engine and the
+toolchain, and read back by a later run in place of that load (#6a3kjvz). `"standardLibraryRead"`,
+`"standardLibraryWritten"` and `"standardLibraryUnreadable"` count those, each written only when not 0, and a
+standard-library record that could not be written counts in `"writeFailed"` too.
 
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
 which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive
@@ -1115,7 +1120,9 @@ and `"standardLibraryDependentUnits"`, which `"dependencies"` include, so the to
 every package from source. Each object of a restored package a unit reads is answered by its counterpart in that graph,
 found by its path: `"answered"` counts those, `"withoutCounterpart"` those whose path names nothing alike there, and
 `"withoutPackage"` those of a package no graph holds, a warm store's say, the last two called dependent, failing wide.
-The host's record never writes it, and neither does a run without the switch.
+`"standardLibraryFromRecords"` counts the standard library's packages its graph took from the records the findings
+store keeps of them, which that load then skips, and `"standardLibrarySideLoaded"` those it loaded, each written only
+when not 0. The host's record never writes it, and neither does a run without the switch.
 
 Its `"facts"` is the build's facts census (#0ghk7vj), written once its lint has run. Under the switch every extra build
 restores nothing from the host's run, so its facts are its own, and such a run is slower than a plain one. The standard

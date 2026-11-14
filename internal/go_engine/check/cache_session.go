@@ -63,6 +63,10 @@ type StandardLibraryCaching struct {
 	Table     *cache.StandardLibraryTable
 	Context   cache.StandardLibraryContext
 	Collected map[cache.Key]StandardLibraryRunEntry
+
+	// Toolchain is the Go version and `GOROOT` go env reports, which every standard-library dependence record's key
+	// holds beside the engine (StandardLibraryDependenceRecordKey, #6a3kjvz).
+	Toolchain string
 }
 
 // StandardLibraryRunEntry is one standard-library package a run saved: its import path, its entry and export data as
@@ -722,9 +726,10 @@ func (session *CacheSession) save(
 	if session.host != nil {
 		hostRestored = len(session.host.restoring)
 	}
+	// The counts themselves, not a copy: the standard library's records are written once the side load has ended,
+	// after this save, and the record of the run is written after that (WriteStandardLibraryRecords).
 	if session.dependence != nil {
-		counted := session.dependence.counts
-		session.counts.DependenceRecords = &counted
+		session.counts.DependenceRecords = &session.dependence.counts
 	}
 	session.counts.Hit = len(session.hits) - len(session.fromBinary) - hostRestored
 	session.counts.Missed = len(session.keys) - len(session.hits)

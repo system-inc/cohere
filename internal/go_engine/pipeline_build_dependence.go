@@ -47,6 +47,11 @@ type hostDependence struct {
 // package ID, which each build's are compared with, and fileSet is the side load's, where its objects' positions are,
 // by which the facts census keys the host's facts of a restored package (indexHostFacts). Its packages are counted
 // among the dependencies.
+//
+// fromRecords counts the packages its graph took from the records the findings store keeps of them (#6a3kjvz), which
+// the side load skipped, and sideLoaded those it loaded, by ID in loaded, whose records the host's session writes once
+// it has ended (awaitStandardLibrary), writeFailed counting the writes that failed and firstWriteFailure the first's
+// reason.
 type standardLibraryDependence struct {
 	done         chan struct{}
 	graph        *build_dependence.Graph
@@ -56,6 +61,12 @@ type standardLibraryDependence struct {
 	problem      error
 	loadElapsed  time.Duration
 	graphElapsed time.Duration
+	fromRecords  int
+	sideLoaded   int
+	loaded       map[string]bool
+
+	writeFailed       int
+	firstWriteFailure error
 }
 
 // buildDependenceGraph builds the host's graph from loaded, every package it checked from source, on the run's pool,
@@ -90,6 +101,7 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		restored: map[string]bool{},
 	}
 	var restoredStandardLibrary []string
+	recordedStandardLibrary := map[string]*build_dependence.Record{}
 	records := make([]*build_dependence.Record, len(every))
 	for index, each := range every {
 		host.files[each.ID] = each.GoFiles
@@ -104,6 +116,12 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		// The standard library is the only package in no module that a module's load reaches, and none of it is a
 		// test variant here, since only the workspace's packages have tests built.
 		if each.Module == nil && each.ForTest == "" {
+			if engine.session != nil {
+				if record, isRecorded := engine.session.StandardLibraryRecord(each); isRecorded {
+					recordedStandardLibrary[each.PkgPath] = record
+					continue
+				}
+			}
 			restoredStandardLibrary = append(restoredStandardLibrary, each.PkgPath)
 		}
 	}
@@ -126,23 +144,40 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 	switch {
 	case engine.dependence != nil && engine.dependence.standardLibrary != nil:
 		host.standardLibrary = engine.dependence.standardLibrary
-	case len(restoredStandardLibrary) > 0:
-		host.standardLibrary = engine.standardLibraryGraph(restoredStandardLibrary)
+	case len(restoredStandardLibrary) > 0 || len(recordedStandardLibrary) > 0:
+		host.standardLibrary = engine.standardLibraryGraph(restoredStandardLibrary, recordedStandardLibrary,
+			host.files)
 	}
 	engine.dependence = host
 }
 
 // standardLibraryGraph starts the standard library's graph (standardLibraryDependence) on a goroutine of its own and
-// returns at once: paths, the standard-library packages the host restored, are loaded from source by the engine's own
-// loader (loadPackages), as the host's load would have checked them, under the host's environment, on the run's pool,
-// without tests, and every package the load reaches is added to the graph, so the graph holds whatever they import too
-// and needs no answers of its own. Its work takes the pool's slots beside the host's lint, and the builds wait for it
-// (awaitStandardLibrary).
-func (engine *pipeline) standardLibraryGraph(paths []string) *standardLibraryDependence {
-	side := &standardLibraryDependence{done: make(chan struct{})}
+// returns at once: paths, the standard-library packages the host restored with no record in the findings store, are
+// loaded from source by the engine's own loader (loadPackages), as the host's load would have checked them, under the
+// host's environment, on the run's pool, without tests, and every package the load reaches is added to the graph, so
+// the graph holds whatever they import too and needs no answers of its own. Its work takes the pool's slots beside the
+// host's lint, and the builds wait for it (awaitStandardLibrary). recorded are the records the store holds of the rest,
+// by path, each added as it is, its files those hostFiles name of it, the host's listing's, with no load at all when
+// paths is empty (#6a3kjvz).
+func (engine *pipeline) standardLibraryGraph(
+	paths []string,
+	recorded map[string]*build_dependence.Record,
+	hostFiles map[string][]string,
+) *standardLibraryDependence {
+	side := &standardLibraryDependence{done: make(chan struct{}), graph: build_dependence.NewGraph(),
+		files: map[string][]string{}, fromRecords: len(recorded), loaded: map[string]bool{}}
+	// The standard library's side load has no test variants, so each package's ID is its path.
+	for path, record := range recorded {
+		side.graph.AddDecoded(record)
+		side.files[path] = hostFiles[path]
+	}
+	side.packages = len(recorded)
 	workspace := engine.described.workspace
 	go func() {
 		defer close(side.done)
+		if len(paths) == 0 {
+			return
+		}
 		started := time.Now()
 		loaded, loadError := engine.loadPackages(loadRequest{
 			environment: workspace.Environment(),
@@ -152,21 +187,26 @@ func (engine *pipeline) standardLibraryGraph(paths []string) *standardLibraryDep
 		side.loadElapsed = time.Since(started)
 		switch {
 		case loadError != nil:
-			side.problem = loadError
+			side.problem, side.graph = loadError, nil
 			return
 		case len(loaded.Diagnostics) > 0:
 			side.problem = fmt.Errorf("%d errors, the first %s", len(loaded.Diagnostics), loaded.Diagnostics[0].Message)
+			side.graph = nil
 			return
 		}
 		graphStarted := time.Now()
 		var every []*packages.Package
-		packages.Visit(loaded.Roots, nil, func(each *packages.Package) { every = append(every, each) })
-		side.graph = build_dependence.NewGraph()
-		side.files = make(map[string][]string, len(every))
+		packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
+			if _, isRecorded := recorded[each.ID]; !isRecorded {
+				every = append(every, each)
+			}
+		})
 		for _, each := range every {
 			side.files[each.ID] = each.GoFiles
+			side.loaded[each.ID] = true
 		}
-		side.packages = len(every)
+		side.packages += len(every)
+		side.sideLoaded = len(every)
 		if len(every) > 0 {
 			side.fileSet = every[0].Fset
 		}
@@ -190,6 +230,22 @@ func (engine *pipeline) awaitStandardLibrary() {
 	if side.problem != nil {
 		engine.note("the standard library's side load for --build-dependence failed, so every object of it a unit "+
 			"reads is called dependent: %v", side.problem)
+		return
+	}
+	// What the side load built from live packages is written into the findings store, for a later run to read in its
+	// place (#6a3kjvz), and never a record the graph took from the store. The session's counts were handed on with the
+	// host's result before the side load ended, so its failed writes are kept here and counted in the lint record.
+	if engine.session != nil && side.sideLoaded > 0 {
+		side.writeFailed, side.firstWriteFailure = engine.session.WriteStandardLibraryRecords(
+			func(path string) ([]byte, bool) {
+				if !side.loaded[path] {
+					return nil, false
+				}
+				return side.graph.EncodedRecord(path)
+			})
+		if side.firstWriteFailure != nil {
+			engine.note("the findings cache: %v", side.firstWriteFailure)
+		}
 	}
 }
 
@@ -303,6 +359,8 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 			WithoutPackage:     answered.WithoutPackage,
 		}
 		if standardLibrary != nil {
+			record.Restored.StandardLibraryFromRecords = standardLibrary.fromRecords
+			record.Restored.StandardLibrarySideLoaded = standardLibrary.sideLoaded
 			record.Restored.StandardLibraryPackages = standardLibrary.packages
 			record.Restored.LoadMilliseconds = int(standardLibrary.loadElapsed.Milliseconds())
 			record.Restored.GraphMilliseconds = int(standardLibrary.graphElapsed.Milliseconds())

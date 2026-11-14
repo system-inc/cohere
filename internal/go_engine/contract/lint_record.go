@@ -223,7 +223,10 @@ type BuildDependence struct {
 // build's judgment of it, which the dependencies' counts include. Each object of a restored package a unit of the host
 // reads is answered by its counterpart in that graph: Answered counts those, WithoutCounterpart those whose path names
 // nothing alike there, and WithoutPackage those of a package the graph does not hold, a store's or every one when the
-// side load failed, the last two answered dependent, failing wide.
+// side load failed, the last two answered dependent, failing wide. StandardLibraryFromRecords, additive (#6a3kjvz),
+// counts the standard library's packages the graph took from the records the findings store keeps of them, which the
+// side load skipped, and StandardLibrarySideLoaded those the side load loaded, whose records it then writes; each is
+// written only when not 0.
 type RestoredDependence struct {
 	Packages                      int `json:"packages"`
 	StandardLibraryPackages       int `json:"standardLibraryPackages"`
@@ -234,6 +237,9 @@ type RestoredDependence struct {
 	Answered                      int `json:"answered"`
 	WithoutCounterpart            int `json:"withoutCounterpart"`
 	WithoutPackage                int `json:"withoutPackage"`
+
+	StandardLibraryFromRecords int `json:"standardLibraryFromRecords,omitempty"`
+	StandardLibrarySideLoaded  int `json:"standardLibrarySideLoaded,omitempty"`
 }
 
 // DependenceFacts is one build's facts beside the host's: Kinds counts them by analyzer and fact type, and Workspace
@@ -352,6 +358,10 @@ type LintCache struct {
 // that did not decode, each a problem, whose packages are checked from source so their records are written again, a
 // hit among them counted in backfilled too; and droppedAfterBackfill, the hits made misses in a load that backfilled
 // any, since a backfilled package asks the facts of everything below it, written only when not 0.
+// The standard library's, additive (#6a3kjvz piece 3), count the records of the packages the host restored from the
+// binary's table, which the store keeps apart: standardLibraryRead and standardLibraryUnreadable over the load, and
+// standardLibraryWritten once the side load has ended, a write that failed counted in the cache's writeFailed. Each is
+// written only when not 0.
 type DependenceRecords struct {
 	Read         int `json:"read"`
 	Written      int `json:"written"`
@@ -360,6 +370,10 @@ type DependenceRecords struct {
 	Unreadable   int `json:"unreadable"`
 
 	DroppedAfterBackfill int `json:"droppedAfterBackfill,omitempty"`
+
+	StandardLibraryRead       int `json:"standardLibraryRead,omitempty"`
+	StandardLibraryWritten    int `json:"standardLibraryWritten,omitempty"`
+	StandardLibraryUnreadable int `json:"standardLibraryUnreadable,omitempty"`
 }
 
 func (LintRecord) kind() Kind { return KindLint }
