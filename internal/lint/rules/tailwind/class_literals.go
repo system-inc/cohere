@@ -335,11 +335,16 @@ func targetArguments(arguments *ast.NodeList, target *SelectorTarget) []*ast.Nod
 		}
 		return targetItems(expressions, target, "all")
 	}
+	// An index picks from the arguments as written, so what targetItems hands back is a window onto the call's own
+	// list, and the spreads are read into a list of this function's own. Unspread into the window, they replaced a
+	// spread argument with what it spreads in the call itself, for every rule and checker reading the tree after
+	// (#qb5xxj1).
 	picked := targetItems(arguments.Nodes, target, "all")
-	for index, argument := range picked {
-		picked[index] = unspread(argument)
+	expressions := make([]*ast.Node, 0, len(picked))
+	for _, argument := range picked {
+		expressions = append(expressions, unspread(argument))
 	}
-	return picked
+	return expressions
 }
 
 // calleeName is calleeNameAndPath's name alone, which allocates nothing.
@@ -403,9 +408,15 @@ func classValuesOf(matched matchedNodes, origin ClassLiteralOrigin) classValues 
 	if len(matched) == 0 {
 		return classValues{}
 	}
-	slices.SortFunc(matched, func(left, right *ast.Node) int { return left.Pos() - right.Pos() })
+	// Sorted as a copy. matched is the caller's own, built by add, but it reaches here through the matchers' walkers'
+	// fields, which the guard against writing the tree cannot follow, and an in-place sort of a slice of nodes it
+	// cannot prove the rule built reads as a sort of the tree's (TestRulesNeverWriteTheSyntaxTree).
+	ordered := slices.SortedFunc(
+		slices.Values(matched),
+		func(left, right *ast.Node) int { return left.Pos() - right.Pos() },
+	)
 	values := classValues{}
-	for _, node := range matched {
+	for _, node := range ordered {
 		concatenated := concatenationEdges(node)
 		edges := holeEdgesOf(node)
 		edges.Leading = edges.Leading || concatenated.Leading
