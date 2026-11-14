@@ -175,7 +175,16 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	if counted := result.Cache.DependenceRecords; counted != nil {
 		record.Cache.DependenceRecords = &contract.DependenceRecords{Read: counted.Read, Written: counted.Written,
 			Backfilled: counted.Backfilled, AliasSkipped: counted.AliasSkipped, Unreadable: counted.Unreadable,
-			DroppedAfterBackfill: counted.DroppedAfterBackfill}
+			DroppedAfterBackfill: counted.DroppedAfterBackfill, StandardLibraryRead: counted.StandardLibraryRead,
+			StandardLibraryWritten:    counted.StandardLibraryWritten,
+			StandardLibraryUnreadable: counted.StandardLibraryUnreadable}
+	}
+	// The standard library's records are written once its side load has ended, after the host's counts were taken
+	// (awaitStandardLibrary), so their failed writes, and the note of the first, are counted here.
+	if engine.dependence != nil && engine.dependence.standardLibrary != nil &&
+		engine.dependence.standardLibrary.writeFailed > 0 {
+		record.Cache.WriteFailed += engine.dependence.standardLibrary.writeFailed
+		record.Cache.Problems++
 	}
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)

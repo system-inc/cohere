@@ -45,6 +45,10 @@ func DependenceRecordKey(key cache.Key) cache.Key {
 //
 // DroppedAfterBackfill counts the hits dropShortHits made misses in a load that backfilled any, which asks the facts
 // of everything below a backfilled package: a backfill that cascaded would show here.
+//
+// The standard library's counts are of the packages the host restored from the binary's table, whose records the
+// store keeps apart (cache_session_standard_library_records.go): read and unreadable over the last load, and written
+// once the side load has ended, whose failed writes the run counts with the entries' (WriteStandardLibraryRecords).
 type DependenceRecordCounts struct {
 	Read                 int
 	Written              int
@@ -52,6 +56,10 @@ type DependenceRecordCounts struct {
 	AliasSkipped         int
 	Unreadable           int
 	DroppedAfterBackfill int
+
+	StandardLibraryRead       int
+	StandardLibraryWritten    int
+	StandardLibraryUnreadable int
 }
 
 // dependenceRecords is a session's dependence records over its last load: decode, the host graph's decoding of a
@@ -63,6 +71,10 @@ type dependenceRecords struct {
 	found    map[*packages.Package]*build_dependence.Record
 	recordOf func(*packages.Package) ([]byte, bool)
 	counts   DependenceRecordCounts
+
+	// standardLibrary are the records the store holds of the standard-library packages the load restored from the
+	// binary's table, decoded (readStandardLibraryRecords).
+	standardLibrary map[*packages.Package]*build_dependence.Record
 }
 
 // KeepDependenceRecords has the session read and write the dependence records of its host's load: under
@@ -144,6 +156,7 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 		delete(session.stored, each)
 		records.counts.Backfilled++
 	}
+	session.readStandardLibraryRecords(reachable)
 }
 
 // dependenceRecordToWrite is the record to write beside saved's entry, and whether there is one: the host graph's,

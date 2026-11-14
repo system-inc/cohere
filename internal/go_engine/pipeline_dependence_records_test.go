@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
 // The dependence-records fixture's packages (#6a3kjvz): platform, whose Make returns a Plain alike in every build,
@@ -249,15 +249,13 @@ func TestABackfillMissesOnceAndNeverCascades(test *testing.T) {
 	}
 }
 
-// A plain run never opens a record key (engine's condition on #6a3kjvz): over a store a run under
-// `--build-dependence` filled, with records beside every entry, a warm run with neither switch reads no key that is a
-// record's, every one derived from a key the store holds, while a warm run under the switch reads them.
-//
-// Not parallel: cache.ObserveReads is the process's, and one observer at a time can be set.
-func TestAPlainRunReadsNoRecord(test *testing.T) {
-	root := copyFixture(test, filepath.Join("testdata", "dependence-records"))
-	runOverRaw(test, root, exitClean, recordsSwitches...)
-	recordKeys := map[cache.Key]bool{}
+// storedRecordKeys are the keys of the records root's store holds, of each kind: the host's, each under the key
+// check.DependenceRecordKey derives from a key the store holds, and the standard library's, every other file whose
+// body opens as a record does (check.StandardLibraryDependenceRecordKey, which no test can derive, since its key holds
+// the engine's identity).
+func storedRecordKeys(test *testing.T, root string) (map[cache.Key]bool, map[cache.Key]bool) {
+	test.Helper()
+	stored := map[cache.Key][]byte{}
 	walkError := filepath.WalkDir(storeDirectory(root), func(path string, entry fs.DirEntry, pathError error) error {
 		if pathError != nil || entry.IsDir() {
 			return pathError
@@ -266,28 +264,79 @@ func TestAPlainRunReadsNoRecord(test *testing.T) {
 		if decodeError != nil || len(decoded) != len(cache.Key{}) {
 			return nil
 		}
-		recordKeys[check.DependenceRecordKey(cache.Key(decoded))] = true
-		return nil
+		contents, readError := os.ReadFile(path)
+		stored[cache.Key(decoded)] = contents
+		return readError
 	})
 	if walkError != nil {
 		test.Fatal(walkError)
 	}
-	readsOf := func(switches ...string) int {
-		var reading sync.Mutex
-		var read []cache.Key
+	host, standardLibrary := map[cache.Key]bool{}, map[cache.Key]bool{}
+	for key := range stored {
+		if _, isStored := stored[check.DependenceRecordKey(key)]; isStored {
+			host[check.DependenceRecordKey(key)] = true
+		}
+	}
+	opening := append([]byte("cohere dependence record 1"), 0)
+	for key, contents := range stored {
+		if !host[key] && len(contents) > sha256.Size && bytes.HasPrefix(contents[sha256.Size:], opening) {
+			standardLibrary[key] = true
+		}
+	}
+	return host, standardLibrary
+}
+
+// A plain run never opens a record key of either kind, the host's or the standard library's (engine's condition on
+// #6a3kjvz, pieces 2 and 3): over the engine tests' table, a cold run with neither switch writes no record; over the
+// store a run under `--build-dependence` then filled, with a record beside every entry and one of each
+// standard-library package it side-loaded, a warm run with neither switch reads no key of either kind and writes none,
+// while a warm run under the switch reads every one.
+//
+// Not parallel: cache.ObserveReads is the process's, and one observer at a time can be set.
+func TestAPlainRunReadsNoRecord(test *testing.T) {
+	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	root := copyFixture(test, standardLibraryRecordsFixture)
+	reading := readingTableAs(table, engineTestsStamp, "")
+	runOverNoted(test, root, exitClean, reading, "--other-builds")
+	if host, standardLibrary := storedRecordKeys(test, root); len(host) != 0 || len(standardLibrary) != 0 {
+		test.Errorf("a plain cold run wrote %d records of the host's and %d of the standard library's, want none",
+			len(host), len(standardLibrary))
+	}
+	runOverNoted(test, root, exitClean, reading, recordsSwitches...)
+	host, standardLibrary := storedRecordKeys(test, root)
+	if len(host) == 0 || len(standardLibrary) == 0 {
+		test.Fatalf("the store holds %d records of the host's and %d of the standard library's, want some of each",
+			len(host), len(standardLibrary))
+	}
+	readsOf := func(switches ...string) (int, int) {
+		var counting sync.Mutex
+		hostReads, standardLibraryReads := 0, 0
 		stop := cache.ObserveReads(func(key cache.Key) {
-			reading.Lock()
-			defer reading.Unlock()
-			read = append(read, key)
+			counting.Lock()
+			defer counting.Unlock()
+			switch {
+			case host[key]:
+				hostReads++
+			case standardLibrary[key]:
+				standardLibraryReads++
+			}
 		})
-		runOverRaw(test, root, exitClean, switches...)
+		runOverNoted(test, root, exitClean, reading, switches...)
 		stop()
-		return len(slices.DeleteFunc(read, func(key cache.Key) bool { return !recordKeys[key] }))
+		return hostReads, standardLibraryReads
 	}
-	if plain := readsOf("--other-builds"); plain != 0 {
-		test.Errorf("a plain run read %d record keys, want none", plain)
+	if hostReads, standardLibraryReads := readsOf("--other-builds"); hostReads != 0 || standardLibraryReads != 0 {
+		test.Errorf("a plain run read %d record keys of the host's and %d of the standard library's, want none",
+			hostReads, standardLibraryReads)
 	}
-	if switched := readsOf(recordsSwitches...); switched == 0 {
-		test.Error("a run under --build-dependence read no record key, so the plain run's none proves nothing")
+	if after, afterStandardLibrary := storedRecordKeys(test, root); len(after) != len(host) ||
+		len(afterStandardLibrary) != len(standardLibrary) {
+		test.Errorf("a plain warm run left %d and %d records, want the %d and %d before it", len(after),
+			len(afterStandardLibrary), len(host), len(standardLibrary))
+	}
+	if hostReads, standardLibraryReads := readsOf(recordsSwitches...); hostReads < len(host) ||
+		standardLibraryReads < len(standardLibrary) {
+		test.Errorf("a run under --build-dependence read %d of the host's %d record keys and %d of the standard "+
+			"library's %d", hostReads, len(host), standardLibraryReads, len(standardLibrary))
 	}
 }

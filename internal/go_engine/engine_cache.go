@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -24,6 +25,10 @@ type builtInStandardLibrary struct {
 	table     *cache.StandardLibraryTable
 	stamp     string
 	collected map[cache.Key]check.StandardLibraryRunEntry
+
+	// toolchain, when not empty, stands for go env's toolchain in the standard library's dependence records' keys,
+	// for a test that fakes a toolchain the records were written under (#6a3kjvz); every run leaves it empty.
+	toolchain string
 }
 
 // embeddedStandardLibrary is the binary's own, parsed on its first lookup.
@@ -78,6 +83,8 @@ func lintCache(
 				Goroot:        values["GOROOT"],
 			},
 			Collected: builtIn.collected,
+			// A standard-library dependence record is written under the toolchain that loaded it (#6a3kjvz).
+			Toolchain: cmp.Or(builtIn.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
 		}
 		if holdsTable {
 			standardLibrary.Table = builtIn.table
