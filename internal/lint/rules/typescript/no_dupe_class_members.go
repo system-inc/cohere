@@ -75,17 +75,8 @@ var NoDupeClassMembers = rule.Rule[rule.NoOptions]{
 				})
 			})
 		}
-		coreListeners := rule.Listeners{
-			ast.KindClassDeclaration: func(node *ast.Node) {
-				coreCheck(node.AsClassDeclaration().Members)
-			},
-			ast.KindClassExpression: func(node *ast.Node) {
-				coreCheck(node.AsClassExpression().Members)
-			},
-		}
-
-		// A class carrying a computed member is handed to the core with those members removed from
-		// its list, rather than having the core's findings filtered afterwards.
+		// A class carrying a computed member is handed to the core with those members left out of the list
+		// it reads, rather than having the core's findings filtered afterwards.
 		//
 		// Filtering the output was tried first and is wrong, in a way worth recording because it
 		// looks right. Upstream skips a computed member before it is keyed, so the member never
@@ -93,74 +84,41 @@ var NoDupeClassMembers = rule.Rule[rule.NoOptions]{
 		// findings after the fact cannot express that: measured, `class A { ['foo']() {} foo() {} }`
 		// then reported on `foo`, whose own key is not computed, while upstream is silent. The
 		// distinction is which member seeds the collision, and only the input side knows.
-		//
-		// Nothing here fabricates an AST node. The list is a `NodeList` holding the class's own
-		// member nodes minus some, with the original list's own Loc, so every node the core sees is
-		// one the parser produced and every span it reports is real.
-		filtered := func(
-			coreListener func(*ast.Node),
-			setMembers func(*ast.Node, *ast.NodeList) func(),
-		) func(*ast.Node) {
-			return func(node *ast.Node) {
-				restore := setMembers(node, nil)
-				if restore == nil {
-					// Nothing computed, so the core sees the class untouched. The common case by a
-					// wide margin, and it costs one pass over the member list.
-					coreListener(node)
-					return
-				}
-				coreListener(node)
-				restore()
-			}
-		}
-
 		return rule.Listeners{
-			ast.KindClassDeclaration: filtered(
-				coreListeners[ast.KindClassDeclaration],
-				func(node *ast.Node, _ *ast.NodeList) func() {
-					declaration := node.AsClassDeclaration()
-					return swapOutComputedClassMembers(&declaration.Members)
-				},
-			),
-			ast.KindClassExpression: filtered(
-				coreListeners[ast.KindClassExpression],
-				func(node *ast.Node, _ *ast.NodeList) func() {
-					expression := node.AsClassExpression()
-					return swapOutComputedClassMembers(&expression.Members)
-				},
-			),
+			ast.KindClassDeclaration: func(node *ast.Node) {
+				coreCheck(withoutComputedClassMembers(node.AsClassDeclaration().Members))
+			},
+			ast.KindClassExpression: func(node *ast.Node) {
+				coreCheck(withoutComputedClassMembers(node.AsClassExpression().Members))
+			},
 		}
 	},
 }
 
-// swapOutComputedClassMembers temporarily replaces a class's member list with one holding no
-// computed members, returning the function that puts the original back.
+// withoutComputedClassMembers is a class's member list with its computed members left out, the list itself
+// when it has none. The list is new, holding the class's own member nodes and the original list's Loc, so every
+// node the core sees is one the parser produced and every span it reports is real.
 //
-// Nil means there was nothing to remove, so the caller can skip both the swap and the restore.
-//
-// The swap is scoped to one synchronous listener call and undone before returning, so no other rule
-// can observe it: the walk is single-threaded per file and hands one node to one listener at a time.
-// That is the invariant this depends on, and it is written here rather than assumed because
-// widening it, running rules concurrently over one tree, would make this unsafe rather than slow.
-//
-// Mutates: members the swap is the caller's to ask for, and the restore it returns writes the original back
-func swapOutComputedClassMembers(members **ast.NodeList) func() {
-	original := *members
-	if original == nil {
+// The class is never written. Its member list once was, swapped for this one and put back after the call, on
+// the reasoning that the walk is single-threaded per file. The syntax tree is shared with every checker, though,
+// and a checker on another goroutine that resolved the class during the swap saw it without its computed members
+// and kept it that way for the run: loom's cursor lost its `*[Symbol.iterator]()`, and every `for ... of` over a
+// cursor on that checker read TS2488 (#72kn826, caught by -race).
+func withoutComputedClassMembers(members *ast.NodeList) *ast.NodeList {
+	if members == nil {
 		return nil
 	}
-	kept := make([]*ast.Node, 0, len(original.Nodes))
-	for _, member := range original.Nodes {
+	kept := make([]*ast.Node, 0, len(members.Nodes))
+	for _, member := range members.Nodes {
 		if isComputedClassMember(member) {
 			continue
 		}
 		kept = append(kept, member)
 	}
-	if len(kept) == len(original.Nodes) {
-		return nil
+	if len(kept) == len(members.Nodes) {
+		return members
 	}
-	*members = &ast.NodeList{Loc: original.Loc, Nodes: kept}
-	return func() { *members = original }
+	return &ast.NodeList{Loc: members.Loc, Nodes: kept}
 }
 
 // isComputedClassMember is upstream's `node.computed`.
