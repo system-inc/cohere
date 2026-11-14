@@ -359,9 +359,9 @@ func TestRunCacheEndToEnd(test *testing.T) {
 		{"an uncommitted change committed",
 			func(fixture *runCacheFixture) { fixture.write("source/a.ts", "export const a: number = 2;\n") },
 			func(fixture *runCacheFixture) { fixture.commit("commit the change") }},
-		// docs exists and is tracked, and the build reads nothing in it, so no watched directory moves.
+		// documentation exists and is tracked, and the build reads nothing in it, so no watched directory moves.
 		{"an untracked file in a directory the build never reads", nil,
-			func(fixture *runCacheFixture) { fixture.write("docs/notes.md", "notes\n") }},
+			func(fixture *runCacheFixture) { fixture.write("documentation/notes.md", "notes\n") }},
 	} {
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
@@ -640,7 +640,7 @@ func newRunCacheFixture(test *testing.T, binary string) *runCacheFixture {
 	fixture.write(".gitignore", ".cache/\nnode_modules/\n")
 	fixture.write("source/a.ts", "export const a: number = 1;\n")
 	fixture.write("source/nested/b.ts", "import { a } from \"../a\";\nexport const b = a + 1;\n")
-	fixture.write("docs/keep.md", "keep\n")
+	fixture.write("documentation/keep.md", "keep\n")
 	fixture.git("init", "--quiet")
 	fixture.git("config", "user.email", "fixture@example.com")
 	fixture.git("config", "user.name", "fixture")

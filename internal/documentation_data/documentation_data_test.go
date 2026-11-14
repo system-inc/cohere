@@ -1,4 +1,4 @@
-package docs_data
+package documentation_data
 
 import (
 	"bytes"
@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/docs"
 	"github.com/system-inc/cohere/internal/bench_results"
-	"github.com/system-inc/cohere/internal/docs_data/capture"
+	"github.com/system-inc/cohere/internal/documentation_data/capture"
 	goenginerules "github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/rule_names"
 )
 
 // moduleRoot is the directory the generated paths are relative to: go test runs in the package's own
@@ -52,21 +52,23 @@ func staleAgainstCommitted(test *testing.T, files map[string][]byte) []string {
 	return stale
 }
 
-// TestTheRenderedFilesAreCurrent: docs/data is what Build renders now from the committed examples, every
-// file but cli.json, which needs the binary built. It is -check-rendering's depth: the examples themselves
-// are recaptured only by the generator's -check, which takes minutes and runs in the release's module check.
+// TestTheRenderedFilesAreCurrent: documentation/data and internal/rule_names' generated file are what Build renders
+// now from the committed examples, every file but cli.json, which needs the binary built. It is -check-rendering's
+// depth: the examples themselves are recaptured only by the generator's -check, which takes minutes and runs in the
+// release's module check.
 func TestTheRenderedFilesAreCurrent(test *testing.T) {
 	test.Parallel()
 	if stale := staleAgainstCommitted(test, built(test, sourceInputs(test))); len(stale) > 0 {
-		test.Errorf("stale: %v; run go run ./internal/docs_data/tools/generate", stale)
+		test.Errorf("stale: %v; run go run ./internal/documentation_data/tools/generate", stale)
 	}
 }
 
-// TestTheDocsPackageReadsTheRenderedRuleNames: package docs embeds data/rules.json for the Go engine's file-name rule,
-// which reads every engine's rule names from it because the Go engine can't link the TypeScript registry (#2xt6v5r).
-// The embedded names are the ones Build renders now, so the freshness this file guards for docs/data reaches the copy
-// a binary carries too, and a registry change the generator has not been run for fails here as well as above.
-func TestTheDocsPackageReadsTheRenderedRuleNames(test *testing.T) {
+// TestTheRuleNamesPackageHoldsTheRenderedRuleNames: internal/rule_names is the Go file Build writes for the Go
+// engine's file-name rule and the folder check, which read every engine's rule names because the Go engine can't link
+// the TypeScript registry (#2xt6v5r). TestTheRenderedFilesAreCurrent holds that file to what Build renders now, as it
+// holds documentation/data, and this holds the compiled names to the rows of rules.json, in its order, so the two
+// renderings can never disagree.
+func TestTheRuleNamesPackageHoldsTheRenderedRuleNames(test *testing.T) {
 	test.Parallel()
 	var rendered struct {
 		Rules []struct {
@@ -80,11 +82,12 @@ func TestTheDocsPackageReadsTheRenderedRuleNames(test *testing.T) {
 	for _, entry := range rendered.Rules {
 		names = append(names, entry.Name)
 	}
-	if embedded := docs.RuleNames(); !slices.Equal(embedded, names) {
+	if compiled := rule_names.RuleNames(); !slices.Equal(compiled, names) {
 		test.Errorf(
-			"docs.RuleNames holds %d names and Build renders %d; run go run ./internal/docs_data/tools/generate",
-			len(embedded),
+			"rule_names.RuleNames holds %d names and Build renders %d; run go run %s",
+			len(compiled),
 			len(names),
+			"./internal/documentation_data/tools/generate",
 		)
 	}
 }
@@ -672,16 +675,16 @@ func TestAnUnearnedQuietNumberRefusesTheBuild(test *testing.T) {
 	}
 }
 
-// Every file under docs/data is one the generator builds, so a file there is generated whole, which is what lets
-// cohere-dev land resolve a merge conflict confined to docs/data by rerunning the generator (#y84h1te). A
+// Every file under documentation/data is one the generator builds, so a file there is generated whole, which is what
+// lets cohere-dev land resolve a merge conflict confined to documentation/data by rerunning the generator (#y84h1te). A
 // hand-written file put there would be overwritten by that resolution, and fails here first.
-func TestEveryFileUnderDocsDataIsGenerated(test *testing.T) {
+func TestEveryFileUnderDocumentationDataIsGenerated(test *testing.T) {
 	test.Parallel()
 	files := built(test, sourceInputs(test))
 	// cli.json is built from the binary's help, which these inputs leave out (Inputs.Help), and the generator
 	// adds whenever it runs.
 	files[CommandLineInterfacePath] = nil
-	directory := filepath.Join(moduleRoot, "docs", "data")
+	directory := filepath.Join(moduleRoot, "documentation", "data")
 	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, pathError error) error {
 		if pathError != nil || entry.IsDir() {
 			return pathError
@@ -691,7 +694,10 @@ func TestEveryFileUnderDocsDataIsGenerated(test *testing.T) {
 			return relativePathError
 		}
 		if _, generated := files[filepath.ToSlash(relative)]; !generated {
-			test.Errorf("%s is under docs/data and the generator does not build it", filepath.ToSlash(relative))
+			test.Errorf(
+				"%s is under documentation/data and the generator does not build it",
+				filepath.ToSlash(relative),
+			)
 		}
 		return nil
 	})

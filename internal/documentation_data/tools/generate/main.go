@@ -1,11 +1,11 @@
-// Command generate writes the website's data (internal/docs_data) into the module's docs/data/ directory.
-// Run it from the module root:
+// Command generate writes the website's data (internal/documentation_data) into the module's documentation/data/
+// directory, and every engine's rule names into internal/rule_names. Run it from the module root:
 //
-//	go run ./internal/docs_data/tools/generate                   write the files, examples read back
-//	go run ./internal/docs_data/tools/generate -capture          write the files, examples recaptured
-//	go run ./internal/docs_data/tools/generate -check            exit 1 if any is stale, examples recaptured
-//	go run ./internal/docs_data/tools/generate -check-rendering  exit 1 if a file rendered from the
-//	                                                            committed examples is stale
+//	go run ./internal/documentation_data/tools/generate                   write the files, examples read back
+//	go run ./internal/documentation_data/tools/generate -capture          write the files, examples recaptured
+//	go run ./internal/documentation_data/tools/generate -check            exit 1 if any is stale, examples recaptured
+//	go run ./internal/documentation_data/tools/generate -check-rendering  exit 1 if a file rendered from the
+//	                                                                      committed examples is stale
 //
 // cli.json is read from the binary's own help, so every run builds ./command/cohere into a temporary
 // directory. To recapture is to rerun the lint tests with COHERE_DOCS_CAPTURE set, which takes minutes.
@@ -29,8 +29,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/docs_data"
-	"github.com/system-inc/cohere/internal/docs_data/capture"
+	"github.com/system-inc/cohere/internal/documentation_data"
+	"github.com/system-inc/cohere/internal/documentation_data/capture"
 	"github.com/system-inc/cohere/internal/sentence"
 )
 
@@ -43,7 +43,7 @@ var verbs = []string{"rename"}
 // notRecaptured is what a run that read the examples back says, every time, so nothing it prints reads as
 // a verdict on the examples themselves.
 const notRecaptured = "the examples were read back from " +
-	docs_data.ExamplesDirectory +
+	documentation_data.ExamplesDirectory +
 	", not recaptured from the lint tests; -check recaptures them"
 
 // sources is where a run reads what Build takes beyond the module's files: the binary's help and the lint
@@ -133,7 +133,7 @@ func run(check bool, checkRendering bool, recapture bool) error {
 	if gatherError != nil {
 		return gatherError
 	}
-	files, buildError := docs_data.Build(inputs)
+	files, buildError := documentation_data.Build(inputs)
 	if buildError != nil {
 		return buildError
 	}
@@ -159,7 +159,7 @@ func run(check bool, checkRendering bool, recapture bool) error {
 			return fmt.Errorf("saying %s was written: %w", path, printError)
 		}
 	}
-	orphans, orphanedExamplesError := docs_data.OrphanedExamples(".", files)
+	orphans, orphanedExamplesError := documentation_data.OrphanedExamples(".", files)
 	if orphanedExamplesError != nil {
 		return orphanedExamplesError
 	}
@@ -188,16 +188,16 @@ func staleFiles(source sources, scratch string, recapture bool) ([]string, error
 	if gatherError != nil {
 		return nil, gatherError
 	}
-	files, buildError := docs_data.Build(inputs)
+	files, buildError := documentation_data.Build(inputs)
 	if buildError != nil {
 		return nil, buildError
 	}
-	return docs_data.Stale(source.root, files)
+	return documentation_data.Stale(source.root, files)
 }
 
 // gather reads every source Build takes. Without recapture, the examples are the committed files.
-func gather(source sources, scratch string, recapture bool) (docs_data.Inputs, error) {
-	inputs, sourceInputsError := docs_data.SourceInputs(source.root)
+func gather(source sources, scratch string, recapture bool) (documentation_data.Inputs, error) {
+	inputs, sourceInputsError := documentation_data.SourceInputs(source.root)
 	if sourceInputsError != nil {
 		return inputs, sourceInputsError
 	}
@@ -213,7 +213,7 @@ func gather(source sources, scratch string, recapture bool) (docs_data.Inputs, e
 	if captureError := source.capture(captured); captureError != nil {
 		return inputs, captureError
 	}
-	records, readCapturesError := docs_data.ReadCaptures(captured)
+	records, readCapturesError := documentation_data.ReadCaptures(captured)
 	if readCapturesError != nil {
 		return inputs, readCapturesError
 	}
@@ -223,7 +223,7 @@ func gather(source sources, scratch string, recapture bool) (docs_data.Inputs, e
 		return inputs, fmt.Errorf("the lint tests ran under capture and recorded no case")
 	}
 	var withOptions int
-	inputs.Examples, withOptions = docs_data.PickExamples(records)
+	inputs.Examples, withOptions = documentation_data.PickExamples(records)
 	_, printError := fmt.Printf(
 		"captured %d records; %d distinct cases ran with options, counted for message ids and never shown\n",
 		len(records),

@@ -9,16 +9,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/docs_data"
-	"github.com/system-inc/cohere/internal/docs_data/capture"
+	"github.com/system-inc/cohere/internal/documentation_data"
+	"github.com/system-inc/cohere/internal/documentation_data/capture"
 	"github.com/system-inc/cohere/internal/format/native"
 )
 
 // moduleRoot is the module's root: go test runs in this package's directory, four below it.
 const moduleRoot = "../../../.."
 
-// moduleCopy copies every file a check reads into a fresh directory: docs/data, and the sources beside it
-// that SourceInputs reads. A test plants a change in the copy and never touches the module's own files.
+// moduleCopy copies every file a check reads into a fresh directory: documentation/data, the rule names Build writes as
+// Go, and the sources beside them that SourceInputs reads. A test plants a change in the copy and never touches the
+// module's own files.
 func moduleCopy(test *testing.T) string {
 	test.Helper()
 	root := test.TempDir()
@@ -35,7 +36,12 @@ func moduleCopy(test *testing.T) string {
 			test.Fatal(writeError)
 		}
 	}
-	for _, relative := range []string{"swift/HouseRuleVerdicts.json", "swift/Rules.json", "CHANGELOG.md"} {
+	for _, relative := range []string{
+		"swift/HouseRuleVerdicts.json",
+		"swift/Rules.json",
+		"CHANGELOG.md",
+		documentation_data.RuleNamesPath,
+	} {
 		copyFile(relative)
 	}
 	records, globError := filepath.Glob(filepath.Join(moduleRoot, "bench", "results", "*.json"))
@@ -47,7 +53,7 @@ func moduleCopy(test *testing.T) string {
 	}
 	walkError := filepath.WalkDir(filepath.Join(
 		moduleRoot,
-		docs_data.Directory,
+		documentation_data.Directory,
 	), func(path string, entry os.DirEntry, pathError error) error {
 		if pathError != nil || entry.IsDir() {
 			return pathError
@@ -68,7 +74,7 @@ func moduleCopy(test *testing.T) string {
 // recordsReproducing is capture records from which PickExamples picks exactly these examples: the shown
 // cases as they were asserted, and every other message id and fix kind as a case run with options, which
 // counts and is never shown.
-func recordsReproducing(examples docs_data.Examples) []capture.Record {
+func recordsReproducing(examples documentation_data.Examples) []capture.Record {
 	var records []capture.Record
 	if firing := examples.Firing; firing != nil {
 		outcome := capture.OutcomeFindings
@@ -116,7 +122,7 @@ func recordsReproducing(examples docs_data.Examples) []capture.Record {
 // the real capture records when the committed examples are current.
 func lintTestsAsCommitted(test *testing.T) func(directory string) error {
 	test.Helper()
-	committed, readCommittedExamplesError := docs_data.ReadCommittedExamples(moduleRoot)
+	committed, readCommittedExamplesError := documentation_data.ReadCommittedExamples(moduleRoot)
 	if readCommittedExamplesError != nil {
 		test.Fatal(readCommittedExamplesError)
 	}
@@ -149,7 +155,7 @@ func noHelp(string) ([]byte, map[string][]byte, error) { return nil, nil, nil }
 // rule's tests changed and nobody recaptured, and returns its path.
 func plantStaleExample(test *testing.T, root string) string {
 	test.Helper()
-	committed, readCommittedExamplesError := docs_data.ReadCommittedExamples(root)
+	committed, readCommittedExamplesError := documentation_data.ReadCommittedExamples(root)
 	if readCommittedExamplesError != nil {
 		test.Fatal(readCommittedExamplesError)
 	}
@@ -168,7 +174,7 @@ func plantStaleExample(test *testing.T, root string) string {
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
-	path := docs_data.ExamplePath(planted.Rule)
+	path := documentation_data.ExamplePath(planted.Rule)
 	// In the house format, as the generator writes an example, so the only thing stale about it is its case.
 	formatted, formatHouseError := native.FormatHouse(path, append(encoded, '\n'))
 	if formatHouseError != nil {

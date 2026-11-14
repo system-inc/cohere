@@ -11,7 +11,7 @@
 //
 // A file named for a registered rule holds the rule's name, upstream's for a port, which is not the file's author's to
 // spell out: max_lines.go is max-lines, and no_var_cfg.go is no-var and `cfg`, judged on `cfg` alone. The names are
-// every engine's, from docs/data/rules.json (registeredRuleNames). Otherwise the identifier rule's reading of whose a
+// every engine's, from internal/rule_names (registeredRuleNames). Otherwise the identifier rule's reading of whose a
 // name is has no counterpart here: a file's name is the package's own.
 // A generated file's name is its generator's, so a file go/ast.IsGenerated accepts is not judged, and neither is
 // doc.go, whose name the Go project's convention fixes, nor a file of a package under a folder whose files are someone
@@ -25,9 +25,9 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	"github.com/system-inc/cohere/docs"
 	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/rule_names"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -54,12 +54,12 @@ var messages = map[string]policy.MessageHandle{
 	file_name_words.AbbreviatedFileNameAdvice: policy.MessageOf(Name, file_name_words.AbbreviatedFileNameAdvice),
 }
 
-// registeredRuleNames are every engine's rule names, from docs/data/rules.json, read once. A Go file is named for a
-// rule as often for a TypeScript one, internal/lint/rules/core/max_lines.go for max-lines, as for one of this
-// engine's, and this engine's registry holds only its own, so the names are the generated list of every registry's
-// rather than knownRuleNames.
+// registeredRuleNames are every engine's rule names, from internal/rule_names, which the website's data generator
+// writes beside rules.json, read once. A Go file is named for a rule as often for a TypeScript one,
+// internal/lint/rules/core/max_lines.go for max-lines, as for one of this engine's, and this engine's registry holds
+// only its own, so the names are the generated list of every registry's rather than knownRuleNames.
 var registeredRuleNames = sync.OnceValue(func() file_name_words.RuleNames {
-	return file_name_words.NewRuleNames(docs.RuleNames())
+	return file_name_words.NewRuleNames(rule_names.RuleNames())
 })
 
 func run(pass *analysis.Pass) (any, error) {

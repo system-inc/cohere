@@ -552,7 +552,7 @@ const ruleCpuCheck = "./internal/lint/registry/rule_budget_test.go"
 const ruleCpuTest = "TestRegisteredRuleCpuBudget"
 
 // docsDataGenerator is the repository's generator of the website's data, relative to its root.
-const docsDataGenerator = "./internal/docs_data/tools/generate"
+const docsDataGenerator = "./internal/documentation_data/tools/generate"
 
 // checkRuleCpu runs uncached on each land attempt, before tests and fast-forward.
 // Repositories without this cohere-specific check say so, like the docs data check.
@@ -616,8 +616,8 @@ func checkDocsData(worktree string, environment func() []string) (int, bool) {
 	if runError := check.Run(); runError != nil {
 		fmt.Fprintf(
 			streams.Errors,
-			"cohere-dev: the docs data is stale, so nothing landed: recapture it with `%s`, commit docs/data, "+
-				"and land again\n",
+			"cohere-dev: the docs data is stale, so nothing landed: recapture it with `%s`, commit "+
+				"documentation/data, and land again\n",
 			docsDataRecapture,
 		)
 		return exitCodeOf(runError), true

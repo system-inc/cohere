@@ -128,7 +128,7 @@
 #   --record             also write the run to bench/results as a record to commit
 #                        (internal/bench_results, schema 2): the machine, the commits, the modes, every run
 #                        and each mode's numbers, refused when it disagrees with its own runs or the engine
-#                        is dirty; commit it with what `go run ./internal/docs_data/tools/generate` rewrites
+#                        is dirty; commit it with what `go run ./internal/documentation_data/tools/generate` rewrites
 #   --record-to DIR      --record, writing the record to DIR instead of bench/results: a record kept apart
 #                        from the committed ones, as the nightly speed guard keeps its own (bench/nightly.zsh)
 #
@@ -464,9 +464,10 @@ if [[ $record == true ]]; then
     -rounds $rounds_taken -out ${record_directory:-bench/results} $record_flags) ||
     fail "could not record the run; its logs are in $logs"
   # The website's benchmarks page is generated from bench/results, and a record committed alone leaves
-  # docs/data stale, which TestTheRenderedFilesAreCurrent fails (@system_cohere_web_data). A record kept
+  # documentation/data stale, which TestTheRenderedFilesAreCurrent fails (@system_cohere_web_data). A record kept
   # elsewhere is never committed, so it has nothing to regenerate.
   [[ -z $record_directory ]] &&
-    print "commit the record with what \`go run ./internal/docs_data/tools/generate\` rewrites in docs/data"
+    print "commit the record with what \`go run ./internal/documentation_data/tools/generate\` rewrites in" \
+      "documentation/data"
 fi
 exit $outcome

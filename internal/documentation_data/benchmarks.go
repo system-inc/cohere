@@ -1,4 +1,4 @@
-package docs_data
+package documentation_data
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ func buildBenchmarks(records []bench_results.Record) (Benchmarks, error) {
 	for _, record := range ordered {
 		if validateError := bench_results.Validate(record); validateError != nil {
 			return Benchmarks{}, fmt.Errorf(
-				"docs_data: benchmark record %s: %w",
+				"documentation_data: benchmark record %s: %w",
 				bench_results.FileName(record),
 				validateError,
 			)

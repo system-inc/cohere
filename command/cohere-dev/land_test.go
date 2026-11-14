@@ -596,7 +596,7 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 
 // The landing gate checks the docs data, so a change that leaves an example stale is refused where it's
 // made, not at the next release (#h31rcf0). The fixture's generator stands in for cohere's: -check fails
-// while docs/data/example.txt is stale. The refusal names the recapture command, and once the example is
+// while documentation/data/example.txt is stale. The refusal names the recapture command, and once the example is
 // fresh the same landing lands. This runs the real go through the land fixture.
 func TestTheGateRefusesStaleDocsData(test *testing.T) {
 	test.Parallel()
@@ -618,13 +618,20 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 	}
 	write(map[string]string{
 		"go.mod": "module example.com/root\n\ngo 1.21\n",
-		"internal/docs_data/tools/generate/main.go": "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\n" +
-			"func main() {\n\tcontents, _ := os.ReadFile(\"docs/data/example.txt\")\n" +
-			"\tif string(contents) != \"fresh\\n\" {\n\t\tfmt.Println(\"stale: docs/data/example.txt\")\n\t\tos.Exit(1)\n\t}\n}\n",
-		"docs/data/example.txt": "stale\n",
+		"internal/documentation_data/tools/generate/main.go": "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\n" +
+			"func main() {\n\tcontents, _ := os.ReadFile(\"documentation/data/example.txt\")\n" +
+			"\tif string(contents) != \"fresh\\n\" {\n" +
+			"\t\tfmt.Println(\"stale: documentation/data/example.txt\")\n\t\tos.Exit(1)\n\t}\n}\n",
+		"documentation/data/example.txt": "stale\n",
 	})
-	fixture.git(worktreeA, "add", "go.mod", "internal", "docs")
-	fixture.git(worktreeA, "commit", "-q", "-m", "docs: a rule change whose example went stale (#"+fixtureTask+")")
+	fixture.git(worktreeA, "add", "go.mod", "internal", "documentation")
+	fixture.git(
+		worktreeA,
+		"commit",
+		"-q",
+		"-m",
+		"documentation: a rule change whose example went stale (#"+fixtureTask+")",
+	)
 	land := func() (string, error) {
 		landing := exec.Command(fixture.wrapper, "land", "--message", "a rule change and its example")
 		landing.Dir, landing.Env = worktreeA, fixture.environment
@@ -634,7 +641,7 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 	if output, landError := land(); landError == nil ||
 		!strings.Contains(output, "the docs data is stale, so nothing landed") ||
 		!strings.Contains(output, docsDataRecapture) ||
-		!strings.Contains(output, "stale: docs/data/example.txt") {
+		!strings.Contains(output, "stale: documentation/data/example.txt") {
 		test.Fatalf("a stale example did not refuse the landing, naming the recapture (%v):\n%s", landError, output)
 	}
 	// A red gate says it failed, and never exits 75, which says a quiet window held the landing (#vq5b7fs).
@@ -646,9 +653,9 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 		test.Errorf("a red gate ended with %v, want it to say it failed, and an exit other than %d:\n%s",
 			landError, quietRefusedExitCode, output)
 	}
-	write(map[string]string{"docs/data/example.txt": "fresh\n"})
-	fixture.git(worktreeA, "add", "docs/data/example.txt")
-	fixture.git(worktreeA, "commit", "-q", "-m", "docs: the example recaptured (#"+fixtureTask+")")
+	write(map[string]string{"documentation/data/example.txt": "fresh\n"})
+	fixture.git(worktreeA, "add", "documentation/data/example.txt")
+	fixture.git(worktreeA, "commit", "-q", "-m", "documentation: the example recaptured (#"+fixtureTask+")")
 	if output, landError := land(); landError != nil ||
 		!strings.Contains(output, "the docs data is current") ||
 		!strings.Contains(output, "landed") {

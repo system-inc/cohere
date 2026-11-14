@@ -1,4 +1,4 @@
-package docs_data
+package documentation_data
 
 import (
 	"bufio"
@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/docs_data/capture"
+	"github.com/system-inc/cohere/internal/documentation_data/capture"
 )
 
 // Examples is examples/<rule>.json: the cases a rule's own tests assert, the shortest of each kind, and
@@ -79,14 +79,14 @@ func ReadCaptures(directory string) ([]capture.Record, error) {
 			var record capture.Record
 			if decodeError := json.Unmarshal(scanner.Bytes(), &record); decodeError != nil {
 				file.Close() // Ignored: the file was only read, and the decode error is the failure to report.
-				return nil, fmt.Errorf("docs_data: %s: %w", path, decodeError)
+				return nil, fmt.Errorf("documentation_data: %s: %w", path, decodeError)
 			}
 			records = append(records, record)
 		}
 		scanError := scanner.Err()
 		file.Close() // Ignored: the file was only read, and everything it held was already scanned.
 		if scanError != nil {
-			return nil, fmt.Errorf("docs_data: %s: %w", path, scanError)
+			return nil, fmt.Errorf("documentation_data: %s: %w", path, scanError)
 		}
 	}
 	return records, nil
@@ -206,7 +206,7 @@ func ReadCommittedExamples(root string) (map[string]Examples, error) {
 		}
 		var example Examples
 		if decodeError := json.Unmarshal(contents, &example); decodeError != nil {
-			return fmt.Errorf("docs_data: %s: %w", path, decodeError)
+			return fmt.Errorf("documentation_data: %s: %w", path, decodeError)
 		}
 		examples[example.Rule] = example
 		return nil

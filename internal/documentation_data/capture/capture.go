@@ -3,7 +3,7 @@
 //
 // It is a leaf, importing nothing of cohere's, because both ends need it and they cannot import each
 // other: the harness (internal/lint/testing) is imported by every rule package's tests, and the
-// generator (internal/docs_data) imports every rule package through the registry.
+// generator (internal/documentation_data) imports every rule package through the registry.
 //
 // Nothing is written unless COHERE_DOCS_CAPTURE names a directory, so an ordinary test run pays one
 // string comparison per assertion and touches no file.
