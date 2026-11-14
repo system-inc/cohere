@@ -1,7 +1,6 @@
 package load
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -16,11 +15,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )
@@ -412,11 +411,11 @@ func (loader *loader) acquire(current *node, work slotWork) {
 	}
 }
 
-// readExportData sets a package's types from the export data the findings cache holds, against the types its
+// readExportData sets a package's types from the export data the findings cache holds, shallow, against the types its
 // imports already have, closure (ClosureTypes): every package its export data names is among its imports,
-// transitively, and is put in the importer's map first, so each object is the one that package declares, and every
-// package of the run has exactly one *types.Package. The package's own imports are set to the ones its type check had,
-// in its order, since export data names every package it reaches.
+// transitively, and the read takes each from closure (export_data.Read), so each object is the one that package
+// declares, and every package of the run has exactly one *types.Package. The package's own imports are set to the ones
+// its type check had, in its order, since export data names every package it reaches.
 //
 // Mutates: current its package gains its types
 // Mutates: closure gains the package itself, which export data names its own objects by
@@ -426,8 +425,6 @@ func (loader *loader) readExportData(current *node, restored *Restored, closure 
 		loaded.Types = types.Unsafe
 		return nil
 	}
-	own := types.NewPackage(loaded.PkgPath, loaded.Name)
-	closure[loaded.PkgPath] = own
 	var read *types.Package
 	var readError error
 	exportDataCpu := loader.timing.Measure(func() {
@@ -436,7 +433,7 @@ func (loader *loader) readExportData(current *node, restored *Restored, closure 
 			readError = exportError
 			return
 		}
-		read, readError = gcexportdata.Read(bytes.NewReader(exportData), loader.fileSet, closure, loaded.PkgPath)
+		read, readError = export_data.Read(loader.fileSet, closure, exportData, loaded.PkgPath)
 	})
 	if readError != nil {
 		return fmt.Errorf("reading the export data of %s: %w", loaded.ID, readError)

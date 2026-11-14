@@ -12,13 +12,13 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/copied"
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -37,8 +37,10 @@ import (
 // an entry as a record under its key (entryRecord), its reads and export data's digest beside its body, or, for an
 // entry an extra build writes through, a reference to the record of the host's that holds the body (#fq7dxvx); a key
 // of 11 held the whole entry. At 13, the store keeps a package's block 1 dependence record beside its entry under a
-// key derived from the entry's (DependenceRecordKey, #6a3kjvz), which no entry of 12 has beside it.
-const CacheFormatVersion = "go-engine-cache-13"
+// key derived from the entry's (DependenceRecordKey, #6a3kjvz), which no entry of 12 has beside it. At 14, the store's
+// export data is shallow (export_data.Write), each package's own declarations only, which no reader of 13's deep
+// export data can read (#z4arggw).
+const CacheFormatVersion = "go-engine-cache-14"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.
@@ -429,9 +431,9 @@ func contentDigest(contents []byte) []byte {
 	return digest[:]
 }
 
-// writeExportData is a package's types as gcexportdata writes them with the package's positions, nothing for unsafe,
-// whose types are the type checker's own. The writer panics on what it cannot carry, as types a faked package "C" left
-// invalid may be, so a panic is a package the entry cannot hold.
+// writeExportData is a package's types as export_data writes them, shallow, with the package's positions, nothing for
+// unsafe, whose types are the type checker's own. The writer panics on what it cannot carry, as types a faked package
+// "C" left invalid may be, so a panic is a package the entry cannot hold.
 func writeExportData(saved *packages.Package) (exportData []byte, exportError error) {
 	if !carriesExportData(saved) {
 		return nil, nil
@@ -445,11 +447,11 @@ func writeExportData(saved *packages.Package) (exportData []byte, exportError er
 			exportError = fmt.Errorf("writing the export data of %s: %w: %v", saved.ID, errorUnstorable, recovered)
 		}
 	}()
-	var written bytes.Buffer
-	if writeError := gcexportdata.Write(&written, saved.Fset, saved.Types); writeError != nil {
+	written, writeError := export_data.Write(saved.Fset, saved.Types)
+	if writeError != nil {
 		return nil, fmt.Errorf("writing the export data of %s: %w: %w", saved.ID, errorUnstorable, writeError)
 	}
-	return written.Bytes(), nil
+	return written, nil
 }
 
 // carriesExportData reports whether an entry of saved holds export data beside it: every package's does but unsafe's,

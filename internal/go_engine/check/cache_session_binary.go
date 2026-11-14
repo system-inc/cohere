@@ -27,8 +27,11 @@ type binaryHit struct {
 // restoreFromBinary keys every standard-library package among reachable (see cache.StandardLibraryKeys), reading the
 // digest of each file hashed holds rather than hashing it again, and makes a hit of each one the binary's table holds
 // an entry for that decodes whole, its Withheld and export data renamed from goRootMarker to the run's own `GOROOT`.
-// The renames are done here, before the load, as many at once as there are cores, so a package whose export data does
-// not rename is a miss, analyzed as any other, rather than a hit whose types the load checks from source. A package
+// The renames are done here, before the load, so a package whose export data does not rename is a miss, analyzed as
+// any other, rather than a hit whose types the load checks from source. Export data is shallow, so each package's is
+// read against the table's entries of the packages it imports, which are read first, one package at a time, from every
+// package keyed that the table holds an entry of, held or not (renameBinaryExportData); the rest of each restore runs
+// as many at once as there are cores. A package
 // Analyze was given is never restored from the table, which holds no findings, and neither is one with a list error,
 // nor one the run reloads to answer a question (see Reload). A
 // table that does not parse, or keys that cannot be computed, are a problem, and every standard-library package is
@@ -69,12 +72,13 @@ func (session *CacheSession) restoreFromBinary(
 		return
 	}
 	rename := renameFromGoRootMarker(shared.Goroot)
+	renamed := renameBinaryExportData(keys, standardLibrary.Table, held, rename)
 	var hitsLock sync.Mutex
 	restorings := slices.Collect(maps.Keys(held))
 	session.fanOut(len(restorings), func(index int) {
 		restoring := restorings[index]
-		entry := held[restoring]
-		restored, hit, restoreError := restoreBinaryEntry(session.known, restoring, entry, rename)
+		restored, hit, restoreError := restoreBinaryEntry(session.known, restoring, held[restoring],
+			renamed[restoring], rename)
 		if restoreError != nil {
 			return
 		}
@@ -88,22 +92,68 @@ func (session *CacheSession) restoreFromBinary(
 	})
 }
 
-// restoreBinaryEntry is one standard-library package's entry from the binary's table decoded whole, with every file
-// its Withheld and its export data name renamed by rename, and what the host keeps of it for its extra builds, or an
-// error, which is a miss, as is an entry of another package than restoring.
+// renamedExportData is a package's export data from the binary's table renamed (renameBinaryExportData), nil for
+// unsafe, which has none, or why it did not rename.
+type renamedExportData struct {
+	exportData  []byte
+	renameError error
+}
+
+// renameBinaryExportData is the export data of each of held, the packages restoreFromBinary restores from table,
+// renamed by rename. Each is read shallow against the table's entries of every package it imports, read first, among
+// every package keyed whose key the table holds an entry under, so a package held or not, as one Analyze was given,
+// still lends its types to the packages that import it. One that the table does not hold, or whose export data does
+// not read, is a rename error of every held package that reaches it.
+func renameBinaryExportData(
+	keys map[*packages.Package]cache.Key,
+	table *cache.StandardLibraryTable,
+	held map[*packages.Package]cache.StandardLibraryEntry,
+	rename func(string) (string, error),
+) map[*packages.Package]renamedExportData {
+	exportData := newStandardLibraryExportData()
+	for keyed, key := range keys {
+		entry, found := table.Lookup(key)
+		if !found {
+			continue
+		}
+		imports := make([]string, 0, len(keyed.Imports))
+		for _, imported := range keyed.Imports {
+			imports = append(imports, imported.PkgPath)
+		}
+		// Sorted, so a package whose two imports both fail to read names the same one each run.
+		slices.Sort(imports)
+		exportData.add(keyed.PkgPath, exportDataSource{imports: imports, exportData: entry.ExportData})
+	}
+	renamed := make(map[*packages.Package]renamedExportData, len(held))
+	for restoring, entry := range held {
+		if entry.ExportData == nil {
+			renamed[restoring] = renamedExportData{}
+			continue
+		}
+		read, readFileSet, readError := exportData.readPackage(restoring.PkgPath)
+		if readError != nil {
+			renamed[restoring] = renamedExportData{renameError: readError}
+			continue
+		}
+		written, renameError := renameExportDataFiles(read, readFileSet, rename)
+		renamed[restoring] = renamedExportData{exportData: written, renameError: renameError}
+	}
+	return renamed
+}
+
+// restoreBinaryEntry is one standard-library package's entry from the binary's table decoded whole, with its export
+// data as renameBinaryExportData renamed it and every file its Withheld names renamed by rename, and what the host
+// keeps of it for its extra builds, or an error, which is a miss, as is an entry of another package than restoring and
+// one whose export data did not rename.
 func restoreBinaryEntry(
 	known *cacheAnalyzers,
 	restoring *packages.Package,
 	entry cache.StandardLibraryEntry,
+	renamed renamedExportData,
 	rename func(string) (string, error),
 ) (*restoredPackage, binaryHit, error) {
-	var exportData []byte
-	if entry.ExportData != nil {
-		renamed, renameError := renameExportDataFiles(entry.ExportData, restoring.PkgPath, rename)
-		if renameError != nil {
-			return nil, binaryHit{}, renameError
-		}
-		exportData = renamed
+	if renamed.renameError != nil {
+		return nil, binaryHit{}, renamed.renameError
 	}
 	tableEntry, decodeError := decodeStandardLibraryEntry(entry.Entry)
 	if decodeError != nil {
@@ -114,10 +164,10 @@ func restoreBinaryEntry(
 			restoring.PkgPath)
 	}
 	readExportData := func() ([]byte, error) {
-		if exportData == nil {
+		if renamed.exportData == nil {
 			return nil, fmt.Errorf("the binary's table holds no export data for %s", restoring.ID)
 		}
-		return exportData, nil
+		return renamed.exportData, nil
 	}
 	restored, restoreError := restoredOf(known, restoring, cacheEntryOf(tableEntry), readExportData)
 	if restoreError != nil {
@@ -129,7 +179,7 @@ func restoreBinaryEntry(
 	}
 	restored.types.Withheld = withheld
 	tableEntry.Withheld = withheld
-	return restored, binaryHit{entry: tableEntry, exportData: exportData, reads: entry.Reads}, nil
+	return restored, binaryHit{entry: tableEntry, exportData: renamed.exportData, reads: entry.Reads}, nil
 }
 
 // keepBinaryHit is what the host's run keeps for its extra builds of kept, a package it restored from the binary's

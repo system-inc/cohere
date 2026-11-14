@@ -108,9 +108,11 @@ func TestAStandardLibraryTableThatDoesNotParseHoldsNothing(test *testing.T) {
 		"with a byte after its keys": gzipped(standardLibraryTableMagic + "\x00\x00\x00x"),
 		// One variant whose target says it is longer than the table.
 		"inside a variant": gzipped(standardLibraryTableMagic + "\x01\x7f"),
-		// The first format, which held no variants, and the second, which held no reads.
+		// The first format, which held no variants, the second, which held no reads, and the third, whose export data
+		// was deep.
 		"of the first format":  gzipped("cohere standard library table 1\n\x00\x00"),
 		"of the second format": gzipped("cohere standard library table 2\n\x00\x00\x00"),
+		"of the third format":  gzipped("cohere standard library table 3\n\x00\x00\x00"),
 	} {
 		table := NewStandardLibraryTable(contents)
 		if table.Empty() {

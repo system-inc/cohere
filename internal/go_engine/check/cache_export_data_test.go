@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"testing"
 
+	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
@@ -337,6 +338,58 @@ func TestAnEntryOfTheFormatBeforeRecordsIsAMiss(test *testing.T) {
 	if edited.result.Cache.Hit != 1 || edited.loaded.FilesParsed != 1 {
 		test.Fatalf("want user a miss checked from source and base a hit, got %d parsed and %+v",
 			edited.loaded.FilesParsed, edited.result.Cache)
+	}
+	if !reflect.DeepEqual(withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result)) {
+		test.Fatalf("edited\n%+v\ncold\n%+v", withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result))
+	}
+}
+
+// An entry of format 13, whose record names deep export data the store holds by its digest, as every entry did before
+// export data was shallow (#z4arggw), is a miss under a key of this format, never decoded: its package is checked from
+// source and its entry written again, with the cold run's result and no problem said, where a record read past its
+// format would restore user as a hit.
+func TestAnEntryOfTheFormatBeforeShallowExportDataIsAMiss(test *testing.T) {
+	test.Parallel()
+
+	root := loadedFixtures(test)
+	rules := []rule.Rule{houseRule(markedAnalyzer), houseRule(targetAnalyzer)}
+	caching := testCaching(test, rules)
+	cold := runWithSession(test, root, caching, rules)
+	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
+	entry, record, stored := storedEntryAt(caching.Store, userKey)
+	if !stored {
+		test.Fatal("the cold run wrote no entry of user")
+	}
+	user := sharedPackage(test, cold, "example.com/fixture/user")
+	var deep bytes.Buffer
+	if writeError := gcexportdata.Write(&deep, user.Fset, user.Types); writeError != nil {
+		test.Fatalf("writing user's deep export data: %v", writeError)
+	}
+	if putError := caching.Store.Put(exportDataKey(contentDigest(deep.Bytes())), deep.Bytes()); putError != nil {
+		test.Fatal(putError)
+	}
+	entry.Version = "go-engine-cache-13"
+	var body bytes.Buffer
+	if encodeError := gob.NewEncoder(&body).Encode(entry); encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	record.Version, record.Inline, record.Body = entry.Version, body.Bytes(), contentDigest(body.Bytes())
+	record.ExportData = contentDigest(deep.Bytes())
+	older, encodeError := encodeRecord(record)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if putError := caching.Store.Put(userKey, older); putError != nil {
+		test.Fatal(putError)
+	}
+
+	edited := runWithSession(test, root, caching, rules)
+	if edited.result.Cache.Hit != 1 || edited.loaded.FilesParsed != 1 {
+		test.Fatalf("want user a miss checked from source and base a hit, got %d parsed and %+v",
+			edited.loaded.FilesParsed, edited.result.Cache)
+	}
+	if len(edited.result.Cache.Problems) != 0 {
+		test.Fatalf("want no problem said, got %v", edited.result.Cache.Problems)
 	}
 	if !reflect.DeepEqual(withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result)) {
 		test.Fatalf("edited\n%+v\ncold\n%+v", withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result))

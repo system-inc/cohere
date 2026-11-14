@@ -1,7 +1,6 @@
 package check
 
 import (
-	"bytes"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -9,9 +8,8 @@ import (
 	"go/types"
 	"testing"
 
-	"golang.org/x/tools/go/gcexportdata"
-
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 )
 
 // The restored fixture's paths: hidden declares an unexported type with a Close method, and an unexported close, that
@@ -75,11 +73,12 @@ func checkedRestoredWorld(test *testing.T, answered bool) restoredWorld {
 	if userError != nil {
 		test.Fatal(userError)
 	}
-	var exportData bytes.Buffer
-	if writeError := gcexportdata.Write(&exportData, fileSet, hostHidden); writeError != nil {
+	exportData, writeError := export_data.Write(fileSet, hostHidden)
+	if writeError != nil {
 		test.Fatal(writeError)
 	}
-	exportHidden, readError := gcexportdata.Read(&exportData, token.NewFileSet(), map[string]*types.Package{},
+	// Hidden imports nothing, so it reads against no other package.
+	exportHidden, readError := export_data.Read(token.NewFileSet(), map[string]*types.Package{}, exportData,
 		restoredHiddenPath)
 	if readError != nil {
 		test.Fatal(readError)

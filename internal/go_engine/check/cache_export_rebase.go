@@ -1,15 +1,13 @@
 package check
 
 import (
-	"bytes"
 	"fmt"
 	"go/token"
 	"go/types"
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/tools/go/gcexportdata"
-
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
@@ -20,37 +18,31 @@ import (
 // release machine's separator, so entries made on one platform read on another.
 const goRootMarker = "$GOROOT"
 
-// renameExportDataFiles is exportData, as gcexportdata.Write wrote the package at packagePath, written again with
-// every file it names renamed by rename: the package's own and those of the dependencies whose declarations deep
-// export data carries. gcexportdata.Read has no hook for a file's name, so it reads into a private file set, which
-// is copied file by file in base order under the new names, each with the base, size and lines it had, so every
-// token.Pos the read package holds lands on the same line of the renamed file, and the package is written again
-// from the copy. The importer gives every file it meets maxlines of one byte each and keeps no column, so a
-// position read back is the file and line written, at column 1, from the original bytes as from these. A rename
-// that refuses a file, export data that does not read, or a package that does not write is an error.
+// renameExportDataFiles is the export data of read, a package read from shallow export data into readFileSet, which
+// holds its files and no other package's, written again with every file it names renamed by rename. A shallow read
+// needs every package the data reaches, which a table's export data has only among the table's other packages, so
+// the caller reads it from those first (StandardLibraryExportData) and hands over what it read. The file set is copied
+// file by file in base order under the new names, each with the base, size and lines it had, so every token.Pos the
+// read package holds lands on the same line and column of the renamed file, and the package is written again from
+// the copy. Shallow export data names only the package's own files, since it carries no declaration of another
+// package. A rename that refuses a file, or a package that does not write, is an error.
 func renameExportDataFiles(
-	exportData []byte,
-	packagePath string,
+	read *types.Package,
+	readFileSet *token.FileSet,
 	rename func(string) (string, error),
 ) (renamed []byte, renameError error) {
-	readFileSet := token.NewFileSet()
-	read, readError := gcexportdata.Read(bytes.NewReader(exportData), readFileSet, map[string]*types.Package{},
-		packagePath)
-	if readError != nil {
-		return nil, fmt.Errorf("reading the export data of %s to rename its files: %w", packagePath, readError)
-	}
 	renamedFileSet := token.NewFileSet()
 	readFileSet.Iterate(func(file *token.File) bool {
 		name, nameError := rename(file.Name())
 		if nameError != nil {
-			renameError = fmt.Errorf("renaming a file of the export data of %s: %w", packagePath, nameError)
+			renameError = fmt.Errorf("renaming a file of the export data of %s: %w", read.Path(), nameError)
 			return false
 		}
 		// The bases go in increasing order, each past the end of the file before it, as AddFile asks.
 		copied := renamedFileSet.AddFile(name, file.Base(), file.Size())
 		if !copied.SetLines(file.Lines()) {
 			renameError = fmt.Errorf("renaming %s in the export data of %s: its lines do not copy", file.Name(),
-				packagePath)
+				read.Path())
 			return false
 		}
 		return true
@@ -63,14 +55,15 @@ func renameExportDataFiles(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			renamed = nil
-			renameError = fmt.Errorf("writing the export data of %s with its files renamed: %v", packagePath, recovered)
+			renameError = fmt.Errorf("writing the export data of %s with its files renamed: %v", read.Path(),
+				recovered)
 		}
 	}()
-	var written bytes.Buffer
-	if writeError := gcexportdata.Write(&written, renamedFileSet, read); writeError != nil {
-		return nil, fmt.Errorf("writing the export data of %s with its files renamed: %w", packagePath, writeError)
+	written, writeError := export_data.Write(renamedFileSet, read)
+	if writeError != nil {
+		return nil, fmt.Errorf("writing the export data of %s with its files renamed: %w", read.Path(), writeError)
 	}
-	return written.Bytes(), nil
+	return written, nil
 }
 
 // renameWithheldFiles is withheld with every file it names renamed by rename: each withheld error's file, and the

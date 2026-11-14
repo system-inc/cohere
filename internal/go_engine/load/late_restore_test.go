@@ -1,7 +1,6 @@
 package load
 
 import (
-	"bytes"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -9,8 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/export_data"
 )
 
 // lateRestoreFiles are a module whose package user imports base and returns base's Handle, and top, which imports
@@ -50,11 +50,11 @@ func otherBuildsUserExportData(test *testing.T) []byte {
 	if userError != nil {
 		test.Fatal(userError)
 	}
-	var written bytes.Buffer
-	if writeError := gcexportdata.Write(&written, fileSet, user); writeError != nil {
+	written, writeError := export_data.Write(fileSet, user)
+	if writeError != nil {
 		test.Fatal(writeError)
 	}
-	return written.Bytes()
+	return written
 }
 
 // lateRestorer restores user alone, decided late by holds, from exportData, and counts the declines.
