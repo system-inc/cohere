@@ -189,13 +189,14 @@ func (lister *inProcessLister) list(patterns []string) (*listing, string) {
 			return nil, doubt
 		}
 		direct := lister.directModules(reached)
-		var group sync.WaitGroup
-		for _, current := range pass.ordered {
-			group.Go(func() {
-				measureListing(lister.timing, func() { current.listed.Deps = lister.deps(current) })
-			})
-		}
-		group.Wait()
+		// Each package's Deps is made from what it walks to and their Deps, which its place in the order puts first,
+		// or an earlier pass did (#zcc03r6).
+		measureListing(lister.timing, func() {
+			var merging dependencyMerge
+			for _, current := range pass.ordered {
+				current.listed.Deps = merging.deps(current, lister.byPath)
+			}
+		})
 		for _, current := range pass.ordered {
 			current.listed.DepOnly = !slices.Contains(pass.starts, current.listed.ImportPath)
 			if module := current.listed.Module; module != nil {
@@ -899,25 +900,6 @@ func (lister *inProcessLister) directModules(reached []*inProcessPackage) map[st
 		}
 	}
 	return direct
-}
-
-// deps is every package current reaches, by import path, sorted, as go list's Deps.
-func (lister *inProcessLister) deps(current *inProcessPackage) []string {
-	seen := map[string]bool{}
-	queue := slices.Clone(current.walked)
-	for len(queue) > 0 {
-		importPath := queue[0]
-		queue = queue[1:]
-		if seen[importPath] {
-			continue
-		}
-		seen[importPath] = true
-		queue = append(queue, lister.byPath[importPath].walked...)
-	}
-	if len(seen) == 0 {
-		return nil
-	}
-	return sortedKeys(seen)
 }
 
 // doubt records why the listing cannot be answered here.
