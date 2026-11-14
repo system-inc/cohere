@@ -86,12 +86,16 @@ type useContext struct {
 }
 
 // useWalk is one package's walk of its syntax for its kinds of use: the package, its type information, what it has
-// collected, and the context each expression's parent set before the walk reached it.
+// collected, and the context each expression's parent set before the walk reached it. A context is read once, when the
+// walk reaches its expression (apply), and let go there, so contexts holds only those set and not yet reached, rather
+// than one for every expression of the package: kept, it was 1.74 GB of a cold run's allocation at cohere's root
+// (#954dadc). keepsContexts keeps every one, for a test that the walk reads alike without letting them go.
 type useWalk struct {
-	own       *types.Package
-	info      *types.Info
-	collected *typeReads
-	contexts  map[ast.Expr]useContext
+	own           *types.Package
+	info          *types.Info
+	collected     *typeReads
+	contexts      map[ast.Expr]useContext
+	keepsContexts bool
 
 	// emptyInterface is the universe's any, the destination of a value handed to panic.
 	emptyInterface types.Type
@@ -109,9 +113,22 @@ type useWalk struct {
 //
 // Mutates: collected gains each use
 func walkUses(collected *typeReads, own *types.Package, info *types.Info, files []*ast.File) {
+	walkUsesKeeping(collected, own, info, files, false)
+}
+
+// walkUsesKeeping is walkUses, keeping every context it set when keepsContexts is set (useWalk), and returns the walk.
+//
+// Mutates: collected gains each use
+func walkUsesKeeping(
+	collected *typeReads,
+	own *types.Package,
+	info *types.Info,
+	files []*ast.File,
+	keepsContexts bool,
+) *useWalk {
 	walk := &useWalk{own: own, info: info, collected: collected, contexts: map[ast.Expr]useContext{},
-		emptyInterface: types.Universe.Lookup("any").Type(), seen: map[*types.Named]bool{},
-		wholeOperands: map[*ast.SelectorExpr]bool{}}
+		keepsContexts: keepsContexts, emptyInterface: types.Universe.Lookup("any").Type(),
+		seen: map[*types.Named]bool{}, wholeOperands: map[*ast.SelectorExpr]bool{}}
 	for _, file := range files {
 		for _, declaration := range file.Decls {
 			var results *types.Tuple
@@ -126,6 +143,7 @@ func walkUses(collected *typeReads, own *types.Package, info *types.Info, files 
 	for identifier, instance := range info.Instances {
 		walk.instance(identifier, instance)
 	}
+	return walk
 }
 
 // inspect walks root, a declaration or a function literal, whose return statements return results, each function
@@ -625,11 +643,16 @@ func (walk *useWalk) placeSwitch(statement *ast.SwitchStmt) {
 
 // apply records the uses expression's type gets where it sits.
 func (walk *useWalk) apply(expression ast.Expr) {
+	// The walk reaches each expression once, after its parent set its context (place), so it is let go here, before
+	// anything returns.
+	context := walk.contexts[expression]
+	if !walk.keepsContexts {
+		delete(walk.contexts, expression)
+	}
 	typeAndValue, recorded := walk.info.Types[expression]
 	if !recorded || typeAndValue.Type == nil {
 		return
 	}
-	context := walk.contexts[expression]
 	if typeAndValue.IsType() {
 		walk.typeExpression(typeAndValue.Type, context)
 		return
