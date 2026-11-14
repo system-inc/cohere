@@ -20,11 +20,19 @@ import (
 // A run with them on looks up the record of every package its host's load keyed, hit or miss, beside the entries in
 // one fan-out, and hands each one found to the host's graph in place of the package's syntax (DependenceRecord). A hit
 // by its first key with no record is made a miss once, so its record is written from its syntax (backfill); its
-// importers' hits stand, since their keys did not move. A hit by an alias, a second key's, finds no record under the
-// first key that ran, and stays without one, counted, since a record under the alias's target was made against other
-// dependencies (engine's ruling on #6a3kjvz, until piece 4 proves it). Only the host writes a record, after its
-// entry's write held, with no slot of the run's pool held, and a failed write is counted with the entries' failed
-// writes.
+// importers' hits stand, since their keys did not move. A hit by an alias, a second key's, has no record under the
+// first key that ran: it reads the record beside the entry the alias leads to, its target's (engine's ruling 1 on
+// #6a3kjvz, piece 4). That record was made against other dependencies, and it is the package's as this run would
+// build it for two reasons, and no broader one. A record names each object of another package it reads, so this run
+// judges the object fresh, by the unit that declares it now, whatever the dependency changed. What a record keeps of
+// another package's types is the bits a read reached walking through one of its unnamed types, a struct with no name
+// of its own, and the second key holds the output of everything below the package, whose export rendering writes
+// each such type whole (writtenType, through types.TypeString, unexported fields and their types included), so a
+// change there moves the second key and no alias leads to the old record. The alias-records fixture pins that line
+// (TestAnUnexportedFieldsTypeIsNeverReadStaleThroughAnAlias): a rendering that leaves out an unexported field of an
+// unnamed struct reads a stale record, and its graph differs from a cold run's. A hit by an alias with no record
+// beside its target stays without one, counted. Only the host writes a record, after its entry's write held, with no
+// slot of the run's pool held, and a failed write is counted with the entries' failed writes.
 
 // DependenceRecordVersion is the format of a dependence record as the store keeps it, hashed into every record's key
 // (DependenceRecordKey), so a record of another format is never read: it changes whenever the record's encoding does.
@@ -39,9 +47,11 @@ func DependenceRecordKey(key cache.Key) cache.Key {
 
 // DependenceRecordCounts are what the session did with dependence records over its last load: the records read, each
 // found under its package's key; written, after their entries; backfilled, the first-key hits with no record made a
-// miss so their records are written; alias skipped, the hits by an alias that hold, once holdAliasHits has dropped
-// those that do not, which stay without one; and the records that did not decode, each a problem, whose packages are
-// checked from source so their records are written again, a hit among them counted backfilled too.
+// miss so their records are written; alias read, the hits by an alias that hold, once holdAliasHits has dropped those
+// that do not, which found the record beside their alias's target; alias skipped, those that found none there, which
+// stay without one; and the records that did not decode, each a problem, whose packages are checked from source so
+// their records are written again, a hit by its first key among them counted backfilled too, and one by an alias
+// alias skipped, since it stays restored.
 //
 // DroppedAfterBackfill counts the hits dropShortHits made misses in a load that backfilled any, which asks the facts
 // of everything below a backfilled package: a backfill that cascaded would show here.
@@ -56,6 +66,7 @@ type DependenceRecordCounts struct {
 	AliasSkipped         int
 	Unreadable           int
 	DroppedAfterBackfill int
+	AliasRead            int
 
 	StandardLibraryRead       int
 	StandardLibraryWritten    int
@@ -64,13 +75,14 @@ type DependenceRecordCounts struct {
 
 // dependenceRecords is a session's dependence records over its last load: decode, the host graph's decoding of a
 // record's bytes; found, each record the store holds of a package the load keyed that decodes, by package, decoded;
-// recordOf, the host graph's record of a package its syntax built, for the write, nil until the graph is built; and
-// the counts.
+// throughAlias, the packages of found whose record is their alias target's; recordOf, the host graph's record of a
+// package its syntax built, for the write, nil until the graph is built; and the counts.
 type dependenceRecords struct {
-	decode   func(encoded []byte) (*build_dependence.Record, error)
-	found    map[*packages.Package]*build_dependence.Record
-	recordOf func(*packages.Package) ([]byte, bool)
-	counts   DependenceRecordCounts
+	decode       func(encoded []byte) (*build_dependence.Record, error)
+	found        map[*packages.Package]*build_dependence.Record
+	throughAlias map[*packages.Package]bool
+	recordOf     func(*packages.Package) ([]byte, bool)
+	counts       DependenceRecordCounts
 
 	// standardLibrary are the records the store holds of the standard-library packages the load restored from the
 	// binary's table, decoded (readStandardLibraryRecords).
@@ -97,9 +109,10 @@ func (session *CacheSession) DependenceRecordsFrom(recordOf func(*packages.Packa
 }
 
 // DependenceRecord is the record the store holds of keyed, a package of the last load, decoded, and whether it holds
-// one that decodes.
+// one that decodes. A record beside an alias's target is keyed's only while keyed is still restored through that
+// alias: a hit the run made a miss after (dropShortHits) is checked from source, and its graph built from its syntax.
 func (session *CacheSession) DependenceRecord(keyed *packages.Package) (*build_dependence.Record, bool) {
-	if session.dependence == nil {
+	if session.dependence == nil || session.dependence.throughAlias[keyed] && !session.restored(keyed) {
 		return nil, false
 	}
 	record, isFound := session.dependence.found[keyed]
@@ -108,7 +121,8 @@ func (session *CacheSession) DependenceRecord(keyed *packages.Package) (*build_d
 
 // readDependenceRecords looks up the record of every package among reachable the session keyed, hit or miss, and
 // decodes each, as many at once as readHits reads entries, then makes a miss of each hit by its first key that has
-// none (backfill) and counts each hit by an alias that has none. A record that does not decode is a problem, said,
+// none (backfill) and counts each hit by an alias that has none. A hit by an alias looks up its record beside the
+// entry the alias leads to (recordKeyOf). A record that does not decode is a problem, said,
 // and its package has none: a hit by its first key is backfilled, so its record is written again over the one that
 // did not decode, and a miss's is written from its syntax. A hit from the binary's table is never the store's to
 // backfill.
@@ -118,6 +132,7 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 		return
 	}
 	records.found = map[*packages.Package]*build_dependence.Record{}
+	records.throughAlias = map[*packages.Package]bool{}
 	records.counts = DependenceRecordCounts{}
 	var keyed []*packages.Package
 	for _, each := range reachable {
@@ -128,15 +143,21 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	read := make([]*build_dependence.Record, len(keyed))
 	unreadable := make([]error, len(keyed))
 	session.fanOut(len(keyed), func(index int) {
-		if record, isStored := session.caching.Store.Get(DependenceRecordKey(session.keys[keyed[index]])); isStored {
+		recordKey, _ := session.recordKeyOf(keyed[index])
+		if record, isStored := session.caching.Store.Get(DependenceRecordKey(recordKey)); isStored {
 			read[index], unreadable[index] = records.decode(record)
 		}
 	})
 	for index, each := range keyed {
+		_, isAliased := session.recordKeyOf(each)
 		switch {
 		case unreadable[index] != nil:
 			records.counts.Unreadable++
 			session.problem(fmt.Sprintf("reading the dependence record of %s: %v", each.ID, unreadable[index]))
+		case read[index] != nil && isAliased:
+			records.found[each] = read[index]
+			records.throughAlias[each] = true
+			records.counts.AliasRead++
 		case read[index] != nil:
 			records.found[each] = read[index]
 			records.counts.Read++
@@ -159,6 +180,18 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	session.readStandardLibraryRecords(reachable)
 }
 
+// recordKeyOf is the key keyed's record is kept beside, and whether it is an alias's target: a hit by an alias that
+// holdAliasHits kept, whose entry is under the key the alias leads to (session.stored), finds its record beside that
+// entry, and every other package beside its own first key. A hit from the binary's table has no record in the store
+// under either.
+func (session *CacheSession) recordKeyOf(keyed *packages.Package) (cache.Key, bool) {
+	stored, isStored := session.stored[keyed]
+	if session.restored(keyed) && isStored && !session.fromBinary[keyed] && stored != session.keys[keyed] {
+		return stored, true
+	}
+	return session.keys[keyed], false
+}
+
 // dependenceRecordToWrite is the record to write beside saved's entry, and whether there is one: the host graph's,
 // when the session keeps records, the graph holds one of saved and the store does not hold it already.
 func (session *CacheSession) dependenceRecordToWrite(saved *packages.Package) ([]byte, bool) {
@@ -166,7 +199,8 @@ func (session *CacheSession) dependenceRecordToWrite(saved *packages.Package) ([
 	if records == nil || records.recordOf == nil {
 		return nil, false
 	}
-	if _, isFound := records.found[saved]; isFound {
+	// A package whose record was its alias target's is written its own once it is checked from source.
+	if _, isFound := records.found[saved]; isFound && !records.throughAlias[saved] {
 		return nil, false
 	}
 	return records.recordOf(saved)

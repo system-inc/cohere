@@ -354,10 +354,12 @@ type LintCache struct {
 // beside each package's entry under `--build-dependence` (#6a3kjvz): read, the records found under their packages'
 // keys, each added to the host's graph in place of the package's syntax; written, those written beside their
 // entries; backfilled, the hits by their first key with no record, made a miss once so their records are written;
-// aliasSkipped, the hits by a second key's alias that hold, which go without a record; and unreadable, the records
-// that did not decode, each a problem, whose packages are checked from source so their records are written again, a
-// hit among them counted in backfilled too; and droppedAfterBackfill, the hits made misses in a load that backfilled
-// any, since a backfilled package asks the facts of everything below it, written only when not 0.
+// aliasSkipped, the hits by a second key's alias that hold with no record beside the alias's target, which go without
+// one; and unreadable, the records that did not decode, each a problem, whose packages are checked from source so
+// their records are written again, a hit by its first key among them counted in backfilled too, one by an alias in
+// aliasSkipped; and droppedAfterBackfill, the hits made misses in a load that backfilled any, since a backfilled
+// package asks the facts of everything below it, written only when not 0. aliasRead, additive (#6a3kjvz piece 4),
+// counts the hits by an alias that hold whose record is the one beside the alias's target, written only when not 0.
 // The standard library's, additive (#6a3kjvz piece 3), count the records of the packages the host restored from the
 // binary's table, which the store keeps apart: standardLibraryRead and standardLibraryUnreadable over the load, and
 // standardLibraryWritten once the side load has ended, a write that failed counted in the cache's writeFailed. Each is
@@ -370,6 +372,7 @@ type DependenceRecords struct {
 	Unreadable   int `json:"unreadable"`
 
 	DroppedAfterBackfill int `json:"droppedAfterBackfill,omitempty"`
+	AliasRead            int `json:"aliasRead,omitempty"`
 
 	StandardLibraryRead       int `json:"standardLibraryRead,omitempty"`
 	StandardLibraryWritten    int `json:"standardLibraryWritten,omitempty"`
