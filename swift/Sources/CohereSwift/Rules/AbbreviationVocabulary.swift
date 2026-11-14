@@ -91,6 +91,24 @@ public struct AbbreviationVocabulary: Sendable {
     }
 
     /*
+     The compiled-in words a folder's or a file's name spells out and an identifier need not, cohere's
+     `policy/NameWords.json` in the shared vocabulary's shape (#zyq63kk): `docs` as documentation. Only the file-name
+     rule reads them, after the shared vocabulary, as Go's `file_name_words.Abbreviated` does. No keyword term speaks
+     for their words, since a keyword is an identifier's.
+     */
+    public static func nameWordsCompiledIn() throws -> AbbreviationVocabulary {
+        do {
+            return try load(data: Data(PolicyNameWords.file.utf8))
+        }
+        catch let failure as LoadFailure {
+            throw failure
+        }
+        catch {
+            throw LoadFailure(description: "it is not valid JSON (\((error as NSError).localizedDescription))")
+        }
+    }
+
+    /*
      Parsed by hand from JSON objects rather than decoded, because an unknown key must be refused, as Go's
      `DisallowUnknownFields` refuses it: a misspelled form would otherwise be an entry that silently never
      matches. A keyword term is refused where no entry's segment form gives advice for its word, as Go refuses

@@ -58,6 +58,30 @@ func TestEverySetCohereCarriesLoads(test *testing.T) {
 	}
 }
 
+// Discovery's folder check is off in every set cohere carries, with its reason, until its census turns it on
+// (#zyq63kk): every set but cohere:adamic reaches cohere:style, which turns it off, and cohere:adamic never names it.
+func TestTheFolderCheckIsOffInEverySetUntilItsCensus(test *testing.T) {
+	test.Parallel()
+	for _, name := range SetNames() {
+		directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "` + name + `"}`})
+		loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
+		setting, configured := loaded.Rules[AbbreviatedFolderName]
+		if name == SetPrefix+"adamic" {
+			if configured {
+				test.Errorf("%s configures the folder check, which only cohere:style rules on", name)
+			}
+			continue
+		}
+		if !configured || setting.Severity != SeverityOff {
+			test.Errorf("%s gives the folder check %+v (configured %t), want off", name, setting, configured)
+		}
+		if reason, found := loaded.OffReasonFor(AbbreviatedFolderName); !found ||
+			reason.Reason != "Off until its census turns it on (#zyq63kk)." {
+			test.Errorf("%s turns the folder check off for %+v (found %t)", name, reason, found)
+		}
+	}
+}
+
 // cohere:style and the cohere:system-inc/ tiers each resolve to their own set (#qnjvzh3). The lookup
 // is exact after the cohere: prefix, so no set name reaches another that it begins like.
 func TestCohereStyleAndTheSystemIncTiersResolveToThemselves(test *testing.T) {

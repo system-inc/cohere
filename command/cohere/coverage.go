@@ -534,7 +534,7 @@ func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuratio
 	}
 	missing := []string{}
 	for name, setting := range lintConfiguration.Rules {
-		if name == configuration.UnusedDisable || setting.Severity == configuration.SeverityOff {
+		if configuration.IsEngineCheck(name) || setting.Severity == configuration.SeverityOff {
 			continue
 		}
 		if !implementsConfiguredRule(name, implemented) {
@@ -549,7 +549,7 @@ func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuratio
 func wantedConfiguredRules(lintConfiguration *configuration.Configuration) int {
 	wanted := 0
 	for name, setting := range lintConfiguration.Rules {
-		if name != configuration.UnusedDisable && setting.Severity != configuration.SeverityOff {
+		if !configuration.IsEngineCheck(name) && setting.Severity != configuration.SeverityOff {
 			wanted++
 		}
 	}

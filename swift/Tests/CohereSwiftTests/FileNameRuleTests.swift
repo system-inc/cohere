@@ -35,9 +35,11 @@ struct FileNameRuleTests {
 
     static func abbreviationFindings(_ path: String) throws -> [String] {
         described(
-            ConsistencyNoAbbreviatedFileName(vocabulary: try AbbreviationVocabulary.compiledIn()).findings(
-                in: file(path)
+            ConsistencyNoAbbreviatedFileName(
+                vocabulary: try AbbreviationVocabulary.compiledIn(),
+                nameWords: try AbbreviationVocabulary.nameWordsCompiledIn(),
             )
+            .findings(in: file(path))
         )
     }
 
@@ -115,6 +117,12 @@ struct FileNameRuleTests {
             "abbreviatedFileName File name \"PosLabel.swift\" abbreviates \"pos\". Spell it out as \"position\" or "
                 + "\"positive\", whichever it means.",
         ),
+        /* A word of `policy/NameWords.json`, judged in a name on a path and never in an identifier (#zyq63kk). */
+        (
+            "/project/Sources/Fixture/DocsReader.swift",
+            "abbreviatedFileName File name \"DocsReader.swift\" abbreviates \"docs\". Spell it out as "
+                + "\"documentation\".",
+        ),
         (
             "/project/Sources/Fixture/Fn.swift",
             "abbreviatedFileNameAdvice File name \"Fn.swift\" abbreviates \"fn\". Use \"callback\", \"handler\", "
@@ -130,6 +138,10 @@ struct FileNameRuleTests {
         "/project/Sources/Fixture/Configuration.swift",
         /* An initialism in capitals, here Switzerland's code, is no abbreviation of the vocabulary's. */
         "/project/Sources/Fixture/FlagCH.swift",
+        /* Google Docs, the product, is an allowed segment of the name words, and `doc` is no entry (#zyq63kk). */
+        "/project/Sources/Fixture/GoogleDocsClient.swift",
+        "/project/Sources/Fixture/DocPrinter.swift",
+        "/project/Sources/Fixture/Documentation.swift",
         "/project/Package.swift",
         "/project/Package@swift-6.0.swift",
         "/project/Sources/Fixture/main.swift",

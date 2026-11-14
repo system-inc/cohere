@@ -35,6 +35,7 @@ struct RulesJsonTests {
     static func declaredRows() -> [Row] {
         let fileRows = RuleRegistry.fileRules(
             vocabulary: AbbreviationVocabulary(),
+            nameWords: AbbreviationVocabulary(),
             shoutingVocabulary: ShoutingVocabulary(),
             brandVocabulary: BrandVocabulary(),
             words: WordList(),

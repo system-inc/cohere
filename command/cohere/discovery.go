@@ -148,6 +148,12 @@ type discovery struct {
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
 	// enumeration from rather than listing the same directories again (#bjv0tg4).
 	Listings *program.DirectoryListings
+
+	// Folders are the outermost folders the walk entered whose names abbreviate a word the house spells out, sorted
+	// by path (see folder_names.go), judged on every walk and kept only where the root's settings turn the check on,
+	// at FolderSeverity, which is off otherwise.
+	Folders        []folderFinding
+	FolderSeverity configuration.Severity
 }
 
 // unusedModule is a Go module that runs on its own though a workspace sits above it, which a reader who
@@ -267,6 +273,8 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	// xcodeCandidates are the directories that could be an Xcode project's root, relative to root. The claim
 	// after the walk decides which are projects.
 	xcodeCandidates := map[string]bool{}
+	// folders are every entered directory whose name the folder check reports, outermost or not.
+	var folders []folderFinding
 	fail := func(sourceError error) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -317,7 +325,8 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			}
 		}
 		// After the check above, since a repository of its own is counted where its parent lists it and its
-		// entries are never this walk's to consider.
+		// entries are never this walk's to consider, its name among them.
+		folder, offending := judgeFolder(relative, ignoreTally.TakesWhole)
 		directoryTally := ignoreTally.Fresh()
 		directoryDefaults := map[string]int{}
 		for _, entry := range entries {
@@ -366,6 +375,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		}
 		if formattableCount > 0 {
 			found.Formattable[relative] = formattableCount
+		}
+		if offending {
+			folders = append(folders, folder)
 		}
 		// A go.work found here makes the directory's go.mod part of its project rather than one of its own.
 		workspaceHere := false
@@ -438,6 +450,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return discovery{}, countNamedPathsError
 	}
 	found.IgnoreMatched = ignoreTally.Matched
+	found.Folders = outermostFolders(folders)
 	xcodeProjects, anyUnclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
 	found.Projects = append(found.Projects, xcodeProjects...)
 	// No Swift project is at the root, or it would have claimed every file, so the scripts-only root is the only

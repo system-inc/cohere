@@ -14,7 +14,8 @@ import (
 // failing here would fail every project that extends it, on every run.
 //
 // The keys are judged here as well as by the load, through KeyReachesRule, the resolver's own test, so the
-// guard does not rest on the refusal it guards: a load that let an unknown key through would still fail here.
+// guard does not rest on the refusal it guards: a load that let an unknown key through would still fail here. An
+// engine check's key, `unused-disable` or discovery's folder check, configures the engine rather than a rule.
 //
 // Here rather than beside the sets, because it needs the whole rule set, and the configuration package's test
 // binary does not link it (see BenchmarkLoadForTheLiveConfiguration).
@@ -61,7 +62,7 @@ func TestEveryKeyInEverySetReachesARegisteredRule(test *testing.T) {
 			}
 		}
 		for _, key := range keys {
-			if key == configuration.UnusedDisable || reachesARegisteredRule(key, names) {
+			if configuration.IsEngineCheck(key) || reachesARegisteredRule(key, names) {
 				continue
 			}
 			test.Errorf("%s names %q, which reaches no registered rule", setName, key)

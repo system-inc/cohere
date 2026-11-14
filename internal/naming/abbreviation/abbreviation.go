@@ -170,14 +170,23 @@ var millisecondSegmentPattern = regexp.MustCompile(`([a-z])Ms($|[A-Z])`)
 
 // Policy is policy's file, read once. An invalid file panics at startup, which is the loud failure: a vocabulary
 // read wrongly would make every engine quietly judge less than it appears to.
-var Policy = mustLoad(policy.AbbreviationsFile(), policy.KeywordTerms.KeywordTerms)
+var Policy = mustLoad(
+	"policy/Abbreviations.json with policy/KeywordTerms.json",
+	policy.AbbreviationsFile(),
+	policy.KeywordTerms.KeywordTerms,
+)
 
-func mustLoad(data []byte, keywordTerms []policy.KeywordTerm) *Vocabulary {
+// NameWords is policy/NameWords.json, read once with the same loader: the words a folder's or a file's name spells
+// out and an identifier need not (#zyq63kk). Only a name on a path reads it, through internal/file_name_words, and
+// no keyword term speaks for its words, since a keyword is an identifier's.
+var NameWords = mustLoad("policy/NameWords.json", policy.NameWordsFile(), nil)
+
+func mustLoad(name string, data []byte, keywordTerms []policy.KeywordTerm) *Vocabulary {
 	loaded, loadError := Load(data, keywordTerms)
 	if loadError != nil {
 		// Invariant: the files are embedded and their tests load them, so a refusal here is a broken build, not a
 		// state any run can recover from.
-		panic(fmt.Sprintf("policy/Abbreviations.json with policy/KeywordTerms.json: %v", loadError))
+		panic(fmt.Sprintf("%s: %v", name, loadError))
 	}
 	return loaded
 }

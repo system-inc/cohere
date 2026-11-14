@@ -383,6 +383,10 @@ type overallFacts struct {
 	// EngineBuilds are the engines this run built before its projects ran, as a coverage query does: their
 	// time is in Total, and said apart from it.
 	EngineBuilds []engineBuild
+	// FolderFindings is the folders discovery's folder check reported, and FolderWarnings how many of them are
+	// warnings, which never fail the run (see folder_names.go).
+	FolderFindings int
+	FolderWarnings int
 }
 
 // overallFooter renders the verdict line for a repository with several projects:
@@ -405,7 +409,8 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 
 	verdict := "✓ 💎 "
-	if len(facts.Failed) > 0 || facts.Unfinished > 0 || facts.UnusedIgnores > 0 {
+	if len(facts.Failed) > 0 || facts.Unfinished > 0 || facts.UnusedIgnores > 0 ||
+		facts.FolderFindings > facts.FolderWarnings {
 		verdict = "✗ ☠️ "
 	}
 	line := style.bold(verdict+footerSeconds(facts.Total)) + " • " + counted(total, "project", "projects")
@@ -414,6 +419,9 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 	if facts.UnusedIgnores > 0 {
 		line += " • " + style.red(counted(facts.UnusedIgnores, "unused ignore pattern", "unused ignore patterns"))
+	}
+	if facts.FolderFindings > 0 {
+		line += " • " + style.red(counted(facts.FolderFindings, "folder finding", "folder findings"))
 	}
 	if len(facts.Failed) > 0 {
 		line += " → " + style.red("☠️ "+strings.Join(facts.Failed, ", "))

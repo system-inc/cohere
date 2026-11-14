@@ -1,6 +1,8 @@
 // Package file_name_words is what a file's name says in words, and the two judgments of those words every engine
 // shares, in one place (#2xt6v5r): a file name holds no `util` or `utils`, as a folder's name holds neither, and its
-// words abbreviate nothing policy/Abbreviations.json names, as an identifier's do not.
+// words abbreviate nothing policy/Abbreviations.json names, as an identifier's do not, nor anything
+// policy/NameWords.json names, the words a name on a path spells out and an identifier need not (#zyq63kk). A
+// folder's name is judged by NameWords alone (FolderAbbreviated), by the folder check in discovery.
 //
 // The TypeScript rules nexus/consistency-no-utils-file-name and nexus/consistency-no-abbreviated-file-name and the Go
 // engine's rules of the same names read it, so which parts of a name are words, and what each judgment makes of them,
@@ -302,15 +304,52 @@ func isInitialism(word string) bool {
 }
 
 // Abbreviated is what policy/Abbreviations.json says of a file name's words, read as one identifier (Identifier), and
-// false when it says nothing. A run of words that spells a registered rule's name is the rule's, so only the words
-// around it are judged (withoutRuleName). The finding's entry names the word and how to spell it out; its message and
-// values are the identifier rule's, and a file-name rule renders its own from the entry (Advice).
+// failing that what policy/NameWords.json says, and false when neither says anything. A run of words that spells a
+// registered rule's name is the rule's, so only the words around it are judged (withoutRuleName). The finding's entry
+// names the word and how to spell it out; its message and values are the identifier rule's, and a file-name rule
+// renders its own from the entry (Advice).
+//
+// The shared vocabulary is asked first, since a word there is every name's, and NameWords holds none of its words.
+// Each list's allowed segments pass only its own words: `googleDocsApi` holds Google Docs and passes `docs`, and a
+// `Cfg` beside the brand is still the shared vocabulary's to report.
 func Abbreviated(words []string, ruleNames RuleNames) (abbreviation.Finding, bool) {
 	ownWords := ruleNames.withoutRuleName(words)
 	if len(ownWords) == 0 {
 		return abbreviation.Finding{}, false
 	}
-	return abbreviation.Policy.Find(Identifier(ownWords))
+	identifier := Identifier(ownWords)
+	if finding, found := abbreviation.Policy.Find(identifier); found {
+		return finding, true
+	}
+	return abbreviation.NameWords.Find(identifier)
+}
+
+// FolderAbbreviated is what policy/NameWords.json says of a folder's name, the folder alone without its path, and
+// false when it says nothing: its words cut as a file stem's are (wordsOf), every one of them, since a folder has no
+// extension or role marker, with a registered rule's name set aside, and read as one identifier. `docs` and
+// `api-docs` are judged, and `documentation` and `doc` pass.
+//
+// NameWords alone, never the shared vocabulary (#zyq63kk, @system_cohere's ruling): a folder's name is often plain
+// human words where policy/Abbreviations.json reads a code meaning, and its census read ahra's `op-art-*` (Op art,
+// the movement) and `*-environment-and-prop` (a stage prop) as `op` and `prop`, all false. A word judges folders only
+// by joining NameWords on its own census, so `src` waits for one.
+//
+// A brand is read across the folder and its parent: when the parent's words and the folder's, read as one
+// identifier, hold one of NameWords' allowed segments, the folder is named for the brand and passes, so google/docs
+// is Google Docs and a docs/ anywhere else is not. parent is the folder's parent's name, empty at the project's root.
+func FolderAbbreviated(parent string, folder string, ruleNames RuleNames) (abbreviation.Finding, bool) {
+	words := ruleNames.withoutRuleName(wordsOf(folder))
+	if len(words) == 0 {
+		return abbreviation.Finding{}, false
+	}
+	finding, found := abbreviation.NameWords.Find(Identifier(words))
+	if !found || parent == "" {
+		return finding, found
+	}
+	if abbreviation.NameWords.ContainsAllowedSegment(Identifier(append(wordsOf(parent), words...))) {
+		return abbreviation.Finding{}, false
+	}
+	return finding, true
 }
 
 // The ids of the two messages a file-name abbreviation finding carries, in
@@ -334,18 +373,48 @@ func Advice(fileName string, entry *abbreviation.Entry) (string, map[string]stri
 			"advice":   entry.Advice,
 		}
 	}
+	return AbbreviatedFileName, map[string]string{
+		"fileName":   fileName,
+		"word":       entry.Abbreviation,
+		"expansions": quotedExpansions(entry),
+	}
+}
+
+// The ids of the two messages a folder-name abbreviation finding carries, in
+// policy/messages/consistency-no-abbreviated-folder-name.json.
+const (
+	// AbbreviatedFolderName is a word with expansions, with the values `folder`, `word` and `expansions`.
+	AbbreviatedFolderName = "abbreviatedFolderName"
+	// AbbreviatedFolderNameAdvice is a word whose entry gives advice in place of expansions, with the values
+	// `folder`, `word` and `advice`.
+	AbbreviatedFolderNameAdvice = "abbreviatedFolderNameAdvice"
+)
+
+// FolderAdvice is Advice for a folder FolderAbbreviated found abbreviated, folder being its name alone.
+func FolderAdvice(folder string, entry *abbreviation.Entry) (string, map[string]string) {
+	if len(entry.Expansions) == 0 {
+		return AbbreviatedFolderNameAdvice, map[string]string{
+			"folder": folder,
+			"word":   entry.Abbreviation,
+			"advice": entry.Advice,
+		}
+	}
+	return AbbreviatedFolderName, map[string]string{
+		"folder":     folder,
+		"word":       entry.Abbreviation,
+		"expansions": quotedExpansions(entry),
+	}
+}
+
+// quotedExpansions is an entry's expansions quoted as a list, every meaning named and the reader asked for whichever
+// it means where there is more than one.
+func quotedExpansions(entry *abbreviation.Entry) string {
 	quoted := make([]string, len(entry.Expansions))
 	for index, expansion := range entry.Expansions {
 		quoted[index] = `"` + expansion + `"`
 	}
-	expansions := quoted[0]
-	if len(quoted) > 1 {
-		expansions = strings.Join(quoted[:len(quoted)-1], ", ") + " or " + quoted[len(quoted)-1] +
-			", whichever it means"
+	if len(quoted) == 1 {
+		return quoted[0]
 	}
-	return AbbreviatedFileName, map[string]string{
-		"fileName":   fileName,
-		"word":       entry.Abbreviation,
-		"expansions": expansions,
-	}
+	return strings.Join(quoted[:len(quoted)-1], ", ") + " or " + quoted[len(quoted)-1] + ", whichever it means"
 }

@@ -828,7 +828,8 @@ func checkReasons(layer configurationLayer) error {
 // the Swift engine one in its `swift` block; this is the TypeScript loader's.
 //
 // Asked through reach, which asks KeyReachesRule, the resolver's own test, so a key refused here is exactly
-// one the resolver could never apply. `unused-disable` is the engine's setting rather than a rule, and passes.
+// one the resolver could never apply. `unused-disable` and `consistency-no-abbreviated-folder-name` are the engine's
+// own checks rather than rules (IsEngineCheck), and pass.
 // `reasons` and `departures` need no check of their own: an entry in either must name a key the same file
 // writes under "rules" (checkReasons, and the departures check in loadLayers), and that key is judged here.
 //
@@ -865,7 +866,7 @@ func unknownRuleKeysError(where string, unknown []string) error {
 func keysReachingNoRule(rules map[string]json.RawMessage, reach *ruleReach) []string {
 	var unknown []string
 	for key := range rules {
-		if key == UnusedDisable || len(reach.of(key)) > 0 {
+		if IsEngineCheck(key) || len(reach.of(key)) > 0 {
 			continue
 		}
 		unknown = append(unknown, key)

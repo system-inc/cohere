@@ -17,6 +17,7 @@ changed in cohere outside the sets is written under the same heading.
 - On: `nexus/consistency-no-label (error)`
 - On: `nexus/consistency-no-warning-comment (error)`
 - On: `nexus/consistency-require-separated-folder-words (error)`
+- Off: `consistency-no-abbreviated-folder-name`
 - Off: `nexus/consistency-no-abbreviated-file-name`
 - Off: `nexus/consistency-no-utils-file-name`
 - Off: `no-labels`
@@ -44,6 +45,15 @@ changed in cohere outside the sets is written under the same heading.
 
 ### Added
 
+- A folder's name spells its words out (#zyq63kk): `consistency-no-abbreviated-folder-name`, a check discovery makes
+  on every folder its walk enters, so a `docs/` of Markdown is judged, for TypeScript, Go and Swift projects alike.
+  Its words are policy/NameWords.json's, today `docs` as documentation, which file names are judged by too and
+  identifiers never are. The outermost offending folder is reported once, at its path with no line, counted as a
+  finding, and fails the run; a `--directory` or `--tsconfig` run of a whole project judges its folders too. It is
+  keyed in `rules` as `unused-disable` is, off in `cohere:style` until its census turns it on, and a settings chain
+  that does not load fails the run rather than reading it as off. With a finding standing, a single project's run
+  takes the several-projects path: its project runs as a child, `--verbose` ends on `1 project • 1 folder finding`,
+  and `--json` carries two summaries, the project's and the folder check's, labelled `. (folders)`.
 - A settings file's go block takes reasons, why each rule it turns off is off, in a sentence, as the TypeScript
   block's reasons say it. Coverage prints the reason beside the rule. In a root that governs a module of ours, one
   whose path is under github.com/system-inc/, an off with no reason is refused at load, and outside our tiers an off

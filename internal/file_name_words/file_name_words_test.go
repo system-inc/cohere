@@ -4,6 +4,8 @@ import (
 	"maps"
 	"slices"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/naming/abbreviation"
 )
 
 // A file name's words in each language's convention: Go's snake_case, TypeScript's camelCase, PascalCase and
@@ -179,6 +181,111 @@ func TestAbbreviated(test *testing.T) {
 		if finding, found := Abbreviated(words, nil); found {
 			test.Errorf("%s: reported %q, and it passes", fileName, finding.Entry.Abbreviation)
 		}
+	}
+}
+
+// A word policy/NameWords.json holds is judged in a file name in every convention, `docs` as documentation, while the
+// shared vocabulary leaves it alone, so the identifier rule never reads it (#zyq63kk). Google Docs, its allowed
+// segment, passes, and a word the shared vocabulary holds beside the brand is still reported.
+func TestAbbreviatedReadsTheNameWords(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		fileName string
+		language Language
+	}{
+		{"docs_data.go", LanguageGo},
+		{"docs_capture_test.go", LanguageGo},
+		{"api_docs.go", LanguageGo},
+		{"docs.ts", LanguageTypeScript},
+		{"DocsReader.tsx", LanguageTypeScript},
+		{"ApiDocs.swift", LanguageSwift},
+	} {
+		words, _ := Words(testCase.fileName, testCase.language)
+		finding, found := Abbreviated(words, nil)
+		if !found || finding.Entry.Abbreviation != "docs" {
+			test.Errorf("%s: %+v (found %t), want the word \"docs\"", testCase.fileName, finding.Entry, found)
+			continue
+		}
+		id, values := Advice(testCase.fileName, finding.Entry)
+		if id != AbbreviatedFileName || values["expansions"] != `"documentation"` {
+			test.Errorf("%s: %s %v, want documentation", testCase.fileName, id, values)
+		}
+	}
+	for _, fileName := range []string{
+		"GoogleDocsApi.ts", "GoogleDocsCommandLineInterface.ts", "googleDocs.ts", "documentation.ts",
+		"docstring.ts", "Docstring.ts", "doc.ts", "DocReader.ts",
+	} {
+		words, _ := Words(fileName, LanguageTypeScript)
+		if finding, found := Abbreviated(words, nil); found {
+			test.Errorf("%s: reported %q, and it passes", fileName, finding.Entry.Abbreviation)
+		}
+	}
+	words, _ := Words("GoogleDocsCfg.ts", LanguageTypeScript)
+	if finding, found := Abbreviated(words, nil); !found || finding.Entry.Abbreviation != "cfg" {
+		test.Errorf("GoogleDocsCfg.ts: %+v (found %t), want the word \"cfg\"", finding.Entry, found)
+	}
+	if _, found := abbreviation.Policy.Find("docsData"); found {
+		test.Errorf("the shared vocabulary judges docs, which the identifier rules would then read")
+	}
+}
+
+// A folder's name is judged by policy/NameWords.json alone, every word of it, and a brand spelled across the folder
+// and its parent passes, so google/docs is Google Docs and docs/ anywhere else is documentation (#zyq63kk). A word
+// only the shared vocabulary holds is a folder's plain word: Op art, a stage prop, `src` until its own census.
+func TestFolderAbbreviated(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		parent string
+		folder string
+		word   string
+	}{
+		{"", "docs", "docs"},
+		{"src", "docs", "docs"},
+		{"web", "api-docs", "docs"},
+		{"modules", "Docs", "docs"},
+		{"docs", "docs", "docs"},
+		// A brand's letters in the parent alone do not make the folder the brand's.
+		{"google", "api-docs", "docs"},
+		{"googledrive", "docs", "docs"},
+	} {
+		finding, found := FolderAbbreviated(testCase.parent, testCase.folder, nil)
+		if !found || finding.Entry.Abbreviation != testCase.word {
+			test.Errorf("%s/%s: %+v (found %t), want the word %q", testCase.parent, testCase.folder, finding.Entry,
+				found, testCase.word)
+			continue
+		}
+		id, values := FolderAdvice(testCase.folder, finding.Entry)
+		if id != AbbreviatedFolderName || values["folder"] != testCase.folder || values["word"] != testCase.word {
+			test.Errorf("%s/%s: %s %v", testCase.parent, testCase.folder, id, values)
+		}
+	}
+	for _, testCase := range []struct {
+		parent string
+		folder string
+	}{
+		{"", "documentation"},
+		{"format", "doc"},
+		{"google", "docs"},
+		{"Google", "Docs"},
+		{"", "_components"},
+		{"", "docstrings"},
+		{"modules", "utilities"},
+		{"styles", "op-art-one"},
+		{"universes", "stage-prop"},
+		{"", "src"},
+		{"", "cfg"},
+		{"modules", "msg_queue"},
+	} {
+		if finding, found := FolderAbbreviated(testCase.parent, testCase.folder, nil); found {
+			test.Errorf("%s/%s: reported %q, and it passes", testCase.parent, testCase.folder,
+				finding.Entry.Abbreviation)
+		}
+	}
+	if _, found := FolderAbbreviated("", "no_var_docs", NewRuleNames([]string{"no-var"})); !found {
+		test.Errorf("a folder spelling a rule's name beside its own words is judged on them")
+	}
+	if _, found := FolderAbbreviated("", "require_docs_link", NewRuleNames([]string{"require-docs-link"})); found {
+		test.Errorf("a folder named for a registered rule holds the rule's name, which is not its author's")
 	}
 }
 
