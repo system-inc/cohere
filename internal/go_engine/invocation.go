@@ -166,7 +166,7 @@ func (request invocation) read(file string) ([]byte, error) {
 // standard-library entries as any other run does; the standard library it restores is judged on a graph of its own,
 // loaded from source beside the host's lint, and anything else restored fails wide (buildDependenceGraph, #ss4t5g6).
 // Its rules wait for the load's end (lintOverlaps), since they let go of each package's syntax as they finish with it,
-// and its extra builds restore nothing from the host's run (keepsHostRestoreOff), for the facts census.
+// and its extra builds restore nothing from the host's run (censusKeepsHostRestoreOff), for the facts census.
 func (request invocation) judgesDependence() bool {
 	return request.switches["build-dependence"] && request.switches["other-builds"]
 }

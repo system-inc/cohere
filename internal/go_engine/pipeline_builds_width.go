@@ -27,18 +27,21 @@ const forcedCyclesMetric = "/gc/cycles/forced:gc-cycles"
 const markPollInterval = time.Millisecond
 
 // fixedBuildsWidth is how many of the run's extras extra builds run side by side when no heap need be measured for it,
-// and true then, decided once as they start (#b2t9xmf): one at a time unless the builds restore packages from host, the
-// host's run (restoresFromHost), a test's forced width when it set one, one at a time for the release's
-// standard-library child, and one at a time when no heap could make it more (buildsWidth over the smallest heap). It is
-// false when the width is the memory's to decide, by what the first build holds (measuredBuildsWidth). The width never
-// reaches a key or the verdict, only the lint record's buildsAtOnce and the heap it was decided by: the builds' results
-// and notes are taken in one order whatever it is (extraBuildRuns).
+// and true then, decided once as they start (#b2t9xmf): one at a time unless the builds would restore packages from
+// host, the host's run, as a plain run's do (wouldRestoreFromHost), a test's forced width when it set one, one at a
+// time for the release's standard-library child, and one at a time when no heap could make it more (buildsWidth over
+// the smallest heap). It is false when the width is the memory's to decide, by what the first build holds
+// (measuredBuildsWidth). The width never reaches a key or the verdict, only the lint record's buildsAtOnce and the heap
+// it was decided by: the builds' results and notes are taken in one order whatever it is (extraBuildRuns).
 //
 // Builds that restore nothing each check every package, about what the host's did: two of those side by side under
 // the cap drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
-// builds that restore most of their packages from the host ran 22% faster side by side.
+// builds that restore most of their packages from the host ran 22% faster side by side. A run judging each build's
+// dependence restores nothing for its facts census alone and keeps a plain run's width (#f9br7sg): warm, its builds
+// each hit their own store, and cold, each build that checks most of its packages from source lints alone at the gate
+// (lintGate), so only their loads overlap.
 func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun) (int, bool) {
-	if !engine.buildsWidthUnguarded && !engine.restoresFromHost(host) {
+	if !engine.buildsWidthUnguarded && !engine.wouldRestoreFromHost(host) {
 		return 1, true
 	}
 	if engine.buildsWidthForced > 0 {
@@ -111,10 +114,12 @@ func heaviestFirst(host project.Build, extras []project.Build) []int {
 	return order
 }
 
-// restoresFromHost reports whether the extra builds will restore packages from host, the host's run: it kept entries
-// for them, and nothing keeps the builds from reading them, a test turning the restore off or a run whose rename wrote,
-// whose builds read no findings cache. A run under `--timing` keeps no entries.
-func (engine *pipeline) restoresFromHost(host *check.HostRun) bool {
+// wouldRestoreFromHost reports whether the extra builds would restore packages from host, the host's run, as a plain
+// run's do: it kept entries for them, and nothing keeps the builds from reading them, a test turning the restore off or
+// a run whose rename wrote, whose builds read no findings cache. A run under `--timing` keeps no entries. The facts
+// census's restore off (censusKeepsHostRestoreOff) is the census's alone and no reason here (#f9br7sg): a run judging
+// each build's dependence still keeps the host's entries, and its builds run at the width a plain run's would.
+func (engine *pipeline) wouldRestoreFromHost(host *check.HostRun) bool {
 	return host.EntriesKept() > 0 && !engine.keepsHostRestoreOff && !engine.renamed
 }
 

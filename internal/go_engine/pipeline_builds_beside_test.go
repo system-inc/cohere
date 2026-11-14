@@ -614,6 +614,65 @@ func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
 	}
 }
 
+// A run judging each build's dependence runs its extra builds at the width a plain run does (#f9br7sg): the facts
+// census turns off the builds' restore from the host's run for the census alone, and the width asks whether they would
+// restore as a plain run's do. Over a copy of threeExtraBuilds each, with the findings cache on, a cold run and then a
+// warm one under `--other-builds --build-dependence` keep as many host entries for the builds as under
+// `--other-builds` alone, and run as many builds at once, which the lint record says, while the switch's builds still
+// restore nothing from the host. Cold, the host keeps its packages and the width is the one a test forces, 3; warm,
+// it restored every package from its store, which it keeps none of, so both run one at a time.
+func TestADependenceRunKeepsAPlainRunsWidth(test *testing.T) {
+	test.Parallel()
+	// runsUnder runs a cold run and then a warm one over a fresh copy of threeExtraBuilds under switches at the forced
+	// width, and returns, run by run, its builds at once, the host's entries kept for the builds, and the packages its
+	// extra builds restored from the host's run.
+	runsUnder := func(switches ...string) ([]int, []int, []int) {
+		name := strings.Join(switches, " ")
+		root := threeExtraBuilds(test)
+		var widths []int
+		var kept []int
+		var restored []int
+		for _, temperature := range []string{"cold", "warm"} {
+			engine, raw := runOverConfigured(test, root, exitFindings,
+				func(engine *pipeline) { engine.buildsWidthForced = 3 }, switches...)
+			if len(engine.buildRuns) != 4 {
+				test.Fatalf("the %s run under %s handed the merge %d runs, want the host's and three beside it",
+					temperature, name, len(engine.buildRuns))
+			}
+			if !strings.Contains(raw, fmt.Sprintf(`"buildsAtOnce":%d`, engine.buildsAtOnce)) {
+				test.Errorf("the lint record of the %s run under %s does not say %d at once:\n%s", temperature, name,
+					engine.buildsAtOnce, raw)
+			}
+			fromHost := 0
+			for _, run := range engine.buildRuns[1:] {
+				fromHost += len(run.result.FromHost.Restored) + len(run.result.FromHost.Untouched)
+			}
+			widths = append(widths, engine.buildsAtOnce)
+			kept = append(kept, engine.buildRuns[0].result.Host.EntriesKept())
+			restored = append(restored, fromHost)
+		}
+		return widths, kept, restored
+	}
+	plainWidths, plainKept, _ := runsUnder("--other-builds")
+	switchedWidths, switchedKept, switchedRestored := runsUnder("--other-builds", "--build-dependence")
+	if !slices.Equal(plainWidths, []int{3, 1}) || plainKept[0] == 0 || plainKept[1] != 0 {
+		test.Fatalf("the plain runs ran %v builds at once, the host keeping %v entries, cold then warm, want 3 "+
+			"keeping some and then 1 keeping none", plainWidths, plainKept)
+	}
+	if !slices.Equal(switchedKept, plainKept) {
+		test.Errorf("under --build-dependence the host kept %v entries for the builds, cold then warm, want a plain "+
+			"run's %v", switchedKept, plainKept)
+	}
+	if !slices.Equal(switchedWidths, plainWidths) {
+		test.Errorf("under --build-dependence the runs ran %v builds at once, cold then warm, want a plain run's %v",
+			switchedWidths, plainWidths)
+	}
+	if !slices.Equal(switchedRestored, []int{0, 0}) {
+		test.Errorf("under --build-dependence the builds restored %v packages from the host's run, cold then warm, "+
+			"want none, for the facts census", switchedRestored)
+	}
+}
+
 // withinBesideWait runs run, and fails test when it has not returned within besideWait, so a gate that holds a build's
 // weight past its rules fails the test rather than hang it.
 func withinBesideWait(test *testing.T, what string, run func()) {

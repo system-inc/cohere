@@ -102,9 +102,9 @@ func TestAPlainRunComparesNoFacts(test *testing.T) {
 	test.Parallel()
 
 	engine, windows := windowsFacts(test, exitClean, "--other-builds")
-	if engine.dependence != nil || windows.Dependence != nil || engine.keepsHostRestoreOff {
+	if engine.dependence != nil || windows.Dependence != nil || engine.censusKeepsHostRestoreOff {
 		test.Errorf("a plain run built the graph (%t), wrote the dependence %+v, or kept the host's restore off (%t)",
-			engine.dependence != nil, windows.Dependence, engine.keepsHostRestoreOff)
+			engine.dependence != nil, windows.Dependence, engine.censusKeepsHostRestoreOff)
 	}
 	for _, run := range engine.buildRuns {
 		if run.judged != nil || run.result != nil && run.result.Facts != nil {
