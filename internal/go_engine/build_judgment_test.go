@@ -102,32 +102,23 @@ func TestACallIntoARestoredPackageIsFollowedThroughItsGraph(test *testing.T) {
 	dependencyGraph := build_dependence.NewGraph()
 	dependencyGraph.AddPackage(dependency, false)
 	nothingDiffers := build_dependence.Difference{}
+	hostJudged := hostGraph.Against(nothingDiffers)
 	dependencyJudged := dependencyGraph.Against(nothingDiffers)
-	judged := &buildJudgment{
-		dependence:      hostGraph.Against(nothingDiffers),
-		standardLibrary: dependencyJudged,
-		counterparts:    build_dependence.NewCounterparts(dependencyGraph, dependencyJudged),
-	}
-	units, unitContaining := judged.census()
+	calls := build_dependence.NewCallIndex(hostGraph, dependencyGraph)
 
 	wide := dependency.Types.Scope().Lookup("Wide")
 	position := dependency.Fset.Position(wide.Pos())
-	wideUnit, isUnit := unitContaining(dependency.ID, position.Filename, position.Offset)
+	wideUnit, isUnit := calls.UnitContaining(dependency.ID, position.Filename, position.Offset)
 	if !isUnit {
 		test.Fatalf("no unit of the census holds Wide at %s", position)
 	}
-	var callers []int
-	for index, unit := range units {
-		if slices.Contains(unit.Calls, wideUnit) {
-			callers = append(callers, index)
-		}
-	}
-	if len(callers) != 1 || !units[callers[0]].Workspace || units[callers[0]].Dependent {
+	callers := calls.Callers(wideUnit)
+	if len(callers) != 1 || !calls.Workspace(callers[0]) || calls.Dependent(hostJudged, dependencyJudged, callers[0]) {
 		test.Fatalf("want one independent workspace unit, CallsWide, calling Wide's unit, got the callers %v", callers)
 	}
 
-	workspace, dependencies := factCallers(units, map[int]bool{wideUnit: true})
-	if workspace.FirstOrderUnits != 1 || workspace.FirstOrderNodes != units[callers[0]].Nodes {
+	workspace, dependencies := factCallers(calls, hostJudged, dependencyJudged, map[int]bool{wideUnit: true})
+	if workspace.FirstOrderUnits != 1 || workspace.FirstOrderNodes != calls.Nodes(callers[0]) {
 		test.Errorf("want CallsWide the workspace's one first-order caller, got %+v", workspace)
 	}
 	if dependencies.DifferingUnits != 1 {
