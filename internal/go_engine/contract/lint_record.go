@@ -53,7 +53,8 @@ type LintRecord struct {
 	// BuildsWidthLiveBytes is additive within contract 3, and the Go engine's alone: the host's live heap that decision
 	// was given, measured by a collection as the extra builds started with nothing else running, so a reader sees why a
 	// width was chosen. Absent when the decision needed none: under `--single-threaded`, a limit other than the cap,
-	// builds that restore nothing from the host, or one build alone, which no heap can widen.
+	// builds that restore nothing from the host for any reason but the facts census (#f9br7sg), or one build alone,
+	// which no heap can widen.
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
 	// BuildsWidthBuildBytes is additive within contract 3, and the Go engine's alone: what the first extra build to
 	// start, the heaviest, held beyond that heap as its load ended, measured the same way. With

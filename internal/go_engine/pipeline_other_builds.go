@@ -354,7 +354,7 @@ func (engine *pipeline) extraBuildRun(
 			hostFiles = engine.session.Files()
 		}
 		session = engine.cacheSession(environment, goEnvironment, hostFiles, notes)
-		if session != nil && !engine.keepsHostRestoreOff {
+		if session != nil && !engine.keepsHostRestoreOff && !engine.censusKeepsHostRestoreOff {
 			session.RestoreFromHost(host)
 			if engine.keepsWalkOff {
 				session.VisitEvery()
