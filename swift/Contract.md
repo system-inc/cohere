@@ -974,11 +974,13 @@ from records rather than syntax (#6a3kjvz); the cache record then writes `"depen
 contract 3 and the Go engine's alone, absent from every other run: `{"read":1308, "written":0, "backfilled":0,
 "aliasSkipped":0, "unreadable":0}`. `"read"` counts the records found under their packages' keys, `"written"` those
 written beside their entries, `"backfilled"` the packages restored by their own key with no record, checked once more
-so their records are written, `"aliasSkipped"` those restored by a second key's alias, which go without a record, and
-`"unreadable"` the records that did not decode, each a problem, whose packages are checked from source so their records
-are written again, a restored one counted in `"backfilled"` too. `"droppedAfterBackfill":0`, written only when not 0,
+so their records are written, `"aliasSkipped"` those restored by a second key's alias with no record beside the entry
+the alias leads to, which go without one, and `"unreadable"` the records that did not decode, each a problem, whose
+packages are checked from source so their records are written again, one restored by its own key counted in
+`"backfilled"` too and one by an alias in `"aliasSkipped"`. `"droppedAfterBackfill":0`, written only when not 0,
 counts the hits made misses in a load that backfilled any: a backfilled package asks the facts of everything below
-it. A record that could not be written counts in `"writeFailed"`. The standard library the host restores from the
+it. `"aliasRead"`, written only when not 0, counts the packages restored by a second key's alias whose record is the
+one beside the entry the alias leads to, read in place of their syntax as `"read"`'s are (#6a3kjvz piece 4). A record that could not be written counts in `"writeFailed"`. The standard library the host restores from the
 binary's table has no entry in the store: when the switch loads it from source for its graph, its packages' records
 are written into the store under keys derived from each package's own standard-library key, the engine and the
 toolchain, and read back by a later run in place of that load (#6a3kjvz). `"standardLibraryRead"`,

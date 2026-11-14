@@ -175,7 +175,8 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	if counted := result.Cache.DependenceRecords; counted != nil {
 		record.Cache.DependenceRecords = &contract.DependenceRecords{Read: counted.Read, Written: counted.Written,
 			Backfilled: counted.Backfilled, AliasSkipped: counted.AliasSkipped, Unreadable: counted.Unreadable,
-			DroppedAfterBackfill: counted.DroppedAfterBackfill, StandardLibraryRead: counted.StandardLibraryRead,
+			DroppedAfterBackfill: counted.DroppedAfterBackfill, AliasRead: counted.AliasRead,
+			StandardLibraryRead:       counted.StandardLibraryRead,
 			StandardLibraryWritten:    counted.StandardLibraryWritten,
 			StandardLibraryUnreadable: counted.StandardLibraryUnreadable}
 	}
