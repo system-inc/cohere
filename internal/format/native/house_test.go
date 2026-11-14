@@ -12,14 +12,14 @@ import (
 func TestFormatHouseIsTheHouseFormatAndAFixedPoint(test *testing.T) {
 	test.Parallel()
 	generated := "{\n  \"rules\": {\n    \"a\": [\n      \"x\",\n      \"y\"\n    ]\n  }\n}\n"
-	formatted, formatHouseError := FormatHouse("docs/data/rules.json", []byte(generated))
+	formatted, formatHouseError := FormatHouse("documentation/data/rules.json", []byte(generated))
 	if formatHouseError != nil {
 		test.Fatal(formatHouseError)
 	}
 	if want := "{\n    \"rules\": {\n        \"a\": [\"x\", \"y\"]\n    }\n}\n"; string(formatted) != want {
 		test.Fatalf("formatted %q, want %q", formatted, want)
 	}
-	again, formatHouseError := FormatHouse("docs/data/rules.json", formatted)
+	again, formatHouseError := FormatHouse("documentation/data/rules.json", formatted)
 	if formatHouseError != nil {
 		test.Fatal(formatHouseError)
 	}

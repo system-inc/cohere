@@ -111,7 +111,7 @@ first-parent line gains that one commit per landing, and the branch's own histor
 included, stays one hop off it. The branch itself doesn't move, and the worktree is left at the landing,
 detached. Nothing landed this way moves main during another's gate. A commit to main by hand does, and
 when one happens mid-gate, land merges onto it and gates again. A merge that conflicts is refused with its
-files named, and the worktree is left as it was, unless every conflicted file is under `docs/data`, which the
+files named, and the worktree is left as it was, unless every conflicted file is under `documentation/data`, which the
 docs data generator writes whole: then land takes main's side of them, reruns the generator from the merged
 sources in a scratch worktree, requires a second run to change nothing, and gates that (#y84h1te).
 Every landing runs main's own land: when the worktree's `command/cohere-dev` differs from main's, land

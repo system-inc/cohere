@@ -8,11 +8,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/system-inc/cohere/docs"
 	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/rule_names"
 )
 
 // A folder's name spells its words out (#zyq63kk). Kirk, Nov 13: "has a folder called docs, i want it to be
@@ -61,11 +61,11 @@ const folderReasoning = "A folder's name is read on every path and every import 
 	"it was named are paid back by every reader who has to expand the word themselves and hope they expanded it the " +
 	"way the author meant."
 
-// folderRuleNames are every engine's rule names, from docs/data/rules.json, as the Go engine's file-name rule reads
-// them, so a folder named for a rule it holds, internal/go_engine/rules/no_param_reassign, is not judged on the rule's
-// words.
+// folderRuleNames are every engine's rule names, from internal/rule_names, as the Go engine's file-name rule reads
+// them, so a folder named for a rule it holds, internal/go_engine/rules/no_param_reassign, is not judged on the
+// rule's words.
 var folderRuleNames = sync.OnceValue(func() file_name_words.RuleNames {
-	return file_name_words.NewRuleNames(docs.RuleNames())
+	return file_name_words.NewRuleNames(rule_names.RuleNames())
 })
 
 // isForeignToFolders reports whether a folder, and every folder below it, is someone else's: the file-name rules'

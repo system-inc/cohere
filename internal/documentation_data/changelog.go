@@ -1,4 +1,4 @@
-package docs_data
+package documentation_data
 
 import (
 	"fmt"
@@ -44,7 +44,7 @@ func parseChangelog(changelog []byte) ([]ChangelogEntry, error) {
 		match := releaseHeading.FindStringSubmatch(line)
 		if match == nil {
 			return nil, fmt.Errorf(
-				"docs_data: CHANGELOG.md heading %q is not a release (## <version> (<date>|unreleased))",
+				"documentation_data: CHANGELOG.md heading %q is not a release (## <version> (<date>|unreleased))",
 				line,
 			)
 		}
@@ -59,7 +59,7 @@ func parseChangelog(changelog []byte) ([]ChangelogEntry, error) {
 	}
 	flush()
 	if len(entries) == 0 {
-		return nil, fmt.Errorf("docs_data: CHANGELOG.md has no release")
+		return nil, fmt.Errorf("documentation_data: CHANGELOG.md has no release")
 	}
 	return entries, nil
 }

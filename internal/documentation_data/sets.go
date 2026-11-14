@@ -1,4 +1,4 @@
-package docs_data
+package documentation_data
 
 import (
 	"encoding/json"
@@ -50,11 +50,11 @@ func buildSets(inputs Inputs) ([]RuleSet, error) {
 		}
 		extends, ownExtendsError := ownExtends(contents)
 		if ownExtendsError != nil {
-			return nil, fmt.Errorf("docs_data: %s: %w", name, ownExtendsError)
+			return nil, fmt.Errorf("documentation_data: %s: %w", name, ownExtendsError)
 		}
 		resolved, loadSetError := inputs.LoadSet(name)
 		if loadSetError != nil {
-			return nil, fmt.Errorf("docs_data: resolving %s: %w", name, loadSetError)
+			return nil, fmt.Errorf("documentation_data: resolving %s: %w", name, loadSetError)
 		}
 
 		set := RuleSet{

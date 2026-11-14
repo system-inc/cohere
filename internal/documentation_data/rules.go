@@ -1,4 +1,4 @@
-package docs_data
+package documentation_data
 
 import (
 	"encoding/json"
@@ -156,7 +156,7 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 		}
 		origin, originOfError := originOf(row.Namespace, registration.RunPackage)
 		if originOfError != nil {
-			return Rules{}, fmt.Errorf("docs_data: %s: %w", name, originOfError)
+			return Rules{}, fmt.Errorf("documentation_data: %s: %w", name, originOfError)
 		}
 		row.Origin = origin
 		if origin != houseOrigin {
@@ -168,7 +168,7 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 				name[strings.LastIndex(name, "/")+1:],
 			)
 			if parseRuleNameError != nil {
-				return Rules{}, fmt.Errorf("docs_data: %s: %w", name, parseRuleNameError)
+				return Rules{}, fmt.Errorf("documentation_data: %s: %w", name, parseRuleNameError)
 			}
 			row.Category = parsed.Category
 		}
@@ -206,7 +206,7 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 		TypeAware    bool   `json:"typeAware"`
 	}
 	if unmarshalOptionsError := rule.UnmarshalOptions(registry, &entries); unmarshalOptionsError != nil {
-		return nil, fmt.Errorf("docs_data: reading swift/Rules.json: %w", unmarshalOptionsError)
+		return nil, fmt.Errorf("documentation_data: reading swift/Rules.json: %w", unmarshalOptionsError)
 	}
 	carries := map[string][]string{}
 	for typeScriptRule, verdict := range verdicts {
@@ -219,11 +219,11 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 	for _, entry := range entries {
 		leaf, found := strings.CutPrefix(entry.Name, swiftNamespace+"/")
 		if !found {
-			return nil, fmt.Errorf("docs_data: the Swift rule %s is not under %s/", entry.Name, swiftNamespace)
+			return nil, fmt.Errorf("documentation_data: the Swift rule %s is not under %s/", entry.Name, swiftNamespace)
 		}
 		if !swiftOrigins[entry.Origin] {
 			return nil, fmt.Errorf(
-				"docs_data: %s: the origin %q is not one of house, swiftlint, swift-format",
+				"documentation_data: %s: the origin %q is not one of house, swiftlint, swift-format",
 				entry.Name,
 				entry.Origin,
 			)
@@ -239,7 +239,7 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 		if entry.Origin == houseOrigin {
 			parsed, parseRuleNameError := policy.Naming.ParseRuleName(swiftNamespace, leaf)
 			if parseRuleNameError != nil {
-				return nil, fmt.Errorf("docs_data: %s: %w", entry.Name, parseRuleNameError)
+				return nil, fmt.Errorf("documentation_data: %s: %w", entry.Name, parseRuleNameError)
 			}
 			row.Category = parsed.Category
 		}
@@ -254,7 +254,10 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 			dangling = append(dangling, swiftRule)
 		}
 		sort.Strings(dangling)
-		return nil, fmt.Errorf("docs_data: the Swift verdicts name %v, which swift/Rules.json does not hold", dangling)
+		return nil, fmt.Errorf(
+			"documentation_data: the Swift verdicts name %v, which swift/Rules.json does not hold",
+			dangling,
+		)
 	}
 	return rows, nil
 }
@@ -269,7 +272,7 @@ func buildGoRows(registered []goenginerule.Rule, fixing []string) ([]RuleRow, er
 	rows := make([]RuleRow, 0, len(registered))
 	for _, goRule := range registered {
 		if validateError := goRule.Validate(); validateError != nil {
-			return nil, fmt.Errorf("docs_data: %w", validateError)
+			return nil, fmt.Errorf("documentation_data: %w", validateError)
 		}
 		row := RuleRow{
 			Name:         goRule.Name,
@@ -283,7 +286,7 @@ func buildGoRows(registered []goenginerule.Rule, fixing []string) ([]RuleRow, er
 			leaf := strings.TrimPrefix(goRule.Name, goenginerule.Namespace)
 			parsed, parseError := policy.Naming.ParseRuleName(namespace, leaf)
 			if parseError != nil {
-				return nil, fmt.Errorf("docs_data: %s: %w", goRule.Name, parseError)
+				return nil, fmt.Errorf("documentation_data: %s: %w", goRule.Name, parseError)
 			}
 			row.Category = parsed.Category
 		}
@@ -294,7 +297,10 @@ func buildGoRows(registered []goenginerule.Rule, fixing []string) ([]RuleRow, er
 	}
 	for _, name := range fixing {
 		if !slices.ContainsFunc(rows, func(row RuleRow) bool { return row.Name == name }) {
-			return nil, fmt.Errorf("docs_data: %s is fixed by a run, and the Go registry holds no such rule", name)
+			return nil, fmt.Errorf(
+				"documentation_data: %s is fixed by a run, and the Go registry holds no such rule",
+				name,
+			)
 		}
 	}
 	return rows, nil
@@ -338,7 +344,7 @@ func swiftVerdicts(catalog []byte) (map[string]SwiftVerdict, error) {
 		SwiftRule      *string `json:"swiftRule"`
 	}
 	if decodeError := json.Unmarshal(catalog, &entries); decodeError != nil {
-		return nil, fmt.Errorf("docs_data: reading the Swift verdict catalog: %w", decodeError)
+		return nil, fmt.Errorf("documentation_data: reading the Swift verdict catalog: %w", decodeError)
 	}
 	verdicts := make(map[string]SwiftVerdict, len(entries))
 	for _, entry := range entries {

@@ -1,4 +1,4 @@
-package docs_data
+package documentation_data
 
 import (
 	"fmt"
@@ -46,7 +46,7 @@ var flagDefault = regexp.MustCompile(` \(default ("(?:[^"\\]|\\.)*"|[^()"]*)\)$`
 func parseCommandLineInterface(help []byte, verbHelp map[string][]byte) (CommandLineInterface, error) {
 	_, flags, parseFlagHelpError := parseFlagHelp(help)
 	if parseFlagHelpError != nil {
-		return CommandLineInterface{}, fmt.Errorf("docs_data: cohere -help: %w", parseFlagHelpError)
+		return CommandLineInterface{}, fmt.Errorf("documentation_data: cohere -help: %w", parseFlagHelpError)
 	}
 	cli := CommandLineInterface{Flags: flags}
 	verbs := make([]string, 0, len(verbHelp))
@@ -57,7 +57,11 @@ func parseCommandLineInterface(help []byte, verbHelp map[string][]byte) (Command
 	for _, verb := range verbs {
 		preamble, flags, parseFlagHelpError := parseFlagHelp(verbHelp[verb])
 		if parseFlagHelpError != nil {
-			return CommandLineInterface{}, fmt.Errorf("docs_data: cohere %s -help: %w", verb, parseFlagHelpError)
+			return CommandLineInterface{}, fmt.Errorf(
+				"documentation_data: cohere %s -help: %w",
+				verb,
+				parseFlagHelpError,
+			)
 		}
 		entry := CommandLineInterfaceVerb{Name: verb, Flags: flags}
 		var summary []string
@@ -74,7 +78,7 @@ func parseCommandLineInterface(help []byte, verbHelp map[string][]byte) (Command
 			}
 		}
 		if len(entry.Usage) == 0 {
-			return CommandLineInterface{}, fmt.Errorf("docs_data: cohere %s -help printed no usage line", verb)
+			return CommandLineInterface{}, fmt.Errorf("documentation_data: cohere %s -help printed no usage line", verb)
 		}
 		entry.Summary = strings.Join(summary, " ")
 		cli.Verbs = append(cli.Verbs, entry)

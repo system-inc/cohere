@@ -205,7 +205,7 @@ jobs:
                   # stand in for, because capture changes what the tests record (#d7vx76v). Measured on the
                   # desk machine at load 151: 85 seconds, 2.6 GB peak resident. GOFLAGS carries the same
                   # per-package ceiling into the go test it runs, and only go test takes -timeout.
-                  GOFLAGS=-timeout=30m go run ./internal/docs_data/tools/generate -check
+                  GOFLAGS=-timeout=30m go run ./internal/documentation_data/tools/generate -check
 
             - name: Import the signing certificate
               # Skipped when the secret is absent, so a fork or a contributor without credentials

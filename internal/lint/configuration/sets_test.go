@@ -58,9 +58,9 @@ func TestEverySetCohereCarriesLoads(test *testing.T) {
 	}
 }
 
-// Discovery's folder check is off in every set cohere carries, with its reason, until its census turns it on
-// (#zyq63kk): every set but cohere:adamic reaches cohere:style, which turns it off, and cohere:adamic never names it.
-func TestTheFolderCheckIsOffInEverySetUntilItsCensus(test *testing.T) {
+// Discovery's folder check is on in every set cohere carries but cohere:adamic, as an error with no off reason left
+// (#zyq63kk): every set but cohere:adamic reaches cohere:style, which turns it on, and cohere:adamic never names it.
+func TestTheFolderCheckIsOnInEverySetThatReachesStyle(test *testing.T) {
 	test.Parallel()
 	for _, name := range SetNames() {
 		directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "` + name + `"}`})
@@ -72,12 +72,11 @@ func TestTheFolderCheckIsOffInEverySetUntilItsCensus(test *testing.T) {
 			}
 			continue
 		}
-		if !configured || setting.Severity != SeverityOff {
-			test.Errorf("%s gives the folder check %+v (configured %t), want off", name, setting, configured)
+		if !configured || setting.Severity != SeverityError {
+			test.Errorf("%s gives the folder check %+v (configured %t), want error", name, setting, configured)
 		}
-		if reason, found := loaded.OffReasonFor(AbbreviatedFolderName); !found ||
-			reason.Reason != "Off until its census turns it on (#zyq63kk)." {
-			test.Errorf("%s turns the folder check off for %+v (found %t)", name, reason, found)
+		if reason, found := loaded.OffReasonFor(AbbreviatedFolderName); found {
+			test.Errorf("%s still gives the folder check an off reason, %+v", name, reason)
 		}
 	}
 }

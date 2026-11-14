@@ -78,7 +78,7 @@ func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(test *testing.T) {
 		)
 	}
 
-	late := filepath.Join(fixture.root, "docs", "late.md")
+	late := filepath.Join(fixture.root, "documentation", "late.md")
 	unformatted := "#   Late\n\n\n\nA paragraph.\n"
 	formatting("COHERE_TEST_CREATE_AFTER_DISCOVERY="+late, "COHERE_TEST_CREATE_AFTER_DISCOVERY_TEXT="+unformatted)
 	if contents, readError := os.ReadFile(late); readError != nil || string(contents) == "" {

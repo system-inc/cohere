@@ -124,25 +124,26 @@ func TestTheFolderCheckKeepsTheWalksGaps(test *testing.T) {
 	}
 }
 
-// The setting is the chain's top-level one: off where the sets leave it, as every house set does until its census,
-// and the project's own file turns it on or warns, under zero config as under a chain naming its sets. A chain that
-// does not load is an error naming the file, never an off.
+// The setting is the chain's top-level one: an error where the sets leave it, as cohere:style turns it on for every
+// house set that reaches it, and the project's own file warns or turns it off, under zero config as under a chain
+// naming its sets. A chain that does not load is an error naming the file, never an off.
 func TestTheFolderCheckReadsTheRootsSetting(test *testing.T) {
 	test.Parallel()
 	for name, testCase := range map[string]struct {
 		settings string
 		want     configuration.Severity
 	}{
-		"no settings file, the house stack's off": {"", configuration.SeverityOff},
-		"a chain naming its sets, cohere:style's off": {
+		"no settings file, the house stack's error": {"", configuration.SeverityError},
+		"a chain naming its sets, cohere:style's error": {
 			`{"extends": "cohere:typescript"}`,
-			configuration.SeverityOff,
-		},
-		"zero config with the project's own file on top": {
-			`{"rules": {"` + configuration.AbbreviatedFolderName + `": "error"}}`,
 			configuration.SeverityError,
 		},
-		"a chain naming its sets, turned on by the project": {
+		"zero config with the project's own file on top": {
+			`{"rules": {"` + configuration.AbbreviatedFolderName + `": "off"}, "reasons": {"` +
+				configuration.AbbreviatedFolderName + `": "This project keeps its folder names as they are."}}`,
+			configuration.SeverityOff,
+		},
+		"a chain naming its sets, warned by the project": {
 			`{"extends": "cohere:typescript", "rules": {"` + configuration.AbbreviatedFolderName + `": "warn"}}`,
 			configuration.SeverityWarn,
 		},
@@ -202,7 +203,7 @@ type folderRun struct {
 // with a path and no line, and the folder check's summary fails, so a reader of the verdicts reads it too. Renaming
 // the folder between two runs gives the next run a fresh verdict, green, and renaming it back red, though the
 // project's own run between them is replayed from the run cache: a project's recorded run never holds the folders'
-// verdict, which each run judges from its own walk. With the check off, the folder passes.
+// verdict, which each run judges from its own walk. With the check off in the project's settings, the folder passes.
 func TestARealRunReportsAnAbbreviatedFolderAndRenamingItIsAFreshVerdict(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -285,9 +286,12 @@ func TestARealRunReportsAnAbbreviatedFolderAndRenamingItIsAFreshVerdict(test *te
 			back.exit, back.output)
 	}
 
-	writeTree(test, root, map[string]string{"CohereSettings.json": "{\n    \"extends\": \"cohere:typescript\"\n}\n"})
+	writeTree(test, root, map[string]string{"CohereSettings.json": "{\n    \"extends\": \"cohere:typescript\",\n" +
+		"    \"rules\": {\n        \"" + configuration.AbbreviatedFolderName + "\": \"off\"\n    },\n" +
+		"    \"reasons\": {\n        \"" + configuration.AbbreviatedFolderName +
+		"\": \"This project keeps its folder names as they are.\"\n    }\n}\n"})
 	if off := run(); off.exit != 0 || strings.Contains(off.output, configuration.AbbreviatedFolderName) {
-		test.Errorf("with the check off, as cohere:style leaves it, the run exited %d naming the folder:\n%s",
+		test.Errorf("with the check off in the project's settings, the run exited %d naming the folder:\n%s",
 			off.exit, off.output)
 	}
 }

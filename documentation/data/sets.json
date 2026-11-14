@@ -178,7 +178,7 @@
         "name": "cohere:next",
         "extends": ["cohere:typescript"],
         "plugins": ["@next"],
-        "rulesOn": 307,
+        "rulesOn": 308,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -777,7 +777,7 @@
             },
             {
                 "name": "consistency-no-abbreviated-folder-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "consistent-return",
@@ -1741,7 +1741,7 @@
         "name": "cohere:react",
         "extends": ["cohere:typescript"],
         "plugins": ["react", "react-hooks"],
-        "rulesOn": 372,
+        "rulesOn": 373,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2252,7 +2252,7 @@
             },
             {
                 "name": "consistency-no-abbreviated-folder-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "consistent-return",
@@ -3559,7 +3559,7 @@
     },
     {
         "name": "cohere:style",
-        "rulesOn": 143,
+        "rulesOn": 144,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3798,7 +3798,7 @@
             },
             {
                 "name": "consistency-no-abbreviated-folder-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "consistent-this",
@@ -4321,7 +4321,7 @@
     {
         "name": "cohere:system-inc/base",
         "extends": ["cohere:typescript"],
-        "rulesOn": 298,
+        "rulesOn": 299,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5064,7 +5064,7 @@
             },
             {
                 "name": "consistency-no-abbreviated-folder-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "consistent-return",
@@ -6155,7 +6155,7 @@
         "name": "cohere:system-inc/structure",
         "extends": ["cohere:typescript"],
         "plugins": ["@typescript-eslint"],
-        "rulesOn": 306,
+        "rulesOn": 307,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6734,7 +6734,7 @@
             },
             {
                 "name": "consistency-no-abbreviated-folder-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "consistent-return",
@@ -7891,7 +7891,7 @@
     {
         "name": "cohere:tailwind",
         "extends": ["cohere:typescript"],
-        "rulesOn": 296,
+        "rulesOn": 297,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8450,7 +8450,7 @@
             },
             {
                 "name": "consistency-no-abbreviated-folder-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "consistent-return",
@@ -9398,7 +9398,7 @@
     {
         "name": "cohere:typescript",
         "extends": ["cohere:adamic", "cohere:style"],
-        "rulesOn": 284,
+        "rulesOn": 285,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9909,7 +9909,7 @@
             },
             {
                 "name": "consistency-no-abbreviated-folder-name",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "consistent-return",

@@ -178,20 +178,20 @@ func equalVersions(left map[string]string, right map[string]string) bool {
 	return true
 }
 
-// pluginOrigins are the origins docs/data/rules.json gives a rule ported from ESLint core or an ESLint
+// pluginOrigins are the origins documentation/data/rules.json gives a rule ported from ESLint core or an ESLint
 // plugin, which are the rules extract.mjs reads a schema for.
 var pluginOrigins = map[string]bool{
 	"core": true, "typescript-eslint": true, "react": true, "react-hooks": true, "next": true,
 	"tailwind": true, "eslint-comments": true, "boundaries": true,
 }
 
-// The embedded schemas cover exactly the rules cohere ports from ESLint, as docs/data/rules.json lists
-// them (which docs_data's own check keeps current with the registry). A port added without regenerating
+// The embedded schemas cover exactly the rules cohere ports from ESLint, as documentation/data/rules.json lists
+// them (which documentation_data's own check keeps current with the registry). A port added without regenerating
 // has no schema and would be checked by nothing, and a schema for a rule cohere dropped is dead weight.
 func TestSchemasCoverEveryPortedRule(test *testing.T) {
 	test.Parallel()
 
-	data, readError := os.ReadFile(filepath.Join("..", "..", "..", "docs", "data", "rules.json"))
+	data, readError := os.ReadFile(filepath.Join("..", "..", "..", "documentation", "data", "rules.json"))
 	if readError != nil {
 		test.Fatal(readError)
 	}

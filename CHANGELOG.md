@@ -14,10 +14,10 @@ changed in cohere outside the sets is written under the same heading.
 
 ### `cohere:style`
 
+- On: `consistency-no-abbreviated-folder-name (error)`
 - On: `nexus/consistency-no-label (error)`
 - On: `nexus/consistency-no-warning-comment (error)`
 - On: `nexus/consistency-require-separated-folder-words (error)`
-- Off: `consistency-no-abbreviated-folder-name`
 - Off: `nexus/consistency-no-abbreviated-file-name`
 - Off: `nexus/consistency-no-utils-file-name`
 - Off: `no-labels`
@@ -50,8 +50,8 @@ changed in cohere outside the sets is written under the same heading.
   Its words are policy/NameWords.json's, today `docs` as documentation, which file names are judged by too and
   identifiers never are. The outermost offending folder is reported once, at its path with no line, counted as a
   finding, and fails the run; a `--directory` or `--tsconfig` run of a whole project judges its folders too. It is
-  keyed in `rules` as `unused-disable` is, off in `cohere:style` until its census turns it on, and a settings chain
-  that does not load fails the run rather than reading it as off. With a finding standing, a single project's run
+  keyed in `rules` as `unused-disable` is, on in `cohere:style` as an error, and a settings chain that does not
+  load fails the run rather than reading it as off. With a finding standing, a single project's run
   takes the several-projects path: its project runs as a child, `--verbose` ends on `1 project • 1 folder finding`,
   and `--json` carries two summaries, the project's and the folder check's, labelled `. (folders)`.
 - A settings file's go block takes reasons, why each rule it turns off is off, in a sentence, as the TypeScript
@@ -121,8 +121,8 @@ changed in cohere outside the sets is written under the same heading.
   rule's name, upstream's for a port, is the rule's and is set aside, and only the words beside it are judged:
   `max_lines.go` and `MaxClassesPerFileRule.ts` pass, `no_var_cfg.go` reports `cfg`. Only a name of two
   words or more does: `config.ts` is judged though `react-hooks/config` is registered. TypeScript reads its
-  registry, Swift its own, and Go every engine's names from `docs/data/rules.json`, since a Go file in cohere is
-  named for the TypeScript rule it ports.
+  registry, Swift its own, and Go every engine's names from `internal/rule_names`, which the generator writes
+  beside `documentation/data/rules.json`, since a Go file in cohere is named for the TypeScript rule it ports.
   A name's words are cut at underscores, hyphens, dots, a Swift `+` and case, with what a tool reads set
   aside (`_test`, `_linux`, `_amd64`, `.test`, `.d`, `.config`), and a generated file, a name a tool requires
   (`doc.go`, `Package.swift`, Next.js's `page.tsx` and `next-env.d.ts`) and a file under `node_modules`,
@@ -140,6 +140,13 @@ changed in cohere outside the sets is written under the same heading.
 
 ### Changed
 
+- cohere's own `docs/` is `documentation/`, and `internal/docs_data/` is `internal/documentation_data/`, package
+  `documentation_data`, so the folder check reads cohere itself clean (#zyq63kk). The website's data is
+  `documentation/data/` from here, written by `go run ./internal/documentation_data/tools/generate`, and a reader
+  of `docs/data/` follows it at its next copy or pin. `documentation/` holds no Go, since the go command ignores a
+  package named documentation: every engine's rule names, which the Go file-name rule and the folder check read,
+  are `internal/rule_names`, a Go file the same generator writes and its freshness check holds, where they were an
+  embed of `rules.json`.
 - `.mts` and `.cts` files are formatted, as Prettier formats them: its typescript parser with no JSX, so a
   `<T>x` cast stays a cast, and an arrow's lone type parameter keeps its `<T,>`, since upstream's `.ts` test
   misses both names. The format walk offers them, a root's `Format` project counts them, and a save through

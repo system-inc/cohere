@@ -9,7 +9,7 @@
  *
  * Each `--home` is a directory whose node_modules resolves some of the plugins. A package is taken from
  * the first home that has it, so ahra serves ESLint and every plugin but boundaries, which only
- * api-phi-health installs. The rule list is cohere's own docs/data/rules.json: every row whose origin is
+ * api-phi-health installs. The rule list is cohere's own documentation/data/rules.json: every row whose origin is
  * an ESLint plugin or ESLint core.
  *
  * This is a regeneration tool, and nothing runs it. Its two outputs are committed. schemas.json is
@@ -59,7 +59,7 @@ import { parseArgs } from 'node:util';
 const { values: argumentValues } = parseArgs({
     options: {
         home: { type: 'string', multiple: true },
-        rules: { type: 'string', default: 'docs/data/rules.json' },
+        rules: { type: 'string', default: 'documentation/data/rules.json' },
         schemas: { type: 'string' },
         samples: { type: 'string' },
     },

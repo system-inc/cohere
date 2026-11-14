@@ -1,4 +1,4 @@
-// Package docs_data generates the data the cohere website (system.inc/cohere) is built from, from the
+// Package documentation_data generates the data the cohere website (system.inc/cohere) is built from, from the
 // sources the binary itself is built from, so the site can never say something the binary does not do.
 //
 // Nothing here is typed in. Each output reads one source the build already trusts: the rule registry
@@ -11,11 +11,11 @@
 //
 // The per-rule .md files beside the rules are internal working notes and are never read here.
 //
-// Run `go run ./internal/docs_data/tools/generate` from the module root after a change. `-check` recaptures
+// Run `go run ./internal/documentation_data/tools/generate` from the module root after a change. `-check` recaptures
 // the examples from the lint tests and exits 1 on any stale file, writing nothing; `-check-rendering` is
-// the fast check of everything rendered from the committed examples. The website vendors docs/data/ at a
+// the fast check of everything rendered from the committed examples. The website vendors documentation/data/ at a
 // pinned commit.
-package docs_data
+package documentation_data
 
 import (
 	"bytes"
@@ -32,9 +32,10 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// The files Build produces, relative to the module root.
+// The files Build produces under Directory, relative to the module root. RuleNamesPath is the one it writes
+// elsewhere.
 const (
-	Directory                = "docs/data"
+	Directory                = "documentation/data"
 	RulesPath                = Directory + "/rules.json"
 	SetsPath                 = Directory + "/sets.json"
 	CommandLineInterfacePath = Directory + "/cli.json"
@@ -131,6 +132,11 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 		return nil, encodeError
 	}
 	files[RulesPath] = encodedRules
+	renderedRuleNames, renderRuleNamesError := renderRuleNames(rules)
+	if renderRuleNamesError != nil {
+		return nil, renderRuleNamesError
+	}
+	files[RuleNamesPath] = renderedRuleNames
 
 	changelog, parseChangelogError := parseChangelog(inputs.Changelog)
 	if parseChangelogError != nil {
@@ -171,7 +177,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 		files[Directory+"/"+filepath.Base(path)] = contents
 	}
 	if _, present := files[Directory+"/"+settingsSchemaName]; !present {
-		return nil, fmt.Errorf("docs_data: internal/settings_schema rendered no %s", settingsSchemaName)
+		return nil, fmt.Errorf("documentation_data: internal/settings_schema rendered no %s", settingsSchemaName)
 	}
 	return files, nil
 }

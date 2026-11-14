@@ -1,4 +1,4 @@
-package docs_data
+package documentation_data
 
 import (
 	"encoding/json"

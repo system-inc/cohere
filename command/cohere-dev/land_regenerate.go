@@ -15,14 +15,14 @@ import (
 // A landing whose merge with main conflicts only in generated files is resolved by regenerating them (#y84h1te).
 // On 2026-11-07 a unit reformatting 1,083 data files reached the head of the land line again and again to find
 // main had changed one of them, cli.json or sets.json among them, and every conflict sent it back to the end of a
-// six-deep line to be merged by hand. Every file under docs/data is one the docs data generator writes whole
-// (TestEveryFileUnderDocsDataIsGenerated), so a conflict there has one right answer: what the generator writes
+// six-deep line to be merged by hand. Every file under documentation/data is one the docs data generator writes whole
+// (TestEveryFileUnderDocumentationDataIsGenerated), so a conflict there has one right answer: what the generator writes
 // from the merged sources. Land takes main's side of each conflicted file, reruns the generator in a scratch
 // worktree, requires a second run to change nothing, and gates that tree as it gates any other. A conflict in any
 // other file still refuses, naming it, since only a person can say what a hand-written merge means.
 
 // generatedDirectory is the directory whose every file the docs data generator writes.
-const generatedDirectory = "docs/data/"
+const generatedDirectory = "documentation/data/"
 
 // isGeneratedPath reports whether a path is one the docs data generator writes.
 func isGeneratedPath(path string) bool {
