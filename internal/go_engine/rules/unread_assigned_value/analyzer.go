@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"slices"
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/generated"
@@ -97,28 +98,14 @@ func Check(
 		// goyacc's state machine assigns hundreds of values it never reads.
 		return
 	}
-	// A switch's tag is read by its cases, which the representation compares against it without a referrer the
-	// walk below would see. A switch with no tag adds the nil value, which no value asked about is.
-	switchTags := map[intermediate_representation.Value]bool{}
-	ast.Inspect(body, func(node ast.Node) bool {
-		if statement, isSwitch := node.(*ast.SwitchStmt); isSwitch {
-			tag, _ := function.ValueForExpression(statement.Tag)
-			switchTags[tag] = true
-		}
-		return true
-	})
-	isUsed := func(value intermediate_representation.Value) bool {
-		return hasUse(value, switchTags)
-	}
-	ast.Inspect(body, func(node ast.Node) bool {
-		switch statement := node.(type) {
-		case *ast.IncDecStmt:
-			checkIncrement(context, function, statement, isUsed)
-		case *ast.AssignStmt:
-			checkAssignment(context, function, statement, isUsed)
-		}
-		return true
-	})
+	// One walker serves both walks, the one allocation Check makes for a function without a tagged switch, where a
+	// map of tags, a closure for each walk and one for the use test cost four. No finding can change: ast.Inspect is
+	// ast.Walk with a visitor that returns itself, so each walk visits the nodes in the order it did, and the slice of
+	// tags holds what the map did but the nil of a switch with no tag, which hasUse is never asked about.
+	walker := &functionWalker{context: context, function: function}
+	ast.Walk(walker, body)
+	walker.hasSwitchTags = true
+	ast.Walk(walker, body)
 }
 
 // checkIncrement reports an increment or decrement whose result nothing reads.
@@ -126,7 +113,7 @@ func checkIncrement(
 	context *rule.Context,
 	function *intermediate_representation.Function,
 	statement *ast.IncDecStmt,
-	isUsed func(value intermediate_representation.Value) bool,
+	switchTags []intermediate_representation.Value,
 ) {
 	value, _ := function.ValueForExpression(statement.X)
 	if value == nil {
@@ -136,7 +123,7 @@ func checkIncrement(
 		// A zero-valued constant, for example in `values := []string(nil)`.
 		return
 	}
-	if !isUsed(value) {
+	if !hasUse(value, switchTags) {
 		staticcheck_report.Report(context, statement, fmt.Sprintf(messageFormat, statement.X))
 	}
 }
@@ -147,7 +134,7 @@ func checkAssignment(
 	context *rule.Context,
 	function *intermediate_representation.Function,
 	statement *ast.AssignStmt,
-	isUsed func(value intermediate_representation.Value) bool,
+	switchTags []intermediate_representation.Value,
 ) {
 	if len(statement.Lhs) > 1 && len(statement.Rhs) == 1 {
 		// A call of several results, or a comma-ok form: each variable takes one extraction of the one value.
@@ -161,7 +148,7 @@ func checkAssignment(
 		}
 		for _, referrer := range *referrers {
 			extraction, isExtraction := referrer.(*intermediate_representation.Extract)
-			if !isExtraction || isUsed(extraction) {
+			if !isExtraction || hasUse(extraction, switchTags) {
 				continue
 			}
 			assigned := statement.Lhs[extraction.Index]
@@ -190,7 +177,7 @@ func checkAssignment(
 			// A zero-valued constant, for example in `values := []string(nil)`.
 			continue
 		}
-		if !isUsed(value) {
+		if !hasUse(value, switchTags) {
 			staticcheck_report.Report(context, statement, fmt.Sprintf(messageFormat, assigned))
 		}
 	}
@@ -204,7 +191,7 @@ func isNamedVariable(assigned ast.Expr) bool {
 
 // hasUse is whether anything reads value: a switch whose tag it is, or any referrer but a phi, or a phi something
 // reads in turn, each phi followed once. A value whose referrers the representation does not track counts as read.
-func hasUse(value intermediate_representation.Value, switchTags map[intermediate_representation.Value]bool) bool {
+func hasUse(value intermediate_representation.Value, switchTags []intermediate_representation.Value) bool {
 	// One set of what the walk has followed from, shared by the whole walk as the original's is, so a loop of phis
 	// that reach each other ends.
 	seen := map[intermediate_representation.Value]bool{}
@@ -213,7 +200,7 @@ func hasUse(value intermediate_representation.Value, switchTags map[intermediate
 		if seen[value] {
 			return false
 		}
-		if switchTags[value] {
+		if slices.Contains(switchTags, value) {
 			return true
 		}
 		referrers := value.Referrers()

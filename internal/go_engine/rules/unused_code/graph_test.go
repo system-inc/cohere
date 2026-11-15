@@ -13,31 +13,36 @@ import (
 // that a node list or a map starting empty would grow many times over.
 const storageMethods = 4096
 
-// TestGraphIsSizedOnceAndWordsNoObjectWhileBuilding holds the graph's storage to its sizes (#k8e189q): a node is the
-// object it stands for and its edges, 64 bytes, an edge map is keyed by one word, and filling a graph sized from its
-// package's declarations allocates only each node's own lists of uses and ownerships. A node list or a map starting
-// empty would allocate again as it grew, and a node worded as it is made would allocate for each method's name. The
-// verdict's lists are each made once at their size.
+// TestGraphIsSizedOnceAndWordsNoObjectWhileBuilding holds the graph's storage to its sizes (#k8e189q, #fex6s0v): a
+// node is the object it stands for and where its two chains of edges start, 24 bytes, a link of a chain is two 32-bit
+// indexes, the object map and the edge maps are keyed by one word, and filling a graph sized from its package's
+// declarations allocates nothing. Lists of uses and ownerships kept on each node would allocate for every node with
+// an edge, a node list, a list of links or a map starting empty would allocate again as it grew, and a node worded as
+// it is made would allocate for each method's name. The verdict's lists are each made once at their size.
 //
 // Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would
 // add to.
 func TestGraphIsSizedOnceAndWordsNoObjectWhileBuilding(test *testing.T) {
-	if size := reflect.TypeFor[node]().Size(); size != 64 {
-		test.Errorf("a node is %d bytes, not 64: it holds more than its object and its edges", size)
+	if size := reflect.TypeFor[node]().Size(); size != 24 {
+		test.Errorf("a node is %d bytes, not 24: it holds more than its object and where its edges start", size)
 	}
-	// Each method is owned and used by the method before it, so filling the graph gives every method but the last one
-	// list of ownerships and one of uses, a single entry each: two allocations a method, and no other.
-	expected := float64(2 * (storageMethods - 1))
+	if size := reflect.TypeFor[edgeLink]().Size(); size != 8 {
+		test.Errorf("a link is %d bytes, not 8: its indexes are wider than 32 bits", size)
+	}
+	// Each method is owned and used by the method before it, so filling the graph makes every method a node and links
+	// an ownership and a use for each, all in room the graph was made with.
+	const expected = 0
 	const runs = 4
 	graphs := make([]storageGraph, runs+1)
 	for index := range graphs {
 		graphs[index] = newStorageGraph()
 	}
-	for _, edges := range []reflect.Type{
+	for _, keyed := range []reflect.Type{
 		reflect.TypeOf(graphs[0].graph.usedEdges), reflect.TypeOf(graphs[0].graph.ownedEdges),
+		reflect.TypeOf(graphs[0].graph.objects),
 	} {
-		if size := edges.Key().Size(); size != 8 {
-			test.Errorf("an edge map's key is %d bytes, not one word", size)
+		if size := keyed.Key().Size(); size != 8 {
+			test.Errorf("the map %v's key is %d bytes, not one word", keyed, size)
 		}
 	}
 	filled := 0
@@ -46,8 +51,9 @@ func TestGraphIsSizedOnceAndWordsNoObjectWhileBuilding(test *testing.T) {
 		filled++
 	})
 	if allocations != expected {
-		test.Errorf("filling a graph of %d methods allocated %.0f times, not %.0f: the node list or a map grew, or a "+
-			"node was worded as it was made", storageMethods, allocations, expected)
+		test.Errorf("filling a graph of %d methods allocated %.0f times, not %d: a node kept lists of its own, the "+
+			"node list, a list of links or a map grew, or a node was worded as it was made", storageMethods,
+			allocations, expected)
 	}
 
 	verdict := graphs[0].graph.results()
