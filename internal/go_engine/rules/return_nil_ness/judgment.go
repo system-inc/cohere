@@ -51,7 +51,7 @@ func defaultNilness(valueType types.Type) ValueNilness {
 // that returns, each normalized, so a result that is no pointer is never nil and one the analysis knows nothing of may
 // be nil.
 func (judging *judgment) judge(function *intermediate_representation.Function) []ValueNilness {
-	values := numbering{}
+	values := numberingOf(function)
 
 	// The default state of the values that are no instruction is set on entry, since state.get cannot supply it
 	// where control flow merges: a merge of lattice values knows nothing of a value's kind.
@@ -113,6 +113,8 @@ func (judging *judgment) judge(function *intermediate_representation.Function) [
 			returned[index] = lattice{}.Merge(returned[index], current.get(result))
 		}
 	}
+	// Every state is read by now, and none outlives the analysis, so the numbering goes back for the next function.
+	values.release()
 
 	for index := range returned {
 		resultType := function.Signature.Results().At(index).Type()
