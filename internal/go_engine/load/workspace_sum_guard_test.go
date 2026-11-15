@@ -181,6 +181,8 @@ func TestASideCopyAnswersAsTheTreeDoes(test *testing.T) {
 			}
 			unguarded := *goEnvironment
 			unguarded.guard = nil
+			// The guarded load fetched the lister's go commands under the guard, and the tree's must run its own.
+			unguarded.listerState = &listerState{}
 			loadedTree, errorTree := loadAnswer(test, workspace, &unguarded)
 			compareAnswers(test, "the load", loadedAside, loadedTree)
 			compareAnswers(test, "the load's error", errorAside, errorTree)

@@ -103,7 +103,7 @@ func (generator standardLibraryGenerator) variantTable(
 	// Ignored: the directory is a temporary one of this call's own, and a failure to remove it changes no table.
 	defer func() { _ = os.RemoveAll(directory) }()
 	environment := generator.variantEnvironment(request)
-	goEnvironment, environmentError := load.ReadGoEnvironment(directory, environment, nil)
+	goEnvironment, environmentError := load.ReadGoEnvironment(directory, environment, nil, nil)
 	if environmentError != nil {
 		return nil, cache.StandardLibraryVariant{}, fmt.Errorf("fetching the toolchain %s with GOTOOLCHAIN: %w",
 			request.goVersion, environmentError)

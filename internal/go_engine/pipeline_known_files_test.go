@@ -34,6 +34,8 @@ func plainRun(test *testing.T, root string) *pipeline {
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
 	engine := newPipeline(request, described, ruleSettings, registered, &bytes.Buffer{}, io.Discard, nil)
 	engine.run()
 	if engine.session == nil || engine.fix == nil {

@@ -32,6 +32,14 @@ type workspaceSumGuard struct {
 	environment []string
 	answer      map[string]string
 
+	// readsNoWorkFile is set when go reads no go.work, where -mod=readonly, go's default, refuses any write of go.sum,
+	// so each command runs as it is.
+	readsNoWorkFile bool
+
+	// children is the run's account of the go commands it starts, which each command the guard runs is recorded in,
+	// nil to record none (see Children).
+	children *Children
+
 	// sideRoot is the directory each side copy's own directory is made in, the system's temporary directory when
 	// empty. Only a test sets it, to one where nothing can be made, to fail the copy.
 	sideRoot string
@@ -47,24 +55,29 @@ type workspaceSumGuard struct {
 	unguarded string
 }
 
-// newWorkspaceSumGuard is the guard of the go commands run under environment, as go env answered under it, or nil
-// when go reads no go.work, where -mod=readonly, go's default, refuses any write of go.sum.
-func newWorkspaceSumGuard(environment []string, answer map[string]string) *workspaceSumGuard {
-	if answer["GOWORK"] == "" || answer["GOWORK"] == "off" {
-		return nil
-	}
+// newWorkspaceSumGuard is the guard of the go commands run under environment, as go env answered under it, recording
+// each in children. It runs each as it is when go reads no go.work, where -mod=readonly, go's default, refuses any
+// write of go.sum, and is made all the same, since every go list of a load is recorded through it.
+func newWorkspaceSumGuard(environment []string, answer map[string]string, children *Children) *workspaceSumGuard {
 	return &workspaceSumGuard{
-		environment: environment,
-		answer:      answer,
-		plans:       map[string]*workspaceSumPlan{},
+		environment:     environment,
+		answer:          answer,
+		readsNoWorkFile: answer["GOWORK"] == "" || answer["GOWORK"] == "off",
+		children:        children,
+		plans:           map[string]*workspaceSumPlan{},
 	}
 }
 
 // output runs command, a go command whose output and standard error nothing has taken, and returns what it printed on
 // each and how it ended: under a side copy of the go.work when one answers exactly, and otherwise in the tree, noted as
-// unguarded. A nil guard runs it as it is.
+// unguarded. Every go command of a load runs through it, so it records each in the guard's children. A guard of a
+// workspace with no go.work runs it as it is, and so does a nil guard, which records nothing.
 func (guard *workspaceSumGuard) output(command *exec.Cmd) ([]byte, []byte, error) {
 	if guard == nil {
+		return runCommand(command)
+	}
+	guard.children.started(command.Args[1:])
+	if guard.readsNoWorkFile {
 		return runCommand(command)
 	}
 	environment := command.Env
@@ -97,7 +110,8 @@ func (guard *workspaceSumGuard) planFor(workingDirectory string) *workspaceSumPl
 }
 
 // unguardedSum is the go.work.sum a command of the guard ran beside without a side copy, so go list may have rewritten
-// it, or empty when every one ran under a copy, or none ran. A nil guard guards nothing go could write.
+// it, or empty when every one ran under a copy, or none ran. A nil guard, and one of a workspace with no go.work,
+// guard nothing go could write.
 func (guard *workspaceSumGuard) unguardedSum() string {
 	if guard == nil {
 		return ""

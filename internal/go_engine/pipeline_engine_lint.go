@@ -223,6 +223,9 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.duplicates = engine.duplicatesReport(result)
 	}
 	record.ElapsedMilliseconds = int(elapsed.Milliseconds())
+	// Every load of the run has ended, the builds' too, so every go command a load started is counted.
+	record.ChildProcessesAfterLoadNamed = engine.described.children.Late()
+	record.ChildProcessesAfterLoad = len(record.ChildProcessesAfterLoadNamed)
 	engine.write(record)
 	engine.phase(contract.PhaseLint, contract.OutcomeRan, elapsed, "")
 	return lintedLoad
@@ -384,7 +387,7 @@ func (engine *pipeline) cacheSession(
 	}
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
-		enabled)
+		enabled, engine.described.children)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}

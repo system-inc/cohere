@@ -28,6 +28,16 @@ type describedProject struct {
 	// in place of asking again, nil when the census judged no file (#f53yra8).
 	goEnvironment *load.GoEnvironment
 
+	// children is the run's account of the go commands its loads start, and of those started once its first load has
+	// begun, for the lint record (#sktb2y8). It is made here, since the census asks the run's first go env, and every
+	// go list under that answer is recorded in it. Nil, as a test's hand-made project has it, records nothing.
+	children *load.Children
+
+	// started is the go commands describeProject started beside its census and its reads that may still run (see
+	// earlyStart), which the pipeline joins before its first load (awaitStarted). Nil, as a test's hand-made project
+	// has it, started none.
+	started *earlyStart
+
 	// builds are what a run under `--other-builds` checks, the host's first, read from the census before the first
 	// record (readBuilds), so the project record names a file only another build compiles as checked by it, and the
 	// lint phase checks these and reads them no second time (otherBuilds). Nil without the switch, and when the census
@@ -62,6 +72,14 @@ type describedProject struct {
 
 	// unreadable are the in-scope files that could not be read, each written before the first phase.
 	unreadable []contract.UnreadableRecord
+}
+
+// awaitStarted joins every go command describeProject started beside its census and its reads (#q9ezwvw), so none of
+// them starts after the run's first load begins, and none outlives the run.
+func (described *describedProject) awaitStarted() {
+	if described.started != nil {
+		described.started.wait()
+	}
 }
 
 // readable are the in-scope files that could be read, in order: the files a phase that reads source is given.

@@ -26,7 +26,7 @@ func TestALoadReadsTheGoEnvironmentItIsHanded(test *testing.T) {
 	environment := []string{"GOWORK=off"}
 	planted := filepath.Join(root, "planted-go.env")
 
-	answer, answerError := ReadGoEnvironment(project, environment, nil)
+	answer, answerError := ReadGoEnvironment(project, environment, nil, nil)
 	if answerError != nil {
 		test.Fatal(answerError)
 	}
@@ -65,7 +65,7 @@ func TestEachLoadOfOneAnswerReadsItsOwnHeldBytes(test *testing.T) {
 	}
 	writeListingFiles(test, root, listingFiles)
 	project := filepath.Join(root, "project")
-	answer, answerError := ReadGoEnvironment(project, []string{"GOWORK=off"}, nil)
+	answer, answerError := ReadGoEnvironment(project, []string{"GOWORK=off"}, nil, nil)
 	if answerError != nil {
 		test.Fatal(answerError)
 	}
@@ -138,7 +138,7 @@ func TestTheRunsBuildCacheIsSkippedForTheStaticcheckConf(test *testing.T) {
 // when go env fails.
 func goEnvironmentOf(test *testing.T, directory string, environment []string) *GoEnvironment {
 	test.Helper()
-	goEnvironment, environmentError := ReadGoEnvironment(directory, environment, nil)
+	goEnvironment, environmentError := ReadGoEnvironment(directory, environment, nil, nil)
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}

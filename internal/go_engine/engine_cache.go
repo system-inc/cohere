@@ -49,13 +49,15 @@ var embeddedStandardLibrary = builtInStandardLibrary{
 // workspace's own for the host's build and with an extra build's target after it for that build, and goEnvironment
 // is go env's answer the load reads there, so the build context every key shares is the one of the build the load is
 // of, read from the go env the load asked rather than from one of its own (#4rpt1jh). goEnvironment is nil only for a
-// host whose census judged no file, which asked go env nothing; then it is read here.
+// host whose census judged no file, which asked go env nothing; then it is read here, recorded in children, the run's
+// account of the go commands it starts (see load.Children).
 func lintCache(
 	request invocation,
 	workspace project.Workspace,
 	environment []string,
 	goEnvironment *load.GoEnvironment,
 	enabled []rule.Rule,
+	children *load.Children,
 ) (*check.Caching, error) {
 	builtIn := request.standardLibrary
 	holdsTable := builtIn.table != nil && !builtIn.table.Empty()
@@ -67,7 +69,7 @@ func lintCache(
 	answered := goEnvironment
 	if answered == nil {
 		var environmentError error
-		answered, environmentError = load.ReadGoEnvironment(workspace.Root, environment, nil)
+		answered, environmentError = load.ReadGoEnvironment(workspace.Root, environment, nil, children)
 		if environmentError != nil {
 			return nil, environmentError
 		}

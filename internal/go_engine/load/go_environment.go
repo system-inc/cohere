@@ -15,15 +15,17 @@ import (
 	"sync/atomic"
 
 	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // GoEnvironment is go env's answer for a workspace under an environment, as ReadGoEnvironment reads it: the whole
 // environment every go command of a load runs with, the build target, the go environment the inputs record names, and
-// every variable of goEnvironmentNames by name. The project's census asks for it (ExcludedByConstraints), and a load
-// handed it through Caching asks go env nothing, so a run asks once where it asked twice (#f53yra8); the load's
-// lister, its kept listing and the engine's findings cache read their variables from it too, so a build asks go env
-// once where it asked up to five times (#4rpt1jh). Nothing a run writes moves it: go env reads the environment, the go
-// env files and the go.mod and go.work go finds, and a run rewrites only Go files.
+// every variable of goEnvironmentNames by name. The project's description asks for it beside its census and its reads,
+// and judges the census's constraints by it (ExcludedByConstraints), and a load handed it through Caching asks go env
+// nothing, so a run asks once where it asked twice (#f53yra8); the load's lister, its kept listing and the engine's
+// findings cache read their variables from it too, so a build asks go env once where it asked up to five times
+// (#4rpt1jh). Nothing a run writes moves it: go env reads the environment, the go env files and the go.mod and go.work
+// go finds, and a run rewrites only Go files.
 type GoEnvironment struct {
 	workspace       string
 	environment     []string
@@ -36,9 +38,14 @@ type GoEnvironment struct {
 	answer map[string]string
 
 	// guard runs every go list of a load under it beside a side copy of the go.work in use, so none rewrites the
-	// tree's go.work.sum, nil when go reads no go.work (see workspaceSumGuard). go env runs without it: it reads the
-	// go.work's path and never its sums, and every reader of `GOWORK` reads the tree's own.
+	// tree's go.work.sum, and as it is when go reads no go.work (see workspaceSumGuard). go env runs without it: it
+	// reads the go.work's path and never its sums, and every reader of `GOWORK` reads the tree's own.
 	guard *workspaceSumGuard
+
+	// listerState is the two go commands the in-process lister reads under the answer, run once for every load under
+	// it, and early when the run asks (FetchListerState). A pointer, so a copy of the answer, as a test makes, shares
+	// it.
+	listerState *listerState
 }
 
 // goEnvironmentNames are every variable a reader of a GoEnvironment reads, asked of go env in one command: the kept
@@ -54,15 +61,17 @@ var goEnvironmentNames = slices.Concat(listingEnvironment, []string{"GOENV", "GO
 // differently for it. go env is asked under the environment as given, and nothing it reports but `GOFLAGS` itself
 // would differ under the whole one: go env defines no flag of `GOFLAGS` but -n and -x, and skips every other (see
 // value), so the load's lister and kept listing, which asked under the whole environment, read the same answer with
-// `GOFLAGS` rewritten. held is what the build context opens a file from when ExcludedByConstraints reads it directly;
-// a load reads it through contextFor.
-func ReadGoEnvironment(directory string, environment []string, held Held) (*GoEnvironment, error) {
+// `GOFLAGS` rewritten. held is what the build context opens a file from when ExcludedByConstraints judges it, only
+// stored as the context is made and never called here, so a caller may ask before it holds the bytes; a load reads it
+// through contextFor. children is the run's account of the go commands it starts (see Children), which go env here and
+// every go list under the answer are recorded in, nil to record none.
+func ReadGoEnvironment(directory string, environment []string, held Held, children *Children) (*GoEnvironment, error) {
 	workspace, absoluteError := filepath.Abs(directory)
 	if absoluteError != nil {
 		return nil, absoluteError
 	}
 	given := append(os.Environ(), environment...)
-	answer, askError := askGoEnvironment(workspace, given)
+	answer, askError := askGoEnvironment(workspace, given, children)
 	if askError != nil {
 		return nil, askError
 	}
@@ -82,7 +91,8 @@ func ReadGoEnvironment(directory string, environment []string, held Held) (*GoEn
 		buildContext:    buildContext,
 		reported:        reported,
 		answer:          answer,
-		guard:           newWorkspaceSumGuard(fullEnvironment, answer),
+		guard:           newWorkspaceSumGuard(fullEnvironment, answer, children),
+		listerState:     &listerState{},
 	}, nil
 }
 
@@ -90,10 +100,12 @@ func ReadGoEnvironment(directory string, environment []string, held Held) (*GoEn
 // by name: the one go env the engine runs for a run's build (#4rpt1jh). It asks with `PWD` set to workspace, as
 // runList does, so the go.mod and go.work it reports, and the modules a go.work uses below it, are spelled under
 // workspace as the load names it, never through a link the caller's working directory went through (#hd5bsqh): a run
-// through a linked root then names its inputs as a run at the real root does.
-func askGoEnvironment(workspace string, environment []string) (map[string]string, error) {
+// through a linked root then names its inputs as a run at the real root does. The command is recorded in children.
+func askGoEnvironment(workspace string, environment []string, children *Children) (map[string]string, error) {
 	goEnvironmentAsked(workspace)
-	command := exec.Command("go", append([]string{"env", "-json"}, goEnvironmentNames...)...)
+	arguments := append([]string{"env", "-json"}, goEnvironmentNames...)
+	children.started(arguments)
+	command := exec.Command("go", arguments...)
 	command.Dir = workspace
 	command.Env = append(slices.Clone(environment), "PWD="+workspace)
 	var standardError bytes.Buffer
@@ -154,6 +166,16 @@ func (goEnvironment *GoEnvironment) Values() map[string]string {
 func (goEnvironment *GoEnvironment) Target() (*build.Context, []string) {
 	buildContext := *goEnvironment.buildContext
 	return &buildContext, slices.Clone(goEnvironment.reported.goFlags)
+}
+
+// FetchListerState runs the two go commands the in-process lister reads in the workspace under the whole environment,
+// now, unless they have run already, so every load under the answer reads what they printed and starts neither: the
+// run fetches each build's before the host's first load, while the heap is small (#sktb2y8). The commands, their
+// environment and their guard are the ones a load would start, only earlier. What they spend, and what starting them
+// and reading their answers costs this process, is added to collector, by whichever call ran them, so it is counted
+// once.
+func (goEnvironment *GoEnvironment) FetchListerState(collector *timing.Collector) {
+	goEnvironment.listerState.fetch(goEnvironment, collector)
 }
 
 // contextFor is the build target as a build context that opens a file held holds from its held bytes, and any other

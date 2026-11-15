@@ -31,6 +31,8 @@ type loadRequest struct {
 // it (#44n0vap). Every load, the first, the long-line wrap's, the rename's and its proofs, a lint reload and an extra
 // build's, runs under the cap, and the raise may lift the limit at most once after each.
 func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) {
+	// Every go command started from here on is late (#sktb2y8).
+	engine.described.children.LoadBegins()
 	engine.loads.begin()
 	workspace := engine.described.workspace
 	// The workspace, unless this is the editor's save, which loads its file's package alone (stdinPackage).
@@ -82,8 +84,10 @@ func (engine *pipeline) unguardedWorkspaceSums() []string {
 // watchedCaching is caching as it is, unless a test watches inside its loads (engineMemory.duringLoad): then its held
 // reader calls the watch before each lookup, which is during the load.
 func (engine *pipeline) watchedCaching(caching load.Caching) load.Caching {
-	// Every cached load of the run, the host's and every extra build's, takes its slots from the run's one pool.
+	// Every cached load of the run, the host's and every extra build's, takes its slots from the run's one pool, and
+	// records the go commands it starts in the run's account.
 	caching.Pool = engine.workPool()
+	caching.Children = engine.described.children
 	if engine.memory == nil || engine.memory.duringLoad == nil {
 		return caching
 	}

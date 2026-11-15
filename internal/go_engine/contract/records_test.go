@@ -38,8 +38,11 @@ var fieldsNotWritten = map[Kind][]string{
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
-	KindFix:  {"notWritten"},
-	KindLint: {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds", "offReasons"},
+	KindFix: {"notWritten"},
+	KindLint: {
+		"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds", "offReasons",
+		"childProcessesAfterLoad", "childProcessesAfterLoadNamed",
+	},
 	KindTypes: {
 		"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation", "censusMissed",
 		"headersUnshared",
@@ -353,7 +356,9 @@ func populatedRecords() []Record {
 					LintPeakOverLoadEnd: 2,
 				},
 			},
-			OffReasons: map[string]string{"cohere-go/printf": "a reason"},
+			OffReasons:                   map[string]string{"cohere-go/printf": "a reason"},
+			ChildProcessesAfterLoad:      1,
+			ChildProcessesAfterLoadNamed: []string{"go list -e -deps"},
 		},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
 		RuleRecord{Name: "cohere-go/printf", Severity: "error"},
