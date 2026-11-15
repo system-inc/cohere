@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/types"
@@ -124,6 +125,48 @@ func TestIsGeneratedReadsStaticchecksJudgment(test *testing.T) {
 	expected := map[string]bool{"dispatched.go": false, "generated.go": true, "plain.go": false}
 	if !maps.Equal(judged, expected) {
 		test.Errorf("IsGenerated judged the fixture's files %v, where %v was expected", judged, expected)
+	}
+}
+
+// finish builds its result at the size it ends at: over two hundred started rules and one not started, the size of a
+// registry, it allocates no more than a map made for every outcome from the start, where a map grown from empty
+// allocates its table again each time it fills (#fex6s0v). Every outcome is there, under its rule's name.
+//
+// Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would
+// add to.
+func TestFinishSizesItsResultOnce(test *testing.T) {
+	notStarted := Outcome{Crash: errors.New("what it requires failed")}
+	started := &startedRuns{notStarted: Result{"not started": notStarted}}
+	for index := range 200 {
+		started.runs = append(started.runs, &listenerRun{
+			registered:  &registeredRule{name: fmt.Sprintf("rule %d", index), listener: &rule.Listener{}},
+			diagnostics: []analysis.Diagnostic{{Message: fmt.Sprintf("finding %d", index)}},
+		})
+	}
+	finished := finish(started)
+	if len(finished) != len(started.runs)+1 || !errors.Is(finished["not started"].Crash, notStarted.Crash) {
+		test.Fatalf("finish returned %d outcomes, with %+v not started, where %d and the crash were expected",
+			len(finished), finished["not started"], len(started.runs)+1)
+	}
+	for _, run := range started.runs {
+		diagnostics := finished[run.registered.name].Diagnostics
+		if len(diagnostics) != 1 || diagnostics[0].Message != run.diagnostics[0].Message {
+			test.Errorf("finish returned %+v for %s, where its findings %+v were expected",
+				finished[run.registered.name], run.registered.name, run.diagnostics)
+		}
+	}
+	allocations := testing.AllocsPerRun(10, func() { finish(started) })
+	var sized Result
+	sizedAllocations := testing.AllocsPerRun(10, func() {
+		sized = make(Result, len(started.runs)+1)
+		sized["not started"] = notStarted
+		for _, run := range started.runs {
+			sized[run.registered.name] = run.outcome()
+		}
+	})
+	if allocations > sizedAllocations || len(sized) != len(finished) {
+		test.Errorf("finish allocated %.0f times, where a map sized for its %d outcomes allocates %.0f: it grew its "+
+			"result rather than sizing it once", allocations, len(sized), sizedAllocations)
 	}
 }
 

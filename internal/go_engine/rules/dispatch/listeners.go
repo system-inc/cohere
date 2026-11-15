@@ -345,7 +345,10 @@ func finish(started *startedRuns) Result {
 		}
 		started.timing.Nested(started.dispatcher, listened, calls)
 	}
-	result := Result{}
+	// Sized once to every outcome it holds: grown from empty, it reallocated and zeroed its table several times over
+	// on the way to a couple of hundred rules, once per package per dispatcher (#fex6s0v). The size is exact, since a
+	// rule is started or not and each is named once, and a map's size never changes what it holds.
+	result := make(Result, len(started.notStarted)+len(started.runs))
 	for name, outcome := range started.notStarted {
 		result[name] = outcome
 	}
