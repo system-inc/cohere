@@ -11,10 +11,27 @@ import (
 // syntaxWalk is the walk of one package's files, which keeps the ancestors of the node it visits as it goes.
 type syntaxWalk struct {
 	started *startedRuns
+	// byNodeKind is started's byKind for each kind nodeKindOf numbers, at its number, so a node visited finds its
+	// listeners by a type switch and an index. A kind it numbers 0 is found in byKind itself.
+	byNodeKind [nodeKindCount][]*listenerRun
 	// spine is the cursors from the file down to the node last visited, that node included, and ancestors is their
 	// nodes, the slice a listener is handed with the last left out. Both are reused across the whole walk.
 	spine     []inspector.Cursor
 	ancestors []ast.Node
+}
+
+// newSyntaxWalk is the walk calling started's listeners, each kind they list found by its number where nodeKindOf
+// numbers it.
+func newSyntaxWalk(started *startedRuns) *syntaxWalk {
+	walk := &syntaxWalk{started: started}
+	for kind, runs := range started.byKind {
+		// Every kind a syntax listener lists is the type of one of its Nodes, so its zero value is an ast.Node too,
+		// whose kind nodeKindOf reads off its type alone.
+		if zero, isNode := reflect.Zero(kind).Interface().(ast.Node); isNode && nodeKindOf(zero) != 0 {
+			walk.byNodeKind[nodeKindOf(zero)] = runs
+		}
+	}
+	return walk
 }
 
 // visit calls every started listener that lists cursor's node's kind, with the node, its ancestors and its cursor,
@@ -25,7 +42,12 @@ func (walk *syntaxWalk) visit(cursor inspector.Cursor) bool {
 	// Capped at the ancestors, so a listener that appends to its stack makes a copy rather than overwriting the node
 	// in the slice the walk goes on handing its descendants.
 	ancestors := walk.ancestors[: len(walk.ancestors)-1 : len(walk.ancestors)-1]
-	runs := walk.started.byKind[reflect.TypeOf(node)]
+	// The same listeners byKind holds for the kind, in the same order, found without hashing it.
+	number := nodeKindOf(node)
+	runs := walk.byNodeKind[number]
+	if number == 0 {
+		runs = walk.started.byKind[reflect.TypeOf(node)]
+	}
 	for called := 0; called < len(runs); {
 		called = walk.callNodes(runs, called, cursor, node, ancestors)
 	}

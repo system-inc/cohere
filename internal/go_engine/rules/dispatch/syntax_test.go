@@ -3,13 +3,17 @@ package dispatch
 import (
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
+	"maps"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/ast/inspector"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -264,6 +268,100 @@ func TestEveryNodeCallOnANodeSharesTheWalksRecover(test *testing.T) {
 	if ifs < 4 || len(callers) != 1 || callers[walkCalls] != ifs+1 {
 		test.Errorf("the listeners were called from %v over %d ifs, where every call from %s was expected", callers,
 			ifs, walkCalls)
+	}
+}
+
+// numberedSource is Go reaching every common kind of node, generics, a select and a labeled loop among them, for
+// the walk's kind numbering to be read over.
+const numberedSource = `package numbered
+
+import "fmt"
+
+type Pair[Key comparable, Value any] struct {
+	key   Key
+	value Value
+}
+
+func Lookup[Key comparable, Value any](pairs []Pair[Key, Value], wanted Key) (Value, bool) {
+	for _, pair := range pairs {
+		if pair.key == wanted {
+			return pair.value, true
+		}
+	}
+	var zero Value
+	return zero, false
+}
+
+func Drain(values chan int, done <-chan struct{}) (total int) {
+	defer fmt.Println("drained")
+outer:
+	for index := 0; index < 10; index++ {
+		select {
+		case value := <-values:
+			total += value
+		case <-done:
+			break outer
+		}
+	}
+	go func() { values <- -total }()
+	switch typed := any(total).(type) {
+	case int:
+		total = typed * 2
+	}
+	lookup := map[string][]int{"a": {1, 2}}
+	_ = lookup["a"][1:]
+	_ = &Pair[int, string]{key: 1}
+	return
+}
+`
+
+// The walk finds a node's listeners by the number nodeKindOf gives its kind, never by hashing its reflect.Type, and
+// finds the very listeners byKind holds for it (#fex6s0v): with byKind emptied once the walk is built, every listener
+// still hears every node of each kind it lists, so the map is not what the walk reads. Every kind of the source is
+// numbered, and no two kinds share a number.
+func TestTheSyntaxWalkFindsListenersByTheNodesKindNumber(test *testing.T) {
+	test.Parallel()
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "numbered.go", numberedSource, parser.ParseComments)
+	if parseError != nil {
+		test.Fatalf("parsing the source: %v", parseError)
+	}
+	numbers := map[int]reflect.Type{}
+	expected := map[reflect.Type]int{}
+	ast.Inspect(file, func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+		number, kind := nodeKindOf(node), reflect.TypeOf(node)
+		if number == 0 || (numbers[number] != nil && numbers[number] != kind) {
+			test.Errorf("%v is numbered %d, which is no number or %v's as well", kind, number, numbers[number])
+		}
+		numbers[number] = kind
+		expected[kind]++
+		return true
+	})
+	pass := &analysis.Pass{Fset: fileSet, Files: []*ast.File{file}}
+	started := &startedRuns{byKind: map[reflect.Type][]*listenerRun{}, notStarted: Result{}}
+	heard := map[reflect.Type]int{}
+	kinds := []ast.Node{}
+	for kind := range expected {
+		node, isNode := reflect.Zero(kind).Interface().(ast.Node)
+		if !isNode {
+			test.Fatalf("%v is no ast.Node", kind)
+		}
+		kinds = append(kinds, node)
+		listener := &rule.Listener{Nodes: []ast.Node{node}, Node: func(_ *rule.Context, at ast.Node, _ []ast.Node) {
+			heard[reflect.TypeOf(at)]++
+		}}
+		registered := &registeredRule{name: kind.String(), analyzer: &analysis.Analyzer{}, listener: listener,
+			kinds: []reflect.Type{kind}}
+		started.add(newListenerRun(registered, pass, func(string) bool { return false }, nil, false))
+	}
+	walk := newSyntaxWalk(started)
+	clear(started.byKind)
+	inspector.New([]*ast.File{file}).Root().Inspect(kinds, walk.visit)
+	if len(expected) < 40 || !maps.Equal(heard, expected) {
+		test.Errorf("the listeners heard %v, where the source holds %v, %d kinds", heard, expected, len(expected))
 	}
 }
 
