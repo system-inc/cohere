@@ -388,10 +388,10 @@ func TestAFlagNoVerdictReadsStaysOutOfTheBuildContext(test *testing.T) {
 }
 
 // The standard library's build context is the target, cgo, the toolchain and its experiments, and the go flags but
-// those no verdict reads and those that change nothing of the standard library: -trimpath and the module flags drop
-// out, while -n, -buildvcs, -tags, -race and every other flag stay and key apart. It names none of the process's own
-// variables, and go env's `GOROOT`, which the standard library's keys name each file below, is read beside it and is
-// in neither context.
+// those no verdict reads and those that change nothing of the standard library: -trimpath, the module flags and
+// -buildvcs drop out, while -n, -tags, -race and every other flag stay and key apart. It names none of the process's
+// own variables, and go env's `GOROOT`, which the standard library's keys name each file below, is read beside it and
+// is in neither context.
 //
 // Not parallel: it sets the process's own `GOARCH`, which every test in the process reads.
 func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSee(test *testing.T) {
@@ -405,8 +405,9 @@ func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSe
 		return standardLibraryBuild(goEnvironmentIn(test, root, []string{"GOFLAGS=" + goFlags,
 			"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOEXPERIMENT="}))
 	}
-	keptFlags := "-n -buildvcs=false -tags=probe -race -gcflags=all=-N"
-	narrowed := contextUnder("-trimpath -mod=mod -modfile=other.mod -modcacherw -p=3 -v " + keptFlags)
+	keptFlags := "-n -tags=probe -race -gcflags=all=-N"
+	narrowed := contextUnder("-trimpath -mod=mod -modfile=other.mod -modcacherw -buildvcs=false -p=3 -v " +
+		keptFlags)
 	values := goEnvironmentIn(test, root, nil)
 	want := []string{"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=" + keptFlags,
 		"GOVERSION=" + values["GOVERSION"], "GOEXPERIMENT="}
@@ -414,7 +415,7 @@ func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSe
 		test.Errorf("want\n%q\ngot\n%q", want, narrowed)
 	}
 	if bare := contextUnder(keptFlags); !slices.Equal(narrowed, bare) {
-		test.Errorf("want -trimpath, the module flags, -p and -v left out, got %q and %q", narrowed, bare)
+		test.Errorf("want -trimpath, the module flags, -buildvcs, -p and -v left out, got %q and %q", narrowed, bare)
 	}
 	for _, kept := range strings.Fields(keptFlags) {
 		without := strings.Join(slices.DeleteFunc(strings.Fields(keptFlags), func(field string) bool {
