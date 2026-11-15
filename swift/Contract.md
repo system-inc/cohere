@@ -913,7 +913,10 @@ darwin go starts a child with fork, which marks the whole address space copy-on-
 started once the engine's heap has grown makes every resident page fault again; a run under
 `--other-builds` with builds beside the host's starts every go command they need before that load, and
 reads 0. A run of one build starts its lister's two inside its first load, as it always has. Both are
-absent when none started, and no key and no verdict reads them.
+absent when none started, and no key and no verdict reads them. They count the go commands of the run's
+cached loads, which are every load the host's lint and its builds make: a load with no cache account, as
+the rename's, records none, and neither does a go command x/tools or go/build starts on its own, so a 0
+says nothing wider than that.
 
 The Go engine's lint record carries one more field, additive within contract 3 as the types record's
 are, so a front door that does not read it yet loses only what it counts:
