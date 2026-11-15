@@ -1,6 +1,7 @@
 package boolean_constant_comparison
 
 import (
+	"bytes"
 	"cmp"
 	"fmt"
 	"go/ast"
@@ -9,10 +10,12 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/simple/s1002"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
@@ -36,6 +39,28 @@ var fixtures = []string{"go1.0/CheckIfBoolCmp", "go1.18/CheckIfBoolCmp", "parity
 // differences is the differences fixture's one package, where the two make the same findings and part on some
 // fixes.
 const differences = "differences"
+
+// sampleNames are the sample package's files, the second a test file, each holding binary expressions that compare no
+// boolean constant and one that does.
+var sampleNames = []string{"sample.go", "sample_test.go"}
+
+// sampleSources are the sample package's files' sources, by sampleNames' order.
+var sampleSources = []string{
+	"package sample\n\n" +
+		"func compare(left int, right int, flag bool) bool {\n" +
+		"\treturn left < right && left == right && flag != flag\n" +
+		"}\n\n" +
+		"func constant(flag bool) bool {\n" +
+		"\treturn flag == true\n" +
+		"}\n",
+	"package sample\n\n" +
+		"func compareInTest(left int, right int) bool {\n" +
+		"\treturn left > right\n" +
+		"}\n\n" +
+		"func constantInTest(flag bool) bool {\n" +
+		"\treturn flag == true\n" +
+		"}\n",
+}
 
 // Every `//@ diag(...)` note each upstream fixture holds, the port reports on the same line with a message the note
 // matches, and the port reports nothing no note expects. The go1.0 package has in-package tests, so it is held alone
@@ -150,58 +175,111 @@ func TestPortMovedFixesCompile(test *testing.T) {
 }
 
 // Check asks whether a comparison is in a test file only once it compares with a boolean constant, so the file set's
-// lookup is spared for every other binary expression. The context holds no file set, so a question of it panics: Check
-// must return quietly from each binary expression of a file that compares no boolean constant, and must reach the
-// question, panicking, at one that does, which shows the probe would catch it.
+// lookup is spared for every other binary expression. The context holds no file set, so IsInTest's question of it
+// panics, and only a panic whose stack holds IsInTest asking the file set counts as the question: Check must ask it at
+// the two comparisons with a boolean constant, one in each file, and nowhere else, and must panic in no other way.
 func TestCheckAsksTheFileOnlyOfAComparisonWithABooleanConstant(test *testing.T) {
 	test.Parallel()
-	fileSet := token.NewFileSet()
-	file, parseError := parser.ParseFile(fileSet, "sample.go", "package sample\n\n"+
-		"func compare(left int, right int, flag bool) bool {\n"+
-		"\treturn left < right && left == right && flag != flag\n"+
-		"}\n\n"+
-		"func constant(flag bool) bool {\n"+
-		"\treturn flag == true\n"+
-		"}\n", 0)
-	if parseError != nil {
-		test.Fatal(parseError)
+	sample := checkedSample(test)
+	context := &rule.Context{Package: sample.checked, TypesInfo: sample.information, Files: sample.files}
+	asked := []string{}
+	for index, file := range sample.files {
+		ast.Inspect(file, func(node ast.Node) bool {
+			binary, isBinary := node.(*ast.BinaryExpr)
+			if !isBinary {
+				return true
+			}
+			func() {
+				defer func() {
+					recovered := recover()
+					if recovered == nil {
+						return
+					}
+					if !isFileAsked(debug.Stack()) {
+						test.Errorf("Check panicked at %s other than by asking the file: %v", types.ExprString(binary),
+							recovered)
+						return
+					}
+					asked = append(asked, sampleNames[index]+": "+types.ExprString(binary))
+				}()
+				Check(context, binary)
+			}()
+			return true
+		})
 	}
-	information := &types.Info{
+	expected := []string{"sample.go: flag == true", "sample_test.go: flag == true"}
+	if !slices.Equal(asked, expected) {
+		test.Errorf("Check asked the file of %v, where it must ask it of %v alone", asked, expected)
+	}
+}
+
+// Check takes IsInTest's answer as it is: of the two comparisons with a boolean constant, the one in sample.go is
+// found and the one in sample_test.go is left alone, so a check that ignored the answer or read it backwards finds
+// the other.
+func TestCheckLeavesAComparisonInATestFileAlone(test *testing.T) {
+	test.Parallel()
+	sample := checkedSample(test)
+	found := []string{}
+	pass := &analysis.Pass{
+		Fset:      sample.fileSet,
+		Files:     sample.files,
+		Pkg:       sample.checked,
+		TypesInfo: sample.information,
+	}
+	context := rule.NewContext("S1002", pass, nil, nil, func(string) bool { return false },
+		func(_ string, diagnostic analysis.Diagnostic) {
+			found = append(found, filepath.Base(sample.fileSet.Position(diagnostic.Pos).Filename))
+		})
+	for _, file := range sample.files {
+		ast.Inspect(file, func(node ast.Node) bool {
+			if binary, isBinary := node.(*ast.BinaryExpr); isBinary {
+				Check(context, binary)
+			}
+			return true
+		})
+	}
+	if !slices.Equal(found, []string{"sample.go"}) {
+		test.Errorf("Check found comparisons in %v, where it must find the one in sample.go alone", found)
+	}
+}
+
+// samplePackage is the sample package, parsed and type-checked.
+type samplePackage struct {
+	fileSet     *token.FileSet
+	files       []*ast.File
+	checked     *types.Package
+	information *types.Info
+}
+
+// checkedSample parses and type-checks the sample package.
+func checkedSample(test *testing.T) samplePackage {
+	test.Helper()
+	sample := samplePackage{fileSet: token.NewFileSet(), information: &types.Info{
 		Types: map[ast.Expr]types.TypeAndValue{},
 		Defs:  map[*ast.Ident]types.Object{},
 		Uses:  map[*ast.Ident]types.Object{},
+	}}
+	for index, name := range sampleNames {
+		file, parseError := parser.ParseFile(sample.fileSet, name, sampleSources[index], 0)
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		sample.files = append(sample.files, file)
 	}
-	checked, checkError := (&types.Config{}).Check("sample", fileSet, []*ast.File{file}, information)
+	checkedPackage, checkError := (&types.Config{}).Check("sample", sample.fileSet, sample.files, sample.information)
 	if checkError != nil {
 		test.Fatal(checkError)
 	}
-	context := &rule.Context{Package: checked, TypesInfo: information, Files: []*ast.File{file}}
-	asked := map[string]bool{}
-	ast.Inspect(file, func(node ast.Node) bool {
-		binary, isBinary := node.(*ast.BinaryExpr)
-		if !isBinary {
-			return true
-		}
-		rendered := types.ExprString(binary)
-		func() {
-			defer func() {
-				if recover() != nil {
-					asked[rendered] = true
-				}
-			}()
-			Check(context, binary)
-		}()
-		return true
-	})
-	test.Logf("the file set was asked of %v", asked)
-	if !asked["flag == true"] {
-		test.Error("Check never asked whether flag == true is in a test file, so the probe proves nothing")
-	}
-	for rendered := range asked {
-		if rendered != "flag == true" {
-			test.Errorf("Check asked whether %s is in a test file, which compares no boolean constant", rendered)
-		}
-	}
+	sample.checked = checkedPackage
+	return sample
+}
+
+// isFileAsked is whether stack, read in a deferred function as a panic unwinds through it, so the panicking frames are
+// still on it, is IsInTest asking the file set which file a position is in: any other panic is no question of the
+// file.
+func isFileAsked(stack []byte) bool {
+	return bytes.Contains(stack, []byte("staticcheck_code.IsInTest(")) &&
+		bytes.Contains(stack, []byte("go/token.(*FileSet).File("))
 }
 
 // fixedErrors is every type error of the differences fixture with the fixes of findings applied, loaded through an
