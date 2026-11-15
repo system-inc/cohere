@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/inspect"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 )
 
 // plantedAnalyzer is an analyzer that finds nothing, for rules that need one to be valid.
@@ -149,6 +151,13 @@ func TestValidateAcceptsAWellFormedRule(test *testing.T) {
 			Analyzer:     plantedAnalyzer,
 			Listener:     &Listener{FileEnter: plantedFile, PackageExit: plantedPackageExit},
 		},
+		{
+			Name:     "cohere-go/consistency-no-shouting",
+			Origin:   OriginHouse,
+			Analyzer: plantedAnalyzer,
+			Listener: &Listener{FileEnter: plantedFile, FileLocal: true, SyntaxOnly: true,
+				Requires: []*analysis.Analyzer{marker.Analyzer, inspect.Analyzer}},
+		},
 	}
 	for _, testCase := range cases {
 		if validateError := testCase.Validate(); validateError != nil {
@@ -275,6 +284,23 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			saying: "is marked FileLocal and declares PackageExit",
 		},
 		{
+			name:   "a syntax-only listener that is not file-local",
+			rule:   listening(Listener{FileEnter: plantedFile, SyntaxOnly: true}),
+			saying: "is marked SyntaxOnly and is not FileLocal",
+		},
+		{
+			name: "a syntax-only listener of the engine's own walk",
+			rule: listening(Listener{FileLocal: true, SyntaxOnly: true,
+				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedFunction}}),
+			saying: "is marked SyntaxOnly and hears no syntax walk",
+		},
+		{
+			name: "a syntax-only listener requiring what a syntax-only context does not answer",
+			rule: listening(Listener{FileEnter: plantedFile, FileLocal: true, SyntaxOnly: true,
+				Requires: []*analysis.Analyzer{marker.Analyzer, plantedAnalyzer}}),
+			saying: "requires planted, which a syntax-only context does not answer",
+		},
+		{
 			name:   "a listener with PackageExit alone",
 			rule:   listening(Listener{PackageExit: plantedPackageExit}),
 			saying: "declares PackageExit alone",
@@ -329,6 +355,42 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 		}
 		if !strings.Contains(validateError.Error(), testCase.saying) {
 			test.Errorf("%s: refused with %q, expected it to say %q", testCase.name, validateError, testCase.saying)
+		}
+	}
+}
+
+// A rule whose own analyzer walks its files, reads no types and requires only what a syntax-only context answers may be
+// marked a syntax-only walk, and ValidateSyntaxOnlyWalk refuses the mark on a dispatched rule, a rule that reads types,
+// an analyzer requiring what a syntax-only context does not answer, and one requiring the inspector, whose walk covers
+// the inherited files too.
+func TestValidateSyntaxOnlyWalkRefusesAMarkThatCannotHold(test *testing.T) {
+	test.Parallel()
+	requiring := func(required ...*analysis.Analyzer) *analysis.Analyzer {
+		return &analysis.Analyzer{Name: "requiring", Doc: "requires what it is given", Run: plantedAnalyzer.Run,
+			Requires: required}
+	}
+	walking := Rule{Name: "cohere-go/consistency-no-long-line", Origin: OriginHouse,
+		Analyzer: requiring(marker.Analyzer)}
+	if validateError := ValidateSyntaxOnlyWalk(walking); validateError != nil {
+		test.Errorf("refused a well-formed syntax-only walk: %v", validateError)
+	}
+	typeAware := walking
+	typeAware.TypeAware = true
+	inspecting := walking
+	inspecting.Analyzer = requiring(marker.Analyzer, inspect.Analyzer)
+	reading := walking
+	reading.Analyzer = requiring(plantedAnalyzer)
+	cases := map[string]Rule{
+		"has a listener; mark the listener SyntaxOnly instead": listening(Listener{FileEnter: plantedFile,
+			FileLocal: true, SyntaxOnly: true}),
+		"is TypeAware":                          typeAware,
+		"requires inspect, which a syntax-only": inspecting,
+		"requires planted, which a syntax-only": reading,
+	}
+	for saying, marked := range cases {
+		validateError := ValidateSyntaxOnlyWalk(marked)
+		if validateError == nil || !strings.Contains(validateError.Error(), saying) {
+			test.Errorf("marking %s refused with %v, want it to say %q", marked.Name, validateError, saying)
 		}
 	}
 }

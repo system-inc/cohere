@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are thirteen.
+// The changes are fourteen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -196,6 +196,13 @@
 // walk ends, so neither the load's chain nor the rules' waits on it.
 // Unset, nothing is recorded and both are upstream's.
 //
+// The fourteenth is Options.Inheritance, the seam an extra build takes
+// the host's findings of a syntax-only rule through (#y6q1x2j).
+// Options.Inherited keys it in every pass's ResultOf, as Options.Resolved
+// keys the resolver, so a syntax-only rule's run skips each file it
+// inherits and reports the host's findings there as its own. The checker
+// never reads it. Unset, ResultOf holds no inheritance.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -269,6 +276,8 @@ import (
 	// Options.Timing measures into.
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
+	// cohere: the inheritance Options.Inheritance hands every pass.
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // Options specifies options that control the analysis driver.
@@ -369,6 +378,14 @@ type Options struct {
 	// ResultOf holds no resolver.
 	Resolver Resolver
 	Resolved *analysis.Analyzer
+
+	// cohere: Inheritance, when set, is the host's findings an extra
+	// build's syntax-only rules take rather than walk a file again.
+	// Inherited, when Inheritance is set too, keys it in every pass's
+	// ResultOf, a key never run, as Dependents is. Unset, ResultOf holds
+	// no inheritance.
+	Inheritance rule.Inheritance
+	Inherited   *analysis.Analyzer
 
 	// cohere: Reads, when set, holds the reads of each package whose
 	// fact reads are recorded: every ObjectFact and PackageFact an action
@@ -884,6 +901,10 @@ func (act *Action) execOnce() {
 	// cohere: Options.Resolved, the resolver under Options.Resolver.
 	if act.opts.Resolved != nil && act.opts.Resolver != nil {
 		inputs[act.opts.Resolved] = act.opts.Resolver
+	}
+	// cohere: Options.Inherited, the inheritance under Options.Inheritance.
+	if act.opts.Inherited != nil && act.opts.Inheritance != nil {
+		inputs[act.opts.Inherited] = act.opts.Inheritance
 	}
 	// cohere: Options.Recorded, the package's reads under Options.Reads.
 	if act.opts.Recorded != nil && act.opts.Reads != nil {

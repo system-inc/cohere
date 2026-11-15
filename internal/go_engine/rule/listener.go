@@ -47,6 +47,14 @@ type Listener struct {
 	// never quietly: Validate refuses it beside PackageExit, and State panics in a file-local run, which the dispatcher
 	// makes the rule's crash.
 	FileLocal bool
+
+	// SyntaxOnly marks a listener whose findings on a file depend on nothing but that file's bytes and the rule's
+	// settings: it hears the syntax walk, is FileLocal, and requires nothing past what NewSyntaxOnlyContext answers.
+	// Its context is always that one, on the host's build as on every other, so a check that reads more crashes on its
+	// own fixtures rather than in a build that took its findings. A build checking a package from source because one
+	// of its files differs then takes the host's findings of the rule on each file the host checked, rather than walk
+	// the file again (#y6q1x2j, see Inheritance). Validate refuses the mark on any other listener.
+	SyntaxOnly bool
 }
 
 // IsSyntax is whether the listener hears the syntax walk, declaring Nodes, Node, FileEnter or FileExit.
@@ -64,7 +72,8 @@ func (listener *Listener) IsIntermediateRepresentation() bool {
 // with no callback at all, one that declares two walks, one with PackageExit alone, which no walk gathers for, one
 // that declares the engine's own intermediate representation's walk with none of its callbacks, kinds listed with no
 // callback to call for them, a kind callback with no kinds, a kind that is a bare nil and so names no type, a kind
-// listed twice, or a listener marked FileLocal that declares PackageExit.
+// listed twice, a listener marked FileLocal that declares PackageExit, or a listener marked SyntaxOnly that hears no
+// syntax walk, is not FileLocal, or requires what a syntax-only context does not answer.
 func (listener *Listener) Validate() error {
 	declared := []string{}
 	if listener.IsIntermediateRepresentation() {
@@ -86,6 +95,11 @@ func (listener *Listener) Validate() error {
 	if listener.FileLocal && listener.PackageExit != nil {
 		return errors.New("is marked FileLocal and declares PackageExit, which judges what it gathered across the " +
 			"package's files; a file-local run hears only some of them")
+	}
+	if listener.SyntaxOnly {
+		if syntaxOnlyError := listener.validateSyntaxOnly(); syntaxOnlyError != nil {
+			return syntaxOnlyError
+		}
 	}
 	if listener.IsIntermediateRepresentation() {
 		return listener.IntermediateRepresentation.validate()
@@ -115,6 +129,27 @@ func validateKinds[Kind any](noun string, listName string, callbackName string, 
 			return fmt.Errorf("lists the %s kind %s twice in %s", noun, kindType, listName)
 		}
 		seen[kindType] = true
+	}
+	return nil
+}
+
+// validateSyntaxOnly refuses the SyntaxOnly mark on a listener whose findings on a file could read more than the file:
+// one that hears the intermediate representation's walk, built from the package's type information, one not FileLocal,
+// which may gather across the package's files, and one requiring an analyzer a syntax-only context does not answer.
+func (listener *Listener) validateSyntaxOnly() error {
+	if !listener.IsSyntax() {
+		return errors.New("is marked SyntaxOnly and hears no syntax walk; the intermediate representation is built " +
+			"from the package's type information")
+	}
+	if !listener.FileLocal {
+		return errors.New("is marked SyntaxOnly and is not FileLocal, so its findings on a file may read the " +
+			"package's other files")
+	}
+	for _, required := range listener.Requires {
+		if !AnswersSyntaxOnly(required) {
+			return fmt.Errorf("is marked SyntaxOnly and requires %s, which a syntax-only context does not answer",
+				required.Name)
+		}
 	}
 	return nil
 }

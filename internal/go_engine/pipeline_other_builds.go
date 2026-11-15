@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // otherBuilds is the run under every build beside the host's that the census needs (#72n9mq0), each extra build
@@ -322,6 +323,10 @@ func checkingBuild(builds []project.Build, file string, contents []byte) (projec
 // those, the walk leaves untouched each whose dependence set misses what changed in the build (#qbvtkfm): restored
 // unjudged and never analyzed, so the build has no say on its files and the host's findings stand there.
 //
+// A build restoring from host inherits too (#y6q1x2j): each of its syntax-only rules takes the host's findings on each
+// file the host checked, rather than walk the file again in a package the build checks from source
+// (check.HostInheritance), counted into the build's record.
+//
 // gate is the extra builds' lint gate, which the build takes its weight of once its first load has ended, by the share
 // of its packages that load checked from source (lintWeight), and gives back once its rules end, every reload's
 // included, on every path.
@@ -348,6 +353,8 @@ func (engine *pipeline) extraBuildRun(
 			engine.described.children)
 	}
 	var session *check.CacheSession
+	enabled, _ := engine.enabledRules()
+	var inheritance *check.HostInheritance
 	// As the host's lint does, a run that renamed reads no findings cache, whose keys are of the bytes it replaced.
 	if !engine.renamed {
 		var hostFiles cache.FileDigests
@@ -359,6 +366,10 @@ func (engine *pipeline) extraBuildRun(
 			session.RestoreFromHost(host)
 			if engine.keepsWalkOff {
 				session.VisitEvery()
+			}
+			// Only a build restoring from the host's run inherits from it: the same run read the same bytes for both.
+			if !engine.keepsInheritanceOff {
+				inheritance = host.Inheritance(enabled)
 			}
 		}
 	}
@@ -434,7 +445,11 @@ func (engine *pipeline) extraBuildRun(
 		run.lintWait = time.Since(waitStarted)
 	}
 	engine.lintStepped(extra, lintStepTaken, weight)
-	enabled, _ := engine.enabledRules()
+	// A nil *check.HostInheritance would be a non-nil rule.Inheritance, which every pass would read as one.
+	var inherits rule.Inheritance
+	if inheritance != nil {
+		inherits = inheritance
+	}
 	runRules := func(over *load.Loaded) (*check.Result, error) {
 		started := time.Now()
 		defer func() { linting += time.Since(started) }()
@@ -450,6 +465,7 @@ func (engine *pipeline) extraBuildRun(
 			Timing:          engine.timing,
 			// Under `--build-dependence` the build's facts are compared with the host's (#0ghk7vj).
 			ExportFacts: engine.dependence != nil,
+			Inheritance: inherits,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -514,6 +530,7 @@ func (engine *pipeline) extraBuildRun(
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
 	}
 	run.loading, run.linting = loading, linting
+	run.inheritedFiles, run.inheritedFindings = inheritance.Counts()
 	if engine.extraBuildEnds != nil {
 		if endError := engine.extraBuildEnds(extra, notes); endError != nil {
 			return buildRun{}, fmt.Errorf("the build %s: %w", extra, endError)
@@ -596,6 +613,9 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			LintPeakOverLoadEnd: lintPeakOverLoadEnd(run.heldAtLoadEnd, run.heldAtLintPeak),
 			// An extra build's alone, under `--build-dependence`: nil otherwise, which the record leaves out.
 			Dependence: run.dependence,
+			// An extra build's alone: 0 otherwise, which the record leaves out.
+			InheritedFiles:    run.inheritedFiles,
+			InheritedFindings: run.inheritedFindings,
 		}
 		recordTimes(&record, run)
 		if run.result != nil {

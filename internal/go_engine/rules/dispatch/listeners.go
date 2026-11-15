@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"fmt"
+	"go/token"
 	"reflect"
 	"runtime"
 	"slices"
@@ -53,9 +54,12 @@ type registeredRule struct {
 type Result map[string]Outcome
 
 // Outcome is what one rule's listener found over one package: its findings, or the crash that ended its run there,
-// in which case it has no findings, since a run cut short could have reported anything.
+// in which case it has no findings, since a run cut short could have reported anything. Inherited is the host's
+// findings on the files a syntax-only rule inherits, which it never walked (rule.InheritedFiles), and none beside a
+// crash.
 type Outcome struct {
 	Diagnostics []analysis.Diagnostic
+	Inherited   []analysis.Diagnostic
 	Crash       error
 }
 
@@ -174,6 +178,10 @@ func (listeners *listeners) ruleAnalyzer(
 			for _, diagnostic := range outcome.Diagnostics {
 				pass.Report(diagnostic)
 			}
+			// After the walk's own, the host's findings on the files the rule inherited, as its own.
+			for _, diagnostic := range outcome.Inherited {
+				pass.Report(diagnostic)
+			}
 			return nil, nil
 		},
 	}
@@ -237,6 +245,9 @@ func (listeners *listeners) register(
 // shards above 1 splits the package (see shardsOf): whole holds every started listener that is not marked FileLocal,
 // with every rule not started, and each of parts holds a run of every started FileLocal listener, with a file-local
 // context, to hear one shard's files. At 1, whole holds every started listener and parts is empty.
+//
+// A started listener marked SyntaxOnly hears none of the files its rule inherits (rule.InheritedFiles), decided here,
+// before any walk, and whole holds the inherited findings, which finish hands its outcome.
 func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns, []*startedRuns, error) {
 	// Absent under a driver that runs nothing past a failure, where the pass runs only once everything it requires
 	// finished, and the nil map reads as nothing failed.
@@ -261,7 +272,7 @@ func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns
 	collector, _ := pass.ResultOf[rule.Timed].(*timing.Collector)
 	newStarted := func() *startedRuns {
 		return &startedRuns{byKind: map[reflect.Type][]*listenerRun{}, notStarted: Result{}, timing: collector,
-			dispatcher: listeners.analyzer.Name}
+			dispatcher: listeners.analyzer.Name, inherited: map[string][]analysis.Diagnostic{}}
 	}
 	whole := newStarted()
 	var parts []*startedRuns
@@ -280,13 +291,23 @@ func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns
 			whole.notStarted[registered.name] = Outcome{Crash: crash}
 			continue
 		}
+		var inheritedFiles map[*token.File]bool
+		// Only the syntax walk skips a file, so only its listeners inherit, whatever a listener built past Validate
+		// claims.
+		if registered.listener.SyntaxOnly && registered.listener.IsSyntax() {
+			var inherited []analysis.Diagnostic
+			inheritedFiles, inherited = rule.InheritedFiles(pass, registered.name)
+			if len(inheritedFiles) > 0 {
+				whole.inherited[registered.name] = inherited
+			}
+		}
 		if len(parts) > 0 && registered.listener.FileLocal {
 			for _, part := range parts {
-				part.add(newListenerRun(registered, pass, isGenerated, collector, true))
+				part.add(newListenerRun(registered, pass, isGenerated, collector, true, inheritedFiles))
 			}
 			continue
 		}
-		whole.add(newListenerRun(registered, pass, isGenerated, collector, false))
+		whole.add(newListenerRun(registered, pass, isGenerated, collector, false, inheritedFiles))
 	}
 	return whole, parts, nil
 }
@@ -351,6 +372,15 @@ func finish(started *startedRuns) Result {
 	}
 	for _, run := range started.runs {
 		result[run.registered.name] = run.outcome()
+	}
+	// A split package's file-local rule has no run here and its outcome only this, which finishShards gathers its
+	// shards' findings into, or replaces with a shard's crash.
+	for name, inherited := range started.inherited {
+		outcome := result[name]
+		if outcome.Crash == nil {
+			outcome.Inherited = inherited
+			result[name] = outcome
+		}
 	}
 	return result
 }

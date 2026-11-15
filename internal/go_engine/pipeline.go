@@ -92,6 +92,10 @@ type pipeline struct {
 	// the test can compare the two.
 	keepsWalkOff bool
 
+	// keepsInheritanceOff, set only by a test, has every extra build run its syntax-only rules on every file it checks
+	// rather than take the host's findings on the files the host checked (#y6q1x2j), so the test can compare the two.
+	keepsInheritanceOff bool
+
 	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once (fixedBuildsWidth, or
 	// measuredBuildsWidth as the first build's load ends), 0 until it was, for the lint record, and
 	// buildsWidthLiveBytes and buildsWidthBuildBytes the host's live heap that decision was given and what the first

@@ -27,6 +27,9 @@ import (
 // at cohere's root (#954dadc). decodes counts the decodes it ran, which a test reads.
 //
 // factTypes are restoring's ReadFactTypes, read once by the first of every build's verdicts to ask (readFactTypes).
+//
+// compiledFiles are the package's CompiledGoFiles as the host compiled them, which the builds' inheritance indexes by
+// file (HostRun.holdersOf, #y6q1x2j).
 type hostEntry struct {
 	restoring   Restoring
 	portable    cache.Key
@@ -38,6 +41,8 @@ type hostEntry struct {
 
 	factTypesOnce sync.Once
 	factTypes     map[reflect.Type]bool
+
+	compiledFiles []string
 }
 
 // readFactTypes is kept's ReadFactTypes, read once however many builds' verdicts ask at once (#nrk4zt0): restoring is

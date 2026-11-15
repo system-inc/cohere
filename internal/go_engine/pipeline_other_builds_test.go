@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_else_return"
 )
@@ -74,12 +75,24 @@ func runOverNoted(
 	extra ...string,
 ) (*pipeline, string, string) {
 	test.Helper()
+	return runOverRegistered(test, root, wantExit, rules.All(), configure, extra...)
+}
+
+// runOverRegistered is runOverNoted with registered as the registry's rules, for a test that adds a rule of its own.
+func runOverRegistered(
+	test *testing.T,
+	root string,
+	wantExit int,
+	registered []rule.Rule,
+	configure func(*pipeline),
+	extra ...string,
+) (*pipeline, string, string) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
-	registered := rules.All()
 	ruleSettings, settingsError := loadSettings(request, registered)
 	if settingsError != nil {
 		test.Fatal(settingsError)

@@ -39,6 +39,14 @@ type Context struct {
 	// them.
 	TypesSizes types.Sizes
 
+	// FileGoVersions and PackageGoVersion are a syntax-only context's alone (NewSyntaxOnlyContext): each of the
+	// package's files' Go version, as the type checker recorded it in TypesInfo.FileVersions, by the file's token.File,
+	// and the package's, Package.GoVersion(), both read before TypesInfo and Package are dropped, so the version gates
+	// of a check ported from staticcheck read them there (staticcheck_report.LanguageVersion). Any other context leaves
+	// them empty, its checks reading TypesInfo and Package.
+	FileGoVersions   map[*token.File]string
+	PackageGoVersion string
+
 	// ruleName is the name the check was registered under, which Report stamps on each finding, so a ported check
 	// can take the name of the rule it replaces and the settings and `//cohere:ignore` lines naming it keep working.
 	ruleName string
@@ -60,9 +68,13 @@ type Context struct {
 	// fileLocal is set on the context of a file-local run, which hears only some of the package's files, so State,
 	// which gathers across them, panics there (see Listener.FileLocal).
 	fileLocal bool
+	// syntaxOnly is set on the context of a listener marked SyntaxOnly, which answers only what a file's own bytes do
+	// (see NewSyntaxOnlyContext).
+	syntaxOnly bool
 	// file is the file the syntax walk is calling the check on, from FileEnter through FileExit, and nil outside one,
-	// and fileStates is each file's FileState, by file.
-	file *token.File
+	// walkedFile its syntax, and fileStates is each file's FileState, by file.
+	file       *token.File
+	walkedFile *ast.File
 	//cohere:ignore consistency-no-any each check chooses its own state type, read back through FileState's type
 	fileStates map[*token.File]any
 }
@@ -111,6 +123,50 @@ func NewFileLocalContext(
 	return context
 }
 
+// NewSyntaxOnlyContext is NewFileLocalContext's context for a listener marked SyntaxOnly, whose findings on a file must
+// depend on nothing but the file's bytes and the rule's settings, so a build may take the host's findings of the rule
+// on a file rather than walk it again (#y6q1x2j). It holds nothing that reads past the file: Package, TypesInfo,
+// TypesSizes, ReadFile and Files are nil, State panics as a file-local run's does, ResultOf answers only what
+// AnswersSyntaxOnly names, and LookupIn and Reads panic. What a ported check's version gates read of the type checker
+// and the package it carries as FileGoVersions and PackageGoVersion, read from pass before they are dropped. A check
+// reading anything it dropped panics or dereferences nil, which the dispatcher makes the rule's crash on the package,
+// on the host's build as on any other, so a wrong mark fails the rule's own fixtures.
+func NewSyntaxOnlyContext(
+	ruleName string,
+	pass *analysis.Pass,
+	requires []*analysis.Analyzer,
+	options *flag.FlagSet,
+	isGenerated func(filename string) bool,
+	sink func(ruleName string, diagnostic analysis.Diagnostic),
+) *Context {
+	context := NewFileLocalContext(ruleName, pass, requires, options, isGenerated, sink)
+	context.syntaxOnly = true
+	context.FileGoVersions = make(map[*token.File]string, len(pass.Files))
+	for _, file := range pass.Files {
+		// A pass of a package whose type check never ran holds no type information, and its files no version, as a
+		// file the type checker recorded none of reads "" from TypesInfo.FileVersions.
+		if pass.TypesInfo != nil {
+			context.FileGoVersions[pass.Fset.File(file.FileStart)] = pass.TypesInfo.FileVersions[file]
+		}
+	}
+	if pass.Pkg != nil {
+		context.PackageGoVersion = pass.Pkg.GoVersion()
+	}
+	context.Package, context.TypesInfo, context.TypesSizes, context.ReadFile, context.Files = nil, nil, nil, nil, nil
+	return context
+}
+
+// IsSyntaxOnly is whether the context is a syntax-only one (NewSyntaxOnlyContext).
+func (context *Context) IsSyntaxOnly() bool {
+	return context.syntaxOnly
+}
+
+// WalkedFile is the syntax of the file the syntax walk is calling the check on, from FileEnter through FileExit, and
+// nil outside one, so a syntax-only check, which holds no Files, finds the file a node is in.
+func (context *Context) WalkedFile() *ast.File {
+	return context.walkedFile
+}
+
 // Report hands diagnostic to the sink under the rule name the check was registered under. The check never names its
 // rule itself.
 func (context *Context) Report(diagnostic analysis.Diagnostic) {
@@ -133,6 +189,12 @@ func (context *Context) ReportRangef(node analysis.Range, format string, argumen
 // Reads is the reads of the context's package the checker handed the dispatcher's pass under Recorded, nil when the
 // run records none, which every recording method takes as recording nothing.
 func (context *Context) Reads() *build_reads.Reads {
+	if context.syntaxOnly {
+		// Invariant: a syntax-only check reads nothing of another package, which the mark promises, so a read of the
+		// reads is a wrong mark, and the dispatcher's recover makes it this rule's crash on the package.
+		panic(fmt.Sprintf("rule %s reads the package's reads in a syntax-only run, which reads nothing of another "+
+			"package; a listener that does is not SyntaxOnly", context.ruleName))
+	}
 	reads, _ := context.resultOf[Recorded].(*build_reads.Reads)
 	return reads
 }
@@ -140,6 +202,11 @@ func (context *Context) Reads() *build_reads.Reads {
 // LookupIn is what declaring declares as name, nil when it declares nothing so, the question recorded in the
 // context's reads when declaring is another package (see build_reads.Reads.ScopeLookup).
 func (context *Context) LookupIn(declaring *types.Package, name string) types.Object {
+	if context.syntaxOnly {
+		// Invariant: as in Reads.
+		panic(fmt.Sprintf("rule %s looks up %s in a syntax-only run, which reads nothing of another package; a "+
+			"listener that does is not SyntaxOnly", context.ruleName, name))
+	}
 	return context.Reads().ScopeLookup(context.Package, declaring, name)
 }
 
@@ -159,6 +226,12 @@ func (context *Context) ResultOf(analyzer *analysis.Analyzer) any {
 		// the dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 		panic(fmt.Sprintf("rule %s reads the result of analyzer %s, which its listener does not require; list it in "+
 			"the listener's Requires", context.ruleName, analyzer.Name))
+	}
+	if context.syntaxOnly && !AnswersSyntaxOnly(analyzer) {
+		// Invariant: Validate refuses a listener marked SyntaxOnly that requires such an analyzer, so a read here is a
+		// listener built past Validate, and the dispatcher's recover makes it this rule's crash on the package.
+		panic(fmt.Sprintf("rule %s reads the result of analyzer %s in a syntax-only run, which answers only what a "+
+			"file's own bytes do", context.ruleName, analyzer.Name))
 	}
 	return context.resultOf[analyzer]
 }
@@ -196,11 +269,11 @@ func (context *Context) EnterNode(cursor inspector.Cursor) {
 	context.cursor = cursor
 }
 
-// EnterFile is called by the syntax dispatcher as it enters file, before FileEnter, and with nil once FileExit has
-// returned, so FileState reads the slot of the file the call is on and panics outside one. Only the dispatcher calls
-// it.
-func (context *Context) EnterFile(file *token.File) {
-	context.file = file
+// EnterFile is called by the syntax dispatcher as it enters file, whose token file is tokenFile, before FileEnter, and
+// with nils once FileExit has returned, so FileState reads the slot of the file the call is on and panics outside one,
+// and WalkedFile is the file. Only the dispatcher calls it.
+func (context *Context) EnterFile(file *ast.File, tokenFile *token.File) {
+	context.file, context.walkedFile = tokenFile, file
 }
 
 // LeaveNode makes Cursor panic again, as Node returns. See EnterNode.
