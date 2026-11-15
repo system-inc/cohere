@@ -28,6 +28,7 @@ import (
 	"go/token"
 	"go/types"
 	"math"
+	"unsafe"
 
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/lint"
@@ -145,15 +146,23 @@ type graph struct {
 	generated map[string]generated.Generator
 
 	// usedEdges and ownedEdges are every use and every ownership between nodes, each keyed by edgeKey. This data is
-	// also present in the node struct, but there it can't be accessed in constant time; these deduplicate edges. The
+	// also present in the nodes' chains, but there it can't be accessed in constant time; these deduplicate edges. The
 	// original keeps one map keyed by a struct of both nodes and the kind; a map per kind keyed by one word keeps a
 	// third of the bytes per key, hashes it on the runtime's path for 64-bit keys, and holds the same edges.
 	usedEdges  map[uint64]struct{}
 	ownedEdges map[uint64]struct{}
 	// nodes is every node, by its index, the root first.
 	nodes []node
-	// objects is each object's node.
-	objects map[types.Object]nodeIndex
+	// uses and owns are every use and every ownership as a link of its node's chain, which node.firstUse and
+	// node.firstOwned start. Link 0 is none, so each list starts with one link that no chain reaches. The original
+	// keeps a slice of each kind on every node; one list a kind is two lists to make for the whole graph, not two
+	// for each node and again each time one grows.
+	uses []edgeLink
+	owns []edgeLink
+	// objects is each object's node, keyed by objectKey, the object's one pointer word, which hashes on the runtime's
+	// path for 64-bit keys. Keyed by the object itself, a key is two words, its type and its pointer, and every
+	// lookup hashes and compares both through the interface.
+	objects map[unsafe.Pointer]nodeIndex
 
 	// namedTypes is every named type the package declares, a function's own among them, but no alias. The original
 	// calls them package-level, and its walk collects the local ones too.
@@ -162,22 +171,35 @@ type graph struct {
 	interfaceTypes []*types.Interface
 }
 
-// nodeIndex is a node's place in graph.nodes, the original's NodeID. The root is 0.
-type nodeIndex uint64
+// nodeIndex is a node's place in graph.nodes, the original's NodeID. The root is 0. The original's is 64 bits; 32 are
+// room for more objects than any package declares, and node stops a walk that would number past them.
+type nodeIndex uint32
 
-// node is one object in the graph, and the nodes it uses and owns. The original keeps its own index on it too, for
-// the merge and the Graphviz output; the port leaves both out, and a node's index is its place in graph.nodes.
+// linkIndex is a link's place in graph.uses or graph.owns, 0 for none.
+type linkIndex uint32
+
+// edgeLink is one edge in its node's chain: the node the edge leads to, and the node's next link of the same kind.
+type edgeLink struct {
+	to   nodeIndex
+	next linkIndex
+}
+
+// node is one object in the graph, and where its uses and ownerships start. The original keeps its own index on it
+// too, for the merge and the Graphviz output; the port leaves both out, and a node's index is its place in
+// graph.nodes.
 type node struct {
 	// typesObject is the object the node stands for, the generic one of an instance. The root's is nil. The original
 	// words what a finding says of it, its object, when it makes the node; the port words it in results, from this same
-	// object, so a node is 64 bytes rather than 104 while the walk appends and copies the list.
+	// object, so a node is 24 bytes rather than 104 while the walk appends and copies the list.
 	typesObject types.Object
 
-	// uses is each node this one uses, in the order the walk found them. The original keeps slices rather than maps
-	// to merge graphs by rewriting indexes in place; the port keeps them for the same order.
-	uses []nodeIndex
-	// owns is each node this one owns, which is quiet when this one goes unused.
-	owns []nodeIndex
+	// firstUse is the first link of this node's chain in graph.uses, each node this one uses, the latest the walk
+	// found first. The original keeps them in the order found, which only its merge reads: coloring reaches the same
+	// nodes along a chain in any order, so the port keeps the order that needs one link a node.
+	firstUse linkIndex
+	// firstOwned is the first link of this node's chain in graph.owns, each node this one owns, which is quiet when
+	// this one goes unused.
+	firstOwned linkIndex
 }
 
 // object is what a finding says of an object: its kind, its name and its position. The original's also carries an
@@ -204,7 +226,7 @@ type result struct {
 
 // edgeKey is the edge from one node to another as one word, from in the high half and to in the low, which
 // graph.usedEdges and graph.ownedEdges are keyed by. It is exact, two edges sharing a key only when they share both
-// nodes, because node never numbers a node past 32 bits.
+// nodes, because a node's index is 32 bits.
 func edgeKey(from nodeIndex, to nodeIndex) uint64 {
 	return uint64(from)<<32 | uint64(to)
 }
@@ -221,7 +243,9 @@ func newGraph(
 	// Almost every node is an object a declaration in the package names, each in typesInfo.Defs. Over cohere's own
 	// packages the nodes and the ownerships come to a little under one per declaration, and the uses to about one and
 	// a half, under two in nearly every package. Sized so up front, the node list and the maps seldom grow while the
-	// walk fills them. A size is only room: it changes no node, no order and no edge, so no finding.
+	// walk fills them. The lists of links grow by append, where room left over is a copy, not a rehash, so they take
+	// what nine packages in ten need: the uses one and a half a declaration, the ownerships one. A size is only room:
+	// it changes no node, no order and no edge, so no finding.
 	declared := len(typesInfo.Defs)
 	return &graph{
 		typesPackage: typesPackage,
@@ -231,10 +255,48 @@ func newGraph(
 		generated:    generatedFiles,
 		fileSet:      fileSet,
 		nodes:        make([]node, 1, declared+1),
+		uses:         make([]edgeLink, 1, declared+declared/2+1),
+		owns:         make([]edgeLink, 1, declared+1),
 		usedEdges:    make(map[uint64]struct{}, 2*declared),
 		ownedEdges:   make(map[uint64]struct{}, declared),
-		objects:      make(map[types.Object]nodeIndex, declared),
+		objects:      make(map[unsafe.Pointer]nodeIndex, declared),
 	}
+}
+
+// objectKey is typesObject's pointer, which graph.objects is keyed by. Two objects share it only when they are the
+// same object: every object is a pointer to a struct of its own, and the map's key holds it alive, so no other can
+// come to share its address while the graph lives. types.Object's unexported methods close it to these eight types.
+func objectKey(typesObject types.Object) unsafe.Pointer {
+	switch typesObject := typesObject.(type) {
+	case *types.Var:
+		return pointerOf(typesObject)
+	case *types.Func:
+		return pointerOf(typesObject)
+	case *types.TypeName:
+		return pointerOf(typesObject)
+	case *types.Const:
+		return pointerOf(typesObject)
+	case *types.Label:
+		return pointerOf(typesObject)
+	case *types.PkgName:
+		return pointerOf(typesObject)
+	case *types.Builtin:
+		return pointerOf(typesObject)
+	case *types.Nil:
+		return pointerOf(typesObject)
+	default:
+		// Invariant: go/types implements types.Object with these eight types alone, its unexported methods keeping
+		// out any other.
+		panic(fmt.Sprintf("an object of type %T", typesObject))
+	}
+}
+
+// pointerOf is object's address, as a map key that holds object alive.
+func pointerOf[Object any](object *Object) unsafe.Pointer {
+	// Unsafe: the pointer is only compared and hashed as a map key, never dereferenced, cast to another type or moved
+	// by arithmetic, and as an unsafe.Pointer the garbage collector still traces it, so the object it names lives as
+	// long as the key does and no other object can take its address.
+	return unsafe.Pointer(object)
 }
 
 // objectOf is what a finding says of typesObject.
@@ -289,18 +351,19 @@ func (graph *graph) node(typesObject types.Object) nodeIndex {
 		return 0
 	}
 	generic := origin(typesObject)
-	if index, found := graph.objects[generic]; found {
+	key := objectKey(generic)
+	if index, found := graph.objects[key]; found {
 		return index
 	}
 	if uint64(len(graph.nodes)) > math.MaxUint32 {
-		// Invariant: edgeKey packs a node's index in 32 bits, which a package outgrows only by declaring four billion
-		// objects, more than any machine could type-check. Were it ever to, two edges would share a key, so the walk
-		// stops rather than drop one.
+		// Invariant: a node's index is 32 bits, which a package outgrows only by declaring four billion objects, more
+		// than any machine could type-check. Were it ever to, two nodes would share an index, so the walk stops rather
+		// than merge them.
 		panic(fmt.Sprintf("a package of more than %d objects", uint64(math.MaxUint32)))
 	}
 	index := nodeIndex(len(graph.nodes))
 	graph.nodes = append(graph.nodes, node{typesObject: generic})
-	graph.objects[generic] = index
+	graph.objects[key] = index
 	return index
 }
 
@@ -324,7 +387,8 @@ func (graph *graph) addOwned(owner nodeIndex, owned nodeIndex) {
 	if len(graph.ownedEdges) == before {
 		return
 	}
-	graph.nodes[owner].owns = append(graph.nodes[owner].owns, owned)
+	graph.owns = append(graph.owns, edgeLink{to: owned, next: graph.nodes[owner].firstOwned})
+	graph.nodes[owner].firstOwned = newestLink(graph.owns)
 }
 
 // addUse records that by uses used.
@@ -334,7 +398,19 @@ func (graph *graph) addUse(by nodeIndex, used nodeIndex) {
 	if len(graph.usedEdges) == before {
 		return
 	}
-	graph.nodes[by].uses = append(graph.nodes[by].uses, used)
+	graph.uses = append(graph.uses, edgeLink{to: used, next: graph.nodes[by].firstUse})
+	graph.nodes[by].firstUse = newestLink(graph.uses)
+}
+
+// newestLink is the index of links' last link, the one just appended.
+func newestLink(links []edgeLink) linkIndex {
+	if uint64(len(links)) > math.MaxUint32 {
+		// Invariant: a link's index is 32 bits, and a package has a new edge only for a pair of its objects, so it
+		// outgrows them only with billions of objects, more than any machine could type-check. Were it ever to, a
+		// chain would lead to the wrong link, so the walk stops rather than follow one.
+		panic(fmt.Sprintf("a package of more than %d edges of one kind", uint64(math.MaxUint32)))
+	}
+	return linkIndex(len(links) - 1)
 }
 
 // see makes seen a node, owned by owner when there is one, unless it is another package's.
@@ -393,8 +469,8 @@ func (graph *graph) colorAndQuieten() []nodeState {
 			return
 		}
 		states[root] |= nodeStateSeen
-		for _, used := range graph.nodes[root].uses {
-			color(used)
+		for link := graph.nodes[root].firstUse; link != 0; link = graph.uses[link].next {
+			color(graph.uses[link].to)
 		}
 	}
 	color(0)
@@ -402,8 +478,8 @@ func (graph *graph) colorAndQuieten() []nodeState {
 	var quieten func(index nodeIndex)
 	quieten = func(index nodeIndex) {
 		states[index] |= nodeStateQuiet
-		for _, owned := range graph.nodes[index].owns {
-			quieten(owned)
+		for link := graph.nodes[index].firstOwned; link != 0; link = graph.owns[link].next {
+			quieten(graph.owns[link].to)
 		}
 	}
 
@@ -411,8 +487,8 @@ func (graph *graph) colorAndQuieten() []nodeState {
 		if states[index].seen() {
 			continue
 		}
-		for _, owned := range each.owns {
-			quieten(owned)
+		for link := each.firstOwned; link != 0; link = graph.owns[link].next {
+			quieten(graph.owns[link].to)
 		}
 	}
 

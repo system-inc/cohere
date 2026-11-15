@@ -44,11 +44,13 @@ func (graph *graph) entry() {
 		}
 	}
 
-	// (1.9) packages use objects in generated files: DefaultOptions' GeneratedIsUsed.
-	for typesObject := range graph.objects {
-		path := graph.fileSet.PositionFor(typesObject.Pos(), false).Filename
+	// (1.9) packages use objects in generated files: DefaultOptions' GeneratedIsUsed. The original ranges over its map
+	// of objects, whose keys are the nodes' objects; the port's map is keyed by pointer, so it ranges over the nodes,
+	// past the root, whose order only orders the root's uses.
+	for _, each := range graph.nodes[1:] {
+		path := graph.fileSet.PositionFor(each.typesObject.Pos(), false).Filename
 		if _, isGenerated := graph.generated[path]; isGenerated {
-			graph.use(typesObject, nil)
+			graph.use(each.typesObject, nil)
 		}
 	}
 
@@ -130,10 +132,13 @@ func (graph *graph) entry() {
 // useIgnored uses every object annotated with a //lint:ignore U1000, and the methods and fields of an ignored type.
 // The original does this inside entry; the port names it, entry's one deep nesting.
 //
-// Like the original it ranges over graph.objects while use may add to it, a method or field seen for the first time,
-// so which of those the range then visits too is the map's to decide, as it is the original's.
+// The original ranges over its map of objects while use may add to it, a method or field seen for the first time, so
+// which of those the range then visits too is the map's to decide. The port's map is keyed by pointer, so it walks
+// the nodes, past the root, to their end as it stands at each step: it visits every one use adds, one of the visits
+// the original's map allows.
 func (graph *graph) useIgnored(ignores map[ignoredKey]struct{}) {
-	for typesObject := range graph.objects {
+	for index := 1; index < len(graph.nodes); index++ {
+		typesObject := graph.nodes[index].typesObject
 		position := graph.fileSet.PositionFor(typesObject.Pos(), false)
 		_, isIgnored := ignores[ignoredKey{position.Filename, position.Line}]
 		if !isIgnored {
