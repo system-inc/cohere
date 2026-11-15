@@ -494,7 +494,9 @@ func (session *CacheSession) fromHost(restoring *packages.Package) *hostRestore 
 // exported (buildFacts), whose answers read of other packages could not all be named, or one of which no longer holds
 // (readsHold), is declined. It returns the IDs declined, sorted, which the run asks to load again, and excludes each of
 // them from the host's restores from then on: the reload checks it from source, and it is of what changed for the
-// reload's walk.
+// reload's walk. Each package's verdict is its own, so they are decided on every core at once (fanOutDeciding), and
+// what they share, the counts, the reasons and each restore's settling, is written after, in ID order, so the result is
+// the same whatever order they finish in (#9fer4tx).
 //
 // The packages above a decline are not excluded (#axbw09w). This load judged them against the declined package's
 // restored types and analyzed them over its restored facts and answers, but the reload judges and analyzes everything
@@ -512,8 +514,16 @@ func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []strin
 		return nil
 	}
 	exported := newBuildFacts(session, graphs)
-	var declined []*packages.Package
-	for candidate, hosted := range state.restoring {
+	// The candidates in ID order, so the writes below run in one order however the workers finish.
+	candidates := slices.SortedFunc(maps.Keys(state.restoring), func(left, right *packages.Package) int {
+		return strings.Compare(left.ID, right.ID)
+	})
+	// Each candidate's why is its own: decided on every core at once, on the build's critical path, each written to its
+	// own index. A worker only reads what the analysis left, and the facts' memo, which gathers each owner once.
+	whys := make([]string, len(candidates))
+	session.fanOutDeciding(len(candidates), func(index int) {
+		candidate := candidates[index]
+		hosted := state.restoring[candidate]
 		hosted.lock.Lock()
 		why := hosted.declined
 		hosted.lock.Unlock()
@@ -523,6 +533,11 @@ func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []strin
 		if why == "" && (hosted.restored.readsIncomplete || !session.readsHold(candidate)) {
 			why = "A an answer it read of another package differs in the build, or cannot be named"
 		}
+		whys[index] = why
+	})
+	var declined []*packages.Package
+	for index, candidate := range candidates {
+		hosted, why := state.restoring[candidate], whys[index]
 		hosted.lock.Lock()
 		hosted.declined, hosted.settled = why, true
 		hosted.lock.Unlock()

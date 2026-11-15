@@ -1,7 +1,9 @@
 package check
 
 import (
+	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"golang.org/x/tools/go/analysis"
@@ -14,11 +16,13 @@ import (
 
 // buildFacts are the facts the build's packages exported, by owner, as an importer inherits them, each owner's
 // gathered on first use: a restored package's from its entry, the host's or the build's own, and an analyzed one's from
-// the actions on it, each of its analyzer's fact types available only when one ran there.
+// the actions on it, each of its analyzer's fact types available only when one ran there. The decide asks it from
+// every core at once (decideHostRestores), so byOwner holds each owner's gathering as a func() ownerFacts made by
+// sync.OnceValue, by owner: the first to ask an owner gathers it, once, and every other waits for that and reads it.
 type buildFacts struct {
 	session   *CacheSession
 	actionsOf map[*packages.Package][]*checker.Action
-	byOwner   map[*packages.Package]ownerFacts
+	byOwner   sync.Map
 }
 
 // ownerFacts are one owner's exported facts by type, then by objectpath, the empty path its package's own, and the
@@ -39,14 +43,28 @@ func newBuildFacts(session *CacheSession, graphs []*checker.Graph) *buildFacts {
 			actionsOf[action.Package] = append(actionsOf[action.Package], action)
 		}
 	}
-	return &buildFacts{session: session, actionsOf: actionsOf, byOwner: map[*packages.Package]ownerFacts{}}
+	return &buildFacts{session: session, actionsOf: actionsOf}
 }
 
-// of is owner's exported facts.
+// of is owner's exported facts, gathered once however many ask at once.
 func (exported *buildFacts) of(owner *packages.Package) ownerFacts {
-	if known, isKnown := exported.byOwner[owner]; isKnown {
-		return known
+	stored, isStored := exported.byOwner.Load(owner)
+	if !isStored {
+		// Two askers may each make a once; LoadOrStore keeps the first, so both run the same one.
+		gatheredOnce := sync.OnceValue(func() ownerFacts { return exported.gather(owner) })
+		stored, _ = exported.byOwner.LoadOrStore(owner, gatheredOnce)
 	}
+	gathering, isGathering := stored.(func() ownerFacts)
+	if !isGathering {
+		// Invariant: of stores only a func() ownerFacts.
+		panic(fmt.Sprintf("check: the facts of %s are held as a %T", owner.ID, stored))
+	}
+	return gathering()
+}
+
+// gather is owner's exported facts, read from its restore or the actions on it, which nothing writes once the analysis
+// is over.
+func (exported *buildFacts) gather(owner *packages.Package) ownerFacts {
 	gathered := ownerFacts{facts: map[reflect.Type]map[objectpath.Path]analysis.Fact{},
 		available: map[reflect.Type]bool{}}
 	add := func(path objectpath.Path, fact analysis.Fact) {
@@ -88,7 +106,6 @@ func (exported *buildFacts) of(owner *packages.Package) ownerFacts {
 			}
 		}
 	}
-	exported.byOwner[owner] = gathered
 	return gathered
 }
 
