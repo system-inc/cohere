@@ -48,7 +48,8 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
 	}
 	indexes := &Indexes{table: table, byFile: make(map[*ast.File]*Index, len(pass.Files))}
-	// Every file, test files included, since some of the rules that read it judge only tests and others never do.
+	// Every file, test files included, since some of the rules that read it judge only tests and others never do. Each
+	// index finds its file's groups only when a rule first asks it, so a file no rule asks of costs no walk.
 	for _, file := range pass.Files {
 		indexes.byFile[file] = NewIndex(table, file)
 	}
