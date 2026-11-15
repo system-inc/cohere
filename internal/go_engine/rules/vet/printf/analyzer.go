@@ -121,7 +121,7 @@ func newAnalyzer() *analysis.Analyzer {
 // run finds the package's wrappers, then checks every call of a print function.
 func run(pass *analysis.Pass) (any, error) {
 	// What each function the pass has met is, found or looked up, x/tools' printf Result.
-	kinds := wrapperKinds{}
+	kinds := newWrapperKinds()
 	findPrintLike(pass, kinds)
 	checkCalls(pass, kinds)
 	return nil, nil
