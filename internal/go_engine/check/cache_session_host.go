@@ -529,12 +529,11 @@ func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []strin
 	session.fanOutDeciding(len(candidates), func(index int) {
 		candidate := candidates[index]
 		hosted := state.restoring[candidate]
-		hosted.lock.Lock()
-		why := hosted.declined
-		hosted.lock.Unlock()
-		if why == "" {
-			why = exported.factsHold(candidate, hosted.kept, state)
-		}
+		// No candidate here was declined by the load: a restore is made afresh for each load, its why is set at load
+		// only when its types do not hold (typesHoldFunction), and the load then declines it (load's decline), which
+		// drops it from restoring (declineAtLoad) before the load returns, so its facts and reads are always asked
+		// (#a6caffk).
+		why := exported.factsHold(candidate, hosted.kept, state)
 		if why == "" && (hosted.restored.readsIncomplete || !session.readsHold(candidate)) {
 			why = "A an answer it read of another package differs in the build, or cannot be named"
 		}
