@@ -57,7 +57,9 @@ var factLearners = []string{"ctrlflow", "fact_deprecated", "printf"}
 // per-load memo of consistency_no_any and consistency_no_abbreviated_identifier, each held by a package-level variable:
 // it is keyed by each load's file set and each declaring package's types, and holds what compute reads off that package
 // alone, once, so a reader reads the same whichever package asked first, and an entry goes only when its load's file
-// set is collected (#k8e189q).
+// set is collected (#k8e189q). return_nil_ness's is a sync.Pool of value numberings, each emptied by release of every
+// slot and entry its function claimed before it goes back, so a pass reads an empty numbering whichever package's
+// judgment put it there (#fex6s0v).
 // staticcheck_configuration's build caches are written by go env's answers (load.ReadGoEnvironment), never by a pass,
 // and only grow, each by a directory go writes its own files to, so a pass reads the same whatever ran before it.
 //
@@ -85,6 +87,7 @@ var packageStateWriters = []string{
 	"intermediate_representation",
 	"rules/dispatch",
 	"rules/load_memo",
+	"rules/return_nil_ness",
 	"rules/vet/cgo_call",
 	"staticcheck_configuration",
 }
