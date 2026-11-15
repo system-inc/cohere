@@ -57,16 +57,19 @@ var Analyzer = dispatch.RuleAnalyzer(
 // an expression whose every type is a boolean says no more than that expression or its negation, which the fix
 // writes in the comparison's place.
 func Check(context *rule.Context, binary *ast.BinaryExpr) {
-	// A test may spell out what it compares, so a comparison in a test file is left alone.
-	if staticcheck_code.IsInTest(context, binary) {
-		return
-	}
 	if binary.Op != token.EQL && binary.Op != token.NEQ {
 		return
 	}
 	// The constant is an identifier as written, never looked through parentheses, so `x == (true)` is no finding.
 	isLeftConstant := staticcheck_code.IsBoolConst(context, binary.X)
 	if !isLeftConstant && !staticcheck_code.IsBoolConst(context, binary.Y) {
+		return
+	}
+	// A test may spell out what it compares, so a comparison in a test file is left alone. Asked once the comparison
+	// is one with a boolean constant, where the original asks it first: every question before it only reads the
+	// syntax and the type information, and it only reads the file's name, so the order changes no finding, and it is
+	// spared the file set's lookup for nearly every binary expression, which compares no boolean constant.
+	if staticcheck_code.IsInTest(context, binary) {
 		return
 	}
 	// A constant on the left is the one compared, even where the right is one too, and the right is the other side.

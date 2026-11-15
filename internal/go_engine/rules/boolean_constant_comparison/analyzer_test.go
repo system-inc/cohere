@@ -3,6 +3,10 @@ package boolean_constant_comparison
 import (
 	"cmp"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // upstreams are staticcheck's own fixtures for S1002, each copied unchanged, golden file and all, from
@@ -140,6 +145,61 @@ func TestPortMovedFixesCompile(test *testing.T) {
 		if !isBroken {
 			test.Errorf("the port's fix at %s:%d parts from the original's, and the original's there type-checks",
 				each.File, each.Line)
+		}
+	}
+}
+
+// Check asks whether a comparison is in a test file only once it compares with a boolean constant, so the file set's
+// lookup is spared for every other binary expression. The context holds no file set, so a question of it panics: Check
+// must return quietly from each binary expression of a file that compares no boolean constant, and must reach the
+// question, panicking, at one that does, which shows the probe would catch it.
+func TestCheckAsksTheFileOnlyOfAComparisonWithABooleanConstant(test *testing.T) {
+	test.Parallel()
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "sample.go", "package sample\n\n"+
+		"func compare(left int, right int, flag bool) bool {\n"+
+		"\treturn left < right && left == right && flag != flag\n"+
+		"}\n\n"+
+		"func constant(flag bool) bool {\n"+
+		"\treturn flag == true\n"+
+		"}\n", 0)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	information := &types.Info{
+		Types: map[ast.Expr]types.TypeAndValue{},
+		Defs:  map[*ast.Ident]types.Object{},
+		Uses:  map[*ast.Ident]types.Object{},
+	}
+	checked, checkError := (&types.Config{}).Check("sample", fileSet, []*ast.File{file}, information)
+	if checkError != nil {
+		test.Fatal(checkError)
+	}
+	context := &rule.Context{Package: checked, TypesInfo: information, Files: []*ast.File{file}}
+	asked := map[string]bool{}
+	ast.Inspect(file, func(node ast.Node) bool {
+		binary, isBinary := node.(*ast.BinaryExpr)
+		if !isBinary {
+			return true
+		}
+		rendered := types.ExprString(binary)
+		func() {
+			defer func() {
+				if recover() != nil {
+					asked[rendered] = true
+				}
+			}()
+			Check(context, binary)
+		}()
+		return true
+	})
+	test.Logf("the file set was asked of %v", asked)
+	if !asked["flag == true"] {
+		test.Error("Check never asked whether flag == true is in a test file, so the probe proves nothing")
+	}
+	for rendered := range asked {
+		if rendered != "flag == true" {
+			test.Errorf("Check asked whether %s is in a test file, which compares no boolean constant", rendered)
 		}
 	}
 }
