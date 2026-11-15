@@ -153,9 +153,13 @@ func cacheBuild(values map[string]string) []string {
 // dependencies, resolve none of it: go finds every standard-library package below `GOROOT` whatever they say. -trimpath
 // rewrites the paths go compiles into what it builds, never the paths go list names, and the source loader reads the
 // standard library's files by the paths go list names, with it or without it; the key names each file below `GOROOT`
-// besides. Every other flag stays, as in the engine's key (#s5h4q2t): -tags and -race choose which files a package
-// holds, and -n and -buildvcs can decide whether a load succeeds at all.
-var flagsNoStandardLibraryReads = []string{"trimpath", "mod", "modfile", "modcacherw"}
+// besides. -buildvcs decides whether go stamps version control into a main package of the main module, which can refuse
+// that package's build where go cannot read the tree's version control, and no standard-library package is one, so it
+// changes nothing of one either way; with it in the key, a release binary under `GOFLAGS=-buildvcs=false`, as every
+// cohere worktree and cohere-dev set, read nothing from its standard-library table (#30kzgj1). The engine's own key
+// keeps it (load.VerdictFlags). Every other flag stays, as in the engine's key (#s5h4q2t): -tags and -race choose which
+// files a package holds, and -n can decide whether a load succeeds at all.
+var flagsNoStandardLibraryReads = []string{"trimpath", "mod", "modfile", "modcacherw", "buildvcs"}
 
 // standardLibraryBuild is the build context every standard-library key shares, in cacheBuild's order: of values,
 // go env's answer as cacheBuild reads it, the target, cgo, the flags narrowed for the standard library (see
