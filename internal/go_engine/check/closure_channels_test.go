@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
@@ -39,23 +40,42 @@ var resolverAskers = []string{
 // wrap a print, each judged from the function's own body and the facts of what it calls.
 var factLearners = []string{"ctrlflow", "fact_deprecated", "printf"}
 
-// packageStateWriters are the packages a rule's run reaches that write a package-level variable from a function body:
-// state that outlives one package's pass, which a pass on one package could leave for a pass on another to read. A
-// write inside a once's body counts too when the body captures its caller (see capturesCaller), since the first
-// package to reach the once decides it for every later pass. The checker's initializer hands upstream's internal
-// package its pass accessor, as upstream's does; fact_resolver's registry is each kind registering as its package
-// initializes; intermediate_representation's are a build census only tests open and a sync.Pool of scratch space a
-// lift empties before it gives it back. staticcheck_configuration's build caches are written by go env's answers (load.ReadGoEnvironment), never by a
-// pass, and only grow, each by a directory go writes its own files to, so a pass reads the same whatever ran before it.
+// packageStateWriters are the packages a rule's run reaches that write package state from a function body (see
+// packageStateWritesOf): a package-level variable, or what one holds behind a pointer, a field or a map's entry,
+// written by any function or method of the reach through a value of the held type or a local given such state. That
+// state outlives one package's pass, which a pass on one package could leave for a pass on another to read. A write
+// inside a once's body counts too when the body captures its caller (see capturesCaller), since the first package to
+// reach the once decides it for every later pass. What runs before any pass is left out: an init function's body, a
+// function that only initialization calls, as each vet rule's newAnalyzer is, and a flag's setter that only flag calls
+// (see packageStateExemptionsOf). dispatch's is each dispatcher's registry: the shared ones are filled from package
+// initializers, every `var Analyzer = dispatch.RuleAnalyzer(...)` and each vet rule's newAnalyzer, and a dispatcher of
+// its own from NewSyntax is filled only by a rule's NewAnalyzer, which only tests call; register panics on a name it
+// holds, and a pass only reads the registry, through run. fact_resolver's registry is each kind registering as its
+// package initializes; intermediate_representation's are a build census only tests open and a sync.Pool of scratch
+// space a lift empties before it gives it back. cgo_call's are the syntax of the cgo files its pass parsed for itself,
+// which it rewrites to declare nothing before it type-checks them, and no other pass is handed. load_memo's is the
+// per-load memo of consistency_no_any and consistency_no_abbreviated_identifier, each held by a package-level variable:
+// it is keyed by each load's file set and each declaring package's types, and holds what compute reads off that package
+// alone, once, so a reader reads the same whichever package asked first, and an entry goes only when its load's file
+// set is collected (#k8e189q).
+// staticcheck_configuration's build caches are written by go env's answers (load.ReadGoEnvironment), never by a pass,
+// and only grow, each by a directory go writes its own files to, so a pass reads the same whatever ran before it.
 //
-// What this does not see: state a package-level variable holds in a struct whose methods write it, which is how the
-// per-load memo of consistency_no_abbreviated_identifier and consistency_no_any is held (rules/load_memo, #k8e189q).
-// That memo is keyed by each load's file set and each declaring package's types, and holds what that package declares,
-// so a reader reads the same whichever package asked first.
+// What a green does not cover, since the guard reads types, never how values flow:
+//   - state passed to a helper, or returned by one, that writes it, as `fill(memo.byLoad)`, since an alias is followed
+//     within one function only;
+//   - a value held behind an interface or a function, whose type does not say what it holds, but for a package-level
+//     variable's initial value;
+//   - a method of a type outside the reach that writes its receiver, but for mutatingMethods;
+//   - a send on a channel package state holds;
+//   - a pass that sets a flag through flag.FlagSet.Set or the flag.Value interface, which reaches an exempt setter
+//     with no reference the guard can see.
 var packageStateWriters = []string{
-	"check/checker",
 	"fact_resolver",
 	"intermediate_representation",
+	"rules/dispatch",
+	"rules/load_memo",
+	"rules/vet/cgo_call",
 	"staticcheck_configuration",
 }
 
@@ -64,8 +84,8 @@ var engineSource = sync.OnceValues(func() (map[string]*sourcePackage, error) {
 	return parseEngineSource("..")
 })
 
-// sourcePackage is one directory's non-test Go files under the go_engine directory, parsed with object resolution, so
-// an identifier a file declares locally is told apart from a package-level one.
+// sourcePackage is one directory's non-test Go files under the go_engine directory, parsed for the imports that make
+// the rules' reach and the names its packages call.
 type sourcePackage struct {
 	fileSet *token.FileSet
 	files   []*ast.File
@@ -216,228 +236,6 @@ func factLearnersOf(registered []*analysis.Analyzer, ruleNames []string) map[str
 	return learners
 }
 
-// mutatingMethods are the methods of sync's and sync/atomic's types that write the value they are called on, which a
-// call on a package-level variable counts as a write by. Every other method call is taken for a read: telling them
-// apart needs the receiver's type, which a walk of the syntax alone does not have, and these are how a package keeps
-// shared state safe for concurrent passes.
-var mutatingMethods = []string{
-	"Add", "And", "Clear", "CompareAndDelete", "CompareAndSwap", "Delete", "LoadAndDelete", "LoadOrStore", "Or", "Put",
-	"Store", "Swap",
-}
-
-// packageVariables is every name a package-level var declaration of files declares, and every such declaration.
-func packageVariables(files []*ast.File) (map[string]bool, map[*ast.ValueSpec]bool) {
-	names := map[string]bool{}
-	declarations := map[*ast.ValueSpec]bool{}
-	for _, file := range files {
-		for _, declaration := range file.Decls {
-			general, isGeneral := declaration.(*ast.GenDecl)
-			if !isGeneral || general.Tok != token.VAR {
-				continue
-			}
-			for _, specification := range general.Specs {
-				value, isValue := specification.(*ast.ValueSpec)
-				if !isValue {
-					continue
-				}
-				declarations[value] = true
-				for _, name := range value.Names {
-					names[name.Name] = true
-				}
-			}
-		}
-	}
-	return names, declarations
-}
-
-// writtenRoot is the identifier a write to expression writes through: the variable itself, or the one whose element,
-// field or pointee it writes, or nil for a write through anything else, as a call's result.
-func writtenRoot(expression ast.Expr) *ast.Ident {
-	current := expression
-	for {
-		switch typed := current.(type) {
-		case *ast.Ident:
-			return typed
-		case *ast.IndexExpr:
-			current = typed.X
-		case *ast.IndexListExpr:
-			current = typed.X
-		case *ast.SelectorExpr:
-			// A selector of an import is another package's variable, whose qualifier is the root written through.
-			current = typed.X
-		case *ast.StarExpr:
-			current = typed.X
-		case *ast.ParenExpr:
-			current = typed.X
-		default:
-			return nil
-		}
-	}
-}
-
-// isOnceBody reports whether call runs its function argument once for the whole process, as a sync.Once's Do and
-// sync.OnceFunc, sync.OnceValue and sync.OnceValues do. Once is no safety by itself: the first package whose pass
-// reaches the call decides what every later pass reads, so a write inside the body is left out only when the body
-// captures nothing of its caller (see capturesCaller).
-func isOnceBody(call *ast.CallExpr) bool {
-	if selector, isSelector := call.Fun.(*ast.SelectorExpr); isSelector && selector.Sel.Name == "Do" {
-		return true
-	}
-	// An instantiation spelled out, as sync.OnceValue[int], is the generic function it instantiates.
-	function := call.Fun
-	if index, isIndex := function.(*ast.IndexExpr); isIndex {
-		function = index.X
-	}
-	if index, isIndex := function.(*ast.IndexListExpr); isIndex {
-		function = index.X
-	}
-	return isSelectorOf(function, "sync", "OnceFunc") || isSelectorOf(function, "sync", "OnceValue") ||
-		isSelectorOf(function, "sync", "OnceValues")
-}
-
-// capturesCaller reports whether literal, a once's body inside enclosing, the outermost function around it, reads
-// anything enclosing declares outside the literal: a parameter, a receiver or a local, which differ with each pass that
-// calls it. A body that reads only package-level names, imports and its own locals builds the same data whichever pass
-// runs it first. A once at package level has no enclosing function, so it captures nothing.
-func capturesCaller(literal *ast.FuncLit, enclosing ast.Node) bool {
-	if enclosing == nil {
-		return false
-	}
-	captures := false
-	ast.Inspect(literal.Body, func(node ast.Node) bool {
-		identifier, isIdentifier := node.(*ast.Ident)
-		if !isIdentifier || identifier.Obj == nil {
-			return !captures
-		}
-		declared := identifier.Obj.Pos()
-		insideEnclosing := declared >= enclosing.Pos() && declared < enclosing.End()
-		insideLiteral := declared >= literal.Pos() && declared < literal.End()
-		if declared.IsValid() && insideEnclosing && !insideLiteral {
-			captures = true
-		}
-		return !captures
-	})
-	return captures
-}
-
-// isImportQualifier reports whether expression is a bare name of one of a file's imports, which no declaration of the
-// file resolves and no package-level variable of the package shadows.
-func isImportQualifier(expression ast.Expr, imports map[string]bool, names map[string]bool) bool {
-	identifier, isIdentifier := expression.(*ast.Ident)
-	return isIdentifier && identifier.Obj == nil && imports[identifier.Name] && !names[identifier.Name]
-}
-
-// packageStateWritesOf is where the package's non-test files write a package-level variable, its own or an imported
-// package's, from a function body, but inside a once's body that captures nothing of its caller.
-func packageStateWritesOf(source *sourcePackage) []string {
-	names, declarations := packageVariables(source.files)
-	var writes []string
-	for _, file := range source.files {
-		imports := map[string]bool{}
-		for _, imported := range file.Imports {
-			// Ignored: the parser accepted the file, so every import path is a quoted string that unquotes.
-			importPath, _ := strconv.Unquote(imported.Path.Value)
-			name := importPath[strings.LastIndex(importPath, "/")+1:]
-			if imported.Name != nil {
-				name = imported.Name.Name
-			}
-			imports[name] = true
-		}
-		// isPackageLevel is whether identifier, written through, names a package-level variable: one this file
-		// declares, or a name no declaration in the file resolves that another file of the package declares, or an
-		// import's qualifier.
-		isPackageLevel := func(identifier *ast.Ident) bool {
-			if identifier == nil || identifier.Name == "_" {
-				return false
-			}
-			if identifier.Obj != nil {
-				value, isValue := identifier.Obj.Decl.(*ast.ValueSpec)
-				return isValue && declarations[value]
-			}
-			return names[identifier.Name] || imports[identifier.Name]
-		}
-		record := func(at ast.Node) {
-			writes = append(writes, source.fileSet.Position(at.Pos()).String())
-		}
-		// inspect walks node, inside enclosing, the outermost function around it, nil at package level, where no
-		// write is a function's.
-		var inspect func(node ast.Node, enclosing ast.Node)
-		inspect = func(node ast.Node, enclosing ast.Node) {
-			inFunction := enclosing != nil
-			ast.Inspect(node, func(current ast.Node) bool {
-				if current == node {
-					return true
-				}
-				switch typed := current.(type) {
-				case *ast.FuncDecl:
-					if typed.Body != nil {
-						inspect(typed.Body, typed)
-					}
-					return false
-				case *ast.FuncLit:
-					// A literal at package level, as a variable's initializer, is the outermost function around it.
-					outermost := enclosing
-					if outermost == nil {
-						outermost = typed
-					}
-					inspect(typed.Body, outermost)
-					return false
-				case *ast.CallExpr:
-					if isOnceBody(typed) {
-						// A body that captures its caller is walked as any function's; one that captures nothing
-						// builds constant data, and is left out.
-						for _, argument := range typed.Args {
-							if literal, isLiteral := argument.(*ast.FuncLit); isLiteral &&
-								capturesCaller(literal, enclosing) {
-								inspect(literal.Body, enclosing)
-							}
-						}
-						return false
-					}
-					if !inFunction {
-						return true
-					}
-					if builtin, isIdentifier := typed.Fun.(*ast.Ident); isIdentifier &&
-						(builtin.Name == "delete" || builtin.Name == "clear") && len(typed.Args) > 0 &&
-						isPackageLevel(writtenRoot(typed.Args[0])) {
-						record(typed)
-					}
-					// A call qualified by an import, as slices.Delete or cmp.Or, is a function of that package, never a
-					// method of a variable.
-					if selector, isSelector := typed.Fun.(*ast.SelectorExpr); isSelector &&
-						slices.Contains(mutatingMethods, selector.Sel.Name) &&
-						isPackageLevel(writtenRoot(selector.X)) && !isImportQualifier(selector.X, imports, names) {
-						record(typed)
-					}
-				case *ast.AssignStmt:
-					if inFunction && typed.Tok != token.DEFINE {
-						for _, written := range typed.Lhs {
-							if isPackageLevel(writtenRoot(written)) {
-								record(written)
-							}
-						}
-					}
-				case *ast.IncDecStmt:
-					if inFunction && isPackageLevel(writtenRoot(typed.X)) {
-						record(typed)
-					}
-				case *ast.RangeStmt:
-					if inFunction && typed.Tok == token.ASSIGN {
-						for _, written := range []ast.Expr{typed.Key, typed.Value} {
-							if written != nil && isPackageLevel(writtenRoot(written)) {
-								record(written)
-							}
-						}
-					}
-				}
-				return true
-			})
-		}
-		inspect(file, nil)
-	}
-	return writes
-}
-
 // requireOnlyKnown fails test for each package of found not in known, with where, and for each of known found
 // nowhere, naming list, the variable that holds known, and why a newcomer is read before it joins.
 func requireOnlyKnown(test *testing.T, found map[string][]string, known []string, list string, why string) {
@@ -485,22 +283,34 @@ func TestOnlyTheKnownAnalyzersLearnFacts(test *testing.T) {
 			"before adding it")
 }
 
-// Every package a rule's run reaches that writes a package-level variable from a function body is one whose state was
-// read: a pass runs once per package in one process, so such a variable outlives the pass and could carry what one
-// package's pass saw into another's, an importer's into its dependency's (#23b2grt). A sync.Once or sync.OnceValue
+// Every package a rule's run reaches that writes package state from a function body is one whose state was read: a
+// pass runs once per package in one process, so a package-level variable, and what it holds behind a pointer, a field
+// or a map's entry, outlives the pass and could carry what one package's pass saw into another's, an importer's into
+// its dependency's (#23b2grt, #rhsx4gc). A sync.Once or sync.OnceValue
 // does not make a write safe, since the first package to reach it decides it for every pass after: a write in its body
 // counts unless the body reads nothing of the function that calls it, and so builds the same data whoever runs it.
 func TestOnlyTheKnownPackagesWritePackageStateFromAFunction(test *testing.T) {
 	test.Parallel()
 
 	parsed := parsedEngineSource(test)
-	found := map[string][]string{}
+	reach := loadedReach(test)
+	test.Logf("the rules' reach, %d packages, loaded with types in %s", len(reach.byDirectory), reach.wall)
+	var reached []*packages.Package
 	for _, directory := range ruleReach(parsed) {
 		if parsed[directory] == nil {
 			continue
 		}
-		if writes := packageStateWritesOf(parsed[directory]); len(writes) > 0 {
-			found[directory] = writes
+		if reach.byDirectory[directory] == nil {
+			test.Fatalf("%s is in the rules' reach, but the typed load holds no package of it", directory)
+		}
+		reached = append(reached, reach.byDirectory[directory])
+	}
+	held := heldTypesOf(reached)
+	exempt := packageStateExemptionsOf(reached)
+	found := map[string][]string{}
+	for _, analyzed := range reached {
+		if writes := packageStateWritesOf(analyzed, held, exempt); len(writes) > 0 {
+			found[strings.TrimPrefix(analyzed.PkgPath, engineImportPath)] = writes
 		}
 	}
 	requireOnlyKnown(test, found, packageStateWriters, "packageStateWriters",
