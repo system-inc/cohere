@@ -14,6 +14,12 @@ import (
 type sourceFile struct {
 	tokenFile *token.File
 	content   []byte
+	// lines is tokenFile's line table, each line's starting offset, read once rather than under the file's lock for
+	// every line.
+	lines []int
+	// longLines are the lines wider than the limit before any exemption, in order. Only a file with one is walked
+	// for what follows.
+	longLines []longLine
 	// exemptLines are the lines no length is blamed on: an import spec's, and a //go: directive's.
 	exemptLines map[int]bool
 	// stringLiterals and comments are in source order, so the one holding an offset is a binary search away.
@@ -29,6 +35,14 @@ type sourceFile struct {
 	unwrappableFields map[int]*ast.Field
 }
 
+// longLine is one line wider than the limit: where it starts and ends, and how wide it reads.
+type longLine struct {
+	line   int
+	start  int
+	end    int
+	length int
+}
+
 // reportedLine is one line the rule reports: where it overflows, where it ends, and how wide it reads.
 type reportedLine struct {
 	line     int
@@ -37,24 +51,33 @@ type reportedLine struct {
 	length   int
 }
 
+// gatherLongLines are the lines wider than the limit, in order, whether or not an exemption covers them.
+func (source *sourceFile) gatherLongLines() []longLine {
+	var long []longLine
+	for line := 1; line <= len(source.lines); line++ {
+		start, end := source.lineStart(line), source.lineEnd(line)
+		length := columnsOf(source.content[start:end])
+		if length > Limit {
+			long = append(long, longLine{line: line, start: start, end: end, length: length})
+		}
+	}
+	return long
+}
+
 // reportedLines are the lines past the limit that no exemption covers, in order.
 func (source *sourceFile) reportedLines() []reportedLine {
 	var reported []reportedLine
-	for line := 1; line <= source.tokenFile.LineCount(); line++ {
-		if source.exemptLines[line] {
+	for _, long := range source.longLines {
+		if source.exemptLines[long.line] {
 			continue
 		}
-		start, end := source.lineStart(line), source.lineEnd(line)
-		length := columnsOf(source.content[start:end])
-		if length <= Limit {
+		overflow := long.start + offsetPastLimit(source.content[long.start:long.end])
+		if source.isRawStringBody(long.line, overflow) || source.isLoneStringLiteral(long.line, overflow) ||
+			source.isUnbreakableCommentToken(long.line, overflow) || source.isLoneField(long.line) {
 			continue
 		}
-		overflow := start + offsetPastLimit(source.content[start:end])
-		if source.isRawStringBody(line, overflow) || source.isLoneStringLiteral(line, overflow) ||
-			source.isUnbreakableCommentToken(line, overflow) || source.isLoneField(line) {
-			continue
-		}
-		reported = append(reported, reportedLine{line: line, overflow: overflow, end: end, length: length})
+		reported = append(reported, reportedLine{line: long.line, overflow: overflow, end: long.end,
+			length: long.length})
 	}
 	return reported
 }
@@ -181,14 +204,15 @@ func (source *sourceFile) lineOf(position token.Pos) int {
 	return source.tokenFile.PositionFor(position, false).Line
 }
 
+// lineStart is the offset line starts at, as tokenFile.LineStart gives it, read from lines without the file's lock.
 func (source *sourceFile) lineStart(line int) int {
-	return source.offsetOf(source.tokenFile.LineStart(line))
+	return source.lines[line-1]
 }
 
 // lineEnd is the offset just past line's last character, before its newline and a carriage return ahead of it.
 func (source *sourceFile) lineEnd(line int) int {
 	end := len(source.content)
-	if line < source.tokenFile.LineCount() {
+	if line < len(source.lines) {
 		end = source.lineStart(line + 1)
 	}
 	text := bytes.TrimSuffix(bytes.TrimSuffix(source.content[source.lineStart(line):end], []byte("\n")), []byte("\r"))
