@@ -83,8 +83,8 @@ func TestTheClosureIndexAnswersAsTheWalks(test *testing.T) {
 			byPath, closure := closureFixtureOracle(candidate)
 			for _, path := range paths {
 				if declared := index.declaring(candidate, path); declared != byPath[path] {
-					test.Errorf("%s declares %s as %s, the walk as %s", candidate.ID, path, closureFixtureName(declared),
-						closureFixtureName(byPath[path]))
+					test.Errorf("%s declares %s as %s, the walk as %s", candidate.ID, path,
+						closureFixtureName(declared), closureFixtureName(byPath[path]))
 				}
 				if typed := index.typesOf(candidate, path); typed != closure[path] {
 					test.Errorf("%s has other types at %s than load.ClosureTypes", candidate.ID, path)
