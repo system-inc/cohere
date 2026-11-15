@@ -130,3 +130,29 @@ var configuredCeiling ceiling
 func raise() error {
 	return configuredCeiling.Set("raised")
 }
+
+// swept counts what the janitor swept, kept for the whole process.
+var swept int
+
+// init starts the janitor on a goroutine of its own, which runs whenever the scheduler runs it, a pass's time too.
+func init() {
+	go janitor()
+}
+
+// janitor sweeps, called only by the go statement init runs, which is no call made while the package initializes.
+func janitor() {
+	swept++ // written: package state
+}
+
+// queue is the items the process holds, in order.
+type queue struct {
+	items []int
+}
+
+// pending is the process's one queue.
+var pending = &queue{items: make([]int, 4)}
+
+// refill copies source over the queue's items, writing the queue's array.
+func (held *queue) refill(source []int) {
+	copy(held.items, source) // written: package state
+}

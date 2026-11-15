@@ -69,7 +69,17 @@ var factLearners = []string{"ctrlflow", "fact_deprecated", "printf"}
 //   - a method of a type outside the reach that writes its receiver, but for mutatingMethods;
 //   - a send on a channel package state holds;
 //   - a pass that sets a flag through flag.FlagSet.Set or the flag.Value interface, which reaches an exempt setter
-//     with no reference the guard can see.
+//     with no reference the guard can see;
+//   - an append into the spare capacity of a held slice whose result is dropped, which writes the shared array and
+//     assigns nothing;
+//   - a mutating method taken as a value or a method expression, as `store := cache.Store; store(key, value)` or
+//     `(*sync.Map).Store(&cache, key, value)`, which no call of the method's name shows;
+//   - state moved through a composite literal, as `local := wrapper{inner: held.byKey}; local.inner[key] = 1`, since
+//     an alias is a local given held state directly;
+//   - state a package-level variable of function type returns, as `lazyState().byKey[key] = 1` after
+//     `var lazyState = sync.OnceValue(...)`, since a call's result is held only by its type;
+//   - a method value kept at package level, as `var putter = (&T{}).put`, whose receiver no type walk reaches;
+//   - an interface variable assigned in an init function, whose dynamic type is not its initializer's.
 var packageStateWriters = []string{
 	"fact_resolver",
 	"intermediate_representation",
@@ -237,8 +247,16 @@ func factLearnersOf(registered []*analysis.Analyzer, ruleNames []string) map[str
 }
 
 // requireOnlyKnown fails test for each package of found not in known, with where, and for each of known found
-// nowhere, naming list, the variable that holds known, and why a newcomer is read before it joins.
-func requireOnlyKnown(test *testing.T, found map[string][]string, known []string, list string, why string) {
+// nowhere, naming list, the variable that holds known, why a newcomer is read before it joins, and stopped, what a
+// listed one found nowhere no longer does.
+func requireOnlyKnown(
+	test *testing.T,
+	found map[string][]string,
+	known []string,
+	list string,
+	why string,
+	stopped string,
+) {
 	test.Helper()
 
 	for _, newcomer := range slices.Sorted(maps.Keys(found)) {
@@ -248,7 +266,7 @@ func requireOnlyKnown(test *testing.T, found map[string][]string, known []string
 	}
 	for _, listed := range known {
 		if _, holds := found[listed]; !holds {
-			test.Errorf("%s is in %s but no longer reaches its channel: take it out", listed, list)
+			test.Errorf("%s is in %s but %s: take it out", listed, list, stopped)
 		}
 	}
 }
@@ -263,7 +281,8 @@ func TestOnlyTheKnownRulesAskTheRunsFactResolver(test *testing.T) {
 	parsed := parsedEngineSource(test)
 	requireOnlyKnown(test, resolverAskersIn(parsed, ruleReach(parsed)), resolverAskers, "resolverAskers",
 		"read that every question it asks reaches only the asker's import closure, through fact_resolver.Visible, "+
-			"and that its answer is the same whichever package asks first, before adding it")
+			"and that its answer is the same whichever package asks first, before adding it",
+		"no longer reaches its channel")
 }
 
 // Every analyzer the rules reach that declares FactTypes is one whose facts were read: the checker carries a fact only
@@ -280,15 +299,16 @@ func TestOnlyTheKnownAnalyzersLearnFacts(test *testing.T) {
 	}
 	requireOnlyKnown(test, factLearnersOf(analyzers, names), factLearners, "factLearners",
 		"read that its facts are about its own package's objects and computed from its import closure alone, "+
-			"before adding it")
+			"before adding it",
+		"no longer reaches its channel")
 }
 
 // Every package a rule's run reaches that writes package state from a function body is one whose state was read: a
 // pass runs once per package in one process, so a package-level variable, and what it holds behind a pointer, a field
 // or a map's entry, outlives the pass and could carry what one package's pass saw into another's, an importer's into
-// its dependency's (#23b2grt, #rhsx4gc). A sync.Once or sync.OnceValue
-// does not make a write safe, since the first package to reach it decides it for every pass after: a write in its body
-// counts unless the body reads nothing of the function that calls it, and so builds the same data whoever runs it.
+// its dependency's (#23b2grt, #rhsx4gc). A sync.Once or sync.OnceValue does not make a write safe, since the first
+// package to reach it decides it for every pass after: a write in its body counts unless the body reads nothing of the
+// function that calls it, and so builds the same data whoever runs it.
 func TestOnlyTheKnownPackagesWritePackageStateFromAFunction(test *testing.T) {
 	test.Parallel()
 
@@ -315,5 +335,6 @@ func TestOnlyTheKnownPackagesWritePackageStateFromAFunction(test *testing.T) {
 	}
 	requireOnlyKnown(test, found, packageStateWriters, "packageStateWriters",
 		"read that what it keeps is never read by a pass on another package, or reads the same whichever package "+
-			"wrote it first, before adding it")
+			"wrote it first, before adding it",
+		"no longer writes package state")
 }

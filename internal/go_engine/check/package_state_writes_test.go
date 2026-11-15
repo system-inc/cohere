@@ -317,7 +317,8 @@ func isInitFunction(declaration *ast.FuncDecl) bool {
 // functionReferencesOf is how the reach refers to each function and method its packages use, by origin: the
 // functions whose body directly calls it, by callers, whether a package-level initializer or an init function's body
 // calls it, by fromInitialization, and whether any reference is something else, by otherwise: a value, as `Run: run`
-// or `sync.OnceValue(compute)`, or a call inside a function literal, which may run whenever the literal is called.
+// or `sync.OnceValue(compute)`, a call inside a function literal, which may run whenever the literal is called, or a
+// call a go statement starts, which runs on a goroutine of its own whenever the scheduler runs it, a pass's time too.
 func functionReferencesOf(reached []*packages.Package) (
 	callers map[*types.Func]map[*types.Func]bool,
 	fromInitialization map[*types.Func]bool,
@@ -329,11 +330,18 @@ func functionReferencesOf(reached []*packages.Package) (
 	for _, analyzed := range reached {
 		information := analyzed.TypesInfo
 		for _, file := range analyzed.Syntax {
-			// called is each name a call is made through, as f in `f(x)`, `(f)(x)`, `f[int](x)` and `value.f(x)`.
+			// called is each name a call is made through, as f in `f(x)`, `(f)(x)`, `f[int](x)` and `value.f(x)`, but
+			// for the call a go statement starts, which is spawned. A deferred call stays a call: it runs before its
+			// function returns.
 			called := map[*ast.Ident]bool{}
+			spawned := map[*ast.CallExpr]bool{}
 			ast.Inspect(file, func(node ast.Node) bool {
+				// The walk reaches a go statement before the call it holds.
+				if statement, isGo := node.(*ast.GoStmt); isGo {
+					spawned[statement.Call] = true
+				}
 				call, isCall := node.(*ast.CallExpr)
-				if !isCall {
+				if !isCall || spawned[call] {
 					return true
 				}
 				function := ast.Unparen(call.Fun)
@@ -465,12 +473,12 @@ func packageStateExemptionsOf(reached []*packages.Package) map[*types.Func]bool 
 	return exempt
 }
 
-// packageStateWritesOf is where the package's files write package state from a function body, but inside a once's
-// body that captures nothing of its caller: a package-level variable, its own or an imported package's, or a location
-// behind an indirection that a value of a held type (see heldTypesOf), or a local holding such state (see
-// heldAliasesOf), leads to. A write is an assignment, an increment, a range's assignment, a delete or clear, or a call
-// of one of mutatingMethods. A write directly in the body of an init function, or of one of exempt (see
-// initializationOnlyOf and unreferencedFlagSettersOf), is left out, since it runs before any pass; one inside a
+// packageStateWritesOf is where the package's files write package state from a function body, but inside a once's body
+// that captures nothing of its caller: a package-level variable, its own or an imported package's, or a location behind
+// an indirection that a value of a held type (see heldTypesOf), or a local holding such state (see heldAliasesOf),
+// leads to. A write is an assignment, an increment, a range's assignment, a clear, copy or delete of its first
+// argument, or a call of one of mutatingMethods. A write directly in the body of an init function, or of one of exempt
+// (see initializationOnlyOf and unreferencedFlagSettersOf), is left out, since it runs before any pass; one inside a
 // function literal there is walked as any function's, since the literal may run later, in a pass.
 func packageStateWritesOf(
 	analyzed *packages.Package,
@@ -483,8 +491,8 @@ func packageStateWritesOf(
 	writesLocation := func(expression ast.Expr) bool {
 		return isStateWrite(stateReachOf(information, expression, held, aliases))
 	}
-	// writesValue reports whether a write into what expression holds, a map a delete empties or a value a method
-	// mutates, writes package state: the value is the indirection.
+	// writesValue reports whether a write into what expression holds, a map a delete empties, a slice a copy fills or
+	// a value a method mutates, writes package state: the value is the indirection.
 	writesValue := func(expression ast.Expr) bool {
 		rootedInPackage, leadsHeld, _ := stateReachOf(information, expression, held, aliases)
 		return isStateWrite(rootedInPackage, leadsHeld, true)
@@ -538,7 +546,7 @@ func packageStateWritesOf(
 						return true
 					}
 					if builtin, isBuiltin := information.Uses[builtinNameOf(typed.Fun)].(*types.Builtin); isBuiltin &&
-						(builtin.Name() == "delete" || builtin.Name() == "clear") && len(typed.Args) > 0 &&
+						slices.Contains([]string{"clear", "copy", "delete"}, builtin.Name()) && len(typed.Args) > 0 &&
 						writesValue(typed.Args[0]) {
 						record(typed)
 					}
