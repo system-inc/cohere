@@ -41,18 +41,18 @@ func TestALoadReadsEachPackagesMethodsOnce(test *testing.T) {
 	fileSet := token.NewFileSet()
 	few := importer(declaringPackage(1))
 	many := importer(declaringPackage(256))
-	reached := reachedMethodsOf(methodsOf(fileSet), many)
+	reached := reachedMethodsOf(methodsByLoad.Load(fileSet), many)
 	if len(reached) != 1 {
 		test.Fatalf("want the one package reached, got %d", len(reached))
 	}
 	if len(reached[0].byName) != 256 {
 		test.Fatalf("want the package's 256 methods indexed, got %d", len(reached[0].byName))
 	}
-	if again := reachedMethodsOf(methodsOf(fileSet), many); again[0] != reached[0] {
+	if again := reachedMethodsOf(methodsByLoad.Load(fileSet), many); again[0] != reached[0] {
 		test.Error("the load read the package's methods again, where it must hand back what it read first")
 	}
-	fewAllocations := testing.AllocsPerRun(20, func() { reachedMethodsOf(methodsOf(fileSet), few) })
-	manyAllocations := testing.AllocsPerRun(20, func() { reachedMethodsOf(methodsOf(fileSet), many) })
+	fewAllocations := testing.AllocsPerRun(20, func() { reachedMethodsOf(methodsByLoad.Load(fileSet), few) })
+	manyAllocations := testing.AllocsPerRun(20, func() { reachedMethodsOf(methodsByLoad.Load(fileSet), many) })
 	if manyAllocations != fewAllocations {
 		test.Errorf("reaching 256 types allocated %.0f times, one type %.0f, where the two must be the same",
 			manyAllocations, fewAllocations)

@@ -30,6 +30,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/load_memo"
 	"github.com/system-inc/cohere/internal/naming/abbreviation"
 	"github.com/system-inc/cohere/policy"
 )
@@ -118,11 +119,16 @@ type foreignMethod struct {
 	generic *types.Named
 }
 
+// declarationsByLoad are what the packages of each load declare (declaredMethodsOf), each package read once however
+// many packages of the load reach it. A package the whole tree imports, as fmt is, was read once for every importer,
+// and Scope.Names, which sorts on every call, was nearly half the rule's time.
+var declarationsByLoad = load_memo.New(declaredMethodsOf)
+
 // reach is what the rule knows of the packages this one can reach through its imports.
 type reach struct {
 	// declared are the methods of every interface and named type those packages declare, by name, one map to each
 	// package that declares any. Each map is its package's alone, so it is shared with every other package of the
-	// load that reaches the same one (see loadDeclarations).
+	// load that reaches the same one (see declarationsByLoad).
 	declared []map[string][]foreignMethod
 	// packageNames are those packages' names, which a whole-word suggestion must not take.
 	packageNames map[string]bool
@@ -160,7 +166,7 @@ func enterFile(context *rule.Context, _ *ast.File) {
 	if state.writes != nil {
 		return
 	}
-	state.reachable = reachOf(declarationsOf(context.FileSet), context.Package, context.Reads())
+	state.reachable = reachOf(declarationsByLoad.Load(context.FileSet), context.Package, context.Reads())
 	state.writes = sync.OnceValue(func() map[*types.Var]*variableWrites { return writesOf(context) })
 }
 
@@ -391,7 +397,11 @@ func haveSameShape(left *types.Signature, right *types.Signature) bool {
 
 // reachOf walks every package this one reaches through its imports, once per package, and gathers what the rule
 // asks of them, each package's methods from what the load has already read of it.
-func reachOf(declarations *loadDeclarations, current *types.Package, reads *build_reads.Reads) reach {
+func reachOf(
+	declarations *load_memo.Load[map[string][]foreignMethod],
+	current *types.Package,
+	reads *build_reads.Reads,
+) reach {
 	reachable := reach{packageNames: map[string]bool{}, reads: reads}
 	visited := map[*types.Package]bool{current: true}
 	pending := append([]*types.Package{}, current.Imports()...)
@@ -404,7 +414,7 @@ func reachOf(declarations *loadDeclarations, current *types.Package, reads *buil
 		visited[imported] = true
 		pending = append(pending, imported.Imports()...)
 		reachable.packageNames[imported.Name()] = true
-		if methodsByName := declarations.of(imported); len(methodsByName) > 0 {
+		if methodsByName := declarations.Of(imported); len(methodsByName) > 0 {
 			reachable.declared = append(reachable.declared, methodsByName)
 		}
 	}

@@ -23,6 +23,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/load_memo"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -212,7 +213,7 @@ func sameShape(left *types.Signature, right *types.Signature) bool {
 // reachedMethodsOf are the methods of every package reachable through current's imports, current's own excepted, one
 // index to each package in the order the walk first reaches it, each read once for the whole load. A method declared
 // here is ours, and is judged with the rest of this package.
-func reachedMethodsOf(load *loadMethods, current *types.Package) []*foreignMethods {
+func reachedMethodsOf(load *load_memo.Load[*foreignMethods], current *types.Package) []*foreignMethods {
 	reached := []*foreignMethods{}
 	visited := map[*types.Package]bool{current: true}
 	pending := []*types.Package{current}
@@ -225,7 +226,7 @@ func reachedMethodsOf(load *loadMethods, current *types.Package) []*foreignMetho
 			}
 			visited[imported] = true
 			pending = append(pending, imported)
-			reached = append(reached, load.of(imported))
+			reached = append(reached, load.Of(imported))
 		}
 	}
 	return reached

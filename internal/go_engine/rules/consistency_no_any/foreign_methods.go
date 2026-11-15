@@ -1,11 +1,15 @@
 package consistency_no_any
 
-import "go/types"
+import (
+	"go/types"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/load_memo"
+)
 
 // foreignMethods are the exported methods of every named type one package declares, interfaces and concrete types
 // alike, by name. Signature identity ignores receivers, so each is matched by its signature alone, and held as the
 // method, which a recorded answer names. Nothing in them depends on the package that reaches the declaring one, so a
-// load reads each package's once (see loadMethods).
+// load reads each package's once (see methodsByLoad).
 type foreignMethods struct {
 	byName map[string][]*types.Func
 	// genericByName holds a generic type's methods apart, since their signatures speak of type parameters that only
@@ -36,6 +40,12 @@ func (foreign *foreignMethods) add(named *types.Named) {
 		}
 	}
 }
+
+// methodsByLoad are what the packages of each load declare, each package read once however many packages of the load
+// reach it. Every package holding a method candidate once indexed its whole import closure afresh, so a package the
+// tree imports everywhere was read again for each, and Scope.Names, which sorts on every call, was nearly half of
+// that.
+var methodsByLoad = load_memo.New(declaredMethodsOf)
 
 // declaredMethodsOf indexes the methods of every named type declaring declares, in the order of the type's names. An
 // alias adds nothing: the type it names is declared in a package of the closure, which indexes it there.

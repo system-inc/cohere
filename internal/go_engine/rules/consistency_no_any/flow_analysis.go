@@ -693,7 +693,7 @@ func (flows *flowAnalysis) matchesForeignMethod(method *types.Func) bool {
 // none does.
 func (flows *flowAnalysis) matchingForeignMethod(method *types.Func) *types.Func {
 	if flows.reached == nil {
-		flows.reached = reachedMethodsOf(methodsOf(flows.context.FileSet), flows.context.Package)
+		flows.reached = reachedMethodsOf(methodsByLoad.Load(flows.context.FileSet), flows.context.Package)
 	}
 	// Only an interface fixes a concrete method of ours, and a concrete method of another package only an interface
 	// method of ours.
