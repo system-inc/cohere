@@ -1,9 +1,12 @@
 package go_engine
 
 import (
+	"encoding/hex"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
@@ -164,4 +167,110 @@ func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
 	}
 	expectSameVerdicts(test, "read from the store against side-loaded", everyGraphVerdict(test, sideLoaded),
 		everyGraphVerdict(test, warm))
+}
+
+// expectSameCensus fails for every build whose facts census in got, whose standard-library graph is records, does not
+// count what want's, side-loaded, counts as differing: kind for kind the facts that differ and the answers asked in one
+// build alone, and every unit those reach, firstOrderUnits among them. got may compare fewer facts than want, since it
+// leaves out what no name pairs exactly (withholdNameless), but never more, and never more fewer than its Unkeyed
+// counts; it logs how many it left out (#01chv64).
+func expectSameCensus(test *testing.T, want string, got string) {
+	test.Helper()
+	wantBuilds, gotBuilds := lintRecordOf(test, want).Builds, lintRecordOf(test, got).Builds
+	compared := 0
+	for index := range min(len(wantBuilds), len(gotBuilds)) {
+		wantDependence, gotDependence := wantBuilds[index].Dependence, gotBuilds[index].Dependence
+		if wantDependence == nil || gotDependence == nil || wantDependence.Facts == nil || gotDependence.Facts == nil {
+			continue
+		}
+		wantFacts, gotFacts := *wantDependence.Facts, *gotDependence.Facts
+		target := gotBuilds[index].Target
+		if wantFacts.Workspace != gotFacts.Workspace || wantFacts.Dependencies != gotFacts.Dependencies {
+			test.Errorf("build %s: the facts census reaches\n%+v and %+v\nwant\n%+v and %+v", target,
+				gotFacts.Workspace, gotFacts.Dependencies, wantFacts.Workspace, wantFacts.Dependencies)
+		}
+		gotKinds := map[[2]string]contract.FactKindCounts{}
+		for _, kind := range gotFacts.Kinds {
+			gotKinds[[2]string{kind.Analyzer, kind.FactType}] = kind
+		}
+		fewer := 0
+		for _, wantKind := range wantFacts.Kinds {
+			gotKind := gotKinds[[2]string{wantKind.Analyzer, wantKind.FactType}]
+			if gotKind.Different != wantKind.Different || gotKind.WorkspaceDifferent != wantKind.WorkspaceDifferent ||
+				gotKind.AskedInOne != wantKind.AskedInOne || gotKind.Compared > wantKind.Compared {
+				test.Errorf("build %s: %s %s counts %+v, want %+v", target, wantKind.Analyzer, wantKind.FactType,
+					gotKind, wantKind)
+			}
+			fewer += wantKind.Compared - gotKind.Compared
+		}
+		if fewer > gotFacts.Unkeyed {
+			test.Errorf("build %s: the census compares %d facts fewer than the side load and counts %d unkeyed",
+				target, fewer, gotFacts.Unkeyed)
+		}
+		test.Logf("build %s: %d facts compared fewer, %d unkeyed", target, fewer, gotFacts.Unkeyed)
+		compared++
+	}
+	if compared == 0 {
+		test.Error("no build's facts census was compared")
+	}
+}
+
+// The facts census counts the same differing facts, and the same units they reach, whether the standard library's
+// graph comes from the records the findings store keeps (#6a3kjvz piece 3) or from a side load (#01chv64): a cold run
+// over a table with no records side-loads the standard library and writes its records; a fresh copy of the fixture
+// whose store holds those records alone reads them, with its host checked from source as the first run's was, and
+// both runs census every build alike (expectSameCensus), judge every unit alike and report the same findings.
+func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
+	test.Parallel()
+
+	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	reading := readingTableAs(table, engineTestsStamp, "")
+	sideRoot := copyFixture(test, standardLibraryRecordsFixture)
+	sideLoaded, sideStream, _ := runOverNoted(test, sideRoot, exitClean, reading, recordsSwitches...)
+	if restored := restoredOf(test, sideStream); restored.StandardLibrarySideLoaded == 0 {
+		test.Fatalf("the first run counts %+v, want the standard library side-loaded", restored)
+	}
+	storedRoot := copyFixture(test, standardLibraryRecordsFixture)
+	_, standardLibraryKeys := storedRecordKeys(test, sideRoot)
+	for key := range standardLibraryKeys {
+		name := hex.EncodeToString(key[:])
+		contents, readError := os.ReadFile(filepath.Join(storeDirectory(sideRoot), name[:2], name))
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		copied := filepath.Join(storeDirectory(storedRoot), name[:2], name)
+		if makeError := os.MkdirAll(filepath.Dir(copied), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(copied, contents, 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	fromStore, storeStream, _ := runOverNoted(test, storedRoot, exitClean, reading, recordsSwitches...)
+	if restored := restoredOf(test, storeStream); restored.StandardLibraryFromRecords == 0 ||
+		restored.StandardLibrarySideLoaded != 0 {
+		test.Fatalf("over the stored records the run counts %+v, want every package from them", restored)
+	}
+	withoutRoot := func(verdicts map[string]bool, root string) map[string]bool {
+		moved := make(map[string]bool, len(verdicts))
+		for unit, dependent := range verdicts {
+			moved[strings.ReplaceAll(unit, root, "")] = dependent
+		}
+		return moved
+	}
+	expectSameVerdicts(test, "from the store against side-loaded",
+		withoutRoot(everyGraphVerdict(test, sideLoaded), sideRoot), withoutRoot(everyGraphVerdict(test, fromStore),
+			storedRoot))
+	expectSameCensus(test, sideStream, storeStream)
+	withoutRootLines := func(lines []string, root string) []string {
+		moved := make([]string, 0, len(lines))
+		for _, line := range lines {
+			moved = append(moved, strings.ReplaceAll(line, root, ""))
+		}
+		return moved
+	}
+	if !slices.Equal(withoutRootLines(findingLines(sideStream), sideRoot),
+		withoutRootLines(findingLines(storeStream), storedRoot)) {
+		test.Error("the findings over the stored records are not the side-loaded run's")
+	}
 }

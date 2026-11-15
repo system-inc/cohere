@@ -1156,7 +1156,12 @@ scope, `"differingUnits"` and `"differingNodes"`, the units declaring an object 
 and `"firstOrderNodes"`, the units the judgment calls independent that call one of those statically, the callers a
 model judging each unit once would judge again, `"boundUnits"` and `"boundNodes"`, the same followed to a fixed point
 that takes each such caller as differing in turn, an upper bound, and `"callerUnits"` and `"callerNodes"`, every
-independent unit that calls a dependent one, the most that facts through call bodies can put in play.
+independent unit that calls a dependent one, the most that facts through call bodies can put in play. Where the
+standard library's graph is records, the store's, with no types, a restored package's facts are matched on both sides
+by their objects' declaring units, the host's found by the name the records give each object, the build's by its
+position; `"unkeyed"` counts the facts of such a package left out, on either side: one no record name reaches, one no
+unit declares, one the host holds by a method's or a field's path alone, which nothing pairs exactly, and a build's
+fact that would meet such a fact unpaired. It is always written, since every count beside it leaves them out.
 `"milliseconds"` is the comparison's wall time.
 
 ### `phase`

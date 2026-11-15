@@ -258,12 +258,17 @@ type RestoredDependence struct {
 // and Dependencies count, by the scope of the unit, the units a differing fact reaches. Milliseconds is the
 // comparison's wall time. Every build restores nothing from the host's run under the census, so its facts are its own.
 // The standard library the host restored from the binary's table is compared through the table's facts and answers
-// (#ss4t5g6), but for a fact about an object no objectpath names, which no table holds.
+// (#ss4t5g6), but for a fact about an object no objectpath names, which no table holds. Unkeyed, additive (#01chv64),
+// counts the facts of a package the host restored whose standard-library graph is records, the store's, that the census
+// left out of the comparison, on either side: one it could not name as the records do, one no unit of that graph
+// declares, one the host holds by a method's or a field's path alone, and a build's fact that would meet such a fact
+// unpaired. It is always written, beside the callers the census counts, since they leave those facts out.
 type DependenceFacts struct {
 	Kinds        []FactKindCounts `json:"kinds"`
 	Workspace    FactCallers      `json:"workspace"`
 	Dependencies FactCallers      `json:"dependencies"`
 	Milliseconds int              `json:"milliseconds"`
+	Unkeyed      int              `json:"unkeyed"`
 }
 
 // FactKindCounts are one kind of fact's comparisons: the analyzer and the fact's type, the facts compared, those equal

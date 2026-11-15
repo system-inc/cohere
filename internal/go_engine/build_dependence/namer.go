@@ -3,6 +3,8 @@ package build_dependence
 import (
 	"go/types"
 	"slices"
+
+	"golang.org/x/tools/go/types/objectpath"
 )
 
 // namer names one live package's objects for its record: the package, its declared objects' local names, the graph's
@@ -34,14 +36,21 @@ func (naming *namer) nameOf(object types.Object) string {
 	return local
 }
 
-// localName is object's local name by encoder, as no unit's declaring names it: a package-level object's name, which
-// is its objectpath where it has one, and any other object's objectpath, empty for none. A package-level object is
-// named without the encoder, whose search of a package's API is the costly part of naming.
+// localName is object's local name by encoder, as no unit's declaring names it (LocalName).
 func localName(encoder *objectPaths, object types.Object) string {
+	return LocalName(object, encoder.For)
+}
+
+// LocalName is object's local name as a record names it when no unit's declaring names it by its place: a
+// package-level object's name, which is its objectpath where it has one, and any other object's objectpath by
+// pathOf, empty for none. A package-level object is named without pathOf, whose search of a package's API is the
+// costly part of naming. The facts census names a restored package's objects this way, to meet them in a graph of
+// records (#01chv64).
+func LocalName(object types.Object, pathOf func(types.Object) (objectpath.Path, error)) string {
 	if packageLevel(object) {
 		return object.Name()
 	}
-	if path, pathError := encoder.For(object); pathError == nil {
+	if path, pathError := pathOf(object); pathError == nil {
 		return string(path)
 	}
 	return ""

@@ -1,12 +1,21 @@
 package go_engine
 
 import (
+	"go/types"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/types/objectpath"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
@@ -162,5 +171,142 @@ func TestTheFactsCensusFollowsACallerChainAcrossBothGraphs(test *testing.T) {
 			test.Errorf("%s: want Finish's no-return fact the workspace's one compared, and different, got %+v",
 				each.name, noReturn)
 		}
+	}
+}
+
+// pathOnlyFact is a fact the host restored of package fmt about the object at path, which its export data does not
+// hold, so it carries the path alone, as a table's entry holds it.
+func pathOnlyFact(path string) check.ExportedFact {
+	return check.ExportedFact{Package: &packages.Package{ID: "fmt", PkgPath: "fmt"}, Analyzer: "ctrlflow",
+		FactType: "noReturn", ObjectPath: objectpath.Path(path)}
+}
+
+// A fact the host holds by a package-level object's path alone is keyed by that path as the object's name, which is
+// exact, and is compared with the build's fact about the object of that name in its unit (#01chv64).
+func TestAPathOnlyPackageLevelFactIsCompared(test *testing.T) {
+	test.Parallel()
+
+	key, isKeyed := factKeyByName(pathOnlyFact("fatal"), &objectpath.Encoder{})
+	if !isKeyed || key.local != "fatal" || key.name != "fatal" {
+		test.Fatalf("want the path keyed as the object's name, got %+v (keyed %t)", key, isKeyed)
+	}
+	// Moved to the unit declaring it, as byDeclaringUnit moves both sides.
+	key.file, key.offset, key.local = "print.go", 120, ""
+	hosted := map[factKey]check.ExportedFact{key: pathOnlyFact("fatal")}
+	built := map[factKey]check.ExportedFact{key: {Analyzer: "ctrlflow", FactType: "noReturn"}}
+	keptHosted, keptBuilt, left := withholdNameless(hosted, built)
+	if _, isHosted := keptHosted[key]; !isHosted || len(keptBuilt) != 1 || left != 0 {
+		test.Errorf("want the fact compared, both sides kept, got %d host and %d build facts, %d left out",
+			len(keptHosted), len(keptBuilt), left)
+	}
+}
+
+// A fact the host holds by a method's path alone has no name, since the path indexes into a method set another build's
+// files can change, so it is never paired, even in a unit whose one unclaimed build fact of its kind is the likeliest
+// match: both are left out and counted (#01chv64).
+func TestAPathOnlyMethodFactIsUnkeyed(test *testing.T) {
+	test.Parallel()
+
+	key, isKeyed := factKeyByName(pathOnlyFact("pp.M3"), &objectpath.Encoder{})
+	if !isKeyed || key.local != "pp.M3" || key.name != "" {
+		test.Fatalf("want the path keyed with no name, got %+v (keyed %t)", key, isKeyed)
+	}
+	key.file, key.offset, key.local = "print.go", 900, ""
+	builtKey := key
+	builtKey.name = "badVerb"
+	hosted := map[factKey]check.ExportedFact{key: pathOnlyFact("pp.M3")}
+	built := map[factKey]check.ExportedFact{builtKey: {Analyzer: "ctrlflow", FactType: "noReturn"}}
+	keptHosted, keptBuilt, left := withholdNameless(hosted, built)
+	if len(keptHosted) != 0 || len(keptBuilt) != 0 || left != 2 {
+		test.Errorf("want both facts left out and counted, got %d host and %d build facts, %d left out",
+			len(keptHosted), len(keptBuilt), left)
+	}
+}
+
+// loadedOs is the standard library's os package loaded from source for goos on arm64, cgo off, from a module of its
+// own.
+func loadedOs(test *testing.T, goos string) *packages.Package {
+	test.Helper()
+	module := test.TempDir()
+	if writeError := os.WriteFile(filepath.Join(module, "go.mod"), []byte("module cohere.invalid/answers\n\ngo 1.24\n"),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	loaded, loadError := load.PackagesCached(module, []string{"os"},
+		[]string{"GOOS=" + goos, "GOARCH=arm64", "CGO_ENABLED=0", "GOWORK=off"}, nil, load.Caching{WithoutTests: true})
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading os for %s: %v, %d errors", goos, loadError, len(loaded.Diagnostics))
+	}
+	var found *packages.Package
+	packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
+		if each.ID == "os" {
+			found = each
+		}
+	})
+	if found == nil {
+		test.Fatalf("the load for %s holds no os", goos)
+	}
+	return found
+}
+
+// A restored package's answer about a method is the host's answer about that method, though the build's files change
+// its type's method set (#01chv64): os.Process has other methods on windows than on darwin, so the windows build's
+// objectpath of a method declared in a file both compile names another method in the darwin host's answers, and the
+// census finds the host's answer by the unit declaring the method in the darwin graph instead, where the build's
+// method sits.
+func TestARestoredMethodAnswerMeetsItsOwnMethodWhereMethodSetsDiverge(test *testing.T) {
+	test.Parallel()
+
+	host, build := loadedOs(test, "darwin"), loadedOs(test, "windows")
+	graph := build_dependence.NewGraph()
+	graph.AddPackage(host, false)
+	standardLibrary := graph.Against(build_dependence.Difference{
+		Packages:          map[string]build_dependence.PackageDifference{},
+		HostOnlyPackages:  map[string]bool{},
+		BuildOnlyPackages: map[string]bool{},
+	})
+	processOf := func(loaded *packages.Package) *types.Named {
+		named, isNamed := loaded.Types.Scope().Lookup("Process").Type().(*types.Named)
+		if !isNamed {
+			test.Fatal("os.Process is no named type")
+		}
+		return named
+	}
+	hostProcess, buildProcess := processOf(host), processOf(build)
+	var hostEncoder objectpath.Encoder
+	var buildEncoder objectpath.Encoder
+	var method *types.Func
+	var hostPath objectpath.Path
+	var buildPath objectpath.Path
+	for built := range buildProcess.Methods() {
+		file := build.Fset.Position(built.Pos()).Filename
+		hosted, _, _ := types.LookupFieldOrMethod(hostProcess, true, host.Types, built.Name())
+		hostedMethod, isMethod := hosted.(*types.Func)
+		if !isMethod || !slices.Contains(host.GoFiles, file) {
+			continue
+		}
+		hostMethodPath, hostError := hostEncoder.For(hostedMethod)
+		buildMethodPath, buildError := buildEncoder.For(built)
+		other, otherError := objectpath.Object(host.Types, buildMethodPath)
+		if hostError == nil && buildError == nil && otherError == nil && hostMethodPath != buildMethodPath &&
+			other.Name() != built.Name() {
+			method, hostPath, buildPath = built, hostMethodPath, buildMethodPath
+			break
+		}
+	}
+	if method == nil {
+		test.Fatal("no method of os.Process in a shared file has another objectpath on windows, so the case proves " +
+			"nothing")
+	}
+	test.Logf("Process.%s is %s on darwin and %s on windows", method.Name(), hostPath, buildPath)
+	answers := &fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
+		"function_purity": {hostPath: []byte("its own"), buildPath: []byte("another method's")},
+	}}
+	declaring := &byDeclaringUnit{standardLibrary: standardLibrary}
+	encoded, isHeld, isPlaced := declaring.answerOf(answers, check.ExportedFact{Package: build,
+		Analyzer: "function_purity", FactType: "answer", Object: method, Answer: true})
+	if !isPlaced || !isHeld || string(encoded) != "its own" {
+		test.Errorf("Process.%s, %s on darwin and %s on windows: want the host's answer about it, got %q (held %t, "+
+			"placed %t)", method.Name(), hostPath, buildPath, encoded, isHeld, isPlaced)
 	}
 }
