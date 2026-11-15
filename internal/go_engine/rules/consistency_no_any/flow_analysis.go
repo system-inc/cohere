@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 
+	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
@@ -31,10 +32,9 @@ type flowAnalysis struct {
 	foreign     *foreignMethods
 }
 
-// record notes every place node hands a value on. enclosing is the signature of the function a return statement is
-// in, read where the walk met it.
-func (flows *flowAnalysis) record(node ast.Node, enclosing *types.Signature) {
-	switch handing := node.(type) {
+// record notes every place the node at cursor hands a value on.
+func (flows *flowAnalysis) record(cursor inspector.Cursor) {
+	switch handing := cursor.Node().(type) {
 	case *ast.CallExpr:
 		flows.recordCall(handing)
 	case *ast.AssignStmt:
@@ -42,7 +42,7 @@ func (flows *flowAnalysis) record(node ast.Node, enclosing *types.Signature) {
 	case *ast.ValueSpec:
 		flows.recordValueSpec(handing)
 	case *ast.ReturnStmt:
-		flows.recordReturn(handing, enclosing)
+		flows.recordReturn(handing, flows.enclosingSignature(cursor))
 	case *ast.CompositeLit:
 		flows.recordCompositeLiteral(handing)
 	case *ast.SendStmt:
@@ -223,11 +223,11 @@ func (flows *flowAnalysis) recordSend(statement *ast.SendStmt) {
 	flows.source(flows.referenceOf(statement.Chan, -1), channel.Elem(), value)
 }
 
-// enclosingSignature is the signature of the innermost function the stack is inside, whose results a return
-// statement hands its values to, or nil outside any function.
-func (flows *flowAnalysis) enclosingSignature(stack []ast.Node) *types.Signature {
-	for index := len(stack) - 1; index >= 0; index-- {
-		switch function := stack[index].(type) {
+// enclosingSignature is the signature of the innermost function cursor is inside, whose results a return statement
+// hands its values to, or nil outside any function.
+func (flows *flowAnalysis) enclosingSignature(cursor inspector.Cursor) *types.Signature {
+	for enclosing := range cursor.Enclosing((*ast.FuncLit)(nil), (*ast.FuncDecl)(nil)) {
+		switch function := enclosing.Node().(type) {
 		case *ast.FuncLit:
 			signature, _ := flows.context.TypesInfo.TypeOf(function).(*types.Signature)
 			return signature

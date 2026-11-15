@@ -18,6 +18,8 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/inspect"
+	"golang.org/x/tools/go/ast/inspector"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -27,23 +29,25 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-any"
 
-// listener follows values and gathers candidates over the syntax dispatcher's walk of every file, hearing each node
-// that hands a value on and each that could be any or an empty interface, and judges the candidates once the whole
-// package has been walked, since a place anywhere in it may fix a declaration's type.
+// listener gathers candidates over the syntax dispatcher's walk of every file, hearing each node that could be any or
+// an empty interface, and once the whole package has been walked follows its values and judges the candidates, since
+// a place anywhere in it may fix a declaration's type. It reads the package's inspector to find the values.
 var listener = rule.Listener{
-	FileEnter: enterFile,
-	Nodes: []ast.Node{
-		(*ast.CallExpr)(nil),
-		(*ast.AssignStmt)(nil),
-		(*ast.ValueSpec)(nil),
-		(*ast.ReturnStmt)(nil),
-		(*ast.CompositeLit)(nil),
-		(*ast.SendStmt)(nil),
-		(*ast.Ident)(nil),
-		(*ast.InterfaceType)(nil),
-	},
+	Requires:    []*analysis.Analyzer{inspect.Analyzer},
+	FileEnter:   enterFile,
+	Nodes:       []ast.Node{(*ast.Ident)(nil), (*ast.InterfaceType)(nil)},
 	Node:        judgeNode,
 	PackageExit: exitPackage,
+}
+
+// handingKinds are the nodes that hand a value on, which exitPackage walks the package for.
+var handingKinds = []ast.Node{
+	(*ast.CallExpr)(nil),
+	(*ast.AssignStmt)(nil),
+	(*ast.ValueSpec)(nil),
+	(*ast.ReturnStmt)(nil),
+	(*ast.CompositeLit)(nil),
+	(*ast.SendStmt)(nil),
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
@@ -64,17 +68,6 @@ type packageState struct {
 	flows *flowAnalysis
 	// candidates are the any and interface{} words written in a declaration's type, in the order the walk met them.
 	candidates []candidate
-	// handings are the nodes that hand a value on, in the order the walk met them, recorded into flows only once the
-	// package is walked and only when it holds a candidate: the flows decide nothing else, and most packages write
-	// no any at all.
-	handings []handing
-}
-
-// handing is a node that hands a value on, with the signature of the function it is in when it is a return
-// statement, read from the walk's stack where the node was met, since the stack is gone by the time it is recorded.
-type handing struct {
-	node      ast.Node
-	signature *types.Signature
 }
 
 // enterFile makes the package's flow analysis, the first time the walk enters one of its files.
@@ -93,19 +86,11 @@ func enterFile(context *rule.Context, _ *ast.File) {
 	state.candidates = []candidate{}
 }
 
-// judgeNode keeps every node that hands a value on, and keeps node as a candidate when it is any or an empty
-// interface written in a declaration's type, its ancestors in stack.
+// judgeNode keeps node as a candidate when it is any or an empty interface written in a declaration's type, its
+// ancestors in stack.
 func judgeNode(context *rule.Context, node ast.Node, stack []ast.Node) {
 	state := rule.State[packageState](context)
 	if state.flows == nil {
-		return
-	}
-	switch node.(type) {
-	case *ast.CallExpr, *ast.AssignStmt, *ast.ValueSpec, *ast.CompositeLit, *ast.SendStmt:
-		state.handings = append(state.handings, handing{node: node})
-		return
-	case *ast.ReturnStmt:
-		state.handings = append(state.handings, handing{node: node, signature: state.flows.enclosingSignature(stack)})
 		return
 	}
 	if found, isCandidate := state.flows.candidateAt(node, stack); isCandidate {
@@ -113,15 +98,27 @@ func judgeNode(context *rule.Context, node ast.Node, stack []ast.Node) {
 	}
 }
 
-// exitPackage records the package's flows and settles them when it holds a candidate, and reports each candidate none
-// of whose declarations has its type fixed elsewhere.
+// exitPackage records and settles the package's flows when it holds a candidate, and reports each candidate none of
+// whose declarations has its type fixed elsewhere.
+//
+// The flows decide nothing else, and most packages write no any at all, so only a package holding a candidate is
+// walked for the nodes that hand a value on, rather than every package keeping each one as the dispatcher's walk met
+// it. The walk covers the inspector's whole root, the same files the dispatcher's walk covers, and settle marks the
+// same declarations in any order the flows are recorded, so no finding changes.
 func exitPackage(context *rule.Context) {
 	state := rule.State[packageState](context)
 	if state.flows == nil || len(state.candidates) == 0 {
 		return
 	}
-	for _, each := range state.handings {
-		state.flows.record(each.node, each.signature)
+	walker, isInspector := context.ResultOf(inspect.Analyzer).(*inspector.Inspector)
+	if !isInspector {
+		// The syntax dispatcher refuses a pass whose inspector failed before any listener hears it, so this never
+		// holds. Were it to, a candidate judged with no flows would be flagged where a flow fixes its type, so the
+		// package reports nothing.
+		return
+	}
+	for cursor := range walker.Root().Preorder(handingKinds...) {
+		state.flows.record(cursor)
 	}
 	state.flows.settle(state.candidates)
 	for _, found := range state.candidates {
