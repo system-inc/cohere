@@ -35,6 +35,8 @@ func saveRun(test *testing.T, root string, file string, buffer []byte) {
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
 	var output bytes.Buffer
 	var standardError bytes.Buffer
 	engine := newPipeline(request, described, ruleSettings, registered, io.Discard, &standardError, nil)

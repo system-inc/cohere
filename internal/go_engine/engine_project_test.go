@@ -106,6 +106,8 @@ func TestDescribeProjectReadsAProjectOfManyFilesAsASerialReadDoes(test *testing.
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
 
 	var wantReadable []string
 	wantContents := map[string][]byte{}
@@ -157,6 +159,8 @@ func TestDescribeProjectHoldsTheEditorsBufferForItsSave(test *testing.T) {
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
 	if !bytes.Equal(described.contents[saved], request.buffer) {
 		test.Errorf("the save's file holds %q, want the buffer %q", described.contents[saved], request.buffer)
 	}
@@ -204,6 +208,8 @@ func TestDescribeProjectUnderSingleThreadedReadsOneFileAtATime(test *testing.T) 
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
 	if most := mostInFlight.Load(); most > 1 {
 		test.Errorf("%d reads were in flight at once under --single-threaded, want one", most)
 	}
@@ -245,8 +251,8 @@ func TestDescribeProjectAsksGoEnvironmentBesideItsReads(test *testing.T) {
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
-	// The host's lister state may still run, and ends before the test does.
-	described.awaitStarted()
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
 	if described.goEnvironment == nil {
 		test.Error("the description holds no go env answer, want the one asked beside the reads")
 	}

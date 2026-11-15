@@ -46,6 +46,8 @@ func renamingPipelineOver(test *testing.T, fixture string) (*pipeline, *load.Loa
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
 	engine := &pipeline{
 		request:       request,
 		described:     described,
