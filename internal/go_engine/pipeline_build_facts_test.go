@@ -389,3 +389,89 @@ func TestARestoredMethodAnswerMeetsItsOwnMethodWhereMethodSetsDiverge(test *test
 			"placed %t)", method.Name(), hostPath, buildPath, hosted.Encoded, isHeld, isPlaced)
 	}
 }
+
+// loadedSplit is the census-split fixture's package loaded from source for goos on arm64, cgo off.
+func loadedSplit(test *testing.T, root string, goos string) *packages.Package {
+	test.Helper()
+	loaded, loadError := load.PackagesCached(root, []string{"./..."},
+		[]string{"GOOS=" + goos, "GOARCH=arm64", "CGO_ENABLED=0", "GOWORK=off"}, nil, load.Caching{WithoutTests: true})
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading the fixture for %s: %v, %d errors", goos, loadError, len(loaded.Diagnostics))
+	}
+	var found *packages.Package
+	packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
+		if each.ID == "example.com/split" {
+			found = each
+		}
+	})
+	if found == nil {
+		test.Fatalf("the load for %s holds no example.com/split", goos)
+	}
+	return found
+}
+
+// parameterAnswer is the host's answer, through restoredAnswer as compareFacts asks, about the first parameter of the
+// function name in build's package, the darwin host holding answers and the census-split fixture's darwin graph.
+func parameterAnswer(
+	test *testing.T,
+	host *packages.Package,
+	build *packages.Package,
+	name string,
+	answers *fact_resolver.Answers,
+) (check.ExportedFact, bool, bool) {
+	test.Helper()
+	graph := build_dependence.NewGraph()
+	graph.AddPackage(host, false)
+	standardLibrary := graph.Against(build_dependence.Difference{
+		Packages:          map[string]build_dependence.PackageDifference{},
+		HostOnlyPackages:  map[string]bool{},
+		BuildOnlyPackages: map[string]bool{},
+	})
+	function, isFunction := build.Types.Scope().Lookup(name).(*types.Func)
+	if !isFunction {
+		test.Fatalf("the build declares no function %s", name)
+	}
+	engine := &pipeline{dependence: &hostDependence{
+		restoredAnswers: map[string]*fact_resolver.Answers{host.ID: answers},
+		standardLibrary: &standardLibraryDependence{graph: graph, files: map[string][]string{host.ID: host.GoFiles}},
+	}}
+	return engine.restoredAnswer(check.ExportedFact{Package: build, Analyzer: "odd_slice_argument", FactType: "answer",
+		Object: function.Signature().Params().At(0), Answer: true}, &objectpath.Encoder{},
+		&byDeclaringUnit{standardLibrary: standardLibrary})
+}
+
+// A restored package's answer about a function's parameter, as odd_slice_argument answers, is placed through the unit
+// declaring its function and its place in the signature, and compared with the host's answer about that parameter
+// (#h660y7d): Shared is in a file both builds compile.
+func TestAParameterAnswerIsComparedThroughItsFunctionsUnit(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "census-split"))
+	host, build := loadedSplit(test, root, "darwin"), loadedSplit(test, root, "windows")
+	hosted, isHeld, isPlaced := parameterAnswer(test, host, build, "Shared",
+		&fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
+			"odd_slice_argument": {"Shared.PA0": []byte("the host's")},
+		}})
+	if !isPlaced || !isHeld || string(hosted.Encoded) != "the host's" {
+		test.Errorf("Shared's parameter: want the host's answer about it, got %q (held %t, placed %t)",
+			hosted.Encoded, isHeld, isPlaced)
+	}
+}
+
+// Two functions of one name in files of different builds share a path, Split.PA0 for each's parameter, though they are
+// other code, so a build's answer about windows' never meets the darwin host's about darwin's: no unit of the host's
+// graph holds windows' file, and the answer is not placed (#h660y7d).
+func TestSameNamedFunctionsOfOtherBuildsNeverPair(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "census-split"))
+	host, build := loadedSplit(test, root, "darwin"), loadedSplit(test, root, "windows")
+	hosted, isHeld, isPlaced := parameterAnswer(test, host, build, "Split",
+		&fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
+			"odd_slice_argument": {"Split.PA0": []byte("darwin's")},
+		}})
+	if isPlaced || isHeld {
+		test.Errorf("windows' Split: want its parameter's answer not placed, got %q (held %t, placed %t)",
+			hosted.Encoded, isHeld, isPlaced)
+	}
+}

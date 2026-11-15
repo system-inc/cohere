@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"go/types"
+	"strings"
 
 	"golang.org/x/tools/go/types/objectpath"
 
@@ -18,9 +19,11 @@ type byDeclaringUnit struct {
 	standardLibrary *build_dependence.Dependence
 	units           []build_dependence.Unit
 
-	// answerPaths are the paths of a restored package's answers of one kind, by the unit declaring each, read once
-	// the first answer of the package and kind asks (answerOf).
-	answerPaths map[answerKind]map[int][]objectpath.Path
+	// answerPaths are the paths of a restored package's answers of one kind, by where each sits (answerPlace), read
+	// once the first answer of the package and kind asks (answerOf), and paths the build's objectpaths, which say a
+	// parameter's or a result's place in its function's signature.
+	answerPaths map[answerKind]map[answerPlace][]objectpath.Path
+	paths       objectpath.Encoder
 }
 
 // answerKind is one package's answers of one kind.
@@ -172,20 +175,25 @@ func (declaring *byDeclaringUnit) built(key factKey) (factKey, bool) {
 	return declaring.unitKey(key, index), true
 }
 
-// answerOf is the host's answer, among answers, the answers it restored of builtFact's package, about the function a
-// build's answer, builtFact, is about (#01chv64), whether it holds one, and whether the function is placed at all. The
-// host holds each answer by its function's objectpath, which names a method by its index in its type's method set, and
-// another build's files can change that set, so the build's own objectpath may name another method. The function is
-// found instead by its position, in the unit of the standard library's graph holding it, and the host's answer by the
-// unit declaring its path: a function declaration's unit declares one function, so the two meet exactly. A function
-// with no position in the graph, and an interface's method, which a type's unit declares beside others, are not
-// placed, and the census never guesses at them.
+// answerOf is the host's answer, among answers, the answers it restored of builtFact's package, about the function, or
+// the parameter or result of one, a build's answer, builtFact, is about (#h660y7d), whether it holds one, and whether
+// the object is placed at all. The host holds each answer by its object's objectpath, which names a method by its
+// index in its type's method set, and another build's files can change that set, so the build's own objectpath may
+// name another method; and two functions of one name in files of different builds share a path, though they are other
+// code. The object is found instead by its position, in the unit of the standard library's graph holding it, and the
+// host's answer by the unit declaring the function its path names, beside the object's place in that function's
+// signature (answerPlaceOf): a function declaration's unit declares one function, so the two meet exactly. An object
+// with no position in the graph, an interface's method or its parameter, which a type's unit declares beside others,
+// and an object two of the host's answers meet at, are not placed, and the census never guesses at them.
 func (declaring *byDeclaringUnit) answerOf(
 	answers *fact_resolver.Answers,
 	builtFact check.ExportedFact,
 ) ([]byte, bool, bool) {
-	function, isFunction := builtFact.Object.(*types.Func)
-	if !isFunction || declaring.standardLibrary == nil {
+	if declaring.standardLibrary == nil {
+		return nil, false, false
+	}
+	function, place, isPlaced := declaring.builtFunction(builtFact)
+	if !isPlaced {
 		return nil, false, false
 	}
 	if receiver := function.Signature().Recv(); receiver != nil && types.IsInterface(receiver.Type()) {
@@ -199,26 +207,107 @@ func (declaring *byDeclaringUnit) answerOf(
 	if !isUnit {
 		return nil, false, false
 	}
+	// A parameter or result is placed only within its own function's declaration.
+	if place != "" {
+		functionKey, isFunctionKeyed := factKeyAt(builtFact, function, builtFact.Package.Fset)
+		functionUnit, isFunctionUnit := declaring.standardLibrary.UnitContaining(key.packageIdentifier,
+			functionKey.file, functionKey.offset)
+		if !isFunctionKeyed || !isFunctionUnit || functionUnit != unit {
+			return nil, false, false
+		}
+	}
 	kind := answerKind{packageIdentifier: builtFact.Package.ID, analyzer: builtFact.Analyzer}
 	if declaring.answerPaths == nil {
-		declaring.answerPaths = map[answerKind]map[int][]objectpath.Path{}
+		declaring.answerPaths = map[answerKind]map[answerPlace][]objectpath.Path{}
 	}
-	byUnit, isRead := declaring.answerPaths[kind]
+	byPlace, isRead := declaring.answerPaths[kind]
 	if !isRead {
-		byUnit = map[int][]objectpath.Path{}
+		byPlace = map[answerPlace][]objectpath.Path{}
 		for path := range answers.Values[builtFact.Analyzer] {
-			if index, isDeclared := declaring.standardLibrary.UnitDeclaringName(builtFact.Package.PkgPath,
-				string(path)); isDeclared {
-				byUnit[index] = append(byUnit[index], path)
+			if hostPlace, isHostPlaced := declaring.hostedAnswer(builtFact.Package.PkgPath, path); isHostPlaced {
+				byPlace[hostPlace] = append(byPlace[hostPlace], path)
 			}
 		}
-		declaring.answerPaths[kind] = byUnit
+		declaring.answerPaths[kind] = byPlace
 	}
-	switch len(byUnit[unit]) {
+	paths := byPlace[answerPlace{unit: unit, place: place}]
+	switch len(paths) {
 	case 0:
 		return nil, false, true
 	case 1:
-		return answers.Values[builtFact.Analyzer][byUnit[unit][0]], true, true
+		return answers.Values[builtFact.Analyzer][paths[0]], true, true
 	}
 	return nil, false, false
+}
+
+// builtFunction is the function a build's answer, builtFact, is about, and its object's place in that function's
+// signature, empty for the function itself (answerPlaceOf), and false for an object that is neither a function nor a
+// parameter or result of a function its package names.
+func (declaring *byDeclaringUnit) builtFunction(builtFact check.ExportedFact) (*types.Func, string, bool) {
+	switch object := builtFact.Object.(type) {
+	case *types.Func:
+		return object, "", true
+	case *types.Var:
+		if object.IsField() || builtFact.Package.Types == nil {
+			return nil, "", false
+		}
+		path, pathError := declaring.paths.For(object)
+		if pathError != nil {
+			return nil, "", false
+		}
+		functionPath, place, isPlace := answerPlaceOf(path)
+		if !isPlace {
+			return nil, "", false
+		}
+		named, findError := objectpath.Object(builtFact.Package.Types, functionPath)
+		function, isFunction := named.(*types.Func)
+		if findError != nil || !isFunction {
+			return nil, "", false
+		}
+		return function, place, true
+	}
+	return nil, "", false
+}
+
+// hostedAnswer is the place of the host's answer at path, of the package of packagePath: the unit declaring the object
+// it names, a function's, with no place, or the unit declaring the function whose parameter or result it names, beside
+// that place (answerPlaceOf), and false when no unit declares either.
+func (declaring *byDeclaringUnit) hostedAnswer(packagePath string, path objectpath.Path) (answerPlace, bool) {
+	if index, isDeclared := declaring.standardLibrary.UnitDeclaringName(packagePath, string(path)); isDeclared {
+		return answerPlace{unit: index}, true
+	}
+	functionPath, place, isPlace := answerPlaceOf(path)
+	if !isPlace {
+		return answerPlace{}, false
+	}
+	index, isDeclared := declaring.standardLibrary.UnitDeclaringName(packagePath, string(functionPath))
+	if !isDeclared {
+		return answerPlace{}, false
+	}
+	return answerPlace{unit: index, place: place}, true
+}
+
+// answerPlace is where a host's answer sits: the unit declaring its function, and its object's place in that
+// function's signature, empty for the function itself.
+type answerPlace struct {
+	unit  int
+	place string
+}
+
+// answerPlaceOf splits path, a parameter's or a result's, into its function's path and its place in the function's
+// signature, as objectpath's grammar writes it: the function's path, then `.`, its Type operator, then `P` or `R`, the
+// signature's Params or Results, then `A` and the tuple's index. A `.` appears in a path only as the Type operator,
+// since no identifier holds one, so the last one opens the final step; any other final step, a field's or one through
+// another type, is no place, and false.
+func answerPlaceOf(path objectpath.Path) (objectpath.Path, string, bool) {
+	dot := strings.LastIndexByte(string(path), '.')
+	if dot < 0 {
+		return "", "", false
+	}
+	step := string(path[dot+1:])
+	if len(step) < 3 || (step[0] != 'P' && step[0] != 'R') || step[1] != 'A' ||
+		strings.Trim(step[2:], "0123456789") != "" {
+		return "", "", false
+	}
+	return path[:dot], step, true
 }

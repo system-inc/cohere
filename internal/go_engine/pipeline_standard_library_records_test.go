@@ -271,10 +271,11 @@ func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 	expectSameVerdicts(test, "from the store against side-loaded",
 		withoutRoot(everyGraphVerdict(test, sideLoaded), sideRoot), withoutRoot(everyGraphVerdict(test, fromStore),
 			storedRoot))
-	// The fixture's windows build meets facts the host holds by a member's path alone, and answers no unit places.
+	// The fixture's windows build meets facts the host holds by a member's path alone, and places every answer, its
+	// parameters' among them, through their functions' units.
 	if parts := expectSameCensus(test, sideStream, storeStream)["windows/arm64"]; parts.PathOnly == 0 ||
-		parts.Answers == 0 {
-		test.Errorf("the windows build leaves out %+v, want facts held by a path alone and answers not placed", parts)
+		parts.Answers != 0 {
+		test.Errorf("the windows build leaves out %+v, want facts held by a path alone and every answer placed", parts)
 	}
 	withoutRootLines := func(lines []string, root string) []string {
 		moved := make([]string, 0, len(lines))
