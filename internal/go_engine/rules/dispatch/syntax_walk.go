@@ -25,10 +25,50 @@ func (walk *syntaxWalk) visit(cursor inspector.Cursor) bool {
 	// Capped at the ancestors, so a listener that appends to its stack makes a copy rather than overwriting the node
 	// in the slice the walk goes on handing its descendants.
 	ancestors := walk.ancestors[: len(walk.ancestors)-1 : len(walk.ancestors)-1]
-	for _, run := range walk.started.byKind[reflect.TypeOf(node)] {
-		run.node(cursor, node, ancestors)
+	runs := walk.started.byKind[reflect.TypeOf(node)]
+	for called := 0; called < len(runs); {
+		called = walk.callNodes(runs, called, cursor, node, ancestors)
 	}
 	return true
+}
+
+// callNodes calls the Node of each of runs from the one at from on, in order, on node with its ancestors, each
+// listener's context handing it cursor for the length of its call, and returns how far it got: past the last run, or
+// past the one whose listener panicked, which it records as that run's crash, so the caller goes on with the rest.
+//
+// One recover serves every call on the node, where a call of its own each cost a deferred call and a recover for every
+// listener a node reaches, about ten per node visited (#fex6s0v). It cannot change a finding: each listener is called
+// in the same order with what it was handed before, and one that panics is the same crash, spelled from the same
+// frames, and is called no more on the package. A Node that panics leaves its context's cursor held, which is
+// harmless: the run has crashed, and nothing calls it again.
+func (walk *syntaxWalk) callNodes(
+	runs []*listenerRun,
+	from int,
+	cursor inspector.Cursor,
+	node ast.Node,
+	ancestors []ast.Node,
+) (next int) {
+	calling := from
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			runs[calling].crashed(recovered)
+			next = calling + 1
+		}
+	}()
+	for ; calling < len(runs); calling++ {
+		run := runs[calling]
+		if run.crash != nil {
+			continue
+		}
+		run.context.EnterNode(cursor)
+		if run.timing != nil {
+			run.measured(func() { run.registered.listener.Node(run.context, node, ancestors) })
+		} else {
+			run.registered.listener.Node(run.context, node, ancestors)
+		}
+		run.context.LeaveNode()
+	}
+	return calling
 }
 
 // descendTo makes the spine end at cursor. The walk is in preorder, so of the spine of the node visited last, the

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -220,6 +221,49 @@ func TestAPanickingSyntaxListenerCrashesItsOwnRuleAlone(test *testing.T) {
 	if crashingCalls != 2 || exits != 0 {
 		test.Errorf("the panicking listener was called %d times and exited %d times, where it should stop at its "+
 			"panic, the second call", crashingCalls, exits)
+	}
+}
+
+// Every Node call on a node is made by the walk's one recover over that node's calls, never by a recover of its own
+// per call (#fex6s0v): each listener's caller is the walk's callNodes. A listener that panics there is still its own
+// rule's crash, spelled from its own frames and none of the walk's, and the listener after it on the same node is
+// still called on that node and every later one.
+func TestEveryNodeCallOnANodeSharesTheWalksRecover(test *testing.T) {
+	test.Parallel()
+	callers := map[string]int{}
+	dispatcher := NewSyntax()
+	panicking := dispatcher.RuleAnalyzer(rule.Namespace+"panicking", "panicking", "panics on the first if",
+		&rule.Listener{
+			Nodes: []ast.Node{(*ast.IfStmt)(nil)},
+			Node: func(*rule.Context, ast.Node, []ast.Node) {
+				programCounter, _, _, _ := runtime.Caller(1)
+				callers[runtime.FuncForPC(programCounter).Name()]++
+				panic("planted panic")
+			},
+		})
+	ifs := 0
+	after := dispatcher.RuleAnalyzer(rule.Namespace+"after", "after", "counts every if", &rule.Listener{
+		Nodes: []ast.Node{(*ast.IfStmt)(nil)},
+		Node: func(*rule.Context, ast.Node, []ast.Node) {
+			programCounter, _, _, _ := runtime.Caller(1)
+			callers[runtime.FuncForPC(programCounter).Name()]++
+			ifs++
+		},
+	})
+	graph := analyzeFixture(test, "walked", panicking, after)
+	for _, action := range graph.Roots {
+		if action.Analyzer == panicking && (action.Err == nil ||
+			!strings.Contains(action.Err.Error(), "TestEveryNodeCallOnANodeSharesTheWalksRecover.func1") ||
+			strings.Contains(action.Err.Error(), ".(*syntaxWalk).") ||
+			strings.Contains(action.Err.Error(), ".(*listenerRun).")) {
+			test.Errorf("the panicking rule ended with %v, where a crash at its own listener alone was expected",
+				action.Err)
+		}
+	}
+	walkCalls := "github.com/system-inc/cohere/internal/go_engine/rules/dispatch.(*syntaxWalk).callNodes"
+	if ifs < 4 || len(callers) != 1 || callers[walkCalls] != ifs+1 {
+		test.Errorf("the listeners were called from %v over %d ifs, where every call from %s was expected", callers,
+			ifs, walkCalls)
 	}
 }
 
