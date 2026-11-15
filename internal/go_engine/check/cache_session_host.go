@@ -264,10 +264,21 @@ func (session *CacheSession) restoreFromHost(
 	}
 	// The entries are read, and decoded, on every core at once, as readHits reads the store's, and made hits in
 	// reachable's order after. Their export data is written only when the load reads it, in the package's own turn
-	// (lazyExportData). Each is decoded before the walk, which reads the answers it holds.
+	// (lazyExportData). Each is decoded before the walk, which reads the answers it holds: once a run, shared by every
+	// build whose analyzers decode alike (hostEntry.decoded), each build given a package and types of its own, the
+	// only part of it a build writes; a build whose analyzers differ decodes the entry itself.
 	read := make([]*restoredPackage, len(reading))
 	readErrors := make([]error, len(reading))
+	sharesDecode := decodesAlike(session.known, state.host.known)
 	session.fanOut(len(reading), func(index int) {
+		if sharesDecode {
+			shared, decodeError := readingKept[index].decoded()
+			if decodeError == nil {
+				read[index] = restoredForBuild(shared)
+			}
+			readErrors[index] = decodeError
+			return
+		}
 		body, record, readExportData, readError := readingKept[index].contents()
 		if readError == nil {
 			read[index], readError = decodeEntry(session.known, reading[index], body, record, readExportData)
@@ -977,6 +988,11 @@ func (session *CacheSession) keepForBuilds(
 		host.entries[saved.ID].contents = func() ([]byte, entryRecord, func() ([]byte, error), error) {
 			return body, record, readExportData, nil
 		}
+	}
+	// Each entry is decoded the first time a build considers it, and never again by another (hostEntry.decoded).
+	host.known = session.known
+	for identifier, kept := range host.entries {
+		kept.decoded = decodeOnce(kept, identifier, session.known)
 	}
 	host.kept = len(host.entries)
 	// What the analysis built to answer questions, every package's intermediate representation, syntax and type maps,
