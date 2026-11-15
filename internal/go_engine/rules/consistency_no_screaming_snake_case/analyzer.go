@@ -727,8 +727,13 @@ func directedNames(context *rule.Context) map[string]bool {
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
 				for _, directive := range []string{"//export ", "//go:linkname "} {
+					// The prefix is asked first: nearly every comment is no directive, and splitting each into
+					// fields only to drop them was most of the rule's time (#k8e189q).
 					arguments, isDirective := strings.CutPrefix(comment.Text, directive)
-					if fields := strings.Fields(arguments); isDirective && len(fields) > 0 {
+					if !isDirective {
+						continue
+					}
+					if fields := strings.Fields(arguments); len(fields) > 0 {
 						directed[fields[0]] = true
 					}
 				}
