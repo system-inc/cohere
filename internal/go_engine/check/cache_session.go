@@ -942,6 +942,17 @@ func (session *CacheSession) fanOut(count int, work func(index int)) {
 	bounded.ForEach(count, false, work)
 }
 
+// fanOutDeciding is fanOut for verdicts, under slots taken at the top of the scale as a single verdict's are
+// (typesHoldFunction): the build waits on every one of them, and at priority 0 they would queue behind the other
+// builds' analysis, one slot at a time, which is how the decide ran on one core in all but name (#9fer4tx).
+func (session *CacheSession) fanOutDeciding(count int, work func(index int)) {
+	if session.caching.Pool != nil {
+		session.caching.Pool.ForEach(count, bounded.PriorityScale, work)
+		return
+	}
+	bounded.ForEach(count, false, work)
+}
+
 // fanOutWriting is fanOut for work that writes to the store: compute runs for every index as fanOut runs work, and the
 // writes it returns run with no slot of the run's pool held (bounded.Pool.ForEachWriting), so a write blocked in the
 // file system holds none of the run's cores (#g2e4mz8). Without a pool, each index's writes run straight after its
