@@ -22,31 +22,21 @@ type Excluded struct {
 }
 
 // ExcludedByConstraints is each of files, absolute paths, that the build constraints leave out when go runs
-// in directory with the current environment plus environment, sorted, with the target they were read for. It
-// reads each file's name and build lines as go does, so it names a file in a directory whose every file is
-// left out, which go list matches as no package at all and so never reports. A file held holds is read from its
-// held bytes, and any other from disk. It returns go env's answer too, for the load to take in place of asking again
-// (see GoEnvironment), or nil when there were no files and go env was not asked, read with children, the run's account
-// of the go commands it starts (see Children).
-func ExcludedByConstraints(
-	directory string,
-	environment []string,
-	files []string,
-	held Held,
-	children *Children,
-) ([]Excluded, *GoEnvironment, error) {
-	if _, absoluteError := filepath.Abs(directory); absoluteError != nil {
-		return nil, nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
-	}
+// in the workspace goEnvironment answers for, sorted, with the target they were read for. It reads each file's name and
+// build lines as go does, so it names a file in a directory whose every file is left out, which go list matches as no
+// package at all and so never reports. A file the answer's held bytes hold is read from them, and any other from disk
+// (see ReadGoEnvironment). goEnvironment and environmentError are what ReadGoEnvironment gave, asked by the caller
+// beside its reads of the files rather than here after them (#q9ezwvw); with no files it judges nothing, and
+// environmentError is not its to say.
+func ExcludedByConstraints(files []string, goEnvironment *GoEnvironment, environmentError error) ([]Excluded, error) {
 	if len(files) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
-	goEnvironment, environmentError := ReadGoEnvironment(directory, environment, held, children)
 	if environmentError != nil {
-		return nil, nil, environmentError
+		return nil, environmentError
 	}
 	excluded, _, matchError := matchConstraints(goEnvironment.buildContext, files)
-	return excluded, goEnvironment, matchError
+	return excluded, matchError
 }
 
 // excludedAndUnseen is what the load left out of the workspace. The root packages' ignored files inside

@@ -29,8 +29,10 @@ type moduleDescription struct {
 
 // describeProject reads the workspace, takes its census, decides which files are ours and in scope, and reads
 // each of those once. It refuses a root that is not a Go root, and a path outside the root. The editor's save is
-// scoped to its one path, and that file is read as the buffer (invocation.read).
-func describeProject(request invocation) (*describedProject, error) {
+// scoped to its one path, and that file is read as the buffer (invocation.read). The go commands that wait on neither
+// the census nor the reads start beside them (earlyStart); a refusal joins them before it returns, and a description
+// keeps what still runs for the pipeline to join before its first load (describedProject.awaitStarted).
+func describeProject(request invocation) (described *describedProject, describeError error) {
 	started := time.Now()
 	root := filepath.Clean(request.root)
 	information, statError := os.Stat(root)
@@ -55,9 +57,39 @@ func describeProject(request invocation) (*describedProject, error) {
 	if workspaceError != nil {
 		return nil, fmt.Errorf("reading the workspace at %s: %w", root, workspaceError)
 	}
+	children := &load.Children{}
+	// contents are every readable file's bytes as readOurs read them, which the build constraints are judged from, so
+	// none is opened again. go env starts before they are read, and its build context opens a file through held, which
+	// reads them: load.constraintContext only stores held as the context's OpenFile and never calls it as it makes
+	// the context, and the context is first opened through by the judging below, once readOurs has filled the map, so
+	// nothing reads it before it is written.
+	var contents map[string][]byte
+	held := func(file string) ([]byte, bool) {
+		fileContents, isRead := contents[file]
+		return fileContents, isRead
+	}
+	// Only a run whose lint phase is asked for reads them, since that phase is where every extra build is loaded and
+	// checked (runLint): a file said checked by a build is one that build's run checks.
+	readsBuilds := request.switches["other-builds"] && request.requests(contract.PhaseLint)
+	// Under `--timing` the lister states and the builds' go commands run where they always have, one at a time
+	// (startChildrenFirst), so each measurement of their children's CPU is of its own commands alone. A run that asks
+	// for neither types nor lint, as the editor's save, may never load, so it fetches no lister state it might not
+	// read.
+	timed := request.switches["timing"]
+	loads := request.requests(contract.PhaseTypes) || request.requests(contract.PhaseLint)
+	early := startEarly(workspace, held, children, !timed && loads, readsBuilds)
+	defer func() {
+		// A refusal leaves no go command running.
+		if describeError != nil {
+			early.wait()
+		}
+	}()
 	census, censusError := project.TakeCensus(workspace)
 	if censusError != nil {
 		return nil, fmt.Errorf("taking the census of %s: %w", root, censusError)
+	}
+	if readsBuilds {
+		early.startReadingBuilds(workspace, census, request.targets, !timed, children)
 	}
 	modules, modulesError := describeModules(workspace)
 	if modulesError != nil {
@@ -73,14 +105,15 @@ func describeProject(request invocation) (*describedProject, error) {
 		scope, scopeDescription = []string{request.stdinPath}, request.stdinPath
 	}
 
-	described := &describedProject{
+	described = &describedProject{
 		workspace:          workspace,
 		census:             census,
 		manifest:           manifest,
 		inScopeSet:         map[string]bool{},
 		constrainedInScope: map[string]bool{},
 		contents:           map[string][]byte{},
-		children:           &load.Children{},
+		children:           children,
+		started:            early,
 	}
 	described.record = contract.ProjectRecord{
 		Root:             root,
@@ -95,7 +128,9 @@ func describeProject(request invocation) (*describedProject, error) {
 			contract.ExcludedFile{File: exclusion.File, Reason: exclusion.Reason, Source: exclusion.Source})
 	}
 
-	readable, contents, unread := readOurs(census.Ours, request.read, request.switches["single-threaded"])
+	var readable []string
+	var unread []unreadFile
+	readable, contents, unread = readOurs(census.Ours, request.read, request.switches["single-threaded"])
 	for _, failed := range unread {
 		// A file nothing could read is ours until something says otherwise; inside the scope it is a gap the run
 		// names, and outside it the load says what it makes of the file.
@@ -107,22 +142,18 @@ func describeProject(request invocation) (*describedProject, error) {
 		described.record.FilesOurs++
 	}
 	described.readableOurs = readable
-	// Only the files read are judged, from the bytes just read, every readable file and not only those in scope, so
-	// none is opened again; a file the judging had to open and could not would refuse all.
-	constrained, goEnvironment, constraintsError := load.ExcludedByConstraints(root, workspace.Environment(), readable,
-		func(file string) ([]byte, bool) {
-			fileContents, isRead := contents[file]
-			return fileContents, isRead
-		}, described.children)
+	// Only the files read are judged, from the bytes just read, every readable file and not only those in scope; a file
+	// the judging had to open and could not would refuse all.
+	goEnvironment, goEnvironmentError := early.hostGoEnvironment()
+	constrained, constraintsError := load.ExcludedByConstraints(readable, goEnvironment, goEnvironmentError)
 	if constraintsError != nil {
 		return nil, fmt.Errorf("describing %s: %w", root, constraintsError)
 	}
-	described.goEnvironment = goEnvironment
-	// Only a run whose lint phase is asked for reads them, since that phase is where every extra build is loaded and
-	// checked (runLint): a file said checked by a build is one that build's run checks.
-	if request.switches["other-builds"] && request.requests(contract.PhaseLint) && goEnvironment != nil {
-		described.builds, described.unbuiltReasons, described.buildsError = readBuilds(workspace, census,
-			goEnvironment, request.targets)
+	// A census that judged no file keeps no answer and reads no builds, so each load asks go env for its own, and the
+	// early answer goes unread.
+	if len(readable) > 0 {
+		described.goEnvironment = goEnvironment
+		described.builds, described.unbuiltReasons, described.buildsError = early.awaitBuilds()
 		if refused, isRefused := errors.AsType[refusedTarget](described.buildsError); isRefused {
 			return nil, refused
 		}

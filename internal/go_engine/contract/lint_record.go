@@ -87,7 +87,8 @@ type LintRecord struct {
 	// started after its first load began, and ChildProcessesAfterLoadNamed names each, go and its first arguments,
 	// sorted (#sktb2y8). On darwin each child started once the engine's heap has grown makes every resident page fault
 	// again, so a run with extra builds starts every go command its builds need before that load, and reads 0 here; a
-	// run of one build starts its own lister's two within it. Both are absent when none started. They count the go
+	// run of one build starts its own lister's two beside its census and reads 0 too (#q9ezwvw), except under
+	// `--timing`, where it starts them within its first load. Both are absent when none started. They count the go
 	// commands of the run's cached loads, every one the host's lint and its builds make: a load with no cache account,
 	// as the rename's, records none, and neither does x/tools' or go/build's own go command, so 0 says no more than
 	// that.

@@ -20,11 +20,12 @@ import (
 
 // GoEnvironment is go env's answer for a workspace under an environment, as ReadGoEnvironment reads it: the whole
 // environment every go command of a load runs with, the build target, the go environment the inputs record names, and
-// every variable of goEnvironmentNames by name. The project's census asks for it (ExcludedByConstraints), and a load
-// handed it through Caching asks go env nothing, so a run asks once where it asked twice (#f53yra8); the load's
-// lister, its kept listing and the engine's findings cache read their variables from it too, so a build asks go env
-// once where it asked up to five times (#4rpt1jh). Nothing a run writes moves it: go env reads the environment, the go
-// env files and the go.mod and go.work go finds, and a run rewrites only Go files.
+// every variable of goEnvironmentNames by name. The project's description asks for it beside its census and its reads,
+// and judges the census's constraints by it (ExcludedByConstraints), and a load handed it through Caching asks go env
+// nothing, so a run asks once where it asked twice (#f53yra8); the load's lister, its kept listing and the engine's
+// findings cache read their variables from it too, so a build asks go env once where it asked up to five times
+// (#4rpt1jh). Nothing a run writes moves it: go env reads the environment, the go env files and the go.mod and go.work
+// go finds, and a run rewrites only Go files.
 type GoEnvironment struct {
 	workspace       string
 	environment     []string
@@ -60,9 +61,10 @@ var goEnvironmentNames = slices.Concat(listingEnvironment, []string{"GOENV", "GO
 // differently for it. go env is asked under the environment as given, and nothing it reports but `GOFLAGS` itself
 // would differ under the whole one: go env defines no flag of `GOFLAGS` but -n and -x, and skips every other (see
 // value), so the load's lister and kept listing, which asked under the whole environment, read the same answer with
-// `GOFLAGS` rewritten. held is what the build context opens a file from when ExcludedByConstraints reads it directly;
-// a load reads it through contextFor. children is the run's account of the go commands it starts (see Children), which
-// go env here and every go list under the answer are recorded in, nil to record none.
+// `GOFLAGS` rewritten. held is what the build context opens a file from when ExcludedByConstraints judges it, only
+// stored as the context is made and never called here, so a caller may ask before it holds the bytes; a load reads it
+// through contextFor. children is the run's account of the go commands it starts (see Children), which go env here and
+// every go list under the answer are recorded in, nil to record none.
 func ReadGoEnvironment(directory string, environment []string, held Held, children *Children) (*GoEnvironment, error) {
 	workspace, absoluteError := filepath.Abs(directory)
 	if absoluteError != nil {

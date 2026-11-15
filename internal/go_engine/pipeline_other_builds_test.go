@@ -91,6 +91,8 @@ func runOverNoted(
 	if describeError != nil {
 		test.Fatal(describeError)
 	}
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	engine := newPipeline(request, described, ruleSettings, registered, &standardOutput, &standardError, nil)
@@ -747,7 +749,12 @@ func TestATargetTheToolchainDoesNotListIsRefusedAtLoad(test *testing.T) {
 			test.Fatal(parseError)
 		}
 		request.targets = targets
-		return describeProject(request)
+		described, describeError := describeProject(request)
+		if describeError == nil {
+			// What the description started beside its reads ends before the test and its directory do.
+			test.Cleanup(described.awaitStarted)
+		}
+		return described, describeError
 	}
 	if _, refused := describe([]string{"plan9/arm64"}); refused == nil ||
 		!strings.Contains(refused.Error(), "the go block's targets name plan9/arm64, which go tool dist list does "+
