@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // TestReadOursKeepsTheFilesOrderWhicheverReadFinishesFirst holds the first file's read until every other has finished,
@@ -205,6 +206,49 @@ func TestDescribeProjectUnderSingleThreadedReadsOneFileAtATime(test *testing.T) 
 	}
 	if most := mostInFlight.Load(); most > 1 {
 		test.Errorf("%d reads were in flight at once under --single-threaded, want one", most)
+	}
+	if !slices.Equal(described.readableOurs, files) {
+		test.Errorf("readable files\n got %v\nwant %v", described.readableOurs, files)
+	}
+}
+
+// TestDescribeProjectAsksGoEnvironmentBesideItsReads holds every file's read until go env has been asked in the
+// workspace, so a describe that asks it only once the files are read never lets a read end, and its reads give up at
+// the deadline, failing the test (#q9ezwvw). go env needs only the root and the workspace's environment, and starts
+// beside the census and the reads.
+func TestDescribeProjectAsksGoEnvironmentBesideItsReads(test *testing.T) {
+	test.Parallel()
+	root, files := manyFileProject(test, 8)
+	asks, stop := load.WatchGoEnvironmentAsks(root)
+	defer stop()
+	request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root,
+		"--no-fix"})
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	// One deadline for every read, so a describe that never asks waits it out once, not once per read.
+	deadline := time.Now().Add(10 * time.Second)
+	var waitedOut sync.Once
+	request.readFromDisk = func(file string) ([]byte, error) {
+		for asks.Load() == 0 {
+			if time.Now().After(deadline) {
+				waitedOut.Do(func() {
+					test.Error("the reads waited 10s and go env was never asked, so it waits for the reads")
+				})
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+		return os.ReadFile(file)
+	}
+	described, describeError := describeProject(request)
+	if describeError != nil {
+		test.Fatal(describeError)
+	}
+	// The host's lister state may still run, and ends before the test does.
+	described.awaitStarted()
+	if described.goEnvironment == nil {
+		test.Error("the description holds no go env answer, want the one asked beside the reads")
 	}
 	if !slices.Equal(described.readableOurs, files) {
 		test.Errorf("readable files\n got %v\nwant %v", described.readableOurs, files)

@@ -346,13 +346,8 @@ func TestExcludedByConstraintsNamesWhatTheLoadExcludes(test *testing.T) {
 	test.Parallel()
 
 	root := loadedFixtures(test)
-	excluded, _, excludedError := ExcludedByConstraints(
-		filepath.Join(root, "clean"),
-		cleanEnvironment,
-		fixtures.census,
-		nil,
-		nil,
-	)
+	goEnvironment, environmentError := ReadGoEnvironment(filepath.Join(root, "clean"), cleanEnvironment, nil, nil)
+	excluded, excludedError := ExcludedByConstraints(fixtures.census, goEnvironment, environmentError)
 	if excludedError != nil {
 		test.Fatal(excludedError)
 	}

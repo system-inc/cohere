@@ -26,11 +26,13 @@ func TestARunWithBuildsStartsEveryGoCommandBeforeItsFirstLoad(test *testing.T) {
 	}
 }
 
-// A run of one build starts nothing before its first load, and its lister's two go commands start inside it, which
-// the lint record counts and names, so the count is of commands that ran and not a field never set.
+// A run of one build under `--timing` starts nothing before its first load, and its lister's two go commands start
+// inside it, which the lint record counts and names, so the count is of commands that ran and not a field never set. A
+// run not timed fetches its lister state beside its census and its reads (#q9ezwvw), and reads 0, as the end-to-end
+// streams pin.
 func TestARunOfOneBuildNamesItsListersCommands(test *testing.T) {
 	test.Parallel()
-	_, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "clean")), exitClean)
+	_, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "clean")), exitClean, "--timing")
 	lint := lintRecordOf(test, stream)
 	named := slices.Sorted(slices.Values(lint.ChildProcessesAfterLoadNamed))
 	want := []string{"go list -e -f", "go list -m -json"}
