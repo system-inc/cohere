@@ -2,9 +2,10 @@ package consistency_no_any
 
 import "go/types"
 
-// foreignMethods are the exported methods of every named type in a package's import graph, interfaces and concrete
-// types alike, by name. Signature identity ignores receivers, so each is matched by its signature alone, and held as
-// the method, which a recorded answer names.
+// foreignMethods are the exported methods of every named type one package declares, interfaces and concrete types
+// alike, by name. Signature identity ignores receivers, so each is matched by its signature alone, and held as the
+// method, which a recorded answer names. Nothing in them depends on the package that reaches the declaring one, so a
+// load reads each package's once (see loadMethods).
 type foreignMethods struct {
 	byName map[string][]*types.Func
 	// genericByName holds a generic type's methods apart, since their signatures speak of type parameters that only
@@ -34,4 +35,20 @@ func (foreign *foreignMethods) add(named *types.Named) {
 			index[method.Name()] = append(index[method.Name()], method)
 		}
 	}
+}
+
+// declaredMethodsOf indexes the methods of every named type declaring declares, in the order of the type's names. An
+// alias adds nothing: the type it names is declared in a package of the closure, which indexes it there.
+func declaredMethodsOf(declaring *types.Package) *foreignMethods {
+	foreign := &foreignMethods{byName: map[string][]*types.Func{}, genericByName: map[string][]*types.Func{}}
+	for _, name := range declaring.Scope().Names() {
+		typeName, isTypeName := declaring.Scope().Lookup(name).(*types.TypeName)
+		if !isTypeName || typeName.IsAlias() {
+			continue
+		}
+		if named, isNamed := typeName.Type().(*types.Named); isNamed {
+			foreign.add(named)
+		}
+	}
+	return foreign
 }

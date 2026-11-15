@@ -209,10 +209,11 @@ func sameShape(left *types.Signature, right *types.Signature) bool {
 		left.Variadic() == right.Variadic()
 }
 
-// buildForeignMethods indexes the methods of every package reachable through current's imports, current's own
-// excepted: a method declared here is ours, and is judged with the rest of this package.
-func buildForeignMethods(current *types.Package) *foreignMethods {
-	foreign := &foreignMethods{byName: map[string][]*types.Func{}, genericByName: map[string][]*types.Func{}}
+// reachedMethodsOf are the methods of every package reachable through current's imports, current's own excepted, one
+// index to each package in the order the walk first reaches it, each read once for the whole load. A method declared
+// here is ours, and is judged with the rest of this package.
+func reachedMethodsOf(load *loadMethods, current *types.Package) []*foreignMethods {
+	reached := []*foreignMethods{}
 	visited := map[*types.Package]bool{current: true}
 	pending := []*types.Package{current}
 	for len(pending) > 0 {
@@ -224,16 +225,8 @@ func buildForeignMethods(current *types.Package) *foreignMethods {
 			}
 			visited[imported] = true
 			pending = append(pending, imported)
-			for _, name := range imported.Scope().Names() {
-				typeName, isTypeName := imported.Scope().Lookup(name).(*types.TypeName)
-				if !isTypeName || typeName.IsAlias() {
-					continue
-				}
-				if named, isNamed := typeName.Type().(*types.Named); isNamed {
-					foreign.add(named)
-				}
-			}
+			reached = append(reached, load.of(imported))
 		}
 	}
-	return foreign
+	return reached
 }

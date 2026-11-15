@@ -29,7 +29,9 @@ type flowAnalysis struct {
 	feeds map[flowKey][]flowKey
 	// methodFixed caches whether a method's signature matches a method of another package.
 	methodFixed map[*types.Func]bool
-	foreign     *foreignMethods
+	// reached are the methods of the packages the import closure reaches, one index to each in the order the walk
+	// first reached it, nil until a method is first asked about.
+	reached []*foreignMethods
 }
 
 // record notes every place the node at cursor hands a value on.
@@ -690,26 +692,32 @@ func (flows *flowAnalysis) matchesForeignMethod(method *types.Func) bool {
 // matchingForeignMethod is the first method of another package that matchesForeignMethod matches method to, nil when
 // none does.
 func (flows *flowAnalysis) matchingForeignMethod(method *types.Func) *types.Func {
-	if flows.foreign == nil {
-		flows.foreign = buildForeignMethods(flows.context.Package)
+	if flows.reached == nil {
+		flows.reached = reachedMethodsOf(methodsOf(flows.context.FileSet), flows.context.Package)
 	}
 	// Only an interface fixes a concrete method of ours, and a concrete method of another package only an interface
 	// method of ours.
 	ours := types.IsInterface(method.Signature().Recv().Type())
-	for _, foreignMethod := range flows.foreign.byName[method.Name()] {
-		if !ours && !types.IsInterface(foreignMethod.Signature().Recv().Type()) {
-			continue
-		}
-		if types.Identical(method.Signature(), foreignMethod.Signature()) {
-			return foreignMethod
+	// The packages in the order the walk reached them, and each one's methods in the order of its type names, are the
+	// order one index of the whole closure would hold them in, so the first match, the answer recorded, is the same.
+	for _, declared := range flows.reached {
+		for _, foreignMethod := range declared.byName[method.Name()] {
+			if !ours && !types.IsInterface(foreignMethod.Signature().Recv().Type()) {
+				continue
+			}
+			if types.Identical(method.Signature(), foreignMethod.Signature()) {
+				return foreignMethod
+			}
 		}
 	}
-	for _, foreignMethod := range flows.foreign.genericByName[method.Name()] {
-		if !ours && !types.IsInterface(foreignMethod.Signature().Recv().Type()) {
-			continue
-		}
-		if sameShape(method.Signature(), foreignMethod.Signature()) {
-			return foreignMethod
+	for _, declared := range flows.reached {
+		for _, foreignMethod := range declared.genericByName[method.Name()] {
+			if !ours && !types.IsInterface(foreignMethod.Signature().Recv().Type()) {
+				continue
+			}
+			if sameShape(method.Signature(), foreignMethod.Signature()) {
+				return foreignMethod
+			}
 		}
 	}
 	return nil
