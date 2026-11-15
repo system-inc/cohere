@@ -111,3 +111,28 @@ func TestCheckedReadFileFromManyGoroutines(test *testing.T) {
 		test.Error(failure)
 	}
 }
+
+// TestCheckedReadFileKeepsEachPassToItsOwnNames holds the names to their pass: once pass A has read its files, pass
+// B, which holds fewer, refuses a name only A holds, in CheckReadable's words, as it would had A never read.
+func TestCheckedReadFileKeepsEachPassToItsOwnNames(test *testing.T) {
+	test.Parallel()
+	passA, namesA := passOfFiles(test, 3)
+	passB, namesB := passOfFiles(test, 1)
+	readA, readB := driverutil.CheckedReadFile(passA, readName), driverutil.CheckedReadFile(passB, readName)
+	for _, name := range namesA {
+		if _, readError := readA(name); readError != nil {
+			test.Fatalf("pass A reading its own %s gave %v", name, readError)
+		}
+	}
+	if _, readError := readB(namesB[0]); readError != nil {
+		test.Fatalf("pass B reading its own %s gave %v", namesB[0], readError)
+	}
+	for _, name := range namesA[len(namesB):] {
+		_, refusal := readB(name)
+		expected := driverutil.CheckReadable(passB, name)
+		if refusal == nil || expected == nil || refusal.Error() != expected.Error() {
+			test.Errorf("pass B reading %s, which only pass A holds, gave %v, where CheckReadable gives %v", name,
+				refusal, expected)
+		}
+	}
+}

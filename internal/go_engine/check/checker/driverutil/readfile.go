@@ -43,6 +43,15 @@ func CheckedReadFile(pass *analysis.Pass, readFile ReadFileFunc) ReadFileFunc {
 	// IgnoredFiles, which are looked at first so that a read of those
 	// never builds the names. Any other name still goes to CheckReadable,
 	// so a refusal is its own, in its own words.
+	//
+	// The names are the pass's own, never another's, and they outlive
+	// pass.Files: once letGoOfSyntax in checker.go sets pass.Files to nil,
+	// CheckReadable would refuse a name the pass held, where this reads it.
+	// No reader reaches that: the six that call pass.ReadFile, the
+	// long-line rule (rules/consistency_no_long_line), time_format through
+	// rule.Context.ReadFile, and build_tag, directive, frame_pointer and
+	// asm_decl (all under rules/vet), read in their own pass's run, and a
+	// package is let go of only once every action on it has finished.
 	fileNames := sync.OnceValue(func() map[string]bool {
 		names := make(map[string]bool, len(pass.Files))
 		for _, f := range pass.Files {
