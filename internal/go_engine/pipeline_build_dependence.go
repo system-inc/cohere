@@ -28,9 +28,9 @@ type hostDependence struct {
 	graph *build_dependence.Graph
 	from  *load.Loaded
 	// facts are the host's facts by object and kind (indexHostFacts), indexed once its lint has run, before any extra
-	// build starts, nil until then, and factsUnkeyed those of a package named by records it could not name.
+	// build starts, nil until then, and factsUnnamed those of a package named by records it could not name.
 	facts           map[factKey]check.ExportedFact
-	factsUnkeyed    int
+	factsUnnamed    int
 	files           map[string][]string
 	paths           map[string]string
 	elapsed         time.Duration

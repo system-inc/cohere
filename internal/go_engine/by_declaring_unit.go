@@ -7,6 +7,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
@@ -29,47 +30,120 @@ type answerKind struct {
 }
 
 // unitKey is key moved to the unit at index: its file and start in place of its object's position, beside its name,
-// empty for a fact the host holds by its object's path alone (nameless).
+// empty for a fact the host holds by its object's path alone, and marked as a unit's key.
 func (declaring *byDeclaringUnit) unitKey(key factKey, index int) factKey {
 	if declaring.units == nil {
 		declaring.units = declaring.standardLibrary.Units()
 	}
-	key.file, key.offset, key.local = declaring.units[index].File, declaring.units[index].Start, ""
+	key.file, key.offset, key.local, key.byUnit = declaring.units[index].File, declaring.units[index].Start, "", true
 	return key
 }
 
-// withholdNameless is hosted and built, the host's and the build's facts by unit, with every fact the host holds by
-// a path that is no name left out, and how many facts it left out (#01chv64). A package-level object's path is its
-// name, which factKeyByName keyed it by; any other path, a method's or a field's, indexes into a set another build's
-// files can change, so nothing pairs it with the build's fact about the same object. The census never guesses: such a
-// host fact is left out, and so is every build fact of its kind in its unit that no named fact of the host's claims,
-// which would otherwise count as differing.
-func withholdNameless(
-	hosted map[factKey]check.ExportedFact,
-	built map[factKey]check.ExportedFact,
-) (map[factKey]check.ExportedFact, map[factKey]check.ExportedFact, int) {
-	keptHosted := make(map[factKey]check.ExportedFact, len(hosted))
-	withheld := map[factKey]bool{}
-	left := 0
-	for key, fact := range hosted {
-		if key.name == "" {
-			withheld[key] = true
-			left++
+// withheldReason is why the census leaves out, in one unit, the build's facts of one kind that no named fact of the
+// host's claims (pairByUnit).
+type withheldReason int
+
+const (
+	// notWithheld leaves the build's facts to be compared.
+	notWithheld withheldReason = iota
+	// withheldPathOnly is a host fact of the kind in the unit held by a member's path alone.
+	withheldPathOnly
+	// withheldCollision is two host facts of the kind meeting in the unit under one name.
+	withheldCollision
+)
+
+// pairByUnit is the host's facts by name, hostByName, and the build's by position, builtByPosition, each moved to its
+// declaring unit by hosted and built, as the census compares them, and the facts it left out, by why (#h660y7d). The
+// census never guesses, and the two sides fail alike: a fact either side cannot place is left out, and so are the
+// build's facts that would otherwise meet a host fact left out unpaired and count as differing: of the same package,
+// kind and name as a host fact no unit declares, or of its kind in the package where that fact has no name; and of the
+// kind in a unit where the host's fact is held by a member's path alone, a method's or a field's, which indexes into a
+// set another build's files can change, or where two host facts of the kind meet under one name. Two build facts that
+// meet under one key are left out with the host's fact there. A package-level object's path is its name, which
+// factKeyByName keyed it by, so its fact is paired exactly.
+func pairByUnit(
+	hostByName map[factKey]check.ExportedFact,
+	builtByPosition map[factKey]check.ExportedFact,
+	hosted func(factKey) (factKey, bool),
+	built func(factKey) (factKey, bool),
+) (map[factKey]check.ExportedFact, map[factKey]check.ExportedFact, contract.UnkeyedFacts) {
+	var parts contract.UnkeyedFacts
+	hostGroups := map[factKey][]check.ExportedFact{}
+	unplaced := map[factKey]bool{}
+	for key, fact := range hostByName {
+		unitKey, isPlaced := hosted(key)
+		if !isPlaced {
+			parts.Unplaced++
+			unplaced[factKey{packageIdentifier: key.packageIdentifier, name: key.name, analyzer: key.analyzer,
+				factType: key.factType}] = true
 			continue
 		}
-		keptHosted[key] = fact
+		hostGroups[unitKey] = append(hostGroups[unitKey], fact)
 	}
-	keptBuilt := make(map[factKey]check.ExportedFact, len(built))
-	for key, fact := range built {
-		inUnit := key
+	hostFacts := make(map[factKey]check.ExportedFact, len(hostGroups))
+	withheld := map[factKey]withheldReason{}
+	withhold := func(unitKey factKey, reason withheldReason) {
+		inUnit := unitKey
 		inUnit.name = ""
-		if _, isClaimed := keptHosted[key]; !isClaimed && withheld[inUnit] {
-			left++
+		if withheld[inUnit] == notWithheld {
+			withheld[inUnit] = reason
+		}
+	}
+	for unitKey, group := range hostGroups {
+		switch {
+		case len(group) > 1:
+			parts.Collisions += len(group)
+			withhold(unitKey, withheldCollision)
+		case unitKey.name == "":
+			parts.PathOnly++
+			withhold(unitKey, withheldPathOnly)
+		default:
+			hostFacts[unitKey] = group[0]
+		}
+	}
+	builtGroups := map[factKey][]check.ExportedFact{}
+	for key, fact := range builtByPosition {
+		unitKey, isPlaced := built(key)
+		if !isPlaced {
+			parts.Unplaced++
 			continue
 		}
-		keptBuilt[key] = fact
+		builtGroups[unitKey] = append(builtGroups[unitKey], fact)
 	}
-	return keptHosted, keptBuilt, left
+	builtFacts := make(map[factKey]check.ExportedFact, len(builtGroups))
+	for unitKey, group := range builtGroups {
+		_, isClaimed := hostFacts[unitKey]
+		inUnit := unitKey
+		inUnit.name = ""
+		inPackage := factKey{packageIdentifier: unitKey.packageIdentifier, analyzer: unitKey.analyzer,
+			factType: unitKey.factType}
+		named := inPackage
+		named.name = unitKey.name
+		switch {
+		case len(group) > 1:
+			parts.Collisions += len(group)
+			if isClaimed {
+				parts.Collisions++
+				delete(hostFacts, unitKey)
+			}
+		case isClaimed:
+			builtFacts[unitKey] = group[0]
+		case withheld[inUnit] == withheldCollision:
+			parts.Collisions++
+		case withheld[inUnit] == withheldPathOnly:
+			parts.PathOnly++
+		case unplaced[named] || unplaced[inPackage]:
+			parts.Unplaced++
+		default:
+			builtFacts[unitKey] = group[0]
+		}
+	}
+	return hostFacts, builtFacts, parts
+}
+
+// unkeyedTotal is the facts parts left out in all, the census's Unkeyed.
+func unkeyedTotal(parts contract.UnkeyedFacts) int {
+	return parts.Unnamed + parts.Closures + parts.Unplaced + parts.PathOnly + parts.Collisions + parts.Answers
 }
 
 // hosted is a host's key by name (factKeyByName) moved to the unit declaring its object, and false when no unit

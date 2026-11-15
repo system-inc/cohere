@@ -36,14 +36,15 @@ type sharedFile struct {
 // the file's bytes are the same, so its key is the same in both, as its unit's key is. An object of a package named by
 // records (namedByRecords) is keyed by its declaring unit's file and start in place of its own position, beside its
 // name (#01chv64): the host's, found by its local name as the records name it, held in local until a build's census
-// finds its unit (byDeclaringUnit), and the build's by its position, the unit holding it. A fact the host holds by a
-// method's or a field's path alone has no name, and is left out (withholdNameless).
+// finds its unit (byDeclaringUnit), and the build's by its position, the unit holding it, byUnit then set. A fact the
+// host holds by a method's or a field's path alone has no name, and is left out (pairByUnit).
 type factKey struct {
 	packageIdentifier string
 	file              string
 	offset            int
 	name              string
 	local             string
+	byUnit            bool
 	analyzer          string
 	factType          string
 }
@@ -98,7 +99,7 @@ func (engine *pipeline) namedByRecords(identifier string) bool {
 // factKeyByName is the host's fact's key with its object named as a record names it (build_dependence.LocalName),
 // beside the object's own name, or the path a fact with no object carries standing for it: a package-level object's
 // path is its name alone, and any other path, a method's or a field's, holds a dot and no name, and is keyed with none,
-// for the census to leave out (withholdNameless). It is false when nothing names the object.
+// for the census to leave out (pairByUnit). It is false when nothing names the object.
 func factKeyByName(fact check.ExportedFact, encoder *objectpath.Encoder) (factKey, bool) {
 	key := factKey{packageIdentifier: fact.Package.ID, offset: -1, analyzer: fact.Analyzer, factType: fact.FactType}
 	switch {
@@ -111,33 +112,6 @@ func factKeyByName(fact check.ExportedFact, encoder *objectpath.Encoder) (factKe
 		}
 	}
 	return key, key.local != ""
-}
-
-// keyByUnit is facts with each key moved to its unit by move, and how many it left out, unkeyed: each fact it finds no
-// unit for, and two or more facts of one kind that meet under one unit, which nothing tells apart (#01chv64).
-func keyByUnit(
-	facts map[factKey]check.ExportedFact,
-	move func(factKey) (factKey, bool),
-) (map[factKey]check.ExportedFact, int) {
-	moved := make(map[factKey]check.ExportedFact, len(facts))
-	met := map[factKey]int{}
-	unkeyed := 0
-	for key, fact := range facts {
-		unitKey, isMoved := move(key)
-		if !isMoved {
-			unkeyed++
-			continue
-		}
-		met[unitKey]++
-		moved[unitKey] = fact
-	}
-	for unitKey, count := range met {
-		if count > 1 {
-			unkeyed += count
-			delete(moved, unitKey)
-		}
-	}
-	return moved, unkeyed
 }
 
 // indexHostFacts keeps the host's facts by key, for every extra build's to be compared with, when the run judges
@@ -171,13 +145,13 @@ func (engine *pipeline) indexHostFacts(
 	}
 	indexed := make(map[factKey]check.ExportedFact, len(facts))
 	var encoder objectpath.Encoder
-	engine.dependence.factsUnkeyed = 0
+	engine.dependence.factsUnnamed = 0
 	for _, fact := range facts {
 		key, isKeyed := factKeyOf(fact)
 		if engine.namedByRecords(fact.Package.ID) && (fact.Object != nil || fact.ObjectPath != "") {
 			key, isKeyed = factKeyByName(fact, &encoder)
 			if !isKeyed {
-				engine.dependence.factsUnkeyed++
+				engine.dependence.factsUnnamed++
 			}
 		} else if engine.dependence.restored[fact.Package.ID] && (fact.Object != nil || fact.ObjectPath != "") {
 			isKeyed = false
@@ -211,16 +185,16 @@ func (engine *pipeline) indexHostFacts(
 // encoding, one only a build asked counted apart; then the units declaring an object whose fact differs, and the
 // units the judgment calls independent that call those statically, first-order and followed to a fixed point, beside
 // every independent unit that calls a dependent one, over both graphs' units, the run's call index (callIndex) read by
-// the build's verdicts. A fact of a package named by records is keyed by its object's declaring unit on both sides
-// (byDeclaringUnit), and counted unkeyed, with the host's, where no unit is found or two facts of a kind meet under one
-// unit and name. Nil when the host's facts were never indexed.
+// the build's verdicts. A fact of a package named by records is keyed by its object's declaring unit on both sides,
+// and left out, counted by why, where pairByUnit cannot pair it exactly, as is a build's answer restoredAnswer cannot
+// place. Nil when the host's facts were never indexed.
 func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.ExportedFact) *contract.DependenceFacts {
 	if engine.dependence.facts == nil {
 		return nil
 	}
 	started := time.Now()
 	var encoder objectpath.Encoder
-	unkeyed := engine.dependence.factsUnkeyed
+	parts := contract.UnkeyedFacts{Unnamed: engine.dependence.factsUnnamed}
 	declaring := &byDeclaringUnit{standardLibrary: judged.standardLibrary}
 	hostFacts := make(map[factKey]check.ExportedFact, len(engine.dependence.facts))
 	hostByName := map[factKey]check.ExportedFact{}
@@ -231,15 +205,22 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 		}
 		hostFacts[key] = hosted
 	}
-	hostByUnit, hostUnkeyed := keyByUnit(hostByName, declaring.hosted)
 	built := make(map[factKey]check.ExportedFact, len(facts))
 	builtByPosition := map[factKey]check.ExportedFact{}
 	for _, fact := range facts {
 		key, isKeyed := factKeyOf(fact)
 		if engine.namedByRecords(fact.Package.ID) && fact.Object != nil {
+			if !isKeyed {
+				parts.Unplaced++
+				continue
+			}
+			// A fact in a file only the build compiles is no comparison's, as compare finds of a positioned one.
+			if !judged.shared[sharedFile{packageIdentifier: key.packageIdentifier, file: key.file}] {
+				continue
+			}
 			// As for a restored package below: an object no objectpath names has no side in the host's.
-			if _, pathError := encoder.For(fact.Object); !isKeyed || pathError != nil {
-				unkeyed++
+			if _, pathError := encoder.For(fact.Object); pathError != nil {
+				parts.Closures++
 				continue
 			}
 			builtByPosition[key] = fact
@@ -258,18 +239,24 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 		}
 		built[key] = fact
 	}
-	builtByUnit, builtUnkeyed := keyByUnit(builtByPosition, declaring.built)
-	hostNamed, builtNamed, namelessUnkeyed := withholdNameless(hostByUnit, builtByUnit)
-	maps.Copy(hostFacts, hostNamed)
-	maps.Copy(built, builtNamed)
+	hostByUnit, builtByUnit, paired := pairByUnit(hostByName, builtByPosition, declaring.hosted, declaring.built)
+	maps.Copy(hostFacts, hostByUnit)
+	maps.Copy(built, builtByUnit)
+	parts.Unplaced += paired.Unplaced
+	parts.PathOnly += paired.PathOnly
+	parts.Collisions += paired.Collisions
 	calls := engine.callIndex()
 	kinds := map[[2]string]*contract.FactKindCounts{}
 	examples := map[[2]string][]string{}
 	differing := map[int]bool{}
+	// A fact is compared only of a package both builds have by one ID, in a file both compile.
+	comparable := func(key factKey) bool {
+		return judged.sharedPackages[key.packageIdentifier] &&
+			(key.file == "" || judged.shared[sharedFile{packageIdentifier: key.packageIdentifier, file: key.file}])
+	}
 	compare := func(key factKey, hosted check.ExportedFact, hostHas bool, builtFact check.ExportedFact,
 		buildHas bool) {
-		if !judged.sharedPackages[key.packageIdentifier] ||
-			key.file != "" && !judged.shared[sharedFile{packageIdentifier: key.packageIdentifier, file: key.file}] {
+		if !comparable(key) {
 			return
 		}
 		kind := [2]string{key.analyzer, key.factType}
@@ -313,8 +300,12 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 		compare(key, hosted, true, builtFact, buildHas)
 	}
 	for key, builtFact := range built {
-		if _, hostHas := hostFacts[key]; !hostHas {
-			hosted, hostHas := engine.restoredAnswer(builtFact, &encoder, declaring)
+		if _, hostHas := hostFacts[key]; !hostHas && comparable(key) {
+			hosted, hostHas, isPlaced := engine.restoredAnswer(builtFact, &encoder, declaring)
+			if !isPlaced {
+				parts.Answers++
+				continue
+			}
 			compare(key, hosted, hostHas, builtFact, true)
 		}
 	}
@@ -329,7 +320,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 	}
 	census.Workspace, census.Dependencies = factCallers(calls, judged.dependence, judged.standardLibrary, differing)
 	census.Milliseconds = int(time.Since(started).Milliseconds())
-	census.Unkeyed = unkeyed + hostUnkeyed + builtUnkeyed + namelessUnkeyed
+	census.Unkeyed, census.UnkeyedParts = unkeyedTotal(parts), parts
 	return census
 }
 
@@ -339,15 +330,16 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 // would have had to ask, as one only the build asked is. The host's own run asked only what its rules reached, and the
 // table answers far more, so an answer the build never asked is never compared. In a package the standard library's
 // graph holds, the answer is found through the unit declaring the function, never by the build's own objectpath,
-// which can name another method where the build's files change a method set (byDeclaringUnit.answerOf, #01chv64).
+// which can name another method where the build's files change a method set (byDeclaringUnit.answerOf, #h660y7d),
+// and the third result is false where the function cannot be placed there, whose host side is unknown.
 func (engine *pipeline) restoredAnswer(
 	builtFact check.ExportedFact,
 	encoder *objectpath.Encoder,
 	declaring *byDeclaringUnit,
-) (check.ExportedFact, bool) {
+) (check.ExportedFact, bool, bool) {
 	answers := engine.dependence.restoredAnswers[builtFact.Package.ID]
 	if !builtFact.Answer || builtFact.Object == nil || answers == nil {
-		return check.ExportedFact{}, false
+		return check.ExportedFact{}, false, true
 	}
 	var encoded []byte
 	isHeld := false
@@ -355,29 +347,31 @@ func (engine *pipeline) restoredAnswer(
 		var isPlaced bool
 		encoded, isHeld, isPlaced = declaring.answerOf(answers, builtFact)
 		if !isPlaced {
-			return check.ExportedFact{}, false
+			return check.ExportedFact{}, false, false
 		}
 	} else {
 		path, pathError := encoder.For(builtFact.Object)
 		if pathError != nil {
-			return check.ExportedFact{}, false
+			return check.ExportedFact{}, false, true
 		}
 		encoded, isHeld = answers.Values[builtFact.Analyzer][path]
 	}
 	if !isHeld {
 		if !answers.Complete[builtFact.Analyzer] {
-			return check.ExportedFact{}, false
+			return check.ExportedFact{}, false, true
 		}
 		encoded, isHeld = fact_resolver.ZeroAnswer(builtFact.Analyzer)
 		if !isHeld {
-			return check.ExportedFact{}, false
+			return check.ExportedFact{}, false, true
 		}
 	}
 	return check.ExportedFact{Package: builtFact.Package, Analyzer: builtFact.Analyzer, FactType: builtFact.FactType,
-		Object: builtFact.Object, Digest: cache.DigestOf(encoded), Answer: true, Encoded: encoded}, true
+		Object: builtFact.Object, Digest: cache.DigestOf(encoded), Answer: true, Encoded: encoded}, true, true
 }
 
 // factExample names one differing fact: its package, its object and both builds' values, or that one build has none.
+// The object is named by its own position, the build's where the fact is keyed by its declaring unit and the build has
+// it, and otherwise by the unit's, said so, since the host's fact of a package named by records has no position.
 func factExample(
 	key factKey,
 	hosted check.ExportedFact,
@@ -395,7 +389,16 @@ func factExample(
 		return fmt.Sprintf("%v", fact.Fact)
 	}
 	object := "the package"
-	if key.file != "" {
+	switch {
+	case key.byUnit && buildHas && builtFact.Object != nil:
+		if positioned, isPositioned := factKeyOf(builtFact); isPositioned {
+			object = fmt.Sprintf("%s at %s:%d", positioned.name, positioned.file, positioned.offset)
+			break
+		}
+		object = fmt.Sprintf("%s in the unit at %s:%d", key.name, key.file, key.offset)
+	case key.byUnit:
+		object = fmt.Sprintf("%s in the unit at %s:%d", key.name, key.file, key.offset)
+	case key.file != "":
 		object = fmt.Sprintf("%s at %s:%d", key.name, key.file, key.offset)
 	}
 	return fmt.Sprintf("%s, %s: host %s, build %s", key.packageIdentifier, object, value(hosted, hostHas),

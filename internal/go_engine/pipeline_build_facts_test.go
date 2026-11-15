@@ -181,8 +181,23 @@ func pathOnlyFact(path string) check.ExportedFact {
 		FactType: "noReturn", ObjectPath: objectpath.Path(path)}
 }
 
+// toUnit moves a key to the unit at offset 900 of print.go, as byDeclaringUnit.unitKey moves a placed key.
+func toUnit(key factKey) (factKey, bool) {
+	key.file, key.offset, key.local, key.byUnit = "print.go", 900, "", true
+	return key, true
+}
+
+// builtAt is the build's fact key, by position, of a noReturn fact of fmt about the object name at offset.
+func builtAt(name string, offset int) factKey {
+	return factKey{packageIdentifier: "fmt", file: "print.go", offset: offset, name: name, analyzer: "ctrlflow",
+		factType: "noReturn"}
+}
+
+// builtNoReturn is the build's noReturn fact of fmt, its value beside the point.
+var builtNoReturn = check.ExportedFact{Analyzer: "ctrlflow", FactType: "noReturn"}
+
 // A fact the host holds by a package-level object's path alone is keyed by that path as the object's name, which is
-// exact, and is compared with the build's fact about the object of that name in its unit (#01chv64).
+// exact, and is paired with the build's fact about the object of that name in its unit (#h660y7d).
 func TestAPathOnlyPackageLevelFactIsCompared(test *testing.T) {
 	test.Parallel()
 
@@ -190,20 +205,18 @@ func TestAPathOnlyPackageLevelFactIsCompared(test *testing.T) {
 	if !isKeyed || key.local != "fatal" || key.name != "fatal" {
 		test.Fatalf("want the path keyed as the object's name, got %+v (keyed %t)", key, isKeyed)
 	}
-	// Moved to the unit declaring it, as byDeclaringUnit moves both sides.
-	key.file, key.offset, key.local = "print.go", 120, ""
-	hosted := map[factKey]check.ExportedFact{key: pathOnlyFact("fatal")}
-	built := map[factKey]check.ExportedFact{key: {Analyzer: "ctrlflow", FactType: "noReturn"}}
-	keptHosted, keptBuilt, left := withholdNameless(hosted, built)
-	if _, isHosted := keptHosted[key]; !isHosted || len(keptBuilt) != 1 || left != 0 {
-		test.Errorf("want the fact compared, both sides kept, got %d host and %d build facts, %d left out",
-			len(keptHosted), len(keptBuilt), left)
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{key: pathOnlyFact("fatal")},
+		map[factKey]check.ExportedFact{builtAt("fatal", 905): builtNoReturn}, toUnit, toUnit)
+	paired, _ := toUnit(builtAt("fatal", 905))
+	if _, isHosted := hosted[paired]; !isHosted || len(built) != 1 || unkeyedTotal(parts) != 0 {
+		test.Errorf("want the fact paired, got %d host and %d build facts, %+v left out", len(hosted), len(built),
+			parts)
 	}
 }
 
 // A fact the host holds by a method's path alone has no name, since the path indexes into a method set another build's
 // files can change, so it is never paired, even in a unit whose one unclaimed build fact of its kind is the likeliest
-// match: both are left out and counted (#01chv64).
+// match: both are left out, counted as path-only (#h660y7d).
 func TestAPathOnlyMethodFactIsUnkeyed(test *testing.T) {
 	test.Parallel()
 
@@ -211,15 +224,77 @@ func TestAPathOnlyMethodFactIsUnkeyed(test *testing.T) {
 	if !isKeyed || key.local != "pp.M3" || key.name != "" {
 		test.Fatalf("want the path keyed with no name, got %+v (keyed %t)", key, isKeyed)
 	}
-	key.file, key.offset, key.local = "print.go", 900, ""
-	builtKey := key
-	builtKey.name = "badVerb"
-	hosted := map[factKey]check.ExportedFact{key: pathOnlyFact("pp.M3")}
-	built := map[factKey]check.ExportedFact{builtKey: {Analyzer: "ctrlflow", FactType: "noReturn"}}
-	keptHosted, keptBuilt, left := withholdNameless(hosted, built)
-	if len(keptHosted) != 0 || len(keptBuilt) != 0 || left != 2 {
-		test.Errorf("want both facts left out and counted, got %d host and %d build facts, %d left out",
-			len(keptHosted), len(keptBuilt), left)
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{key: pathOnlyFact("pp.M3")},
+		map[factKey]check.ExportedFact{builtAt("badVerb", 905): builtNoReturn}, toUnit, toUnit)
+	if len(hosted) != 0 || len(built) != 0 || parts != (contract.UnkeyedFacts{PathOnly: 2}) {
+		test.Errorf("want both facts left out as path-only, got %d host and %d build facts, %+v", len(hosted),
+			len(built), parts)
+	}
+}
+
+// Two facts the host holds by members' paths alone, of one kind, in one unit, meet under one key, and the unit loses
+// them as a collision: the build's facts of that kind there are left out with them, never counted as differing with no
+// host side (#h660y7d, the review's probe).
+func TestTwoPathOnlyHostFactsInOneUnitWithholdTheBuilds(test *testing.T) {
+	test.Parallel()
+
+	first, _ := factKeyByName(pathOnlyFact("pp.F0"), &objectpath.Encoder{})
+	second, _ := factKeyByName(pathOnlyFact("pp.F1"), &objectpath.Encoder{})
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{
+		first: pathOnlyFact("pp.F0"), second: pathOnlyFact("pp.F1"),
+	}, map[factKey]check.ExportedFact{builtAt("buf", 910): builtNoReturn, builtAt("arg", 920): builtNoReturn},
+		toUnit, toUnit)
+	if len(hosted) != 0 || len(built) != 0 || parts != (contract.UnkeyedFacts{Collisions: 4}) {
+		test.Errorf("want all four facts left out as a collision, got %d host and %d build facts, %+v", len(hosted),
+			len(built), parts)
+	}
+}
+
+// Two facts of one kind that meet under one unit and name, on the host's side as on the build's, are told apart by
+// nothing, so neither is paired: on the host's side the unit's build facts of the kind go with them, and on the
+// build's the host's fact under that key does (#h660y7d).
+func TestFactsMeetingUnderOneKeyAreNeverPaired(test *testing.T) {
+	test.Parallel()
+
+	named := func(path string) factKey {
+		key := factKey{packageIdentifier: "fmt", offset: -1, local: path, name: "x", analyzer: "ctrlflow",
+			factType: "noReturn"}
+		return key
+	}
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{
+		named("pp.F0.F0"): pathOnlyFact("pp.F0.F0"), named("pp.F1.F0"): pathOnlyFact("pp.F1.F0"),
+	}, map[factKey]check.ExportedFact{builtAt("x", 910): builtNoReturn, builtAt("y", 920): builtNoReturn},
+		toUnit, toUnit)
+	if len(hosted) != 0 || len(built) != 0 || parts != (contract.UnkeyedFacts{Collisions: 4}) {
+		test.Errorf("host side meeting: want all four facts left out, got %d host and %d build facts, %+v",
+			len(hosted), len(built), parts)
+	}
+	hosted, built, parts = pairByUnit(map[factKey]check.ExportedFact{named("pp.F0.F0"): pathOnlyFact("pp.F0.F0")},
+		map[factKey]check.ExportedFact{builtAt("x", 910): builtNoReturn, builtAt("x", 930): builtNoReturn},
+		toUnit, toUnit)
+	if len(hosted) != 0 || len(built) != 0 || parts != (contract.UnkeyedFacts{Collisions: 3}) {
+		test.Errorf("build side meeting: want all three facts left out, got %d host and %d build facts, %+v",
+			len(hosted), len(built), parts)
+	}
+}
+
+// A host fact no unit declares, its name not found in the graph, fails as the build's fact about the same object
+// does: the build's fact of the same package, kind and name is left out with it, counted unplaced, rather than
+// compared with nothing (#h660y7d).
+func TestAnUnplacedHostFactWithholdsTheBuildsFactOfItsName(test *testing.T) {
+	test.Parallel()
+
+	unplacedHost := func(key factKey) (factKey, bool) { return factKey{}, false }
+	key := factKey{packageIdentifier: "fmt", offset: -1, local: "pp.M9", name: "badVerb", analyzer: "ctrlflow",
+		factType: "noReturn"}
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{key: pathOnlyFact("pp.M9")},
+		map[factKey]check.ExportedFact{builtAt("badVerb", 905): builtNoReturn, builtAt("other", 920): builtNoReturn},
+		unplacedHost, toUnit)
+	other, _ := toUnit(builtAt("other", 920))
+	if _, isKept := built[other]; len(hosted) != 0 || len(built) != 1 || !isKept ||
+		parts != (contract.UnkeyedFacts{Unplaced: 2}) {
+		test.Errorf("want the host's fact and the build's of its name left out, the other kept, got %d host and %d "+
+			"build facts, %+v", len(hosted), len(built), parts)
 	}
 }
 
@@ -302,11 +377,15 @@ func TestARestoredMethodAnswerMeetsItsOwnMethodWhereMethodSetsDiverge(test *test
 	answers := &fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
 		"function_purity": {hostPath: []byte("its own"), buildPath: []byte("another method's")},
 	}}
-	declaring := &byDeclaringUnit{standardLibrary: standardLibrary}
-	encoded, isHeld, isPlaced := declaring.answerOf(answers, check.ExportedFact{Package: build,
-		Analyzer: "function_purity", FactType: "answer", Object: method, Answer: true})
-	if !isPlaced || !isHeld || string(encoded) != "its own" {
+	// Through restoredAnswer, as compareFacts asks, the host having restored os and the standard library's graph
+	// holding it.
+	engine := &pipeline{dependence: &hostDependence{restoredAnswers: map[string]*fact_resolver.Answers{"os": answers},
+		standardLibrary: &standardLibraryDependence{graph: graph, files: map[string][]string{"os": host.GoFiles}}}}
+	hosted, isHeld, isPlaced := engine.restoredAnswer(check.ExportedFact{Package: build,
+		Analyzer: "function_purity", FactType: "answer", Object: method, Answer: true}, &objectpath.Encoder{},
+		&byDeclaringUnit{standardLibrary: standardLibrary})
+	if !isPlaced || !isHeld || string(hosted.Encoded) != "its own" {
 		test.Errorf("Process.%s, %s on darwin and %s on windows: want the host's answer about it, got %q (held %t, "+
-			"placed %t)", method.Name(), hostPath, buildPath, encoded, isHeld, isPlaced)
+			"placed %t)", method.Name(), hostPath, buildPath, hosted.Encoded, isHeld, isPlaced)
 	}
 }

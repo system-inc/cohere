@@ -1143,8 +1143,10 @@ when not 0. The host's record never writes it, and neither does a run without th
 Its `"facts"` is the build's facts census (#0ghk7vj), written once its lint has run. Under the switch every extra build
 restores nothing from the host's run, so its facts are its own, and such a run is slower than a plain one. The standard
 library the host restored from the binary's table is compared through the table: its facts by their objects'
-counterparts in the standard library's graph, its answers by objectpath, an answer the build asked compared with the
-table's, and its units counted beside the host's, a host unit's call into it among the calls. A fact about an object no
+counterparts in the standard library's graph, its answers by the unit of that graph declaring each function, an answer
+the build asked compared with the table's for the function the build's answer is about, never by the build's own
+objectpath, which names a method by its place in a method set another build's files can change, and its units counted
+beside the host's, a host unit's call into it among the calls. A fact about an object no
 objectpath names, a function's local closure, has no side in the table and is left out, as is every fact of a package
 an extra build restored. Every fact an analyzer exported about an object in a file both builds compile, or about
 a package both have, is compared with the host's by the digest of its value, a fact only one build exported counting as
@@ -1158,10 +1160,16 @@ model judging each unit once would judge again, `"boundUnits"` and `"boundNodes"
 that takes each such caller as differing in turn, an upper bound, and `"callerUnits"` and `"callerNodes"`, every
 independent unit that calls a dependent one, the most that facts through call bodies can put in play. Where the
 standard library's graph is records, the store's, with no types, a restored package's facts are matched on both sides
-by their objects' declaring units, the host's found by the name the records give each object, the build's by its
-position; `"unkeyed"` counts the facts of such a package left out, on either side: one no record name reaches, one no
-unit declares, one the host holds by a method's or a field's path alone, which nothing pairs exactly, and a build's
-fact that would meet such a fact unpaired. It is always written, since every count beside it leaves them out.
+by their objects' declaring units and names, the host's found by the name the records give each object, the build's by
+its position, and an example names the build's object at its own position, or the unit's start, said so, where the
+build has none. `"unkeyed"` counts what the census left out, and `"unkeyedParts"` says why, its parts summing to it:
+`"unnamed"`, a host fact no record name reaches; `"closures"`, a build fact about an object no objectpath names;
+`"unplaced"`, a fact whose object no unit declares or holds, with the build's facts of its package, kind and name, or
+of its kind where it has no name; `"pathOnly"`, a host fact held by a method's or a field's path alone, which nothing
+pairs exactly, with the build's facts of its kind in its unit that no named host fact claims; `"collisions"`, two facts
+of one kind meeting under one unit and name on either side, which nothing tells apart, with the other side's fact
+there, or where the host's meet, the build's facts of the kind in the unit; and `"answers"`, a build's answer about a
+function no unit of the graph places. Both are always written, since every count beside them leaves those out.
 `"milliseconds"` is the comparison's wall time.
 
 ### `phase`

@@ -173,9 +173,10 @@ func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
 // count what want's, side-loaded, counts as differing: kind for kind the facts that differ and the answers asked in one
 // build alone, and every unit those reach, firstOrderUnits among them. got may compare fewer facts than want, since it
 // leaves out what no name pairs exactly (withholdNameless), but never more, and never more fewer than its Unkeyed
-// counts; it logs how many it left out (#01chv64).
-func expectSameCensus(test *testing.T, want string, got string) {
+// counts, its parts summing to it; it logs how many it left out, by why, and returns those by build (#h660y7d).
+func expectSameCensus(test *testing.T, want string, got string) map[string]contract.UnkeyedFacts {
 	test.Helper()
+	parts := map[string]contract.UnkeyedFacts{}
 	wantBuilds, gotBuilds := lintRecordOf(test, want).Builds, lintRecordOf(test, got).Builds
 	compared := 0
 	for index := range min(len(wantBuilds), len(gotBuilds)) {
@@ -207,12 +208,21 @@ func expectSameCensus(test *testing.T, want string, got string) {
 			test.Errorf("build %s: the census compares %d facts fewer than the side load and counts %d unkeyed",
 				target, fewer, gotFacts.Unkeyed)
 		}
-		test.Logf("build %s: %d facts compared fewer, %d unkeyed", target, fewer, gotFacts.Unkeyed)
+		unkeyed := gotFacts.UnkeyedParts
+		if total := unkeyed.Unnamed + unkeyed.Closures + unkeyed.Unplaced + unkeyed.PathOnly + unkeyed.Collisions +
+			unkeyed.Answers; total != gotFacts.Unkeyed {
+			test.Errorf("build %s: the census counts %d unkeyed, and its parts %+v sum to %d", target,
+				gotFacts.Unkeyed, unkeyed, total)
+		}
+		parts[target] = unkeyed
+		test.Logf("build %s: %d facts compared fewer, %d unkeyed, %+v", target, fewer, gotFacts.Unkeyed,
+			gotFacts.UnkeyedParts)
 		compared++
 	}
 	if compared == 0 {
 		test.Error("no build's facts census was compared")
 	}
+	return parts
 }
 
 // The facts census counts the same differing facts, and the same units they reach, whether the standard library's
@@ -261,7 +271,11 @@ func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 	expectSameVerdicts(test, "from the store against side-loaded",
 		withoutRoot(everyGraphVerdict(test, sideLoaded), sideRoot), withoutRoot(everyGraphVerdict(test, fromStore),
 			storedRoot))
-	expectSameCensus(test, sideStream, storeStream)
+	// The fixture's windows build meets facts the host holds by a member's path alone, and answers no unit places.
+	if parts := expectSameCensus(test, sideStream, storeStream)["windows/arm64"]; parts.PathOnly == 0 ||
+		parts.Answers == 0 {
+		test.Errorf("the windows build leaves out %+v, want facts held by a path alone and answers not placed", parts)
+	}
 	withoutRootLines := func(lines []string, root string) []string {
 		moved := make([]string, 0, len(lines))
 		for _, line := range lines {
