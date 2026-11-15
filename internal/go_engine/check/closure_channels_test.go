@@ -45,8 +45,9 @@ var factLearners = []string{"ctrlflow", "fact_deprecated", "printf"}
 // package to reach the once decides it for every later pass. The checker's initializer hands upstream's internal
 // package its pass accessor, as upstream's does; fact_resolver's registry is each kind registering as its package
 // initializes; intermediate_representation's are a build census only tests open and a sync.Pool of scratch space a
-// lift empties before it gives it back. staticcheck_configuration's build caches are written by go env's answers (load.ReadGoEnvironment), never by a
-// pass, and only grow, each by a directory go writes its own files to, so a pass reads the same whatever ran before it.
+// lift empties before it gives it back. staticcheck_configuration's build caches are written by go env's answers
+// (load.ReadGoEnvironment), never by a pass, and only grow, each by a directory go writes its own files to, so a pass
+// reads the same whatever ran before it.
 //
 // What this does not see: state a package-level variable holds in a struct whose methods write it, which is how the
 // per-load memo of consistency_no_abbreviated_identifier and consistency_no_any is held (rules/load_memo, #k8e189q).
