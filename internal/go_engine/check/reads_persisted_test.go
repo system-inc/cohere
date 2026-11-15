@@ -116,7 +116,7 @@ func wholeVerdict(
 	if holds, why := TypesHold(restoring, closure, restored, host, build); !holds {
 		return false, why
 	}
-	return FactsHold(restoring, closure, host, build, fact, ReadFactTypes(restoring))
+	return FactsHold(restoring, closureLookupOf(closure), host, build, fact, ReadFactTypes(restoring))
 }
 
 // verdictFactsOf is the fixture's facts of one build, by factKeyOf, as a FactLookup.

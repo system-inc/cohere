@@ -513,11 +513,16 @@ func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []strin
 	if state == nil || len(state.restoring) == 0 {
 		return nil
 	}
-	exported := newBuildFacts(session, graphs)
 	// The candidates in ID order, so the writes below run in one order however the workers finish.
 	candidates := slices.SortedFunc(maps.Keys(state.restoring), func(left, right *packages.Package) int {
 		return strings.Compare(left.ID, right.ID)
 	})
+	// Indexed before the fan-out, so the workers only read it. It is FactsHold's walks of every candidate's closure,
+	// made once, so the time deciding counts it.
+	indexing := time.Now()
+	closures := newClosureIndex(candidates)
+	state.deciding.Add(int64(time.Since(indexing)))
+	exported := newBuildFacts(session, graphs, closures)
 	// Each candidate's why is its own: decided on every core at once, on the build's critical path, each written to its
 	// own index. A worker only reads what the analysis left, and the facts' memo, which gathers each owner once.
 	whys := make([]string, len(candidates))
@@ -528,7 +533,7 @@ func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []strin
 		why := hosted.declined
 		hosted.lock.Unlock()
 		if why == "" {
-			why = exported.factsHold(candidate, hosted.kept.restoring, state)
+			why = exported.factsHold(candidate, hosted.kept, state)
 		}
 		if why == "" && (hosted.restored.readsIncomplete || !session.readsHold(candidate)) {
 			why = "A an answer it read of another package differs in the build, or cannot be named"

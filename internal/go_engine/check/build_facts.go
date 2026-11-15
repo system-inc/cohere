@@ -2,6 +2,7 @@ package check
 
 import (
 	"fmt"
+	"go/types"
 	"reflect"
 	"sync"
 	"time"
@@ -19,9 +20,11 @@ import (
 // the actions on it, each of its analyzer's fact types available only when one ran there. The decide asks it from
 // every core at once (decideHostRestores), so byOwner holds each owner's gathering as a func() ownerFacts made by
 // sync.OnceValue, by owner: the first to ask an owner gathers it, once, and every other waits for that and reads it.
+// closures are the decide's candidates' import closures, indexed once for every verdict (closureIndex).
 type buildFacts struct {
 	session   *CacheSession
 	actionsOf map[*packages.Package][]*checker.Action
+	closures  *closureIndex
 	byOwner   sync.Map
 }
 
@@ -32,8 +35,9 @@ type ownerFacts struct {
 	available map[reflect.Type]bool
 }
 
-// newBuildFacts is the facts of session's packages, as the actions of graphs left them.
-func newBuildFacts(session *CacheSession, graphs []*checker.Graph) *buildFacts {
+// newBuildFacts is the facts of session's packages, as the actions of graphs left them, asked by the verdicts of the
+// candidates closures indexes.
+func newBuildFacts(session *CacheSession, graphs []*checker.Graph, closures *closureIndex) *buildFacts {
 	actionsOf := map[*packages.Package][]*checker.Action{}
 	for _, graph := range graphs {
 		if graph == nil {
@@ -43,7 +47,7 @@ func newBuildFacts(session *CacheSession, graphs []*checker.Graph) *buildFacts {
 			actionsOf[action.Package] = append(actionsOf[action.Package], action)
 		}
 	}
-	return &buildFacts{session: session, actionsOf: actionsOf}
+	return &buildFacts{session: session, actionsOf: actionsOf, closures: closures}
 }
 
 // of is owner's exported facts, gathered once however many ask at once.
@@ -109,10 +113,45 @@ func (exported *buildFacts) gather(owner *packages.Package) ownerFacts {
 	return gathered
 }
 
-// factsHold is why candidate's fact reads, restoring's, do not read the same in what the build's packages exported, or
+// factsHold is why candidate's fact reads, kept's, do not read the same in what the build's packages exported, or
 // empty when they do. A read of an owner that exported no facts of the type in this build, since no action of the
-// type ran on it, cannot be asked, and fails it.
-func (exported *buildFacts) factsHold(candidate *packages.Package, restoring Restoring, state *hostState) string {
+// type ran on it, cannot be asked, and fails it. What candidate reaches is the closure index's, or walked as before
+// for a candidate the index does not answer (closureIndex.walks).
+func (exported *buildFacts) factsHold(candidate *packages.Package, kept *hostEntry, state *hostState) string {
+	started := time.Now()
+	declaring := func(owner string) *packages.Package { return exported.closures.declaring(candidate, owner) }
+	closure := ClosureLookup(func(path string) *types.Package { return exported.closures.typesOf(candidate, path) })
+	if exported.closures.walks(candidate) {
+		declaring, closure = walkedClosure(candidate)
+	}
+	unavailable := ""
+	lookup := func(owner string, path objectpath.Path, factType reflect.Type) (analysis.Fact, bool) {
+		declared := declaring(owner)
+		if declared == nil {
+			return nil, false
+		}
+		facts := exported.of(declared)
+		if !facts.available[factType] && unavailable == "" {
+			unavailable = "F the build has no " + factType.String() + " facts of " + owner + " to ask"
+		}
+		fact, found := facts.facts[factType][path]
+		return fact, found
+	}
+	holds, why := FactsHold(kept.restoring, closure, state.host.renderings, state.renderings, lookup,
+		kept.readFactTypes())
+	state.deciding.Add(int64(time.Since(started)))
+	switch {
+	case unavailable != "":
+		return unavailable
+	case !holds:
+		return why
+	}
+	return ""
+}
+
+// walkedClosure is what candidate reaches through its imports, walked: the package of each path, the first a walk of
+// every import meets, and the types of each, load.ClosureTypes's, for a candidate the closure index does not answer.
+func walkedClosure(candidate *packages.Package) (func(owner string) *packages.Package, ClosureLookup) {
 	byPath := map[string]*packages.Package{}
 	var collect func(importer *packages.Package)
 	collect = func(importer *packages.Package) {
@@ -124,28 +163,5 @@ func (exported *buildFacts) factsHold(candidate *packages.Package, restoring Res
 		}
 	}
 	collect(candidate)
-	unavailable := ""
-	lookup := func(owner string, path objectpath.Path, factType reflect.Type) (analysis.Fact, bool) {
-		declaring := byPath[owner]
-		if declaring == nil {
-			return nil, false
-		}
-		facts := exported.of(declaring)
-		if !facts.available[factType] && unavailable == "" {
-			unavailable = "F the build has no " + factType.String() + " facts of " + owner + " to ask"
-		}
-		fact, found := facts.facts[factType][path]
-		return fact, found
-	}
-	started := time.Now()
-	holds, why := FactsHold(restoring, load.ClosureTypes(candidate), state.host.renderings, state.renderings, lookup,
-		ReadFactTypes(restoring))
-	state.deciding.Add(int64(time.Since(started)))
-	switch {
-	case unavailable != "":
-		return unavailable
-	case !holds:
-		return why
-	}
-	return ""
+	return func(owner string) *packages.Package { return byPath[owner] }, closureLookupOf(load.ClosureTypes(candidate))
 }
