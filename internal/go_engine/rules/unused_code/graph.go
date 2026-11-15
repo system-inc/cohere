@@ -27,6 +27,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"math"
 
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/lint"
@@ -143,9 +144,12 @@ type graph struct {
 	// generated is each generated file of the package, by its name, which staticcheck's generated analyzer read.
 	generated map[string]generated.Generator
 
-	// edges tracks all edges between nodes (uses and owns relationships). This data is also present in the node
-	// struct, but there it can't be accessed in constant time. edges is used to deduplicate edges.
-	edges map[edge]struct{}
+	// usedEdges and ownedEdges are every use and every ownership between nodes, each keyed by edgeKey. This data is
+	// also present in the node struct, but there it can't be accessed in constant time; these deduplicate edges. The
+	// original keeps one map keyed by a struct of both nodes and the kind; a map per kind keyed by one word keeps a
+	// third of the bytes per key, hashes it on the runtime's path for 64-bit keys, and holds the same edges.
+	usedEdges  map[uint64]struct{}
+	ownedEdges map[uint64]struct{}
 	// nodes is every node, by its index, the root first.
 	nodes []node
 	// objects is each object's node.
@@ -164,8 +168,10 @@ type nodeIndex uint64
 // node is one object in the graph, and the nodes it uses and owns. The original keeps its own index on it too, for
 // the merge and the Graphviz output; the port leaves both out, and a node's index is its place in graph.nodes.
 type node struct {
-	// object is what a finding says of the object the node stands for. The root's is empty.
-	object object
+	// typesObject is the object the node stands for, the generic one of an instance. The root's is nil. The original
+	// words what a finding says of it, its object, when it makes the node; the port words it in results, from this same
+	// object, so a node is 64 bytes rather than 104 while the walk appends and copies the list.
+	typesObject types.Object
 
 	// uses is each node this one uses, in the order the walk found them. The original keeps slices rather than maps
 	// to merge graphs by rewriting indexes in place; the port keeps them for the same order.
@@ -196,19 +202,11 @@ type result struct {
 	quiet  []object
 }
 
-// edgeKind is whether an edge is a use or an ownership.
-type edgeKind uint8
-
-const (
-	edgeKindUse edgeKind = iota + 1
-	edgeKindOwn
-)
-
-// edge is one use or ownership, from one node to another, as graph.edges deduplicates them.
-type edge struct {
-	from nodeIndex
-	to   nodeIndex
-	kind edgeKind
+// edgeKey is the edge from one node to another as one word, from in the high half and to in the low, which
+// graph.usedEdges and graph.ownedEdges are keyed by. It is exact, two edges sharing a key only when they share both
+// nodes, because node never numbers a node past 32 bits.
+func edgeKey(from nodeIndex, to nodeIndex) uint64 {
+	return uint64(from)<<32 | uint64(to)
 }
 
 // newGraph is an empty graph of one package: the root and no edges.
@@ -220,6 +218,11 @@ func newGraph(
 	directives []lint.Directive,
 	generatedFiles map[string]generated.Generator,
 ) *graph {
+	// Almost every node is an object a declaration in the package names, each in typesInfo.Defs. Over cohere's own
+	// packages the nodes and the ownerships come to a little under one per declaration, and the uses to about one and
+	// a half, under two in nearly every package. Sized so up front, the node list and the maps seldom grow while the
+	// walk fills them. A size is only room: it changes no node, no order and no edge, so no finding.
+	declared := len(typesInfo.Defs)
 	return &graph{
 		typesPackage: typesPackage,
 		typesInfo:    typesInfo,
@@ -227,9 +230,10 @@ func newGraph(
 		directives:   directives,
 		generated:    generatedFiles,
 		fileSet:      fileSet,
-		nodes:        []node{{}},
-		edges:        map[edge]struct{}{},
-		objects:      map[types.Object]nodeIndex{},
+		nodes:        make([]node, 1, declared+1),
+		usedEdges:    make(map[uint64]struct{}, 2*declared),
+		ownedEdges:   make(map[uint64]struct{}, declared),
+		objects:      make(map[types.Object]nodeIndex, declared),
 	}
 }
 
@@ -288,8 +292,14 @@ func (graph *graph) node(typesObject types.Object) nodeIndex {
 	if index, found := graph.objects[generic]; found {
 		return index
 	}
+	if uint64(len(graph.nodes)) > math.MaxUint32 {
+		// Invariant: edgeKey packs a node's index in 32 bits, which a package outgrows only by declaring four billion
+		// objects, more than any machine could type-check. Were it ever to, two edges would share a key, so the walk
+		// stops rather than drop one.
+		panic(fmt.Sprintf("a package of more than %d objects", uint64(math.MaxUint32)))
+	}
 	index := nodeIndex(len(graph.nodes))
-	graph.nodes = append(graph.nodes, node{object: graph.objectOf(generic)})
+	graph.nodes = append(graph.nodes, node{typesObject: generic})
 	graph.objects[generic] = index
 	return index
 }
@@ -306,18 +316,12 @@ func origin(typesObject types.Object) types.Object {
 	}
 }
 
-// addEdge records added and is whether it is new.
-func (graph *graph) addEdge(added edge) bool {
-	if _, found := graph.edges[added]; found {
-		return false
-	}
-	graph.edges[added] = struct{}{}
-	return true
-}
-
-// addOwned records that owner owns owned.
+// addOwned records that owner owns owned. Like addUse, it stores the edge's key and reads whether the map grew, one
+// hash where a lookup and then a store would be two.
 func (graph *graph) addOwned(owner nodeIndex, owned nodeIndex) {
-	if !graph.addEdge(edge{owner, owned, edgeKindOwn}) {
+	before := len(graph.ownedEdges)
+	graph.ownedEdges[edgeKey(owner, owned)] = struct{}{}
+	if len(graph.ownedEdges) == before {
 		return
 	}
 	graph.nodes[owner].owns = append(graph.nodes[owner].owns, owned)
@@ -325,7 +329,9 @@ func (graph *graph) addOwned(owner nodeIndex, owned nodeIndex) {
 
 // addUse records that by uses used.
 func (graph *graph) addUse(by nodeIndex, used nodeIndex) {
-	if !graph.addEdge(edge{by, used, edgeKindUse}) {
+	before := len(graph.usedEdges)
+	graph.usedEdges[edgeKey(by, used)] = struct{}{}
+	if len(graph.usedEdges) == before {
 		return
 	}
 	graph.nodes[by].uses = append(graph.nodes[by].uses, used)
@@ -413,19 +419,33 @@ func (graph *graph) colorAndQuieten() []nodeState {
 	return states
 }
 
-// results is the graph's verdict on every node but the root, in the order of the nodes.
+// results is the graph's verdict on every node but the root, in the order of the nodes, each node's object worded
+// here from the object the node stands for, as the original words it when it makes the node.
 func (graph *graph) results() result {
 	states := graph.colorAndQuieten()
 
-	var verdict result
+	// Each list is counted first and made once at its size, which changes neither what it holds nor its order.
+	usedCount, quietCount := 0, 0
+	for _, state := range states[1:] {
+		if state.seen() {
+			usedCount++
+		} else if state.quiet() {
+			quietCount++
+		}
+	}
+	verdict := result{
+		used:   make([]object, 0, usedCount),
+		unused: make([]object, 0, len(states)-1-usedCount-quietCount),
+		quiet:  make([]object, 0, quietCount),
+	}
 	for index, each := range graph.nodes[1:] {
 		state := states[index+1]
 		if state.seen() {
-			verdict.used = append(verdict.used, each.object)
+			verdict.used = append(verdict.used, graph.objectOf(each.typesObject))
 		} else if state.quiet() {
-			verdict.quiet = append(verdict.quiet, each.object)
+			verdict.quiet = append(verdict.quiet, graph.objectOf(each.typesObject))
 		} else {
-			verdict.unused = append(verdict.unused, each.object)
+			verdict.unused = append(verdict.unused, graph.objectOf(each.typesObject))
 		}
 	}
 	return verdict
