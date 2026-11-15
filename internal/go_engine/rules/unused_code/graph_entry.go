@@ -46,11 +46,15 @@ func (graph *graph) entry() {
 
 	// (1.9) packages use objects in generated files: DefaultOptions' GeneratedIsUsed. The original ranges over its map
 	// of objects, whose keys are the nodes' objects; the port's map is keyed by pointer, so it ranges over the nodes,
-	// past the root, whose order only orders the root's uses.
-	for _, each := range graph.nodes[1:] {
-		path := graph.fileSet.PositionFor(each.typesObject.Pos(), false).Filename
-		if _, isGenerated := graph.generated[path]; isGenerated {
-			graph.use(each.typesObject, nil)
+	// past the root, whose order only orders the root's uses. A package with no generated file has no object in one,
+	// so it asks the file set for no node's file: most packages, and each ask reads, and often writes, the cache of the
+	// last file the shared file set keeps for every core.
+	if len(graph.generated) > 0 {
+		for _, each := range graph.nodes[1:] {
+			path := graph.fileSet.PositionFor(each.typesObject.Pos(), false).Filename
+			if _, isGenerated := graph.generated[path]; isGenerated {
+				graph.use(each.typesObject, nil)
+			}
 		}
 	}
 
