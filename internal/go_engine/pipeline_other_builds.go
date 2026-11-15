@@ -340,12 +340,17 @@ func (engine *pipeline) extraBuildRun(
 	notes io.Writer,
 	afterLoad func(loaded bool),
 ) (buildRun, error) {
-	environment := append(slices.Clone(engine.described.workspace.Environment()), extra.Environment()...)
+	environment := engine.extraBuildEnvironment(extra)
 	// The build's one go env, which its findings cache's key and its load, the lister and the kept listing among it,
-	// all read (#4rpt1jh).
-	// Ignored: when go env fails the answer is nil and each asks on its own, as before, so the cache notes it sat out
-	// and the load fails the build with go env's own words.
-	goEnvironment, _ := load.ReadGoEnvironment(engine.described.workspace.Root, environment, nil)
+	// all read (#4rpt1jh), read with its lister state before the host's first load (startChildrenFirst), and read here
+	// only when that failed.
+	goEnvironment := engine.buildGoEnvironments[extra.String()]
+	if goEnvironment == nil {
+		// Ignored: when go env fails the answer is nil and each asks on its own, as before, so the cache notes it sat
+		// out and the load fails the build with go env's own words.
+		goEnvironment, _ = load.ReadGoEnvironment(engine.described.workspace.Root, environment, nil,
+			engine.described.children)
+	}
 	var session *check.CacheSession
 	// As the host's lint does, a run that renamed reads no findings cache, whose keys are of the bytes it replaced.
 	if !engine.renamed {

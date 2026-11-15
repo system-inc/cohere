@@ -372,7 +372,7 @@ func runStandardLibraryVariant(arguments []string, standardError io.Writer, regi
 		return fail(standardError, fmt.Errorf("computing the standard library: the engine exited %d: %s", exitCode,
 			strings.TrimSpace(engineError.String())))
 	}
-	goEnvironment, environmentError := load.ReadGoEnvironment(*root, nil, nil)
+	goEnvironment, environmentError := load.ReadGoEnvironment(*root, nil, nil, nil)
 	if environmentError != nil {
 		return fail(standardError, environmentError)
 	}

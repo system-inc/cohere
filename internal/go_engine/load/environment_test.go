@@ -63,12 +63,12 @@ func TestGoEnvironmentUnderTheWholeEnvironmentIsTheGivenOnes(test *testing.T) {
 				test.Fatalf("go env answered %d variables of the %d asked", len(goEnvironment.answer),
 					len(goEnvironmentNames))
 			}
-			underWhole, wholeError := askGoEnvironment(goEnvironment.workspace, goEnvironment.fullEnvironment)
+			underWhole, wholeError := askGoEnvironment(goEnvironment.workspace, goEnvironment.fullEnvironment, nil)
 			if wholeError != nil {
 				test.Fatal(wholeError)
 			}
 			underTranslated, translatedError := askGoEnvironment(goEnvironment.workspace,
-				translatedEnvironment(goEnvironment))
+				translatedEnvironment(goEnvironment), nil)
 			if translatedError != nil {
 				test.Fatal(translatedError)
 			}

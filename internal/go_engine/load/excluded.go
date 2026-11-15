@@ -26,12 +26,14 @@ type Excluded struct {
 // reads each file's name and build lines as go does, so it names a file in a directory whose every file is
 // left out, which go list matches as no package at all and so never reports. A file held holds is read from its
 // held bytes, and any other from disk. It returns go env's answer too, for the load to take in place of asking again
-// (see GoEnvironment), or nil when there were no files and go env was not asked.
+// (see GoEnvironment), or nil when there were no files and go env was not asked, read with children, the run's account
+// of the go commands it starts (see Children).
 func ExcludedByConstraints(
 	directory string,
 	environment []string,
 	files []string,
 	held Held,
+	children *Children,
 ) ([]Excluded, *GoEnvironment, error) {
 	if _, absoluteError := filepath.Abs(directory); absoluteError != nil {
 		return nil, nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
@@ -39,7 +41,7 @@ func ExcludedByConstraints(
 	if len(files) == 0 {
 		return nil, nil, nil
 	}
-	goEnvironment, environmentError := ReadGoEnvironment(directory, environment, held)
+	goEnvironment, environmentError := ReadGoEnvironment(directory, environment, held, children)
 	if environmentError != nil {
 		return nil, nil, environmentError
 	}

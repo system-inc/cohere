@@ -117,6 +117,12 @@ type pipeline struct {
 	// collection, which each build's holdings are measured beyond (extraBuildRun), 0 in any other run.
 	timedHostLiveBytes uint64
 
+	// buildGoEnvironments are each extra build's go env, by the build's name (project.Build.String), read with its
+	// lister state before the host's first load (startChildrenFirst), which the build's run reads in place of asking
+	// again (extraBuildRun), nil in a run that checks no extra build. Written before any build starts and only read
+	// after.
+	buildGoEnvironments map[string]*load.GoEnvironment
+
 	// pool is the run's one set of slots, every load and check of the run sharing it, the host's and every extra
 	// build's (#ckm0hsp), made on first use (workPool). poolSizeForced, set only by a test, is its size in place of one
 	// per core, and poolObserve, a test's too, is told of each slot taken, +1, and each given back, -1.
@@ -318,6 +324,8 @@ func (engine *pipeline) run() int {
 			}
 		}
 	}
+	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8).
+	engine.startChildrenFirst()
 	var loaded *load.Loaded
 	var loadError error
 	if (needsTypes || wraps) && engine.loadsBesideFix() {

@@ -217,6 +217,11 @@ type Caching struct {
 	// again when it is for the load's workspace and environment (see GoEnvironment).
 	GoEnvironment *GoEnvironment
 
+	// Children is the run's account of the go commands its loads start (see Children), which the load's own go env,
+	// when it asks one, records in, nil to record none. A load handed GoEnvironment records in the account that answer
+	// was read with.
+	Children *Children
+
 	// Held is the bytes the run already holds of the workspace's files, read in place of opening each again by every
 	// reader of the load: the in-process lister and the kept listing's fingerprint, which read each file's header, the
 	// parse, and the build constraints of the files no package holds. go list, when the in-process lister doubts, and
@@ -300,7 +305,7 @@ func loadWorkspace(
 	if !goEnvironment.answers(workspace, environment) {
 		var environmentError error
 		measureListingCommand(caching.Timing, func() {
-			goEnvironment, environmentError = ReadGoEnvironment(workspace, environment, caching.Held)
+			goEnvironment, environmentError = ReadGoEnvironment(workspace, environment, caching.Held, caching.Children)
 		})
 		if environmentError != nil {
 			return nil, environmentError
