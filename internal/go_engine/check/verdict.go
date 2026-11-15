@@ -29,7 +29,7 @@ var useDiffers = map[build_reads.UseKind]string{
 type verdict struct {
 	host     *ReadsBuild
 	build    *ReadsBuild
-	closure  map[string]*types.Package
+	closure  ClosureLookup
 	restored map[*types.Package]bool
 	fact     FactLookup
 	methods  *verdictClosures
@@ -92,7 +92,7 @@ func (judged verdict) buildClosure(roots []*types.Package) *gatheredClosure {
 
 // find is the build's object at path in the package of ownerPath, and why not when there is none.
 func (judged verdict) find(ownerPath string, path objectpath.Path) (types.Object, string) {
-	owner := judged.closure[ownerPath]
+	owner := judged.closure(ownerPath)
 	if owner == nil {
 		return nil, "the build has no package " + ownerPath
 	}
@@ -154,7 +154,7 @@ func (judged verdict) selectionHolds(selection build_reads.Selection, closureOnl
 	// A lookup of an unexported name finds it only in its own package, the build's of the member's path.
 	var namedIn *types.Package
 	if selection.Selected.Pkg() != nil {
-		namedIn = judged.closure[selection.Selected.Pkg().Path()]
+		namedIn = judged.closure(selection.Selected.Pkg().Path())
 	}
 	selected, index, _ := types.LookupFieldOrMethod(found.Type(), true, namedIn, selection.Name)
 	switch {
@@ -344,10 +344,10 @@ func (judged verdict) closureCandidates(
 func (judged verdict) importRoots(imports []string) ([]*types.Package, string) {
 	roots := make([]*types.Package, 0, len(imports))
 	for _, imported := range imports {
-		if judged.closure[imported] == nil {
+		if judged.closure(imported) == nil {
 			return nil, "the build has no package " + imported
 		}
-		roots = append(roots, judged.closure[imported])
+		roots = append(roots, judged.closure(imported))
 	}
 	return roots, ""
 }
@@ -362,7 +362,7 @@ func (judged verdict) buildAnswer(
 	roots []*types.Package,
 ) (types.Object, string) {
 	if query == build_reads.QueryScope {
-		declaring := judged.closure[path]
+		declaring := judged.closure(path)
 		if declaring == nil {
 			return nil, "the build has no package " + path
 		}

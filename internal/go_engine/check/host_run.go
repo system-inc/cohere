@@ -1,8 +1,10 @@
 package check
 
 import (
+	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/tools/go/packages"
@@ -65,12 +67,24 @@ func (host *HostRun) Keeping() time.Duration {
 //
 // bodyAt is the key the host's record of it is under, when the run wrote it to the store, holding its body, which an
 // extra build writing the package through names rather than copy (#fq7dxvx); holdsBodyAt is whether there is one.
+//
+// factTypes are restoring's ReadFactTypes, read once by the first of every build's verdicts to ask (readFactTypes).
 type hostEntry struct {
 	restoring   Restoring
 	portable    cache.Key
 	contents    func() (body []byte, record entryRecord, readExportData func() ([]byte, error), readError error)
 	bodyAt      cache.Key
 	holdsBodyAt bool
+
+	factTypesOnce sync.Once
+	factTypes     map[reflect.Type]bool
+}
+
+// readFactTypes is kept's ReadFactTypes, read once however many builds' verdicts ask at once (#nrk4zt0): restoring is
+// never written once the entry is made, and FactsHold only reads the set, so every verdict shares one.
+func (kept *hostEntry) readFactTypes() map[reflect.Type]bool {
+	kept.factTypesOnce.Do(func() { kept.factTypes = ReadFactTypes(kept.restoring) })
+	return kept.factTypes
 }
 
 // restoringOf is kept, a package of the host's run, as a verdict judges it: its path, its imports' paths, its name, its

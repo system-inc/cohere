@@ -195,7 +195,7 @@ func holdsIn(restoring Restoring, host *ReadsBuild, linux linuxWorld) (bool, str
 	if holds, why := TypesHold(restoring, linux.closure, nil, host, linux.build); !holds {
 		return false, why
 	}
-	return FactsHold(restoring, linux.closure, host, linux.build, linux.fact, ReadFactTypes(restoring))
+	return FactsHold(restoring, closureLookupOf(linux.closure), host, linux.build, linux.fact, ReadFactTypes(restoring))
 }
 
 // A package reads the same in another build when every object it read is there and reads alike for the kind of use it
