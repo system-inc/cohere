@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
@@ -48,39 +47,20 @@ const contextTemplate = "{{context.GOOS}}\n{{context.GOARCH}}\n{{context.Compile
 	"{{context.GOROOT}}\n{{join context.BuildTags \",\"}}\n{{join context.ToolTags \",\"}}\n" +
 	"{{join context.ReleaseTags \",\"}}"
 
-// readGoState runs the two go commands the lister needs, at once, in goEnvironment's workspace under its whole
-// environment, reads the go environment from goEnvironment, as go env reports it under that environment, and says why
-// it cannot list from them when it cannot. What the commands spend, and what starting them and reading their answers
-// costs this process, is added to collector.
+// readGoState reads what the two go commands the lister needs printed in goEnvironment's workspace under its whole
+// environment, running them when nothing has yet (FetchListerState), reads the go environment from goEnvironment, as
+// go env reports it under that environment, and says why it cannot list from them when it cannot. What the commands
+// spend, when this call runs them, is added to collector.
 //
 // go env was the third command here, asked beside the two with `PWD` set to the workspace, and goEnvironment asks
 // with the process's own (askGoEnvironment): of what the lister reads, only `GOWORK` reads the working directory, and
 // it names the same go.work either way, spelled through a symbolic link or not, which the lister only opens and
 // names in a doubt (#4rpt1jh).
 func readGoState(goEnvironment *GoEnvironment, collector *timing.Collector) (goState, string) {
-	commands := [][]string{
-		{"list", "-m", "-json", "all"},
-		{"list", "-e", "-f", contextTemplate, "unsafe"},
-	}
-	outputs := make([][]byte, len(commands))
-	failures := make([]error, len(commands))
-	// The two run at once, so their children's CPU is read once around both, which a read around each would count
-	// twice.
-	measureGoCommands(collector, func() {
-		var group sync.WaitGroup
-		for index, arguments := range commands {
-			group.Go(func() {
-				measureListing(collector, func() {
-					outputs[index], failures[index] = goOutput(goEnvironment.guard, goEnvironment.workspace,
-						goEnvironment.fullEnvironment, arguments)
-				})
-			})
-		}
-		group.Wait()
-	})
+	outputs, failures := goEnvironment.listerState.fetch(goEnvironment, collector)
 	for index, failure := range failures {
 		if failure != nil {
-			return goState{}, fmt.Sprintf("go %s: %v", strings.Join(commands[index], " "), failure)
+			return goState{}, fmt.Sprintf("go %s: %v", strings.Join(listerCommands[index], " "), failure)
 		}
 	}
 

@@ -105,7 +105,7 @@ func coheresBuilds(test *testing.T) (project.Workspace, []project.Build) {
 	if portsError != nil {
 		test.Fatal(portsError)
 	}
-	goEnvironment, environmentError := ReadGoEnvironment(workspace.Root, workspace.Environment(), nil)
+	goEnvironment, environmentError := ReadGoEnvironment(workspace.Root, workspace.Environment(), nil, nil)
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}

@@ -905,6 +905,16 @@ that never does: it prints a reason beside its rule in the coverage, as `off bec
 rule off with no reason given, which only a project outside our tiers can have. A Swift engine writes
 none, and its offs are marked neither way.
 
+The Go engine's lint record carries `childProcessesAfterLoad` and `childProcessesAfterLoadNamed`
+(#sktb2y8), additive within contract 3 and the Go engine's alone: how many go commands the run started
+after its first load began, and each by go and its first arguments, sorted, as
+`"childProcessesAfterLoad":2,"childProcessesAfterLoadNamed":["go list -e -f","go list -m -json"]`. On
+darwin go starts a child with fork, which marks the whole address space copy-on-write, so each child
+started once the engine's heap has grown makes every resident page fault again; a run under
+`--other-builds` with builds beside the host's starts every go command they need before that load, and
+reads 0. A run of one build starts its lister's two inside its first load, as it always has. Both are
+absent when none started, and no key and no verdict reads them.
+
 The Go engine's lint record carries one more field, additive within contract 3 as the types record's
 are, so a front door that does not read it yet loses only what it counts:
 `"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1,"factsSkipped":0,"waves":1}`.

@@ -80,6 +80,7 @@ func describeProject(request invocation) (*describedProject, error) {
 		inScopeSet:         map[string]bool{},
 		constrainedInScope: map[string]bool{},
 		contents:           map[string][]byte{},
+		children:           &load.Children{},
 	}
 	described.record = contract.ProjectRecord{
 		Root:             root,
@@ -112,7 +113,7 @@ func describeProject(request invocation) (*describedProject, error) {
 		func(file string) ([]byte, bool) {
 			fileContents, isRead := contents[file]
 			return fileContents, isRead
-		})
+		}, described.children)
 	if constraintsError != nil {
 		return nil, fmt.Errorf("describing %s: %w", root, constraintsError)
 	}

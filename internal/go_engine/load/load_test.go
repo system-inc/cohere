@@ -351,6 +351,7 @@ func TestExcludedByConstraintsNamesWhatTheLoadExcludes(test *testing.T) {
 		cleanEnvironment,
 		fixtures.census,
 		nil,
+		nil,
 	)
 	if excludedError != nil {
 		test.Fatal(excludedError)

@@ -83,6 +83,13 @@ type LintRecord struct {
 	// Always written, `{}` when no off is explained, so a reader tells an engine that explains its offs, where a rule
 	// off and not named here has no reason, from one that never does, a Swift engine's.
 	OffReasons map[string]string `json:"offReasons"`
+	// ChildProcessesAfterLoad is additive within contract 3, and the Go engine's alone: how many go commands the run
+	// started after its first load began, and ChildProcessesAfterLoadNamed names each, go and its first arguments,
+	// sorted (#sktb2y8). On darwin each child started once the engine's heap has grown makes every resident page fault
+	// again, so a run with extra builds starts every go command its builds need before that load, and reads 0 here; a
+	// run of one build starts its own lister's two within it. Both are absent when none started.
+	ChildProcessesAfterLoad      int      `json:"childProcessesAfterLoad,omitempty"`
+	ChildProcessesAfterLoadNamed []string `json:"childProcessesAfterLoadNamed,omitempty"`
 }
 
 // BuildRecord is what one build of a run covered, and what the merge of every build's findings kept of it.

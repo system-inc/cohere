@@ -19,9 +19,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
-// cacheFieldPattern is the lint record's cache counts, which are all a cached run may change in the stream once the
-// elapsed times are normalized.
-var cacheFieldPattern = regexp.MustCompile(`,"cache":\{[^}]*\}`)
+// cacheFieldPattern is the lint record's cache counts, and childProcessesPattern the go commands it counts started
+// after the first load began, which a listing the store kept spares the lister's of (#sktb2y8): all a cached run may
+// change in the stream once the elapsed times are normalized.
+var (
+	cacheFieldPattern     = regexp.MustCompile(`,"cache":\{[^}]*\}`)
+	childProcessesPattern = regexp.MustCompile(
+		`,"childProcessesAfterLoad":\d+,"childProcessesAfterLoadNamed":\[[^\]]*\]`)
+)
 
 // cachedRun is one engine run over root with extra after the contract and root, its stream normalized, its stream
 // without the cache counts, and its lint record's cache counts.
@@ -73,7 +78,10 @@ func runEngineAnsweringInPart(
 		test.Fatalf("want nothing on stderr, got:\n%s", standardError.String())
 	}
 	stream := elapsedPattern.ReplaceAllString(standardOutput.String(), `"elapsedMilliseconds":0`)
-	ran := cachedRun{stream: stream, withoutCounts: cacheFieldPattern.ReplaceAllString(stream, "")}
+	ran := cachedRun{
+		stream:        stream,
+		withoutCounts: childProcessesPattern.ReplaceAllString(cacheFieldPattern.ReplaceAllString(stream, ""), ""),
+	}
 	for line := range strings.Lines(stream) {
 		if !strings.HasPrefix(line, `{"kind":"lint"`) {
 			continue
@@ -320,7 +328,7 @@ func TestALintDirectiveIsInItsPackagesKey(test *testing.T) {
 // (load.GoEnvironment.Values), failing the test when go env fails.
 func goEnvironmentIn(test *testing.T, root string, environment []string) map[string]string {
 	test.Helper()
-	goEnvironment, environmentError := load.ReadGoEnvironment(root, environment, nil)
+	goEnvironment, environmentError := load.ReadGoEnvironment(root, environment, nil, nil)
 	if environmentError != nil {
 		test.Fatalf("reading the build context under %q: %v", environment, environmentError)
 	}
