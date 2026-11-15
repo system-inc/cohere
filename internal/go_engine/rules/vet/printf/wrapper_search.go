@@ -226,10 +226,10 @@ func (search *wrapperSearch) propagate(candidate *wrapper, call *ast.CallExpr, k
 	if call != nil && !search.forwardsWell(candidate, call, kind) {
 		return
 	}
-	if search.kinds[candidate.object] == kind {
+	if search.kinds.byObject[candidate.object] == kind {
 		return
 	}
-	search.kinds[candidate.object] = kind
+	search.kinds.byObject[candidate.object] = kind
 	// A fact can only be exported on this package's own objects, but a variable of another package is still a
 	// wrapper within this one. A fact is about the generic declaration.
 	if candidate.object.Pkg() == search.pass.Pkg {

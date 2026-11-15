@@ -148,6 +148,12 @@ func checkComparison(
 	if callee == nil {
 		return
 	}
+	// A test may be enforcing on purpose that a value is not nil. Asked before the nilness, which judges the callee and
+	// everything it calls: a comparison in a test file is never reported whatever the answer, and the file's name is
+	// all this reads, so no finding can change, and a question never asked records no read for a cached reader.
+	if staticcheck_code.IsInTest(context, comparison) {
+		return
+	}
 
 	returned := nilnesses.Nilness(callee, resultIndex)
 	// Flagged: an interface value never nil itself that may hold, or always holds, a typed nil, which points to a bug
@@ -155,10 +161,6 @@ func checkComparison(
 	// comparing it is more likely defensive, guarding against a future untyped nil.
 	if returned.Outer != return_nil_ness.NeverNil || returned.Inner != return_nil_ness.MaybeNil &&
 		returned.Inner != return_nil_ness.AlwaysNil {
-		return
-	}
-	// A test may be enforcing on purpose that a value is not nil.
-	if staticcheck_code.IsInTest(context, comparison) {
 		return
 	}
 	if intermediate_representation.IsTrivial(comparison.Parent().Program.FunctionValue(callee)) {

@@ -175,6 +175,11 @@ func directedObjects(context *rule.Context) map[types.Object]bool {
 		// A //go:linkname may sit anywhere in any file of the package, and names its local declaration by name.
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
+				// A comment's text starts with its `//`, so its first field is `//go:linkname` only when the text
+				// starts with it: asked first, the rest are never split (#k8e189q).
+				if !strings.HasPrefix(comment.Text, "//go:linkname") {
+					continue
+				}
 				fields := strings.Fields(comment.Text)
 				if len(fields) >= 2 && fields[0] == "//go:linkname" {
 					if object := context.Package.Scope().Lookup(fields[1]); object != nil {
@@ -190,7 +195,8 @@ func directedObjects(context *rule.Context) map[types.Object]bool {
 				continue
 			}
 			for _, comment := range function.Doc.List {
-				if comment.Text == "//export "+function.Name.Name {
+				named, isExport := strings.CutPrefix(comment.Text, "//export ")
+				if isExport && named == function.Name.Name {
 					if object := context.TypesInfo.Defs[function.Name]; object != nil {
 						directed[object] = true
 					}

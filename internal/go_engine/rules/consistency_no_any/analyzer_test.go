@@ -58,7 +58,7 @@ func TestAConcreteForeignMethodNeverFixesAConcreteName(test *testing.T) {
 	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_any.Analyzer, "exportedmethods")
 }
 
-// The verdict's method index leaves out an alias of a type that is not an interface, and buildForeignMethods skips
+// The verdict's method index leaves out an alias of a type that is not an interface, and declaredMethodsOf skips
 // every alias (#swv3jbw). An alias of a named type adds nothing, since that type's package is in the closure and
 // declares the same methods, so the alias that matters names a concrete type written in place, a struct with a method
 // only by promotion. aliasedconcrete reaches foreign.Vault, such an alias, the only type carrying Store, and the any

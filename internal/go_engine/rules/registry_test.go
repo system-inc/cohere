@@ -1241,7 +1241,8 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // checks share (#d8s4rsy) are staticcheck_report, where they report, staticcheck_code, the helpers they call,
 // staticcheck_call, the walk of call arguments, and staticcheck_wants, the reader of staticcheck's own fixtures, and
 // dispatch walks a package once for every rule with a listener and builds each such rule's analyzer, holding no rule
-// itself, and child_process names the pipe, command and wait the two rules about a child's piped output share.
+// itself, child_process names the pipe, command and wait the two rules about a child's piped output share, and
+// load_memo keeps what the rules reading the import closure read off each package once for the whole load.
 // One name a line, in a slice rather than a map, since gofmt aligns a map's values to its longest key and would rewrite
 // every line when a branch adds a longer one; a line of a slice is never rewritten for another's sake.
 var sharedReaders = []string{
@@ -1250,6 +1251,7 @@ var sharedReaders = []string{
 	"dispatch",
 	"function_purity",
 	"inert_value",
+	"load_memo",
 	"marker",
 	"marker_type",
 	"positions",

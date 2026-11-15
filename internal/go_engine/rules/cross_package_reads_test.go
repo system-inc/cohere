@@ -51,9 +51,13 @@ var listedCrossPackageReads = map[string]listedRead{
 		class:  readRecorded,
 		reason: "fixedByAnotherPackage and isTakenInGo record each question they ask of the closure",
 	},
-	"consistency_no_any/analyzer.go:buildForeignMethods": {
+	"consistency_no_any/analyzer.go:reachedMethodsOf": {
 		class:  readRecorded,
 		reason: "matchesForeignMethod records each question it asks of the closure",
+	},
+	"consistency_no_any/foreign_methods.go:declaredMethodsOf": {
+		class:  readRecorded,
+		reason: "matchesForeignMethod records each answer read off the index",
 	},
 	"consistency_no_screaming_snake_case/analyzer.go:isMemberOf": {
 		class:  readDirectImports,

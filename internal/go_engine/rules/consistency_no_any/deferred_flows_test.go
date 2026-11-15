@@ -6,17 +6,22 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"reflect"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/inspect"
+	"golang.org/x/tools/go/ast/inspector"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // flowSource hands values on in every way the rule records, an assignment, a definition, a call, a return, a
 // composite literal and a send, and writes any in a declaration's type only when withAny is set, so the two packages
-// differ in their candidate alone.
-func flowSource(withAny bool) string {
+// differ in their candidate alone. The assignment is written assignments times, so two packages can differ in how many
+// values they hand on alone.
+func flowSource(withAny bool, assignments int) string {
 	parameterType := "int"
 	if withAny {
 		parameterType = "any"
@@ -27,7 +32,7 @@ func flowSource(withAny bool) string {
 		"func run(channel chan int) int {\n" +
 		"\tcount := 1\n" +
 		"\tvar total int\n" +
-		"\ttotal = count\n" +
+		strings.Repeat("\ttotal = count\n", assignments) +
 		"\talias := total\n" +
 		"\t_ = alias\n" +
 		"\t_ = take(total)\n" +
@@ -37,9 +42,23 @@ func flowSource(withAny bool) string {
 		"}\n"
 }
 
-// walkedState runs the rule's listener over source as the syntax dispatcher would, every node with its ancestors, and
-// returns what the rule gathered and the findings it reported.
-func walkedState(test *testing.T, source string) (*packageState, []analysis.Diagnostic) {
+// checkedPackage is one type-checked file, the pass the rule is run on, and each node the syntax dispatcher would call
+// the listener on.
+type checkedPackage struct {
+	file  *ast.File
+	pass  *analysis.Pass
+	heard []heardNode
+}
+
+// heardNode is a node of a kind the listener lists, with its ancestors, outermost first, the node itself left out.
+type heardNode struct {
+	node  ast.Node
+	stack []ast.Node
+}
+
+// checkedPackageOf parses and type-checks source, gives its pass the package's inspector, as the dispatcher's pass
+// holds it, and keeps each node of a kind the listener lists, as the dispatcher's walk calls Node on no other.
+func checkedPackageOf(test *testing.T, source string) checkedPackage {
 	test.Helper()
 	fileSet := token.NewFileSet()
 	file, parseError := parser.ParseFile(fileSet, "flows.go", source, parser.ParseComments)
@@ -59,27 +78,46 @@ func walkedState(test *testing.T, source string) (*packageState, []analysis.Diag
 	if checkError != nil {
 		test.Fatalf("type-checking the package: %v", checkError)
 	}
-	pass := &analysis.Pass{
-		Fset:      fileSet,
-		Files:     []*ast.File{file},
-		Pkg:       checked,
-		TypesInfo: information,
-		ResultOf:  map[*analysis.Analyzer]any{},
+	listed := map[reflect.Type]bool{}
+	for _, kind := range listener.Nodes {
+		listed[reflect.TypeOf(kind)] = true
 	}
-	reported := []analysis.Diagnostic{}
-	context := rule.NewContext(Name, pass, nil, flag.NewFlagSet(Name, flag.ContinueOnError), nil,
-		func(_ string, diagnostic analysis.Diagnostic) { reported = append(reported, diagnostic) })
-	enterFile(context, file)
+	heard := []heardNode{}
 	stack := []ast.Node{}
 	ast.Inspect(file, func(node ast.Node) bool {
 		if node == nil {
 			stack = stack[:len(stack)-1]
 			return true
 		}
-		judgeNode(context, node, stack)
+		if listed[reflect.TypeOf(node)] {
+			heard = append(heard, heardNode{node: node, stack: append([]ast.Node{}, stack...)})
+		}
 		stack = append(stack, node)
 		return true
 	})
+	return checkedPackage{
+		file: file,
+		pass: &analysis.Pass{
+			Fset:      fileSet,
+			Files:     []*ast.File{file},
+			Pkg:       checked,
+			TypesInfo: information,
+			ResultOf:  map[*analysis.Analyzer]any{inspect.Analyzer: inspector.New([]*ast.File{file})},
+		},
+		heard: heard,
+	}
+}
+
+// run runs the rule's listener over the package as the syntax dispatcher would, and returns what the rule gathered
+// and the findings it reported.
+func (checked checkedPackage) run() (*packageState, []analysis.Diagnostic) {
+	reported := []analysis.Diagnostic{}
+	context := rule.NewContext(Name, checked.pass, listener.Requires, flag.NewFlagSet(Name, flag.ContinueOnError), nil,
+		func(_ string, diagnostic analysis.Diagnostic) { reported = append(reported, diagnostic) })
+	enterFile(context, checked.file)
+	for _, each := range checked.heard {
+		judgeNode(context, each.node, each.stack)
+	}
 	exitPackage(context)
 	return rule.State[packageState](context), reported
 }
@@ -90,10 +128,7 @@ func walkedState(test *testing.T, source string) (*packageState, []analysis.Diag
 // all, and reports that any, since nothing fixes the parameter's type.
 func TestFlowsAreRecordedOnlyForAPackageWithACandidate(test *testing.T) {
 	test.Parallel()
-	without, reportedWithout := walkedState(test, flowSource(false))
-	if len(without.handings) == 0 {
-		test.Fatal("the package hands values on, yet the walk kept no node that does")
-	}
+	without, reportedWithout := checkedPackageOf(test, flowSource(false, 1)).run()
 	if recorded := len(without.flows.sinkFixed) + len(without.flows.feeds) + len(without.flows.definedFrom) +
 		len(without.flows.sourceFixed); recorded != 0 {
 		test.Errorf("a package with no candidate recorded %d flows", recorded)
@@ -101,7 +136,7 @@ func TestFlowsAreRecordedOnlyForAPackageWithACandidate(test *testing.T) {
 	if len(reportedWithout) != 0 {
 		test.Errorf("a package with no candidate reported %d findings", len(reportedWithout))
 	}
-	with, reportedWith := walkedState(test, flowSource(true))
+	with, reportedWith := checkedPackageOf(test, flowSource(true, 1)).run()
 	if len(with.candidates) != 1 {
 		test.Fatalf("want the one any as the candidate, got %d", len(with.candidates))
 	}
@@ -111,5 +146,23 @@ func TestFlowsAreRecordedOnlyForAPackageWithACandidate(test *testing.T) {
 	}
 	if len(reportedWith) != 1 {
 		test.Errorf("want the one any reported, got %d findings", len(reportedWith))
+	}
+}
+
+// A package with no candidate keeps nothing of the values it hands on as the walk meets them, since only a package
+// holding a candidate is walked for them, at its exit. So running the listener over a package that hands a value on
+// once allocates as much as over one that hands values on hundreds of times; a listener that kept each node that hands
+// a value on would grow its list as the second is walked.
+//
+// Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would
+// add to.
+func TestAPackageWithNoCandidateKeepsNothingItHandsOn(test *testing.T) {
+	few := checkedPackageOf(test, flowSource(false, 1))
+	many := checkedPackageOf(test, flowSource(false, 512))
+	fewAllocations := testing.AllocsPerRun(20, func() { few.run() })
+	manyAllocations := testing.AllocsPerRun(20, func() { many.run() })
+	if manyAllocations != fewAllocations {
+		test.Errorf("handing values on 512 times allocated %.0f times, once %.0f, where the two must be the same",
+			manyAllocations, fewAllocations)
 	}
 }
