@@ -52,6 +52,40 @@ func TestTheLaterOfTwoUnitsAtOneStartAnswersForThePlace(test *testing.T) {
 	}
 }
 
+// A decoded read of an object of a package the graph does not hold, which the answering graph declares no unit of, is
+// judged by what the read reaches through the object's type, each read by its own (#gf9qrzf): unit Reader reads
+// Opaque, which no unit of the answering graph declares and whose bits are unset, through its type to Inner, set, and
+// unit Later, after it, reads Plain, which a unit there declares, unset, through nothing. Reader is dependent through
+// Inner, and Later is independent. A read's reach dropped makes Reader independent, and one moved a read along gives
+// Reader Later's empty reach.
+func TestAnExternalReadIsJudgedByWhatItReachesThroughItsType(test *testing.T) {
+	test.Parallel()
+
+	path := "example.com/reaching"
+	record := &packageRecord{identifier: "reaching", path: path, imports: map[string]string{},
+		objects: []recordedObject{{path: "example.com/elsewhere", local: "Opaque"},
+			{path: "example.com/elsewhere", local: "Inner"}, {path: "example.com/elsewhere", local: "Plain"}}}
+	record.units = []recordedUnit{
+		{file: "reaching.go", start: 10, end: 20, nodes: 3, declares: []recordedObject{{path: path, local: "Reader"}},
+			reads: []recordedRead{{target: 0, through: []recordedBit{{object: 1}}}}},
+		{file: "reaching.go", start: 30, end: 40, nodes: 3, declares: []recordedObject{{path: path, local: "Later"}},
+			reads: []recordedRead{{target: 2}}},
+	}
+	graph := NewGraph()
+	graph.add(record)
+	dependence := graph.Against(Difference{
+		DependentObject: func(object types.Object) (bool, bool) { return false, false },
+		DependentName: func(path string, local string) (bool, bool, bool) {
+			return local == "Inner", false, local == "Plain"
+		},
+	})
+	for start, want := range map[int]bool{10: true, 30: false} {
+		if got := dependence.UnitDependent("reaching", "reaching.go", start); got != want {
+			test.Errorf("reaching.go:%d: want dependent %t, got %t", start, want, got)
+		}
+	}
+}
+
 // A build's judgment asks its DependentObject once per object, whether a unit reads the object or ObjectBits meets it
 // after, and its DependentName once per name: the layout fixture's workspace, restored from export data, judged on
 // linux by its dependency's graph, from its live packages and from their records read back, then asked ObjectBits of

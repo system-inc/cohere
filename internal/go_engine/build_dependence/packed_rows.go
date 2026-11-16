@@ -1,6 +1,7 @@
 package build_dependence
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -21,7 +22,7 @@ func newPackedRows[Entry int32 | uint32](rows int, entries int) packedRows[Entry
 
 // closeRow ends the row being filled at the entries appended so far; the next row starts empty.
 func (packed *packedRows[Entry]) closeRow() {
-	packed.offsets = append(packed.offsets, uint32(len(packed.entries)))
+	packed.offsets = append(packed.offsets, narrowed[uint32](len(packed.entries), "a table's entries"))
 }
 
 // open is the entries of the row being filled, appended since the last row closed.
@@ -48,7 +49,9 @@ type rowEntry struct {
 // groupedRows are pairs as rows rows, each pair's entry in its row, each row's entries in the order of pairs: a count
 // of each row's entries, then each entry in its place, so the rows need not be filled in their order.
 func groupedRows(rows int, pairs []rowEntry) packedRows[int32] {
-	grouped := packedRows[int32]{offsets: make([]uint32, rows+1), entries: make([]int32, len(pairs))}
+	// Every offset is at most the count of pairs, so one check of that count keeps every offset below from wrapping.
+	grouped := packedRows[int32]{offsets: make([]uint32, rows+1),
+		entries: make([]int32, narrowed[uint32](len(pairs), "a table's entries"))}
 	for _, pair := range pairs {
 		grouped.offsets[pair.row+1]++
 	}
@@ -72,4 +75,16 @@ func column(value int) int32 {
 		panic("build_dependence: a unit's offset or size passes what a unit column holds")
 	}
 	return int32(value)
+}
+
+// narrowed is value, a count or an index of the graph's units, nodes or entries, as the 32-bit Width that holds it, a
+// column's or an offset's. Those are millions in a tree's graph, far below 2^31, but one past it would wrap into
+// another index, or into a negative that reads as none, and be read wrong rather than fail, so it fails here instead,
+// as column does. counting names what value counts, for the panic.
+func narrowed[Width int32 | uint32](value int, counting string) Width {
+	narrow := Width(value)
+	if value < 0 || int(narrow) != value {
+		panic(fmt.Sprintf("build_dependence: %s number %d, more than %T holds", counting, value, narrow))
+	}
+	return narrow
 }

@@ -266,10 +266,10 @@ func (resolved *resolvedGraph) resolveUnits() {
 	resolved.packageUnits = make([][2]int32, 0, len(resolved.packages))
 	resolved.files.rows = map[fileKey]int32{}
 	for packageIndex, record := range resolved.packages {
-		first := int32(resolved.unitCount())
+		first := narrowed[int32](resolved.unitCount(), "the graph's units")
 		for unitIndex := range record.units {
 			unit := &record.units[unitIndex]
-			index := int32(resolved.unitCount())
+			index := narrowed[int32](resolved.unitCount(), "the graph's units")
 			for _, declared := range unit.declares {
 				node := resolved.node(nodeKey{packageIndex: int32(packageIndex), local: declared.local},
 					declared.object)
@@ -286,7 +286,8 @@ func (resolved *resolvedGraph) resolveUnits() {
 			resolved.unitUniverseNames = append(resolved.unitUniverseNames, unit.universeNames)
 			resolved.unitReceiver = append(resolved.unitReceiver, -1)
 		}
-		resolved.packageUnits = append(resolved.packageUnits, [2]int32{first, int32(resolved.unitCount())})
+		resolved.packageUnits = append(resolved.packageUnits,
+			[2]int32{first, narrowed[int32](resolved.unitCount(), "the graph's units")})
 	}
 	resolved.files.placeUnits(resolved.unitFile, resolved.unitStart)
 	for packageIndex, record := range resolved.packages {
@@ -311,7 +312,7 @@ func (resolved *resolvedGraph) node(key nodeKey, object types.Object) int32 {
 		}
 		return index
 	}
-	index := int32(len(resolved.objects))
+	index := narrowed[int32](len(resolved.objects), "the graph's nodes")
 	resolved.nodes[key] = index
 	resolved.objects = append(resolved.objects, object)
 	if object != nil {

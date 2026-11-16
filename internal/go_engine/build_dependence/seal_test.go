@@ -192,7 +192,9 @@ func expectSealedAlike(test *testing.T, sealing sealCase) {
 }
 
 // After Seal, adding a package, from its live load, its bytes or its decoded record, and encoding a record each
-// panic, saying the graph was sealed, and leave the graph's lock free for the next caller.
+// panic, saying the graph was sealed, and leave the graph's lock free for the next caller. A decoded record a graph
+// held when it was sealed, which the seal emptied, panics too when it is added to a second graph, open, which would
+// otherwise hold its package with no unit (#gf9qrzf).
 func TestASealedGraphRefusesToAddOrEncode(test *testing.T) {
 	test.Parallel()
 
@@ -221,6 +223,24 @@ func TestASealedGraphRefusesToAddOrEncode(test *testing.T) {
 	}
 	if unnameable := live.Unnameable(); unnameable != 0 {
 		test.Errorf("want the lock free and no unnameable object after the refusals, got %d", unnameable)
+	}
+
+	held, decodeError := DecodeRecord(encoded)
+	if decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	holding := NewGraph()
+	holding.AddDecoded(held)
+	holding.Seal()
+	second := NewGraph()
+	if message := panicOf(func() { second.AddDecoded(held) }); !strings.Contains(message,
+		"after a graph holding it was sealed") {
+		test.Errorf("AddDecoded of a record a sealed graph held: want a panic saying a graph holding it was sealed, "+
+			"got %q", message)
+	}
+	if second.Unnameable() != 0 || len(second.packages) != 0 {
+		test.Errorf("want the second graph's lock free and no package held after the refusal, got %d",
+			len(second.packages))
 	}
 }
 

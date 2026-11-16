@@ -21,6 +21,10 @@ var graphBytesFixture = filepath.Join("..", "testdata", "build-facts-chain")
 // fails main's by nearly three times.
 const graphBytesBound = 4 << 20
 
+// graphBytesFloor is the least the graphs of graphBytesFixture hold of their own, under half the 2.62 MB this test
+// reads: a reading below it saw nothing of them, the graphs still live at the second reading say, and proves nothing.
+const graphBytesFloor = 1 << 20
+
 // liveHeapBytes is the heap's live bytes after two full collections, the second sweeping what the first finalized.
 func liveHeapBytes() uint64 {
 	runtime.GC()
@@ -116,5 +120,9 @@ func TestTheGraphsHoldFewBytesOfTheirOwn(test *testing.T) {
 	if ownBytes > graphBytesBound {
 		test.Errorf("the graphs hold %.2f MB of their own, over the bound of %.2f MB", float64(ownBytes)/(1<<20),
 			float64(graphBytesBound)/(1<<20))
+	}
+	if ownBytes < graphBytesFloor {
+		test.Errorf("the graphs hold %.2f MB of their own, under %.2f MB: the reading saw nothing of them, so it "+
+			"proves nothing", float64(ownBytes)/(1<<20), float64(graphBytesFloor)/(1<<20))
 	}
 }

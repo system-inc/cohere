@@ -33,8 +33,11 @@ func NewCallIndex(host *Graph, standardLibrary *Graph) *CallIndex {
 		index.calls = index.host.calls
 	} else {
 		index.standardLibrary = standardLibrary.resolve()
+		// Each graph's units fit an int32 (resolveUnits), and the two together are checked to as well, so no index
+		// here, a host unit's or hostUnits plus a standard library unit's, wraps.
+		units := narrowed[int32](index.host.unitCount()+index.standardLibrary.unitCount(), "the call index's units")
 		hostUnits := int32(index.host.unitCount())
-		index.calls = newPackedRows[int32](int(hostUnits)+index.standardLibrary.unitCount(),
+		index.calls = newPackedRows[int32](int(units),
 			len(index.host.calls.entries)+len(index.host.externalCalls.entries)+
 				len(index.standardLibrary.calls.entries))
 		for unit := range index.host.unitCount() {

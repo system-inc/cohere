@@ -60,7 +60,7 @@ type Graph struct {
 // path to package ID, and typeNames the names of its scope's type names, in which a method of a build-only file finds
 // its receiver. unnameable counts the objects of other packages it reads that no name can carry, which a record read
 // back could not find (Graph.Unnameable). Sealing the graph lets go of its imports, objects, units and edges
-// (Graph.Seal).
+// (Graph.Seal), and marks it released.
 type packageRecord struct {
 	identifier string
 	path       string
@@ -79,6 +79,10 @@ type packageRecord struct {
 	units      []recordedUnit
 	edges      []recordedEdge
 	unnameable int
+
+	// released says a sealed graph let go of the record's imports, objects, units and edges (Graph.Seal), so another
+	// graph it was added to would hold its package with no unit and drop every read of its objects: add refuses it.
+	released bool
 }
 
 // unitRecord is one unit as the collector finds it in a live package, before newRecord names its objects: the file a
@@ -177,11 +181,18 @@ func (graph *Graph) encoders() *objectPaths {
 }
 
 // add publishes record under one hold of the lock, and lets the last resolution go. A sealed graph panics
-// (refuseSealed), one sealed while the package's walk ran included.
+// (refuseSealed), one sealed while the package's walk ran included, and so does a record another graph's Seal let go
+// of (packageRecord.released).
 func (graph *Graph) add(record *packageRecord) {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
 	graph.refuseSealed("add a package")
+	if record.released {
+		panic("build_dependence: a caller tried to add the record of " + record.identifier + " after a graph " +
+			"holding it was sealed (Graph.Seal), which let go of its units, objects and edges, so this graph would " +
+			"hold the package with no unit and drop every read of its objects: a decoded Record is added to one " +
+			"graph only")
+	}
 	graph.packages[record.identifier] = record
 	graph.resolved = nil
 }
@@ -225,8 +236,8 @@ func (graph *Graph) Unnameable() int {
 // records the store keeps are written, the graph is never resolved or encoded again. After Seal, adding a package
 // (AddPackage, AddRecord, AddDecoded) or encoding a record (EncodedRecord) panics, as the caller's ordering bug it is:
 // a sealed graph can neither resolve again nor encode a record, having let go of what both read. A record added from a
-// decoded Record is the Record's own, so sealing lets go of that Record's too, and it can be added to no other graph
-// after.
+// decoded Record is the Record's own, so sealing lets go of that Record's too, and adding it to another graph after
+// panics (packageRecord.released).
 func (graph *Graph) Seal() {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
@@ -236,6 +247,7 @@ func (graph *Graph) Seal() {
 	graph.resolveHeld()
 	for _, record := range graph.packages {
 		record.imports, record.objects, record.units, record.edges = nil, nil, nil, nil
+		record.released = true
 	}
 	graph.paths = nil
 	graph.sealed = true
