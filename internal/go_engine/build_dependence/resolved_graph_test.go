@@ -296,9 +296,10 @@ func TestUnitsAreFoundAsByMapsWhereverLineDirectivesPlaceThem(test *testing.T) {
 	expectUnitsFoundAsByMaps(test, "layout", layout)
 }
 
-// chainLoad is the build-facts-chain fixture of the engine's testdata, its own module, loaded whole under build with
-// its tests: one package of its own and the part of the standard library it reaches.
-func chainLoad(benchmark *testing.B, build fixtureBuild) loadedBuild {
+// chainLoadUnder is the build-facts-chain fixture of the engine's testdata, its own module, loaded whole under build
+// with its tests: one package of its own and the part of the standard library it reaches. It is not the scratch tests'
+// chainLoad, which loads the fixture once and under the host alone: the benchmark judges a windows build on it too.
+func chainLoadUnder(benchmark *testing.B, build fixtureBuild) loadedBuild {
 	benchmark.Helper()
 	roots, loadError := packages.Load(&packages.Config{
 		Mode:  packages.LoadAllSyntax | packages.NeedTypesInfo,
@@ -323,8 +324,8 @@ func chainLoad(benchmark *testing.B, build fixtureBuild) loadedBuild {
 // every package the build-facts-chain fixture reaches on one graph, resolved anew each round, and windows, where the
 // standard library's files differ most, judged on the resolution each round.
 func BenchmarkResolveAndAgainstOnTheChainFixture(benchmark *testing.B) {
-	host := chainLoad(benchmark, hostBuild)
-	windows := chainLoad(benchmark, fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
+	host := chainLoadUnder(benchmark, hostBuild)
+	windows := chainLoadUnder(benchmark, fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
 	graph := graphOf(host, nil)
 	difference := differenceOf(host, windows)
 	benchmark.Run("resolve", func(benchmark *testing.B) {

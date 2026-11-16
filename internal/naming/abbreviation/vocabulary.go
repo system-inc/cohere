@@ -22,14 +22,31 @@ type Vocabulary struct {
 	// segmentPatterns are the two shapes a mid-name segment can take, plus the replacement form, one per entry of
 	// Segments and in its order, so Find reaches an entry's patterns by its index rather than by a lookup per name.
 	segmentPatterns []wordSegmentPatterns
+
+	// prefixByAbbreviation is every entry of EarlyPrefixes and LatePrefixes by its abbreviation, and longestPrefix the
+	// longest of those, so Find looks up the one prefix a name could begin with (prefixEntry) rather than comparing
+	// the name with every entry.
+	prefixByAbbreviation map[string]*Entry
+	longestPrefix        int
 }
 
-// beginsWithPrefix is `^<abbreviation>[A-Z]`, the prefix form, as a comparison: the name begins with the
-// abbreviation and an ASCII capital follows it. Load accepts only letters a to z in an abbreviation, so the pattern
-// holds no syntax and the two say the same.
-func beginsWithPrefix(name string, abbreviation string) bool {
-	return len(name) > len(abbreviation) && strings.HasPrefix(name, abbreviation) &&
-		name[len(abbreviation)] >= 'A' && name[len(abbreviation)] <= 'Z'
+// prefixEntry is the entry whose prefix form, `^<abbreviation>[A-Z]`, the name matches, nil when none does.
+//
+// Load accepts only letters a to z in an abbreviation, so a name that begins with one and then an ASCII capital has
+// the abbreviation as its whole leading run of lowercase letters, ended by that capital. That run is the one
+// abbreviation the name could begin with, and Load refuses an abbreviation that appears twice, so at most one entry
+// matches, in either phase: the lookup gives exactly the entry the walk over EarlyPrefixes or LatePrefixes stopped at.
+func (vocabulary *Vocabulary) prefixEntry(name string) *Entry {
+	for index := 0; index < len(name) && index <= vocabulary.longestPrefix; index++ {
+		if isAsciiLowercase(name[index]) {
+			continue
+		}
+		if index == 0 || !isAsciiUppercase(name[index]) {
+			return nil
+		}
+		return vocabulary.prefixByAbbreviation[name[:index]]
+	}
+	return nil
 }
 
 // endsWithCapitalized is whether a name ends with the abbreviation capitalized, the suffix form, without building
@@ -115,6 +132,8 @@ func isAsciiLowercase(character byte) bool {
 // as the literal text its pattern holds, and only a name that passes costs a regular expression run. A literal test
 // that fails is a pattern that could not have matched, so the findings are the ones the patterns alone gave
 // (#300qvxj), and find_equivalence_test.go holds them to that over every name in this repository and the ahra tree.
+// The prefix forms are not walked at all: the one entry a name could begin with is looked up (prefixEntry), which
+// prefix_index_test.go holds to the walk it replaced (#fex6s0v).
 func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 	if vocabulary.AllowedNames[name] {
 		return Finding{}, false
@@ -124,14 +143,9 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 		return wholeFinding(entry, name), true
 	}
 
-	for _, entry := range vocabulary.EarlyPrefixes {
-		if !beginsWithPrefix(name, entry.Abbreviation) {
-			continue
-		}
-		if vocabulary.allowedSegmentHolds(name, entry.Abbreviation) {
-			continue
-		}
-		return prefixFinding(entry, name), true
+	prefix := vocabulary.prefixEntry(name)
+	if prefix != nil && prefix.Prefix.Phase == "early" && !vocabulary.allowedSegmentHolds(name, prefix.Abbreviation) {
+		return prefixFinding(prefix, name), true
 	}
 
 	for _, entry := range vocabulary.Suffixes {
@@ -156,11 +170,8 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 		return suffixFinding(entry, name, Capitalize(entry.Abbreviation)), true
 	}
 
-	for _, entry := range vocabulary.LatePrefixes {
-		if !beginsWithPrefix(name, entry.Abbreviation) {
-			continue
-		}
-		return prefixFinding(entry, name), true
+	if prefix != nil && prefix.Prefix.Phase == "late" {
+		return prefixFinding(prefix, name), true
 	}
 
 	if vocabulary.ContainsAllowedSegment(name) {
