@@ -301,10 +301,9 @@ func TestAUnitsCalleesAndOwnersAreItsOwnInsideOnePackage(test *testing.T) {
 var scratchOwnPointers = map[string]bool{"bodies.walker": true, "collecting.walker": true, "collecting.bodies": true}
 
 // poisoned sets every number under value that is zero to one, and every flag to true, so a reset release leaves out
-// shows whatever the package left it. Reflection reads an unexported field but will not set it, so each is set through
-// its address.
+// shows whatever the package left it.
 //
-// Mutates: value's numbers and flags
+// Mutates: value has its numbers and flags set in place, the scratch's own fields
 func poisoned(value reflect.Value) {
 	switch {
 	case value.Kind() == reflect.Struct:
@@ -312,12 +311,21 @@ func poisoned(value reflect.Value) {
 			poisoned(value.Field(index))
 		}
 	case value.CanInt() && value.IsZero():
-		reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem().SetInt(1)
+		settable(value).SetInt(1)
 	case value.CanUint() && value.IsZero():
-		reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem().SetUint(1)
+		settable(value).SetUint(1)
 	case value.Kind() == reflect.Bool:
-		reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem().SetBool(true)
+		settable(value).SetBool(true)
 	}
+}
+
+// settable is value, an addressable field reflection reads but will not set since it is unexported, as a value it
+// sets.
+//
+// Unsafe: reflect.NewAt takes the field's own address with the field's own type, so the value it makes is the field
+// itself, written in place, and the scratch it lies in outlives the write.
+func settable(value reflect.Value) reflect.Value {
+	return reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem()
 }
 
 // expectEmptied fails for each part of value, at path in a released scratch, that holds anything: a map with an entry,
