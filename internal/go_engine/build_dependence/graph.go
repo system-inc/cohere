@@ -15,6 +15,11 @@
 // (`command/scratch_dependence -kinds` on scratch-budget, ece0e3392), which found zero misses unit by unit against
 // fully loaded builds of cohere's root on linux and of deeafbf4 on windows. Where it had a choice it took the larger
 // set, so a doubt makes a unit dependent.
+//
+// A graph lives in three steps: it is built, package by package, each package's record written for the findings store
+// (Graph.EncodedRecord), then sealed (Graph.Seal) before the builds are judged. Sealing resolves the graph once and
+// lets go of what only resolution and encoding read, the records' reads, callees, edges and object tables among them,
+// so the graph every build is judged on holds only what a judgment reads.
 package build_dependence
 
 import (
@@ -28,7 +33,9 @@ import (
 // Graph is the declarations of the packages checked from source, built package by package (AddPackage). Each
 // package's record is collected on its caller's goroutine and published under one hold of the lock, so packages can be
 // added concurrently. Against resolves the records into one graph of nodes the first time it runs after a package was
-// added, and judges a build on that resolution.
+// added, and judges a build on that resolution. Once every package is added and every record the store keeps is
+// written, the graph is sealed (Seal) before its builds are judged, after which nothing can be added to it and no
+// record encoded from it.
 type Graph struct {
 	lock sync.Mutex
 
@@ -36,12 +43,15 @@ type Graph struct {
 	packages map[string]*packageRecord
 
 	// resolved is the graph of nodes Against judges on, nil until it is first resolved and again once a package is
-	// added after.
+	// added after, and never nil once the graph is sealed.
 	resolved *resolvedGraph
 
 	// paths finds the objectpaths every package's record names objects by (newRecord), searching each package's
-	// API once for the graph.
+	// API once for the graph, nil once the graph is sealed.
 	paths *objectPaths
+
+	// sealed says the graph was sealed (Seal): resolved for good, and holding only what a judgment reads.
+	sealed bool
 }
 
 // packageRecord is what the graph keeps of one package: no syntax and no type maps, only its units and the kind edges
@@ -49,7 +59,8 @@ type Graph struct {
 // resolves as one collected from a live package does. path is the package's import path, imports its import map,
 // path to package ID, and typeNames the names of its scope's type names, in which a method of a build-only file finds
 // its receiver. unnameable counts the objects of other packages it reads that no name can carry, which a record read
-// back could not find (Graph.Unnameable).
+// back could not find (Graph.Unnameable). Sealing the graph lets go of its imports, objects and edges, and of each
+// unit's declares, receiver, reads and callees (Graph.Seal).
 type packageRecord struct {
 	identifier string
 	path       string
@@ -112,8 +123,9 @@ func NewGraph() *Graph {
 // dependency, which only the counts tell apart. A package the loader gave no type information declares no units.
 //
 // It is safe to call concurrently for different packages: the walk runs on the caller's goroutine, and only its
-// publication takes the lock.
+// publication, and a read of the graph's encoders before the walk, take the lock.
 func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
+	encoders := graph.encoders()
 	imports := make(map[string]string, len(loaded.Imports))
 	for path, imported := range loaded.Imports {
 		imports[path] = imported.ID
@@ -131,7 +143,7 @@ func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
 	if loaded.TypesInfo != nil {
 		typesPackage = loaded.Types
 	}
-	record := newRecord(loaded.ID, workspace, typesPackage, imports, graph.paths, units, edges)
+	record := newRecord(loaded.ID, workspace, typesPackage, imports, encoders, units, edges)
 	record.typesPackage = loaded.Types
 	if record.path == "" {
 		record.path = loaded.PkgPath
@@ -155,19 +167,31 @@ func (graph *Graph) AddDecoded(decoded *Record) {
 	graph.add(decoded.record)
 }
 
-// add publishes record under one hold of the lock, and lets the last resolution go.
+// encoders are the graph's objectpath encoders (Graph.paths), for a package about to be collected, read under the lock
+// since Seal lets them go. A sealed graph panics (refuseSealed) before the package's walk starts.
+func (graph *Graph) encoders() *objectPaths {
+	graph.lock.Lock()
+	defer graph.lock.Unlock()
+	graph.refuseSealed("add a package")
+	return graph.paths
+}
+
+// add publishes record under one hold of the lock, and lets the last resolution go. A sealed graph panics
+// (refuseSealed), one sealed while the package's walk ran included.
 func (graph *Graph) add(record *packageRecord) {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
+	graph.refuseSealed("add a package")
 	graph.packages[record.identifier] = record
 	graph.resolved = nil
 }
 
 // EncodedRecord is the record of the package of identifier as AddRecord reads it, and false when the graph holds no
-// such package.
+// such package. A sealed graph panics (refuseSealed), since it let go of most of what a record holds.
 func (graph *Graph) EncodedRecord(identifier string) ([]byte, bool) {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
+	graph.refuseSealed("encode a record")
 	record, isHeld := graph.packages[identifier]
 	if !isHeld {
 		return nil, false
@@ -188,10 +212,58 @@ func (graph *Graph) Unnameable() int {
 	return count
 }
 
-// resolve is the graph's resolution, built if a package was added since the last one.
+// Seal resolves the graph, if no build was judged on it yet, and lets go of what only resolution and encoding read:
+// every record's import map, object table and kind edges, and each of its units' declares, receiver, reads and
+// callees; the resolution's targets and resolved paths; and the graph's objectpath encoders. What stays is what a
+// judgment and the graph's other answers read: each record's ID, path, scope, type names, types and unnameable count
+// (Counterparts, seedMethodSets, Unnameable, count), and each unit's file, place, size and universe names, which the
+// resolution reads through its unit's record (judgment, Dependence, CallIndex). Sealing again does nothing.
+//
+// The order is safe because resolution reads the records once, all of them, and builds every node, bit, edge and call
+// a judgment reads, and encoding reads them only to write a record: once the records the store keeps are written, the
+// graph is never resolved or encoded again. After Seal, adding a package (AddPackage, AddRecord, AddDecoded) or
+// encoding a record (EncodedRecord) panics, as the caller's ordering bug it is: a sealed graph can neither resolve
+// again nor encode a record, having let go of what both read. A record added from a decoded Record is the Record's
+// own, so sealing lets go of that Record's too, and it can be added to no other graph after.
+func (graph *Graph) Seal() {
+	graph.lock.Lock()
+	defer graph.lock.Unlock()
+	if graph.sealed {
+		return
+	}
+	resolved := graph.resolveHeld()
+	for _, record := range graph.packages {
+		record.imports, record.objects, record.edges = nil, nil, nil
+		for index := range record.units {
+			unit := &record.units[index]
+			unit.declares, unit.receiver, unit.reads, unit.callees = nil, "", nil, nil
+		}
+	}
+	resolved.targets, resolved.resolvedPaths = nil, nil
+	graph.paths = nil
+	graph.sealed = true
+}
+
+// refuseSealed panics when the graph is sealed, saying what the caller tried. It is called under the lock, by a method
+// that unlocks in a defer, so the panic leaves the lock free.
+func (graph *Graph) refuseSealed(tried string) {
+	if graph.sealed {
+		panic("build_dependence: a caller tried to " + tried + " after the graph was sealed (Graph.Seal), which " +
+			"let go of what resolving and encoding read, so the caller's order is wrong: every package is added " +
+			"and every record encoded before the graph is sealed")
+	}
+}
+
+// resolve is the graph's resolution, built if a package was added since the last one. A sealed graph's is the one
+// Seal kept, never nil, since nothing can be added after.
 func (graph *Graph) resolve() *resolvedGraph {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
+	return graph.resolveHeld()
+}
+
+// resolveHeld is resolve with the lock already held, which Seal holds while it resolves.
+func (graph *Graph) resolveHeld() *resolvedGraph {
 	if graph.resolved != nil {
 		return graph.resolved
 	}

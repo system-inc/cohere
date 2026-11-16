@@ -34,6 +34,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	// The standard library's graph under `--build-dependence` ran beside the host's lint, and is over before anything
 	// of the builds is measured or started.
 	engine.awaitStandardLibrary()
+	// Every record of the host's graph and the standard library's is written by now, so both let go of what only
+	// resolution and encoding read before any build is measured.
+	engine.sealDependenceGraphs()
 	host, extras, buildsError := engine.buildsBeside()
 	if buildsError != nil {
 		engine.otherBuildsFailed(buildsError)

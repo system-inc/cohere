@@ -269,6 +269,23 @@ func (engine *pipeline) awaitStandardLibrary() {
 	}
 }
 
+// sealDependenceGraphs seals the host's graph and the standard library's (build_dependence.Graph.Seal), so every
+// build is judged on graphs that hold only what a judgment reads. otherBuilds calls it straight after
+// awaitStandardLibrary, the first moment no record of either graph is left to write: the host's session wrote the
+// host's records beside their entries in its save (check.Run's), which ended with the host's lint, reloads included,
+// before otherBuilds began; the standard library's were written inside awaitStandardLibrary, once its side load had
+// ended; and no extra build's session writes any, since only the host's session keeps records (KeepDependenceRecords).
+// The standard library's graph is nil when its side load failed, and then there is nothing of it to seal.
+func (engine *pipeline) sealDependenceGraphs() {
+	if engine.dependence == nil {
+		return
+	}
+	engine.dependence.graph.Seal()
+	if engine.dependence.standardLibrary != nil && engine.dependence.standardLibrary.graph != nil {
+		engine.dependence.standardLibrary.graph.Seal()
+	}
+}
+
 // dependenceOf is one extra build's judgment on the host's graph, from its first load, nil when the host built none.
 // Each package's files are compared as written (GoFiles), as compiledFiles reads them, since a cgo output's name
 // changes from run to run, and the graph names each unit by the file a reader sees. A file only the build compiles is
