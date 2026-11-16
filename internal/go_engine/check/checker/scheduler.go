@@ -352,12 +352,17 @@ func (scheduler *scheduler) work() {
 			scheduler.executing++
 			scheduler.lock.Unlock()
 			// The run's pool, when there is one, bounds the actions of every build at once; a worker holds no other
-			// slot, and its action never waits on one (see schedule), so taking it here cannot deadlock.
-			if pool := scheduler.options.Pool; pool != nil {
+			// slot, and its action never waits on one (see schedule), so taking it here cannot deadlock. An action that
+			// only restores takes none (restoresOnly).
+			pool := scheduler.options.Pool
+			if next.action.restoresOnly() {
+				pool = nil
+			}
+			if pool != nil {
 				pool.Acquire(bounded.ScaledPriority(next.group.priority, scheduler.longest))
 			}
 			next.action.exec()
-			if pool := scheduler.options.Pool; pool != nil {
+			if pool != nil {
 				pool.Release()
 			}
 			scheduler.lock.Lock()
@@ -454,4 +459,14 @@ func (scheduler *scheduler) describeStuck() string {
 	sort.Strings(waiting)
 	return fmt.Sprintf("checker: %d package groups wait on actions that never finish, which only an import cycle "+
 		"makes: %s", len(waiting), strings.Join(waiting, ", "))
+}
+
+// restoresOnly is whether act will only restore its package's analysis, copying what the findings cache or the host's
+// run holds (Options.Restored), and run no pass: the very test execOnce makes before it calls Restore. Such an action
+// takes no slot of the run's pool, since a slot bounds the passes that keep a core busy, and an extra build restores
+// about 200,000 actions a run at cohere's root, each of which parked for a slot: on Shackler, letting them run without
+// one took 0.17 s and 1.05 CPU-s off an every-build `--no-cache` run, and a quarter of its involuntary context switches
+// (#ss4t5g6). An action on a package that is not restored runs its pass, and takes a slot.
+func (act *Action) restoresOnly() bool {
+	return act.opts.Restored != nil && act.opts.Restored(act.Package)
 }
