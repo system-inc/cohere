@@ -41,36 +41,38 @@ func recordedGraphOf(test *testing.T, live *Graph) *Graph {
 // bit to bit, by key. Two graphs resolve alike exactly when their lines are equal.
 func resolvedLines(graph *Graph) []string {
 	resolved := graph.resolve()
+	keys := make([]nodeKey, len(resolved.objects))
+	for key, node := range resolved.nodes {
+		keys[node] = key
+	}
 	bitName := func(value int32) string {
-		key := resolved.keys[value/2]
-		return fmt.Sprintf("%s %s/%d", key.packageIdentifier, key.local, value%2)
+		key := keys[value/2]
+		return fmt.Sprintf("%s %s/%d", resolved.packages[key.packageIndex].identifier, key.local, value%2)
 	}
 	unitName := func(index int) string {
-		unit := &resolved.units[index]
-		return fmt.Sprintf("%s %s:%d", resolved.packages[unit.packageIndex].identifier, unit.record.file,
-			unit.record.start)
+		return fmt.Sprintf("%s %s:%d", resolved.packages[resolved.unitPackage[index]].identifier,
+			resolved.files.names[resolved.unitFile[index]], resolved.unitStart[index])
 	}
 	var lines []string
-	for index := range resolved.units {
-		unit := &resolved.units[index]
-		parts := []string{"unit " + unitName(index), fmt.Sprintf("nodes %d end %d universe %x", unit.record.nodes,
-			unit.record.end, unit.record.universeNames)}
-		for _, node := range unit.declares {
+	for index := range resolved.unitCount() {
+		parts := []string{"unit " + unitName(index), fmt.Sprintf("nodes %d end %d universe %x",
+			resolved.unitNodes[index], resolved.unitEnd[index], resolved.unitUniverseNames[index])}
+		for _, node := range resolved.declares.row(index) {
 			parts = append(parts, "declares "+bitName(bit(node, false)))
 		}
-		if unit.receiver >= 0 {
-			parts = append(parts, "receiver "+bitName(bit(unit.receiver, false)))
+		if receiver := resolved.unitReceiver[index]; receiver >= 0 {
+			parts = append(parts, "receiver "+bitName(bit(receiver, false)))
 		}
 		var reads []string
-		for _, read := range unit.bits {
+		for _, read := range resolved.bits.row(index) {
 			reads = append(reads, "reads "+bitName(read))
 		}
-		for _, read := range unit.external {
+		for _, read := range resolved.unitExternal[index] {
 			reads = append(reads, fmt.Sprintf("external %s %s/%t", read.object.path, read.object.local,
 				read.underlying))
 		}
-		for _, called := range unit.calls {
-			reads = append(reads, "calls "+unitName(called))
+		for _, called := range resolved.calls.row(index) {
+			reads = append(reads, "calls "+unitName(int(called)))
 		}
 		slices.Sort(reads)
 		lines = append(lines, strings.Join(append(parts, slices.Compact(reads)...), "; "))

@@ -12,7 +12,7 @@ func (graph *Graph) Against(difference Difference) *Dependence {
 	judging := &judgment{
 		resolved:   resolved,
 		difference: difference,
-		seedUnit:   make([]bool, len(resolved.units)),
+		seedUnit:   make([]bool, resolved.unitCount()),
 		answers:    map[types.Object]Bits{},
 	}
 	judging.seedFiles()
@@ -25,9 +25,9 @@ func (graph *Graph) Against(difference Difference) *Dependence {
 	}
 	bits := resolved.fixedPoint(judging.seedBits)
 
-	unitDependent := make([]bool, len(resolved.units))
-	for index := range resolved.units {
-		unitDependent[index] = judging.seedUnit[index] || judging.unitReaches(&resolved.units[index], bits)
+	unitDependent := make([]bool, resolved.unitCount())
+	for index := range unitDependent {
+		unitDependent[index] = judging.seedUnit[index] || judging.unitReaches(index, bits)
 	}
 	dependence := &Dependence{resolved: resolved, judging: judging, unitDependent: unitDependent, bits: bits}
 	dependence.counts = judging.count(unitDependent)

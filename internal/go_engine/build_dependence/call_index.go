@@ -25,24 +25,28 @@ type CallIndex struct {
 // no graph of the standard library, whose units the index then leaves out.
 func NewCallIndex(host *Graph, standardLibrary *Graph) *CallIndex {
 	index := &CallIndex{host: host.resolve()}
-	hostUnits := len(index.host.units)
+	hostUnits := index.host.unitCount()
 	if standardLibrary != nil {
 		index.standardLibrary = standardLibrary.resolve()
 	}
 	index.calls = make([][]int, 0, hostUnits+index.standardLibraryUnits())
-	for unit := range index.host.units {
-		index.calls = append(index.calls, index.host.units[unit].calls)
+	for unit := range hostUnits {
+		calls := make([]int, 0, len(index.host.calls.row(unit)))
+		for _, callee := range index.host.calls.row(unit) {
+			calls = append(calls, int(callee))
+		}
+		index.calls = append(index.calls, calls)
 	}
 	if index.standardLibrary != nil {
-		for unit := range index.standardLibrary.units {
-			calls := make([]int, 0, len(index.standardLibrary.units[unit].calls))
-			for _, callee := range index.standardLibrary.units[unit].calls {
-				calls = append(calls, hostUnits+callee)
+		for unit := range index.standardLibrary.unitCount() {
+			calls := make([]int, 0, len(index.standardLibrary.calls.row(unit)))
+			for _, callee := range index.standardLibrary.calls.row(unit) {
+				calls = append(calls, hostUnits+int(callee))
 			}
 			index.calls = append(index.calls, calls)
 		}
 		for unit := range hostUnits {
-			for _, callee := range index.host.units[unit].externalCalls {
+			for _, callee := range index.host.unitExternalCalls[unit] {
 				declaring, isDeclared := index.standardLibrary.unitDeclaringName(callee.Path, callee.Local)
 				if isDeclared && !slices.Contains(index.calls[unit], hostUnits+declaring) {
 					// A copy, since the host's graph holds the slice the index began with.
@@ -65,7 +69,7 @@ func (index *CallIndex) standardLibraryUnits() int {
 	if index.standardLibrary == nil {
 		return 0
 	}
-	return len(index.standardLibrary.units)
+	return index.standardLibrary.unitCount()
 }
 
 // UnitCount counts the index's units, which its indexes run below.
@@ -73,24 +77,24 @@ func (index *CallIndex) UnitCount() int {
 	return len(index.calls)
 }
 
-// resolvedUnit is the unit of the index's unit index, in the graph that holds it.
-func (index *CallIndex) resolvedUnit(unit int) (*resolvedGraph, *resolvedUnit) {
-	if unit < len(index.host.units) {
-		return index.host, &index.host.units[unit]
+// resolvedUnit is the graph that holds the unit of the index's unit index, and the unit's index there.
+func (index *CallIndex) resolvedUnit(unit int) (*resolvedGraph, int) {
+	if unit < index.host.unitCount() {
+		return index.host, unit
 	}
-	return index.standardLibrary, &index.standardLibrary.units[unit-len(index.host.units)]
+	return index.standardLibrary, unit - index.host.unitCount()
 }
 
 // Nodes is unit's size in syntax nodes.
 func (index *CallIndex) Nodes(unit int) int {
-	_, resolved := index.resolvedUnit(unit)
-	return resolved.record.nodes
+	graph, graphUnit := index.resolvedUnit(unit)
+	return int(graph.unitNodes[graphUnit])
 }
 
 // Workspace reports whether unit's package is the workspace's.
 func (index *CallIndex) Workspace(unit int) bool {
-	graph, resolved := index.resolvedUnit(unit)
-	return graph.packages[resolved.packageIndex].workspace
+	graph, graphUnit := index.resolvedUnit(unit)
+	return graph.packages[graph.unitPackage[graphUnit]].workspace
 }
 
 // Calls are the units unit calls statically, by their index here, each once. The slice is the index's, read and never
@@ -108,10 +112,10 @@ func (index *CallIndex) Callers(unit int) []int {
 // Dependent reports whether a build makes unit dependent, read from the build's judgment of each graph: host is its
 // judgment of the host's graph, and standardLibrary of the standard library's, nil when the index has no such graph.
 func (index *CallIndex) Dependent(host *Dependence, standardLibrary *Dependence, unit int) bool {
-	if unit < len(index.host.units) {
+	if unit < index.host.unitCount() {
 		return host.unitDependent[unit]
 	}
-	return standardLibrary.unitDependent[unit-len(index.host.units)]
+	return standardLibrary.unitDependent[unit-index.host.unitCount()]
 }
 
 // UnitContaining is the index here of the unit of the package packageId whose span in file, the one a reader sees,
@@ -124,5 +128,5 @@ func (index *CallIndex) UnitContaining(packageId string, file string, offset int
 		return 0, false
 	}
 	unit, isUnit := index.standardLibrary.unitContaining(packageId, file, offset)
-	return len(index.host.units) + unit, isUnit
+	return index.host.unitCount() + unit, isUnit
 }

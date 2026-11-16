@@ -32,7 +32,7 @@ type Counts struct {
 // host parsed. A unit the graph does not hold, one in a file only the build compiles, is
 // dependent by definition, and any other place is no unit the graph knows, which is never read as independent.
 func (dependence *Dependence) UnitDependent(packageId string, file string, offset int) bool {
-	index, isUnit := dependence.resolved.unitIndex[unitKey{packageIdentifier: packageId, file: file, offset: offset}]
+	index, isUnit := dependence.resolved.unitStartingAt(packageId, file, offset)
 	if !isUnit {
 		return true
 	}
@@ -104,11 +104,11 @@ func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 // time as ObjectBits is.
 func (dependence *Dependence) NameBits(path string, local string) (Bits, bool) {
 	resolved := dependence.resolved
-	identifiers := resolved.pathsHeld[path]
-	if len(identifiers) != 1 {
+	held, isHeld := resolved.pathPackages[path]
+	if !isHeld || held < 0 {
 		return Bits{}, false
 	}
-	node, isNode := resolved.nodes[nodeKey{packageIdentifier: identifiers[0], local: local}]
+	node, isNode := resolved.nodes[nodeKey{packageIndex: held, local: local}]
 	if !isNode {
 		return Bits{}, false
 	}
@@ -138,21 +138,31 @@ type ObjectName struct {
 	Local string
 }
 
-// Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name.
+// Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name. Each
+// unit's calls are read out of the resolution's packed rows into one slice that all the units' Calls share, each
+// unit's its own part of it, nil for a unit with none.
 func (dependence *Dependence) Units() []Unit {
-	units := make([]Unit, 0, len(dependence.resolved.units))
-	for index := range dependence.resolved.units {
-		resolved := &dependence.resolved.units[index]
+	resolved := dependence.resolved
+	units := make([]Unit, 0, resolved.unitCount())
+	calls := make([]int, len(resolved.calls.entries))
+	for position, callee := range resolved.calls.entries {
+		calls[position] = int(callee)
+	}
+	for index := range resolved.unitCount() {
+		var unitCalls []int
+		if first, end := resolved.calls.offsets[index], resolved.calls.offsets[index+1]; end > first {
+			unitCalls = calls[first:end:end]
+		}
 		units = append(units, Unit{
-			PackageId: dependence.resolved.packages[resolved.packageIndex].identifier,
-			File:      resolved.record.file,
-			Start:     resolved.record.start,
-			Nodes:     resolved.record.nodes,
-			Workspace: dependence.resolved.packages[resolved.packageIndex].workspace,
+			PackageId: resolved.packages[resolved.unitPackage[index]].identifier,
+			File:      resolved.files.names[resolved.unitFile[index]],
+			Start:     int(resolved.unitStart[index]),
+			Nodes:     int(resolved.unitNodes[index]),
+			Workspace: resolved.packages[resolved.unitPackage[index]].workspace,
 			Dependent: dependence.unitDependent[index],
-			Calls:     resolved.calls,
+			Calls:     unitCalls,
 
-			ExternalCalls: resolved.externalCalls,
+			ExternalCalls: resolved.unitExternalCalls[index],
 		})
 	}
 	return units

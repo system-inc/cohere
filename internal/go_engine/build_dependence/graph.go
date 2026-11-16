@@ -20,8 +20,6 @@ package build_dependence
 import (
 	"go/ast"
 	"go/types"
-	"maps"
-	"slices"
 	"sync"
 
 	"golang.org/x/tools/go/packages"
@@ -197,36 +195,8 @@ func (graph *Graph) resolve() *resolvedGraph {
 	if graph.resolved != nil {
 		return graph.resolved
 	}
-	resolved := &resolvedGraph{
-		packageIndex:  map[string]int{},
-		typesPackages: map[*types.Package]bool{},
-		nodes:         map[nodeKey]int32{},
-		objectNodes:   map[types.Object]int32{},
-		unitIndex:     map[unitKey]int{},
-		fileUnits:     map[fileKey][]int{},
-		pathsHeld:     map[string][]string{},
-		resolvedPaths: map[pathFrom]string{},
-	}
-	for _, identifier := range slices.Sorted(maps.Keys(graph.packages)) {
-		record := graph.packages[identifier]
-		resolved.packageIndex[identifier] = len(resolved.packages)
-		resolved.packages = append(resolved.packages, record)
-		if record.typesPackage != nil {
-			resolved.typesPackages[record.typesPackage] = true
-		}
-		resolved.pathsHeld[record.path] = append(resolved.pathsHeld[record.path], identifier)
-	}
-	resolved.resolveUnits()
-	resolved.resolveTargets()
-	resolved.resolveEdges()
-	resolved.resolveCalls()
-	for index := range resolved.units {
-		for _, read := range resolved.units[index].record.reads {
-			resolved.resolveRead(&resolved.units[index], read)
-		}
-	}
-	graph.resolved = resolved
-	return resolved
+	graph.resolved = resolveRecords(graph.packages)
+	return graph.resolved
 }
 
 // canonical is an instantiated method or field as its generic declares it, the object the graph knows.

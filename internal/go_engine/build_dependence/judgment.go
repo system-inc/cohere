@@ -30,7 +30,7 @@ type nameAnswer struct {
 // seed makes the unit at index a seed, both bits of everything it declares set.
 func (judging *judgment) seed(index int) {
 	judging.seedUnit[index] = true
-	for _, node := range judging.resolved.units[index].declares {
+	for _, node := range judging.resolved.declares.row(index) {
 		judging.seedBits = append(judging.seedBits, bit(node, false), bit(node, true))
 	}
 }
@@ -48,11 +48,18 @@ func (judging *judgment) seedFiles() {
 		}
 		hostOnlyFiles[identifier] = files
 	}
-	for index := range judging.resolved.units {
-		unit := &judging.resolved.units[index]
-		identifier := judging.resolved.packages[unit.packageIndex].identifier
-		if judging.difference.HostOnlyPackages[identifier] || hostOnlyFiles[identifier][unit.record.file] {
-			judging.seed(index)
+	resolved := judging.resolved
+	for packageIndex, record := range resolved.packages {
+		hostOnly := judging.difference.HostOnlyPackages[record.identifier]
+		files := hostOnlyFiles[record.identifier]
+		if !hostOnly && files == nil {
+			continue
+		}
+		span := resolved.packageUnits[packageIndex]
+		for index := span[0]; index < span[1]; index++ {
+			if hostOnly || files[resolved.files.names[resolved.unitFile[index]]] {
+				judging.seed(int(index))
+			}
 		}
 	}
 }
@@ -62,9 +69,9 @@ func (judging *judgment) seedFiles() {
 // base name among the host package's type names, as its record holds them (packageRecord.typeNames), since the file
 // was parsed for its syntax alone; a package-level type's local name is its name.
 func (judging *judgment) seedMethodSets() {
-	for index := range judging.resolved.units {
-		if unit := &judging.resolved.units[index]; judging.seedUnit[index] && unit.receiver >= 0 {
-			judging.seedBits = append(judging.seedBits, bit(unit.receiver, false))
+	for index, receiver := range judging.resolved.unitReceiver {
+		if judging.seedUnit[index] && receiver >= 0 {
+			judging.seedBits = append(judging.seedBits, bit(receiver, false))
 		}
 	}
 	for identifier, differing := range judging.difference.Packages {
@@ -83,7 +90,8 @@ func (judging *judgment) seedMethodSets() {
 				if !slices.Contains(record.typeNames, name) {
 					continue
 				}
-				if node, isNode := judging.resolved.nodes[nodeKey{packageIdentifier: identifier, local: name}]; isNode {
+				key := nodeKey{packageIndex: int32(packageIndex), local: name}
+				if node, isNode := judging.resolved.nodes[key]; isNode {
 					judging.seedBits = append(judging.seedBits, bit(node, false))
 				}
 			}
@@ -109,8 +117,8 @@ func (judging *judgment) seedShadowed() {
 		}
 		span := judging.resolved.packageUnits[packageIndex]
 		for index := span[0]; index < span[1]; index++ {
-			if !judging.seedUnit[index] && judging.resolved.units[index].record.universeNames&shadowed != 0 {
-				judging.seed(index)
+			if !judging.seedUnit[index] && judging.resolved.unitUniverseNames[index]&shadowed != 0 {
+				judging.seed(int(index))
 			}
 		}
 	}
@@ -228,20 +236,20 @@ func (judging *judgment) nameAnswer(object recordedObject) nameAnswer {
 	return answered
 }
 
-// unitReaches is whether a unit that is no seed is dependent: an object it declares has either bit set, or its body
-// reads a set bit.
-func (judging *judgment) unitReaches(unit *resolvedUnit, bits []bool) bool {
-	for _, node := range unit.declares {
+// unitReaches is whether the unit at index, no seed, is dependent: an object it declares has either bit set, or its
+// body reads a set bit.
+func (judging *judgment) unitReaches(index int, bits []bool) bool {
+	for _, node := range judging.resolved.declares.row(index) {
 		if bits[bit(node, false)] || bits[bit(node, true)] {
 			return true
 		}
 	}
-	for _, read := range unit.bits {
+	for _, read := range judging.resolved.bits.row(index) {
 		if bits[read] {
 			return true
 		}
 	}
-	for _, read := range unit.external {
+	for _, read := range judging.resolved.unitExternal[index] {
 		if judging.answer(read) {
 			return true
 		}
@@ -287,7 +295,7 @@ func (judging *judgment) count(unitDependent []bool) Counts {
 		packageNodes, dependentUnits := 0, 0
 		span := resolved.packageUnits[packageIndex]
 		for index := span[0]; index < span[1]; index++ {
-			nodes := resolved.units[index].record.nodes
+			nodes := int(resolved.unitNodes[index])
 			scope.Units++
 			scope.Nodes += nodes
 			packageNodes += nodes
