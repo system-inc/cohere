@@ -224,7 +224,7 @@ func TestTheGatesMacScriptNamesTheCorporaItLacks(test *testing.T) {
 	script = strings.Replace(script, `goroot="`+macBoxGoroot+`"`, `goroot="`+noGo+`"`, 1)
 	// The toolchain's refusal names the variable, so the test sees what the script set before it.
 	script = strings.Replace(script, `refuse "there is no go at $goroot"`,
-		`refuse "there is no go at $goroot, ahra at ${COHERE_CORPUS_AHRA:-none}"`, 1)
+		`refuse "there is no go at $goroot, ahra at ${COHERE_CORPUS_AHRA:-none}, temporary at $TMPDIR"`, 1)
 	home := test.TempDir()
 	run := func(corpora string) string {
 		test.Helper()
@@ -246,8 +246,17 @@ func TestTheGatesMacScriptNamesTheCorporaItLacks(test *testing.T) {
 	if said := run("COHERE_CORPUS_AHRA=ahra/abc"); !strings.Contains(said, "ahra at "+laid) {
 		test.Errorf("a box holding ahra didn't set its variable to the laid copy:\n%s", said)
 	}
-	if said := run("-"); !strings.Contains(said, "ahra at none") || strings.Contains(said, corpusUnlaidMarker) {
+	said := run("-")
+	if !strings.Contains(said, "ahra at none") || strings.Contains(said, corpusUnlaidMarker) {
 		test.Errorf("a landing pinning no corpus wasn't tested with none set:\n%s", said)
+	}
+	// The tests' temporary directory is under /tmp, which macOS reaches through a link, and it goes with the run.
+	_, temporary, found := strings.Cut(strings.TrimSpace(said), "temporary at ")
+	if !found || !strings.HasPrefix(temporary, "/tmp/cohere-gate.") {
+		test.Fatalf("the tests' temporary directory wasn't made under /tmp:\n%s", said)
+	}
+	if _, statError := os.Stat(temporary); !os.IsNotExist(statError) {
+		test.Errorf("the tests' temporary directory %s outlived the run: %v", temporary, statError)
 	}
 }
 

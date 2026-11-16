@@ -128,6 +128,11 @@ for laid in $(echo "$corpora" | tr , ' '); do
   if [ -e "$base/corpora/$place" ]; then export "$variable=$base/corpora/$place"; else unlaid="$unlaid $place"; fi
 done
 [ -z "$unlaid" ] || { echo "` + corpusUnlaidMarker + `${unlaid# }"; exit 0; }
+# The tests' temporary directory is reached through a link, /tmp to /private/tmp, as a developer's Mac reaches its own
+# through /var, so a test of what such a path does runs here too; the gap's own is reached through none (#5r0vrte).
+gatetemp=$(mktemp -d /tmp/cohere-gate.XXXXXX)
+trap 'chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"' EXIT
+export TMPDIR="$gatetemp"
 cd tree
 goroot="` + macBoxGoroot + `"; digest="` + macBoxToolchainDigest + `"
 node="` + macBoxNode + `"; nodeDigest="` + macBoxNodeDigest + `"
