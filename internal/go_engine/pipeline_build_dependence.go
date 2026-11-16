@@ -270,11 +270,13 @@ func (engine *pipeline) awaitStandardLibrary() {
 }
 
 // sealDependenceGraphs seals the host's graph and the standard library's (build_dependence.Graph.Seal), so every
-// build is judged on graphs that hold only what a judgment reads. otherBuilds calls it straight after
-// awaitStandardLibrary, the first moment no record of either graph is left to write: the host's session wrote the
-// host's records beside their entries in its save (check.Run's), which ended with the host's lint, reloads included,
-// before otherBuilds began; the standard library's were written inside awaitStandardLibrary, once its side load had
-// ended; and no extra build's session writes any, since only the host's session keeps records (KeepDependenceRecords).
+// build is judged on graphs that hold only what a judgment reads. otherBuilds calls it after awaitStandardLibrary,
+// once it knows there are builds to judge and before any is measured or started, with no record of either graph left
+// to write: the host's session wrote the host's records beside their entries in its save (check.Run's), which ended
+// with the host's lint, reloads included, before otherBuilds began; the standard library's were written inside
+// awaitStandardLibrary, once its side load had ended; and no extra build's session writes any, since only the host's
+// session keeps records (KeepDependenceRecords). Seal resolves under the graph's lock, as the first build's Against
+// would have, so sealing adds no contention.
 // The standard library's graph is nil when its side load failed, and then there is nothing of it to seal.
 func (engine *pipeline) sealDependenceGraphs() {
 	if engine.dependence == nil {
