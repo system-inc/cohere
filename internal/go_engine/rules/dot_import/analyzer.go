@@ -40,12 +40,14 @@ const Doc = "Dot imports are discouraged"
 const message = "should not use dot imports"
 
 // Listener is what the port hears of each package from the dispatcher: each file as the walk enters it, whose imports
-// are all the port reads of the syntax. It requires staticcheck's config analyzer, as the original does, for the
-// paths dot_import_whitelist allows.
+// are all the port reads of the syntax. It requires staticcheck's config analyzer, as the original does, for the paths
+// dot_import_whitelist allows. It is SyntaxOnly: a file's imports and its own name decide every finding, with the
+// configuration and the Go versions staticcheck_report.Report reads, which a syntax-only context answers (#y6q1x2j).
 var Listener = rule.Listener{
-	FileLocal: true,
-	Requires:  []*analysis.Analyzer{staticcheck_configuration.Analyzer},
-	FileEnter: checkFile,
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Requires:   []*analysis.Analyzer{staticcheck_configuration.Analyzer},
+	FileEnter:  checkFile,
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.

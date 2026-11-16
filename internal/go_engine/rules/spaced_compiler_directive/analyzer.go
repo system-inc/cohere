@@ -20,9 +20,11 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it.
+// Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it. It is
+// SyntaxOnly: the syntax it hears decides every finding, with the Go versions staticcheck_report.Report reads, which a
+// syntax-only context holds (#y6q1x2j).
 var Listener = rule.Listener{
-	FileLocal: true, FileEnter: CheckFile}
+	FileLocal: true, SyntaxOnly: true, FileEnter: CheckFile}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the

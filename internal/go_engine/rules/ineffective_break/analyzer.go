@@ -22,10 +22,12 @@ import (
 )
 
 // Listener is what the port hears of each package from the dispatcher: every for and range loop, in preorder, whose
-// body it judges.
+// body it judges. It is SyntaxOnly: the syntax it hears decides every finding, with the Go versions
+// staticcheck_report.Report reads, which a syntax-only context holds (#y6q1x2j).
 var Listener = rule.Listener{
-	FileLocal: true,
-	Nodes:     []ast.Node{(*ast.ForStmt)(nil), (*ast.RangeStmt)(nil)},
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Nodes:      []ast.Node{(*ast.ForStmt)(nil), (*ast.RangeStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		switch loop := node.(type) {
 		case *ast.ForStmt:

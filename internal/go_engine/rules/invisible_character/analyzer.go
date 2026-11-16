@@ -40,11 +40,13 @@ const Doc = "Avoid zero-width and control characters in string literals"
 const zeroWidthJoiner = '‍'
 
 // Listener is what the port hears of each package from the dispatcher: each basic literal, of which it judges the
-// strings.
+// strings. It is SyntaxOnly: the syntax it hears decides every finding, with the Go versions staticcheck_report.Report
+// reads, which a syntax-only context holds (#y6q1x2j).
 var Listener = rule.Listener{
-	FileLocal: true,
-	Nodes:     []ast.Node{(*ast.BasicLit)(nil)},
-	Node:      checkLiteral,
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Nodes:      []ast.Node{(*ast.BasicLit)(nil)},
+	Node:       checkLiteral,
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.

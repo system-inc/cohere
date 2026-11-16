@@ -25,10 +25,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every for statement, in preorder.
+// Listener is what the port hears of each package from the dispatcher: every for statement, in preorder. It is
+// SyntaxOnly: the syntax it hears decides every finding, with the Go versions staticcheck_report.Report reads, which a
+// syntax-only context holds (#y6q1x2j).
 var Listener = rule.Listener{
-	FileLocal: true,
-	Nodes:     []ast.Node{(*ast.ForStmt)(nil)},
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Nodes:      []ast.Node{(*ast.ForStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		loop, isLoop := node.(*ast.ForStmt)
 		if !isLoop {
