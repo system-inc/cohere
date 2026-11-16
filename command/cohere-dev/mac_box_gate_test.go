@@ -168,7 +168,10 @@ func TestALandingTestsOnTheGatesMacsAndNeverOnKirksMac(test *testing.T) {
 			environment: []string{gateWaitVariable + "=2s"},
 			said: []string{"every gate box is held (Sun2, Marin); the land waits in line holding the lock",
 				"no verdict from a gate box, so nothing landed, and its tests never fall back to Kirk's Mac: every " +
-					"gate box stayed held through 2s of waiting: Sun2 (gap Sun2 closed",
+					"gate box stayed held through ",
+				// How long it waited is the clock's, which a loaded box stretches (4s on Sun2, Nov 16), so it is
+				// left out.
+				" of waiting: Sun2 (gap Sun2 closed",
 				"; Marin (gap Marin closed"},
 			unasked:    []string{"loom gap --box Sun2 --within", "loom gap --box Marin --within"},
 			claimReads: map[string]int{"Sun2": 2, "Marin": 2},

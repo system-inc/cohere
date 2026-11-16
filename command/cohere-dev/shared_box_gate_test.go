@@ -17,16 +17,20 @@ import (
 	"github.com/system-inc/cohere/internal/needs"
 )
 
-// plantedGo stands in for a shared box's go: it answers go env, and records every go mod verify and go test it is
-// asked for in GATE_LOG, with the Go settings it ran under and whether its Go cache was empty, so a test can read what
-// the gate asked of it. GATE_VERIFY_FAILS makes go mod verify fail as a tampered module cache would.
+// plantedGo stands in for a shared box's go: it answers go env, and records every go mod download, go mod verify and
+// go test it is asked for in GATE_LOG, with the Go settings it ran under and whether its Go cache was empty, so a test
+// can read what the gate asked of it. GATE_VERIFY_FAILS makes go mod verify fail as a tampered module cache would, and
+// GATE_DOWNLOAD_FAILS makes go mod download fail as a box cut off from the module proxy would.
 const plantedGo = `#!/bin/sh
 case "$1" in
 env) [ "$2" = GOOS ] && echo linux; [ "$2" = GOARCH ] && echo amd64; exit 0 ;;
 mod)
-  echo "verify" >> "$GATE_LOG"
-  if [ -n "$GATE_VERIFY_FAILS" ]; then echo "example.com/module v1.0.0: dir has been modified"; exit 1; fi
-  echo "all modules verified" ;;
+  echo "$2" >> "$GATE_LOG"
+  if [ "$2" = download ] && [ -n "$GATE_DOWNLOAD_FAILS" ]; then
+    echo "example.com/module@v1.0.0: no route to the proxy"; exit 1; fi
+  if [ "$2" = verify ] && [ -n "$GATE_VERIFY_FAILS" ]; then echo "example.com/module v1.0.0: dir has been modified"
+    exit 1; fi
+  [ "$2" = verify ] && echo "all modules verified"; exit 0 ;;
 test)
   empty=no; [ -z "$(ls -A "$GOCACHE")" ] && empty=yes
   echo "test $* | cache $GOCACHE empty $empty | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
@@ -123,6 +127,13 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			},
 			refusal: "go mod verify failed: example.com/module v1.0.0: dir has been modified",
 		},
+		{
+			name: "a module the box can't fetch is refused before any test",
+			plant: func(test *testing.T, goroot string, environment []string) []string {
+				return append(environment, "GATE_DOWNLOAD_FAILS=1")
+			},
+			refusal: "go mod download failed: example.com/module@v1.0.0: no route to the proxy",
+		},
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()
@@ -194,10 +205,12 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 				test.Fatalf("the gate failed: %v\n%s", gateError, output)
 			}
 			lines := strings.Split(strings.TrimSpace(string(asked)), "\n")
-			if len(lines) != 3 || lines[0] != "verify" {
-				test.Fatalf("the gate asked for %q, want go mod verify, then the module's tests and the -race run",
-					lines)
+			if len(lines) != 4 || lines[0] != "download" || lines[1] != "verify" {
+				test.Fatalf("the gate asked for %q, want go mod download, go mod verify, then the module's tests and "+
+					"the -race run", lines)
 			}
+			// Past the download, the log reads as the checks below index it: verify, the tests, the -race run.
+			lines = lines[1:]
 			for _, line := range lines[1:] {
 				for _, want := range []string{"-count=1", "empty yes", "toolchain local", "goenv off",
 					"goflags -buildvcs=false -trimpath", "cache " + temporary} {
