@@ -119,18 +119,25 @@ says so and runs main's from the main checkout, against the worktree (#8wpk5tp),
 code can't land the old way. On a loaded morning a branch gated green eight times without landing, and
 every one of those gates compiled a merge that never existed again.
 
-The gate's `go test` runs on Home, Loom's day box, on the exact commit being landed, and the Mac runs only what
-Home could not: every test Home skipped and every test in a file Linux never compiles (#acdf5mc). A red on Home
-refuses the landing. Home unreachable, held, inside the witness's window (09:00 to 15:00 UTC) or reporting
-another tree gives no verdict, and the whole run happens on the Mac, said on the land line. Once the module
-passes, the packages `race_gated.go` names run again under `-race`, on whichever machine ran it (#bnabymg).
-`COHERE_DEV_HOME_GATE=off` tests on the Mac alone.
+The gate's `go test` runs on a house Mac through Loom's gap, on the exact commit being landed, and never on
+Kirk's Mac (#rr818c8). Land puts the commit in Loom's feed with `ahra loom push --feed`, Operations' bridge
+carries it to each Mac's `/opt/loom-mirrors`, and the first free Mac of `COHERE_DEV_GATE_BOXES`, `Sun2,Marin`
+unless it says, runs the tests as loom under `~/scratch/system_cohere_tools`. Shackler holds numbers of record,
+so the setting naming her is refused. A Mac another org holds is passed over for the next; with every one held,
+the land waits in line holding the lock, asking again each minute, and after `COHERE_DEV_GATE_WAIT` (2h unless
+it says) refuses, naming each box. A red on the box refuses the landing, and so does a box that refuses, gives no
+verdict or reports another tree, in its own words. Once the module passes, the packages `race_gated.go` names
+run again under `-race` on the same box (#bnabymg). A gate box is darwin, so nothing it skipped runs again:
+the land line names its skips as run nowhere. Kirk's Mac keeps go vet, the rule CPU budget, the docs data and
+cohere on the tree. `COHERE_DEV_GATE=off` is the escape: the tests run on Kirk's Mac alone, named on the land
+line.
 
-Home is a shared box: every job there runs as one account and writes one Go cache, so her run trusts nothing
-she kept (`shared_box_gate.go`, #adbkt5t). Her Go toolchain must digest to the one pinned there before any of
-it runs. Her account's Go settings are left unread. `go mod verify` passes before any test. Every test runs with
-`-count=1` on a Go cache made empty for the job. A toolchain or module cache she can't vouch for refuses the
-landing, and her verdict's land line says "scratch box, shared uid".
+A gate box is a shared box: every org there runs as loom and writes one Go cache, so its run trusts nothing it
+kept (`shared_box_gate.go`, #adbkt5t). Its Go toolchain must digest to the one pinned there before any of it
+runs. Its account's Go settings are left unread. `go mod verify` passes before any test. Every test runs with
+`-count=1` on a Go cache made empty for the job. A mirror that doesn't hold the commit after 3 minutes, or a
+toolchain or module cache it can't vouch for, refuses the landing, and its verdict's land line says "scratch box,
+shared uid".
 
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
 body. The area is a folder in the tree, by its name or its path (`go_engine`, `release/dispatch`), or a

@@ -508,9 +508,9 @@ func gate(worktree string, commit string, task string) (int, string) {
 			return 2
 		}
 		defer printUncovered(streams.Errors, uncovered)
-		// On Home, with what Home could not run on the Mac, or all of it here when Home gives no verdict
-		// (home_verdict.go), or as a land-gate job, whose no verdict refuses (land_gate_job.go).
-		testCode, where := runModuleTests(worktree, commit, task, covered, testing, time.Now())
+		// On a gate box, a house Mac (box_verdict.go, mac_box_gate.go), or as a land-gate job (land_gate_job.go),
+		// either one's no verdict refusing the landing, or on Kirk's Mac alone when the gate says off.
+		testCode, where := runModuleTests(worktree, commit, task, covered, testing)
 		if testCode != 0 {
 			return testCode
 		}

@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/base64"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,28 +12,29 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
 // landGateJobFixture is a landing ready to gate as a land-gate job: a module with one package and one test, ahra stood
-// in for by a script that answers the ask with landGateFixtureJob, the wait with waitCode and the log with the job's
-// output, and go stood in for by one that records each call, so a test can read what the Mac ran.
+// in for by a script that answers the ask with landGateFixtureJob, the row with the job's end and the log with the
+// job's output, and go stood in for by one that records each call, so a test can read what Kirk's Mac ran.
 type landGateJobFixture struct {
 	*landFixture
 	// asks is every call the stand-in ahra took, one line each, command the last ask's command, whole, and at the
 	// commit it named.
 	asks, command, at string
-	// goCalls is every go command the Mac ran, one line each.
+	// goCalls is every go command Kirk's Mac ran, one line each.
 	goCalls string
 }
 
 // landGateFixtureJob is the job id the stand-in ahra's ask answers with.
 const landGateFixtureJob = "J-tst1234"
 
-// newLandGateJobFixture makes the fixture, its stand-in ahra answering the wait with waitCode and the log with
-// jobOutput, in which `COMMIT` is the commit the ask named.
-func newLandGateJobFixture(test *testing.T, waitCode int, jobOutput string) *landGateJobFixture {
+// newLandGateJobFixture makes the fixture, its stand-in ahra answering the row with an Ended job whose outcome is
+// outcome and exit is exit, and the log with jobOutput, in which `COMMIT` is the commit the ask named.
+func newLandGateJobFixture(test *testing.T, outcome string, exit int, jobOutput string) *landGateJobFixture {
 	test.Helper()
 	fixture := &landGateJobFixture{landFixture: newLandFixture(test)}
 	stand := test.TempDir()
@@ -47,10 +49,12 @@ func newLandGateJobFixture(test *testing.T, waitCode int, jobOutput string) *lan
 	log := filepath.Join(stand, "log")
 	writeFixtureFile(test, log, jobOutput)
 	fixture.at = filepath.Join(stand, "at")
-	// The ask is `loom job <command> --kind ... --at cohere@<sha>`, the wait `loom wait job <id> ...` and the log
-	// `loom job <id> --log`, as ahra takes them.
+	// The ask is `loom job <command> --kind ... --at cohere@<sha>`, the row `loom job <id> --json` and the log
+	// `loom job <id> --log`, as ahra takes them. The row is Ended at once, so no read waits landGateReadEvery.
+	row := `{"id":"` + landGateFixtureJob + `","state":"Ended","outcome":"` + outcome + `","outcomeWhy":null,` +
+		`"exit":` + strconv.Itoa(exit) + `}`
 	ahra := "#!/bin/sh\necho \"$*\" >> '" + fixture.asks + "'\n" +
-		"if [ \"$2\" = wait ]; then exit " + strconv.Itoa(waitCode) + "; fi\n" +
+		"if [ \"$4\" = --json ]; then echo '" + row + "'; exit 0; fi\n" +
 		"if [ \"$4\" = --log ]; then sed \"s/COMMIT/$(cat '" + fixture.at + "')/\" '" + log + "'; exit 0; fi\n" +
 		"printf '%s' \"$3\" > '" + fixture.command + "'\n" +
 		"previous=''\nfor argument in \"$@\"; do\n" +
@@ -61,7 +65,7 @@ func newLandGateJobFixture(test *testing.T, waitCode int, jobOutput string) *lan
 	if writeError := executable_testing.WriteFile(standIn, []byte(ahra), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	fixture.environment = append(fixture.environment, homeGateVariable+"="+landGateKindSetting,
+	fixture.environment = append(fixture.environment, gateVariable+"="+landGateKindSetting,
 		loomStandInVariable+"="+standIn)
 	worktree := fixture.worktree("a")
 	writeFixtureFile(test, filepath.Join(worktree, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
@@ -86,31 +90,31 @@ func (fixture *landGateJobFixture) landing() (bool, string) {
 
 // A landing's tests as a land-gate job: a job that passed lands it, naming the job and the trust its box earns on the
 // land line; a job whose test failed refuses it, naming the test; and a job that gave no verdict, Loom's or the
-// machine's failure or a box that couldn't lay the tree, refuses it saying why, and never sends its tests to the Mac
-// (#1v2shq7, item 2).
+// machine's failure or a box that couldn't lay the tree, refuses it saying why, and never sends its tests to Kirk's
+// Mac (#1v2shq7, item 2). Its end is read from its row's outcome, since ahra's wait verb is gone (#rr818c8).
 func TestALandingTestedAsALandGateJobLandsOnlyOnItsVerdict(test *testing.T) {
 	test.Parallel()
-	passing := homeMarker + "COMMIT on linux/amd64\n" + `{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n"
+	passing := boxMarker + "COMMIT on linux/amd64\n" + `{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n"
 	for _, testCase := range []struct {
 		name      string
-		waitCode  int
+		outcome   string
+		exit      int
 		jobOutput string
 		lands     bool
 		said      []string
-		// macTests is whether the Mac may run a go test, which none of the refusals may.
-		macTests bool
 	}{
 		{
 			name:      "the job passes",
+			outcome:   "Exit",
 			jobOutput: "PASS lay: no submodule pinned\n" + passing,
 			lands:     true,
 			said:      []string{"asked Loom for land-gate job " + landGateFixtureJob, "the land lock stays held"},
-			macTests:  true,
 		},
 		{
-			name:     "the job fails a test",
-			waitCode: 1,
-			jobOutput: homeMarker + "COMMIT on linux/amd64\n" +
+			name:    "the job fails a test",
+			outcome: "Exit",
+			exit:    1,
+			jobOutput: boxMarker + "COMMIT on linux/amd64\n" +
 				`{"Action":"fail","Package":"example.com/fixture/alpha","Test":"TestPlantedFailure"}` + "\n" +
 				`{"Action":"fail","Package":"example.com/fixture/alpha"}` + "\n",
 			said: []string{"land-gate job " + landGateFixtureJob + "'s tests on linux/amd64 failed",
@@ -118,28 +122,29 @@ func TestALandingTestedAsALandGateJobLandsOnlyOnItsVerdict(test *testing.T) {
 		},
 		{
 			name:      "the job meets infrastructure",
-			waitCode:  205,
+			outcome:   "Infrastructure",
 			jobOutput: passing,
-			said: []string{"no verdict", "never fall back to the Mac",
+			said: []string{"no verdict", "never fall back to Kirk's Mac",
 				"it met Loom's or the machine's failure, never the tree's (infrastructure)"},
 		},
 		{
 			name:      "the box holds no lay kit",
-			waitCode:  3,
+			outcome:   "Exit",
+			exit:      3,
 			jobOutput: "FAIL lay: kit not on this box\n",
 			said:      []string{"no verdict", "its box could not lay the tree (FAIL lay: kit not on this box)"},
 		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			fixture := newLandGateJobFixture(test, testCase.waitCode, testCase.jobOutput)
+			fixture := newLandGateJobFixture(test, testCase.outcome, testCase.exit, testCase.jobOutput)
 			landed, output := fixture.landing()
-			// Read before whether it landed, so a refusal that fell back to the Mac says so on its own.
+			// Read before whether it landed, so a refusal that fell back to Kirk's Mac says so on its own.
 			// Ignored: a Mac that ran no go command wrote no record.
 			goCalls, _ := os.ReadFile(fixture.goCalls)
 			for _, line := range strings.Split(string(goCalls), "\n") {
-				if strings.HasPrefix(line, "test") && !testCase.macTests {
-					test.Errorf("the Mac ran a go test for a landing the job alone may test: go %s", line)
+				if strings.HasPrefix(line, "test") {
+					test.Errorf("Kirk's Mac ran a go test for a landing the job alone may test: go %s", line)
 				}
 			}
 			if landed != testCase.lands {
@@ -169,10 +174,10 @@ var landGateEncoded = regexp.MustCompile(`bash -c "\$\(echo ([A-Za-z0-9+/=]+) \|
 // The job's command lays the commit's submodules with the lay kit at its pinned commit, refusing as `FAIL lay:` on a
 // box without it, then runs sharedBoxGate, unchanged, against the pinned toolchain, its goroot left for the box's
 // shell to expand. The ask names the kind, the landing's task and the commit the gate ran at, whose tree is the one
-// that lands, and the wait is bounded.
+// that lands, and the job's end is read from its row.
 func TestALandGateJobAsksForTheLayKitAndTheSharedBoxGate(test *testing.T) {
 	test.Parallel()
-	fixture := newLandGateJobFixture(test, 0, homeMarker+"COMMIT on linux/amd64\n"+
+	fixture := newLandGateJobFixture(test, "Exit", 0, boxMarker+"COMMIT on linux/amd64\n"+
 		`{"Action":"pass","Package":"example.com/fixture/alpha"}`+"\n")
 	landed, output := fixture.landing()
 	if !landed {
@@ -218,11 +223,64 @@ func TestALandGateJobAsksForTheLayKitAndTheSharedBoxGate(test *testing.T) {
 	}
 	for _, want := range []string{
 		" --kind land-gate --task " + fixtureTask + " --at cohere@" + gated + "\n",
-		"loom wait job " + landGateFixtureJob + " --within 2h\n",
+		"loom job " + landGateFixtureJob + " --json\n",
 		"loom job " + landGateFixtureJob + " --log\n",
 	} {
 		if !strings.Contains(string(asks), want) {
 			test.Errorf("ahra was not asked %q:\n%s", want, asks)
+		}
+	}
+}
+
+// The land reads a land-gate job's row every landGateReadEvery until it has ended, and reads its end from the row: an
+// Exit is the job's own code, every other outcome no verdict in its own words, a cancel naming who and why. A run of
+// rows that didn't read gives up, one alone never does, and the wait gives up at landGateWithin, still in line.
+func TestALandGateJobIsReadUntilItsRowSaysItEnded(test *testing.T) {
+	test.Parallel()
+	running := `{"id":"J-tst1234","state":"Running","outcome":null,"exit":null}`
+	for _, row := range []struct {
+		name string
+		// rows are what each read answers in turn, the last again once they run out; empty is a read that failed.
+		rows  []string
+		code  int
+		said  string
+		reads int
+	}{
+		{"an exit after two reads in line", []string{running, running,
+			`{"state":"Ended","outcome":"Exit","exit":4}`}, 4, "", 3},
+		{"a read that failed between", []string{running, "", `{"state":"Ended","outcome":"Exit","exit":0}`}, 0, "",
+			3},
+		{"a cancel", []string{`{"state":"Ended","outcome":"Cancelled","outcomeWhy":"killed","exit":143,` +
+			`"cancelledBy":"kirkouimet","cancelledReason":"a wrong ask"}`}, 0,
+			"land-gate job J-tst1234 gave no verdict: it was cancelled by kirkouimet: a wrong ask", 1},
+		{"infrastructure under its old name", []string{`{"state":"Ended","outcome":"Infra","outcomeWhy":"box lost"}`},
+			0, "it met Loom's or the machine's failure, never the tree's (infrastructure): box lost", 1},
+		{"an outcome unknown here", []string{`{"state":"Ended","outcome":"Unplaced"}`}, 0,
+			"it ended Unplaced, an outcome this land doesn't know", 1},
+		{"an Exit with no exit", []string{`{"state":"Ended","outcome":"Exit","exit":null}`}, 0,
+			"it ended Exit with no exit", 1},
+		{"rows that never read", []string{""}, 0, "the door failed to read it 5 times in a row", 5},
+		{"a job still in line at the bound", []string{running}, 0, "the wait on it ran out after 2h0m0s", 241},
+	} {
+		reads := 0
+		slept := time.Duration(0)
+		code, said := waitForLandGateJob("J-tst1234", func() ([]byte, error) {
+			answer := row.rows[min(reads, len(row.rows)-1)]
+			reads++
+			if answer == "" {
+				return []byte("job: Zach didn't answer"), errors.New("exit status 1")
+			}
+			return []byte(answer), nil
+		}, func(duration time.Duration) {
+			if duration != landGateReadEvery {
+				test.Errorf("%s: slept %s between reads, want %s", row.name, duration, landGateReadEvery)
+			}
+			slept += duration
+		}, func() time.Duration { return slept })
+		if code != row.code || !strings.Contains(said, row.said) || (row.said == "") != (said == "") ||
+			reads != row.reads {
+			test.Errorf("%s: read %d times to %d, %q; want %d times to %d, %q", row.name, reads, code, said, row.reads,
+				row.code, row.said)
 		}
 	}
 }
