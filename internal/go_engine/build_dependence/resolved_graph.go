@@ -60,16 +60,29 @@ type resolvedGraph struct {
 	declares packedRows[int32]
 	bits     packedRows[int32]
 
-	// unitExternal are each unit's reads of objects of packages the graph does not hold, for the build's
-	// DependentObject.
-	unitExternal [][]externalRead
+	// externalObjects are every object of a package the graph does not hold that a unit reads or calls or a kind edge
+	// reaches, each once, which the build's DependentObject answers for a live object, and its DependentName for an
+	// object a decoded record names, which has none: the object as a record names it, its live object nil in a decoded
+	// record. A live object is one entry, and a decoded name of the same path and local name another, since the two
+	// are answered apart. externalObjectIndex are the live objects' indexes there, for ObjectBits, which asks of an
+	// object; namedExternal are the decoded names', read only while resolving, and let go after it.
+	externalObjects     []recordedObject
+	externalObjectIndex map[types.Object]uint32
+	namedExternal       map[[2]string]uint32
+
+	// external are each unit's reads of objects of packages the graph does not hold, each a bit of an external object
+	// (externalObjectBit), and externalThrough, for each of those reads in turn, what the read reaches through the
+	// object's type, the same way, which DependentName's graph reads in its place when no unit of it declares the
+	// object (judgment.answerByName): only a read whose record holds what it reaches has any.
+	external        packedRows[uint32]
+	externalThrough packedRows[uint32]
 
 	// calls are the units each unit's body calls statically (recordedUnit.callees), each once, never itself: a callee
 	// no unit of the graph declares is left out, and one of a package the graph does not hold, a dependency's checked
-	// without syntax, is kept in unitExternalCalls by its path and local name, a live record's and a decoded one's
-	// alike, for another graph to find its unit (#ss4t5g6, #6a3kjvz).
-	calls             packedRows[int32]
-	unitExternalCalls [][]ObjectName
+	// without syntax, is kept in externalCalls by its external object, a live record's and a decoded one's alike, for
+	// another graph to find its unit by its path and local name (#ss4t5g6, #6a3kjvz).
+	calls         packedRows[int32]
+	externalCalls packedRows[uint32]
 
 	// packageUnits are, for each package, the half-open range of its units.
 	packageUnits [][2]int32
@@ -125,27 +138,11 @@ type fileTable struct {
 	inStartOrder bool
 }
 
-// externalRead is one bit of an object of a package the graph does not hold, which the build's DependentObject
-// answers for a live object, and its DependentName for an object a decoded record names, which has none: the object
-// as a record names it, its live object nil in a decoded record, and through, what the read reaches through the
-// object's type, which DependentName's graph reads in its place when no unit of it declares the object
-// (judgment.nameAnswer).
-type externalRead struct {
-	object     recordedObject
-	underlying bool
-	through    []externalBit
-}
-
-// externalBit is one bit of an object a decoded record names by path and local name.
-type externalBit struct {
-	object     recordedObject
-	underlying bool
-}
-
-// externalEdge is an edge from a bit of the graph to a bit of an object of a package it does not hold.
+// externalEdge is an edge from a bit of the graph to a bit of an object of a package it does not hold, a bit of an
+// external object (externalObjectBit).
 type externalEdge struct {
 	fromBit int32
-	to      externalRead
+	to      uint32
 }
 
 // fileKey is a file of a package: its package ID and the file a reader sees.
@@ -162,6 +159,38 @@ func bit(node int32, underlying bool) int32 {
 	return 2 * node
 }
 
+// externalObjectBit is a bit of the external object at index, packed in one uint32: the index shifted up by one, the
+// lowest bit set for the underlying bit. A graph's external objects are far fewer than 2^31.
+func externalObjectBit(index uint32, underlying bool) uint32 {
+	if underlying {
+		return index<<1 | 1
+	}
+	return index << 1
+}
+
+// externalObject is object's index among the external objects, added on its first meeting. A live object is found by
+// itself, since the path and local name every record of the graph names it by are its own (one encoder names every
+// record's objects, Graph.paths), and a decoded name by its path and local name.
+func (resolved *resolvedGraph) externalObject(object recordedObject) uint32 {
+	if object.object != nil {
+		if index, isKnown := resolved.externalObjectIndex[object.object]; isKnown {
+			return index
+		}
+		index := uint32(len(resolved.externalObjects))
+		resolved.externalObjectIndex[object.object] = index
+		resolved.externalObjects = append(resolved.externalObjects, object)
+		return index
+	}
+	key := [2]string{object.path, object.local}
+	if index, isKnown := resolved.namedExternal[key]; isKnown {
+		return index
+	}
+	index := uint32(len(resolved.externalObjects))
+	resolved.namedExternal[key] = index
+	resolved.externalObjects = append(resolved.externalObjects, object)
+	return index
+}
+
 // resolveRecords resolves records, every package the graph holds by its ID, into nodes: each package's units and
 // their nodes, then every object of each record's table, the kind edges, the calls and the reads, each a pass over
 // every unit in the graph's order, so each pass fills its packed rows by appending.
@@ -171,6 +200,9 @@ func resolveRecords(records map[string]*packageRecord) *resolvedGraph {
 		typesPackages: map[*types.Package]bool{},
 		pathPackages:  make(map[string]int32, len(records)),
 		resolvedPaths: map[pathFrom]int32{},
+
+		externalObjectIndex: map[types.Object]uint32{},
+		namedExternal:       map[[2]string]uint32{},
 	}
 	for _, identifier := range slices.Sorted(maps.Keys(records)) {
 		record := records[identifier]
@@ -193,6 +225,7 @@ func resolveRecords(records map[string]*packageRecord) *resolvedGraph {
 	resolved.resolveReads()
 	resolved.resolvedPaths = nil
 	resolved.targets = nil
+	resolved.namedExternal = nil
 	return resolved
 }
 
@@ -438,7 +471,7 @@ func (resolved *resolvedGraph) resolveEdges() {
 				continue
 			}
 			resolved.externalEdges = append(resolved.externalEdges, externalEdge{fromBit: fromBit,
-				to: externalRead{object: record.objects[edge.to], underlying: edge.toUnderlying}})
+				to: externalObjectBit(resolved.externalObject(record.objects[edge.to]), edge.toUnderlying)})
 		}
 	}
 }
@@ -452,27 +485,28 @@ func (resolved *resolvedGraph) resolveReads() {
 		}
 	}
 	resolved.bits = newPackedRows[int32](resolved.unitCount(), reads)
-	resolved.unitExternal = make([][]externalRead, resolved.unitCount())
+	resolved.external = newPackedRows[uint32](resolved.unitCount(), 0)
+	resolved.externalThrough = newPackedRows[uint32](0, 0)
 	for packageIndex, record := range resolved.packages {
 		for unitIndex := range record.units {
-			index := int(resolved.packageUnits[packageIndex][0]) + unitIndex
 			for _, read := range record.units[unitIndex].reads {
-				resolved.resolveRead(index, packageIndex, read)
+				resolved.resolveRead(packageIndex, read)
 			}
 			resolved.bits.closeRow()
+			resolved.external.closeRow()
 		}
 	}
 }
 
-// resolveRead adds read to the unit at index, of the package at packageIndex, as bits of the row being filled, or as
-// an external read when its object is of a package the graph does not hold. An object of a package the graph holds
+// resolveRead adds read, of a unit of the package at packageIndex, to the unit's rows being filled: as bits, or as an
+// external read when its object is of a package the graph does not hold. An object of a package the graph holds
 // that no unit declares, a field of an anonymous struct in a var's initializer or a method of an interface in a type
 // parameter's constraint, is read through its type, as the counter read every object without a node: what its record
 // holds of it (recordedRead.through), each bit of which resolves the same way, one with no node in a package the graph
 // holds dropped.
 //
 // Mutates: the unit gains the bits and external reads
-func (resolved *resolvedGraph) resolveRead(index int, packageIndex int, read recordedRead) {
+func (resolved *resolvedGraph) resolveRead(packageIndex int, read recordedRead) {
 	targets := resolved.targets[packageIndex]
 	objects := resolved.packages[packageIndex].objects
 	if read.target >= 0 {
@@ -482,12 +516,13 @@ func (resolved *resolvedGraph) resolveRead(index int, packageIndex int, read rec
 			return
 		}
 		if !target.isHeld {
-			external := externalRead{object: objects[read.target], underlying: read.underlying}
+			resolved.external.entries = append(resolved.external.entries,
+				externalObjectBit(resolved.externalObject(objects[read.target]), read.underlying))
 			for _, reached := range read.through {
-				external.through = append(external.through,
-					externalBit{object: objects[reached.object], underlying: reached.underlying})
+				resolved.externalThrough.entries = append(resolved.externalThrough.entries,
+					externalObjectBit(resolved.externalObject(objects[reached.object]), reached.underlying))
 			}
-			resolved.unitExternal[index] = append(resolved.unitExternal[index], external)
+			resolved.externalThrough.closeRow()
 			return
 		}
 	}
@@ -497,8 +532,9 @@ func (resolved *resolvedGraph) resolveRead(index int, packageIndex int, read rec
 		case target.isNode:
 			resolved.bits.entries = append(resolved.bits.entries, bit(target.node, reached.underlying))
 		case !target.isHeld:
-			resolved.unitExternal[index] = append(resolved.unitExternal[index],
-				externalRead{object: objects[reached.object], underlying: reached.underlying})
+			resolved.external.entries = append(resolved.external.entries,
+				externalObjectBit(resolved.externalObject(objects[reached.object]), reached.underlying))
+			resolved.externalThrough.closeRow()
 		}
 	}
 }
@@ -536,7 +572,7 @@ func (resolved *resolvedGraph) resolveCalls() {
 		}
 	}
 	resolved.calls = newPackedRows[int32](resolved.unitCount(), callees)
-	resolved.unitExternalCalls = make([][]ObjectName, resolved.unitCount())
+	resolved.externalCalls = newPackedRows[uint32](resolved.unitCount(), 0)
 	for packageIndex, record := range resolved.packages {
 		for unitIndex := range record.units {
 			index := resolved.packageUnits[packageIndex][0] + int32(unitIndex)
@@ -544,9 +580,8 @@ func (resolved *resolvedGraph) resolveCalls() {
 				target := resolved.targets[packageIndex][callee]
 				if !target.isNode {
 					if !target.isHeld {
-						named := record.objects[callee]
-						resolved.unitExternalCalls[index] = append(resolved.unitExternalCalls[index],
-							ObjectName{Path: named.path, Local: named.local})
+						resolved.externalCalls.entries = append(resolved.externalCalls.entries,
+							resolved.externalObject(record.objects[callee]))
 					}
 					continue
 				}
@@ -556,6 +591,7 @@ func (resolved *resolvedGraph) resolveCalls() {
 				}
 			}
 			resolved.calls.closeRow()
+			resolved.externalCalls.closeRow()
 		}
 	}
 }

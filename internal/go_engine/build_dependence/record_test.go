@@ -67,9 +67,9 @@ func resolvedLines(graph *Graph) []string {
 		for _, read := range resolved.bits.row(index) {
 			reads = append(reads, "reads "+bitName(read))
 		}
-		for _, read := range resolved.unitExternal[index] {
-			reads = append(reads, fmt.Sprintf("external %s %s/%t", read.object.path, read.object.local,
-				read.underlying))
+		for _, read := range resolved.external.row(index) {
+			object := &resolved.externalObjects[read>>1]
+			reads = append(reads, fmt.Sprintf("external %s %s/%t", object.path, object.local, read&1 != 0))
 		}
 		for _, called := range resolved.calls.row(index) {
 			reads = append(reads, "calls "+unitName(int(called)))
@@ -83,8 +83,9 @@ func resolvedLines(graph *Graph) []string {
 		}
 	}
 	for _, edge := range resolved.externalEdges {
-		lines = append(lines, fmt.Sprintf("external edge %s <- %s %s/%t", bitName(edge.fromBit), edge.to.object.path,
-			edge.to.object.local, edge.to.underlying))
+		object := &resolved.externalObjects[edge.to>>1]
+		lines = append(lines, fmt.Sprintf("external edge %s <- %s %s/%t", bitName(edge.fromBit), object.path,
+			object.local, edge.to&1 != 0))
 	}
 	slices.Sort(lines)
 	return slices.Compact(lines)

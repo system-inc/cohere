@@ -76,9 +76,8 @@ func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 	}
 	if !resolved.typesPackages[declared.Pkg()] {
 		return Bits{
-			Name: dependence.judging.answer(externalRead{object: recordedObject{object: declared}}),
-			Underlying: dependence.judging.answer(
-				externalRead{object: recordedObject{object: declared}, underlying: true}),
+			Name:       dependence.judging.answerObject(declared, false),
+			Underlying: dependence.judging.answerObject(declared, true),
 		}
 	}
 	_, isConstant := declared.(*types.Const)
@@ -88,8 +87,7 @@ func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 		if node, isNode := resolved.objectNodes[through.object]; isNode {
 			set = dependence.bits[bit(node, through.touchesUnderlying)]
 		} else if !resolved.typesPackages[through.object.Pkg()] {
-			set = dependence.judging.answer(externalRead{object: recordedObject{object: through.object},
-				underlying: through.touchesUnderlying})
+			set = dependence.judging.answerObject(through.object, through.touchesUnderlying)
 		}
 		if set {
 			return Bits{Name: true, Underlying: true}
@@ -138,9 +136,9 @@ type ObjectName struct {
 	Local string
 }
 
-// Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name. Each
-// unit's calls are read out of the resolution's packed rows into one slice that all the units' Calls share, each
-// unit's its own part of it, nil for a unit with none.
+// Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name. The
+// units' calls and external calls are read out of the resolution's packed rows into one slice of each that all the
+// units share, each unit's its own part of it, nil for a unit with none.
 func (dependence *Dependence) Units() []Unit {
 	resolved := dependence.resolved
 	units := make([]Unit, 0, resolved.unitCount())
@@ -148,10 +146,19 @@ func (dependence *Dependence) Units() []Unit {
 	for position, callee := range resolved.calls.entries {
 		calls[position] = int(callee)
 	}
+	externalCalls := make([]ObjectName, len(resolved.externalCalls.entries))
+	for position, callee := range resolved.externalCalls.entries {
+		named := &resolved.externalObjects[callee]
+		externalCalls[position] = ObjectName{Path: named.path, Local: named.local}
+	}
 	for index := range resolved.unitCount() {
 		var unitCalls []int
 		if first, end := resolved.calls.offsets[index], resolved.calls.offsets[index+1]; end > first {
 			unitCalls = calls[first:end:end]
+		}
+		var unitExternalCalls []ObjectName
+		if first, end := resolved.externalCalls.offsets[index], resolved.externalCalls.offsets[index+1]; end > first {
+			unitExternalCalls = externalCalls[first:end:end]
 		}
 		units = append(units, Unit{
 			PackageId: resolved.packages[resolved.unitPackage[index]].identifier,
@@ -162,7 +169,7 @@ func (dependence *Dependence) Units() []Unit {
 			Dependent: dependence.unitDependent[index],
 			Calls:     unitCalls,
 
-			ExternalCalls: resolved.unitExternalCalls[index],
+			ExternalCalls: unitExternalCalls,
 		})
 	}
 	return units

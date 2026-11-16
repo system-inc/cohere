@@ -48,6 +48,52 @@ func TestTheLaterOfTwoUnitsAtOneStartAnswersForThePlace(test *testing.T) {
 	}
 }
 
+// A build's judgment asks its DependentObject once per object, whether a unit reads the object or ObjectBits meets it
+// after, and its DependentName once per name: the layout fixture's workspace, restored from export data, judged on
+// linux by its dependency's graph, from its live packages and from their records read back, then asked ObjectBits of
+// every object the workspace's units read of the dependency.
+func TestABuildAsksOfEachObjectOnce(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "layout", linuxBuild)
+	restored := restoredFromExportData(test, judged.host)
+	dependencyGraph := graphOf(judged.host, func(loaded *packages.Package) bool { return fixtureWorkspace(loaded) })
+	counterparts := NewCounterparts(dependencyGraph, dependencyGraph.Against(judged.difference))
+	live := graphOf(restored, nil)
+	for _, graph := range []*Graph{live, recordedGraphOf(test, live)} {
+		objectsAsked := map[types.Object]int{}
+		namesAsked := map[ObjectName]int{}
+		difference := judged.difference
+		difference.DependentObject = func(object types.Object) (bool, bool) {
+			objectsAsked[object]++
+			return counterparts.DependentObject(object)
+		}
+		difference.DependentName = func(path string, local string) (bool, bool, bool) {
+			namesAsked[ObjectName{Path: path, Local: local}]++
+			return counterparts.DependentName(path, local)
+		}
+		dependence := graph.Against(difference)
+		for _, external := range graph.resolve().externalObjects {
+			if external.object != nil {
+				dependence.ObjectBits(external.object)
+			}
+		}
+		if len(objectsAsked)+len(namesAsked) == 0 {
+			test.Fatal("the build asked of no object, so the case proves nothing")
+		}
+		for object, asked := range objectsAsked {
+			if asked > 1 {
+				test.Errorf("DependentObject was asked of %s %d times", object, asked)
+			}
+		}
+		for name, asked := range namesAsked {
+			if asked > 1 {
+				test.Errorf("DependentName was asked of %v %d times", name, asked)
+			}
+		}
+	}
+}
+
 // chainLoad is the build-facts-chain fixture of the engine's testdata, its own module, loaded whole under build with
 // its tests: one package of its own and the part of the standard library it reaches.
 func chainLoad(benchmark *testing.B, build fixtureBuild) loadedBuild {

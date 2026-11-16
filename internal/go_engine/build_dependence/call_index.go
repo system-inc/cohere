@@ -46,8 +46,9 @@ func NewCallIndex(host *Graph, standardLibrary *Graph) *CallIndex {
 			index.calls = append(index.calls, calls)
 		}
 		for unit := range hostUnits {
-			for _, callee := range index.host.unitExternalCalls[unit] {
-				declaring, isDeclared := index.standardLibrary.unitDeclaringName(callee.Path, callee.Local)
+			for _, callee := range index.host.externalCalls.row(unit) {
+				named := &index.host.externalObjects[callee]
+				declaring, isDeclared := index.standardLibrary.unitDeclaringName(named.path, named.local)
 				if isDeclared && !slices.Contains(index.calls[unit], hostUnits+declaring) {
 					// A copy, since the host's graph holds the slice the index began with.
 					index.calls[unit] = append(slices.Clone(index.calls[unit]), hostUnits+declaring)
