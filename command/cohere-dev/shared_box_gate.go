@@ -9,7 +9,10 @@ package main
 //   - The Go toolchain is the one pinned here, by a digest of its whole tree, read before anything of it runs. A
 //     swapped `go`, `compile` or standard-library source differs from the Go project's own archive.
 //   - The account's Go settings are never read: no env.sh, no go env file, no toolchain switch, the path set here.
-//   - `go mod verify` passes before any test runs, so the module cache matches go.sum.
+//   - `go mod download` fetches every module the workspace names, other platforms' included, and `go mod verify`
+//     passes before any test runs, so the module cache is whole and matches go.sum. A box that never held a module
+//     only another platform needs failed the tests that list for that platform, though its own build never asked
+//     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8).
 //   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it.
 //
 // It is the exception to the house's rule against -count=1 in a gate. That rule holds because Go's test cache is
@@ -84,6 +87,7 @@ gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
 trap 'rm -rf "$gocache"' EXIT
 export GOCACHE="$gocache"
 echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
+downloaded=$(go mod download 2>&1) || refuse "go mod download failed: $(echo "$downloaded" | tail -n 1)"
 verified=$(go mod verify 2>&1) || refuse "go mod verify failed: $(echo "$verified" | tail -n 1)"
 go test -count=1 -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
 if [ -n "$races" ]; then
