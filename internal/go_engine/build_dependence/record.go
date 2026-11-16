@@ -149,6 +149,7 @@ func newRecord(
 				recorded.reads = append(recorded.reads, read)
 			}
 		}
+		naming.callees = naming.callees[:0]
 		for _, callee := range unit.callees {
 			if universal(callee) {
 				continue
@@ -157,8 +158,12 @@ func newRecord(
 				continue
 			}
 			if index, isNamed := naming.recorded(callee); isNamed {
-				recorded.callees = append(recorded.callees, index)
+				naming.callees = append(naming.callees, index)
 			}
+		}
+		// A copy at its size, nil for none, so the record holds nothing of the scratch's slice.
+		if len(naming.callees) > 0 {
+			recorded.callees = slices.Clone(naming.callees)
 		}
 		record.units = append(record.units, recorded)
 	}
@@ -175,8 +180,12 @@ func newRecord(
 		if !isNamed {
 			continue
 		}
-		record.edges = append(record.edges, recordedEdge{from: from, fromUnderlying: edge.fromUnderlying, to: to,
+		naming.edges = append(naming.edges, recordedEdge{from: from, fromUnderlying: edge.fromUnderlying, to: to,
 			toUnderlying: edge.toUnderlying})
+	}
+	// A copy at its size, nil for none, so the record holds nothing of the scratch's slice.
+	if len(naming.edges) > 0 {
+		record.edges = slices.Clone(naming.edges)
 	}
 	record.unnameable = naming.unnameable
 	naming.order()

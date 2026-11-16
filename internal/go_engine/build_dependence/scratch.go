@@ -100,6 +100,11 @@ func (scratch *workerScratch) release() {
 	scratch.naming.names = clearedMap(scratch.naming.names, len(scratch.naming.names))
 	scratch.naming.throughs = clearedMap(scratch.naming.throughs, len(scratch.naming.throughs))
 	scratch.naming.indexes = clearedMap(scratch.naming.indexes, len(scratch.naming.indexes))
+	scratch.naming.objects = clearedSlice(scratch.naming.objects)
+	scratch.naming.edges = clearedSlice(scratch.naming.edges)
+	scratch.naming.callees = clearedSlice(scratch.naming.callees)
+	scratch.naming.byName = clearedSlice(scratch.naming.byName)
+	scratch.naming.renumbered = clearedSlice(scratch.naming.renumbered)
 }
 
 // clearedMap is held emptied for the next package, or a new map in its place when it once held more than scratchHeld
