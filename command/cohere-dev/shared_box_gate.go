@@ -1,9 +1,10 @@
 package main
 
-// A shared box is one where every job runs as one account and writes one Go cache, Home and Loom's scratch boxes
-// until #3e0jmys. There a candidate's tests could leave a test result, a module or a toolchain file that a later
-// landing's gate trusts, and Go's test cache would answer "ok" for a test that landing never ran. So a gate there
-// trusts nothing the box kept (#adbkt5t, on Loom Security's terms on #1v2shq7):
+// A shared box is one where every job runs as one account and writes one Go cache: the house Macs the land gate runs
+// on, every org there running as loom, and Loom's scratch boxes, where a land-gate job runs. There a candidate's tests
+// could leave a test result, a module or a toolchain file that a later landing's gate trusts, and Go's test cache would
+// answer "ok" for a test that landing never ran. So a gate there trusts nothing the box kept (#adbkt5t, on Loom
+// Security's terms on #1v2shq7):
 //
 //   - The Go toolchain is the one pinned here, by a digest of its whole tree, read before anything of it runs. A
 //     swapped `go`, `compile` or standard-library source differs from the Go project's own archive.
@@ -12,18 +13,18 @@ package main
 //   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it.
 //
 // It is the exception to the house's rule against -count=1 in a gate. That rule holds because Go's test cache is
-// keyed honestly, and on a cache any job can write it isn't. The Mac's own runs keep the cache.
+// keyed honestly, and on a cache any job can write it isn't. Kirk's Mac's own runs keep the cache.
 
 // sharedBoxTrust is what the land line says of a verdict from a shared box beside it: it holds against our own
 // mistakes, not against a candidate written to forge one, since every job there runs as one account (#1v2shq7).
 const sharedBoxTrust = "scratch box, shared uid"
 
 // sharedBoxRefusedMarker opens the line a shared box's gate prints when it refuses to run the tests at all, for a
-// toolchain that isn't the pinned one or a module cache that doesn't match go.sum. The Mac reads it as a refusal of
-// the landing, never as a box that gave no verdict, which would run the tests on the Mac instead.
-const sharedBoxRefusedMarker = "cohere-dev-home: refused "
+// toolchain that isn't the pinned one or a module cache that doesn't match go.sum. Kirk's Mac reads it as a refusal of
+// the landing in the box's own words, never as a box that gave no verdict.
+const sharedBoxRefusedMarker = "cohere-dev-gate: refused "
 
-// sharedBoxGoroot is where Home and the scratch boxes keep the Go toolchain, ~/adamic-tools/go (#p3rd3vn).
+// sharedBoxGoroot is where the scratch boxes keep the Go toolchain, ~/adamic-tools/go (#p3rd3vn).
 const sharedBoxGoroot = "$HOME/adamic-tools/go"
 
 // sharedBoxToolchainDigest is the digest of go1.27.1's linux/amd64 tree as the Go project ships it: every regular file,
@@ -36,16 +37,34 @@ const sharedBoxToolchainDigest = "aa737bb2de5f152e1bdaad9902816611d1cdbe3298238a
 // /srv/loom-*, since on a scratch box nothing but a release lays anything under /opt, which is in the house stamp
 // (#myvcam7). And sharedBoxNodeDigest is the sha256 of its bin/node: node v24.19.0 linux-x64 as nodejs.org ships it
 // (node-v24.19.0-linux-x64.tar.xz, sha256 14b342e7..., matching its SHASUMS256.txt, Nov 13). A box holding it puts
-// it on the gate's path, so the tests whose oracle is node run on Linux. A box without it skips them by name, and the
-// Mac runs them (#myvcam7).
+// it on the gate's path, so the tests whose oracle is node run on Linux. A box without it skips them by name, which
+// the land line names as run nowhere (#myvcam7).
 const (
 	sharedBoxNode       = "/srv/loom-tools/node-v24.19.0"
 	sharedBoxNodeDigest = "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
 )
 
+// macBoxGoroot is where Machines lays the Go toolchain on the house Macs, root-owned, outside loom's home, and
+// macBoxToolchainDigest is sharedBoxGate's digest of it: go1.27.1 darwin/arm64 as go.dev ships it
+// (go1.27.1.darwin-arm64.tar.gz, sha256 ee215d57..., matching go.dev's published one), read by this digest on Sun2 and
+// on Marin (#rr818c8, Nov 16). A Mac on another Go refuses until this moves.
+const (
+	macBoxGoroot          = "/opt/loom-tools/go"
+	macBoxToolchainDigest = "4256a1b77627be7a90f81396a371991e6232f1d1f0d55df55d4ad1f58f43405b"
+)
+
+// macBoxNode is where Machines lays node on the house Macs, beside the toolchain, and macBoxNodeDigest is the sha256 of
+// its bin/node: node v24.19.0 darwin-arm64 as nodejs.org ships it (node-v24.19.0-darwin-arm64.tar.gz, sha256
+// 3f1cf157..., matching its SHASUMS256.txt), read on Sun2 and on Marin (#rr818c8, Nov 16). macOS's /sbin/sha256sum
+// prints the digests Linux's does, so sharedBoxGate reads both the same way.
+const (
+	macBoxNode       = "/opt/loom-tools/node-v24.19.0"
+	macBoxNodeDigest = "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1"
+)
+
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
 // goroot, digest, node, nodeDigest and races (the raceGated packages, comma-separated) as variables, and the
-// module's test patterns as its arguments. It prints homeMarker before the tests, homeRaceMarker before the -race
+// module's test patterns as its arguments. It prints boxMarker before the tests, boxRaceMarker before the -race
 // run once the module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box.
 const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
 [ -x "$goroot/bin/go" ] || refuse "there is no go at $goroot"
@@ -64,11 +83,11 @@ export PATH="$goroot/bin:$nodePath/usr/bin:/bin" GOROOT="$goroot" GOTOOLCHAIN=lo
 gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
 trap 'rm -rf "$gocache"' EXIT
 export GOCACHE="$gocache"
-echo "` + homeMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
+echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 verified=$(go mod verify 2>&1) || refuse "go mod verify failed: $(echo "$verified" | tail -n 1)"
 go test -count=1 -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
 if [ -n "$races" ]; then
-  echo "` + homeRaceMarker + `"
+  echo "` + boxRaceMarker + `"
   go test -count=1 -json -race $(echo "$races" | tr , ' ') | grep -vE '"Action":"(start|run|pause|cont)"'
 fi
 `

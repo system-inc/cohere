@@ -226,63 +226,47 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 	}
 }
 
-// The Mac's runs keep Go's test cache, which is keyed honestly there: the exception is for shared boxes alone, so no
-// go test the Mac's half of a landing runs carries -count. Shown through landings whose go records its arguments:
-// one tested on the Mac alone, module and -race run, and one Home passed with a skip, whose remainder the Mac runs.
+// Kirk's Mac's runs keep Go's test cache, which is keyed honestly there: the exception is for shared boxes alone, so no
+// go test Kirk's Mac runs carries -count. Shown through a landing with the gate off, module and -race run, whose go
+// records its arguments: since no box's skips run again on Kirk's Mac, the escape is the one road that runs tests
+// there.
 func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 	test.Parallel()
-	for _, home := range []string{"off", "a stand-in"} {
-		test.Run("Home "+home, func(test *testing.T) {
-			test.Parallel()
-			fixture := newLandFixture(test)
-			asked := filepath.Join(test.TempDir(), "asked")
-			recorder := "#!/bin/sh\necho \"$*\" >> '" + asked + "'\n"
-			if writeError := executable_testing.WriteFile(filepath.Join(filepath.Dir(fixture.log), "go"),
-				[]byte(recorder), 0o755); writeError != nil {
-				test.Fatal(writeError)
-			}
-			worktree := fixture.worktree("a")
-			writeFixtureFile(test, filepath.Join(worktree, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
-			writeFixtureFile(test, filepath.Join(worktree, "internal", "edit", "edit_test.go"),
-				"package edit\n\nimport \"testing\"\n\nfunc TestEdit(test *testing.T) {}\n")
-			fixture.git(worktree, "add", ".")
-			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a module"))
-			fixture.git(worktree, "merge", "-q", "--no-edit", "-m", "Merge main", "main")
-			setting := "off"
-			if home != "off" {
-				setting = filepath.Join(test.TempDir(), "home")
-				reply := "#!/bin/sh\necho \"" + homeMarker + "$1 on linux/amd64\"\n" +
-					`echo '{"Action":"pass","Package":"example.com/fixture/internal/edit"}'` + "\n" +
-					`echo '{"Action":"skip","Package":"example.com/fixture/internal/edit","Test":"TestEdit"}'` + "\n" +
-					"echo \"" + homeRaceMarker + "\"\n" +
-					`echo '{"Action":"pass","Package":"example.com/fixture/internal/edit"}'` + "\n"
-				if writeError := executable_testing.WriteFile(setting, []byte(reply), 0o755); writeError != nil {
-					test.Fatal(writeError)
-				}
-			}
-			landing := exec.Command(fixture.wrapper, "land", "--message", "a module tested")
-			landing.Dir, landing.Env = worktree, append(fixture.environment, homeGateVariable+"="+setting)
-			output, landError := landing.CombinedOutput()
-			if landError != nil {
-				test.Fatalf("the landing failed: %v\n%s", landError, output)
-			}
-			recorded, readError := os.ReadFile(asked)
-			if readError != nil {
-				test.Fatal(readError)
-			}
-			tests := 0
-			for _, line := range strings.Split(strings.TrimSpace(string(recorded)), "\n") {
-				if !strings.HasPrefix(line, "test") {
-					continue
-				}
-				tests++
-				if strings.Contains(line, "-count") {
-					test.Errorf("the Mac ran a go test with -count, which throws its honest cache away: go %s", line)
-				}
-			}
-			if tests == 0 {
-				test.Fatalf("the Mac ran no go test, so nothing was checked:\n%s", recorded)
-			}
-		})
+	fixture := newLandFixture(test)
+	asked := filepath.Join(test.TempDir(), "asked")
+	recorder := "#!/bin/sh\necho \"$*\" >> '" + asked + "'\n"
+	if writeError := executable_testing.WriteFile(filepath.Join(filepath.Dir(fixture.log), "go"),
+		[]byte(recorder), 0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	worktree := fixture.worktree("a")
+	writeFixtureFile(test, filepath.Join(worktree, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
+	writeFixtureFile(test, filepath.Join(worktree, "internal", "edit", "edit_test.go"),
+		"package edit\n\nimport \"testing\"\n\nfunc TestEdit(test *testing.T) {}\n")
+	fixture.git(worktree, "add", ".")
+	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a module"))
+	fixture.git(worktree, "merge", "-q", "--no-edit", "-m", "Merge main", "main")
+	landing := exec.Command(fixture.wrapper, "land", "--message", "a module tested")
+	landing.Dir, landing.Env = worktree, append(fixture.environment, gateVariable+"="+gateOffSetting)
+	output, landError := landing.CombinedOutput()
+	if landError != nil {
+		test.Fatalf("the landing failed: %v\n%s", landError, output)
+	}
+	recorded, readError := os.ReadFile(asked)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	tests := 0
+	for _, line := range strings.Split(strings.TrimSpace(string(recorded)), "\n") {
+		if !strings.HasPrefix(line, "test") {
+			continue
+		}
+		tests++
+		if strings.Contains(line, "-count") {
+			test.Errorf("Kirk's Mac ran a go test with -count, which throws its honest cache away: go %s", line)
+		}
+	}
+	if tests != 2 {
+		test.Fatalf("Kirk's Mac ran %d go tests, want the module's and its -race run:\n%s", tests, recorded)
 	}
 }

@@ -24,9 +24,9 @@ import (
 // The unit-isolation step (#h350vqr): a landing that touches a rule's package, its code or its fixtures, runs that
 // rule's fixtures under unit isolation on the Mac, after the module's tests. A rule that starts reading another
 // declaration's body does it by editing its code while its declared inputs stay the same, so the declaration alone
-// cannot say when to look. Home's run is left alone: its script takes no variable of the land's, and widening its
-// contract for this is not the gate's to do. A landing that touches no rule directory runs only the isolation core
-// the module's tests already hold, the test's own fixture and the pin, about a second.
+// cannot say when to look. The gate box's run is left alone: its script takes no variable of the land's, and widening
+// its contract for this is not the gate's to do. A landing that touches no rule directory runs only the isolation
+// core the module's tests already hold, the test's own fixture and the pin, about a second.
 //
 // A change to a shared helper isolates every rule that imports it, and a dispatcher every rule imports moves any
 // rule's findings, so a landing that changes one isolates nearly every rule's fixtures, about 140 s on the Mac. That
