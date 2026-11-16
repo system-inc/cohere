@@ -68,6 +68,40 @@ func TestAnIndexNeverAskedIsNeverBuilt(test *testing.T) {
 	}
 }
 
+// TestMakingTheIndexesWalksNoFile holds the laziness by what it costs, not by the flag the build sets: the analyzer's
+// run over a package of one real file, marker.go, allocates the indexes, their map, and each file's index and its
+// unbuilt groups, 7 allocations, while an eager walk of that file adds its maps, their growth and its slice of lines,
+// 34 more. A walk put back anywhere the run reaches, inside the closure or beside it, takes the run past the bound,
+// which leaves room for a compiler that allocates a little differently and none for a walk.
+//
+// Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would add
+// to.
+func TestMakingTheIndexesWalksNoFile(test *testing.T) {
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "marker.go", nil, parser.ParseComments)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	syntax := []*ast.File{file}
+	table := positions.New(fileSet, syntax)
+	// A walk of a file with few comments costs little, so a bound held over one would pass for the wrong reason.
+	if walked := testing.AllocsPerRun(1, func() { _ = findCommentLines(table, file) }); walked < 20 {
+		test.Fatalf("walking marker.go allocated %.0f times, too few for the bound to tell a walk from none", walked)
+	}
+	pass := &analysis.Pass{Fset: fileSet, Files: syntax,
+		ResultOf: map[*analysis.Analyzer]any{positions.Analyzer: table}}
+	allocations := testing.AllocsPerRun(10, func() {
+		if _, runError := run(pass); runError != nil {
+			test.Fatal(runError)
+		}
+	})
+	test.Logf("allocations making the indexes of a package of marker.go: %.0f", allocations)
+	if allocations > 12 {
+		test.Errorf("making the indexes of a package of marker.go allocated %.0f times, more than 12, so a file was "+
+			"walked before anything asked its index", allocations)
+	}
+}
+
 // Several rules, and one rule's shards of a large package, ask one file's index at once. Each asker gets what an index
 // built up front answers, for every node of a real file, and the race detector, under which the gate runs this
 // package, sees the groups found once and read by all.
