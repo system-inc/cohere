@@ -265,7 +265,9 @@ pin_swift_engine() {
     local contract=$(print -- "$cohere_version" | awk '$1 == "swift" && $2 == "contract:" { print $3; exit }')
     swift_commit=$(git -C $module rev-parse --verify "$commit^{commit}") ||
       fail "the engine's commit $commit is not in $module"
-    (cd ${bench_directory:h} && go build -o $logs/swift_engine ./internal/bench_results/tools/swift_engine) ||
+    # Built without a version stamp, which nothing reads, so it builds in a cohere-dev worktree too (#268j573).
+    (cd ${bench_directory:h} && go build -buildvcs=false -o $logs/swift_engine \
+      ./internal/bench_results/tools/swift_engine) ||
       fail "could not build the Swift engine resolver"
     swift_source=$($logs/swift_engine $module $swift_commit $contract) ||
       fail "could not resolve the Swift engine built from $swift_commit"
