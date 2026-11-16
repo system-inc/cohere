@@ -369,6 +369,8 @@ func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 		return
 	}
 	byName := map[string]packageMethods{}
+	// One namer reads every type name's method set by its names alone, never building the set (#5xzb4q2).
+	namer := newMethodSetNamer()
 	for _, name := range declaring.Scope().Names() {
 		typeName, isTypeName := declaring.Scope().Lookup(name).(*types.TypeName)
 		if !isTypeName {
@@ -378,16 +380,14 @@ func (build *ReadsBuild) indexPackage(declaring *types.Package) {
 		if !types.IsInterface(setOf) {
 			setOf = types.NewPointer(setOf)
 		}
-		wholeSet := types.NewMethodSet(setOf)
-		for index := range wholeSet.Len() {
-			methodName := wholeSet.At(index).Obj().Name()
+		wholeSetNames := namer.methodNames(setOf)
+		for _, methodName := range wholeSetNames {
 			entry := byName[methodName]
 			entry.methodSetTypeNames = append(entry.methodSetTypeNames, typeName)
 			byName[methodName] = entry
 		}
 		if types.IsInterface(typeName.Type()) {
-			for index := range wholeSet.Len() {
-				methodName := wholeSet.At(index).Obj().Name()
+			for _, methodName := range wholeSetNames {
 				entry := byName[methodName]
 				entry.ruleTypeNames = append(entry.ruleTypeNames, typeName)
 				byName[methodName] = entry
