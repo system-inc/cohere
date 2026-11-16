@@ -573,7 +573,7 @@ func TestNoUnusedVariablesCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T
 			len(result.Diagnostics))
 	}
 	// The variables pattern does not reach a caught error.
-	varsOnly, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(
+	variablesOnly, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(
 		json.RawMessage(`{"varsIgnorePattern":"^_"}`),
 	)
 	if decodeNoUnusedVariablesOptionsError != nil {
@@ -584,7 +584,7 @@ func TestNoUnusedVariablesCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T
 		NoUnusedVariables,
 		"a.ts",
 		"try {} catch(_) { }",
-		varsOnly,
+		variablesOnly,
 	); len(result.Diagnostics) != 1 {
 		test.Errorf("varsIgnorePattern does not cover a caught error; got %d", len(result.Diagnostics))
 	}

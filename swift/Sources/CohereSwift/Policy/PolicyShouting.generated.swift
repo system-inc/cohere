@@ -9,7 +9,7 @@ enum PolicyShouting {
             "about": "The uppercase vocabulary of the shouting rules: nexus/consistency-no-shouting in TypeScript, read through go:embed, and cohere-swift/consistency-no-shouting in Swift, compiled in, so every engine reads one list. An uppercase word in a comment is shouting unless a group of `allowed` names it, it carries a digit or an underscore, it has no vowel, or it has two letters and `shoutedTwoLetterWords` does not name it. A word an allowed group names is never shouting, whatever its shape, and `shoutedTwoLetterWords` cannot overrule it. The shape tests and the masks that hide code are each engine's to apply, not data.",
             "allowed": [
                 {
-                    "reason": "Acronyms, identifiers and protocol names that are legitimately uppercase. Earned entry by entry against a live corpus of this codebase's comments: every one is a word the codebase speaks, and a missing one shows up as a false positive that teaches people to disable the rule. `SSA` and `WHATWG` were added when the text rules corpus ruled one list for every engine (#4b337jk, cases sh02 and sh03).",
+                    "reason": "Acronyms, identifiers and protocol names that are legitimately uppercase. Earned entry by entry against a live corpus of this codebase's comments: every one is a word the codebase speaks, and a missing one shows up as a false positive that teaches people to disable the rule. `SSA` and `WHATWG` were added when the text rules corpus ruled one list for every engine (#4b337jk, cases sh02 and sh03). `LAN`, a local area network, was Kirk's ask (#1ykwdb9).",
                     "tokens": [
                         "AAB",
                         "AAC",
@@ -171,6 +171,7 @@ enum PolicyShouting {
                         "JSX",
                         "JWT",
                         "KPI",
+                        "LAN",
                         "LIFO",
                         "LLM",
                         "LRE",

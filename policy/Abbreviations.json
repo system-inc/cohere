@@ -254,7 +254,9 @@
         {
             "abbreviation": "vars",
             "advice": "Use \"Variables\" for variables, or a name saying it means JavaScript's var keyword.",
-            "reason": "Before `var`, so the longer word wins. It asks rather than offering `Variables` for the reason `var` does: a census of the Go fix's renames found `Var` and `Vars` in names meaning JavaScript's var keyword, which is no variable.",
+            "reason": "Before `var`, so the longer word wins. It asks rather than offering `Variables` for the reason `var` does: a census of the Go fix's renames found `Var` and `Vars` in names meaning JavaScript's var keyword, which is no variable. Judged as the whole name and as a prefix too, by Kirk's ask (#1ykwdb9), each giving the same advice, and in folder names through policy/NameWords.json, which holds the same entry.",
+            "whole": { "style": "advice" },
+            "prefix": { "phase": "late", "style": "advice" },
             "segment": { "style": "advice" }
         },
         {

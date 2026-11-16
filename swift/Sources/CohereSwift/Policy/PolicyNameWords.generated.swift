@@ -6,7 +6,7 @@ enum PolicyNameWords {
     /* policy/NameWords.json, byte for byte. */
     static let file = ##"""
         {
-            "about": "The words a folder's or a file's name spells out and an identifier need not, beside policy/Abbreviations.json, which every name is judged by. A name on a path is read on every path and every import, and a word in it can be short for a word the house spells out while the same letters inside an identifier are someone else's term: `docs` is documentation as a folder or a file name, and the plural of Prettier's doc in the formatter's `expressionDocs`. So these are judged in folder and file names alone, by the TypeScript and Go file-name rules and the folder check in discovery through internal/file_name_words, and by the Swift engine compiled in as PolicyNameWords. Each entry has Abbreviations.json's shape and is read by its loader, with the forms judged on the name's words read as one camelCase identifier, so `docs_data.go` reads as `docsData`. A word joins here only when it is not in Abbreviations.json, since a word there is judged in every name already. allowedSegments are proper nouns whose letters hold a word here, read as Abbreviations.json reads its own, and across a folder and its parent, so google/docs is Google Docs.",
+            "about": "The words a folder's or a file's name spells out and an identifier need not, beside policy/Abbreviations.json, which every name is judged by. A name on a path is read on every path and every import, and a word in it can be short for a word the house spells out while the same letters inside an identifier are someone else's term: `docs` is documentation as a folder or a file name, and the plural of Prettier's doc in the formatter's `expressionDocs`. So these are judged in folder and file names alone, by the TypeScript and Go file-name rules and the folder check in discovery through internal/file_name_words, and by the Swift engine compiled in as PolicyNameWords. Each entry has Abbreviations.json's shape and is read by its loader, with the forms judged on the name's words read as one camelCase identifier, so `docs_data.go` reads as `docsData`. A word in Abbreviations.json is judged in every file name already, so it joins here only to judge folders too, whose names are read by this list alone, and then with the same forms, expansions and advice, word for word, so the two readings cannot drift: `vars` (#1ykwdb9). allowedSegments are proper nouns whose letters hold a word here, read as Abbreviations.json reads its own, and across a folder and its parent, so google/docs is Google Docs.",
             "abbreviations": [
                 {
                     "abbreviation": "docs",
@@ -15,6 +15,14 @@ enum PolicyNameWords {
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "segment": {}
+                },
+                {
+                    "abbreviation": "vars",
+                    "advice": "Use \"Variables\" for variables, or a name saying it means JavaScript's var keyword.",
+                    "reason": "Abbreviations.json's entry, every form and the advice as written there, held here so a folder is judged on it, since a folder's name is read by this list alone (#zyq63kk): Kirk's ask (#1ykwdb9), Loom's wire/vars/ the case he saw. In a file name the shared vocabulary is asked first, so this entry speaks only for folders.",
+                    "whole": { "style": "advice" },
+                    "prefix": { "phase": "late", "style": "advice" },
+                    "segment": { "style": "advice" }
                 }
             ],
             "allowedSegments": [

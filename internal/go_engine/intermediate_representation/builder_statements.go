@@ -420,12 +420,12 @@ func (packageBuilder *builder) typeSwitchStatement(function *Function, statement
 	// default branch
 	rets = append(rets, tag.Type())
 
-	var vars []*types.Var
-	vars = append(vars, varIndex)
+	var variables []*types.Var
+	variables = append(variables, varIndex)
 	for _, caseType := range rets {
-		vars = append(vars, anonymousVariable(caseType))
+		variables = append(variables, anonymousVariable(caseType))
 	}
-	tswtch.setType(types.NewTuple(vars...))
+	tswtch.setType(types.NewTuple(variables...))
 	// default branch
 	function.currentBlock = entry
 	function.emit(tswtch, statement)
@@ -458,7 +458,7 @@ func (packageBuilder *builder) typeSwitchStatement(function *Function, statement
 				// In multi-type cases, 'case nil' and default,
 				// y has the same type as the interface operand.
 
-				variable := function.vars[object]
+				variable := function.localVariables[object]
 				if rets[index] == tUntypedNil {
 					emitStore(function, variable, nilConstant(tswtch.Tag.Type(), nil), statement.Assign)
 				} else {
@@ -492,7 +492,7 @@ func (packageBuilder *builder) typeSwitchStatement(function *Function, statement
 			_break: done,
 		}
 		if object, ok := function.info.Implicits[default_].(*types.Var); ok {
-			variable := function.vars[object]
+			variable := function.localVariables[object]
 			x := emitExtract(function, tswtch, index+1, statement.Assign)
 			emitStore(function, variable, x, statement)
 		}
@@ -624,8 +624,8 @@ func (packageBuilder *builder) selectStatement(
 		Blocking: blocking,
 	}
 	selectInstruction.source = statement
-	var vars []*types.Var
-	vars = append(vars, varIndex, varOk)
+	var variables []*types.Var
+	variables = append(variables, varIndex, varOk)
 	for _, st := range states {
 		if st.Direction == types.RecvOnly {
 			channelType, isChannel := core_type.Of(function.instantiatedType(st.Channel.Type())).(*types.Chan)
@@ -634,10 +634,10 @@ func (packageBuilder *builder) selectStatement(
 				panic(fmt.Sprintf("receive from %s, which has no channel core type", st.Channel.Type()))
 			}
 			tElem := channelType.Elem()
-			vars = append(vars, anonymousVariable(tElem))
+			variables = append(variables, anonymousVariable(tElem))
 		}
 	}
-	selectInstruction.setType(types.NewTuple(vars...))
+	selectInstruction.setType(types.NewTuple(variables...))
 	function.emit(selectInstruction, statement)
 	index := emitExtract(function, selectInstruction, 0, statement)
 
@@ -855,7 +855,7 @@ func (packageBuilder *builder) forStatementGo122(function *Function, statement *
 		next   *Allocation
 		store  *Store
 	}
-	vars := make([]loopVariable, len(init.Lhs))
+	loopVariables := make([]loopVariable, len(init.Lhs))
 	for index, lhs := range init.Lhs {
 		id, isIdent := lhs.(*ast.Ident)
 		if !isIdent {
@@ -882,13 +882,13 @@ func (packageBuilder *builder) forStatementGo122(function *Function, statement *
 		store := emitStore(function, next, load, statement)
 
 		phi.Edges = []Value{outer, next} // pre edge is emitted before post edge.
-		vars[index] = loopVariable{variable, outer, phi, load, next, store}
+		loopVariables[index] = loopVariable{variable, outer, phi, load, next, store}
 	}
 
 	// ...init... under fn.objects[v] = i_outer
 	function.currentBlock = pre
-	for _, variable := range vars {
-		function.vars[variable.object] = variable.outer
+	for _, variable := range loopVariables {
+		function.localVariables[variable.object] = variable.outer
 	}
 	const isDef = false // assign to already-allocated outers
 	packageBuilder.assignStatement(function, init.Lhs, init.Rhs, isDef, init)
@@ -900,8 +900,8 @@ func (packageBuilder *builder) forStatementGo122(function *Function, statement *
 
 	// ...cond... under fn.objects[v] = i
 	function.currentBlock = loop
-	for _, variable := range vars {
-		function.vars[variable.object] = variable.phi
+	for _, variable := range loopVariables {
+		function.localVariables[variable.object] = variable.phi
 	}
 	if statement.Cond != nil {
 		packageBuilder.condition(function, statement.Cond, body, done)
@@ -921,8 +921,8 @@ func (packageBuilder *builder) forStatementGo122(function *Function, statement *
 	emitJump(function, post, statement)
 
 	// ...post... under fn.objects[v] = i_next
-	for _, variable := range vars {
-		function.vars[variable.object] = variable.next
+	for _, variable := range loopVariables {
+		function.localVariables[variable.object] = variable.next
 	}
 	function.currentBlock = post
 	if statement.Post != nil {
@@ -940,7 +940,7 @@ func (packageBuilder *builder) forStatementGo122(function *Function, statement *
 	// the cond or post expression causes i to escape
 	// (because escape distributes over phi).
 	var nlocals int
-	for _, variable := range vars {
+	for _, variable := range loopVariables {
 		if !variable.next.Heap {
 			nlocals++
 		}
@@ -948,7 +948,7 @@ func (packageBuilder *builder) forStatementGo122(function *Function, statement *
 	if nlocals > 0 {
 		replace := make(map[Value]Value, 2*nlocals)
 		dead := make(map[Instruction]bool, 4*nlocals)
-		for _, variable := range vars {
+		for _, variable := range loopVariables {
 			if !variable.next.Heap {
 				replace[variable.next] = variable.outer
 				replace[variable.phi] = variable.outer

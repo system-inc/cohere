@@ -61,7 +61,7 @@ func emitLocal(function *Function, resolvedType types.Type, source ast.Node, com
 // It applies the appropriate generic instantiation to the type.
 func emitLocalVariable(function *Function, variable *types.Var, source ast.Node) *Allocation {
 	allocation := emitLocal(function, function.instantiatedType(variable.Type()), source, variable.Name())
-	function.vars[variable] = allocation
+	function.localVariables[variable] = allocation
 	return allocation
 }
 

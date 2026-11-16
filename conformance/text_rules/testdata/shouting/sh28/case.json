@@ -1,0 +1,11 @@
+{
+    "why": "sh28: `LAN`, the local area network, is on the one allowlist every engine reads, so it is clean (#1ykwdb9)",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

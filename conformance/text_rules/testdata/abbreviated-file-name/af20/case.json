@@ -1,0 +1,15 @@
+{
+    "why": "af20: `vars` is reported in a file's name as in an identifier, `env_vars` read as `envVars` (#1ykwdb9)",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "env_vars",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

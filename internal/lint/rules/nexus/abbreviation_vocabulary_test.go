@@ -41,12 +41,12 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 		want []string
 	}{
 		// The switch (13), the early group (7), exactAbbreviations (10), the thirteen Go words @system_cohere
-		// added for every engine on #ec8mvbg, and the twenty-three go/ast, go/types and go/ir taught (#r0fa8pa).
-		// Whole-word matches cannot overlap, so this one is compared as a set.
+		// added for every engine on #ec8mvbg, the twenty-three go/ast, go/types and go/ir taught (#r0fa8pa), and
+		// `vars` (#1ykwdb9). Whole-word matches cannot overlap, so this one is compared as a set.
 		{"whole", wholeWords, sortedCopy([]string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "acc", "char", "fn", "str",
 			"ctx", "db", "tx", "opts", "cur", "pct", "prev",
-			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
+			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max", "vars",
 			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
 			"instrs", "instr", "succs", "succ", "preds", "pred", "prog", "alloc", "addr", "conds", "cond", "chan",
 			"expr", "func", "fset", "recv", "op", "stmt", "ptr", "typ", "sel", "anon", "deref",
@@ -55,12 +55,12 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 		{"early prefix", abbreviationsOf(vocabulary.EarlyPrefixes), []string{
 			"ctx", "db", "tx", "opts", "cur", "pct", "prev",
 		}},
-		// The late group (9), the role prefixes (3), prefixAbbreviations (10), the thirteen Go words and the
-		// syntax tree's twenty-three. No two of these can match one name, so their relative order was never
+		// The late group (9), the role prefixes (3), prefixAbbreviations (10), `vars`, the thirteen Go words and
+		// the syntax tree's twenty-three. No two of these can match one name, so their relative order was never
 		// observable; the file's order is pinned.
 		{"late prefix", abbreviationsOf(vocabulary.LatePrefixes), []string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "char", "fn", "str",
-			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
+			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max", "vars",
 			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
 			"instrs", "instr", "succs", "succ", "preds", "pred", "prog", "alloc", "addr", "conds", "cond", "chan",
 			"expr", "func", "fset", "recv", "op", "stmt", "ptr", "typ", "sel", "anon", "deref",
@@ -148,9 +148,9 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 		}
 		judged++
 	}
-	// 66 whole, 65 prefix, 23 suffix, 46 segment: the counts the table above pins.
-	if judged != 200 {
-		test.Errorf("judged %d forms, want 200", judged)
+	// 67 whole, 66 prefix, 23 suffix, 46 segment: the counts the table above pins.
+	if judged != 202 {
+		test.Errorf("judged %d forms, want 202", judged)
 	}
 }
 

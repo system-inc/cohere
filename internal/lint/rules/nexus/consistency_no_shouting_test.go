@@ -61,6 +61,7 @@ func TestConsistencyNoShoutingStaysSilent(test *testing.T) {
 		{"identifier with underscore", "// read DATABASE_URL from the environment\nexport const Value = 1;\n"},
 		{"identifier with a digit", "// the H3 heading and the C1 column\nexport const Value = 1;\n"},
 		{"currency code", "// amounts in KRW have no minor unit\nexport const Value = 1;\n"},
+		{"local area network", "// reachable once the LAN is up\nexport const Value = 1;\n"},
 		{"double quoted literal", "// \"ORDER STATUS\" is the column label\nexport const Value = 1;\n"},
 		{"single quoted token", "// pass 'US' as the region\nexport const Value = 1;\n"},
 		{"fenced block", "/*\n * ```\n * NEVER DO THIS\n * ```\n */\nexport const Value = 1;\n"},

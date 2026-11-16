@@ -309,7 +309,8 @@ func isInitialism(word string) bool {
 // names the word and how to spell it out; its message and values are the identifier rule's, and a file-name rule
 // renders its own from the entry (Advice).
 //
-// The shared vocabulary is asked first, since a word there is every name's, and NameWords holds none of its words.
+// The shared vocabulary is asked first, since a word there is every name's, and NameWords holds one of its words
+// only to judge folders on it, reading it as the shared vocabulary does (`vars`, #1ykwdb9).
 // Each list's allowed segments pass only its own words: `googleDocsApi` holds Google Docs and passes `docs`, and a
 // `Cfg` beside the brand is still the shared vocabulary's to report.
 func Abbreviated(words []string, ruleNames RuleNames) (abbreviation.Finding, bool) {

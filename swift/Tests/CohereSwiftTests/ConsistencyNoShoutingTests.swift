@@ -52,6 +52,7 @@ struct ConsistencyNoShoutingTests {
         #expect(try Self.flagged("// Reads DATABASE_URL, then H264 and the CPU count.\nlet value = 1\n").isEmpty)
         #expect(try Self.flagged("// Read the README and the CHANGELOG.\nlet value = 1\n").isEmpty)
         #expect(try Self.flagged("// The XKCD comic and the IP range.\nlet value = 1\n").isEmpty)
+        #expect(try Self.flagged("// Reachable once the LAN is up.\nlet value = 1\n").isEmpty)
         #expect(try Self.flagged("// It IS done, and US is allowed.\nlet value = 1\n") == ["1:IS"])
         /* A word glued to lowercase is a name, never a shout. */
         #expect(try Self.flagged("// NEVERmind the URLs.\nlet value = 1\n").isEmpty)
@@ -171,7 +172,7 @@ struct ConsistencyNoShoutingTests {
         #expect(!onDisk.isEmpty)
         #expect(Data(PolicyShouting.file.utf8) == onDisk, "run go run ./policy/tools/generate")
         let vocabulary = try ShoutingVocabulary.compiledIn()
-        #expect(vocabulary.allowed.isSuperset(of: ["SSA", "WHATWG", "API", "README", "KRW"]))
+        #expect(vocabulary.allowed.isSuperset(of: ["SSA", "WHATWG", "API", "README", "KRW", "LAN"]))
         #expect(vocabulary.shoutedTwoLetterWords.contains("IS"))
     }
 }

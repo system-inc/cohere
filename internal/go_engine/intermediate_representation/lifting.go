@@ -735,7 +735,7 @@ func liftingHasDirectReferrer(value Value) bool {
 // liftingDeferStackPreamble is the Allocation holding the function's ssa:deferstack() and the call that fills it,
 // or nils when the function has none.
 func liftingDeferStackPreamble(function *Function) (*Allocation, *Call) {
-	allocation, _ := function.vars[function.deferstack].(*Allocation)
+	allocation, _ := function.localVariables[function.deferstack].(*Allocation)
 	if allocation == nil {
 		return nil, nil
 	}
