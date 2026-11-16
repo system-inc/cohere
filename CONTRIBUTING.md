@@ -135,7 +135,8 @@ line.
 A gate box is a shared box: every org there runs as loom and writes one Go cache, so its run trusts nothing it
 kept (`shared_box_gate.go`, #adbkt5t). Its Go toolchain must digest to the one pinned there before any of it
 runs. Its account's Go settings are left unread. `go mod verify` passes before any test. Every test runs with
-`-count=1` on a Go cache made empty for the job. A mirror that doesn't hold the commit after 3 minutes, or a
+`-count=1` on a Go cache made empty for the job, and each package may run 30 minutes, since on an empty cache
+`internal/go_engine` alone took 8 on an idle Sun2 and crossed go test's default 10 in the whole run (#er5mbvc). A mirror that doesn't hold the commit after 3 minutes, or a
 toolchain or module cache it can't vouch for, refuses the landing, and its verdict's land line says "scratch box,
 shared uid".
 
