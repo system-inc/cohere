@@ -1,6 +1,8 @@
 package build_dependence
 
 import (
+	"go/ast"
+	"go/types"
 	"maps"
 	"slices"
 	"sync"
@@ -151,5 +153,43 @@ func TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild(test *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// newUnit's one walk of a declaration sizes it as countNodes does and finds the universe's names a walk of its own
+// finds, for every unit of block 1's fixtures, so folding the two walks into one changed no unit's size or names.
+func TestAUnitsOneWalkSizesItAndFindsItsUniverseNames(test *testing.T) {
+	test.Parallel()
+
+	units := 0
+	for _, fixture := range scratchFixtures {
+		for _, loaded := range sortedPackages(loadFixture(test, fixture, hostBuild)) {
+			collecting := newWorkerScratch().collector(loaded.TypesInfo)
+			for _, file := range loaded.Syntax {
+				tokenFile := loaded.Fset.File(file.FileStart)
+				for _, declaration := range unitDeclarations(file) {
+					var universeNames uint64
+					ast.Inspect(declaration, func(node ast.Node) bool {
+						if identifier, isIdentifier := node.(*ast.Ident); isIdentifier {
+							object := loaded.TypesInfo.Uses[identifier]
+							if object != nil && object.Parent() == types.Universe {
+								universeNames |= universeNameBit(object.Name())
+							}
+						}
+						return true
+					})
+					unit := collecting.newUnit(tokenFile, declaration)
+					if unit.nodes != countNodes(declaration) || unit.universeNames != universeNames {
+						test.Errorf("%s %s:%d: the walk finds %d nodes and names %x, want %d and %x", loaded.ID,
+							unit.file, unit.start, unit.nodes, unit.universeNames, countNodes(declaration),
+							universeNames)
+					}
+					units++
+				}
+			}
+		}
+	}
+	if units == 0 {
+		test.Fatal("the fixtures hold no unit, so the walk was compared with nothing")
 	}
 }

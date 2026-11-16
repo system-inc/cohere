@@ -34,12 +34,7 @@ type bodyWalk struct {
 func (walk *bodyWalk) references(bodies ...ast.Node) []reference {
 	clear(walk.collected)
 	for _, body := range bodies {
-		ast.Inspect(body, func(node ast.Node) bool {
-			if node != nil {
-				walk.visit(node)
-			}
-			return true
-		})
+		ast.Walk(bodyVisitor{walk: walk}, body)
 	}
 	walk.collectedMost = max(walk.collectedMost, len(walk.collected))
 	if len(walk.collected) == 0 {
@@ -51,6 +46,21 @@ func (walk *bodyWalk) references(bodies ...ast.Node) []reference {
 	}
 	// The slice's capacity ends with it, so nothing appended to it could write over the next body's references.
 	return walk.referenceStore[start:len(walk.referenceStore):len(walk.referenceStore)]
+}
+
+// bodyVisitor is references' walk of a body, which makes no closure for each body: a struct of one pointer is held
+// in an interface as the pointer itself.
+type bodyVisitor struct {
+	walk *bodyWalk
+}
+
+// Visit collects what node reads.
+func (visitor bodyVisitor) Visit(node ast.Node) ast.Visitor {
+	if node == nil {
+		return nil
+	}
+	visitor.walk.visit(node)
+	return visitor
 }
 
 // visit collects what one node of a body reads: its own object or selection, what it touches of an underlying, and

@@ -32,6 +32,59 @@ type collector struct {
 	calleeSeen     map[types.Object]bool
 	calleeSeenMost int
 	calleeStore    []types.Object
+
+	// unitWalk and usesWalk are newUnit's and addUses' walks, kept here so neither makes a closure for each walk.
+	unitWalk unitVisitor
+	usesWalk usesVisitor
+}
+
+// unitVisitor is newUnit's one walk of a declaration: it counts the syntax nodes under it, the declaration itself
+// included, as countNodes does, and gathers the universe's names its identifiers use.
+type unitVisitor struct {
+	typesInformation *types.Info
+	nodes            int
+	universeNames    uint64
+}
+
+// Visit counts node and reads the universe's name it uses, if any.
+func (visitor *unitVisitor) Visit(node ast.Node) ast.Visitor {
+	if node == nil {
+		return nil
+	}
+	visitor.nodes++
+	if identifier, isIdentifier := node.(*ast.Ident); isIdentifier {
+		object := visitor.typesInformation.Uses[identifier]
+		if object != nil && object.Parent() == types.Universe {
+			visitor.universeNames |= universeNameBit(object.Name())
+		}
+	}
+	return visitor
+}
+
+// usesVisitor is addUses' walk of one root: the object whose bit depends on what the root uses, which bit, and whether
+// a type name or var is read in full. Adding a use walks no syntax, so one walk at a time is all a collector holds.
+type usesVisitor struct {
+	collecting     *collector
+	from           types.Object
+	fromUnderlying bool
+	full           bool
+}
+
+// Visit adds the use of the object an identifier or selector resolves to.
+func (visitor *usesVisitor) Visit(node ast.Node) ast.Visitor {
+	var used types.Object
+	switch node := node.(type) {
+	case *ast.Ident:
+		used = visitor.collecting.typesInformation.Uses[node]
+	case *ast.SelectorExpr:
+		if selection := visitor.collecting.typesInformation.Selections[node]; selection != nil {
+			used = selection.Obj()
+		}
+	}
+	if used != nil {
+		visitor.collecting.addUse(visitor.from, visitor.fromUnderlying, visitor.full, used)
+	}
+	return visitor
 }
 
 // collectFile collects every unit of file, whose place tokenFile holds. Imports are no units.
@@ -68,26 +121,20 @@ func (collecting *collector) collectFile(tokenFile *token.File, file *ast.File) 
 	}
 }
 
-// newUnit is the unit of declaration, sized and placed, and the universe's names it uses, with nothing declared yet.
+// newUnit is the unit of declaration, sized and placed, and the universe's names it uses, with nothing declared yet,
+// its size and names read in one walk of it.
 func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node) unitRecord {
-	unit := unitRecord{
+	collecting.unitWalk = unitVisitor{typesInformation: collecting.typesInformation}
+	ast.Walk(&collecting.unitWalk, declaration)
+	return unitRecord{
 		// The file a reader sees, past any //line directive, so a cgo package's unit carries its .go file as written
 		// rather than the cgo tool's output in the build cache, whose name changes from run to run.
-		file:  tokenFile.Position(declaration.Pos()).Filename,
-		start: tokenFile.Offset(declaration.Pos()),
-		end:   tokenFile.Offset(declaration.End()),
-		nodes: countNodes(declaration),
+		file:          tokenFile.Position(declaration.Pos()).Filename,
+		start:         tokenFile.Offset(declaration.Pos()),
+		end:           tokenFile.Offset(declaration.End()),
+		nodes:         collecting.unitWalk.nodes,
+		universeNames: collecting.unitWalk.universeNames,
 	}
-	ast.Inspect(declaration, func(node ast.Node) bool {
-		if identifier, isIdentifier := node.(*ast.Ident); isIdentifier {
-			object := collecting.typesInformation.Uses[identifier]
-			if object != nil && object.Parent() == types.Universe {
-				unit.universeNames |= universeNameBit(object.Name())
-			}
-		}
-		return true
-	})
-	return unit
 }
 
 // collectFunction collects a FuncDecl's unit: its function, the fields of anonymous structs in its signature, and its
@@ -340,25 +387,12 @@ func (collecting *collector) collectValue(
 // Type names are left to the structural walk of from's type, except where full, in a constant's value, where a type
 // name or a var is read in full. A package name, a builtin, nil and a label are the same in every build.
 func (collecting *collector) addUses(from types.Object, fromUnderlying bool, full bool, roots ...ast.Node) {
+	collecting.usesWalk = usesVisitor{collecting: collecting, from: from, fromUnderlying: fromUnderlying, full: full}
 	for _, root := range roots {
 		if root == nil {
 			continue
 		}
-		ast.Inspect(root, func(node ast.Node) bool {
-			var used types.Object
-			switch node := node.(type) {
-			case *ast.Ident:
-				used = collecting.typesInformation.Uses[node]
-			case *ast.SelectorExpr:
-				if selection := collecting.typesInformation.Selections[node]; selection != nil {
-					used = selection.Obj()
-				}
-			}
-			if used != nil {
-				collecting.addUse(from, fromUnderlying, full, used)
-			}
-			return true
-		})
+		ast.Walk(&collecting.usesWalk, root)
 	}
 }
 
