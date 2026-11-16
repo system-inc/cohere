@@ -114,7 +114,9 @@ func judgeLiteral(context *rule.Context, node ast.Node, stack []ast.Node) {
 	}
 	// A literal the parser accepted always unquotes; one that does not is left alone rather than guessed at.
 	value, unquoteError := strconv.Unquote(literal.Value)
-	if unquoteError != nil || !homeDirectory.MatchString(value) {
+	// Most literals kept for unquoting hold an escape such as \n and no home directory, so the words are asked of the
+	// value before the expression, which costs far more than the search and can match only where they stand.
+	if unquoteError != nil || !holdsHomeWords(value) || !homeDirectory.MatchString(value) {
 		return
 	}
 	if state.coveredAbove == nil {
@@ -155,7 +157,13 @@ func mayNameHomeDirectory(source string) bool {
 	if strings.ContainsAny(source, "\\\r") {
 		return true
 	}
-	return strings.Contains(source, "/Users/") || strings.Contains(source, "/home/")
+	return holdsHomeWords(source)
+}
+
+// holdsHomeWords is whether text holds /Users/ or /home/ as written, which every match of homeDirectory does, so text
+// without either names no home directory.
+func holdsHomeWords(text string) bool {
+	return strings.Contains(text, "/Users/") || strings.Contains(text, "/home/")
 }
 
 // linesCoveredAbove is the excuse each line of file takes from a marker directly above a node: every line of each node
