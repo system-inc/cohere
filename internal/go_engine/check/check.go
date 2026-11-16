@@ -401,18 +401,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if session != nil {
 		hostReloads = session.decideHostRestores(graphs)
 	}
-	type rootKey struct {
-		analyzer        *analysis.Analyzer
-		analyzedPackage *packages.Package
-	}
-	// A later wave's action on a package is the one that counts: the second wave analyzes again a package of the first
-	// that it could not restore.
-	actionOf := map[rootKey]*checker.Action{}
-	for _, waveGraph := range graphs {
-		for _, action := range waveGraph.Roots {
-			actionOf[rootKey{action.Analyzer, action.Package}] = action
-		}
-	}
+	rootsOf := rootActions(roots, analyzed, graphs)
 
 	result := &Result{
 		ReadWalks:           walks,
@@ -436,17 +425,30 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		}
 		return loadedFiles
 	}
-	seenFindings := map[findingKey]bool{}
+	// What the gather reads of each analyzed package, by its index in analyzed, read once rather than once per
+	// analyzer.
+	gathering := make([]gatheredPackage, len(analyzed))
+	for index, analyzedPackage := range analyzed {
+		gathering[index] = gatheredPackage{restored: session.restoredOf(analyzedPackage),
+			reads: options.Reads[analyzedPackage]}
+	}
+	// found is each analyzer's findings on each package, by the analyzer's index in analyzers and the package's in
+	// analyzed, nil where it crashed, all of them gathered before any is kept, so the findings kept and the set they
+	// are deduplicated in are allocated once at their whole size.
+	found := make([][][]Finding, len(analyzers))
+	foundCount := 0
 	seenCrashes := map[Crash]bool{}
-	// In the order of graph.Roots, each analyzer over each package, so of two findings alike the one kept is the
-	// one a run without the cache keeps.
-	for _, analyzer := range analyzers {
+	for analyzerIndex, analyzer := range analyzers {
 		analyzerRule := ruleOf[analyzer]
-		for _, analyzedPackage := range analyzed {
-			found, restored := session.findingsOf(analyzer, analyzedPackage)
-			if !restored {
-				action, ran := actionOf[rootKey{analyzer, analyzedPackage}]
-				if !ran {
+		found[analyzerIndex] = make([][]Finding, len(analyzed))
+		for packageIndex, analyzedPackage := range analyzed {
+			gathered := &gathering[packageIndex]
+			var packageFound []Finding
+			if gathered.restored != nil {
+				packageFound = gathered.restored.analyses[analyzer].findings
+			} else {
+				action := rootsOf[analyzerIndex][packageIndex]
+				if action == nil {
 					return nil, fmt.Errorf("reading the analysis of %s: analyzer %s has no action on it",
 						analyzedPackage.ID, analyzer.Name)
 				}
@@ -461,12 +463,23 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 					}
 					continue
 				}
-				found = actionFindings(analyzerRule, action)
+				packageFound = actionFindings(analyzerRule, action)
 			}
-			if reads := options.Reads[analyzedPackage]; reads != nil && len(found) > 0 {
-				markForeignFindings(reads, analyzedPackage, found, known)
+			if gathered.reads != nil && len(packageFound) > 0 {
+				gathered.markForeignFindings(analyzedPackage, packageFound, known)
 			}
-			for _, finding := range found {
+			found[analyzerIndex][packageIndex] = packageFound
+			foundCount += len(packageFound)
+		}
+	}
+	result.Findings = make([]Finding, 0, foundCount)
+	seenFindings := make(map[findingKey]bool, foundCount)
+	// In the order of graph.Roots, each analyzer over each package, so of two findings alike the one kept is the
+	// one a run without the cache keeps.
+	for analyzerIndex, analyzer := range analyzers {
+		analyzerRule := ruleOf[analyzer]
+		for _, packageFound := range found[analyzerIndex] {
+			for _, finding := range packageFound {
 				key := findingKey{finding.Rule, finding.File, finding.Line, finding.Column, finding.Message}
 				if seenFindings[key] {
 					continue
@@ -485,13 +498,14 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			}
 		}
 	}
+	// A run that kept none hands back no slice at all, as one that never allocated it did.
+	if len(result.Findings) == 0 {
+		result.Findings = nil
+	}
 	if options.Report != nil {
-		ranOn := func(analyzedPackage *packages.Package) (*checker.Action, bool) {
-			action, ran := actionOf[rootKey{options.Report, analyzedPackage}]
-			return action, ran
-		}
+		// The report is the last of roots.
 		result.Reports, result.ReportCrashes, result.ReportsRestored = reportsOf(options.Report, analyzed, session,
-			ranOn)
+			rootsOf[len(roots)-1])
 	}
 	slices.SortFunc(result.Findings, func(left, right Finding) int {
 		return cmp.Or(
@@ -594,25 +608,40 @@ func recordUnreachedTypes(
 	}
 }
 
-// markForeignFindings marks reads never when a finding of analyzedPackage names a file that is not the package's own:
-// the file it is in, a file its message names or one its fix edits (see namesForeignFile). Such a finding can change
-// with a line of another package, which no read records. known gives every file of the load.
-func markForeignFindings(
-	reads *build_reads.Reads,
-	analyzedPackage *packages.Package,
-	found []Finding,
-	known func() *knownFiles,
-) {
-	if reads.Never() != "" {
-		return
+// rootActions is each root action of graphs, by its analyzer's index in roots and then its package's index in analyzed,
+// nil where no graph ran one. A later graph's action on a package is the one that counts: the second wave analyzes
+// again a package of the first that it could not restore. A root on a package analyzed does not hold, as a first
+// wave's on a package below them, is one the gather never reads.
+func rootActions(
+	roots []*analysis.Analyzer,
+	analyzed []*packages.Package,
+	graphs []*checker.Graph,
+) [][]*checker.Action {
+	analyzerIndex := make(map[*analysis.Analyzer]int, len(roots))
+	for index, root := range roots {
+		analyzerIndex[root] = index
 	}
-	own := ownFiles(analyzedPackage)
-	for _, finding := range found {
-		if !own[finding.File] || namesForeignFile(finding, own, known()) {
-			reads.MarkNever(fmt.Sprintf("a finding of %s names a file of another package", finding.Rule))
-			return
+	// A package listed twice is read at its first index, as every lookup of it finds the same action.
+	packageIndexes := make(map[*packages.Package][]int, len(analyzed))
+	for index, analyzedPackage := range analyzed {
+		packageIndexes[analyzedPackage] = append(packageIndexes[analyzedPackage], index)
+	}
+	actions := make([][]*checker.Action, len(roots))
+	for index := range actions {
+		actions[index] = make([]*checker.Action, len(analyzed))
+	}
+	for _, graph := range graphs {
+		for _, action := range graph.Roots {
+			rootIndex, isRoot := analyzerIndex[action.Analyzer]
+			if !isRoot {
+				continue
+			}
+			for _, packageIndex := range packageIndexes[action.Package] {
+				actions[rootIndex][packageIndex] = action
+			}
 		}
 	}
+	return actions
 }
 
 // abandoned is whether abandon is closed, never for a nil one.
@@ -803,25 +832,25 @@ func walk(files map[*packages.Package][]storedFile, counted func(file string) bo
 }
 
 // reportsOf is a report analyzer's result on every analyzed package, from its restored entry or from the action that
-// ran it, the packages it crashed on, and how many it restored. action finds the action that ran on a package that
-// was not restored.
+// ran it, the packages it crashed on, and how many it restored. actions are the report's root actions by the package's
+// index in analyzed (rootActions), nil where none ran.
 func reportsOf(
 	report *analysis.Analyzer,
 	analyzed []*packages.Package,
 	session *CacheSession,
-	action func(*packages.Package) (*checker.Action, bool),
+	actions []*checker.Action,
 ) (map[*packages.Package]any, []Crash, int) {
 	reports := map[*packages.Package]any{}
 	var crashes []Crash
 	restoredCount := 0
-	for _, analyzedPackage := range analyzed {
+	for packageIndex, analyzedPackage := range analyzed {
 		if restored, hit := session.reportOf(report, analyzedPackage); hit {
 			reports[analyzedPackage] = restored
 			restoredCount++
 			continue
 		}
-		ran, found := action(analyzedPackage)
-		if !found {
+		ran := actions[packageIndex]
+		if ran == nil {
 			crashes = append(crashes, Crash{File: firstFile(analyzedPackage),
 				Error: fmt.Sprintf("%s has no action on %s", report.Name, analyzedPackage.ID)})
 			continue

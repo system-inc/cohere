@@ -647,20 +647,13 @@ func (session *CacheSession) restore(action *checker.Action) error {
 	return nil
 }
 
-// findingsOf is what one analyzer found on a restored package, from its entry, and false for a package that missed
-// or a run without the cache.
-func (session *CacheSession) findingsOf(
-	analyzer *analysis.Analyzer,
-	analyzedPackage *packages.Package,
-) ([]Finding, bool) {
+// restoredOf is a restored package's entry, which holds what each analyzer found on it, and nil for a package that
+// missed or a run without the cache.
+func (session *CacheSession) restoredOf(analyzedPackage *packages.Package) *restoredPackage {
 	if session == nil {
-		return nil, false
+		return nil
 	}
-	restored, hit := session.hits[analyzedPackage]
-	if !hit {
-		return nil, false
-	}
-	return restored.analyses[analyzer].findings, true
+	return session.hits[analyzedPackage]
 }
 
 // reportOf is a report analyzer's result on a restored package, from its entry, and false for a package that missed or

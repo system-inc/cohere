@@ -125,11 +125,22 @@ func ownFiles(owner *packages.Package) map[string]bool {
 // file of known, those the load holds, by its absolute path or by its path relative to the finding's own directory, as
 // structtag writes it, a trailing `:line` or `:line:column` aside; or one of its fixes edits any file not of own.
 func namesForeignFile(finding Finding, own map[string]bool, known *knownFiles) bool {
+	return messageNamesForeignFile(finding, own, known) || editsForeignFile(finding, own)
+}
+
+// messageNamesForeignFile reports whether finding's message names a file of known that is not one of own (namedFiles),
+// which reads only its message and the file it is in.
+func messageNamesForeignFile(finding Finding, own map[string]bool, known *knownFiles) bool {
 	for _, named := range namedFiles(finding, known.baseNames) {
 		if known.paths[named] && !own[named] {
 			return true
 		}
 	}
+	return false
+}
+
+// editsForeignFile reports whether one of finding's fixes edits a file not of own.
+func editsForeignFile(finding Finding, own map[string]bool) bool {
 	for _, suggestion := range finding.Suggestions {
 		for _, edit := range suggestion.Edits {
 			if !own[edit.File] {
