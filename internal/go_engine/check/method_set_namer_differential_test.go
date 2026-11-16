@@ -45,11 +45,11 @@ const methodSetNamesReported = 20
 // std is compared for the host and for every platform a release ships besides the host's (release.Targets), each with
 // cgo off as a release builds it, so the types only one platform declares, Windows' syscall and
 // internal/syscall/windows among them, are compared on any machine (#jy0v2ef). All of them, not a sample, since the
-// test tier affords it: on the Mac each platform's std takes about 1 s to type-check from source, and the five beyond
-// the host's take about 5 s one at a time and, in parallel with the rest of the package, add at most 2.4 s to its run
-// (34.8 s and 32.7 s in two runs, against 32.4 s without them). The six loads at once peak at 2.17 and 2.19 GB RSS
-// in two runs, against 0.38 and 0.39 GB for the host's alone (`/usr/bin/time -l` on the test binary `go test -c`
-// built, `-test.run` this test).
+// test tier affords it. The five beyond the host's load one at a time, in one subtest beside the host's and the rest
+// of the package, since all six at once peaked at 2.2 GB RSS. On the Mac, by `/usr/bin/time -l` on the test binary
+// `go test -c` built, `-test.run` this test, two runs: each platform's std takes about 0.5 s to type-check from
+// source, the test 2.81 and 2.46 s, and the test binary peaks at 0.85 and 0.83 GB RSS, against 0.38 and 0.39 GB for
+// the host's load alone; the package ran in 34.8 s, against 32.4 s without the five.
 func TestMethodSetNamesMatchNewMethodSet(test *testing.T) {
 	test.Parallel()
 	if corpus := os.Getenv(methodSetNamesCorpusVariable); corpus != "" {
@@ -62,20 +62,24 @@ func TestMethodSetNamesMatchNewMethodSet(test *testing.T) {
 		methodSetNamesHoldPlatform(test, loaded, runtime.GOOS, runtime.GOARCH)
 		methodSetNamesCompare(test, loaded, methodSetNamesStandardMinimum)
 	})
-	for _, target := range release.Targets {
-		// The host's std, loaded above as the host builds it, is this platform's.
-		if target.GoOperatingSystem == runtime.GOOS && target.GoArchitecture == runtime.GOARCH {
-			continue
+	test.Run("platforms", func(test *testing.T) {
+		test.Parallel()
+		for _, target := range release.Targets {
+			// The host's std, loaded above as the host builds it, is this platform's.
+			if target.GoOperatingSystem == runtime.GOOS && target.GoArchitecture == runtime.GOARCH {
+				continue
+			}
+			// Not parallel: one platform's std at a time holds one load's memory, not five, and each stays its own
+			// subtest so a red names its platform.
+			test.Run(target.GoOperatingSystem+"_"+target.GoArchitecture, func(test *testing.T) {
+				environment := append(os.Environ(), "GOOS="+target.GoOperatingSystem,
+					"GOARCH="+target.GoArchitecture, "CGO_ENABLED=0")
+				loaded := methodSetNamesLoad(test, "", environment, "std")
+				methodSetNamesHoldPlatform(test, loaded, target.GoOperatingSystem, target.GoArchitecture)
+				methodSetNamesCompare(test, loaded, methodSetNamesStandardMinimum)
+			})
 		}
-		test.Run(target.GoOperatingSystem+"_"+target.GoArchitecture, func(test *testing.T) {
-			test.Parallel()
-			environment := append(os.Environ(), "GOOS="+target.GoOperatingSystem, "GOARCH="+target.GoArchitecture,
-				"CGO_ENABLED=0")
-			loaded := methodSetNamesLoad(test, "", environment, "std")
-			methodSetNamesHoldPlatform(test, loaded, target.GoOperatingSystem, target.GoArchitecture)
-			methodSetNamesCompare(test, loaded, methodSetNamesStandardMinimum)
-		})
-	}
+	})
 }
 
 // methodSetNamesHoldPlatform fails unless loaded is std as operatingSystem and architecture build it, read from the
