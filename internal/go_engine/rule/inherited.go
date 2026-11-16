@@ -100,18 +100,23 @@ func InheritedFiles(pass *analysis.Pass, ruleName string) (map[*token.File]bool,
 // SyntaxOnlyRun is run, the Run of a rule's own analyzer that walks pass.Files itself, for the rule named ruleName,
 // which the registry marks a syntax-only walk (ValidateSyntaxOnlyWalk): run is handed a pass holding only the files the
 // rule does not inherit (InheritedFiles), and once it returns without an error the inherited findings are reported on
-// the pass as its own, after its own. A pass inheriting nothing is handed to run as it is.
+// the pass as its own, after its own. Whether or not it inherits, run's pass holds no type information, no package and
+// no sizes, so a walk marked syntax-only that reads any of them panics in its own fixtures rather than pass silently
+// while an extra build hands on the host's findings, which only a file's bytes and the settings may decide.
 //
 //cohere:ignore consistency-no-any an analyzer's Run returns its result as any, which SyntaxOnlyRun hands on untouched
 func SyntaxOnlyRun(ruleName string, run func(*analysis.Pass) (any, error)) func(*analysis.Pass) (any, error) {
 	return func(pass *analysis.Pass) (any, error) {
 		inherited, diagnostics := InheritedFiles(pass, ruleName)
-		if len(inherited) == 0 {
-			return run(pass)
-		}
 		// A copy of the pass, every function of it the checker's, so what run reports and exports lands on the action
-		// as it would from pass, with only the inherited files left out.
+		// as it would from pass, with the inherited files and everything a syntax-only walk may not read left out.
 		own := *pass
+		own.TypesInfo = nil
+		own.Pkg = nil
+		own.TypesSizes = nil
+		if len(inherited) == 0 {
+			return run(&own)
+		}
 		own.Files = slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool {
 			return inherited[pass.Fset.File(file.FileStart)]
 		})

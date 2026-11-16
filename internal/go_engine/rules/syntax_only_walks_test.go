@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -145,4 +146,57 @@ func TestTheRegistrysSyntaxOnlyWalksAreWrapped(test *testing.T) {
 				name, reported, expected)
 		}
 	}
+}
+
+// A walk marked syntax-only is handed a pass with no type information, no package and no sizes, whether or not it
+// inherits a file, so one that reads any of them panics in its own fixtures rather than pass silently while an extra
+// build hands on the host's findings (#y6q1x2j).
+func TestAMarkedSyntaxOnlyWalkThatReadsTypesPanics(test *testing.T) {
+	test.Parallel()
+	reads := map[string]func(*analysis.Pass, *ast.File){
+		"the type information": func(pass *analysis.Pass, file *ast.File) { _ = pass.TypesInfo.TypeOf(file.Name) },
+		"the package":          func(pass *analysis.Pass, _ *ast.File) { _ = pass.Pkg.Path() },
+		"the sizes": func(pass *analysis.Pass, _ *ast.File) {
+			_ = pass.TypesSizes.Alignof(types.Typ[types.Int])
+		},
+	}
+	inheritances := map[string]any{"inheriting second.go": inheritsSecond{}, "inheriting nothing": nil}
+	for read, reading := range reads {
+		for inheriting, inheritance := range inheritances {
+			run := rule.SyntaxOnlyRun(rule.Namespace+"consistency-test-typed", func(pass *analysis.Pass) (any, error) {
+				for _, file := range pass.Files {
+					reading(pass, file)
+				}
+				return nil, nil
+			})
+			fileSet := token.NewFileSet()
+			files := []*ast.File{}
+			for _, filename := range []string{"first.go", "second.go"} {
+				file, parseError := parser.ParseFile(fileSet, filename, "package typed\n", 0)
+				if parseError != nil {
+					test.Fatal(parseError)
+				}
+				files = append(files, file)
+			}
+			pass := &analysis.Pass{Fset: fileSet, Files: files, Pkg: types.NewPackage("typed", "typed"),
+				TypesInfo: &types.Info{}, TypesSizes: types.SizesFor("gc", "amd64"),
+				ResultOf: map[*analysis.Analyzer]any{rule.Inherited: inheritance},
+				Report: func(analysis.Diagnostic) {
+					// Nothing reports: the walk panics on its first file, and a walk that did not is the failure.
+				}}
+			// Ignored: the walk returns no error, and whether it panics is all this asks.
+			if !panics(func() { _, _ = run(pass) }) {
+				test.Errorf("a marked walk %s read %s and did not panic", inheriting, read)
+			}
+		}
+	}
+}
+
+// panics is whether calling call panics.
+func panics(call func()) (panicked bool) {
+	defer func() {
+		panicked = recover() != nil
+	}()
+	call()
+	return false
 }
