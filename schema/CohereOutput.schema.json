@@ -822,6 +822,10 @@
                             "type": "integer",
                             "description": "Rules that declined every file they were offered."
                         },
+                        "folderCheckSkipped": {
+                            "type": "string",
+                            "description": "Why the folder check judged no folder on a run that named paths below its project's root, which its project turns on. Absent on every other run."
+                        },
                         "formattingNotChecked": { "type": "boolean" },
                         "nothingToCheck": { "type": "boolean", "description": "The project had no files to check." },
                         "sourceFiles": {

@@ -293,6 +293,9 @@ func uncheckedMarkers(summary runSummary) []string {
 	if gaps.FormattingNotChecked {
 		markers = append(markers, "💅 formatting not checked")
 	}
+	if gaps.FolderCheckSkipped != "" {
+		markers = append(markers, "⚠ folders not checked")
+	}
 	if gaps.CrashedFiles > 0 {
 		markers = append(markers, "⚠ "+counted(gaps.CrashedFiles, "file crashed", "files crashed"))
 	}

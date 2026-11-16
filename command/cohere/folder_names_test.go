@@ -82,9 +82,17 @@ func TestTheFolderCheckReportsTheVariablesAbbreviation(test *testing.T) {
 	if got := folderDirectories(found.Folders); !reflect.DeepEqual(got, want) {
 		test.Fatalf("reported %v, want %v", got, want)
 	}
+	// A folder named the word alone says the name is an abbreviation, rather than naming the word twice, and one
+	// holding other words names which word asks for the advice (#xd2q11d).
+	advice := `Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`
+	opening := map[string]string{
+		"wire/vars":           `Folder name "vars" is an abbreviation. `,
+		"modules/env-vars":    `Folder name "env-vars" abbreviates "vars". `,
+		"modules/vars-reader": `Folder name "vars-reader" abbreviates "vars". `,
+	}
 	for _, finding := range found.Folders {
-		if finding.MessageId != "abbreviatedFolderNameAdvice" || !strings.Contains(finding.Message,
-			`abbreviates "vars". Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`) {
+		if finding.MessageId != "abbreviatedFolderNameAdvice" ||
+			!strings.HasPrefix(finding.Message, opening[finding.Directory]+advice) {
 			test.Errorf("%s/ reads %s %q", finding.Directory, finding.MessageId, finding.Message)
 		}
 	}
@@ -389,5 +397,56 @@ func TestANarrowedRunJudgesItsProjectsFolders(test *testing.T) {
 				test.Errorf("with docs/ renamed the run exited %d, want 0 and no folder named:\n%s", exit, output)
 			}
 		})
+	}
+}
+
+// A run given its project's root as its path is the bare run, so it judges the same folders (#xd2q11d): `.`, `./`,
+// the root's absolute path and a symbolic link to it each read red over a planted vars/. A path below the root
+// narrows the run to its files, and skips the check, saying so: the footer names `folders not checked`, and
+// `--json` names the gap, so it never reads as a clean pass. Before, `cohere .` read green and named nothing.
+func TestARunGivenTheRootAsItsPathJudgesItsFolders(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		".gitignore":          ".cache/\n",
+		"CohereSettings.json": "{\n    \"extends\": \"cohere:typescript\"\n}\n",
+		"tsconfig.json": "{ \"compilerOptions\": { \"strict\": true, \"noEmit\": true }, " +
+			"\"include\": [\"source\"] }\n",
+		"source/tidy.ts": "export const tidy = 1;\n",
+		"vars/README.md": "# Variables\n",
+	})
+	link := filepath.Join(test.TempDir(), "linked-root")
+	if symbolicLinkError := os.Symlink(root, link); symbolicLinkError != nil {
+		test.Fatal(symbolicLinkError)
+	}
+	folderLine := filepath.Join(root, "vars") + "/ - error " + configuration.AbbreviatedFolderName + ": " +
+		`Folder name "vars" is an abbreviation.`
+	for _, path := range []string{".", "./", root, link} {
+		output, exit := runCohere(test, binary, root, "--no-fix", path)
+		if exit != 1 || !strings.Contains(output, folderLine) || !strings.Contains(output, "1 folder finding") {
+			test.Errorf("given %s the run exited %d, want 1 naming vars/ and counting it:\n%s", path, exit, output)
+		}
+	}
+
+	output, exit := runCohere(test, binary, root, "--no-fix", "source")
+	if strings.Contains(output, folderLine) || !strings.Contains(output, "⚠ folders not checked") {
+		test.Errorf("given source the run exited %d, want the folder check named as skipped:\n%s", exit, output)
+	}
+	records, _ := runCohere(test, binary, root, "--no-fix", "--json", "source")
+	named := false
+	for _, line := range strings.Split(strings.TrimSpace(records), "\n") {
+		var record struct {
+			Kind string `json:"kind"`
+			Gaps struct {
+				FolderCheckSkipped string `json:"folderCheckSkipped"`
+			} `json:"gaps"`
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Kind == "summary" {
+			named = strings.Contains(record.Gaps.FolderCheckSkipped, "folder check")
+		}
+	}
+	if !named {
+		test.Errorf("given source, --json named no folderCheckSkipped gap:\n%s", records)
 	}
 }

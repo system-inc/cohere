@@ -159,6 +159,8 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	if report.filesInScope > 0 && report.filesInScope < report.filesInProgram {
 		summary.Gaps.ProgramFiles = report.filesInProgram
 	}
+	// Recorded, since the key covers the paths and the settings that decide it, so a replay names it too.
+	summary.Gaps.FolderCheckSkipped = folderCheckSkipped
 	// In a repository with several projects each is its own run, told its path, the root's as ".".
 	if label := os.Getenv(projectLabelVariable); label != "" {
 		summary.Label = label

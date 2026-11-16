@@ -237,14 +237,26 @@ func withoutValuedFlags(arguments []string, dropped []string) []string {
 	return kept
 }
 
-// lintsWholeLocatedProject reports whether a run discovery does not apply to still lints its located project whole:
-// one given `--directory` into one engine's project, `--tsconfig`, or `--profile`, with no path argument, and not
-// one of discovery's children, which its parent already judged, nor a run that only answers, explains one file or
-// formats one from standard input (#zyq63kk). A path argument narrows the run to those files, partial by its nature,
-// so its folders are not judged.
-func lintsWholeLocatedProject(given map[string]bool, arguments []string, locateError error) bool {
-	return locateError == nil && len(arguments) == 0 && os.Getenv(projectEngineVariable) == "" && runLints(given) &&
-		!answersOnly(given) && !given["explain"] && !given["stdin-filepath"]
+// lintsLocatedProject reports whether a run discovery does not apply to lints its located project, whole or by named
+// paths: not one of discovery's children, which its parent already judged, nor a run that only answers, explains
+// one file or formats one from standard input (#zyq63kk).
+func lintsLocatedProject(given map[string]bool, locateError error) bool {
+	return locateError == nil && os.Getenv(projectEngineVariable) == "" && runLints(given) && !answersOnly(given) &&
+		!given["explain"] && !given["stdin-filepath"]
+}
+
+// lintsWholeLocatedProject reports whether such a run lints its project whole: one given `--directory` into one
+// engine's project, `--tsconfig`, or `--profile`, with no path argument or only the project's root as its path, which
+// is the bare run (#xd2q11d). A path below the root narrows the run to those files, partial by its nature, so its
+// folders are not judged, and the run says so (noteFolderCheckSkipped).
+func lintsWholeLocatedProject(
+	given map[string]bool,
+	arguments []string,
+	locateError error,
+	location projectLocation,
+) bool {
+	return lintsLocatedProject(given, locateError) &&
+		(len(arguments) == 0 || namesOnlyTheRoot(arguments, location.ArgumentBase, location.Root))
 }
 
 // checkNarrowedProjectFolders judges the folders of a located project a narrowed run lints whole, as discovery
@@ -253,7 +265,14 @@ func lintsWholeLocatedProject(given map[string]bool, arguments []string, locateE
 // printed green over a docs/. With a finding standing, the project runs in its own process, as one of several
 // projects would, and this run prints the folders, counts them in the footer and fails, exactly as the discovery
 // path does; reported is then true. With none, the run goes on in this process as it always did.
-func checkNarrowedProjectFolders(location projectLocation, lintConfigFileName string) (int, bool, error) {
+//
+// flags are the run's arguments less its paths, which are the root's alone when it has any, and which the project's
+// run, named by its directory, needs no more.
+func checkNarrowedProjectFolders(
+	location projectLocation,
+	lintConfigFileName string,
+	flags []string,
+) (int, bool, error) {
 	ignoreEntries, rootIgnoreEntriesError := rootIgnoreEntries(location.Root)
 	if rootIgnoreEntriesError != nil {
 		return 0, false, rootIgnoreEntriesError
@@ -284,8 +303,7 @@ func checkNarrowedProjectFolders(location projectLocation, lintConfigFileName st
 		FolderSeverity: severity,
 	}
 	// The project's run is named by the directory and tsconfig runProject gives it, so this run's own go.
-	arguments := childArguments(withoutValuedFlags(os.Args[1:], []string{"directory", "tsconfig"}),
-		lintConfigFileName, false)
+	arguments := childArguments(withoutValuedFlags(flags, []string{"directory", "tsconfig"}), lintConfigFileName, false)
 	return runProjects(found, arguments, streams.Output), true, nil
 }
 
