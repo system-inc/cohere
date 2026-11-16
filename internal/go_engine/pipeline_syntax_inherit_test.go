@@ -285,3 +285,55 @@ func TestAFindingAnotherFileWithholdsIsNotInherited(test *testing.T) {
 			strings.Join(inheriting, "\n"), strings.Join(walking, "\n"), expected)
 	}
 }
+
+// A run judging each build's dependence restores nothing from the host's run, so under `--build-dependence` windows
+// inherits nothing (#y6q1x2j): its record counts no file inherited, and the probe enters shared.go in both builds.
+func TestABuildDependenceRunInheritsNothing(test *testing.T) {
+	test.Parallel()
+	engine, stream, entered, _ := runInheriting(test, true, "--build-dependence")
+	requireInheritedNothing(test, engine, stream, entered, 2)
+}
+
+// A run that renamed reads no findings cache, so its builds restore nothing from the host's run and windows inherits
+// nothing (#y6q1x2j): with an uppercase initialism the naming rule renames, the run renames it, windows's record counts
+// no file inherited, and the probe enters shared.go in windows's build as well as twice in the host's, once in the pass
+// the rename was planned from and once over what it wrote. The host of a renamed run keeps nothing for its builds
+// too, so the run inherits nothing on either count.
+func TestARenamedRunInheritsNothing(test *testing.T) {
+	test.Parallel()
+	entered := &enteredFiles{entered: map[string]int{}}
+	root := copyFixture(test, syntaxInheritFixture)
+	// Unexported, since a run renames no exported name of an importable package.
+	renamed := "package inherit\n\n// parseURL is a name the naming rule renames.\nfunc parseURL() string {\n" +
+		"\treturn \"planted address\"\n}\n"
+	if writeError := os.WriteFile(filepath.Join(root, "renamed.go"), []byte(renamed), 0o600); writeError != nil {
+		test.Fatal(writeError)
+	}
+	engine, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), plantedProbe(entered)), nil,
+		"--no-cache", "--other-builds")
+	if !engine.renamed {
+		test.Fatalf("the run renamed nothing, so it shows nothing of a renamed run:\n%s", normalize(stream, root))
+	}
+	entered.lock.Lock()
+	defer entered.lock.Unlock()
+	requireInheritedNothing(test, engine, normalize(stream, root), entered.entered, 3)
+}
+
+// requireInheritedNothing fails test unless windows's build in engine's run inherited nothing: its run and its record
+// in stream count nothing inherited, and the probe entered shared.go the times the run's passes over it, windows's
+// among them, number.
+func requireInheritedNothing(test *testing.T, engine *pipeline, stream string, entered map[string]int, passes int) {
+	test.Helper()
+	windows := windowsRun(test, engine)
+	if windows.inheritedFiles != 0 || windows.inheritedFindings != 0 {
+		test.Errorf("windows inherited %d files and %d findings, want none", windows.inheritedFiles,
+			windows.inheritedFindings)
+	}
+	if _, written := windowsRecord(test, engine, stream); strings.Contains(written, `"inherited`) {
+		test.Errorf("windows's record counts something inherited, want the counts left out: %s", written)
+	}
+	if entered["shared.go"] != passes {
+		test.Errorf("the probe entered shared.go %d times, want %d, windows's among them", entered["shared.go"],
+			passes)
+	}
+}
