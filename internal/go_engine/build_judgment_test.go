@@ -115,12 +115,13 @@ func TestACallIntoARestoredPackageIsFollowedThroughItsGraph(test *testing.T) {
 		test.Fatalf("no unit of the census holds Wide at %s", position)
 	}
 	callers := calls.Callers(wideUnit)
-	if len(callers) != 1 || !calls.Workspace(callers[0]) || calls.Dependent(hostJudged, dependencyJudged, callers[0]) {
+	if len(callers) != 1 || !calls.Workspace(int(callers[0])) ||
+		calls.Dependent(hostJudged, dependencyJudged, int(callers[0])) {
 		test.Fatalf("want one independent workspace unit, CallsWide, calling Wide's unit, got the callers %v", callers)
 	}
 
 	workspace, dependencies := factCallers(calls, hostJudged, dependencyJudged, map[int]bool{wideUnit: true})
-	if workspace.FirstOrderUnits != 1 || workspace.FirstOrderNodes != calls.Nodes(callers[0]) {
+	if workspace.FirstOrderUnits != 1 || workspace.FirstOrderNodes != calls.Nodes(int(callers[0])) {
 		test.Errorf("want CallsWide the workspace's one first-order caller, got %+v", workspace)
 	}
 	if dependencies.DifferingUnits != 1 {

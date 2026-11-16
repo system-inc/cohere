@@ -290,7 +290,7 @@ func factCallers(
 		if calls.Dependent(host, standardLibrary, unit) {
 			continue
 		}
-		if slices.ContainsFunc(calls.Calls(unit), func(callee int) bool { return differing[callee] }) {
+		if slices.ContainsFunc(calls.Calls(unit), func(callee int32) bool { return differing[int(callee)] }) {
 			firstOrder[unit] = true
 		}
 	}
@@ -300,7 +300,8 @@ func factCallers(
 	for len(pending) > 0 {
 		current := pending[len(pending)-1]
 		pending = pending[:len(pending)-1]
-		for _, caller := range calls.Callers(current) {
+		for _, callerIndex := range calls.Callers(current) {
+			caller := int(callerIndex)
 			if calls.Dependent(host, standardLibrary, caller) || bound[caller] {
 				continue
 			}
@@ -331,8 +332,8 @@ func factCallers(
 			scope.BoundUnits++
 			scope.BoundNodes += nodes
 		}
-		callsDependent := slices.ContainsFunc(calls.Calls(unit), func(callee int) bool {
-			return calls.Dependent(host, standardLibrary, callee)
+		callsDependent := slices.ContainsFunc(calls.Calls(unit), func(callee int32) bool {
+			return calls.Dependent(host, standardLibrary, int(callee))
 		})
 		if !calls.Dependent(host, standardLibrary, unit) && callsDependent {
 			scope.CallerUnits++

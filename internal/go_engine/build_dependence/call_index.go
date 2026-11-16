@@ -17,65 +17,57 @@ type CallIndex struct {
 	host *resolvedGraph
 	// standardLibrary is the standard library's graph's resolution, nil when the host has none.
 	standardLibrary *resolvedGraph
-	calls           [][]int
-	callers         [][]int
+
+	// calls are the units each unit calls, and callers the units that call each, by their index here, a row each.
+	calls   packedRows[int32]
+	callers packedRows[int32]
 }
 
 // NewCallIndex is the call index over host's units and then standardLibrary's, standardLibrary nil when the host has
-// no graph of the standard library, whose units the index then leaves out.
+// no graph of the standard library, whose units the index then leaves out. With no such graph a unit's calls are the
+// host's graph's, which the index shares, read and never written; with one, nearly every host unit gains a call into
+// it, so the index holds calls of its own.
 func NewCallIndex(host *Graph, standardLibrary *Graph) *CallIndex {
 	index := &CallIndex{host: host.resolve()}
-	hostUnits := index.host.unitCount()
-	if standardLibrary != nil {
+	if standardLibrary == nil {
+		index.calls = index.host.calls
+	} else {
 		index.standardLibrary = standardLibrary.resolve()
-	}
-	index.calls = make([][]int, 0, hostUnits+index.standardLibraryUnits())
-	for unit := range hostUnits {
-		calls := make([]int, 0, len(index.host.calls.row(unit)))
-		for _, callee := range index.host.calls.row(unit) {
-			calls = append(calls, int(callee))
-		}
-		index.calls = append(index.calls, calls)
-	}
-	if index.standardLibrary != nil {
-		for unit := range index.standardLibrary.unitCount() {
-			calls := make([]int, 0, len(index.standardLibrary.calls.row(unit)))
-			for _, callee := range index.standardLibrary.calls.row(unit) {
-				calls = append(calls, hostUnits+int(callee))
-			}
-			index.calls = append(index.calls, calls)
-		}
-		for unit := range hostUnits {
+		hostUnits := int32(index.host.unitCount())
+		index.calls = newPackedRows[int32](int(hostUnits)+index.standardLibrary.unitCount(),
+			len(index.host.calls.entries)+len(index.host.externalCalls.entries)+
+				len(index.standardLibrary.calls.entries))
+		for unit := range index.host.unitCount() {
+			index.calls.entries = append(index.calls.entries, index.host.calls.row(unit)...)
 			for _, callee := range index.host.externalCalls.row(unit) {
 				named := &index.host.externalObjects[callee]
 				declaring, isDeclared := index.standardLibrary.unitDeclaringName(named.path, named.local)
-				if isDeclared && !slices.Contains(index.calls[unit], hostUnits+declaring) {
-					// A copy, since the host's graph holds the slice the index began with.
-					index.calls[unit] = append(slices.Clone(index.calls[unit]), hostUnits+declaring)
+				if isDeclared && !slices.Contains(index.calls.open(), hostUnits+int32(declaring)) {
+					index.calls.entries = append(index.calls.entries, hostUnits+int32(declaring))
 				}
 			}
+			index.calls.closeRow()
+		}
+		for unit := range index.standardLibrary.unitCount() {
+			for _, callee := range index.standardLibrary.calls.row(unit) {
+				index.calls.entries = append(index.calls.entries, hostUnits+callee)
+			}
+			index.calls.closeRow()
 		}
 	}
-	index.callers = make([][]int, len(index.calls))
-	for unit, calls := range index.calls {
-		for _, callee := range calls {
-			index.callers[callee] = append(index.callers[callee], unit)
+	callers := make([]rowEntry, 0, len(index.calls.entries))
+	for unit := range index.calls.rowCount() {
+		for _, callee := range index.calls.row(unit) {
+			callers = append(callers, rowEntry{row: callee, entry: int32(unit)})
 		}
 	}
+	index.callers = groupedRows(index.calls.rowCount(), callers)
 	return index
-}
-
-// standardLibraryUnits counts the standard library's graph's units, none when the host has no such graph.
-func (index *CallIndex) standardLibraryUnits() int {
-	if index.standardLibrary == nil {
-		return 0
-	}
-	return index.standardLibrary.unitCount()
 }
 
 // UnitCount counts the index's units, which its indexes run below.
 func (index *CallIndex) UnitCount() int {
-	return len(index.calls)
+	return index.calls.rowCount()
 }
 
 // resolvedUnit is the graph that holds the unit of the index's unit index, and the unit's index there.
@@ -100,14 +92,14 @@ func (index *CallIndex) Workspace(unit int) bool {
 
 // Calls are the units unit calls statically, by their index here, each once. The slice is the index's, read and never
 // written.
-func (index *CallIndex) Calls(unit int) []int {
-	return index.calls[unit]
+func (index *CallIndex) Calls(unit int) []int32 {
+	return index.calls.row(unit)
 }
 
 // Callers are the units that call unit statically, by their index here, each once, in the order of their indexes.
 // The slice is the index's, read and never written.
-func (index *CallIndex) Callers(unit int) []int {
-	return index.callers[unit]
+func (index *CallIndex) Callers(unit int) []int32 {
+	return index.callers.row(unit)
 }
 
 // Dependent reports whether a build makes unit dependent, read from the build's judgment of each graph: host is its
