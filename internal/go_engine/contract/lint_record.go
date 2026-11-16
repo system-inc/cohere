@@ -279,8 +279,9 @@ type DependenceFacts struct {
 // a method's or a field's path alone, which nothing pairs exactly, and the build's facts of the kind in the unit that
 // no named fact of the host's claims. Collisions are the facts of one kind that meet under one unit and name on either
 // side, which nothing tells apart, the other side's fact under that key, and, where the host's meet, the build's facts
-// of the kind in the unit that no named fact of the host's claims. Answers are the build's answers about a function
-// the census could not place in the graph's units, whose host side is unknown.
+// of the kind in the unit that no named fact of the host's claims. Answers are the build's answers about a function, or
+// about a parameter or result of one, the census could not place in the graph's units, or that two of the host's
+// answers meet at, whose host side is unknown.
 type UnkeyedFacts struct {
 	Unnamed    int `json:"unnamed"`
 	Closures   int `json:"closures"`

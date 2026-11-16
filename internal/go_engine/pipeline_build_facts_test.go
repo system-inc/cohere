@@ -410,8 +410,46 @@ func loadedSplit(test *testing.T, root string, goos string) *packages.Package {
 	return found
 }
 
-// parameterAnswer is the host's answer, through restoredAnswer as compareFacts asks, about the first parameter of the
-// function name in build's package, the darwin host holding answers and the census-split fixture's darwin graph.
+// splitGraph is the census-split fixture's standard-library graph as host, darwin, loads it, judged with no difference.
+func splitGraph(host *packages.Package) (*build_dependence.Graph, *build_dependence.Dependence) {
+	graph := build_dependence.NewGraph()
+	graph.AddPackage(host, false)
+	return graph, graph.Against(build_dependence.Difference{
+		Packages:          map[string]build_dependence.PackageDifference{},
+		HostOnlyPackages:  map[string]bool{},
+		BuildOnlyPackages: map[string]bool{},
+	})
+}
+
+// answerAbout is the host's answer, through restoredAnswer as compareFacts asks, about object of build's package, the
+// darwin host holding answers and the census-split fixture's darwin graph.
+func answerAbout(
+	host *packages.Package,
+	build *packages.Package,
+	object types.Object,
+	answers *fact_resolver.Answers,
+) (check.ExportedFact, bool, bool) {
+	graph, standardLibrary := splitGraph(host)
+	engine := &pipeline{dependence: &hostDependence{
+		restoredAnswers: map[string]*fact_resolver.Answers{host.ID: answers},
+		standardLibrary: &standardLibraryDependence{graph: graph, files: map[string][]string{host.ID: host.GoFiles}},
+	}}
+	return engine.restoredAnswer(check.ExportedFact{Package: build, Analyzer: "odd_slice_argument", FactType: "answer",
+		Object: object, Answer: true}, &objectpath.Encoder{}, &byDeclaringUnit{standardLibrary: standardLibrary})
+}
+
+// splitFunction is the function name that loaded, the census-split fixture's package, declares.
+func splitFunction(test *testing.T, loaded *packages.Package, name string) *types.Func {
+	test.Helper()
+	function, isFunction := loaded.Types.Scope().Lookup(name).(*types.Func)
+	if !isFunction {
+		test.Fatalf("the fixture declares no function %s", name)
+	}
+	return function
+}
+
+// parameterAnswer is the host's answer (answerAbout) about the first parameter of the function name in build's
+// package.
 func parameterAnswer(
 	test *testing.T,
 	host *packages.Package,
@@ -420,24 +458,7 @@ func parameterAnswer(
 	answers *fact_resolver.Answers,
 ) (check.ExportedFact, bool, bool) {
 	test.Helper()
-	graph := build_dependence.NewGraph()
-	graph.AddPackage(host, false)
-	standardLibrary := graph.Against(build_dependence.Difference{
-		Packages:          map[string]build_dependence.PackageDifference{},
-		HostOnlyPackages:  map[string]bool{},
-		BuildOnlyPackages: map[string]bool{},
-	})
-	function, isFunction := build.Types.Scope().Lookup(name).(*types.Func)
-	if !isFunction {
-		test.Fatalf("the build declares no function %s", name)
-	}
-	engine := &pipeline{dependence: &hostDependence{
-		restoredAnswers: map[string]*fact_resolver.Answers{host.ID: answers},
-		standardLibrary: &standardLibraryDependence{graph: graph, files: map[string][]string{host.ID: host.GoFiles}},
-	}}
-	return engine.restoredAnswer(check.ExportedFact{Package: build, Analyzer: "odd_slice_argument", FactType: "answer",
-		Object: function.Signature().Params().At(0), Answer: true}, &objectpath.Encoder{},
-		&byDeclaringUnit{standardLibrary: standardLibrary})
+	return answerAbout(host, build, splitFunction(test, build, name).Signature().Params().At(0), answers)
 }
 
 // A restored package's answer about a function's parameter, as odd_slice_argument answers, is placed through the unit
@@ -473,5 +494,121 @@ func TestSameNamedFunctionsOfOtherBuildsNeverPair(test *testing.T) {
 	if isPlaced || isHeld {
 		test.Errorf("windows' Split: want its parameter's answer not placed, got %q (held %t, placed %t)",
 			hosted.Encoded, isHeld, isPlaced)
+	}
+}
+
+// A function's declaration declares the members of anonymous types in its signature beside the function, so the unit
+// of Serve declares Handle, its second parameter's method, at Serve.PA1.M0, and Handle's own parameter beside it. The
+// host's answer about either is no answer about Serve or Serve's own parameter, though the two sit in one unit, at the
+// function and at the first parameter's place: a build's answer about Serve, or about dst, is placed and finds none
+// (#h660y7d, the second read's must).
+func TestAnAnonymousInterfacesMethodNeverAnswersForItsFunction(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "census-split"))
+	host, build := loadedSplit(test, root, "darwin"), loadedSplit(test, root, "windows")
+	hostServe := splitFunction(test, host, "Serve")
+	handler, isInterface := hostServe.Signature().Params().At(1).Type().(*types.Interface)
+	if !isInterface || handler.NumMethods() != 1 {
+		test.Fatal("Serve's second parameter is no interface of one method, so the case proves nothing")
+	}
+	var encoder objectpath.Encoder
+	methodPath, methodError := encoder.For(handler.Method(0))
+	parameterPath, parameterError := encoder.For(handler.Method(0).Signature().Params().At(0))
+	if methodError != nil || parameterError != nil || methodPath != "Serve.PA1.M0" ||
+		parameterPath != "Serve.PA1.M0.PA0" {
+		test.Fatalf("want Handle at Serve.PA1.M0 and its parameter at Serve.PA1.M0.PA0, got %q (%v) and %q (%v)",
+			methodPath, methodError, parameterPath, parameterError)
+	}
+	_, standardLibrary := splitGraph(host)
+	serveUnit, isServeDeclared := standardLibrary.UnitDeclaringName(host.PkgPath, "Serve")
+	handleUnit, isHandleDeclared := standardLibrary.UnitDeclaringName(host.PkgPath, string(methodPath))
+	if !isServeDeclared || !isHandleDeclared || serveUnit != handleUnit {
+		test.Fatalf("want Serve's unit to declare Handle beside Serve, got units %d (%t) and %d (%t), so the case "+
+			"proves nothing", serveUnit, isServeDeclared, handleUnit, isHandleDeclared)
+	}
+	buildServe := splitFunction(test, build, "Serve")
+	for _, each := range []struct {
+		about  string
+		object types.Object
+		path   objectpath.Path
+	}{
+		{about: "Serve", object: buildServe, path: methodPath},
+		{about: "Serve's dst", object: buildServe.Signature().Params().At(0), path: parameterPath},
+	} {
+		hosted, isHeld, isPlaced := answerAbout(host, build, each.object,
+			&fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
+				"odd_slice_argument": {each.path: []byte("Handle's")},
+			}})
+		if !isPlaced || isHeld {
+			test.Errorf("%s, the host answering only at %s: want it placed and holding none, got %q (held %t, "+
+				"placed %t)", each.about, each.path, hosted.Encoded, isHeld, isPlaced)
+		}
+	}
+}
+
+// A host's fact about a parameter is declared by no unit of its own, so it is moved to the unit declaring its function,
+// where the build's fact about the same parameter sits by position and meets it by name (#h660y7d); a parameter of an
+// anonymous interface's method in a signature, whose function's path is no declared function's, is not placed.
+func TestAHostFactAboutAParameterIsPlacedByItsFunction(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "census-split"))
+	host, build := loadedSplit(test, root, "darwin"), loadedSplit(test, root, "windows")
+	_, standardLibrary := splitGraph(host)
+	declaring := &byDeclaringUnit{standardLibrary: standardLibrary}
+	keyOf := func(loaded *packages.Package, object types.Object) check.ExportedFact {
+		return check.ExportedFact{Package: loaded, Analyzer: "odd_slice_argument", FactType: "answer", Object: object,
+			Answer: true}
+	}
+	hostDestination := splitFunction(test, host, "Shared").Signature().Params().At(0)
+	hostKey, isNamed := factKeyByName(keyOf(host, hostDestination), &objectpath.Encoder{})
+	if !isNamed || hostKey.local != "Shared.PA0" || hostKey.name != "dst" {
+		test.Fatalf("want the host's dst named Shared.PA0, got %+v (named %t)", hostKey, isNamed)
+	}
+	buildKey, isKeyed := factKeyOf(keyOf(build, splitFunction(test, build, "Shared").Signature().Params().At(0)))
+	if !isKeyed {
+		test.Fatal("the build's dst has no position")
+	}
+	hosted, isHosted := declaring.hosted(hostKey)
+	built, isBuilt := declaring.built(buildKey)
+	if !isHosted || !isBuilt || hosted != built {
+		test.Errorf("Shared's dst: want the host's fact and the build's under one key, got %+v (placed %t) and %+v "+
+			"(placed %t)", hosted, isHosted, built, isBuilt)
+	}
+	handler, isInterface := splitFunction(test, host, "Serve").Signature().Params().At(1).Type().(*types.Interface)
+	if !isInterface || handler.NumMethods() != 1 {
+		test.Fatal("Serve's second parameter is no interface of one method, so the case proves nothing")
+	}
+	bufferKey, _ := factKeyByName(keyOf(host, handler.Method(0).Signature().Params().At(0)), &objectpath.Encoder{})
+	if placed, isPlaced := declaring.hosted(bufferKey); isPlaced {
+		test.Errorf("Handle's buf, at %s: want it not placed, got %+v", bufferKey.local, placed)
+	}
+}
+
+// A unit where the host's facts of one kind both meet under one name and are held by a path alone withholds the
+// build's unclaimed facts of the kind as a collision, whichever group the census ranges over first, so every run
+// counts them alike (#h660y7d).
+func TestAWithheldUnitIsCountedAsItsCollisionInEveryOrder(test *testing.T) {
+	test.Parallel()
+
+	named := func(path string, name string) factKey {
+		return factKey{packageIdentifier: "fmt", offset: -1, local: path, name: name, analyzer: "ctrlflow",
+			factType: "noReturn"}
+	}
+	host := map[factKey]check.ExportedFact{
+		named("pp.F0.F0", "x"): pathOnlyFact("pp.F0.F0"),
+		named("pp.F1.F0", "x"): pathOnlyFact("pp.F1.F0"),
+		named("pp.M3", ""):     pathOnlyFact("pp.M3"),
+	}
+	want := contract.UnkeyedFacts{PathOnly: 1, Collisions: 3}
+	// Go ranges over a map in a new order each time, so a hundred rounds meet both orders all but surely.
+	for round := range 100 {
+		hosted, built, parts := pairByUnit(host,
+			map[factKey]check.ExportedFact{builtAt("y", 920): builtNoReturn}, toUnit, toUnit)
+		if len(hosted) != 0 || len(built) != 0 || parts != want {
+			test.Fatalf("round %d: want every fact left out, counted %+v, got %d host and %d build facts, %+v", round,
+				want, len(hosted), len(built), parts)
+		}
 	}
 }

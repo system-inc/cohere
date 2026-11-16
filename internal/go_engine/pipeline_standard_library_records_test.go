@@ -172,7 +172,7 @@ func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
 // expectSameCensus fails for every build whose facts census in got, whose standard-library graph is records, does not
 // count what want's, side-loaded, counts as differing: kind for kind the facts that differ and the answers asked in one
 // build alone, and every unit those reach, firstOrderUnits among them. got may compare fewer facts than want, since it
-// leaves out what no name pairs exactly (withholdNameless), but never more, and never more fewer than its Unkeyed
+// leaves out what no name pairs exactly (pairByUnit), but never more, and never more fewer than its Unkeyed
 // counts, its parts summing to it; it logs how many it left out, by why, and returns those by build (#h660y7d).
 func expectSameCensus(test *testing.T, want string, got string) map[string]contract.UnkeyedFacts {
 	test.Helper()

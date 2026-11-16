@@ -43,14 +43,12 @@ func (declaring *byDeclaringUnit) unitKey(key factKey, index int) factKey {
 }
 
 // withheldReason is why the census leaves out, in one unit, the build's facts of one kind that no named fact of the
-// host's claims (pairByUnit).
+// host's claims (pairByUnit), the zero value leaving them to be compared, and a greater reason winning over a lesser.
 type withheldReason int
 
 const (
-	// notWithheld leaves the build's facts to be compared.
-	notWithheld withheldReason = iota
 	// withheldPathOnly is a host fact of the kind in the unit held by a member's path alone.
-	withheldPathOnly
+	withheldPathOnly withheldReason = iota + 1
 	// withheldCollision is two host facts of the kind meeting in the unit under one name.
 	withheldCollision
 )
@@ -85,10 +83,12 @@ func pairByUnit(
 	}
 	hostFacts := make(map[factKey]check.ExportedFact, len(hostGroups))
 	withheld := map[factKey]withheldReason{}
+	// A unit holding both a collision and a path-only fact of one kind is withheld as a collision, whichever group the
+	// range meets first, so two runs alike count the build's facts there under the same part.
 	withhold := func(unitKey factKey, reason withheldReason) {
 		inUnit := unitKey
 		inUnit.name = ""
-		if withheld[inUnit] == notWithheld {
+		if withheld[inUnit] < reason {
 			withheld[inUnit] = reason
 		}
 	}
@@ -150,12 +150,23 @@ func unkeyedTotal(parts contract.UnkeyedFacts) int {
 }
 
 // hosted is a host's key by name (factKeyByName) moved to the unit declaring its object, and false when no unit
-// of the graph declares it.
+// of the graph declares it. A parameter or a result is declared by no unit of its own, so its fact, an answer about it
+// say, is moved to the unit declaring its function, where the build's fact about it sits by position and meets it by
+// its name; a function's path must have a declared function's shape (functionShaped), as an answer's must
+// (hostedAnswer), since a function's unit also declares the members of anonymous types in its signature (#h660y7d).
 func (declaring *byDeclaringUnit) hosted(key factKey) (factKey, bool) {
 	if declaring.standardLibrary == nil {
 		return factKey{}, false
 	}
 	index, isDeclared := declaring.standardLibrary.UnitDeclaringName(key.packageIdentifier, key.local)
+	if isDeclared {
+		return declaring.unitKey(key, index), true
+	}
+	functionPath, _, isPlace := answerPlaceOf(objectpath.Path(key.local))
+	if !isPlace || !functionShaped(functionPath) {
+		return factKey{}, false
+	}
+	index, isDeclared = declaring.standardLibrary.UnitDeclaringName(key.packageIdentifier, string(functionPath))
 	if !isDeclared {
 		return factKey{}, false
 	}
@@ -182,9 +193,11 @@ func (declaring *byDeclaringUnit) built(key factKey) (factKey, bool) {
 // name another method; and two functions of one name in files of different builds share a path, though they are other
 // code. The object is found instead by its position, in the unit of the standard library's graph holding it, and the
 // host's answer by the unit declaring the function its path names, beside the object's place in that function's
-// signature (answerPlaceOf): a function declaration's unit declares one function, so the two meet exactly. An object
-// with no position in the graph, an interface's method or its parameter, which a type's unit declares beside others,
-// and an object two of the host's answers meet at, are not placed, and the census never guesses at them.
+// signature (answerPlaceOf). A function declaration's unit declares its function and also every member of an anonymous
+// type in its signature, an interface's method or a struct's field, so the host's answer is placed only at a path of a
+// declared function's shape (functionShaped), and the two meet exactly. An object with no position in the graph, an
+// interface's method or its parameter, which a type's unit declares beside others, and an object two of the host's
+// answers meet at, are not placed, and the census never guesses at them.
 func (declaring *byDeclaringUnit) answerOf(
 	answers *fact_resolver.Answers,
 	builtFact check.ExportedFact,
@@ -269,15 +282,19 @@ func (declaring *byDeclaringUnit) builtFunction(builtFact check.ExportedFact) (*
 	return nil, "", false
 }
 
-// hostedAnswer is the place of the host's answer at path, of the package of packagePath: the unit declaring the object
-// it names, a function's, with no place, or the unit declaring the function whose parameter or result it names, beside
-// that place (answerPlaceOf), and false when no unit declares either.
+// hostedAnswer is the place of the host's answer at path, of the package of packagePath: the unit declaring the
+// function it names, with no place, or the unit declaring the function whose parameter or result it names, beside that
+// place (answerPlaceOf), and false when no unit declares either. A path is a function's only where it has a declared
+// function's shape (functionShaped): the unit declaring a function also declares the members of anonymous types in its
+// signature, and a build's answer about the function, or its parameter, must never be handed one of theirs (#h660y7d).
 func (declaring *byDeclaringUnit) hostedAnswer(packagePath string, path objectpath.Path) (answerPlace, bool) {
-	if index, isDeclared := declaring.standardLibrary.UnitDeclaringName(packagePath, string(path)); isDeclared {
-		return answerPlace{unit: index}, true
+	if functionShaped(path) {
+		if index, isDeclared := declaring.standardLibrary.UnitDeclaringName(packagePath, string(path)); isDeclared {
+			return answerPlace{unit: index}, true
+		}
 	}
 	functionPath, place, isPlace := answerPlaceOf(path)
-	if !isPlace {
+	if !isPlace || !functionShaped(functionPath) {
 		return answerPlace{}, false
 	}
 	index, isDeclared := declaring.standardLibrary.UnitDeclaringName(packagePath, string(functionPath))
@@ -310,4 +327,18 @@ func answerPlaceOf(path objectpath.Path) (objectpath.Path, string, bool) {
 		return "", "", false
 	}
 	return path[:dot], step, true
+}
+
+// functionShaped reports whether path has a declared function's shape in objectpath's grammar: a package-level name,
+// with no `.`, or a concrete method, its type's name, `.`, its Type operator, then `M` and the method's index. An
+// interface's method is reached through its type's underlying type (`I.UM0`), as a struct's field is (`T.UF0`), and a
+// member of an anonymous type in a signature through the signature (`F.PA1.M0`), so each holds another step or another
+// operator, and is refused.
+func functionShaped(path objectpath.Path) bool {
+	dot := strings.IndexByte(string(path), '.')
+	if dot < 0 {
+		return path != ""
+	}
+	step := string(path[dot+1:])
+	return len(step) > 1 && step[0] == 'M' && strings.Trim(step[1:], "0123456789") == ""
 }

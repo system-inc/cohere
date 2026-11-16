@@ -1157,19 +1157,24 @@ fact that moved, and up to three `"examples"` of a difference. `"workspace"` and
 scope, `"differingUnits"` and `"differingNodes"`, the units declaring an object whose fact differs, `"firstOrderUnits"`
 and `"firstOrderNodes"`, the units the judgment calls independent that call one of those statically, the callers a
 model judging each unit once would judge again, `"boundUnits"` and `"boundNodes"`, the same followed to a fixed point
-that takes each such caller as differing in turn, an upper bound, and `"callerUnits"` and `"callerNodes"`, every
+that takes each such caller as differing in turn, an upper bound on what the facts compared reach, since a fact the
+census leaves out (`"unkeyed"`) is never counted as differing, and `"callerUnits"` and `"callerNodes"`, every
 independent unit that calls a dependent one, the most that facts through call bodies can put in play. Where the
 standard library's graph is records, the store's, with no types, a restored package's facts are matched on both sides
 by their objects' declaring units and names, the host's found by the name the records give each object, the build's by
 its position, and an example names the build's object at its own position, or the unit's start, said so, where the
-build has none. `"unkeyed"` counts what the census left out, and `"unkeyedParts"` says why, its parts summing to it:
+build has none. `"unkeyed"` counts the facts the census left out of a package the host restored whose graph is
+records, and the build's answers it could not place in any package the graph holds; elsewhere a closure's fact, and a
+host fact with no counterpart in a graph loaded from source, are left out uncounted, as before. `"unkeyedParts"` says
+why, its parts summing to it:
 `"unnamed"`, a host fact no record name reaches; `"closures"`, a build fact about an object no objectpath names;
 `"unplaced"`, a fact whose object no unit declares or holds, with the build's facts of its package, kind and name, or
 of its kind where it has no name; `"pathOnly"`, a host fact held by a method's or a field's path alone, which nothing
 pairs exactly, with the build's facts of its kind in its unit that no named host fact claims; `"collisions"`, two facts
 of one kind meeting under one unit and name on either side, which nothing tells apart, with the other side's fact
 there, or where the host's meet, the build's facts of the kind in the unit; and `"answers"`, a build's answer about a
-function no unit of the graph places. Both are always written, since every count beside them leaves those out.
+function, or about a parameter or result of one, that no unit of the graph places, or that two of the host's answers
+meet at. Both are always written, since every count beside them leaves those out.
 `"milliseconds"` is the comparison's wall time.
 
 ### `phase`
