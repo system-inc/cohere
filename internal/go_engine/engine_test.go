@@ -957,7 +957,7 @@ var (
 	// 0, so one that took under a millisecond on one run and more on the next would appear and vanish: each is
 	// normalized to 0, which the record writes by leaving it out.
 	buildTimingPattern = regexp.MustCompile(
-		`,"((load|lint|decide|keep|wait|lintWait)Milliseconds|heldAt(LoadEnd|LintPeak)Bytes)":\d+`)
+		`,"((load|lint|decide|keep|wait|shareGateWait|lintWait)Milliseconds|heldAt(LoadEnd|LintPeak)Bytes)":\d+`)
 	// lintWaitedPattern is whether an extra build's lint waited for its weight at the gate, which turns on how the
 	// builds side by side fall in time and never reaches the verdict, so it is left out as the times are.
 	lintWaitedPattern     = regexp.MustCompile(`,"lintWaited":true`)

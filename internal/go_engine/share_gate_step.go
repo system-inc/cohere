@@ -11,7 +11,8 @@ const (
 	// shareGateHeld is the build looking for its turn once the shares are judged and not let through, told under the
 	// gate's lock, so a hook told it must not wait on another build.
 	shareGateHeld
-	// shareGateAdmitted is the build let through, before its type check.
+	// shareGateAdmitted is the build let through, before its type check, told under the gate's lock before the build
+	// after it can pass, so a hook told it must not wait on another build.
 	shareGateAdmitted
 	// shareGateRefused is the build turned away because a build before it in start order failed, before its type
 	// check, which it never runs.

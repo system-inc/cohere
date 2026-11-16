@@ -115,9 +115,12 @@ type pipeline struct {
 	//
 	// buildsWidthFromHostLive is whether the share gate decided the width from the host's live heap, every build's
 	// share low (hostLiveBuildsWidth), for the lint record. buildsWidthAtGateForced, set only by a test and never by a
-	// switch or the environment, is the width in place of that decision, so a test can hold builds at the share gate at
-	// a width it knows. shareGateSteps, a test's alone too, is told each step of an extra build at the share gate
-	// (shareGateStep), with its position in start order, so a test can see the order builds pass and hold one.
+	// switch or the environment, is the width in place of the share gate's decision, from the host's live heap or its
+	// fallback's measure, so a test can hold builds at the share gate at a width it knows. shareGateSteps, a test's
+	// alone too, is told each step of an extra build at the share gate (shareGateStep), with its position in start
+	// order, so a test can see the order builds pass and hold one. buildLoadTimes, a test's alone too, is told as each
+	// extra build ends without failing its loads' whole wall time, its wait at the share gate included, and that
+	// wait, so a test can check the record splits the one into its load time and its wait.
 	buildsAtOnce            int
 	buildsWidthLiveBytes    uint64
 	buildsWidthBuildBytes   uint64
@@ -129,6 +132,7 @@ type pipeline struct {
 	extraBuildEnds          func(extra project.Build, notes io.Writer) error
 	lintSteps               func(extra project.Build, step lintStep, weight int)
 	shareGateSteps          func(extra project.Build, position int, step shareGateStep)
+	buildLoadTimes          func(extra project.Build, loadWall time.Duration, shareGateWait time.Duration)
 
 	// timedHostLiveBytes is the host's live heap as the extra builds start under `--timing`, measured by a forced
 	// collection, which each build's holdings are measured beyond (extraBuildRun), 0 in any other run.

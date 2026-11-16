@@ -1074,7 +1074,10 @@ across the goroutines that decided, so it can exceed the load and lint it ran wi
 `"keepMilliseconds":180` keeping its packages for the other builds, within its lint: their keys, which a run without
 a store computes only for this, and what each entry holds of the run's answers, since the entries themselves are
 encoded when a build first asks for them, and the host's `"waitMilliseconds":40`, how long the other builds
-waited after its lint for its walks of what each package read of others to end, before any could start.
+waited after its lint for its walks of what each package read of others to end, before any could start. An extra
+build's `"shareGateWaitMilliseconds":900` is how long its first load waited at the share gate, in a run without a
+findings store, for every build to arrive and then its turn (#ghb3rcn); its `loadMilliseconds` leaves that wait out,
+so a build's load time is its own whatever its position.
 
 An extra build's record also says what weighed its lint (#b2t9xmf): `"checkedFromSource":120` the packages of its
 whole graph its loads checked from source rather than restored, summed over every load, and `"packagesLoaded":1400`
@@ -1096,8 +1099,10 @@ host's ran side by side, decided once (#b2t9xmf, #rmzehfg, #ghb3rcn). The first 
 then every other in build order, the host's own before the other platforms (#awbzy9y). When the memory decides the
 width in a run with a findings store, the first runs alone until its load has ended; there a collection measures the
 live heap, the build's holding is that heap less the host's, measured the same way as the builds started, and the rest
-start once the width is decided. A run without a store, under `--no-cache`, decides it at a share gate instead: every
-build starts at once, lists, builds its graph and restores, and waits before its type check, until every build has
+start once the width is decided. A run without a store, under `--no-cache`, decides it at a share gate instead,
+unless it judges each build's dependence (`--build-dependence`), whose builds restore nothing from the host, so every
+share would be high and the measured rule is taken from the start: every build starts at once, lists, builds its
+graph and restores, and waits before its type check, until every build has
 reported its share there, `checkedFromSourceAtGate` over `packagesLoaded`, or ended. When every share is at or under
 0.10, `"buildsWidthFromHostLive":true` says the width was decided from the host's live heap alone, each build's holding
 taken as 1.2 times it. Otherwise the first build passes the gate alone and is measured as its load ends, its holding

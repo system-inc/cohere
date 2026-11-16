@@ -32,9 +32,9 @@ const markPollInterval = time.Millisecond
 // time for the release's standard-library child, and one at a time when no heap could make it more (buildsWidth over
 // the smallest heap). It is false when the width is the memory's to decide: by what the first build holds
 // (measuredBuildsWidth), and in a run without a findings store at the share gate (shareGate), by the host's live heap
-// when every share is low (hostLiveBuildsWidth). The width never
-// reaches a key or the verdict, only the lint record's buildsAtOnce and the heap it was decided by: the builds'
-// results and notes are taken in one order whatever it is (extraBuildRuns).
+// when every share is low (hostLiveBuildsWidth). The width never reaches a key or the verdict, only the lint record's
+// buildsAtOnce and the heap it was decided by: the builds' results and notes are taken in one order whatever it is
+// (extraBuildRuns).
 //
 // Builds that restore nothing each check every package, about what the host's did: two of those side by side under
 // the cap drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
@@ -85,18 +85,28 @@ const lowShareAtGate = 0.10
 // (measuredBuildsWidth). It is fitted to one tree's best width without a store, cohere's root's 6 against 7, where the
 // peak factor is 2.5, not a holding anyone measured: the heaviest low-share build there, windows, holds about 1.3 to
 // 1.4 times the host's live heap, and linux 0.95 (#bg2ffdw). 1.2, with the peak factor's own margin, is the narrowest
-// value that kept the root's best width. That margin does not carry to a store's factor of 3.5, so a run with a
-// store budgets each build at its measured holding, as before the gate (holdingBudget). A row at 1.4 is owed and may
-// move it.
+// value that kept the root's best width. That margin does not carry to a store's factor of 3.5, so a run that takes no
+// share gate, one with a store among them, budgets each build at its measured holding, as before the gate
+// (holdingBudget). A row at 1.4 is owed and may move it.
 const buildHoldingBudget = 1.2
 
-// holdingBudget is how many times its holding the width budgets each build: buildHoldingBudget in a run without a
-// findings store, whose width the share gate decides, and the holding itself, 1, in a run with one (#ghb3rcn).
-func holdingBudget(withStore bool) float64 {
-	if withStore {
+// holdingBudget is how many times its holding the width budgets each build: buildHoldingBudget in a run whose width the
+// share gate decides, gated, and the holding itself, 1, in a run that takes no gate (takesShareGate, #ghb3rcn).
+func holdingBudget(gated bool) float64 {
+	if !gated {
 		return 1
 	}
 	return buildHoldingBudget
+}
+
+// takesShareGate reports whether a width the memory decides is decided at the share gate (shareGate): only in a run
+// without a findings store, since with one the gate cost about 3 CPU-s at cohere's root cold at every width tried
+// (#ghb3rcn), cause unmeasured, and only when the builds restore from the host's run. A run judging each build's
+// dependence restores nothing from it for the facts census (censusKeepsHostRestoreOff, #f9br7sg), so every build's
+// share would be high and the gate would fall back to the measured rule after holding every build for nothing: it
+// takes the measured rule whole from the start.
+func (engine *pipeline) takesShareGate() bool {
+	return !engine.withFindingsStore() && !engine.censusKeepsHostRestoreOff
 }
 
 // budgetedHolding is holding times budget, rounded up to the byte, what the width budgets each build.
@@ -119,15 +129,14 @@ func (engine *pipeline) hostLiveBuildsWidth(extras int, hostLive uint64) (int, b
 // (#rmzehfg), the heaviest the run has (heaviestFirst): the live heap with that build's load ended, measured by a
 // collection run for it (forcedLiveHeapBytes), less hostLive, the host's live heap measured the same way as the builds
 // started, times the run's holdingBudget. It returns the width and the budgeted holding, at least one byte. The first
-// build calls it between its load and its rules, holding none of the run's slots, and the rest are admitted once it
-// is decided (extraBuildRuns). In a run with a findings store it is main's rule whole: the first build runs alone, and
-// its holding is not budgeted. In a run without one it is the share gate's fallback, a share there over
-// lowShareAtGate: the other builds' listings, graphs and restores are live as it measures, since they wait at the
-// gate, so the holding reads high, which errs narrow, and it is budgeted at buildHoldingBudget times. Beside the width
-// it returns whether the slack added its last build (buildsWidth).
+// build calls it between its load and its rules, holding none of the run's slots, and the rest are admitted once it is
+// decided (extraBuildRuns). In a run that takes no share gate (takesShareGate), one with a findings store among them,
+// it is main's rule whole: the first build runs alone, and its holding is not budgeted. In a run that takes the gate it
+// is the gate's fallback, a share there over lowShareAtGate: the other builds' listings, graphs and restores are live
+// as it measures, since they wait at the gate, so the holding reads high, which errs narrow, and it is budgeted at
+// buildHoldingBudget times. Beside the width it returns whether the slack added its last build (buildsWidth).
 func (engine *pipeline) measuredBuildsWidth(extras int, hostLive uint64) (int, bool, uint64) {
-	holding := budgetedHolding(holdingAbove(forcedLiveHeapBytes(), hostLive),
-		holdingBudget(engine.withFindingsStore()))
+	holding := budgetedHolding(holdingAbove(forcedLiveHeapBytes(), hostLive), holdingBudget(engine.takesShareGate()))
 	width, slack := buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding,
 		engine.withFindingsStore())
 	return width, slack, holding
@@ -176,7 +185,8 @@ func heaviestFirst(host project.Build, extras []project.Build) []int {
 // run's do: it kept entries for them, and nothing keeps the builds from reading them, a test turning the restore off or
 // a run whose rename wrote, whose builds read no findings cache. A run under `--timing` keeps no entries. The facts
 // census's restore off (censusKeepsHostRestoreOff) is the census's alone and no reason here (#f9br7sg): a run judging
-// each build's dependence still keeps the host's entries, and its builds run at the width a plain run's would.
+// each build's dependence still keeps the host's entries, and its builds run at the width a plain run's would, measured
+// by its first build rather than at the share gate (takesShareGate).
 func (engine *pipeline) wouldRestoreFromHost(host *check.HostRun) bool {
 	return host.EntriesKept() > 0 && !engine.keepsHostRestoreOff && !engine.renamed
 }

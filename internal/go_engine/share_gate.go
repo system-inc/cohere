@@ -8,6 +8,10 @@ package go_engine
 // the host's live heap alone, and otherwise it is measured by the first build in start order, which passes the gate
 // alone (open). Builds pass in start order, each once every build before it has passed or ended (turn, admit). Every
 // field is read and written under extraBuildRuns' admitLock.
+//
+// A build waiting here holds its load open (loadPackages, loadMemory), so the late raise of the memory limit waits
+// until the last waiting build's load has ended rather than landing while the first builds lint, as it did when a
+// build started only once there was room for it (#ghb3rcn, #ph5532e measures it).
 type shareGate struct {
 	// shares are each build's share by position in start order, arrived the builds that reported or ended, settled
 	// those admitted or ended, so a later build's turn waits for none of them, and arrivals how many have arrived.

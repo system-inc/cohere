@@ -57,13 +57,15 @@ type buildRun struct {
 	// checkedFromSourceRounds is every load's count, the first's and each reload's, which the record sums (#k8gty9e).
 	// lintWait is how long its lint waited for that weight, and lintWaited whether it waited at all, so a wait under a
 	// millisecond still reads as one. checkedFromSourceAtGate is the count its first load told the share gate before
-	// its type check (load.Caching.AtGate), a lower bound on checkedFromSource's first round (lowShareAtGate).
+	// its type check (load.Caching.AtGate), a lower bound on checkedFromSource's first round (lowShareAtGate), and
+	// shareGateWait how long that load waited there, which loading leaves out.
 	checkedFromSource       int
 	checkedFromSourceRounds []int
 	checkedFromSourceAtGate int
 	packagesLoaded          int
 	lintWait                time.Duration
 	lintWaited              bool
+	shareGateWait           time.Duration
 	// heldAtLoadEnd and heldAtLintPeak are an extra build's alone, measured only under `--timing`: what it held beyond
 	// the host's live heap as its load ended, and the most it held while its rules ran (heldWhileLinting).
 	heldAtLoadEnd  uint64

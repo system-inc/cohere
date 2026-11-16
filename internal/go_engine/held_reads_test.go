@@ -79,7 +79,7 @@ func TestTheBuildsReadFromTheDescriptionsReadsAreTheDisks(test *testing.T) {
 			defer close(selected)
 			heldBuilds, heldUnbuilt, heldError = project.BuildsFor(census, host, ports, nil, reads.read)
 		}()
-		readOurs(reads, os.ReadFile, false)
+		readOurs(census.Ours, reads, os.ReadFile, false)
 		select {
 		case <-selected:
 		case <-time.After(heldReadsDeadline):

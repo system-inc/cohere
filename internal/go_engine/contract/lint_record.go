@@ -169,12 +169,16 @@ type BuildRecord struct {
 	// the others, within its lint: their keys, which a run without a store computes only for this, and what each entry
 	// holds of the run's answers, since the entries themselves are encoded when a build first asks for them.
 	// WaitMilliseconds is the host's too: how long the extra builds waited after its lint for its walks of what each
-	// package read of others to end, before any could start. Each is written only when not 0.
-	LoadMilliseconds   int `json:"loadMilliseconds,omitempty"`
-	LintMilliseconds   int `json:"lintMilliseconds,omitempty"`
-	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
-	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
-	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
+	// package read of others to end, before any could start. ShareGateWaitMilliseconds, additive within contract 3,
+	// is an extra build's alone (#ghb3rcn): how long its first load waited at the share gate before its type check, in
+	// a run without a findings store, for every build to arrive and then its turn, which LoadMilliseconds leaves out,
+	// so a build's load time is its own whatever its position. Each is written only when not 0.
+	LoadMilliseconds          int `json:"loadMilliseconds,omitempty"`
+	LintMilliseconds          int `json:"lintMilliseconds,omitempty"`
+	DecideMilliseconds        int `json:"decideMilliseconds,omitempty"`
+	KeepMilliseconds          int `json:"keepMilliseconds,omitempty"`
+	WaitMilliseconds          int `json:"waitMilliseconds,omitempty"`
+	ShareGateWaitMilliseconds int `json:"shareGateWaitMilliseconds,omitempty"`
 
 	// HeldAtLoadEndBytes and HeldAtLintPeakBytes are an extra build's alone, and written only under `--timing`, whose
 	// builds run one at a time: what the build held beyond the host's live heap as its load ended, measured by a

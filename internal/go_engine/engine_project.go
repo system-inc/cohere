@@ -125,19 +125,21 @@ func describeProject(request invocation) (described *describedProject, describeE
 			contract.ExcludedFile{File: exclusion.File, Reason: exclusion.Reason, Source: exclusion.Source})
 	}
 
-	// Each file's read is held for the builds' selection, which takes it as soon as it is read (heldReads). Abandoned
-	// on the way out, so a slot no read reached, on a refusal or a panic, never holds the selection, and a refusal's
+	// In a run that reads builds, each file's read is held for the builds' selection, which takes it as soon as it is
+	// read (heldReads); a run that reads none makes no slot. Abandoned on the way out: nothing returns between here and
+	// readOurs filling every slot, so it guards a panic alone, which leaves no slot a reader waits on, and a refusal's
 	// join above, deferred first, runs after it.
-	reads := newHeldReads(census.Ours)
-	defer reads.abandon()
+	var reads *heldReads
 	if readsBuilds {
+		reads = newHeldReads(census.Ours)
+		defer reads.abandon()
 		// Started here, beside the reads, rather than beside the census: nothing between them refuses the run, and it
 		// waits on go env and the ports first all the same.
 		early.startReadingBuilds(workspace, census, request.targets, !timed, children, reads.read)
 	}
 	var readable []string
 	var unread []unreadFile
-	readable, contents, unread = readOurs(reads, request.read, request.switches["single-threaded"])
+	readable, contents, unread = readOurs(census.Ours, reads, request.read, request.switches["single-threaded"])
 	for _, failed := range unread {
 		// A file nothing could read is ours until something says otherwise; inside the scope it is a gap the run
 		// names, and outside it the load says what it makes of the file.
@@ -221,31 +223,34 @@ type unreadFile struct {
 	readError error
 }
 
-// readOurs reads each of reads' files through read, as many at once as there are cores unless singleThreaded, holding
-// each in its slot as it is read, and returns those it read, in files' order, with their bytes, and those it could
-// not, in files' order too. Each read lands in its own file's place, so what the run names and in what order is the
-// same whichever read finishes first.
+// readOurs reads each of files through read, as many at once as there are cores unless singleThreaded, holding each
+// in its slot of reads as it is read when reads is not nil, and returns those it read, in files' order, with their
+// bytes, and those it could not, in files' order too. Each read lands in its own file's place, so what the run names
+// and in what order is the same whichever read finishes first. reads, when not nil, is of files.
 //
 // Mutates: reads holds every file's read
 func readOurs(
-	reads *heldReads, read func(file string) ([]byte, error), singleThreaded bool,
+	files []string, reads *heldReads, read func(file string) ([]byte, error), singleThreaded bool,
 ) ([]string, map[string][]byte, []unreadFile) {
-	bounded.ForEach(len(reads.files), singleThreaded, func(index int) {
-		contents, readError := read(reads.files[index])
-		reads.hold(index, contents, readError)
+	readContents := make([][]byte, len(files))
+	readErrors := make([]error, len(files))
+	bounded.ForEach(len(files), singleThreaded, func(index int) {
+		readContents[index], readErrors[index] = read(files[index])
+		if reads != nil {
+			reads.hold(index, readContents[index], readErrors[index])
+		}
 	})
 	var readable []string
-	contents := make(map[string][]byte, len(reads.files))
+	contents := make(map[string][]byte, len(files))
 	var unread []unreadFile
-	for index, file := range reads.files {
-		// Held by the read above, which ForEach has returned from, so its slot is written and nothing waits here.
-		slot := &reads.slots[index]
-		if slot.readError != nil {
-			unread = append(unread, unreadFile{file: file, readError: slot.readError})
+	// Every read is written by the time ForEach has returned, so nothing waits here.
+	for index, file := range files {
+		if readErrors[index] != nil {
+			unread = append(unread, unreadFile{file: file, readError: readErrors[index]})
 			continue
 		}
 		readable = append(readable, file)
-		contents[file] = slot.contents
+		contents[file] = readContents[index]
 	}
 	return readable, contents, unread
 }

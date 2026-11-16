@@ -657,7 +657,11 @@
                             },
                             "loadMilliseconds": {
                                 "type": "integer",
-                                "description": "This build's wall time loading the workspace, every reload included. Absent when 0."
+                                "description": "This build's wall time loading the workspace, every reload included, its wait at the share gate left out. Absent when 0."
+                            },
+                            "shareGateWaitMilliseconds": {
+                                "type": "integer",
+                                "description": "Another build's alone, in a run without a findings store: how long its first load waited at the share gate before its type check, for every build to arrive and then its turn, which loadMilliseconds leaves out. Absent when 0."
                             },
                             "lintMilliseconds": {
                                 "type": "integer",

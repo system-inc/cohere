@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"runtime"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -26,6 +26,13 @@ const sharedPackages = 40
 func lowShareBuilds(test *testing.T) string {
 	test.Helper()
 	root := threeExtraBuilds(test)
+	writeSharedPackages(test, root)
+	return root
+}
+
+// writeSharedPackages writes sharedPackages packages under root that every build compiles alike.
+func writeSharedPackages(test *testing.T, root string) {
+	test.Helper()
 	files := map[string]string{}
 	for index := range sharedPackages {
 		files[fmt.Sprintf("internal/shared%d/shared.go", index)] = fmt.Sprintf("// Package shared%d is compiled "+
@@ -33,7 +40,6 @@ func lowShareBuilds(test *testing.T) string {
 			index, index)
 	}
 	writeFixtureFiles(test, root, files)
-	return root
 }
 
 // underCapRun runs the engine over root under `--other-builds` and the 8 GiB cap, so the memory, not a fixed rule,
@@ -117,13 +123,7 @@ func TestTheWidthIsTheHostsLiveHeapsWhenEveryShareIsLow(test *testing.T) {
 func TestTheWidthIsMeasuredWhenABuildChecksMuchFromSource(test *testing.T) {
 	test.Parallel()
 	root := threeExtraBuilds(test)
-	third := ""
-	for _, operatingSystem := range []string{"linux", "darwin", "freebsd"} {
-		if operatingSystem != runtime.GOOS {
-			third = operatingSystem
-			break
-		}
-	}
+	third := thirdPlatform()
 	writeFixtureFiles(test, root, map[string]string{
 		"internal/third/heavy_" + third + ".go": "package third\n\n// net/http is many packages the host's run " +
 			"never checked.\nimport _ \"net/http\"\n",
@@ -321,5 +321,156 @@ func TestARunWithAStoreTakesNoShareGate(test *testing.T) {
 		if build.CheckedFromSourceAtGate == 0 {
 			test.Errorf("the build %s's record reads nothing from source at the gate, want its count", build.Target)
 		}
+	}
+}
+
+// A build loaded again for a question passes the share gate at once, admitted once (#ghb3rcn): its reload's load
+// reaches the gate again holding the place its first admission took, so a gate that judged it anew would count its
+// share twice and, at a width of one, wait behind itself for good. Over restore-from-host, whose windows build declines
+// two packages at its check and reloads once, with a package a third platform alone compiles for a second extra build
+// and sharedPackages more, at a width forced to one, every build is admitted once, and windows' record keeps its first
+// load's count at the gate, under its first round's, not its reload's.
+func TestAReloadingBuildIsAdmittedAtTheShareGateOnce(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "restore-from-host"))
+	third := thirdPlatform()
+	writeFixtureFiles(test, root, map[string]string{
+		"third/third.go": "// Package third is compiled beside the fixture's.\npackage third\n",
+		"third/third_" + third + ".go": "//go:build " + third + "\n\npackage third\n\n// Third is compiled by " +
+			"one platform alone.\nconst Third = 3\n",
+	})
+	writeSharedPackages(test, root)
+	var admittedLock sync.Mutex
+	admitted := map[int]int{}
+	var engine *pipeline
+	var raw string
+	withinBesideWait(test, "the run whose build reloads at a width of one", func() {
+		engine, raw, _ = shareGateRun(test, root, exitFindings, func(engine *pipeline) {
+			engine.buildsWidthAtGateForced = 1
+			engine.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
+				if step == shareGateAdmitted {
+					admittedLock.Lock()
+					admitted[position]++
+					admittedLock.Unlock()
+				}
+			}
+		})
+	})
+	if engine.buildsAtOnce != 1 {
+		test.Fatalf("the width was %d, want the forced width of one", engine.buildsAtOnce)
+	}
+	lint := lintRecordOf(test, raw)
+	index := slices.IndexFunc(lint.Builds, func(build contract.BuildRecord) bool {
+		return strings.HasPrefix(build.Target, "windows/")
+	})
+	if index < 0 || len(lint.Builds[index].CheckedFromSourceRounds) != 2 {
+		test.Fatalf("windows was not loaded twice, the fixture's premise:\n%s", raw)
+	}
+	windows := lint.Builds[index]
+	admittedLock.Lock()
+	defer admittedLock.Unlock()
+	if len(admitted) != len(lint.Builds)-1 {
+		test.Errorf("%d builds were admitted at the share gate, %v, want each of the %d", len(admitted), admitted,
+			len(lint.Builds)-1)
+	}
+	for position, times := range admitted {
+		if times != 1 {
+			test.Errorf("the build at %d was admitted %d times, want once", position, times)
+		}
+	}
+	first, reload := windows.CheckedFromSourceRounds[0], windows.CheckedFromSourceRounds[1]
+	if windows.CheckedFromSourceAtGate == 0 || windows.CheckedFromSourceAtGate > first {
+		test.Errorf("windows' record reads %d from source at the gate, want its first load's, at most its first "+
+			"round's %d (its reload checked %d)", windows.CheckedFromSourceAtGate, first, reload)
+	}
+}
+
+// A build's wait at the share gate is its own figure, shareGateWaitMilliseconds, and its load time leaves it out
+// (#ghb3rcn), so load times read alike whatever a build's position. At a width of one the first build holds itself at
+// its end until the second waits behind it at the gate, so every build after the first waits there: each build's
+// record splits its loads' whole wall time, as the engine told it (buildLoadTimes), into loadMilliseconds and
+// shareGateWaitMilliseconds, which sum to it within the millisecond each figure's rounding down may lose, and every
+// build after the first was told a wait. The wait is read from what the engine told, not the record's milliseconds,
+// since a wait under one rounds to none there.
+func TestABuildsWaitAtTheShareGateIsNotItsLoadTime(test *testing.T) {
+	test.Parallel()
+	secondHeld := make(chan struct{})
+	var secondHolding sync.Once
+	var wallsLock sync.Mutex
+	walls := map[string]time.Duration{}
+	waits := map[string]time.Duration{}
+	var engine *pipeline
+	var raw string
+	withinBesideWait(test, "the run whose first build holds the rest at the share gate", func() {
+		engine, raw, _ = shareGateRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
+			engine.buildsWidthAtGateForced = 1
+			positions := startPositions(engine)
+			engine.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
+				if position == 1 && step == shareGateHeld {
+					secondHolding.Do(func() { close(secondHeld) })
+				}
+			}
+			engine.buildLoadTimes = func(extra project.Build, loadWall time.Duration, shareGateWait time.Duration) {
+				wallsLock.Lock()
+				walls[extra.String()], waits[extra.String()] = loadWall, shareGateWait
+				wallsLock.Unlock()
+			}
+			engine.extraBuildEnds = func(extra project.Build, _ io.Writer) error {
+				if positions[extra.String()] != 0 {
+					return nil
+				}
+				select {
+				case <-secondHeld:
+				case <-time.After(besideWait):
+					return fmt.Errorf("the second build never waited at the share gate")
+				}
+				return nil
+			}
+		})
+	})
+	if engine.buildsAtOnce != 1 {
+		test.Fatalf("the width was %d, want the forced width of one", engine.buildsAtOnce)
+	}
+	positions := startPositions(engine)
+	wallsLock.Lock()
+	defer wallsLock.Unlock()
+	for _, build := range lintRecordOf(test, raw).Builds[1:] {
+		wall, told := walls[build.Target]
+		if !told {
+			test.Errorf("the engine told no load time of the build %s", build.Target)
+			continue
+		}
+		split := build.LoadMilliseconds + build.ShareGateWaitMilliseconds
+		if whole := int(wall.Milliseconds()); split != whole && split != whole-1 {
+			test.Errorf("the build %s recorded a load of %d ms and a wait at the share gate of %d ms, %d together, "+
+				"want its loads' %d ms whole, within the millisecond rounding may lose", build.Target,
+				build.LoadMilliseconds, build.ShareGateWaitMilliseconds, split, whole)
+		}
+		if positions[build.Target] > 0 && waits[build.Target] <= 0 {
+			test.Errorf("the build %s, held behind the first at the share gate, was told no wait there",
+				build.Target)
+		}
+	}
+}
+
+// A run judging each build's dependence takes no share gate even without a findings store (#ghb3rcn): its builds
+// restore nothing from the host's run for the facts census, so every share would be high and the gate would only hold
+// every build before falling back. Under `--build-dependence --no-cache` over lowShareBuilds no build steps at the
+// gate, and the width is the first build's measured holding, unbudgeted, at the factor without a store.
+func TestADependenceRunTakesNoShareGate(test *testing.T) {
+	test.Parallel()
+	var stepped atomic.Int64
+	engine, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
+		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+	}, "--no-cache", "--build-dependence")
+	if engine.withFindingsStore() || !engine.censusKeepsHostRestoreOff {
+		test.Fatalf("the run has a store %t and keeps the census's restore off %t, want none and on",
+			engine.withFindingsStore(), engine.censusKeepsHostRestoreOff)
+	}
+	lint := lintRecordOf(test, raw)
+	if stepped.Load() != 0 || lint.BuildsWidthFromHostLive || lint.BuildsWidthBuildBytes == 0 {
+		test.Errorf("a dependence run stepped %d times at the share gate, decided from the host's live heap %t, "+
+			"with a holding of %d bytes, want no step, no and a measured holding", stepped.Load(),
+			lint.BuildsWidthFromHostLive, lint.BuildsWidthBuildBytes)
 	}
 }

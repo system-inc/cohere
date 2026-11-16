@@ -26,18 +26,23 @@ import (
 // past what the fixture's builds take, so only builds that never ran beside it reach it.
 const besideWait = 2 * time.Minute
 
+// thirdPlatform is the first of linux, darwin and freebsd that is not the host's, a platform beside the host's and
+// windows a fixture can give a file of its own.
+func thirdPlatform() string {
+	for _, operatingSystem := range []string{"linux", "darwin", "freebsd"} {
+		if operatingSystem != runtime.GOOS {
+			return operatingSystem
+		}
+	}
+	return ""
+}
+
 // threeExtraBuilds is a copy of the other-builds fixture with a package one more platform alone compiles beside the
 // tagged build and windows, the first of linux, darwin and freebsd that is not the host's, so a run under
 // `--other-builds` checks three builds beside the host's.
 func threeExtraBuilds(test *testing.T) string {
 	test.Helper()
-	third := ""
-	for _, operatingSystem := range []string{"linux", "darwin", "freebsd"} {
-		if operatingSystem != runtime.GOOS {
-			third = operatingSystem
-			break
-		}
-	}
+	third := thirdPlatform()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 	writeFixtureFiles(test, root, map[string]string{
 		"internal/third/third.go": "// Package third is compiled beside the fixture's.\npackage third\n",

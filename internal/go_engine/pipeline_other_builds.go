@@ -86,11 +86,12 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	}
 
 	// A width the memory decides is decided against the host's live heap measured here, as the builds start, with
-	// nothing else running. In a run with a findings store it is main's rule whole: the first build runs alone and is
-	// measured as its load ends. In a run without one it is decided at the share gate (shareGate): from that heap alone
-	// when every build's share is low, and otherwise measured as the first build's load ends, each holding budgeted at
-	// buildHoldingBudget. The gate is for runs without a store alone, since on Shackler it cost about 3 CPU-s at
-	// cohere's root cold with a store at every width tried (#ghb3rcn), cause unmeasured.
+	// nothing else running. In a run that takes no share gate, one with a findings store or one judging each build's
+	// dependence (takesShareGate), it is main's rule whole: the first build runs alone and is measured as its load
+	// ends. Otherwise it is decided at the share gate (shareGate): from that heap alone when every build's share is
+	// low, and otherwise measured as the first build's load ends, each holding budgeted at buildHoldingBudget. The gate
+	// is for runs without a store alone, since on Shackler it cost about 3 CPU-s at cohere's root cold with a store at
+	// every width tried (#ghb3rcn), cause unmeasured.
 	width, fixed := engine.fixedBuildsWidth(len(extras), pass.result.Host)
 	// Under `--timing` each build's heap is measured as its own (extraBuildRun), which holds only with every build
 	// running alone: a timed run keeps nothing for its builds, so they restore nothing and run one at a time already.
@@ -102,8 +103,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	var measure func() int
 	if !fixed {
 		hostLive := forcedLiveHeapBytes()
-		// Left nil in a run with a findings store, which takes no share gate.
-		if !engine.withFindingsStore() {
+		// Left nil in a run that takes no share gate: one with a findings store, or one judging each build's
+		// dependence, whose builds restore nothing from the host's run (takesShareGate).
+		if engine.takesShareGate() {
 			fromHostLive = func() int {
 				decided, slack, holding := engine.hostLiveBuildsWidth(len(extras), hostLive)
 				engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes = hostLive, holding
@@ -120,6 +122,11 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 			measured, slack, holding := engine.measuredBuildsWidth(len(extras), hostLive)
 			engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes = hostLive, holding
 			engine.buildsWidthSlack = slack
+			// A test's width in place of the gate's fallback too, so a test holds builds at the gate at a width it
+			// knows whatever their shares.
+			if engine.buildsWidthAtGateForced > 0 && engine.takesShareGate() {
+				measured = min(engine.buildsWidthAtGateForced, max(len(extras), 1))
+			}
 			return measured
 		}
 	}
@@ -137,11 +144,12 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 // order, the order they start in, and its error. order is a permutation of extras' indexes (heaviestFirst). The width
 // it ran at is engine.buildsAtOnce.
 //
-// With measure alone, the width is the memory's to decide by what the first build to start holds, main's rule whole,
-// a run with a findings store's: it runs alone until its load has ended, when measure decides the width, and the rest
-// start then, as many at once as it allows (#rmzehfg). A first build whose load failed decides one at a time.
+// With measure alone, the width is the memory's to decide by what the first build to start holds, main's rule whole, a
+// run's that takes no share gate (takesShareGate): it runs alone until its load has ended, when measure decides the
+// width, and the rest start then, as many at once as it allows (#rmzehfg). A first build whose load failed decides one
+// at a time.
 //
-// With fromHostLive too, a run without a findings store's, the width is decided at the share gate (shareGate,
+// With fromHostLive too, a run's that takes the gate, the width is decided at the share gate (shareGate,
 // #ghb3rcn): every build starts at once, lists, builds its graph and restores, and waits before its type check
 // (load.Caching.AtGate) until every build has reported its share or ended. When every share is low the width is
 // fromHostLive's, decided then. Otherwise it is measure's: the first build in order passes alone, and measure decides
@@ -207,8 +215,8 @@ func (engine *pipeline) extraBuildRuns(
 			return 1
 		})
 	}
-	// shares is the builds' share gate, nil but for a run without a findings store whose width the memory decides:
-	// without it the builds start as they are admitted, the first alone while measure decides.
+	// shares is the builds' share gate, nil but for a run that takes it (takesShareGate) whose width the memory
+	// decides: without it the builds start as they are admitted, the first alone while measure decides.
 	var shares *shareGate
 	if measure != nil {
 		limit = 1
@@ -296,11 +304,13 @@ func (engine *pipeline) extraBuildRuns(
 					}
 					running++
 					shares.admit(position)
+					// Told under the lock, before the build after this one can pass, so a test reads the order builds
+					// pass in from the order it was told.
+					engine.shareGateStepped(extra, position, shareGateAdmitted)
 					// The build after this one in order may be waiting only for this one to pass.
 					admitting.Broadcast()
 					admitLock.Unlock()
 					admitted = true
-					engine.shareGateStepped(extra, position, shareGateAdmitted)
 					return nil
 				}
 			}
@@ -552,6 +562,14 @@ func (engine *pipeline) extraBuildRun(
 	// The first load's count at its gate, which a reload's never replaces, as checkedFromSource's first round is the
 	// first load's: the gauge reads the gate's share beside the final one.
 	checkedAtGate, reachedGate := 0, false
+	// loading is every load's wall time but its wait at the share gate, which is shareGateWait's: a build held there
+	// waits for the builds before it, which main's schedule never started it beside, so its load time stays its own.
+	// The wait is taken off here, inside the load, and the load's whole time added once it returns.
+	var loading time.Duration
+	var shareGateWait time.Duration
+	// loadWall is every load's whole wall time, its wait at the share gate included, which only a test's buildLoadTimes
+	// hook reads, to check the two figures the record splits it into.
+	var loadWall time.Duration
 	caching.AtGate = func(fromSource int, packages int) error {
 		if !reachedGate {
 			checkedAtGate, reachedGate = fromSource, true
@@ -559,13 +577,19 @@ func (engine *pipeline) extraBuildRun(
 		if atGate == nil {
 			return nil
 		}
-		return atGate(fromSource, packages)
+		waitStarted := time.Now()
+		gateError := atGate(fromSource, packages)
+		waited := time.Since(waitStarted)
+		loading -= waited
+		shareGateWait += waited
+		return gateError
 	}
-	var loading time.Duration
 	var linting time.Duration
 	started := time.Now()
 	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
-	loading += time.Since(started)
+	elapsed := time.Since(started)
+	loading += elapsed
+	loadWall += elapsed
 	// The first build's load has ended and its rules have not started: it holds none of the run's slots, and every
 	// other build waits at the share gate, before its type check, so the width is measured here, before any other
 	// build is admitted (extraBuildRuns). Their listings, graphs and restores are live as it measures, so the holding
@@ -589,6 +613,8 @@ func (engine *pipeline) extraBuildRun(
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
 		loading:    loading,
+		// The first load's wait, the only one: a reload passes the gate at once.
+		shareGateWait: shareGateWait,
 		// What it held as its load ended is the build's own under `--timing` with any load: a load with type errors
 		// holds its packages too.
 		heldAtLoadEnd: heldAtLoadEnd,
@@ -660,7 +686,9 @@ func (engine *pipeline) extraBuildRun(
 			reloads := strings.Join(result.Reloads, ", ")
 			started := time.Now()
 			loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
-			loading += time.Since(started)
+			elapsed := time.Since(started)
+			loading += elapsed
+			loadWall += elapsed
 			if loadError != nil {
 				return nil, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
 					loadError)
@@ -699,7 +727,10 @@ func (engine *pipeline) extraBuildRun(
 	if run.judged != nil && run.dependence != nil {
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
 	}
-	run.loading, run.linting = loading, linting
+	run.loading, run.linting, run.shareGateWait = loading, linting, shareGateWait
+	if engine.buildLoadTimes != nil {
+		engine.buildLoadTimes(extra, loadWall, shareGateWait)
+	}
 	run.inheritedFiles, run.inheritedFindings = inheritance.Counts()
 	if engine.extraBuildEnds != nil {
 		if endError := engine.extraBuildEnds(extra, notes); endError != nil {
@@ -848,7 +879,8 @@ func sumOf(counts []int) int {
 }
 
 // recordTimes writes into record where run's time went: its load and its lint, every reload's included, the host's wait
-// for its walks before the extra builds could start, an extra build's lint's wait for its weight at the gate, and of
+// for its walks before the extra builds could start, an extra build's wait at the share gate, which its load's time
+// leaves out, and its lint's wait for its weight at the lint gate, and of
 // its result, an extra build's deciding which packages restore from the host's run and the host's keeping its packages
 // for the others, each in wall milliseconds, as the record writes them, and whether the build's lint waited at all.
 //
@@ -857,6 +889,7 @@ func recordTimes(record *contract.BuildRecord, run buildRun) {
 	record.LoadMilliseconds = int(run.loading.Milliseconds())
 	record.LintMilliseconds = int(run.linting.Milliseconds())
 	record.WaitMilliseconds = int(run.waited.Milliseconds())
+	record.ShareGateWaitMilliseconds = int(run.shareGateWait.Milliseconds())
 	record.LintWaitMilliseconds = int(run.lintWait.Milliseconds())
 	record.LintWaited = run.lintWaited
 	if run.result != nil {

@@ -40,12 +40,14 @@ type checkedBuild struct {
 	InheritedFiles    int `json:"inheritedFiles,omitempty"`
 	InheritedFindings int `json:"inheritedFindings,omitempty"`
 	// LoadMilliseconds, LintMilliseconds, DecideMilliseconds (summed across goroutines), KeepMilliseconds and
-	// WaitMilliseconds (the host's) are where the build's time went, each absent when 0.
-	LoadMilliseconds   int `json:"loadMilliseconds,omitempty"`
-	LintMilliseconds   int `json:"lintMilliseconds,omitempty"`
-	DecideMilliseconds int `json:"decideMilliseconds,omitempty"`
-	KeepMilliseconds   int `json:"keepMilliseconds,omitempty"`
-	WaitMilliseconds   int `json:"waitMilliseconds,omitempty"`
+	// WaitMilliseconds (the host's) are where the build's time went, and ShareGateWaitMilliseconds another build's
+	// wait at the share gate, which its load time leaves out (#ghb3rcn), each absent when 0.
+	LoadMilliseconds          int `json:"loadMilliseconds,omitempty"`
+	LintMilliseconds          int `json:"lintMilliseconds,omitempty"`
+	DecideMilliseconds        int `json:"decideMilliseconds,omitempty"`
+	KeepMilliseconds          int `json:"keepMilliseconds,omitempty"`
+	WaitMilliseconds          int `json:"waitMilliseconds,omitempty"`
+	ShareGateWaitMilliseconds int `json:"shareGateWaitMilliseconds,omitempty"`
 	// HeldAtLoadEndBytes and HeldAtLintPeakBytes are what another build held beyond the host's live heap as its load
 	// ended and at its lint's peak, written only under `--timing` (#rmzehfg), and LintPeakOverLoadEnd the second over
 	// the first (#ewkp7w0), each absent when 0.

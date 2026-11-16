@@ -52,7 +52,8 @@ func (reads *heldReads) hold(index int, contents []byte, readError error) {
 }
 
 // abandon closes every slot not yet held as never read, so a reader waiting on one returns: deferred by the
-// description, it runs on every way out of it, a refusal or a panic among them.
+// description, it runs on every way out of it. Nothing returns between the slots' making and readOurs filling every
+// one, so in the description it guards a panic alone.
 func (reads *heldReads) abandon() {
 	for index := range reads.slots {
 		reads.hold(index, nil, errorNeverRead)
