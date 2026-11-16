@@ -145,8 +145,10 @@ commits `internal/corpus/corpus_pinned.go` names in the tree being landed (`gate
 script sets each corpus's variable to its laid copy. A box that lacks one names it and tests nothing; land then
 lays it from the checkout its corpora file names, carried on a gap of its own, and asks the box again. ahra goes
 without `data/`, which no test reads. ahra and connected are installed from their pnpm lockfiles and the
-Prettier fork from its yarn.lock, with no install scripts; Structure is a repository holding every commit a test
-reads through `At`. Laying another commit of a corpus removes the one before it. To move a pin, change its
+Prettier fork from its yarn.lock, with no install scripts, then the eight bundles cohere embeds built into its
+`dist/`, which the engine loads when the fork is set; Structure is a repository holding every commit a test reads
+through `At`. A corpus's place is its commit and the digest of how it is laid, so changing the lay lays it again,
+and laying a corpus anew removes the copy before it. To move a pin, change its
 constant and say why: the next landing on each box lays it. A corpus the corpora file doesn't name is said on
 the land line, and its tests run nowhere.
 
