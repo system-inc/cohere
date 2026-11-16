@@ -65,7 +65,12 @@ func throughHost(test *testing.T, root string, storeDirectory string) *HostRun {
 // throughHostSession is throughHost with the host's session.
 func throughHostSession(test *testing.T, root string, storeDirectory string) (*HostRun, *CacheSession) {
 	test.Helper()
-	rules := throughRules()
+	return hostSessionOf(test, root, storeDirectory, throughRules())
+}
+
+// hostSessionOf is throughHostSession under rules.
+func hostSessionOf(test *testing.T, root string, storeDirectory string, rules []rule.Rule) (*HostRun, *CacheSession) {
+	test.Helper()
 	session := NewCacheSession(cachingAt(storeDirectory, rules), rules)
 	session.KeepForBuilds()
 	loaded, loadError := load.PackagesCached(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
@@ -87,7 +92,18 @@ func throughHostSession(test *testing.T, root string, storeDirectory string) (*H
 // and loaded again as the engine loads an extra build, until no reload is asked, with its session.
 func throughBuild(test *testing.T, root string, storeDirectory string, host *HostRun) (*Result, *CacheSession) {
 	test.Helper()
-	rules := throughRules()
+	return buildOf(test, root, storeDirectory, host, throughRules())
+}
+
+// buildOf is throughBuild under rules.
+func buildOf(
+	test *testing.T,
+	root string,
+	storeDirectory string,
+	host *HostRun,
+	rules []rule.Rule,
+) (*Result, *CacheSession) {
+	test.Helper()
 	caching := cachingAt(storeDirectory, rules)
 	// The build's keys hold its target, as the engine's do, so they never meet the host's.
 	caching.Context.Build = append(caching.Context.Build, "GOOS=windows")
