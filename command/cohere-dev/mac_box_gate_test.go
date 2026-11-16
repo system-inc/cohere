@@ -172,9 +172,11 @@ func TestALandingTestsOnTheGatesMacsAndNeverOnKirksMac(test *testing.T) {
 			unasked: []string{"loom gap --box Sun2 --within"},
 		},
 		{
-			name:        "every box held",
-			replies:     map[string]string{"Sun2.held": "", "Marin.held": ""},
-			environment: []string{gateWaitVariable + "=2s"},
+			name:    "every box held",
+			replies: map[string]string{"Sun2.held": "", "Marin.held": ""},
+			// A wait shorter than one round of asking, so the case reads the same at any load: each box is still
+			// asked twice before the land refuses.
+			environment: []string{gateWaitVariable + "=1ms"},
 			said: []string{"every gate box is held (Sun2, Marin); the land waits in line holding the lock",
 				"no verdict from a gate box, so nothing landed, and its tests never fall back to Kirk's Mac: every " +
 					"gate box stayed held through ",
