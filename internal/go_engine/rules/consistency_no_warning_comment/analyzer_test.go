@@ -7,6 +7,10 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
+	// The registry marks this rule a syntax-only walk as it initializes, wrapping Analyzer in place so it runs on a
+	// pass without type information (rules.syntaxOnlyWalks), and only a test binary that links the registry runs
+	// the fixtures through that wrap, which is what shows the rule reads nothing the mark forbids.
+	_ "github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_warning_comment"
 	"github.com/system-inc/cohere/policy"
 )

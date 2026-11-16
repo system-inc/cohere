@@ -13,6 +13,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 )
 
 // Every rule syntaxOnlyWalks names is registered, and the mark holds for it (rule.ValidateSyntaxOnlyWalk), so All's
@@ -103,15 +104,18 @@ func TestAMarkedSyntaxOnlyWalkIsHandedOnlyTheFilesItDoesNotInherit(test *testing
 	}
 }
 
-// Each rule syntaxOnlyWalks names is run by the registry through rule.SyntaxOnlyRun (#y6q1x2j): handed second.go, a
-// file holding a long line of shouting either rule would report, under an inheritance that says the rule inherits
-// second.go, its registered analyzer reports the host's finding there and nothing of its own, which only the wrap can
-// do.
+// Each rule syntaxOnlyWalks names is run by the registry through rule.SyntaxOnlyRun (#y6q1x2j): second.go holds what
+// every marked rule reports, a build line with a malformed Go version, a go:debug directive outside package main, a
+// long line of shouting with a deferred task in it, and more lines than a file may hold, so each rule's registered
+// analyzer, under an inheritance that says the rule inherits second.go, reports the host's finding there and nothing of
+// its own, which only the wrap can do, and inheriting nothing it reports its own there, which shows second.go provokes
+// it.
 func TestTheRegistrysSyntaxOnlyWalksAreWrapped(test *testing.T) {
 	test.Parallel()
 	sources := map[string]string{
-		"first.go":  "package walked\n",
-		"second.go": "package walked\n\n// A LOUD comment " + strings.Repeat("that runs on ", 10) + "past the limit.\n",
+		"first.go": "package walked\n",
+		"second.go": "//go:build go1.x\n//go:debug panicnil=1\n\npackage walked\n\n// A LOUD comment, TODO " +
+			strings.Repeat("that runs on ", 10) + "past the limit.\n" + strings.Repeat("\n", 2001),
 	}
 	registered := All()
 	for name := range syntaxOnlyWalks {
@@ -120,32 +124,47 @@ func TestTheRegistrysSyntaxOnlyWalksAreWrapped(test *testing.T) {
 			test.Errorf("%s is marked a syntax-only walk and is not registered", name)
 			continue
 		}
-		fileSet := token.NewFileSet()
-		files := []*ast.File{}
-		for _, filename := range []string{"first.go", "second.go"} {
-			file, parseError := parser.ParseFile(fileSet, filename, sources[filename], parser.ParseComments)
-			if parseError != nil {
-				test.Fatal(parseError)
-			}
-			files = append(files, file)
-		}
-		reported := []string{}
-		pass := &analysis.Pass{Analyzer: registered[at].Analyzer, Fset: fileSet, Files: files,
-			ResultOf: map[*analysis.Analyzer]any{rule.Inherited: inheritsSecond{}},
-			ReadFile: func(filename string) ([]byte, error) { return []byte(sources[filename]), nil },
-			Report: func(diagnostic analysis.Diagnostic) {
-				position := fileSet.PositionFor(diagnostic.Pos, false)
-				reported = append(reported, position.String()+" "+diagnostic.Category+" "+diagnostic.Message)
-			}}
-		if _, runError := registered[at].Analyzer.Run(pass); runError != nil {
-			test.Fatal(runError)
-		}
+		inheriting := walkedSecond(test, registered[at].Analyzer, sources, inheritsSecond{})
 		expected := []string{"second.go:1:1 inherited the host's finding"}
-		if !slices.Equal(reported, expected) {
+		if !slices.Equal(inheriting, expected) {
 			test.Errorf("%s reported %q, want only %q, so the registry does not run it through rule.SyntaxOnlyRun",
-				name, reported, expected)
+				name, inheriting, expected)
+		}
+		own := walkedSecond(test, registered[at].Analyzer, sources, nil)
+		if !slices.ContainsFunc(own, func(finding string) bool { return strings.HasPrefix(finding, "second.go:") }) {
+			test.Errorf("%s reported %q inheriting nothing, want a finding of its own on second.go", name, own)
 		}
 	}
+}
+
+// walkedSecond is what analyzer reports, each finding as its position, category and message, over first.go and
+// second.go parsed from sources, under inheritance, the positions table answered as the checker answers it.
+//
+//cohere:ignore consistency-no-any a pass's ResultOf holds each result as any, and inheritance is one
+func walkedSecond(test *testing.T, analyzer *analysis.Analyzer, sources map[string]string, inheritance any) []string {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	files := []*ast.File{}
+	for _, filename := range []string{"first.go", "second.go"} {
+		file, parseError := parser.ParseFile(fileSet, filename, sources[filename], parser.ParseComments)
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		files = append(files, file)
+	}
+	reported := []string{}
+	pass := &analysis.Pass{Analyzer: analyzer, Fset: fileSet, Files: files,
+		ResultOf: map[*analysis.Analyzer]any{rule.Inherited: inheritance,
+			positions.Analyzer: positions.New(fileSet, files)},
+		ReadFile: func(filename string) ([]byte, error) { return []byte(sources[filename]), nil },
+		Report: func(diagnostic analysis.Diagnostic) {
+			position := fileSet.PositionFor(diagnostic.Pos, false)
+			reported = append(reported, position.String()+" "+diagnostic.Category+" "+diagnostic.Message)
+		}}
+	if _, runError := analyzer.Run(pass); runError != nil {
+		test.Fatal(runError)
+	}
+	return reported
 }
 
 // A walk marked syntax-only is handed a pass with no type information, no package and no sizes, whether or not it
