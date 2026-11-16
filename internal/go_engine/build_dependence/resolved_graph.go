@@ -9,14 +9,14 @@ import (
 
 // resolvedGraph is the graph's records resolved into nodes: every object a unit declares has a node, and each node two
 // bits, its name bit at twice its index and its underlying bit just after, a non-type object using only the first.
-// A node is keyed by its package's ID and its local name (record.go), so a record decoded from its bytes and one
-// collected from a live package resolve alike (#6a3kjvz). It is built once for the packages added so far and read,
-// never written, by every judgment on it, so judgments can run concurrently.
+// A node is keyed by its package, by its index in package ID order, and its local name (record.go), so a record
+// decoded from its bytes and one collected from a live package resolve alike (#6a3kjvz). It is built once for the
+// packages added so far and read, never written, by every judgment on it, so judgments can run concurrently.
 //
 // Everything it holds of a unit, a node or a bit is a column, a slice indexed by the unit, node or bit, and every list
 // a unit or a bit holds is a row of packed rows (packedRows), so a tree's resolution is a few dozen slices rather than
-// a slice header and an allocation for each list of each unit. It points into no record's units, which it copies what
-// it reads of at resolution, so a record's units can be let go once the graph is resolved.
+// a slice header and an allocation for each list of each unit. It points into no record's units: what it reads of them
+// it copies while resolving, so a record's units can be let go once the graph is resolved.
 type resolvedGraph struct {
 	// packages are the records, in package ID order, so a node's index never hangs on the order packages were added.
 	packages     []*packageRecord
@@ -93,8 +93,8 @@ type resolvedGraph struct {
 	// declaringUnit is, for each node, the unit that declares it.
 	declaringUnit []int32
 
-	// dependents are, for each bit, the bits that depend on it (rule 3), a row each in the order of the edges, which the
-	// fixed point never reads: its result is a set.
+	// dependents are, for each bit, the bits that depend on it (rule 3), a row each, its entries in the order of the
+	// edges, an order the fixed point never reads, its result being a set.
 	dependents packedRows[int32]
 
 	// externalEdges are the edges to bits of objects of packages the graph does not hold, set when the build's
