@@ -62,6 +62,8 @@ type runSummary struct {
 	BuildsAtOnce int
 	// BuildsWidthLiveBytes is the host's live heap BuildsAtOnce was decided from, 0 when the decision needed none.
 	BuildsWidthLiveBytes uint64
+	// BuildsWidthFromHostLive is whether that heap alone decided BuildsAtOnce, at the share gate (#ghb3rcn).
+	BuildsWidthFromHostLive bool
 
 	TypeErrors int
 	Findings   int

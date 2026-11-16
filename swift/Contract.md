@@ -1074,41 +1074,59 @@ across the goroutines that decided, so it can exceed the load and lint it ran wi
 `"keepMilliseconds":180` keeping its packages for the other builds, within its lint: their keys, which a run without
 a store computes only for this, and what each entry holds of the run's answers, since the entries themselves are
 encoded when a build first asks for them, and the host's `"waitMilliseconds":40`, how long the other builds
-waited after its lint for its walks of what each package read of others to end, before any could start.
+waited after its lint for its walks of what each package read of others to end, before any could start. An extra
+build's `"shareGateWaitMilliseconds":900` is how long its first load waited at the share gate, in a run without a
+findings store, for every build to arrive and then its turn (#ghb3rcn); its `loadMilliseconds` leaves that wait out,
+so a build's load time is its own whatever its position.
 
 An extra build's record also says what weighed its lint (#b2t9xmf): `"checkedFromSource":120` the packages of its
 whole graph its loads checked from source rather than restored, summed over every load, and `"packagesLoaded":1400`
 every package its first load loaded, dependencies and test variants included. A build loaded again after a decline
 also writes `"checkedFromSourceRounds":[20,100]`, each load's count in order (#k8gty9e); the first load's count over
-`packagesLoaded` is the share that weighs its lint. The extra builds' lints
+`packagesLoaded` is the share that weighs its lint. `"checkedFromSourceAtGate":30` is what its first load would check
+from source as it reached its type check, every package not restored, where a run without a findings store holds it
+at the share gate (#ghb3rcn), written whatever the run: a lower bound on that first count, since a restore decided
+late can still decline, and over `packagesLoaded` the share the gate reads, so a tree whose gate and final shares part
+widely is findable from the record. The extra builds' lints
 share a budget of one whole build: each takes that share of it once its load has ended, or all of it at or above one
 half, so no two near-full builds lint at once, and they are admitted in the order they became ready, a light build
 never passing a heavy one already waiting. `"lintWaitMilliseconds":850` is how long its lint waited for that weight,
 written only when it is not 0, and `"lintWaited":true` whether it waited at all, so a wait under a millisecond still
-reads as one. The host's record writes none of the four, and none reaches a key or the verdict.
+reads as one. The host's record writes none of these, and none reaches a key or the verdict.
 
 Beside `builds` the Go engine writes `"buildsAtOnce":3`, additive within contract 3: how many of the builds beside the
-host's ran side by side, decided once (#b2t9xmf, #rmzehfg) by what the heaviest build holds. The first build on another
-platform starts first, then every other in build order, the host's own before the other platforms, so heavy builds
-never start side by side ahead of the light ones (#awbzy9y), and the first runs alone until its load has ended; there,
-with nothing else running, a collection measures the live heap, and the build's holding is that heap less the host's,
-measured the same way as the builds started. A build is taken to hold `"buildsWidthPeakFactor":3.5` times that at its
-lint's peak in a run with a findings store, and 2.5 times under `--no-cache` (#hv090f4), each the largest ratio
-measured in its mode across 14 builds of two trees rounded up to the next half, and the width is
+host's ran side by side, decided once (#b2t9xmf, #rmzehfg, #ghb3rcn). The first build on another platform comes first,
+then every other in build order, the host's own before the other platforms (#awbzy9y). When the memory decides the
+width in a run with a findings store, the first runs alone until its load has ended; there a collection measures the
+live heap, the build's holding is that heap less the host's, measured the same way as the builds started, and the rest
+start once the width is decided. A run without a store, under `--no-cache`, decides it at a share gate instead,
+unless it judges each build's dependence (`--build-dependence`), whose builds restore nothing from the host, so every
+share would be high and the measured rule is taken from the start: every build starts at once, lists, builds its
+graph and restores, and waits before its type check, until every build has
+reported its share there, `checkedFromSourceAtGate` over `packagesLoaded`, or ended. When every share is at or under
+0.10, `"buildsWidthFromHostLive":true` says the width was decided from the host's live heap alone, each build's holding
+taken as 1.2 times it. Otherwise the first build passes the gate alone and is measured as its load ends, its holding
+taken as 1.2 times what it holds; the others' listings and restores are live then, so it reads high, which errs
+narrow. Builds pass the gate in that order, each once every build before it has passed or ended, and a build after one
+that failed is turned away there, before its type check. The gate and the 1.2 are for runs without a store alone: with
+one, the gate cost about 3 CPU-s at cohere's root cold at every width tried, cause unmeasured. A build is taken to
+hold `"buildsWidthPeakFactor":3.5` times its holding at its lint's peak in a run with a findings store, and 2.5 times
+under `--no-cache` (#hv090f4), each the largest ratio measured in its mode across 14 builds of two trees rounded up
+to the next half, and the width is
 `floor((limit - live) / (holding * factor))`, no more than the builds and at least one, and one at a time under
 `--single-threaded` or a limit other than the cap. The slack adds one build past that, never two, when it is fewer than
 the builds and one more fits by the largest ratio measured unrounded, 3.22 with a store and 2.16 without one, with 512
 MiB to spare: `live + (width + 1) * holding * measured + 536870912 <= limit` (#ewkp7w0); `"buildsWidthSlack":true`
 says it did, absent when it did not. Beside it, `"buildsWidthLiveBytes":2147483648` is the host's live
-heap and `"buildsWidthBuildBytes":536870912` the first build's holding, so a reader redoes the arithmetic with the
+heap and `"buildsWidthBuildBytes":536870912` the holding budgeted each build, so a reader redoes the arithmetic with the
 memory record's limit, and two runs of one workspace are given the same width; all three are absent when the decision
 needed none, because nothing could make the builds more than one at a time. `"buildsPoolSize":16` is how many slots the
 run's one pool holds, which every load and check of the run shares, the host's and every extra build's, so however many
 builds run side by side the run never runs more of that work at once (#ckm0hsp): one per core, one under
 `--single-threaded`. Each build notes into its own buffer, and once every build has ended their results are taken in
 build order and their notes in the order they started, up to and including the first that failed in that order, so the
-records and stderr are those of a run one build at a time, byte for byte, but these six fields, which no key and no
-verdict reads. All six are absent when `builds` is.
+records and stderr are those of a run one build at a time, byte for byte, but these seven fields, which no key and no
+verdict reads. All seven are absent when `builds` is.
 
 Under `--timing`, whose builds run one at a time, each extra build's record writes `"heldAtLoadEndBytes":1170372464`,
 what it held beyond the host's live heap as its load ended, measured by a forced collection, and

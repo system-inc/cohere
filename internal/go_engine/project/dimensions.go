@@ -55,7 +55,7 @@ const (
 func DimensionsOf(files []string, ports []Port) (Dimensions, error) {
 	sources := make([]source, 0, len(files))
 	for _, file := range files {
-		read, readError := readSource(file)
+		read, readError := readSource(file, os.ReadFile)
 		if readError != nil {
 			return Dimensions{}, readError
 		}
@@ -74,8 +74,10 @@ type source struct {
 	importsC bool
 }
 
-func readSource(file string) (source, error) {
-	contents, readError := os.ReadFile(file)
+// readSource is file as source, its bytes taken through read: the engine's reader of what it read once for the run
+// (BuildsFor), or the disk's.
+func readSource(file string, read func(file string) ([]byte, error)) (source, error) {
+	contents, readError := read(file)
 	if readError != nil {
 		return source{}, fmt.Errorf("reading %s: %w", file, readError)
 	}

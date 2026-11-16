@@ -41,7 +41,17 @@ const searchBudget = 1 << 20
 // share a build, and no other component's ride with them), on the host's platform, or on a platform where a file of
 // the component names that platform and the tag together. No build sets tags that compile a program of its own,
 // which would put it beside its directory's package (breaks).
-func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]Build, []Unbuilt, error) {
+//
+// Each file's bytes are what reader hands it, asked in census order, and it has no other way to them, so the engine
+// hands it the bytes it read once for the whole run and no file is opened twice (#ghb3rcn). A file reader cannot give
+// is unbuilt, its reason the error wrapped as readSource wraps any.
+func BuildsFor(
+	census Census,
+	host Build,
+	ports []Port,
+	extraTargets []Port,
+	reader func(file string) ([]byte, error),
+) ([]Build, []Unbuilt, error) {
 	var candidatesUncompiled []source
 	var unbuilt []Unbuilt
 	// named are the `GOOS` values the project's files name as ones they are built for (targetPorts).
@@ -49,7 +59,7 @@ func BuildsFor(census Census, host Build, ports []Port, extraTargets []Port) ([]
 	// compiledPackages are the packages the host's build compiles in each directory, by name as packageOf reads it.
 	compiledPackages := map[string]map[string]bool{}
 	for _, file := range census.Ours {
-		read, readError := readSource(file)
+		read, readError := readSource(file, reader)
 		if readError != nil {
 			// The engine names an unreadable file as a gap of its own; no build can say it compiles one.
 			unbuilt = append(unbuilt, Unbuilt{File: file, Reason: readError.Error()})

@@ -234,6 +234,16 @@ type Caching struct {
 	// is, restoring the standard library from the binary.
 	Begin func(*Overlap)
 
+	// AtGate, when set, is called once the graph is built and the Restorer has decided, before any package is
+	// type-checked, on the load's goroutine, with how many of the graph's packages the load will check from source,
+	// every one the Restorer did not restore, and how many it holds, the packages Loaded.PackagesLoaded counts. The
+	// count is a lower bound: a package restored with a late decision (Restored.Holds) is checked from source too when
+	// the type check declines it, which only the type check knows. A non-nil error ends the load with it, before any
+	// package is type-checked. The load holds none of the pool's slots there: every slot it takes is taken and given
+	// back within the listing, the restore and the type check, so a caller may hold the load at its gate as long as it
+	// likes. Every load given it calls it, a reload's included.
+	AtGate func(fromSource int, packages int) error
+
 	// Timing is the run's collector under `--timing`, which the load adds its phases to: the listing, each file's read
 	// and parse, each package's type check and each read of export data. Nil measures nothing (#3apgjer).
 	Timing *timing.Collector
@@ -426,7 +436,8 @@ func hasOwnCgo(listed *listing, workspace string) bool {
 // declarations of dependencies that reach their cgo files lose what reaches it only once every package is
 // type-checked. caching's Restorer is told which loader ran, since a translated package has other files than one
 // checked with package "C" faked. caching's Begin, when set, is given the graph once the Restorer has decided and
-// before the first type check, with ended, closed when the load returns, for what is final only then.
+// before the first type check, with ended, closed when the load returns, for what is final only then. caching's AtGate,
+// when set, is told the counts there, after Begin, and its error ends the load before the first type check.
 func fromSource(
 	workspace string,
 	listed *listing,
@@ -513,6 +524,11 @@ func fromSource(
 			nodes:     nodes,
 			ended:     ended,
 		})
+	}
+	if caching.AtGate != nil {
+		if gateError := caching.AtGate(len(reachable)-len(typeChecker.restored), len(reachable)); gateError != nil {
+			return nil, nil, gateError
+		}
 	}
 	typeChecker.load(reachable)
 

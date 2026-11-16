@@ -647,20 +647,13 @@ func (session *CacheSession) restore(action *checker.Action) error {
 	return nil
 }
 
-// findingsOf is what one analyzer found on a restored package, from its entry, and false for a package that missed
-// or a run without the cache.
-func (session *CacheSession) findingsOf(
-	analyzer *analysis.Analyzer,
-	analyzedPackage *packages.Package,
-) ([]Finding, bool) {
+// restoredOf is a restored package's entry, which holds what each analyzer found on it, and nil for a package that
+// missed or a run without the cache.
+func (session *CacheSession) restoredOf(analyzedPackage *packages.Package) *restoredPackage {
 	if session == nil {
-		return nil, false
+		return nil
 	}
-	restored, hit := session.hits[analyzedPackage]
-	if !hit {
-		return nil, false
-	}
-	return restored.analyses[analyzer].findings, true
+	return session.hits[analyzedPackage]
 }
 
 // reportOf is a report analyzer's result on a restored package, from its entry, and false for a package that missed or
@@ -782,7 +775,7 @@ func (session *CacheSession) saveMisses(
 		saved := saving[index]
 		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
 		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-			withheld[saved], demanded, files[saved], knownFiles, true)
+			withheld[saved], demanded, files[saved], knownFiles, nil, true)
 		record, keepsRecord := session.dependenceRecordToWrite(saved)
 		// The writes and their counting run with no slot held: the counting is a map's and a counter's, under a lock.
 		return func() {
@@ -836,14 +829,7 @@ func (session *CacheSession) saveMisses(
 	throughPositionDependent := session.writeThrough(actionsOf, unsettled, knownFiles)
 	clear(session.closures)
 	aliases := map[cache.Key]cache.Key{}
-	for _, saved := range written {
-		if encoded[saved].positionDependent {
-			continue
-		}
-		if second, known := session.secondKey(saved); known {
-			aliases[second] = session.keys[saved]
-		}
-	}
+	session.aliasWritten(written, encoded, aliases)
 	for through, dependent := range throughPositionDependent {
 		if dependent {
 			continue
@@ -854,6 +840,31 @@ func (session *CacheSession) saveMisses(
 	}
 	session.alias(aliases)
 	return encoded
+}
+
+// aliasWritten gives each package of written whose entry, of encoded, has no finding naming a file outside it an alias
+// under its second key, once that key is known, leading to its own. An entry encoded without that judgment is refused
+// as a problem of the session and given no alias, never read as one whose findings stay put.
+//
+// Mutates: aliases gains each alias given
+func (session *CacheSession) aliasWritten(
+	written []*packages.Package,
+	encoded map[*packages.Package]encodedEntry,
+	aliases map[cache.Key]cache.Key,
+) {
+	for _, saved := range written {
+		dependent, judgeError := encoded[saved].positionDependent.read(saved.ID)
+		if judgeError != nil {
+			session.problem(judgeError.Error())
+			continue
+		}
+		if dependent {
+			continue
+		}
+		if second, known := session.secondKey(saved); known {
+			aliases[second] = session.keys[saved]
+		}
+	}
 }
 
 // putEntry writes entry's record under key, its export data first, so a record is never in the store before what it

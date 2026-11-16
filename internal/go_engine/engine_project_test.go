@@ -57,7 +57,7 @@ func TestReadOursKeepsTheFilesOrderWhicheverReadFinishesFirst(test *testing.T) {
 		}
 		return contents, readError
 	}
-	readable, contents, unread := readOurs(files, read, false)
+	readable, contents, unread := readOurs(files, nil, read, false)
 
 	var wantReadable []string
 	wantContents := map[string][]byte{}

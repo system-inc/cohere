@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
@@ -24,18 +26,23 @@ import (
 // past what the fixture's builds take, so only builds that never ran beside it reach it.
 const besideWait = 2 * time.Minute
 
+// thirdPlatform is the first of linux, darwin and freebsd that is not the host's, a platform beside the host's and
+// windows a fixture can give a file of its own.
+func thirdPlatform() string {
+	for _, operatingSystem := range []string{"linux", "darwin", "freebsd"} {
+		if operatingSystem != runtime.GOOS {
+			return operatingSystem
+		}
+	}
+	return ""
+}
+
 // threeExtraBuilds is a copy of the other-builds fixture with a package one more platform alone compiles beside the
 // tagged build and windows, the first of linux, darwin and freebsd that is not the host's, so a run under
 // `--other-builds` checks three builds beside the host's.
 func threeExtraBuilds(test *testing.T) string {
 	test.Helper()
-	third := ""
-	for _, operatingSystem := range []string{"linux", "darwin", "freebsd"} {
-		if operatingSystem != runtime.GOOS {
-			third = operatingSystem
-			break
-		}
-	}
+	third := thirdPlatform()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 	writeFixtureFiles(test, root, map[string]string{
 		"internal/third/third.go": "// Package third is compiled beside the fixture's.\npackage third\n",
@@ -550,17 +557,19 @@ func TestTheBuildsStartHeaviestFirst(test *testing.T) {
 // never by whenever the collector last ran, so two decisions over one heap agree whatever state the collector is in:
 // one right after a collection, one after a collection that counted 512 MiB the decision no longer holds, which a read
 // of the last collection would count as the build's (#rmzehfg). A retained 256 MiB stands for the first build, and the
-// limit is set so that holding, taken at its peak, leaves room for two builds, and the holding with the garbage
-// counted for none beside the host's heap.
+// limit is set so that holding, budgeted at buildHoldingBudget times it and taken at its peak, leaves room for two
+// builds and not three, which the holding unbudgeted would, and the holding with the garbage counted for none beside
+// the host's heap (#ghb3rcn).
 //
 // Not parallel: it measures this process's live heap, which another test's run would move.
 func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	const garbageBytes = 512 << 20
 	const buildBytes = 256 << 20
 	hostLive := forcedLiveHeapBytes()
-	// Room for two peaks of the build, 2.5 times its holding each, since the engine here has no findings store, and
-	// half a holding more.
-	limit := int64(hostLive + 5*buildBytes + buildBytes/2)
+	// Room for two peaks of the build, 2.5 times its budgeted holding, 1.2 times what it holds, each, since the engine
+	// here has no findings store, 6 holdings, and a quarter more: three peaks of the holding unbudgeted, 7.5, would
+	// fit in less, and the slack's third build, 3 times 1.2 times 2.16, 7.8 holdings, with 512 MiB to spare would not.
+	limit := int64(hostLive + 8*buildBytes + buildBytes/4)
 	engine := &pipeline{memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
 		Source: contract.MemorySourceCap}}}
 	build := make([]byte, buildBytes)
@@ -586,12 +595,43 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 			collectedWidth, staleWidth)
 	}
 	if collectedWidth != 2 {
-		test.Errorf("the width is %d, want 2, the builds at their peaks the limit holds beside the host's heap",
-			collectedWidth)
+		test.Errorf("the width is %d, want 2, the builds at their budgeted peaks the limit holds beside the host's "+
+			"heap", collectedWidth)
 	}
 	if difference := max(collectedHolding, staleHolding) - min(collectedHolding, staleHolding); difference > 64<<20 {
 		test.Errorf("the decision was given holdings of %d and %d bytes, %d apart, want the same holding measured "+
 			"both times", collectedHolding, staleHolding, difference)
+	}
+}
+
+// A run with a findings store budgets the first build at what it measured, its holding itself, since the share gate's
+// 1.2, buildHoldingBudget, was fitted without a store, where the peak factor is 2.5, and its margin does not carry to
+// a store's 3.5 (#ghb3rcn). A retained 256 MiB stands for the first build, measured by an engine whose session has a
+// store, and the holding it is given is within a sixteenth of it, well short of the 1.2 a run without one takes.
+//
+// Not parallel: it measures this process's live heap, which another test's run would move.
+func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
+	const buildBytes = 256 << 20
+	hostLive := forcedLiveHeapBytes()
+	limit := int64(hostLive + 16*buildBytes)
+	engine := &pipeline{
+		memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
+			Source: contract.MemorySourceCap}},
+		session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil),
+	}
+	if !engine.withFindingsStore() {
+		test.Fatal("the engine has no findings store, want one")
+	}
+	build := make([]byte, buildBytes)
+	for index := range build {
+		build[index] = 1
+	}
+	_, _, holding := engine.measuredBuildsWidth(8, hostLive)
+	runtime.KeepAlive(build)
+	// Within a sixteenth either way, since the rest of the heap moves by a little between the two collections.
+	if holding < buildBytes-buildBytes/16 || holding > buildBytes+buildBytes/16 {
+		test.Errorf("a run with a store was given a holding of %d bytes for a build of %d, want the holding "+
+			"measured, unbudgeted", holding, buildBytes)
 	}
 }
 

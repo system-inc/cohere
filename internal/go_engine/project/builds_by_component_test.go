@@ -2,6 +2,7 @@ package project
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -53,7 +54,7 @@ func TestBuildsForChoosesByTagComponentWhenTheTagsAreMany(test *testing.T) {
 	}
 	done := make(chan selection, 1)
 	go func() {
-		builds, unbuilt, buildsError := BuildsFor(census, testHost, testPorts, nil)
+		builds, unbuilt, buildsError := BuildsFor(census, testHost, testPorts, nil, os.ReadFile)
 		done <- selection{builds: builds, unbuilt: unbuilt, failure: buildsError}
 	}()
 	var chosen selection

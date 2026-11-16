@@ -957,19 +957,20 @@ var (
 	// 0, so one that took under a millisecond on one run and more on the next would appear and vanish: each is
 	// normalized to 0, which the record writes by leaving it out.
 	buildTimingPattern = regexp.MustCompile(
-		`,"((load|lint|decide|keep|wait|lintWait)Milliseconds|heldAt(LoadEnd|LintPeak)Bytes)":\d+`)
+		`,"((load|lint|decide|keep|wait|shareGateWait|lintWait)Milliseconds|heldAt(LoadEnd|LintPeak)Bytes)":\d+`)
 	// lintWaitedPattern is whether an extra build's lint waited for its weight at the gate, which turns on how the
 	// builds side by side fall in time and never reaches the verdict, so it is left out as the times are.
 	lintWaitedPattern     = regexp.MustCompile(`,"lintWaited":true`)
 	checkedByBuildPattern = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
 	// buildsAtOncePattern is how many extra builds ran side by side, the host's live heap, the first build's holding
-	// and the peak factor that was decided by, whether the slack added a build, and the run's pool's size, one slot per
-	// core, which the machine decides and the verdict never reads, so they are left out as the times are. The slack
+	// and the peak factor that was decided by, whether the slack added a build, whether the host's live heap alone
+	// decided it at the share gate (#ghb3rcn), and the run's pool's size, one slot per core, which the machine decides
+	// and the verdict never reads, so they are left out as the times are. The slack
 	// sits between the factor and the pool's size, and a pattern that skipped it left both in whenever the measured
 	// headroom added a build, a test process's heap under load deciding (#f0h29a2).
 	buildsAtOncePattern = regexp.MustCompile(
 		`,"buildsAtOnce":\d+(,"buildsWidthLiveBytes":\d+,"buildsWidthBuildBytes":\d+,"buildsWidthPeakFactor":[\d.]+)?` +
-			`(,"buildsWidthSlack":true)?(,"buildsPoolSize":\d+)?`)
+			`(,"buildsWidthSlack":true)?(,"buildsWidthFromHostLive":true)?(,"buildsPoolSize":\d+)?`)
 	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",

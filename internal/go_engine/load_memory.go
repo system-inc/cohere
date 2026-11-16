@@ -5,8 +5,13 @@ import "sync"
 // loadMemory is the memory limit across a run's loads (#44n0vap). Every load runs under the cap, and once no load is
 // in flight a late raise may lift the limit at most once, until the next load starts: the first load in flight retires
 // the last raise, so none of its sentinels can lift the limit during this load, sets the limit back to the cap, and
-// arms a raise of its own, and the last load to end tells that raise its end. The engine's loads are sequential today,
-// so the count is 0 or 1, and it is a count so that two loads in flight at once would share one cap and one raise.
+// arms a raise of its own, and the last load to end tells that raise its end. Loads are in flight at once whenever
+// extra builds run side by side, so it is a count, and the loads in flight share one cap and one raise.
+//
+// A build waiting at the share gate (shareGate) holds its load open, since loadPackages brackets the whole load and the
+// gate is inside it: in a run without a findings store every extra build begins its load at once, so the late raise
+// waits until the last of them ends, where main's schedule, which started a build only once there was room for it,
+// let it land while the first builds linted (#ghb3rcn). It is kept so on purpose until #ph5532e has measured it.
 //
 // It is the one place that knows the raises the run made (raisedTo), for a record written at the run's end.
 type loadMemory struct {

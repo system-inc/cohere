@@ -565,16 +565,17 @@ func TestTheCountsDescribeTheRun(test *testing.T) {
 	}
 }
 
-// A rule with no analyzer, and two rules sharing one, are refused before anything runs, since no finding could
-// say which rule it is.
+// A rule with no analyzer, two rules sharing one, and a report that is a rule's analyzer are refused before anything
+// runs, since no finding could say which rule it is, nor the report's result which root ran it.
 func TestRulesThatCannotBeTiedToTheirFindingsAreRefused(test *testing.T) {
 	test.Parallel()
 
 	loadedFixtures(test)
 	for _, refused := range []struct {
-		name   string
-		rules  []rule.Rule
-		saying string
+		name    string
+		rules   []rule.Rule
+		options Options
+		saying  string
 	}{
 		{
 			name:   "no analyzer",
@@ -589,11 +590,17 @@ func TestRulesThatCannotBeTiedToTheirFindingsAreRefused(test *testing.T) {
 			},
 			saying: "share analyzer quiet",
 		},
+		{
+			name:    "a report that is a rule's analyzer",
+			rules:   []rule.Rule{houseRule(quietAnalyzer)},
+			options: Options{Report: quietAnalyzer},
+			saying:  "report quiet: it is the analyzer of rule",
+		},
 	} {
 		test.Run(refused.name, func(test *testing.T) {
 			test.Parallel()
 
-			_, runError := Run(fixtures.loaded.Packages, refused.rules, Options{})
+			_, runError := Run(fixtures.loaded.Packages, refused.rules, refused.options)
 			if runError == nil || !strings.Contains(runError.Error(), refused.saying) {
 				test.Fatalf("want a refusal saying %q, got %v", refused.saying, runError)
 			}

@@ -117,6 +117,9 @@ type summaryJson struct {
 	// BuildsWidthLiveBytes is the host's live heap buildsAtOnce was decided from, absent when the decision needed none
 	// and for every other run, so a reader sees why the width was chosen without running the engine alone (#qwb6ns8).
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
+	// BuildsWidthFromHostLive is whether that heap alone decided buildsAtOnce, every build's share at the share gate
+	// low (#ghb3rcn), absent when it did not and for every other run.
+	BuildsWidthFromHostLive bool `json:"buildsWidthFromHostLive,omitempty"`
 
 	TypeErrors     int `json:"typeErrors"`
 	Findings       int `json:"findings"`
@@ -206,6 +209,7 @@ func summaryAsJson(summary runSummary) summaryJson {
 		Builds:                      summary.Builds,
 		BuildsAtOnce:                summary.BuildsAtOnce,
 		BuildsWidthLiveBytes:        summary.BuildsWidthLiveBytes,
+		BuildsWidthFromHostLive:     summary.BuildsWidthFromHostLive,
 		TypeErrors:                  summary.TypeErrors,
 		Findings:                    summary.Findings,
 		FilesFixed:                  summary.filesFixed(),
