@@ -24,7 +24,9 @@ func TestOnlyAnActionThatRunsAPassTakesASlotOfThePool(test *testing.T) {
 	}
 	slices.Sort(identifiers)
 	restoredPackages := map[string]bool{identifiers[0]: true, identifiers[1]: true}
-	var passes, restores, slots atomic.Int64
+	var passes atomic.Int64
+	var restores atomic.Int64
+	var slots atomic.Int64
 	counted := &analysis.Analyzer{
 		Name: "counted",
 		Doc:  "counted counts the passes it runs",
