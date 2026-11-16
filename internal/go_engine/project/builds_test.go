@@ -56,7 +56,7 @@ func censusOf(test *testing.T, files map[string]string) Census {
 // on an architecture other than the host's: the guard every test of the builds holds.
 func buildsFor(test *testing.T, census Census, host Build, ports []Port) ([]Build, []Unbuilt) {
 	test.Helper()
-	builds, unbuilt, buildsError := BuildsFor(census, host, ports, nil)
+	builds, unbuilt, buildsError := BuildsFor(census, host, ports, nil, os.ReadFile)
 	if buildsError != nil {
 		test.Fatal(buildsError)
 	}
@@ -88,7 +88,7 @@ func requireEachCompiledOnce(test *testing.T, census Census, builds []Build, unb
 		if slices.ContainsFunc(unbuilt, func(each Unbuilt) bool { return each.File == file }) {
 			continue
 		}
-		read, readError := readSource(file)
+		read, readError := readSource(file, os.ReadFile)
 		if readError != nil {
 			test.Fatal(readError)
 		}
@@ -611,7 +611,7 @@ func TestBuildsForSatisfiesANegationOnlyConstraintFromTheTargets(test *testing.T
 		"fallback_other.go": "//go:build !linux && !darwin\n\npackage native\n",
 	})
 
-	builds, unbuilt, buildsError := BuildsFor(census, testHost, ports, nil)
+	builds, unbuilt, buildsError := BuildsFor(census, testHost, ports, nil, os.ReadFile)
 	if buildsError != nil {
 		test.Fatal(buildsError)
 	}
@@ -625,7 +625,7 @@ func TestBuildsForSatisfiesANegationOnlyConstraintFromTheTargets(test *testing.T
 	}
 
 	wasm := Port{OperatingSystem: "wasip1", Architecture: "wasm"}
-	builds, unbuilt, buildsError = BuildsFor(census, testHost, ports, []Port{wasm})
+	builds, unbuilt, buildsError = BuildsFor(census, testHost, ports, []Port{wasm}, os.ReadFile)
 	if buildsError != nil {
 		test.Fatal(buildsError)
 	}
@@ -646,7 +646,7 @@ func TestBuildsForAlwaysBuildsAListedTarget(test *testing.T) {
 	windows := Port{OperatingSystem: "windows", Architecture: "amd64", CgoSupported: true}
 	host := Port{OperatingSystem: "darwin", Architecture: "arm64", CgoSupported: true}
 	plain := censusOf(test, map[string]string{"main.go": "package p\n"})
-	builds, unbuilt, buildsError := BuildsFor(plain, testHost, testPorts, []Port{windows, host})
+	builds, unbuilt, buildsError := BuildsFor(plain, testHost, testPorts, []Port{windows, host}, os.ReadFile)
 	if buildsError != nil {
 		test.Fatal(buildsError)
 	}
@@ -660,7 +660,7 @@ func TestBuildsForAlwaysBuildsAListedTarget(test *testing.T) {
 		"epoll_linux.go":     "package p\n",
 		"console_windows.go": "package p\n",
 	})
-	builds, unbuilt, buildsError = BuildsFor(named, testHost, testPorts, []Port{windows})
+	builds, unbuilt, buildsError = BuildsFor(named, testHost, testPorts, []Port{windows}, os.ReadFile)
 	if buildsError != nil {
 		test.Fatal(buildsError)
 	}

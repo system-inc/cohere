@@ -381,11 +381,13 @@ func (engine *pipeline) keepsForBuilds() bool {
 // earlyStart), and why each file no build compiles is left so, by path. targets are the settings' `targets`, each
 // `GOOS/GOARCH` a port the toolchain lists or the run is refused: a target named and never checked would read as
 // checked (#ntamp9e). Each file no build compiles is left to the types phase, which names it as a gap with that reason.
+// reader hands BuildsFor each file's bytes as the description read them (heldReads).
 func readBuilds(
 	census project.Census,
 	goEnvironment *load.GoEnvironment,
 	ports []project.Port,
 	targets []string,
+	reader func(file string) ([]byte, error),
 ) ([]project.Build, map[string]string, error) {
 	buildContext, goFlags := goEnvironment.Target()
 	host := project.HostBuild(buildContext, goFlags)
@@ -401,7 +403,7 @@ func readBuilds(
 		}
 		extraTargets = append(extraTargets, ports[index])
 	}
-	builds, unbuilt, buildsError := project.BuildsFor(census, host, ports, extraTargets)
+	builds, unbuilt, buildsError := project.BuildsFor(census, host, ports, extraTargets, reader)
 	if buildsError != nil {
 		return nil, nil, buildsError
 	}

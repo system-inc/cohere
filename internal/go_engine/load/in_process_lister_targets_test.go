@@ -131,7 +131,8 @@ func coheresBuilds(test *testing.T) (project.Workspace, []project.Build) {
 			}
 		}
 	}
-	builds, _, buildsError := project.BuildsFor(census, project.HostBuild(buildContext, goFlags), ports, extraTargets)
+	builds, _, buildsError := project.BuildsFor(census, project.HostBuild(buildContext, goFlags), ports, extraTargets,
+		os.ReadFile)
 	if buildsError != nil {
 		test.Fatal(buildsError)
 	}

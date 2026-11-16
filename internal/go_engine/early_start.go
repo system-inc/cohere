@@ -88,16 +88,18 @@ func (early *earlyStart) readPorts() ([]project.Port, error) {
 }
 
 // startReadingBuilds reads the builds the census needs beside the host's (readBuilds) on a goroutine of its own, once
-// the host's go env and the ports have answered, beside the file reads: it reads neither them nor their bytes, since
-// project.BuildsFor reads each file from disk itself. With a go env that failed it reads none, since the run is refused
-// with go env's words, or, when no file was readable, never asked. Then, when startsBuilds, it starts each extra
-// build's go env and lister state (startBuilds).
+// the host's go env and the ports have answered, beside the file reads: project.BuildsFor takes each file's bytes
+// through reader, the description's read of it (heldReads), as soon as that read is done, so no file is opened twice
+// (#ghb3rcn). With a go env that failed it reads none, since the run is refused with go env's words, or, when no file
+// was readable, never asked. Then, when startsBuilds, it starts each extra build's go env and lister state
+// (startBuilds).
 func (early *earlyStart) startReadingBuilds(
 	workspace project.Workspace,
 	census project.Census,
 	targets []string,
 	startsBuilds bool,
 	children *load.Children,
+	reader func(file string) ([]byte, error),
 ) {
 	early.buildsRead.Add(1)
 	early.started.Go(func() {
@@ -115,7 +117,8 @@ func (early *earlyStart) startReadingBuilds(
 			early.buildsError = portsError
 			return
 		}
-		early.builds, early.unbuiltReasons, early.buildsError = readBuilds(census, goEnvironment, ports, targets)
+		early.builds, early.unbuiltReasons, early.buildsError = readBuilds(census, goEnvironment, ports, targets,
+			reader)
 		if startsBuilds && early.buildsError == nil && len(early.builds) > 1 {
 			early.startBuilds(workspace, early.builds[1:], children)
 		}
