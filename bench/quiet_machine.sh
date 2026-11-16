@@ -239,7 +239,8 @@ runs_table=$logs/runs.tsv
 pin_engine $logs
 first_table=$logs/first.tsv
 run_output_reader=$logs/run_output
-(cd ${0:A:h:h} && go build -o $run_output_reader ./internal/bench_results/tools/run_output) ||
+# Built without a version stamp, which nothing reads, so it builds in a cohere-dev worktree too (#268j573).
+(cd ${0:A:h:h} && go build -buildvcs=false -o $run_output_reader ./internal/bench_results/tools/run_output) ||
   fail "could not build the run output reader"
 
 print "# quiet-machine benchmark, $(date -u +%Y-%m-%dT%H:%M:%SZ)"

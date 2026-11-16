@@ -258,12 +258,37 @@ type RestoredDependence struct {
 // and Dependencies count, by the scope of the unit, the units a differing fact reaches. Milliseconds is the
 // comparison's wall time. Every build restores nothing from the host's run under the census, so its facts are its own.
 // The standard library the host restored from the binary's table is compared through the table's facts and answers
-// (#ss4t5g6), but for a fact about an object no objectpath names, which no table holds.
+// (#ss4t5g6), but for a fact about an object no objectpath names, which no table holds. Unkeyed, additive (#h660y7d),
+// counts the facts the census left out of the comparison, on either side, of a package the host restored whose
+// standard-library graph is records, the store's, and the answers it could not place in any package that graph holds,
+// and UnkeyedParts says why, part by part, their sum being Unkeyed. Both are always written, beside the callers the
+// census counts, since those leave the facts out.
 type DependenceFacts struct {
 	Kinds        []FactKindCounts `json:"kinds"`
 	Workspace    FactCallers      `json:"workspace"`
 	Dependencies FactCallers      `json:"dependencies"`
 	Milliseconds int              `json:"milliseconds"`
+	Unkeyed      int              `json:"unkeyed"`
+	UnkeyedParts UnkeyedFacts     `json:"unkeyedParts"`
+}
+
+// UnkeyedFacts are the facts a census left out, by why (#h660y7d). Unnamed are the host's facts no name a record gives
+// reaches. Closures are the build's facts about an object no objectpath names, which no host can hold. Unplaced are
+// the facts whose object no unit of the graph declares or holds, and the build's facts of the same package, kind and
+// name as such a host fact's, or of its kind at all where the host's has no name. PathOnly are the host's facts held by
+// a method's or a field's path alone, which nothing pairs exactly, and the build's facts of the kind in the unit that
+// no named fact of the host's claims. Collisions are the facts of one kind that meet under one unit and name on either
+// side, which nothing tells apart, the other side's fact under that key, and, where the host's meet, the build's facts
+// of the kind in the unit that no named fact of the host's claims. Answers are the build's answers about a function, or
+// about a parameter or result of one, the census could not place in the graph's units, or that two of the host's
+// answers meet at, whose host side is unknown.
+type UnkeyedFacts struct {
+	Unnamed    int `json:"unnamed"`
+	Closures   int `json:"closures"`
+	Unplaced   int `json:"unplaced"`
+	PathOnly   int `json:"pathOnly"`
+	Collisions int `json:"collisions"`
+	Answers    int `json:"answers"`
 }
 
 // FactKindCounts are one kind of fact's comparisons: the analyzer and the fact's type, the facts compared, those equal

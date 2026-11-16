@@ -1,12 +1,21 @@
 package go_engine
 
 import (
+	"go/types"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/types/objectpath"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
@@ -161,6 +170,445 @@ func TestTheFactsCensusFollowsACallerChainAcrossBothGraphs(test *testing.T) {
 			noReturn.WorkspaceDifferent != 1 || !slices.Equal(noReturn.Examples, wantExamples) {
 			test.Errorf("%s: want Finish's no-return fact the workspace's one compared, and different, got %+v",
 				each.name, noReturn)
+		}
+	}
+}
+
+// pathOnlyFact is a fact the host restored of package fmt about the object at path, which its export data does not
+// hold, so it carries the path alone, as a table's entry holds it.
+func pathOnlyFact(path string) check.ExportedFact {
+	return check.ExportedFact{Package: &packages.Package{ID: "fmt", PkgPath: "fmt"}, Analyzer: "ctrlflow",
+		FactType: "noReturn", ObjectPath: objectpath.Path(path)}
+}
+
+// toUnit moves a key to the unit at offset 900 of print.go, as byDeclaringUnit.unitKey moves a placed key.
+func toUnit(key factKey) (factKey, bool) {
+	key.file, key.offset, key.local, key.byUnit = "print.go", 900, "", true
+	return key, true
+}
+
+// builtAt is the build's fact key, by position, of a noReturn fact of fmt about the object name at offset.
+func builtAt(name string, offset int) factKey {
+	return factKey{packageIdentifier: "fmt", file: "print.go", offset: offset, name: name, analyzer: "ctrlflow",
+		factType: "noReturn"}
+}
+
+// builtNoReturn is the build's noReturn fact of fmt, its value beside the point.
+var builtNoReturn = check.ExportedFact{Analyzer: "ctrlflow", FactType: "noReturn"}
+
+// A fact the host holds by a package-level object's path alone is keyed by that path as the object's name, which is
+// exact, and is paired with the build's fact about the object of that name in its unit (#h660y7d).
+func TestAPathOnlyPackageLevelFactIsCompared(test *testing.T) {
+	test.Parallel()
+
+	key, isKeyed := factKeyByName(pathOnlyFact("fatal"), &objectpath.Encoder{})
+	if !isKeyed || key.local != "fatal" || key.name != "fatal" {
+		test.Fatalf("want the path keyed as the object's name, got %+v (keyed %t)", key, isKeyed)
+	}
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{key: pathOnlyFact("fatal")},
+		map[factKey]check.ExportedFact{builtAt("fatal", 905): builtNoReturn}, toUnit, toUnit)
+	paired, _ := toUnit(builtAt("fatal", 905))
+	if _, isHosted := hosted[paired]; !isHosted || len(built) != 1 || unkeyedTotal(parts) != 0 {
+		test.Errorf("want the fact paired, got %d host and %d build facts, %+v left out", len(hosted), len(built),
+			parts)
+	}
+}
+
+// A fact the host holds by a method's path alone has no name, since the path indexes into a method set another build's
+// files can change, so it is never paired, even in a unit whose one unclaimed build fact of its kind is the likeliest
+// match: both are left out, counted as path-only (#h660y7d).
+func TestAPathOnlyMethodFactIsUnkeyed(test *testing.T) {
+	test.Parallel()
+
+	key, isKeyed := factKeyByName(pathOnlyFact("pp.M3"), &objectpath.Encoder{})
+	if !isKeyed || key.local != "pp.M3" || key.name != "" {
+		test.Fatalf("want the path keyed with no name, got %+v (keyed %t)", key, isKeyed)
+	}
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{key: pathOnlyFact("pp.M3")},
+		map[factKey]check.ExportedFact{builtAt("badVerb", 905): builtNoReturn}, toUnit, toUnit)
+	if len(hosted) != 0 || len(built) != 0 || parts != (contract.UnkeyedFacts{PathOnly: 2}) {
+		test.Errorf("want both facts left out as path-only, got %d host and %d build facts, %+v", len(hosted),
+			len(built), parts)
+	}
+}
+
+// Two facts the host holds by members' paths alone, of one kind, in one unit, meet under one key, and the unit loses
+// them as a collision: the build's facts of that kind there are left out with them, never counted as differing with no
+// host side (#h660y7d, the review's probe).
+func TestTwoPathOnlyHostFactsInOneUnitWithholdTheBuilds(test *testing.T) {
+	test.Parallel()
+
+	first, _ := factKeyByName(pathOnlyFact("pp.F0"), &objectpath.Encoder{})
+	second, _ := factKeyByName(pathOnlyFact("pp.F1"), &objectpath.Encoder{})
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{
+		first: pathOnlyFact("pp.F0"), second: pathOnlyFact("pp.F1"),
+	}, map[factKey]check.ExportedFact{builtAt("buf", 910): builtNoReturn, builtAt("arg", 920): builtNoReturn},
+		toUnit, toUnit)
+	if len(hosted) != 0 || len(built) != 0 || parts != (contract.UnkeyedFacts{Collisions: 4}) {
+		test.Errorf("want all four facts left out as a collision, got %d host and %d build facts, %+v", len(hosted),
+			len(built), parts)
+	}
+}
+
+// Two facts of one kind that meet under one unit and name, on the host's side as on the build's, are told apart by
+// nothing, so neither is paired: on the host's side the unit's build facts of the kind go with them, and on the
+// build's the host's fact under that key does (#h660y7d).
+func TestFactsMeetingUnderOneKeyAreNeverPaired(test *testing.T) {
+	test.Parallel()
+
+	named := func(path string) factKey {
+		key := factKey{packageIdentifier: "fmt", offset: -1, local: path, name: "x", analyzer: "ctrlflow",
+			factType: "noReturn"}
+		return key
+	}
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{
+		named("pp.F0.F0"): pathOnlyFact("pp.F0.F0"), named("pp.F1.F0"): pathOnlyFact("pp.F1.F0"),
+	}, map[factKey]check.ExportedFact{builtAt("x", 910): builtNoReturn, builtAt("y", 920): builtNoReturn},
+		toUnit, toUnit)
+	if len(hosted) != 0 || len(built) != 0 || parts != (contract.UnkeyedFacts{Collisions: 4}) {
+		test.Errorf("host side meeting: want all four facts left out, got %d host and %d build facts, %+v",
+			len(hosted), len(built), parts)
+	}
+	hosted, built, parts = pairByUnit(map[factKey]check.ExportedFact{named("pp.F0.F0"): pathOnlyFact("pp.F0.F0")},
+		map[factKey]check.ExportedFact{builtAt("x", 910): builtNoReturn, builtAt("x", 930): builtNoReturn},
+		toUnit, toUnit)
+	if len(hosted) != 0 || len(built) != 0 || parts != (contract.UnkeyedFacts{Collisions: 3}) {
+		test.Errorf("build side meeting: want all three facts left out, got %d host and %d build facts, %+v",
+			len(hosted), len(built), parts)
+	}
+}
+
+// A host fact no unit declares, its name not found in the graph, fails as the build's fact about the same object
+// does: the build's fact of the same package, kind and name is left out with it, counted unplaced, rather than
+// compared with nothing (#h660y7d).
+func TestAnUnplacedHostFactWithholdsTheBuildsFactOfItsName(test *testing.T) {
+	test.Parallel()
+
+	unplacedHost := func(key factKey) (factKey, bool) { return factKey{}, false }
+	key := factKey{packageIdentifier: "fmt", offset: -1, local: "pp.M9", name: "badVerb", analyzer: "ctrlflow",
+		factType: "noReturn"}
+	hosted, built, parts := pairByUnit(map[factKey]check.ExportedFact{key: pathOnlyFact("pp.M9")},
+		map[factKey]check.ExportedFact{builtAt("badVerb", 905): builtNoReturn, builtAt("other", 920): builtNoReturn},
+		unplacedHost, toUnit)
+	other, _ := toUnit(builtAt("other", 920))
+	if _, isKept := built[other]; len(hosted) != 0 || len(built) != 1 || !isKept ||
+		parts != (contract.UnkeyedFacts{Unplaced: 2}) {
+		test.Errorf("want the host's fact and the build's of its name left out, the other kept, got %d host and %d "+
+			"build facts, %+v", len(hosted), len(built), parts)
+	}
+}
+
+// loadedOs is the standard library's os package loaded from source for goos on arm64, cgo off, from a module of its
+// own.
+func loadedOs(test *testing.T, goos string) *packages.Package {
+	test.Helper()
+	module := test.TempDir()
+	if writeError := os.WriteFile(filepath.Join(module, "go.mod"), []byte("module cohere.invalid/answers\n\ngo 1.24\n"),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	loaded, loadError := load.PackagesCached(module, []string{"os"},
+		[]string{"GOOS=" + goos, "GOARCH=arm64", "CGO_ENABLED=0", "GOWORK=off"}, nil, load.Caching{WithoutTests: true})
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading os for %s: %v, %d errors", goos, loadError, len(loaded.Diagnostics))
+	}
+	var found *packages.Package
+	packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
+		if each.ID == "os" {
+			found = each
+		}
+	})
+	if found == nil {
+		test.Fatalf("the load for %s holds no os", goos)
+	}
+	return found
+}
+
+// A restored package's answer about a method is the host's answer about that method, though the build's files change
+// its type's method set (#01chv64): os.Process has other methods on windows than on darwin, so the windows build's
+// objectpath of a method declared in a file both compile names another method in the darwin host's answers, and the
+// census finds the host's answer by the unit declaring the method in the darwin graph instead, where the build's
+// method sits.
+func TestARestoredMethodAnswerMeetsItsOwnMethodWhereMethodSetsDiverge(test *testing.T) {
+	test.Parallel()
+
+	host, build := loadedOs(test, "darwin"), loadedOs(test, "windows")
+	graph := build_dependence.NewGraph()
+	graph.AddPackage(host, false)
+	standardLibrary := graph.Against(build_dependence.Difference{
+		Packages:          map[string]build_dependence.PackageDifference{},
+		HostOnlyPackages:  map[string]bool{},
+		BuildOnlyPackages: map[string]bool{},
+	})
+	processOf := func(loaded *packages.Package) *types.Named {
+		named, isNamed := loaded.Types.Scope().Lookup("Process").Type().(*types.Named)
+		if !isNamed {
+			test.Fatal("os.Process is no named type")
+		}
+		return named
+	}
+	hostProcess, buildProcess := processOf(host), processOf(build)
+	var hostEncoder objectpath.Encoder
+	var buildEncoder objectpath.Encoder
+	var method *types.Func
+	var hostPath objectpath.Path
+	var buildPath objectpath.Path
+	for built := range buildProcess.Methods() {
+		file := build.Fset.Position(built.Pos()).Filename
+		hosted, _, _ := types.LookupFieldOrMethod(hostProcess, true, host.Types, built.Name())
+		hostedMethod, isMethod := hosted.(*types.Func)
+		if !isMethod || !slices.Contains(host.GoFiles, file) {
+			continue
+		}
+		hostMethodPath, hostError := hostEncoder.For(hostedMethod)
+		buildMethodPath, buildError := buildEncoder.For(built)
+		other, otherError := objectpath.Object(host.Types, buildMethodPath)
+		if hostError == nil && buildError == nil && otherError == nil && hostMethodPath != buildMethodPath &&
+			other.Name() != built.Name() {
+			method, hostPath, buildPath = built, hostMethodPath, buildMethodPath
+			break
+		}
+	}
+	if method == nil {
+		test.Fatal("no method of os.Process in a shared file has another objectpath on windows, so the case proves " +
+			"nothing")
+	}
+	test.Logf("Process.%s is %s on darwin and %s on windows", method.Name(), hostPath, buildPath)
+	answers := &fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
+		"function_purity": {hostPath: []byte("its own"), buildPath: []byte("another method's")},
+	}}
+	// Through restoredAnswer, as compareFacts asks, the host having restored os and the standard library's graph
+	// holding it.
+	engine := &pipeline{dependence: &hostDependence{restoredAnswers: map[string]*fact_resolver.Answers{"os": answers},
+		standardLibrary: &standardLibraryDependence{graph: graph, files: map[string][]string{"os": host.GoFiles}}}}
+	hosted, isHeld, isPlaced := engine.restoredAnswer(check.ExportedFact{Package: build,
+		Analyzer: "function_purity", FactType: "answer", Object: method, Answer: true}, &objectpath.Encoder{},
+		&byDeclaringUnit{standardLibrary: standardLibrary})
+	if !isPlaced || !isHeld || string(hosted.Encoded) != "its own" {
+		test.Errorf("Process.%s, %s on darwin and %s on windows: want the host's answer about it, got %q (held %t, "+
+			"placed %t)", method.Name(), hostPath, buildPath, hosted.Encoded, isHeld, isPlaced)
+	}
+}
+
+// loadedSplit is the census-split fixture's package loaded from source for goos on arm64, cgo off.
+func loadedSplit(test *testing.T, root string, goos string) *packages.Package {
+	test.Helper()
+	loaded, loadError := load.PackagesCached(root, []string{"./..."},
+		[]string{"GOOS=" + goos, "GOARCH=arm64", "CGO_ENABLED=0", "GOWORK=off"}, nil, load.Caching{WithoutTests: true})
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading the fixture for %s: %v, %d errors", goos, loadError, len(loaded.Diagnostics))
+	}
+	var found *packages.Package
+	packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
+		if each.ID == "example.com/split" {
+			found = each
+		}
+	})
+	if found == nil {
+		test.Fatalf("the load for %s holds no example.com/split", goos)
+	}
+	return found
+}
+
+// splitGraph is the census-split fixture's standard-library graph as host, darwin, loads it, judged with no difference.
+func splitGraph(host *packages.Package) (*build_dependence.Graph, *build_dependence.Dependence) {
+	graph := build_dependence.NewGraph()
+	graph.AddPackage(host, false)
+	return graph, graph.Against(build_dependence.Difference{
+		Packages:          map[string]build_dependence.PackageDifference{},
+		HostOnlyPackages:  map[string]bool{},
+		BuildOnlyPackages: map[string]bool{},
+	})
+}
+
+// answerAbout is the host's answer, through restoredAnswer as compareFacts asks, about object of build's package, the
+// darwin host holding answers and the census-split fixture's darwin graph.
+func answerAbout(
+	host *packages.Package,
+	build *packages.Package,
+	object types.Object,
+	answers *fact_resolver.Answers,
+) (check.ExportedFact, bool, bool) {
+	graph, standardLibrary := splitGraph(host)
+	engine := &pipeline{dependence: &hostDependence{
+		restoredAnswers: map[string]*fact_resolver.Answers{host.ID: answers},
+		standardLibrary: &standardLibraryDependence{graph: graph, files: map[string][]string{host.ID: host.GoFiles}},
+	}}
+	return engine.restoredAnswer(check.ExportedFact{Package: build, Analyzer: "odd_slice_argument", FactType: "answer",
+		Object: object, Answer: true}, &objectpath.Encoder{}, &byDeclaringUnit{standardLibrary: standardLibrary})
+}
+
+// splitFunction is the function name that loaded, the census-split fixture's package, declares.
+func splitFunction(test *testing.T, loaded *packages.Package, name string) *types.Func {
+	test.Helper()
+	function, isFunction := loaded.Types.Scope().Lookup(name).(*types.Func)
+	if !isFunction {
+		test.Fatalf("the fixture declares no function %s", name)
+	}
+	return function
+}
+
+// parameterAnswer is the host's answer (answerAbout) about the first parameter of the function name in build's
+// package.
+func parameterAnswer(
+	test *testing.T,
+	host *packages.Package,
+	build *packages.Package,
+	name string,
+	answers *fact_resolver.Answers,
+) (check.ExportedFact, bool, bool) {
+	test.Helper()
+	return answerAbout(host, build, splitFunction(test, build, name).Signature().Params().At(0), answers)
+}
+
+// A restored package's answer about a function's parameter, as odd_slice_argument answers, is placed through the unit
+// declaring its function and its place in the signature, and compared with the host's answer about that parameter
+// (#h660y7d): Shared is in a file both builds compile.
+func TestAParameterAnswerIsComparedThroughItsFunctionsUnit(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "census-split"))
+	host, build := loadedSplit(test, root, "darwin"), loadedSplit(test, root, "windows")
+	hosted, isHeld, isPlaced := parameterAnswer(test, host, build, "Shared",
+		&fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
+			"odd_slice_argument": {"Shared.PA0": []byte("the host's")},
+		}})
+	if !isPlaced || !isHeld || string(hosted.Encoded) != "the host's" {
+		test.Errorf("Shared's parameter: want the host's answer about it, got %q (held %t, placed %t)",
+			hosted.Encoded, isHeld, isPlaced)
+	}
+}
+
+// Two functions of one name in files of different builds share a path, Split.PA0 for each's parameter, though they are
+// other code, so a build's answer about windows' never meets the darwin host's about darwin's: no unit of the host's
+// graph holds windows' file, and the answer is not placed (#h660y7d).
+func TestSameNamedFunctionsOfOtherBuildsNeverPair(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "census-split"))
+	host, build := loadedSplit(test, root, "darwin"), loadedSplit(test, root, "windows")
+	hosted, isHeld, isPlaced := parameterAnswer(test, host, build, "Split",
+		&fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
+			"odd_slice_argument": {"Split.PA0": []byte("darwin's")},
+		}})
+	if isPlaced || isHeld {
+		test.Errorf("windows' Split: want its parameter's answer not placed, got %q (held %t, placed %t)",
+			hosted.Encoded, isHeld, isPlaced)
+	}
+}
+
+// A function's declaration declares the members of anonymous types in its signature beside the function, so the unit
+// of Serve declares Handle, its second parameter's method, at Serve.PA1.M0, and Handle's own parameter beside it. The
+// host's answer about either is no answer about Serve or Serve's own parameter, though the two sit in one unit, at the
+// function and at the first parameter's place: a build's answer about Serve, or about dst, is placed and finds none
+// (#h660y7d, the second read's must).
+func TestAnAnonymousInterfacesMethodNeverAnswersForItsFunction(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "census-split"))
+	host, build := loadedSplit(test, root, "darwin"), loadedSplit(test, root, "windows")
+	hostServe := splitFunction(test, host, "Serve")
+	handler, isInterface := hostServe.Signature().Params().At(1).Type().(*types.Interface)
+	if !isInterface || handler.NumMethods() != 1 {
+		test.Fatal("Serve's second parameter is no interface of one method, so the case proves nothing")
+	}
+	var encoder objectpath.Encoder
+	methodPath, methodError := encoder.For(handler.Method(0))
+	parameterPath, parameterError := encoder.For(handler.Method(0).Signature().Params().At(0))
+	if methodError != nil || parameterError != nil || methodPath != "Serve.PA1.M0" ||
+		parameterPath != "Serve.PA1.M0.PA0" {
+		test.Fatalf("want Handle at Serve.PA1.M0 and its parameter at Serve.PA1.M0.PA0, got %q (%v) and %q (%v)",
+			methodPath, methodError, parameterPath, parameterError)
+	}
+	_, standardLibrary := splitGraph(host)
+	serveUnit, isServeDeclared := standardLibrary.UnitDeclaringName(host.PkgPath, "Serve")
+	handleUnit, isHandleDeclared := standardLibrary.UnitDeclaringName(host.PkgPath, string(methodPath))
+	if !isServeDeclared || !isHandleDeclared || serveUnit != handleUnit {
+		test.Fatalf("want Serve's unit to declare Handle beside Serve, got units %d (%t) and %d (%t), so the case "+
+			"proves nothing", serveUnit, isServeDeclared, handleUnit, isHandleDeclared)
+	}
+	buildServe := splitFunction(test, build, "Serve")
+	for _, each := range []struct {
+		about  string
+		object types.Object
+		path   objectpath.Path
+	}{
+		{about: "Serve", object: buildServe, path: methodPath},
+		{about: "Serve's dst", object: buildServe.Signature().Params().At(0), path: parameterPath},
+	} {
+		hosted, isHeld, isPlaced := answerAbout(host, build, each.object,
+			&fact_resolver.Answers{Values: map[string]map[objectpath.Path][]byte{
+				"odd_slice_argument": {each.path: []byte("Handle's")},
+			}})
+		if !isPlaced || isHeld {
+			test.Errorf("%s, the host answering only at %s: want it placed and holding none, got %q (held %t, "+
+				"placed %t)", each.about, each.path, hosted.Encoded, isHeld, isPlaced)
+		}
+	}
+}
+
+// A host's fact about a parameter is declared by no unit of its own, so it is moved to the unit declaring its function,
+// where the build's fact about the same parameter sits by position and meets it by name (#h660y7d); a parameter of an
+// anonymous interface's method in a signature, whose function's path is no declared function's, is not placed.
+func TestAHostFactAboutAParameterIsPlacedByItsFunction(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "census-split"))
+	host, build := loadedSplit(test, root, "darwin"), loadedSplit(test, root, "windows")
+	_, standardLibrary := splitGraph(host)
+	declaring := &byDeclaringUnit{standardLibrary: standardLibrary}
+	keyOf := func(loaded *packages.Package, object types.Object) check.ExportedFact {
+		return check.ExportedFact{Package: loaded, Analyzer: "odd_slice_argument", FactType: "answer", Object: object,
+			Answer: true}
+	}
+	hostDestination := splitFunction(test, host, "Shared").Signature().Params().At(0)
+	hostKey, isNamed := factKeyByName(keyOf(host, hostDestination), &objectpath.Encoder{})
+	if !isNamed || hostKey.local != "Shared.PA0" || hostKey.name != "dst" {
+		test.Fatalf("want the host's dst named Shared.PA0, got %+v (named %t)", hostKey, isNamed)
+	}
+	buildKey, isKeyed := factKeyOf(keyOf(build, splitFunction(test, build, "Shared").Signature().Params().At(0)))
+	if !isKeyed {
+		test.Fatal("the build's dst has no position")
+	}
+	hosted, isHosted := declaring.hosted(hostKey)
+	built, isBuilt := declaring.built(buildKey)
+	if !isHosted || !isBuilt || hosted != built {
+		test.Errorf("Shared's dst: want the host's fact and the build's under one key, got %+v (placed %t) and %+v "+
+			"(placed %t)", hosted, isHosted, built, isBuilt)
+	}
+	handler, isInterface := splitFunction(test, host, "Serve").Signature().Params().At(1).Type().(*types.Interface)
+	if !isInterface || handler.NumMethods() != 1 {
+		test.Fatal("Serve's second parameter is no interface of one method, so the case proves nothing")
+	}
+	bufferKey, _ := factKeyByName(keyOf(host, handler.Method(0).Signature().Params().At(0)), &objectpath.Encoder{})
+	if placed, isPlaced := declaring.hosted(bufferKey); isPlaced {
+		test.Errorf("Handle's buf, at %s: want it not placed, got %+v", bufferKey.local, placed)
+	}
+}
+
+// A unit where the host's facts of one kind both meet under one name and are held by a path alone withholds the
+// build's unclaimed facts of the kind as a collision, whichever group the census ranges over first, so every run
+// counts them alike (#h660y7d).
+func TestAWithheldUnitIsCountedAsItsCollisionInEveryOrder(test *testing.T) {
+	test.Parallel()
+
+	named := func(path string, name string) factKey {
+		return factKey{packageIdentifier: "fmt", offset: -1, local: path, name: name, analyzer: "ctrlflow",
+			factType: "noReturn"}
+	}
+	host := map[factKey]check.ExportedFact{
+		named("pp.F0.F0", "x"): pathOnlyFact("pp.F0.F0"),
+		named("pp.F1.F0", "x"): pathOnlyFact("pp.F1.F0"),
+		named("pp.M3", ""):     pathOnlyFact("pp.M3"),
+	}
+	want := contract.UnkeyedFacts{PathOnly: 1, Collisions: 3}
+	// Go ranges over a map in a new order each time, so a hundred rounds meet both orders all but surely.
+	for round := range 100 {
+		hosted, built, parts := pairByUnit(host,
+			map[factKey]check.ExportedFact{builtAt("y", 920): builtNoReturn}, toUnit, toUnit)
+		if len(hosted) != 0 || len(built) != 0 || parts != want {
+			test.Fatalf("round %d: want every fact left out, counted %+v, got %d host and %d build facts, %+v", round,
+				want, len(hosted), len(built), parts)
 		}
 	}
 }
