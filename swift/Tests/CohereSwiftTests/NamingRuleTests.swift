@@ -57,7 +57,7 @@ struct NamingRuleTests {
         #expect(vocabulary.allowedSegments == ["InnoDb"])
     }
 
-    /* The Go test's count: every form of every entry judged once, 200 in all. */
+    /* The Go test's count: every form of every entry judged once, 202 in all. */
     @Test func everyFormIsJudged() throws {
         let vocabulary = try Self.vocabulary()
         var judged = 0
@@ -89,7 +89,7 @@ struct NamingRuleTests {
             )
             judged += 1
         }
-        #expect(judged == 200)
+        #expect(judged == 202)
     }
 
     @Test(arguments: [
@@ -218,6 +218,38 @@ struct NamingRuleTests {
         let finding = try #require(try Self.vocabulary().find(name))
         #expect(finding.form == "segment")
         #expect(finding.message == want + " " + Self.reasoning)
+    }
+
+    /*
+     `vars` is judged as the whole name and as a prefix as well as a segment, each asking the same (#1ykwdb9), the
+     prefix naming the word as the role words do, while `variables` spells it out and `hoistedVarDeclarations` holds
+     a spelling policy/KeywordTerms.json lists for JavaScript's var keyword.
+     */
+    @Test(arguments: [
+        (
+            "vars", "whole",
+            #"Identifier "vars" should not be abbreviated. Use "Variables" for variables, or a name saying it means JavaScript's var keyword."#,
+        ),
+        (
+            "varsFoo", "prefix",
+            #"Identifier "vars" should not be abbreviated. Use "Variables" for variables, or a name saying it means JavaScript's var keyword."#,
+        ),
+        (
+            "envVars", "segment",
+            #"Identifier "envVars" abbreviates "Vars". Use "Variables" for variables, or a name saying it means JavaScript's var keyword."#,
+        ),
+    ])
+    func theVariablesAbbreviationAsksInEveryForm(name: String, form: String, want: String) throws {
+        let finding = try #require(try Self.vocabulary().find(name))
+        #expect(finding.form == form)
+        #expect(finding.message == want + " " + Self.reasoning)
+    }
+
+    @Test func theVariablesSpelledOutAndTheKeywordTermReadClean() throws {
+        let vocabulary = try Self.vocabulary()
+        #expect(vocabulary.find("variables") == nil)
+        #expect(vocabulary.find("environmentVariables") == nil)
+        #expect(vocabulary.find("hoistedVarDeclarations") == nil)
     }
 
     /* `sb` fits more words than a list could hold, a scroll region's bottom among them, so every form asks what it holds. */

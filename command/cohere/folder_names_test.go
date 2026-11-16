@@ -60,6 +60,36 @@ func TestTheFolderCheckReportsTheOutermostAbbreviatedFolder(test *testing.T) {
 	}
 }
 
+// `vars` is judged in a folder's name, whole, as a prefix and as a segment, as policy/NameWords.json holds it beside
+// the shared vocabulary (#1ykwdb9): Loom's wire/vars/ is the folder Kirk saw. It asks rather than spells out, since it
+// can mean JavaScript's var keyword, and variables/ passes.
+func TestTheFolderCheckReportsTheVariablesAbbreviation(test *testing.T) {
+	test.Parallel()
+	root := newRepository(test, map[string]string{
+		"go.mod":                               "module example.com/root\n",
+		"wire/vars/README.md":                  "# Wire\n",
+		"modules/env-vars/README.md":           "# Environment\n",
+		"modules/vars-reader/README.md":        "# Reader\n",
+		"modules/variables/README.md":          "# Variables\n",
+		"environment-variables/README.md":      "# Environment\n",
+		"modules/hoisted-var-scoped/README.md": "# Hoisted\n",
+	})
+	found, discoverProjectsError := discoverProjects(root, nil)
+	if discoverProjectsError != nil {
+		test.Fatal(discoverProjectsError)
+	}
+	want := []string{"modules/env-vars", "modules/vars-reader", "wire/vars"}
+	if got := folderDirectories(found.Folders); !reflect.DeepEqual(got, want) {
+		test.Fatalf("reported %v, want %v", got, want)
+	}
+	for _, finding := range found.Folders {
+		if finding.MessageId != "abbreviatedFolderNameAdvice" || !strings.Contains(finding.Message,
+			`abbreviates "vars". Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`) {
+			test.Errorf("%s/ reads %s %q", finding.Directory, finding.MessageId, finding.Message)
+		}
+	}
+}
+
 // The folder check keeps the walk's gaps: nothing .gitignore ignores, no node_modules, .build, .cache, testdata, or
 // nested repository, none of which the walk enters, and beside them nothing the root's ignorePatterns take whole,
 // nothing at or below vendor, Vendor or third_party, and no App Router folder. The control lifts the walk's own

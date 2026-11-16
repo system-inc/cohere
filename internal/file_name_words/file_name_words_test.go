@@ -3,6 +3,7 @@ package file_name_words
 import (
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/naming/abbreviation"
@@ -286,6 +287,61 @@ func TestFolderAbbreviated(test *testing.T) {
 	}
 	if _, found := FolderAbbreviated("", "require_docs_link", NewRuleNames([]string{"require-docs-link"})); found {
 		test.Errorf("a folder named for a registered rule holds the rule's name, which is not its author's")
+	}
+}
+
+// `vars` is judged in folder and file names as in identifiers, whole, as a prefix and as a segment, and asks rather
+// than renames, since it can mean JavaScript's var keyword (#1ykwdb9): a folder through policy/NameWords.json, a file
+// through the shared vocabulary. Loom's wire/vars/ is the folder Kirk saw. A rule's name holding it is the rule's.
+func TestTheVariablesAbbreviationIsJudgedInFolderAndFileNames(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct{ parent, folder string }{
+		{"wire", "vars"},
+		{"", "env-vars"},
+		{"", "vars_reader"},
+		{"", "EnvVars"},
+	} {
+		finding, found := FolderAbbreviated(testCase.parent, testCase.folder, nil)
+		if !found || finding.Entry.Abbreviation != "vars" {
+			test.Errorf("%s/%s: %+v (found %t), want the word \"vars\"", testCase.parent, testCase.folder,
+				finding.Entry, found)
+			continue
+		}
+		id, values := FolderAdvice(testCase.folder, finding.Entry)
+		if id != AbbreviatedFolderNameAdvice || !strings.Contains(values["advice"], "var keyword") {
+			test.Errorf("%s/%s: %s %v, want the advice naming the keyword", testCase.parent, testCase.folder, id,
+				values)
+		}
+	}
+	for _, testCase := range []struct {
+		fileName string
+		language Language
+	}{
+		{"vars.ts", LanguageTypeScript},
+		{"env_vars.go", LanguageGo},
+		{"VarsReader.swift", LanguageSwift},
+	} {
+		words, _ := Words(testCase.fileName, testCase.language)
+		finding, found := Abbreviated(words, nil)
+		if !found || finding.Entry.Abbreviation != "vars" {
+			test.Errorf("%s: %+v (found %t), want the word \"vars\"", testCase.fileName, finding.Entry, found)
+			continue
+		}
+		if id, _ := Advice(testCase.fileName, finding.Entry); id != AbbreviatedFileNameAdvice {
+			test.Errorf("%s: %s, want the advice", testCase.fileName, id)
+		}
+	}
+	for _, folder := range []string{"variables", "environment-variables", "varsity"} {
+		if finding, found := FolderAbbreviated("", folder, nil); found {
+			test.Errorf("%s: reported %q, and it passes", folder, finding.Entry.Abbreviation)
+		}
+	}
+	if _, found := FolderAbbreviated("", "no_unused_vars", NewRuleNames([]string{"no-unused-vars"})); found {
+		test.Errorf("a folder named for a registered rule holds the rule's name, which is not its author's")
+	}
+	words, _ := Words("no_unused_vars.go", LanguageGo)
+	if _, found := Abbreviated(words, NewRuleNames([]string{"no-unused-vars"})); found {
+		test.Errorf("a file named for a registered rule holds the rule's name, which is not its author's")
 	}
 }
 

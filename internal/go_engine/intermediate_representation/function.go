@@ -302,10 +302,10 @@ type Function struct {
 	generic        *generic // instances of this function, if generic
 
 	// The following fields are cleared after building.
-	build        buildFunction        // algorithm to build function body (nil => built)
-	currentBlock *BasicBlock          // where to emit code
-	vars         map[*types.Var]Value // addresses of local variables
-	results      []*Allocation        // result allocations of the current function
+	build          buildFunction        // algorithm to build function body (nil => built)
+	currentBlock   *BasicBlock          // where to emit code
+	localVariables map[*types.Var]Value // addresses of local variables
+	results        []*Allocation        // result allocations of the current function
 	// variables for a return statement. Either results or for range-over-func a parent's results
 	returnVariables []*types.Var
 	targets         *targets                 // linked stack of branch targets
@@ -786,7 +786,7 @@ func (function *Function) addSpilledParameter(object *types.Var, source ast.Node
 func (function *Function) startBody() {
 	entry := function.newBasicBlock("entry")
 	function.currentBlock = entry
-	function.vars = make(map[*types.Var]Value) // needed for some synthetics, e.g. init
+	function.localVariables = make(map[*types.Var]Value) // needed for some synthetics, e.g. init
 }
 
 // createSyntacticParameters populates f.Parameters and generates code (spills
@@ -941,9 +941,9 @@ func (function *Function) finishBody() {
 	function.recordExpressions()
 
 	// clear remaining builder state
-	function.results = nil    // (used by lifting)
-	function.deferstack = nil // (used by lifting)
-	function.vars = nil       // (used by lifting)
+	function.results = nil        // (used by lifting)
+	function.deferstack = nil     // (used by lifting)
+	function.localVariables = nil // (used by lifting)
 
 	numberNodes(function)
 
@@ -992,7 +992,7 @@ func (function *Function) removeNilBlocks() {
 // We assume the referent is a *Allocation or *Phi.
 // (The only Phis at this stage are those created directly by go1.22 "for" loops.)
 func (function *Function) lookup(object *types.Var, escaping bool) Value {
-	if value, ok := function.vars[object]; ok {
+	if value, ok := function.localVariables[object]; ok {
 		if escaping {
 			switch typed := value.(type) {
 			case *Allocation:
@@ -1012,7 +1012,8 @@ func (function *Function) lookup(object *types.Var, escaping bool) Value {
 	// plumb it through intervening closures.
 	if function.parent == nil {
 		// Invariant: callers look up only function-local variables that go/types resolved in scope here, so one
-		// missing from this function's vars is declared in an enclosing function, and this function has a parent.
+		// missing from this function's localVariables is declared in an enclosing function, and this function has a
+		// parent.
 		panic("no ir.Value for " + object.String())
 	}
 	outer := function.parent.lookup(object, true) // escaping
@@ -1022,7 +1023,7 @@ func (function *Function) lookup(object *types.Var, escaping bool) Value {
 		outer:     outer,
 		parent:    function,
 	}
-	function.vars[object] = variable
+	function.localVariables[object] = variable
 	function.FreeVariables = append(function.FreeVariables, variable)
 	return variable
 }

@@ -49,6 +49,7 @@ func TestConsistencyNoAbbreviatedIdentifierFires(test *testing.T) {
 		{"cur", "const cur = 1;\n", []string{"abbreviatedIdentifier"}},
 		{"pct", "const pct = 1;\n", []string{"abbreviatedIdentifier"}},
 		{"prev", "const prev = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"vars", "const vars = 1;\n", []string{"abbreviatedIdentifier"}},
 
 		// camelCase prefixes.
 		{"ctx prefix", "const ctxValue = 1;\n", []string{"abbreviatedIdentifier"}},
@@ -70,6 +71,7 @@ func TestConsistencyNoAbbreviatedIdentifierFires(test *testing.T) {
 		{"str prefix", "const strValue = 1;\n", []string{"abbreviatedIdentifier"}},
 		{"max prefix", "const maxAge = 1;\n", []string{"abbreviatedIdentifier"}},
 		{"err prefix", "const errCount = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"vars prefix", "const varsFoo = 1;\n", []string{"abbreviatedIdentifier"}},
 
 		// Suffixes.
 		{"Prop suffix", "const rowProp = 1;\n", []string{"abbreviatedSuffix"}},
@@ -110,6 +112,7 @@ func TestConsistencyNoAbbreviatedIdentifierFires(test *testing.T) {
 		{"Db segment", "const primaryDbHost = 1;\n", []string{"abbreviatedWordSegment"}},
 		{"Tx segment", "const pendingTxHash = 1;\n", []string{"abbreviatedWordSegment"}},
 		{"Vars segment", "const themeVars = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"envVars segment", "const envVars = 1;\n", []string{"abbreviatedWordSegment"}},
 		{"Var segment", "const themeVarName = 1;\n", []string{"abbreviatedWordSegment"}},
 		{"Pos segment", "const resultPos = 1;\n", []string{"abbreviatedWordSegment"}},
 		{"Sb segment", "const scrollSbOffset = 1;\n", []string{"abbreviatedWordSegment"}},
@@ -230,6 +233,7 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(test *testing.T) {
 		{"spelled String suffix", "const queryString = 'a';\n"},
 		{"spelled milliseconds", "const durationInMilliseconds = 500;\n"},
 		{"spelled word segments", "const workingDirectory = 1;\nconst environment = 2;\nconst length = 3;\n"},
+		{"spelled variables", "const variables = 1;\nconst environmentVariables = 2;\n"},
 
 		// Words that merely contain an abbreviation's letters.
 		{"Direction is not Dir", "const scrollDirection = 1;\n"},
@@ -522,6 +526,19 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(test *testing.T) 
 			`Identifier "themeVars" abbreviates "Vars". ` +
 				`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`,
 		},
+		// The whole name and the prefix ask the same (#1ykwdb9), the prefix naming the word as the role words do.
+		{
+			"a whole vars asks which it means",
+			"const vars = 1;\n",
+			`Identifier "vars" should not be abbreviated. ` +
+				`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`,
+		},
+		{
+			"a vars prefix asks which it means",
+			"const varsFoo = 1;\n",
+			`Identifier "vars" should not be abbreviated. ` +
+				`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`,
+		},
 		// `sb` fits more words than a list could hold, a scroll region's bottom among them, so it suggests none.
 		{
 			"sb asks what it holds",
@@ -572,7 +589,7 @@ func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(test *
 		"targetObj", "pageNum", "fetchRes", "parseErr", "httpReq", "errorMsg", "pageMin", "pageMax",
 		"maximumAgeMs", "maximumAgeMsHalf",
 		"originalInitCwd", "outputDirPath", "buildEnvName", "runCliCommand", "bufferLen",
-		"eventSeq", "primaryDbHost", "pendingTxHash", "themeVars", "themeVarName",
+		"eventSeq", "primaryDbHost", "pendingTxHash", "themeVars", "themeVarName", "vars", "varsFoo", "envVars",
 	}
 	for _, name := range reportable {
 		if !isAbbreviationCandidate(name) {
@@ -1608,7 +1625,8 @@ func TestConsistencyNoAbbreviatedIdentifierReadsAKeywordTermAsAWord(test *testin
 		"export const themeVar = 1;\n" +
 		"export const VarScopedness = 1;\n" +
 		"export const VarDeclarationSrc = 1;\n" +
-		"export const themeVarBeforeVarKeyword = 1;\n"
+		"export const themeVarBeforeVarKeyword = 1;\n" +
+		"export const hoistedVarDeclarations = 1;\n"
 	result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, sourceText)
 	want := []string{
 		`Identifier "NoVar" abbreviates "Var". Use "Variable" for a variable,`,

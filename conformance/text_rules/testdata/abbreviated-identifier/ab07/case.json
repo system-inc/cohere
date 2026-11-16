@@ -1,0 +1,24 @@
+{
+    "why": "ab07: `vars` is judged as the whole name, as a prefix and as a segment, so `vars`, `varsCount` and `envVars` are each reported, while `variables` spells it out and `hoistedVarDeclarations` holds a spelling policy/KeywordTerms.json lists for JavaScript's var keyword, both clean (#1ykwdb9)",
+    "expect": [
+        {
+            "covers": "vars",
+            "occurrence": 1
+        },
+        {
+            "covers": "varsCount",
+            "occurrence": 1
+        },
+        {
+            "covers": "envVars",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

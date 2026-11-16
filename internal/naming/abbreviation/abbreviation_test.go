@@ -2,6 +2,7 @@ package abbreviation_test
 
 import (
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -83,6 +84,8 @@ func TestFindNamesTheSpellingsItsAdviceOffers(test *testing.T) {
 		// `Var` can mean JavaScript's var keyword, which no word spells out, so its advice names no name.
 		{"themeVarName", nil},
 		{"themeVars", nil},
+		{"vars", nil},
+		{"varsFoo", nil},
 		{"sb", nil},
 		{"sbBottom", nil},
 		{"scrollSbOffset", nil},
@@ -121,7 +124,9 @@ func oneNamePerForm(vocabulary *abbreviation.Vocabulary) []string {
 // A name holding none of the words is no finding, and an allowed name is none even though it holds one.
 func TestFindStaysQuietOnFullWords(test *testing.T) {
 	test.Parallel()
-	for _, name := range []string{"requestContext", "readError", "position", "URLSearchParams", "InnoDbIndex"} {
+	for _, name := range []string{
+		"requestContext", "readError", "position", "URLSearchParams", "InnoDbIndex", "variables", "varsity",
+	} {
 		if finding, found := abbreviation.Policy.Find(name); found {
 			test.Errorf("%q reads as an abbreviation: %+v", name, finding)
 		}
@@ -233,10 +238,18 @@ func TestFindNamesEveryMeaningOfAWordWithMore(test *testing.T) {
 
 // `Var` and `Vars` can mean JavaScript's var keyword, as a rule against it is named `NoVar`, and the keyword has no
 // full word to expand to. So they offer no spelling: they say what to write for a variable, and ask for a name saying
-// it means the keyword otherwise. `vars` still precedes `var`, so a name holding both reports the longer word.
+// it means the keyword otherwise. `vars` still precedes `var`, so a name holding both reports the longer word, and it
+// is judged as the whole name and as a prefix as well as a segment (#1ykwdb9), each form asking the same.
 func TestFindAsksWhetherAWordMeansTheKeyword(test *testing.T) {
 	test.Parallel()
 	cases := []struct{ name, want string }{
+		{"vars", `Identifier "vars" should not be abbreviated. ` +
+			`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`},
+		// An advice-style prefix names the abbreviation rather than the name, as the role words always have.
+		{"varsFoo", `Identifier "vars" should not be abbreviated. ` +
+			`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`},
+		{"envVars", `Identifier "envVars" abbreviates "Vars". ` +
+			`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`},
 		{"NoVar", `Identifier "NoVar" abbreviates "Var". ` +
 			`Use "Variable" for a variable, or a name saying it means JavaScript's var keyword.`},
 		{"themeVarName", `Identifier "themeVarName" abbreviates "Var". ` +
@@ -340,12 +353,13 @@ func TestLoadRefusesAnAbbreviationThatIsNotLetters(test *testing.T) {
 	}
 }
 
-// policy/NameWords.json holds only words policy/Abbreviations.json does not, since a word there is judged in every name
-// already and a second entry would be a second reading of it to drift, and it holds `docs`, judged in names on a path
-// and never in an identifier (#zyq63kk).
-func TestNameWordsHoldOnlyWordsTheSharedVocabularyDoesNot(test *testing.T) {
+// policy/NameWords.json holds a word policy/Abbreviations.json holds only to judge folders on it too, since a word
+// there is judged in every other name already, and then with the same forms, expansions and advice, so the second
+// entry is no second reading to drift (#1ykwdb9). It holds `docs`, judged in names on a path and never in an
+// identifier (#zyq63kk), and `vars`, which folders are judged on as every name is.
+func TestNameWordsReadEveryWordTheSharedVocabularyHoldsAsItDoes(test *testing.T) {
 	test.Parallel()
-	shared := map[string]bool{}
+	shared := map[string]*abbreviation.Entry{}
 	for _, entry := range append(
 		slices.Collect(maps.Values(abbreviation.Policy.WholeByName)),
 		slices.Concat(
@@ -355,7 +369,7 @@ func TestNameWordsHoldOnlyWordsTheSharedVocabularyDoesNot(test *testing.T) {
 			abbreviation.Policy.Segments,
 		)...,
 	) {
-		shared[entry.Abbreviation] = true
+		shared[entry.Abbreviation] = entry
 	}
 	nameWords := map[string]bool{}
 	for _, entry := range slices.Concat(
@@ -364,9 +378,20 @@ func TestNameWordsHoldOnlyWordsTheSharedVocabularyDoesNot(test *testing.T) {
 		abbreviation.NameWords.Segments,
 	) {
 		nameWords[entry.Abbreviation] = true
-		if shared[entry.Abbreviation] {
-			test.Errorf("%q is in both policy/Abbreviations.json and policy/NameWords.json", entry.Abbreviation)
+		sharedEntry, inBoth := shared[entry.Abbreviation]
+		if !inBoth {
+			continue
 		}
+		// The reason is each file's own, saying why the word is in it; everything the engines read is the same.
+		sameEntry := *entry
+		sameEntry.Reason = sharedEntry.Reason
+		if !reflect.DeepEqual(&sameEntry, sharedEntry) {
+			test.Errorf("%q is in both policy/Abbreviations.json and policy/NameWords.json and reads differently: "+
+				"%+v and %+v", entry.Abbreviation, sharedEntry, entry)
+		}
+	}
+	if !nameWords["vars"] {
+		test.Errorf("policy/NameWords.json holds no vars, so no folder is judged on it (#1ykwdb9)")
 	}
 	if !nameWords["docs"] {
 		test.Errorf("policy/NameWords.json holds no docs, Kirk's word on #zyq63kk")

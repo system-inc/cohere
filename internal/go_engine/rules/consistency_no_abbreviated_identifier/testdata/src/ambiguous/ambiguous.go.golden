@@ -38,8 +38,8 @@ func walk(text string, outputDir string, channelDir reflect.ChanDir) int { // wa
 	return len(ch) + len(outputDir) + int(channelDir)
 }
 
-// `Var` and `Vars` as JavaScript's var keyword, as a rule against it is named, and as variables. A bare lowercase
-// `vars` is no camelCase word, so it is not judged.
+// `Var` and `Vars` as JavaScript's var keyword, as a rule against it is named, and as variables. `vars` is judged as
+// the whole name and as a prefix too (#1ykwdb9), asking as every form of it does, and `variables` spells it out.
 type NoVar struct{} // want `Identifier "NoVar" abbreviates "Var"\. Use "Variable" for a variable, or a name saying it means JavaScript's var keyword\.`
 
 func NoUnusedVars() {} // want `Identifier "NoUnusedVars" abbreviates "Vars"\. Use "Variables" for variables, or a name saying it means JavaScript's var keyword\.`
@@ -47,8 +47,11 @@ func NoUnusedVars() {} // want `Identifier "NoUnusedVars" abbreviates "Vars"\. U
 func theme() int {
 	themeVars := map[string]string{} // want `Identifier "themeVars" abbreviates "Vars"\. Use "Variables" for variables, or a name saying it means JavaScript's var keyword\.`
 	themeVarName := ""               // want `Identifier "themeVarName" abbreviates "Var"\. Use "Variable" for a variable, or a name saying it means JavaScript's var keyword\.`
-	vars := 0
-	return len(themeVars) + len(themeVarName) + vars
+	vars := 0                        // want `Identifier "vars" should not be abbreviated\. Use "Variables" for variables, or a name saying it means JavaScript's var keyword\.`
+	varsCount := 0                   // want `Identifier "vars" should not be abbreviated\. Use "Variables" for variables, or a name saying it means JavaScript's var keyword\.`
+	envVars := []string{}            // want `Identifier "envVars" abbreviates "Vars"\. Use "Variables" for variables, or a name saying it means JavaScript's var keyword\.`
+	variables := 0
+	return len(themeVars) + len(themeVarName) + vars + varsCount + len(envVars) + variables
 }
 
 // `pred` as a filter's predicate, where a block's predecessor, go/ir's sense, would be a confident wrong name.

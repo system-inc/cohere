@@ -97,17 +97,17 @@ var VarDeclarationsOnTop = rule.Rule[rule.NoOptions]{
 
 				switch container.Kind {
 				case ast.KindSourceFile:
-					if !varsOnTopIsOnTop(subject, container.AsSourceFile().Statements, false) {
+					if !varDeclarationsOnTopIsOnTop(subject, container.AsSourceFile().Statements, false) {
 						ruleContext.ReportNode(subject, messageVarDeclarationsOnTop)
 					}
 				case ast.KindBlock:
 					grandparent := container.Parent
 					if grandparent != nil && ast.IsFunctionLike(grandparent) &&
-						varsOnTopIsOnTop(subject, container.AsBlock().Statements, false) {
+						varDeclarationsOnTopIsOnTop(subject, container.AsBlock().Statements, false) {
 						return
 					}
 					if grandparent != nil && grandparent.Kind == ast.KindClassStaticBlockDeclaration &&
-						varsOnTopIsOnTop(subject, container.AsBlock().Statements, true) {
+						varDeclarationsOnTopIsOnTop(subject, container.AsBlock().Statements, true) {
 						return
 					}
 					ruleContext.ReportNode(subject, messageVarDeclarationsOnTop)
@@ -119,12 +119,12 @@ var VarDeclarationsOnTop = rule.Rule[rule.NoOptions]{
 	},
 }
 
-// varsOnTopIsOnTop answers whether `subject` is reached without passing anything but directives,
+// varDeclarationsOnTopIsOnTop answers whether `subject` is reached without passing anything but directives,
 // imports and other variable declarations.
 //
 // `insideStaticBlock` turns off the directive and import skip, which upstream does explicitly
 // because a static block has neither.
-func varsOnTopIsOnTop(subject *ast.Node, statements *ast.NodeList, insideStaticBlock bool) bool {
+func varDeclarationsOnTopIsOnTop(subject *ast.Node, statements *ast.NodeList, insideStaticBlock bool) bool {
 	if statements == nil {
 		return false
 	}
@@ -132,7 +132,7 @@ func varsOnTopIsOnTop(subject *ast.Node, statements *ast.NodeList, insideStaticB
 	if !insideStaticBlock {
 		for index < len(statements.Nodes) {
 			statement := statements.Nodes[index]
-			if !varsOnTopLooksLikeDirective(statement) && !varsOnTopLooksLikeImport(statement) {
+			if !varDeclarationsOnTopLooksLikeDirective(statement) && !varDeclarationsOnTopLooksLikeImport(statement) {
 				break
 			}
 			index++
@@ -140,7 +140,7 @@ func varsOnTopIsOnTop(subject *ast.Node, statements *ast.NodeList, insideStaticB
 	}
 	for ; index < len(statements.Nodes); index++ {
 		statement := statements.Nodes[index]
-		if !varsOnTopIsVariableDeclaration(statement) {
+		if !varDeclarationsOnTopIsVariableDeclaration(statement) {
 			return false
 		}
 		if statement == subject {
@@ -150,7 +150,7 @@ func varsOnTopIsOnTop(subject *ast.Node, statements *ast.NodeList, insideStaticB
 	return false
 }
 
-// varsOnTopLooksLikeDirective is upstream's structural test rather than a semantic one: any
+// varDeclarationsOnTopLooksLikeDirective is upstream's structural test rather than a semantic one: any
 // expression statement whose expression is a string literal, not only `'use strict'`.
 //
 // The corpus pins the looseness. `'use strict'; 'directive'; var x; var y; f();` is clean, so a
@@ -169,7 +169,7 @@ func varsOnTopIsOnTop(subject *ast.Node, statements *ast.NodeList, insideStaticB
 //
 // A template is never a directive to any engine either, so upstream is right and the improvement
 // was not one. Found by a surviving mutant, because no upstream case writes a backtick here.
-func varsOnTopLooksLikeDirective(node *ast.Node) bool {
+func varDeclarationsOnTopLooksLikeDirective(node *ast.Node) bool {
 	if node.Kind != ast.KindExpressionStatement {
 		return false
 	}
@@ -177,7 +177,7 @@ func varsOnTopLooksLikeDirective(node *ast.Node) bool {
 	return expression != nil && expression.Kind == ast.KindStringLiteral
 }
 
-// varsOnTopLooksLikeImport answers whether a statement is an import.
+// varDeclarationsOnTopLooksLikeImport answers whether a statement is an import.
 //
 // Upstream also lists the three specifier kinds, which cannot appear as statements in any parser and
 // are unreachable there too. Only the declaration is named here, and the omission is deliberate
@@ -187,14 +187,14 @@ func varsOnTopLooksLikeDirective(node *ast.Node) bool {
 // An `import x = require('y')` is the TypeScript spelling and our parser produces it where upstream
 // has no node at all. It is accepted, because it is an import by every reading of what the skip is
 // for, and the divergence is stated rather than silent.
-func varsOnTopLooksLikeImport(node *ast.Node) bool {
+func varDeclarationsOnTopLooksLikeImport(node *ast.Node) bool {
 	return node.Kind == ast.KindImportDeclaration || node.Kind == ast.KindImportEqualsDeclaration
 }
 
-// varsOnTopIsVariableDeclaration counts a variable statement.
+// varDeclarationsOnTopIsVariableDeclaration counts a variable statement.
 //
 // Upstream's second arm, for a declaration wrapped in an export, has no counterpart here because
 // our parser does not wrap. See the rule doc comment.
-func varsOnTopIsVariableDeclaration(node *ast.Node) bool {
+func varDeclarationsOnTopIsVariableDeclaration(node *ast.Node) bool {
 	return node.Kind == ast.KindVariableStatement
 }
