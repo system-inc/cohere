@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/needs"
 )
 
@@ -132,10 +133,10 @@ func TestTheCorporaAreLaidAsTheirPinsSay(test *testing.T) {
 	}
 	said := lay(corpora)
 	laid := filepath.Join(home, "scratch", "system_cohere_tools", "corpora")
-	ahra := filepath.Join(laid, "ahra", fixtures.ahraCommit)
-	structure := filepath.Join(laid, "structure", fixtures.structureSecond)
-	for _, want := range []string{corpusLaidMarker + "ahra at " + fixtures.ahraCommit,
-		corpusLaidMarker + "structure at " + fixtures.structureSecond} {
+	ahra := filepath.Join(laid, filepath.FromSlash(corpora[0].place()))
+	structure := filepath.Join(laid, filepath.FromSlash(corpora[1].place()))
+	for _, want := range []string{corpusLaidMarker + "ahra at " + filepath.Base(ahra),
+		corpusLaidMarker + "structure at " + filepath.Base(structure)} {
 		if !strings.Contains(said, want) {
 			test.Errorf("the lay script never said %q:\n%s", want, said)
 		}
@@ -171,10 +172,10 @@ func TestTheCorporaAreLaidAsTheirPinsSay(test *testing.T) {
 	corpora[1].pins = corpus.Pins{Checkout: fixtures.structureFirst, Held: []string{fixtures.structureFirst}}
 	moved := lay(corpora[1:])
 	if _, statError := os.Stat(structure); !os.IsNotExist(statError) ||
-		!strings.Contains(moved, corpusLaidMarker+"structure at "+fixtures.structureSecond+" removed") {
+		!strings.Contains(moved, corpusLaidMarker+"structure at "+filepath.Base(structure)+" removed") {
 		test.Errorf("laying Structure at another commit left the one before it (%v):\n%s", statError, moved)
 	}
-	if _, statError := os.Stat(filepath.Join(laid, "structure", fixtures.structureFirst, "source",
+	if _, statError := os.Stat(filepath.Join(laid, filepath.FromSlash(corpora[1].place()), "source",
 		"first.ts")); statError != nil {
 		test.Errorf("Structure wasn't laid at its new pin: %v", statError)
 	}
@@ -260,6 +261,11 @@ func TestALandingLaysTheCorporaItsBoxLacks(test *testing.T) {
 	for _, each := range corpus.All {
 		environment = append(environment, each.Variable+"=")
 	}
+	ahraPlace := gateCorpus{corpus: corpus.Ahra, pins: corpus.Pins{Checkout: fixtures.ahraCommit}}.place()
+	structurePlace := gateCorpus{
+		corpus: corpus.Structure,
+		pins:   corpus.Pins{Checkout: fixtures.structureSecond},
+	}.place()
 	newFixture := func() *macBoxFixture {
 		test.Helper()
 		fixture := newMacBoxFixture(test, false)
@@ -268,8 +274,7 @@ func TestALandingLaysTheCorporaItsBoxLacks(test *testing.T) {
 		fixture.git(worktree, "add", ".")
 		fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("the corpora's pins"))
 		fixture.reply("Sun2.run", macBoxPassing)
-		fixture.reply("Sun2.unlaid", corpusUnlaidMarker+"ahra/"+fixtures.ahraCommit+" structure/"+
-			fixtures.structureSecond+"\n")
+		fixture.reply("Sun2.unlaid", corpusUnlaidMarker+ahraPlace+" "+structurePlace+"\n")
 		return fixture
 	}
 	test.Run("laid, then tested", func(test *testing.T) {
@@ -291,13 +296,12 @@ func TestALandingLaysTheCorporaItsBoxLacks(test *testing.T) {
 				calls)
 		}
 		remote := string(readMaybeMissing(test, filepath.Join(fixture.replies, "Sun2.remote")))
-		if !strings.Contains(remote, " 'COHERE_CORPUS_AHRA=ahra/"+fixtures.ahraCommit+
-			",COHERE_CORPUS_STRUCTURE=structure/"+fixtures.structureSecond+"' ") {
+		if !strings.Contains(remote, " 'COHERE_CORPUS_AHRA="+ahraPlace+",COHERE_CORPUS_STRUCTURE="+structurePlace+
+			"' ") {
 			test.Errorf("the script wasn't handed the laid corpora's places:\n%s", remote)
 		}
 		lay := string(readMaybeMissing(test, filepath.Join(fixture.replies, "Sun2.lay")))
-		for _, want := range []string{"ahra/" + fixtures.ahraCommit + "/pnpm/ ",
-			"structure/" + fixtures.structureSecond + "/none/" + fixtures.structureSecond} {
+		for _, want := range []string{ahraPlace + "/pnpm/ ", structurePlace + "/none/" + fixtures.structureSecond} {
 			if !strings.Contains(lay+" ", want) {
 				test.Errorf("the lay's remote lacks %q:\n%s", want, lay)
 			}
@@ -307,7 +311,7 @@ func TestALandingLaysTheCorporaItsBoxLacks(test *testing.T) {
 		if listError != nil {
 			test.Fatalf("listing the carry: %v\n%s", listError, listing)
 		}
-		if !strings.Contains(string(listing), "ahra/"+fixtures.ahraCommit+"/app/theme.css") ||
+		if !strings.Contains(string(listing), ahraPlace+"/app/theme.css") ||
 			strings.Contains(string(listing), "/data/") {
 			test.Errorf("the carry isn't ahra's tree without data/:\n%s", listing)
 		}
@@ -336,4 +340,38 @@ func TestALandingLaysTheCorporaItsBoxLacks(test *testing.T) {
 			test.Errorf("Kirk's Mac ran a go test: %s", goCalls)
 		}
 	})
+}
+
+// The fork's lay builds exactly the bundles the engine loads from a fork's dist/prettier, BundleFiles, so a laid fork
+// can stand where Kirk's checkout stands.
+func TestTheForksLayBuildsEveryBundleTheEngineLoads(test *testing.T) {
+	test.Parallel()
+	want := ""
+	for _, name := range prettier.BundleFiles {
+		want += " --file prettier/" + name
+	}
+	if corpusForkBundleFlags != want {
+		test.Errorf("the fork's lay builds%s, want%s", corpusForkBundleFlags, want)
+	}
+}
+
+// A corpus's place carries the digest of how it is laid, so changing the lay script or a corpus's recipe lays it again
+// rather than trusting a copy laid the old way.
+func TestACorpusLaidAnotherWayHasAnotherPlace(test *testing.T) {
+	test.Parallel()
+	fork := gateCorpus{corpus: corpus.PrettierFork, pins: corpus.Pins{Checkout: corpus.PrettierForkPin}}
+	ahra := gateCorpus{corpus: corpus.Ahra, pins: corpus.Pins{Checkout: corpus.AhraPin}}
+	if fork.place() != "prettier-fork/"+corpus.PrettierForkPin+"-"+corpusRecipeDigest(corpus.PrettierFork.Name) ||
+		fork.place() == ahra.place() {
+		test.Fatalf("the fork's place is %s and ahra's %s", fork.place(), ahra.place())
+	}
+	before := corpusRecipeDigest(corpus.PrettierFork.Name)
+	recipe := corpusRecipes[corpus.PrettierFork.Name]
+	recipe.install = corpusInstallNone
+	if digest := recipeDigestOf(corpusLayScript, recipe); digest == before {
+		test.Errorf("the fork laid with another install keeps its digest, %s", digest)
+	}
+	if digest := recipeDigestOf(corpusLayScript+"\n", corpusRecipes[corpus.PrettierFork.Name]); digest == before {
+		test.Errorf("the fork laid by another lay script keeps its digest, %s", digest)
+	}
 }

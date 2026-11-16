@@ -36,7 +36,10 @@ import (
 //     and with no install scripts, since the tests read installed packages (tailwindcss, @types/react).
 //   - connected: the same, nothing left out.
 //   - the Prettier fork: its tree, then its yarn.lock installed by the yarn it vendors, since its oracles run node
-//     inside it.
+//     inside it, and the eight bundles cohere embeds built into its dist/, since with the fork set the engine loads
+//     its bundles from there (internal/format/prettier's Bundles). Built at the pin on Sun2 they matched the embedded
+//     ones byte for byte (Nov 16); the fork's whole build doesn't finish on a box, since its oxc plugin runs a yarn
+//     of its own, and none of the eight needs it.
 //   - Structure: a repository holding every commit a test reads through At, checked out at its checkout pin, since its
 //     tests read commits by git as well as the tree on disk.
 
@@ -59,8 +62,14 @@ const corpusLayBound = "30m"
 // shares.
 const corpusFreeFloor = "8"
 
+// corpusForkBundleFlags is the fork build's --file for each bundle cohere embeds, internal/format/prettier's
+// BundleFiles under dist/prettier, which a test holds to that list.
+const corpusForkBundleFlags = " --file prettier/standalone.js --file prettier/plugins/estree.js" +
+	" --file prettier/plugins/typescript.js --file prettier/plugins/babel.js --file prettier/plugins/postcss.js" +
+	" --file prettier/plugins/markdown.js --file prettier/plugins/graphql.js --file prettier/plugins/yaml.js"
+
 // corpusRecipe is how a corpus is laid: excluded is what of its tree never leaves the lander, install is how the box
-// installs its packages (corpusInstallNone, corpusInstallPnpm, corpusInstallYarn), and repository is whether it is laid
+// installs its packages (corpusInstallNone, corpusInstallPnpm, corpusInstallFork), and repository is whether it is laid
 // as a git repository holding every commit a test reads through At rather than as a tree.
 type corpusRecipe struct {
 	excluded   []string
@@ -72,13 +81,13 @@ type corpusRecipe struct {
 const (
 	corpusInstallNone = "none"
 	corpusInstallPnpm = "pnpm"
-	corpusInstallYarn = "yarn"
+	corpusInstallFork = "fork"
 )
 
 var corpusRecipes = map[string]corpusRecipe{
 	corpus.Ahra.Name:         {excluded: []string{"data"}, install: corpusInstallPnpm},
 	corpus.Connected.Name:    {install: corpusInstallPnpm},
-	corpus.PrettierFork.Name: {install: corpusInstallYarn},
+	corpus.PrettierFork.Name: {install: corpusInstallFork},
 	corpus.Structure.Name:    {install: corpusInstallNone, repository: true},
 }
 
@@ -89,9 +98,11 @@ type gateCorpus struct {
 	checkout string
 }
 
-// place is where the corpus is laid on a box, under macBoxScratch/corpora.
+// place is where the corpus is laid on a box, under macBoxScratch/corpora: its name, then its checkout commit with the
+// digest of how it is laid (corpusRecipeDigest), so a lay that changes lays the corpus again rather than trusting a
+// copy laid the old way.
 func (gate gateCorpus) place() string {
-	return gate.corpus.Name + "/" + gate.pins.Checkout
+	return gate.corpus.Name + "/" + gate.pins.Checkout + "-" + corpusRecipeDigest(gate.corpus.Name)
 }
 
 // gateCorpora is every corpus the landing of commit lays, and a line for each it can't, naming why: the commit names
@@ -165,11 +176,12 @@ func unlaidIn(output []byte) []string {
 }
 
 // corpusLayScript lays each corpus a carry holds, as loom, under macBoxScratch/corpora. Its arguments are the carry and
-// one `name/commit/install/checkout` for each corpus in it, checkout empty but for a repository's. The carry is a gzip
-// tar holding each corpus's tree at `name/commit`. Each is installed in a staging directory beside its place, made
-// read-only, and only then renamed into place, so a place that exists is whole; a corpus whose place exists is left
-// alone. Every other commit of a corpus it lays is removed, so a box holds one of each and its disk stays bounded. The
-// node that installs is the pinned one, checked by its digest as sharedBoxGate checks it.
+// one `name/laid/install/checkout` for each corpus in it, laid being its place's leaf (the commit and its recipe's
+// digest) and checkout empty but for a repository's. The carry is a gzip tar holding each corpus's tree at its place.
+// Each is installed in a staging directory beside its place, made read-only, and only then renamed into place, so a
+// place that exists is whole; a corpus whose place exists is left alone. Every other commit of a corpus it lays is
+// removed, so a box holds one of each and its disk stays bounded. The node that installs is the pinned one, checked by
+// its digest as sharedBoxGate checks it.
 const corpusLayScript = `set -euo pipefail
 carry="$1"; shift
 base=` + macBoxScratch + `/corpora
@@ -199,8 +211,10 @@ for spec in "$@"; do
       none) ;;
       pnpm) said=$(cd "$staging" && corepack pnpm install --frozen-lockfile --ignore-scripts 2>&1) ||
           refuse "$name's pnpm install at $commit failed: $(echo "$said" | tail -n 1)" ;;
-      yarn) said=$(cd "$staging" && set -- .yarn/releases/yarn-*.cjs && [ "$#" -eq 1 ] &&
-          node "$1" install --immutable 2>&1) || refuse "$name's yarn install at $commit failed: $(echo "$said" | tail -n 1)" ;;
+      fork) said=$(cd "$staging" && set -- .yarn/releases/yarn-*.cjs && [ "$#" -eq 1 ] &&
+          node "$1" install --immutable 2>&1) || refuse "$name's yarn install at $commit failed: $(echo "$said" | tail -n 1)"
+        said=$(cd "$staging" && node scripts/build/build.js` + corpusForkBundleFlags + ` 2>&1) ||
+          refuse "$name's bundles at $commit didn't build: $(echo "$said" | tail -n 1)" ;;
       *) refuse "no install is named $install" ;;
     esac
     if [ -n "$checkout" ]; then
@@ -217,6 +231,18 @@ for spec in "$@"; do
   done
 done
 `
+
+// corpusRecipeDigest is the first 8 hex digits of the sha256 of how a corpus is laid: the lay script and its recipe.
+func corpusRecipeDigest(name string) string {
+	return recipeDigestOf(corpusLayScript, corpusRecipes[name])
+}
+
+// recipeDigestOf is corpusRecipeDigest of a recipe laid by script.
+func recipeDigestOf(script string, recipe corpusRecipe) string {
+	hash := sha256.Sum256(fmt.Appendf(nil, "%s\x00%q\x00%s\x00%t", script, recipe.excluded, recipe.install,
+		recipe.repository))
+	return hex.EncodeToString(hash[:])[:8]
+}
 
 // layCorpora lays on box the corpora at places, the ones her run said she lacks, in a gap of their own carrying them,
 // and returns what the gap said, or why they weren't laid, which refuses the landing.
