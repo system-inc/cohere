@@ -21,9 +21,8 @@ type bodyWalk struct {
 	typeReferences     map[walkKey][]reference
 	typeReferenceStore []reference
 
-	// collected are the current body's references, each once, and collectedMost the most it held.
-	collected     map[reference]bool
-	collectedMost int
+	// collected are the current body's references, each once.
+	collected map[reference]bool
 
 	// referenceStore is every body's references, each body's a slice of it (references).
 	referenceStore []reference
@@ -37,7 +36,6 @@ func (walk *bodyWalk) references(bodies ...ast.Node) []reference {
 	for _, body := range bodies {
 		ast.Walk(bodyVisitor{walk: walk}, body)
 	}
-	walk.collectedMost = max(walk.collectedMost, len(walk.collected))
 	if len(walk.collected) == 0 {
 		return nil
 	}

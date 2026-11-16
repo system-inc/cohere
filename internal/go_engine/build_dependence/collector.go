@@ -27,11 +27,10 @@ type collector struct {
 	walker           *bitWalker
 	bodies           *bodyWalk
 
-	// calleeSeen are the callees of the unit staticCallees is collecting, calleeSeenMost the most it held, and
-	// calleeStore every unit's callees, each unit's a slice of it, which newRecord reads into the record's own.
-	calleeSeen     map[types.Object]bool
-	calleeSeenMost int
-	calleeStore    []types.Object
+	// calleeSeen are the callees of the unit staticCallees is collecting, and calleeStore every unit's callees, each
+	// unit's a slice of it, which newRecord reads into the record's own.
+	calleeSeen  map[types.Object]bool
+	calleeStore []types.Object
 
 	// declareStore is every unit's declares, each unit's a slice of it from declaresStart (declare), which newRecord
 	// reads into the record's own, and owners the objects whose members collectMembers is declaring.

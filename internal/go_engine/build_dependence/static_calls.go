@@ -17,7 +17,6 @@ func (collecting *collector) staticCallees(bodies ...ast.Node) []types.Object {
 	for _, body := range bodies {
 		ast.Walk(calleeVisitor{collecting: collecting}, body)
 	}
-	collecting.calleeSeenMost = max(collecting.calleeSeenMost, len(collecting.calleeSeen))
 	if len(collecting.calleeStore) == start {
 		return nil
 	}
