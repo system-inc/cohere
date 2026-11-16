@@ -32,7 +32,7 @@ type Counts struct {
 // host parsed. A unit the graph does not hold, one in a file only the build compiles, is
 // dependent by definition, and any other place is no unit the graph knows, which is never read as independent.
 func (dependence *Dependence) UnitDependent(packageId string, file string, offset int) bool {
-	index, isUnit := dependence.resolved.unitIndex[unitKey{packageIdentifier: packageId, file: file, offset: offset}]
+	index, isUnit := dependence.resolved.unitStartingAt(packageId, file, offset)
 	if !isUnit {
 		return true
 	}
@@ -76,9 +76,8 @@ func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 	}
 	if !resolved.typesPackages[declared.Pkg()] {
 		return Bits{
-			Name: dependence.judging.answer(externalRead{object: recordedObject{object: declared}}),
-			Underlying: dependence.judging.answer(
-				externalRead{object: recordedObject{object: declared}, underlying: true}),
+			Name:       dependence.judging.answerObject(declared, false),
+			Underlying: dependence.judging.answerObject(declared, true),
 		}
 	}
 	_, isConstant := declared.(*types.Const)
@@ -88,8 +87,7 @@ func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 		if node, isNode := resolved.objectNodes[through.object]; isNode {
 			set = dependence.bits[bit(node, through.touchesUnderlying)]
 		} else if !resolved.typesPackages[through.object.Pkg()] {
-			set = dependence.judging.answer(externalRead{object: recordedObject{object: through.object},
-				underlying: through.touchesUnderlying})
+			set = dependence.judging.answerObject(through.object, through.touchesUnderlying)
 		}
 		if set {
 			return Bits{Name: true, Underlying: true}
@@ -104,11 +102,11 @@ func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 // time as ObjectBits is.
 func (dependence *Dependence) NameBits(path string, local string) (Bits, bool) {
 	resolved := dependence.resolved
-	identifiers := resolved.pathsHeld[path]
-	if len(identifiers) != 1 {
+	held, isHeld := resolved.pathPackages[path]
+	if !isHeld || held < 0 {
 		return Bits{}, false
 	}
-	node, isNode := resolved.nodes[nodeKey{packageIdentifier: identifiers[0], local: local}]
+	node, isNode := resolved.nodes[nodeKey{packageIndex: held, local: local}]
 	if !isNode {
 		return Bits{}, false
 	}
@@ -138,21 +136,40 @@ type ObjectName struct {
 	Local string
 }
 
-// Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name.
+// Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name. The
+// units' calls and external calls are read out of the resolution's packed rows into one slice of each that all the
+// units share, each unit's its own part of it, nil for a unit with none.
 func (dependence *Dependence) Units() []Unit {
-	units := make([]Unit, 0, len(dependence.resolved.units))
-	for index := range dependence.resolved.units {
-		resolved := &dependence.resolved.units[index]
+	resolved := dependence.resolved
+	units := make([]Unit, 0, resolved.unitCount())
+	calls := make([]int, len(resolved.calls.entries))
+	for position, callee := range resolved.calls.entries {
+		calls[position] = int(callee)
+	}
+	externalCalls := make([]ObjectName, len(resolved.externalCalls.entries))
+	for position, callee := range resolved.externalCalls.entries {
+		named := &resolved.externalObjects[callee]
+		externalCalls[position] = ObjectName{Path: named.path, Local: named.local}
+	}
+	for index := range resolved.unitCount() {
+		var unitCalls []int
+		if first, end := resolved.calls.offsets[index], resolved.calls.offsets[index+1]; end > first {
+			unitCalls = calls[first:end:end]
+		}
+		var unitExternalCalls []ObjectName
+		if first, end := resolved.externalCalls.offsets[index], resolved.externalCalls.offsets[index+1]; end > first {
+			unitExternalCalls = externalCalls[first:end:end]
+		}
 		units = append(units, Unit{
-			PackageId: dependence.resolved.packages[resolved.packageIndex].identifier,
-			File:      resolved.record.file,
-			Start:     resolved.record.start,
-			Nodes:     resolved.record.nodes,
-			Workspace: dependence.resolved.packages[resolved.packageIndex].workspace,
+			PackageId: resolved.packages[resolved.unitPackage[index]].identifier,
+			File:      resolved.files.names[resolved.unitFile[index]],
+			Start:     int(resolved.unitStart[index]),
+			Nodes:     int(resolved.unitNodes[index]),
+			Workspace: resolved.packages[resolved.unitPackage[index]].workspace,
 			Dependent: dependence.unitDependent[index],
-			Calls:     resolved.calls,
+			Calls:     unitCalls,
 
-			ExternalCalls: resolved.externalCalls,
+			ExternalCalls: unitExternalCalls,
 		})
 	}
 	return units

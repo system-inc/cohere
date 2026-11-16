@@ -136,7 +136,10 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-(cd $repository && go build -o $guard ./internal/bench_results/tools/guard) || fail "could not build the guard"
+# The guard is a tool the bench runs, and nothing reads its version stamp, so it is built without one: in a cohere-dev
+# worktree, whose TypeScript submodule is a symbolic link, git cannot report status and a stamped build fails (#268j573).
+(cd $repository && go build -buildvcs=false -o $guard ./internal/bench_results/tools/guard) ||
+  fail "could not build the guard"
 
 # parse_timing prints a --timing output's rule table as rule and CPU milliseconds, tab-separated, sorted by
 # rule: the rows after each header whose first fields are `rule` and `cpu`, up to the blank line that ends the

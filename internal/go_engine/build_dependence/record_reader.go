@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 )
 
 // Record is a package's record decoded from its bytes, for a caller that decodes it apart from adding it to a graph
@@ -151,12 +152,18 @@ func (reader *recordReader) index(count int) int32 {
 	return int32(value)
 }
 
-// unit reads one unit of the package at path, whose record's table holds objects entries.
+// unit reads one unit of the package at path, whose record's table holds objects entries. A unit whose start, end or
+// size passes what a unit column holds (column) is refused here, a number no source file under 2 GiB gives: added to a
+// graph, the record would panic every run that resolves it until the store let it go, where a record refused is the
+// findings cache's to say and to write again (Record).
 func (reader *recordReader) unit(path string, objects int) recordedUnit {
 	unit := recordedUnit{file: reader.text()}
-	unit.start = int(reader.number())
-	unit.end = unit.start + int(reader.number())
-	unit.nodes = int(reader.number())
+	start, length, nodes := reader.number(), reader.number(), reader.number()
+	if reader.failed == nil && (start > math.MaxInt32 || length > math.MaxInt32-start || nodes > math.MaxInt32) {
+		reader.failed = fmt.Errorf("the record places a unit at %d, %d bytes long, of %d nodes, past what a unit "+
+			"column holds", start, length, nodes)
+	}
+	unit.start, unit.end, unit.nodes = int(start), int(start+length), int(nodes)
 	unit.universeNames = reader.number()
 	if reader.number() == 1 {
 		unit.receiver = reader.text()
