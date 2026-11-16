@@ -775,7 +775,7 @@ func (session *CacheSession) saveMisses(
 		saved := saving[index]
 		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
 		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-			withheld[saved], demanded, files[saved], knownFiles, true)
+			withheld[saved], demanded, files[saved], knownFiles, nil, true)
 		record, keepsRecord := session.dependenceRecordToWrite(saved)
 		// The writes and their counting run with no slot held: the counting is a map's and a counter's, under a lock.
 		return func() {
@@ -830,7 +830,12 @@ func (session *CacheSession) saveMisses(
 	clear(session.closures)
 	aliases := map[cache.Key]cache.Key{}
 	for _, saved := range written {
-		if encoded[saved].positionDependent {
+		dependent, judgeError := encoded[saved].positionDependent.read(saved.ID)
+		if judgeError != nil {
+			session.problem(judgeError.Error())
+			continue
+		}
+		if dependent {
 			continue
 		}
 		if second, known := session.secondKey(saved); known {

@@ -563,7 +563,8 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		result.Cache = session.counts
 		result.FromHost = session.hostCounts()
 		if options.KeepForBuilds && options.Reads != nil {
-			result.Host = session.keepForBuilds(graphs, analyzed, options.Reads, options.Withheld, files)
+			result.Host = session.keepForBuilds(graphs, analyzed, options.Reads, options.Withheld, files,
+				gatheredFindingsOf(analyzers, analyzed, gathering, rootsOf, found))
 		}
 	}
 	if options.ExportFacts {
@@ -642,6 +643,39 @@ func rootActions(
 		}
 	}
 	return actions
+}
+
+// gatheredFindingsOf gives the findings the gather made of a root action's diagnostics, found by the analyzer's index
+// in analyzers and the package's in analyzed, for an action the gather converted: a rule's on a package the findings
+// cache did not restore, which rootsOf holds. Any other action, a dependency's or one a restored entry stood for, it
+// has none of.
+func gatheredFindingsOf(
+	analyzers []*analysis.Analyzer,
+	analyzed []*packages.Package,
+	gathering []gatheredPackage,
+	rootsOf [][]*checker.Action,
+	found [][][]Finding,
+) func(action *checker.Action) ([]Finding, bool) {
+	analyzerIndexes := make(map[*analysis.Analyzer]int, len(analyzers))
+	for index, analyzer := range analyzers {
+		analyzerIndexes[analyzer] = index
+	}
+	packageIndexes := make(map[*packages.Package]int, len(analyzed))
+	for index, analyzedPackage := range analyzed {
+		// A package listed twice was gathered alike at each index, so its first is read.
+		if _, listed := packageIndexes[analyzedPackage]; !listed {
+			packageIndexes[analyzedPackage] = index
+		}
+	}
+	return func(action *checker.Action) ([]Finding, bool) {
+		analyzerIndex, isRule := analyzerIndexes[action.Analyzer]
+		packageIndex, isAnalyzed := packageIndexes[action.Package]
+		if !isRule || !isAnalyzed || gathering[packageIndex].restored != nil ||
+			rootsOf[analyzerIndex][packageIndex] != action {
+			return nil, false
+		}
+		return found[analyzerIndex][packageIndex], true
+	}
 }
 
 // abandoned is whether abandon is closed, never for a nil one.

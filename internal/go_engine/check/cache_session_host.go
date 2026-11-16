@@ -718,7 +718,13 @@ func (session *CacheSession) writeThrough(
 		if writable[index] {
 			session.host.writtenThrough[saved] = true
 			session.counts.WrittenThrough++
-			positionDependent[saved] = encoded[index].positionDependent
+			dependent, judgeError := encoded[index].positionDependent.read(saved.ID)
+			if judgeError != nil {
+				// Left out, the package is given no alias.
+				session.problem(judgeError.Error())
+				continue
+			}
+			positionDependent[saved] = dependent
 		}
 	}
 	return positionDependent
@@ -784,7 +790,7 @@ func (session *CacheSession) throughEntry(
 	if hosted.kept.holdsBodyAt {
 		encoded.record.BodyAt = hosted.kept.bodyAt[:]
 	}
-	encoded.positionDependent = restoredPositionDependent(saved, hosted.restored, knownFiles)
+	encoded.positionDependent = judgedPosition(restoredPositionDependent(saved, hosted.restored, knownFiles))
 	return encoded, true, nil
 }
 
@@ -876,13 +882,15 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 // under `--no-cache` never stores. A package restored from the binary's table is kept from the table's entry, with the
 // reads the table persisted beside it (keepBinaryHit, #pcv6eff). Each package's portable digest is the one Restore
 // keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
-// without pays nothing.
+// without pays nothing. gathered gives the findings the run's gather made of each root action, which an encoded entry
+// holds rather than convert them again (see encodeEntry).
 func (session *CacheSession) keepForBuilds(
 	graphs []*checker.Graph,
 	analyzed []*packages.Package,
 	reads map[*packages.Package]*build_reads.Reads,
 	withheld map[*packages.Package]load.PackageWithheld,
 	files map[*packages.Package][]storedFile,
+	gathered func(action *checker.Action) ([]Finding, bool),
 ) *HostRun {
 	keyed := session.keptKeys
 	if session.known == nil || keyed == nil {
@@ -965,14 +973,15 @@ func (session *CacheSession) keepForBuilds(
 	// only when a load first reads it (lazyExportData). What it is written from is the package's types alone, so the
 	// host's syntax, type maps, intermediate representation and actions all go once the keep returns, as they did
 	// when the keep wrote everything: holding them for a later write marked about 4 GB on every collection of adamic's
-	// builds. The types live until the last build has run (HostRun.Release).
-	knownFiles := session.allFiles()
+	// builds. The types live until the last build has run (HostRun.Release). An entry kept is encoded without the
+	// load's files, so whether its findings name another package's file is not judged: only the store's entries are
+	// aliased by it, and a build writing one through judges it again from the findings (throughEntry).
 	encoded := make([]encodedEntry, len(encoding))
 	encodeErrors := make([]error, len(encoding))
 	session.fanOut(len(encoding), func(index int) {
 		saved := encoding[index]
 		encoded[index], encodeErrors[index] = encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-			withheld[saved], session.withBodiless(saved, session.recordedDemandOf(saved)), files[saved], knownFiles,
+			withheld[saved], session.withBodiless(saved, session.recordedDemandOf(saved)), files[saved], nil, gathered,
 			false)
 	})
 	for index, saved := range encoding {

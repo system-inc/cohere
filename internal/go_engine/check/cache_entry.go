@@ -203,9 +203,9 @@ type encodedEntry struct {
 	output    cache.Key
 	hasOutput bool
 
-	// positionDependent is set when a finding of the package names a file outside it, so its findings can change
-	// with a line of another package (see positionDependent).
-	positionDependent bool
+	// positionDependent is whether a finding of the package names a file outside it, so its findings can change
+	// with a line of another package (see positionDependent), not judged for an entry encoded without the load's files.
+	positionDependent positionJudgment
 }
 
 // restoredAnalysis is a storedAnalysis decoded.
@@ -238,10 +238,12 @@ func factTypeName(factType reflect.Type) string {
 // error, its types, what the load withheld of it, the answers of the fact kinds computed on demand in it, those its
 // analysis read of other packages and what it declares without a body (demanded), and, for a package Analyze was
 // given, its files' walk, with its export data beside it, its output digest, and whether a finding of it names a file
-// outside it, among loadFiles, every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact
-// the package exported, or factValueDigest cannot read one, or its types cannot be written as export data. Without
-// writesExportData the entry is encoded alone, for a caller that writes the export data itself only if it is ever read
-// (lazyExportData).
+// outside it, among loadFiles, every file the load holds, left not judged when loadFiles is nil. It returns
+// errorUnstorable, wrapped, when gob refuses a fact the package exported, or factValueDigest cannot read one, or its
+// types cannot be written as export data. Without writesExportData the entry is encoded alone, for a caller that writes
+// the export data itself only if it is ever read (lazyExportData). gathered, when not nil, gives the findings the run's
+// gather made of an action's diagnostics, which the entry holds rather than convert them again; an action it has none
+// of is converted here.
 func encodeEntry(
 	known *cacheAnalyzers,
 	ruleOf map[*analysis.Analyzer]rule.Rule,
@@ -251,6 +253,7 @@ func encodeEntry(
 	demanded entryDemand,
 	files []storedFile,
 	loadFiles *knownFiles,
+	gathered func(action *checker.Action) ([]Finding, bool),
 	writesExportData bool,
 ) (encodedEntry, error) {
 	entry := cacheEntry{
@@ -272,9 +275,15 @@ func encodeEntry(
 		}
 		stored := storedAnalysis{}
 		facts := analysisFacts{}
-		if actionRule, isRule := ruleOf[action.Analyzer]; isRule {
-			for _, diagnostic := range action.Diagnostics {
-				stored.Findings = append(stored.Findings, newFinding(actionRule, action.Package.Fset, diagnostic))
+		// An action with no diagnostic, as most are, has nothing to convert or look up, and its list stays nil.
+		if actionRule, isRule := ruleOf[action.Analyzer]; isRule && len(action.Diagnostics) > 0 {
+			// The gather made these of the same diagnostics with the same rule (actionFindings).
+			if found, made := gatheredFindings(gathered, action); made && len(found) > 0 {
+				stored.Findings = found
+			} else {
+				for _, diagnostic := range action.Diagnostics {
+					stored.Findings = append(stored.Findings, newFinding(actionRule, action.Package.Fset, diagnostic))
+				}
 			}
 		}
 		if known.reports[action.Analyzer] {
@@ -336,7 +345,9 @@ func encodeEntry(
 		encoded.output, encoded.hasOutput = outputDigest(exportDigest(saved.Types), digested), true
 		entry.Output = encoded.output[:]
 	}
-	encoded.positionDependent = positionDependent(saved, entry.Analyzers, loadFiles)
+	if loadFiles != nil {
+		encoded.positionDependent = judgedPosition(positionDependent(saved, entry.Analyzers, loadFiles))
+	}
 	body, bodyError := encodeBody(entry)
 	if bodyError != nil {
 		return encodedEntry{}, fmt.Errorf("encoding the entry: %w: %w", errorUnstorable, bodyError)
@@ -351,6 +362,17 @@ func encodeEntry(
 		ReadsIncomplete: demanded.readsIncomplete,
 	}
 	return encoded, nil
+}
+
+// gatheredFindings is what gathered gives of action, nothing when gathered is nil.
+func gatheredFindings(
+	gathered func(action *checker.Action) ([]Finding, bool),
+	action *checker.Action,
+) ([]Finding, bool) {
+	if gathered == nil {
+		return nil, false
+	}
+	return gathered(action)
 }
 
 // encodeBody is entry's body, as the store keeps it under its digest: entry without its reads, which its record holds.
