@@ -5371,7 +5371,7 @@
             "namespace": "cohere-go",
             "origin": "staticcheck",
             "upstreamName": "S1023",
-            "typeAware": true
+            "typeAware": false
         },
         {
             "name": "cohere-go/S1024",
@@ -5803,7 +5803,7 @@
             "namespace": "cohere-go",
             "origin": "staticcheck",
             "upstreamName": "SA4001",
-            "typeAware": true
+            "typeAware": false
         },
         {
             "name": "cohere-go/SA4003",
@@ -5867,7 +5867,7 @@
             "namespace": "cohere-go",
             "origin": "staticcheck",
             "upstreamName": "SA4011",
-            "typeAware": true
+            "typeAware": false
         },
         {
             "name": "cohere-go/SA4012",
@@ -5883,7 +5883,7 @@
             "namespace": "cohere-go",
             "origin": "staticcheck",
             "upstreamName": "SA4013",
-            "typeAware": true
+            "typeAware": false
         },
         {
             "name": "cohere-go/SA4014",
@@ -5931,7 +5931,7 @@
             "namespace": "cohere-go",
             "origin": "staticcheck",
             "upstreamName": "SA4019",
-            "typeAware": true
+            "typeAware": false
         },
         {
             "name": "cohere-go/SA4020",
@@ -6067,7 +6067,7 @@
             "namespace": "cohere-go",
             "origin": "staticcheck",
             "upstreamName": "SA5003",
-            "typeAware": true
+            "typeAware": false
         },
         {
             "name": "cohere-go/SA5004",
@@ -6075,7 +6075,7 @@
             "namespace": "cohere-go",
             "origin": "staticcheck",
             "upstreamName": "SA5004",
-            "typeAware": true
+            "typeAware": false
         },
         {
             "name": "cohere-go/SA5005",

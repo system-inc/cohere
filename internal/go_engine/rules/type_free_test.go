@@ -17,11 +17,21 @@ import (
 )
 
 // typeFreeSource is a package holding what each pass typeFree names reports: a build line with a malformed Go version,
-// a go:debug directive outside package main, a dot import, a package imported twice, a directive indented out of
-// effect, a string holding a control character, and a statement after a return.
-const typeFreeSource = "//go:build go1.x\n//go:debug panicnil=1\n\npackage typefree\n\nimport (\n\t. \"fmt\"\n" +
-	"\t\"strings\"\n\tagain \"strings\"\n)\n\n// go:linkname unreached unreached\n\nvar Bell = \"a\x07b\"\n\n" +
-	"func Unreached() string {\n\treturn Sprint(strings.ToUpper(again.ToLower(Bell)))\n\treturn \"\"\n}\n"
+// two `+build` lines that say the same, a go:debug directive outside package main, a dot import, a package imported
+// twice, a directive indented out of effect, a string holding a control character, a statement after a return, a
+// doubled negation, `&*x`, a break that ends only its case, a defer in a loop that never ends, an endless loop around
+// a select with an empty default, and a return that ends its function anyway.
+const typeFreeSource = "//go:build go1.x\n// +build linux\n// +build linux\n//go:debug panicnil=1\n\n" +
+	"package typefree\n\nimport (\n\t. \"fmt\"\n\t\"strings\"\n\tagain \"strings\"\n)\n\n" +
+	"// go:linkname unreached unreached\n\nvar Bell = \"a\x07b\"\n\n" +
+	"func Unreached() string {\n\treturn Sprint(strings.ToUpper(again.ToLower(Bell)))\n\treturn \"\"\n}\n\n" +
+	"func Doubled(flag bool) bool {\n\treturn !!flag\n}\n\n" +
+	"func Copied(value *int) *int {\n\treturn &*value\n}\n\n" +
+	"func Breaks(values []int) {\n\tfor _, value := range values {\n\t\tswitch value {\n\t\tcase 1:\n" +
+	"\t\t\tbreak\n\t\t}\n\t}\n}\n\n" +
+	"func Deferred() {\n\tfor {\n\t\tdefer Sprint()\n\t}\n}\n\n" +
+	"func Spins(done chan int) {\n\tfor {\n\t\tselect {\n\t\tcase <-done:\n\t\tdefault:\n\t\t}\n\t}\n}\n\n" +
+	"func Redundant() {\n\tSprint()\n\treturn\n}\n"
 
 // Each pass typeFree names reads no type information (#9k8ps1y): run over a package whose pass holds of the type
 // checker only the Go version it records for the file, which a port's version gate reads, no sizes, and a package that
