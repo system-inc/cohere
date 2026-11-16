@@ -20,9 +20,10 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-label"
 
-// listener hears every labeled statement of the syntax dispatcher's walk.
+// listener hears every labeled statement of the syntax dispatcher's walk. It is SyntaxOnly: a labeled statement alone
+// decides every finding (#y6q1x2j).
 var listener = rule.Listener{
-	FileLocal: true, Nodes: []ast.Node{(*ast.LabeledStmt)(nil)}, Node: judgeLabeled}
+	FileLocal: true, SyntaxOnly: true, Nodes: []ast.Node{(*ast.LabeledStmt)(nil)}, Node: judgeLabeled}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_label", "Flags every labeled statement at its label, "+

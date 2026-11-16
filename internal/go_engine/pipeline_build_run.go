@@ -66,6 +66,11 @@ type buildRun struct {
 	// the host's live heap as its load ended, and the most it held while its rules ran (heldWhileLinting).
 	heldAtLoadEnd  uint64
 	heldAtLintPeak uint64
+	// inheritedFiles and inheritedFindings are an extra build's alone: the distinct files at least one of its
+	// syntax-only rules took the host's findings on rather than walk, and how many findings it took, each rule's on
+	// each file once (check.HostInheritance.Counts, #y6q1x2j).
+	inheritedFiles    int
+	inheritedFindings int
 	// dependence is an extra build's alone, under `--build-dependence`: its judgment on the host's graph from its first
 	// load (dependenceOf), nil otherwise.
 	dependence *contract.BuildDependence

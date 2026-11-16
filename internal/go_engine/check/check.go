@@ -115,6 +115,12 @@ type Options struct {
 	// digesting every fact of a run is work no finding needs.
 	ExportFacts bool
 
+	// Inheritance, when not nil, is an extra build's take of the host's run for its syntax-only rules (#y6q1x2j): each
+	// such rule skips each file it inherits and reports the host's findings there as its own (rule.InheritedFiles),
+	// handed every pass under rule.Inherited (see checker.Options.Inheritance). Only an extra build restoring from the
+	// host's run sets it (HostRun.Inheritance). The findings are the same either way.
+	Inheritance rule.Inheritance
+
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
 	holdWalk func(owner *packages.Package)
@@ -316,6 +322,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
 	checkerOptions.Reads = options.Reads
+	checkerOptions.Inheritance = options.Inheritance
 	checkerOptions.ListingsRead = listingsRead
 	checkerOptions.Pool = options.Pool
 	// The walks run beside the rules, and on past Run's return, so no package's walk sits at the end of the run's
@@ -628,7 +635,8 @@ func abandoned(abandon <-chan struct{}) bool {
 // run requires it too, so what only a left-out rule reads never runs. Resolver is a new fact resolver, one for the run
 // the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat), with no
 // store, which Run gives the resolver of a run with the findings cache. Recorded hands each rule its package's reads,
-// to record its lookups of other packages in, once Run sets Reads (#b2t9xmf).
+// to record its lookups of other packages in, once Run sets Reads (#b2t9xmf). Inherited hands each syntax-only rule the
+// host's findings it inherits, once Run sets Inheritance (#y6q1x2j).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
@@ -638,6 +646,7 @@ func DispatchOptions() *checker.Options {
 		Resolver:      fact_resolver.New(nil),
 		Resolved:      rule.Resolved,
 		Recorded:      rule.Recorded,
+		Inherited:     rule.Inherited,
 	}
 }
 

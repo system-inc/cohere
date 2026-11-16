@@ -12,10 +12,19 @@ import (
 // code.File, which reads the same match from its tokenfile pass. A parsed file holds the positions from its FileStart
 // to its FileEnd, both included: the bounds of its token.File, which the file set's own lookup reads. So comparing them
 // gives the file set's answer without its lock, which every call took, and contended for once a package's walk ran on
-// several workers, with a lookup per file besides.
+// several workers, with a lookup per file besides. A syntax-only context holds no Files (rule.NewSyntaxOnlyContext),
+// and a syntax-only check reports only at nodes of the file it is walking, so there the file is the walked one, and a
+// node outside it is in none.
 func File(context *rule.Context, node Positioner) *ast.File {
 	position := node.Pos()
 	if !position.IsValid() {
+		return nil
+	}
+	if context.IsSyntaxOnly() {
+		walked := context.WalkedFile()
+		if walked != nil && walked.FileStart <= position && position <= walked.FileEnd {
+			return walked
+		}
 		return nil
 	}
 	for _, file := range context.Files {
@@ -29,8 +38,16 @@ func File(context *rule.Context, node Positioner) *ast.File {
 // LanguageVersion is the Go language version node is written in, such as "go1.22": its file's own, from a
 // `//go:build` line naming one, and otherwise its package's, as the type checker recorded it. It is "" where neither
 // says, as for a package loaded outside a module, and for a node in none of the package's files: staticcheck's
-// code.LanguageVersion, whose comment walks through why the type checker's record is the answer.
+// code.LanguageVersion, whose comment walks through why the type checker's record is the answer. A syntax-only context
+// holds the record as FileGoVersions, read before its TypesInfo was dropped.
 func LanguageVersion(context *rule.Context, node Positioner) string {
+	if context.IsSyntaxOnly() {
+		file := File(context, node)
+		if file == nil {
+			return ""
+		}
+		return context.FileGoVersions[context.FileSet.File(file.FileStart)]
+	}
 	return context.TypesInfo.FileVersions[File(context, node)]
 }
 
@@ -38,8 +55,14 @@ func LanguageVersion(context *rule.Context, node Positioner) string {
 // version: staticcheck's code.StdlibVersion. It panics, as staticcheck's does, for a node in none of the package's
 // files.
 func StandardLibraryVersion(context *rule.Context, node Positioner) string {
-	// The package's version is its module's go line, which staticcheck's -go flag can set too.
-	packageVersion := context.Package.GoVersion()
+	// The package's version is its module's go line, which staticcheck's -go flag can set too, and a syntax-only
+	// context holds it as PackageGoVersion, read before its Package was dropped.
+	var packageVersion string
+	if context.IsSyntaxOnly() {
+		packageVersion = context.PackageGoVersion
+	} else {
+		packageVersion = context.Package.GoVersion()
+	}
 	file := File(context, node)
 	if file == nil {
 		// Invariant: a check reports only at nodes of its own package, which are in its files; a node elsewhere is

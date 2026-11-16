@@ -79,7 +79,8 @@ func (walk *syntaxWalk) callNodes(
 	}()
 	for ; calling < len(runs); calling++ {
 		run := runs[calling]
-		if run.crash != nil {
+		// A run whose rule inherits the file the walk is in hears none of its nodes (#y6q1x2j).
+		if run.crash != nil || run.skipping {
 			continue
 		}
 		run.context.EnterNode(cursor)

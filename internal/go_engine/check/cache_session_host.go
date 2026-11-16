@@ -989,6 +989,12 @@ func (session *CacheSession) keepForBuilds(
 			return body, record, readExportData, nil
 		}
 	}
+	// Each entry knows the files the host compiled into it, which the builds' inheritance indexes (holdersOf).
+	for keptPackage := range keyed.Portable {
+		if kept := host.entries[keptPackage.ID]; kept != nil {
+			kept.compiledFiles = keptPackage.CompiledGoFiles
+		}
+	}
 	// Each entry is decoded the first time a build considers it, and never again by another (hostEntry.decoded).
 	host.known = session.known
 	for identifier, kept := range host.entries {

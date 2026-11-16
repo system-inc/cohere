@@ -1183,10 +1183,10 @@ func TestTheRegisteredAnalyzersValidateTogether(test *testing.T) {
 	}
 }
 
-// TestTypeAwareFollowsTheSyntaxOnlyTable proves the table is read the right way round, with one pass
+// TestTypeAwareFollowsTheTypeFreeTable proves the table is read the right way round, with one pass
 // from each side of it, and that no entry names a pass the registry does not hold, which would mean a
 // rename upstream left a decision about nothing.
-func TestTypeAwareFollowsTheSyntaxOnlyTable(test *testing.T) {
+func TestTypeAwareFollowsTheTypeFreeTable(test *testing.T) {
 	test.Parallel()
 	expected := map[string]bool{
 		"cohere-go/printf":   true,
@@ -1206,9 +1206,9 @@ func TestTypeAwareFollowsTheSyntaxOnlyTable(test *testing.T) {
 			test.Errorf("%s has TypeAware %t, expected %t", name, registeredRule.TypeAware, typeAware)
 		}
 	}
-	for upstreamName := range syntaxOnly {
+	for upstreamName := range typeFree {
 		if _, found := registeredRuleNamed(rule.Namespace + upstreamName); !found {
-			test.Errorf("the syntax-only table names %q, which is not a registered rule", upstreamName)
+			test.Errorf("the type-free table names %q, which is not a registered rule", upstreamName)
 		}
 	}
 }

@@ -11,8 +11,9 @@ import (
 // every package of the workspace in each; and the findings that stand which it kept and the host's did not, and those
 // it kept that the merge left out. Then what the build restored from the host's run rather than checked, each count
 // written only when not 0: the host's entries kept for the others, and another's packages restored, declined by its
-// load and by its check, every decline by why, the loads again it took, by why, and the packages it wrote through to
-// its own findings cache. A run of one build writes none, and neither does a Swift run, so their output is as it was.
+// load and by its check, every decline by why, the loads again it took, by why, the packages it wrote through to its
+// own findings cache, and the files and findings it inherited from the host's run. A run of one build writes none, and
+// neither does a Swift run, so their output is as it was.
 type checkedBuild struct {
 	Target           string `json:"target"`
 	Host             bool   `json:"host"`
@@ -34,6 +35,10 @@ type checkedBuild struct {
 	// WrittenThrough is the packages it restored from the host's run whose entry it wrote to its own findings cache,
 	// so its next run hits them there, absent when 0.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
+	// InheritedFiles and InheritedFindings are the files it took the host's findings of a syntax-only rule on rather
+	// than walk again, and the findings it took, each absent when 0.
+	InheritedFiles    int `json:"inheritedFiles,omitempty"`
+	InheritedFindings int `json:"inheritedFindings,omitempty"`
 	// LoadMilliseconds, LintMilliseconds, DecideMilliseconds (summed across goroutines), KeepMilliseconds and
 	// WaitMilliseconds (the host's) are where the build's time went, each absent when 0.
 	LoadMilliseconds   int `json:"loadMilliseconds,omitempty"`

@@ -26,11 +26,13 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-lone-block"
 
-// listener hears every statement list of the syntax dispatcher's walk, a block's or a clause's.
+// listener hears every statement list of the syntax dispatcher's walk, a block's or a clause's. It is SyntaxOnly: a
+// statement list's own statements decide every finding (#y6q1x2j).
 var listener = rule.Listener{
-	FileLocal: true,
-	Nodes:     []ast.Node{(*ast.BlockStmt)(nil), (*ast.CaseClause)(nil), (*ast.CommClause)(nil)},
-	Node:      judgeHolder,
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Nodes:      []ast.Node{(*ast.BlockStmt)(nil), (*ast.CaseClause)(nil), (*ast.CommClause)(nil)},
+	Node:       judgeHolder,
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.

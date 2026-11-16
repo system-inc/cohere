@@ -32,12 +32,15 @@ import (
 const Name = "cohere-go/consistency-no-dash-punctuation"
 
 // listener reads each file's comments as the syntax dispatcher's walk enters the file, and hears every literal in it.
+// It is SyntaxOnly: the file's own comments and literals, and its lines through the line table, decide every finding on
+// it (#y6q1x2j).
 var listener = rule.Listener{
-	FileLocal: true,
-	Requires:  []*analysis.Analyzer{positions.Analyzer},
-	FileEnter: enterFile,
-	Nodes:     []ast.Node{(*ast.BasicLit)(nil)},
-	Node:      judgeLiteral,
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Requires:   []*analysis.Analyzer{positions.Analyzer},
+	FileEnter:  enterFile,
+	Nodes:      []ast.Node{(*ast.BasicLit)(nil)},
+	Node:       judgeLiteral,
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.

@@ -32,7 +32,9 @@ const Name = "ST1019"
 const Doc = "Importing the same package multiple times"
 
 // Listener is what the port hears of each package from the dispatcher: each file as the walk enters it, whose imports
-// are all the port reads of the syntax.
+// are all the port reads of the syntax. It is not SyntaxOnly: its findings pass FilterGenerated, which asks whether a
+// finding's display file, the one a `//line` directive names, is generated among the package's files as this build
+// compiled them, so another file of the package decides (#y6q1x2j).
 var Listener = rule.Listener{
 	FileLocal: true, FileEnter: checkFile}
 

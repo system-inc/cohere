@@ -45,9 +45,10 @@ func init() {
 }
 `
 
-// loudSource has a panic after a function literal holding another, a re-panic in a deferred literal, a recovered
+// loudSource has two panics after a function literal holding another, a re-panic in a deferred literal, a recovered
 // variable written again, and Must calls inside and outside initialization, so the order of its findings shows each
-// function's panics reported in the order the functions begin, then the Must calls.
+// function's panics reported in the order the functions begin, each function's own in the order they stand, then the
+// Must calls.
 const loudSource = `package loud
 
 func MustParse(text string) int { return len(text) }
@@ -64,6 +65,9 @@ func outer() {
 		panic("inner")
 	}
 	inner()
+	if parsed == 0 {
+		panic("empty")
+	}
 	panic("outer")
 }
 
@@ -112,8 +116,9 @@ func newJudgedFile(test *testing.T, source string) *judgedFile {
 }
 
 // TestFindingsKeepTheirOrder holds the order judgeSyntax reports in: each function's panics in the order the
-// functions begin, an outer function's before those of a literal it holds even when the literal comes first, then
-// the Must calls, with a re-panic of a recovered value quiet and one of a recovered variable written again reported.
+// functions begin, an outer function's before those of a literal it holds even when the literal comes first, and two
+// in one function in the order they stand, then the Must calls, with a re-panic of a recovered value quiet and one of
+// a recovered variable written again reported.
 func TestFindingsKeepTheirOrder(test *testing.T) {
 	test.Parallel()
 	judged := newJudgedFile(test, loudSource)
@@ -123,10 +128,11 @@ func TestFindingsKeepTheirOrder(test *testing.T) {
 		category string
 	}
 	expected := []finding{
-		{17, unexplainedPanicMessage.Id},
+		{18, unexplainedPanicMessage.Id},
+		{20, unexplainedPanicMessage.Id},
 		{14, unexplainedPanicMessage.Id},
-		{24, unexplainedPanicMessage.Id},
-		{23, mustOutsideInitializationMessage.Id},
+		{27, unexplainedPanicMessage.Id},
+		{26, mustOutsideInitializationMessage.Id},
 	}
 	if len(judged.reported) != len(expected) {
 		test.Fatalf("reported %d findings, expected %d: %v", len(judged.reported), len(expected), judged.reported)

@@ -28,7 +28,10 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it.
+// Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it. It is not
+// SyntaxOnly: its findings pass FilterGenerated, which asks whether a finding's display file, the one a `//line`
+// directive names, is generated among the package's files as this build compiled them, so another file of the package
+// decides (#y6q1x2j).
 var Listener = rule.Listener{
 	FileLocal: true, FileEnter: CheckFile}
 

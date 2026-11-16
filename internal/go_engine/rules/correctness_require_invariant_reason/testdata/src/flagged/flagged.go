@@ -100,6 +100,16 @@ func recoverByAddress() {
 	}()
 }
 
+// A range loop that assigns to a recovered variable leaves it holding an element, not the recovered value.
+func rangedOverRecover(values []any) {
+	defer func() {
+		recovered := recover()
+		for recovered = range values {
+		}
+		panic(recovered) // want `This panic stops the process`
+	}()
+}
+
 func replace(target *any) {
 	*target = "replaced"
 }

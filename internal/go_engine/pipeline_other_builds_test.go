@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_else_return"
 )
@@ -74,12 +75,24 @@ func runOverNoted(
 	extra ...string,
 ) (*pipeline, string, string) {
 	test.Helper()
+	return runOverRegistered(test, root, wantExit, rules.All(), configure, extra...)
+}
+
+// runOverRegistered is runOverNoted with registered as the registry's rules, for a test that adds a rule of its own.
+func runOverRegistered(
+	test *testing.T,
+	root string,
+	wantExit int,
+	registered []rule.Rule,
+	configure func(*pipeline),
+	extra ...string,
+) (*pipeline, string, string) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
-	registered := rules.All()
 	ruleSettings, settingsError := loadSettings(request, registered)
 	if settingsError != nil {
 		test.Fatal(settingsError)
@@ -435,10 +448,12 @@ func withoutCache(stream string) string {
 // hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds, what each restored
 // from it, what its walk left untouched and visited, and what each wrote through to its own store
 // (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source, which are
-// what it did not restore, and that count load by load.
+// what it did not restore, and that count load by load, and the files and findings an extra build inherited from the
+// host for its syntax-only rules, which only a package it checks from source inherits (#y6q1x2j).
 var hostRestoreCounts = regexp.MustCompile(
 	`,"(entriesKept|restoredFromHost|untouched|visited|declinedAtLoad|declinedAtCheck|reloadRounds|writtenThrough|` +
-		`checkedFromSource)":[0-9]+|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}|,"checkedFromSourceRounds":\[[0-9,]*\]`)
+		`checkedFromSource|inheritedFiles|inheritedFindings)":[0-9]+|,"(declinedBy|reloadRoundsBy)":\{[^}]*\}|` +
+		`,"checkedFromSourceRounds":\[[0-9,]*\]`)
 
 // extraAnalyzedPackages is an extra build's record's count of the packages it analyzed, which its walk's untouched
 // packages leave out (#qbvtkfm), so a run that restores counts fewer than one that checks every package.

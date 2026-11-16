@@ -117,10 +117,12 @@ func walkFiles(started *startedRuns, files []inspector.Cursor) {
 	for _, fileCursor := range files {
 		// Checked as files were gathered, so the assertion holds.
 		file, _ := fileCursor.Node().(*ast.File)
-		// Each run's FileState is the file's from here through FileExit (see rule.FileState).
+		// Each run's FileState is the file's from here through FileExit (see rule.FileState). A run whose rule
+		// inherits the file hears none of it.
 		tokenFile := started.runs[0].pass.Fset.File(file.Pos())
 		for _, run := range started.runs {
-			run.context.EnterFile(tokenFile)
+			run.skipping = run.inherited[tokenFile]
+			run.context.EnterFile(file, tokenFile)
 			run.fileEnter(file)
 		}
 		// An empty list is every kind to the inspector, so listeners that list none, hearing only FileEnter and
@@ -132,7 +134,8 @@ func walkFiles(started *startedRuns, files []inspector.Cursor) {
 		}
 		for _, run := range started.runs {
 			run.fileExit(file)
-			run.context.EnterFile(nil)
+			run.context.EnterFile(nil, nil)
+			run.skipping = false
 		}
 	}
 }

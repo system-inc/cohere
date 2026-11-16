@@ -647,6 +647,14 @@
                                 "type": "integer",
                                 "description": "The packages this build restored from the host's run whose entry it wrote to its own findings cache once their restore held, so its next run hits them there rather than check them from source. Absent when 0, and always under --no-cache, which writes nothing."
                             },
+                            "inheritedFiles": {
+                                "type": "integer",
+                                "description": "The distinct files this build took the host's findings of at least one syntax-only rule on, rather than walk them again in a package it checked from source. Absent when 0, and always under --timing, which restores nothing from the host's run."
+                            },
+                            "inheritedFindings": {
+                                "type": "integer",
+                                "description": "The findings this build took from the host's run on the files it inherited, each rule's on each file once. Absent when 0."
+                            },
                             "loadMilliseconds": {
                                 "type": "integer",
                                 "description": "This build's wall time loading the workspace, every reload included. Absent when 0."

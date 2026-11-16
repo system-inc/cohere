@@ -146,6 +146,13 @@ type BuildRecord struct {
 	// Written only when not 0, so a run under `--no-cache` writes none.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
 
+	// InheritedFiles counts the distinct files an extra build took the host's findings of at least one syntax-only
+	// rule on, rather than walk them again in a package it checked from source (#y6q1x2j), and InheritedFindings the
+	// findings it took, each rule's on each file once. A build that restores nothing from the host's run, as under
+	// `--timing`, inherits nothing. Each is written only when not 0.
+	InheritedFiles    int `json:"inheritedFiles,omitempty"`
+	InheritedFindings int `json:"inheritedFindings,omitempty"`
+
 	// LoadMilliseconds is the build's wall time loading the workspace and LintMilliseconds running the rules over it,
 	// every reload's included, so a run can be read build by build. DecideMilliseconds is the time an extra build spent
 	// deciding which packages restore from the host's run, summed across the goroutines that decided, so it can exceed

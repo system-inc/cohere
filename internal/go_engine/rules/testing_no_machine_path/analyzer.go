@@ -29,14 +29,16 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/testing-no-machine-path"
 
-// listener reads the file's comments as the syntax dispatcher's walk enters each _test.go file, and hears every
-// literal in it.
+// listener reads the file's comments as the syntax dispatcher's walk enters each _test.go file, and hears every literal
+// in it. It is SyntaxOnly: the file's own name, its literals, its comments through the comment indexes and its lines
+// through the line table decide every finding on it (#y6q1x2j).
 var listener = rule.Listener{
-	FileLocal: true,
-	Requires:  []*analysis.Analyzer{marker.Analyzer, positions.Analyzer},
-	FileEnter: enterFile,
-	Nodes:     []ast.Node{(*ast.BasicLit)(nil)},
-	Node:      judgeLiteral,
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Requires:   []*analysis.Analyzer{marker.Analyzer, positions.Analyzer},
+	FileEnter:  enterFile,
+	Nodes:      []ast.Node{(*ast.BasicLit)(nil)},
+	Node:       judgeLiteral,
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.

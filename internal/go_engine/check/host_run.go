@@ -3,12 +3,15 @@ package check
 import (
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // HostRun is what the host's run keeps for the extra builds to restore packages from: each package's entry by ID, the
@@ -27,6 +30,11 @@ type HostRun struct {
 
 	// kept is how many entries the run kept, which outlives Release (EntriesKept).
 	kept int
+
+	// holders is the IDs of the kept packages that compiled each file, by the file's name, sorted, made once a run by
+	// the first build to ask (holdersOf).
+	holdersOnce sync.Once
+	holders     map[string][]string
 }
 
 // EntriesKept counts the packages the host's run kept an entry of for the extra builds.
@@ -48,6 +56,7 @@ func (host *HostRun) Release() {
 	host.entries = nil
 	host.renderings = nil
 	host.known = nil
+	host.holders = nil
 }
 
 // Keeping is the time the host's run spent keeping its packages for the extra builds, over every load: the keys a run
@@ -75,4 +84,35 @@ func importPaths(importer *packages.Package) []string {
 	}
 	slices.Sort(paths)
 	return paths
+}
+
+// Inheritance is an extra build's take of host for the rules enabled, nil when host kept nothing, as under `--timing`.
+// Whether a rule inherits is its own to ask: a listener marked SyntaxOnly asks through its dispatcher, and a
+// syntax-only walk through rule.SyntaxOnlyRun, and no other rule asks at all.
+func (host *HostRun) Inheritance(enabled []rule.Rule) *HostInheritance {
+	if host == nil {
+		return nil
+	}
+	analyzerOf := make(map[string]*analysis.Analyzer, len(enabled))
+	for _, each := range enabled {
+		analyzerOf[each.Name] = each.Analyzer
+	}
+	return &HostInheritance{host: host, analyzerOf: analyzerOf, taken: map[inheritedKey]int{}}
+}
+
+// holdersOf is the IDs of the host's kept packages that compiled filename, sorted, read from an index of every kept
+// entry's files made once a run, the first time any build asks.
+func (host *HostRun) holdersOf(filename string) []string {
+	host.holdersOnce.Do(func() {
+		host.holders = map[string][]string{}
+		for identifier, kept := range host.entries {
+			for _, compiled := range kept.compiledFiles {
+				host.holders[compiled] = append(host.holders[compiled], identifier)
+			}
+		}
+		for _, identifiers := range host.holders {
+			slices.Sort(identifiers)
+		}
+	})
+	return host.holders[filename]
 }

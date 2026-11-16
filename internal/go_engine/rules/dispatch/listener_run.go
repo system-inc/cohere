@@ -3,6 +3,7 @@ package dispatch
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"runtime"
 	"strings"
 	"time"
@@ -37,6 +38,12 @@ type listenerRun struct {
 	diagnostics []analysis.Diagnostic
 	crash       error
 
+	// inherited is the files the run's rule takes the host's findings on rather than hear (rule.InheritedFiles), nil
+	// for a rule that inherits none, and skipping is whether the file the walk is in is one of them, when the run hears
+	// none of its calls.
+	inherited map[*token.File]bool
+	skipping  bool
+
 	// timing is the run's collector under `--timing`, nil otherwise, when each call is the listener's call alone, at
 	// the cost of reading this field. cpu and calls are what the measured calls cost over the package, which finish
 	// bills to the rule and takes out of the dispatcher's own row.
@@ -48,17 +55,22 @@ type listenerRun struct {
 // newListenerRun is registered's listener ready to hear pass's package, with a context of its own whose findings
 // collect on the run, judging generated files by isGenerated, and each call measured into collector when it is set.
 // A fileLocal run hears only some of the package's files, a shard of a large package's, and its context's State
-// panics (see rule.Listener.FileLocal).
+// panics (see rule.Listener.FileLocal). A listener marked SyntaxOnly always has a syntax-only context, on every build,
+// and hears none of the inherited files, whose findings are the host's.
 func newListenerRun(
 	registered *registeredRule,
 	pass *analysis.Pass,
 	isGenerated func(string) bool,
 	collector *timing.Collector,
 	fileLocal bool,
+	inherited map[*token.File]bool,
 ) *listenerRun {
-	run := &listenerRun{registered: registered, pass: pass, timing: collector}
+	run := &listenerRun{registered: registered, pass: pass, timing: collector, inherited: inherited}
 	newContext := rule.NewContext
-	if fileLocal {
+	switch {
+	case registered.listener.SyntaxOnly:
+		newContext = rule.NewSyntaxOnlyContext
+	case fileLocal:
 		newContext = rule.NewFileLocalContext
 	}
 	run.context = newContext(registered.name, pass, registered.listener.Requires, &registered.analyzer.Flags,
@@ -113,7 +125,7 @@ func (run *listenerRun) functionExit(function *intermediate_representation.Funct
 
 // fileEnter calls the listener's FileEnter as the walk enters file.
 func (run *listenerRun) fileEnter(file *ast.File) {
-	if run.crash != nil || run.registered.listener.FileEnter == nil {
+	if run.crash != nil || run.skipping || run.registered.listener.FileEnter == nil {
 		return
 	}
 	defer run.recoverCrash()
@@ -126,7 +138,7 @@ func (run *listenerRun) fileEnter(file *ast.File) {
 
 // fileExit calls the listener's FileExit as the walk leaves file.
 func (run *listenerRun) fileExit(file *ast.File) {
-	if run.crash != nil || run.registered.listener.FileExit == nil {
+	if run.crash != nil || run.skipping || run.registered.listener.FileExit == nil {
 		return
 	}
 	defer run.recoverCrash()

@@ -16,6 +16,10 @@ type startedRuns struct {
 	// notStarted is the outcome of each rule of the run whose listener was not started because something it
 	// requires failed on the package.
 	notStarted Result
+	// inherited is, for each started rule marked SyntaxOnly that inherits a file of the package, those files and the
+	// host's findings on them, which its outcome reports after its own (rule.InheritedFiles). Only the runs over the
+	// whole package hold them, however the package is split, so each is reported once.
+	inherited map[string]inheritedTake
 	// timing is the run's collector under `--timing`, which the checker hands the pass under rule.Timed, nil
 	// otherwise, and dispatcher is the name of the dispatcher's own analyzer, whose row finish takes the listeners'
 	// calls out of.

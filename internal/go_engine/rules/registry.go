@@ -244,29 +244,38 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
 )
 
-// syntaxOnly names the passes that read no type information, decided by reading each pass's source at
-// x/tools v0.49.0 and staticcheck v0.8.1, and still true at v0.50.0, which go.mod requires: the four vet passes
-// below are byte-identical between the two. Every other pass in vet's suite reads pass.TypesInfo, the ports of
+// typeFree names the borrowed passes that read no type information, which the registry says of them as TypeAware
+// false, for the docs, and which a syntax-only walk must be (rule.ValidateSyntaxOnlyWalk). It says nothing of whether
+// a pass's findings on a file are the file's alone: that is the SyntaxOnly mark, on a listener or in syntaxOnlyWalks,
+// which a pass here may lack, as unreachable does. Every other pass in vet's suite reads pass.TypesInfo, the ports of
 // nilness and unusedwrite read the engine's own intermediate representation built from it, and staticcheck's checks
-// read it through the helpers they share (analysis/code, pattern, buildir). A pass missing from this table counts as
-// type aware, so a pass a newer release adds is never described as running without types before someone has read it.
-var syntaxOnly = map[string]bool{
-	// buildtag reads build constraint lines from the files' comments and text.
+// read it through the helpers they share. A pass missing from this table counts as type aware, so a pass a newer
+// release adds is never described as running without types before someone has read it.
+var typeFree = map[string]bool{
+	// buildtag reads build constraint lines from its files' comments and text, its other and ignored files' among
+	// them.
 	"buildtag": true,
-	// directive reads `//go:debug` lines from the files' comments and text.
+	// directive reads `//go:debug` lines from its files' comments and text, its other and ignored files' among them.
 	"directive": true,
-	// framepointer reads assembly files, and of the package only its import path, which a load without
-	// types also has.
+	// framepointer reads assembly files, and of the package only its import path, which a load without types also
+	// has.
 	"framepointer": true,
-	// unreachable walks the syntax tree for statements after a terminating one.
+	// unreachable walks each function's syntax for statements after a terminating one, and every file of the package
+	// for a `panic` the package declares itself, so it reads no types and is still not SyntaxOnly.
 	"unreachable": true,
-	// SA9009 reads comments for a directive indented out of effect.
+	// SA9009 reads comments for a directive indented out of effect. Like every port below, it reports through
+	// staticcheck_report's version gate, which reads of the type checker only the Go versions it recorded for the file
+	// and the package, the file's `//go:build` line and the module's go line, and no type information. SA9009 and
+	// ST1018 are SyntaxOnly, so the gate reads those versions as their syntax-only context carries them.
 	"SA9009": true,
-	// ST1001 reads import declarations for a dot import, and of a file only its name, to allow one in a test.
+	// ST1001 reads import declarations for a dot import, a file's own name, to allow one in a test, and staticcheck's
+	// configuration. It is not SyntaxOnly: the configuration's directory, and FilterGenerated's judgment of a finding's
+	// display file, are read past the file.
 	"ST1001": true,
 	// ST1018 reads string literals for control and format characters.
 	"ST1018": true,
-	// ST1019 reads import declarations for a package imported twice.
+	// ST1019 reads import declarations for a package imported twice. It is not SyntaxOnly, for FilterGenerated, as
+	// ST1001 is not.
 	"ST1019": true,
 }
 
@@ -690,7 +699,7 @@ func portedRule(analyzer *analysis.Analyzer, origin rule.Origin) rule.Rule {
 		Name:         rule.Namespace + analyzer.Name,
 		Origin:       origin,
 		UpstreamName: analyzer.Name,
-		TypeAware:    !syntaxOnly[analyzer.Name],
+		TypeAware:    !typeFree[analyzer.Name],
 		Analyzer:     analyzer,
 	}
 }
