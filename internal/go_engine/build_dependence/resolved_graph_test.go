@@ -2,8 +2,12 @@ package build_dependence
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"go/types"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -92,6 +96,135 @@ func TestABuildAsksOfEachObjectOnce(test *testing.T) {
 			}
 		}
 	}
+}
+
+// parsedPackage is the package identifier of files, each a name and its source, parsed and checked here with no loader,
+// as AddPackage takes a loaded package: what a //line directive makes of a file is the parser's, which a fixture
+// module's load would give alike.
+func parsedPackage(test *testing.T, identifier string, files [][2]string) *packages.Package {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	var syntax []*ast.File
+	for _, file := range files {
+		parsed, parseError := parser.ParseFile(fileSet, file[0], file[1], parser.ParseComments)
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		syntax = append(syntax, parsed)
+	}
+	information := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{},
+		Uses: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{},
+		Instances: map[*ast.Ident]types.Instance{}, Implicits: map[ast.Node]types.Object{}}
+	checked, checkError := (&types.Config{}).Check("example.com/"+identifier, fileSet, syntax, information)
+	if checkError != nil {
+		test.Fatal(checkError)
+	}
+	return &packages.Package{ID: identifier, PkgPath: "example.com/" + identifier, Fset: fileSet, Syntax: syntax,
+		Types: checked, TypesInfo: information}
+}
+
+// expectUnitsFoundAsByMaps fails for every place in graph's units, each one's start, the offsets just inside and
+// past its ends, and offsets before and after every unit, where unitStartingAt or unitContaining answers other than
+// the maps the resolution held before its file table: one from each unit's package, file and start to the last unit
+// written there, and one from each file to its units in the graph's order, searched for the last unit starting at or
+// before the offset.
+func expectUnitsFoundAsByMaps(test *testing.T, label string, graph *Graph) {
+	test.Helper()
+	resolved := graph.resolve()
+	unitIndex := map[unitPlace]int{}
+	fileUnits := map[fileKey][]int{}
+	for index := range resolved.unitCount() {
+		file := fileKey{packageIdentifier: resolved.packages[resolved.unitPackage[index]].identifier,
+			file: resolved.files.names[resolved.unitFile[index]]}
+		unitIndex[unitPlace{file: file, offset: int(resolved.unitStart[index])}] = index
+		fileUnits[file] = append(fileUnits[file], index)
+	}
+	containing := func(file fileKey, offset int) (int, bool) {
+		inFile := fileUnits[file]
+		position := sort.Search(len(inFile), func(index int) bool {
+			return int(resolved.unitStart[inFile[index]]) > offset
+		}) - 1
+		if position < 0 || offset >= int(resolved.unitEnd[inFile[position]]) {
+			return 0, false
+		}
+		return inFile[position], true
+	}
+	for file, units := range fileUnits {
+		offsets := []int{0, 1 << 20}
+		for _, index := range units {
+			start, end := int(resolved.unitStart[index]), int(resolved.unitEnd[index])
+			offsets = append(offsets, start-1, start, start+1, end-1, end, end+1)
+		}
+		for _, offset := range offsets {
+			wantIndex, wantFound := unitIndex[unitPlace{file: file, offset: offset}]
+			gotIndex, gotFound := resolved.unitStartingAt(file.packageIdentifier, file.file, offset)
+			if gotIndex != wantIndex || gotFound != wantFound {
+				test.Errorf("%s: %s %s:%d starts unit %d (%t), want %d (%t)", label, file.packageIdentifier, file.file,
+					offset, gotIndex, gotFound, wantIndex, wantFound)
+			}
+			wantIndex, wantFound = containing(file, offset)
+			gotIndex, gotFound = resolved.unitContaining(file.packageIdentifier, file.file, offset)
+			if gotIndex != wantIndex || gotFound != wantFound {
+				test.Errorf("%s: %s %s:%d is in unit %d (%t), want %d (%t)", label, file.packageIdentifier, file.file,
+					offset, gotIndex, gotFound, wantIndex, wantFound)
+			}
+		}
+	}
+}
+
+// unitPlace is a unit's place as the resolution's map from places held it: its file and its start offset.
+type unitPlace struct {
+	file   fileKey
+	offset int
+}
+
+// A file's units are found as the resolution's maps found them however //line directives place them. One file whose
+// directives switch between two names interleaves those files' units, so the file table keeps an order of its own;
+// two files parsed that name one file put that file's units out of start order, at starts that meet, so UnitDependent
+// reads each of them; and the layout fixture, every file's units together and in order, keeps neither. UnitDependent
+// answers for a unit of a file only the host compiles, a name //line gave, by that unit's verdict.
+func TestUnitsAreFoundAsByMapsWhereverLineDirectivesPlaceThem(test *testing.T) {
+	test.Parallel()
+
+	interleaved := NewGraph()
+	interleaved.AddPackage(parsedPackage(test, "interleaved", [][2]string{{"generated.go",
+		"package interleaved\n\n//line alpha.go:1\nfunc AlphaOne() {}\n\n//line beta.go:1\nfunc BetaOne() {}\n\n" +
+			"//line alpha.go:10\nfunc AlphaTwo() {}\n\n//line beta.go:10\nfunc BetaTwo() {}\n"}}), true)
+	if resolved := interleaved.resolve(); resolved.files.unitOrder == nil || !resolved.files.inStartOrder {
+		test.Errorf("interleaved: want an order of the file table's own, its files in start order, got order %v, "+
+			"in start order %t", resolved.files.unitOrder, resolved.files.inStartOrder)
+	}
+	expectUnitsFoundAsByMaps(test, "interleaved", interleaved)
+	dependence := interleaved.Against(Difference{Packages: map[string]PackageDifference{
+		"interleaved": {HostOnlyFiles: []string{"alpha.go"}}}})
+	for index, unit := range dependence.Units() {
+		if got := dependence.UnitDependent(unit.PackageId, unit.File, unit.Start); got != (unit.File == "alpha.go") {
+			test.Errorf("interleaved: unit %d, %s:%d, dependent %t", index, unit.File, unit.Start, got)
+		}
+	}
+
+	shared := NewGraph()
+	sharedSource := func(names ...string) string {
+		source := "package shared\n\n//line shared.go:1\n"
+		for _, name := range names {
+			source += "func " + name + "() {}\n"
+		}
+		return source
+	}
+	shared.AddPackage(parsedPackage(test, "shared", [][2]string{{"first.go", sharedSource("One", "Two", "Three")},
+		{"second.go", sharedSource("Uno", "Dos")}}), true)
+	if resolved := shared.resolve(); resolved.files.unitOrder != nil || resolved.files.inStartOrder {
+		test.Errorf("shared: want no order of the file table's own, its file out of start order, got order %v, in "+
+			"start order %t", resolved.files.unitOrder, resolved.files.inStartOrder)
+	}
+	expectUnitsFoundAsByMaps(test, "shared", shared)
+
+	layout := graphOf(loadFixture(test, "layout", hostBuild), nil)
+	if resolved := layout.resolve(); resolved.files.unitOrder != nil || !resolved.files.inStartOrder {
+		test.Errorf("layout: want no order of the file table's own, every file in start order, got order %v, in "+
+			"start order %t", resolved.files.unitOrder, resolved.files.inStartOrder)
+	}
+	expectUnitsFoundAsByMaps(test, "layout", layout)
 }
 
 // chainLoad is the build-facts-chain fixture of the engine's testdata, its own module, loaded whole under build with
