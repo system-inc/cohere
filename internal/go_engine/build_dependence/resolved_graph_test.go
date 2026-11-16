@@ -86,6 +86,41 @@ func TestAnExternalReadIsJudgedByWhatItReachesThroughItsType(test *testing.T) {
 	}
 }
 
+// Two decoded objects of packages the graph does not hold that share a local name are two external objects, each
+// answered by its own path (#gf9qrzf): unit First reads Shared of example.com/first, which DependentName sets, and
+// unit Second reads Shared of example.com/second, which it does not. First is dependent and Second is not; keyed by
+// the local name alone, the two would share First's answer.
+func TestTwoExternalObjectsOfOneLocalNameAreAnsweredApart(test *testing.T) {
+	test.Parallel()
+
+	path := "example.com/sharing"
+	record := &packageRecord{identifier: "sharing", path: path, imports: map[string]string{},
+		objects: []recordedObject{{path: "example.com/first", local: "Shared"},
+			{path: "example.com/second", local: "Shared"}}}
+	record.units = []recordedUnit{
+		{file: "sharing.go", start: 10, end: 20, nodes: 3, declares: []recordedObject{{path: path, local: "First"}},
+			reads: []recordedRead{{target: 0}}},
+		{file: "sharing.go", start: 30, end: 40, nodes: 3, declares: []recordedObject{{path: path, local: "Second"}},
+			reads: []recordedRead{{target: 1}}},
+	}
+	graph := NewGraph()
+	graph.add(record)
+	if external := len(graph.resolve().externalObjects); external != 2 {
+		test.Errorf("want two external objects, one for each path, got %d", external)
+	}
+	dependence := graph.Against(Difference{
+		DependentObject: func(object types.Object) (bool, bool) { return false, false },
+		DependentName: func(path string, local string) (bool, bool, bool) {
+			return path == "example.com/first", false, true
+		},
+	})
+	for start, want := range map[int]bool{10: true, 30: false} {
+		if got := dependence.UnitDependent("sharing", "sharing.go", start); got != want {
+			test.Errorf("sharing.go:%d: want dependent %t, got %t", start, want, got)
+		}
+	}
+}
+
 // A build's judgment asks its DependentObject once per object, whether a unit reads the object or ObjectBits meets it
 // after, and its DependentName once per name: the layout fixture's workspace, restored from export data, judged on
 // linux by its dependency's graph, from its live packages and from their records read back, then asked ObjectBits of
