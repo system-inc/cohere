@@ -234,16 +234,15 @@ func TestAPlatformLoadIsMadeForEachCallAndKeptByNone(test *testing.T) {
 	freed := make(chan struct{})
 	runtime.AddCleanup(first, func(done chan struct{}) { close(done) }, freed)
 	first = nil
-	deadline := time.Now().Add(10 * time.Second)
+	// The test waits on the cleanup alone, collecting between looks, never on a clock: a 10 s deadline read a loaded
+	// machine as a kept load (#f0h29a2). A load still reachable keeps it waiting until go test's own timeout, which
+	// names the test.
 	for waiting := true; waiting; {
 		runtime.GC()
 		select {
 		case <-freed:
 			waiting = false
 		case <-time.After(10 * time.Millisecond):
-			if time.Now().After(deadline) {
-				test.Fatal("a platform load its reader let go was still reachable after 10s of collections")
-			}
 		}
 	}
 	runtime.KeepAlive(loadPlatform)

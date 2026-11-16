@@ -29,17 +29,16 @@ func (setter *limitSetter) limits() []int64 {
 	return slices.Clone(setter.set)
 }
 
-// waitFor waits until done holds, failing after 10 seconds: a finalizer runs on the finalizer goroutine some time after
-// runtime.GC returns, and nothing says when.
+// waitFor waits until done holds: a finalizer runs on the finalizer goroutine some time after runtime.GC returns, and
+// nothing says when. It waits on that event alone, never on a clock, since a 10 s deadline read a loaded machine as a
+// finalizer that never ran (#f0h29a2, #6r36ahd); one that truly never runs keeps the test waiting until go test's own
+// timeout, which names what it waited for in the stack.
 func waitFor(test *testing.T, what string, done func() bool) {
 	test.Helper()
-	deadline := time.Now().Add(10 * time.Second)
 	for !done() {
-		if time.Now().After(deadline) {
-			test.Fatalf("waited 10s for %s", what)
-		}
 		time.Sleep(time.Millisecond)
 	}
+	test.Logf("waited for %s", what)
 }
 
 // Not parallel: it turns the collector's automatic collections off for the whole process and counts collections, so

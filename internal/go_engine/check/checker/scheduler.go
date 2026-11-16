@@ -352,12 +352,17 @@ func (scheduler *scheduler) work() {
 			scheduler.executing++
 			scheduler.lock.Unlock()
 			// The run's pool, when there is one, bounds the actions of every build at once; a worker holds no other
-			// slot, and its action never waits on one (see schedule), so taking it here cannot deadlock.
-			if pool := scheduler.options.Pool; pool != nil {
+			// slot, and its action never waits on one (see schedule), so taking it here cannot deadlock. An action that
+			// only restores takes none (restoresOnly).
+			pool := scheduler.options.Pool
+			if next.action.restoresOnly() {
+				pool = nil
+			}
+			if pool != nil {
 				pool.Acquire(bounded.ScaledPriority(next.group.priority, scheduler.longest))
 			}
 			next.action.exec()
-			if pool := scheduler.options.Pool; pool != nil {
+			if pool != nil {
 				pool.Release()
 			}
 			scheduler.lock.Lock()
