@@ -5,7 +5,9 @@ import (
 	"strings"
 )
 
-// Vocabulary is the file turned into the tables each phase walks.
+// Vocabulary is the file turned into the tables each phase reads: Find walks the suffix and segment tables in order,
+// and answers both prefix phases from an index of EarlyPrefixes and LatePrefixes by abbreviation (prefixEntry), never
+// walking those two.
 //
 // The tables are exported for the engines that build their own lookups from them, like the TypeScript rule's
 // candidate gate, and for the tests that pin their order. They are read, never written: every engine shares the one
