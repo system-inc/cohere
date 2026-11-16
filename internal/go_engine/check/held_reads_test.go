@@ -87,7 +87,7 @@ func TestUnreadablePersistedReadsAreDeclined(test *testing.T) {
 			func() (bool, string) { return TypesHold(restoring, linux.closure, nil, host, linux.build) },
 			func() (bool, string) {
 				ReadFactTypes(restoring)
-				return FactsHold(restoring, linux.closure, host, linux.build, linux.fact, allFactTypes)
+				return FactsHold(restoring, closureLookupOf(linux.closure), host, linux.build, linux.fact, allFactTypes)
 			},
 		} {
 			func() {

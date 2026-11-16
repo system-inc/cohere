@@ -20,6 +20,16 @@ import (
 // package at owner, or on that package itself when path is empty, and whether there is one.
 type FactLookup func(owner string, path objectpath.Path, factType reflect.Type) (analysis.Fact, bool)
 
+// ClosureLookup is the types of the package at path among those a judged package reaches in a build through its
+// imports, nil when it reaches none there: load.ClosureTypes read at path, asked of a map (closureLookupOf) or of the
+// build's closure index (closureIndex.typesOf).
+type ClosureLookup func(path string) *types.Package
+
+// closureLookupOf is closure, load.ClosureTypes's map, asked as a ClosureLookup.
+func closureLookupOf(closure map[string]*types.Package) ClosureLookup {
+	return func(path string) *types.Package { return closure[path] }
+}
+
 // ReadsBuild is what the verdicts on packages' reads compute of one build's types, the host's or an extra build's
 // (linux, windows, freebsd), memoized for the build, so every package's verdict renders each object once (#b2t9xmf).
 // Which packages a verdict asks of is the judged package's own (see TypesHold), since a test variant sees its
@@ -546,7 +556,7 @@ func TypesHold(
 	if restoring.Assembly {
 		judgedHost, judgedBuild = host.wholeTwin(), build.wholeTwin()
 	}
-	judged := verdict{host: judgedHost, build: judgedBuild, closure: closure, restored: restored,
+	judged := verdict{host: judgedHost, build: judgedBuild, closure: closureLookupOf(closure), restored: restored,
 		methods: &verdictClosures{host: map[*types.Package]*gatheredClosure{}}}
 	closureOnly := restoring.Assembly || restoring.Reads.ClosureOnly() != ""
 	for _, use := range restoring.Reads.Uses() {
@@ -578,7 +588,7 @@ func TypesHold(
 // which read types every action asked.
 func FactsHold(
 	restoring Restoring,
-	closure map[string]*types.Package,
+	closure ClosureLookup,
 	host *ReadsBuild,
 	build *ReadsBuild,
 	fact FactLookup,

@@ -13,11 +13,14 @@ import (
 
 // HostRun is what the host's run keeps for the extra builds to restore packages from: each package's entry by ID, the
 // renderings the verdicts make of the host's types, shared by every build, and the digests of the files its keys
-// hashed, which an extra build's keys read rather than hash again.
+// hashed, which an extra build's keys read rather than hash again. known is what the host's session knows of its
+// analyzers, which each entry's shared decode reads (hostEntry.decoded), and which a build's own must decode alike for
+// the build to share it (decodesAlike).
 type HostRun struct {
 	entries    map[string]*hostEntry
 	renderings *ReadsBuild
 	files      cache.FileDigests
+	known      *cacheAnalyzers
 
 	// keeping is the time the run spent keeping its packages for the extra builds over every load (Keeping).
 	keeping time.Duration
@@ -36,14 +39,15 @@ func (host *HostRun) EntriesKept() int {
 
 // Release lets go of everything the host's run kept for the extra builds once the last of them has run, since no
 // build can ask for an entry, or a verdict render a host type, after that: the entries, with the host's types their
-// export data is written from, and the renderings, keyed by the host's objects (#b2t9xmf). What the record counts of
-// it stays.
+// export data is written from, each with its decode the builds shared (hostEntry.decoded), and the renderings, keyed by
+// the host's objects (#b2t9xmf). What the record counts of it stays.
 func (host *HostRun) Release() {
 	if host == nil {
 		return
 	}
 	host.entries = nil
 	host.renderings = nil
+	host.known = nil
 }
 
 // Keeping is the time the host's run spent keeping its packages for the extra builds, over every load: the keys a run
@@ -54,23 +58,6 @@ func (host *HostRun) Keeping() time.Duration {
 		return 0
 	}
 	return host.keeping
-}
-
-// hostEntry is one package the host's run kept: what a verdict judges it by, its portable digest, and its entry, its
-// body and its record (entryRecord), and export data, read from the store when the run wrote them there, or, under
-// `--no-cache`, which never stores them, held in memory: the entry encoded at the host's tail, and the export data,
-// most of the cost, written from the package's types only when a load first reads it, after the package's late
-// decision held, so a package no build restores never has it written (lazyExportData, #b2t9xmf). contents and the
-// reader it returns may be called from several goroutines at once.
-//
-// bodyAt is the key the host's record of it is under, when the run wrote it to the store, holding its body, which an
-// extra build writing the package through names rather than copy (#fq7dxvx); holdsBodyAt is whether there is one.
-type hostEntry struct {
-	restoring   Restoring
-	portable    cache.Key
-	contents    func() (body []byte, record entryRecord, readExportData func() ([]byte, error), readError error)
-	bodyAt      cache.Key
-	holdsBodyAt bool
 }
 
 // restoringOf is kept, a package of the host's run, as a verdict judges it: its path, its imports' paths, its name, its

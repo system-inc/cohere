@@ -41,7 +41,8 @@ func persistedTypesHold(
 	if held.record.Assembly {
 		judgedBuild = build.wholeTwin()
 	}
-	judged := verdict{build: judgedBuild, closure: closure, restored: restored, methods: &verdictClosures{}}
+	judged := verdict{build: judgedBuild, closure: closureLookupOf(closure), restored: restored,
+		methods: &verdictClosures{}}
 	for _, use := range held.record.Uses {
 		if holds, why := judged.persistedUseHolds(held, use); !holds {
 			return false, "T " + why
@@ -139,7 +140,7 @@ func (judged verdict) persistedSelectionHolds(held *heldReads, selection persist
 	// A lookup of an unexported name finds it only in its own package, the build's of the member's path.
 	var namedIn *types.Package
 	if member := held.object(selection.Selected); member.Owner != 0 {
-		namedIn = judged.closure[held.owner(member.Owner)]
+		namedIn = judged.closure(held.owner(member.Owner))
 	}
 	selected, index, _ := types.LookupFieldOrMethod(found.Type(), true, namedIn, selection.Name)
 	switch {
@@ -304,7 +305,7 @@ func (judged verdict) persistedMethodJudgment(
 		stored := held.object(lookup.Answer)
 		owner := held.owner(stored.Owner)
 		judgment.answer = answerInBuild{name: held.objectName(lookup.Answer), isMethod: lookup.AnswerIsMethod,
-			hostLines: lookup.AnswerLines, restored: stored.Owner != 0 && judged.restored[judged.closure[owner]]}
+			hostLines: lookup.AnswerLines, restored: stored.Owner != 0 && judged.restored[judged.closure(owner)]}
 		switch {
 		case judgment.answer.restored:
 		case stored.Owner == 0:
@@ -352,7 +353,7 @@ func (judged verdict) samePersisted(held *heldReads, reference int, buildObject 
 // a type no analyzer of the build learns can never be asked, and declines whatever factTypes holds.
 func persistedFactsHold(
 	restoring Restoring,
-	closure map[string]*types.Package,
+	closure ClosureLookup,
 	build *ReadsBuild,
 	fact FactLookup,
 	factTypes map[reflect.Type]bool,

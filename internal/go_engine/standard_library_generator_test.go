@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"os/exec"
@@ -372,11 +373,6 @@ func TestTheCheckRecomputesEveryEntryOfTheTable(test *testing.T) {
 			copied[firstKey] = cache.StandardLibraryEntry{Entry: encoded.Bytes(),
 				ExportData: copied[firstKey].ExportData, Reads: copied[firstKey].Reads}
 		}), says: "its output digest differs"},
-		"another package's export data": {table: changed(func(copied map[cache.Key]cache.StandardLibraryEntry,
-			_ *[]cache.StandardLibraryVariant) {
-			copied[firstKey] = cache.StandardLibraryEntry{Entry: copied[firstKey].Entry,
-				ExportData: copied[secondKey].ExportData, Reads: copied[firstKey].Reads}
-		}), says: "1 differ"},
 		"another package's persisted reads": {table: changed(func(copied map[cache.Key]cache.StandardLibraryEntry,
 			_ *[]cache.StandardLibraryVariant) {
 			copied[firstKey] = cache.StandardLibraryEntry{Entry: copied[firstKey].Entry,
@@ -404,6 +400,88 @@ func TestTheCheckRecomputesEveryEntryOfTheTable(test *testing.T) {
 		if exitCode == exitClean || !strings.Contains(standardOutput+standardError, failing.says) {
 			test.Errorf("%s: want the check to fail saying %q, exit %d\n%s\n%s", name, failing.says, exitCode,
 				standardOutput, standardError)
+		}
+	}
+	expectSwappedExportDataFails(test, entries, firstKey, changed(func(copied map[cache.Key]cache.StandardLibraryEntry,
+		_ *[]cache.StandardLibraryVariant) {
+		copied[firstKey] = cache.StandardLibraryEntry{Entry: copied[firstKey].Entry,
+			ExportData: copied[secondKey].ExportData, Reads: copied[firstKey].Reads}
+	}))
+}
+
+// expectSwappedExportDataFails fails unless the check fails on swapped, entries' table with the entry under firstKey
+// holding another package's export data, exactly as it guarantees (#etpzxm3): the swapped entry differs, and so may
+// any entry that imports the swapped package, directly or through what it imports, by the table's own entries, since
+// shallow export data is read against the other entries of its variant, and no other; the count the check prints is
+// exactly the entries it names. On linux/amd64 eight entries differ where darwin/arm64 has one, so no count is pinned.
+func expectSwappedExportDataFails(
+	test *testing.T,
+	entries map[cache.Key]cache.StandardLibraryEntry,
+	firstKey cache.Key,
+	swapped []byte,
+) {
+	test.Helper()
+	pathOf := func(key cache.Key) string {
+		var entry tableEntry
+		if decodeError := gob.NewDecoder(bytes.NewReader(entries[key].Entry)).Decode(&entry); decodeError != nil {
+			test.Fatal(decodeError)
+		}
+		return entry.PackagePath
+	}
+	swappedPath := pathOf(firstKey)
+	importsOf := map[string][]string{}
+	for _, entry := range entries {
+		var decoded tableEntry
+		if decodeError := gob.NewDecoder(bytes.NewReader(entry.Entry)).Decode(&decoded); decodeError != nil {
+			test.Fatal(decodeError)
+		}
+		importsOf[decoded.PackagePath] = decoded.Imports
+	}
+	// reaches reports whether from imports target, directly or through what it imports, by the table's own entries.
+	reaches := func(from string, target string) bool {
+		seen := map[string]bool{from: true}
+		pending := []string{from}
+		for len(pending) > 0 {
+			current := pending[len(pending)-1]
+			pending = pending[:len(pending)-1]
+			for _, imported := range importsOf[current] {
+				if imported == target {
+					return true
+				}
+				if !seen[imported] {
+					seen[imported] = true
+					pending = append(pending, imported)
+				}
+			}
+		}
+		return false
+	}
+	exitCode, standardOutput, standardError := verifiedTable(test, swapped)
+	label := variantLabel(localVariant(test, "")) + ": "
+	checked, differ, holds, counted := 0, 0, 0, false
+	for line := range strings.Lines(standardOutput) {
+		if rest, isVariant := strings.CutPrefix(line, label); isVariant {
+			_, scanError := fmt.Sscanf(rest, "%d checked, %d differ, of the %d", &checked, &differ, &holds)
+			counted = scanError == nil
+		}
+	}
+	differing := map[string]bool{}
+	for line := range strings.Lines(standardError) {
+		if rest, isVariant := strings.CutPrefix(line, label); isVariant {
+			if packagePath, _, isPackage := strings.Cut(rest, ": "); isPackage {
+				differing[packagePath] = true
+			}
+		}
+	}
+	if exitCode == exitClean || !counted || differ != len(differing) || !differing[swappedPath] {
+		test.Fatalf("another package's export data under %s: want the check to fail naming it among exactly the "+
+			"entries it counts, exit %d, %d differ, naming %v\n%s\n%s", swappedPath, exitCode, differ,
+			slices.Sorted(maps.Keys(differing)), standardOutput, standardError)
+	}
+	for packagePath := range differing {
+		if packagePath != swappedPath && !reaches(packagePath, swappedPath) {
+			test.Errorf("another package's export data under %s: %s differs, and imports nothing that reaches %s",
+				swappedPath, packagePath, swappedPath)
 		}
 	}
 }

@@ -264,10 +264,21 @@ func (session *CacheSession) restoreFromHost(
 	}
 	// The entries are read, and decoded, on every core at once, as readHits reads the store's, and made hits in
 	// reachable's order after. Their export data is written only when the load reads it, in the package's own turn
-	// (lazyExportData). Each is decoded before the walk, which reads the answers it holds.
+	// (lazyExportData). Each is decoded before the walk, which reads the answers it holds: once a run, shared by every
+	// build whose analyzers decode alike (hostEntry.decoded), each build given a package and types of its own, the
+	// only part of it a build writes; a build whose analyzers differ decodes the entry itself.
 	read := make([]*restoredPackage, len(reading))
 	readErrors := make([]error, len(reading))
+	sharesDecode := decodesAlike(session.known, state.host.known)
 	session.fanOut(len(reading), func(index int) {
+		if sharesDecode {
+			shared, decodeError := readingKept[index].decoded()
+			if decodeError == nil {
+				read[index] = restoredForBuild(shared)
+			}
+			readErrors[index] = decodeError
+			return
+		}
 		body, record, readExportData, readError := readingKept[index].contents()
 		if readError == nil {
 			read[index], readError = decodeEntry(session.known, reading[index], body, record, readExportData)
@@ -513,23 +524,27 @@ func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []strin
 	if state == nil || len(state.restoring) == 0 {
 		return nil
 	}
-	exported := newBuildFacts(session, graphs)
 	// The candidates in ID order, so the writes below run in one order however the workers finish.
 	candidates := slices.SortedFunc(maps.Keys(state.restoring), func(left, right *packages.Package) int {
 		return strings.Compare(left.ID, right.ID)
 	})
+	// Indexed before the fan-out, so the workers only read it. It is FactsHold's walks of every candidate's closure,
+	// made once, so the time deciding counts it.
+	indexing := time.Now()
+	closures := newClosureIndex(candidates)
+	state.deciding.Add(int64(time.Since(indexing)))
+	exported := newBuildFacts(session, graphs, closures)
 	// Each candidate's why is its own: decided on every core at once, on the build's critical path, each written to its
 	// own index. A worker only reads what the analysis left, and the facts' memo, which gathers each owner once.
 	whys := make([]string, len(candidates))
 	session.fanOutDeciding(len(candidates), func(index int) {
 		candidate := candidates[index]
 		hosted := state.restoring[candidate]
-		hosted.lock.Lock()
-		why := hosted.declined
-		hosted.lock.Unlock()
-		if why == "" {
-			why = exported.factsHold(candidate, hosted.kept.restoring, state)
-		}
+		// No candidate here was declined by the load: a restore is made afresh for each load, its why is set at load
+		// only when its types do not hold (typesHoldFunction), and the load then declines it (load's decline), which
+		// drops it from restoring (declineAtLoad) before the load returns, so its facts and reads are always asked
+		// (#a6caffk).
+		why := exported.factsHold(candidate, hosted.kept, state)
 		if why == "" && (hosted.restored.readsIncomplete || !session.readsHold(candidate)) {
 			why = "A an answer it read of another package differs in the build, or cannot be named"
 		}
@@ -973,6 +988,11 @@ func (session *CacheSession) keepForBuilds(
 		host.entries[saved.ID].contents = func() ([]byte, entryRecord, func() ([]byte, error), error) {
 			return body, record, readExportData, nil
 		}
+	}
+	// Each entry is decoded the first time a build considers it, and never again by another (hostEntry.decoded).
+	host.known = session.known
+	for identifier, kept := range host.entries {
+		kept.decoded = decodeOnce(kept, identifier, session.known)
 	}
 	host.kept = len(host.entries)
 	// What the analysis built to answer questions, every package's intermediate representation, syntax and type maps,

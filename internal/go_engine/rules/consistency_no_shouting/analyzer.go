@@ -108,6 +108,9 @@ type commentSpan struct {
 // finding per word covering the word's bytes, so a fix lands on what shouted rather than the whole comment. marker is
 // the file's generated-code marker, or nil.
 func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Comment) {
+	if !anyCommentHasAdjacentUppercaseLetters(group) {
+		return
+	}
 	var joined strings.Builder
 	spans := []commentSpan{}
 	for _, comment := range group.List {
@@ -146,6 +149,19 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 			})
 		}
 	}
+}
+
+// anyCommentHasAdjacentUppercaseLetters is the shared gate asked of each comment's own text, before judgeGroup builds
+// the joined text it would otherwise ask, so a group with no two capitals in a row allocates nothing. It cannot change
+// a finding: each body is a piece of its comment's text with at most a note marker blanked, and the joined text puts a
+// newline between bodies, so two capitals in a row there are two capitals in a row in some comment's text.
+func anyCommentHasAdjacentUppercaseLetters(group *ast.CommentGroup) bool {
+	for _, comment := range group.List {
+		if shouting.HasAdjacentUppercaseLetters(comment.Text) {
+			return true
+		}
+	}
+	return false
 }
 
 // bodyOf is the text of comment the masks read, and where it starts in the comment's text, so a word maps back to the

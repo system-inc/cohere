@@ -14,7 +14,9 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
@@ -99,5 +101,62 @@ func TestRangeStringRunesMatchesStaticcheck(test *testing.T) {
 		if !slices.Equal(upstream, port) {
 			test.Errorf("%s reported\n%v\nand the port\n%v", original.Name, upstream, port)
 		}
+	}
+}
+
+// TestRangeStringRunesSkipsTheWalkWithoutAConversion holds RangeStringRunes to its look at the function's own
+// instructions before it walks the syntax: the fixture's genericUnion ranges over a conversion, but of no string to a
+// slice of runes, so it is never walked, and judging it allocates nothing, where the walk's closure is an allocation.
+//
+// Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would
+// add to.
+func TestRangeStringRunesSkipsTheWalkWithoutAConversion(test *testing.T) {
+	var context *rule.Context
+	var judged *intermediate_representation.Function
+	finder := &analysis.Analyzer{
+		Name:     "RangeStringRunesFunction",
+		Doc:      "finds the fixture's genericUnion and the context RangeStringRunes judges it in",
+		Requires: rangeStringRunesAnalyzer.Requires,
+		Run: func(pass *analysis.Pass) (any, error) {
+			built, readError := build_intermediate_representation.ResultOf(pass)
+			if readError != nil {
+				return nil, readError
+			}
+			passContext, contextError := staticcheck_report.PassContext(pass)
+			if contextError != nil {
+				return nil, contextError
+			}
+			context = passContext
+			for function := range built.SourceFunctions() {
+				if function.Name() == "genericUnion" {
+					judged = function
+				}
+			}
+			return nil, nil
+		},
+	}
+	directory := analysistest.TestData()
+	loaded, loadError := load.Packages(directory, []string{"range_string_runes"}, []string{
+		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
+	}, nil)
+	if loadError != nil {
+		test.Fatalf("loading range_string_runes: %v", loadError)
+	}
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{finder}, loaded.Roots, &checker.Options{})
+	if analyzeError != nil {
+		test.Fatalf("analyzing range_string_runes: %v", analyzeError)
+	}
+	for _, action := range graph.Roots {
+		if action.Err != nil {
+			test.Fatalf("running %s: %v", action, action.Err)
+		}
+	}
+	if judged == nil {
+		test.Fatal("the fixture's genericUnion was not among the package's source functions")
+	}
+	allocations := testing.AllocsPerRun(10, func() { staticcheck_code.RangeStringRunes(context, judged) })
+	if allocations != 0 {
+		test.Errorf("RangeStringRunes allocated %.0f times judging a function with no conversion to runes: it walked "+
+			"the syntax its instructions already ruled out", allocations)
 	}
 }

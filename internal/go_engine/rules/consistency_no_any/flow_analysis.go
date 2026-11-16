@@ -32,6 +32,8 @@ type flowAnalysis struct {
 	// reached are the methods of the packages the import closure reaches, one index to each in the order the walk
 	// first reached it, nil until a method is first asked about.
 	reached []*foreignMethods
+	// paired is the buffer valuesOf pairs values in, reused by every assignment, var declaration and return.
+	paired []flowingValue
 }
 
 // record notes every place the node at cursor hands a value on.
@@ -249,13 +251,18 @@ func (flows *flowAnalysis) valueOf(expression ast.Expr) flowingValue {
 
 // valuesOf pairs count receivers with the values right of an assignment or return: one expression each, or one
 // multi-value expression spread over them, a call or a comma-ok form. Nil when the two cannot be paired.
+//
+// The values are paired in flows.paired, which the next call overwrites, rather than in a slice made for each
+// statement. Each caller is done reading its values before the next statement is recorded, and the slice handed back
+// is capped at its length, so an append copies it out: each statement reads the values a fresh slice would hold, and
+// no finding changes.
 func (flows *flowAnalysis) valuesOf(right []ast.Expr, count int) []flowingValue {
+	flows.paired = flows.paired[:0]
 	if len(right) == count {
-		values := make([]flowingValue, count)
-		for index, expression := range right {
-			values[index] = flows.valueOf(expression)
+		for _, expression := range right {
+			flows.paired = append(flows.paired, flows.valueOf(expression))
 		}
-		return values
+		return flows.paired[:count:count]
 	}
 	if len(right) != 1 {
 		return nil
@@ -264,11 +271,11 @@ func (flows *flowAnalysis) valuesOf(right []ast.Expr, count int) []flowingValue 
 	if !isTuple || tuple.Len() != count {
 		return nil
 	}
-	values := make([]flowingValue, count)
 	for index := range count {
-		values[index] = flowingValue{expression: right[0], resultIndex: index, valueType: tuple.At(index).Type()}
+		flows.paired = append(flows.paired,
+			flowingValue{expression: right[0], resultIndex: index, valueType: tuple.At(index).Type()})
 	}
-	return values
+	return flows.paired[:count:count]
 }
 
 // sink notes value handed to a place of type expected. A place whose type is an interface accepts a value of any
