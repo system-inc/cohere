@@ -30,6 +30,11 @@ func corpusFixtureGit(test *testing.T, directory string, arguments ...string) st
 	return strings.TrimSpace(string(output))
 }
 
+// longFixturePath is 228 characters, which a `USTAR` header holds, as git archive writes it, and which the 55 of a
+// place's prefix push past the 255 it can split.
+var longFixturePath = filepath.Join("modules", strings.Repeat("a", 60), strings.Repeat("c", 60),
+	strings.Repeat("b", 95)+".md")
+
 // corpusFixtures is a Structure checkout with two commits, and an ahra checkout whose one commit holds a data/
 // directory and records Structure's first commit as its libraries/structure submodule, filled in from a clone of it.
 type corpusFixtures struct {
@@ -51,6 +56,8 @@ func newCorpusFixtures(test *testing.T) corpusFixtures {
 	fixtures.structureSecond = corpusFixtureGit(test, fixtures.structure, "rev-parse", "HEAD")
 	corpusFixtureGit(test, fixtures.ahra, "init", "-q")
 	writeFixtureFile(test, filepath.Join(fixtures.ahra, "app", "theme.css"), "@import \"tailwindcss\";\n")
+	// A path that fits a `USTAR` header alone, as git archive writes it, and not under a place's prefix.
+	writeFixtureFile(test, filepath.Join(fixtures.ahra, longFixturePath), "long\n")
 	writeFixtureFile(test, filepath.Join(fixtures.ahra, "data", "conversations", "private.md"), "never laid\n")
 	corpusFixtureGit(test, fixtures.ahra, "add", ".")
 	corpusFixtureGit(test, fixtures.ahra, "clone", "-q", fixtures.structure, filepath.Join("libraries", "structure"))
@@ -143,6 +150,9 @@ func TestTheCorporaAreLaidAsTheirPinsSay(test *testing.T) {
 	}
 	if _, statError := os.Stat(filepath.Join(ahra, "app", "theme.css")); statError != nil {
 		test.Errorf("ahra's tree wasn't laid: %v", statError)
+	}
+	if _, statError := os.Stat(filepath.Join(ahra, longFixturePath)); statError != nil {
+		test.Errorf("ahra's long path wasn't laid: %v", statError)
 	}
 	if _, statError := os.Stat(filepath.Join(ahra, "data")); !os.IsNotExist(statError) {
 		test.Errorf("ahra's data/ was laid, which never leaves the lander: %v", statError)
