@@ -224,9 +224,10 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 				test.Errorf("the -race run is not of the race list: %s", lines[2])
 			}
 			// A pinned node is on the tests' path, before the system's own; an absent one is nowhere on it.
-			onPath := strings.Contains(lines[1], "path "+goroot+"/bin:"+node+"/bin:/usr/bin:/bin")
-			if offPath := strings.Contains(lines[1], "path "+goroot+"/bin:/usr/bin:/bin"); (row.node == "pinned" &&
-				!onPath) || (row.node == "absent" && !offPath) {
+			// The path is the line's last field, so it is read whole, the system's sbin directories included.
+			onPath := strings.HasSuffix(lines[1], "path "+goroot+"/bin:"+node+"/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+			offPath := strings.HasSuffix(lines[1], "path "+goroot+"/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+			if (row.node == "pinned" && !onPath) || (row.node == "absent" && !offPath) {
 				test.Errorf("with the box's node %s, the tests ran on the wrong path: %s", row.node, lines[1])
 			}
 			left, readError := os.ReadDir(temporary)
