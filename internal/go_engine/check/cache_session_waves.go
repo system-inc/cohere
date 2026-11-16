@@ -136,7 +136,14 @@ func (session *CacheSession) firstWave(
 // that falls short of what the run can ask of it is a
 // miss again (dropShortHits). Each package restored gets an alias under its first key, so the next run with the same
 // inputs restores it with no first wave.
+//
+// A package above a restore from the host's run that has not settled is never restored here (#k36hp1a): its second
+// key holds the output the host's entry gives, which check may still decline, and then the reload checks the restore
+// from source with another output, while an alias of the package's first key, which holds only the restore's inputs,
+// would have the reload, and every later run, hit an entry made over the output declined. It is analyzed by the run's
+// one more wave, and saved once the restore settles (see saveMisses).
 func (session *CacheSession) decideBySecondKey() {
+	unsettled := session.unsettledBelow()
 	visited := map[*packages.Package]bool{}
 	var decide func(current *packages.Package)
 	decide = func(current *packages.Package) {
@@ -149,7 +156,8 @@ func (session *CacheSession) decideBySecondKey() {
 		}
 		// A package the run reloads to answer a question is checked from source whatever its second key holds, or
 		// the run would restore it again with no answer, as it did before the reload (see Reload).
-		if session.restoredInWave(current) || len(current.Errors) > 0 || session.reloading(current) {
+		if session.restoredInWave(current) || len(current.Errors) > 0 || session.reloading(current) ||
+			unsettled[current] {
 			return
 		}
 		second, known := session.secondKey(current)
