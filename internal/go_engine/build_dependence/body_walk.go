@@ -47,21 +47,6 @@ func (walk *bodyWalk) references(bodies ...ast.Node) []reference {
 	return walk.referenceStore[start:len(walk.referenceStore):len(walk.referenceStore)]
 }
 
-// bodyVisitor is references' walk of a body, which makes no closure for each body: a struct of one pointer is held
-// in an interface as the pointer itself.
-type bodyVisitor struct {
-	walk *bodyWalk
-}
-
-// Visit collects what node reads.
-func (visitor bodyVisitor) Visit(node ast.Node) ast.Visitor {
-	if node == nil {
-		return nil
-	}
-	visitor.walk.visit(node)
-	return visitor
-}
-
 // visit collects what one node of a body reads: its own object or selection, what it touches of an underlying, and
 // for an expression its type by name, a constant's type in full, and a map's key type in full.
 func (walk *bodyWalk) visit(node ast.Node) {
