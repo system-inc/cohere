@@ -18,8 +18,8 @@
 //
 // A graph lives in three steps: it is built, package by package, each package's record written for the findings store
 // (Graph.EncodedRecord), then sealed (Graph.Seal) before the builds are judged. Sealing resolves the graph once and
-// lets go of what only resolution and encoding read, the records' reads, callees, edges and object tables among them,
-// so the graph every build is judged on holds only what a judgment reads.
+// lets go of what only resolution and encoding read, the records' units, edges and object tables among them, so the
+// graph every build is judged on holds only what a judgment reads.
 package build_dependence
 
 import (
@@ -59,8 +59,8 @@ type Graph struct {
 // resolves as one collected from a live package does. path is the package's import path, imports its import map,
 // path to package ID, and typeNames the names of its scope's type names, in which a method of a build-only file finds
 // its receiver. unnameable counts the objects of other packages it reads that no name can carry, which a record read
-// back could not find (Graph.Unnameable). Sealing the graph lets go of its imports, objects and edges, and of each
-// unit's declares, receiver, reads and callees (Graph.Seal).
+// back could not find (Graph.Unnameable). Sealing the graph lets go of its imports, objects, units and edges
+// (Graph.Seal).
 type packageRecord struct {
 	identifier string
 	path       string
@@ -213,33 +213,30 @@ func (graph *Graph) Unnameable() int {
 }
 
 // Seal resolves the graph, if no build was judged on it yet, and lets go of what only resolution and encoding read:
-// every record's import map, object table and kind edges, and each of its units' declares, receiver, reads and
-// callees; the resolution's targets and resolved paths; and the graph's objectpath encoders. What stays is what a
-// judgment and the graph's other answers read: each record's ID, path, scope, type names, types and unnameable count
-// (Counterparts, seedMethodSets, Unnameable, count), and each unit's file, place, size and universe names, which the
-// resolution reads through its unit's record (judgment, Dependence, CallIndex). Sealing again does nothing.
+// every record's import map, object table, units and kind edges, and the graph's objectpath encoders. Resolution lets
+// go of its own scaffolding, its targets, resolved paths and decoded names, as it ends. What stays of each record is
+// what a judgment and the graph's other answers read: its ID, path, workspace flag, type names, types and unnameable
+// count (NewCounterparts, seedFiles, seedMethodSets, count, Units, CallIndex.Workspace, Unnameable); every unit's file,
+// place, size and universe names are the resolution's own columns, copied while it resolved. Sealing again does
+// nothing.
 //
-// The order is safe because resolution reads the records once, all of them, and builds every node, bit, edge and call
-// a judgment reads, and encoding reads them only to write a record: once the records the store keeps are written, the
-// graph is never resolved or encoded again. After Seal, adding a package (AddPackage, AddRecord, AddDecoded) or
-// encoding a record (EncodedRecord) panics, as the caller's ordering bug it is: a sealed graph can neither resolve
-// again nor encode a record, having let go of what both read. A record added from a decoded Record is the Record's
-// own, so sealing lets go of that Record's too, and it can be added to no other graph after.
+// The order is safe because resolution reads the records once, all of them, and copies every node, bit, edge, call and
+// unit column a judgment reads, pointing into no record, and encoding reads them only to write a record: once the
+// records the store keeps are written, the graph is never resolved or encoded again. After Seal, adding a package
+// (AddPackage, AddRecord, AddDecoded) or encoding a record (EncodedRecord) panics, as the caller's ordering bug it is:
+// a sealed graph can neither resolve again nor encode a record, having let go of what both read. A record added from a
+// decoded Record is the Record's own, so sealing lets go of that Record's too, and it can be added to no other graph
+// after.
 func (graph *Graph) Seal() {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
 	if graph.sealed {
 		return
 	}
-	resolved := graph.resolveHeld()
+	graph.resolveHeld()
 	for _, record := range graph.packages {
-		record.imports, record.objects, record.edges = nil, nil, nil
-		for index := range record.units {
-			unit := &record.units[index]
-			unit.declares, unit.receiver, unit.reads, unit.callees = nil, "", nil, nil
-		}
+		record.imports, record.objects, record.units, record.edges = nil, nil, nil, nil
 	}
-	resolved.targets, resolved.resolvedPaths = nil, nil
 	graph.paths = nil
 	graph.sealed = true
 }

@@ -235,10 +235,10 @@ func panicOf(call func()) (message string) {
 	return ""
 }
 
-// A sealed graph holds nothing only resolution and encoding read: no record holds imports, objects or edges, no unit
-// declares, a receiver, reads or callees, the resolution holds no targets or resolved paths, and the graph no
-// objectpath encoders. What a judgment reads stays: every unit's file and size, and the resolution itself. A graph of
-// live packages and one read back from records are sealed alike.
+// A sealed graph holds nothing only resolution and encoding read: no record holds imports, objects, units or edges,
+// the resolution holds no targets, resolved paths or decoded names, and the graph no objectpath encoders. What a
+// judgment reads stays: each record's ID and path, and the resolution itself, whose unit columns hold every unit's
+// file and size. A graph of live packages and one read back from records are sealed alike.
 func TestASealedGraphHoldsNothingOnlyResolutionReads(test *testing.T) {
 	test.Parallel()
 
@@ -249,38 +249,37 @@ func TestASealedGraphHoldsNothingOnlyResolutionReads(test *testing.T) {
 		graph *Graph
 	}{{"live", live}, {"recorded", recorded}} {
 		sealed.graph.Seal()
-		if sealed.graph.resolved == nil || sealed.graph.paths != nil {
+		resolved := sealed.graph.resolved
+		if resolved == nil || sealed.graph.paths != nil {
 			test.Errorf("%s: want the resolution kept and the encoders gone, got resolution %t, encoders %t",
-				sealed.name, sealed.graph.resolved != nil, sealed.graph.paths != nil)
+				sealed.name, resolved != nil, sealed.graph.paths != nil)
+			continue
 		}
-		if sealed.graph.resolved != nil &&
-			(sealed.graph.resolved.targets != nil || sealed.graph.resolved.resolvedPaths != nil) {
-			test.Errorf("%s: want no targets and no resolved paths, got %d and %d", sealed.name,
-				len(sealed.graph.resolved.targets), len(sealed.graph.resolved.resolvedPaths))
+		if resolved.targets != nil || resolved.resolvedPaths != nil || resolved.namedExternal != nil {
+			test.Errorf("%s: want no targets, resolved paths or decoded names, got %d, %d and %d", sealed.name,
+				len(resolved.targets), len(resolved.resolvedPaths), len(resolved.namedExternal))
 		}
-		units, nodes := 0, 0
 		for _, identifier := range slices.Sorted(maps.Keys(sealed.graph.packages)) {
 			record := sealed.graph.packages[identifier]
-			if record.imports != nil || record.objects != nil || record.edges != nil {
-				test.Errorf("%s %s: want no imports, objects or edges, got %d, %d and %d", sealed.name, identifier,
-					len(record.imports), len(record.objects), len(record.edges))
+			if record.imports != nil || record.objects != nil || record.units != nil || record.edges != nil {
+				test.Errorf("%s %s: want no imports, objects, units or edges, got %d, %d, %d and %d", sealed.name,
+					identifier, len(record.imports), len(record.objects), len(record.units), len(record.edges))
 			}
-			for index := range record.units {
-				unit := &record.units[index]
-				if unit.declares != nil || unit.receiver != "" || unit.reads != nil || unit.callees != nil {
-					test.Errorf("%s %s:%d: want no declares, receiver, reads or callees, got %d, %q, %d and %d",
-						sealed.name, unit.file, unit.start, len(unit.declares), unit.receiver, len(unit.reads),
-						len(unit.callees))
-				}
-				if unit.file == "" {
-					test.Errorf("%s %s: a unit lost its file", sealed.name, identifier)
-				}
-				units++
-				nodes += unit.nodes
+			if record.identifier != identifier || record.path == "" {
+				test.Errorf("%s %s: want the record's ID and path kept, got %q and %q", sealed.name, identifier,
+					record.identifier, record.path)
 			}
 		}
-		if units == 0 || nodes == 0 {
-			test.Errorf("%s: want the units and their sizes kept, got %d units of %d nodes", sealed.name, units, nodes)
+		nodes := 0
+		for index := range resolved.unitCount() {
+			nodes += int(resolved.unitNodes[index])
+			if resolved.files.names[resolved.unitFile[index]] == "" {
+				test.Errorf("%s: unit %d has no file", sealed.name, index)
+			}
+		}
+		if resolved.unitCount() == 0 || nodes == 0 {
+			test.Errorf("%s: want the units and their sizes kept, got %d units of %d nodes", sealed.name,
+				resolved.unitCount(), nodes)
 		}
 	}
 }
