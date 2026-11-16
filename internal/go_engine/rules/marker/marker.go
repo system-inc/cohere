@@ -21,6 +21,7 @@ import (
 	"go/ast"
 	"go/token"
 	"strings"
+	"sync"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 )
@@ -73,11 +74,22 @@ type codeOnLine struct {
 	last  token.Pos
 }
 
-// NewIndex indexes file's comment groups, reading each position's line from table. Where code sits on a line is read
-// from where the file's nodes begin and end in the AST, never from the source text.
+// NewIndex is the index of file's comment groups, reading each position's line from table, which finds them on its
+// first question. Finding them then and not now cannot change an answer: they are found from the same file and table,
+// which no rule changes, and sync.OnceValue finds them once and hands every question, on any goroutine, that result.
 func NewIndex(table *positions.Table, file *ast.File) *Index {
-	index := &Index{
-		table:            table,
+	index := &Index{table: table}
+	index.groups = sync.OnceValue(func() *commentLines {
+		index.built.Store(true)
+		return findCommentLines(table, file)
+	})
+	return index
+}
+
+// findCommentLines finds file's comment groups by line, reading each position's line from table. Where code sits on a
+// line is read from where the file's nodes begin and end in the AST, never from the source text.
+func findCommentLines(table *positions.Table, file *ast.File) *commentLines {
+	found := &commentLines{
 		ownLinesEndingOn: map[int]*ast.CommentGroup{},
 		startingOn:       map[int][]*ast.CommentGroup{},
 	}
@@ -121,9 +133,9 @@ func NewIndex(table *positions.Table, file *ast.File) *Index {
 		return true
 	})
 	for _, group := range file.Comments {
-		startLine := index.line(group.Pos())
-		endLine := index.line(group.End())
-		index.startingOn[startLine] = append(index.startingOn[startLine], group)
+		startLine := table.Line(group.Pos())
+		endLine := table.Line(group.End())
+		found.startingOn[startLine] = append(found.startingOn[startLine], group)
 		// A node ending where the comment starts, `work()// note`, is code before it as much as one ending earlier,
 		// and one starting where it ends, `/* note */work()`, is code after it.
 		if startLine < len(code) && code[startLine].first != token.NoPos && code[startLine].first <= group.Pos() {
@@ -132,7 +144,7 @@ func NewIndex(table *positions.Table, file *ast.File) *Index {
 		if endLine < len(code) && code[endLine].last >= group.End() {
 			continue
 		}
-		index.ownLinesEndingOn[endLine] = group
+		found.ownLinesEndingOn[endLine] = group
 	}
-	return index
+	return found
 }
