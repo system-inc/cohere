@@ -42,6 +42,10 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	if len(extras) == 0 {
 		return nil
 	}
+	// Every record of the host's graph and the standard library's is written by now, so both let go of what only
+	// resolution and encoding read before any build is measured. A run with no build to judge returned above, and
+	// pays for no resolution it never reads.
+	engine.sealDependenceGraphs()
 	// Once the last build has run, or one has failed, no build is left to ask for what the host kept for them, so it
 	// goes before the builds are merged.
 	defer pass.result.Host.Release()

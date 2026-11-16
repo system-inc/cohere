@@ -26,16 +26,24 @@ type walkKey struct {
 // A type of the universe is the same in every build and gives nothing, and a type declared in a function is walked
 // through to what lies under it, since no unit declares it.
 type bitWalker struct {
+	// seen are the types the current walk has walked.
 	seen      map[walkKey]bool
 	collected []reference
 }
 
-// references are the bits walked reaches, read in full or as a name, each once.
+// references are the bits walked reaches, read in full or as a name, each once, in a slice of their own, for a caller
+// that keeps them or walks again before it is done with them.
 func (walker *bitWalker) references(walked types.Type, full bool) []reference {
+	return append([]reference(nil), walker.borrowedReferences(walked, full)...)
+}
+
+// borrowedReferences are references' bits in the walker's own buffer, which its next walk writes over: for a caller
+// that reads them at once and keeps none, as addEdges and namer.through do, so no copy is made for each walk.
+func (walker *bitWalker) borrowedReferences(walked types.Type, full bool) []reference {
 	clear(walker.seen)
 	walker.collected = walker.collected[:0]
 	walker.walk(walked, full)
-	return append([]reference(nil), walker.collected...)
+	return walker.collected
 }
 
 // emit records object's name bit, and with full its underlying bit too.
