@@ -89,13 +89,16 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 func newSourceFile(file *ast.File, tokenFile *token.File, content []byte) *sourceFile {
-	source := &sourceFile{
-		tokenFile:           tokenFile,
-		content:             content,
-		exemptLines:         map[int]bool{},
-		unwrappableOpenings: map[int]*ast.BasicLit{},
-		unwrappableFields:   map[int]*ast.Field{},
+	source := &sourceFile{tokenFile: tokenFile, content: content, lines: tokenFile.Lines()}
+	source.longLines = source.gatherLongLines()
+	// Every exemption only takes a line past the limit off the report, and none adds one, so a file with no such
+	// line reports nothing whatever its syntax holds, and the walk that gathers the exemptions is skipped for it.
+	if len(source.longLines) == 0 {
+		return source
 	}
+	source.exemptLines = map[int]bool{}
+	source.unwrappableOpenings = map[int]*ast.BasicLit{}
+	source.unwrappableFields = map[int]*ast.Field{}
 	for _, declaration := range file.Decls {
 		general, isGeneral := declaration.(*ast.GenDecl)
 		if !isGeneral || general.Tok != token.IMPORT {

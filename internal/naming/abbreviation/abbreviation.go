@@ -202,8 +202,9 @@ func Load(data []byte, keywordTerms []policy.KeywordTerm) (*Vocabulary, error) {
 	}
 
 	loaded := &Vocabulary{
-		WholeByName:  map[string]*Entry{},
-		AllowedNames: map[string]bool{},
+		WholeByName:          map[string]*Entry{},
+		AllowedNames:         map[string]bool{},
+		prefixByAbbreviation: map[string]*Entry{},
 	}
 	seen := map[string]bool{}
 	for index := range file.Abbreviations {
@@ -220,6 +221,8 @@ func Load(data []byte, keywordTerms []policy.KeywordTerm) (*Vocabulary, error) {
 			loaded.WholeByName[entry.Abbreviation] = entry
 		}
 		if entry.Prefix != nil {
+			loaded.prefixByAbbreviation[entry.Abbreviation] = entry
+			loaded.longestPrefix = max(loaded.longestPrefix, len(entry.Abbreviation))
 			if entry.Prefix.Phase == "early" {
 				loaded.EarlyPrefixes = append(loaded.EarlyPrefixes, entry)
 			} else {

@@ -82,15 +82,17 @@ func Check(
 	function *intermediate_representation.Function,
 	isPure func(function *types.Func) bool,
 ) {
-	if staticcheck_code.IsInTest(context, function) {
-		for parameter := range function.Signature.Params().Variables() {
-			if typeutil.IsPointerToTypeWithName(parameter.Type(), "testing.B") {
-				// Ignore discarded pure functions in code related to benchmarks. Instead of matching BenchmarkFoo
-				// functions, we match any function accepting a *testing.B. Benchmarks sometimes call generic
-				// functions for doing the actual work, and checking for the parameter is a lot easier and faster than
-				// analyzing call trees.
-				return
-			}
+	// The parameters are read before the file is asked, where the original asks the file first: reading them only
+	// reads the signature's types, and IsInTest only reads the file's name, so the order changes no finding, and the
+	// file set's lookup is spared for every function taking no *testing.B, nearly all of them.
+	for parameter := range function.Signature.Params().Variables() {
+		if typeutil.IsPointerToTypeWithName(parameter.Type(), "testing.B") &&
+			staticcheck_code.IsInTest(context, function) {
+			// Ignore discarded pure functions in code related to benchmarks. Instead of matching BenchmarkFoo
+			// functions, we match any function accepting a *testing.B. Benchmarks sometimes call generic
+			// functions for doing the actual work, and checking for the parameter is a lot easier and faster than
+			// analyzing call trees.
+			return
 		}
 	}
 	for _, block := range function.Blocks {

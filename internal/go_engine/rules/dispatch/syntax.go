@@ -112,7 +112,7 @@ func walkFiles(started *startedRuns, files []inspector.Cursor) {
 	for _, run := range started.runs {
 		kinds = append(kinds, run.registered.listener.Nodes...)
 	}
-	walk := &syntaxWalk{started: started}
+	walk := newSyntaxWalk(started)
 	visit := walk.visit
 	for _, fileCursor := range files {
 		// Checked as files were gathered, so the assertion holds.

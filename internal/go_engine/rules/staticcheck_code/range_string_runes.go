@@ -32,6 +32,13 @@ func RangeStringRunes(context *rule.Context, function *intermediate_representati
 		// A function staticcheck synthesized, a package's initializer among them, has no syntax to walk.
 		return
 	}
+	// The walk reports only at a range whose operand is a conversion of this function's own, which is an instruction
+	// in one of its blocks, since a value is read only where its definition dominates, and nothing removes an
+	// instruction once the expression map is recorded. So a function whose blocks hold no such conversion has nothing
+	// the walk could report, and most functions hold none.
+	if !holdsRangedConversion(function) {
+		return
+	}
 	ast.Inspect(source, func(node ast.Node) bool {
 		rangeStatement, isRange := node.(*ast.RangeStmt)
 		if !isRange || !isBlank(rangeStatement.Key) {
@@ -40,18 +47,34 @@ func RangeStringRunes(context *rule.Context, function *intermediate_representati
 		// The operand's value is the function's own only when the range is in its body, not in a literal within it.
 		operand, _ := function.ValueForExpression(rangeStatement.X)
 		conversion, isConversion := operand.(*intermediate_representation.Convert)
-		if !isConversion || !isStringToRunes(conversion) {
-			return true
-		}
-		// Ranging over a slice reads it twice, once for its length and once for each element. Any other reader, the
-		// slice ranged over twice among them, as the original's own comment owns, leaves it alone.
-		referrers := conversion.Referrers()
-		if referrers == nil || len(*referrers) != 2 {
+		if !isConversion || !isStringToRunes(conversion) || !isReadOnlyByRange(conversion) {
 			return true
 		}
 		context.Report(analysis.Diagnostic{Pos: rangeStatement.Pos(), Message: rangeStringRunesMessage})
 		return true
 	})
+}
+
+// holdsRangedConversion is whether one of function's own instructions converts a string to a slice of runes that
+// nothing but a range reads, the only operand RangeStringRunes reports, found without walking the syntax.
+func holdsRangedConversion(function *intermediate_representation.Function) bool {
+	for _, block := range function.Blocks {
+		for _, instruction := range block.Instructions {
+			conversion, isConversion := instruction.(*intermediate_representation.Convert)
+			if isConversion && isStringToRunes(conversion) && isReadOnlyByRange(conversion) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isReadOnlyByRange is whether conversion's slice has the two readers a range over it makes, once for its length and
+// once for each element. Any other reader, the slice ranged over twice among them, as the original's own comment owns,
+// leaves it alone.
+func isReadOnlyByRange(conversion *intermediate_representation.Convert) bool {
+	referrers := conversion.Referrers()
+	return referrers != nil && len(*referrers) == 2
 }
 
 // isBlank is whether expression is the blank identifier, as staticcheck's astutil.IsBlank judges it; a range with no

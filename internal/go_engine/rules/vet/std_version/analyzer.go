@@ -71,6 +71,9 @@ func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
 	return analyzer
 }
 
+// newestTableVersion is the version of the newest symbols the table holds, read once as the package initializes.
+var newestTableVersion = minorVersion(newestMinor(standardSymbols))
+
 // symbol is one exported standard-library symbol, by the name x/tools' internal/stdlib manifest gives it, with the
 // minor version of Go that introduced it. Its kind is in its name: a method's, concrete or an interface's, is
 // `(*T).m` or `(T).m`, a field's is `T.f`, and a package-level function's, variable's, constant's or type's is bare.
@@ -98,6 +101,9 @@ type packageState struct {
 	packageVersion string
 	// fileVersion is the language version of the file being walked, and empty in a file that is not judged.
 	fileVersion string
+	// fileIsBeforeTable is whether the file being walked is judged at a version before newestTableVersion, the only
+	// files in which any symbol of the table can be too new.
+	fileIsBeforeTable bool
 	// tooNew is each package's too-new symbols at each version, worked out once.
 	tooNew map[tooNewKey]map[types.Object]symbol
 }
@@ -128,8 +134,12 @@ func checkNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 		if !ast.IsGenerated(visited) {
 			state.fileVersion = version.Lang(recordedFileVersion(context.TypesInfo, visited))
 		}
+		// tooNewSymbols keeps only a symbol whose version the file's is before, and no symbol of the table is newer
+		// than its newest, so in a file at or past that version every package's too-new symbols are none, and its
+		// identifiers are left before any map is asked of them. An empty version is not judged, and before says so.
+		state.fileIsBeforeTable = before(state.fileVersion, newestTableVersion)
 	case *ast.Ident:
-		if state.fileVersion == "" {
+		if !state.fileIsBeforeTable {
 			return
 		}
 		used, isUsed := context.TypesInfo.Uses[visited]
@@ -155,6 +165,17 @@ func checkNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 		context.ReportRangef(visited, "%s.%s requires %v or later (%s is %s)", used.Pkg().Name(), standard.name,
 			minorVersion(standard.minor), versionSource, state.fileVersion)
 	}
+}
+
+// newestMinor is the newest minor version of any symbol in table.
+func newestMinor(table map[string][]symbol) int {
+	newest := 0
+	for _, symbols := range table {
+		for _, standard := range symbols {
+			newest = max(newest, standard.minor)
+		}
+	}
+	return newest
 }
 
 // tooNewSymbols is the objects of the exported symbols of a standard-library package that are not yet available at

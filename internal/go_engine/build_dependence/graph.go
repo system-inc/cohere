@@ -113,9 +113,22 @@ func NewGraph() *Graph {
 // maps of it. workspace says whether loaded belongs to the checked modules, its test variants included, or is a
 // dependency, which only the counts tell apart. A package the loader gave no type information declares no units.
 //
-// It is safe to call concurrently for different packages: the walk runs on the caller's goroutine, and only its
-// publication takes the lock.
+// It is safe to call concurrently for different packages: the walk runs on the caller's goroutine, in a scratch of
+// its own (workerScratch), and only its publication takes the lock.
 func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
+	scratch, isScratch := scratches.Get().(*workerScratch)
+	if !isScratch {
+		// Only AddPackage puts into scratches, and only scratches; its New makes one when it holds none.
+		scratch = newWorkerScratch()
+	}
+	graph.addPackage(loaded, workspace, scratch)
+	// Given back once the record is made, and never on a panic, so the pool holds no scratch a walk left half used.
+	scratch.release()
+	scratches.Put(scratch)
+}
+
+// addPackage is AddPackage walking in scratch, which the caller releases before another package's walk.
+func (graph *Graph) addPackage(loaded *packages.Package, workspace bool, scratch *workerScratch) {
 	imports := make(map[string]string, len(loaded.Imports))
 	for path, imported := range loaded.Imports {
 		imports[path] = imported.ID
@@ -123,7 +136,7 @@ func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
 	var units []unitRecord
 	var edges []kindEdge
 	if loaded.TypesInfo != nil {
-		collecting := newCollector(loaded.TypesInfo)
+		collecting := scratch.collector(loaded.TypesInfo)
 		for _, file := range loaded.Syntax {
 			collecting.collectFile(loaded.Fset.File(file.FileStart), file)
 		}
@@ -133,7 +146,7 @@ func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
 	if loaded.TypesInfo != nil {
 		typesPackage = loaded.Types
 	}
-	record := newRecord(loaded.ID, workspace, typesPackage, imports, graph.paths, units, edges)
+	record := newRecord(loaded.ID, workspace, typesPackage, imports, graph.paths, units, edges, scratch)
 	record.typesPackage = loaded.Types
 	if record.path == "" {
 		record.path = loaded.PkgPath

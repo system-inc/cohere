@@ -9,10 +9,12 @@
 package correctness_require_invariant_reason
 
 import (
+	"cmp"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -29,11 +31,12 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/correctness-require-invariant-reason"
 
-// listener judges each file whole as the syntax dispatcher's walk enters it, walking the file itself: a panic is
-// judged against every variable the file writes, a write after the panic included, so the writes are gathered over
-// the whole file before any panic, a panic's recovered variables are its own function's and none of the literals
-// inside it, and a Must call is judged by whether it runs while the package initializes, which the walk carries down
-// from the declaration holding it and through each function literal, never entering a var's names or type.
+// listener judges each file whole as the syntax dispatcher's walk enters it, walking the file itself, once: a panic
+// is judged against every write of its recovered variables, a write after the panic included, so the panics are judged
+// only once the walk has gathered the whole file, a panic's recovered variables are its own function's and none of the
+// literals inside it, and a Must call is judged by whether it runs while the package initializes, which a second walk,
+// taken only of a file that calls a Must function, carries down from the declaration holding it and through each
+// function literal, never entering a var's names or type.
 var listener = rule.Listener{
 	FileLocal: true, Requires: []*analysis.Analyzer{marker.Analyzer}, FileEnter: judgeFile}
 
@@ -67,166 +70,50 @@ func judgeFile(context *rule.Context, file *ast.File) {
 		// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 		panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 	}
-	judgePanics(context, file, indexes.ForFile(file))
-	judgeMustCalls(context, file)
+	judgeSyntax(context, file, indexes.ForFile(file))
 }
 
-// judgePanics reports every builtin panic in file that is not a re-panic and whose comments give no reason.
-func judgePanics(context *rule.Context, file *ast.File, comments *marker.Index) {
-	written := writtenVariables(context, file)
-	ast.Inspect(file, func(node ast.Node) bool {
-		// Each function is judged on its own, so a recover in one never excuses a panic in a closure it holds.
-		switch function := node.(type) {
-		case *ast.FuncDecl:
-			if function.Body != nil {
-				judgeFunctionPanics(context, function.Body, comments, written)
-			}
-		case *ast.FuncLit:
-			judgeFunctionPanics(context, function.Body, comments, written)
-		}
-		return true
+// judgeSyntax judges file's panics against comments, its comment index, then its Must calls.
+func judgeSyntax(context *rule.Context, file *ast.File, comments *marker.Index) {
+	walk := &syntaxWalk{context: context, functions: make([]openFunction, 0, 8)}
+	ast.Walk(walk, file)
+	judgePanics(context, walk, comments)
+	// Only a call whose callee is a Must function is ever reported as one, so a file holding none reports nothing
+	// however its initialization is read, and is not walked again.
+	if walk.holdsMustCall {
+		judgeMustCalls(context, file)
+	}
+}
+
+// judgePanics reports every panic walk gathered that is not a re-panic and whose comments give no reason: each
+// function's panics in the order they stand, and the functions in the order they begin, an outer function's panics
+// before those of a literal it holds.
+func judgePanics(context *rule.Context, walk *syntaxWalk, comments *marker.Index) {
+	// The walk meets a literal's panics before any of its outer function's that come after the literal, so the panics
+	// are put in their functions' order; stable, so each function's keep the order they stand in.
+	slices.SortStableFunc(walk.panics, func(first panicStatement, second panicStatement) int {
+		return cmp.Compare(first.function, second.function)
 	})
-}
-
-// judgeFunctionPanics judges the panics directly in one function's body, leaving the function literals inside it to
-// judgePanics, which reaches each of them on its own.
-func judgeFunctionPanics(
-	context *rule.Context,
-	body *ast.BlockStmt,
-	comments *marker.Index,
-	written map[*types.Var]bool,
-) {
-	recovered := recoveredVariables(context, body, written)
-	inspectFunction(body, func(node ast.Node) {
-		// panic returns no value, so a call to it is always a statement of its own, or the call a defer or go runs.
-		var call *ast.CallExpr
-		switch statement := node.(type) {
-		case *ast.ExprStmt:
-			call, _ = ast.Unparen(statement.X).(*ast.CallExpr)
-		case *ast.DeferStmt:
-			call = statement.Call
-		case *ast.GoStmt:
-			call = statement.Call
-		}
-		if call == nil || !isBuiltin(context, call, "panic") {
-			return
-		}
-		if len(call.Args) == 1 && isRecoveredValue(context, call.Args[0], recovered) {
-			return
+	for _, gathered := range walk.panics {
+		if len(gathered.call.Args) == 1 && walk.isRecoveredValue(gathered.call.Args[0], gathered.function) {
+			continue
 		}
 		message := unexplainedPanicMessage
 		// The comment directly above the statement, on lines of its own, or at the end of its last line.
-		switch comments.ExcuseFor(node, marker.Invariant) {
+		switch comments.ExcuseFor(gathered.statement, marker.Invariant) {
 		case marker.WithReason:
-			return
+			continue
 		case marker.WithoutReason:
 			message = invariantWithoutReasonMessage
 		case marker.None:
 		}
 		context.Report(analysis.Diagnostic{
-			Pos:      call.Pos(),
-			End:      call.End(),
+			Pos:      gathered.call.Pos(),
+			End:      gathered.call.End(),
 			Category: message.Id,
 			Message:  message.Render(map[string]string{}),
 		})
-	})
-}
-
-// inspectFunction visits every node of one function's body without entering the function literals inside it.
-func inspectFunction(body *ast.BlockStmt, visit func(node ast.Node)) {
-	ast.Inspect(body, func(node ast.Node) bool {
-		if _, isLiteral := node.(*ast.FuncLit); isLiteral {
-			return false
-		}
-		if node != nil {
-			visit(node)
-		}
-		return true
-	})
-}
-
-// recoveredVariables is every variable body declares holding what recover returned, `recovered := recover()` or `var
-// recovered = recover()`, that nothing writes again, so a panic of it re-raises the value recover caught.
-func recoveredVariables(context *rule.Context, body *ast.BlockStmt, written map[*types.Var]bool) map[*types.Var]bool {
-	recovered := map[*types.Var]bool{}
-	declare := func(names []*ast.Ident, values []ast.Expr) {
-		// Only one value per name pairs them; `first, second := pair()` assigns from one call's results.
-		if len(names) != len(values) {
-			return
-		}
-		for index, name := range names {
-			variable, isVariable := context.TypesInfo.Defs[name].(*types.Var)
-			value, isCall := ast.Unparen(values[index]).(*ast.CallExpr)
-			if isVariable && isCall && isBuiltin(context, value, "recover") && !written[variable] {
-				recovered[variable] = true
-			}
-		}
 	}
-	inspectFunction(body, func(node ast.Node) {
-		switch declaration := node.(type) {
-		case *ast.AssignStmt:
-			if declaration.Tok != token.DEFINE {
-				return
-			}
-			names := make([]*ast.Ident, 0, len(declaration.Lhs))
-			for _, left := range declaration.Lhs {
-				// A define's left side is identifiers only; the compiler refuses anything else.
-				if name, isIdentifier := left.(*ast.Ident); isIdentifier {
-					names = append(names, name)
-				}
-			}
-			declare(names, declaration.Rhs)
-		case *ast.ValueSpec:
-			declare(declaration.Names, declaration.Values)
-		}
-	})
-	return recovered
-}
-
-// writtenVariables is every variable file writes after declaring it: assigned, ranged into with `=`, or given away
-// by its address. Such a variable may hold something other than what it was declared with when a panic reads it.
-func writtenVariables(context *rule.Context, file *ast.File) map[*types.Var]bool {
-	written := map[*types.Var]bool{}
-	mark := func(expression ast.Expr) {
-		// A declaration's own name is in Defs, never Uses, so only a later write is marked.
-		if name, isIdentifier := ast.Unparen(expression).(*ast.Ident); isIdentifier {
-			if variable, isVariable := context.TypesInfo.Uses[name].(*types.Var); isVariable {
-				written[variable] = true
-			}
-		}
-	}
-	ast.Inspect(file, func(node ast.Node) bool {
-		switch write := node.(type) {
-		case *ast.AssignStmt:
-			for _, left := range write.Lhs {
-				mark(left)
-			}
-		case *ast.RangeStmt:
-			if write.Tok == token.ASSIGN {
-				mark(write.Key)
-				mark(write.Value)
-			}
-		case *ast.UnaryExpr:
-			if write.Op == token.AND {
-				mark(write.X)
-			}
-		}
-		return true
-	})
-	return written
-}
-
-// isRecoveredValue is whether argument is what recover returned in this function: the call itself, or a variable
-// holding it.
-func isRecoveredValue(context *rule.Context, argument ast.Expr, recovered map[*types.Var]bool) bool {
-	switch value := ast.Unparen(argument).(type) {
-	case *ast.CallExpr:
-		return isBuiltin(context, value, "recover")
-	case *ast.Ident:
-		variable, isVariable := context.TypesInfo.Uses[value].(*types.Var)
-		return isVariable && recovered[variable]
-	}
-	return false
 }
 
 // isBuiltin is whether call calls the predeclared builtin of that name, found by its object, so a function or
@@ -298,8 +185,8 @@ func reportMustCall(context *rule.Context, node ast.Node) bool {
 	if !isCall {
 		return true
 	}
-	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
-	if !isFunction || !isMustName(function.Name()) {
+	function, isMust := mustCallee(context, call)
+	if !isMust {
 		return true
 	}
 	context.Report(analysis.Diagnostic{
@@ -309,6 +196,12 @@ func reportMustCall(context *rule.Context, node ast.Node) bool {
 		Message:  mustOutsideInitializationMessage.Render(map[string]string{"name": calleeName(context, function)}),
 	})
 	return true
+}
+
+// mustCallee is the function call calls, and whether it is a Must function.
+func mustCallee(context *rule.Context, call *ast.CallExpr) (*types.Func, bool) {
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	return function, isFunction && isMustName(function.Name())
 }
 
 // isMustName is whether name is Must, as template.Must, or Must followed by an upper-case letter, as

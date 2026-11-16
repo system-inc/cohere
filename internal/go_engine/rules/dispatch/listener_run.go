@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/ast/inspector"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -24,9 +23,14 @@ const panicFramesShown = 5
 // stop being the check's and start being the dispatcher's.
 const listenerRunMethods = ".(*listenerRun)."
 
+// nodeCalls is in the name the runtime gives the syntax walk's method that calls each listener's Node, and its
+// closures, where a panic's frames stop being the check's for a Node call.
+const nodeCalls = ".(*syntaxWalk).callNodes"
+
 // listenerRun is one rule's listener over one package: its context, what it has reported, and the crash that ended
-// it, after which it is called no more on that package. Each call recovers on its own, so one rule's panic is that
-// rule's crash and every other rule's walk goes on.
+// it, after which it is called no more on that package. Each call recovers on its own, or for the Node calls on one
+// node, the walk's one recover over them recovers each (see syntaxWalk.callNodes), so one rule's panic is that rule's
+// crash and every other rule's walk goes on.
 type listenerRun struct {
 	registered  *registeredRule
 	pass        *analysis.Pass
@@ -132,23 +136,6 @@ func (run *listenerRun) fileEnter(file *ast.File) {
 	run.registered.listener.FileEnter(run.context, file)
 }
 
-// node calls the listener's Node on node, a kind the listener lists, with its ancestors, its context handing the
-// listener cursor, node's own, for the length of the call. A Node that panics leaves the cursor held, which is
-// harmless: the run has crashed, and nothing calls it on the package again.
-func (run *listenerRun) node(cursor inspector.Cursor, node ast.Node, stack []ast.Node) {
-	if run.crash != nil || run.skipping {
-		return
-	}
-	defer run.recoverCrash()
-	run.context.EnterNode(cursor)
-	if run.timing != nil {
-		run.measured(func() { run.registered.listener.Node(run.context, node, stack) })
-	} else {
-		run.registered.listener.Node(run.context, node, stack)
-	}
-	run.context.LeaveNode()
-}
-
 // fileExit calls the listener's FileExit as the walk leaves file.
 func (run *listenerRun) fileExit(file *ast.File) {
 	if run.crash != nil || run.skipping || run.registered.listener.FileExit == nil {
@@ -190,6 +177,12 @@ func (run *listenerRun) recoverCrash() {
 	if recovered == nil {
 		return
 	}
+	run.crashed(recovered)
+}
+
+// crashed records recovered, a panic in the listener being recovered, as the rule's crash on the package. It reads the
+// panic's frames, so it is called from the deferred function that recovered it, while they are still on the stack.
+func (run *listenerRun) crashed(recovered any) {
 	run.crash = fmt.Errorf("running analyzer %s on %s: it panicked with %v, at %s", run.registered.analyzer.Name,
 		run.pass.Pkg.Path(), recovered, panicFrames())
 }
@@ -203,10 +196,10 @@ func (run *listenerRun) outcome() Outcome {
 }
 
 // panicFrames is the frames of the panic being recovered, innermost first, from where it was raised up to the
-// listenerRun method that called the check, read as check.panicFrames reads them for an analyzer: it runs in the
-// deferred recover, where the panicking frames are still on the stack below runtime.gopanic, and the runtime's own
-// frames are left out, since a nil dereference passes through several. It is a copy rather than a call because the
-// engine's is unexported in package check, which a rule package does not import.
+// listenerRun method, or the syntax walk's callNodes, that called the check, read as check.panicFrames reads them for
+// an analyzer: it runs in the deferred recover, where the panicking frames are still on the stack below
+// runtime.gopanic, and the runtime's own frames are left out, since a nil dereference passes through several. It is a
+// copy rather than a call because the engine's is unexported in package check, which a rule package does not import.
 func panicFrames() string {
 	callers := make([]uintptr, 64)
 	frames := runtime.CallersFrames(callers[:runtime.Callers(0, callers)])
@@ -219,7 +212,7 @@ func panicFrames() string {
 			pastPanic = true
 		case !pastPanic, strings.HasPrefix(frame.Function, "runtime."):
 			// Above the panic, or inside the runtime.
-		case strings.Contains(frame.Function, listenerRunMethods):
+		case strings.Contains(frame.Function, listenerRunMethods), strings.Contains(frame.Function, nodeCalls):
 			more = false
 		default:
 			shown = append(shown, fmt.Sprintf("%s (%s:%d)", frame.Function, frame.File, frame.Line))

@@ -29,6 +29,8 @@ var raceGated = []raceEntry{
 		"other goroutines fork (#g93ts58)"},
 	{"internal/go_engine/bounded", "its worker pool runs a function on every index at once, as many as there " +
 		"are cores"},
+	{"internal/go_engine/build_dependence", "TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild adds packages " +
+		"from many goroutines, each through a scratch of the shared pool (scratch_test.go, #86qvr6b)"},
 	{"internal/go_engine/cache", "TestConcurrentPutsOfOneKeyLeaveAWholeEntry writes one key from several goroutines"},
 	{"internal/go_engine/check", "dependence sets and type graph digests are computed at once over one host " +
 		"(dependence_concurrency_test.go, type_graph_concurrency_test.go)"},
@@ -36,6 +38,8 @@ var raceGated = []raceEntry{
 	{"internal/go_engine/intermediate_representation", "the intermediate representation is built in parallel " +
 		"(parallel_build_test.go)"},
 	{"internal/go_engine/load", "the loader lists and type-checks packages side by side"},
+	{"internal/go_engine/rules/marker", "TestAnIndexAskedAtOnceAnswersAsOneBuiltUpFront asks one file's lazily " +
+		"built comment index from several goroutines, as rules and a package's shards do (#fex6s0v)"},
 	{"internal/go_engine/suppression", "TestBuildConcurrently builds suppression tables from several goroutines"},
 	{"internal/lint/rules/typescript", "TestNoDupeClassMembersAndACheckerReadTheClassAtOnce runs the rule beside " +
 		"a checker's read of the class it lints (no_dupe_class_members_concurrency_test.go, #72kn826)"},

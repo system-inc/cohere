@@ -14,7 +14,7 @@ import (
 type state struct {
 	cloned    bool
 	values    []ValueNilness
-	numbering numbering
+	numbering *numbering
 }
 
 // get is value's nilness: {_ NeverNil} for a value that cannot be nil, what the state holds, or, for a value it holds
