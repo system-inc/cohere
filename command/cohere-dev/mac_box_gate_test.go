@@ -236,6 +236,10 @@ func TestALandingTestsOnTheGatesMacsAndNeverOnKirksMac(test *testing.T) {
 				if strings.HasPrefix(line, "test") {
 					macTests++
 				}
+				// Kirk's Mac keeps Go's test cache, honestly keyed there: only a shared box runs -count=1 (#adbkt5t).
+				if strings.HasPrefix(line, "test") && strings.Contains(line, "-count") {
+					test.Errorf("Kirk's Mac ran a go test past its cache: %s", line)
+				}
 			}
 			if testCase.kirksMac != (macTests > 0) {
 				test.Errorf("Kirk's Mac ran %d go tests, want them run there %t:\n%s", macTests, testCase.kirksMac,
