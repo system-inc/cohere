@@ -264,16 +264,18 @@ var typeFree = map[string]bool{
 	// for a `panic` the package declares itself, so it reads no types and is still not SyntaxOnly.
 	"unreachable": true,
 	// SA9009 reads comments for a directive indented out of effect. Like every port below, it reports through
-	// staticcheck_report's version gate, which reads the file's and the package's Go versions from the type checker's
-	// records in any other context; its listener is SyntaxOnly, so the gate reads the versions its syntax-only context
-	// carries instead, and nothing of the port reads types.
+	// staticcheck_report's version gate, which reads of the type checker only the Go versions it recorded for the file
+	// and the package, the file's `//go:build` line and the module's go line, and no type information. SA9009 and
+	// ST1018 are SyntaxOnly, so the gate reads those versions as their syntax-only context carries them.
 	"SA9009": true,
 	// ST1001 reads import declarations for a dot import, a file's own name, to allow one in a test, and staticcheck's
-	// configuration.
+	// configuration. It is not SyntaxOnly: the configuration's directory, and FilterGenerated's judgment of a finding's
+	// display file, are read past the file.
 	"ST1001": true,
 	// ST1018 reads string literals for control and format characters.
 	"ST1018": true,
-	// ST1019 reads import declarations for a package imported twice.
+	// ST1019 reads import declarations for a package imported twice. It is not SyntaxOnly, for FilterGenerated, as
+	// ST1001 is not.
 	"ST1019": true,
 }
 

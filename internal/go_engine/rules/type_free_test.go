@@ -23,11 +23,11 @@ const typeFreeSource = "//go:build go1.x\n//go:debug panicnil=1\n\npackage typef
 	"\t\"strings\"\n\tagain \"strings\"\n)\n\n// go:linkname unreached unreached\n\nvar Bell = \"a\x07b\"\n\n" +
 	"func Unreached() string {\n\treturn Sprint(strings.ToUpper(again.ToLower(Bell)))\n\treturn \"\"\n}\n"
 
-// Each pass typeFree names reads no type information (#9k8ps1y): run over a package whose pass holds no type
-// information, no sizes, and a package that is its path and name alone, it neither crashes nor errors, and, but for
-// framepointer, which judges only assembly on the architectures it knows, it reports what the package holds for it, so
-// the run reached the code that reports. A port of staticcheck's reports through its version gate, which reads the type
-// checker's records in a context that is not syntax-only, so a port named here whose listener is not SyntaxOnly fails.
+// Each pass typeFree names reads no type information (#9k8ps1y): run over a package whose pass holds of the type
+// checker only the Go version it records for the file, which a port's version gate reads, no sizes, and a package that
+// is its path and name alone, it neither crashes nor errors, and, but for framepointer, which judges only assembly on
+// the architectures it knows, it reports what the package holds for it, so the run reached the code that reports. A
+// pass that read a type, a use or a definition would find none, and report nothing or crash.
 func TestEveryTypeFreePassRunsWithoutTypes(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -63,7 +63,8 @@ func TestEveryTypeFreePassRunsWithoutTypes(test *testing.T) {
 }
 
 // runWithoutTypes is what analyzer reports over the one file at filename, and its error, run after every analyzer it
-// requires, each on a pass with no type information, no sizes, and a package that is its path and name alone.
+// requires, each on a pass holding of the type checker only the file's Go version, no sizes, and a package that is
+// its path and name alone.
 func runWithoutTypes(test *testing.T, analyzer *analysis.Analyzer, filename string) ([]analysis.Diagnostic, error) {
 	test.Helper()
 	fileSet := token.NewFileSet()
@@ -85,7 +86,8 @@ func runWithoutTypes(test *testing.T, analyzer *analysis.Analyzer, filename stri
 			resultOf[required] = results[required]
 		}
 		pass := &analysis.Pass{Analyzer: each, Fset: fileSet, Files: []*ast.File{file},
-			Pkg: types.NewPackage("example.com/typefree", "typefree"), ResultOf: resultOf,
+			Pkg:       types.NewPackage("example.com/typefree", "typefree"),
+			TypesInfo: &types.Info{FileVersions: map[*ast.File]string{file: "go1.24"}}, ResultOf: resultOf,
 			ReadFile: os.ReadFile,
 			Report: func(diagnostic analysis.Diagnostic) {
 				if each == analyzer {

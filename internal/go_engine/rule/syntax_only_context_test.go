@@ -61,10 +61,10 @@ func TestASyntaxOnlyContextHoldsNothingPastItsFile(test *testing.T) {
 		test.Error("a syntax-only context says it is not one")
 	}
 	if context.Package != nil || context.TypesInfo != nil || context.TypesSizes != nil || context.ReadFile != nil ||
-		context.Files != nil {
+		context.Files != nil || context.IsGenerated != nil {
 		test.Errorf("a syntax-only context holds Package %v, TypesInfo %v, TypesSizes %v, ReadFile %t, Files %d, "+
-			"want none", context.Package, context.TypesInfo, context.TypesSizes, context.ReadFile != nil,
-			len(context.Files))
+			"IsGenerated %t, want none", context.Package, context.TypesInfo, context.TypesSizes,
+			context.ReadFile != nil, len(context.Files), context.IsGenerated != nil)
 	}
 	if context.FileSet != pass.Fset {
 		test.Error("a syntax-only context dropped the file set, which positions read")
@@ -94,7 +94,7 @@ func TestASyntaxOnlyContextHoldsNothingPastItsFile(test *testing.T) {
 			test.Error("a context that reports nothing handed the sink a finding")
 		})
 	if ordinary.IsSyntaxOnly() || ordinary.TypesInfo == nil || ordinary.Package == nil ||
-		ordinary.ResultOf(plantedAnalyzer) != "planted's result" {
+		ordinary.IsGenerated == nil || ordinary.ResultOf(plantedAnalyzer) != "planted's result" {
 		test.Error("a file-local context that is not syntax-only dropped what a syntax-only one drops")
 	}
 }

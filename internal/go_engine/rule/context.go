@@ -127,10 +127,13 @@ func NewFileLocalContext(
 // depend on nothing but the file's bytes and the rule's settings, so a build may take the host's findings of the rule
 // on a file rather than walk it again (#y6q1x2j). It holds nothing that reads past the file: Package, TypesInfo,
 // TypesSizes, ReadFile and Files are nil, State panics as a file-local run's does, ResultOf answers only what
-// AnswersSyntaxOnly names, and LookupIn and Reads panic. What a ported check's version gates read of the type checker
-// and the package it carries as FileGoVersions and PackageGoVersion, read from pass before they are dropped. A check
-// reading anything it dropped panics or dereferences nil, which the dispatcher makes the rule's crash on the package,
-// on the host's build as on any other, so a wrong mark fails the rule's own fixtures.
+// AnswersSyntaxOnly names, and LookupIn and Reads panic. IsGenerated is nil too: staticcheck's judgment is a lookup in
+// the generated files of the package as this build compiled it, asked by a finding's display file, which a `//line`
+// directive can name, so another file of the package can decide it, and a port's FilterGenerated panics on a nil
+// judgment. What a ported check's version gates read of the type checker and the package it carries as FileGoVersions
+// and PackageGoVersion, read from pass before they are dropped. A check reading anything it dropped panics or
+// dereferences nil, which the dispatcher makes the rule's crash on the package, on the host's build as on any other, so
+// a wrong mark fails the rule's own fixtures.
 func NewSyntaxOnlyContext(
 	ruleName string,
 	pass *analysis.Pass,
@@ -153,6 +156,7 @@ func NewSyntaxOnlyContext(
 		context.PackageGoVersion = pass.Pkg.GoVersion()
 	}
 	context.Package, context.TypesInfo, context.TypesSizes, context.ReadFile, context.Files = nil, nil, nil, nil, nil
+	context.IsGenerated = nil
 	return context
 }
 

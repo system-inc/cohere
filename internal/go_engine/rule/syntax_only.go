@@ -9,18 +9,16 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
-	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
 )
 
 // syntaxOnlyAnswers are the analyzers a syntax-only context answers through ResultOf (see Listener.SyntaxOnly), each
-// one whose answer on a file is read from that file's bytes alone, or, for staticcheck's configuration, from the
-// package's directory, which every build of a run shares: the line table, the comment indexes, the inspector and the
-// merged staticcheck.conf.
+// one whose answer on a file is read from that file's bytes alone: the line table, the comment indexes and the
+// inspector. Staticcheck's configuration is not among them: it is read from the directory of the package's first file
+// as a `//line` directive names it, and which file is first can differ by build.
 var syntaxOnlyAnswers = []*analysis.Analyzer{
 	positions.Analyzer,
 	marker.Analyzer,
 	inspect.Analyzer,
-	staticcheck_configuration.Analyzer,
 }
 
 // AnswersSyntaxOnly is whether a syntax-only context answers analyzer's result, so a rule marked syntax-only may

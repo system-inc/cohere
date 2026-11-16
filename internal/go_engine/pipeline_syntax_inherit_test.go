@@ -249,3 +249,39 @@ func TestATimedRunWithExtraBuildsInheritsNothing(test *testing.T) {
 		test.Errorf("the timed run's probe entered shared.go %d times, want once in each build", entered["shared.go"])
 	}
 }
+
+// syntaxInheritGeneratedFixture is a module of one package whose shared.go ends in a redundant return a line directive
+// places in gen_notwindows.go, a generated file every build but windows compiles, and whose platform_windows.go only
+// windows compiles.
+var syntaxInheritGeneratedFixture = filepath.Join("testdata", "syntax-inherit-generated")
+
+// A rule whose findings pass FilterGenerated is not syntax-only (#y6q1x2j): staticcheck withholds a finding whose
+// display file, the one a line directive names, is generated among the package's files as the build compiled them, so
+// another file decides. The host compiles gen_notwindows.go and withholds S1023's finding on shared.go; windows does
+// not compile it and reports the finding. Windows's own findings of S1023 are the same inheriting or not, one on
+// shared.go: a mark on S1023 would have windows inherit the host's none.
+func TestAFindingAnotherFileWithholdsIsNotInherited(test *testing.T) {
+	test.Parallel()
+	redundantReturn := rule.Namespace + "S1023"
+	windowsFindings := func(inherits bool) []string {
+		root := copyFixture(test, syntaxInheritGeneratedFixture)
+		engine, _, _ := runOverRegistered(test, root, exitFindings, rules.All(),
+			func(engine *pipeline) { engine.keepsInheritanceOff = !inherits },
+			"--no-cache", "--no-fix", "--other-builds")
+		found := []string{}
+		for _, finding := range windowsRun(test, engine).result.Findings {
+			if finding.Rule == redundantReturn {
+				found = append(found, fmt.Sprintf("%s:%d:%d %s", filepath.Base(finding.File), finding.Line,
+					finding.Column, finding.Message))
+			}
+		}
+		slices.Sort(found)
+		return found
+	}
+	inheriting, walking := windowsFindings(true), windowsFindings(false)
+	expected := []string{"shared.go:8:2 redundant return statement"}
+	if !slices.Equal(walking, expected) || !slices.Equal(inheriting, walking) {
+		test.Errorf("windows found of S1023, inheriting\n%s\nwalking every file\n%s\nwant %q both ways",
+			strings.Join(inheriting, "\n"), strings.Join(walking, "\n"), expected)
+	}
+}
