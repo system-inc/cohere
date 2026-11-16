@@ -70,8 +70,8 @@ func dependenceAnswers(dependence *Dependence, objects []types.Object) []string 
 	}
 	lines = append(lines, fmt.Sprintf("counts %+v", dependence.Counts()))
 	resolved := dependence.resolved
-	for _, key := range resolved.keys {
-		path := resolved.packages[resolved.packageIndex[key.packageIdentifier]].path
+	for key := range resolved.nodes {
+		path := resolved.packages[key.packageIndex].path
 		bits, isDeclared := dependence.NameBits(path, key.local)
 		declaring, isDeclaring := dependence.UnitDeclaringName(path, key.local)
 		lines = append(lines, fmt.Sprintf("name %s %s %+v %t declared by %d %t", path, key.local, bits, isDeclared,
