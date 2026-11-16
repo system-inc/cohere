@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -35,10 +36,16 @@ func lowShareBuilds(test *testing.T) string {
 	return root
 }
 
-// shareGateRun runs the engine over root with the findings cache on, cold, under `--other-builds` and the 8 GiB cap,
-// so the memory, not a fixed rule, decides the width at the share gate, with configure, when not nil, given the
-// pipeline first. It returns the pipeline, its stream as written and its stderr.
-func shareGateRun(test *testing.T, root string, wantExit int, configure func(*pipeline)) (*pipeline, string, string) {
+// underCapRun runs the engine over root under `--other-builds` and the 8 GiB cap, so the memory, not a fixed rule,
+// decides the width, with configure, when not nil, given the pipeline first, and extra after the switches. It returns
+// the pipeline, its stream as written and its stderr.
+func underCapRun(
+	test *testing.T,
+	root string,
+	wantExit int,
+	configure func(*pipeline),
+	extra ...string,
+) (*pipeline, string, string) {
 	test.Helper()
 	return runOverNoted(test, root, wantExit, func(engine *pipeline) {
 		engine.memory = &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
@@ -46,7 +53,14 @@ func shareGateRun(test *testing.T, root string, wantExit int, configure func(*pi
 		if configure != nil {
 			configure(engine)
 		}
-	}, "--other-builds")
+	}, append([]string{"--other-builds"}, extra...)...)
+}
+
+// shareGateRun is underCapRun without a findings store, under `--no-cache`, the only run whose width the share gate
+// decides (#ghb3rcn).
+func shareGateRun(test *testing.T, root string, wantExit int, configure func(*pipeline)) (*pipeline, string, string) {
+	test.Helper()
+	return underCapRun(test, root, wantExit, configure, "--no-cache")
 }
 
 // startPositions is each extra build of engine's described builds by name, at its position in the order the builds
@@ -60,10 +74,11 @@ func startPositions(engine *pipeline) map[string]int {
 	return positions
 }
 
-// When every build checks at most lowShareAtGate of its packages from source as it reaches the share gate, the width
-// is decided there from the host's live heap alone, each build budgeted at buildHoldingBudget times it, and no build's
-// holding is measured: the holding the width was given is exactly that budget. Each build's record carries what it
-// would check from source at the gate, under the line over the packages its load holds (#ghb3rcn).
+// When every build of a run without a findings store checks at most lowShareAtGate of its packages from source as it
+// reaches the share gate, the width is decided there from the host's live heap alone, each build budgeted at
+// buildHoldingBudget times it, and no build's holding is measured: the holding the width was given is exactly that
+// budget. Each build's record carries what it would check from source at the gate, under the line over the packages its
+// load holds (#ghb3rcn).
 func TestTheWidthIsTheHostsLiveHeapsWhenEveryShareIsLow(test *testing.T) {
 	test.Parallel()
 	engine, raw, _ := shareGateRun(test, lowShareBuilds(test), exitFindings, nil)
@@ -80,7 +95,7 @@ func TestTheWidthIsTheHostsLiveHeapsWhenEveryShareIsLow(test *testing.T) {
 		test.Errorf("the width was given a holding of %d bytes beside a live heap of %d, want 1.2 times the live "+
 			"heap, %d, and nothing measured", engine.buildsWidthBuildBytes, engine.buildsWidthLiveBytes, budget)
 	}
-	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, budget, true)
+	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, budget, false)
 	if engine.buildsAtOnce != want {
 		test.Errorf("the builds ran %d at once, want %d, the width the host's live heap gives", engine.buildsAtOnce,
 			want)
@@ -94,11 +109,11 @@ func TestTheWidthIsTheHostsLiveHeapsWhenEveryShareIsLow(test *testing.T) {
 	}
 }
 
-// When a build will check more than lowShareAtGate of its packages from source as it reaches the share gate, the
-// width falls back to the measured rule: the first build passes alone, its holding is measured as its load ends and
-// budgeted at buildHoldingBudget times it, and the width is what that decides. The third platform of threeExtraBuilds
-// here alone imports net/http, none of whose packages the host's run checked, so its record reads its share over the
-// line at the gate.
+// When a build of a run without a findings store will check more than lowShareAtGate of its packages from source as it
+// reaches the share gate, the width falls back to the measured rule: the first build passes alone, its holding is
+// measured as its load ends and budgeted at buildHoldingBudget times it, and the width is what that decides. The third
+// platform of threeExtraBuilds here alone imports net/http, none of whose packages the host's run checked, so its
+// record reads its share over the line at the gate.
 func TestTheWidthIsMeasuredWhenABuildChecksMuchFromSource(test *testing.T) {
 	test.Parallel()
 	root := threeExtraBuilds(test)
@@ -136,7 +151,7 @@ func TestTheWidthIsMeasuredWhenABuildChecksMuchFromSource(test *testing.T) {
 		test.Fatalf("the width was given a holding of %d bytes beside a live heap of %d, want both measured",
 			engine.buildsWidthBuildBytes, engine.buildsWidthLiveBytes)
 	}
-	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes, true)
+	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes, false)
 	if engine.buildsAtOnce != want {
 		test.Errorf("the builds ran %d at once, want %d, the width the measured holding gives", engine.buildsAtOnce,
 			want)
@@ -276,5 +291,35 @@ func TestABuildEndedBeforeTheShareGateStillLetsTheSharesBeJudged(test *testing.T
 	gate.admit(0)
 	if !gate.turn(2, true) {
 		test.Error("the third build waits for the second, which ended before its gate, want its turn")
+	}
+}
+
+// A run with a findings store takes no share gate and keeps the measured rule whole (#ghb3rcn): on Shackler the gate
+// cost about 3 CPU-s at cohere's root cold with a store at every width tried. Over lowShareBuilds, whose shares the
+// gate would read as low, no build steps at the gate, the width is not decided from the host's live heap, and the
+// first build's holding is measured and taken at the store's peak factor, while every build's record still carries
+// what it would check from source at the gate.
+func TestARunWithAStoreTakesNoShareGate(test *testing.T) {
+	test.Parallel()
+	var stepped atomic.Int64
+	engine, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
+		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+	})
+	if !engine.withFindingsStore() {
+		test.Fatal("the run has no findings store, want one: the cache is on")
+	}
+	lint := lintRecordOf(test, raw)
+	if stepped.Load() != 0 || engine.buildsWidthFromHostLive || lint.BuildsWidthFromHostLive {
+		test.Errorf("a run with a store stepped %d times at the share gate and decided from the host's live heap "+
+			"%t, want neither", stepped.Load(), engine.buildsWidthFromHostLive)
+	}
+	if engine.buildsWidthBuildBytes == 0 || lint.BuildsWidthPeakFactor != buildPeakOverLoadEndWithStore {
+		test.Errorf("the width was given a holding of %d bytes at a peak factor of %.1f, want one measured at %.1f",
+			engine.buildsWidthBuildBytes, lint.BuildsWidthPeakFactor, buildPeakOverLoadEndWithStore)
+	}
+	for _, build := range lint.Builds[1:] {
+		if build.CheckedFromSourceAtGate == 0 {
+			test.Errorf("the build %s's record reads nothing from source at the gate, want its count", build.Target)
+		}
 	}
 }

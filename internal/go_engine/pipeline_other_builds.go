@@ -85,9 +85,12 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		runs[0].files = engine.session.Files()
 	}
 
-	// A width the memory decides is decided at the share gate (shareGate), against the host's live heap measured here,
-	// as the builds start, with nothing else running: from that heap alone when every build's share is low, and
-	// otherwise measured as the first build's load ends.
+	// A width the memory decides is decided against the host's live heap measured here, as the builds start, with
+	// nothing else running. In a run with a findings store it is main's rule whole: the first build runs alone and is
+	// measured as its load ends. In a run without one it is decided at the share gate (shareGate): from that heap alone
+	// when every build's share is low, and otherwise measured as the first build's load ends, each holding budgeted at
+	// buildHoldingBudget. The gate is for runs without a store alone, since on Shackler it cost about 3 CPU-s at
+	// cohere's root cold with a store at every width tried (#ghb3rcn), cause unmeasured.
 	width, fixed := engine.fixedBuildsWidth(len(extras), pass.result.Host)
 	// Under `--timing` each build's heap is measured as its own (extraBuildRun), which holds only with every build
 	// running alone: a timed run keeps nothing for its builds, so they restore nothing and run one at a time already.
@@ -99,16 +102,19 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	var measure func() int
 	if !fixed {
 		hostLive := forcedLiveHeapBytes()
-		fromHostLive = func() int {
-			decided, slack, holding := engine.hostLiveBuildsWidth(len(extras), hostLive)
-			engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes = hostLive, holding
-			engine.buildsWidthSlack = slack
-			engine.buildsWidthFromHostLive = true
-			// A test's width in place of the decision, which the record's fields above still explain.
-			if engine.buildsWidthAtGateForced > 0 {
-				decided = min(engine.buildsWidthAtGateForced, max(len(extras), 1))
+		// Left nil in a run with a findings store, which takes no share gate.
+		if !engine.withFindingsStore() {
+			fromHostLive = func() int {
+				decided, slack, holding := engine.hostLiveBuildsWidth(len(extras), hostLive)
+				engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes = hostLive, holding
+				engine.buildsWidthSlack = slack
+				engine.buildsWidthFromHostLive = true
+				// A test's width in place of the decision, which the record's fields above still explain.
+				if engine.buildsWidthAtGateForced > 0 {
+					decided = min(engine.buildsWidthAtGateForced, max(len(extras), 1))
+				}
+				return decided
 			}
-			return decided
 		}
 		measure = func() int {
 			measured, slack, holding := engine.measuredBuildsWidth(len(extras), hostLive)
@@ -131,19 +137,26 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 // order, the order they start in, and its error. order is a permutation of extras' indexes (heaviestFirst). The width
 // it ran at is engine.buildsAtOnce.
 //
-// With fromHostLive and measure, the width is the memory's to decide at the share gate (shareGate, #ghb3rcn): every
-// build starts at once, lists, builds its graph and restores, and waits before its type check (load.Caching.AtGate)
-// until every build has reported its share or ended. When every share is low the width is fromHostLive's, decided
-// then. Otherwise it is measure's: the first build in order passes alone, and measure decides the width by what it
-// holds as its load ends, which a first build whose load failed decides as one at a time. Builds pass in order, each
-// once every build before it has passed or ended and fewer than the width are past the gate. Without them the width is
-// fixed, and each build starts once fewer than width are running, in order.
+// With measure alone, the width is the memory's to decide by what the first build to start holds, main's rule whole,
+// a run with a findings store's: it runs alone until its load has ended, when measure decides the width, and the rest
+// start then, as many at once as it allows (#rmzehfg). A first build whose load failed decides one at a time.
+//
+// With fromHostLive too, a run without a findings store's, the width is decided at the share gate (shareGate,
+// #ghb3rcn): every build starts at once, lists, builds its graph and restores, and waits before its type check
+// (load.Caching.AtGate) until every build has reported its share or ended. When every share is low the width is
+// fromHostLive's, decided then. Otherwise it is measure's: the first build in order passes alone, and measure decides
+// the width by what it holds as its load ends, which a first build whose load failed decides as one at a time. Builds
+// pass in order, each once every build before it has passed or ended and fewer than the width are past the gate. The
+// gate is for runs without a store alone: on Shackler it cost about 3 CPU-s at cohere's root cold with a store at every
+// width tried, cause unmeasured, and read 0.26 s faster without one, its CPU level.
+//
+// With neither the width is fixed, and each build starts once fewer than width are running, in order.
 //
 // One at a time, a build that fails stops the run before any later build in order starts, so their notes are never
 // written. Side by side, a later build may already have ended, so each build notes into a buffer of its own, and once
 // every build has ended the buffers are written to stderr in order, up to and including the first build that failed,
 // and the rest are dropped with the runs after it: the stream and stderr are a run one at a time's, byte for byte, at
-// any width. A build after one known to have failed is never started at a fixed width, and is refused at the share
+// any width. A build after one known to have failed is never started without the share gate, and is refused at the
 // gate (errorRefusedAtGate), so it never type-checks, as it never would one at a time; one before it still runs.
 //
 // The builds' lints share one gate (lintGate), a budget of one whole build that each takes its weight of once its first
@@ -194,10 +207,13 @@ func (engine *pipeline) extraBuildRuns(
 			return 1
 		})
 	}
-	// shares is the builds' share gate, nil at a fixed width, whose builds start as they are admitted.
+	// shares is the builds' share gate, nil but for a run without a findings store whose width the memory decides:
+	// without it the builds start as they are admitted, the first alone while measure decides.
 	var shares *shareGate
 	if measure != nil {
 		limit = 1
+	}
+	if measure != nil && fromHostLive != nil {
 		shares = newShareGate(len(order))
 	}
 	// judge is called once, by the last build to arrive at the share gate: a share over the line leaves the width to
@@ -218,7 +234,7 @@ func (engine *pipeline) extraBuildRuns(
 	var group sync.WaitGroup
 	for position, index := range order {
 		extra := extras[index]
-		// At a fixed width a build is admitted as it starts; at the share gate every build starts at once, since the
+		// Without the share gate a build is admitted as it starts; at the gate every build starts at once, since the
 		// shares are judged only once every one has arrived, and is admitted at its gate.
 		if shares == nil {
 			admitLock.Lock()

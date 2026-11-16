@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
@@ -594,6 +596,37 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	if difference := max(collectedHolding, staleHolding) - min(collectedHolding, staleHolding); difference > 64<<20 {
 		test.Errorf("the decision was given holdings of %d and %d bytes, %d apart, want the same holding measured "+
 			"both times", collectedHolding, staleHolding, difference)
+	}
+}
+
+// A run with a findings store budgets the first build at what it measured, its holding itself, since the share gate's
+// 1.2, buildHoldingBudget, was fitted without a store, where the peak factor is 2.5, and its margin does not carry to
+// a store's 3.5 (#ghb3rcn). A retained 256 MiB stands for the first build, measured by an engine whose session has a
+// store, and the holding it is given is within a sixteenth of it, well short of the 1.2 a run without one takes.
+//
+// Not parallel: it measures this process's live heap, which another test's run would move.
+func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
+	const buildBytes = 256 << 20
+	hostLive := forcedLiveHeapBytes()
+	limit := int64(hostLive + 16*buildBytes)
+	engine := &pipeline{
+		memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
+			Source: contract.MemorySourceCap}},
+		session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil),
+	}
+	if !engine.withFindingsStore() {
+		test.Fatal("the engine has no findings store, want one")
+	}
+	build := make([]byte, buildBytes)
+	for index := range build {
+		build[index] = 1
+	}
+	_, _, holding := engine.measuredBuildsWidth(8, hostLive)
+	runtime.KeepAlive(build)
+	// Within a sixteenth either way, since the rest of the heap moves by a little between the two collections.
+	if holding < buildBytes-buildBytes/16 || holding > buildBytes+buildBytes/16 {
+		test.Errorf("a run with a store was given a holding of %d bytes for a build of %d, want the holding "+
+			"measured, unbudgeted", holding, buildBytes)
 	}
 }
 

@@ -142,11 +142,12 @@ func TestTheWidthChangesNothingUnderTheOnePool(test *testing.T) {
 }
 
 // The width the memory decides is measured as the first build's load ends (#rmzehfg): over the fixture's three builds
-// beside the host's under the memory cap, whose windows build checks a quarter of its graph from source, over the share
-// gate's line (#ghb3rcn), the first build passes the share gate alone to its load's end, its holding is read, the lint
-// record names the host's live heap, the holding and the peak factor the width was decided by, 2.5 under `--no-cache`
-// and 3.5 with a findings store (#hv090f4), and the stream is the one a run one build at a time writes, but for the
-// width.
+// beside the host's under the memory cap, whose windows build checks a quarter of its graph from source, the first
+// build runs to its load's end alone, its holding is read, the lint record names the host's live heap, the holding and
+// the peak factor the width was decided by, 2.5 under `--no-cache` and 3.5 with a findings store (#hv090f4), and the
+// stream is the one a run one build at a time writes, but for the width. Under `--no-cache` the first build passes the
+// share gate alone, the windows build's share being over its line, and with a store it runs alone from the start, as no
+// gate holds the rest (#ghb3rcn).
 func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	test.Parallel()
 

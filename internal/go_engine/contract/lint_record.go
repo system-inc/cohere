@@ -57,8 +57,9 @@ type LintRecord struct {
 	// which no heap can widen.
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
 	// BuildsWidthBuildBytes is additive within contract 3, and the Go engine's alone: the holding each extra build was
-	// budgeted beyond that heap as its load ends, 1.2 times what the first build to start, the heaviest, held then,
-	// measured the same way, or 1.2 times that heap when BuildsWidthFromHostLive (#ghb3rcn). With
+	// budgeted beyond that heap as its load ends: what the first build to start, the heaviest, held then, measured the
+	// same way, in a run with a findings store, and in a run without one 1.2 times that, or 1.2 times that heap when
+	// BuildsWidthFromHostLive (#ghb3rcn). With
 	// BuildsWidthPeakFactor, the times that holding a build is taken to reach at its lint's peak, 3.5 in a run with a
 	// findings store and 2.5 without one (#hv090f4), and the memory record's limit, a reader redoes the arithmetic:
 	// floor((limit - live) / (holding * factor)), no more than the builds and at least one (#rmzehfg). Both are absent
@@ -70,11 +71,11 @@ type LintRecord struct {
 	// mode, 3.22 with a findings store and 2.16 without one, with 512 MiB to spare (#ewkp7w0). Absent when it did not.
 	BuildsWidthSlack bool `json:"buildsWidthSlack,omitempty"`
 	// BuildsWidthFromHostLive is additive within contract 3, and the Go engine's alone: whether the width was decided
-	// from the host's live heap alone, at the share gate every extra build waits at before its type check, since every
-	// build's share there, its CheckedFromSourceAtGate over its PackagesLoaded, was at or under 0.10 (#ghb3rcn).
-	// BuildsWidthBuildBytes is then that heap times 1.2, the holding budgeted each build, and nothing was measured
-	// again. Absent when the first build's holding was measured instead, a share being over the line, or the width
-	// needed no heap.
+	// from the host's live heap alone, at the share gate every extra build waits at before its type check in a run
+	// without a findings store, since every build's share there, its CheckedFromSourceAtGate over its PackagesLoaded,
+	// was at or under 0.10 (#ghb3rcn). BuildsWidthBuildBytes is then that heap times 1.2, the holding budgeted each
+	// build, and nothing was measured again. Absent when the first build's holding was measured instead, a share being
+	// over the line or the run having a store, which takes no gate, or the width needed no heap.
 	BuildsWidthFromHostLive bool `json:"buildsWidthFromHostLive,omitempty"`
 	// BuildsPeakProblems is additive within contract 3, and the Go engine's alone: a sentence for each extra build of
 	// a run under `--timing` whose LintPeakOverLoadEnd passed the largest ratio measured in the run's mode, which the
@@ -201,10 +202,11 @@ type BuildRecord struct {
 	CheckedFromSourceRounds []int `json:"checkedFromSourceRounds,omitempty"`
 	PackagesLoaded          int   `json:"packagesLoaded,omitempty"`
 	// CheckedFromSourceAtGate is additive within contract 3, and an extra build's alone (#ghb3rcn): the packages its
-	// first load would check from source as it reached the share gate before its type check, every one not restored.
-	// It is a lower bound on the first round of CheckedFromSource, since a restore decided late can still decline,
-	// and its share over PackagesLoaded is the one the width's decision read, so a tree whose gate and final shares
-	// part widely is findable from the record. Absent when 0.
+	// first load would check from source as it reached the point before its type check where, in a run without a
+	// findings store, the share gate holds it, every one not restored. It is written whatever the run. It is a lower
+	// bound on the first round of CheckedFromSource, since a restore decided late can still decline, and its share over
+	// PackagesLoaded is the one the gate's decision reads, so a tree whose gate and final shares part widely is
+	// findable from the record. Absent when 0.
 	CheckedFromSourceAtGate int  `json:"checkedFromSourceAtGate,omitempty"`
 	LintWaitMilliseconds    int  `json:"lintWaitMilliseconds,omitempty"`
 	LintWaited              bool `json:"lintWaited,omitempty"`
