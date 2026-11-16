@@ -41,3 +41,33 @@ func TestMayNameHomeDirectoryKeepsEveryLiteralThatNamesOne(test *testing.T) {
 		}
 	}
 }
+
+// holdsHomeWords turns a value away before homeDirectory only when homeDirectory could not match it: every value here
+// it matches holds the words, and a value kept for an escape that names no home directory, the common case, is turned
+// away without the expression.
+func TestHoldsHomeWordsKeepsEveryValueThatNamesOne(test *testing.T) {
+	test.Parallel()
+	// Not a machine path: planted values, the inputs the check is held to, never read from disk.
+	for _, value := range []struct {
+		text       string
+		turnedAway bool
+	}{
+		{text: "/Users/someone/x"},
+		{text: "see /home/someone/"},
+		{text: "x:/Users/a b/"},
+		{text: "/Users/"},
+		{text: "/home//"},
+		{text: "line one\nline two", turnedAway: true},
+		{text: "/AllUsers/someone/", turnedAway: true},
+		{text: "/users/someone/", turnedAway: true},
+		{text: "", turnedAway: true},
+	} {
+		held := holdsHomeWords(value.text)
+		if homeDirectory.MatchString(value.text) && !held {
+			test.Errorf("%q names a home directory and was turned away before the expression", value.text)
+		}
+		if value.turnedAway && held {
+			test.Errorf("%q holds neither /Users/ nor /home/ and reached the expression", value.text)
+		}
+	}
+}

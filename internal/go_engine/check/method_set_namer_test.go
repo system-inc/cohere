@@ -7,11 +7,13 @@ import (
 )
 
 // methodSetNamesFixture is one package of a method set rule's own, checked in memory, and the sets it asks of it.
+// holds, when set, checks what the sets prove nothing without, a fact of the checked package the rule turns on.
 type methodSetNamesFixture struct {
 	name         string
 	source       string
 	dependencies map[string]string
 	sets         []methodSetNamesQuery
+	holds        func(test *testing.T, checked *types.Package)
 }
 
 // methodSetNamesQuery is one set a fixture asks: the type of the package-scope object named object, a type name's
@@ -108,6 +110,32 @@ func (Deeper) Shadowed() {}
 		},
 	},
 	{
+		// A type embedded twice at one depth carries its collision down: Shared appears twice at depth 2, so Deep,
+		// which it embeds once, brings Carried at depth 3 as a collision too, and neither set holds it (#jy0v2ef).
+		name: "a collision carried down from a type embedded twice",
+		source: `package fixture
+
+type Deep struct{}
+
+func (Deep) Carried() {}
+
+type Shared struct{ Deep }
+
+type First struct{ Shared }
+
+type Second struct{ Shared }
+
+type Diamond struct {
+	First
+	Second
+}
+`,
+		sets: []methodSetNamesQuery{
+			{object: "Diamond", names: nil},
+			{object: "Diamond", pointer: true, names: nil},
+		},
+	},
+	{
 		// A field hides a deeper method of its name, and collides with a method of its name at its own depth.
 		name: "a field collides with a method",
 		source: `package fixture
@@ -134,6 +162,42 @@ type Beside struct {
 			{object: "Outer", pointer: true, names: []string{"Kept"}},
 			{object: "Beside", names: []string{"Kept"}},
 			{object: "Beside", pointer: true, names: []string{"Kept"}},
+		},
+	},
+	{
+		// An unexported field is its package's name: Outer's name hides Inner's method of its package and spelling,
+		// and Mixed's name, the fixture's, is not other's method name, which the set keeps (#jy0v2ef).
+		name: "an unexported field keyed by its package",
+		source: `package fixture
+
+import "example.com/other"
+
+type Inner struct{}
+
+func (Inner) name() {}
+func (Inner) Kept() {}
+
+type Outer struct {
+	Inner
+	name string
+}
+
+type Mixed struct {
+	other.Hidden
+	name int
+}
+`,
+		dependencies: map[string]string{"example.com/other": `package other
+
+type Hidden struct{}
+
+func (Hidden) name() {}
+`},
+		sets: []methodSetNamesQuery{
+			{object: "Outer", names: []string{"Kept"}},
+			{object: "Outer", pointer: true, names: []string{"Kept"}},
+			{object: "Mixed", names: []string{"name"}},
+			{object: "Mixed", pointer: true, names: []string{"name"}},
 		},
 	},
 	{
@@ -248,6 +312,10 @@ type Pointing *Counter
 		sets: []methodSetNamesQuery{
 			{object: "Counter", names: []string{"Read"}},
 			{object: "Counter", pointer: true, names: []string{"Increment", "Read"}},
+			// No finished type check reaches the namer's named pointer return (method_set_namer.go, methodNames' first
+			// check), so this holds with it deleted: Go declares no method on a named pointer type, and its underlying
+			// pointer is neither a struct nor an interface, so the walk finds nothing either way. go/types attaches a
+			// method to one only in a package with type errors, which checkedInMemory refuses (#jy0v2ef).
 			{object: "Pointing", names: nil},
 		},
 	},
@@ -278,6 +346,81 @@ func (Hidden) name() {}
 			{object: "Both", pointer: true, names: []string{"name", "name"}},
 		},
 	},
+	{
+		// One instance reached twice at one depth by two pointers, other.G[int] instantiated by other's checker in A
+		// and by the fixture's in B, is one type embedded twice, folded by types.Identical, not by ==, so M collides
+		// (#jy0v2ef). wasSeen's types.Identical half has no fixture and can have none: a type identical to one walked
+		// at a shallower depth brings only names that depth settled, so walking it again changes no name, and a
+		// cycle's types are finitely many pointers, so == alone still ends it.
+		name: "two identical instances that are not one pointer",
+		source: `package fixture
+
+import "example.com/other"
+
+type B struct{ other.G[int] }
+
+type Both struct {
+	other.A
+	B
+}
+`,
+		dependencies: map[string]string{"example.com/other": `package other
+
+type G[T any] struct{}
+
+func (G[T]) M() {}
+
+type A struct{ G[int] }
+`},
+		sets: []methodSetNamesQuery{
+			{object: "Both", names: nil},
+			{object: "Both", pointer: true, names: nil},
+		},
+		holds: func(test *testing.T, checked *types.Package) {
+			both := methodSetNamesDeclared(test, checked, "Both")
+			throughOther := methodSetNamesField(test, methodSetNamesField(test, both, 0), 0)
+			throughFixture := methodSetNamesField(test, methodSetNamesField(test, both, 1), 0)
+			if throughOther == throughFixture || !types.Identical(throughOther, throughFixture) {
+				test.Fatalf("A's %s and B's %s are not two pointers to identical instances, so the fixture proves "+
+					"nothing", throughOther, throughFixture)
+			}
+		},
+	},
+	{
+		// An alias is its type: as a type name, embedded, embedded through a pointer, and of a pointer, whose set is
+		// its base's pointer set (#jy0v2ef).
+		name: "an alias, as a type name and embedded",
+		source: `package fixture
+
+type Inner struct{}
+
+func (Inner) Look()  {}
+func (*Inner) Grow() {}
+
+type Renamed = Inner
+
+type ThroughAlias struct{ Renamed }
+
+type ThroughPointer struct{ *Renamed }
+
+type PointerTo = *Inner
+`,
+		sets: []methodSetNamesQuery{
+			{object: "Renamed", names: []string{"Look"}},
+			{object: "Renamed", pointer: true, names: []string{"Grow", "Look"}},
+			{object: "ThroughAlias", names: []string{"Look"}},
+			{object: "ThroughAlias", pointer: true, names: []string{"Grow", "Look"}},
+			{object: "ThroughPointer", names: []string{"Grow", "Look"}},
+			{object: "PointerTo", names: []string{"Grow", "Look"}},
+		},
+		holds: func(test *testing.T, checked *types.Package) {
+			for _, alias := range []string{"Renamed", "PointerTo"} {
+				if _, isAlias := methodSetNamesDeclared(test, checked, alias).(*types.Alias); !isAlias {
+					test.Fatalf("%s is no *types.Alias, so the fixture proves nothing of aliases", alias)
+				}
+			}
+		},
+	},
 }
 
 // TestMethodSetNamesFixtures holds the namer, on each rule's fixture, to the names written out and to NewMethodSet's.
@@ -287,13 +430,12 @@ func TestMethodSetNamesFixtures(test *testing.T) {
 		test.Run(fixture.name, func(test *testing.T) {
 			test.Parallel()
 			checked := checkedInMemory(test, "example.com/fixture", fixture.source, fixture.dependencies)
+			if fixture.holds != nil {
+				fixture.holds(test, checked)
+			}
 			namer := newMethodSetNamer()
 			for _, query := range fixture.sets {
-				object := checked.Scope().Lookup(query.object)
-				if object == nil {
-					test.Fatalf("the fixture declares no %s", query.object)
-				}
-				set := object.Type()
+				set := methodSetNamesDeclared(test, checked, query.object)
 				if query.pointer {
 					set = types.NewPointer(set)
 				}
@@ -307,6 +449,26 @@ func TestMethodSetNamesFixtures(test *testing.T) {
 			}
 		})
 	}
+}
+
+// methodSetNamesDeclared is the type of the package-scope object checked declares as name.
+func methodSetNamesDeclared(test *testing.T, checked *types.Package, name string) types.Type {
+	test.Helper()
+	object := checked.Scope().Lookup(name)
+	if object == nil {
+		test.Fatalf("the fixture declares no %s", name)
+	}
+	return object.Type()
+}
+
+// methodSetNamesField is the type of the field at index of fielded's underlying struct.
+func methodSetNamesField(test *testing.T, fielded types.Type, index int) types.Type {
+	test.Helper()
+	structure, isStruct := fielded.Underlying().(*types.Struct)
+	if !isStruct || index >= structure.NumFields() {
+		test.Fatalf("%s has no field %d", fielded, index)
+	}
+	return structure.Field(index).Type()
 }
 
 // methodSetNamesOf are the names of NewMethodSet(set), sorted, what the namer must give.

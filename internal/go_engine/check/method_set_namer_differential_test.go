@@ -2,13 +2,18 @@ package check
 
 import (
 	"fmt"
+	"go/constant"
 	"go/types"
 	"os"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
+
+	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // methodSetNamesCorpusVariable names a directory whose packages, `./...` there and every package they import, the
@@ -19,26 +24,98 @@ import (
 //	    -run 'TestMethodSetNamesMatchNewMethodSet$' -count=1 -v
 const methodSetNamesCorpusVariable = "COHERE_METHOD_SET_NAMES_CORPUS"
 
-// methodSetNamesStandardMinimum is fewer sets than std's type names give, values and pointers, so the differential
-// cannot pass on a load that found little: go1.27's std gives 7,919 sets of 4,126 type names in 381 packages, its
-// export data holding every package-scope type name, unexported ones too.
+// methodSetNamesCorpusMinimumVariable names the fewest sets a corpus must give, a whole number of at least one, one
+// when it is unset, so a corpus whose `./...` matches nothing fails rather than passing on no comparison (#jy0v2ef).
+const methodSetNamesCorpusMinimumVariable = "COHERE_METHOD_SET_NAMES_CORPUS_MINIMUM"
+
+// methodSetNamesStandardMinimum is fewer sets than std's type names give on any platform the differential loads,
+// values and pointers, so it cannot pass on a load that found little: go1.27's std gives 7,919 sets of 4,126 type
+// names in 381 packages on darwin/arm64, every package type-checked from source, so every package-scope type name is
+// read, unexported ones too.
 const methodSetNamesStandardMinimum = 6000
 
 // methodSetNamesReported is how many differing sets the differential names before it stops listing them.
 const methodSetNamesReported = 20
 
-// TestMethodSetNamesMatchNewMethodSet holds the namer to NewMethodSet on every type name of std's packages, or of
-// the closure methodSetNamesCorpusVariable names: the set of each, and of a pointer to each that is not an interface,
-// both as sorted names, since the namer's order is its map's and the method index reads none, while NewMethodSet's is
-// by unique name. A name twice, two packages' unexported methods of one spelling, is twice in both.
+// TestMethodSetNamesMatchNewMethodSet holds the namer to NewMethodSet on every type name of std's packages, or of the
+// closure methodSetNamesCorpusVariable names: the set of each, and of a pointer to each that is not an interface, both
+// as sorted names, since the namer's order is its map's and the method index reads none, while NewMethodSet's is by
+// unique name. A name twice, two packages' unexported methods of one spelling, is twice in both.
+//
+// std is compared for the host and for every platform a release ships besides the host's (release.Targets), each with
+// cgo off as a release builds it, so the types only one platform declares, Windows' syscall and
+// internal/syscall/windows among them, are compared on any machine (#jy0v2ef). All of them, not a sample, since the
+// test tier affords it. The five beyond the host's load one at a time, in one subtest beside the host's and the rest
+// of the package, since all six at once peaked at 2.2 GB RSS. On the Mac, by `/usr/bin/time -l` on the test binary
+// `go test -c` built, `-test.run` this test, two runs: each platform's std takes about 0.5 s to type-check from
+// source, the test 2.81 and 2.46 s, and the test binary peaks at 0.85 and 0.83 GB RSS, against 0.38 and 0.39 GB for
+// the host's load alone; the package ran in 34.8 s, against 32.4 s without the five.
 func TestMethodSetNamesMatchNewMethodSet(test *testing.T) {
 	test.Parallel()
-	directory, patterns := "", []string{"std"}
-	corpus := os.Getenv(methodSetNamesCorpusVariable)
-	if corpus != "" {
-		directory, patterns = corpus, []string{"./..."}
+	if corpus := os.Getenv(methodSetNamesCorpusVariable); corpus != "" {
+		methodSetNamesCompare(test, methodSetNamesLoad(test, corpus, nil, "./..."), methodSetNamesCorpusMinimum(test))
+		return
 	}
-	loaded := methodSetNamesLoad(test, directory, patterns)
+	test.Run("host", func(test *testing.T) {
+		test.Parallel()
+		loaded := methodSetNamesLoad(test, "", nil, "std")
+		methodSetNamesHoldPlatform(test, loaded, runtime.GOOS, runtime.GOARCH)
+		methodSetNamesCompare(test, loaded, methodSetNamesStandardMinimum)
+	})
+	test.Run("platforms", func(test *testing.T) {
+		test.Parallel()
+		for _, target := range release.Targets {
+			// The host's std, loaded above as the host builds it, is this platform's.
+			if target.GoOperatingSystem == runtime.GOOS && target.GoArchitecture == runtime.GOARCH {
+				continue
+			}
+			// Not parallel: one platform's std at a time holds one load's memory, not five, and each stays its own
+			// subtest so a red names its platform.
+			test.Run(target.GoOperatingSystem+"_"+target.GoArchitecture, func(test *testing.T) {
+				environment := append(os.Environ(), "GOOS="+target.GoOperatingSystem,
+					"GOARCH="+target.GoArchitecture, "CGO_ENABLED=0")
+				loaded := methodSetNamesLoad(test, "", environment, "std")
+				methodSetNamesHoldPlatform(test, loaded, target.GoOperatingSystem, target.GoArchitecture)
+				methodSetNamesCompare(test, loaded, methodSetNamesStandardMinimum)
+			})
+		}
+	})
+}
+
+// methodSetNamesHoldPlatform fails unless loaded is std as operatingSystem and architecture build it, read from the
+// constants `internal/goos.GOOS` and `internal/goarch.GOARCH` among its packages, so a load that ignored its
+// environment and read the host's std cannot pass as another platform's (#jy0v2ef).
+func methodSetNamesHoldPlatform(test *testing.T, loaded []*types.Package, operatingSystem string, architecture string) {
+	test.Helper()
+	if read := methodSetNamesStringConstant(test, loaded, "internal/goos", "GOOS"); read != operatingSystem {
+		test.Fatalf("the load is std for GOOS %s, want %s", read, operatingSystem)
+	}
+	if read := methodSetNamesStringConstant(test, loaded, "internal/goarch", "GOARCH"); read != architecture {
+		test.Fatalf("the load is std for GOARCH %s, want %s", read, architecture)
+	}
+}
+
+// methodSetNamesStringConstant is the value of the string constant name declares in the package of loaded at path.
+func methodSetNamesStringConstant(test *testing.T, loaded []*types.Package, path string, name string) string {
+	test.Helper()
+	for _, each := range loaded {
+		if each.Path() != path {
+			continue
+		}
+		declared, isConstant := each.Scope().Lookup(name).(*types.Const)
+		if !isConstant || declared.Val().Kind() != constant.String {
+			test.Fatalf("%s declares no string constant %s", path, name)
+		}
+		return constant.StringVal(declared.Val())
+	}
+	test.Fatalf("the load holds no %s", path)
+	return ""
+}
+
+// methodSetNamesCompare holds the namer to NewMethodSet on every type name of loaded, failing on any difference and
+// on fewer than minimum sets compared, a load that found too little.
+func methodSetNamesCompare(test *testing.T, loaded []*types.Package, minimum int) {
+	test.Helper()
 	namer := newMethodSetNamer()
 	compared, typeNames := 0, 0
 	var differences []string
@@ -70,18 +147,35 @@ func TestMethodSetNamesMatchNewMethodSet(test *testing.T) {
 		test.Fatalf("%d of %d sets differ from NewMethodSet's:\n%s", len(differences), compared,
 			strings.Join(shown, "\n"))
 	}
-	if corpus == "" && compared < methodSetNamesStandardMinimum {
-		test.Fatalf("compared %d sets of std, want at least %d: the load found too little", compared,
-			methodSetNamesStandardMinimum)
+	if compared < minimum {
+		test.Fatalf("compared %d sets, want at least %d: the load found too little", compared, minimum)
 	}
 }
 
+// methodSetNamesCorpusMinimum is the fewest sets a corpus must give, methodSetNamesCorpusMinimumVariable's whole
+// number, or one when it is unset.
+func methodSetNamesCorpusMinimum(test *testing.T) int {
+	test.Helper()
+	spelled := os.Getenv(methodSetNamesCorpusMinimumVariable)
+	if spelled == "" {
+		return 1
+	}
+	minimum, parseError := strconv.Atoi(spelled)
+	if parseError != nil || minimum < 1 {
+		test.Fatalf("%s is %q, want a whole number of at least 1", methodSetNamesCorpusMinimumVariable, spelled)
+	}
+	return minimum
+}
+
 // methodSetNamesLoad are the types of the packages patterns name from directory, and of every package they import,
-// each once, from export data, which every type name's method set reads in full.
-func methodSetNamesLoad(test testing.TB, directory string, patterns []string) []*types.Package {
+// each once, for the platform environment names (the host's when it is nil). Each is type-checked from source,
+// function bodies included, since NeedDeps without NeedExportFile reads no export data, so every package-scope type
+// name is there, unexported ones too, and every type name's method set reads in full.
+func methodSetNamesLoad(test testing.TB, directory string, environment []string, patterns ...string) []*types.Package {
 	test.Helper()
 	configuration := &packages.Config{
 		Dir:  directory,
+		Env:  environment,
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps,
 	}
 	roots, loadError := packages.Load(configuration, patterns...)
@@ -107,7 +201,7 @@ func methodSetNamesLoad(test testing.TB, directory string, patterns []string) []
 // not an interface, both by NewMethodSet and by the namer, one namer a package as indexPackage makes it, so the two
 // report their allocations side by side (#5xzb4q2).
 func BenchmarkMethodSetNames(benchmark *testing.B) {
-	loaded := methodSetNamesLoad(benchmark, "", []string{"net/http"})
+	loaded := methodSetNamesLoad(benchmark, "", nil, "net/http")
 	var sets []types.Type
 	for _, each := range loaded {
 		if each.Path() != "net/http" {
