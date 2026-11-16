@@ -622,9 +622,11 @@ func TestALargeCorpusDiffersFromEachConsumerOnlyInKnownClasses(test *testing.T) 
 	test.Parallel()
 	root := os.Getenv("COHERE_STRACE_CORPUS")
 	if root == "" {
+		// The phrase is cohere's needs.OptInPhrase, by which the land gate names this test opt-in, spelled here
+		// since this module requires nothing of cohere's.
 		test.Skip(
-			"COHERE_STRACE_CORPUS is not set, so the large corpus was not read: " +
-				"nothing here was checked against real traces",
+			"opt-in, run with COHERE_STRACE_CORPUS set: the large corpus was not read, " +
+				"so nothing here was checked against real traces",
 		)
 	}
 	counts := map[string]map[differenceClass]int{"loom": {}, "adamic": {}}

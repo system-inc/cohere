@@ -27,6 +27,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The unit-isolation test (#h350vqr) holds every rule the side table declares rules.InputsPerUnit or
@@ -938,8 +939,8 @@ func treePackageDirectories(test *testing.T, root string) []string {
 func TestASampleOfCoheresTreeFindsTheSameInTheUnitsAVariantKeeps(test *testing.T) {
 	test.Parallel()
 	if os.Getenv(unitIsolationVariable) != "tree" {
-		test.Skipf("%s=tree runs the sampled pass over cohere's tree, with the seed %s_SEED names",
-			unitIsolationVariable, unitIsolationVariable)
+		test.Skipf("%s%s=tree set: it runs the sampled pass over cohere's tree, with the seed %s_SEED names",
+			needs.OptInPhrase, unitIsolationVariable, unitIsolationVariable)
 	}
 	var seed uint64
 	var sampleSize uint64 = treeSampleSize

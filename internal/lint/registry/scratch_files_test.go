@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // scratchFilePrefixes are the names an agent gives a throwaway test file.
@@ -69,11 +71,8 @@ func TestNoScratchFilesRemain(test *testing.T) {
 	// become permanent. `COHERE_CHECK_SCRATCH=1 go test ./internal/registry/` is the invocation, and
 	// the commit path sets it. Everywhere else it says why it did not run, so a reader never mistakes
 	// a skip for a pass.
-	if os.Getenv("COHERE_CHECK_SCRATCH") == "" {
-		test.Skip("set COHERE_CHECK_SCRATCH=1 to run; skipped during ordinary work because a live " +
-			"agent's probe is a legitimate mid-measurement file, and a guard that fires on normal " +
-			"work stops being read")
-	}
+	needs.OptIn(test, "COHERE_CHECK_SCRATCH", "skipped during ordinary work because a live agent's probe is a "+
+		"legitimate mid-measurement file, and a guard that fires on normal work stops being read")
 
 	roots := []string{"../../../internal", "../../../command"}
 

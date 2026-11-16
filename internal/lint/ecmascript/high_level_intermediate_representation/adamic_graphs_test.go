@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -46,7 +47,7 @@ var exportGraphs = flag.String(
 func TestExportGraphsForAdamic(test *testing.T) {
 	test.Parallel()
 	if *exportGraphs == "" {
-		test.Skip("writes Adamic's corpus only when -export-graphs names a directory")
+		test.Skip(needs.OptInPhrase + "-export-graphs set: it writes Adamic's corpus into the directory it names")
 	}
 	if createDirectoryError := os.MkdirAll(*exportGraphs, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)

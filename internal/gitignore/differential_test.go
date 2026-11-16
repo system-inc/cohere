@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The differential: on a real tree, every path's verdict and deciding rule equals git check-ignore's, read
@@ -25,10 +27,7 @@ import (
 // directory, and the sandbox is shown to hold before git reads anything.
 func TestTheMatcherAgreesWithGitOnRealTrees(test *testing.T) {
 	test.Parallel()
-	trees := os.Getenv("COHERE_GITIGNORE_TREES")
-	if trees == "" {
-		test.Skip("COHERE_GITIGNORE_TREES names no trees to compare")
-	}
+	trees := needs.OptIn(test, "COHERE_GITIGNORE_TREES", "it names the trees, colon separated, compared with git")
 	oracle := newOracle(test)
 	for _, tree := range strings.Split(trees, ":") {
 		pending := []string{tree}
@@ -76,7 +75,7 @@ func TestTheMatcherAgreesWithGitOnGeneratedTrees(test *testing.T) {
 		test.Fatalf("COHERE_GITIGNORE_GENERATED is %q, which is not a count of trees: %v", generated, countError)
 	}
 	if count <= 0 {
-		test.Skip("COHERE_GITIGNORE_GENERATED asks for no generated trees")
+		test.Skip(needs.OptInPhrase + "COHERE_GITIGNORE_GENERATED set: it asks for that many generated trees")
 	}
 	seed, parseError := strconv.ParseInt(os.Getenv("COHERE_GITIGNORE_SEED"), 10, 64)
 	if parseError != nil {

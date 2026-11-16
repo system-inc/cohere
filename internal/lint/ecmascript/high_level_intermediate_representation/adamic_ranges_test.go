@@ -11,6 +11,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
@@ -52,7 +53,7 @@ var exportRanges = flag.String(
 func TestExportRangesForAdamic(test *testing.T) {
 	test.Parallel()
 	if *exportRanges == "" {
-		test.Skip("writes Adamic's corpus only when -export-ranges names a directory")
+		test.Skip(needs.OptInPhrase + "-export-ranges set: it writes Adamic's corpus into the directory it names")
 	}
 	if createDirectoryError := os.MkdirAll(*exportRanges, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)

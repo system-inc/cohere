@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The records' wide run's variables (#6a3kjvz): the tree it loads, and the builds it judges, by name (wideBuilds),
@@ -238,10 +240,7 @@ func TestARecordOfAUnitPastAColumnIsRefused(test *testing.T) {
 func TestARecordedGraphIsTheLiveGraphInATree(test *testing.T) {
 	test.Parallel()
 
-	tree := os.Getenv(recordsTreeVariable)
-	if tree == "" {
-		test.Skipf("%s names no tree", recordsTreeVariable)
-	}
+	tree := needs.OptIn(test, recordsTreeVariable, "it names the tree whose recorded graph is held to its live graph")
 	started := time.Now()
 	host := loadTree(test, tree, wideEnvironment("darwin", ""))
 	live := graphOf(host, nil)
