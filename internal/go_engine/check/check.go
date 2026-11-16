@@ -306,6 +306,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// roots are what the checker runs on every package to analyze: the rules, and the report beside them.
 	roots := analyzers
 	if options.Report != nil {
+		// A root listed twice has one action per package, which rootActions files under its last index alone, leaving
+		// the other's empty.
+		if reporting, isRule := ruleOf[options.Report]; isRule {
+			return nil, fmt.Errorf("running report %s: it is the analyzer of rule %s, so the run could not tell the "+
+				"report's result from the rule's", options.Report.Name, reporting.Name)
+		}
 		roots = append(slices.Clone(analyzers), options.Report)
 	}
 	if wrapError := wrapRuns(roots); wrapError != nil {
@@ -622,7 +628,7 @@ func rootActions(
 	for index, root := range roots {
 		analyzerIndex[root] = index
 	}
-	// A package listed twice is read at its first index, as every lookup of it finds the same action.
+	// A package listed twice gets its action at every index it is listed at, since the gather reads each one.
 	packageIndexes := make(map[*packages.Package][]int, len(analyzed))
 	for index, analyzedPackage := range analyzed {
 		packageIndexes[analyzedPackage] = append(packageIndexes[analyzedPackage], index)

@@ -829,6 +829,29 @@ func (session *CacheSession) saveMisses(
 	throughPositionDependent := session.writeThrough(actionsOf, unsettled, knownFiles)
 	clear(session.closures)
 	aliases := map[cache.Key]cache.Key{}
+	session.aliasWritten(written, encoded, aliases)
+	for through, dependent := range throughPositionDependent {
+		if dependent {
+			continue
+		}
+		if second, known := session.secondKey(through); known {
+			aliases[second] = session.keys[through]
+		}
+	}
+	session.alias(aliases)
+	return encoded
+}
+
+// aliasWritten gives each package of written whose entry, of encoded, has no finding naming a file outside it an alias
+// under its second key, once that key is known, leading to its own. An entry encoded without that judgment is refused
+// as a problem of the session and given no alias, never read as one whose findings stay put.
+//
+// Mutates: aliases gains each alias given
+func (session *CacheSession) aliasWritten(
+	written []*packages.Package,
+	encoded map[*packages.Package]encodedEntry,
+	aliases map[cache.Key]cache.Key,
+) {
 	for _, saved := range written {
 		dependent, judgeError := encoded[saved].positionDependent.read(saved.ID)
 		if judgeError != nil {
@@ -842,16 +865,6 @@ func (session *CacheSession) saveMisses(
 			aliases[second] = session.keys[saved]
 		}
 	}
-	for through, dependent := range throughPositionDependent {
-		if dependent {
-			continue
-		}
-		if second, known := session.secondKey(through); known {
-			aliases[second] = session.keys[through]
-		}
-	}
-	session.alias(aliases)
-	return encoded
 }
 
 // putEntry writes entry's record under key, its export data first, so a record is never in the store before what it

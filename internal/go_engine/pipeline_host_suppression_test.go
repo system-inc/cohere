@@ -41,7 +41,7 @@ func Tail(path string, at int) string {
 // The host's lint pass applies the //cohere:ignore comments to its own findings only when something reads them: never
 // in a run whose builds merge, which suppresses the host's findings again (outcomeOf), and once in a run with no
 // builds or whose builds failed, which writes exactly that suppression, Tail's finding kept and Head's withheld, or in
-// a fixing run, whose rename reads it.
+// a fixing run, whose rename reads it, and whose lint phase with no builds reads that same outcome again.
 func TestTheHostsSuppressionIsComputedOnlyWhenNoMergeReplacesIt(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
@@ -55,6 +55,9 @@ func TestTheHostsSuppressionIsComputedOnlyWhenNoMergeReplacesIt(test *testing.T)
 		{name: "builds failed", arguments: []string{"--no-fix", "--other-builds"}, failBuild: true, wantCount: 1},
 		// A fixing run's rename reads the host's kept findings for the renames they ask, before any build runs.
 		{name: "builds merged in a fixing run", arguments: []string{"--other-builds"}, wantCount: 1},
+		// The rename reads it, asks nothing, and the lint phase reads the same pass again: the second read is the
+		// first's, never computed twice.
+		{name: "no builds in a fixing run", wantCount: 1},
 	}
 	for _, each := range cases {
 		test.Run(each.name, func(test *testing.T) {
