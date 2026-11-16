@@ -26,7 +26,10 @@ type walkKey struct {
 // A type of the universe is the same in every build and gives nothing, and a type declared in a function is walked
 // through to what lies under it, since no unit declares it.
 type bitWalker struct {
+	// seen are the types the current walk has walked, and seenMost the most it held, which a worker's scratch reads
+	// to let go of a map grown too wide (workerScratch.release).
 	seen      map[walkKey]bool
+	seenMost  int
 	collected []reference
 }
 
@@ -35,6 +38,7 @@ func (walker *bitWalker) references(walked types.Type, full bool) []reference {
 	clear(walker.seen)
 	walker.collected = walker.collected[:0]
 	walker.walk(walked, full)
+	walker.seenMost = max(walker.seenMost, len(walker.seen))
 	return append([]reference(nil), walker.collected...)
 }
 

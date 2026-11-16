@@ -7,7 +7,7 @@ import (
 )
 
 // bodyWalk turns a unit's body or initializers into its references (rule 4), so a build judges the body by its bits
-// without the body. Every use counts by name: an object whose own bit is set, an expression whose type reaches a name
+// without the body. Its maps and slices are a worker's scratch, kept from one package to the next (workerScratch). Every use counts by name: an object whose own bit is set, an expression whose type reaches a name
 // bit. A type's underlying bit counts only where the use touches the underlying (see touch). The counter judged each
 // body per build and stopped at the first dependent use; a unit is dependent in a build exactly when one of the
 // references collected here is set in it, so collecting them all once decides the same.
@@ -18,21 +18,17 @@ type bodyWalk struct {
 	// typeReferences are the bits each type reaches in each mode, walked once for the package.
 	typeReferences map[walkKey][]reference
 
-	// collected are the current body's references, each once.
-	collected map[reference]bool
+	// collected are the current body's references, each once, and collectedMost the most it held.
+	collected     map[reference]bool
+	collectedMost int
+
+	// referenceStore is every body's references, each body's a slice of it (references).
+	referenceStore []reference
 }
 
-// newBodyWalk is a walk of the bodies of the package typesInformation describes, walking types with walker.
-func newBodyWalk(typesInformation *types.Info, walker *bitWalker) *bodyWalk {
-	return &bodyWalk{
-		typesInformation: typesInformation,
-		walker:           walker,
-		typeReferences:   map[walkKey][]reference{},
-		collected:        map[reference]bool{},
-	}
-}
-
-// references are what bodies read, each object once with the bit the read touches.
+// references are what bodies read, each object once with the bit the read touches. They are a slice of the walk's
+// store, which the next package's walk writes over, so newRecord reads them into the record's own reads; nil when
+// bodies read nothing.
 func (walk *bodyWalk) references(bodies ...ast.Node) []reference {
 	clear(walk.collected)
 	for _, body := range bodies {
@@ -43,14 +39,16 @@ func (walk *bodyWalk) references(bodies ...ast.Node) []reference {
 			return true
 		})
 	}
+	walk.collectedMost = max(walk.collectedMost, len(walk.collected))
 	if len(walk.collected) == 0 {
 		return nil
 	}
-	collected := make([]reference, 0, len(walk.collected))
+	start := len(walk.referenceStore)
 	for read := range walk.collected {
-		collected = append(collected, read)
+		walk.referenceStore = append(walk.referenceStore, read)
 	}
-	return collected
+	// The slice's capacity ends with it, so nothing appended to it could write over the next body's references.
+	return walk.referenceStore[start:len(walk.referenceStore):len(walk.referenceStore)]
 }
 
 // visit collects what one node of a body reads: its own object or selection, what it touches of an underlying, and

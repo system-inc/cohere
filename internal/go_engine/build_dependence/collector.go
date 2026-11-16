@@ -17,7 +17,8 @@ type kindEdge struct {
 }
 
 // collector is one package's walk of its declarations: its type information, the units and kind edges collected so
-// far, each edge once, and a walker of types' bits shared by the walk.
+// far, each edge once, and a walker of types' bits shared by the walk. Its maps and slices are a worker's scratch,
+// kept from one package to the next (workerScratch.collector).
 type collector struct {
 	typesInformation *types.Info
 	units            []unitRecord
@@ -25,17 +26,12 @@ type collector struct {
 	edgeSeen         map[kindEdge]bool
 	walker           *bitWalker
 	bodies           *bodyWalk
-}
 
-// newCollector is a walk of the declarations of the package typesInformation describes.
-func newCollector(typesInformation *types.Info) *collector {
-	walker := &bitWalker{seen: map[walkKey]bool{}}
-	return &collector{
-		typesInformation: typesInformation,
-		edgeSeen:         map[kindEdge]bool{},
-		walker:           walker,
-		bodies:           newBodyWalk(typesInformation, walker),
-	}
+	// calleeSeen are the callees of the unit staticCallees is collecting, calleeSeenMost the most it held, and
+	// calleeStore every unit's callees, each unit's a slice of it, which newRecord reads into the record's own.
+	calleeSeen     map[types.Object]bool
+	calleeSeenMost int
+	calleeStore    []types.Object
 }
 
 // collectFile collects every unit of file, whose place tokenFile holds. Imports are no units.
@@ -101,7 +97,7 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	defer func() { collecting.units = append(collecting.units, unit) }()
 	if declaration.Body != nil {
 		unit.references = collecting.bodies.references(declaration.Body)
-		unit.callees = staticCallees(collecting.typesInformation, declaration.Body)
+		unit.callees = collecting.staticCallees(declaration.Body)
 	}
 	function, isFunction := collecting.typesInformation.Defs[declaration.Name].(*types.Func)
 	if !isFunction {
@@ -312,7 +308,7 @@ func (collecting *collector) collectValue(
 	isVariable := keyword == token.VAR
 	if isVariable && len(spec.Values) > 0 {
 		unit.references = collecting.bodies.references(expressionNodes(spec.Values)...)
-		unit.callees = staticCallees(collecting.typesInformation, expressionNodes(spec.Values)...)
+		unit.callees = collecting.staticCallees(expressionNodes(spec.Values)...)
 	}
 	var declared []types.Object
 	for _, name := range spec.Names {

@@ -91,7 +91,9 @@ func packageLevel(object types.Object) bool {
 }
 
 // newRecord names the units and kind edges collected of one live package (collector) into its record: its ID, path,
-// scope, import map and type names, each object named, and the live objects kept beside the names.
+// scope, import map and type names, each object named, and the live objects kept beside the names. It names them with
+// scratch's namer and walker, and every slice it gives the record is its own, never one of units or of scratch, which
+// the next package's walk writes over.
 func newRecord(
 	identifier string,
 	workspace bool,
@@ -100,6 +102,7 @@ func newRecord(
 	encoder *objectPaths,
 	units []unitRecord,
 	edges []kindEdge,
+	scratch *workerScratch,
 ) *packageRecord {
 	record := &packageRecord{identifier: identifier, workspace: workspace, typesPackage: typesPackage,
 		imports: imports}
@@ -112,15 +115,7 @@ func newRecord(
 			record.typeNames = append(record.typeNames, name)
 		}
 	}
-	declares, references := 0, 0
-	for index := range units {
-		declares += len(units[index].declares)
-		references += len(units[index].references)
-	}
-	naming := &namer{typesPackage: typesPackage, declared: make(map[types.Object]string, declares),
-		encoder: encoder, names: make(map[types.Object]string, references/4),
-		throughs: map[types.Object][]recordedBit{}, indexes: make(map[types.Object]int32, references/4),
-		record: record}
+	naming := scratch.namer(typesPackage, encoder, record)
 	for unitIndex := range units {
 		for declareIndex, object := range units[unitIndex].declares {
 			if _, isDeclared := naming.declared[object]; isDeclared {
@@ -133,7 +128,8 @@ func newRecord(
 			naming.declared[object] = local
 		}
 	}
-	walker := &bitWalker{seen: map[walkKey]bool{}}
+	// The collector is done with the walker, so the namer walks with it.
+	walker := &scratch.walker
 	record.units = make([]recordedUnit, 0, len(units))
 	for unitIndex := range units {
 		unit := &units[unitIndex]

@@ -8,7 +8,8 @@ import (
 // namer names one live package's objects for its record: the package, its declared objects' local names, the graph's
 // encoders that find objectpaths (Graph.paths), each object's name and expansion once, each named object's index in
 // the record's table (packageRecord.objects), the record, and how many objects of another package it met that no name
-// can carry (Graph.Unnameable).
+// can carry (Graph.Unnameable). Its maps are a worker's scratch, kept from one package to the next (workerScratch); the
+// expansions throughs holds are each made fresh, since the record's reads keep them.
 type namer struct {
 	typesPackage *types.Package
 	declared     map[types.Object]string
