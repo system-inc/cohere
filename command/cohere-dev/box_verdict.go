@@ -89,6 +89,10 @@ type boxVerdict struct {
 	box string
 	// job is the land-gate job whose box ran the tests, empty when a gate box or a stand-in did.
 	job string
+	// corpora names the corpora the box held, each at its commit, and unlaidCorpora says of each corpus she didn't
+	// hold why it wasn't laid (#5r0vrte). Both are the road's to set; only a gate box holds corpora.
+	corpora       string
+	unlaidCorpora []string
 }
 
 // raceReportStart and raceReportEnd are the race detector's lines around each report it prints.
@@ -292,6 +296,8 @@ func runBoxGate(
 	var runError error
 	box := ""
 	job := ""
+	corporaLaid := ""
+	unlaidCorpora := []string{}
 	switch setting {
 	case "", "on":
 		boxes, boxesError := gateBoxes(os.Getenv(gateBoxesVariable))
@@ -302,8 +308,13 @@ func runBoxGate(
 		if waitError != nil {
 			return boxVerdict{}, waitError.Error()
 		}
+		corpora, unlaid, corporaError := gateCorpora(worktree, commit)
+		if corporaError != nil {
+			return boxVerdict{}, "the corpora this landing pins can't be read: " + corporaError.Error()
+		}
+		corporaLaid, unlaidCorpora = corporaNamed(corpora), unlaid
 		var unavailable string
-		output, box, unavailable, runError = runOnGateBoxes(worktree, commit, patterns, races, boxes, wait)
+		output, box, unavailable, runError = runOnGateBoxes(worktree, commit, patterns, races, corpora, boxes, wait)
 		if unavailable != "" {
 			return boxVerdict{}, unavailable
 		}
@@ -331,6 +342,7 @@ func runBoxGate(
 	moduleOutput, raceOutput, raced := bytes.Cut(output, []byte("\n"+boxRaceMarker+"\n"))
 	verdict := readTestJson(moduleOutput)
 	verdict.box, verdict.job = box, job
+	verdict.corpora, verdict.unlaidCorpora = corporaLaid, unlaidCorpora
 	if raced {
 		race := readTestJson(raceOutput)
 		verdict.race = &race
@@ -495,6 +507,13 @@ func runModuleTests(
 	if optIn := testsNamed(verdict.optIn); len(optIn) > 0 {
 		fmt.Fprintf(streams.Errors, "cohere-dev: opt-in, so run by no gate: %s\n", strings.Join(optIn, ", "))
 		where += "; opt-in, which no gate runs: " + strings.Join(optIn, ", ")
+	}
+	if verdict.corpora != "" {
+		where += "; the corpora laid at their pins: " + verdict.corpora
+	}
+	for _, unlaid := range verdict.unlaidCorpora {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", unlaid)
+		where += "; " + unlaid
 	}
 	return 0, where
 }

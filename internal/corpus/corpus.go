@@ -31,30 +31,40 @@ type Corpus struct {
 	Variable string
 	// What says what the path is, in the skip line.
 	What string
+	// Identifier is its name in Go, which the constants naming its pinned commits begin with (Pins).
+	Identifier string
 }
 
 var (
 	// Ahra is a checkout of ahra, which is private: its CohereSettings.json and the chain it extends, its
 	// design system's stylesheets, and its installed packages.
-	Ahra = Corpus{Name: "ahra", Variable: "COHERE_CORPUS_AHRA", What: "a checkout of ahra (private)"}
+	Ahra = Corpus{
+		Name:       "ahra",
+		Variable:   "COHERE_CORPUS_AHRA",
+		What:       "a checkout of ahra (private)",
+		Identifier: "Ahra",
+	}
 	// Structure is a checkout of Structure, which is private, for the TypeScript under its source/.
 	Structure = Corpus{
-		Name:     "structure",
-		Variable: "COHERE_CORPUS_STRUCTURE",
-		What:     "a checkout of Structure (private)",
+		Name:       "structure",
+		Variable:   "COHERE_CORPUS_STRUCTURE",
+		What:       "a checkout of Structure (private)",
+		Identifier: "Structure",
 	}
 	// Connected is a checkout of www-connected-app, which is private, for its design system.
 	Connected = Corpus{
-		Name:     "connected",
-		Variable: "COHERE_CORPUS_CONNECTED",
-		What:     "a checkout of www-connected-app (private)",
+		Name:       "connected",
+		Variable:   "COHERE_CORPUS_CONNECTED",
+		What:       "a checkout of www-connected-app (private)",
+		Identifier: "Connected",
 	}
 	// PrettierFork is a checkout of the Prettier fork cohere's formatter is held to, with its node_modules
 	// installed, for the oracles that run its parsers.
 	PrettierFork = Corpus{
-		Name:     "prettier-fork",
-		Variable: "COHERE_PRETTIER_FORK",
-		What:     "a checkout of the Prettier fork, with node_modules",
+		Name:       "prettier-fork",
+		Variable:   "COHERE_PRETTIER_FORK",
+		What:       "a checkout of the Prettier fork, with node_modules",
+		Identifier: "PrettierFork",
 	}
 )
 

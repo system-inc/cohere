@@ -59,12 +59,19 @@ const (
 // for 3 minutes, before the box refuses. A test replaces the line to point the script at mirrors of its own.
 const macBoxMirrorLine = "mirrors=" + macBoxMirrors + "; tries=10; pause=20"
 
+// macBoxCorpusVariables is every corpus's variable, which the gate's Mac script unsets before it sets the laid ones, so
+// a variable another org left in loom's environment never points a test at a copy the gate didn't lay. A test holds it
+// to internal/corpus's list.
+const macBoxCorpusVariables = "COHERE_CORPUS_AHRA COHERE_CORPUS_STRUCTURE COHERE_CORPUS_CONNECTED COHERE_PRETTIER_FORK"
+
 // macBoxScript is what a gate box runs, from the land that runs it rather than from the tree it tests, so no branch can
-// change what tests it. Its arguments are the commit, its TypeScript pin, the raceGated packages comma-separated and
-// the module's test patterns. It works only under macBoxScratch, in a bare repository and one tree that last across
-// landings, so the tree's path stays one path. It waits for the box's mirror to hold the commit, refusing once it has
-// waited 3 minutes, fetches the commit and the pin, checks them out, and runs sharedBoxGate against the Mac's pinned
-// toolchain and node.
+// change what tests it. Its arguments are the commit, its TypeScript pin, the raceGated packages comma-separated, the
+// corpora the landing pins (corporaArgument) and the module's test patterns. It sets each corpus's variable to the copy
+// laid under macBoxScratch/corpora, and when one isn't laid there it names what it lacks (corpusUnlaidMarker) and tests
+// nothing, for the lander to lay it (gate_corpus.go). It works only under macBoxScratch, in a bare repository and one
+// tree that last across landings, so the tree's path stays one path. It waits for the box's mirror to hold the commit,
+// refusing once it has waited 3 minutes, fetches the commit and the pin, checks them out, and runs sharedBoxGate
+// against the Mac's pinned toolchain and node.
 //
 // The mirrors are root's, and git refuses another owner's repository as dubious unless safe.directory names it. Git
 // 2.43 reads that setting for a fetch's source only from global or system configuration, since `-c safe.directory`
@@ -72,7 +79,7 @@ const macBoxMirrorLine = "mirrors=" + macBoxMirrors + "; tries=10; pause=20"
 // cohere-pairs, measured on Lunatic and Pupa). So the script writes a configuration file of its own naming both
 // mirrors, gives it to each git that reads them as GIT_CONFIG_GLOBAL, and removes it before any test runs.
 const macBoxScript = `set -euo pipefail
-commit="$1"; pin="$2"; races="$3"; shift 3
+commit="$1"; pin="$2"; races="$3"; corpora="$4"; shift 4
 ` + macBoxMirrorLine + `
 base=` + macBoxScratch + `
 mkdir -p "$base"; cd "$base"
@@ -112,6 +119,15 @@ if [ -n "$pin" ]; then
   git -C tree/TypeScript checkout -q --detach --force "$pin"
 fi
 rm -f "$safe"; trap - EXIT
+# No corpus variable the account's environment carries reaches the tests: every org on the box runs as loom.
+unset ` + macBoxCorpusVariables + `
+unlaid=""
+for laid in $(echo "$corpora" | tr , ' '); do
+  [ "$laid" != - ] || continue
+  variable="${laid%%=*}"; place="${laid#*=}"
+  if [ -e "$base/corpora/$place" ]; then export "$variable=$base/corpora/$place"; else unlaid="$unlaid $place"; fi
+done
+[ -z "$unlaid" ] || { echo "` + corpusUnlaidMarker + `${unlaid# }"; exit 0; }
 cd tree
 goroot="` + macBoxGoroot + `"; digest="` + macBoxToolchainDigest + `"
 node="` + macBoxNode + `"; nodeDigest="` + macBoxNodeDigest + `"
@@ -165,6 +181,7 @@ func runOnGateBoxes(
 	commit string,
 	patterns []string,
 	races []string,
+	corpora []gateCorpus,
 	boxes []string,
 	wait time.Duration,
 ) ([]byte, string, string, error) {
@@ -184,7 +201,8 @@ func runOnGateBoxes(
 	pin, _ := gitOutput(worktree, "rev-parse", "--verify", "--quiet", commit+":TypeScript")
 	// Encoded, so nothing in the script is read by a shell before the box's bash: gap's command is one argument to ssh.
 	remote := "echo " + base64.StdEncoding.EncodeToString([]byte(macBoxScript)) + " | base64 -d | bash -s -- " +
-		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' " + strings.Join(patterns, " ")
+		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' '" + corporaArgument(corpora) + "' " +
+		strings.Join(patterns, " ")
 	started := time.Now()
 	for {
 		held := []string{}
@@ -200,6 +218,22 @@ func runOnGateBoxes(
 				"runs\n", shortCommit(commit), box)
 			streams.Show(streams.Errors)
 			output, runError := ahra("loom", "gap", "--box", box, "--within", gateGapBound, "--", "ssh", box, remote)
+			// A box that lacks a corpus the landing pins tests nothing and names it, so it is laid there, in a gap
+			// of its own, and the box is asked once more. Laid once, a corpus stays for every landing that pins it.
+			if places := unlaidIn(output); len(places) > 0 && !gapHeld(runError, output) {
+				laid, layError := layCorpora(worktree, box, corpora, places)
+				fmt.Fprint(streams.Errors, corpusLaidLines(laid))
+				if layError != nil {
+					return nil, "", fmt.Sprintf("%s lacks %s, and laying it failed: %v", box,
+						strings.Join(places, ", "), layError), nil
+				}
+				output, runError = ahra("loom", "gap", "--box", box, "--within", gateGapBound, "--", "ssh", box,
+					remote)
+				if places := unlaidIn(output); len(places) > 0 {
+					return nil, "", fmt.Sprintf("%s still lacks %s after it was laid there", box,
+						strings.Join(places, ", ")), nil
+				}
+			}
 			if gapHeld(runError, output) {
 				words := box + " (" + lastWords(output, describeEnd(runError)) + ")"
 				fmt.Fprintf(streams.Errors, "cohere-dev: %s is held: %s\n", box, words)
