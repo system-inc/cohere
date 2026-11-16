@@ -186,38 +186,94 @@ func TestAStaleRecordIsNeverRead(test *testing.T) {
 }
 
 // A record that does not decode under a valid opening is the run's problem, said, and it heals (#6a3kjvz): reader's
-// record cut short, with the store's sum written again so the store reads it whole, leaves a warm run that counts it
-// unreadable, names it among the cache's problems, and backfills reader, checking it from source and writing its
-// record again, so its graph is the cold run's; the run after reads both records whole.
+// record cut short, or its first unit placed past 2 GiB, where no unit column reaches (#gf9qrzf), with the store's sum
+// written again so the store reads it whole, leaves a warm run that counts it unreadable, names it among the cache's
+// problems, and backfills reader, checking it from source and writing its record again, so its graph is the cold
+// run's; the run after reads every record whole.
 func TestAnUnreadableRecordIsAProblem(test *testing.T) {
 	test.Parallel()
 
-	root := copyFixture(test, filepath.Join("testdata", "dependence-records"))
-	cold, _ := runOverRaw(test, root, exitClean, recordsSwitches...)
-	file := recordFileOf(test, root, recordsReader)
-	contents, readError := os.ReadFile(file)
-	if readError != nil {
-		test.Fatal(readError)
+	for _, damaged := range []struct {
+		name   string
+		damage func(test *testing.T, body []byte) []byte
+	}{
+		{"cut short", func(test *testing.T, body []byte) []byte { return body[:len(body)-3] }},
+		{"a unit past 2 GiB", placeFirstUnitPastTwoGibibytes},
+	} {
+		test.Run(damaged.name, func(test *testing.T) {
+			test.Parallel()
+
+			root := copyFixture(test, filepath.Join("testdata", "dependence-records"))
+			cold, _ := runOverRaw(test, root, exitClean, recordsSwitches...)
+			file := recordFileOf(test, root, recordsReader)
+			contents, readError := os.ReadFile(file)
+			if readError != nil {
+				test.Fatal(readError)
+			}
+			body := damaged.damage(test, contents[sha256.Size:])
+			sum := sha256.Sum256(body)
+			if writeError := os.WriteFile(file, append(sum[:], body...), 0o644); writeError != nil {
+				test.Fatal(writeError)
+			}
+			healed, healedStream, noted := runOverNoted(test, root, exitClean, nil, recordsSwitches...)
+			if counted := recordCounts(test, healedStream); counted != (contract.DependenceRecords{Read: 2, Written: 1,
+				Backfilled: 1, Unreadable: 1}) {
+				test.Errorf("the run counts %+v, want base's and platform's records read, reader's unreadable, "+
+					"backfilled and written", counted)
+			}
+			if !strings.Contains(noted, "reading the dependence record of "+recordsReader) {
+				test.Errorf("the run's notes say nothing of reader's record:\n%s", noted)
+			}
+			expectSameVerdicts(test, "healed against cold", graphVerdicts(test, cold, root),
+				graphVerdicts(test, healed, root))
+			_, afterStream := runOverRaw(test, root, exitClean, recordsSwitches...)
+			if after := recordCounts(test, afterStream); after != (contract.DependenceRecords{Read: 3}) {
+				test.Errorf("the run after counts %+v, want every record read and nothing else", after)
+			}
+		})
 	}
-	body := contents[sha256.Size : len(contents)-3]
-	sum := sha256.Sum256(body)
-	if writeError := os.WriteFile(file, append(sum[:], body...), 0o644); writeError != nil {
-		test.Fatal(writeError)
+}
+
+// placeFirstUnitPastTwoGibibytes is a record's bytes with its first unit's start moved 2 GiB later, past what a unit
+// column holds, and nothing else changed: it reads the record as build_dependence's decodeRecord does, up to that
+// number (record_writer.go names the format), failing when the record holds no unit.
+func placeFirstUnitPastTwoGibibytes(test *testing.T, body []byte) []byte {
+	test.Helper()
+	at := len("cohere dependence record 1") + 1
+	number := func() uint64 {
+		value, length := binary.Uvarint(body[at:])
+		if length <= 0 {
+			test.Fatalf("the record ends early at byte %d", at)
+		}
+		at += length
+		return value
 	}
-	healed, healedStream, noted := runOverNoted(test, root, exitClean, nil, recordsSwitches...)
-	if counted := recordCounts(test, healedStream); counted != (contract.DependenceRecords{Read: 2, Written: 1,
-		Backfilled: 1, Unreadable: 1}) {
-		test.Errorf("the run counts %+v, want base's and platform's records read, reader's unreadable, backfilled "+
-			"and written", counted)
+	skip := func(numbers uint64) {
+		for range numbers {
+			number()
+		}
 	}
-	if !strings.Contains(noted, "reading the dependence record of "+recordsReader) {
-		test.Errorf("the run's notes say nothing of reader's record:\n%s", noted)
+	raw := func() {
+		at += int(number())
 	}
-	expectSameVerdicts(test, "healed against cold", graphVerdicts(test, cold, root), graphVerdicts(test, healed, root))
-	_, afterStream := runOverRaw(test, root, exitClean, recordsSwitches...)
-	if after := recordCounts(test, afterStream); after != (contract.DependenceRecords{Read: 3}) {
-		test.Errorf("the run after counts %+v, want every record read and nothing else", after)
+	raw()
+	raw()
+	skip(1)
+	for range number() {
+		raw()
 	}
+	skip(2 * number())
+	skip(number())
+	skip(2 * number())
+	if units := number(); units == 0 {
+		test.Fatal("reader's record holds no unit, so the case proves nothing")
+	}
+	skip(1)
+	startAt := at
+	start := number()
+	placed := append([]byte{}, body[:startAt]...)
+	placed = binary.AppendUvarint(placed, start+1<<31)
+	return append(placed, body[at:]...)
 }
 
 // A hit by its first key with no record is made a miss once, and no package above or below it misses with it

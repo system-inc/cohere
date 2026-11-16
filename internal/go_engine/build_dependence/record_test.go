@@ -3,6 +3,7 @@ package build_dependence
 import (
 	"fmt"
 	"maps"
+	"math"
 	"os"
 	"slices"
 	"strings"
@@ -41,48 +42,51 @@ func recordedGraphOf(test *testing.T, live *Graph) *Graph {
 // bit to bit, by key. Two graphs resolve alike exactly when their lines are equal.
 func resolvedLines(graph *Graph) []string {
 	resolved := graph.resolve()
+	keys := make([]nodeKey, len(resolved.objects))
+	for key, node := range resolved.nodes {
+		keys[node] = key
+	}
 	bitName := func(value int32) string {
-		key := resolved.keys[value/2]
-		return fmt.Sprintf("%s %s/%d", key.packageIdentifier, key.local, value%2)
+		key := keys[value/2]
+		return fmt.Sprintf("%s %s/%d", resolved.packages[key.packageIndex].identifier, key.local, value%2)
 	}
 	unitName := func(index int) string {
-		unit := &resolved.units[index]
-		return fmt.Sprintf("%s %s:%d", resolved.packages[unit.packageIndex].identifier, unit.record.file,
-			unit.record.start)
+		return fmt.Sprintf("%s %s:%d", resolved.packages[resolved.unitPackage[index]].identifier,
+			resolved.files.names[resolved.unitFile[index]], resolved.unitStart[index])
 	}
 	var lines []string
-	for index := range resolved.units {
-		unit := &resolved.units[index]
-		parts := []string{"unit " + unitName(index), fmt.Sprintf("nodes %d end %d universe %x", unit.record.nodes,
-			unit.record.end, unit.record.universeNames)}
-		for _, node := range unit.declares {
+	for index := range resolved.unitCount() {
+		parts := []string{"unit " + unitName(index), fmt.Sprintf("nodes %d end %d universe %x",
+			resolved.unitNodes[index], resolved.unitEnd[index], resolved.unitUniverseNames[index])}
+		for _, node := range resolved.declares.row(index) {
 			parts = append(parts, "declares "+bitName(bit(node, false)))
 		}
-		if unit.receiver >= 0 {
-			parts = append(parts, "receiver "+bitName(bit(unit.receiver, false)))
+		if receiver := resolved.unitReceiver[index]; receiver >= 0 {
+			parts = append(parts, "receiver "+bitName(bit(receiver, false)))
 		}
 		var reads []string
-		for _, read := range unit.bits {
+		for _, read := range resolved.bits.row(index) {
 			reads = append(reads, "reads "+bitName(read))
 		}
-		for _, read := range unit.external {
-			reads = append(reads, fmt.Sprintf("external %s %s/%t", read.object.path, read.object.local,
-				read.underlying))
+		for _, read := range resolved.external.row(index) {
+			object := &resolved.externalObjects[read>>1]
+			reads = append(reads, fmt.Sprintf("external %s %s/%t", object.path, object.local, read&1 != 0))
 		}
-		for _, called := range unit.calls {
-			reads = append(reads, "calls "+unitName(called))
+		for _, called := range resolved.calls.row(index) {
+			reads = append(reads, "calls "+unitName(int(called)))
 		}
 		slices.Sort(reads)
 		lines = append(lines, strings.Join(append(parts, slices.Compact(reads)...), "; "))
 	}
-	for to, dependents := range resolved.dependents {
-		for _, from := range dependents {
+	for to := range resolved.dependents.rowCount() {
+		for _, from := range resolved.dependents.row(to) {
 			lines = append(lines, "edge "+bitName(int32(to))+" <- "+bitName(from))
 		}
 	}
 	for _, edge := range resolved.externalEdges {
-		lines = append(lines, fmt.Sprintf("external edge %s <- %s %s/%t", bitName(edge.fromBit), edge.to.object.path,
-			edge.to.object.local, edge.to.underlying))
+		object := &resolved.externalObjects[edge.to>>1]
+		lines = append(lines, fmt.Sprintf("external edge %s <- %s %s/%t", bitName(edge.fromBit), object.path,
+			object.local, edge.to&1 != 0))
 	}
 	slices.Sort(lines)
 	return slices.Compact(lines)
@@ -182,6 +186,48 @@ func TestARecordReadsBackWhole(test *testing.T) {
 	}
 	if _, formatError := decodeRecord([]byte("another format")); formatError == nil {
 		test.Error("bytes of another format decode as a record")
+	}
+}
+
+// A record whose unit passes what a unit column holds (column) is refused as it decodes, so the findings cache says it
+// and writes it again, where a graph it was added to would panic as it resolved (#gf9qrzf): a unit starting past 2 GiB,
+// one ending past it, one of more than 2^31 nodes, and one whose start was written from -1, which a reader taking the
+// number as an int would read back as -1. A unit at the very edge, ending at 2^31-1 bytes with 2^31-1 nodes, decodes
+// and resolves.
+func TestARecordOfAUnitPastAColumnIsRefused(test *testing.T) {
+	test.Parallel()
+
+	for _, placed := range []struct {
+		name  string
+		start int
+		end   int
+		nodes int
+	}{
+		{"starting past 2 GiB", 1 << 31, 1<<31 + 10, 3},
+		{"ending past 2 GiB", 10, 1 << 31, 3},
+		{"of more than 2^31 nodes", 10, 20, 1 << 31},
+		{"starting at -1", -1, 20, 3},
+	} {
+		record := sameStartRecord("placed", 0)
+		record.units[0].start, record.units[0].end, record.units[0].nodes = placed.start, placed.end, placed.nodes
+		if _, decodeError := DecodeRecord(encodeRecord(record)); decodeError == nil ||
+			!strings.Contains(decodeError.Error(), "past what a unit column holds") {
+			test.Errorf("a unit %s: want the record refused for passing a unit column, got %v", placed.name,
+				decodeError)
+		}
+	}
+
+	record := sameStartRecord("edge", 0)
+	record.units[0].start, record.units[0].end, record.units[0].nodes = 10, math.MaxInt32, math.MaxInt32
+	decoded, decodeError := DecodeRecord(encodeRecord(record))
+	if decodeError != nil {
+		test.Fatalf("a unit at the edge of a unit column: want it decoded, got %v", decodeError)
+	}
+	graph := NewGraph()
+	graph.AddDecoded(decoded)
+	if resolved := graph.resolve(); resolved.unitEnd[0] != math.MaxInt32 || resolved.unitNodes[0] != math.MaxInt32 {
+		test.Errorf("a unit at the edge of a unit column: want it resolved whole, got end %d and %d nodes",
+			resolved.unitEnd[0], resolved.unitNodes[0])
 	}
 }
 

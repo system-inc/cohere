@@ -14,23 +14,40 @@ type judgment struct {
 	difference Difference
 	seedUnit   []bool
 	seedBits   []int32
-	answers    map[types.Object]Bits
 
-	// nameAnswers are the build's answers for objects decoded records name, by path and local name, each asked once
-	// (nameAnswer).
-	nameAnswers map[[2]string]nameAnswer
+	// answers are the build's answers for the resolution's external objects, by their index there, each a few flags
+	// (objectAsked and those after it): DependentObject's for a live object, DependentName's for a decoded name.
+	answers []uint8
+
+	// objectAnswers are DependentObject's answers for the live objects of packages the graph does not hold that are no
+	// external object of it, which ObjectBits meets through an object's type, made at the first.
+	objectAnswers map[types.Object]Bits
 }
 
-// nameAnswer is DependentName's answer for one object: its bits, and whether a unit declares it.
-type nameAnswer struct {
-	bits     Bits
-	declared bool
+// The flags of an external object's answer (judgment.answers): DependentObject asked, and the name and underlying bits
+// it set; DependentName asked, the bits it set, and whether a unit of the answering graph declares the object.
+const (
+	objectAsked uint8 = 1 << iota
+	objectNameSet
+	objectUnderlyingSet
+	nameAsked
+	nameNameSet
+	nameUnderlyingSet
+	nameDeclared
+)
+
+// flagWhen is flag when isSet holds, else none.
+func flagWhen(isSet bool, flag uint8) uint8 {
+	if isSet {
+		return flag
+	}
+	return 0
 }
 
 // seed makes the unit at index a seed, both bits of everything it declares set.
 func (judging *judgment) seed(index int) {
 	judging.seedUnit[index] = true
-	for _, node := range judging.resolved.units[index].declares {
+	for _, node := range judging.resolved.declares.row(index) {
 		judging.seedBits = append(judging.seedBits, bit(node, false), bit(node, true))
 	}
 }
@@ -48,11 +65,18 @@ func (judging *judgment) seedFiles() {
 		}
 		hostOnlyFiles[identifier] = files
 	}
-	for index := range judging.resolved.units {
-		unit := &judging.resolved.units[index]
-		identifier := judging.resolved.packages[unit.packageIndex].identifier
-		if judging.difference.HostOnlyPackages[identifier] || hostOnlyFiles[identifier][unit.record.file] {
-			judging.seed(index)
+	resolved := judging.resolved
+	for packageIndex, record := range resolved.packages {
+		hostOnly := judging.difference.HostOnlyPackages[record.identifier]
+		files := hostOnlyFiles[record.identifier]
+		if !hostOnly && files == nil {
+			continue
+		}
+		span := resolved.packageUnits[packageIndex]
+		for index := span[0]; index < span[1]; index++ {
+			if hostOnly || files[resolved.files.names[resolved.unitFile[index]]] {
+				judging.seed(int(index))
+			}
 		}
 	}
 }
@@ -62,9 +86,9 @@ func (judging *judgment) seedFiles() {
 // base name among the host package's type names, as its record holds them (packageRecord.typeNames), since the file
 // was parsed for its syntax alone; a package-level type's local name is its name.
 func (judging *judgment) seedMethodSets() {
-	for index := range judging.resolved.units {
-		if unit := &judging.resolved.units[index]; judging.seedUnit[index] && unit.receiver >= 0 {
-			judging.seedBits = append(judging.seedBits, bit(unit.receiver, false))
+	for index, receiver := range judging.resolved.unitReceiver {
+		if judging.seedUnit[index] && receiver >= 0 {
+			judging.seedBits = append(judging.seedBits, bit(receiver, false))
 		}
 	}
 	for identifier, differing := range judging.difference.Packages {
@@ -83,7 +107,8 @@ func (judging *judgment) seedMethodSets() {
 				if !slices.Contains(record.typeNames, name) {
 					continue
 				}
-				if node, isNode := judging.resolved.nodes[nodeKey{packageIdentifier: identifier, local: name}]; isNode {
+				key := nodeKey{packageIndex: int32(packageIndex), local: name}
+				if node, isNode := judging.resolved.nodes[key]; isNode {
 					judging.seedBits = append(judging.seedBits, bit(node, false))
 				}
 			}
@@ -109,8 +134,8 @@ func (judging *judgment) seedShadowed() {
 		}
 		span := judging.resolved.packageUnits[packageIndex]
 		for index := span[0]; index < span[1]; index++ {
-			if !judging.seedUnit[index] && judging.resolved.units[index].record.universeNames&shadowed != 0 {
-				judging.seed(index)
+			if !judging.seedUnit[index] && judging.resolved.unitUniverseNames[index]&shadowed != 0 {
+				judging.seed(int(index))
 			}
 		}
 	}
@@ -163,86 +188,113 @@ func receiverBaseName(expression ast.Expr) string {
 	}
 }
 
-// answer is whether read's bit is set in the build, for an object of a package the graph does not hold, by the
-// build's DependentObject, asked once per object. An object a decoded record names has no live object, and is
-// answered by its name (answerByName). A build with no DependentObject says no such object is dependent.
-func (judging *judgment) answer(read externalRead) bool {
+// answer is whether the bit of an external object, packed (externalObjectBit), is set in the build, by the build's
+// DependentObject, asked once per object; through is what its read reaches through the object's type, the same way.
+// An object a decoded record names has no live object, and is answered by its name (answerByName). A build with no
+// DependentObject says no such object is dependent.
+func (judging *judgment) answer(packed uint32, through []uint32) bool {
 	if judging.difference.DependentObject == nil {
 		return false
 	}
-	object := read.object.object
+	index := packed >> 1
+	object := judging.resolved.externalObjects[index].object
 	if object == nil {
-		return judging.answerByName(read)
+		return judging.answerByName(packed, through)
 	}
-	answered, isAsked := judging.answers[object]
+	answered := judging.answers[index]
+	if answered&objectAsked == 0 {
+		name, underlying := judging.difference.DependentObject(object)
+		answered |= objectAsked | flagWhen(name, objectNameSet) | flagWhen(underlying, objectUnderlyingSet)
+		judging.answers[index] = answered
+	}
+	if packed&1 != 0 {
+		return answered&objectUnderlyingSet != 0
+	}
+	return answered&objectNameSet != 0
+}
+
+// answerObject is whether object's bit, its underlying bit with underlying set, is set in the build, for a live object
+// of a package the graph does not hold, as answer says, asked once per object whether a unit reads it or ObjectBits
+// meets it.
+func (judging *judgment) answerObject(object types.Object, underlying bool) bool {
+	if judging.difference.DependentObject == nil {
+		return false
+	}
+	if index, isExternal := judging.resolved.externalObjectIndex[object]; isExternal {
+		return judging.answer(externalObjectBit(index, underlying), nil)
+	}
+	answered, isAsked := judging.objectAnswers[object]
 	if !isAsked {
 		answered.Name, answered.Underlying = judging.difference.DependentObject(object)
-		judging.answers[object] = answered
+		if judging.objectAnswers == nil {
+			judging.objectAnswers = map[types.Object]Bits{}
+		}
+		judging.objectAnswers[object] = answered
 	}
-	if read.underlying {
+	if underlying {
 		return answered.Underlying
 	}
 	return answered.Name
 }
 
-// answerByName is whether read's bit is set in the build, for an object a decoded record names, by the build's
+// answerByName is whether the bit packed of an object a decoded record names is set in the build, by the build's
 // DependentName: the object's own bit when a unit of the answering graph declares it, else any bit of what reading it
-// reaches through its type, as read holds that, set, as the answering graph reads an object no unit declares through
-// its type, both bits at once (Dependence.ObjectBits). A build with no DependentName fails it wide.
-func (judging *judgment) answerByName(read externalRead) bool {
+// reaches through its type, as through holds that, set, as the answering graph reads an object no unit declares
+// through its type, both bits at once (Dependence.ObjectBits). A build with no DependentName fails it wide.
+func (judging *judgment) answerByName(packed uint32, through []uint32) bool {
 	if judging.difference.DependentName == nil {
 		return true
 	}
-	answered := judging.nameAnswer(read.object)
-	if answered.declared {
-		if read.underlying {
-			return answered.bits.Underlying
+	answered := judging.nameAnswer(packed >> 1)
+	if answered&nameDeclared != 0 {
+		if packed&1 != 0 {
+			return answered&nameUnderlyingSet != 0
 		}
-		return answered.bits.Name
+		return answered&nameNameSet != 0
 	}
-	if answered.bits.Name || answered.bits.Underlying {
+	if answered&(nameNameSet|nameUnderlyingSet) != 0 {
 		return true
 	}
-	for _, reached := range read.through {
-		reachedAnswer := judging.nameAnswer(reached.object)
-		if reachedAnswer.bits.Name && !reached.underlying || reachedAnswer.bits.Underlying && reached.underlying {
+	for _, reached := range through {
+		reachedAnswer := judging.nameAnswer(reached >> 1)
+		if reachedAnswer&nameNameSet != 0 && reached&1 == 0 || reachedAnswer&nameUnderlyingSet != 0 && reached&1 != 0 {
 			return true
 		}
 	}
 	return false
 }
 
-// nameAnswer is DependentName's answer for object, asked once per name.
-func (judging *judgment) nameAnswer(object recordedObject) nameAnswer {
-	key := [2]string{object.path, object.local}
-	if answered, isAsked := judging.nameAnswers[key]; isAsked {
+// nameAnswer is DependentName's answer for the external object at index, asked once per name: a decoded name is one
+// external object.
+func (judging *judgment) nameAnswer(index uint32) uint8 {
+	answered := judging.answers[index]
+	if answered&nameAsked != 0 {
 		return answered
 	}
-	var answered nameAnswer
-	answered.bits.Name, answered.bits.Underlying, answered.declared = judging.difference.DependentName(object.path,
-		object.local)
-	if judging.nameAnswers == nil {
-		judging.nameAnswers = map[[2]string]nameAnswer{}
-	}
-	judging.nameAnswers[key] = answered
+	object := judging.resolved.externalObjects[index]
+	name, underlying, declared := judging.difference.DependentName(object.path, object.local)
+	answered |= nameAsked | flagWhen(name, nameNameSet) | flagWhen(underlying, nameUnderlyingSet) |
+		flagWhen(declared, nameDeclared)
+	judging.answers[index] = answered
 	return answered
 }
 
-// unitReaches is whether a unit that is no seed is dependent: an object it declares has either bit set, or its body
-// reads a set bit.
-func (judging *judgment) unitReaches(unit *resolvedUnit, bits []bool) bool {
-	for _, node := range unit.declares {
+// unitReaches is whether the unit at index, no seed, is dependent: an object it declares has either bit set, or its
+// body reads a set bit.
+func (judging *judgment) unitReaches(index int, bits []bool) bool {
+	for _, node := range judging.resolved.declares.row(index) {
 		if bits[bit(node, false)] || bits[bit(node, true)] {
 			return true
 		}
 	}
-	for _, read := range unit.bits {
+	for _, read := range judging.resolved.bits.row(index) {
 		if bits[read] {
 			return true
 		}
 	}
-	for _, read := range unit.external {
-		if judging.answer(read) {
+	external := &judging.resolved.external
+	for position := external.offsets[index]; position < external.offsets[index+1]; position++ {
+		if judging.answer(external.entries[position], judging.resolved.externalThrough.row(int(position))) {
 			return true
 		}
 	}
@@ -287,7 +339,7 @@ func (judging *judgment) count(unitDependent []bool) Counts {
 		packageNodes, dependentUnits := 0, 0
 		span := resolved.packageUnits[packageIndex]
 		for index := span[0]; index < span[1]; index++ {
-			nodes := resolved.units[index].record.nodes
+			nodes := int(resolved.unitNodes[index])
 			scope.Units++
 			scope.Nodes += nodes
 			packageNodes += nodes
