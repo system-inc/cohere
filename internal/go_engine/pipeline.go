@@ -96,6 +96,10 @@ type pipeline struct {
 	// rather than take the host's findings on the files the host checked (#y6q1x2j), so the test can compare the two.
 	keepsInheritanceOff bool
 
+	// hostSuppressed, set only by a test, is called each time a lint pass applies the //cohere:ignore comments to its
+	// own findings (lintPass.outcome), so a test can count that a run whose builds merge never does.
+	hostSuppressed func()
+
 	// buildsAtOnce is how many extra builds otherBuilds ran side by side, decided once (fixedBuildsWidth, or at the
 	// share gate, hostLiveBuildsWidth or measuredBuildsWidth as the first build's load ends), 0 until it was, for the
 	// lint record, and buildsWidthLiveBytes and buildsWidthBuildBytes the host's live heap that decision was given and

@@ -83,7 +83,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 			"the rules could not run: "+oneLine(pass.checkError))
 		return lintedLoad
 	}
-	result, outcome := pass.result, pass.outcome
+	result := pass.result
 	// A run collecting the standard library's entries for the release's table persists each one's reads beside it once
 	// every type-read walk has ended, so the table carries them and a host restoring a package from it can keep it for
 	// its extra builds (#pcv6eff).
@@ -91,6 +91,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.session.PersistCollectedReads(wholeReads(pass.result))
 	}
 	var verdict *buildsVerdict
+	var outcome suppressedFindings
 	if engine.request.switches["other-builds"] {
 		// The host's reads, pass.result.Reads, are what an extra build will restore a package by (#b2t9xmf). Their
 		// type-read walks run beside the host's lint and past its end, so otherBuilds waits for every one before any
@@ -111,6 +112,10 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				engine.write(engine.compilerFinding(typeError))
 			}
 		}
+	}
+	// With no builds merged, none ran or they failed, the host's own suppression is the phase's.
+	if verdict == nil {
+		outcome = pass.outcome()
 	}
 
 	findings := make([]contract.FindingRecord, 0, len(outcome.kept)+len(outcome.directiveFindings))
@@ -235,10 +240,15 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 // lintPass is the lint phase's rules over one load before any record is written: what they found, the findings in
 // scope the //cohere:ignore comments left, and how long that took, or why the rules could not run.
 type lintPass struct {
-	result     *check.Result
-	enabled    []rule.Rule
-	turnedOff  []string
-	outcome    suppressedFindings
+	result    *check.Result
+	enabled   []rule.Rule
+	turnedOff []string
+
+	// outcome applies the //cohere:ignore comments to the findings in scope the first time it is called, and returns
+	// that each time after. It is computed only when read, since a run whose builds merge suppresses the host's
+	// findings again in the merge (outcomeOf) and never reads this one.
+	outcome func() suppressedFindings
+
 	checkError error
 	elapsed    time.Duration
 }
@@ -301,8 +311,15 @@ func (engine *pipeline) lintPackages(
 		result:    result,
 		enabled:   enabled,
 		turnedOff: turnedOff,
-		outcome:   engine.suppress(ran, engine.inScope(result.Findings), engine.described.readable()),
-		elapsed:   time.Since(started),
+		// The contents it reads are final by now: the fix phase holds what it wrote before any load, and a rename that
+		// writes drops this pass and loads again.
+		outcome: sync.OnceValue(func() suppressedFindings {
+			if engine.hostSuppressed != nil {
+				engine.hostSuppressed()
+			}
+			return engine.suppress(ran, engine.inScope(result.Findings), engine.described.readable())
+		}),
+		elapsed: time.Since(started),
 	}
 }
 

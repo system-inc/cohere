@@ -140,7 +140,7 @@ func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.L
 	if first.checkError != nil {
 		return loaded, &first, loadError
 	}
-	asked := engine.askedRenames(first.outcome.kept)
+	asked := engine.askedRenames(first.outcome().kept)
 	if engine.request.stdinPath != "" {
 		engine.nameRenamesLeft(asked)
 		return loaded, &first, loadError
