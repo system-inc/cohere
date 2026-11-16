@@ -101,8 +101,13 @@ func judgeFolder(relative string, takenWhole func(string) bool) (folderFinding, 
 	message := fmt.Sprintf("Folder name %q abbreviates %q. Spell it out as %s. %s", values["folder"], values["word"],
 		values["expansions"], folderReasoning)
 	if id == file_name_words.AbbreviatedFolderNameAdvice {
-		message = fmt.Sprintf("Folder name %q abbreviates %q. %s %s", values["folder"], values["word"],
-			values["advice"], folderReasoning)
+		// A folder named the word alone, vars/, would read `"vars" abbreviates "vars"`, so it says what the name is;
+		// one holding other words, env-vars/, still names which word asks for the advice (#xd2q11d).
+		opening := fmt.Sprintf("Folder name %q abbreviates %q.", values["folder"], values["word"])
+		if strings.EqualFold(values["folder"], values["word"]) {
+			opening = fmt.Sprintf("Folder name %q is an abbreviation.", values["folder"])
+		}
+		message = fmt.Sprintf("%s %s %s", opening, values["advice"], folderReasoning)
 	}
 	return folderFinding{Directory: relative, MessageId: id, Message: message}, true
 }
@@ -160,6 +165,41 @@ func folderCheckSeverity(root string, lintConfigFileName string) (configuration.
 		return configuration.SeverityOff, nil
 	}
 	return setting.Severity, nil
+}
+
+// folderCheckSkipped is why this run's folder check judged no folder though its project turns the check on, for the
+// summary's gaps (runGaps.FolderCheckSkipped), and empty when the check ran or is off.
+var folderCheckSkipped string
+
+// namesOnlyTheRoot reports whether a run's path arguments are its project's root and nothing else, each resolving to
+// it, `.`, `./`, the root's absolute path or a symbolic link to it, read from base as the run reads its paths. Such a
+// run covers the tree a bare run does, so it judges the same folders (#xd2q11d).
+func namesOnlyTheRoot(arguments []string, base string, root string) bool {
+	if len(arguments) == 0 {
+		return false
+	}
+	resolvedRoot := resolvedPath(root)
+	for _, argument := range arguments {
+		if resolvedPath(absoluteFrom(base, argument)) != resolvedRoot {
+			return false
+		}
+	}
+	return true
+}
+
+// noteFolderCheckSkipped records, for the summary's gaps, that a run naming paths below its project's root skips
+// the folder check, when its project turns the check on (#xd2q11d). A chain that does not load fails the run, as
+// the check fails closed everywhere else.
+func noteFolderCheckSkipped(location projectLocation) error {
+	severity, folderCheckSeverityError := folderCheckSeverity(location.Root, location.LintConfigFileName)
+	if folderCheckSeverityError != nil {
+		return folderCheckSeverityError
+	}
+	if severity != configuration.SeverityOff {
+		folderCheckSkipped = "the run named paths below its project's root, and the folder check judges a whole " +
+			"project's folders: run with no path, or the root as its path, to judge them"
+	}
+	return nil
 }
 
 // runLints reports whether a run given these flags runs the lint rules, which the folder check is one of: every run

@@ -37,6 +37,10 @@ type runGaps struct {
 	// the ignore files alone, so a file git tracks under a pattern that matches it went unformatted, counted ignored.
 	// A gap, not a failure: which files those are is the index's to say, and it could not be read.
 	IndexFallback string `json:"indexFallback,omitempty"`
+	// FolderCheckSkipped is why the folder check judged no folder on a run that named paths below its project's root
+	// (#xd2q11d): it judges a whole project's folders, so a narrowed run skips it, and says so rather than pass
+	// quietly. Empty on every other run, and on one whose project turns the check off.
+	FolderCheckSkipped string `json:"folderCheckSkipped,omitempty"`
 	// ModifiedBuild is a binary built from a modified tree, which no commit reproduces.
 	ModifiedBuild bool `json:"modifiedBuild"`
 	// Unread is files the run could not check for any other reason, said as the run said it.

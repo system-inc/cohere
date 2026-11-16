@@ -330,21 +330,30 @@ func run() error {
 				return writeError
 			}
 		}
-	} else if lintsWholeLocatedProject(given, flag.Args(), locateError) {
-		// A narrowed run of a whole project judges its folders as discovery would (#zyq63kk).
+	} else if lintsWholeLocatedProject(given, flag.Args(), locateError, location) {
+		// A narrowed run of a whole project judges its folders as discovery would (#zyq63kk), and so does one given
+		// its root as its path, which is the bare run (#xd2q11d).
 		namedLintConfiguration := ""
 		if given["lint-config"] {
 			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
 		}
+		// flag.Parse stops at the first path, so the paths are the arguments' tail.
+		flags := os.Args[1 : len(os.Args)-len(flag.Args())]
 		exitCode, reported, checkNarrowedProjectFoldersError := checkNarrowedProjectFolders(
 			location,
 			namedLintConfiguration,
+			flags,
 		)
 		if checkNarrowedProjectFoldersError != nil {
 			return checkNarrowedProjectFoldersError
 		}
 		if reported {
 			exitProcess(exitCode)
+		}
+	} else if len(flag.Args()) > 0 && lintsLocatedProject(given, locateError) {
+		// Paths below the root: the folder check is skipped, and the summary names it (#xd2q11d).
+		if noteFolderCheckSkippedError := noteFolderCheckSkipped(location); noteFolderCheckSkippedError != nil {
+			return noteFolderCheckSkippedError
 		}
 	}
 
