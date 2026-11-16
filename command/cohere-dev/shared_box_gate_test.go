@@ -212,7 +212,8 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			// Past the download, the log reads as the checks below index it: verify, the tests, the -race run.
 			lines = lines[1:]
 			for _, line := range lines[1:] {
-				for _, want := range []string{"-count=1", "empty yes", "toolchain local", "goenv off",
+				for _, want := range []string{"-count=1", "-timeout " + sharedBoxTestTimeout,
+					"empty yes", "toolchain local", "goenv off",
 					"goflags -buildvcs=false -trimpath", "cache " + temporary} {
 					if !strings.Contains(line, want) {
 						test.Errorf("a go test the gate asked for lacks %q: %s", want, line)

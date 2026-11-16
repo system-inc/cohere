@@ -65,6 +65,12 @@ const (
 	macBoxNodeDigest = "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1"
 )
 
+// sharedBoxTestTimeout is how long one package's tests may run on a shared box, past go test's default of 10 minutes:
+// there every package builds and runs on an empty cache beside every other, and internal/go_engine alone took 484s on
+// an idle Sun2, so in the whole run it crossed 600s and failed a landing that changed none of it (#er5mbvc, Nov 16).
+// The gap's own bound, gateGapBound, still ends a run that hangs.
+const sharedBoxTestTimeout = "30m"
+
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
 // goroot, digest, node, nodeDigest and races (the raceGated packages, comma-separated) as variables, and the
 // module's test patterns as its arguments. It prints boxMarker before the tests, boxRaceMarker before the -race
@@ -89,9 +95,10 @@ export GOCACHE="$gocache"
 echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 downloaded=$(go mod download 2>&1) || refuse "go mod download failed: $(echo "$downloaded" | tail -n 1)"
 verified=$(go mod verify 2>&1) || refuse "go mod verify failed: $(echo "$verified" | tail -n 1)"
-go test -count=1 -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
+go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
 if [ -n "$races" ]; then
   echo "` + boxRaceMarker + `"
-  go test -count=1 -json -race $(echo "$races" | tr , ' ') | grep -vE '"Action":"(start|run|pause|cont)"'
+  go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json -race $(echo "$races" | tr , ' ') |
+    grep -vE '"Action":"(start|run|pause|cont)"'
 fi
 `
