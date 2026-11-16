@@ -185,6 +185,31 @@ func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	}
 }
 
+// A run whose measured headroom added a build by the slack writes a stream the verdict reads as one forced to width one
+// writes: every field of the width the machine decides normalizes away, the slack among them, which sits between the
+// peak factor and the pool's size (#f0h29a2). The pattern once stopped at the factor, so a slack the test process's
+// heap decided under load split TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds's two streams.
+func TestTheWidthsFieldsNormalizeAlikeWhateverTheSlack(test *testing.T) {
+	test.Parallel()
+	encode := func(record contract.LintRecord) string {
+		encoded, encodeError := json.Marshal(record)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		return string(encoded)
+	}
+	slack := encode(contract.LintRecord{BuildsAtOnce: 4, BuildsWidthLiveBytes: 1 << 30, BuildsWidthBuildBytes: 1 << 29,
+		BuildsWidthPeakFactor: 2.5, BuildsWidthSlack: true, BuildsPoolSize: 16})
+	forced := encode(contract.LintRecord{BuildsAtOnce: 1, BuildsPoolSize: 12})
+	if !strings.Contains(slack, `"buildsWidthSlack":true`) {
+		test.Fatalf("the record writes no slack to normalize away:\n%s", slack)
+	}
+	if normalize(slack, "/project") != normalize(forced, "/project") {
+		test.Errorf("a run the slack widened normalizes unlike one forced to width one:\nslack  %s\nforced %s",
+			normalize(slack, "/project"), normalize(forced, "/project"))
+	}
+}
+
 // Under `--timing` every extra build runs alone, and its record writes what it held beyond the host's live heap as
 // its load ended and the most it held while its rules ran, the ratio the width's factor stands for, so a tree that
 // breaks the factor shows in one run (#rmzehfg); the host's record writes neither. The builds start on another

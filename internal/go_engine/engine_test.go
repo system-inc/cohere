@@ -963,11 +963,13 @@ var (
 	lintWaitedPattern     = regexp.MustCompile(`,"lintWaited":true`)
 	checkedByBuildPattern = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
 	// buildsAtOncePattern is how many extra builds ran side by side, the host's live heap, the first build's holding
-	// and the peak factor that was decided by, and the run's pool's size, one slot per core, which the machine decides
-	// and the verdict never reads, so they are left out as the times are.
+	// and the peak factor that was decided by, whether the slack added a build, and the run's pool's size, one slot per
+	// core, which the machine decides and the verdict never reads, so they are left out as the times are. The slack
+	// sits between the factor and the pool's size, and a pattern that skipped it left both in whenever the measured
+	// headroom added a build, a test process's heap under load deciding (#f0h29a2).
 	buildsAtOncePattern = regexp.MustCompile(
 		`,"buildsAtOnce":\d+(,"buildsWidthLiveBytes":\d+,"buildsWidthBuildBytes":\d+,"buildsWidthPeakFactor":[\d.]+)?` +
-			`(,"buildsPoolSize":\d+)?`)
+			`(,"buildsWidthSlack":true)?(,"buildsPoolSize":\d+)?`)
 	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",
