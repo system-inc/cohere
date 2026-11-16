@@ -54,13 +54,21 @@ type registeredRule struct {
 type Result map[string]Outcome
 
 // Outcome is what one rule's listener found over one package: its findings, or the crash that ended its run there,
-// in which case it has no findings, since a run cut short could have reported anything. Inherited is the host's
-// findings on the files a syntax-only rule inherits, which it never walked (rule.InheritedFiles), and none beside a
-// crash.
+// in which case it has no findings, since a run cut short could have reported anything. InheritedFiles are the files a
+// syntax-only rule inherits, which it never walked, and Inherited the host's findings on them (rule.InheritedFiles),
+// none beside a crash.
 type Outcome struct {
-	Diagnostics []analysis.Diagnostic
-	Inherited   []analysis.Diagnostic
-	Crash       error
+	Diagnostics    []analysis.Diagnostic
+	InheritedFiles map[*token.File]bool
+	Inherited      []analysis.Diagnostic
+	Crash          error
+}
+
+// inheritedTake is what one rule inherits over a package, as rule.InheritedFiles gives it: the files, and the host's
+// findings on them.
+type inheritedTake struct {
+	files       map[*token.File]bool
+	diagnostics []analysis.Diagnostic
 }
 
 // newListeners is the registry of a dispatcher whose analyzer is named name, documented by doc, runs run, and requires
@@ -179,9 +187,7 @@ func (listeners *listeners) ruleAnalyzer(
 				pass.Report(diagnostic)
 			}
 			// After the walk's own, the host's findings on the files the rule inherited, as its own.
-			for _, diagnostic := range outcome.Inherited {
-				pass.Report(diagnostic)
-			}
+			rule.ReportInherited(pass, ruleName, outcome.InheritedFiles, outcome.Inherited)
 			return nil, nil
 		},
 	}
@@ -272,7 +278,7 @@ func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns
 	collector, _ := pass.ResultOf[rule.Timed].(*timing.Collector)
 	newStarted := func() *startedRuns {
 		return &startedRuns{byKind: map[reflect.Type][]*listenerRun{}, notStarted: Result{}, timing: collector,
-			dispatcher: listeners.analyzer.Name, inherited: map[string][]analysis.Diagnostic{}}
+			dispatcher: listeners.analyzer.Name, inherited: map[string]inheritedTake{}}
 	}
 	whole := newStarted()
 	var parts []*startedRuns
@@ -298,7 +304,7 @@ func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns
 			var inherited []analysis.Diagnostic
 			inheritedFiles, inherited = rule.InheritedFiles(pass, registered.name)
 			if len(inheritedFiles) > 0 {
-				whole.inherited[registered.name] = inherited
+				whole.inherited[registered.name] = inheritedTake{files: inheritedFiles, diagnostics: inherited}
 			}
 		}
 		if len(parts) > 0 && registered.listener.FileLocal {
@@ -381,7 +387,7 @@ func finish(started *startedRuns) Result {
 	for name, inherited := range started.inherited {
 		outcome := result[name]
 		if outcome.Crash == nil {
-			outcome.Inherited = inherited
+			outcome.InheritedFiles, outcome.Inherited = inherited.files, inherited.diagnostics
 			result[name] = outcome
 		}
 	}

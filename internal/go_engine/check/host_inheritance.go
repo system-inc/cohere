@@ -17,8 +17,10 @@ import (
 // lowest ID holding the rule's analysis is the one inherited from, and since a syntax-only rule's findings on a file
 // are the file's alone, either would give the same.
 //
-// It counts what the build took, each rule's findings on each file once however many of the build's packages and loads
-// took them (Counts). Every method may be called from several goroutines at once.
+// It counts what the build showed of the host's, each rule's findings on each file once its rule reported them
+// (Took), however many of the build's packages and loads did (Counts). A file asked for whose findings would not place,
+// or whose rule then crashed or returned an error, is not counted. Every method may be called from several goroutines
+// at once.
 type HostInheritance struct {
 	host *HostRun
 	// analyzerOf is each enabled rule's analyzer by the rule's name, in whose slot the host's entries hold its
@@ -32,7 +34,7 @@ type HostInheritance struct {
 	taken map[inheritedKey]int
 }
 
-// inheritedKey is one rule's findings on one file, as the build took them.
+// inheritedKey is one rule's findings on one file, as the build showed them.
 type inheritedKey struct {
 	ruleName string
 	filename string
@@ -46,7 +48,7 @@ func (inheritance *HostInheritance) Inherits(ruleName string, filename string) b
 }
 
 // Findings is the host's findings of the rule named ruleName on filename, before any dedupe or withholding
-// (rule.Inheritance), counted as the build's take of them.
+// (rule.Inheritance).
 func (inheritance *HostInheritance) Findings(ruleName string, filename string) []rule.InheritedFinding {
 	findings, held := inheritance.held(ruleName, filename)
 	if !held {
@@ -56,14 +58,19 @@ func (inheritance *HostInheritance) Findings(ruleName string, filename string) [
 	for _, finding := range findings {
 		inherited = append(inherited, inheritedFinding(finding))
 	}
-	inheritance.lock.Lock()
-	inheritance.taken[inheritedKey{ruleName: ruleName, filename: filename}] = len(findings)
-	inheritance.lock.Unlock()
 	return inherited
 }
 
-// Counts is how many distinct files the build took at least one rule's findings on, and how many findings it took,
-// each rule's on each file once.
+// Took counts findings, what the rule named ruleName reported of the host's on filename, as the build's take of them
+// (rule.Inheritance). A file taken again, by another of the build's packages or loads, is counted once.
+func (inheritance *HostInheritance) Took(ruleName string, filename string, findings int) {
+	inheritance.lock.Lock()
+	defer inheritance.lock.Unlock()
+	inheritance.taken[inheritedKey{ruleName: ruleName, filename: filename}] = findings
+}
+
+// Counts is how many distinct files the build showed at least one rule's findings of the host's on, and how many
+// findings it showed, each rule's on each file once.
 func (inheritance *HostInheritance) Counts() (files int, findings int) {
 	if inheritance == nil {
 		return 0, 0

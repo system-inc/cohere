@@ -34,6 +34,10 @@ type Inheritance interface {
 	// Findings is the host's findings of the rule named ruleName on filename, every one, before any dedupe or
 	// withholding, for a file Inherits answers true of.
 	Findings(ruleName string, filename string) []InheritedFinding
+	// Took is told, once the rule named ruleName has reported the host's findings on filename as its own
+	// (ReportInherited), how many it reported there, so a build counts what it showed of the host's, never what it
+	// asked for and then dropped: a file whose findings would not place, or a rule that crashed or returned an error.
+	Took(ruleName string, filename string, findings int)
 }
 
 // InheritedFinding is one of the host's findings an extra build inherits, as check.Finding holds it, in a type of its
@@ -121,13 +125,37 @@ func SyntaxOnlyRun(ruleName string, run func(*analysis.Pass) (any, error)) func(
 			return inherited[pass.Fset.File(file.FileStart)]
 		})
 		result, runError := run(&own)
+		// A walk that ended with an error could have reported anything of its own, so the host's findings are not
+		// reported beside it either, and the error stands as the rule's.
 		if runError != nil {
 			return result, runError
 		}
-		for _, diagnostic := range diagnostics {
-			pass.Report(diagnostic)
-		}
+		ReportInherited(pass, ruleName, inherited, diagnostics)
 		return result, nil
+	}
+}
+
+// ReportInherited reports diagnostics, the host's findings on the files inherited of the rule named ruleName
+// (InheritedFiles), on pass as the rule's own, and tells the build's Inheritance how many it reported on each of those
+// files (Inheritance.Took), so the build counts what it showed. Only a rule whose run finished without a crash or an
+// error calls it.
+func ReportInherited(
+	pass *analysis.Pass,
+	ruleName string,
+	inherited map[*token.File]bool,
+	diagnostics []analysis.Diagnostic,
+) {
+	reported := make(map[*token.File]int, len(inherited))
+	for _, diagnostic := range diagnostics {
+		pass.Report(diagnostic)
+		reported[pass.Fset.File(diagnostic.Pos)]++
+	}
+	inheritance, inherits := pass.ResultOf[Inherited].(Inheritance)
+	if !inherits {
+		return
+	}
+	for tokenFile := range inherited {
+		inheritance.Took(ruleName, tokenFile.Name(), reported[tokenFile])
 	}
 }
 

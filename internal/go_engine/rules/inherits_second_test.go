@@ -19,3 +19,8 @@ func (inheritsSecond) Inherits(_ string, filename string) bool {
 func (inheritsSecond) Findings(string, string) []rule.InheritedFinding {
 	return []rule.InheritedFinding{{Line: 1, Column: 1, MessageId: "inherited", Message: "the host's finding"}}
 }
+
+// Took counts nothing: no test here reads what a build showed.
+func (inheritsSecond) Took(string, string, int) {
+	// The registry's tests read the findings a rule reports, never the build's count of them.
+}

@@ -151,3 +151,44 @@ func diagnosticPlaced(action *checker.Action, diagnostic analysis.Diagnostic) st
 	}
 	return placed
 }
+
+// A dispatched rule tells the build what it showed of the host's only once it reports it (#y6q1x2j): a syntax-only
+// listener that finishes reports the two findings planted on second.go and the build is told two, while one that
+// crashes on first.go reports none of them and the build is told nothing, so a crash never counts as inherited.
+func TestADispatchedRuleCountsOnlyWhatItReported(test *testing.T) {
+	test.Parallel()
+	for _, crashing := range []bool{false, true} {
+		dispatcher := NewSyntax()
+		ruleName := rule.Namespace + "counted"
+		counted := dispatcher.RuleAnalyzer(ruleName, "counted", "crashes on the files it hears, or hears them",
+			&rule.Listener{
+				FileLocal:  true,
+				SyntaxOnly: true,
+				FileEnter: func(*rule.Context, *ast.File) {
+					if crashing {
+						panic("the listener crashed")
+					}
+				},
+			})
+		took := &tookFindings{byFile: map[string]int{}}
+		inheritance := plantedInheritance{ruleName: ruleName,
+			planted: map[string][]rule.InheritedFinding{"second.go": inheritedOnSecond}, took: took}
+		graph, analyzeError := checker.Analyze([]*analysis.Analyzer{counted}, loadFixture(test, "walked"),
+			&checker.Options{Inheritance: inheritance, Inherited: rule.Inherited})
+		if analyzeError != nil {
+			test.Fatalf("analyzing the fixture: %v", analyzeError)
+		}
+		action := graph.Roots[0]
+		if crashing {
+			if action.Err == nil || len(action.Diagnostics) != 0 || len(took.byFile) != 0 {
+				test.Errorf("the crashing rule ended with %v, reported %d findings and told the build %v, want its "+
+					"crash, nothing reported and nothing told", action.Err, len(action.Diagnostics), took.byFile)
+			}
+			continue
+		}
+		if action.Err != nil || len(action.Diagnostics) != 2 || took.byFile["second.go"] != 2 || len(took.byFile) != 1 {
+			test.Errorf("the rule ended with %v, reported %d findings and told the build %v, want the two planted "+
+				"on second.go reported and told", action.Err, len(action.Diagnostics), took.byFile)
+		}
+	}
+}
