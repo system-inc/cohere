@@ -72,6 +72,8 @@ func groupedRows(rows int, pairs []rowEntry) packedRows[int32] {
 // would be read wrong rather than fail, so it fails here instead.
 func column(value int) int32 {
 	if value < 0 || value > math.MaxInt32 {
+		// Invariant: a live unit's offsets and size are those of a source file the host parsed, under 2 GiB, and a
+		// stored record's past them is refused as it decodes (recordReader.unit).
 		panic("build_dependence: a unit's offset or size passes what a unit column holds")
 	}
 	return int32(value)
@@ -84,6 +86,8 @@ func column(value int) int32 {
 func narrowed[Width int32 | uint32](value int, counting string) Width {
 	narrow := Width(value)
 	if value < 0 || int(narrow) != value {
+		// Invariant: a tree's graph holds a few million units, nodes and entries in its largest table, thousands of
+		// times below 2^31.
 		panic(fmt.Sprintf("build_dependence: %s number %d, more than %T holds", counting, value, narrow))
 	}
 	return narrow

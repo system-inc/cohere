@@ -188,6 +188,9 @@ func (graph *Graph) add(record *packageRecord) {
 	defer graph.lock.Unlock()
 	graph.refuseSealed("add a package")
 	if record.released {
+		// Invariant: each decoded Record is added to one graph, the host's or the standard library's
+		// (pipeline_build_dependence.go), and the findings cache decodes its records afresh for every load, so no
+		// record a sealed graph emptied reaches another; one that did is the caller's bug.
 		panic("build_dependence: a caller tried to add the record of " + record.identifier + " after a graph " +
 			"holding it was sealed (Graph.Seal), which let go of its units, objects and edges, so this graph would " +
 			"hold the package with no unit and drop every read of its objects: a decoded Record is added to one " +
@@ -257,6 +260,8 @@ func (graph *Graph) Seal() {
 // that unlocks in a defer, so the panic leaves the lock free.
 func (graph *Graph) refuseSealed(tried string) {
 	if graph.sealed {
+		// Invariant: the engine adds every package and writes every record the store keeps before it seals the graphs
+		// (otherBuilds seals them after awaitStandardLibrary), so a call after Seal is the caller's ordering bug.
 		panic("build_dependence: a caller tried to " + tried + " after the graph was sealed (Graph.Seal), which " +
 			"let go of what resolving and encoding read, so the caller's order is wrong: every package is added " +
 			"and every record encoded before the graph is sealed")

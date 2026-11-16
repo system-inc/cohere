@@ -212,7 +212,10 @@ func TestASealedGraphRefusesToAddOrEncode(test *testing.T) {
 		call func()
 	}{
 		{"AddPackage", func() { live.AddPackage(host[identifier], true) }},
-		{"AddRecord", func() { _ = live.AddRecord(encoded) }},
+		{"AddRecord", func() {
+			// Ignored: the graph is sealed, so the call panics before it can return an error.
+			_ = live.AddRecord(encoded)
+		}},
 		{"AddDecoded", func() { live.AddDecoded(decoded) }},
 		{"EncodedRecord", func() { _, _ = live.EncodedRecord(identifier) }},
 	} {

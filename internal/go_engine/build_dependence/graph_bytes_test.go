@@ -40,9 +40,10 @@ func liveHeapBytes() uint64 {
 // engine's rules let them go. Every package's types are held for the whole test, so what the graphs hold of them is
 // no part of their own bytes: the live heap with the graphs, less the live heap once they and every judgment of them
 // are let go.
+//
+// Not parallel: top-level parallel tests pause until every sequential one has ended, so the heap this test reads holds
+// no other test's allocations.
 func TestTheGraphsHoldFewBytesOfTheirOwn(test *testing.T) {
-	// Not parallel: top-level parallel tests pause until every sequential one has ended, so the heap this test reads
-	// holds no other test's allocations.
 	roots, loadError := packages.Load(&packages.Config{
 		Mode:  packages.LoadAllSyntax | packages.NeedTypesInfo | packages.NeedTypesSizes | packages.NeedModule,
 		Tests: true,

@@ -437,8 +437,6 @@ func (resolved *resolvedGraph) resolveReads() {
 // parameter's constraint, is read through its type, as the counter read every object without a node: what its record
 // holds of it (recordedRead.through), each bit of which resolves the same way, one with no node in a package the graph
 // holds dropped.
-//
-// Mutates: the unit gains the bits and external reads
 func (resolved *resolvedGraph) resolveRead(packageIndex int, read recordedRead) {
 	targets := resolved.targets[packageIndex]
 	objects := resolved.packages[packageIndex].objects
