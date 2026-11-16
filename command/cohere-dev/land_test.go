@@ -124,15 +124,17 @@ func (fixture *landFixture) land(name string) *exec.Cmd {
 	return command
 }
 
+// waitForGate waits for line in the gate log. Its bound only keeps a landing that never gates from hanging the test,
+// so it is long: a minute was outrun on Sun2 at load 19, with every package of the gate beside it (#kgneqxv).
 func (fixture *landFixture) waitForGate(line string) {
 	fixture.test.Helper()
-	for deadline := time.Now().Add(time.Minute); ; time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(10 * time.Minute); ; time.Sleep(20 * time.Millisecond) {
 		contents := readMaybeMissing(fixture.test, fixture.log)
 		if strings.Contains(string(contents), line) {
 			return
 		}
 		if time.Now().After(deadline) {
-			fixture.test.Fatalf("waited a minute for %q in the gate log:\n%s", line, contents)
+			fixture.test.Fatalf("waited ten minutes for %q in the gate log:\n%s", line, contents)
 		}
 	}
 }
