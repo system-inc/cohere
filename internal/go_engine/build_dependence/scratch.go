@@ -73,6 +73,7 @@ func (scratch *workerScratch) release() {
 
 	scratch.bodies.typesInformation = nil
 	scratch.bodies.typeReferences = clearedMap(scratch.bodies.typeReferences, len(scratch.bodies.typeReferences))
+	scratch.bodies.typeReferenceStore = clearedSlice(scratch.bodies.typeReferenceStore)
 	scratch.bodies.collected = clearedMap(scratch.bodies.collected, scratch.bodies.collectedMost)
 	scratch.bodies.collectedMost = 0
 	scratch.bodies.referenceStore = clearedSlice(scratch.bodies.referenceStore)

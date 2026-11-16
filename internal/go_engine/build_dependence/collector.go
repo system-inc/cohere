@@ -107,7 +107,7 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	collecting.collectMembers(&unit, []types.Object{function}, false, declaration.Type)
 	// The signature's name bits, a signature moving being what a function's bit carries.
 	signature := function.Signature()
-	collecting.addEdges(function, false, collecting.walker.references(signature, false))
+	collecting.addEdges(function, false, collecting.walker.borrowedReferences(signature, false))
 	collecting.addUses(function, false, false, declaration.Type)
 	receiver := signature.Recv()
 	if receiver == nil {
@@ -116,9 +116,9 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	// Method receivers are included, the larger set: without receiver edges the counter found 8 to 14% fewer
 	// dependent objects. A method's bit takes its receiver's name bit, since its method set moving is what the name
 	// bit carries.
-	collecting.addEdges(function, false, collecting.walker.references(receiver.Type(), false))
+	collecting.addEdges(function, false, collecting.walker.borrowedReferences(receiver.Type(), false))
 	for parameter := range signature.RecvTypeParams().TypeParams() {
-		collecting.addEdges(function, false, collecting.walker.references(parameter.Constraint(), false))
+		collecting.addEdges(function, false, collecting.walker.borrowedReferences(parameter.Constraint(), false))
 	}
 	receiverType := receiver.Type()
 	if pointer, isPointer := receiverType.(*types.Pointer); isPointer {
@@ -149,18 +149,18 @@ func (collecting *collector) collectType(tokenFile *token.File, spec *ast.TypeSp
 func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *ast.TypeSpec) {
 	switch declared := typeName.Type().(type) {
 	case *types.Named:
-		collecting.addEdges(typeName, true, collecting.walker.references(declared.Underlying(), true))
+		collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(declared.Underlying(), true))
 		if typeAndValue, isRecorded := collecting.typesInformation.Types[spec.Type]; isRecorded {
 			// `type T S` keeps S in its expression's type, where the resolved underlying has lost it, so S is read in
 			// full into T's underlying.
-			collecting.addEdges(typeName, true, collecting.walker.references(typeAndValue.Type, true))
+			collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(typeAndValue.Type, true))
 		}
 		collecting.addUses(typeName, true, false, spec.Type)
 		if spec.TypeParams != nil {
 			collecting.addUses(typeName, false, false, spec.TypeParams)
 		}
 		for parameter := range declared.TypeParams().TypeParams() {
-			collecting.addEdges(typeName, false, collecting.walker.references(parameter.Constraint(), true))
+			collecting.addEdges(typeName, false, collecting.walker.borrowedReferences(parameter.Constraint(), true))
 		}
 		for method := range declared.Methods() {
 			collecting.addEdge(kindEdge{from: typeName, to: method})
@@ -190,8 +190,8 @@ func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *as
 		}
 	case *types.Alias:
 		// An alias is its target's bits.
-		collecting.addEdges(typeName, false, collecting.walker.references(declared.Rhs(), false))
-		collecting.addEdges(typeName, true, collecting.walker.references(declared.Rhs(), true))
+		collecting.addEdges(typeName, false, collecting.walker.borrowedReferences(declared.Rhs(), false))
+		collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(declared.Rhs(), true))
 		collecting.addUses(typeName, false, false, spec.Type)
 		collecting.addUses(typeName, true, false, spec.Type)
 		if spec.TypeParams != nil {
@@ -199,7 +199,7 @@ func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *as
 			collecting.addUses(typeName, true, false, spec.TypeParams)
 		}
 		for parameter := range declared.TypeParams().TypeParams() {
-			collecting.addEdges(typeName, false, collecting.walker.references(parameter.Constraint(), true))
+			collecting.addEdges(typeName, false, collecting.walker.borrowedReferences(parameter.Constraint(), true))
 		}
 	}
 }
@@ -256,7 +256,7 @@ func (collecting *collector) collectFields(
 			variable := declared.Field(index)
 			index++
 			unit.declares = append(unit.declares, variable)
-			collecting.addEdges(variable, false, collecting.walker.references(variable.Type(), false))
+			collecting.addEdges(variable, false, collecting.walker.borrowedReferences(variable.Type(), false))
 			collecting.addUses(variable, false, false, field.Type)
 			for _, owner := range owners {
 				collecting.addEdge(kindEdge{from: owner, fromUnderlying: ownerUnderlying, to: variable})
@@ -283,8 +283,8 @@ func (collecting *collector) collectInterfaceMethods(
 			}
 			unit.declares = append(unit.declares, method)
 			signature := method.Signature()
-			collecting.addEdges(method, false, collecting.walker.references(signature.Params(), false))
-			collecting.addEdges(method, false, collecting.walker.references(signature.Results(), false))
+			collecting.addEdges(method, false, collecting.walker.borrowedReferences(signature.Params(), false))
+			collecting.addEdges(method, false, collecting.walker.borrowedReferences(signature.Results(), false))
 			collecting.addUses(method, false, false, field.Type)
 			for _, owner := range owners {
 				collecting.addEdge(kindEdge{from: owner, fromUnderlying: ownerUnderlying, to: method})
@@ -320,7 +320,7 @@ func (collecting *collector) collectValue(
 		declared = append(declared, object)
 		if isVariable {
 			// A var's own type, as a name, and the initializer an untyped var takes its type from.
-			collecting.addEdges(object, false, collecting.walker.references(object.Type(), false))
+			collecting.addEdges(object, false, collecting.walker.borrowedReferences(object.Type(), false))
 			collecting.addUses(object, false, false, specType)
 			if spec.Type == nil {
 				collecting.addUses(object, false, false, expressionNodes(specValues)...)
@@ -329,7 +329,7 @@ func (collecting *collector) collectValue(
 		}
 		// A constant reads its own type in full, and whatever its value expression uses, in full too:
 		// unsafe.Sizeof(v) reaches v's layout.
-		collecting.addEdges(object, false, collecting.walker.references(object.Type(), true))
+		collecting.addEdges(object, false, collecting.walker.borrowedReferences(object.Type(), true))
 		collecting.addUses(object, false, true, specType)
 		collecting.addUses(object, false, true, expressionNodes(specValues)...)
 	}
@@ -369,17 +369,18 @@ func (collecting *collector) addUse(from types.Object, fromUnderlying bool, full
 		return
 	case *types.TypeName:
 		if full {
-			collecting.addEdges(from, fromUnderlying, collecting.walker.references(used.Type(), true))
+			collecting.addEdges(from, fromUnderlying, collecting.walker.borrowedReferences(used.Type(), true))
 		}
 		return
 	}
 	collecting.addEdge(kindEdge{from: from, fromUnderlying: fromUnderlying, to: used})
 	if full {
-		collecting.addEdges(from, fromUnderlying, collecting.walker.references(used.Type(), true))
+		collecting.addEdges(from, fromUnderlying, collecting.walker.borrowedReferences(used.Type(), true))
 	}
 }
 
-// addEdges makes from's bit depend on each of referenced.
+// addEdges makes from's bit depend on each of referenced, which may be the walker's own buffer (borrowedReferences):
+// adding an edge walks no type.
 func (collecting *collector) addEdges(from types.Object, fromUnderlying bool, referenced []reference) {
 	for _, target := range referenced {
 		collecting.addEdge(kindEdge{from: from, fromUnderlying: fromUnderlying, to: target.object,

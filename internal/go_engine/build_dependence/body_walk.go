@@ -15,8 +15,10 @@ type bodyWalk struct {
 	typesInformation *types.Info
 	walker           *bitWalker
 
-	// typeReferences are the bits each type reaches in each mode, walked once for the package.
-	typeReferences map[walkKey][]reference
+	// typeReferences are the bits each type reaches in each mode, walked once for the package, each a slice of
+	// typeReferenceStore, which holds them for the package's walk.
+	typeReferences     map[walkKey][]reference
+	typeReferenceStore []reference
 
 	// collected are the current body's references, each once, and collectedMost the most it held.
 	collected     map[reference]bool
@@ -245,7 +247,10 @@ func (walk *bodyWalk) addType(walked types.Type, full bool) {
 	key := walkKey{walked: walked, full: full}
 	referenced, isWalked := walk.typeReferences[key]
 	if !isWalked {
-		referenced = walk.walker.references(walked, full)
+		start := len(walk.typeReferenceStore)
+		walk.typeReferenceStore = append(walk.typeReferenceStore, walk.walker.borrowedReferences(walked, full)...)
+		// The slice's capacity ends with it, so nothing appended to it could write over the next type's bits.
+		referenced = walk.typeReferenceStore[start:len(walk.typeReferenceStore):len(walk.typeReferenceStore)]
 		walk.typeReferences[key] = referenced
 	}
 	for _, read := range referenced {
