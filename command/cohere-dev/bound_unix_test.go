@@ -230,15 +230,53 @@ func readPids(test *testing.T, path string) []int {
 	return pids
 }
 
-// gone reports whether a process has ended, waiting a few seconds for the system to reap it: one stopped as
-// the run ended may still be a zombie until its new parent collects it.
+// gone reports whether a process has ended, waiting a few seconds for it to: a zombie has ended, since it runs nothing
+// and waits only for its new parent to reap it, which a loaded box held past 5 seconds (#z5b7v6n, Sun2 at load 19).
 func gone(pid int) bool {
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
-		if errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) {
+		if errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) || isZombie(pid) {
 			return true
 		}
 		if time.Now().After(deadline) {
 			return false
 		}
 	}
+}
+
+// A process that exited and isn't reaped yet is a zombie, and gone; one still running is neither, so the bounded run's
+// test can't take a running sleep for an ended one.
+func TestAZombieIsGoneAndARunningProcessIsNot(test *testing.T) {
+	test.Parallel()
+	sleeper := exec.Command("sleep", "60")
+	if startError := sleeper.Start(); startError != nil {
+		test.Fatal(startError)
+	}
+	pid := sleeper.Process.Pid
+	reaped := false
+	test.Cleanup(func() {
+		if !reaped {
+			// Ignored: the sleep may have ended already, which the wait below reaps either way.
+			_ = sleeper.Process.Kill()
+			// Ignored: the sleep was killed, so its wait's error is that kill.
+			_ = sleeper.Wait()
+		}
+	})
+	if isZombie(pid) {
+		test.Fatalf("a running sleep, %d, reads as a zombie", pid)
+	}
+	if killError := sleeper.Process.Signal(syscall.SIGKILL); killError != nil {
+		test.Fatal(killError)
+	}
+	// Not waited for, so it stays a zombie of this test's own until the cleanup reaps it.
+	for deadline := time.Now().Add(5 * time.Second); !isZombie(pid); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			test.Fatalf("the killed sleep %d never read as a zombie", pid)
+		}
+	}
+	if !gone(pid) {
+		test.Errorf("the killed, unreaped sleep %d isn't gone", pid)
+	}
+	// Ignored: the sleep was killed, so its wait's error is that kill.
+	_ = sleeper.Wait()
+	reaped = true
 }
