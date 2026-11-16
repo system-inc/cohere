@@ -29,13 +29,16 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-useless-concatenation"
 
-// listener reads the package's line table as the syntax dispatcher's walk enters its first file, and hears every
-// binary expression of the walk.
+// listener reads the package's line table as the syntax dispatcher's walk enters each file, and hears every binary
+// expression of the walk. It is FileLocal, holding the table in each file's state rather than the package's, and
+// SyntaxOnly: two literals and their lines decide every finding (#y6q1x2j).
 var listener = rule.Listener{
-	Requires:  []*analysis.Analyzer{positions.Analyzer},
-	FileEnter: enterFile,
-	Nodes:     []ast.Node{(*ast.BinaryExpr)(nil)},
-	Node:      judgeBinary,
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Requires:   []*analysis.Analyzer{positions.Analyzer},
+	FileEnter:  enterFile,
+	Nodes:      []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node:       judgeBinary,
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
@@ -50,25 +53,21 @@ var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Ana
 
 var uselessConcatenationMessage = policy.MessageOf(Name, "uselessConcatenation")
 
-// packageState is what the rule reads once for its package, held in its context's state.
-type packageState struct {
-	// table is the package's line table, read as the walk enters its first file.
+// fileState is what the rule reads once for each file, held in its file state (rule.FileState).
+type fileState struct {
+	// table is the package's line table, read as the walk enters the file.
 	table *positions.Table
 }
 
-// enterFile reads the package's line table, the first time the walk enters one of its files.
+// enterFile reads the package's line table as the walk enters a file.
 func enterFile(context *rule.Context, _ *ast.File) {
-	state := rule.State[packageState](context)
-	if state.table != nil {
-		return
-	}
 	table, isTable := context.ResultOf(positions.Analyzer).(*positions.Table)
 	if !isTable {
 		// Invariant: positions' result is a *Table, its declared ResultType, which the checker holds it to. Anything
 		// else is a mistake in positions, and the dispatcher's recover makes it this rule's crash on the package.
 		panic(fmt.Sprintf("reading the line table: positions gave %T", context.ResultOf(positions.Analyzer)))
 	}
-	state.table = table
+	rule.FileState[fileState](context).table = table
 }
 
 // judgeBinary reports a + between two string literals that stand on one line.
@@ -78,7 +77,7 @@ func judgeBinary(context *rule.Context, node ast.Node, _ []ast.Node) {
 		return
 	}
 	left, right, joins := JoinedLiterals(binary)
-	if !joins || !onOneLine(rule.State[packageState](context).table, left, right) {
+	if !joins || !onOneLine(rule.FileState[fileState](context).table, left, right) {
 		return
 	}
 	// The operator rather than the expression, as the core port reports, so a chain's findings point at the one join

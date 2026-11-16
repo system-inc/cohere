@@ -21,11 +21,13 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-require-default-last"
 
-// listener hears every switch, type switch and select of the syntax dispatcher's walk.
+// listener hears every switch, type switch and select of the syntax dispatcher's walk. It is SyntaxOnly: a statement's
+// own clauses decide every finding (#y6q1x2j).
 var listener = rule.Listener{
-	FileLocal: true,
-	Nodes:     []ast.Node{(*ast.SwitchStmt)(nil), (*ast.TypeSwitchStmt)(nil), (*ast.SelectStmt)(nil)},
-	Node:      judgeStatement,
+	FileLocal:  true,
+	SyntaxOnly: true,
+	Nodes:      []ast.Node{(*ast.SwitchStmt)(nil), (*ast.TypeSwitchStmt)(nil), (*ast.SelectStmt)(nil)},
+	Node:       judgeStatement,
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
