@@ -79,8 +79,8 @@ func TestMethodSetNamesMatchNewMethodSet(test *testing.T) {
 }
 
 // methodSetNamesHoldPlatform fails unless loaded is std as operatingSystem and architecture build it, read from the
-// constants internal/goos.GOOS and internal/goarch.GOARCH among its packages, so a load that ignored its environment
-// and read the host's std cannot pass as another platform's (#jy0v2ef).
+// constants `internal/goos.GOOS` and `internal/goarch.GOARCH` among its packages, so a load that ignored its
+// environment and read the host's std cannot pass as another platform's (#jy0v2ef).
 func methodSetNamesHoldPlatform(test *testing.T, loaded []*types.Package, operatingSystem string, architecture string) {
 	test.Helper()
 	if read := methodSetNamesStringConstant(test, loaded, "internal/goos", "GOOS"); read != operatingSystem {
