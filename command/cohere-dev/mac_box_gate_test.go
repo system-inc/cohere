@@ -24,8 +24,10 @@ type macBoxFixture struct {
 	*landFixture
 	// replies holds what the stand-in ahra answers: `push.fails` makes the push fail, `<box>.held` makes the box's
 	// claim read held, `<box>.run` is what her gap prints, with `COMMIT` the commit the remote names, and `<box>.exit`
-	// its exit. The stand-in writes each call it took to `calls`, one line each, and each box's remote command whole
-	// to `<box>.remote`.
+	// its exit. `<box>.unlaid` is what her gap prints in place of `<box>.run` until a gap carrying corpora has laid
+	// them, which copies its carry to `<box>.carry` and its remote to `<box>.lay`, or prints `<box>.lay.fails` and
+	// exits 1 when that is there. The stand-in writes each call it took to `calls`, one line each, and each box's
+	// remote command whole to `<box>.remote`.
 	replies string
 	// goCalls is every go command Kirk's Mac ran, one line each.
 	goCalls string
@@ -47,7 +49,14 @@ gap)
     if [ -e "$replies/$box.held" ]; then echo "gap $box closed · $box is held by system_loom until 18:00Z"; exit 1; fi
     echo "gap $box open"; exit 0
   fi
+  if [ "$7" = --carry ]; then
+    cp "$8" "$replies/$box.carry"
+    printf '%s' "${14}" > "$replies/$box.lay"
+    if [ -e "$replies/$box.lay.fails" ]; then cat "$replies/$box.lay.fails"; exit 1; fi
+    touch "$replies/$box.laid"; echo "cohere-dev-gate: laid ahra at COMMIT in 1s, 1.8G"; exit 0
+  fi
   printf '%s' "${10}" > "$replies/$box.remote"
+  if [ -e "$replies/$box.unlaid" ] && [ ! -e "$replies/$box.laid" ]; then cat "$replies/$box.unlaid"; exit 0; fi
   commit=$(printf '%s' "${10}" | sed 's/.* bash -s -- \([0-9a-f]*\) .*/\1/')
   sed "s/COMMIT/$commit/g" "$replies/$box.run"
   exit "$(cat "$replies/$box.exit" 2>/dev/null || echo 0)" ;;
@@ -281,7 +290,7 @@ func TestALandingTestsOnTheGatesMacsAndNeverOnKirksMac(test *testing.T) {
 // macBoxRemote is a gap's remote command: the encoded script through bash, then its arguments, the commit, the pin and
 // the races quoted, then the patterns.
 var macBoxRemote = regexp.MustCompile(
-	`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| bash -s -- ([0-9a-f]{40}) '([0-9a-f]*)' '([^']*)' (.*)$`,
+	`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| bash -s -- ([0-9a-f]{40}) '([0-9a-f]*)' '([^']*)' '([^']*)' (.*)$`,
 )
 
 // The push puts the commit being landed in Loom's feed for cohere, the gap runs on Sun2 within its bound over ssh to
@@ -304,10 +313,13 @@ func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 	if found == nil {
 		test.Fatalf("the gap's remote is not the encoded script and its arguments:\n%s", remote)
 	}
-	commit, pin, races, patterns := string(found[2]), string(found[3]), string(found[4]), string(found[5])
+	commit, pin, races, corpora, patterns := string(found[2]), string(found[3]), string(found[4]), string(found[5]),
+		string(found[6])
 	if fixture.git(fixture.repository, "rev-parse", commit+"^{tree}") !=
-		fixture.git(fixture.repository, "rev-parse", "main^{tree}") || pin != "" || races != "" || patterns != "./..." {
-		test.Errorf("the script was handed commit %s, pin %q, races %q and patterns %q", commit, pin, races, patterns)
+		fixture.git(fixture.repository, "rev-parse", "main^{tree}") || pin != "" || races != "" || corpora != "-" ||
+		patterns != "./..." {
+		test.Errorf("the script was handed commit %s, pin %q, races %q, corpora %q and patterns %q", commit, pin,
+			races, corpora, patterns)
 	}
 	for _, want := range []string{
 		"loom push --feed " + commit + " --repository cohere",
@@ -390,7 +402,7 @@ func TestTheGatesMacScriptWaitsForItsMirrorAndWorksInItsScratch(test *testing.T)
 			if script == macBoxScript {
 				test.Fatal("the script's mirror line or goroot was not found to replace")
 			}
-			bash := exec.Command("bash", "-s", "--", row.commit, "", "", "./...")
+			bash := exec.Command("bash", "-s", "--", row.commit, "", "", "-", "./...")
 			bash.Dir = test.TempDir()
 			bash.Stdin = strings.NewReader(script)
 			bash.Env = append(os.Environ(), "HOME="+home, "GIT_CONFIG_NOSYSTEM=1")

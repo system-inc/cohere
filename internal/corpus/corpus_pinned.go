@@ -15,6 +15,30 @@ import (
 // count reads a pin of its own, which moves only when its analysis does.
 const StructurePin = "1fa60efa5922c795ce8c42b7390ca21bd8030bec"
 
+// StructureCountPin is a commit of the Structure corpus whose files never change, for the walks that assert exact
+// counts (pinnedCorpusFiles in the high-level representation's tests).
+//
+// The well-formedness walks read StructurePin in the gate and the live directory in the nightly: they look for a
+// construct nobody anticipated, and new code is where those arrive (#jf5dz34). A pin that moves forward is wrong for a
+// test that asserts exact counts, because the counts then move whenever anyone edits the directory, and our own lint
+// sweeps edit it most. TestHoistableCorpusDistribution asserts exact counts on purpose (its comment records the
+// mutants only an exact count can see), and against the live tree it failed after every sweep in both directions, 796
+// to 800 and then to 773. So it reads the same paths at this commit instead, and its numbers move only when the
+// analysis does. It lives here, beside every other pin, because the land gate reads them all from this file (#5r0vrte).
+const StructureCountPin = "9f40ee3e313a9c78b8e98da4cd214d45af4b7495"
+
+// AhraPin is the commit of ahra the land gate lays on its boxes (#5r0vrte): its tree, Structure filled in at the
+// commit it records, and the packages its lockfile names installed. A test that reads ahra's Root on a gate box reads
+// this commit, while a developer's run reads their own checkout as it stands. It moves in a commit that says why.
+const AhraPin = "958fffe2bbedffa0c514f095a5e70045d44e67eb"
+
+// ConnectedPin is the commit of www-connected-app the land gate lays, as AhraPin is ahra's.
+const ConnectedPin = "394d26d8a9ec58d06247029c6c415d78f1054c49"
+
+// PrettierForkPin is the commit of the Prettier fork the land gate lays, with its yarn.lock installed, the fork whose
+// CSS fixtures cohere vendors (internal/format/css/testdata/prettier/README.md).
+const PrettierForkPin = "54c8b90aeaeb09fbc9a4b41717c45911ea55636d"
+
 // LiveVariable, set, makes At read a corpus's live checkout instead of its pinned commit: the nightly's census over
 // the tree as it is now. No gate sets it.
 const LiveVariable = "COHERE_CORPUS_LIVE"

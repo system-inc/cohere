@@ -773,7 +773,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// moves 625/2841 to 631/3043; STATE_EFFECTS.md accounts for all added and removed scope inputs.
 	// Effect-hook freezing moves those to 649/3118, attributed in EFFECT_HOOK_EFFECTS.md. Immutable
 	// alias-edge refinement moves those to 685/3227; IMMUTABLE_ALIAS_EDGES.md lists the full delta.
-	// # Frozen 2026-10-01: 769 deep / 3,320 flat, over Structure at pinnedCorpusCommit
+	// # Frozen 2026-10-01: 769 deep / 3,320 flat, over Structure at corpus.StructureCountPin
 	//
 	// The live pin of 796 / 3,310 failed after every lint sweep of the directory, 800 / 3,322 and then
 	// 773 / 3,300, so the input is now a fixed commit rather than the working tree. The new figures are

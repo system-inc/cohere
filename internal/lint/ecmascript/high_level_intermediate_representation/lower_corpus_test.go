@@ -52,22 +52,6 @@ func corpusRoot(test testing.TB) string {
 	return corpus.Structure.At(test, corpus.StructurePin, "source")
 }
 
-// pinnedCorpusCommit is a commit in the structure corpus's repository whose files can never change.
-//
-// # Why the exact counts read a pin of their own
-//
-// The well-formedness walks read corpus.StructurePin in the gate and the live directory in the nightly:
-// they look for a construct nobody anticipated, and new code is where those arrive, so the nightly is where
-// that hunt runs, and the gate never reads a tree that moves under a landing (#jf5dz34). A pin that moves
-// forward is wrong for a test that asserts exact counts, because the counts then move whenever anyone edits
-// the directory, and our own lint sweeps edit it most. `TestHoistableCorpusDistribution` asserts exact
-// counts on purpose (its comment records the mutants only an exact count can see), and against the live
-// tree it failed after every sweep in both directions, 796 to 800 and then to 773. So it reads the same
-// paths at this commit instead, and its numbers move only when the analysis does.
-const (
-	pinnedCorpusCommit = "9f40ee3e313a9c78b8e98da4cd214d45af4b7495"
-)
-
 // fastTierVariable is set by `cohere-dev test --fast`, the edit loop, which leaves the corpus walks to the
 // landing gate (#nxgt2ca). A test that walks the corpus reaches it through skipWithoutCorpus or
 // pinnedCorpusFiles, so a new one is left out of the fast tier without anyone listing it. Go's test cache
@@ -110,7 +94,7 @@ type pinnedCorpusRead struct {
 	failure string
 }
 
-// pinnedCorpusFiles returns the first count TypeScript paths under `source/` at pinnedCorpusCommit,
+// pinnedCorpusFiles returns the first count TypeScript paths under `source/` at corpus.StructureCountPin,
 // sorted, with each one's contents at that commit.
 //
 // It skips when the structure corpus is not set, as the live tests do. It fails when the corpus is set
@@ -140,10 +124,10 @@ func pinnedCorpusFiles(test *testing.T, count int) ([]string, map[string]string)
 // one `git cat-file --batch`.
 func readPinnedCorpus(repository string, count int) (paths []string, contents map[string]string, failure string) {
 	listing, outputError := exec.Command("git", "-C", repository, "ls-tree", "-r", "--name-only",
-		pinnedCorpusCommit, "--", "source").Output()
+		corpus.StructureCountPin, "--", "source").Output()
 	if outputError != nil {
 		return nil, nil, fmt.Sprintf("listing %s at %s: %v; the repository is here and the pinned commit is not",
-			repository, pinnedCorpusCommit, outputError)
+			repository, corpus.StructureCountPin, outputError)
 	}
 	for _, line := range strings.Split(string(listing), "\n") {
 		if strings.HasSuffix(line, ".ts") || strings.HasSuffix(line, ".tsx") {
@@ -158,13 +142,13 @@ func readPinnedCorpus(repository string, count int) (paths []string, contents ma
 
 	var request strings.Builder
 	for _, path := range paths {
-		request.WriteString(pinnedCorpusCommit + ":" + path + "\n")
+		request.WriteString(corpus.StructureCountPin + ":" + path + "\n")
 	}
 	batch := exec.Command("git", "-C", repository, "cat-file", "--batch")
 	batch.Stdin = strings.NewReader(request.String())
 	output, outputError := batch.Output()
 	if outputError != nil {
-		return nil, nil, fmt.Sprintf("reading the corpus at %s: %v", pinnedCorpusCommit, outputError)
+		return nil, nil, fmt.Sprintf("reading the corpus at %s: %v", corpus.StructureCountPin, outputError)
 	}
 	// Each answer is "<object> blob <size>\n", the size in bytes of contents, then "\n".
 	contents = make(map[string]string, len(paths))
@@ -176,17 +160,17 @@ func readPinnedCorpus(repository string, count int) (paths []string, contents ma
 			return nil, nil, fmt.Sprintf(
 				"reading %s at %s: git answered %q",
 				path,
-				pinnedCorpusCommit,
+				corpus.StructureCountPin,
 				strings.TrimSpace(header),
 			)
 		}
 		size, parseError := strconv.Atoi(fields[2])
 		if parseError != nil {
-			return nil, nil, fmt.Sprintf("reading %s at %s: a size of %q", path, pinnedCorpusCommit, fields[2])
+			return nil, nil, fmt.Sprintf("reading %s at %s: a size of %q", path, corpus.StructureCountPin, fields[2])
 		}
 		blob := make([]byte, size+1)
 		if _, readFullError := io.ReadFull(reader, blob); readFullError != nil || blob[size] != '\n' {
-			return nil, nil, fmt.Sprintf("reading %s at %s: the blob ended early", path, pinnedCorpusCommit)
+			return nil, nil, fmt.Sprintf("reading %s at %s: the blob ended early", path, corpus.StructureCountPin)
 		}
 		contents[path] = string(blob[:size])
 	}
