@@ -213,6 +213,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 			record.BuildsWidthPeakFactor = engine.buildPeakFactor()
 		}
 		record.BuildsWidthSlack = engine.buildsWidthSlack
+		record.BuildsWidthFromHostLive = engine.buildsWidthFromHostLive
 		engine.recordBuildsPeakProblems(&record)
 	}
 	if len(record.Crashes) > 0 {

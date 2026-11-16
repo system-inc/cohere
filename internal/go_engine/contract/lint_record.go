@@ -56,8 +56,9 @@ type LintRecord struct {
 	// builds that restore nothing from the host for any reason but the facts census (#f9br7sg), or one build alone,
 	// which no heap can widen.
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
-	// BuildsWidthBuildBytes is additive within contract 3, and the Go engine's alone: what the first extra build to
-	// start, the heaviest, held beyond that heap as its load ended, measured the same way. With
+	// BuildsWidthBuildBytes is additive within contract 3, and the Go engine's alone: the holding each extra build was
+	// budgeted beyond that heap as its load ends, 1.2 times what the first build to start, the heaviest, held then,
+	// measured the same way, or 1.2 times that heap when BuildsWidthFromHostLive (#ghb3rcn). With
 	// BuildsWidthPeakFactor, the times that holding a build is taken to reach at its lint's peak, 3.5 in a run with a
 	// findings store and 2.5 without one (#hv090f4), and the memory record's limit, a reader redoes the arithmetic:
 	// floor((limit - live) / (holding * factor)), no more than the builds and at least one (#rmzehfg). Both are absent
@@ -68,6 +69,13 @@ type LintRecord struct {
 	// BuildsAtOnce's last build, one past that floor, since one more fit by the largest ratio measured in the run's
 	// mode, 3.22 with a findings store and 2.16 without one, with 512 MiB to spare (#ewkp7w0). Absent when it did not.
 	BuildsWidthSlack bool `json:"buildsWidthSlack,omitempty"`
+	// BuildsWidthFromHostLive is additive within contract 3, and the Go engine's alone: whether the width was decided
+	// from the host's live heap alone, at the share gate every extra build waits at before its type check, since every
+	// build's share there, its CheckedFromSourceAtGate over its PackagesLoaded, was at or under 0.10 (#ghb3rcn).
+	// BuildsWidthBuildBytes is then that heap times 1.2, the holding budgeted each build, and nothing was measured
+	// again. Absent when the first build's holding was measured instead, a share being over the line, or the width
+	// needed no heap.
+	BuildsWidthFromHostLive bool `json:"buildsWidthFromHostLive,omitempty"`
 	// BuildsPeakProblems is additive within contract 3, and the Go engine's alone: a sentence for each extra build of
 	// a run under `--timing` whose LintPeakOverLoadEnd passed the largest ratio measured in the run's mode, which the
 	// slack spends to, naming the build, its ratio and the constant, each also noted on stderr (#ewkp7w0). Absent
@@ -192,8 +200,14 @@ type BuildRecord struct {
 	CheckedFromSource       int   `json:"checkedFromSource,omitempty"`
 	CheckedFromSourceRounds []int `json:"checkedFromSourceRounds,omitempty"`
 	PackagesLoaded          int   `json:"packagesLoaded,omitempty"`
-	LintWaitMilliseconds    int   `json:"lintWaitMilliseconds,omitempty"`
-	LintWaited              bool  `json:"lintWaited,omitempty"`
+	// CheckedFromSourceAtGate is additive within contract 3, and an extra build's alone (#ghb3rcn): the packages its
+	// first load would check from source as it reached the share gate before its type check, every one not restored.
+	// It is a lower bound on the first round of CheckedFromSource, since a restore decided late can still decline,
+	// and its share over PackagesLoaded is the one the width's decision read, so a tree whose gate and final shares
+	// part widely is findable from the record. Absent when 0.
+	CheckedFromSourceAtGate int  `json:"checkedFromSourceAtGate,omitempty"`
+	LintWaitMilliseconds    int  `json:"lintWaitMilliseconds,omitempty"`
+	LintWaited              bool `json:"lintWaited,omitempty"`
 
 	// FilesAlone, additive within contract 3 (#ytnvt8k), counts the files of ours in scope that this build alone
 	// compiles and a rule ran on: the coverage it buys. NotLinted are the files of ours in scope the host's build

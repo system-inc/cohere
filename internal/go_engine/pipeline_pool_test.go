@@ -142,7 +142,8 @@ func TestTheWidthChangesNothingUnderTheOnePool(test *testing.T) {
 }
 
 // The width the memory decides is measured as the first build's load ends (#rmzehfg): over the fixture's three builds
-// beside the host's under the memory cap, the first build runs alone to its load's end, its holding is read, the lint
+// beside the host's under the memory cap, whose windows build checks a quarter of its graph from source, over the share
+// gate's line (#ghb3rcn), the first build passes the share gate alone to its load's end, its holding is read, the lint
 // record names the host's live heap, the holding and the peak factor the width was decided by, 2.5 under `--no-cache`
 // and 3.5 with a findings store (#hv090f4), and the stream is the one a run one build at a time writes, but for the
 // width.
@@ -157,9 +158,11 @@ func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	engine, raw := runOverConfigured(test, measured, exitFindings, func(engine *pipeline) {
 		engine.memory = underCap()
 	}, "--no-cache", "--other-builds")
-	if engine.buildsWidthBuildBytes == 0 || engine.buildsWidthLiveBytes == 0 || engine.buildsAtOnce < 1 {
-		test.Fatalf("the width %d was decided by a live heap of %d and a holding of %d, want both measured",
-			engine.buildsAtOnce, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes)
+	if engine.buildsWidthBuildBytes == 0 || engine.buildsWidthLiveBytes == 0 || engine.buildsAtOnce < 1 ||
+		engine.buildsWidthFromHostLive {
+		test.Fatalf("the width %d was decided by a live heap of %d and a holding of %d, from the live heap alone %t, "+
+			"want both measured", engine.buildsAtOnce, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes,
+			engine.buildsWidthFromHostLive)
 	}
 	for _, field := range []string{`"buildsWidthLiveBytes":`, `"buildsWidthBuildBytes":`,
 		`"buildsWidthPeakFactor":2.5`} {
@@ -199,7 +202,7 @@ func TestTheWidthsFieldsNormalizeAlikeWhateverTheSlack(test *testing.T) {
 		return string(encoded)
 	}
 	slack := encode(contract.LintRecord{BuildsAtOnce: 4, BuildsWidthLiveBytes: 1 << 30, BuildsWidthBuildBytes: 1 << 29,
-		BuildsWidthPeakFactor: 2.5, BuildsWidthSlack: true, BuildsPoolSize: 16})
+		BuildsWidthPeakFactor: 2.5, BuildsWidthSlack: true, BuildsWidthFromHostLive: true, BuildsPoolSize: 16})
 	forced := encode(contract.LintRecord{BuildsAtOnce: 1, BuildsPoolSize: 12})
 	if !strings.Contains(slack, `"buildsWidthSlack":true`) {
 		test.Fatalf("the record writes no slack to normalize away:\n%s", slack)

@@ -210,6 +210,9 @@ type engineLintRecord struct {
 	// BuildsWidthLiveBytes is the host's live heap BuildsAtOnce was decided from, additive within contract 3, absent
 	// when the decision needed none (#qwb6ns8).
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes"`
+	// BuildsWidthFromHostLive is whether that heap alone decided BuildsAtOnce, every build's share at the share gate
+	// low, additive within contract 3 (#ghb3rcn), absent when the first build's holding was measured instead.
+	BuildsWidthFromHostLive bool `json:"buildsWidthFromHostLive"`
 	// OffReasons is why the settings turn each rule off, for each off the Go engine's settings explain, additive
 	// within contract 3 (#v11k0g2). Nil from an engine that never explains its offs, a Swift engine's, so only an
 	// engine that sends it can say a rule is off with no reason given.
@@ -1004,6 +1007,7 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 	activeSummary.Builds = record.Builds
 	activeSummary.BuildsAtOnce = record.BuildsAtOnce
 	activeSummary.BuildsWidthLiveBytes = record.BuildsWidthLiveBytes
+	activeSummary.BuildsWidthFromHostLive = record.BuildsWidthFromHostLive
 	for _, build := range record.Builds {
 		for _, file := range build.NotLinted {
 			if run.notLinted == nil {

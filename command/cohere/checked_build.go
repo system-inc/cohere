@@ -56,10 +56,12 @@ type checkedBuild struct {
 	// CheckedFromSourceRounds each load's count in order, written only when it was loaded more than once (#k8gty9e).
 	// PackagesLoaded is every package its first load loaded, whose share checked from source weighs its lint, and
 	// LintWaitMilliseconds and LintWaited how long and whether that lint waited for its weight (#b2t9xmf), each absent
-	// when 0 or false, and the host's never written.
+	// when 0 or false, and the host's never written. CheckedFromSourceAtGate is what its first load would check from
+	// source as it reached the share gate, whose share over PackagesLoaded the width read (#ghb3rcn).
 	CheckedFromSource       int   `json:"checkedFromSource,omitempty"`
 	CheckedFromSourceRounds []int `json:"checkedFromSourceRounds,omitempty"`
 	PackagesLoaded          int   `json:"packagesLoaded,omitempty"`
+	CheckedFromSourceAtGate int   `json:"checkedFromSourceAtGate,omitempty"`
 	LintWaitMilliseconds    int   `json:"lintWaitMilliseconds,omitempty"`
 	LintWaited              bool  `json:"lintWaited,omitempty"`
 	// FilesAlone, NotLinted and NotLintedReason are the files of ours only this build compiled and linted, and those it

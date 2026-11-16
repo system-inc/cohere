@@ -550,17 +550,19 @@ func TestTheBuildsStartHeaviestFirst(test *testing.T) {
 // never by whenever the collector last ran, so two decisions over one heap agree whatever state the collector is in:
 // one right after a collection, one after a collection that counted 512 MiB the decision no longer holds, which a read
 // of the last collection would count as the build's (#rmzehfg). A retained 256 MiB stands for the first build, and the
-// limit is set so that holding, taken at its peak, leaves room for two builds, and the holding with the garbage
-// counted for none beside the host's heap.
+// limit is set so that holding, budgeted at buildHoldingBudget times it and taken at its peak, leaves room for two
+// builds and not three, which the holding unbudgeted would, and the holding with the garbage counted for none beside
+// the host's heap (#ghb3rcn).
 //
 // Not parallel: it measures this process's live heap, which another test's run would move.
 func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	const garbageBytes = 512 << 20
 	const buildBytes = 256 << 20
 	hostLive := forcedLiveHeapBytes()
-	// Room for two peaks of the build, 2.5 times its holding each, since the engine here has no findings store, and
-	// half a holding more.
-	limit := int64(hostLive + 5*buildBytes + buildBytes/2)
+	// Room for two peaks of the build, 2.5 times its budgeted holding, 1.2 times what it holds, each, since the engine
+	// here has no findings store, 6 holdings, and a quarter more: three peaks of the holding unbudgeted, 7.5, would
+	// fit in less, and the slack's third build, 3 times 1.2 times 2.16, 7.8 holdings, with 512 MiB to spare would not.
+	limit := int64(hostLive + 8*buildBytes + buildBytes/4)
 	engine := &pipeline{memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
 		Source: contract.MemorySourceCap}}}
 	build := make([]byte, buildBytes)
@@ -586,8 +588,8 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 			collectedWidth, staleWidth)
 	}
 	if collectedWidth != 2 {
-		test.Errorf("the width is %d, want 2, the builds at their peaks the limit holds beside the host's heap",
-			collectedWidth)
+		test.Errorf("the width is %d, want 2, the builds at their budgeted peaks the limit holds beside the host's "+
+			"heap", collectedWidth)
 	}
 	if difference := max(collectedHolding, staleHolding) - min(collectedHolding, staleHolding); difference > 64<<20 {
 		test.Errorf("the decision was given holdings of %d and %d bytes, %d apart, want the same holding measured "+
