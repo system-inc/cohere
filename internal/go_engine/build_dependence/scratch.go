@@ -22,13 +22,16 @@ type workerScratch struct {
 }
 
 // scratches are the workers' scratches between packages. A scratch in the pool holds nothing of the package it last
-// added (release), and the pool lets go of what it holds at a collection, so an idle worker keeps nothing for long.
+// added (release), and the pool lets go of what it holds within two collections, so an idle worker keeps nothing for
+// long.
 //
 // No bound is put on what a scratch keeps for the next package: each keeps the room the largest package it met grew,
-// and the pool lets all of it go at the next collection, so the room is held only while packages are being added. A
+// and the pool lets all of it go within two collections, so the room is held only while packages are being added. A
 // bound of 16 K entries a buffer, measured at cohere's root, bought 20 MB of the add's 411 MB at 16 workers and 38 MB
 // of 561 at 64, and left the live heap with the graphs held the same, since what the add still allocates is each
-// worker's first growth to its largest package (#86qvr6b).
+// worker's first growth to its largest package (#86qvr6b). The CPU was measured too: the add took 3.86 s at 16 workers
+// with the bound and 3.89 s without, so clearing a table a large package grew, for every small package after it,
+// costs nothing visible.
 var scratches = sync.Pool{New: func() any { return newWorkerScratch() }}
 
 // newWorkerScratch is a scratch with every map made and nothing in it, its walk's parts pointing at each other.
