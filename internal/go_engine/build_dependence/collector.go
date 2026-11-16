@@ -33,9 +33,17 @@ type collector struct {
 	calleeSeenMost int
 	calleeStore    []types.Object
 
-	// unitWalk and usesWalk are newUnit's and addUses' walks, kept here so neither makes a closure for each walk.
-	unitWalk unitVisitor
-	usesWalk usesVisitor
+	// declareStore is every unit's declares, each unit's a slice of it from declaresStart (declare), which newRecord
+	// reads into the record's own, and owners the objects whose members collectMembers is declaring.
+	declareStore  []types.Object
+	declaresStart int
+	owners        []types.Object
+
+	// unitWalk, membersWalk and usesWalk are newUnit's, collectMembers' and addUses' walks, kept here so none of them
+	// makes a closure for each walk.
+	unitWalk    unitVisitor
+	membersWalk membersVisitor
+	usesWalk    usesVisitor
 }
 
 // unitVisitor is newUnit's one walk of a declaration: it counts the syntax nodes under it, the declaration itself
@@ -57,6 +65,26 @@ func (visitor *unitVisitor) Visit(node ast.Node) ast.Visitor {
 		if object != nil && object.Parent() == types.Universe {
 			visitor.universeNames |= universeNameBit(object.Name())
 		}
+	}
+	return visitor
+}
+
+// membersVisitor is collectMembers' walk of a unit's header: the unit, the owners of the members it declares, and
+// which of their bits takes each. Declaring a member walks no header, so one walk at a time is all a collector holds.
+type membersVisitor struct {
+	collecting      *collector
+	unit            *unitRecord
+	owners          []types.Object
+	ownerUnderlying bool
+}
+
+// Visit declares the fields of a struct type and the methods of an interface type.
+func (visitor *membersVisitor) Visit(node ast.Node) ast.Visitor {
+	switch node := node.(type) {
+	case *ast.StructType:
+		visitor.collecting.collectFields(visitor.unit, visitor.owners, visitor.ownerUnderlying, node)
+	case *ast.InterfaceType:
+		visitor.collecting.collectInterfaceMethods(visitor.unit, visitor.owners, visitor.ownerUnderlying, node)
 	}
 	return visitor
 }
@@ -121,12 +149,13 @@ func (collecting *collector) collectFile(tokenFile *token.File, file *ast.File) 
 	}
 }
 
-// newUnit is the unit of declaration, sized and placed, and the universe's names it uses, with nothing declared yet,
-// its size and names read in one walk of it.
-func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node) unitRecord {
+// newUnit adds the unit of declaration to the collector's units, sized and placed, and the universe's names it uses,
+// with nothing declared yet, its size and names read in one walk of it. It is the last unit until the next newUnit,
+// and nothing else adds one, so its collector fills it in place through the pointer.
+func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node) *unitRecord {
 	collecting.unitWalk = unitVisitor{typesInformation: collecting.typesInformation}
 	ast.Walk(&collecting.unitWalk, declaration)
-	return unitRecord{
+	collecting.units = append(collecting.units, unitRecord{
 		// The file a reader sees, past any //line directive, so a cgo package's unit carries its .go file as written
 		// rather than the cgo tool's output in the build cache, whose name changes from run to run.
 		file:          tokenFile.Position(declaration.Pos()).Filename,
@@ -134,14 +163,33 @@ func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node
 		end:           tokenFile.Offset(declaration.End()),
 		nodes:         collecting.unitWalk.nodes,
 		universeNames: collecting.unitWalk.universeNames,
-	}
+	})
+	collecting.declaresStart = len(collecting.declareStore)
+	return &collecting.units[len(collecting.units)-1]
+}
+
+// declare adds object to what unit declares, unit being the one newUnit added last: its declares are a slice of the
+// collector's store, which the next package's walk writes over, so newRecord reads them into the record's own.
+//
+// Mutates: unit declares object
+func (collecting *collector) declare(unit *unitRecord, object types.Object) {
+	collecting.declareStore = append(collecting.declareStore, object)
+	// Sliced again from the store each time, since a store grown past its capacity moved; the slice's capacity ends
+	// with it, so nothing appended to it could write over the next unit's declares.
+	end := len(collecting.declareStore)
+	unit.declares = collecting.declareStore[collecting.declaresStart:end:end]
+}
+
+// owning is the collector's owners holding object alone, for collectMembers.
+func (collecting *collector) owning(object types.Object) []types.Object {
+	collecting.owners = append(collecting.owners[:0], object)
+	return collecting.owners
 }
 
 // collectFunction collects a FuncDecl's unit: its function, the fields of anonymous structs in its signature, and its
 // body's references.
 func (collecting *collector) collectFunction(tokenFile *token.File, declaration *ast.FuncDecl) {
 	unit := collecting.newUnit(tokenFile, declaration)
-	defer func() { collecting.units = append(collecting.units, unit) }()
 	if declaration.Body != nil {
 		unit.references = collecting.bodies.references(declaration.Body)
 		unit.callees = collecting.staticCallees(declaration.Body)
@@ -150,8 +198,8 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	if !isFunction {
 		return
 	}
-	unit.declares = append(unit.declares, function)
-	collecting.collectMembers(&unit, []types.Object{function}, false, declaration.Type)
+	collecting.declare(unit, function)
+	collecting.collectMembers(unit, collecting.owning(function), false, declaration.Type)
 	// The signature's name bits, a signature moving being what a function's bit carries.
 	signature := function.Signature()
 	collecting.addEdges(function, false, collecting.walker.borrowedReferences(signature, false))
@@ -179,13 +227,12 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 // collectType collects a TypeSpec's unit: its type name and the fields and interface methods declared in it.
 func (collecting *collector) collectType(tokenFile *token.File, spec *ast.TypeSpec) {
 	unit := collecting.newUnit(tokenFile, spec)
-	defer func() { collecting.units = append(collecting.units, unit) }()
 	typeName, isTypeName := collecting.typesInformation.Defs[spec.Name].(*types.TypeName)
 	if !isTypeName {
 		return
 	}
-	unit.declares = append(unit.declares, typeName)
-	collecting.collectMembers(&unit, []types.Object{typeName}, true, spec.Type)
+	collecting.declare(unit, typeName)
+	collecting.collectMembers(unit, collecting.owning(typeName), true, spec.Type)
 	collecting.collectTypeKinds(typeName, spec)
 }
 
@@ -266,15 +313,9 @@ func (collecting *collector) collectMembers(
 	if root == nil {
 		return
 	}
-	ast.Inspect(root, func(node ast.Node) bool {
-		switch node := node.(type) {
-		case *ast.StructType:
-			collecting.collectFields(unit, owners, ownerUnderlying, node)
-		case *ast.InterfaceType:
-			collecting.collectInterfaceMethods(unit, owners, ownerUnderlying, node)
-		}
-		return true
-	})
+	collecting.membersWalk = membersVisitor{collecting: collecting, unit: unit, owners: owners,
+		ownerUnderlying: ownerUnderlying}
+	ast.Walk(&collecting.membersWalk, root)
 }
 
 // collectFields declares the fields of structure, a struct type in a unit's header, as collectMembers says.
@@ -302,7 +343,7 @@ func (collecting *collector) collectFields(
 			}
 			variable := declared.Field(index)
 			index++
-			unit.declares = append(unit.declares, variable)
+			collecting.declare(unit, variable)
 			collecting.addEdges(variable, false, collecting.walker.borrowedReferences(variable.Type(), false))
 			collecting.addUses(variable, false, false, field.Type)
 			for _, owner := range owners {
@@ -328,7 +369,7 @@ func (collecting *collector) collectInterfaceMethods(
 			if !isMethod {
 				continue
 			}
-			unit.declares = append(unit.declares, method)
+			collecting.declare(unit, method)
 			signature := method.Signature()
 			collecting.addEdges(method, false, collecting.walker.borrowedReferences(signature.Params(), false))
 			collecting.addEdges(method, false, collecting.walker.borrowedReferences(signature.Results(), false))
@@ -351,26 +392,29 @@ func (collecting *collector) collectValue(
 	specValues []ast.Expr,
 ) {
 	unit := collecting.newUnit(tokenFile, spec)
-	defer func() { collecting.units = append(collecting.units, unit) }()
 	isVariable := keyword == token.VAR
 	if isVariable && len(spec.Values) > 0 {
-		unit.references = collecting.bodies.references(expressionNodes(spec.Values)...)
-		unit.callees = collecting.staticCallees(expressionNodes(spec.Values)...)
+		initializers := expressionNodes(spec.Values)
+		unit.references = collecting.bodies.references(initializers...)
+		unit.callees = collecting.staticCallees(initializers...)
 	}
-	var declared []types.Object
+	values := expressionNodes(specValues)
+	// The owners of the members collectMembers declares are the spec's names, gathered here; nothing between reads or
+	// writes them.
+	collecting.owners = collecting.owners[:0]
 	for _, name := range spec.Names {
 		object := collecting.typesInformation.Defs[name]
 		if object == nil {
 			continue
 		}
-		unit.declares = append(unit.declares, object)
-		declared = append(declared, object)
+		collecting.declare(unit, object)
+		collecting.owners = append(collecting.owners, object)
 		if isVariable {
 			// A var's own type, as a name, and the initializer an untyped var takes its type from.
 			collecting.addEdges(object, false, collecting.walker.borrowedReferences(object.Type(), false))
 			collecting.addUses(object, false, false, specType)
 			if spec.Type == nil {
-				collecting.addUses(object, false, false, expressionNodes(specValues)...)
+				collecting.addUses(object, false, false, values...)
 			}
 			continue
 		}
@@ -378,9 +422,9 @@ func (collecting *collector) collectValue(
 		// unsafe.Sizeof(v) reaches v's layout.
 		collecting.addEdges(object, false, collecting.walker.borrowedReferences(object.Type(), true))
 		collecting.addUses(object, false, true, specType)
-		collecting.addUses(object, false, true, expressionNodes(specValues)...)
+		collecting.addUses(object, false, true, values...)
 	}
-	collecting.collectMembers(&unit, declared, false, spec.Type)
+	collecting.collectMembers(unit, collecting.owners, false, spec.Type)
 }
 
 // addUses makes from's bit depend on the own bit of each object an identifier or selector under roots resolves to.

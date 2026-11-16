@@ -1,9 +1,11 @@
 package build_dependence
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 	"maps"
+	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
@@ -13,6 +15,45 @@ import (
 
 // scratchFixtures are the fixtures whose packages the scratch's tests add, every one block 1's tests load.
 var scratchFixtures = []string{"layout", "methods", "lowering"}
+
+// chainLoad is the go_engine's build-facts-chain fixture loaded whole under the host: its package and the 51 of the
+// standard library it reaches through os, runtime, reflect and syscall among them, which give a scratch packages of
+// every size one after another, where block 1's fixtures are four small packages that import nothing.
+var chainLoad = sync.OnceValues(func() (loadedBuild, error) {
+	roots, loadError := packages.Load(&packages.Config{
+		Mode:  packages.LoadAllSyntax | packages.NeedTypesInfo,
+		Tests: true,
+		Dir:   filepath.Join("..", "testdata", "build-facts-chain"),
+		Env:   hostBuild.environment,
+	}, "./...")
+	if loadError != nil {
+		return nil, loadError
+	}
+	loaded := loadedBuild{}
+	packages.Visit(roots, nil, func(visited *packages.Package) { loaded[visited.ID] = visited })
+	for _, visited := range loaded {
+		if len(visited.Errors) > 0 {
+			return nil, fmt.Errorf("%s: %v", visited.ID, visited.Errors)
+		}
+	}
+	return loaded, nil
+})
+
+// scratchHosts are the loads the scratch's tests add, by name: block 1's fixtures under the host, and the chain
+// fixture with the standard library it reaches (chainLoad).
+func scratchHosts(test *testing.T) map[string]loadedBuild {
+	test.Helper()
+	hosts := map[string]loadedBuild{}
+	for _, fixture := range scratchFixtures {
+		hosts[fixture] = loadFixture(test, fixture, hostBuild)
+	}
+	chain, loadError := chainLoad()
+	if loadError != nil {
+		test.Fatal(loadError)
+	}
+	hosts["chain"] = chain
+	return hosts
+}
 
 // sortedPackages are host's packages in the order of their IDs.
 func sortedPackages(host loadedBuild) []*packages.Package {
@@ -73,25 +114,32 @@ func expectRecord(test *testing.T, label string, identifier string, record *pack
 	}
 }
 
-// One scratch reused across every package of block 1's fixtures, in the order of their IDs and again backwards, so
-// each package follows another in each pass and the three fixtures follow one another, writes every record byte for
-// byte as a scratch of its own for each package does (#86qvr6b).
+// One scratch reused across every package of block 1's fixtures and of the standard library the chain fixture
+// reaches, in the order of their IDs and again backwards, so each package follows another in each pass and the loads
+// follow one another, writes every record byte for byte as a scratch of its own for each package does (#86qvr6b).
 func TestAReusedScratchWritesTheRecordsAFreshOneDoes(test *testing.T) {
 	test.Parallel()
 
+	hosts := scratchHosts(test)
 	scratch := newWorkerScratch()
+	records := 0
 	for _, backwards := range []bool{false, true} {
-		for _, fixture := range scratchFixtures {
-			host := loadFixture(test, fixture, hostBuild)
+		for _, name := range slices.Sorted(maps.Keys(hosts)) {
+			host := hosts[name]
 			fresh := freshRecords(host)
 			ordered := sortedPackages(host)
 			if backwards {
 				slices.Reverse(ordered)
 			}
 			for _, loaded := range ordered {
-				expectRecord(test, fixture, loaded.ID, addedThrough(test, loaded, scratch), fresh[loaded.ID])
+				expectRecord(test, name, loaded.ID, addedThrough(test, loaded, scratch), fresh[loaded.ID])
+				records++
 			}
 		}
+	}
+	// Block 1's fixtures hold four packages and the chain fixture's load 52.
+	if records < 2*50 {
+		test.Fatalf("only %d records were compared, so the scratch was reused across few packages", records)
 	}
 }
 
@@ -125,14 +173,15 @@ func TestAScratchCarriesNothingOfOnePackageIntoTheNext(test *testing.T) {
 	}
 }
 
-// Packages added at once from many goroutines, each fixture's whole host into four graphs side by side, every add
-// taking a scratch from the shared pool and giving it back, write the records of a serial build with a fresh scratch
-// for each package. Under -race this is the scratch's concurrency check: a scratch two adds held at once would race.
+// Packages added at once from many goroutines, each load's whole host into four graphs side by side, every add taking
+// a scratch from the shared pool and giving it back, write the records of a serial build with a fresh scratch for
+// each package. Under -race this is the scratch's concurrency check: a scratch two adds held at once would race.
 func TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild(test *testing.T) {
 	test.Parallel()
 
-	for _, fixture := range scratchFixtures {
-		host := loadFixture(test, fixture, hostBuild)
+	hosts := scratchHosts(test)
+	for _, name := range slices.Sorted(maps.Keys(hosts)) {
+		host := hosts[name]
 		serial := freshRecords(host)
 		graphs := make([]*Graph, 4)
 		var group sync.WaitGroup
@@ -143,12 +192,12 @@ func TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild(test *testing.T) {
 		for index, graph := range graphs {
 			records := encodedRecords(graph)
 			if len(records) != len(serial) {
-				test.Errorf("%s: graph %d holds %d records, the serial build %d", fixture, index, len(records),
+				test.Errorf("%s: graph %d holds %d records, the serial build %d", name, index, len(records),
 					len(serial))
 			}
 			for identifier, want := range serial {
 				if string(records[identifier]) != string(want) {
-					test.Errorf("%s: graph %d's record of %s is %d bytes unlike the serial build's %d", fixture,
+					test.Errorf("%s: graph %d's record of %s is %d bytes unlike the serial build's %d", name,
 						index, identifier, len(records[identifier]), len(want))
 				}
 			}
@@ -157,13 +206,14 @@ func TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild(test *testing.T) {
 }
 
 // newUnit's one walk of a declaration sizes it as countNodes does and finds the universe's names a walk of its own
-// finds, for every unit of block 1's fixtures, so folding the two walks into one changed no unit's size or names.
+// finds, for every unit of block 1's fixtures and of the standard library the chain fixture reaches, so folding the
+// two walks into one changed no unit's size or names.
 func TestAUnitsOneWalkSizesItAndFindsItsUniverseNames(test *testing.T) {
 	test.Parallel()
 
 	units := 0
-	for _, fixture := range scratchFixtures {
-		for _, loaded := range sortedPackages(loadFixture(test, fixture, hostBuild)) {
+	for _, host := range scratchHosts(test) {
+		for _, loaded := range sortedPackages(host) {
 			collecting := newWorkerScratch().collector(loaded.TypesInfo)
 			for _, file := range loaded.Syntax {
 				tokenFile := loaded.Fset.File(file.FileStart)

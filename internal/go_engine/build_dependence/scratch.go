@@ -85,7 +85,11 @@ func (scratch *workerScratch) release() {
 	scratch.collecting.calleeSeen = clearedMap(scratch.collecting.calleeSeen, scratch.collecting.calleeSeenMost)
 	scratch.collecting.calleeSeenMost = 0
 	scratch.collecting.calleeStore = clearedSlice(scratch.collecting.calleeStore)
+	scratch.collecting.declareStore = clearedSlice(scratch.collecting.declareStore)
+	scratch.collecting.declaresStart = 0
+	scratch.collecting.owners = clearedSlice(scratch.collecting.owners)
 	scratch.collecting.unitWalk = unitVisitor{}
+	scratch.collecting.membersWalk = membersVisitor{}
 	scratch.collecting.usesWalk = usesVisitor{}
 
 	scratch.naming.typesPackage = nil
