@@ -101,3 +101,48 @@ func TestAMarkedSyntaxOnlyWalkIsHandedOnlyTheFilesItDoesNotInherit(test *testing
 			expected)
 	}
 }
+
+// Each rule syntaxOnlyWalks names is run by the registry through rule.SyntaxOnlyRun (#y6q1x2j): handed second.go, a
+// file holding a long line of shouting either rule would report, under an inheritance that says the rule inherits
+// second.go, its registered analyzer reports the host's finding there and nothing of its own, which only the wrap can
+// do.
+func TestTheRegistrysSyntaxOnlyWalksAreWrapped(test *testing.T) {
+	test.Parallel()
+	sources := map[string]string{
+		"first.go":  "package walked\n",
+		"second.go": "package walked\n\n// A LOUD comment " + strings.Repeat("that runs on ", 10) + "past the limit.\n",
+	}
+	registered := All()
+	for name := range syntaxOnlyWalks {
+		at := slices.IndexFunc(registered, func(each rule.Rule) bool { return each.Name == name })
+		if at < 0 {
+			test.Errorf("%s is marked a syntax-only walk and is not registered", name)
+			continue
+		}
+		fileSet := token.NewFileSet()
+		files := []*ast.File{}
+		for _, filename := range []string{"first.go", "second.go"} {
+			file, parseError := parser.ParseFile(fileSet, filename, sources[filename], parser.ParseComments)
+			if parseError != nil {
+				test.Fatal(parseError)
+			}
+			files = append(files, file)
+		}
+		reported := []string{}
+		pass := &analysis.Pass{Analyzer: registered[at].Analyzer, Fset: fileSet, Files: files,
+			ResultOf: map[*analysis.Analyzer]any{rule.Inherited: inheritsSecond{}},
+			ReadFile: func(filename string) ([]byte, error) { return []byte(sources[filename]), nil },
+			Report: func(diagnostic analysis.Diagnostic) {
+				position := fileSet.PositionFor(diagnostic.Pos, false)
+				reported = append(reported, position.String()+" "+diagnostic.Category+" "+diagnostic.Message)
+			}}
+		if _, runError := registered[at].Analyzer.Run(pass); runError != nil {
+			test.Fatal(runError)
+		}
+		expected := []string{"second.go:1:1 inherited the host's finding"}
+		if !slices.Equal(reported, expected) {
+			test.Errorf("%s reported %q, want only %q, so the registry does not run it through rule.SyntaxOnlyRun",
+				name, reported, expected)
+		}
+	}
+}

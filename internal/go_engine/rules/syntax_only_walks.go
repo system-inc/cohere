@@ -5,15 +5,25 @@ import (
 	"slices"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_shouting"
 )
 
 // syntaxOnlyWalks names the house rules whose own analyzer walks pass.Files itself, rather than listen on a dispatcher,
-// and whose findings on a file are the file's bytes' and the settings' alone, as consistency-no-long-line's and
-// consistency-no-shouting's may be: All runs each through rule.SyntaxOnlyRun, so a build checking a package from source
-// takes the host's findings on each file the host checked rather than hand the analyzer the file again (#y6q1x2j). A
-// dispatched rule is marked on its listener instead (rule.Listener.SyntaxOnly). It names none until each rule is read
-// and marked.
-var syntaxOnlyWalks = map[string]bool{}
+// and whose findings on a file are the file's bytes' and the settings' alone: All runs each through
+// rule.SyntaxOnlyRun, so a build checking a package from source takes the host's findings on each file the host
+// checked rather than hand the analyzer the file again (#y6q1x2j). A dispatched rule is marked on its listener instead
+// (rule.Listener.SyntaxOnly). Each is marked only once its analyzer is read for everything it touches.
+var syntaxOnlyWalks = map[string]bool{
+	// consistency-no-long-line reads of a pass only its files, their line tables and each file's own bytes through
+	// pass.ReadFile, and judges each file on its own: its exemptions come from the file's syntax tree and comments,
+	// its limit and tab width are constants, and it has no settings.
+	consistency_no_long_line.Name: true,
+	// consistency-no-shouting reads of a pass only its files and their line tables, the file's own name among them to
+	// find an example's output, and judges each file's comments on their own: the safe list and the two-letter words
+	// are policy's embedded file, the same in every build, and it has no settings.
+	consistency_no_shouting.Name: true,
+}
 
 // syntaxOnlyWalksMarked is whether syntaxOnlyWalks' rules are marked, which they are as the package initializes, before
 // any pass and however many times All is read after, since a mark wraps the rule's analyzer in place
