@@ -7,10 +7,11 @@ import (
 )
 
 // bodyWalk turns a unit's body or initializers into its references (rule 4), so a build judges the body by its bits
-// without the body. Its maps and slices are a worker's scratch, kept from one package to the next (workerScratch). Every use counts by name: an object whose own bit is set, an expression whose type reaches a name
+// without the body. Every use counts by name: an object whose own bit is set, an expression whose type reaches a name
 // bit. A type's underlying bit counts only where the use touches the underlying (see touch). The counter judged each
 // body per build and stopped at the first dependent use; a unit is dependent in a build exactly when one of the
-// references collected here is set in it, so collecting them all once decides the same.
+// references collected here is set in it, so collecting them all once decides the same. Its maps and slices are a
+// worker's scratch, kept from one package to the next (workerScratch).
 type bodyWalk struct {
 	typesInformation *types.Info
 	walker           *bitWalker
