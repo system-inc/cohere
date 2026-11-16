@@ -77,8 +77,8 @@ func resolvedLines(graph *Graph) []string {
 		slices.Sort(reads)
 		lines = append(lines, strings.Join(append(parts, slices.Compact(reads)...), "; "))
 	}
-	for to, dependents := range resolved.dependents {
-		for _, from := range dependents {
+	for to := range resolved.dependents.rowCount() {
+		for _, from := range resolved.dependents.row(to) {
 			lines = append(lines, "edge "+bitName(int32(to))+" <- "+bitName(from))
 		}
 	}

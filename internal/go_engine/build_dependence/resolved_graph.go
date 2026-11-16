@@ -93,8 +93,9 @@ type resolvedGraph struct {
 	// declaringUnit is, for each node, the unit that declares it.
 	declaringUnit []int32
 
-	// dependents are, for each bit, the bits that depend on it (rule 3).
-	dependents [][]int32
+	// dependents are, for each bit, the bits that depend on it (rule 3), a row each in the order of the edges, which the
+	// fixed point never reads: its result is a set.
+	dependents packedRows[int32]
 
 	// externalEdges are the edges to bits of objects of packages the graph does not hold, set when the build's
 	// DependentObject says so.
@@ -450,9 +451,14 @@ func (resolved *resolvedGraph) resolveTargets() {
 
 // resolveEdges turns every record's kind edges into the bits that depend on each bit. An edge to an object of a
 // package the graph holds that no unit declares is dropped, as the counter dropped every edge to an object without a
-// node, and one to a package the graph does not hold is kept for the build's DependentObject.
+// node, and one to a package the graph does not hold is kept for the build's DependentObject. The edges come by their
+// from bits and are kept by their to bits, so each is gathered first and placed in its row after (groupedRows).
 func (resolved *resolvedGraph) resolveEdges() {
-	resolved.dependents = make([][]int32, 2*len(resolved.objects))
+	edges := 0
+	for _, record := range resolved.packages {
+		edges += len(record.edges)
+	}
+	dependents := make([]rowEntry, 0, edges)
 	for packageIndex, record := range resolved.packages {
 		for _, edge := range record.edges {
 			from, isNode := resolved.nodes[nodeKey{packageIndex: int32(packageIndex), local: edge.from}]
@@ -463,7 +469,7 @@ func (resolved *resolvedGraph) resolveEdges() {
 			to := resolved.targets[packageIndex][edge.to]
 			if to.isNode {
 				if toBit := bit(to.node, edge.toUnderlying); toBit != fromBit {
-					resolved.dependents[toBit] = append(resolved.dependents[toBit], fromBit)
+					dependents = append(dependents, rowEntry{row: toBit, entry: fromBit})
 				}
 				continue
 			}
@@ -474,6 +480,7 @@ func (resolved *resolvedGraph) resolveEdges() {
 				to: externalObjectBit(resolved.externalObject(record.objects[edge.to]), edge.toUnderlying)})
 		}
 	}
+	resolved.dependents = groupedRows(2*len(resolved.objects), dependents)
 }
 
 // resolveReads turns every unit's reads into its bits and its external reads (resolveRead), a row of each a unit.
@@ -552,7 +559,7 @@ func (resolved *resolvedGraph) fixedPoint(seedBits []int32) []bool {
 	for len(pending) > 0 {
 		current := pending[len(pending)-1]
 		pending = pending[:len(pending)-1]
-		for _, dependent := range resolved.dependents[current] {
+		for _, dependent := range resolved.dependents.row(int(current)) {
 			if !set[dependent] {
 				set[dependent] = true
 				pending = append(pending, dependent)
