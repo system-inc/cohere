@@ -71,6 +71,12 @@ const (
 // The gap's own bound, gateGapBound, still ends a run that hangs.
 const sharedBoxTestTimeout = "30m"
 
+// sharedBoxSystemPath is the system's own directories on the tests' path, after the pinned toolchain and node: the
+// sbin directories too, since macOS keeps tools a test runs there, sha256sum in /sbin and lsof in /usr/sbin, and
+// without them three tests skipped on every gate Mac and ran nowhere (#5r0vrte, Nov 16). Nothing there is the
+// account's to change, so it trusts nothing the box kept any more than /usr/bin does.
+const sharedBoxSystemPath = "/usr/bin:/bin:/usr/sbin:/sbin"
+
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
 // goroot, digest, node, nodeDigest and races (the raceGated packages, comma-separated) as variables, and the
 // module's test patterns as its arguments. It prints boxMarker before the tests, boxRaceMarker before the -race
@@ -88,7 +94,8 @@ if [ -e "$node/bin/node" ]; then
   nodePath="$node/bin:"
 fi
 unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
-export PATH="$goroot/bin:$nodePath/usr/bin:/bin" GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
+export PATH="$goroot/bin:$nodePath` + sharedBoxSystemPath + `"
+export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
 gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
 trap 'rm -rf "$gocache"' EXIT
 export GOCACHE="$gocache"

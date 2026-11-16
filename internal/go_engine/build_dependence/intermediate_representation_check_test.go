@@ -33,6 +33,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
+	"github.com/system-inc/cohere/internal/needs"
 )
 
 // The wide run's variables: the tree it loads, and the builds it compares against the host, by name
@@ -374,10 +375,7 @@ func loadTree(test *testing.T, tree string, environment []string) loadedBuild {
 func TestEveryIndependentFunctionLowersTheSameInATree(test *testing.T) {
 	test.Parallel()
 
-	tree := os.Getenv(wideTreeVariable)
-	if tree == "" {
-		test.Skipf("%s names no tree", wideTreeVariable)
-	}
+	tree := needs.OptIn(test, wideTreeVariable, "it names the tree whose independent functions are compared")
 	started := time.Now()
 	host := loadTree(test, tree, wideEnvironment("darwin", ""))
 	hostFlows := controlFlowsOf(test, host)
