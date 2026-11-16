@@ -277,6 +277,23 @@ var typeFree = map[string]bool{
 	// ST1019 reads import declarations for a package imported twice. It is not SyntaxOnly, for FilterGenerated, as
 	// ST1001 is not.
 	"ST1019": true,
+	// The ports below, our own rewrites of staticcheck's checks, read only syntax and the version gate's Go versions,
+	// as the four above do (#y6q1x2j). SA4001, SA4011, SA4013, SA5003 and SA5004 are SyntaxOnly, so a type read would
+	// crash their own fixtures; SA4019 and S1023 are not, for FilterGenerated, and read no types all the same.
+	// SA4001 reads `&*x` and `*&x`, which copy nothing.
+	"SA4001": true,
+	// SA4011 reads a `break` that ends a switch or select case directly inside a loop, where it ends only the case.
+	"SA4011": true,
+	// SA4013 reads a doubled `!` from the syntax.
+	"SA4013": true,
+	// SA4019 reads a file's preamble for two `+build` lines that say the same.
+	"SA4019": true,
+	// SA5003 reads a `defer` inside a `for` with no condition.
+	"SA5003": true,
+	// SA5004 reads a `for` around a `select` with an empty default.
+	"SA5004": true,
+	// S1023 reads a `return` or `break` that ends its block anyway.
+	"S1023": true,
 }
 
 // stylecheckRuledOn is the ST checks ruled on for cohere, from a census of what each found in cohere's own
