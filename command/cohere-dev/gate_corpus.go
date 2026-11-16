@@ -402,6 +402,9 @@ func copyGitArchive(archive *tar.Writer, repository string, commit string, prefi
 			continue
 		}
 		header.Name = prefix + header.Name
+		// The writer picks the format, since the prefix can push a name past what git's choice of `USTAR` holds: ahra
+		// has paths that fit it alone and not under a place (Sun2, Nov 16).
+		header.Format = tar.FormatUnknown
 		if writeError := archive.WriteHeader(header); writeError != nil {
 			copyError = writeError
 			break
