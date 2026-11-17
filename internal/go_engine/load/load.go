@@ -199,9 +199,10 @@ type Caching struct {
 	// (see SharedReads): set on the loads that follow every write of the run, the host's and each extra build's.
 	SharedReads *SharedReads
 
-	// Fingerprints is the kept listing's directory fingerprints the loads after every write of the run share, nil for
-	// none (see Fingerprints): set on each extra build's load and never on the host's, since the long-line wrap writes
-	// between the host's first load and the builds.
+	// Fingerprints is what of the kept listing's fingerprint the loads after every write of the run share, each
+	// directory's, each root's walk, each module file's no go command of the run can rewrite, and each set of inputs'
+	// steady fingerprint, nil for none (see Fingerprints): set on each extra build's load and never on the host's,
+	// since the long-line wrap writes between the host's first load and the builds.
 	Fingerprints *Fingerprints
 
 	// Walks is the package directories the loads after every write of the run share, nil for none (see PackageWalks):
