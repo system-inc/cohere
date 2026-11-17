@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -762,6 +763,50 @@ func TestADamagedHeldEntryIsReplaced(test *testing.T) {
 			entries[utf8Key] = damaged
 		})
 	run := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+	if added := writtenTable(test, run); added == 0 {
+		test.Fatal("want the run to write its table")
+	}
+	next := runWithSession(test, directory, systemCacheCaching(system, context), rules)
+	if next.result.Cache.FromSystemCache != len(next.session.standardLibraryKeys) {
+		test.Errorf("want every one of the %d standard-library packages restored after the write, got %d",
+			len(next.session.standardLibraryKeys), next.result.Cache.FromSystemCache)
+	}
+}
+
+// An entry the table holds that decodes and whose export data reads, but that does not restore, is said as a problem,
+// computed again, and replaced at the run's write by the judgment that refused it (refusedFromTable): a table whose
+// unicode/utf8 names a withheld error in a file outside `$GOROOT`, which no restore can resolve, has the run say so,
+// and the next run restores every standard-library package from the table its write left.
+func TestAnEntryThatDoesNotRestoreIsSaidAndReplaced(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	context := standardLibraryContext("check tests", goRootOf(test))
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	system, _ := seededTable(test, directory, context, rules,
+		func(collecting sessionRun, entries map[cache.Key]cache.StandardLibraryEntry) {
+			delete(entries, standardKeyOf(test, collecting, "strings"))
+			utf8Key := standardKeyOf(test, collecting, "unicode/utf8")
+			unresolvable := entries[utf8Key]
+			tableEntry, decodeError := decodeStandardLibraryEntry(unresolvable.Entry)
+			if decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			tableEntry.Withheld.Errors = append(tableEntry.Withheld.Errors,
+				load.WithheldError{File: "/elsewhere/utf8.go", Line: 1, Column: 1, Message: "withheld"})
+			encoded, encodeError := encodeStandardLibraryEntry(tableEntry)
+			if encodeError != nil {
+				test.Fatal(encodeError)
+			}
+			unresolvable.Entry = encoded
+			entries[utf8Key] = unresolvable
+		})
+	run := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+	if !slices.ContainsFunc(run.result.Cache.Problems, func(problem string) bool {
+		return strings.Contains(problem, "restoring unicode/utf8 from the system cache's table")
+	}) {
+		test.Errorf("want utf8's refused restore said as a problem, got %q", run.result.Cache.Problems)
+	}
 	if added := writtenTable(test, run); added == 0 {
 		test.Fatal("want the run to write its table")
 	}

@@ -107,7 +107,7 @@ func StandardLibraryTableOf(
 	goRoot string,
 	variants []cache.StandardLibraryVariant,
 ) ([]byte, map[cache.Key]bool, error) {
-	table, holds, _, tableError := standardLibraryTableWith(entries, nil, nil, goRoot, variants)
+	table, holds, _, tableError := standardLibraryTableWith(entries, nil, nil, nil, goRoot, variants)
 	return table, holds, tableError
 }
 
@@ -118,9 +118,10 @@ func StandardLibraryTableOf(
 // restored by every later run that reads the table as if it were whole, since an entry the table holds is never
 // written again, so it is left out and computed again by the next run, which keeps it in its project's store.
 //
-// Never written again means a good entry: one held under a key the run computed again whose entry does not decode, or
-// whose export data does not read against the rest of held, is damage, which no reader can restore, so the run's
-// entry under that key replaces it when it is whole, and what imports it is read against what later readers read.
+// Never written again means a good entry: one held under a key the run computed again whose entry does not decode,
+// whose export data does not read against the rest of held, or whose restore the reading run refused (refused, see
+// restoreTableEntry), is damage, which no reader can restore, so the run's entry under that key replaces it when it is
+// whole, and what imports it is read against what later readers read.
 //
 // Each entry taken is written for any machine: a standardLibraryEntry, every file its Withheld and export data name
 // renamed below goRoot to goRootMarker (see renameToGoRootMarker), and its findings left out, since no run reads a
@@ -136,12 +137,13 @@ func StandardLibraryTableOf(
 func standardLibraryTableWith(
 	entries map[cache.Key]StandardLibraryRunEntry,
 	held map[cache.Key]cache.StandardLibraryEntry,
+	refused map[cache.Key]bool,
 	readAgainst map[cache.Key]bool,
 	goRoot string,
 	variants []cache.StandardLibraryVariant,
 ) ([]byte, map[cache.Key]bool, int, error) {
 	rename := renameToGoRootMarker(goRoot)
-	good := withoutDamage(held, readAgainst, entries)
+	good := withoutDamage(held, refused, readAgainst, entries)
 	// In the keys' order, so the same entries refuse with the same error.
 	keys := slices.SortedFunc(maps.Keys(entries), compareCacheKeys)
 	decoded := make(map[cache.Key]cacheEntry, len(entries))
@@ -253,11 +255,15 @@ func standardLibraryTableWith(
 }
 
 // withoutDamage is held less each entry that is damage under a key entries holds too, so the run's entry, when whole,
-// takes its place (standardLibraryTableWith): one that does not decode, or whose export data does not read against the
-// rest of held under readAgainst. A held entry the run did not compute again stays as it is: a reader whose restore of
-// it fails computes it again, and the next write replaces it then.
+// takes its place (standardLibraryTableWith): one that does not decode, whose export data does not read against the
+// rest of held under readAgainst, or whose restore the reading run refused, under a key of refused. The last is
+// restoreTableEntry's own judgment, the session's record of each entry it could not restore, so what a restore
+// refuses is replaced by the judgment that refused it, never by a second one that could drift from it. A held entry
+// the run did not compute again stays as it is: a reader whose restore of it fails computes it again, and the next
+// write replaces it then.
 func withoutDamage(
 	held map[cache.Key]cache.StandardLibraryEntry,
+	refused map[cache.Key]bool,
 	readAgainst map[cache.Key]bool,
 	entries map[cache.Key]StandardLibraryRunEntry,
 ) map[cache.Key]cache.StandardLibraryEntry {
@@ -276,6 +282,10 @@ func withoutDamage(
 	for key := range entries {
 		heldEntry, isHeld := held[key]
 		if !isHeld {
+			continue
+		}
+		if refused[key] {
+			delete(kept, key)
 			continue
 		}
 		tableEntry, decodeError := decodeStandardLibraryEntry(heldEntry.Entry)

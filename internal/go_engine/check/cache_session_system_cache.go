@@ -38,9 +38,10 @@ type tableHit struct {
 // entry of, held or not (renameTableExportData); the rest of each restore runs as many at once as there are cores. A
 // package Analyze was given is never restored from the table, which holds no findings, and neither is one with a list
 // error, nor one the run reloads to answer a question (see Reload). A table that is damaged or does not parse, or keys
-// that cannot be computed, are a problem, and every standard-library package is then computed. The host's session of
-// a run with extra builds holds what it restored of each, which it keeps for the builds as it keeps a package it
-// checked (keepTableHit, #pcv6eff).
+// that cannot be computed, are a problem, and every standard-library package is then computed. So is an entry that
+// does not restore, its package alone computed, and the run's write replaces it (refusedFromTable). The host's
+// session of a run with extra builds holds what it restored of each, which it keeps for the builds as it keeps a
+// package it checked (keepTableHit, #pcv6eff).
 func (session *CacheSession) restoreFromSystemCache(
 	loader string,
 	reachable []*packages.Package,
@@ -86,11 +87,16 @@ func (session *CacheSession) restoreFromSystemCache(
 		restoring := restorings[index]
 		restored, hit, restoreError := restoreTableEntry(session.known, restoring, held[restoring],
 			renamed[restoring], rename)
-		if restoreError != nil {
-			return
-		}
 		hitsLock.Lock()
 		defer hitsLock.Unlock()
+		// An entry the table holds that does not restore is damage the run says, computes again, and replaces at its
+		// write (withoutDamage): left in the table unsaid, it would miss on every run that reads it.
+		if restoreError != nil {
+			session.refusedFromTable[keys[restoring]] = true
+			session.problem(fmt.Sprintf("restoring %s from the system cache's table: %v", restoring.ID,
+				restoreError))
+			return
+		}
 		session.hits[restoring] = restored
 		session.fromSystemCache[restoring] = true
 		if session.keepsForBuilds {
@@ -481,8 +487,8 @@ func (session *CacheSession) WriteSystemCacheTable() (added int, returned error)
 	for _, key := range session.standardLibraryKeys {
 		readAgainst[key] = true
 	}
-	table, holds, added, tableError := standardLibraryTableWith(standardLibrary.Collected, held, readAgainst,
-		shared.Goroot, nil)
+	table, holds, added, tableError := standardLibraryTableWith(standardLibrary.Collected, held,
+		session.refusedFromTable, readAgainst, shared.Goroot, nil)
 	if tableError != nil {
 		return 0, fmt.Errorf("writing the system cache's table of the standard library: %w", tableError)
 	}

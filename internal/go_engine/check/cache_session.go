@@ -245,6 +245,10 @@ type CacheSession struct {
 	fromSystemCache map[*packages.Package]bool
 	tableHits       map[*packages.Package]tableHit
 
+	// refusedFromTable are the keys whose entry the system cache's table holds and restoreTableEntry refused, which the
+	// run computes again and its write replaces (withoutDamage).
+	refusedFromTable map[cache.Key]bool
+
 	counts       CacheCounts
 	factsSkipped atomic.Int64
 
@@ -383,6 +387,7 @@ func (session *CacheSession) Restore(
 	session.systemCacheTable = nil
 	session.fromSystemCache = map[*packages.Package]bool{}
 	session.tableHits = map[*packages.Package]tableHit{}
+	session.refusedFromTable = map[cache.Key]bool{}
 	session.sharedBodyHits = map[*packages.Package]bool{}
 	session.given = make(map[*packages.Package]bool, len(analyzed))
 	for _, analyzedPackage := range analyzed {
