@@ -20,7 +20,19 @@ type Walks struct {
 	// waiting, nil outside tests, is called as Wait starts waiting, so a test can let a held walk end only once a
 	// reader is waiting for it.
 	waiting func()
+
+	// ended is each owner's channel, made as Go starts its walk and closed once the walk has ended and given its slot
+	// back (Ended), guarded by endedLock.
+	endedLock sync.Mutex
+	ended     map[*packages.Package]chan struct{}
 }
+
+// endedAlready is the channel Ended gives for an owner with no walk, closed from the start.
+var endedAlready = func() chan struct{} {
+	closed := make(chan struct{})
+	close(closed)
+	return closed
+}()
 
 // Slots are what a walk takes one of as it starts and gives back as it ends, as the load's are (load.WalkSlots), taken
 // below every package's work, so a walk never displaces the load.
@@ -43,7 +55,17 @@ func NewWalks(concurrency int, slots Slots, hold func(owner *packages.Package), 
 // Go runs walk, the walk of owner's type reads and whatever must follow it, on a goroutine of its own, once ready is
 // closed when it is not nil, and once a slot is free. Wait waits for it from the moment Go returns.
 func (walks *Walks) Go(owner *packages.Package, ready <-chan struct{}, walk func()) {
+	// Made before the walk's goroutine starts, so an Ended asked once Go returns waits for this walk.
+	ended := make(chan struct{})
+	walks.endedLock.Lock()
+	if walks.ended == nil {
+		walks.ended = map[*packages.Package]chan struct{}{}
+	}
+	walks.ended[owner] = ended
+	walks.endedLock.Unlock()
 	walks.group.Go(func() {
+		// Deferred first, so it runs last: a reader waiting for the walk takes its own slot once this one is free.
+		defer close(ended)
 		if ready != nil {
 			<-ready
 		}
@@ -54,6 +76,22 @@ func (walks *Walks) Go(owner *packages.Package, ready <-chan struct{}, walk func
 		}
 		walk()
 	})
+}
+
+// Ended is closed once owner's walk has ended, its reads recorded, so a reader of one package's reads waits for its
+// walk alone rather than every walk (Wait). It is closed already for nil walks, and for an owner Go started no walk of,
+// whose reads are as recorded as they will be from Go's side; a reader asking before Go was called for owner gets
+// that closed channel too. Each owner's walk is started once, since its reads are claimed once (Reads.Claim).
+func (walks *Walks) Ended(owner *packages.Package) <-chan struct{} {
+	if walks == nil {
+		return endedAlready
+	}
+	walks.endedLock.Lock()
+	defer walks.endedLock.Unlock()
+	if ended, started := walks.ended[owner]; started {
+		return ended
+	}
+	return endedAlready
 }
 
 // Wait returns once every walk Go started has ended, at once for nil walks, a run that started none.
