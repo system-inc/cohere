@@ -99,7 +99,7 @@ func TestTheHostComputesEachSetOnceItsPackagesWalkEnds(test *testing.T) {
 			if owner.PkgPath == throughUserPath {
 				<-hold
 			}
-		}, keptDependence: keptDependence})
+		}, KeptDependence: keptDependence})
 	if runError != nil || len(result.Crashes) > 0 {
 		test.Fatalf("running the host's build: %v %+v", runError, result.Crashes)
 	}

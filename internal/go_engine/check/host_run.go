@@ -33,8 +33,10 @@ type HostRun struct {
 	// kept is how many entries the run kept, which outlives Release (EntriesKept).
 	kept int
 
-	// computing are the sets of the kept packages the host computes as each package's walk ends (computeDependence).
+	// computing are the sets of the kept packages the host computes as each package's walk ends (computeDependence),
+	// and joining, nil outside tests, is told as a reader starts waiting for them (DependenceComputed).
 	computing sync.WaitGroup
+	joining   func()
 
 	// holders is the IDs of the kept packages that compiled each file, by the file's name, sorted, made once a run by
 	// the first build to ask (holdersOf).
@@ -48,6 +50,19 @@ func (host *HostRun) EntriesKept() int {
 		return 0
 	}
 	return host.kept
+}
+
+// DependenceComputed returns once the host has computed the dependence set of every package it kept, each as its walk
+// ended (computeDependence), so a build started after it finds every set it asks in the memo, rather than compute one
+// beside the pass, the duplicate work the pass exists to remove (#ybjbqm2). A nil host, which kept nothing, has none.
+func (host *HostRun) DependenceComputed() {
+	if host == nil {
+		return
+	}
+	if host.joining != nil {
+		host.joining()
+	}
+	host.computing.Wait()
 }
 
 // Release lets go of everything the host's run kept for the extra builds once the last of them has run, since no
@@ -106,9 +121,10 @@ func importPaths(importer *packages.Package) []string {
 // asked while the walk still runs, its reads are never recorded and its set the whole closure (Dependence). The keep
 // runs inside check.Run, before the walks are waited for, and waiting there for all of them put the pass on the run's
 // serial path, about 110 ms at cohere's root. So each set waits with no slot held, as the walk it waits for may need
-// one, and the keep returns at once; a build asking a set not computed yet computes it itself, alike, and the memo
-// keeps one. Release waits for the pass, so no set is computed into a memo let go of. kept are the entries, owners
-// their packages, index by index, and asking, nil outside tests, is told of each as its set is asked.
+// one, and the keep returns at once. The run joins the pass once the walks are over, before any build starts
+// (DependenceComputed), which waits for the last sets alone, and Release waits for it too, so no set is computed into
+// a memo let go of. kept are the entries, owners their packages, index by index, and asking, nil outside tests, is
+// told of each as its set is asked.
 func (host *HostRun) computeDependence(
 	walks *build_reads.Walks,
 	pool *bounded.Pool,
