@@ -79,10 +79,12 @@ type ReadsBuild struct {
 	dependences sync.Map
 	reaches     typeReach
 
-	// walking and indexing, nil outside tests, are told of each root as its closure is walked and of each package as
-	// it is indexed, so a test can count them.
-	walking  func(*types.Package)
-	indexing func(*types.Package)
+	// walking, indexing and computing, nil outside tests, are told of each root as its closure is walked, of each
+	// package as it is indexed, and of each package whose dependence set is computed (dependenceOf), so a test can
+	// count them.
+	walking   func(*types.Package)
+	indexing  func(*types.Package)
+	computing func(Restoring)
 }
 
 // packageMethods are the type names of owner with a method of one name, as indexPackage indexes them: ruleTypeNames

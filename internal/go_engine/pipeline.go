@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
@@ -95,6 +96,12 @@ type pipeline struct {
 	// keepsInheritanceOff, set only by a test, has every extra build run its syntax-only rules on every file it checks
 	// rather than take the host's findings on the files the host checked (#y6q1x2j), so the test can compare the two.
 	keepsInheritanceOff bool
+
+	// keptDependence and dependenceJoining, set only by a test, are the host's lint's check.Options.KeptDependence
+	// and DependenceJoining: told of each kept package as the host's pass asks its dependence set, and as the run
+	// joins that pass before the builds start (otherBuilds), so a test can hold a set and see who waits for it.
+	keptDependence    func(owner *packages.Package, restoring check.Restoring)
+	dependenceJoining func()
 
 	// hostSuppressed, set only by a test, is called each time a lint pass applies the //cohere:ignore comments to its
 	// own findings (lintPass.outcome), so a test can count that a run whose builds merge never does.

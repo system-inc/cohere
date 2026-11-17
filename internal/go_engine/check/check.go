@@ -124,6 +124,12 @@ type Options struct {
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
 	holdWalk func(owner *packages.Package)
+
+	// KeptDependence and DependenceJoining, nil outside tests, are told of each package the host kept, with what its
+	// set is computed from, as the host's pass asks its dependence set (HostRun.computeDependence), and of a reader
+	// starting to wait for that pass (HostRun.DependenceComputed), so a test can hold a set and see who waits for it.
+	KeptDependence    func(owner *packages.Package, restoring Restoring)
+	DependenceJoining func()
 }
 
 // ErrAbandoned is Run's error when Options.Abandon closed before every rule had run, so the result would be partial.
@@ -570,7 +576,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		result.FromHost = session.hostCounts()
 		if options.KeepForBuilds && options.Reads != nil {
 			result.Host = session.keepForBuilds(graphs, analyzed, options.Reads, options.Withheld, files,
-				gatheredFindingsOf(analyzers, analyzed, gathering, rootsOf, found))
+				gatheredFindingsOf(analyzers, analyzed, gathering, rootsOf, found), walks,
+				options.KeptDependence)
+			if result.Host != nil {
+				result.Host.joining = options.DependenceJoining
+			}
 		}
 	}
 	if options.ExportFacts {
