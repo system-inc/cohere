@@ -19,6 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/system_cache_testing"
 )
 
 // standardLibraryChildVariable marks a test binary a test started as a generator, or a generator started as its
@@ -47,19 +48,15 @@ func TestMain(suite *testing.M) {
 	if os.Getenv(timingMarginChildVariable) != "" {
 		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
 	}
-	// Every run in this process, and every child it starts, which inherits the variable, reads a system cache of
-	// this test binary's own rather than the developer's (#syscache). A test that gives a run a system cache of its
-	// own names it on the run (standardLibrarySource's systemCacheRoot), or sets the variable itself.
-	systemCache, temporaryDirectoryError := os.MkdirTemp("", "cohere-test-system-cache-")
-	if temporaryDirectoryError != nil {
-		os.Exit(refuse(os.Stderr, temporaryDirectoryError))
+	// Every run in this process, and every child it starts, reads a system cache of this test binary's own rather
+	// than the person's (#syscache). A test that gives a run a system cache of its own names it on the run
+	// (standardLibrarySource's systemCacheRoot), or sets the variable itself.
+	removeSystemCache, isolateError := system_cache_testing.Isolate()
+	if isolateError != nil {
+		os.Exit(refuse(os.Stderr, isolateError))
 	}
-	// Ignored: Setenv fails only for a name holding "=" or a NUL, and this one holds neither.
-	_ = os.Setenv("COHERE_SYSTEM_CACHE", systemCache)
 	code := suite.Run()
-	// Ignored: a temporary directory of this test binary's own, which costs only its space if it outlives the run,
-	// and the run's verdict is already decided.
-	_ = os.RemoveAll(systemCache)
+	removeSystemCache()
 	os.Exit(code)
 }
 

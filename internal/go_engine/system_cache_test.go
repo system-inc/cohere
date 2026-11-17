@@ -11,6 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/system_cache_testing"
 )
 
 // Every run in this package's tests reads a system cache of the test binary's own, never the person's: TestMain set
@@ -18,18 +19,9 @@ import (
 func TestTheTestsSystemCacheIsNotTheUsers(test *testing.T) {
 	test.Parallel()
 
-	systemCache := os.Getenv("COHERE_SYSTEM_CACHE")
-	if systemCache == "" || !filepath.IsAbs(systemCache) {
-		test.Fatalf("want COHERE_SYSTEM_CACHE set to an absolute directory of the tests' own, got %q", systemCache)
-	}
-	usersCache, usersCacheError := os.UserCacheDir()
-	if usersCacheError != nil {
-		return
-	}
-	if relative, relativeError := filepath.Rel(usersCache, systemCache); relativeError == nil &&
-		(relative == "." || !strings.HasPrefix(relative, "..")) {
-		test.Errorf("COHERE_SYSTEM_CACHE %s is in the user cache directory %s", systemCache, usersCache)
-	}
+	// Ignored: a machine with no user cache directory has none a test could reach.
+	usersCache, _ := os.UserCacheDir()
+	system_cache_testing.ExpectIsolated(test, usersCache)
 }
 
 // systemCacheListing is every file below root, a link as itself, by its path with its size and modification time,
