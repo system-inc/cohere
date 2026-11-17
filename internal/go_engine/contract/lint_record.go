@@ -155,6 +155,13 @@ type BuildRecord struct {
 	// Written only when not 0, so a run under `--no-cache` writes none.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
 
+	// SystemCacheRestored counts the standard-library packages the build restored from the system cache's table of its
+	// own build context (#syscache), and SystemCacheWritten the entries it added to that table this run. Additive
+	// within contract 3, and the Go engine's alone. Each is written only when not 0, so a build under
+	// `--no-system-cache`, or one whose table held everything it reached, writes none.
+	SystemCacheRestored int `json:"systemCacheRestored,omitempty"`
+	SystemCacheWritten  int `json:"systemCacheWritten,omitempty"`
+
 	// InheritedFiles counts the distinct files an extra build took the host's findings of at least one syntax-only
 	// rule on, rather than walk them again in a package it checked from source (#y6q1x2j), and InheritedFindings the
 	// findings it took, each rule's on each file once. A build that restores nothing from the host's run, as under
@@ -380,7 +387,9 @@ type DependenceCounts struct {
 // packages: at most two, those whose own inputs moved and then the rest that missed, once the hits the early cutoff
 // found among the packages above the first were restored. FromSystemCache counts the standard-library packages
 // restored from the system cache's tables (#syscache), the host's build's and every other build's summed, which
-// nothing analyzed, apart from hit; it is written only when it is not 0. SystemCacheNotKept is why the run kept no
+// nothing analyzed, apart from hit; it is written only when it is not 0. SystemCacheWritten counts the entries the
+// run's builds added to their tables, summed, written only when not 0, and SystemCacheOff is set under
+// `--no-system-cache`, which neither reads nor writes the system cache. SystemCacheNotKept is why the run kept no
 // system cache though it was on, or could not keep it as it should, in one line, as a root it could not find, a
 // directory it could not write or a trim that failed; it is written only when there is one, and a run under
 // `--no-system-cache` has none. Reloads counts the packages the run loaded again from source,
@@ -402,6 +411,8 @@ type LintCache struct {
 	On                 bool   `json:"on"`
 	Hit                int    `json:"hit"`
 	FromSystemCache    int    `json:"standardLibraryFromSystemCache,omitempty"`
+	SystemCacheWritten int    `json:"systemCacheWritten,omitempty"`
+	SystemCacheOff     bool   `json:"systemCacheOff,omitempty"`
 	SystemCacheNotKept string `json:"systemCacheNotKept,omitempty"`
 	Missed             int    `json:"missed"`
 	Written            int    `json:"written"`

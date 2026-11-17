@@ -958,6 +958,11 @@ var (
 	// normalized to 0, which the record writes by leaving it out.
 	buildTimingPattern = regexp.MustCompile(
 		`,"((load|lint|decide|keep|wait|shareGateWait|lintWait)Milliseconds|heldAt(LoadEnd|LintPeak)Bytes)":\d+`)
+	// systemCacheCountsPattern is what the system cache restored and wrote, the run's and each build's (#syscache),
+	// which count the toolchain's own packages, as the findings cache's do, and turn on what ran before over the same
+	// system cache, each written only when not 0: left out as the times are.
+	systemCacheCountsPattern = regexp.MustCompile(
+		`,"(standardLibraryFromSystemCache|systemCacheWritten|systemCacheRestored)":\d+`)
 	// lintWaitedPattern is whether an extra build's lint waited for its weight at the gate, which turns on how the
 	// builds side by side fall in time and never reaches the verdict, so it is left out as the times are.
 	lintWaitedPattern     = regexp.MustCompile(`,"lintWaited":true`)
@@ -1019,6 +1024,7 @@ func normalize(stream string, root string) string {
 	normalized = panicFramesPattern.ReplaceAllString(normalized, `, at <frames>"`)
 	normalized = buildTargetPattern.ReplaceAllString(normalized, `"target":"target"`)
 	normalized = buildTimingPattern.ReplaceAllString(normalized, "")
+	normalized = systemCacheCountsPattern.ReplaceAllString(normalized, "")
 	normalized = lintWaitedPattern.ReplaceAllString(normalized, "")
 	normalized = buildsAtOncePattern.ReplaceAllString(normalized, "")
 	normalized = checkedByBuildPattern.ReplaceAllString(normalized, `"reason":"checked by the target build"`)

@@ -79,10 +79,11 @@ func readingTable(test *testing.T, table []byte, context cache.StandardLibraryCo
 }
 
 // onlyFromSystemCache is counts with only what a run under `--no-cache` may count kept: how many packages came from
-// the system cache, and the facts restored from it whose object a package's export data lacks, which are skipped and
-// counted.
+// the system cache and how many entries it wrote there, and the facts restored from it whose object a package's export
+// data lacks, which are skipped and counted.
 func onlyFromSystemCache(counts contract.LintCache) contract.LintCache {
-	return contract.LintCache{FromSystemCache: counts.FromSystemCache, FactsSkipped: counts.FactsSkipped}
+	return contract.LintCache{FromSystemCache: counts.FromSystemCache, SystemCacheWritten: counts.SystemCacheWritten,
+		FactsSkipped: counts.FactsSkipped}
 }
 
 // A run under `--no-cache` restores every standard-library package from the system cache's table: the count says how
@@ -338,7 +339,7 @@ func TestATableUnderAnotherIdentityRestoresNothing(test *testing.T) {
 	reading := readingTable(test, table, context)
 	reading.stamp = "release two"
 	other := runEngineWith(test, root, reading, rules.All(), "--no-cache")
-	if other.counts != (contract.LintCache{}) || other.withoutCounts != plain.withoutCounts {
+	if other.counts.FromSystemCache != 0 || other.withoutCounts != plain.withoutCounts {
 		test.Fatalf("want nothing from the system cache and the plain run's records, got %+v\n%s\nplain\n%s",
 			other.counts, other.withoutCounts, plain.withoutCounts)
 	}
@@ -410,7 +411,7 @@ func TestATableUnderAnotherBuildRestoresNothing(test *testing.T) {
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache")
 	other := runEngineWith(test, root, reading, rules.All(), "--no-cache")
-	if other.counts != (contract.LintCache{}) || other.withoutCounts != plain.withoutCounts {
+	if other.counts.FromSystemCache != 0 || other.withoutCounts != plain.withoutCounts {
 		test.Fatalf("want nothing from the system cache and the plain run's records, got %+v\n%s\nplain\n%s",
 			other.counts, other.withoutCounts, plain.withoutCounts)
 	}

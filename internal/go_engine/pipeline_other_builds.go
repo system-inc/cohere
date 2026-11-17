@@ -727,7 +727,7 @@ func (engine *pipeline) extraBuildRun(
 	// standard library beside what the table held, as the host writes its own once every build has ended.
 	if session != nil && session.HasCollected() {
 		session.PersistCollectedReads(wholeReads(result))
-		engine.systemCache.write(session)
+		run.systemCacheWritten = engine.systemCache.write(session)
 	}
 	// The facts census reads the last load's facts, whose result stands, beside the host's (#0ghk7vj).
 	if run.judged != nil && run.dependence != nil {
@@ -843,6 +843,8 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.RestoredFromHost = len(fromHost.Restored)
 			record.Untouched, record.Visited = len(fromHost.Untouched), fromHost.Visited
 			record.WrittenThrough = run.result.Cache.WrittenThrough
+			record.SystemCacheRestored = run.result.Cache.FromSystemCache
+			record.SystemCacheWritten = run.systemCacheWritten
 			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
 			record.DeclinedAtCheck = fromHost.DeclinedAtCheck
 			if len(fromHost.DeclinedBy) > 0 {

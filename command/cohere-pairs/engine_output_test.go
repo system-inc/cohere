@@ -34,7 +34,8 @@ func TestReadEngineOutputKeepsWhatTheRecordReads(test *testing.T) {
 	}{
 		{"filesInScope", read.FilesInScope, 37},
 		{"filesWalked", read.FilesWalked, 36},
-		{"standardLibraryFromBinary", read.StandardLibraryFromBinary, 180},
+		// The fixture is a release's before the system cache, whose record names the count by its old name.
+		{"standardLibraryFromBinary", read.StandardLibraryRestored, 180},
 	} {
 		if count.read == nil || *count.read != count.want {
 			test.Errorf("%s is %s, want %d", count.name, describeCount(count.read), count.want)
@@ -49,8 +50,37 @@ func TestReadEngineOutputKeepsWhatTheRecordReads(test *testing.T) {
 	if string(read.Builds) != wantBuilds {
 		test.Errorf("builds read as\n%s\nwant them as written\n%s", read.Builds, wantBuilds)
 	}
+	if !read.FromBinaryTable {
+		test.Error("a record naming its restores by the old name did not read as a release's table's")
+	}
 	if read.LinesNotJson != 1 {
 		test.Errorf("%d lines not JSON, want 1", read.LinesNotJson)
+	}
+}
+
+// A record of a binary with the system cache names the standard library it restored by the new name, and says what it
+// wrote to the system cache and why it could not keep it, which the read keeps beside the old name's count
+// (#syscache): a pair's base before the system cache and its branch after it are read alike.
+func TestReadEngineOutputReadsTheSystemCachesNames(test *testing.T) {
+	test.Parallel()
+	stream := `{"kind":"lint","filesWalked":4,"cache":{"standardLibraryFromSystemCache":290,"systemCacheWritten":12,` +
+		`"systemCacheNotKept":"trimming: it is not a directory"}}` + "\n" +
+		`{"kind":"lint","filesWalked":5,"cache":{"systemCacheOff":true}}` + "\n"
+	read, readError := readEngineOutput(strings.NewReader(stream))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if read.StandardLibraryRestored == nil || *read.StandardLibraryRestored != 290 || read.SystemCacheWritten != 12 ||
+		read.SystemCacheNotKept != "trimming: it is not a directory" || read.SystemCacheOff {
+		test.Errorf("read %s restored, %d written, not kept %q, off %t; want 290, 12, the reason, false",
+			describeCount(read.StandardLibraryRestored), read.SystemCacheWritten, read.SystemCacheNotKept,
+			read.SystemCacheOff)
+	}
+	off, offError := readEngineOutput(strings.NewReader(`{"kind":"lint","cache":{"systemCacheOff":true}}` + "\n"))
+	if offError != nil || !off.SystemCacheOff || off.StandardLibraryRestored == nil ||
+		*off.StandardLibraryRestored != 0 {
+		test.Errorf("a run under --no-system-cache read as off %t, restored %s (%v), want off and 0",
+			off.SystemCacheOff, describeCount(off.StandardLibraryRestored), offError)
 	}
 }
 
@@ -63,7 +93,7 @@ func TestReadEngineOutputLeavesWhatItNeverReadMissing(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	if read.FilesInScope != nil || read.FilesWalked != nil || read.StandardLibraryFromBinary != nil {
+	if read.FilesInScope != nil || read.FilesWalked != nil || read.StandardLibraryRestored != nil {
 		test.Errorf("counts read from records the stream does not hold: %+v", read)
 	}
 	if read.Findings != 0 || read.FindingsMd5 != "d41d8cd98f00b204e9800998ecf8427e" || read.LinesNotJson != 1 {
@@ -103,7 +133,8 @@ func TestRunRecordKeepsTheEngineOutputFlat(test *testing.T) {
 		test.Fatal(decodeError)
 	}
 	for _, key := range []string{"corpus", "wallSeconds", "findings", "findingsMd5", "filesInScope", "filesWalked",
-		"standardLibraryFromBinary", "buildsAtOnce", "buildsWidthLiveBytes", "builds", "linesNotJson",
+		"standardLibraryRestored", "systemCacheWritten", "buildsAtOnce", "buildsWidthLiveBytes", "builds",
+		"linesNotJson",
 		"standardErrorBytes", "peakResidentBytes", "loadBefore"} {
 		if _, present := decoded[key]; !present {
 			test.Errorf("the record has no %s: %s", key, encoded)

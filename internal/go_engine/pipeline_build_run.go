@@ -49,6 +49,9 @@ type buildRun struct {
 	// load and pass, its reloads' included.
 	loading time.Duration
 	linting time.Duration
+	// systemCacheWritten is the entries the build added to its table of the system cache (systemCache.write), set as an
+	// extra build ends and, for the host's, once every build has ended, when its table is written.
+	systemCacheWritten int
 	// waited is the host's alone: how long the extra builds waited, after its lint, for its walks of what each package
 	// read of others to end (wholeReads), before any could start.
 	waited time.Duration

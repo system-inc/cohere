@@ -58,7 +58,9 @@ func goEnvironmentUnnameable(environment []string) string {
 
 // goKeyedVariables are the variables a Go run's key takes by name, beside every `GO*` and `CGO_*` one. See
 // goRunCacheFacts for why each is there.
-var goKeyedVariables = []string{"HOME", "XDG_CONFIG_HOME", "CC", "CXX", "PKG_CONFIG", "BURNTSUSHI_TOML_110"}
+var goKeyedVariables = []string{
+	"HOME", "XDG_CONFIG_HOME", "CC", "CXX", "PKG_CONFIG", "BURNTSUSHI_TOML_110", "COHERE_SYSTEM_CACHE",
+}
 
 // goRunCacheFacts is what a Go run's verdict depends on that is no file the engine reads, each a fact in the run's
 // key. Computed with no subprocess, since a replay pays for them and `go env` alone costs more than the replay may.
@@ -71,7 +73,9 @@ var goKeyedVariables = []string{"HOME", "XDG_CONFIG_HOME", "CC", "CXX", "PKG_CON
 // one the go command reads that nobody listed here is still covered. `HOME` and `XDG_CONFIG_HOME`, since the go
 // command finds its own settings file, its default `GOPATH` and with it the module cache under them. `CC`, `CXX`
 // and `PKG_CONFIG`, since a package with cgo of its own is loaded through the cgo tool, whose compiler and headers
-// no record can name. `BURNTSUSHI_TOML_110`, which the TOML reader of staticcheck's config consults. And the `go`
+// no record can name. `BURNTSUSHI_TOML_110`, which the TOML reader of staticcheck's config consults.
+// `COHERE_SYSTEM_CACHE`, which names the engine's system cache (#syscache): a run over another one restores and writes
+// other tables, which its records count, so it never replays one over the first. And the `go`
 // the loader will run, as PATH finds it and as its links resolve, so another toolchain on PATH misses even where
 // the engine's own record of the binary would not show it.
 func goRunCacheFacts(

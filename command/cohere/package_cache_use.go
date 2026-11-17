@@ -9,9 +9,11 @@ import "fmt"
 // skipped, whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at
 // most two. FromSystemCache is the standard-library packages restored from the Go engine's system cache, its tables
 // in the user's cache directory, every build's summed, apart from hit, which `--no-cache` reads too, since they are
-// of cohere and the Go installation and nothing of the project; it is absent when 0. SystemCacheNotKept is why the
-// run kept no system cache though it was on, or could not keep it as it should, in one line, absent when there is
-// none (#syscache). Reloads is the packages
+// of cohere and the Go installation and nothing of the project; it is absent when 0. SystemCacheWritten is the
+// entries the run's builds added to their tables of the system cache, summed, absent when 0, and SystemCacheOff is set
+// under `--no-system-cache`, which neither reads nor writes it. SystemCacheNotKept is why the run kept no system cache
+// though it was on, or could not keep it as it should, in one line, absent when there is none (#syscache). Reloads
+// is the packages
 // the run loaded again from source, though the cache held them, to answer a question of a fact computed on demand
 // that no store answered (#w7zmvat wave 3), and ReloadRounds the loads and lints again that took, and Replays the
 // questions of such a fact answered by replaying the push's walk of a package, which a cold run makes too, each absent
@@ -24,6 +26,8 @@ type packageCacheUse struct {
 	On                 bool   `json:"on"`
 	Hit                int    `json:"hit"`
 	FromSystemCache    int    `json:"standardLibraryFromSystemCache,omitempty"`
+	SystemCacheWritten int    `json:"systemCacheWritten,omitempty"`
+	SystemCacheOff     bool   `json:"systemCacheOff,omitempty"`
 	SystemCacheNotKept string `json:"systemCacheNotKept,omitempty"`
 	Missed             int    `json:"missed"`
 	Written            int    `json:"written"`
@@ -39,20 +43,14 @@ type packageCacheUse struct {
 }
 
 // line is the cache's clause of the --verbose account, after "lint: ": the three counts every run has, and the ones
-// that are usually zero only when they are not, so the line stays short where nothing went wrong. The standard
-// library's packages from the system cache are said whether the store was on or not.
+// that are usually zero only when they are not, so the line stays short where nothing went wrong. Where the standard
+// library came from is said whether the store was on or not (systemCacheClause).
 func (cache packageCacheUse) line() string {
 	if !cache.On {
-		line := "package cache off"
-		if cache.FromSystemCache > 0 {
-			line += ", " + cache.segment()
-		}
-		return line + cache.reloads()
+		return "package cache off" + cache.systemCacheClause() + cache.reloads()
 	}
 	line := fmt.Sprintf("package cache hit %d, missed %d, wrote %d", cache.Hit, cache.Missed, cache.Written)
-	if cache.FromSystemCache > 0 {
-		line += ", " + cache.segment()
-	}
+	line += cache.systemCacheClause()
 	if cache.Unstorable > 0 {
 		line += fmt.Sprintf(", %d unstorable", cache.Unstorable)
 	}
@@ -63,6 +61,24 @@ func (cache packageCacheUse) line() string {
 		line += fmt.Sprintf(", %d facts skipped", cache.FactsSkipped)
 	}
 	return line + cache.reloads()
+}
+
+// systemCacheClause is the account's clause of where the standard library came from and went (#syscache): the packages
+// restored from the system cache and the entries written to it, or that the run kept it off, so a run that computed
+// the standard library says why. Empty when neither moved, as in a run that restored nothing and wrote nothing new.
+// The reason the system cache was not kept is the footer's (footer), which every run's reader sees.
+func (cache packageCacheUse) systemCacheClause() string {
+	if cache.SystemCacheOff {
+		return ", system cache off (--no-system-cache)"
+	}
+	clause := ""
+	if cache.FromSystemCache > 0 {
+		clause += ", " + cache.segment()
+	}
+	if cache.SystemCacheWritten > 0 {
+		clause += ", " + counted(cache.SystemCacheWritten, "entry", "entries") + " written to the system cache"
+	}
+	return clause
 }
 
 // reloads is the account's clause of the packages loaded again from source and the rounds that took, and of the

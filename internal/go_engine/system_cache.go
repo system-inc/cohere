@@ -54,15 +54,18 @@ func standardLibraryTablesDirectory(root string) string {
 
 // write writes back session's table of its build's context, once its reads are whole, with what the build computed
 // of the standard library whole beside what the table held (check.CacheSession.WriteSystemCacheTable), and nothing
-// when it computed nothing new. A write that fails is why the system cache is not kept as it should be, never an
-// error: the next run computes what this one could not keep.
-func (system *systemCache) write(session *check.CacheSession) {
+// when it computed nothing new, and returns how many entries it added, for the build's record. A write that fails is
+// why the system cache is not kept as it should be, never an error: the next run computes what this one could not
+// keep.
+func (system *systemCache) write(session *check.CacheSession) int {
 	if system.store == nil || session == nil {
-		return
+		return 0
 	}
-	if _, writeError := session.WriteSystemCacheTable(); writeError != nil {
+	added, writeError := session.WriteSystemCacheTable()
+	if writeError != nil {
 		system.notKeptBecause(cache.NotKeptBecause(writeError))
 	}
+	return added
 }
 
 // notKeptBecause records why the system cache is not kept as it should be, the first reason the run met, which the

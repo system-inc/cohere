@@ -21,7 +21,8 @@ import (
 // and linted the whole package, minutes of compiling under a verdict that said formatting (#nqb3mjv). The
 // engine has read `--format-only` and `--no-format` with TypeScript's meaning since c024df4b, so both pass
 // through. The engine reads `--no-cache` since 9def2dc1: every phase from source, in a scratch of its own that
-// it removes.
+// it removes. `--no-system-cache` is the Go engine's, whose system cache this engine has no counterpart of, so the
+// front door accepts it and forwards nothing, until the engine keeps one.
 var swiftFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
@@ -29,7 +30,7 @@ var swiftFlags = engineFlags{
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile", "open",
-		"duplicates",
+		"duplicates", "no-system-cache",
 	},
 }
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/system_cache_testing"
@@ -368,5 +369,55 @@ func TestAWarmExtraBuildHitsItsShortStandardLibraryEntriesInItsOwnStore(test *te
 			test.Errorf("%s checked %d packages from source warm over the rounds %v, of %d cold, want library alone",
 				build.Target, build.CheckedFromSource, build.CheckedFromSourceRounds, cold[index].CheckedFromSource)
 		}
+	}
+}
+
+// Every build's record says what the system cache did for it, and the lint record sums them (#syscache): over a
+// fixture with a file only another target compiles, a cold run's host build writes its table and restores nothing, a
+// warm run's host restores every package it wrote and writes nothing, the lint record's counts are the builds' summed,
+// and a run under `--no-system-cache` says the system cache was off and counts nothing of it.
+func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, standardLibraryFixture)
+	other := map[bool]string{true: "freebsd", false: "linux"}[runtime.GOOS == "linux"]
+	if writeError := os.WriteFile(filepath.Join(root, "library_"+other+".go"), []byte("package library\n"),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	summed := func(lint contract.LintRecord) (int, int) {
+		restored, written := 0, 0
+		for _, build := range lint.Builds {
+			restored, written = restored+build.SystemCacheRestored, written+build.SystemCacheWritten
+		}
+		return restored, written
+	}
+	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
+		"--other-builds").stream)
+	if len(cold.Builds) < 2 || cold.Builds[0].SystemCacheWritten == 0 || cold.Builds[0].SystemCacheRestored != 0 {
+		test.Fatalf("want the cold host to write its table and restore nothing, got %+v", cold.Builds)
+	}
+	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
+		"--other-builds").stream)
+	if warm.Builds[0].SystemCacheRestored != cold.Builds[0].SystemCacheWritten ||
+		warm.Builds[0].SystemCacheWritten != 0 {
+		test.Errorf("want the warm host to restore the %d entries the cold one wrote and write none, got %+v",
+			cold.Builds[0].SystemCacheWritten, warm.Builds[0])
+	}
+	for name, lint := range map[string]contract.LintRecord{"cold": cold, "warm": warm} {
+		restored, written := summed(lint)
+		if lint.Cache.FromSystemCache != restored || lint.Cache.SystemCacheWritten != written ||
+			lint.Cache.SystemCacheOff {
+			test.Errorf("%s: want the lint record to sum the builds' %d restored and %d written, got %+v", name,
+				restored, written, lint.Cache)
+		}
+	}
+	off := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
+		"--no-system-cache", "--other-builds").stream)
+	if restored, written := summed(off); !off.Cache.SystemCacheOff || off.Cache.FromSystemCache != 0 ||
+		restored+written != 0 {
+		test.Errorf("want a run under --no-system-cache to say the system cache was off and count nothing of it, "+
+			"got %+v and builds %+v", off.Cache, off.Builds)
 	}
 }

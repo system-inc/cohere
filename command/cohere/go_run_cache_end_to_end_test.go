@@ -556,6 +556,24 @@ func goHostIsLinux() bool {
 	return outputError == nil && strings.TrimSpace(string(output)) == "linux"
 }
 
+// A replay never crosses the system cache (#syscache): a run under `--no-system-cache` never replays one without it,
+// and records and replays its own, since the key holds every argument; and a run over another `COHERE_SYSTEM_CACHE`
+// never replays one over the first, since the key holds the variable. Each would replay a verdict whose counts of
+// what the system cache restored and wrote are another run's.
+func TestAGoReplayNeverCrossesTheSystemCache(test *testing.T) {
+	test.Parallel()
+	fixture := newGoReplayFixture(test)
+	fixture.establishHit("--no-fix")
+	if run := fixture.run(true, "--no-fix", "--no-system-cache"); isGoReplay(run) {
+		test.Errorf("a run under --no-system-cache replayed one without it:\n%s", run.stdout)
+	}
+	fixture.establishHit("--no-fix", "--no-system-cache")
+	fixture.setVariable("COHERE_SYSTEM_CACHE", test.TempDir())
+	if run := fixture.run(true, "--no-fix"); isGoReplay(run) {
+		test.Errorf("a run over another COHERE_SYSTEM_CACHE replayed one over the first:\n%s", run.stdout)
+	}
+}
+
 // packageCacheOffLine is the account's lint line of a run whose engine's per-package cache was off, the standard
 // library's packages from the system cache beside it or not.
 var packageCacheOffLine = regexp.MustCompile(

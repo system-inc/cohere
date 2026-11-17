@@ -52,6 +52,40 @@ func TestThePackageCacheLineSaysTheStandardLibraryFromTheSystemCache(test *testi
 	}
 }
 
+// The account's cache clause says what the system cache did (#syscache): the entries the run wrote to it beside the
+// packages it restored, and, under `--no-system-cache`, that it was off, so a run that computed the standard library
+// says why. `--json` carries each only when it is set.
+func TestThePackageCacheLineSaysWhatTheSystemCacheDid(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		cache packageCacheUse
+		want  string
+	}{
+		{
+			cache: packageCacheUse{On: true, Hit: 4, FromSystemCache: 258, SystemCacheWritten: 12},
+			want: "package cache hit 4, missed 0, wrote 0, standard library: 258 from the system cache, 12 entries " +
+				"written to the system cache",
+		},
+		{cache: packageCacheUse{SystemCacheOff: true}, want: "package cache off, system cache off (--no-system-cache)"},
+		{
+			cache: packageCacheUse{On: true, Hit: 4, SystemCacheOff: true},
+			want:  "package cache hit 4, missed 0, wrote 0, system cache off (--no-system-cache)",
+		},
+	} {
+		if got := testCase.cache.line(); got != testCase.want {
+			test.Errorf("got %q, want %q", got, testCase.want)
+		}
+	}
+	encoded, encodeError := json.Marshal(packageCacheUse{On: true})
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if strings.Contains(string(encoded), "systemCache") {
+		test.Errorf("want no system cache field when nothing is set, got %s", encoded)
+	}
+}
+
 // The account says the packages a run loaded again from source to answer a question of a fact computed on demand
 // (#w7zmvat wave 3), whether the store was on or not, and nothing of them when there were none, and `--json` carries
 // the count only when it is not 0.

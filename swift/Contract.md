@@ -964,6 +964,8 @@ of what it restored, are the only counts that can be other than 0, with `reloads
 `--no-system-cache` the engine neither reads nor writes the system cache. A system cache the run
 cannot keep, a directory it cannot find or write, is never an error: the run computes what it would
 have held, and `"systemCacheNotKept"` says why in one line, written only when there is a reason.
+`"systemCacheWritten"` counts the entries the run's builds added to their tables, summed, and `"systemCacheOff":true`
+says the run was under `--no-system-cache`, each written only when not 0 or false.
 
 A few facts are computed only when a rule asks of a function (#w7zmvat), from the function's
 package's syntax, which a restored package does not have. Every entry a run writes holds every
@@ -1066,7 +1068,9 @@ reason it had: `hostDecline` (a package its check declined, at most 2 such round
 reached a restored package with no answer of it kept). `"writtenThrough":301` counts the packages it restored whose
 entry it then wrote to its own findings cache, once their restore held, so its next run hits them there rather than
 check them from source, since the host, hitting its own store then, keeps nothing to restore them from; under
-`--no-cache` nothing is written, and it is absent. `"inheritedFiles":40` counts the distinct files an extra build took
+`--no-cache` nothing is written, and it is absent. `"systemCacheRestored":290` counts the standard-library packages
+the build restored from the system cache's table of its own build context, and `"systemCacheWritten":12` the entries
+it added to that table, each absent when 0. `"inheritedFiles":40` counts the distinct files an extra build took
 the host's findings of at least one syntax-only rule on, rather than walk them again in a package it checked from
 source, since such a rule's findings on a file are the file's alone, and `"inheritedFindings":12` the findings it took,
 each rule's on each file once. Under `--timing` nothing is restored from the host, and nothing inherited, so every

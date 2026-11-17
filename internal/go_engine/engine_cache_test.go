@@ -194,7 +194,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 
 	before := entriesIn(test, root)
 	uncached := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
-	if uncached.counts != (contract.LintCache{}) {
+	if uncached.counts != (contract.LintCache{SystemCacheOff: true}) {
 		test.Fatalf("want a run under --no-cache to count nothing, got %+v", uncached.counts)
 	}
 	if uncached.withoutCounts != edited.withoutCounts {

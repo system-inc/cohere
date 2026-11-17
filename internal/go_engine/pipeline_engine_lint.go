@@ -152,9 +152,14 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	// package from it can keep it for its extra builds (#pcv6eff), and then writes the host's table, the extra builds
 	// having written theirs as each ended (extraBuildRun). A warm run collects nothing, and so never waits for the
 	// walks, which a run with no extra builds otherwise leaves running past its verdict.
+	hostWritten := 0
 	if engine.session != nil && engine.session.HasCollected() {
 		engine.session.PersistCollectedReads(wholeReads(pass.result))
-		engine.systemCache.write(engine.session)
+		hostWritten = engine.systemCache.write(engine.session)
+	}
+	// The host's build record was made with the merge, before its table was written.
+	if verdict != nil && len(verdict.records) > 0 {
+		verdict.records[0].SystemCacheWritten = hostWritten
 	}
 	// Every build has read and written its table of the system cache by now, so a trim takes none from under a build
 	// of this run. A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it
@@ -188,6 +193,8 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		Problems:        len(result.Cache.Problems),
 		WriteFailed:     result.Cache.WriteFailed,
 
+		SystemCacheWritten: hostWritten,
+		SystemCacheOff:     engine.systemCache.off,
 		SystemCacheNotKept: systemCacheNotKept,
 	}
 	if record.Cache.SystemCacheNotKept != "" {
@@ -225,6 +232,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				record.Cache.Problems += len(run.result.Cache.Problems)
 				record.Cache.WriteFailed += run.result.Cache.WriteFailed
 				record.Cache.FromSystemCache += run.result.Cache.FromSystemCache
+				record.Cache.SystemCacheWritten += run.systemCacheWritten
 			}
 		}
 		record.BuildsAtOnce = engine.buildsAtOnce
