@@ -9,9 +9,10 @@ import "sync"
 // extra builds run side by side, so it is a count, and the loads in flight share one cap and one raise.
 //
 // A build waiting at the share gate (shareGate) holds its load open, since loadPackages brackets the whole load and the
-// gate is inside it: in a run without a findings store every extra build begins its load at once, so the late raise
-// waits until the last of them ends, where main's schedule, which started a build only once there was room for it,
-// let it land while the first builds linted (#ghb3rcn). It is kept so on purpose until #ph5532e has measured it.
+// gate is inside it: in a run that takes the gate (takesShareGate) every extra build begins its load at once, so the
+// late raise waits until the last of them ends, where main's schedule, which started a build only once there was room
+// for it, let it land while the first builds linted (#ghb3rcn). It is kept so on purpose until #ph5532e has measured
+// it.
 //
 // It is the one place that knows the raises the run made (raisedTo), for a record written at the run's end.
 type loadMemory struct {
