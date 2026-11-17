@@ -1031,8 +1031,8 @@ func (session *CacheSession) keepForBuilds(
 // session's pool, so each extra build's walk (restoreFromHost) finds every set it asks in the memo (#ybjbqm2). Asked
 // there instead, each set was computed by the first of seven builds racing to ask it, the others waiting or computing
 // it again before the memo stored one: each build's walk took 223 ms at cohere's root, and 4 to 5 ms with the sets
-// computed here, in a pass of 111 ms on about three cores, the run's user and system time 0.11 s less there and 0.07 s
-// at deeafbf4, with the same findings. A set is computed from the host's types and reads alone, so the pass reads the
+// computed here, in a pass of 111 ms on about three cores, the run's wall 0.11 s less there and 0.07 s at deeafbf4,
+// its user and system time level, with the same findings. A set is computed from the host's types and reads alone, so the pass reads the
 // memo, never the session, and runs after the session let go of its analysis.
 func (session *CacheSession) keptDependence(host *HostRun) {
 	// The entries in a slice, so each index of the fan-out has its own.
