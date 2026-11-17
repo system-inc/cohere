@@ -187,8 +187,10 @@ func relocatedKeys(test *testing.T, keys map[string]Key) {
 
 // Each field of the context changes what it must, and only that: the format version, the engine identity, each
 // entry of the build and a fact analyzer's flag change every key; the loader changes the key of a package with cgo
-// files and of every package that imports one, and of no other; and the root changes none when the files below it
-// are the same. A new field without a case here fails, since the fields are found by reflection.
+// files and of every package that imports one, and of no other; the C toolchain, `CGO_CFLAGS` alone, changes those
+// same keys under the cgo-translated loader and none under the source loader, where the cgo tool never runs; and the
+// root changes none when the files below it are the same. A new field without a case here fails, since the fields
+// are found by reflection.
 func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 	test.Parallel()
 
@@ -221,6 +223,18 @@ func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 			changed := standardContextAt(goroot)
 			changed.Loader = load.LoaderCgoTranslated
 			expectChanged(test, "the loader", keys, keyStandard(test, graph, changed), runtimeCgoId, netId, httpId)
+		},
+		"CgoToolchain": func(test *testing.T) {
+			translated := standardContextAt(goroot)
+			translated.Loader = load.LoaderCgoTranslated
+			translated.CgoToolchain = []string{"CC=clang", "CGO_CFLAGS=-O2 -g"}
+			flagged := translated
+			flagged.CgoToolchain = []string{"CC=clang", "CGO_CFLAGS=-O2 -g -DPROBE"}
+			expectChanged(test, "CGO_CFLAGS alone under the cgo-translated loader",
+				keyStandard(test, graph, translated), keyStandard(test, graph, flagged), runtimeCgoId, netId, httpId)
+			fromSource := standardContextAt(goroot)
+			fromSource.CgoToolchain = flagged.CgoToolchain
+			expectChanged(test, "the C toolchain under the source loader", keys, keyStandard(test, graph, fromSource))
 		},
 		"Goroot": func(test *testing.T) {
 			relocatedKeys(test, keys)

@@ -3,6 +3,7 @@ package go_engine
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -34,12 +35,12 @@ func TestARunAsksGoEnvironmentOncePerBuild(test *testing.T) {
 	}
 }
 
-// The findings cache's key reads `GOROOT` and every one of buildNames from go env's one answer, so each is among what
-// it asks: one left out would read as empty in every key, and never miss.
+// The findings cache's key reads `GOROOT`, every one of buildNames and the C toolchain (load.CgoToolchainNames) from go
+// env's one answer, so each is among what it asks: one left out would read as empty in every key, and never miss.
 func TestTheGoEnvironmentAnswersEveryNameTheCacheReads(test *testing.T) {
 	test.Parallel()
 	values := goEnvironmentIn(test, copyFixture(test, filepath.Join("testdata", "other-builds")), nil)
-	for _, name := range append([]string{"GOROOT"}, buildNames...) {
+	for _, name := range slices.Concat([]string{"GOROOT"}, buildNames, load.CgoToolchainNames) {
 		if _, answered := values[name]; !answered {
 			test.Errorf("go env's answer holds no %s, which the findings cache's key reads", name)
 		}

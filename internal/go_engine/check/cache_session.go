@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"go/types"
 	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -46,6 +47,11 @@ type Caching struct {
 	// work on every core, reading its hits, saving its misses, deciding a restore from the host, runs under its slots
 	// (fanOut, typesHoldFunction). Nil, that work takes a goroutine per core of its own.
 	Pool *bounded.Pool
+
+	// CgoToolchain is the C toolchain go env reports, "CC=clang" and the rest, in load.CgoToolchainNames' order, which
+	// every key holds under the cgo-translated loader (keyContextOf), as the standard library's context holds it
+	// (cache.StandardLibraryContext.CgoToolchain).
+	CgoToolchain []string
 
 	// AnswersInPart names, by import path, the packages whose entry the run writes with only the answers its
 	// questions computed in them, never whole, as an entry from a build before format 10 holds them: an entry a later
@@ -328,6 +334,19 @@ func NewCacheSession(caching *Caching, rules []rule.Rule, reports ...*analysis.A
 	return session
 }
 
+// keyContextOf is the context the session keys a load under loader by: the run's, its build with the loader, and under
+// the cgo-translated loader the C toolchain too (Caching.CgoToolchain), since every package with cgo files is then
+// checked from what the cgo tool made with it, and the toolchain's flags and headers change that (#syscache). Under the
+// source loader the cgo tool never runs, so the toolchain changes no key.
+func (session *CacheSession) keyContextOf(loader string) cache.Context {
+	keyContext := session.caching.Context
+	keyContext.Build = append(slices.Clone(keyContext.Build), "loader="+loader)
+	if loader == load.LoaderCgoTranslated {
+		keyContext.Build = append(keyContext.Build, session.caching.CgoToolchain...)
+	}
+	return keyContext
+}
+
 // Restore computes the key of every package the load reached, reads each one's entry, and returns those that decode
 // whole and hold every analyzer the run can ask of them. A standard-library package is looked up in the system cache's
 // table first (see restoreFromSystemCache), and in the store only when the table holds none; without a store it is
@@ -394,11 +413,9 @@ func (session *CacheSession) Restore(
 	// restoreFromHost): only before any package has its syntax do the extra inputs read what both builds read alike.
 	if session.caching.Store != nil || session.keepsForBuilds {
 		keysStarted := time.Now()
-		keyContext := session.caching.Context
-		keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+loader)
 		var keysError error
-		keyed, keysError = cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files,
-			session.caching.Held)
+		keyed, keysError = cache.Keys(reachable, session.keyContextOf(loader), session.caching.ExtraInputs,
+			session.caching.Files, session.caching.Held)
 		// Keys a run with a store computes anyway; without one, they are the keep's alone.
 		if session.caching.Store == nil {
 			session.keeping += time.Since(keysStarted)

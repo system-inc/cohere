@@ -1060,9 +1060,8 @@ func (session *CacheSession) recordedDemandOf(saved *packages.Package) entryDema
 // portableKeys are reachable's keys as an extra build without a store computes them for the portable digests alone,
 // reading the digests of the files the host's run hashed rather than hash them again.
 func (session *CacheSession) portableKeys(loader string, reachable []*packages.Package) (*cache.Keyed, error) {
-	keyContext := session.caching.Context
-	keyContext.Build = append(slices.Clone(keyContext.Build), "loader="+loader)
-	return cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.host.host.files, session.caching.Held)
+	return cache.Keys(reachable, session.keyContextOf(loader), session.caching.ExtraInputs, session.host.host.files,
+		session.caching.Held)
 }
 
 // hostPortableKeys are portableKeys, nil when they cannot be computed, which restoreFromHost computes again and says

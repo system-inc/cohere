@@ -37,6 +37,11 @@ type StandardLibraryContext struct {
 	// through its dependency's key: a run of a project with cgo of its own misses no package that never reaches cgo.
 	Loader string
 
+	// CgoToolchain is the C toolchain go env reports, "CC=clang" and the rest, in load.CgoToolchainNames' order. Under
+	// the cgo-translated loader a package with cgo files is checked from what the cgo tool made with it, so its own
+	// digest holds the toolchain beside the loader, and only then: under the source loader the cgo tool never runs.
+	CgoToolchain []string
+
 	// Goroot is the Go installation's root, `GOROOT` as go env reports it, absolute. It is never hashed: each file is
 	// keyed by its path below it, so the same Go installed elsewhere keys alike.
 	Goroot string
@@ -55,8 +60,8 @@ type StandardLibraryContext struct {
 // length-prefixed: the context (its format version, engine identity, fact analyzers and build, hashed once for every
 // package); the package's ID, PkgPath and Name; each of its GoFiles, CompiledGoFiles, OtherFiles, EmbedFiles and
 // IgnoredFiles as its path below Goroot, written `$GOROOT/` and then slash-separated, and the sha256 of its bytes;
-// and, for a package with cgo files alone, the loader. No absolute path goes in, and nothing of the process: only what
-// the context names and the files' bytes.
+// and, for a package with cgo files alone, the loader, then the C toolchain when the loader is cgo-translated. No
+// absolute path goes in, and nothing of the process: only what the context names and the files' bytes.
 func StandardLibraryKeys(
 	reachable []*packages.Package,
 	shared StandardLibraryContext,
@@ -71,6 +76,7 @@ func StandardLibraryKeys(
 	computing := &standardLibraryKeyer{
 		context:      standardLibraryContextDigest(shared),
 		loader:       shared.Loader,
+		cgoToolchain: shared.CgoToolchain,
 		goroot:       shared.Goroot,
 		rootRelative: map[string]string{},
 		standard:     map[*packages.Package]bool{},
@@ -106,8 +112,8 @@ func StandardLibraryKeys(
 }
 
 // standardLibraryContextDigest is the run's StandardLibraryContext hashed once, in the key's order: a marker that sets
-// these keys apart from Keys', the format version, the engine identity, the fact analyzers, the build. The loader and
-// Goroot are not in it, since neither belongs in every package's key.
+// these keys apart from Keys', the format version, the engine identity, the fact analyzers, the build. The loader, the
+// C toolchain and Goroot are not in it, since none belongs in every package's key.
 func standardLibraryContextDigest(shared StandardLibraryContext) Key {
 	parts := newPartHash()
 	parts.text("standard library")
@@ -121,9 +127,9 @@ func standardLibraryContextDigest(shared StandardLibraryContext) Key {
 // StandardLibraryTableKey is the key of the table the system cache keeps of one build context's standard library: a
 // sha256 over a marker that sets it apart from every package's key, then, in standardLibraryContextDigest's order, the
 // format version, the engine identity, the fact analyzers and the build. So a table is found only by the engine that
-// wrote it, for the target, toolchain and fact analyzers it was written under. Neither the loader nor Goroot is in
-// it: the loader is in the key of each package with cgo files, which the table holds under its own key, and every
-// path in a table's entries stands below the marker for Goroot.
+// wrote it, for the target, toolchain and fact analyzers it was written under. Neither the loader, the C toolchain nor
+// Goroot is in it: the loader and the C toolchain are in the key of each package with cgo files, which the table holds
+// under its own key, and every path in a table's entries stands below the marker for Goroot.
 func StandardLibraryTableKey(shared StandardLibraryContext) Key {
 	parts := newPartHash()
 	parts.text("standard library table")

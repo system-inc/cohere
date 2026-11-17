@@ -86,6 +86,7 @@ func lintCache(
 				FormatVersion:  check.CacheFormatVersion,
 				EngineIdentity: cmp.Or(source.stamp, identity),
 				Build:          standardLibraryBuild(values),
+				CgoToolchain:   cgoToolchain(values),
 				Goroot:         values["GOROOT"],
 			},
 			Collected: source.collected,
@@ -102,7 +103,7 @@ func lintCache(
 		standardLibrary.Collected = map[cache.Key]check.StandardLibraryRunEntry{}
 	}
 	if noCache {
-		return &check.Caching{StandardLibrary: standardLibrary}, nil
+		return &check.Caching{StandardLibrary: standardLibrary, CgoToolchain: cgoToolchain(values)}, nil
 	}
 	return &check.Caching{
 		Store:       cache.Open(workspace.Root),
@@ -114,8 +115,20 @@ func lintCache(
 			RuleSet:        cacheRuleSet(enabled),
 		},
 		StandardLibrary: standardLibrary,
+		CgoToolchain:    cgoToolchain(values),
 		AnswersInPart:   request.answersInPart,
 	}, nil
+}
+
+// cgoToolchain is the C toolchain of values, go env's answer as cacheBuild reads it, each of load.CgoToolchainNames
+// as "NAME=value" in its order, which every key holds under the cgo-translated loader (check.Caching.CgoToolchain,
+// cache.StandardLibraryContext.CgoToolchain).
+func cgoToolchain(values map[string]string) []string {
+	toolchain := make([]string, 0, len(load.CgoToolchainNames))
+	for _, name := range load.CgoToolchainNames {
+		toolchain = append(toolchain, name+"="+values[name])
+	}
+	return toolchain
 }
 
 // processEnvironment are the engine process's own variables an analyzer reads, each named in the build context

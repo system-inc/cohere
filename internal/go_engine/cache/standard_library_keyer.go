@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // standardLibraryKeyer judges which packages are the standard library's, then keys those depth first, each package
@@ -14,6 +16,9 @@ type standardLibraryKeyer struct {
 
 	// loader is the context's Loader, hashed into the own digest of a package with cgo files.
 	loader string
+
+	// cgoToolchain is the context's CgoToolchain, hashed beside loader when it is the cgo-translated one.
+	cgoToolchain []string
 
 	// goroot is the context's Goroot, which every file is keyed below.
 	goroot string
@@ -106,9 +111,10 @@ func (keyer *standardLibraryKeyer) key(keyed *packages.Package) Key {
 }
 
 // ownDigest is the part of a standard-library package's key that is its own: the context, then its path alone for a
-// package keyed so, else its identity, its files below goroot, and the loader when it has cgo files. Its import map
-// is not in it, unlike Keys' own digest, which the findings cache's second key reads apart from the key: no caller
-// reads this one apart, and the key's second part holds each import path with its package's key.
+// package keyed so, else its identity, its files below goroot, and the loader when it has cgo files, with the C
+// toolchain when the loader is cgo-translated. Its import map is not in it, unlike Keys' own digest, which the
+// findings cache's second key reads apart from the key: no caller reads this one apart, and the key's second part
+// holds each import path with its package's key.
 func (keyer *standardLibraryKeyer) ownDigest(keyed *packages.Package) Key {
 	parts := newPartHash()
 	parts.bytes(keyer.context[:])
@@ -133,5 +139,8 @@ func (keyer *standardLibraryKeyer) ownDigest(keyed *packages.Package) Key {
 	}
 	parts.count(1)
 	parts.text(keyer.loader)
+	if keyer.loader == load.LoaderCgoTranslated {
+		parts.texts(keyer.cgoToolchain)
+	}
 	return parts.sum()
 }
