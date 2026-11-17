@@ -209,7 +209,11 @@ func runOnGateBoxes(
 		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' '" + corporaArgument(corpora) + "' " +
 		strings.Join(patterns, " ")
 	started := time.Now()
+	// asked is how many times every box has been asked. A land always asks twice before it refuses, so a wait shorter
+	// than one round of asking still asks again: on a loaded box one round outlasted a 2s wait (Sun2, Nov 16).
+	asked := 0
 	for {
+		asked++
 		held := []string{}
 		for _, box := range boxes {
 			read, readError := ahra("loom", "gap", "--box", box)
@@ -248,11 +252,11 @@ func runOnGateBoxes(
 			return output, box, "", runError
 		}
 		waited := time.Since(started)
-		if waited >= wait {
+		if waited >= wait && asked >= 2 {
 			return nil, "", fmt.Sprintf("every gate box stayed held through %s of waiting: %s",
 				waited.Round(time.Second), strings.Join(held, "; ")), nil
 		}
-		again := min(gateBoxAgain, wait-waited)
+		again := max(min(gateBoxAgain, wait-waited), 0)
 		fmt.Fprintf(streams.Errors, "cohere-dev: every gate box is held (%s); the land waits in line holding the "+
 			"lock, asking again in %s, %s of %s waited\n", strings.Join(boxes, ", "), again.Round(time.Second),
 			waited.Round(time.Second), wait)
