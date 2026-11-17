@@ -273,8 +273,11 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	// xcodeCandidates are the directories that could be an Xcode project's root, relative to root. The claim
 	// after the walk decides which are projects.
 	xcodeCandidates := map[string]bool{}
-	// folders are every entered directory whose name the folder check reports, outermost or not.
+	// folders are every entered directory whose name the folder check reports, outermost or not, and covered the
+	// directories holding a file the run covers, tracked or untracked and not ignored, which decide which of them
+	// are part of the project (keptFolders).
 	var folders []folderFinding
+	covered := map[string]bool{}
 	fail := func(sourceError error) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -348,7 +351,14 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		// directory is.
 		swiftFileCount := 0
 		formattableCount := 0
+		holdsCoveredFile := false
 		for _, entry := range entries {
+			// The matcher answers a tracked file as never ignored, so this is tracked, or untracked and not
+			// ignored, asked of each file until one answers (#13fpvdf).
+			if !holdsCoveredFile && !entry.IsDir() &&
+				!directoryScope.Ignored(fromRepository(path.Join(relative, entry.Name())), false) {
+				holdsCoveredFile = true
+			}
 			isSwift := strings.HasSuffix(entry.Name(), ".swift")
 			isFormattable := formattableExtensions[strings.ToLower(path.Ext(entry.Name()))]
 			if entry.IsDir() || (!isSwift && !isFormattable) {
@@ -378,6 +388,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		}
 		if offending {
 			folders = append(folders, folder)
+		}
+		if holdsCoveredFile {
+			covered[relative] = true
 		}
 		// A go.work found here makes the directory's go.mod part of its project rather than one of its own.
 		workspaceHere := false
@@ -450,7 +463,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return discovery{}, countNamedPathsError
 	}
 	found.IgnoreMatched = ignoreTally.Matched
-	found.Folders = outermostFolders(folders)
+	found.Folders = outermostFolders(keptFolders(folders, covered))
 	xcodeProjects, anyUnclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
 	found.Projects = append(found.Projects, xcodeProjects...)
 	// No Swift project is at the root, or it would have claimed every file, so the scripts-only root is the only

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -98,18 +99,53 @@ func judgeFolder(relative string, takenWhole func(string) bool) (folderFinding, 
 		return folderFinding{}, false
 	}
 	id, values := file_name_words.FolderAdvice(name, finding.Entry)
-	message := fmt.Sprintf("Folder name %q abbreviates %q. Spell it out as %s. %s", values["folder"], values["word"],
-		values["expansions"], folderReasoning)
+	// The message names what the word stands for, never the word twice (#13fpvdf): a folder named the word alone,
+	// docs/, abbreviates "documentation", and one holding other words, api-docs/, abbreviates it as "docs".
+	whole := strings.EqualFold(values["folder"], values["word"])
+	expansions := make([]string, len(finding.Entry.Expansions))
+	for index, expansion := range finding.Entry.Expansions {
+		expansions[index] = strconv.Quote(expansion)
+	}
+	opening := fmt.Sprintf("Folder name %q abbreviates %s", values["folder"], strings.Join(expansions, " or "))
+	if !whole {
+		opening += fmt.Sprintf(" as %q", values["word"])
+	}
+	if len(expansions) > 1 {
+		opening += ", whichever it means"
+	}
+	message := opening + ". " + folderReasoning
 	if id == file_name_words.AbbreviatedFolderNameAdvice {
 		// A folder named the word alone, vars/, would read `"vars" abbreviates "vars"`, so it says what the name is;
 		// one holding other words, env-vars/, still names which word asks for the advice (#xd2q11d).
-		opening := fmt.Sprintf("Folder name %q abbreviates %q.", values["folder"], values["word"])
-		if strings.EqualFold(values["folder"], values["word"]) {
+		opening = fmt.Sprintf("Folder name %q abbreviates %q.", values["folder"], values["word"])
+		if whole {
 			opening = fmt.Sprintf("Folder name %q is an abbreviation.", values["folder"])
 		}
 		message = fmt.Sprintf("%s %s %s", opening, values["advice"], folderReasoning)
 	}
 	return folderFinding{Directory: relative, MessageId: id, Message: message}, true
+}
+
+// keptFolders are the findings whose folder holds, at any depth the walk entered, a file the run covers: tracked, or
+// untracked and not ignored (#13fpvdf). A folder whose every file is ignored, as a docs/ left holding only Finder's
+// .DS_Store after git removed its tracked files at a rename, is no part of the project: no run checks a file in it,
+// git does not know it, and no reader meets it on a path or an import. Nor is a folder with no file at all. covered
+// is every directory the walk entered holding such a file itself, relative to the root.
+func keptFolders(findings []folderFinding, covered map[string]bool) []folderFinding {
+	kept := findings[:0:0]
+	for _, finding := range findings {
+		if covered[finding.Directory] {
+			kept = append(kept, finding)
+			continue
+		}
+		for directory := range covered {
+			if isBelow(directory, finding.Directory) {
+				kept = append(kept, finding)
+				break
+			}
+		}
+	}
+	return kept
 }
 
 // outermostFolders are the findings with every one below another left out, sorted by path, so each offending tree is
