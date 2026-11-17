@@ -73,10 +73,10 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 	return sorted, incomplete
 }
 
-// holdAliasHits trusts every hit whose entry is its own: one from the binary's table, keyed by everything it read,
-// and one the store holds under the package's own first key, which holds every key below it. A hit an alias led to is
-// trusted once its reads hold (see readsHold), checked below it first, each package after everything it imports; one
-// whose reads do not hold is a miss, which the second key may restore once the first wave has run.
+// holdAliasHits trusts every hit whose entry is its own: one from the system cache's table, keyed by everything it
+// read, and one the store holds under the package's own first key, which holds every key below it. A hit an alias led
+// to is trusted once its reads hold (see readsHold), checked below it first, each package after everything it imports;
+// one whose reads do not hold is a miss, which the second key may restore once the first wave has run.
 func (session *CacheSession) holdAliasHits(reachable []*packages.Package) {
 	session.trusted = map[*packages.Package]bool{}
 	session.byIdentifier = make(map[string]*packages.Package, len(reachable))
@@ -96,7 +96,8 @@ func (session *CacheSession) holdAliasHits(reachable []*packages.Package) {
 		if _, hit := session.hits[current]; !hit {
 			return
 		}
-		if key, keyed := session.keys[current]; session.fromBinary[current] || keyed && session.stored[current] == key {
+		if key, keyed := session.keys[current]; session.fromSystemCache[current] ||
+			keyed && session.stored[current] == key {
 			session.trusted[current] = true
 			return
 		}

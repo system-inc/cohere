@@ -25,8 +25,8 @@ func TestATableHitWrittenThroughNamesItsExportDataByDigest(test *testing.T) {
 		0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	builtIn := readingTable(table, engineTestsStamp)
-	cold := runEngineWith(test, root, builtIn, rules.All(), "--other-builds")
+	reading := generatedTableReading(test, table)
+	cold := runEngineWith(test, root, reading, rules.All(), "--other-builds")
 	for _, build := range extraBuildRecords(test, cold.stream) {
 		if build.WrittenThrough == 0 {
 			test.Fatalf("%s wrote nothing through, so it tells nothing", build.Target)
@@ -37,7 +37,7 @@ func TestATableHitWrittenThroughNamesItsExportDataByDigest(test *testing.T) {
 		0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	warm := runEngineWith(test, root, builtIn, rules.All(), "--other-builds")
+	warm := runEngineWith(test, root, reading, rules.All(), "--other-builds")
 	builds := extraBuildRecords(test, warm.stream)
 	if len(builds) == 0 {
 		test.Fatal("the run after the edit ran no extra build")

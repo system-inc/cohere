@@ -47,7 +47,20 @@ func TestMain(suite *testing.M) {
 	if os.Getenv(timingMarginChildVariable) != "" {
 		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
 	}
-	os.Exit(suite.Run())
+	// Every run in this process, and every child it starts, which inherits the variable, reads a system cache of
+	// this test binary's own rather than the developer's (#syscache). A test that gives a run a system cache of its
+	// own names it on the run (standardLibrarySource's systemCacheRoot), or sets the variable itself.
+	systemCache, temporaryDirectoryError := os.MkdirTemp("", "cohere-test-system-cache-")
+	if temporaryDirectoryError != nil {
+		os.Exit(refuse(os.Stderr, temporaryDirectoryError))
+	}
+	// Ignored: Setenv fails only for a name holding "=" or a NUL, and this one holds neither.
+	_ = os.Setenv("COHERE_SYSTEM_CACHE", systemCache)
+	code := suite.Run()
+	// Ignored: a temporary directory of this test binary's own, which costs only its space if it outlives the run,
+	// and the run's verdict is already decided.
+	_ = os.RemoveAll(systemCache)
+	os.Exit(code)
 }
 
 // childGenerator is testGenerator as a test binary TestMain runs as a generator rebuilds it from its environment, in
@@ -145,6 +158,21 @@ func localTable(test *testing.T) []byte {
 	return sharedTable.table
 }
 
+// generatedTableReading is a run's standard library read from a system cache of the test's own that holds table, one
+// the generator wrote under the engine tests' stamp, as the table of the build context a run over the fixture keys
+// its standard library by under that stamp, as a run under the process's environment finds it.
+func generatedTableReading(test *testing.T, table []byte) standardLibrarySource {
+	test.Helper()
+	engine, _, _ := runOverNoted(test, copyFixture(test, standardLibraryFixture), exitFindings, func(engine *pipeline) {
+		engine.request.standardLibrary = standardLibrarySource{stamp: engineTestsStamp}
+	}, "--no-fix", "--no-cache")
+	context, keyed := engine.session.StandardLibraryContext()
+	if !keyed {
+		test.Fatal("want the run to key the standard library")
+	}
+	return readingTable(test, table, context)
+}
+
 // A table the generator writes, as the release would, restores every standard-library package a run over the
 // fixture reaches, and the run's records are the plain run's: the table says it holds the local variant, with as many
 // packages as the run restores.
@@ -160,8 +188,8 @@ func TestAGeneratedTableIsReadByARun(test *testing.T) {
 	}
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache")
-	read := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-	if read.counts.FromBinary != variants[0].Packages {
+	read := runEngineWith(test, root, generatedTableReading(test, table), rules.All(), "--no-cache")
+	if read.counts.FromSystemCache != variants[0].Packages {
 		test.Fatalf("want all %d packages from the generated table, got %+v", variants[0].Packages, read.counts)
 	}
 	if read.withoutCounts != plain.withoutCounts {
@@ -196,9 +224,9 @@ func TestATableHitIsKeptForTheExtraBuilds(test *testing.T) {
 		test.Fatal(writeError)
 	}
 	computed := runCachedEngine(test, root, "--no-cache", "--other-builds")
-	fromTable := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache",
+	fromTable := runEngineWith(test, root, generatedTableReading(test, table), rules.All(), "--no-cache",
 		"--other-builds")
-	if fromTable.counts.FromBinary == 0 {
+	if fromTable.counts.FromSystemCache == 0 {
 		test.Fatalf("want the host to restore the standard library from the table, got %+v", fromTable.counts)
 	}
 	computedBuild, tableBuild := extraBuildRecords(test, computed.stream)[0], extraBuildRecords(test,
@@ -250,16 +278,19 @@ func TestAGeneratedVariantIsKeyedByItsCgo(test *testing.T) {
 	other := map[string]string{"1": "0", "0": "1"}[local]
 	table := generatedTable(test, localVariant(test, other))
 	packages := cache.NewStandardLibraryTable(table).Variants()[0].Packages
+	// The table is put in the system cache as the one of its own build context, `CGO_ENABLED` among it.
+	test.Setenv("CGO_ENABLED", other)
+	tableReading := generatedTableReading(test, table)
 	for _, reading := range []struct {
-		cgoEnabled string
-		fromBinary int
-	}{{cgoEnabled: other, fromBinary: packages}, {cgoEnabled: local}} {
+		cgoEnabled      string
+		fromSystemCache int
+	}{{cgoEnabled: other, fromSystemCache: packages}, {cgoEnabled: local}} {
 		test.Setenv("CGO_ENABLED", reading.cgoEnabled)
 		root := copyFixture(test, standardLibraryFixture)
-		read := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-		if read.counts.FromBinary != reading.fromBinary {
+		read := runEngineWith(test, root, tableReading, rules.All(), "--no-cache")
+		if read.counts.FromSystemCache != reading.fromSystemCache {
 			test.Errorf("CGO_ENABLED=%s: want %d from the table of cgo %s, got %+v", reading.cgoEnabled,
-				reading.fromBinary, other, read.counts)
+				reading.fromSystemCache, other, read.counts)
 		}
 	}
 }

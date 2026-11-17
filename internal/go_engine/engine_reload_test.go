@@ -44,7 +44,7 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 
 	root := copyFixture(test, filepath.Join("testdata", "reload-answer"))
 	inPart := map[string]bool{"example.com/reloadanswer/bottom": true, "example.com/reloadanswer/side": true}
-	cold := runEngineAnsweringInPart(test, root, embeddedStandardLibrary, rules.All(), inPart)
+	cold := runEngineAnsweringInPart(test, root, standardLibrarySource{}, rules.All(), inPart)
 	if cold.counts.Reloads != 0 || cold.counts.Written == 0 {
 		test.Fatalf("want a cold run that wrote its entries and reloaded nothing, got %+v", cold.counts)
 	}

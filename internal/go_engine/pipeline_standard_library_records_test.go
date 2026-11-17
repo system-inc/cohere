@@ -18,12 +18,21 @@ import (
 // has a file only windows builds, so a run under `--other-builds` judges a windows build.
 var standardLibraryRecordsFixture = filepath.Join("testdata", "std-records")
 
-// readingTableAs is the binary's entries as a run reads table under stamp, its standard library's dependence records
-// keyed by toolchain in place of go env's when it is not empty.
-func readingTableAs(table []byte, stamp string, toolchain string) func(*pipeline) {
+// readingTableAs is a run reading table from a system cache of the test's own as the table of context (readingTable),
+// its standard library's dependence records keyed by toolchain in place of go env's when it is not empty.
+func readingTableAs(
+	test *testing.T,
+	table []byte,
+	context cache.StandardLibraryContext,
+	toolchain string,
+) func(*pipeline) {
+	test.Helper()
+	reading := readingTable(test, table, context)
+	reading.toolchain = toolchain
 	return func(engine *pipeline) {
-		engine.request.standardLibrary = builtInStandardLibrary{table: cache.NewStandardLibraryTable(table),
-			stamp: stamp, toolchain: toolchain}
+		engine.request.standardLibrary = reading
+		// The pipeline found its system cache before this ran, from the request it was made with.
+		engine.systemCache = openSystemCache(engine.request)
 	}
 }
 
@@ -73,9 +82,9 @@ func restoredOf(test *testing.T, stream string) contract.RestoredDependence {
 func TestTheStandardLibrarysRecordsComeFromTheStore(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	table, _, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	reading := readingTableAs(test, table, context, "")
 	cold, coldStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	warm, warmStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	coldCounts, warmCounts := recordCounts(test, coldStream), recordCounts(test, warmStream)
@@ -100,11 +109,11 @@ func TestTheStandardLibrarysRecordsComeFromTheStore(test *testing.T) {
 func TestAStandardLibraryRecordOfAnotherToolchainIsNeverRead(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	table, _, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
-	_, firstStream, _ := runOverNoted(test, root, exitClean, readingTableAs(table, engineTestsStamp, "go1.0 /one"),
+	_, firstStream, _ := runOverNoted(test, root, exitClean, readingTableAs(test, table, context, "go1.0 /one"),
 		recordsSwitches...)
-	_, otherStream, _ := runOverNoted(test, root, exitClean, readingTableAs(table, engineTestsStamp, "go1.0 /two"),
+	_, otherStream, _ := runOverNoted(test, root, exitClean, readingTableAs(test, table, context, "go1.0 /two"),
 		recordsSwitches...)
 	written := recordCounts(test, firstStream).StandardLibraryWritten
 	other, otherRestored := recordCounts(test, otherStream), restoredOf(test, otherStream)
@@ -119,9 +128,9 @@ func TestAStandardLibraryRecordOfAnotherToolchainIsNeverRead(test *testing.T) {
 func TestANoCacheRunSideLoadsTheStandardLibrary(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	table, _, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	reading := readingTableAs(test, table, context, "")
 	runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	_, stream, _ := runOverNoted(test, root, exitClean, reading, append(recordsSwitches, "--no-cache")...)
 	if restored := restoredOf(test, stream); restored.StandardLibrarySideLoaded == 0 ||
@@ -137,15 +146,16 @@ func TestANoCacheRunSideLoadsTheStandardLibrary(test *testing.T) {
 // #6a3kjvz piece 3): in a copy of the local Go installation, a run under `--build-dependence` writes the standard
 // library's records, and once unicode/utf8's utf8.go gains a declaration, a run reading the store judges every unit of
 // both graphs, in every build, as a run under `--no-cache` does, which side-loads every package it restored. utf8 and
-// its importers miss the binary's table, whose keys hold each file's bytes, and so does each record keyed from one.
+// its importers miss the system cache's table, whose keys hold each file's bytes, and so does each record keyed from
+// one.
 //
 // Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
 func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	table, _, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	mirror := mirroredGoRoot(test, goEnvironmentIn(test, root, nil)["GOROOT"], "src/unicode/utf8/utf8.go", "")
 	test.Setenv("GOROOT", mirror)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	reading := readingTableAs(test, table, context, "")
 	_, coldStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	if written := recordCounts(test, coldStream).StandardLibraryWritten; written == 0 {
 		test.Fatal("the cold run wrote no standard-library record")
@@ -233,8 +243,8 @@ func expectSameCensus(test *testing.T, want string, got string) map[string]contr
 func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	table, _, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	reading := readingTableAs(test, table, context, "")
 	sideRoot := copyFixture(test, standardLibraryRecordsFixture)
 	sideLoaded, sideStream, _ := runOverNoted(test, sideRoot, exitClean, reading, recordsSwitches...)
 	if restored := restoredOf(test, sideStream); restored.StandardLibrarySideLoaded == 0 {

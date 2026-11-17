@@ -110,6 +110,9 @@ func TestParseInvocationReads(test *testing.T) {
 		// The front door forwards it for a cache the engine will keep of its own, so it is read, never refused.
 		{"no-cache", append(slices.Clone(contractArguments), "--no-cache", "--no-fix"), modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, nil},
+		// The system cache's switch is read as the project store's is (#syscache).
+		{"no-system-cache", append(slices.Clone(contractArguments), "--no-system-cache", "--no-fix"), modeCheck,
+			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, nil},
 		{"values after an equals sign", []string{"--contract=3", "--root=/project", "/project/a"}, modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, []string{"/project/a"}},
 		{"a path after -- that looks like a flag", append(slices.Clone(contractArguments), "--", "/project/--fix"),

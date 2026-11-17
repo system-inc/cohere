@@ -108,9 +108,9 @@ type cacheEntry struct {
 //
 // ExportData is the sha256 of the package's export data, which the store keeps under exportDataKey of it, nil for a
 // package that carries none (carriesExportData) and for an entry encoded without it, which only a run's memory holds
-// (lazyExportData). It is the record's, not the body's, so a body kept without it, as the binary's table keeps one, is
-// still the one an entry written through names (#5s1x2hg): one cold run at cohere's root wrote 562 MB of export data
-// through, 98 MB of it distinct.
+// (lazyExportData). It is the record's, not the body's, so a body kept without it, as the system cache's table keeps
+// one, is still the one an entry written through names (#5s1x2hg): one cold run at cohere's root wrote 562 MB of export
+// data through, 98 MB of it distinct.
 type entryRecord struct {
 	Version         string
 	Body            []byte
@@ -567,8 +567,8 @@ func entryOf(body []byte, record entryRecord) (cacheEntry, error) {
 	return entry, nil
 }
 
-// restoredOf is an entry gob has decoded, read whole as decodeEntry reads it: the binary's table holds its entries in
-// a form of its own (see standardLibraryEntry), which is read through here too.
+// restoredOf is an entry gob has decoded, read whole as decodeEntry reads it: the system cache's table holds its
+// entries in a form of its own (see standardLibraryEntry), which is read through here too.
 func restoredOf(
 	known *cacheAnalyzers,
 	restoring *packages.Package,

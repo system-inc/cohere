@@ -153,6 +153,13 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.write(finding)
 	}
 
+	// Every build has read its table of the system cache by now, so a trim takes none from under a build of this run.
+	// A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it did not keep.
+	systemCacheNotKept := ""
+	if engine.timing == nil {
+		engine.systemCache.trim()
+		systemCacheNotKept = engine.systemCache.notKeptReason()
+	}
 	record := engine.lintCoverage(result, findings, pass.turnedOff, notConfigured(pass.enabled))
 	if verdict != nil {
 		// Written above as compiler findings, so the record counts every finding record of the phase (#rw6tg3a).
@@ -162,20 +169,25 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	record.WithheldAsGenerated = result.WithheldAsGenerated
 	record.WithheldAsCopied = result.WithheldAsCopied
 	record.Cache = contract.LintCache{
-		On:           result.Cache.On,
-		Hit:          result.Cache.Hit,
-		FromBinary:   result.Cache.FromBinary,
-		Missed:       result.Cache.Missed,
-		Written:      result.Cache.Written,
-		Unstorable:   result.Cache.Unstorable,
-		FactsDropped: result.Cache.FactsDropped,
-		FactsSkipped: result.Cache.FactsSkipped,
-		Waves:        result.Cache.Waves,
-		Reloads:      result.Cache.Reloads,
-		ReloadRounds: result.Cache.ReloadRounds,
-		Replays:      result.Replays,
-		Problems:     len(result.Cache.Problems),
-		WriteFailed:  result.Cache.WriteFailed,
+		On:              result.Cache.On,
+		Hit:             result.Cache.Hit,
+		FromSystemCache: result.Cache.FromSystemCache,
+		Missed:          result.Cache.Missed,
+		Written:         result.Cache.Written,
+		Unstorable:      result.Cache.Unstorable,
+		FactsDropped:    result.Cache.FactsDropped,
+		FactsSkipped:    result.Cache.FactsSkipped,
+		Waves:           result.Cache.Waves,
+		Reloads:         result.Cache.Reloads,
+		ReloadRounds:    result.Cache.ReloadRounds,
+		Replays:         result.Replays,
+		Problems:        len(result.Cache.Problems),
+		WriteFailed:     result.Cache.WriteFailed,
+
+		SystemCacheNotKept: systemCacheNotKept,
+	}
+	if record.Cache.SystemCacheNotKept != "" {
+		engine.note("the system cache was not kept: %s", record.Cache.SystemCacheNotKept)
 	}
 	if counted := result.Cache.DependenceRecords; counted != nil {
 		record.Cache.DependenceRecords = &contract.DependenceRecords{Read: counted.Read, Written: counted.Written,
@@ -208,6 +220,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 			if run.result != nil {
 				record.Cache.Problems += len(run.result.Cache.Problems)
 				record.Cache.WriteFailed += run.result.Cache.WriteFailed
+				record.Cache.FromSystemCache += run.result.Cache.FromSystemCache
 			}
 		}
 		record.BuildsAtOnce = engine.buildsAtOnce
@@ -385,7 +398,7 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // cacheSession is the findings cache for the run's enabled rules over a load under environment, whose go env answer
 // is goEnvironment, the one the load reads (lintCache), made before the load so the load restores what it holds, whose
 // keys read files' digests rather than hashing those files again, and nil when lintCache gives none, as under
-// `--no-cache` in a binary with no standard-library entries, or when what every key shares cannot be read, which the
+// `--no-cache` in a run that keeps no system cache, or when what every key shares cannot be read, which the
 // run says on stderr, and always under `--timing`. A run with extra builds gets a
 // session without a store when lintCache gives none, since the host's keeps its packages' entries for the extra
 // builds and theirs restore from them (#b2t9xmf); under `--timing` it gets none, so nothing is restored from the host.
@@ -399,13 +412,13 @@ func (engine *pipeline) cacheSession(
 ) *check.CacheSession {
 	// A run under `--timing` is a measurement, and a package the cache restores, its load's or its rules', runs
 	// nothing, so a table over it would read as measured where it is not. Such a run reads and writes no cache at all,
-	// the binary's standard-library entries included (#3apgjer).
+	// the system cache's standard-library entries included (#3apgjer).
 	if engine.timing != nil {
 		return nil
 	}
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
-		enabled, engine.described.children)
+		enabled, engine.described.children, engine.systemCache)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}

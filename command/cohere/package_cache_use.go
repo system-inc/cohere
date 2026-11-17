@@ -7,8 +7,11 @@ import "fmt"
 // analyzed from source, of which written got an entry and unstorable held a fact no entry can hold; the facts the
 // written entries left out, since nothing outside their package can name their object; the restored facts
 // skipped, whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at
-// most two. FromBinary is the standard-library packages restored from the entries a release binary carries, apart
-// from hit, which `--no-cache` reads too, since they are part of cohere; it is absent when 0. Reloads is the packages
+// most two. FromSystemCache is the standard-library packages restored from the Go engine's system cache, its tables
+// in the user's cache directory, every build's summed, apart from hit, which `--no-cache` reads too, since they are
+// of cohere and the Go installation and nothing of the project; it is absent when 0. SystemCacheNotKept is why the
+// run kept no system cache though it was on, or could not keep it as it should, in one line, absent when there is
+// none (#syscache). Reloads is the packages
 // the run loaded again from source, though the cache held them, to answer a question of a fact computed on demand
 // that no store answered (#w7zmvat wave 3), and ReloadRounds the loads and lints again that took, and Replays the
 // questions of such a fact answered by replaying the push's walk of a package, which a cold run makes too, each absent
@@ -18,35 +21,36 @@ import "fmt"
 // On is false under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as
 // it was.
 type packageCacheUse struct {
-	On           bool `json:"on"`
-	Hit          int  `json:"hit"`
-	FromBinary   int  `json:"standardLibraryFromBinary,omitempty"`
-	Missed       int  `json:"missed"`
-	Written      int  `json:"written"`
-	Unstorable   int  `json:"unstorable"`
-	FactsDropped int  `json:"factsDropped"`
-	FactsSkipped int  `json:"factsSkipped"`
-	Waves        int  `json:"waves"`
-	Reloads      int  `json:"reloads,omitempty"`
-	ReloadRounds int  `json:"reloadRounds,omitempty"`
-	Replays      int  `json:"replays,omitempty"`
-	Problems     int  `json:"problems,omitempty"`
-	WriteFailed  int  `json:"writeFailed,omitempty"`
+	On                 bool   `json:"on"`
+	Hit                int    `json:"hit"`
+	FromSystemCache    int    `json:"standardLibraryFromSystemCache,omitempty"`
+	SystemCacheNotKept string `json:"systemCacheNotKept,omitempty"`
+	Missed             int    `json:"missed"`
+	Written            int    `json:"written"`
+	Unstorable         int    `json:"unstorable"`
+	FactsDropped       int    `json:"factsDropped"`
+	FactsSkipped       int    `json:"factsSkipped"`
+	Waves              int    `json:"waves"`
+	Reloads            int    `json:"reloads,omitempty"`
+	ReloadRounds       int    `json:"reloadRounds,omitempty"`
+	Replays            int    `json:"replays,omitempty"`
+	Problems           int    `json:"problems,omitempty"`
+	WriteFailed        int    `json:"writeFailed,omitempty"`
 }
 
 // line is the cache's clause of the --verbose account, after "lint: ": the three counts every run has, and the ones
 // that are usually zero only when they are not, so the line stays short where nothing went wrong. The standard
-// library's packages from the binary are said whether the store was on or not.
+// library's packages from the system cache are said whether the store was on or not.
 func (cache packageCacheUse) line() string {
 	if !cache.On {
 		line := "package cache off"
-		if cache.FromBinary > 0 {
+		if cache.FromSystemCache > 0 {
 			line += ", " + cache.segment()
 		}
 		return line + cache.reloads()
 	}
 	line := fmt.Sprintf("package cache hit %d, missed %d, wrote %d", cache.Hit, cache.Missed, cache.Written)
-	if cache.FromBinary > 0 {
+	if cache.FromSystemCache > 0 {
 		line += ", " + cache.segment()
 	}
 	if cache.Unstorable > 0 {
@@ -77,10 +81,10 @@ func (cache packageCacheUse) reloads() string {
 	return clause
 }
 
-// segment is the standard library's packages restored from the binary, as the footer and the account say them, so a
-// cold run that reused them reads as such.
+// segment is the standard library's packages restored from the system cache, as the footer and the account say them,
+// so a cold run that reused them reads as such.
 func (cache packageCacheUse) segment() string {
-	return "standard library: " + grouped(cache.FromBinary) + " from the binary"
+	return "standard library: " + grouped(cache.FromSystemCache) + " from the system cache"
 }
 
 // problemsSegment is what kept the cache from being read or written, as the footer and the account say it, so a run

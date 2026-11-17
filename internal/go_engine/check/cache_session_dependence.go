@@ -56,7 +56,7 @@ func DependenceRecordKey(key cache.Key) cache.Key {
 // DroppedAfterBackfill counts the hits dropShortHits made misses in a load that backfilled any, which asks the facts
 // of everything below a backfilled package: a backfill that cascaded would show here.
 //
-// The standard library's counts are of the packages the host restored from the binary's table, whose records the
+// The standard library's counts are of the packages the host restored from the system cache's table, whose records the
 // store keeps apart (cache_session_standard_library_records.go): read and unreadable over the last load, and written
 // once the side load has ended, whose failed writes the run counts with the entries' (WriteStandardLibraryRecords).
 type DependenceRecordCounts struct {
@@ -85,7 +85,7 @@ type dependenceRecords struct {
 	counts       DependenceRecordCounts
 
 	// standardLibrary are the records the store holds of the standard-library packages the load restored from the
-	// binary's table, decoded (readStandardLibraryRecords).
+	// system cache's table, decoded (readStandardLibraryRecords).
 	standardLibrary map[*packages.Package]*build_dependence.Record
 }
 
@@ -124,7 +124,7 @@ func (session *CacheSession) DependenceRecord(keyed *packages.Package) (*build_d
 // none (backfill) and counts each hit by an alias that has none. A hit by an alias looks up its record beside the
 // entry the alias leads to (recordKeyOf). A record that does not decode is a problem, said,
 // and its package has none: a hit by its first key is backfilled, so its record is written again over the one that
-// did not decode, and a miss's is written from its syntax. A hit from the binary's table is never the store's to
+// did not decode, and a miss's is written from its syntax. A hit from the system cache's table is never the store's to
 // backfill.
 func (session *CacheSession) readDependenceRecords(reachable []*packages.Package) {
 	records := session.dependence
@@ -166,7 +166,7 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	for _, each := range keyed {
 		_, hit := session.hits[each]
 		_, isFound := records.found[each]
-		if !hit || isFound || session.fromBinary[each] {
+		if !hit || isFound || session.fromSystemCache[each] {
 			continue
 		}
 		if session.stored[each] != session.keys[each] {
@@ -182,11 +182,11 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 
 // recordKeyOf is the key keyed's record is kept beside, and whether it is an alias's target: a hit by an alias that
 // holdAliasHits kept, whose entry is under the key the alias leads to (session.stored), finds its record beside that
-// entry, and every other package beside its own first key. A hit from the binary's table has no record in the store
-// under either.
+// entry, and every other package beside its own first key. A hit from the system cache's table has no record in the
+// store under either.
 func (session *CacheSession) recordKeyOf(keyed *packages.Package) (cache.Key, bool) {
 	stored, isStored := session.stored[keyed]
-	if session.restored(keyed) && isStored && !session.fromBinary[keyed] && stored != session.keys[keyed] {
+	if session.restored(keyed) && isStored && !session.fromSystemCache[keyed] && stored != session.keys[keyed] {
 		return stored, true
 	}
 	return session.keys[keyed], false

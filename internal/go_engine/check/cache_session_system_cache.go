@@ -15,29 +15,29 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
-// binaryHit is what the host's session holds of one package it restored from the binary's table, for its extra builds
-// to restore from (keepBinaryHit): the table's entry decoded, its export data renamed to the run's `GOROOT`, and its
-// persisted reads as the table holds them, nil for none.
-type binaryHit struct {
+// tableHit is what the host's session holds of one package it restored from the system cache's table, for its extra
+// builds to restore from (keepTableHit): the table's entry decoded, its export data renamed to the run's `GOROOT`, and
+// its persisted reads as the table holds them, nil for none.
+type tableHit struct {
 	entry      standardLibraryEntry
 	exportData []byte
 	reads      []byte
 }
 
-// restoreFromBinary keys every standard-library package among reachable (see cache.StandardLibraryKeys), reading the
-// digest of each file hashed holds rather than hashing it again, and makes a hit of each one the binary's table holds
-// an entry for that decodes whole, its Withheld and export data renamed from goRootMarker to the run's own `GOROOT`.
-// The renames are done here, before the load, so a package whose export data does not rename is a miss, analyzed as
-// any other, rather than a hit whose types the load checks from source. Export data is shallow, so each package's is
-// read against the table's entries of the packages it imports, which are read first, one package at a time, from every
-// package keyed that the table holds an entry of, held or not (renameBinaryExportData); the rest of each restore runs
-// as many at once as there are cores. A package
-// Analyze was given is never restored from the table, which holds no findings, and neither is one with a list error,
-// nor one the run reloads to answer a question (see Reload). A
-// table that does not parse, or keys that cannot be computed, are a problem, and every standard-library package is
-// then computed. The host's session of a run with extra builds holds what it restored of each, which it keeps for the
-// builds as it keeps a package it checked (keepBinaryHit, #pcv6eff).
-func (session *CacheSession) restoreFromBinary(
+// restoreFromSystemCache keys every standard-library package among reachable (see cache.StandardLibraryKeys), reading
+// the digest of each file hashed holds rather than hashing it again, reads the system cache's table of the build's
+// context (readSystemCacheTable), and makes a hit of each package it holds an entry for that decodes whole, its
+// Withheld and export data renamed from goRootMarker to the run's own `GOROOT`. The renames are done here, before the
+// load, so a package whose export data does not rename is a miss, analyzed as any other, rather than a hit whose types
+// the load checks from source. Export data is shallow, so each package's is read against the table's entries of the
+// packages it imports, which are read first, one package at a time, from every package keyed that the table holds an
+// entry of, held or not (renameTableExportData); the rest of each restore runs as many at once as there are cores. A
+// package Analyze was given is never restored from the table, which holds no findings, and neither is one with a list
+// error, nor one the run reloads to answer a question (see Reload). A table that is damaged or does not parse, or keys
+// that cannot be computed, are a problem, and every standard-library package is then computed. The host's session of
+// a run with extra builds holds what it restored of each, which it keeps for the builds as it keeps a package it
+// checked (keepTableHit, #pcv6eff).
+func (session *CacheSession) restoreFromSystemCache(
 	loader string,
 	reachable []*packages.Package,
 	hashed cache.FileDigests,
@@ -55,7 +55,9 @@ func (session *CacheSession) restoreFromBinary(
 		return
 	}
 	session.standardLibraryKeys = keys
-	if standardLibrary.Table == nil {
+	session.standardLibraryContext = &shared
+	table := session.readSystemCacheTable(shared)
+	if table == nil {
 		return
 	}
 	held := map[*packages.Package]cache.StandardLibraryEntry{}
@@ -63,21 +65,21 @@ func (session *CacheSession) restoreFromBinary(
 		if session.given[keyed] || len(keyed.Errors) > 0 || session.reloading(keyed) {
 			continue
 		}
-		if entry, found := standardLibrary.Table.Lookup(key); found {
+		if entry, found := table.Lookup(key); found {
 			held[keyed] = entry
 		}
 	}
-	if tableProblem := standardLibrary.Table.Problem(); tableProblem != nil {
-		session.problem(tableProblem.Error())
+	if tableProblem := table.Problem(); tableProblem != nil {
+		session.problem(fmt.Sprintf("the system cache's table of the standard library: %v", tableProblem))
 		return
 	}
 	rename := renameFromGoRootMarker(shared.Goroot)
-	renamed := renameBinaryExportData(keys, standardLibrary.Table, held, rename)
+	renamed := renameTableExportData(keys, table, held, rename)
 	var hitsLock sync.Mutex
 	restorings := slices.Collect(maps.Keys(held))
 	session.fanOut(len(restorings), func(index int) {
 		restoring := restorings[index]
-		restored, hit, restoreError := restoreBinaryEntry(session.known, restoring, held[restoring],
+		restored, hit, restoreError := restoreTableEntry(session.known, restoring, held[restoring],
 			renamed[restoring], rename)
 		if restoreError != nil {
 			return
@@ -85,26 +87,64 @@ func (session *CacheSession) restoreFromBinary(
 		hitsLock.Lock()
 		defer hitsLock.Unlock()
 		session.hits[restoring] = restored
-		session.fromBinary[restoring] = true
+		session.fromSystemCache[restoring] = true
 		if session.keepsForBuilds {
-			session.binaryHits[restoring] = hit
+			session.tableHits[restoring] = hit
 		}
 	})
 }
 
-// renamedExportData is a package's export data from the binary's table renamed (renameBinaryExportData), nil for
+// readSystemCacheTable is the system cache's table of the build's context, shared with its fact analyzers named,
+// unparsed, and nil when there is none: a run with no system cache, or one that holds no table of this context, which
+// is no problem, since every standard-library package is then computed. A table found damaged, cut short or written
+// over, which the store reads as a miss and removes, is a problem the run says, and is computed again. A table found
+// is marked used, so a trim keeps it (cache.TrimSystemCache).
+func (session *CacheSession) readSystemCacheTable(shared cache.StandardLibraryContext) *cache.StandardLibraryTable {
+	system := session.caching.StandardLibrary.System
+	if system == nil {
+		return nil
+	}
+	key := cache.StandardLibraryTableKey(shared)
+	// Asked before the read, since a read that finds the file damaged removes it: a file there that does not read
+	// whole is damage, where no file is a table never written. By the time Get misses, it has removed the damaged
+	// file already, so the next run finds no table and computes the standard library as this one does. A table a trim
+	// removed between the two reads as damaged once, which says more than it must and changes no finding.
+	held := system.Holds(key)
+	contents, found := system.Get(key)
+	if !found {
+		if held {
+			session.problem(fmt.Sprintf("the system cache's table of the standard library under %s was damaged, so "+
+				"the standard library is computed", key))
+		}
+		return nil
+	}
+	system.MarkUsed(key)
+	return cache.NewStandardLibraryTable(contents)
+}
+
+// StandardLibraryContext is what every standard-library key of the last Restore shared, its fact analyzers named, by
+// which the system cache's table of the build's context is keyed (cache.StandardLibraryTableKey), and false before a
+// Restore keyed the standard library or when it could not.
+func (session *CacheSession) StandardLibraryContext() (cache.StandardLibraryContext, bool) {
+	if session.standardLibraryContext == nil {
+		return cache.StandardLibraryContext{}, false
+	}
+	return *session.standardLibraryContext, true
+}
+
+// renamedExportData is a package's export data from the system cache's table renamed (renameTableExportData), nil for
 // unsafe, which has none, or why it did not rename.
 type renamedExportData struct {
 	exportData  []byte
 	renameError error
 }
 
-// renameBinaryExportData is the export data of each of held, the packages restoreFromBinary restores from table,
+// renameTableExportData is the export data of each of held, the packages restoreFromSystemCache restores from table,
 // renamed by rename. Each is read shallow against the table's entries of every package it imports, read first, among
 // every package keyed whose key the table holds an entry under, so a package held or not, as one Analyze was given,
 // still lends its types to the packages that import it. One that the table does not hold, or whose export data does
 // not read, is a rename error of every held package that reaches it.
-func renameBinaryExportData(
+func renameTableExportData(
 	keys map[*packages.Package]cache.Key,
 	table *cache.StandardLibraryTable,
 	held map[*packages.Package]cache.StandardLibraryEntry,
@@ -141,59 +181,59 @@ func renameBinaryExportData(
 	return renamed
 }
 
-// restoreBinaryEntry is one standard-library package's entry from the binary's table decoded whole, with its export
-// data as renameBinaryExportData renamed it and every file its Withheld names renamed by rename, and what the host
-// keeps of it for its extra builds, or an error, which is a miss, as is an entry of another package than restoring and
-// one whose export data did not rename.
-func restoreBinaryEntry(
+// restoreTableEntry is one standard-library package's entry from the system cache's table decoded whole, with its
+// export data as renameTableExportData renamed it and every file its Withheld names renamed by rename, and what the
+// host keeps of it for its extra builds, or an error, which is a miss, as is an entry of another package than restoring
+// and one whose export data did not rename.
+func restoreTableEntry(
 	known *cacheAnalyzers,
 	restoring *packages.Package,
 	entry cache.StandardLibraryEntry,
 	renamed renamedExportData,
 	rename func(string) (string, error),
-) (*restoredPackage, binaryHit, error) {
+) (*restoredPackage, tableHit, error) {
 	if renamed.renameError != nil {
-		return nil, binaryHit{}, renamed.renameError
+		return nil, tableHit{}, renamed.renameError
 	}
 	tableEntry, decodeError := decodeStandardLibraryEntry(entry.Entry)
 	if decodeError != nil {
-		return nil, binaryHit{}, decodeError
+		return nil, tableHit{}, decodeError
 	}
 	if tableEntry.PackagePath != restoring.PkgPath {
-		return nil, binaryHit{}, fmt.Errorf("the binary's table holds %s under the key of %s", tableEntry.PackagePath,
-			restoring.PkgPath)
+		return nil, tableHit{}, fmt.Errorf("the system cache's table holds %s under the key of %s",
+			tableEntry.PackagePath, restoring.PkgPath)
 	}
 	readExportData := func() ([]byte, error) {
 		if renamed.exportData == nil {
-			return nil, fmt.Errorf("the binary's table holds no export data for %s", restoring.ID)
+			return nil, fmt.Errorf("the system cache's table holds no export data for %s", restoring.ID)
 		}
 		return renamed.exportData, nil
 	}
 	restored, restoreError := restoredOf(known, restoring, cacheEntryOf(tableEntry), readExportData)
 	if restoreError != nil {
-		return nil, binaryHit{}, restoreError
+		return nil, tableHit{}, restoreError
 	}
 	withheld, renameError := renameWithheldFiles(restored.types.Withheld, rename)
 	if renameError != nil {
-		return nil, binaryHit{}, renameError
+		return nil, tableHit{}, renameError
 	}
 	restored.types.Withheld = withheld
 	tableEntry.Withheld = withheld
-	return restored, binaryHit{entry: tableEntry, exportData: renamed.exportData, reads: entry.Reads}, nil
+	return restored, tableHit{entry: tableEntry, exportData: renamed.exportData, reads: entry.Reads}, nil
 }
 
-// keepBinaryHit is what the host's run keeps for its extra builds of kept, a package it restored from the binary's
+// keepTableHit is what the host's run keeps for its extra builds of kept, a package it restored from the system cache's
 // table as hit, whose portable digest is portable: the table's entry as the store would hold it, its export data, and
 // its reads as the table persisted them, read by the analyzers' fact types (heldReadsOf), so a build judges it as it
 // judges a package the host checked (#pcv6eff). A package the table persisted no reads of is kept with none, and a
 // build declines it as unpersisted.
-func (session *CacheSession) keepBinaryHit(kept *packages.Package, hit binaryHit, portable cache.Key) (*hostEntry,
+func (session *CacheSession) keepTableHit(kept *packages.Package, hit tableHit, portable cache.Key) (*hostEntry,
 	error,
 ) {
 	whole := cacheEntryOf(hit.entry)
 	body, encodeError := encodeBody(whole)
 	if encodeError != nil {
-		return nil, fmt.Errorf("keeping %s, restored from the binary's table: %w", kept.ID, encodeError)
+		return nil, fmt.Errorf("keeping %s, restored from the system cache's table: %w", kept.ID, encodeError)
 	}
 	// The table names no export data by digest: a build writing the package through names what it read.
 	record := entryRecord{Version: whole.Version, Body: contentDigest(body), Reads: whole.Reads,
@@ -206,7 +246,7 @@ func (session *CacheSession) keepBinaryHit(kept *packages.Package, hit binaryHit
 		contents: func() ([]byte, entryRecord, func() ([]byte, error), error) {
 			return body, record, func() ([]byte, error) {
 				if hit.exportData == nil {
-					return nil, fmt.Errorf("the binary's table holds no export data for %s", kept.ID)
+					return nil, fmt.Errorf("the system cache's table holds no export data for %s", kept.ID)
 				}
 				return hit.exportData, nil
 			}, nil

@@ -14,43 +14,41 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
-	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 )
 
-// builtInStandardLibrary is the standard library's entries a run may read from the binary: the table, and the release
-// stamp it was written under, empty in a build that is no release. collected, when it is not nil, gains the
-// standard-library entries a cached run saves (see check.StandardLibraryCaching), for a test, or the release, to write
-// a table from.
-type builtInStandardLibrary struct {
-	table     *cache.StandardLibraryTable
+// standardLibrarySource is where a run's standard-library entries come from and go, the zero value a plain run's:
+// the system cache, its tables keyed by the executable's identity (see systemCache). stamp, when not empty, stands for
+// that identity in every standard-library key, as the release's generator keys the table it builds before the
+// executable it ships in exists. collected, when it is not nil, gains the standard-library entries a cached run saves
+// (see check.StandardLibraryCaching), for a test, or the release, to write a table from.
+type standardLibrarySource struct {
 	stamp     string
 	collected map[cache.Key]check.StandardLibraryRunEntry
 
 	// toolchain, when not empty, stands for go env's toolchain in the standard library's dependence records' keys,
 	// for a test that fakes a toolchain the records were written under (#6a3kjvz); every run leaves it empty.
 	toolchain string
-}
 
-// embeddedStandardLibrary is the binary's own, parsed on its first lookup.
-var embeddedStandardLibrary = builtInStandardLibrary{
-	table: cache.NewStandardLibraryTable(standard_library_table.Contents),
-	stamp: standard_library_table.ReleaseStamp,
+	// systemCacheRoot, when not empty, is the system cache's root in place of cache.SystemCacheRoot's, for a test that
+	// gives a run a system cache of its own beside others running in parallel; every run leaves it empty.
+	systemCacheRoot string
 }
 
 // lintCache is the per-package findings cache the lint phase reads and writes, at the root's `.cache/cohere/go`,
-// beside the front door's own cache in `.cache/cohere`, with the standard library's entries the binary carries when
-// it carries any under a release stamp. An empty stamp reads no table at all, so a build that is no release computes
-// the standard library as it always has. Under `--no-cache` it reads and writes no store: it is nil, or, when the
-// binary carries a table, a Caching with that table alone, since the standard library's entries are part of cohere
-// itself and nothing of the project's tree. A run judging each build's dependence reads them as any other run does: the
-// standard library it restores is judged on a graph of its own (buildDependenceGraph, #ss4t5g6). It is nil with an
-// error when what every key shares cannot be read, which
-// the run says on stderr and runs without it. environment is what the load the cache serves runs under, the
-// workspace's own for the host's build and with an extra build's target after it for that build, and goEnvironment
-// is go env's answer the load reads there, so the build context every key shares is the one of the build the load is
-// of, read from the go env the load asked rather than from one of its own (#4rpt1jh). goEnvironment is nil only for a
-// host whose census judged no file, which asked go env nothing; then it is read here, recorded in children, the run's
-// account of the go commands it starts (see load.Children).
+// beside the front door's own cache in `.cache/cohere`, with the standard library's table of the build's context read
+// from the system cache, system, when the run keeps one (#syscache). Under `--no-cache` it reads and writes no store:
+// it is nil, or, when the run keeps a system cache, a Caching with the system cache alone, since the standard
+// library's entries are of cohere and the Go installation and nothing of the project's tree. Under
+// `--no-system-cache` the standard library is keyed and stored as any other package, as it is when the run keeps no
+// system cache. A run judging each build's dependence reads the system cache as any other run does: the standard
+// library it restores is judged on a graph of its own (buildDependenceGraph, #ss4t5g6). It is nil with an error when
+// what every key shares cannot be read, which the run says on stderr and runs without it. environment is what the
+// load the cache serves runs under, the workspace's own for the host's build and with an extra build's target after
+// it for that build, and goEnvironment is go env's answer the load reads there, so the build context every key shares
+// is the one of the build the load is of, read from the go env the load asked rather than from one of its own
+// (#4rpt1jh), and so each build reads its own context's table. goEnvironment is nil only for a host whose census
+// judged no file, which asked go env nothing; then it is read here, recorded in children, the run's account of the go
+// commands it starts (see load.Children).
 func lintCache(
 	request invocation,
 	workspace project.Workspace,
@@ -58,12 +56,13 @@ func lintCache(
 	goEnvironment *load.GoEnvironment,
 	enabled []rule.Rule,
 	children *load.Children,
+	system *systemCache,
 ) (*check.Caching, error) {
-	builtIn := request.standardLibrary
-	holdsTable := builtIn.table != nil && !builtIn.table.Empty()
-	readsBuiltIn := builtIn.stamp != "" && (holdsTable || builtIn.collected != nil)
+	source := request.standardLibrary
+	// The standard library is keyed apart when there is a table to read or entries to collect for one.
+	keysStandardLibrary := system.store != nil || source.collected != nil
 	noCache := request.switches["no-cache"]
-	if noCache && (!readsBuiltIn || !holdsTable) {
+	if noCache && system.store == nil {
 		return nil, nil
 	}
 	answered := goEnvironment
@@ -75,29 +74,27 @@ func lintCache(
 		}
 	}
 	values := answered.Values()
+	identity, identityError := cache.ExecutableIdentity()
+	if identityError != nil {
+		return nil, fmt.Errorf("identifying the engine: %w", identityError)
+	}
 	var standardLibrary *check.StandardLibraryCaching
-	if readsBuiltIn {
+	if keysStandardLibrary {
 		standardLibrary = &check.StandardLibraryCaching{
+			System: system.store,
 			Context: cache.StandardLibraryContext{
-				FormatVersion: check.CacheFormatVersion,
-				ReleaseStamp:  builtIn.stamp,
-				Build:         standardLibraryBuild(values),
-				Goroot:        values["GOROOT"],
+				FormatVersion:  check.CacheFormatVersion,
+				EngineIdentity: cmp.Or(source.stamp, identity),
+				Build:          standardLibraryBuild(values),
+				Goroot:         values["GOROOT"],
 			},
-			Collected: builtIn.collected,
+			Collected: source.collected,
 			// A standard-library dependence record is written under the toolchain that loaded it (#6a3kjvz).
-			Toolchain: cmp.Or(builtIn.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
-		}
-		if holdsTable {
-			standardLibrary.Table = builtIn.table
+			Toolchain: cmp.Or(source.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
 		}
 	}
 	if noCache {
 		return &check.Caching{StandardLibrary: standardLibrary}, nil
-	}
-	identity, identityError := cache.ExecutableIdentity()
-	if identityError != nil {
-		return nil, fmt.Errorf("identifying the engine: %w", identityError)
 	}
 	return &check.Caching{
 		Store:       cache.Open(workspace.Root),

@@ -115,9 +115,9 @@ func factKeyByName(fact check.ExportedFact, encoder *objectpath.Encoder) (factKe
 }
 
 // indexHostFacts keeps the host's facts by key, for every extra build's to be compared with, when the run judges
-// dependence. A fact whose object no build can match is left out. A package the host restored from the binary's table
-// ran no analyzer, but its restored action holds the table's facts and the resolver its answers, about objects read
-// from export data, whose positions are no offsets in its files: each is keyed by its counterpart in the standard
+// dependence. A fact whose object no build can match is left out. A package the host restored from the system cache's
+// table ran no analyzer, but its restored action holds the table's facts and the resolver its answers, about objects
+// read from export data, whose positions are no offsets in its files: each is keyed by its counterpart in the standard
 // library's graph, loaded from source, so it meets the build's fact about the same object (#ss4t5g6). One with no
 // counterpart is left out, as is every fact of a package the host restored that the graph does not hold. A fact the
 // table holds about an object export data does not hold has its path alone (check.ExportedFact.ObjectPath), by which
@@ -230,8 +230,8 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 			continue
 		}
 		// A fact about an object no objectpath names, a function's local closure say, in a package the host restored
-		// from the binary's table, is one no entry can hold, so the host has no side of it to compare with: it is left
-		// out, where a host that checked the package from source would have compared it.
+		// from the system cache's table, is one no entry can hold, so the host has no side of it to compare with: it is
+		// left out, where a host that checked the package from source would have compared it.
 		if engine.dependence.restored[fact.Package.ID] && fact.Object != nil {
 			if _, pathError := encoder.For(fact.Object); pathError != nil {
 				continue

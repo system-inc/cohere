@@ -36,7 +36,7 @@ func runOverCgoStandardPackage(test *testing.T, root string, overlaps bool) cgoS
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, rules.All(), nil,
-		embeddedStandardLibrary, overlaps, nil)
+		standardLibrarySource{}, overlaps, nil)
 	if exitCode > exitFindings {
 		test.Fatalf("under %s, exit %d; stderr:\n%s", root, exitCode, standardError.String())
 	}

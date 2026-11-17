@@ -84,11 +84,33 @@ func goRootOf(test *testing.T) string {
 // standardLibraryContext is what a test's standard-library keys share, under stamp, with goRoot.
 func standardLibraryContext(stamp string, goRoot string) cache.StandardLibraryContext {
 	return cache.StandardLibraryContext{
-		FormatVersion: CacheFormatVersion,
-		ReleaseStamp:  stamp,
-		Build:         []string{"GOOS=" + runtime.GOOS, "GOARCH=" + runtime.GOARCH},
-		Goroot:        goRoot,
+		FormatVersion:  CacheFormatVersion,
+		EngineIdentity: stamp,
+		Build:          []string{"GOOS=" + runtime.GOOS, "GOARCH=" + runtime.GOARCH},
+		Goroot:         goRoot,
 	}
+}
+
+// tableKeyOf is the key a session running rules reads the system cache's table of context by, its fact analyzers
+// named as the session names them.
+func tableKeyOf(test *testing.T, context cache.StandardLibraryContext, rules []rule.Rule) cache.Key {
+	test.Helper()
+	session := NewCacheSession(&Caching{}, rules)
+	if session.known == nil {
+		test.Fatalf("the session knows no analyzers: %v", session.counts.Problems)
+	}
+	context.Facts = factAnalyzerSet(session.known)
+	return cache.StandardLibraryTableKey(context)
+}
+
+// systemCacheHolding is a system cache's store of tables of the test's own holding table under key.
+func systemCacheHolding(test *testing.T, table []byte, key cache.Key) *cache.Store {
+	test.Helper()
+	store := cache.OpenAt(filepath.Join(test.TempDir(), "go", "standard-library"))
+	if putError := store.Put(key, table); putError != nil {
+		test.Fatalf("putting the table in the system cache: %v", putError)
+	}
+	return store
 }
 
 // standardRuns is how many times runs counted an analysis of a standard-library package, whose path has no dot in
@@ -106,12 +128,12 @@ func standardRuns(runs *sync.Map) int {
 	return total
 }
 
-// A cached run collects every standard-library package it saves, and the table written from them restores each one
-// in a run with no store at all: nothing analyzes a package restored from the table, nothing parses one, the store
-// counts stay at 0 and the result is a run's without the cache. strings' types come from its export data, renamed to
-// this machine's `GOROOT`, so a position of strings.ToUpper names the local file; a table read without the rename
-// names `$GOROOT/src/strings`.
-func TestAStandardLibraryPackageFromTheBinaryIsNeverAnalyzedOrParsed(test *testing.T) {
+// A cached run collects every standard-library package it saves, and the table written from them, read from the
+// system cache, restores each one in a run with no store at all: nothing analyzes a package restored from the table,
+// nothing parses one, the store counts stay at 0 and the result is a run's without the cache. strings' types come from
+// its export data, renamed to this machine's `GOROOT`, so a position of strings.ToUpper names the local file; a table
+// read without the rename names `$GOROOT/src/strings`.
+func TestAStandardLibraryPackageFromTheSystemCacheIsNeverAnalyzedOrParsed(test *testing.T) {
 	test.Parallel()
 
 	directory := standardLibraryModule(test)
@@ -148,25 +170,28 @@ func TestAStandardLibraryPackageFromTheBinaryIsNeverAnalyzedOrParsed(test *testi
 	}
 
 	runs.Clear()
-	fromBinary := runWithSession(test, directory, &Caching{StandardLibrary: &StandardLibraryCaching{
-		Table:   cache.NewStandardLibraryTable(table),
-		Context: standardLibraryContext("check tests", goRoot),
+	context := standardLibraryContext("check tests", goRoot)
+	fromSystemCache := runWithSession(test, directory, &Caching{StandardLibrary: &StandardLibraryCaching{
+		System:  systemCacheHolding(test, table, tableKeyOf(test, context, rules)),
+		Context: context,
 	}}, rules)
 	if counted := standardRuns(runs); counted != 0 {
-		test.Errorf("want nothing analyzed on a standard-library package from the binary, got %d runs", counted)
+		test.Errorf("want nothing analyzed on a standard-library package from the system cache, got %d runs", counted)
 	}
-	if want := (CacheCounts{FromBinary: len(collected)}); !reflect.DeepEqual(fromBinary.result.Cache, want) {
-		test.Errorf("want every collected package from the binary and no store count, got %+v", fromBinary.result.Cache)
+	if want := (CacheCounts{FromSystemCache: len(collected)}); !reflect.DeepEqual(fromSystemCache.result.Cache,
+		want) {
+		test.Errorf("want every collected package from the system cache and no store count, got %+v",
+			fromSystemCache.result.Cache)
 	}
-	if fromBinary.loaded.FilesParsed != 1 {
-		test.Errorf("want the module's one file parsed alone, got %d", fromBinary.loaded.FilesParsed)
+	if fromSystemCache.loaded.FilesParsed != 1 {
+		test.Errorf("want the module's one file parsed alone, got %d", fromSystemCache.loaded.FilesParsed)
 	}
-	if !reflect.DeepEqual(withoutTimesOrCache(fromBinary.result), withoutTimesOrCache(plain)) {
-		test.Errorf("from the binary\n%+v\nwithout the cache\n%+v", withoutTimesOrCache(fromBinary.result),
+	if !reflect.DeepEqual(withoutTimesOrCache(fromSystemCache.result), withoutTimesOrCache(plain)) {
+		test.Errorf("from the system cache\n%+v\nwithout the cache\n%+v", withoutTimesOrCache(fromSystemCache.result),
 			withoutTimesOrCache(plain))
 	}
 	var restoredStrings *packages.Package
-	packages.Visit(fromBinary.loaded.Packages, nil, func(visited *packages.Package) {
+	packages.Visit(fromSystemCache.loaded.Packages, nil, func(visited *packages.Package) {
 		if visited.PkgPath == "strings" {
 			restoredStrings = visited
 		}
@@ -181,8 +206,9 @@ func TestAStandardLibraryPackageFromTheBinaryIsNeverAnalyzedOrParsed(test *testi
 	}
 }
 
-// A table written under one release stamp restores nothing under another, nor under another build, nor in a run whose
-// fact analyzers' options are not the table's: each key differs, so every standard-library package computes.
+// A table written under one engine identity restores nothing under another, nor under another build, nor in a run
+// whose fact analyzers' options are not the table's: each table's key differs, and so does each package's, so every
+// standard-library package computes.
 func TestAStandardLibraryTableUnderAnotherKeyRestoresNothing(test *testing.T) {
 	test.Parallel()
 
@@ -201,27 +227,28 @@ func TestAStandardLibraryTableUnderAnotherKeyRestoresNothing(test *testing.T) {
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
+	system := systemCacheHolding(test, table, tableKeyOf(test, standardLibraryContext("release one", goRoot), rules))
 	readUnder := func(context cache.StandardLibraryContext) (CacheCounts, int) {
 		test.Helper()
 		runs.Clear()
 		read := runWithSession(test, directory, &Caching{StandardLibrary: &StandardLibraryCaching{
-			Table:   cache.NewStandardLibraryTable(table),
+			System:  system,
 			Context: context,
 		}}, rules)
 		return read.result.Cache, standardRuns(runs)
 	}
-	if counts, analyzed := readUnder(standardLibraryContext("release one", goRoot)); counts.FromBinary == 0 ||
+	if counts, analyzed := readUnder(standardLibraryContext("release one", goRoot)); counts.FromSystemCache == 0 ||
 		analyzed != 0 {
 		test.Fatalf("want the table read under its own key, got %+v and %d runs", counts, analyzed)
 	}
 	otherBuild := standardLibraryContext("release one", goRoot)
 	otherBuild.Build = []string{"GOOS=plan9", "GOARCH=" + runtime.GOARCH}
 	for name, context := range map[string]cache.StandardLibraryContext{
-		"another stamp": standardLibraryContext("release two", goRoot),
-		"another build": otherBuild,
+		"another identity": standardLibraryContext("release two", goRoot),
+		"another build":    otherBuild,
 	} {
-		if counts, analyzed := readUnder(context); counts.FromBinary != 0 || analyzed == 0 {
-			test.Errorf("%s: want nothing from the binary and the standard library analyzed, got %+v and %d runs",
+		if counts, analyzed := readUnder(context); counts.FromSystemCache != 0 || analyzed == 0 {
+			test.Errorf("%s: want nothing from the system cache and the standard library analyzed, got %+v and %d runs",
 				name, counts, analyzed)
 		}
 	}
@@ -229,10 +256,114 @@ func TestAStandardLibraryTableUnderAnotherKeyRestoresNothing(test *testing.T) {
 	if setError := rules[0].Analyzer.Flags.Set("mode", "second"); setError != nil {
 		test.Fatal(setError)
 	}
-	if counts, analyzed := readUnder(standardLibraryContext("release one", goRoot)); counts.FromBinary != 0 ||
+	if counts, analyzed := readUnder(standardLibraryContext("release one", goRoot)); counts.FromSystemCache != 0 ||
 		analyzed == 0 {
-		test.Errorf("another fact option: want nothing from the binary and the standard library analyzed, got %+v and "+
-			"%d runs", counts, analyzed)
+		test.Errorf("another fact option: want nothing from the system cache and the standard library analyzed, "+
+			"got %+v and %d runs", counts, analyzed)
+	}
+}
+
+// A session reads the system cache's table only under its own context's key: a table whose entries the session would
+// restore, put under the key of another engine identity, another target, another Go version or other fact analyzers,
+// restores nothing, as a linux session must never read a darwin table, and the same table under the session's own key
+// restores every package. A key that left out the target or the identity would find the table, and the entries in it
+// would restore.
+func TestATableIsReadOnlyUnderItsOwnContextsKey(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	goRoot := goRootOf(test)
+	runs := &sync.Map{}
+	rules := []rule.Rule{countingFactRule(runs)}
+	own := standardLibraryContext("check tests", goRoot)
+	own.Build = append(own.Build, "GOVERSION=go1.27.3")
+	collecting := testCaching(test, rules)
+	collected := map[cache.Key]StandardLibraryRunEntry{}
+	collecting.StandardLibrary = &StandardLibraryCaching{Context: own, Collected: collected}
+	runWithSession(test, directory, collecting, rules)
+	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
+	if tableError != nil {
+		test.Fatalf("writing the table: %v", tableError)
+	}
+	otherSystem := "linux"
+	if runtime.GOOS == "linux" {
+		otherSystem = "darwin"
+	}
+	otherTarget := own
+	otherTarget.Build = []string{"GOOS=" + otherSystem, "GOARCH=" + runtime.GOARCH, "GOVERSION=go1.27.3"}
+	otherVersion := own
+	otherVersion.Build = []string{"GOOS=" + runtime.GOOS, "GOARCH=" + runtime.GOARCH, "GOVERSION=go1.26.0"}
+	otherIdentity := own
+	otherIdentity.EngineIdentity = "another engine"
+	for name, testCase := range map[string]struct {
+		key  cache.Key
+		want int
+	}{
+		"its own context":      {key: tableKeyOf(test, own, rules), want: len(collected)},
+		"another target":       {key: tableKeyOf(test, otherTarget, rules)},
+		"another Go version":   {key: tableKeyOf(test, otherVersion, rules)},
+		"another identity":     {key: tableKeyOf(test, otherIdentity, rules)},
+		"other fact analyzers": {key: tableKeyOf(test, own, nil)},
+	} {
+		runs.Clear()
+		read := runWithSession(test, directory, &Caching{StandardLibrary: &StandardLibraryCaching{
+			System:  systemCacheHolding(test, table, testCase.key),
+			Context: own,
+		}}, rules)
+		if read.result.Cache.FromSystemCache != testCase.want {
+			test.Errorf("a table under the key of %s: want %d packages from the system cache, got %+v", name,
+				testCase.want, read.result.Cache)
+		}
+	}
+}
+
+// A table damaged in the system cache, one byte of its file changed, is a problem the session names, and every
+// standard-library package is computed: the store reads the damage as a miss and removes the file, and the session,
+// which found a file there, says the table was damaged rather than that there was none.
+func TestADamagedTableIsANamedProblem(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	goRoot := goRootOf(test)
+	runs := &sync.Map{}
+	rules := []rule.Rule{countingFactRule(runs)}
+	context := standardLibraryContext("check tests", goRoot)
+	collecting := testCaching(test, rules)
+	collected := map[cache.Key]StandardLibraryRunEntry{}
+	collecting.StandardLibrary = &StandardLibraryCaching{Context: context, Collected: collected}
+	runWithSession(test, directory, collecting, rules)
+	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
+	if tableError != nil {
+		test.Fatalf("writing the table: %v", tableError)
+	}
+	key := tableKeyOf(test, context, rules)
+	tables := filepath.Join(test.TempDir(), "go", "standard-library")
+	system := cache.OpenAt(tables)
+	if putError := system.Put(key, table); putError != nil {
+		test.Fatal(putError)
+	}
+	// The store keeps an entry under a directory named for its key's first two hex characters.
+	path := filepath.Join(tables, key.String()[:2], key.String())
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	contents[len(contents)/2]++
+	if writeError := os.WriteFile(path, contents, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+
+	runs.Clear()
+	read := runWithSession(test, directory, &Caching{StandardLibrary: &StandardLibraryCaching{
+		System:  system,
+		Context: context,
+	}}, rules)
+	if read.result.Cache.FromSystemCache != 0 || standardRuns(runs) == 0 {
+		test.Errorf("want the standard library computed beside a damaged table, got %+v and %d runs",
+			read.result.Cache, standardRuns(runs))
+	}
+	if problems := read.result.Cache.Problems; len(problems) != 1 || !strings.Contains(problems[0], "damaged") {
+		test.Errorf("want the damaged table named as the one problem, got %q", problems)
 	}
 }
 

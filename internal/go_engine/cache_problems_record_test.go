@@ -30,7 +30,7 @@ func TestAStoreThatRefusesAWriteCountsItsProblems(test *testing.T) {
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	if exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, rules.All(), nil,
-		embeddedStandardLibrary, true, nil); exitCode != exitClean && exitCode != exitFindings {
+		standardLibrarySource{}, true, nil); exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
 	}
 	var record contract.LintRecord

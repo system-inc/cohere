@@ -29,31 +29,32 @@ var (
 )
 
 // cachedRun is one engine run over root with extra after the contract and root, its stream normalized, its stream
-// without the cache counts, and its lint record's cache counts.
+// without the cache counts, its lint record's cache counts, and its exit code.
 type cachedRun struct {
 	stream        string
 	withoutCounts string
 	counts        contract.LintCache
+	exitCode      int
 }
 
 // runCachedEngine runs the engine over root, in process, and fails the test unless it exits with a summary, 0 or 1,
 // says nothing on stderr and writes a lint record.
 func runCachedEngine(test *testing.T, root string, extra ...string) cachedRun {
 	test.Helper()
-	return runEngineWith(test, root, embeddedStandardLibrary, rules.All(), extra...)
+	return runEngineWith(test, root, standardLibrarySource{}, rules.All(), extra...)
 }
 
-// runEngineWith is runCachedEngine with builtIn as the binary's standard-library entries and registered as the
-// rules.
+// runEngineWith is runCachedEngine with source as where its standard library comes from and goes and registered as
+// the rules.
 func runEngineWith(
 	test *testing.T,
 	root string,
-	builtIn builtInStandardLibrary,
+	source standardLibrarySource,
 	registered []rule.Rule,
 	extra ...string,
 ) cachedRun {
 	test.Helper()
-	return runEngineAnsweringInPart(test, root, builtIn, registered, nil, extra...)
+	return runEngineAnsweringInPart(test, root, source, registered, nil, extra...)
 }
 
 // runEngineAnsweringInPart is runEngineWith writing the entries of the packages answersInPart names, by import path,
@@ -61,26 +62,42 @@ func runEngineWith(
 func runEngineAnsweringInPart(
 	test *testing.T,
 	root string,
-	builtIn builtInStandardLibrary,
+	source standardLibrarySource,
 	registered []rule.Rule,
 	answersInPart map[string]bool,
 	extra ...string,
 ) cachedRun {
 	test.Helper()
+	ran, standardError := runEngineNoting(test, root, source, registered, answersInPart, extra...)
+	if standardError != "" {
+		test.Fatalf("want nothing on stderr, got:\n%s", standardError)
+	}
+	return ran
+}
+
+// runEngineNoting is runEngineAnsweringInPart with what the run said on stderr, which it leaves to the test.
+func runEngineNoting(
+	test *testing.T,
+	root string,
+	source standardLibrarySource,
+	registered []rule.Rule,
+	answersInPart map[string]bool,
+	extra ...string,
+) (cachedRun, string) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	if exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, registered, nil, builtIn, true,
-		answersInPart); exitCode != exitClean && exitCode != exitFindings {
+	exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, registered, nil, source, true,
+		answersInPart)
+	if exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
-	}
-	if standardError.Len() > 0 {
-		test.Fatalf("want nothing on stderr, got:\n%s", standardError.String())
 	}
 	stream := elapsedPattern.ReplaceAllString(standardOutput.String(), `"elapsedMilliseconds":0`)
 	ran := cachedRun{
 		stream:        stream,
 		withoutCounts: childProcessesPattern.ReplaceAllString(cacheFieldPattern.ReplaceAllString(stream, ""), ""),
+		exitCode:      exitCode,
 	}
 	for line := range strings.Lines(stream) {
 		if !strings.HasPrefix(line, `{"kind":"lint"`) {
@@ -93,10 +110,10 @@ func runEngineAnsweringInPart(
 			test.Fatalf("reading the lint record %s: %v", line, decodeError)
 		}
 		ran.counts = record.Cache
-		return ran
+		return ran, standardError.String()
 	}
 	test.Fatalf("no lint record in\n%s", stream)
-	return ran
+	return ran, standardError.String()
 }
 
 // entriesIn is each entry in root's store by its path in the store, with its modification time, so a run that wrote

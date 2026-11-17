@@ -15,9 +15,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
-// kindAnswers is one kind's answers in one package, as the store and the binary's table hold them (#w7zmvat wave 3):
-// each answer by its object's objectpath, sorted, and whether the package was computed whole in the kind, so an object
-// with no answer has no fact.
+// kindAnswers is one kind's answers in one package, as the store and the system cache's table hold them (#w7zmvat wave
+// 3): each answer by its object's objectpath, sorted, and whether the package was computed whole in the kind, so an
+// object with no answer has no fact.
 type kindAnswers struct {
 	Kind     string
 	Complete bool
@@ -135,10 +135,10 @@ func (session *CacheSession) packageOf(packageTypes *types.Package) *packages.Pa
 }
 
 // Answers is what the run can read of the answers of the package whose types are packageTypes, for the resolver: its
-// entry's, for a package the run trusts the entry of (see trusted), restored from the binary's table, complete in every
-// kind its release computed, or from the store by its own first key, or by an alias or its second key once its reads
-// held; or, for a package loaded from source to answer a question, its entry's under its own first key, which the run
-// did not restore. A trusted entry's record of what its package declares without a body comes with them. It is nil
+// entry's, for a package the run trusts the entry of (see trusted), restored from the system cache's table, complete in
+// every kind its release computed, or from the store by its own first key, or by an alias or its second key once its
+// reads held; or, for a package loaded from source to answer a question, its entry's under its own first key, which the
+// run did not restore. A trusted entry's record of what its package declares without a body comes with them. It is nil
 // when there are none and no such record.
 func (session *CacheSession) Answers(packageTypes *types.Package) *fact_resolver.Answers {
 	asked := session.packageOf(packageTypes)
@@ -294,7 +294,7 @@ func (session *CacheSession) withBodiless(saved *packages.Package, demanded entr
 }
 
 // demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are every answer of its
-// package, computed whole, as the binary's table holds them, so a later run that restores it never reloads it to
+// package, computed whole, as the system cache's table holds them, so a later run that restores it never reloads it to
 // answer a question, when the resolver can compute them all without a reload and Caching's AnswersInPart does not
 // name it; otherwise those held before, the entry's before a reload or the first wave's (held), with every answer the
 // run computed in it. Its reads are those held before with every read the run's analysis of it made.

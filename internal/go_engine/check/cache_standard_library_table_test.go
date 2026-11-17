@@ -77,11 +77,12 @@ func TestTheCanonicalTableHoldsTheSameEntriesByValue(test *testing.T) {
 		}
 	}
 
+	context := standardLibraryContext("check tests", goRoot)
 	fromCanonical := runWithSession(test, directory, &Caching{StandardLibrary: &StandardLibraryCaching{
-		Table:   after,
-		Context: standardLibraryContext("check tests", goRoot),
+		System:  systemCacheHolding(test, canonical, tableKeyOf(test, context, rules)),
+		Context: context,
 	}}, rules)
-	if fromCanonical.result.Cache.FromBinary != len(collected) {
+	if fromCanonical.result.Cache.FromSystemCache != len(collected) {
 		test.Errorf("want all %d packages restored from the canonical table, got %+v", len(collected),
 			fromCanonical.result.Cache)
 	}
@@ -210,7 +211,7 @@ func TestATableEntryRestoresAsTheStoreEntryItWasWrittenFrom(test *testing.T) {
 				renamed.exportData, renamed.renameError = renameExportDataFiles(read, readFileSet, rename)
 			}
 		}
-		fromTable, _, tableError := restoreBinaryEntry(known, restoring, tableEntry, renamed, rename)
+		fromTable, _, tableError := restoreTableEntry(known, restoring, tableEntry, renamed, rename)
 		if tableError != nil {
 			test.Fatalf("%s: restoring the table's entry: %v", entry.PackagePath, tableError)
 		}

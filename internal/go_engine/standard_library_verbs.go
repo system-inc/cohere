@@ -365,9 +365,11 @@ func runStandardLibraryVariant(arguments []string, standardError io.Writer, regi
 	}
 	collected := map[cache.Key]check.StandardLibraryRunEntry{}
 	var engineError bytes.Buffer
+	// Without the system cache, so every standard-library package is computed and collected, and nothing the machine
+	// building the release keeps finds its way into the release's table.
 	exitCode := runWithStandardLibrary([]string{"--contract", strconv.Itoa(contract.Version), "--root", *root,
-		"--no-fix"}, io.Discard, &engineError, registered, nil,
-		builtInStandardLibrary{stamp: stamp, collected: collected})
+		"--no-fix", "--no-system-cache"}, io.Discard, &engineError, registered, nil,
+		standardLibrarySource{stamp: stamp, collected: collected})
 	if (exitCode != exitClean && exitCode != exitFindings) || engineError.Len() > 0 {
 		return fail(standardError, fmt.Errorf("computing the standard library: the engine exited %d: %s", exitCode,
 			strings.TrimSpace(engineError.String())))

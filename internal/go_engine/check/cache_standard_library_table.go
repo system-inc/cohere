@@ -18,9 +18,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
-// standardLibraryEntry is one standard-library package as the binary's table holds it: what a cacheEntry holds that a
-// restore reads, with its import path, and its analyses as a list in the order of their slots rather than a map. gob
-// writes a map in Go's iteration order, which is random, so a map would give the same entry other bytes in each
+// standardLibraryEntry is one standard-library package as the system cache's table holds it: what a cacheEntry holds
+// that a restore reads, with its import path, and its analyses as a list in the order of their slots rather than a map.
+// gob writes a map in Go's iteration order, which is random, so a map would give the same entry other bytes in each
 // process, and a table written twice from the same entries would differ; a list in a fixed order gives one encoding
 // (see CanonicalStandardLibraryTable). It holds no findings and no walk of files, which StandardLibraryTableOf leaves
 // out and refuses.

@@ -11,11 +11,11 @@ import (
 
 // unsafe, the type checker's own package, restored by an extra build from the host's table hit, is written through to
 // the build's own store as the build writes it from source, with no export data (#27r8r24): a cold run with the
-// findings cache on over a fixture that imports it, with the standard library from the binary's table and a file only
-// another target compiles, says nothing on stderr, where the note of an entry not written through would go, counts no
-// problem of the cache, and has every extra build write through every package it restored from the host, judged or left
-// untouched by its walk. Without the rule, the table, which holds no export data for unsafe, refuses the write, and
-// each build notes it.
+// findings cache on over a fixture that imports it, with the standard library from the system cache's table and a file
+// only another target compiles, says nothing on stderr, where the note of an entry not written through would go, counts
+// no problem of the cache, and has every extra build write through every package it restored from the host, judged or
+// left untouched by its walk. Without the rule, the table, which holds no export data for unsafe, refuses the write,
+// and each build notes it.
 func TestUnsafeFromATableHitIsWrittenThrough(test *testing.T) {
 	test.Parallel()
 
@@ -34,8 +34,8 @@ func TestUnsafeFromATableHitIsWrittenThrough(test *testing.T) {
 		}
 	}
 	// runEngineWith fails on anything said on stderr, so a note of the findings cache fails here.
-	cold := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--other-builds")
-	if !cold.counts.On || cold.counts.FromBinary == 0 {
+	cold := runEngineWith(test, root, generatedTableReading(test, table), rules.All(), "--other-builds")
+	if !cold.counts.On || cold.counts.FromSystemCache == 0 {
 		test.Fatalf("want a cached run restoring the standard library from the table, got %+v", cold.counts)
 	}
 	if cold.counts.Problems != 0 {

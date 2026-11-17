@@ -70,9 +70,12 @@ type pipeline struct {
 	censusMissed []contract.CensusMissedFile
 
 	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, under
-	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads,
+	// `--no-cache` unless the run keeps a system cache, whose standard-library tables a session without a store reads,
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
+
+	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache).
+	systemCache *systemCache
 
 	// keepsHostRestoreOff, set only by a test, has every extra build check every package itself rather than restore any
 	// from the host's run, so a test can compare the two (#b2t9xmf), and the builds run one at a time, as builds that
@@ -265,6 +268,7 @@ func newPipeline(
 		// The facts census reads each build's own facts, which a restore from the host's run would replace.
 		censusKeepsHostRestoreOff: request.judgesDependence(),
 		timing:                    newTiming(request),
+		systemCache:               openSystemCache(request),
 		reads:                     load.NewSharedReads(),
 		fingerprints:              load.NewFingerprints(),
 		walks:                     load.NewPackageWalks(),

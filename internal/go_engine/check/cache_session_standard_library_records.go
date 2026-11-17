@@ -11,9 +11,9 @@ import (
 )
 
 // The standard library's dependence records in the project's own store (#6a3kjvz piece 3, @system_cohere's choice of
-// the store over the binary's table, engine's ruling on its key and writes). A standard-library package the host
-// restores from the binary's table has no entry in the store, and so no record beside one: the switch loads it from
-// source beside the host's lint for its graph (the side load). When it does, the host's session writes each such
+// the store over the system cache's table, engine's ruling on its key and writes). A standard-library package the host
+// restores from the system cache's table has no entry in the store, and so no record beside one: the switch loads it
+// from source beside the host's lint for its graph (the side load). When it does, the host's session writes each such
 // package's record, built from the side load's live packages, into the store under a key derived from the package's
 // own standard-library key (StandardLibraryDependenceRecordKey), and a later run with a store reads it back in place
 // of the side load. Any doubt is a miss: a record of another format, release, build, file, engine or toolchain is under
@@ -39,11 +39,11 @@ func StandardLibraryDependenceRecordKey(
 }
 
 // standardLibraryRecordKey is keyed's record key, and whether it has one: a standard-library package the session
-// restored from the binary's table, keyed by the table's key, in a session with a store.
+// restored from the system cache's table, keyed by the table's key, in a session with a store.
 func (session *CacheSession) standardLibraryRecordKey(keyed *packages.Package) (cache.Key, bool) {
 	standardLibrary := session.caching.StandardLibrary
 	key, isKeyed := session.standardLibraryKeys[keyed]
-	if !isKeyed || standardLibrary == nil || !session.fromBinary[keyed] {
+	if !isKeyed || standardLibrary == nil || !session.fromSystemCache[keyed] {
 		return cache.Key{}, false
 	}
 	return StandardLibraryDependenceRecordKey(key, session.caching.Context.EngineIdentity, standardLibrary.Toolchain),
@@ -51,9 +51,9 @@ func (session *CacheSession) standardLibraryRecordKey(keyed *packages.Package) (
 }
 
 // readStandardLibraryRecords looks up, beside readDependenceRecords, the record of every standard-library package the
-// session restored from the binary's table, and decodes each, as many at once as readHits reads entries. A record that
-// does not decode is a problem, said, and its package has none, so the side load loads it and its record is written
-// again.
+// session restored from the system cache's table, and decodes each, as many at once as readHits reads entries. A record
+// that does not decode is a problem, said, and its package has none, so the side load loads it and its record is
+// written again.
 func (session *CacheSession) readStandardLibraryRecords(reachable []*packages.Package) {
 	records := session.dependence
 	records.standardLibrary = map[*packages.Package]*build_dependence.Record{}
@@ -89,7 +89,7 @@ func (session *CacheSession) readStandardLibraryRecords(reachable []*packages.Pa
 }
 
 // StandardLibraryRecord is the record the store holds of restored, a standard-library package the last load restored
-// from the binary's table, decoded, and whether it holds one that decodes.
+// from the system cache's table, decoded, and whether it holds one that decodes.
 func (session *CacheSession) StandardLibraryRecord(restored *packages.Package) (*build_dependence.Record, bool) {
 	if session.dependence == nil {
 		return nil, false
@@ -99,7 +99,7 @@ func (session *CacheSession) StandardLibraryRecord(restored *packages.Package) (
 }
 
 // WriteStandardLibraryRecords writes into the store the record of every standard-library package the last load
-// restored from the binary's table with none, as recordOf gives it by the package's path: the host's side load's
+// restored from the system cache's table with none, as recordOf gives it by the package's path: the host's side load's
 // graph, once it has ended, which gives only the records it built from live packages. Each record is encoded on the
 // run's pool and written with no slot held (fanOutWriting), as saveMisses writes the host's entries, since about 260
 // writes one after another took some 40 ms at the run's tail. It is called after the session's counts were handed on,
@@ -114,7 +114,7 @@ func (session *CacheSession) WriteStandardLibraryRecords(
 	}
 	var writing []*packages.Package
 	var keys []cache.Key
-	for each := range session.fromBinary {
+	for each := range session.fromSystemCache {
 		key, isKeyed := session.standardLibraryRecordKey(each)
 		if _, isFound := records.standardLibrary[each]; isKeyed && !isFound {
 			writing = append(writing, each)

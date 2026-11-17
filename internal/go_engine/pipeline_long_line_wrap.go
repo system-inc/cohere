@@ -13,7 +13,7 @@ import (
 )
 
 // loadWorkspace loads the workspace's packages, through the findings cache when the run has one, keeping go list's
-// answer in its store when it has a store: under `--no-cache` a session reading the binary's entries restores the
+// answer in its store when it has a store: under `--no-cache` a session reading the system cache's entries restores the
 // standard library and keeps nothing. Every load reads each file the run holds from its held bytes (held), which are
 // the disk's after every write the fix phase made. When a phase reads the types it says on stderr that the load
 // failed; a load made for the wrap alone leaves that to the wrap's own held note, since that run asked for no

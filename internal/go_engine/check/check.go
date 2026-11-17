@@ -62,7 +62,7 @@ type Options struct {
 	ReadFile func(filename string) ([]byte, error)
 
 	// Ready and Abandon run the rules beside the load rather than after it, on a run whose cache has no store, which
-	// restores only the standard library from the binary, decided before the load checks anything: Ready is
+	// restores only the standard library from the system cache, decided before the load checks anything: Ready is
 	// load.Overlap's, so no rule starts on a package before the load has made it final, and Abandon, closed, starts
 	// nothing more and has Run return ErrAbandoned once what started has finished, for a load whose end says the rules
 	// must not run at all (see checker.Options).
@@ -386,8 +386,8 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), func(restoring *packages.Package) bool {
 			return session.restoredInWave(restoring) && session.fromHost(restoring) == nil
 		})
-		// A session without a store counts only what it restored from the binary, as a run without the cache counts
-		// no wave.
+		// A session without a store counts only what it restored from the system cache, as a run without the cache
+		// counts no wave.
 		if len(toAnalyze) > 0 && session.HasStore() {
 			session.counts.Waves++
 		}

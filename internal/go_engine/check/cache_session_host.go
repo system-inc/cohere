@@ -769,12 +769,12 @@ func (session *CacheSession) throughEntry(
 		}
 	}
 	// The body is the host's, named in the host's record, which the build's store holds once the host wrote it there;
-	// one it does not hold, kept from the binary's table or written to another store, writeThrough holds in the record
-	// itself, read from the host's entry (hostBody). Nothing of the body is decoded or encoded again: the record alone
-	// is the build's (#fq7dxvx).
+	// one it does not hold, kept from the system cache's table or written to another store, writeThrough holds in the
+	// record itself, read from the host's entry (hostBody). Nothing of the body is decoded or encoded again: the record
+	// alone is the build's (#fq7dxvx).
 	encoded := encodedEntry{output: hosted.restored.output, hasOutput: hosted.restored.hasOutput}
 	// unsafe's entry holds no export data, as the build's own from source holds none (carriesExportData); the reader of
-	// one kept from the binary's table, which holds none for it, would refuse (#27r8r24).
+	// one kept from the system cache's table, which holds none for it, would refuse (#27r8r24).
 	if carriesExportData(saved) && hosted.restored.types.ReadExportData != nil {
 		exportData, exportError := hosted.restored.types.ReadExportData()
 		if exportError != nil {
@@ -783,7 +783,7 @@ func (session *CacheSession) throughEntry(
 		encoded.exportData = exportData
 	}
 	// The record names the export data the build read by its digest, which is the host's record's own when the host
-	// wrote it, and new for one kept from the binary's table or from the host's memory under `--no-cache`.
+	// wrote it, and new for one kept from the system cache's table or from the host's memory under `--no-cache`.
 	reads, readsIncomplete := session.readsInBuild(saved.ID, hosted.restored.reads, hosted.restored.readsIncomplete)
 	encoded.record = entryRecord{Version: CacheFormatVersion, Body: hosted.restored.bodyDigest,
 		ExportData: exportDataDigest(encoded.exportData), Reads: reads, ReadsIncomplete: readsIncomplete}
@@ -879,11 +879,11 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 // keepForBuilds is what the host's run keeps of each package it analyzed from source, among analyzed and what they
 // reach, whose reads can hold, for its extra builds to restore from (#b2t9xmf): the package's entry, read back from the
 // store when the run wrote one there, or else encoded here, as saveMisses encodes it, and held in memory, which a run
-// under `--no-cache` never stores. A package restored from the binary's table is kept from the table's entry, with the
-// reads the table persisted beside it (keepBinaryHit, #pcv6eff). Each package's portable digest is the one Restore
-// keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
-// without pays nothing. gathered gives the findings the run's gather made of each root action, which an encoded entry
-// holds rather than convert them again (see encodeEntry).
+// under `--no-cache` never stores. A package restored from the system cache's table is kept from the table's entry,
+// with the reads the table persisted beside it (keepTableHit, #pcv6eff). Each package's portable digest is the one
+// Restore keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it,
+// so a run without pays nothing. gathered gives the findings the run's gather made of each root action, which an
+// encoded entry holds rather than convert them again (see encodeEntry).
 func (session *CacheSession) keepForBuilds(
 	graphs []*checker.Graph,
 	analyzed []*packages.Package,
@@ -926,9 +926,9 @@ func (session *CacheSession) keepForBuilds(
 	}
 	var encoding []*packages.Package
 	for keptPackage := range keyed.Portable {
-		// A package restored from the binary's table is kept from the table's entry and the reads it persisted.
-		if hit, fromTable := session.binaryHits[keptPackage]; fromTable && session.fromBinary[keptPackage] {
-			kept, keepError := session.keepBinaryHit(keptPackage, hit, keyed.Portable[keptPackage])
+		// A package restored from the system cache's table is kept from the table's entry and the reads it persisted.
+		if hit, fromTable := session.tableHits[keptPackage]; fromTable && session.fromSystemCache[keptPackage] {
+			kept, keepError := session.keepTableHit(keptPackage, hit, keyed.Portable[keptPackage])
 			if keepError != nil {
 				session.problem(keepError.Error())
 				continue

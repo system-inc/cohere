@@ -13,7 +13,7 @@ import (
 // one that failed, means main never ran the rules, so the pass is abandoned and nothing it found, crashed on, learned
 // or counted reaches a record or a note (runLint's two abandonSpeculation calls). Only a clean load reads it
 // (speculativePass). It never writes the cache, since it runs only when the run has no store, whose session restores
-// only the standard library from the binary, decided before the load checks anything.
+// only the standard library from the system cache, decided before the load checks anything.
 //
 // A run that fixes keeps the pass while its fixes leave the load standing. The long-line wrap runs beside it and
 // stops it only when it writes a file (wrapAfterLoad), before rereading what it wrote, since the pass reads the held

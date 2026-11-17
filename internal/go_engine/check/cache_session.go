@@ -25,9 +25,9 @@ import (
 
 // Caching is the per-package findings cache a run reads and writes: the store, what every key shares but the
 // loader, which the load names, the inputs a rule reads outside its pass, or nil for none, the standard library's
-// entries the binary carries, or nil for none, and the digests of files the run already hashed, which the keys read
+// table in the system cache, or nil for none, and the digests of files the run already hashed, which the keys read
 // rather than hash again (see cache.Keys), the zero value none. Under `--no-cache` it has no store, and the session
-// reads the binary's entries alone: it keys only the standard library, restores only from the table, and writes
+// reads the system cache alone: it keys only the standard library, restores only from the table, and writes
 // nothing.
 type Caching struct {
 	Store           *cache.Store
@@ -54,13 +54,14 @@ type Caching struct {
 	AnswersInPart map[string]bool
 }
 
-// StandardLibraryCaching is the standard library's entries as a run reads them from the binary: the table, and what
-// every standard-library key shares but the fact analyzers and the loader, which the session names. A table that is
-// nil holds nothing, as in a run that only collects entries. Collected, when it is not nil, gains each
-// standard-library package the run saves to the store, by its standard-library key, for StandardLibraryTableOf; a run
-// under `--no-cache` saves nothing, so it collects nothing.
+// StandardLibraryCaching is the standard library's entries as a run reads them from the system cache (#syscache): the
+// system cache's store of tables, one for each build context, and what every standard-library key shares but the fact
+// analyzers and the loader, which the session names. Once it has, the session reads the table of its context
+// (cache.StandardLibraryTableKey) from System. A System that is nil holds nothing, as in a run that only collects
+// entries. Collected, when it is not nil, gains each standard-library package the run saves to the store, by its
+// standard-library key, for StandardLibraryTableOf; a run under `--no-cache` saves nothing, so it collects nothing.
 type StandardLibraryCaching struct {
-	Table     *cache.StandardLibraryTable
+	System    *cache.Store
 	Context   cache.StandardLibraryContext
 	Collected map[cache.Key]StandardLibraryRunEntry
 
@@ -81,20 +82,20 @@ type StandardLibraryRunEntry struct {
 }
 
 // CacheCounts is what the cache did in one run, by package: every package the load reached is a hit, restored from
-// the store or from the binary, or a miss, and a miss is written, unstorable, or neither, when it had a load error, an
-// action on it did not finish, or its write failed.
+// the store or from the system cache, or a miss, and a miss is written, unstorable, or neither, when it had a load
+// error, an action on it did not finish, or its write failed.
 type CacheCounts struct {
-	// On is whether the run read and wrote the store. A run without it counts nothing but FromBinary, FactsSkipped
-	// of what it restored, and Problems.
+	// On is whether the run read and wrote the store. A run without it counts nothing but FromSystemCache,
+	// FactsSkipped of what it restored, and Problems.
 	On bool
 
 	// Hit is the packages restored from an entry in the store, which nothing analyzed, and on the load from source
 	// nothing parsed or type-checked unless the second key restored it (see SecondKeyHit).
 	Hit int
 
-	// FromBinary is the standard-library packages restored from the entries the binary carries, which nothing
-	// analyzed or parsed, apart from Hit. Under `--no-cache` it is the one count a run can have.
-	FromBinary int
+	// FromSystemCache is the standard-library packages restored from the system cache's table of the build's context,
+	// which nothing analyzed or parsed, apart from Hit. Under `--no-cache` it is the one count a run can have.
+	FromSystemCache int
 
 	// SecondKeyHit is the hits restored by their second key, once their dependencies' analyses came out as before:
 	// the load had checked them, since only an analysis of what is below them could say they would hit.
@@ -196,14 +197,19 @@ type CacheSession struct {
 	// given is the packages to analyze, as the load named them.
 	given map[*packages.Package]bool
 
-	// standardLibraryKeys are the standard-library packages' keys, by which the binary's table holds them, nil when the
-	// run reads no table and collects nothing.
+	// standardLibraryKeys are the standard-library packages' keys, by which the system cache's table holds them, nil
+	// when the run reads no table and collects nothing.
 	standardLibraryKeys map[*packages.Package]cache.Key
 
-	// fromBinary are the hits restored from the binary's table, which are never written to the store, and binaryHits
-	// what the host's session of a run with extra builds holds of each, which it keeps for them (keepBinaryHit).
-	fromBinary map[*packages.Package]bool
-	binaryHits map[*packages.Package]binaryHit
+	// standardLibraryContext is what every standard-library key of the last Restore shared, the fact analyzers
+	// named, which the system cache's table of the build's context is keyed by, nil before a Restore keyed any.
+	standardLibraryContext *cache.StandardLibraryContext
+
+	// fromSystemCache are the hits restored from the system cache's table, which are never written to the store, and
+	// tableHits what the host's session of a run with extra builds holds of each, which it keeps for them
+	// (keepTableHit).
+	fromSystemCache map[*packages.Package]bool
+	tableHits       map[*packages.Package]tableHit
 
 	counts       CacheCounts
 	factsSkipped atomic.Int64
@@ -285,8 +291,8 @@ func NewCacheSession(caching *Caching, rules []rule.Rule, reports ...*analysis.A
 }
 
 // Restore computes the key of every package the load reached, reads each one's entry, and returns those that decode
-// whole and hold every analyzer the run can ask of them. A standard-library package is looked up in the binary's
-// table first (see restoreFromBinary), and in the store only when the table holds none; without a store it is
+// whole and hold every analyzer the run can ask of them. A standard-library package is looked up in the system cache's
+// table first (see restoreFromSystemCache), and in the store only when the table holds none; without a store it is
 // looked up in the table alone, and nothing else is keyed. A package with a list error is always analyzed again. Which
 // analyzers a package can be asked for depends on what misses: a package to analyze is asked for its rules'
 // findings, and any package a missed package to analyze imports, directly or not, is asked for its facts, since a
@@ -316,8 +322,9 @@ func (session *CacheSession) Restore(
 	session.written = map[*packages.Package]bool{}
 	session.buildKeys = nil
 	session.standardLibraryKeys = nil
-	session.fromBinary = map[*packages.Package]bool{}
-	session.binaryHits = map[*packages.Package]binaryHit{}
+	session.standardLibraryContext = nil
+	session.fromSystemCache = map[*packages.Package]bool{}
+	session.tableHits = map[*packages.Package]tableHit{}
 	session.given = make(map[*packages.Package]bool, len(analyzed))
 	for _, analyzedPackage := range analyzed {
 		session.given[analyzedPackage] = true
@@ -369,8 +376,9 @@ func (session *CacheSession) Restore(
 		session.files = keyed.Files
 	}
 	// An extra build without a store keys its load here for the portable digests its restore from the host reads, as
-	// restoreFromHost would after the binary's, so the standard library's keys read the files those keys hashed rather
-	// than hash every one again. Keys that fail are left to restoreFromHost, which computes them again and says why.
+	// restoreFromHost would after the system cache.s, so the standard library's keys read the files those keys hashed
+	// rather than hash every one again. Keys that fail are left to restoreFromHost, which computes them again and says
+	// why.
 	if keyed == nil && session.host != nil && !session.host.off {
 		keyed = session.hostPortableKeys(loader, reachable)
 	}
@@ -380,7 +388,7 @@ func (session *CacheSession) Restore(
 	case session.host != nil:
 		hashed = session.host.host.files
 	}
-	session.restoreFromBinary(loader, reachable, hashed)
+	session.restoreFromSystemCache(loader, reachable, hashed)
 	session.readHits(reachable)
 	session.readPrevious(reachable)
 	session.holdAliasHits(reachable)
@@ -417,7 +425,7 @@ func (session *CacheSession) Files() cache.FileDigests {
 }
 
 // HasStore reports whether the session reads and writes a store, which a session under `--no-cache`, reading the
-// binary's entries alone, does not: such a run keeps neither go list's answer nor gofmt's verdicts.
+// system cache alone, does not: such a run keeps neither go list's answer nor gofmt's verdicts.
 func (session *CacheSession) HasStore() bool {
 	return session.caching.Store != nil
 }
@@ -452,9 +460,9 @@ func (session *CacheSession) KeyFor(label string) [sha256.Size]byte {
 }
 
 // readHits makes a hit, as hitAt would, of every package among reachable that has a key, no list error, no entry from
-// the binary, and no reload pending (see Reload), when the store holds a whole entry of it. The entries are read and
-// decoded as many at once as there are cores, since on a warm run of cohere's own root reading 1,167 of them one at a
-// time was 119ms of a 268ms
+// the system cache, and no reload pending (see Reload), when the store holds a whole entry of it. The entries are read
+// and decoded as many at once as there are cores, since on a warm run of cohere's own root reading 1,167 of them one at
+// a time was 119ms of a 268ms
 // restore. A worker writes only its own slot of what it read: what it calls reads files, the session's analyzers and
 // its store, none of which a restore writes, so the session's maps are written here alone, once every worker is done,
 // in reachable's order.
@@ -463,7 +471,7 @@ func (session *CacheSession) readHits(reachable []*packages.Package) {
 	var keys []cache.Key
 	for _, restoring := range reachable {
 		key, hasKey := session.keys[restoring]
-		if !hasKey || len(restoring.Errors) > 0 || session.fromBinary[restoring] || session.reloading(restoring) {
+		if !hasKey || len(restoring.Errors) > 0 || session.fromSystemCache[restoring] || session.reloading(restoring) {
 			continue
 		}
 		reading = append(reading, restoring)
@@ -587,7 +595,7 @@ func (session *CacheSession) dropShortHits(reachable []*packages.Package) bool {
 		if short {
 			delete(session.hits, hit)
 			delete(session.secondKeyHits, hit)
-			delete(session.fromBinary, hit)
+			delete(session.fromSystemCache, hit)
 			dropped = true
 		}
 	}
@@ -688,15 +696,15 @@ func (session *CacheSession) filesOf(analyzedPackage *packages.Package) ([]store
 
 // save writes the entry of every miss no wave has saved yet, from the last wave's graph, with every answer of its
 // package (see demandOf), writes again each entry the first wave saved whose answers grew since, and counts every
-// package the load reached as a hit, from the store or the binary, or a miss. A session without a store writes nothing
-// and counts only what it restored and reloaded.
+// package the load reached as a hit, from the store or the system cache, or a miss. A session without a store writes
+// nothing and counts only what it restored and reloaded.
 func (session *CacheSession) save(
 	graph *checker.Graph,
 	withheld map[*packages.Package]load.PackageWithheld,
 	files map[*packages.Package][]storedFile,
 ) {
 	session.counts.FactsSkipped = int(session.factsSkipped.Load())
-	session.counts.FromBinary = len(session.fromBinary)
+	session.counts.FromSystemCache = len(session.fromSystemCache)
 	session.answering.lock.Lock()
 	session.counts.Reloads = len(session.answering.reloaded)
 	session.counts.ReloadRounds = session.answering.rounds
@@ -724,7 +732,7 @@ func (session *CacheSession) save(
 	if session.dependence != nil {
 		session.counts.DependenceRecords = &session.dependence.counts
 	}
-	session.counts.Hit = len(session.hits) - len(session.fromBinary) - hostRestored
+	session.counts.Hit = len(session.hits) - len(session.fromSystemCache) - hostRestored
 	session.counts.Missed = len(session.keys) - len(session.hits)
 	session.counts.SecondKeyHit = len(session.secondKeyHits)
 }

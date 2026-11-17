@@ -138,20 +138,21 @@ func TestAPlainRunComparesNoFacts(test *testing.T) {
 // bound, two calls from Finish, so the bound passes the first order. Process calls os.Getpid, whose shared file reads
 // syscall's, which each platform's file declares, so beside Maybe, a caller of the dependent Finish, it is an
 // independent caller of a dependent unit. It counts alike whether the host checks the standard library from source,
-// its graph then holding os, or restores it from the binary's table, when the call is found only through the standard
-// library's graph (#ss4t5g6). The workspace's counts are what the census wrote before every build shared one call
-// index (#f9br7sg); the dependencies' are the standard library's of the host's platform, so they are left to the log.
+// its graph then holding os, or restores it from the system cache's table, when the call is found only through the
+// standard library's graph (#ss4t5g6). The workspace's counts are what the census wrote before every build shared one
+// call index (#f9br7sg); the dependencies' are the standard library's of the host's platform, so they are left to the
+// log.
 func TestTheFactsCensusFollowsACallerChainAcrossBothGraphs(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	table, _, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
 	for _, each := range []struct {
 		name      string
 		configure func(*pipeline)
 		restores  bool
 	}{
 		{name: "checked from source"},
-		{name: "restored from the table", configure: readingTableAs(table, engineTestsStamp, ""), restores: true},
+		{name: "restored from the table", configure: readingTableAs(test, table, context, ""), restores: true},
 	} {
 		engine, census := windowsCensus(test, "build-facts-chain", each.configure)
 		hasGraph := engine.dependence.standardLibrary != nil && engine.dependence.standardLibrary.graph != nil

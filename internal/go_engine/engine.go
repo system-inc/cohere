@@ -19,9 +19,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/format"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
 )
 
@@ -99,7 +101,7 @@ func Main(
 			return refuse(standardError, generatorError)
 		}
 		return runStandardLibraryVerb(arguments, standardOutput, standardError, rules.All(),
-			embeddedStandardLibrary.table, generator)
+			cache.NewStandardLibraryTable(standard_library_table.Contents), generator)
 	}
 	// A save writes no file, refused where every write of a source file passes (format.RefuseWrites), so no phase, one
 	// added later included, can write over a file the editor holds unsaved. Here rather than in run, as the memory
@@ -108,13 +110,13 @@ func Main(
 		format.RefuseWrites()
 	}
 	return runOverlapping(arguments, standardInput, standardOutput, standardError, rules.All(), &memory,
-		embeddedStandardLibrary, true, nil)
+		standardLibrarySource{}, true, nil)
 }
 
 // run is Main with the analyzer rules handed in and no standard input, so a test can run the engine with a rule
 // planted in place of the registry's, such as one that panics. memory is what Main decided about the memory limit, nil
-// in a test, which decides nothing and never raises the limit. It reads the standard library's entries the binary
-// carries.
+// in a test, which decides nothing and never raises the limit. Its standard library is a plain run's, read from the
+// system cache.
 func run(
 	arguments []string,
 	standardOutput io.Writer,
@@ -123,20 +125,20 @@ func run(
 	memory *engineMemory,
 ) int {
 	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, memory,
-		embeddedStandardLibrary)
+		standardLibrarySource{})
 }
 
-// runWithStandardLibrary is run reading builtIn in place of the binary's own standard-library entries, so a test can
-// give a run a table and a stamp of its own, or collect the entries a run saves, without a release build.
+// runWithStandardLibrary is run with source as where its standard library comes from and goes, so a test can give a
+// run a system cache and a stamp of its own, or collect the entries a run saves, without a release build.
 func runWithStandardLibrary(
 	arguments []string,
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
 	memory *engineMemory,
-	builtIn builtInStandardLibrary,
+	source standardLibrarySource,
 ) int {
-	return runOverlapping(arguments, nil, standardOutput, standardError, registered, memory, builtIn, true, nil)
+	return runOverlapping(arguments, nil, standardOutput, standardError, registered, memory, source, true, nil)
 }
 
 // runOverlapping is runWithStandardLibrary, with the standard input the editor's save reads its buffer from, nil for a
@@ -151,7 +153,7 @@ func runOverlapping(
 	standardError io.Writer,
 	registered []rule.Rule,
 	memory *engineMemory,
-	builtIn builtInStandardLibrary,
+	source standardLibrarySource,
 	overlaps bool,
 	answersInPart map[string]bool,
 ) int {
@@ -159,7 +161,7 @@ func runOverlapping(
 	if parseError != nil {
 		return refuse(standardError, parseError)
 	}
-	request.standardLibrary = builtIn
+	request.standardLibrary = source
 	request.answersInPart = answersInPart
 	switch request.mode() {
 	case modeVersion:

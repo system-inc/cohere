@@ -143,9 +143,9 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		line += " " + style.dim("("+strings.Join(inside, " • ")+")")
 	}
 
-	// The standard library's packages a Go run restored from the binary rather than analyzed, which no file count
-	// holds, so a cold run that reused them reads as such.
-	if summary.PackageCache != nil && summary.PackageCache.FromBinary > 0 {
+	// The standard library's packages a Go run restored from the system cache rather than analyzed, which no file
+	// count holds, so a cold run that reused them reads as such.
+	if summary.PackageCache != nil && summary.PackageCache.FromSystemCache > 0 {
 		line += " • " + summary.PackageCache.segment()
 	}
 	// A Go run whose findings cache could not be read or written, which stderr says one by one, says how many where
