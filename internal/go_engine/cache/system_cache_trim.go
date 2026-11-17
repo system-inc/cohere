@@ -16,7 +16,7 @@ import (
 // The system cache is trimmed as Go's build cache is (cmd/go/internal/cache): every dev rebuild is a new engine
 // identity, and so a new table for each target it meets, which nothing reads again once the next rebuild runs.
 const (
-	// trimInterval is how long a trim lasts: a run trims when the last trim was longer ago than this.
+	// trimInterval is how often a run trims at most: a run trims when the last trim was longer ago than this.
 	trimInterval = 24 * time.Hour
 	// unusedAge is how long a file goes unread before a trim deletes it.
 	unusedAge = 5 * 24 * time.Hour
