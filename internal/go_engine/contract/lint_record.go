@@ -155,6 +155,12 @@ type BuildRecord struct {
 	// Written only when not 0, so a run under `--no-cache` writes none.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
 
+	// SharedBodyHits, additive within contract 3, counts the packages a build hit in its own findings cache whose body
+	// it took from the run's memo of decoded bodies (#qqyq61s), the bodies the host's session read from its store and
+	// those an earlier build read, rather than read the host's record its own names and decode the body again. Written
+	// only when not 0, so a cold run, whose host read nothing from its store, and a run under `--no-cache` write none.
+	SharedBodyHits int `json:"sharedBodyHits,omitempty"`
+
 	// InheritedFiles counts the distinct files an extra build took the host's findings of at least one syntax-only
 	// rule on, rather than walk them again in a package it checked from source (#y6q1x2j), and InheritedFindings the
 	// findings it took, each rule's on each file once. A build that restores nothing from the host's run, as under

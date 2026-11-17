@@ -647,6 +647,10 @@
                                 "type": "integer",
                                 "description": "The packages this build restored from the host's run whose entry it wrote to its own findings cache once their restore held, so its next run hits them there rather than check them from source. Absent when 0, and always under --no-cache, which writes nothing."
                             },
+                            "sharedBodyHits": {
+                                "type": "integer",
+                                "description": "The packages this build hit in its own findings cache whose body it took from the run's memo of decoded bodies, the bodies the host's run read from its store and those an earlier build read, rather than read and decode it again. Absent when 0: a cold run, whose host read nothing from its store, and a run under --no-cache write none."
+                            },
                             "inheritedFiles": {
                                 "type": "integer",
                                 "description": "The distinct files this build took the host's findings of at least one syntax-only rule on, rather than walk them again in a package it checked from source. Absent when 0, and always under --timing, which restores nothing from the host's run."
