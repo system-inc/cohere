@@ -67,7 +67,9 @@ type describedProject struct {
 	constrainedInScope map[string]bool
 
 	// contents are the in-scope files that could be read, as they were read, the build constraints' too
-	// (constrainedInScope), for the other builds that compile them.
+	// (constrainedInScope), for the other builds that compile them. A writer replaces a file's bytes here and never
+	// writes into the ones held: the run's suppression indexes (suppressionIndexes) take the same slice to mean the
+	// same bytes, so a write into one in place would leave a stale index and a directive covering the wrong line.
 	contents map[string][]byte
 
 	// unreadable are the in-scope files that could not be read, each written before the first phase.

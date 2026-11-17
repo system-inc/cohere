@@ -446,7 +446,8 @@ type suppressedFindings struct {
 // description read, to the findings in scope: every readable file for one build's run, and those a build has a say on
 // when builds merge (see outcomeOf). ran are the analyzer rules that ran: a directive naming a rule the settings
 // turned off is neither used nor unused. The files are indexed as many at once as there are cores, since each index
-// is its own file's.
+// is its own file's, each through the run's indexes (suppressionIndexes), so a file every build compiles is indexed
+// once for the run rather than once a build (#qqyq61s).
 func (engine *pipeline) suppress(ran []string, inScope []check.Finding, files []string) suppressedFindings {
 	indexes := make([]*suppression.Index, len(files))
 	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
@@ -455,7 +456,7 @@ func (engine *pipeline) suppress(ran []string, inScope []check.Finding, files []
 		slots <- struct{}{}
 		group.Go(func() {
 			defer func() { <-slots }()
-			indexes[index] = suppression.Build(file, engine.described.contents[file])
+			indexes[index] = engine.suppressionIndexes.of(file, engine.described.contents[file])
 		})
 	}
 	group.Wait()
