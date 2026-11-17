@@ -109,7 +109,10 @@ type Selection struct {
 
 // selectionIdentity is what makes two selections the same: the receiver's type name by identity, the name selected,
 // and the path through embedded fields, each index written in decimal and ended by a comma, so two paths are one
-// identity only when they are one path.
+// identity only when they are one path. Within one package's reads a receiver and a name already fix the path: the
+// receiver is a named type's origin, never an unnamed struct, and the one way a name reaches two paths, unexported
+// names of two packages promoted into one type, never meets in one package's reads, which select only its own
+// unexported names. The path is kept in the key so that rests on no such argument.
 type selectionIdentity struct {
 	receiver *types.TypeName
 	name     string
