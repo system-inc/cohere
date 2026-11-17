@@ -53,6 +53,17 @@ func (bodies *decodedBodies) add(decoded *restoredPackage) {
 	}
 }
 
+// release lets go of every decode the memo holds, once no build is left to ask for one (HostRun.Release), so the host's
+// session, which holds the memo too, holds none past the builds.
+func (bodies *decodedBodies) release() {
+	if bodies == nil {
+		return
+	}
+	bodies.lock.Lock()
+	defer bodies.lock.Unlock()
+	bodies.byDigest = map[cache.Key]*restoredPackage{}
+}
+
 // of is the decode of the body whose sha256 is digest, and whether the memo holds one.
 func (bodies *decodedBodies) of(digest []byte) (*restoredPackage, bool) {
 	if bodies == nil || len(digest) != len(cache.Key{}) {

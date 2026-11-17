@@ -918,11 +918,12 @@ func (session *CacheSession) keepForBuilds(
 			actionsOf[action.Package] = append(actionsOf[action.Package], action)
 		}
 	}
-	// The bodies the session decoded from its store go to the builds with the run, which lets go of them once the last
-	// build has run (HostRun.Release), rather than live as long as the session.
+	// The bodies the session decoded from its store go to the builds with the run, which empties the memo once the
+	// last build has run (HostRun.Release), rather than have it live as long as the session. The session keeps the
+	// same memo, so a host that analyzes again after a reload keeps what its earlier loads decoded, and the run its
+	// last keep hands the builds holds all of it.
 	host := &HostRun{entries: map[string]*hostEntry{}, renderings: NewReadsBuild(), files: keyed.Files,
 		bodies: session.bodies}
-	session.bodies = nil
 	// Every package of one load has the load's sizes, the host's build's.
 	for keyedPackage := range keyed.Keys {
 		if keyedPackage.TypesSizes != nil {

@@ -71,11 +71,20 @@ func throughHostSession(test *testing.T, root string, storeDirectory string) (*H
 // hostSessionOf is throughHostSession under rules.
 func hostSessionOf(test *testing.T, root string, storeDirectory string, rules []rule.Rule) (*HostRun, *CacheSession) {
 	test.Helper()
-	return hostSessionWith(test, root, cachingAt(storeDirectory, rules), rules)
+	result, session := hostSessionWith(test, root, cachingAt(storeDirectory, rules), rules, nil)
+	return result.Host, session
 }
 
-// hostSessionWith is hostSessionOf with caching, as under `--no-cache`, whose caching has no store.
-func hostSessionWith(test *testing.T, root string, caching *Caching, rules []rule.Rule) (*HostRun, *CacheSession) {
+// hostSessionWith is hostSessionOf with caching, as under `--no-cache`, whose caching has no store, returning the
+// host's result. afterLoad, when not nil, is given the session once the load has restored what it hits and before
+// anything is analyzed.
+func hostSessionWith(
+	test *testing.T,
+	root string,
+	caching *Caching,
+	rules []rule.Rule,
+	afterLoad func(session *CacheSession),
+) (*Result, *CacheSession) {
 	test.Helper()
 	session := NewCacheSession(caching, rules)
 	session.KeepForBuilds()
@@ -84,6 +93,9 @@ func hostSessionWith(test *testing.T, root string, caching *Caching, rules []rul
 	if loadError != nil || len(loaded.Diagnostics) > 0 {
 		test.Fatalf("loading the host's build: %v %+v", loadError, loaded.Diagnostics)
 	}
+	if afterLoad != nil {
+		afterLoad(session)
+	}
 	result, runError := Run(loaded.Packages, rules, Options{Cache: session, Withheld: loaded.Withheld,
 		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots, KeepForBuilds: true})
 	if runError != nil || len(result.Crashes) > 0 {
@@ -91,7 +103,7 @@ func hostSessionWith(test *testing.T, root string, caching *Caching, rules []rul
 	}
 	// The builds judge the host's reads, which are whole only once their walks end, as the engine waits for them.
 	result.ReadWalks.Wait()
-	return result.Host, session
+	return result, session
 }
 
 // throughBuild is windows's run over root, with its store in storeDirectory, restoring from host when it is not nil,

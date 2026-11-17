@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
@@ -40,11 +41,9 @@ func warmBodiesOf(test *testing.T) warmBodies {
 		windows: windows}
 }
 
-// readUser is user's hit as a session of windows reads it from the store under windows's key of user, with the run's
-// memo of decoded bodies as the session would read it, and the session, a fresh one restoring from fixture's host.
-func (fixture warmBodies) readUser(test *testing.T, known func(*cacheAnalyzers) *cacheAnalyzers) (storeHit,
-	*CacheSession,
-) {
+// readUser is user's hit as a fresh session of windows, restoring from fixture's host, reads it from the store under
+// windows's key of user, with the run's memo of decoded bodies as the session would read it.
+func (fixture warmBodies) readUser(test *testing.T, known func(*cacheAnalyzers) *cacheAnalyzers) storeHit {
 	test.Helper()
 	session := NewCacheSession(windowsCachingAt(fixture.store, throughRules()), throughRules())
 	session.RestoreFromHost(fixture.host)
@@ -52,7 +51,7 @@ func (fixture warmBodies) readUser(test *testing.T, known func(*cacheAnalyzers) 
 		session.known = known(session.known)
 	}
 	user := throughPackage(test, fixture.windows, throughUserPath)
-	return session.readHit(user, fixture.windows.keys[user], session.sharedBodies()), session
+	return session.readHit(user, fixture.windows.keys[user], session.sharedBodies())
 }
 
 // windowsRecordOfUser is the record windows's store keeps of user, under windows's key of it, with that key.
@@ -86,6 +85,17 @@ func TestAWarmBuildTakesTheBodiesItsRecordsNameFromTheRunsDecodes(test *testing.
 	if !reflect.DeepEqual(fixture.warm.Findings, fixture.cold.Findings) {
 		test.Errorf("windows warm found\n%+v\ncold\n%+v", fixture.warm.Findings, fixture.cold.Findings)
 	}
+	// The host's session keeps the memo it handed the run, so a host analyzing again after a reload keeps what it
+	// decoded, and the run's Release empties it for both.
+	memo := fixture.hostRun.bodies
+	if memo == nil || memo != fixture.host.bodies || len(memo.byDigest) == 0 {
+		test.Fatalf("the host's session holds memo %p, the run %p, want one memo holding bodies", memo,
+			fixture.host.bodies)
+	}
+	fixture.host.Release()
+	if len(memo.byDigest) != 0 {
+		test.Errorf("the run's Release left %d bodies in the memo the host's session holds", len(memo.byDigest))
+	}
 
 	uncached := func() *Caching {
 		caching := windowsCachingAt(test.TempDir(), throughRules())
@@ -95,8 +105,8 @@ func TestAWarmBuildTakesTheBodiesItsRecordsNameFromTheRunsDecodes(test *testing.
 	for range 2 {
 		hostCaching := cachingAt(test.TempDir(), throughRules())
 		hostCaching.Store = nil
-		host, _ := hostSessionWith(test, fixture.root, hostCaching, throughRules())
-		result, _ := buildWith(test, fixture.root, uncached(), host, throughRules())
+		host, _ := hostSessionWith(test, fixture.root, hostCaching, throughRules(), nil)
+		result, _ := buildWith(test, fixture.root, uncached(), host.Host, throughRules())
 		if result.Cache.SharedBodyHits != 0 {
 			test.Errorf("windows under --no-cache took %d bodies from the run's memo, want none",
 				result.Cache.SharedBodyHits)
@@ -110,10 +120,10 @@ func TestASharedBodysHitReadsItsOwnRecordsReads(test *testing.T) {
 	test.Parallel()
 
 	fixture := warmBodiesOf(test)
-	read, session := fixture.readUser(test, nil)
-	if read.restored == nil || session.sharedBodyHits.Load() != 1 {
-		test.Fatalf("windows's user was not taken from the run's memo: hit %t, %d taken", read.restored != nil,
-			session.sharedBodyHits.Load())
+	read := fixture.readUser(test, nil)
+	if read.restored == nil || !read.shared {
+		test.Fatalf("windows's user was not taken from the run's memo: hit %t, shared %t", read.restored != nil,
+			read.shared)
 	}
 	own, _ := fixture.windowsRecordOfUser(test)
 	host := fixture.hostRecordOfUser(test)
@@ -150,10 +160,10 @@ func TestASharedBodysHitReadsItsOwnRecordsExportData(test *testing.T) {
 		test.Fatal(putError)
 	}
 
-	read, session := fixture.readUser(test, nil)
-	if read.restored == nil || session.sharedBodyHits.Load() != 1 {
-		test.Fatalf("windows's user was not taken from the run's memo: hit %t, %d taken", read.restored != nil,
-			session.sharedBodyHits.Load())
+	read := fixture.readUser(test, nil)
+	if read.restored == nil || !read.shared {
+		test.Fatalf("windows's user was not taken from the run's memo: hit %t, shared %t", read.restored != nil,
+			read.shared)
 	}
 	if !bytes.Equal(read.restored.exportDigest, digest) {
 		test.Errorf("user's hit names export data %x, its record %x, the host's %x", read.restored.exportDigest,
@@ -171,10 +181,9 @@ func TestTwoBuildsTakingOneSharedBodyHoldTypesOfTheirOwn(test *testing.T) {
 	test.Parallel()
 
 	fixture := warmBodiesOf(test)
-	first, firstSession := fixture.readUser(test, nil)
-	second, secondSession := fixture.readUser(test, nil)
-	if first.restored == nil || second.restored == nil || firstSession.sharedBodyHits.Load() != 1 ||
-		secondSession.sharedBodyHits.Load() != 1 {
+	first := fixture.readUser(test, nil)
+	second := fixture.readUser(test, nil)
+	if first.restored == nil || second.restored == nil || !first.shared || !second.shared {
 		test.Fatal("windows's user was not taken from the run's memo by both builds")
 	}
 	shared, held := fixture.host.bodies.of(first.restored.bodyDigest)
@@ -196,7 +205,7 @@ func TestABuildWhoseAnalyzersDifferTakesNoSharedBody(test *testing.T) {
 	fixture := warmBodiesOf(test)
 	// The one difference: a report analyzer the host's lack, which decodesAlike reads as unlike, and which decodes the
 	// entries cleanly, since none holds its slot, so the build still hits.
-	read, session := fixture.readUser(test, func(known *cacheAnalyzers) *cacheAnalyzers {
+	read := fixture.readUser(test, func(known *cacheAnalyzers) *cacheAnalyzers {
 		unlike := *known
 		unlike.reports = maps.Clone(known.reports)
 		unlike.reports[&analysis.Analyzer{Name: "report_the_host_lacks"}] = true
@@ -205,8 +214,140 @@ func TestABuildWhoseAnalyzersDifferTakesNoSharedBody(test *testing.T) {
 	if read.restored == nil {
 		test.Fatal("windows's user did not decode from disk")
 	}
-	if taken := session.sharedBodyHits.Load(); taken != 0 {
-		test.Errorf("a build whose analyzers differ took %d bodies from the run's memo, want none", taken)
+	if read.shared {
+		test.Error("a build whose analyzers differ took user's body from the run's memo, want its own decode")
+	}
+}
+
+// SharedBodyHits counts the hits a load kept whose body was the run's memo's, never one dropShortHits made a miss
+// after readHit took its body (#qqyq61s).
+func TestSharedBodyHitsCountsOnlyTheHitsKept(test *testing.T) {
+	test.Parallel()
+
+	session := NewCacheSession(&Caching{}, throughRules())
+	kept, dropped := &packages.Package{ID: "kept"}, &packages.Package{ID: "dropped"}
+	session.hits = map[*packages.Package]*restoredPackage{kept: {}}
+	session.sharedBodyHits = map[*packages.Package]bool{kept: true, dropped: true}
+	session.save(nil, nil, nil)
+	if session.counts.SharedBodyHits != 1 {
+		test.Errorf("counted %d hits from the memo, want the 1 kept", session.counts.SharedBodyHits)
+	}
+}
+
+// A record whose body the run's memo holds hits from it though the host's record at its BodyAt has moved on to another
+// body since (#qqyq61s), on purpose: the record's own digest names the bytes it judged, which is what the holder's
+// compare proves on disk. Read from disk, with no memo, the same record is a miss, as it always was.
+func TestASharedBodyHitsThoughItsHostRecordMovedOn(test *testing.T) {
+	test.Parallel()
+
+	fixture := warmBodiesOf(test)
+	own, key := fixture.windowsRecordOfUser(test)
+	hostKey := fixture.hostRun.keys[throughPackage(test, fixture.hostRun, throughUserPath)]
+	if !bytes.Equal(own.BodyAt, hostKey[:]) {
+		test.Fatalf("windows's record of user names %x, want the host's record at %x", own.BodyAt, hostKey[:])
+	}
+	rewriteStoredEntry(test, fixture.hostRun.caching.Store, hostKey, func(entry *cacheEntry) {
+		entry.Files = append(entry.Files, storedFile{Name: "moved on"})
+	})
+	if moved := storedRecordAt(test, fixture.hostRun.caching.Store, hostKey); bytes.Equal(moved.Body, own.Body) {
+		test.Fatal("the host's record of user still holds the body windows's names, so nothing moved")
+	}
+
+	read := fixture.readUser(test, nil)
+	if read.restored == nil || !read.shared || !bytes.Equal(read.restored.bodyDigest, own.Body) {
+		test.Errorf("windows's user from the memo: hit %t, shared %t, want a hit of the body its record names",
+			read.restored != nil, read.shared)
+	}
+	session := NewCacheSession(windowsCachingAt(fixture.store, throughRules()), throughRules())
+	user := throughPackage(test, fixture.windows, throughUserPath)
+	if fromDisk := session.readHit(user, key, nil); fromDisk.restored != nil {
+		test.Error("windows's user read from disk hit, though its host record holds another body")
+	}
+}
+
+// A record of a shape no writer makes, naming its body by a key of the wrong length and holding none, is a miss from
+// the run's memo as from disk (#qqyq61s), though the memo holds the body its digest names.
+func TestAMalformedRecordNeverHitsFromTheMemo(test *testing.T) {
+	test.Parallel()
+
+	fixture := warmBodiesOf(test)
+	record, key := fixture.windowsRecordOfUser(test)
+	if _, held := fixture.host.bodies.of(record.Body); record.Inline != nil || !held {
+		test.Fatalf("want windows's record of user naming a body the memo holds, got %d bytes inline, held %t",
+			len(record.Inline), held)
+	}
+	record.BodyAt = record.BodyAt[:len(record.BodyAt)/2]
+	encoded, encodeError := encodeRecord(record)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if putError := fixture.windows.caching.Store.Put(key, encoded); putError != nil {
+		test.Fatal(putError)
+	}
+	if read := fixture.readUser(test, nil); read.restored != nil || read.shared {
+		test.Errorf("a record naming its body by %d bytes hit, shared %t, want a miss", len(record.BodyAt),
+			read.shared)
+	}
+}
+
+// The host's own analysis over hits whose decodes the run's memo shares, and a build's after it, write nothing of them
+// (#qqyq61s): restore hands their facts to the checker's actions, importers inherit and read them, and findings,
+// reports and answers are read, but each decode the memo holds is, after both runs, what a fresh decode of the same
+// body is. user's comment is edited after a cold run, so the host hits base, whose printf fact about Logf user's
+// analysis reads to find its planted finding.
+func TestTheHostsAnalysisWritesNothingOfASharedDecode(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	writeFiles(test, root, throughFiles)
+	store := filepath.Join(test.TempDir(), "shared")
+	throughBuild(test, root, store, throughHost(test, root, store))
+	editFile(test, root, "user/user.go", replaced(test, "// Use hands Logf", "// Use hands base.Logf"))
+
+	// Each body the load hit, decoded afresh from the store before anything is analyzed, as the memo holds it.
+	fresh := map[cache.Key]*restoredPackage{}
+	result, session := hostSessionWith(test, root, cachingAt(store, throughRules()), throughRules(),
+		func(session *CacheSession) {
+			for hit, restored := range session.hits {
+				if session.fromBinary[hit] {
+					continue
+				}
+				decoded, decodeError := decodedStoredEntry(test, session.caching.Store, session.known, hit,
+					session.stored[hit])
+				if decodeError != nil || !bytes.Equal(decoded.bodyDigest, restored.bodyDigest) {
+					test.Fatalf("%s: decoded afresh to body %x (%v), the hit's %x", hit.ID, decoded.bodyDigest,
+						decodeError, restored.bodyDigest)
+				}
+				expected := newDecodedBodies(session.known)
+				expected.add(decoded)
+				fresh[cache.Key(decoded.bodyDigest)] = expected.byDigest[cache.Key(decoded.bodyDigest)]
+			}
+		})
+	base, user := throughPackage(test, session, throughBasePath), throughPackage(test, session, throughUserPath)
+	if !session.restored(base) || session.restored(user) {
+		test.Fatalf("want base hit and user analyzed, got base hit %t, user hit %t", session.restored(base),
+			session.restored(user))
+	}
+	if !slices.ContainsFunc(result.Findings, func(finding Finding) bool {
+		return strings.HasSuffix(finding.File, "user.go") && finding.Rule == throughRules()[0].Name
+	}) {
+		test.Fatalf("the host found no printf finding in user.go, which only base's restored fact gives: %+v",
+			result.Findings)
+	}
+	throughBuild(test, root, store, result.Host)
+	for digest, expected := range fresh {
+		held, kept := result.Host.bodies.of(digest[:])
+		if !kept {
+			test.Errorf("the run's memo lost body %x", digest[:])
+			continue
+		}
+		if !reflect.DeepEqual(held, expected) {
+			test.Errorf("body %x: the memo's decode after the runs\n%+v\na fresh decode\n%+v", digest[:], held,
+				expected)
+		}
+	}
+	if len(fresh) == 0 {
+		test.Fatal("the host hit nothing, so the memo shared nothing to write")
 	}
 }
 
@@ -235,8 +376,9 @@ func TestTheRunsMemoHoldsNoDecodeFromTheBinarysTable(test *testing.T) {
 		Table:   cache.NewStandardLibraryTable(table),
 		Context: standardLibraryContext("check tests", goRoot),
 	}
-	hostSessionWith(test, directory, caching, rules)
-	host, session := hostSessionWith(test, directory, caching, rules)
+	hostSessionWith(test, directory, caching, rules, nil)
+	warm, session := hostSessionWith(test, directory, caching, rules, nil)
+	host := warm.Host
 	if len(session.fromBinary) == 0 || len(session.hits) == len(session.fromBinary) {
 		test.Fatalf("want hits from the table and the store both, got %d hits, %d from the table", len(session.hits),
 			len(session.fromBinary))

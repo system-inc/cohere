@@ -59,6 +59,8 @@ func (host *HostRun) Release() {
 	host.entries = nil
 	host.renderings = nil
 	host.known = nil
+	// Emptied, not only let go: the host's session holds the same memo (keepForBuilds).
+	host.bodies.release()
 	host.bodies = nil
 	host.holders = nil
 }
