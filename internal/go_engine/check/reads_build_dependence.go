@@ -66,8 +66,8 @@ type DependenceSet struct {
 
 // Dependence is restoring's dependence set for TypesHold and FactsHold, from the reads the host's run made of it, with
 // build the host's memo, which every build shares: memoized there by the package's reads, so each package's set is
-// computed once, when it is first asked, which is once the host's run is over and adds no read to it. Reads the
-// verdict judges read by read reach, by kind:
+// computed once, for every package the host kept, by the host as the package's type-read walk ends
+// (HostRun.computeDependence), so it adds no read to it. Reads the verdict judges read by read reach, by kind:
 //
 //   - a use of the whole, and every read of a package with assembly files (Restoring.Assembly), judged by the memo's
 //     whole twin: every package the closure digest's walk visits (closure);
@@ -94,6 +94,13 @@ func (build *ReadsBuild) Dependence(restoring Restoring) DependenceSet {
 	if known, isKnown := build.dependences.Load(restoring.Reads); isKnown {
 		return knownDependence(restoring, known)
 	}
+	// Reads whose walk is still running, not recorded and not marked never, are the whole import closure for this ask
+	// alone, never stored: stored, the set would stay the whole closure for the run once the walk recorded them, and
+	// how far the run reaches would turn on which walks had ended when the set was first asked. Reads marked never are
+	// final, so their whole closure is stored below as any set is.
+	if restoring.Reads.Never() == "" && !restoring.Reads.Recorded() {
+		return DependenceSet{WholeClosure: true}
+	}
 	// Two verdicts may compute one package's set at once; each computes it alike, and every caller gets the one stored.
 	stored, _ := build.dependences.LoadOrStore(restoring.Reads, build.dependenceOf(restoring))
 	return knownDependence(restoring, stored)
@@ -111,6 +118,9 @@ func knownDependence(restoring Restoring, known any) DependenceSet {
 
 // dependenceOf is restoring's dependence set, computed (Dependence).
 func (build *ReadsBuild) dependenceOf(restoring Restoring) DependenceSet {
+	if build.computing != nil {
+		build.computing(restoring)
+	}
 	if restorable, _ := restoring.Reads.Restorable(); !restorable || restoring.Reads.ClosureOnly() != "" {
 		return DependenceSet{WholeClosure: true}
 	}

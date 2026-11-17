@@ -96,6 +96,8 @@ func inheritHost(test *testing.T, root string, rules []rule.Rule) *HostRun {
 		test.Fatalf("running the host's build: %v %+v", runError, result.Crashes)
 	}
 	result.ReadWalks.Wait()
+	// The host's dependence sets are in before any build starts, as the engine joins them (#ybjbqm2).
+	result.Host.DependenceComputed()
 	return result.Host
 }
 

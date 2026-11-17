@@ -287,6 +287,7 @@ func (engine *pipeline) lintPackages(
 	// The host's run keeps its packages' entries for the extra builds to restore from, only when there are any.
 	options.KeepForBuilds = session != nil && options.Reads != nil && engine.keepsForBuilds()
 	options.Pool = engine.workPool()
+	options.KeptDependence, options.DependenceJoining = engine.keptDependence, engine.dependenceJoining
 	// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 	// and what follows reads the files' contents the project description holds, and the types.
 	options.ReleaseAnalyzed = true
