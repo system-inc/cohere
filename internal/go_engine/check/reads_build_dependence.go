@@ -66,8 +66,8 @@ type DependenceSet struct {
 
 // Dependence is restoring's dependence set for TypesHold and FactsHold, from the reads the host's run made of it, with
 // build the host's memo, which every build shares: memoized there by the package's reads, so each package's set is
-// computed once, at the host's keep for every package it kept (keptDependence), once the host's run is over, so it
-// adds no read to it. Reads the verdict judges read by read reach, by kind:
+// computed once, for every package the host kept, once its type-read walks have ended and before any build starts
+// (HostRun.ComputeDependence), so it adds no read to it. Reads the verdict judges read by read reach, by kind:
 //
 //   - a use of the whole, and every read of a package with assembly files (Restoring.Assembly), judged by the memo's
 //     whole twin: every package the closure digest's walk visits (closure);

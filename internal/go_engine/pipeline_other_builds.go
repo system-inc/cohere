@@ -60,6 +60,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
+	// Every kept package's dependence set, computed once here rather than by the builds racing to ask it, and only now
+	// that the host's reads are whole: computed from a read still being walked, a set would be the whole closure.
+	pass.result.Host.ComputeDependence(engine.workPool())
 	// The host's facts, which each build's are compared with under `--build-dependence` (#0ghk7vj), indexed before any
 	// build starts.
 	engine.indexHostFacts(pass.result.Facts, pass.result.RestoredAnswers)

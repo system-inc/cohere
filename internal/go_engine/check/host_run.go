@@ -1,6 +1,7 @@
 package check
 
 import (
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -9,6 +10,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -84,6 +86,33 @@ func importPaths(importer *packages.Package) []string {
 	}
 	slices.Sort(paths)
 	return paths
+}
+
+// ComputeDependence has host's memo compute the dependence set of every package the host kept, once, fanned out over
+// pool as the session's fanOut does, at the priority below every load's and check's work, or on a goroutine per core
+// when pool is nil, so each extra build's walk (restoreFromHost) finds every set it asks in the memo (#ybjbqm2). Asked
+// there instead, each set was computed by the first of seven builds racing to ask it, the others waiting or computing
+// it again before the memo stored one: each build's walk took 223 ms at cohere's root, and 4 to 5 ms with the sets
+// computed here, in a pass of 111 ms on about three cores, the run's wall 0.11 s less there and 0.07 s at deeafbf4,
+// its user and system time level, with the same findings. A set is computed from the host's types and reads, so it is
+// asked only once the host's type-read walks have ended (check.Result.ReadWalks): a package whose walk is still
+// running reads as never recorded, and its set would be the whole import closure, how far the run reaches turning on
+// which walks finished first. The keep runs inside check.Run, before those walks are waited for, so the run asks it
+// after them, before any build starts.
+func (host *HostRun) ComputeDependence(pool *bounded.Pool) {
+	if host == nil {
+		return
+	}
+	// The entries in a slice, so each index of the fan-out has its own.
+	kept := slices.Collect(maps.Values(host.entries))
+	work := func(index int) {
+		host.renderings.Dependence(kept[index].restoring)
+	}
+	if pool != nil {
+		pool.ForEach(len(kept), 0, work)
+		return
+	}
+	bounded.ForEach(len(kept), false, work)
 }
 
 // Inheritance is an extra build's take of host for the rules enabled, nil when host kept nothing, as under `--timing`.
