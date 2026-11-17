@@ -252,7 +252,8 @@ func TestTheRunsMemoHoldsNoDecodeFromTheBinarysTable(test *testing.T) {
 		held[digest] = true
 	}
 	if !maps.Equal(held, fromStore) {
-		test.Errorf("the run's memo holds bodies %v, want the store's hits' %v", held, fromStore)
+		test.Errorf("the run's memo holds %d bodies, want the %d of the store's hits alone", len(held),
+			len(fromStore))
 	}
 }
 
@@ -315,6 +316,14 @@ func TestTheRunsMemoNeverHandsABuildAnotherBodyOfItsPackage(test *testing.T) {
 	warm, _ := throughBuild(test, root, store, host)
 	reference, _ := throughBuild(test, root, filepath.Join(test.TempDir(), "reference"), nil)
 
+	for label, result := range map[string]*Result{"after the edit": edited, "warm": warm} {
+		if !reflect.DeepEqual(result.Findings, reference.Findings) {
+			test.Errorf("%s windows found\n%+v\nand a run restoring nothing from the host\n%+v", label,
+				result.Findings, reference.Findings)
+		}
+	}
+	// What makes the comparison tell: the host's warm run hit base, its finding in base_host.go in the body the memo
+	// holds.
 	hostBase := throughPackage(test, hostSession, throughBasePath)
 	hostHit, hostHeld := hostSession.hits[hostBase]
 	if !hostHeld || !slices.ContainsFunc(hostHit.analyses[throughRules()[0].Analyzer].findings,
@@ -323,12 +332,6 @@ func TestTheRunsMemoNeverHandsABuildAnotherBodyOfItsPackage(test *testing.T) {
 			"nothing windows could be handed")
 	}
 	if _, held := host.bodies.of(hostHit.bodyDigest); !held {
-		test.Fatal("the run's memo holds no body of the host's base")
-	}
-	for label, result := range map[string]*Result{"after the edit": edited, "warm": warm} {
-		if !reflect.DeepEqual(result.Findings, reference.Findings) {
-			test.Errorf("%s windows found\n%+v\nand a run restoring nothing from the host\n%+v", label,
-				result.Findings, reference.Findings)
-		}
+		test.Error("the run's memo holds no body of the host's base")
 	}
 }
