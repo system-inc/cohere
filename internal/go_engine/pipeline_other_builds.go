@@ -570,6 +570,7 @@ func (engine *pipeline) extraBuildRun(
 		if session.HasStore() {
 			caching.Listings = session
 		}
+		caching.RecordReads = extraBuildRecordsReads(session)
 	}
 	// The first load's count at its gate, which a reload's never replaces, as checkedFromSource's first round is the
 	// first load's: the gauge reads the gate's share beside the final one.
@@ -667,6 +668,10 @@ func (engine *pipeline) extraBuildRun(
 			Cache:          session,
 			Withheld:       over.Withheld,
 			Bodiless:       over.Bodiless,
+			// The standard library's reads, when the build keeps a system cache (extraBuildRecordsReads), walked in the
+			// load's slots below its work, for its table's entries.
+			Reads:     over.Reads,
+			WalkSlots: over.WalkSlots,
 			// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
 			ReleaseAnalyzed: true,
 			ReadFile:        engine.sourceReader(nil, over.Rewritten),
@@ -756,6 +761,17 @@ func (engine *pipeline) extraBuildRun(
 		}
 	}
 	return run, nil
+}
+
+// extraBuildRecordsReads is which packages an extra build's load and lint record what each read of other packages, as
+// load.Caching.RecordReads takes it: the standard library's alone, as session judged it (KeptBySystemCache), in a
+// build that keeps a system cache, so its own table takes the entries it computes (check.standardLibraryEntryWhole)
+// and a warm run restores them from it; none in a build that keeps none, which keeps nothing for a build of its own.
+func extraBuildRecordsReads(session *check.CacheSession) func(*packages.Package) bool {
+	if !session.KeepsSystemCache() {
+		return nil
+	}
+	return session.KeptBySystemCache
 }
 
 // extraBuildSystemCache is the system cache an extra build reads its table from and writes it to: the run's, but none

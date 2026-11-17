@@ -1,7 +1,9 @@
 package go_engine
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/gob"
 	"io"
 	"io/fs"
 	"os"
@@ -442,5 +444,80 @@ func TestAHostOnlyRunWritesEveryEntryWithItsReads(test *testing.T) {
 		if entry, _ := table.Lookup(key); entry.Reads == nil {
 			test.Errorf("the table holds an entry under %s with no persisted reads", key)
 		}
+	}
+}
+
+// A warm run over a system cache with an extra build of another target restores that build's standard library from its
+// own context's table and declines no package of it at the check (#syscache): over the fixture with a file only another
+// target compiles, a cold run under `--no-cache` writes the host's table and the build's, and the warm run's build
+// restores from its own table and declines nothing, so it loads no second round.
+func TestAWarmExtraBuildRestoresItsStandardLibraryFromItsOwnTable(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, standardLibraryFixture)
+	other := map[bool]string{true: "freebsd", false: "linux"}[runtime.GOOS == "linux"]
+	if writeError := os.WriteFile(filepath.Join(root, "library_"+other+".go"), []byte("package library\n"),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
+		"--other-builds").stream)
+	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
+		"--other-builds").stream)
+	if len(warm.Builds) < 2 || len(warm.Builds) != len(cold.Builds) {
+		test.Fatalf("want the warm run to run the cold run's builds and one beside the host's, got %+v", warm.Builds)
+	}
+	for index, build := range warm.Builds[1:] {
+		coldBuild := cold.Builds[index+1]
+		if coldBuild.SystemCacheWritten == 0 {
+			test.Errorf("%s wrote no table of its own cold, %+v", coldBuild.Target, coldBuild)
+		}
+		if build.SystemCacheRestored == 0 || build.DeclinedAtCheck != 0 || build.ReloadRounds != 0 {
+			test.Errorf("%s warm restored %d from its own table and declined %d at the check over %d reloads, "+
+				"want its own table restored from and nothing declined: %+v", build.Target,
+				build.SystemCacheRestored, build.DeclinedAtCheck, build.ReloadRounds, build)
+		}
+	}
+}
+
+// tableEntryReads is what a test reads of a table entry's answer reads, by the field names check's
+// standardLibraryEntry encodes them under, which gob matches by name: whether one could not be named, and each read's
+// owner.
+type tableEntryReads struct {
+	PackagePath     string
+	ReadsIncomplete bool
+	Reads           []struct{ Owner string }
+}
+
+// A run under `--no-cache`, whose lint runs beside the load and keys no package but the standard library's, names the
+// owner of every answer its standard-library packages read (check's readsOf), so its table holds no entry with reads it
+// could not name: such an entry would have every extra build decline it, and what imports it, at the check, and load
+// again, for as long as the table holds it. Over the fixture, 36 of the table's 78 entries read answers of others.
+func TestANoCacheRunsTableNamesEveryAnswerItsEntriesRead(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, standardLibraryFixture)
+	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
+	table := tableIn(test, systemCache.systemCacheRoot)
+	withReads := 0
+	for _, key := range table.Keys() {
+		// Ignored: the key is one of the table's own.
+		entry, _ := table.Lookup(key)
+		var decoded tableEntryReads
+		if decodeError := gob.NewDecoder(bytes.NewReader(entry.Entry)).Decode(&decoded); decodeError != nil {
+			test.Fatal(decodeError)
+		}
+		if decoded.ReadsIncomplete {
+			test.Errorf("the table holds %s with answer reads it could not name", decoded.PackagePath)
+		}
+		if len(decoded.Reads) > 0 {
+			withReads++
+		}
+	}
+	if withReads == 0 {
+		test.Errorf("no entry of the table's %d read an answer of another package, so the run tells nothing",
+			len(table.Keys()))
 	}
 }

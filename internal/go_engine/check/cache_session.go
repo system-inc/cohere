@@ -98,7 +98,7 @@ type StandardLibraryRunEntry struct {
 
 	// ReadsJudged is set once the run's reads were whole and PersistCollectedReads judged the package's recorded reads:
 	// persisted in Reads, or left nil for reads no record can hold, which an extra build declines, as the generator
-	// leaves them. A package whose reads the run never recorded, as in an extra build, is never judged.
+	// leaves them. A package whose reads the run never recorded, in a run keeping no system cache, is never judged.
 	ReadsJudged bool
 }
 
@@ -227,6 +227,10 @@ type CacheSession struct {
 	// standardLibraryKeys are the standard-library packages' keys, by which the system cache's table holds them, nil
 	// when the run reads no table and collects nothing.
 	standardLibraryKeys map[*packages.Package]cache.Key
+
+	// standardLibraryByPath are the packages of standardLibraryKeys by import path, which readsOf names an answer's
+	// owner by when the session was never told of it (standardLibraryOwnerOf).
+	standardLibraryByPath map[string]*packages.Package
 
 	// waitingForTable are the entries of the standard-library packages the run computed whose write to the store waits
 	// for the system cache's table, by their standard-library key, with the package each is of (KeptBySystemCache).
@@ -383,6 +387,7 @@ func (session *CacheSession) Restore(
 	session.written = map[*packages.Package]bool{}
 	session.buildKeys = nil
 	session.standardLibraryKeys = nil
+	session.standardLibraryByPath = nil
 	session.standardLibraryContext = nil
 	session.systemCacheTable = nil
 	session.fromSystemCache = map[*packages.Package]bool{}
@@ -490,6 +495,13 @@ func (session *CacheSession) Files() cache.FileDigests {
 // system cache alone, does not: such a run keeps neither go list's answer nor gofmt's verdicts.
 func (session *CacheSession) HasStore() bool {
 	return session.caching.Store != nil
+}
+
+// KeepsSystemCache reports whether the session reads and writes the system cache's table of its build's context: a
+// run keeping a system cache, under neither `--no-system-cache` nor a root it could not keep.
+func (session *CacheSession) KeepsSystemCache() bool {
+	standardLibrary := session.caching.StandardLibrary
+	return standardLibrary != nil && standardLibrary.System != nil
 }
 
 // Kept is what a run kept in the session's store under key beside the entries, go list's answer for
@@ -1010,8 +1022,7 @@ func (session *CacheSession) savable(saver string, keyed *packages.Package, acti
 // the restore judged, and of nothing a table never holds. A package restored from the table is never checked, so its
 // reads are marked never as restored and never walked: a warm run pays nothing for them.
 func (session *CacheSession) KeptBySystemCache(keyed *packages.Package) bool {
-	standardLibrary := session.caching.StandardLibrary
-	if standardLibrary == nil || standardLibrary.System == nil {
+	if !session.KeepsSystemCache() {
 		return false
 	}
 	_, standard := session.standardLibraryKeys[keyed]

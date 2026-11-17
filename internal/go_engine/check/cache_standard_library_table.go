@@ -313,10 +313,15 @@ func withoutDamage(
 //   - Answers: they were computed whole (demandOf), every kind complete, rather than those the run's questions
 //     happened to compute, which a later run would have to load the package from source to add to.
 //   - Reads: the run recorded them and judged them once they were whole (PersistCollectedReads): persisted beside the
-//     entry, or left out for reads no record can hold, as with cgo, as the generator leaves them. An entry whose
-//     reads the run never recorded, as an extra build's, is refused: taken, it would have every extra build that
-//     restores it from the host decline it as unpersisted, on every run of every project that reads the table, where
-//     the generator's carries what the build needs.
+//     entry, or left out for reads no record can hold, as with cgo, as the generator leaves them. Every run that keeps
+//     a system cache records them for its standard library, the host's build and each extra build alike
+//     (recordsReadsOf, extraBuildRecordsReads). An entry whose reads the run never recorded is refused: taken, it would
+//     have every extra build that restores it from the host decline it as unpersisted, on every run of every project
+//     that reads the table, where the generator's carries what the build needs.
+//
+// An entry whose answer reads could not all be named (ReadsIncomplete) is admitted, as the generator admits it: every
+// standard-library owner is named (readsOf), so only a read with no objectpath leaves one so, which costs the builds a
+// decline of it, never a wrong finding, and refusing it here would drop it from the release's table unsaid.
 func standardLibraryEntryWhole(collected StandardLibraryRunEntry, entry cacheEntry) bool {
 	for _, slot := range collected.FactAnalyzers {
 		if _, analyzed := entry.Analyzers[slot]; !analyzed {

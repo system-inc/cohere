@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"cmp"
+	"go/types"
 	"slices"
 
 	"golang.org/x/tools/go/packages"
@@ -24,7 +25,8 @@ import (
 
 // readsOf is the reads the entry of saved holds: those held before, the entry's before a reload or the first wave's,
 // with every read the run's analysis of saved made, each naming its owner by ID and the owner's first key in this run,
-// sorted, and whether one could not be named, an object with no objectpath or an owner this run did not key.
+// or its standard-library key in a run that keyed no other, sorted, and whether one could not be named, an object with
+// no objectpath or an owner this run did not key.
 func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) ([]storedRead, bool) {
 	if session.readAfterKeep("readsOf, the reads of " + saved.ID) {
 		return held.reads, held.readsIncomplete
@@ -43,11 +45,21 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 	incomplete = incomplete || !complete
 	for _, read := range reads {
 		owner := session.packageOf(read.Owner)
+		if owner == nil {
+			owner = session.standardLibraryOwnerOf(read.Owner)
+		}
 		key, keyed := cache.Key{}, false
 		if owner != nil {
 			key, keyed = session.keys[owner]
 			if !keyed {
 				key, keyed = session.buildKeys[owner]
+			}
+			// A run without a store keys its packages only once it keeps them for its builds, after its saves, but it
+			// keys the standard library before any: a standard-library package reads only the standard library's, so
+			// its entry's reads are always named, as the system cache's table needs them, which drops each owner's key
+			// as it takes the entry.
+			if !keyed {
+				key, keyed = session.standardLibraryKeys[owner]
 			}
 		}
 		if !keyed {
@@ -71,6 +83,19 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 			cmp.Compare(left.Path, right.Path))
 	})
 	return sorted, incomplete
+}
+
+// standardLibraryOwnerOf is the standard-library package whose types are owner, among those the session keyed, or nil.
+// A run beside the load tells the session of a package only as an action restores it, since no package's types are
+// final as the run starts (check.Run), so a standard-library package the run computed is unknown to packageOf when a
+// package above it is saved; its types are final by then, since the read was of them, so it is found by its import
+// path, which names one package of the standard library in a load, and held only when its types are owner's.
+func (session *CacheSession) standardLibraryOwnerOf(owner *types.Package) *packages.Package {
+	candidate := session.standardLibraryByPath[owner.Path()]
+	if candidate == nil || candidate.Types != owner {
+		return nil
+	}
+	return candidate
 }
 
 // holdAliasHits trusts every hit whose entry is its own: one from the system cache's table, keyed by everything it

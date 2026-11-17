@@ -22,6 +22,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
 // countedFact is the fact countingFactRule's analyzer learns, which it never exports: an analyzer with a fact type
@@ -814,6 +815,46 @@ func TestAnEntryThatDoesNotRestoreIsSaidAndReplaced(test *testing.T) {
 	if next.result.Cache.FromSystemCache != len(next.session.standardLibraryKeys) {
 		test.Errorf("want every one of the %d standard-library packages restored after the write, got %d",
 			len(next.session.standardLibraryKeys), next.result.Cache.FromSystemCache)
+	}
+}
+
+// A run without a project's store, as under `--no-cache`, names the owner of every answer a standard-library package
+// read by its standard-library key, so none of its entries is collected with reads it could not name: taken by the
+// system cache's table so, such an entry would have every extra build decline it, and what imports it, at the check,
+// and load again, for as long as the table holds it. Over the engine's standard-library fixture, with every rule, 36
+// of its 78 entries read answers of other packages.
+func TestARunWithoutAStoreNamesEveryStandardLibraryRead(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	for _, name := range []string{"go.mod", "library.go"} {
+		contents, readError := os.ReadFile(filepath.Join("..", "testdata", "standard-library", name))
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		if writeError := os.WriteFile(filepath.Join(directory, name), contents, 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	every := rules.All()
+	caching := systemCacheCaching(nil, standardLibraryContext("check tests", goRootOf(test)))
+	persistRunReads(runSessionWith(test, directory, caching, every, every))
+	withReads := 0
+	for key, collected := range caching.StandardLibrary.Collected {
+		var entry cacheEntry
+		if decodeError := gob.NewDecoder(bytes.NewReader(collected.Entry)).Decode(&entry); decodeError != nil {
+			test.Fatal(decodeError)
+		}
+		if entry.ReadsIncomplete {
+			test.Errorf("%s, under %s, was collected with answer reads it could not name", collected.PackagePath, key)
+		}
+		if len(entry.Reads) > 0 {
+			withReads++
+		}
+	}
+	if withReads == 0 {
+		test.Errorf("no entry of the %d collected read an answer of another package, so the run tells nothing",
+			len(caching.StandardLibrary.Collected))
 	}
 }
 
