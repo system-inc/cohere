@@ -113,7 +113,7 @@ func StandardLibraryTableOf(
 
 // standardLibraryTableWith is the table that holds held, a table's entries as a run read them, each kept as it is, and
 // beside them each of entries, a finished run's standard-library packages by their standard-library keys, whose key
-// held does not hold, and how many of entries it took. It says it holds variants. Only an entry as whole as the
+// held does not hold, and the keys of entries it took. It says it holds variants. Only an entry as whole as the
 // release's generator writes one goes in (standardLibraryEntryWhole): a short one, a package checked where no fact
 // analyzer's action reached it or whose answers were computed in part, would be restored by every later run that reads
 // the table as if it were whole, since an entry the table holds is never written again, so it is left out and computed
@@ -136,7 +136,7 @@ func standardLibraryTableWith(
 	readAgainst map[cache.Key]bool,
 	goRoot string,
 	variants []cache.StandardLibraryVariant,
-) ([]byte, int, error) {
+) ([]byte, map[cache.Key]bool, error) {
 	rename := renameToGoRootMarker(goRoot)
 	// In the keys' order, so the same entries refuse with the same error.
 	keys := slices.SortedFunc(maps.Keys(entries), compareCacheKeys)
@@ -149,11 +149,11 @@ func standardLibraryTableWith(
 	for _, key := range keys {
 		var entry cacheEntry
 		if decodeError := gob.NewDecoder(bytes.NewReader(entries[key].Entry)).Decode(&entry); decodeError != nil {
-			return nil, 0, fmt.Errorf("writing the standard library's table: decoding the entry of %s: %w",
+			return nil, nil, fmt.Errorf("writing the standard library's table: decoding the entry of %s: %w",
 				entries[key].PackagePath, decodeError)
 		}
 		if entry.Version != CacheFormatVersion {
-			return nil, 0, fmt.Errorf("writing the standard library's table: the entry of %s is in format %q, not "+
+			return nil, nil, fmt.Errorf("writing the standard library's table: the entry of %s is in format %q, not "+
 				"%q", entries[key].PackagePath, entry.Version, CacheFormatVersion)
 		}
 		if _, kept := held[key]; kept {
@@ -206,16 +206,16 @@ func standardLibraryTableWith(
 	}
 	portable := make(map[cache.Key]cache.StandardLibraryEntry, len(held)+len(taking))
 	maps.Copy(portable, held)
-	added := 0
+	taken := make(map[cache.Key]bool, len(taking))
 	for _, key := range taking {
 		collected, entry := entries[key], decoded[key]
 		if len(entry.Files) > 0 {
-			return nil, 0, fmt.Errorf("writing the standard library's table: the entry of %s holds the walk of its "+
+			return nil, nil, fmt.Errorf("writing the standard library's table: the entry of %s holds the walk of its "+
 				"files, as only a package the run was asked to analyze does", collected.PackagePath)
 		}
 		withheld, renameError := renameWithheldFiles(entry.Withheld, rename)
 		if renameError != nil {
-			return nil, 0, fmt.Errorf("writing the standard library's table: the entry of %s: %w",
+			return nil, nil, fmt.Errorf("writing the standard library's table: the entry of %s: %w",
 				collected.PackagePath, renameError)
 		}
 		tableEntry := standardLibraryEntry{
@@ -239,7 +239,7 @@ func standardLibraryTableWith(
 		}
 		encoded, encodeError := encodeStandardLibraryEntry(tableEntry)
 		if encodeError != nil {
-			return nil, 0, fmt.Errorf("writing the standard library's table: %w", encodeError)
+			return nil, nil, fmt.Errorf("writing the standard library's table: %w", encodeError)
 		}
 		var renamed []byte
 		if collected.ExportData != nil {
@@ -251,13 +251,13 @@ func standardLibraryTableWith(
 			}
 			renamed, renameError = renameExportDataFiles(read, readFileSet, rename)
 			if renameError != nil {
-				return nil, 0, fmt.Errorf("writing the standard library's table: %w", renameError)
+				return nil, nil, fmt.Errorf("writing the standard library's table: %w", renameError)
 			}
 		}
 		portable[key] = cache.StandardLibraryEntry{Entry: encoded, ExportData: renamed, Reads: collected.Reads}
-		added++
+		taken[key] = true
 	}
-	return cache.WriteStandardLibraryTable(portable, variants), added, nil
+	return cache.WriteStandardLibraryTable(portable, variants), taken, nil
 }
 
 // standardLibraryEntryWhole reports whether collected, decoded as entry, is as whole as an entry the release's

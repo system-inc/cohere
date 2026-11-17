@@ -705,32 +705,49 @@ func TestAnEntryTheTableHoldsIsNeverRewritten(test *testing.T) {
 	}
 }
 
-// A run keeping a system cache writes no standard-library package to the project's store (keptBySystemCache): after
-// a cached run, the store holds the module's package under its key and none of the standard library's packages under
-// theirs, which the run collected for the system cache's table.
-func TestTheProjectStoreTakesNoStandardLibraryEntry(test *testing.T) {
+// The project's store takes no whole standard-library entry the system cache's table holds, and takes every one the
+// table refuses (WriteSystemCacheTable): after a cached run whose answers of strings are computed in part, which leaves
+// strings short and out of the table, the store holds the module's package and strings under their keys, and none of
+// the packages the table holds under theirs.
+func TestTheProjectStoreTakesNoWholeEntryTheTableHolds(test *testing.T) {
 	test.Parallel()
 
 	directory := standardLibraryModule(test)
 	goRoot := goRootOf(test)
-	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	context := standardLibraryContext("check tests", goRoot)
+	rules := []rule.Rule{countingFactRule(&sync.Map{}), houseRule(ctrlflow.Analyzer)}
+	system := cache.OpenAt(filepath.Join(test.TempDir(), "go", "standard-library"))
 	caching := testCaching(test, rules)
-	caching.StandardLibrary = systemCacheCaching(cache.OpenAt(filepath.Join(test.TempDir(), "go",
-		"standard-library")), standardLibraryContext("check tests", goRoot)).StandardLibrary
+	caching.StandardLibrary = systemCacheCaching(system, context).StandardLibrary
+	caching.AnswersInPart = map[string]bool{"strings": true}
 	run := runWithSession(test, directory, caching, rules)
-	if len(run.session.standardLibraryKeys) == 0 {
-		test.Fatal("want the run to key the standard library apart")
+	if writtenTable(test, run) == 0 {
+		test.Fatal("want the whole entries in the table")
 	}
-	for keyed := range run.session.standardLibraryKeys {
-		if caching.Store.Holds(run.session.keys[keyed]) {
-			test.Errorf("the project's store holds %s, a standard-library package", keyed.PkgPath)
+	contents, found := system.Get(tableKeyOf(test, context, rules))
+	if !found {
+		test.Fatal("want the table written")
+	}
+	table := cache.NewStandardLibraryTable(contents)
+	held := 0
+	for keyed, key := range run.session.standardLibraryKeys {
+		_, inTable := table.Lookup(key)
+		if inTable {
+			held++
 		}
+		if inStore := caching.Store.Holds(run.session.keys[keyed]); inStore == inTable {
+			test.Errorf("%s: in the table %t and in the project's store %t, want one or the other", keyed.PkgPath,
+				inTable, inStore)
+		}
+	}
+	if held == 0 {
+		test.Error("want the table to hold the whole entries")
+	}
+	if !caching.Store.Holds(sessionKey(test, run.session, "strings")) {
+		test.Error("want strings, short, in the project's store")
 	}
 	if !caching.Store.Holds(sessionKey(test, run.session, "example.com/standard")) {
 		test.Error("want the module's own package in the project's store")
-	}
-	if len(caching.StandardLibrary.Collected) == 0 {
-		test.Error("want the standard library collected for the system cache's table")
 	}
 }
 

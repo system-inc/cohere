@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -328,5 +329,44 @@ func TestAWarmRunWritesNothingToTheSystemCache(test *testing.T) {
 	after := systemCacheListing(test, systemCache.systemCacheRoot)
 	if len(after) != len(before) || !equalEntries(before, after) {
 		test.Errorf("want the system cache as the cold run left it, before %v, after %v", before, after)
+	}
+}
+
+// A warm extra build hits in its own store the standard-library packages it checked cold only for the types of a
+// package above them restored from the host's run, where no fact analyzer's action reached them: the system cache's
+// table refuses such a short entry (check.standardLibraryEntryWhole), and the store takes it, as it took every
+// standard-library entry before the system cache. The host's table is the generator's, some of whose entries carry no
+// persisted reads, so the build declines those from the host and checks them, and what they import, from source. Over
+// the fixture with a file only another target compiles, the run after a cold one, with that file edited so library
+// misses in the build, checks library alone from source there, where a store that refused the short entries too would
+// have the build check them from source again every run: 11 of them on darwin, beside library.
+func TestAWarmExtraBuildHitsItsShortStandardLibraryEntriesInItsOwnStore(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, standardLibraryFixture)
+	other := map[bool]string{true: "freebsd", false: "linux"}[runtime.GOOS == "linux"]
+	otherFile := filepath.Join(root, "library_"+other+".go")
+	if writeError := os.WriteFile(otherFile, []byte("package library\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	systemCache := generatedTableReading(test, localTable(test))
+	cold := extraBuildRecords(test, runEngineWith(test, root, systemCache, rules.All(), "--other-builds").stream)
+	if writeError := os.WriteFile(otherFile, []byte("// Package library is edited.\npackage library\n"),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	warm := extraBuildRecords(test, runEngineWith(test, root, systemCache, rules.All(), "--other-builds").stream)
+	if len(warm) == 0 || len(warm) != len(cold) {
+		test.Fatalf("want the warm run to run the cold run's %d extra builds, got %d", len(cold), len(warm))
+	}
+	for index, build := range warm {
+		if cold[index].CheckedFromSource <= 1 {
+			test.Fatalf("%s checked %d packages from source cold, so the warm run tells nothing", build.Target,
+				cold[index].CheckedFromSource)
+		}
+		if build.CheckedFromSource != 1 || len(build.CheckedFromSourceRounds) > 0 {
+			test.Errorf("%s checked %d packages from source warm over the rounds %v, of %d cold, want library alone",
+				build.Target, build.CheckedFromSource, build.CheckedFromSourceRounds, cold[index].CheckedFromSource)
+		}
 	}
 }

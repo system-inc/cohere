@@ -215,6 +215,10 @@ type CacheSession struct {
 	// when the run reads no table and collects nothing.
 	standardLibraryKeys map[*packages.Package]cache.Key
 
+	// waitingForTable are the entries of the standard-library packages the run computed whose write to the store waits
+	// for the system cache's table, by their standard-library key, with the package each is of (keptBySystemCache).
+	waitingForTable map[cache.Key]waitingEntry
+
 	// standardLibraryContext is what every standard-library key of the last Restore shared, the fact analyzers
 	// named, which the system cache's table of the build's context is keyed by, nil before a Restore keyed any.
 	// systemCacheTable is that table as the last Restore read it, nil when there was none, which
@@ -799,21 +803,22 @@ func (session *CacheSession) saveMisses(
 		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
 		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
 			withheld[saved], demanded, files[saved], knownFiles, nil, true)
-		// A standard-library package keyed apart is kept by the system cache alone, when the run keeps one: encoded
-		// all the same, for the table and for the second wave, which restores it from the entry, and never written to
-		// the project's store, so no project holds a copy of what every project shares.
-		systemCacheOnly := session.keptBySystemCache(saved)
 		record, keepsRecord := session.dependenceRecordToWrite(saved)
-		keepsRecord = keepsRecord && !systemCacheOnly
 		// The writes and their counting run with no slot held: the counting is a map's and a counter's, under a lock.
+		// A standard-library package keyed apart, in a run that keeps a system cache, waits for the system cache's
+		// table, which takes it when it is whole, so no project holds a copy of what every project shares. What the
+		// table does not take is put in the store then, under its project key, as any miss is now
+		// (WriteSystemCacheTable).
+		systemCacheOnly := session.keptBySystemCache(saved)
 		return func() {
 			var putError error
 			if encodeError == nil && !systemCacheOnly {
 				putError = session.putEntry(session.keys[saved], entry)
 			}
+			writesRecord := keepsRecord && !systemCacheOnly
 			// A dependence record follows its entry, and only an entry whose write held (#6a3kjvz).
 			var recordError error
-			if keepsRecord && encodeError == nil && putError == nil {
+			if writesRecord && encodeError == nil && putError == nil {
 				recordError = session.caching.Store.Put(DependenceRecordKey(session.keys[saved]), record)
 			}
 			countsLock.Lock()
@@ -824,7 +829,7 @@ func (session *CacheSession) saveMisses(
 					session.problem(fmt.Sprintf("writing the dependence record of %s: %v", saved.ID, recordError))
 				}
 				session.counts.WriteFailed++
-			case keepsRecord && encodeError == nil && putError == nil:
+			case writesRecord && encodeError == nil && putError == nil:
 				session.dependence.counts.Written++
 			}
 			if encodeError == nil {
@@ -840,7 +845,8 @@ func (session *CacheSession) saveMisses(
 			case encodeError != nil:
 				session.problem(encodeError.Error())
 			case systemCacheOnly:
-				// Collected for the system cache's table, and never put in the store, so neither written nor failed.
+				// Collected for the system cache's table, and put in the store only if the table refuses it, so neither
+				// written nor failed yet.
 			case putError != nil:
 				if session.counts.WriteFailed == 0 {
 					session.problem(putError.Error())
@@ -883,9 +889,9 @@ func (session *CacheSession) savable(saver string, keyed *packages.Package, acti
 }
 
 // keptBySystemCache reports whether keyed is a standard-library package the session keys apart in a run that keeps a
-// system cache, which keeps it alone (#syscache): the project's store never takes its entry. A run that keeps no system
-// cache, under `--no-system-cache` or with no root, keys no package apart, and the store takes every one as it always
-// has.
+// system cache, whose entry waits for the system cache's table (#syscache): the project's store takes it only when the
+// table refuses it (WriteSystemCacheTable). A run that keeps no system cache, under `--no-system-cache` or with no
+// root, keys no package apart, and the store takes every one as it always has.
 func (session *CacheSession) keptBySystemCache(keyed *packages.Package) bool {
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.System == nil {

@@ -308,12 +308,21 @@ func (session *CacheSession) PersistCollectedReads(reads map[*packages.Package]*
 	}
 }
 
+// waitingEntry is a standard-library package's entry as the run encoded it, which waits for the system cache's table
+// before the store takes it under storeKey, the package's key in the store, if the table refuses it
+// (WriteSystemCacheTable).
+type waitingEntry struct {
+	storeKey cache.Key
+	entry    encodedEntry
+}
+
 // collect adds a standard-library package the run just encoded, with demanded, the answers and reads its entry holds,
 // to the entries the run collects, when it collects any (see StandardLibraryCaching's Collected). It records what
 // standardLibraryEntryWhole later judges the entry by, which no table takes before then: the slots of the run's fact
 // analyzers, each of which a whole entry holds an analysis of, since every action on a package leaves its analysis in
 // the entry, facts or none, so the entry says which ran and the session says which had to; and whether its answers
-// were computed whole. The caller holds the lock the save counts under.
+// were computed whole. An entry whose write to the store waits for the table (keptBySystemCache) is kept as encoded
+// until then. The caller holds the lock the save counts under.
 func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry, demanded entryDemand) {
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.Collected == nil {
@@ -344,6 +353,12 @@ func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry
 		ExportData:    entry.exportData,
 		FactAnalyzers: factAnalyzers,
 		AnswersWhole:  demanded.answersWhole || !asksOnDemand,
+	}
+	if session.caching.Store != nil && session.keptBySystemCache(saved) {
+		if session.waitingForTable == nil {
+			session.waitingForTable = map[cache.Key]waitingEntry{}
+		}
+		session.waitingForTable[key] = waitingEntry{storeKey: session.keys[saved], entry: entry}
 	}
 }
 
@@ -409,16 +424,26 @@ func (session *CacheSession) HasCollected() bool {
 // Put, which renames a whole file into place. It returns how many entries it added, and writes nothing when that is
 // none, as on a warm run, so a run writes its table only when it has something to add.
 //
+// Every entry the table did not take, short or left out for an import it could not read, and every one when the table
+// could not be written, is put in the project's store then, under its package's key, as saveMisses puts any miss
+// (#syscache): the next run hits it there, and dropShortHits judges a short one as it judges any store hit, rather than
+// check it from source every run. A warm extra build hits what it checked only for the types of a package above it
+// restored from the host's run, where no fact analyzer's action reached it, as it always has.
+//
 // Two runs writing the same table each write what they read and their own, and the later rename wins: the earlier
 // one's entries are lost and computed again by the next run, a miss and never a wrong read, since each entry stands
 // under its package's full key. A table that did not parse, or was damaged, is written anew from this run's entries.
 // An error is the run's reason it could not keep the system cache, never a finding's.
-func (session *CacheSession) WriteSystemCacheTable() (int, error) {
+func (session *CacheSession) WriteSystemCacheTable() (added int, returned error) {
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.System == nil || len(standardLibrary.Collected) == 0 ||
 		session.standardLibraryContext == nil {
 		return 0, nil
 	}
+	var taken map[cache.Key]bool
+	// Whatever the table did not take is in the store by the time this returns, the first write that failed joined to
+	// what it returns.
+	defer func() { returned = errors.Join(returned, session.storeWhatTheTableRefused(taken)) }()
 	shared := *session.standardLibraryContext
 	held := map[cache.Key]cache.StandardLibraryEntry{}
 	if read := session.systemCacheTable; read != nil && read.Problem() == nil {
@@ -431,18 +456,47 @@ func (session *CacheSession) WriteSystemCacheTable() (int, error) {
 	for _, key := range session.standardLibraryKeys {
 		readAgainst[key] = true
 	}
-	table, added, tableError := standardLibraryTableWith(standardLibrary.Collected, held, readAgainst, shared.Goroot,
+	table, took, tableError := standardLibraryTableWith(standardLibrary.Collected, held, readAgainst, shared.Goroot,
 		nil)
 	if tableError != nil {
 		return 0, fmt.Errorf("writing the system cache's table of the standard library: %w", tableError)
 	}
-	if added == 0 {
+	if len(took) == 0 {
 		return 0, nil
 	}
 	if putError := standardLibrary.System.Put(cache.StandardLibraryTableKey(shared), table); putError != nil {
 		return 0, fmt.Errorf("writing the system cache's table of the standard library: %w", putError)
 	}
-	return added, nil
+	taken = took
+	return len(took), nil
+}
+
+// storeWhatTheTableRefused puts in the project's store each entry that waited for the system cache's table and is
+// not among taken, the entries the table holds now (WriteSystemCacheTable), forgets every one that waited, and returns
+// the first write that failed. The run's counts were taken at its save, so a failure here is the run's reason it could
+// not keep the system cache as it should, which the run says, rather than one of the store's counted problems.
+func (session *CacheSession) storeWhatTheTableRefused(taken map[cache.Key]bool) error {
+	waiting := session.waitingForTable
+	session.waitingForTable = nil
+	var refused []waitingEntry
+	for key, waited := range waiting {
+		if !taken[key] {
+			refused = append(refused, waited)
+		}
+	}
+	putErrors := make([]error, len(refused))
+	session.fanOutWriting(len(refused), func(index int) func() {
+		return func() {
+			putErrors[index] = session.putEntry(refused[index].storeKey, refused[index].entry)
+		}
+	})
+	for _, putError := range putErrors {
+		if putError != nil {
+			return fmt.Errorf("keeping in the project's store a standard-library entry the table refused: %w",
+				putError)
+		}
+	}
+	return nil
 }
 
 // factAnalyzerSet is each analyzer that learns facts as its slot, then its flags with their values as one JSON object,

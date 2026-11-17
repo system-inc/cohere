@@ -537,13 +537,16 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 
 	renamed := copyFixture(test, filepath.Join("testdata", "rename"))
 	edited := copyFixture(test, filepath.Join("testdata", "rename"))
-	runCachedEngine(test, renamed)
-	runCachedEngine(test, edited)
+	// One system cache for every run of both copies, as a person's, so each restores the standard library alike and
+	// the counts compare the project's own packages.
+	shared := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	runEngineWith(test, renamed, shared, rules.All())
+	runEngineWith(test, edited, shared, rules.All())
 
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	runIsolated(test, []string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput,
-		&standardError, rules.All(), nil)
+	runWithStandardLibrary([]string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput,
+		&standardError, rules.All(), nil, shared)
 	var record contract.FixRecord
 	for line := range strings.Lines(standardOutput.String()) {
 		if strings.HasPrefix(line, `{"kind":"fix"`) {
@@ -569,14 +572,14 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 		}
 	}
 
-	next := runCachedEngine(test, renamed)
-	byHand := runCachedEngine(test, edited)
+	next := runEngineWith(test, renamed, shared, rules.All())
+	byHand := runEngineWith(test, edited, shared, rules.All())
 	if next.counts.Hit == 0 || next.counts.Missed == 0 || next.counts.Hit != byHand.counts.Hit ||
 		next.counts.Missed != byHand.counts.Missed {
 		test.Fatalf("want the run after the rename to hit and miss as the run after the same edit by hand, after the "+
 			"rename %+v, by hand %+v", next.counts, byHand.counts)
 	}
-	uncached := runCachedEngine(test, renamed, "--no-cache")
+	uncached := runEngineWith(test, renamed, shared, rules.All(), "--no-cache")
 	if next.withoutCounts != uncached.withoutCounts {
 		test.Fatalf("after the rename, cached\n%s\nunder --no-cache\n%s", next.withoutCounts, uncached.withoutCounts)
 	}
