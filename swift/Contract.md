@@ -1061,7 +1061,10 @@ reason it had: `hostDecline` (a package its check declined, at most 2 such round
 reached a restored package with no answer of it kept). `"writtenThrough":301` counts the packages it restored whose
 entry it then wrote to its own findings cache, once their restore held, so its next run hits them there rather than
 check them from source, since the host, hitting its own store then, keeps nothing to restore them from; under
-`--no-cache` nothing is written, and it is absent. `"inheritedFiles":40` counts the distinct files an extra build took
+`--no-cache` nothing is written, and it is absent. `"sharedBodyHits":1561` counts the packages a build hit in its own
+findings cache whose body it took from the run's memo of decoded bodies, the bodies the host's run read from its
+store and those an earlier build read, rather than read and decode it again; a cold run, whose host read nothing
+from its store, and a run under `--no-cache` write none, and it is absent. `"inheritedFiles":40` counts the distinct files an extra build took
 the host's findings of at least one syntax-only rule on, rather than walk them again in a package it checked from
 source, since such a rule's findings on a file are the file's alone, and `"inheritedFindings":12` the findings it took,
 each rule's on each file once. Under `--timing` nothing is restored from the host, and nothing inherited, so every

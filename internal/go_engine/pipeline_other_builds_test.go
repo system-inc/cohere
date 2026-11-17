@@ -446,14 +446,15 @@ func withoutCache(stream string) string {
 }
 
 // hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds, what each restored
-// from it, what its walk left untouched and visited, and what each wrote through to its own store
-// (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source, which are
-// what it did not restore, that count load by load, and at the share gate (#ghb3rcn), and the files and findings an
-// extra build inherited from the host for its syntax-only rules, which only a package it checks from source inherits
-// (#y6q1x2j).
+// from it, what its walk left untouched and visited, what each wrote through to its own store, and the hits whose
+// body it took from the run's decodes, which a warm run counts and a cold one does not (#qqyq61s)
+// (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source, which
+// are what it did not restore, that count load by load, and at the share gate (#ghb3rcn), and the files and findings
+// an extra build inherited from the host for its syntax-only rules, which only a package it checks from source
+// inherits (#y6q1x2j).
 var hostRestoreCounts = regexp.MustCompile(
 	`,"(entriesKept|restoredFromHost|untouched|visited|declinedAtLoad|declinedAtCheck|reloadRounds|writtenThrough|` +
-		`checkedFromSource|checkedFromSourceAtGate|inheritedFiles|inheritedFindings)":[0-9]+|` +
+		`sharedBodyHits|checkedFromSource|checkedFromSourceAtGate|inheritedFiles|inheritedFindings)":[0-9]+|` +
 		`,"(declinedBy|reloadRoundsBy)":\{[^}]*\}|,"checkedFromSourceRounds":\[[0-9,]*\]`)
 
 // extraAnalyzedPackages is an extra build's record's count of the packages it analyzed, which its walk's untouched

@@ -12,12 +12,12 @@ package build_reads
 
 import (
 	"cmp"
-	"fmt"
 	"go/ast"
 	"go/types"
 	"maps"
 	"reflect"
 	"slices"
+	"strconv"
 	"sync"
 
 	"golang.org/x/tools/go/analysis"
@@ -44,7 +44,7 @@ type Reads struct {
 	// uses are the foreign objects the package's type check reached, each with every kind of use it made of it, and
 	// selections the selections it made through another package's named type, each once.
 	uses       map[ObjectUse]bool
-	selections map[string]Selection
+	selections map[selectionIdentity]Selection
 
 	// closureOnly is why every read of the package is judged by its closure, empty while each is judged by its kind.
 	closureOnly string
@@ -107,9 +107,27 @@ type Selection struct {
 	Selected types.Object
 }
 
-// selectionKey is what makes two selections the same.
-func selectionKey(selection Selection) string {
-	return fmt.Sprintf("%p %s %v", selection.Receiver, selection.Name, selection.Index)
+// selectionIdentity is what makes two selections the same: the receiver's type name by identity, the name selected,
+// and the path through embedded fields, each index written in decimal and ended by a comma, so two paths are one
+// identity only when they are one path. Within one package's reads a receiver and a name already fix the path: the
+// receiver is a named type's origin, never an unnamed struct, and the one way a name reaches two paths, unexported
+// names of two packages promoted into one type, never meets in one package's reads, which select only its own
+// unexported names. The path is kept in the key so that rests on no such argument.
+type selectionIdentity struct {
+	receiver *types.TypeName
+	name     string
+	index    string
+}
+
+// selectionKey is selection's identity, which formats no address: a Sprintf of the three, receiver by %p, cost every
+// selection of every package a format and its allocations (#deb8gq9).
+func selectionKey(selection Selection) selectionIdentity {
+	index := make([]byte, 0, 4*len(selection.Index))
+	for _, step := range selection.Index {
+		index = strconv.AppendInt(index, int64(step), 10)
+		index = append(index, ',')
+	}
+	return selectionIdentity{receiver: selection.Receiver, name: selection.Name, index: string(index)}
 }
 
 // Fact is one fact an analyzer on the package asked of another package: of Object, or of Package itself when Object

@@ -71,12 +71,30 @@ func throughHostSession(test *testing.T, root string, storeDirectory string) (*H
 // hostSessionOf is throughHostSession under rules.
 func hostSessionOf(test *testing.T, root string, storeDirectory string, rules []rule.Rule) (*HostRun, *CacheSession) {
 	test.Helper()
-	session := NewCacheSession(cachingAt(storeDirectory, rules), rules)
+	result, session := hostSessionWith(test, root, cachingAt(storeDirectory, rules), rules, nil)
+	return result.Host, session
+}
+
+// hostSessionWith is hostSessionOf with caching, as under `--no-cache`, whose caching has no store, returning the
+// host's result. afterLoad, when not nil, is given the session once the load has restored what it hits and before
+// anything is analyzed.
+func hostSessionWith(
+	test *testing.T,
+	root string,
+	caching *Caching,
+	rules []rule.Rule,
+	afterLoad func(session *CacheSession),
+) (*Result, *CacheSession) {
+	test.Helper()
+	session := NewCacheSession(caching, rules)
 	session.KeepForBuilds()
 	loaded, loadError := load.PackagesCached(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
 		load.Caching{Restorer: session, RecordReads: true})
 	if loadError != nil || len(loaded.Diagnostics) > 0 {
 		test.Fatalf("loading the host's build: %v %+v", loadError, loaded.Diagnostics)
+	}
+	if afterLoad != nil {
+		afterLoad(session)
 	}
 	result, runError := Run(loaded.Packages, rules, Options{Cache: session, Withheld: loaded.Withheld,
 		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots, KeepForBuilds: true})
@@ -85,7 +103,7 @@ func hostSessionOf(test *testing.T, root string, storeDirectory string, rules []
 	}
 	// The builds judge the host's reads, which are whole only once their walks end, as the engine waits for them.
 	result.ReadWalks.Wait()
-	return result.Host, session
+	return result, session
 }
 
 // throughBuild is windows's run over root, with its store in storeDirectory, restoring from host when it is not nil,
@@ -104,9 +122,22 @@ func buildOf(
 	rules []rule.Rule,
 ) (*Result, *CacheSession) {
 	test.Helper()
+	return buildWith(test, root, windowsCachingAt(storeDirectory, rules), host, rules)
+}
+
+// windowsCachingAt is windows's cache in storeDirectory, keyed for rules.
+func windowsCachingAt(storeDirectory string, rules []rule.Rule) *Caching {
 	caching := cachingAt(storeDirectory, rules)
 	// The build's keys hold its target, as the engine's do, so they never meet the host's.
 	caching.Context.Build = append(caching.Context.Build, "GOOS=windows")
+	return caching
+}
+
+// buildWith is buildOf with caching, windows's, as under `--no-cache`, whose caching has no store.
+func buildWith(test *testing.T, root string, caching *Caching, host *HostRun, rules []rule.Rule) (*Result,
+	*CacheSession,
+) {
+	test.Helper()
 	session := NewCacheSession(caching, rules)
 	session.RestoreFromHost(host)
 	for {

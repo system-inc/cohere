@@ -149,24 +149,33 @@ func walkUsesKeeping(
 // inspect walks root, a declaration or a function literal, whose return statements return results, each function
 // literal within it walked with its own.
 func (walk *useWalk) inspect(root ast.Node, results *types.Tuple) {
-	ast.Inspect(root, func(node ast.Node) bool {
-		if literal, isLiteral := node.(*ast.FuncLit); isLiteral && node != root {
-			// The literal's own value is placed before its body is walked with its own results.
-			walk.apply(literal)
-			var literalResults *types.Tuple
-			if signature, isSignature := walk.info.TypeOf(literal).(*types.Signature); isSignature {
-				literalResults = signature.Results()
-			}
-			walk.inspect(literal.Type, nil)
-			walk.inspect(literal.Body, literalResults)
-			return false
+	ast.Inspect(root, func(node ast.Node) bool { return walk.visit(node, node == root, results) })
+}
+
+// visit places node's children and records its own use, and reports whether the walk goes on into its children: not
+// for a function literal below the root, walked with its own results, nor for a composite literal, whose elements are
+// placed and walked one at a time (inspectComposite).
+func (walk *useWalk) visit(node ast.Node, isRoot bool, results *types.Tuple) bool {
+	if literal, isLiteral := node.(*ast.FuncLit); isLiteral && !isRoot {
+		// The literal's own value is placed before its body is walked with its own results.
+		walk.apply(literal)
+		var literalResults *types.Tuple
+		if signature, isSignature := walk.info.TypeOf(literal).(*types.Signature); isSignature {
+			literalResults = signature.Results()
 		}
-		walk.place(node, results)
-		if expression, isExpression := node.(ast.Expr); isExpression {
-			walk.apply(expression)
-		}
-		return true
-	})
+		walk.inspect(literal.Type, nil)
+		walk.inspect(literal.Body, literalResults)
+		return false
+	}
+	if literal, isLiteral := node.(*ast.CompositeLit); isLiteral {
+		walk.inspectComposite(literal)
+		return false
+	}
+	walk.place(node, results)
+	if expression, isExpression := node.(ast.Expr); isExpression {
+		walk.apply(expression)
+	}
+	return true
 }
 
 // set gives expression role, where the walk will find it when it reaches the expression, after its parent.
@@ -236,8 +245,6 @@ func (walk *useWalk) place(node ast.Node, results *types.Tuple) {
 		}
 	case *ast.CallExpr:
 		walk.placeCall(node)
-	case *ast.CompositeLit:
-		walk.placeComposite(node)
 	case *ast.AssignStmt:
 		walk.placeAssignment(node)
 	case *ast.ValueSpec:
@@ -358,13 +365,9 @@ func (walk *useWalk) placeCall(call *ast.CallExpr) {
 		return
 	}
 	parameters := signature.Params()
-	var destinations []types.Type
-	for index := range parameters.Len() {
-		destinations = append(destinations, parameters.At(index).Type())
-	}
 	if _, isTuple := walk.info.TypeOf(firstOf(call.Args)).(*types.Tuple); isTuple {
-		// One call's results spread over the parameters.
-		walk.contexts[call.Args[0]] = useContext{role: roleMoved, destinations: destinations}
+		// One call's results spread over the parameters, the one place a call keeps its parameters' types as a list.
+		walk.contexts[call.Args[0]] = useContext{role: roleMoved, destinations: tupleTypes(parameters)}
 		return
 	}
 	for index, argument := range call.Args {
@@ -382,6 +385,19 @@ func (walk *useWalk) placeCall(call *ast.CallExpr) {
 		}
 		walk.moved(argument, destination)
 	}
+}
+
+// tupleTypes are the types of tuple's variables in order, nil for none, a slice made only for a spread of one call's
+// results, which keeps them (#deb8gq9): every other placing reads a variable's type by its index.
+func tupleTypes(tuple *types.Tuple) []types.Type {
+	if tuple.Len() == 0 {
+		return nil
+	}
+	typesOf := make([]types.Type, tuple.Len())
+	for index := range tuple.Len() {
+		typesOf[index] = tuple.At(index).Type()
+	}
+	return typesOf
 }
 
 // firstOf is the first of expressions, nil for none.
@@ -473,13 +489,19 @@ func (walk *useWalk) placeBuiltin(call *ast.CallExpr, name string) {
 	}
 }
 
-// placeComposite places a composite literal's elements, each moved to the field, element or key type it fills. A
+// inspectComposite records a composite literal's own use and walks its type and each element, each moved to the field,
+// element or key type it fills. Each element is placed only as the walk reaches it, so the contexts held at once are
+// the walk's depth, never a literal's element count: placed all at once, a table's thousands of elements were each a
+// context set, held and grown into before any was read, 72% of the walk on golang.org/x/text/collate (#deb8gq9). A
 // struct literal with elements is a use of its type whole, recorded here, since an elided literal type has no type
 // expression of its own: an unkeyed one reads every field in order, and a keyed one is counted against the type's
 // fields by staticcheck's S1016, which also reads whole the type of each value its elements select a field of.
-func (walk *useWalk) placeComposite(literal *ast.CompositeLit) {
+func (walk *useWalk) inspectComposite(literal *ast.CompositeLit) {
+	walk.apply(literal)
+	within := &withinVisitor{walk: walk}
 	if literal.Type != nil {
 		walk.set(literal.Type, roleComponent)
+		ast.Walk(within, literal.Type)
 	}
 	literalType := walk.info.TypeOf(literal)
 	if pointer, isPointer := underlyingOf(literalType).(*types.Pointer); isPointer {
@@ -488,54 +510,66 @@ func (walk *useWalk) placeComposite(literal *ast.CompositeLit) {
 	switch composite := underlyingOf(literalType).(type) {
 	case *types.Struct:
 		for index, element := range literal.Elts {
-			value := element
-			if pair, isPair := element.(*ast.KeyValueExpr); isPair {
-				// A key names a field, a use the type checker records, and moves nothing.
-				walk.set(pair.Key, roleExempt)
-				var fieldType types.Type
-				if key, isIdentifier := pair.Key.(*ast.Ident); isIdentifier {
-					if field, isField := walk.info.Uses[key].(*types.Var); isField {
-						fieldType = field.Type()
-					}
-				}
-				walk.moved(pair.Value, fieldType)
-				value = pair.Value
-			} else if index < composite.NumFields() {
-				walk.moved(element, composite.Field(index).Type())
-			}
-			if selector, isSelector := ast.Unparen(value).(*ast.SelectorExpr); isSelector {
-				if _, selected := walk.info.Selections[selector]; selected {
-					walk.wholeOperands[selector] = true
-				}
-			}
+			walk.placeField(composite, index, element)
+			ast.Walk(within, element)
 		}
 		if len(literal.Elts) > 0 {
 			walk.byValue(literalType)
 		}
 	case *types.Array:
-		walk.placeElements(literal.Elts, nil, composite.Elem())
+		walk.inspectElements(literal.Elts, nil, composite.Elem(), within)
 	case *types.Slice:
-		walk.placeElements(literal.Elts, nil, composite.Elem())
+		walk.inspectElements(literal.Elts, nil, composite.Elem(), within)
 	case *types.Map:
-		walk.placeElements(literal.Elts, composite.Key(), composite.Elem())
+		walk.inspectElements(literal.Elts, composite.Key(), composite.Elem(), within)
+	default:
+		// A literal of no type the walk can place leaves its elements without a context, which goes wide.
+		for _, element := range literal.Elts {
+			ast.Walk(within, element)
+		}
 	}
 }
 
-// placeElements places an array, slice or map literal's elements, each value moved to element, and each key moved to
-// key, or, nil for an array or slice, read as an index.
-func (walk *useWalk) placeElements(elements []ast.Expr, key types.Type, element types.Type) {
+// placeField places a struct literal's element at index: a keyed one's value moved to the field its key names, an
+// unkeyed one moved to the field at its place, and a selector of a field among them marked, its operand read whole.
+func (walk *useWalk) placeField(composite *types.Struct, index int, element ast.Expr) {
+	value := element
+	if pair, isPair := element.(*ast.KeyValueExpr); isPair {
+		// A key names a field, a use the type checker records, and moves nothing.
+		walk.set(pair.Key, roleExempt)
+		var fieldType types.Type
+		if key, isIdentifier := pair.Key.(*ast.Ident); isIdentifier {
+			if field, isField := walk.info.Uses[key].(*types.Var); isField {
+				fieldType = field.Type()
+			}
+		}
+		walk.moved(pair.Value, fieldType)
+		value = pair.Value
+	} else if index < composite.NumFields() {
+		walk.moved(element, composite.Field(index).Type())
+	}
+	if selector, isSelector := ast.Unparen(value).(*ast.SelectorExpr); isSelector {
+		if _, selected := walk.info.Selections[selector]; selected {
+			walk.wholeOperands[selector] = true
+		}
+	}
+}
+
+// inspectElements places and walks an array, slice or map literal's elements one at a time, by within, each value
+// moved to element, and each key moved to key, or, nil for an array or slice, read as an index.
+func (walk *useWalk) inspectElements(elements []ast.Expr, key types.Type, element types.Type, within *withinVisitor) {
 	for _, each := range elements {
-		pair, isPair := each.(*ast.KeyValueExpr)
-		if !isPair {
-			walk.moved(each, element)
-			continue
-		}
-		if key == nil {
-			walk.set(pair.Key, roleUnderlying)
+		if pair, isPair := each.(*ast.KeyValueExpr); isPair {
+			if key == nil {
+				walk.set(pair.Key, roleUnderlying)
+			} else {
+				walk.moved(pair.Key, key)
+			}
+			walk.moved(pair.Value, element)
 		} else {
-			walk.moved(pair.Key, key)
+			walk.moved(each, element)
 		}
-		walk.moved(pair.Value, element)
+		ast.Walk(within, each)
 	}
 }
 
@@ -548,12 +582,12 @@ func (walk *useWalk) placeAssignment(assignment *ast.AssignStmt) {
 		}
 		return
 	}
-	var destinations []types.Type
 	for _, target := range assignment.Lhs {
 		walk.set(target, roleExempt)
-		destinations = append(destinations, walk.info.TypeOf(target))
 	}
-	walk.placeValues(assignment.Rhs, destinations)
+	walk.placeValues(assignment.Rhs, len(assignment.Lhs), func(index int) types.Type {
+		return walk.info.TypeOf(assignment.Lhs[index])
+	})
 }
 
 // placeValueSpec places a variable or constant declaration's type, which declares, and its values, each moved to the
@@ -562,11 +596,9 @@ func (walk *useWalk) placeValueSpec(specification *ast.ValueSpec) {
 	if specification.Type != nil {
 		walk.set(specification.Type, roleDeclared)
 	}
-	destinations := make([]types.Type, 0, len(specification.Names))
-	for _, name := range specification.Names {
-		destinations = append(destinations, walk.info.TypeOf(name))
-	}
-	walk.placeValues(specification.Values, destinations)
+	walk.placeValues(specification.Values, len(specification.Names), func(index int) types.Type {
+		return walk.info.TypeOf(specification.Names[index])
+	})
 }
 
 // placeReturn places a return's values, each moved to its result's type.
@@ -574,23 +606,27 @@ func (walk *useWalk) placeReturn(statement *ast.ReturnStmt, results *types.Tuple
 	if results == nil {
 		return
 	}
-	destinations := make([]types.Type, 0, results.Len())
-	for index := range results.Len() {
-		destinations = append(destinations, results.At(index).Type())
-	}
-	walk.placeValues(statement.Results, destinations)
+	walk.placeValues(statement.Results, results.Len(), func(index int) types.Type {
+		return results.At(index).Type()
+	})
 }
 
-// placeValues places values moved to destinations, one each, or, for one value of many results, all of them to it.
-func (walk *useWalk) placeValues(values []ast.Expr, destinations []types.Type) {
-	if len(values) == 1 && len(destinations) > 1 {
+// placeValues places values moved to count destinations, the one at each index destinationAt's, one each, or, for one
+// value of many results, all of them to it. Only that spread keeps the destinations as a list, made then, so a
+// placing of one value to one destination, nearly every one, allocates nothing (#deb8gq9).
+func (walk *useWalk) placeValues(values []ast.Expr, count int, destinationAt func(index int) types.Type) {
+	if len(values) == 1 && count > 1 {
+		destinations := make([]types.Type, count)
+		for index := range count {
+			destinations[index] = destinationAt(index)
+		}
 		walk.contexts[values[0]] = useContext{role: roleMoved, destinations: destinations}
 		return
 	}
 	for index, value := range values {
 		var destination types.Type
-		if index < len(destinations) {
-			destination = destinations[index]
+		if index < count {
+			destination = destinationAt(index)
 		}
 		walk.moved(value, destination)
 	}

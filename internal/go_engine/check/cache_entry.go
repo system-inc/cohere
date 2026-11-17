@@ -101,10 +101,13 @@ type cacheEntry struct {
 //
 // A record written from source holds its body (Inline). An extra build writing a package through from the host's run
 // holds none: its record names, by BodyAt, the key of the host's record that holds the body, and the body by its
-// digest, which that record must still hold, so the build writes neither the body nor a file of its own for it. A
-// reader that finds the record under BodyAt gone, or holding another body, as the host's next run may rewrite it with
-// more answers, reads a miss: the package is checked from source and its entry written whole. Every body a reference
-// names is checked against the record it reads, field by field, so nothing is hashed on a read.
+// digest, so the build writes neither the body nor a file of its own for it. A reader that reads the body from disk and
+// finds the record under BodyAt gone, or holding another body, as the host's next run may rewrite it with more
+// answers, reads a miss: the package is checked from source and its entry written whole. Every body a reference names
+// is checked against the record it reads, field by field, so nothing is hashed on a read. A reader whose run has
+// decoded a body of that digest already takes it from the run's memo, matched by the record's own Body alone, without
+// reading the record under BodyAt (decodedBodies, #qqyq61s): the digest names the bytes the record judged, which is
+// what the holder's compare proves on disk, so a record whose holder has moved on since still hits from the memo.
 //
 // ExportData is the sha256 of the package's export data, which the store keeps under exportDataKey of it, nil for a
 // package that carries none (carriesExportData) and for an entry encoded without it, which only a run's memory holds

@@ -350,7 +350,7 @@ func populatedRecords() []Record {
 					RestoredFromHost: 1, DeclinedAtLoad: 1, DeclinedAtCheck: 1,
 					DeclinedBy:   map[string]int{"typeReads": 1},
 					ReloadRounds: 1, ReloadRoundsBy: map[string]int{"hostDecline": 1}, WrittenThrough: 1,
-					LoadMilliseconds: 30, LintMilliseconds: 50, DecideMilliseconds: 12,
+					SharedBodyHits: 1, LoadMilliseconds: 30, LintMilliseconds: 50, DecideMilliseconds: 12,
 					CheckedFromSource: 3, CheckedFromSourceRounds: []int{1, 2}, PackagesLoaded: 3,
 					LintWaitMilliseconds: 8, LintWaited: true, HeldAtLoadEndBytes: 64, HeldAtLintPeakBytes: 128,
 					LintPeakOverLoadEnd: 2,
