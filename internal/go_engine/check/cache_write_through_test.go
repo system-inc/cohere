@@ -71,7 +71,13 @@ func throughHostSession(test *testing.T, root string, storeDirectory string) (*H
 // hostSessionOf is throughHostSession under rules.
 func hostSessionOf(test *testing.T, root string, storeDirectory string, rules []rule.Rule) (*HostRun, *CacheSession) {
 	test.Helper()
-	session := NewCacheSession(cachingAt(storeDirectory, rules), rules)
+	return hostSessionWith(test, root, cachingAt(storeDirectory, rules), rules)
+}
+
+// hostSessionWith is hostSessionOf with caching, as under `--no-cache`, whose caching has no store.
+func hostSessionWith(test *testing.T, root string, caching *Caching, rules []rule.Rule) (*HostRun, *CacheSession) {
+	test.Helper()
+	session := NewCacheSession(caching, rules)
 	session.KeepForBuilds()
 	loaded, loadError := load.PackagesCached(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
 		load.Caching{Restorer: session, RecordReads: true})
@@ -104,9 +110,22 @@ func buildOf(
 	rules []rule.Rule,
 ) (*Result, *CacheSession) {
 	test.Helper()
+	return buildWith(test, root, windowsCachingAt(storeDirectory, rules), host, rules)
+}
+
+// windowsCachingAt is windows's cache in storeDirectory, keyed for rules.
+func windowsCachingAt(storeDirectory string, rules []rule.Rule) *Caching {
 	caching := cachingAt(storeDirectory, rules)
 	// The build's keys hold its target, as the engine's do, so they never meet the host's.
 	caching.Context.Build = append(caching.Context.Build, "GOOS=windows")
+	return caching
+}
+
+// buildWith is buildOf with caching, windows's, as under `--no-cache`, whose caching has no store.
+func buildWith(test *testing.T, root string, caching *Caching, host *HostRun, rules []rule.Rule) (*Result,
+	*CacheSession,
+) {
+	test.Helper()
 	session := NewCacheSession(caching, rules)
 	session.RestoreFromHost(host)
 	for {

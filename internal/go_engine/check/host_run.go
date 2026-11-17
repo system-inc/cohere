@@ -18,12 +18,14 @@ import (
 // renderings the verdicts make of the host's types, shared by every build, and the digests of the files its keys
 // hashed, which an extra build's keys read rather than hash again. known is what the host's session knows of its
 // analyzers, which each entry's shared decode reads (hostEntry.decoded), and which a build's own must decode alike for
-// the build to share it (decodesAlike).
+// the build to share it (decodesAlike). bodies is the run's memo of the bodies decoded from the store, by digest,
+// which the host's session filled with its hits and each build adds the bodies it read from disk to (decodedBodies).
 type HostRun struct {
 	entries    map[string]*hostEntry
 	renderings *ReadsBuild
 	files      cache.FileDigests
 	known      *cacheAnalyzers
+	bodies     *decodedBodies
 
 	// keeping is the time the run spent keeping its packages for the extra builds over every load (Keeping).
 	keeping time.Duration
@@ -47,8 +49,9 @@ func (host *HostRun) EntriesKept() int {
 
 // Release lets go of everything the host's run kept for the extra builds once the last of them has run, since no
 // build can ask for an entry, or a verdict render a host type, after that: the entries, with the host's types their
-// export data is written from, each with its decode the builds shared (hostEntry.decoded), and the renderings, keyed by
-// the host's objects (#b2t9xmf). What the record counts of it stays.
+// export data is written from, each with its decode the builds shared (hostEntry.decoded), the bodies decoded from the
+// store (decodedBodies), and the renderings, keyed by the host's objects (#b2t9xmf). What the record counts of it
+// stays.
 func (host *HostRun) Release() {
 	if host == nil {
 		return
@@ -56,6 +59,7 @@ func (host *HostRun) Release() {
 	host.entries = nil
 	host.renderings = nil
 	host.known = nil
+	host.bodies = nil
 	host.holders = nil
 }
 

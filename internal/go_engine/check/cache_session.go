@@ -110,6 +110,11 @@ type CacheCounts struct {
 	// Written is the misses whose entry was written.
 	Written int
 
+	// SharedBodyHits is the hits whose body was taken from the run's memo of decoded bodies (decodedBodies), which
+	// the session neither read from the store at BodyAt nor decoded: in an extra build, those whose own record names a
+	// body the host's session or an earlier build decoded, and 0 for a session with no memo, as under `--no-cache`.
+	SharedBodyHits int
+
 	// WrittenThrough is, in an extra build, the packages restored from the host's run whose entry the build wrote
 	// under its own key once their restore had settled (writeThrough), so its next run hits them in its own store.
 	// They are hits, never misses, so Written leaves them out.
@@ -207,6 +212,14 @@ type CacheSession struct {
 
 	counts       CacheCounts
 	factsSkipped atomic.Int64
+
+	// sharedBodyHits counts the hits readHit took from the run's memo of decoded bodies (SharedBodyHits).
+	sharedBodyHits atomic.Int64
+
+	// bodies is the run's memo of decoded bodies (decodedBodies) on the host's session, which KeepForBuilds makes and
+	// keepForBuilds hands to the host's run for the extra builds, nil for any other session and after the hand-off. An
+	// extra build reads the host run's (sharedBodies).
+	bodies *decodedBodies
 
 	// exportDataReads counts the export data read from the store, which the load asks only of a package something
 	// that missed imports.
@@ -334,6 +347,7 @@ func (session *CacheSession) Restore(
 	// saved are this one's hits. The problems stay, since every one of them was met.
 	session.counts = CacheCounts{On: session.counts.On, Problems: session.counts.Problems}
 	session.factsSkipped.Store(0)
+	session.sharedBodyHits.Store(0)
 	if session.known == nil {
 		return nil
 	}
@@ -457,7 +471,8 @@ func (session *CacheSession) KeyFor(label string) [sha256.Size]byte {
 // time was 119ms of a 268ms
 // restore. A worker writes only its own slot of what it read: what it calls reads files, the session's analyzers and
 // its store, none of which a restore writes, so the session's maps are written here alone, once every worker is done,
-// in reachable's order.
+// in reachable's order. Each reads the run's memo of decoded bodies, when its analyzers decode alike the memo's, once
+// for every worker (sharedBodies).
 func (session *CacheSession) readHits(reachable []*packages.Package) {
 	var reading []*packages.Package
 	var keys []cache.Key
@@ -470,8 +485,9 @@ func (session *CacheSession) readHits(reachable []*packages.Package) {
 		keys = append(keys, key)
 	}
 	read := make([]storeHit, len(reading))
+	bodies := session.sharedBodies()
 	session.fanOut(len(reading), func(index int) {
-		read[index] = session.readHit(reading[index], keys[index])
+		read[index] = session.readHit(reading[index], keys[index], bodies)
 	})
 	for index, restoring := range reading {
 		if read[index].restored != nil {
@@ -491,7 +507,7 @@ type storeHit struct {
 // hitAt makes a hit of restoring when the store holds a whole entry under key, directly or through an alias, and
 // reports whether it did. Which analyzers the entry must hold is dropShortHits' to judge.
 func (session *CacheSession) hitAt(restoring *packages.Package, key cache.Key) bool {
-	read := session.readHit(restoring, key)
+	read := session.readHit(restoring, key, session.sharedBodies())
 	if read.restored == nil {
 		return false
 	}
@@ -501,13 +517,30 @@ func (session *CacheSession) hitAt(restoring *packages.Package, key cache.Key) b
 }
 
 // readHit is restoring's entry under key, directly or through an alias, decoded whole, and a nil restored when the
-// store holds none that decodes. It writes nothing of the session's, so readHits runs it on many packages at once.
-func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key) storeHit {
+// store holds none that decodes. It writes nothing of the session's but bodies, which is locked, and a counter, so
+// readHits runs it on many packages at once.
+//
+// bodies is the run's memo of decoded bodies, nil when there is none or the session's analyzers decode unlike it
+// (sharedBodies). A record whose body the memo holds is answered from it (sharedHit), with neither the record at BodyAt
+// nor the body read: the record names its body by the sha256 of the bytes it was judged good with, so a decode of the
+// bytes with that digest is the one the store would give, wherever they were read. One the memo lacks is read and
+// decoded from the store, as with no memo, and its decode is added, so the next build that names the body shares it.
+func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key, bodies *decodedBodies) storeHit {
 	contents, storedKey, found := session.entryAt(key)
 	if !found {
 		return storeHit{}
 	}
-	body, record, whole := storedEntry(session.caching.Store, contents)
+	record, recordError := decodeRecord(contents)
+	if recordError != nil {
+		return storeHit{}
+	}
+	// decodeRecord refuses a record in another format, as entryOf refuses a body whose format is not its record's, so
+	// a record answered from the memo is in this format, the format of every decode the memo holds (restoredOf).
+	if shared, held := bodies.of(record.Body); held && record.Version == CacheFormatVersion {
+		session.sharedBodyHits.Add(1)
+		return storeHit{restored: session.sharedHit(restoring, shared, record), storedKey: storedKey}
+	}
+	body, whole := recordBody(session.caching.Store, record)
 	if !whole {
 		return storeHit{}
 	}
@@ -515,8 +548,40 @@ func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key)
 	if decodeError != nil {
 		return storeHit{}
 	}
+	bodies.add(restored)
 	restored.types.ReadExportData = session.exportDataReader(restoring, restored.exportDigest)
 	return storeHit{restored: restored, storedKey: storedKey}
+}
+
+// sharedHit is shared, a body's decode from the run's memo, as restoring's hit under record, which names that body:
+// the memo's decode with record laid over it, which is all of a hit that is not the body's. Its reads, which name each
+// owner by its key in the build that wrote record, and its export data's digest, the export data of the record's own
+// target, are record's, read by the session's own reader; and its types are its own, as restoredForBuild gives them,
+// since a build's restore writes their Holds, Declined and Untouched.
+func (session *CacheSession) sharedHit(
+	restoring *packages.Package,
+	shared *restoredPackage,
+	record entryRecord,
+) *restoredPackage {
+	restored := restoredForBuild(shared)
+	restored.reads, restored.readsIncomplete = record.Reads, record.ReadsIncomplete
+	restored.exportDigest, restored.bodyDigest = record.ExportData, record.Body
+	restored.types.ReadExportData = session.exportDataReader(restoring, restored.exportDigest)
+	return restored
+}
+
+// sharedBodies is the run's memo of decoded bodies the session reads and adds to: the host's session's own, an extra
+// build's the host's run's, and nil for a session with neither, or whose analyzers decode a body unlike the memo's,
+// which decodes every body itself.
+func (session *CacheSession) sharedBodies() *decodedBodies {
+	bodies := session.bodies
+	if bodies == nil && session.host != nil {
+		bodies = session.host.host.bodies
+	}
+	if bodies == nil || !decodesAlike(session.known, bodies.known) {
+		return nil
+	}
+	return bodies
 }
 
 // entryAt is the entry under key, or, when there is none, the entry the alias under key names, with the key it is
@@ -696,6 +761,7 @@ func (session *CacheSession) save(
 	files map[*packages.Package][]storedFile,
 ) {
 	session.counts.FactsSkipped = int(session.factsSkipped.Load())
+	session.counts.SharedBodyHits = int(session.sharedBodyHits.Load())
 	session.counts.FromBinary = len(session.fromBinary)
 	session.answering.lock.Lock()
 	session.counts.Reloads = len(session.answering.reloaded)
@@ -893,21 +959,31 @@ func storedEntry(store *cache.Store, contents []byte) ([]byte, entryRecord, bool
 	if recordError != nil {
 		return nil, entryRecord{}, false
 	}
+	body, whole := recordBody(store, record)
+	if !whole {
+		return nil, entryRecord{}, false
+	}
+	return body, record, true
+}
+
+// recordBody is the body record holds or names, read from store, and whether it is there whole: a record naming a body
+// (BodyAt) whose record is gone from the store, or holds another body there, has none.
+func recordBody(store *cache.Store, record entryRecord) ([]byte, bool) {
 	if record.Inline != nil {
-		return record.Inline, record, true
+		return record.Inline, true
 	}
 	if len(record.BodyAt) != len(cache.Key{}) {
-		return nil, entryRecord{}, false
+		return nil, false
 	}
 	holderContents, stored := store.Get(cache.Key(record.BodyAt))
 	if !stored {
-		return nil, entryRecord{}, false
+		return nil, false
 	}
 	holder, holderError := decodeRecord(holderContents)
 	if holderError != nil || holder.Inline == nil || !bytes.Equal(holder.Body, record.Body) {
-		return nil, entryRecord{}, false
+		return nil, false
 	}
-	return holder.Inline, record, true
+	return holder.Inline, true
 }
 
 // storedEntryAt is the entry the store keeps under key, decoded from its record and body, with its record, and whether

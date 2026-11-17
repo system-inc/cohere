@@ -133,7 +133,7 @@ func TestARestoreReadsTheSameHitsAsOneAtATime(test *testing.T) {
 		if !hasKey {
 			continue
 		}
-		one := session.readHit(restoring, key)
+		one := session.readHit(restoring, key, session.sharedBodies())
 		restored, hit := session.hits[restoring]
 		if hit != (one.restored != nil) || session.stored[restoring] != one.storedKey {
 			test.Fatalf("%s: want hit %t at %s as one read alone, got hit %t at %s", restoring.PkgPath,
