@@ -68,7 +68,7 @@ func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun) (int, 
 // held, for the width to be decided from the host's live heap alone (shareGate, hostLiveBuildsWidth): when every
 // build's share is at or under it, each is taken to hold about what the host does (#ghb3rcn). One line, one meaning,
 // mostly restored: it is also the line a run with a findings store takes the gate under, the host's own share, what
-// its session missed over what it held (hostMissedShare, takesShareGate, #ybjbqm2).
+// its session missed over what its store held or missed (hostMissedShare, takesShareGate, #ybjbqm2).
 //
 // It is a heuristic, not a proof. Nearly every restore is decided late (load.Restored.Holds), so the share the gate
 // reads is a lower bound: on the platform builds the upper bound, every late restore declined, read 0.96 to 0.97 at
@@ -121,12 +121,14 @@ func (engine *pipeline) takesShareGate(hostCache check.CacheCounts) bool {
 	return hostMissedShare(hostCache) <= lowShareAtGate
 }
 
-// hostMissedShare is the share of the packages the host's session held that it missed, checked from source over held,
-// from counts, its findings cache's counts: every package its load reached is a hit, from the store or the binary's
-// table, or a miss (check.CacheCounts). A session that held no package has a share of none, as a build's load of no
-// package does at the gate (shareGate.report).
+// hostMissedShare is the share of the packages the host's store answered for that it missed, checked from source over
+// hit and missed, from counts, its findings cache's counts (check.CacheCounts). The packages restored from the binary's
+// table (FromBinary) are left out: the binary holds them on every run, a cold fill's too, so counting them would bring
+// a small tree's cold fill under lowShareAtGate, 20 missed beside 260 from the table reading 0.07, and a cold run with
+// a store is where the gate's cost was measured (#ghb3rcn, #ph5532e). A session whose store answered for no package
+// has a share of none, as a build's load of no package does at the gate (shareGate.report).
 func hostMissedShare(counts check.CacheCounts) float64 {
-	return float64(counts.Missed) / float64(max(counts.Hit+counts.FromBinary+counts.Missed, 1))
+	return float64(counts.Missed) / float64(max(counts.Hit+counts.Missed, 1))
 }
 
 // budgetedHolding is holding times budget, rounded up to the byte, what the width budgets each build.

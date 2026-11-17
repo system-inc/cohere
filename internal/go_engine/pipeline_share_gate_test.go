@@ -374,10 +374,11 @@ func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.
 	}
 }
 
-// The share gate's line for a run with a store is the host's own missed share, its session's misses over every
-// package it held, hits from the store and the binary's table among them, at or under lowShareAtGate (#ybjbqm2), the
-// same line every build's share at the gate is read against: warm, after a leaf edit, and exactly at the line it takes
-// the gate, and just over it, or cold, it keeps main's schedule. A run without a store takes it whatever the counts.
+// The share gate's line for a run with a store is the host's own missed share, its session's misses over the packages
+// its store hit or missed, the binary's table left out, at or under lowShareAtGate (#ybjbqm2), the same line every
+// build's share at the gate is read against: warm, after a leaf edit, and exactly at the line it takes the gate, and
+// just over it, or cold, a small tree's among them whose packages from the binary's table outnumber its misses, it
+// keeps main's schedule. A run without a store takes it whatever the counts.
 func TestTheHostsMissedShareDecidesTheShareGateUnderAStore(test *testing.T) {
 	test.Parallel()
 	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil)}
@@ -393,10 +394,12 @@ func TestTheHostsMissedShareDecidesTheShareGateUnderAStore(test *testing.T) {
 		{name: "a leaf edit, one of many missed", counts: check.CacheCounts{On: true, Hit: 199, Missed: 1},
 			want: true},
 		{name: "exactly at the line", counts: check.CacheCounts{On: true, Hit: 90, Missed: 10}, want: true},
-		{name: "the binary's table counted as held", counts: check.CacheCounts{On: true, FromBinary: 95, Missed: 5},
-			want: true},
+		{name: "a leaf edit beside the binary's table, which is left out", counts: check.CacheCounts{On: true,
+			Hit: 95, FromBinary: 260, Missed: 5}, want: true},
 		{name: "just over the line", counts: check.CacheCounts{On: true, Hit: 89, Missed: 11}, want: false},
 		{name: "cold, an empty store", counts: check.CacheCounts{On: true, Missed: 200}, want: false},
+		{name: "a small tree's cold fill beside the binary's table", counts: check.CacheCounts{On: true,
+			FromBinary: 260, Missed: 20}, want: false},
 	} {
 		if got := withStore.takesShareGate(each.counts); got != each.want {
 			test.Errorf("%s, a missed share of %.3f, took the share gate %t, want %t", each.name,

@@ -748,7 +748,7 @@
                 },
                 "buildsWidthFromHostLive": {
                     "type": "boolean",
-                    "description": "Whether buildsAtOnce was decided from the host's live heap alone, every build beside it budgeted 1.2 times that heap, because every build's share at the share gate, its checkedFromSourceAtGate over its packagesLoaded, was at or under 0.10. A run waits at the gate without a findings store, or with one when the host missed at most 0.10 of the packages it held. Absent when the first build's holding was measured instead, the run had a store its host mostly missed, or the decision needed no heap."
+                    "description": "Whether buildsAtOnce was decided from the host's live heap alone, every build beside it budgeted 1.2 times that heap, because every build's share at the share gate, its checkedFromSourceAtGate over its packagesLoaded, was at or under 0.10. A run waits at the gate without a findings store, or with one when the host missed at most 0.10 of the packages its store hit or missed, the binary's standard-library packages left out. Absent when the first build's holding was measured instead, the run had a store its host mostly missed, or the decision needed no heap."
                 },
                 "typeErrors": { "type": "integer" },
                 "findings": { "type": "integer", "description": "Rule findings, type errors not included." },

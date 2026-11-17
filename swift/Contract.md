@@ -1100,7 +1100,8 @@ then every other in build order, the host's own before the other platforms (#awb
 width in a run with a findings store, the first runs alone until its load has ended; there a collection measures the
 live heap, the build's holding is that heap less the host's, measured the same way as the builds started, and the rest
 start once the width is decided. A run without a store, under `--no-cache`, decides it at a share gate instead, and
-so does a run with a store whose host missed at most 0.10 of the packages it held, mostly restored (#ybjbqm2),
+so does a run with a store whose host missed at most 0.10 of the packages its store hit or missed, the binary's
+standard-library packages left out since it holds them cold too, mostly restored (#ybjbqm2),
 unless it judges each build's dependence (`--build-dependence`), whose builds restore nothing from the host, so every
 share would be high and the measured rule is taken from the start: every build starts at once, lists, builds its
 graph and restores, and waits before its type check, until every build has
