@@ -7,31 +7,41 @@ import (
 	"sync/atomic"
 )
 
-// Fingerprints is the kept listing's directory fingerprints one run's extra builds share (#5jpss95): each directory's
-// directoryFingerprint, read once for every build. A directory's fingerprint is of its entries and its Go files'
-// headers, each read from the run's held bytes where it holds them and from disk otherwise, none of which depends on
-// the build, so every extra build hashed what the first had just hashed, 1.2 to 1.5 CPU-s a run with the cache on
-// (#74ka2zg). A directory is keyed by its path alone: the held bytes are the run's, the same for every build.
+// Fingerprints is what one run's extra builds share of their kept listings' fingerprints, each read once for every
+// build. Each directory's directoryFingerprint (#5jpss95): a directory's fingerprint is of its entries and its Go
+// files' headers, each read from the run's held bytes where it holds them and from disk otherwise, none of which
+// depends on the build, so every extra build hashed what the first had just hashed, 1.2 to 1.5 CPU-s a run with the
+// cache on (#74ka2zg). A directory is keyed by its path alone: the held bytes are the run's, the same for every build.
 //
-// Each kept listing's whole fingerprint is read once too, for every build whose kept listing names the same roots,
-// directories and module files (#qqyq61s), and what two sets that differ still share, each root's walk and each module
-// file's digest, once for every set: a build checking its kept listing walked cohere's root again, about 25 ms of the
-// 26 its fingerprint cost once the directories were shared. A whole fingerprint is keyed by its inputs exactly as
-// given, so a build whose listing names another directory reads its own, and by nothing else, since all it reads
-// besides is a directory's held bytes, which are the run's for every build.
+// Each kept listing's steady fingerprint is read once too (steadyFingerprint), for every build whose kept listing names
+// the same roots, directories and steady module files (#qqyq61s), and what two sets that differ still share, each
+// root's walk and each steady module file's digest, once for every set: a build checking its kept listing walked
+// cohere's root again, about 25 ms of the 26 its fingerprint cost once the directories were shared. A steady
+// fingerprint is keyed by its inputs exactly as given, so a build whose listing names another directory reads its own.
+// Nothing else need be in the key: besides the held bytes, the run's for every build, it reads the disk, module files,
+// directory entries, Go files the run does not hold and the go.mod each walk looks for, and nothing the run writes
+// moves any of that once the builds start.
 //
-// It is shared by loads after which nothing writes, which the extra builds' are and the host's first load is not: the
-// long-line wrap writes between that load and the builds, and a header it rewrote would keep the fingerprint of the
-// bytes before it. One is made for each run, never kept past it, since any file can move between runs. A nil
-// Fingerprints shares nothing, and each fingerprint is read again.
+// A module file a go command of the run can rewrite is the exception, and is never held here (rewritableByGo):
+// go.work.sum, which a build's go list rewrites when the workspace's guard cannot run it beside a side copy of the
+// go.work (workspaceSumGuard), and go.mod and go.sum under -mod=mod. listingFingerprint reads each again at every ask
+// and folds it in after the steady fingerprint, so a build asking after another build's go list rewrote one reads the
+// bytes it left, and keeps its listing against them.
+//
+// It is shared by loads after which the engine writes nothing else, which the extra builds' are and the host's first
+// load is not: the long-line wrap writes between that load and the builds, and a header it rewrote would keep the
+// fingerprint of the bytes before it. A writer outside the run, an editor saving while the builds run, is read by the
+// next run: the builds check the tree as they first read it. One is made for each run (newPipeline), never kept past
+// it, since any file can move between runs. A nil Fingerprints shares nothing, and each fingerprint is read again.
 type Fingerprints struct {
 	// computed counts the directories fingerprinted, which a test reads: one for each directory however many builds
 	// ask.
 	computed atomic.Int64
 
-	// listingsComputed, rootsWalked and moduleFilesRead count the whole fingerprints read, the roots walked and the
-	// module files read, which a test reads: one for each distinct set, root and file however many builds ask.
-	// listingFingerprint counts itself, so a build that read its fingerprint past the memo is counted too.
+	// listingsComputed, rootsWalked and moduleFilesRead count the steady fingerprints read, the roots walked and the
+	// steady module files read, which a test reads: one for each distinct set, root and file however many builds ask.
+	// steadyFingerprint counts itself when it is handed fingerprints, so a build that read past the memo and handed
+	// them on is counted too; one that handed on nil counts nothing, and a test sees its set missing from listings.
 	listingsComputed atomic.Int64
 	rootsWalked      atomic.Int64
 	moduleFilesRead  atomic.Int64
@@ -50,7 +60,7 @@ type fingerprintedDirectory struct {
 	whole  bool
 }
 
-// fingerprintedListing is one kept listing's whole fingerprint, read once for its set of inputs.
+// fingerprintedListing is one kept listing's steady fingerprint, read once for its set of inputs.
 type fingerprintedListing struct {
 	once    sync.Once
 	digest  [sha256.Size]byte
@@ -64,8 +74,8 @@ type walkedRoot struct {
 	whole       bool
 }
 
-// readModuleFile is one module file as listingFingerprint hashes it, read once: the digest of its bytes, or that it is
-// absent, or that it could not be read, which is a doubt.
+// readModuleFile is one steady module file as steadyFingerprint hashes it, read once: the digest of its bytes, or that
+// it is absent, or that it could not be read, which is a doubt.
 type readModuleFile struct {
 	once     sync.Once
 	digest   [sha256.Size]byte
@@ -83,19 +93,23 @@ func NewFingerprints() *Fingerprints {
 	}
 }
 
-// listing is listingFingerprint of roots, directories and moduleFiles, read once for the run for each distinct set of
-// the three, or read now when fingerprints is nil. A doubt is kept as one, so every build with the set asks go list.
-func (fingerprints *Fingerprints) listing(
+// steady is steadyFingerprint of roots, directories and moduleFiles, read once for the run for each distinct set of
+// the three, or read now when fingerprints is nil. moduleFiles never names a file a go command of the run can
+// rewrite, since listingFingerprint leaves each out and reads it itself, so nothing held here is of bytes since
+// rewritten. A doubt is kept as one, so every build with the set asks go list.
+func (fingerprints *Fingerprints) steady(
 	roots []string,
 	directories []string,
 	moduleFiles []string,
 	held Held,
 ) ([sha256.Size]byte, bool) {
 	if fingerprints == nil {
-		return listingFingerprint(roots, directories, moduleFiles, held, nil)
+		return steadyFingerprint(roots, directories, moduleFiles, held, nil)
 	}
-	// Each list is hashed with its length ahead of it, so no part moves from one list into another and two sets
-	// share a key only when every list is the same, in the same order, which the fingerprint hashes them in.
+	// Each list is hashed with its length ahead of it, so no part moves from one list into another, and two sets share
+	// a key only when each list is the same in the same order. The fingerprint sorts the directories it reads, so the
+	// key is stricter than it there, which costs at most a second read of one set, and none while every kept listing
+	// names its directories sorted, as keepListing does.
 	digest := sha256.New()
 	for _, inputs := range [][]string{roots, directories, moduleFiles} {
 		writeParts(digest, []string{strconv.Itoa(len(inputs))})
@@ -110,7 +124,7 @@ func (fingerprints *Fingerprints) listing(
 	}
 	fingerprints.mutex.Unlock()
 	read.once.Do(func() {
-		read.digest, read.certain = listingFingerprint(roots, directories, moduleFiles, held, fingerprints)
+		read.digest, read.certain = steadyFingerprint(roots, directories, moduleFiles, held, fingerprints)
 	})
 	return read.digest, read.certain
 }
@@ -136,7 +150,7 @@ func (fingerprints *Fingerprints) root(root string) ([]string, bool) {
 }
 
 // moduleFile is file's digest, whether it is absent, and whether it could be read, read once for the run, or read
-// now when fingerprints is nil.
+// now when fingerprints is nil. Only steadyFingerprint asks, so file is never one a go command of the run can rewrite.
 func (fingerprints *Fingerprints) moduleFile(file string) ([sha256.Size]byte, bool, bool) {
 	if fingerprints == nil {
 		return moduleFileDigest(file)

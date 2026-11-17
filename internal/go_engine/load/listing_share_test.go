@@ -242,10 +242,10 @@ func decodedKeptListing(test *testing.T, listings *listingMap, key [sha256.Size]
 	return kept
 }
 
-// A kept listing's whole fingerprint is read once a run for every build whose kept listing names the same inputs
+// A kept listing's steady fingerprint is read once a run for every build whose kept listing names the same inputs
 // (#qqyq61s): five extra builds side by side, each keeping its listing and then reading it kept, ask for it ten
-// times, and it is read once, its root walked once and each module file read once. Each build reads its listing kept
-// the second time.
+// times, and it is read once, its root walked once and each steady module file read once. Each build reads its listing
+// kept the second time.
 func TestAListingFingerprintIsReadOnceARunForEachSetOfInputs(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -396,5 +396,112 @@ func TestAListingFingerprintIsReadAgainEachRun(test *testing.T) {
 	if targeted == nil || !slices.Contains(targeted.Imports, "strings") {
 		test.Errorf("after the import was added, the package listed is %+v, without strings among its imports",
 			targeted)
+	}
+}
+
+// rewrittenModuleFile is a module file a go command of a run can rewrite while its builds read it, in a module of
+// targetedModuleFiles with files beside it, its builds' environment after each target's, and the bytes it is rewritten
+// to.
+type rewrittenModuleFile struct {
+	name        string
+	files       map[string]string
+	environment []string
+	file        string
+	contents    string
+}
+
+// rewrittenModuleFiles are go.work.sum in a go.work root, which a build's go list rewrites when the workspace's guard
+// runs it in the tree, and go.mod under -mod=mod, which go list may rewrite there.
+var rewrittenModuleFiles = []rewrittenModuleFile{
+	{
+		name:     "go.work.sum",
+		files:    map[string]string{"go.work": "go 1.27\n\nuse .\n", "go.work.sum": ""},
+		file:     "go.work.sum",
+		contents: "golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=\n",
+	},
+	{
+		name:        "go.mod under -mod=mod",
+		environment: []string{"GOWORK=off", "GOFLAGS=-mod=mod"},
+		file:        "go.mod",
+		contents:    targetedModuleFiles["go.mod"] + "\n// Rewritten while the builds ran.\n",
+	},
+}
+
+// A module file a go command of the run can rewrite is read again at every ask, never from what the run's fingerprints
+// hold (#qqyq61s). Two builds keep listings over one set of inputs. In the next run linux's reads its listing kept, the
+// file is rewritten, standing in for linux's go list, and freebsd's, asking through the same fingerprints, reads the
+// new bytes, asks go list again and keeps its listing against them: the run after reads freebsd's listing kept and not
+// linux's, kept against the bytes before.
+func TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk(test *testing.T) {
+	test.Parallel()
+	for _, rewritten := range rewrittenModuleFiles {
+		test.Run(rewritten.name, func(test *testing.T) {
+			test.Parallel()
+			directory := test.TempDir()
+			writeListingFiles(test, directory, targetedModuleFiles)
+			writeListingFiles(test, directory, rewritten.files)
+			linux := goEnvironmentOf(test, directory, append(slices.Clone(sharedListingTargets[1]),
+				rewritten.environment...))
+			freebsd := goEnvironmentOf(test, directory, append(slices.Clone(sharedListingTargets[3]),
+				rewritten.environment...))
+			listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
+			// ask lists build's patterns through fingerprints and reports whether its listing was kept.
+			ask := func(build *GoEnvironment, fingerprints *Fingerprints) bool {
+				_, kept, listError := cachedList(build, []string{"./..."}, listings, nil, NewSharedReads(),
+					fingerprints, nil, nil)
+				if listError != nil {
+					test.Fatal(listError)
+				}
+				return kept
+			}
+			first := NewFingerprints()
+			ask(linux, first)
+			ask(freebsd, first)
+			linuxListing := decodedKeptListing(test, listings, listingKey(linux, []string{"./..."}))
+			freebsdListing := decodedKeptListing(test, listings, listingKey(freebsd, []string{"./..."}))
+			if !slices.Equal(linuxListing.Roots, freebsdListing.Roots) ||
+				!slices.Equal(linuxListing.Directories, freebsdListing.Directories) ||
+				!slices.Equal(linuxListing.ModuleFiles, freebsdListing.ModuleFiles) {
+				test.Fatalf("linux's and freebsd's kept listings name other inputs: %+v and %+v", linuxListing,
+					freebsdListing)
+			}
+			if !slices.Contains(linuxListing.ModuleFiles, filepath.Join(directory, rewritten.file)) {
+				test.Fatalf("the kept listings name %v, without %s", linuxListing.ModuleFiles, rewritten.file)
+			}
+			second := NewFingerprints()
+			if !ask(linux, second) {
+				test.Fatal("with nothing moved, linux's listing was not kept")
+			}
+			writeListingFiles(test, directory, map[string]string{rewritten.file: rewritten.contents})
+			if ask(freebsd, second) {
+				test.Errorf("after %s was rewritten, freebsd's listing was kept against the bytes before",
+					rewritten.file)
+			}
+			third := NewFingerprints()
+			if freebsdKept, linuxKept := ask(freebsd, third), ask(linux, third); !freebsdKept || linuxKept {
+				test.Errorf("the run after %s was rewritten kept freebsd's listing %v and linux's %v, want freebsd's "+
+					"alone", rewritten.file, freebsdKept, linuxKept)
+			}
+		})
+	}
+}
+
+// go commands run with -mod=mod only when the last -mod of `GOFLAGS` says so, one dash or two.
+func TestGoFlagsRewriteModulesUnderTheLastModAlone(test *testing.T) {
+	test.Parallel()
+	for goFlags, wanted := range map[string]bool{
+		"":                            false,
+		"-mod=mod":                    true,
+		"--mod=mod -p=4":              true,
+		"-mod=mod -mod=readonly":      false,
+		"-mod=readonly -mod=mod":      true,
+		"-mod=vendor":                 false,
+		"-modfile=other.mod":          false,
+		"-modcacherw -tags=mod":       false,
+		"-trimpath -mod=mod -pgo=off": true,
+	} {
+		if rewrites := goFlagsRewriteModules(goFlags); rewrites != wanted {
+			test.Errorf("GOFLAGS %q: rewrites modules %v, want %v", goFlags, rewrites, wanted)
+		}
 	}
 }
