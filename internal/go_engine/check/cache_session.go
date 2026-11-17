@@ -90,8 +90,9 @@ type StandardLibraryRunEntry struct {
 	// answersWhole), rather than those the run's questions happened to compute in it.
 	AnswersWhole bool
 
-	// ReadsJudged is set once the run's reads were whole and PersistCollectedReads judged the package's: persisted in
-	// Reads, or left nil for reads no record can hold, which an extra build declines.
+	// ReadsJudged is set once the run's reads were whole and PersistCollectedReads judged the package's recorded reads:
+	// persisted in Reads, or left nil for reads no record can hold, which an extra build declines, as the generator
+	// leaves them. A package whose reads the run never recorded, as in an extra build, is never judged.
 	ReadsJudged bool
 }
 
@@ -216,7 +217,7 @@ type CacheSession struct {
 	standardLibraryKeys map[*packages.Package]cache.Key
 
 	// waitingForTable are the entries of the standard-library packages the run computed whose write to the store waits
-	// for the system cache's table, by their standard-library key, with the package each is of (keptBySystemCache).
+	// for the system cache's table, by their standard-library key, with the package each is of (KeptBySystemCache).
 	waitingForTable map[cache.Key]waitingEntry
 
 	// standardLibraryContext is what every standard-library key of the last Restore shared, the fact analyzers
@@ -809,7 +810,7 @@ func (session *CacheSession) saveMisses(
 		// table, which takes it when it is whole, so no project holds a copy of what every project shares. What the
 		// table does not take is put in the store then, under its project key, as any miss is now
 		// (WriteSystemCacheTable).
-		systemCacheOnly := session.keptBySystemCache(saved)
+		systemCacheOnly := session.KeptBySystemCache(saved)
 		return func() {
 			var putError error
 			if encodeError == nil && !systemCacheOnly {
@@ -838,6 +839,9 @@ func (session *CacheSession) saveMisses(
 					session.outputs[saved] = entry.output
 				}
 				session.collect(saved, entry, demanded)
+				if systemCacheOnly && keepsRecord {
+					session.waitWithRecord(saved, record)
+				}
 			}
 			switch {
 			case errors.Is(encodeError, errorUnstorable):
@@ -888,11 +892,16 @@ func (session *CacheSession) savable(saver string, keyed *packages.Package, acti
 	return len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actions) && !unsure
 }
 
-// keptBySystemCache reports whether keyed is a standard-library package the session keys apart in a run that keeps a
+// KeptBySystemCache reports whether keyed is a standard-library package the session keys apart in a run that keeps a
 // system cache, whose entry waits for the system cache's table (#syscache): the project's store takes it only when the
 // table refuses it (WriteSystemCacheTable). A run that keeps no system cache, under `--no-system-cache` or with no
 // root, keys no package apart, and the store takes every one as it always has.
-func (session *CacheSession) keptBySystemCache(keyed *packages.Package) bool {
+//
+// It is the load's load.Caching.RecordReads in a run that records reads for the system cache alone, asked once the
+// restore has keyed the standard library, so the reads recorded are of the packages the table could take, by the set
+// the restore judged, and of nothing a table never holds. A package restored from the table is never checked, so its
+// reads are marked never as restored and never walked: a warm run pays nothing for them.
+func (session *CacheSession) KeptBySystemCache(keyed *packages.Package) bool {
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.System == nil {
 		return false

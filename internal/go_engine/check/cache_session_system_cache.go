@@ -273,9 +273,9 @@ func learnedFactTypes(known *cacheAnalyzers) map[string]reflect.Type {
 // PersistCollectedReads gives each standard-library package the run collected an entry of (collect) its reads of
 // other packages, reads, persisted by a memo measured by the run's sizes, its target's, as a table carries them beside
 // each entry (#pcv6eff). The caller hands the reads once every type-read walk has ended, nil for a run that records
-// none, as an extra build's, and every entry it visits is judged (ReadsJudged), which a table asks of each it takes. A
-// package whose reads cannot be persisted, never recorded or marked never, keeps none, and a build declines it as
-// unpersisted.
+// none, as an extra build's. Each package whose reads the run recorded is judged (ReadsJudged), which a table asks of
+// each entry it takes: persisted when they can be, and kept with none when they cannot, as when marked never, which a
+// build declines as unpersisted. One whose reads the run never recorded stays unjudged, so no table takes it.
 func (session *CacheSession) PersistCollectedReads(reads map[*packages.Package]*build_reads.Reads) {
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.Collected == nil {
@@ -294,8 +294,12 @@ func (session *CacheSession) PersistCollectedReads(reads map[*packages.Package]*
 		if !held {
 			continue
 		}
+		recorded := reads[keyed]
+		if recorded == nil {
+			continue
+		}
 		collected.ReadsJudged = true
-		if record, persisted := persistReads(restoringOf(keyed, reads[keyed]), memo,
+		if record, persisted := persistReads(restoringOf(keyed, recorded), memo,
 			ReadsRendererVersion); persisted {
 			encoded, encodeError := encodePersistedReads(record)
 			if encodeError != nil {
@@ -310,10 +314,14 @@ func (session *CacheSession) PersistCollectedReads(reads map[*packages.Package]*
 
 // waitingEntry is a standard-library package's entry as the run encoded it, which waits for the system cache's table
 // before the store takes it under storeKey, the package's key in the store, if the table refuses it
-// (WriteSystemCacheTable).
+// (WriteSystemCacheTable), with record, its dependence record under `--build-dependence`, nil for none.
+//
+// Each waits with its body and export data until the build's table is written, beside Collected's copy of both, the
+// host's until every extra build has ended: the price of deciding at the table's write rather than at the save.
 type waitingEntry struct {
 	storeKey cache.Key
 	entry    encodedEntry
+	record   []byte
 }
 
 // collect adds a standard-library package the run just encoded, with demanded, the answers and reads its entry holds,
@@ -321,7 +329,7 @@ type waitingEntry struct {
 // standardLibraryEntryWhole later judges the entry by, which no table takes before then: the slots of the run's fact
 // analyzers, each of which a whole entry holds an analysis of, since every action on a package leaves its analysis in
 // the entry, facts or none, so the entry says which ran and the session says which had to; and whether its answers
-// were computed whole. An entry whose write to the store waits for the table (keptBySystemCache) is kept as encoded
+// were computed whole. An entry whose write to the store waits for the table (KeptBySystemCache) is kept as encoded
 // until then. The caller holds the lock the save counts under.
 func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry, demanded entryDemand) {
 	standardLibrary := session.caching.StandardLibrary
@@ -354,11 +362,25 @@ func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry
 		FactAnalyzers: factAnalyzers,
 		AnswersWhole:  demanded.answersWhole || !asksOnDemand,
 	}
-	if session.caching.Store != nil && session.keptBySystemCache(saved) {
+	if session.caching.Store != nil && session.KeptBySystemCache(saved) {
 		if session.waitingForTable == nil {
 			session.waitingForTable = map[cache.Key]waitingEntry{}
 		}
 		session.waitingForTable[key] = waitingEntry{storeKey: session.keys[saved], entry: entry}
+	}
+}
+
+// waitWithRecord gives saved's entry, waiting for the system cache's table, its dependence record, which the store
+// takes beside it if the table refuses it (storeWhatTheTableRefused), so a run under `--build-dependence` finds the
+// record a store hit needs rather than backfill it every run. The caller holds the lock the save counts under.
+func (session *CacheSession) waitWithRecord(saved *packages.Package, record []byte) {
+	key, standard := session.standardLibraryKeys[saved]
+	if !standard {
+		return
+	}
+	if waited, waiting := session.waitingForTable[key]; waiting {
+		waited.record = record
+		session.waitingForTable[key] = waited
 	}
 }
 
@@ -424,70 +446,81 @@ func (session *CacheSession) HasCollected() bool {
 // Put, which renames a whole file into place. It returns how many entries it added, and writes nothing when that is
 // none, as on a warm run, so a run writes its table only when it has something to add.
 //
-// Every entry the table did not take, short or left out for an import it could not read, and every one when the table
-// could not be written, is put in the project's store then, under its package's key, as saveMisses puts any miss
-// (#syscache): the next run hits it there, and dropShortHits judges a short one as it judges any store hit, rather than
-// check it from source every run. A warm extra build hits what it checked only for the types of a package above it
-// restored from the host's run, where no fact analyzer's action reached it, as it always has.
+// Every entry that waited and that the table does not hold, short or left out for an import it could not read, and
+// every one when the table could not be written or this returned before writing, is put in the project's store then,
+// under its package's key, as saveMisses puts any miss, with its dependence record when it has one (#syscache): the
+// next run hits it there, and dropShortHits judges a short one as it judges any store hit, rather than check it from
+// source every run. A warm extra build hits what it checked only for the types of a package above it restored from the
+// host's run, where no fact analyzer's action reached it, as it always has. One the table holds already, whose good
+// held entry the run computed again, stays out of the store: the table answers for it.
 //
 // Two runs writing the same table each write what they read and their own, and the later rename wins: the earlier
 // one's entries are lost and computed again by the next run, a miss and never a wrong read, since each entry stands
 // under its package's full key. A table that did not parse, or was damaged, is written anew from this run's entries.
 // An error is the run's reason it could not keep the system cache, never a finding's.
 func (session *CacheSession) WriteSystemCacheTable() (added int, returned error) {
+	// The keys the system cache's table holds once this returns: the table as read until a write replaces it. Whatever
+	// waited and is not among them is in the store by then, the first write that failed joined to what this returns.
+	inTable := map[cache.Key]bool{}
+	defer func() { returned = errors.Join(returned, session.storeWhatTheTableRefused(inTable)) }()
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.System == nil || len(standardLibrary.Collected) == 0 ||
 		session.standardLibraryContext == nil {
 		return 0, nil
 	}
-	var taken map[cache.Key]bool
-	// Whatever the table did not take is in the store by the time this returns, the first write that failed joined to
-	// what it returns.
-	defer func() { returned = errors.Join(returned, session.storeWhatTheTableRefused(taken)) }()
 	shared := *session.standardLibraryContext
 	held := map[cache.Key]cache.StandardLibraryEntry{}
 	if read := session.systemCacheTable; read != nil && read.Problem() == nil {
 		for _, key := range read.Keys() {
 			// Ignored: the key is one of the table's own.
 			held[key], _ = read.Lookup(key)
+			inTable[key] = true
 		}
 	}
 	readAgainst := make(map[cache.Key]bool, len(session.standardLibraryKeys))
 	for _, key := range session.standardLibraryKeys {
 		readAgainst[key] = true
 	}
-	table, took, tableError := standardLibraryTableWith(standardLibrary.Collected, held, readAgainst, shared.Goroot,
-		nil)
+	table, holds, added, tableError := standardLibraryTableWith(standardLibrary.Collected, held, readAgainst,
+		shared.Goroot, nil)
 	if tableError != nil {
 		return 0, fmt.Errorf("writing the system cache's table of the standard library: %w", tableError)
 	}
-	if len(took) == 0 {
+	if added == 0 {
 		return 0, nil
 	}
 	if putError := standardLibrary.System.Put(cache.StandardLibraryTableKey(shared), table); putError != nil {
 		return 0, fmt.Errorf("writing the system cache's table of the standard library: %w", putError)
 	}
-	taken = took
-	return len(took), nil
+	inTable = holds
+	return added, nil
 }
 
 // storeWhatTheTableRefused puts in the project's store each entry that waited for the system cache's table and is
-// not among taken, the entries the table holds now (WriteSystemCacheTable), forgets every one that waited, and returns
-// the first write that failed. The run's counts were taken at its save, so a failure here is the run's reason it could
-// not keep the system cache as it should, which the run says, rather than one of the store's counted problems.
-func (session *CacheSession) storeWhatTheTableRefused(taken map[cache.Key]bool) error {
+// not among inTable, the keys the table holds now (WriteSystemCacheTable), each with its dependence record when it
+// waited with one, forgets every one that waited, and returns the first write that failed. The run's counts were
+// taken at its save, so a failed write is not among the store's counted problems or its writes: the run says it as the
+// reason it could not keep the system cache as it should, since the write is the system cache's handing back. Nor does
+// such an entry get an alias under its second key, which the run gives only what saveMisses wrote; the next run
+// reaches it by its first key.
+func (session *CacheSession) storeWhatTheTableRefused(inTable map[cache.Key]bool) error {
 	waiting := session.waitingForTable
 	session.waitingForTable = nil
 	var refused []waitingEntry
 	for key, waited := range waiting {
-		if !taken[key] {
+		if !inTable[key] {
 			refused = append(refused, waited)
 		}
 	}
 	putErrors := make([]error, len(refused))
 	session.fanOutWriting(len(refused), func(index int) func() {
 		return func() {
-			putErrors[index] = session.putEntry(refused[index].storeKey, refused[index].entry)
+			waited := refused[index]
+			putErrors[index] = session.putEntry(waited.storeKey, waited.entry)
+			// A dependence record follows its entry, and only an entry whose write held (#6a3kjvz).
+			if putErrors[index] == nil && waited.record != nil {
+				putErrors[index] = session.caching.Store.Put(DependenceRecordKey(waited.storeKey), waited.record)
+			}
 		}
 	})
 	for _, putError := range putErrors {

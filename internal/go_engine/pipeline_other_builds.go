@@ -386,13 +386,22 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 	return engine.described.builds[0], engine.described.builds[1:], nil
 }
 
-// recordsReads is whether the load and lint record what each package read of other packages (#b2t9xmf): when the host
-// keeps its packages for extra builds (keepsForBuilds), and when the run collects the standard library's entries for
-// the release's table, which persists each one's reads beside it (#pcv6eff), so a host restoring the package from the
-// table keeps it for its builds as it keeps a package it checked. A run that does neither would pay for reads nothing
-// reads.
-func (engine *pipeline) recordsReads() bool {
-	return engine.keepsForBuilds() || engine.request.standardLibrary.collected != nil
+// recordsReadsOf is which packages the load and lint record what each read of other packages (#b2t9xmf), as
+// load.Caching.RecordReads takes it. Every package, when the host keeps its packages for extra builds
+// (keepsForBuilds), and when the run collects the standard library's entries for the release's table, which persists
+// each one's reads beside it (#pcv6eff), so a host restoring the package from the table keeps it for its builds as it
+// keeps a package it checked. A run that keeps a system cache and does neither records the standard library's alone,
+// as the session judged it (check.CacheSession.KeptBySystemCache): its table takes no entry without them
+// (check.standardLibraryEntryWhole), and holds no other package. A run that does none of these records nothing, since
+// it would pay for reads nothing reads.
+func (engine *pipeline) recordsReadsOf() func(*packages.Package) bool {
+	if engine.keepsForBuilds() || engine.request.standardLibrary.collected != nil {
+		return load.EveryPackage
+	}
+	if engine.systemCache.store != nil && engine.session != nil {
+		return engine.session.KeptBySystemCache
+	}
+	return nil
 }
 
 // keepsForBuilds is whether the host's run keeps its packages' entries for its extra builds to restore from (#b2t9xmf):

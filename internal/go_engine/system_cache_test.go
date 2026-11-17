@@ -421,3 +421,26 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 			"got %+v and builds %+v", off.Cache, off.Builds)
 	}
 }
+
+// A run with no extra builds records what each package read of others when it keeps a system cache, so every entry
+// its table takes carries its persisted reads, as the release's generator writes them: over the standard library
+// fixture, none of whose packages reads what no record can hold, every entry of the cold run's table has its reads.
+// A table written by such a run without them would have every later run's extra builds decline those packages from
+// the host as unpersisted, for good, since an entry the table holds is never written again.
+func TestAHostOnlyRunWritesEveryEntryWithItsReads(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, standardLibraryFixture)
+	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
+	table := tableIn(test, systemCache.systemCacheRoot)
+	if len(table.Keys()) == 0 {
+		test.Fatal("want the run's table to hold the standard library")
+	}
+	for _, key := range table.Keys() {
+		// Ignored: the key is one of the table's own.
+		if entry, _ := table.Lookup(key); entry.Reads == nil {
+			test.Errorf("the table holds an entry under %s with no persisted reads", key)
+		}
+	}
+}

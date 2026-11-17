@@ -148,13 +148,13 @@ func TestAStandardLibraryPackageFromTheSystemCacheIsNeverAnalyzedOrParsed(test *
 		Context:   standardLibraryContext("check tests", goRoot),
 		Collected: collected,
 	}
-	cold := runWithSession(test, directory, collecting, rules)
-	cold.session.PersistCollectedReads(cold.result.Reads)
+	cold := runSessionWith(test, directory, collecting, rules, rules)
+	persistRunReads(cold)
 	if len(collected) == 0 || len(collected) >= cold.result.Cache.Written {
 		test.Fatalf("want every standard-library package written collected, and the module not, got %d of %+v",
 			len(collected), cold.result.Cache)
 	}
-	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
+	table, _, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
@@ -225,9 +225,9 @@ func TestAStandardLibraryTableUnderAnotherKeyRestoresNothing(test *testing.T) {
 		Context:   standardLibraryContext("release one", goRoot),
 		Collected: collected,
 	}
-	collectingRun := runWithSession(test, directory, collecting, rules)
-	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
-	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
+	collectingRun := runSessionWith(test, directory, collecting, rules, rules)
+	persistRunReads(collectingRun)
+	table, _, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
@@ -284,9 +284,9 @@ func TestATableIsReadOnlyUnderItsOwnContextsKey(test *testing.T) {
 	collecting := testCaching(test, rules)
 	collected := map[cache.Key]StandardLibraryRunEntry{}
 	collecting.StandardLibrary = &StandardLibraryCaching{Context: own, Collected: collected}
-	collectingRun := runWithSession(test, directory, collecting, rules)
-	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
-	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
+	collectingRun := runSessionWith(test, directory, collecting, rules, rules)
+	persistRunReads(collectingRun)
+	table, _, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
@@ -336,9 +336,9 @@ func TestADamagedTableIsANamedProblem(test *testing.T) {
 	collecting := testCaching(test, rules)
 	collected := map[cache.Key]StandardLibraryRunEntry{}
 	collecting.StandardLibrary = &StandardLibraryCaching{Context: context, Collected: collected}
-	collectingRun := runWithSession(test, directory, collecting, rules)
-	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
-	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
+	collectingRun := runSessionWith(test, directory, collecting, rules, rules)
+	persistRunReads(collectingRun)
+	table, _, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
@@ -398,7 +398,7 @@ func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
 		},
 	}
 	key := cache.Key{0x01}
-	written, writeError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
+	written, _, writeError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
 		key: {PackagePath: "net", Entry: encoded(portable), AnswersWhole: true, ReadsJudged: true},
 	}, goRoot, nil)
 	if writeError != nil {
@@ -428,7 +428,7 @@ func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
 	walked := portable
 	walked.Files = []storedFile{{Name: inRoot, Nodes: 1}}
 	for name, refused := range map[string]cacheEntry{"outside GOROOT": outside, "with its files' walk": walked} {
-		if _, refusedError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
+		if _, _, refusedError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
 			key: {PackagePath: "net", Entry: encoded(refused), AnswersWhole: true, ReadsJudged: true},
 		}, goRoot, nil); refusedError == nil {
 			test.Errorf("%s: want the entry refused", name)
@@ -518,7 +518,8 @@ func systemCacheCaching(system *cache.Store, context cache.StandardLibraryContex
 }
 
 // runSessionWith is runWithSession with the session opened for sessionRules and the run made of runRules, so a test
-// can have the session expect an analyzer the run never runs.
+// can have the session expect an analyzer the run never runs, and with what each package read of others recorded, as
+// a run keeping a system cache records it, so the entries it collects persist their reads (PersistCollectedReads).
 func runSessionWith(
 	test *testing.T,
 	directory string,
@@ -529,22 +530,30 @@ func runSessionWith(
 	test.Helper()
 	session := NewCacheSession(caching, sessionRules)
 	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
-		load.Caching{Restorer: session, Listings: session})
+		load.Caching{Restorer: session, Listings: session, RecordReads: load.EveryPackage})
 	if loadError != nil {
 		test.Fatalf("loading %s: %v", directory, loadError)
 	}
-	result, runError := Run(loaded.Packages, runRules, Options{Cache: session, Withheld: loaded.Withheld})
+	result, runError := Run(loaded.Packages, runRules, Options{Cache: session, Withheld: loaded.Withheld,
+		Reads: loaded.Reads})
 	if runError != nil {
 		test.Fatalf("running %d rules: %v", len(runRules), runError)
 	}
 	return sessionRun{loaded: loaded, result: result, session: session}
 }
 
+// persistRunReads has run's session persist its collected entries' reads once every type-read walk has ended, as a
+// finished run does (PersistCollectedReads).
+func persistRunReads(run sessionRun) {
+	run.result.ReadWalks.Wait()
+	run.session.PersistCollectedReads(run.result.Reads)
+}
+
 // writtenTable has run's session write its table back (WriteSystemCacheTable), its reads judged first as a finished
 // run's are, and returns how many entries it added.
 func writtenTable(test *testing.T, run sessionRun) int {
 	test.Helper()
-	run.session.PersistCollectedReads(run.result.Reads)
+	persistRunReads(run)
 	added, writeError := run.session.WriteSystemCacheTable()
 	if writeError != nil {
 		test.Fatalf("writing the system cache's table: %v", writeError)
@@ -642,7 +651,8 @@ func TestTwoWritersOfOneTableNeverReadWrong(test *testing.T) {
 		if plainError != nil {
 			test.Fatal(plainError)
 		}
-		read := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+		// Recording no reads, as the run without the cache records none, so the results compare whole.
+		read := runWithSession(test, directory, systemCacheCaching(system, context), rules)
 		if !reflect.DeepEqual(withoutTimesOrCache(read.result), withoutTimesOrCache(plain)) {
 			test.Errorf("%s: over the table two writers wrote\n%+v\nwithout the cache\n%+v", directory,
 				withoutTimesOrCache(read.result), withoutTimesOrCache(plain))
@@ -655,38 +665,66 @@ func TestTwoWritersOfOneTableNeverReadWrong(test *testing.T) {
 	}
 }
 
-// An entry the table already holds under a key is kept as it is, never written again, so two runs never churn one
-// key: a table whose entry of unicode/utf8 does not decode, so a run computes utf8 again, and which lacks strings, so
-// the run adds an entry and writes, still holds utf8's entry byte for byte after the write.
-func TestAnEntryTheTableHoldsIsNeverRewritten(test *testing.T) {
-	test.Parallel()
-
-	directory := standardLibraryModule(test)
-	goRoot := goRootOf(test)
-	context := standardLibraryContext("check tests", goRoot)
-	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+// seededTable is the table of every standard-library package a run over the standard library module collects under
+// context with rules, by key, as change leaves it, put in a system cache of the test's own under the key a session
+// with rules reads it by, and the collecting run, whose session names each package's key (standardKeyOf).
+func seededTable(
+	test *testing.T,
+	directory string,
+	context cache.StandardLibraryContext,
+	rules []rule.Rule,
+	change func(collecting sessionRun, entries map[cache.Key]cache.StandardLibraryEntry),
+) (*cache.Store, sessionRun) {
+	test.Helper()
 	collecting := systemCacheCaching(nil, context)
-	collected := collecting.StandardLibrary.Collected
 	collectingRun := runSessionWith(test, directory, collecting, rules, rules)
-	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
-	stringsKey, utf8Key := standardKeyOf(test, collectingRun, "strings"), standardKeyOf(test, collectingRun,
-		"unicode/utf8")
-	written, writeError := StandardLibraryTableOf(collected, goRoot, nil)
+	persistRunReads(collectingRun)
+	written, _, writeError := StandardLibraryTableOf(collecting.StandardLibrary.Collected, context.Goroot, nil)
 	if writeError != nil {
 		test.Fatal(writeError)
 	}
 	whole := cache.NewStandardLibraryTable(written)
-	seeded := map[cache.Key]cache.StandardLibraryEntry{}
+	entries := map[cache.Key]cache.StandardLibraryEntry{}
 	for _, key := range whole.Keys() {
 		// Ignored: the key is one of the table's own.
-		seeded[key], _ = whole.Lookup(key)
+		entries[key], _ = whole.Lookup(key)
 	}
-	delete(seeded, stringsKey)
-	undecodable := []byte("not an entry")
-	planted := seeded[utf8Key]
-	planted.Entry = undecodable
-	seeded[utf8Key] = planted
-	system := systemCacheHolding(test, cache.WriteStandardLibraryTable(seeded, nil), tableKeyOf(test, context, rules))
+	change(collectingRun, entries)
+	return systemCacheHolding(test, cache.WriteStandardLibraryTable(entries, nil), tableKeyOf(test, context, rules)),
+		collectingRun
+}
+
+// A good entry the table already holds under a key is kept as it is, never written again, so two runs never churn one
+// key: a table whose entry of unicode/utf8 lacks the analysis of the run's fact analyzer, which dropShortHits drops so
+// the run computes utf8 again, and which lacks strings, so the run adds an entry and writes, still holds utf8's entry
+// byte for byte after the write. It decodes and its export data reads, so it is no damage to replace.
+func TestAGoodEntryTheTableHoldsIsNeverRewritten(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	context := standardLibraryContext("check tests", goRootOf(test))
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	var planted []byte
+	var utf8Key cache.Key
+	var stringsKey cache.Key
+	system, _ := seededTable(test, directory, context, rules,
+		func(collecting sessionRun, entries map[cache.Key]cache.StandardLibraryEntry) {
+			utf8Key, stringsKey = standardKeyOf(test, collecting, "unicode/utf8"), standardKeyOf(test, collecting,
+				"strings")
+			delete(entries, stringsKey)
+			held := entries[utf8Key]
+			tableEntry, decodeError := decodeStandardLibraryEntry(held.Entry)
+			if decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			tableEntry.Analyzers = nil
+			short, encodeError := encodeStandardLibraryEntry(tableEntry)
+			if encodeError != nil {
+				test.Fatal(encodeError)
+			}
+			held.Entry, planted = short, short
+			entries[utf8Key] = held
+		})
 
 	run := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
 	if added := writtenTable(test, run); added == 0 {
@@ -697,11 +735,136 @@ func TestAnEntryTheTableHoldsIsNeverRewritten(test *testing.T) {
 		test.Fatal("want the table written")
 	}
 	table := cache.NewStandardLibraryTable(contents)
-	if entry, held := table.Lookup(utf8Key); !held || !bytes.Equal(entry.Entry, undecodable) {
-		test.Errorf("want utf8's entry kept as the table held it, got %q (held %v)", entry.Entry, held)
+	if entry, held := table.Lookup(utf8Key); !held || !bytes.Equal(entry.Entry, planted) {
+		test.Errorf("want utf8's good entry kept as the table held it (held %v)", held)
 	}
 	if _, held := table.Lookup(stringsKey); !held {
 		test.Error("want strings added")
+	}
+}
+
+// A held entry that is damage, its export data unreadable, is replaced by the run's whole entry under its key, never
+// kept: the run computes unicode/utf8 again, since its held entry does not restore, and strings, which the table
+// lacked, read against the run's utf8, and the next run restores every standard-library package, strings with it,
+// from what the write left. Kept, the damaged utf8 would fail every reader's restore of utf8 and of strings, for good.
+func TestADamagedHeldEntryIsReplaced(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	context := standardLibraryContext("check tests", goRootOf(test))
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	system, _ := seededTable(test, directory, context, rules,
+		func(collecting sessionRun, entries map[cache.Key]cache.StandardLibraryEntry) {
+			delete(entries, standardKeyOf(test, collecting, "strings"))
+			utf8Key := standardKeyOf(test, collecting, "unicode/utf8")
+			damaged := entries[utf8Key]
+			damaged.ExportData = []byte("not export data")
+			entries[utf8Key] = damaged
+		})
+	run := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+	if added := writtenTable(test, run); added == 0 {
+		test.Fatal("want the run to write its table")
+	}
+	next := runWithSession(test, directory, systemCacheCaching(system, context), rules)
+	if next.result.Cache.FromSystemCache != len(next.session.standardLibraryKeys) {
+		test.Errorf("want every one of the %d standard-library packages restored after the write, got %d",
+			len(next.session.standardLibraryKeys), next.result.Cache.FromSystemCache)
+	}
+}
+
+// A read takes, of what the table held, only the entries under the reading run's own keys: a table holding a second
+// entry of unicode/utf8's path, under the key of a Go installation since changed, beside the run's own, still has the
+// run's new strings read against the run's utf8 and taken. Read against every held entry, utf8's path would be two
+// packages, and strings, which imports it, would be left out.
+func TestAReadTakesOnlyTheRunsOwnHeldEntries(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	context := standardLibraryContext("check tests", goRootOf(test))
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	var stringsKey cache.Key
+	system, _ := seededTable(test, directory, context, rules,
+		func(collecting sessionRun, entries map[cache.Key]cache.StandardLibraryEntry) {
+			stringsKey = standardKeyOf(test, collecting, "strings")
+			delete(entries, stringsKey)
+			entries[cache.DigestOf([]byte("utf8 of another installation"))] =
+				entries[standardKeyOf(test, collecting, "unicode/utf8")]
+		})
+	run := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+	if added := writtenTable(test, run); added == 0 {
+		test.Fatal("want the run to add strings")
+	}
+	contents, found := system.Get(tableKeyOf(test, context, rules))
+	if !found {
+		test.Fatal("want the table written")
+	}
+	if _, held := cache.NewStandardLibraryTable(contents).Lookup(stringsKey); !held {
+		test.Error("want strings, read against the run's own utf8, in the table")
+	}
+}
+
+// A table that cannot be written keeps nothing from the store: with a regular file where the system cache's
+// directory goes, the run's write fails, and every standard-library entry the run computed, whole or short, is in the
+// project's store, where the next run hits it.
+func TestAStandardLibraryEntryATableCouldNotTakeIsStored(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	context := standardLibraryContext("check tests", goRootOf(test))
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	file := filepath.Join(test.TempDir(), "system-cache")
+	if writeError := os.WriteFile(file, nil, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	caching := testCaching(test, rules)
+	caching.StandardLibrary = systemCacheCaching(cache.OpenAt(filepath.Join(file, "go", "standard-library")),
+		context).StandardLibrary
+	run := runSessionWith(test, directory, caching, rules, rules)
+	persistRunReads(run)
+	if _, writeError := run.session.WriteSystemCacheTable(); writeError == nil {
+		test.Fatal("want the write under a file to fail")
+	}
+	for keyed := range run.session.standardLibraryKeys {
+		if !caching.Store.Holds(run.session.keys[keyed]) {
+			test.Errorf("%s is in neither the table nor the project's store", keyed.PkgPath)
+		}
+	}
+}
+
+// standardLibraryEntryWhole reads each of its three things on its own: an entry whole in each is taken, and one short
+// in any one of them is refused, a fact analyzer's analysis missing, its answers computed in part or a kind of them
+// not complete, or its reads never judged.
+func TestTheWholeCheckReadsEachOfItsThings(test *testing.T) {
+	test.Parallel()
+
+	whole := StandardLibraryRunEntry{FactAnalyzers: []string{"facts"}, AnswersWhole: true, ReadsJudged: true}
+	entry := cacheEntry{
+		Analyzers: map[string]storedAnalysis{"facts": {}},
+		Answers:   []kindAnswers{{Kind: "purity", Complete: true}},
+	}
+	if !standardLibraryEntryWhole(whole, entry) {
+		test.Fatal("want a whole entry taken")
+	}
+	missingFacts := whole
+	missingFacts.FactAnalyzers = []string{"facts", "other"}
+	answersInPart := whole
+	answersInPart.AnswersWhole = false
+	readsUnjudged := whole
+	readsUnjudged.ReadsJudged = false
+	kindInPart := entry
+	kindInPart.Answers = []kindAnswers{{Kind: "purity", Complete: false}}
+	for name, short := range map[string]struct {
+		collected StandardLibraryRunEntry
+		entry     cacheEntry
+	}{
+		"a fact analyzer's analysis missing": {missingFacts, entry},
+		"answers computed in part":           {answersInPart, entry},
+		"a kind of answers not complete":     {whole, kindInPart},
+		"reads never judged":                 {readsUnjudged, entry},
+	} {
+		if standardLibraryEntryWhole(short.collected, short.entry) {
+			test.Errorf("%s: want the entry refused", name)
+		}
 	}
 }
 
@@ -720,7 +883,7 @@ func TestTheProjectStoreTakesNoWholeEntryTheTableHolds(test *testing.T) {
 	caching := testCaching(test, rules)
 	caching.StandardLibrary = systemCacheCaching(system, context).StandardLibrary
 	caching.AnswersInPart = map[string]bool{"strings": true}
-	run := runWithSession(test, directory, caching, rules)
+	run := runSessionWith(test, directory, caching, rules, rules)
 	if writtenTable(test, run) == 0 {
 		test.Fatal("want the whole entries in the table")
 	}

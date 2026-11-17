@@ -346,7 +346,7 @@ func differenceFrom(
 // runStandardLibraryVariant is the child that computes one variant: `standard-library-variant --root <probe> --out
 // <file>`, under the variant's environment, which its parent set. It runs the engine over the probe, cached in an
 // empty store of the probe's own, collecting every standard-library package under stamp, and writes their table with
-// the variant go env reports. Every package the probe imports must be among them.
+// the variant go env reports. Every package the probe imports must be among what the table holds, whole.
 func runStandardLibraryVariant(arguments []string, standardError io.Writer, registered []rule.Rule, stamp string) int {
 	flags := flag.NewFlagSet(standardLibraryVariantVerb, flag.ContinueOnError)
 	flags.SetOutput(standardError)
@@ -383,27 +383,34 @@ func runStandardLibraryVariant(arguments []string, standardError io.Writer, regi
 	if importsError != nil {
 		return fail(standardError, importsError)
 	}
-	collectedPaths := map[string]bool{}
-	for _, entry := range collected {
-		collectedPaths[entry.PackagePath] = true
+	// What the table holds, not what the run collected: the table leaves out an entry that is not whole, or whose
+	// export data does not read against the others (check.StandardLibraryTableOf), and a release must hold every
+	// package its probe imports. Written once to learn what it holds, and again with the variant counting exactly that.
+	_, holds, tableError := check.StandardLibraryTableOf(collected, values["GOROOT"], nil)
+	if tableError != nil {
+		return fail(standardError, tableError)
+	}
+	heldPaths := map[string]bool{}
+	for key := range holds {
+		heldPaths[collected[key].PackagePath] = true
 	}
 	var missing []string
 	for _, importPath := range imported {
-		if !collectedPaths[importPath] {
+		if !heldPaths[importPath] {
 			missing = append(missing, importPath)
 		}
 	}
 	if len(missing) > 0 {
-		return fail(standardError, fmt.Errorf("computing the standard library: the run collected no entry of %s",
+		return fail(standardError, fmt.Errorf("computing the standard library: the table holds no whole entry of %s",
 			strings.Join(missing, ", ")))
 	}
 	variant := cache.StandardLibraryVariant{
 		Target:     values["GOOS"] + "/" + values["GOARCH"],
 		CgoEnabled: values["CGO_ENABLED"],
 		GoVersion:  values["GOVERSION"],
-		Packages:   len(collected),
+		Packages:   len(holds),
 	}
-	table, tableError := check.StandardLibraryTableOf(collected, values["GOROOT"],
+	table, _, tableError := check.StandardLibraryTableOf(collected, values["GOROOT"],
 		[]cache.StandardLibraryVariant{variant})
 	if tableError != nil {
 		return fail(standardError, tableError)

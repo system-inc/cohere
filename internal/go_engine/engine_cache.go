@@ -94,7 +94,10 @@ func lintCache(
 		}
 	}
 	// A run keeping a system cache collects what it computes of the standard library for its build's table, each build
-	// into a map of its own, since each writes the table of its own context (WriteSystemCacheTable).
+	// into a map of its own, since each writes the table of its own context (WriteSystemCacheTable). A source that
+	// hands its own map, as a test or the release's generator does, has every build collect into that one map, and each
+	// build's table takes whatever of it its writer judges whole, another context's entries among them under keys no
+	// reader of that table asks for.
 	if standardLibrary != nil && standardLibrary.Collected == nil && system.store != nil {
 		standardLibrary.Collected = map[cache.Key]check.StandardLibraryRunEntry{}
 	}

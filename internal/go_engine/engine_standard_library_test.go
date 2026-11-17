@@ -59,7 +59,7 @@ func standardLibraryTableOf(
 	if !keyed {
 		test.Fatal("want the cached run to key the standard library")
 	}
-	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
+	table, _, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
@@ -244,7 +244,7 @@ func TestOnlyTheSystemCachesEntriesAreReadUnderNoCache(test *testing.T) {
 	if !found {
 		test.Fatal("want log/slog among the collected entries")
 	}
-	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
+	table, _, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}

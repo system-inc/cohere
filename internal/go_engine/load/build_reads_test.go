@@ -29,9 +29,9 @@ func TestADependencyCheckedForItsTypesAloneIsNeverRestored(test *testing.T) {
 	directory := test.TempDir()
 	writeListingFiles(test, directory, rootSyntaxFiles)
 	lean, leanError := loadWorkspace(directory, []string{"./root"}, []string{"GOWORK=off"}, nil, true,
-		Caching{RecordReads: true, rootSyntaxOnly: true}, nil)
+		Caching{RecordReads: EveryPackage, rootSyntaxOnly: true}, nil)
 	whole, wholeError := loadWorkspace(directory, []string{"./root"}, []string{"GOWORK=off"}, nil, true,
-		Caching{RecordReads: true}, nil)
+		Caching{RecordReads: EveryPackage}, nil)
 	if leanError != nil || wholeError != nil {
 		test.Fatalf("loading the fixture: %v, %v", leanError, wholeError)
 	}
@@ -66,7 +66,8 @@ func TestAPackageWithCgoIsNeverRestored(test *testing.T) {
 		"go.mod":       "module example.com/cgoreads\n\ngo 1.21\n",
 		"user/user.go": "package user\n\nimport _ \"runtime/cgo\"\n",
 	})
-	loaded, loadError := PackagesCached(directory, []string{"./user"}, cgoEnvironment, nil, Caching{RecordReads: true})
+	loaded, loadError := PackagesCached(directory, []string{"./user"}, cgoEnvironment, nil,
+		Caching{RecordReads: EveryPackage})
 	if loadError != nil {
 		test.Fatal(loadError)
 	}

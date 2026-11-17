@@ -35,7 +35,7 @@ func TestARunWithAnExtraBuildHashesEachStandardLibraryFileOnceWithoutAStore(test
 	hostSession := NewCacheSession(storeless(), rules)
 	hostSession.KeepForBuilds()
 	hostLoaded, hostLoadError := load.PackagesCached(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
-		load.Caching{Restorer: hostSession, RecordReads: true})
+		load.Caching{Restorer: hostSession, RecordReads: load.EveryPackage})
 	if hostLoadError != nil || len(hostLoaded.Diagnostics) > 0 {
 		test.Fatalf("loading the host's build: %v %+v", hostLoadError, hostLoaded.Diagnostics)
 	}

@@ -287,8 +287,8 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 	analyzed := slices.DeleteFunc(slices.Clone(loaded.Packages), func(each *packages.Package) bool {
 		return !engine.described.hasFileInScope(each)
 	})
-	// The host's reads, recorded only when the run has extra builds to restore packages into or collects the standard
-	// library's table (recordsReads), walked in the load's slots below its work.
+	// The host's reads, recorded only when the run has extra builds to restore packages into, collects the standard
+	// library's table or keeps a system cache (recordsReadsOf), walked in the load's slots below its work.
 	return engine.lintPackages(analyzed, loaded.Rewritten, check.Options{Withheld: loaded.Withheld,
 		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots})
 }

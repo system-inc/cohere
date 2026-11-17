@@ -53,7 +53,7 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 	if engine.lintOverlaps() {
 		caching.Begin = engine.beginSpeculativeLint
 	}
-	caching.RecordReads = engine.recordsReads()
+	caching.RecordReads = engine.recordsReadsOf()
 	started := time.Now()
 	defer func() { engine.hostLoading.Add(int64(time.Since(started))) }()
 	return engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})

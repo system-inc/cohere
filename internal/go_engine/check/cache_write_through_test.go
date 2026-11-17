@@ -74,7 +74,7 @@ func hostSessionOf(test *testing.T, root string, storeDirectory string, rules []
 	session := NewCacheSession(cachingAt(storeDirectory, rules), rules)
 	session.KeepForBuilds()
 	loaded, loadError := load.PackagesCached(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
-		load.Caching{Restorer: session, RecordReads: true})
+		load.Caching{Restorer: session, RecordReads: load.EveryPackage})
 	if loadError != nil || len(loaded.Diagnostics) > 0 {
 		test.Fatalf("loading the host's build: %v %+v", loadError, loaded.Diagnostics)
 	}
