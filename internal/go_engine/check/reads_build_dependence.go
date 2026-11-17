@@ -94,6 +94,13 @@ func (build *ReadsBuild) Dependence(restoring Restoring) DependenceSet {
 	if known, isKnown := build.dependences.Load(restoring.Reads); isKnown {
 		return knownDependence(restoring, known)
 	}
+	// Reads whose walk is still running, not recorded and not marked never, are the whole import closure for this ask
+	// alone, never stored: stored, the set would stay the whole closure for the run once the walk recorded them, and
+	// how far the run reaches would turn on which walks had ended when the set was first asked. Reads marked never are
+	// final, so their whole closure is stored below as any set is.
+	if restoring.Reads.Never() == "" && !restoring.Reads.Recorded() {
+		return DependenceSet{WholeClosure: true}
+	}
 	// Two verdicts may compute one package's set at once; each computes it alike, and every caller gets the one stored.
 	stored, _ := build.dependences.LoadOrStore(restoring.Reads, build.dependenceOf(restoring))
 	return knownDependence(restoring, stored)
