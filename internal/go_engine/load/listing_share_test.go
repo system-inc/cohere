@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"sync"
 	"testing"
 )
 
@@ -238,4 +240,161 @@ func decodedKeptListing(test *testing.T, listings *listingMap, key [sha256.Size]
 		test.Fatal(decodeError)
 	}
 	return kept
+}
+
+// A kept listing's whole fingerprint is read once a run for every build whose kept listing names the same inputs
+// (#qqyq61s): five extra builds side by side, each keeping its listing and then reading it kept, ask for it ten
+// times, and it is read once, its root walked once and each module file read once. Each build reads its listing kept
+// the second time.
+func TestAListingFingerprintIsReadOnceARunForEachSetOfInputs(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeListingFiles(test, directory, targetedModuleFiles)
+	fingerprints := NewFingerprints()
+	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
+	targets := sharedListingTargets[1:]
+	environments := make([]*GoEnvironment, len(targets))
+	for index, target := range targets {
+		environments[index] = goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
+	}
+	for round := range 2 {
+		var group sync.WaitGroup
+		for index, goEnvironment := range environments {
+			group.Go(func() {
+				_, kept, listError := cachedList(goEnvironment, []string{"./..."}, listings, nil, NewSharedReads(),
+					fingerprints, nil, nil)
+				if listError != nil || kept != (round == 1) {
+					test.Errorf("%v round %d: kept %v with %v, want kept %v", targets[index], round, kept, listError,
+						round == 1)
+				}
+			})
+		}
+		group.Wait()
+	}
+	if len(fingerprints.listings) != 1 {
+		test.Errorf("the builds' kept listings named %d sets of inputs, want the module's one",
+			len(fingerprints.listings))
+	}
+	if computed := fingerprints.listingsComputed.Load(); computed != 1 {
+		test.Errorf("one set of inputs was fingerprinted %d times, want once", computed)
+	}
+	if walked := fingerprints.rootsWalked.Load(); len(fingerprints.roots) != 1 || walked != 1 {
+		test.Errorf("%d roots were walked %d times, want the module's one, once", len(fingerprints.roots), walked)
+	}
+	if read := fingerprints.moduleFilesRead.Load(); read != int64(len(fingerprints.moduleFiles)) {
+		test.Errorf("%d module files were read %d times, want once each", len(fingerprints.moduleFiles), read)
+	}
+}
+
+// pickedListingFiles are a module whose listing on linux names a directory its listing on freebsd does not: only
+// linux's file imports lib, in a module beside it the project replaces by path, so lib's directory is in linux's
+// kept listing alone.
+var pickedListingFiles = map[string]string{
+	"project/go.mod": "module example.com/picked\n\ngo 1.24\n\nrequire example.com/outside v0.0.0\n\n" +
+		"replace example.com/outside => ../outside\n",
+	"project/picked.go":       "package picked\n\n// Picked is one.\nfunc Picked() int { return 1 }\n",
+	"project/picked_linux.go": "package picked\n\nimport _ \"example.com/outside/lib\"\n",
+	"outside/go.mod":          "module example.com/outside\n\ngo 1.24\n",
+	"outside/lib/lib.go":      "package lib\n\n// Lib is two.\nfunc Lib() int { return 2 }\n",
+}
+
+// A kept listing's fingerprint is keyed by every input it names (#qqyq61s): of two builds of one run, linux's kept
+// listing names lib's directory and freebsd's does not, so linux's reads a fingerprint of its own rather than
+// freebsd's, read first, and its listing is kept while nothing moved. A file added in lib, the directory linux's alone
+// names, asks go list again for linux and not for freebsd, and linux's listing is then the one it makes with nothing
+// kept. The two sets share their root's walk and their common module files.
+func TestAListingFingerprintIsKeyedByEveryInputItNames(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeListingFiles(test, root, pickedListingFiles)
+	project := filepath.Join(root, "project")
+	freebsd := goEnvironmentOf(test, project, append([]string{"GOWORK=off"}, sharedListingTargets[3]...))
+	linux := goEnvironmentOf(test, project, append([]string{"GOWORK=off"}, sharedListingTargets[1]...))
+	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
+	// runBuilds lists freebsd's build and then linux's under fingerprints of their own, as one run's extra builds do,
+	// and reports whether each was kept and linux's listing.
+	runBuilds := func(run string) (bool, bool, *listing, *Fingerprints) {
+		fingerprints := NewFingerprints()
+		_, freebsdKept, freebsdError := cachedList(freebsd, []string{"./..."}, listings, nil, NewSharedReads(),
+			fingerprints, nil, nil)
+		linuxListed, linuxKept, linuxError := cachedList(linux, []string{"./..."}, listings, nil, NewSharedReads(),
+			fingerprints, nil, nil)
+		if freebsdError != nil || linuxError != nil {
+			test.Fatalf("%s: listed freebsd with %v, linux with %v", run, freebsdError, linuxError)
+		}
+		return freebsdKept, linuxKept, linuxListed, fingerprints
+	}
+	runBuilds("the first run")
+	libDirectory := filepath.Join(root, "outside", "lib")
+	linuxNames := decodedKeptListing(test, listings, listingKey(linux, []string{"./..."})).Directories
+	if !slices.Contains(linuxNames, libDirectory) {
+		test.Fatalf("linux's kept listing names %v, without lib's directory", linuxNames)
+	}
+	freebsdNames := decodedKeptListing(test, listings, listingKey(freebsd, []string{"./..."})).Directories
+	if slices.Contains(freebsdNames, libDirectory) {
+		test.Fatalf("freebsd's kept listing names lib's directory: %v", freebsdNames)
+	}
+	freebsdKept, linuxKept, _, fingerprints := runBuilds("the second run")
+	if !freebsdKept || !linuxKept {
+		test.Errorf("with nothing moved, freebsd's listing kept %v and linux's %v, want both kept", freebsdKept,
+			linuxKept)
+	}
+	if computed := fingerprints.listingsComputed.Load(); len(fingerprints.listings) != 2 || computed != 2 {
+		test.Errorf("%d sets of inputs were fingerprinted %d times, want two, once each", len(fingerprints.listings),
+			computed)
+	}
+	if walked := fingerprints.rootsWalked.Load(); len(fingerprints.roots) != 1 || walked != 1 {
+		test.Errorf("%d roots were walked %d times, want the project's one, once", len(fingerprints.roots), walked)
+	}
+	if read := fingerprints.moduleFilesRead.Load(); read != int64(len(fingerprints.moduleFiles)) {
+		test.Errorf("%d module files were read %d times, want once each", len(fingerprints.moduleFiles), read)
+	}
+	writeListingFiles(test, root, map[string]string{
+		"outside/lib/more.go": "package lib\n\n// More is three.\nfunc More() int { return 3 }\n",
+	})
+	freebsdKept, linuxKept, linuxListed, _ := runBuilds("the run after lib moved")
+	if !freebsdKept || linuxKept {
+		test.Errorf("after lib moved, freebsd's listing kept %v and linux's %v, want freebsd's alone kept",
+			freebsdKept, linuxKept)
+	}
+	fresh, freshError := list(linux, []string{"./..."}, nil, nil, nil, nil)
+	if freshError != nil {
+		test.Fatal(freshError)
+	}
+	if !reflect.DeepEqual(linuxListed, fresh) {
+		test.Errorf("after lib moved, linux's listing differs from the one it makes with nothing kept:\n%s",
+			listingDifferences(linuxListed, fresh))
+	}
+}
+
+// A run's fingerprints are never carried into the next (#qqyq61s): a build keeps its listing under one run's
+// fingerprints, an import is added to a file's header, and the next run's build, under fingerprints of its own, reads
+// the edit and asks go list again.
+func TestAListingFingerprintIsReadAgainEachRun(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeListingFiles(test, directory, targetedModuleFiles)
+	goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, sharedListingTargets[1]...))
+	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
+	for run, wanted := range []bool{false, true} {
+		_, kept, listError := cachedList(goEnvironment, []string{"./..."}, listings, nil, NewSharedReads(),
+			NewFingerprints(), nil, nil)
+		if listError != nil || kept != wanted {
+			test.Fatalf("run %d: kept %v with %v, want kept %v", run, kept, listError, wanted)
+		}
+	}
+	writeListingFiles(test, directory, map[string]string{
+		"targeted.go": "package targeted\n\nimport (\n\t\"os\"\n\t\"strings\"\n)\n\n// Name is the program's name.\n" +
+			"func Name() string { return strings.TrimSpace(os.Args[0]) }\n",
+	})
+	edited, kept, listError := cachedList(goEnvironment, []string{"./..."}, listings, nil, NewSharedReads(),
+		NewFingerprints(), nil, nil)
+	if listError != nil || kept {
+		test.Fatalf("after the import was added: kept %v with %v, want go list asked again", kept, listError)
+	}
+	targeted := edited.byPath["example.com/targeted"]
+	if targeted == nil || !slices.Contains(targeted.Imports, "strings") {
+		test.Errorf("after the import was added, the package listed is %+v, without strings among its imports",
+			targeted)
+	}
 }

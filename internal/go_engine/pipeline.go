@@ -168,9 +168,10 @@ type pipeline struct {
 	reads *load.SharedReads
 
 	// fingerprints are the kept listing's directory fingerprints the extra builds share, each directory hashed once
-	// for every build (#5jpss95). Only the extra builds read them: the long-line wrap writes between the host's first
-	// load and the builds, so a fingerprint the host's load read could be of bytes since rewritten, while nothing
-	// writes once the builds start (extraBuildRun).
+	// for every build (#5jpss95), and each set of inputs' whole fingerprint, each root's walk and each module file's
+	// digest beside them (#qqyq61s). Only the extra builds read them: the long-line wrap writes between the host's
+	// first load and the builds, so a fingerprint the host's load read could be of bytes since rewritten, while
+	// nothing writes once the builds start (extraBuildRun).
 	fingerprints *load.Fingerprints
 
 	// walks are the package directories each pattern's walk finds, which the extra builds share, each walked once for
