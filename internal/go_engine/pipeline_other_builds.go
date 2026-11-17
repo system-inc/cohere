@@ -86,12 +86,14 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	}
 
 	// A width the memory decides is decided against the host's live heap measured here, as the builds start, with
-	// nothing else running. In a run that takes no share gate, one with a findings store or one judging each build's
-	// dependence (takesShareGate), it is main's rule whole: the first build runs alone and is measured as its load
-	// ends. Otherwise it is decided at the share gate (shareGate): from that heap alone when every build's share is
-	// low, and otherwise measured as the first build's load ends, each holding budgeted at buildHoldingBudget. The gate
-	// is for runs without a store alone, since on Shackler it cost about 3 CPU-s at cohere's root cold with a store at
-	// every width tried (#ghb3rcn), cause unmeasured.
+	// nothing else running. In a run that takes no share gate, one with a findings store whose host missed more than
+	// lowShareAtGate of its packages, a cold fill, or one judging each build's dependence (takesShareGate), it is
+	// main's rule whole: the first build runs alone and is measured as its load ends. Otherwise it is decided at the
+	// share gate (shareGate): from that heap alone when every build's share is low, and otherwise measured as the first
+	// build's load ends, each holding budgeted at buildHoldingBudget. Cold with a store, on Shackler, the gate cost
+	// about 3 CPU-s at cohere's root at every width tried (#ghb3rcn), cause unmeasured, and warm it bought 0.10 s
+	// (#ybjbqm2). The host's counts are final here, its lint saved, so the decision reads them once.
+	gated := engine.takesShareGate(pass.result.Cache)
 	width, fixed := engine.fixedBuildsWidth(len(extras), pass.result.Host)
 	// Under `--timing` each build's heap is measured as its own (extraBuildRun), which holds only with every build
 	// running alone: a timed run keeps nothing for its builds, so they restore nothing and run one at a time already.
@@ -103,9 +105,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	var measure func() int
 	if !fixed {
 		hostLive := forcedLiveHeapBytes()
-		// Left nil in a run that takes no share gate: one with a findings store, or one judging each build's
-		// dependence, whose builds restore nothing from the host's run (takesShareGate).
-		if engine.takesShareGate() {
+		// Left nil in a run that takes no share gate: one with a findings store whose host mostly missed, or one
+		// judging each build's dependence, whose builds restore nothing from the host's run (takesShareGate).
+		if gated {
 			fromHostLive = func() int {
 				decided, slack, holding := engine.hostLiveBuildsWidth(len(extras), hostLive)
 				engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes = hostLive, holding
@@ -119,12 +121,12 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 			}
 		}
 		measure = func() int {
-			measured, slack, holding := engine.measuredBuildsWidth(len(extras), hostLive)
+			measured, slack, holding := engine.measuredBuildsWidth(len(extras), hostLive, gated)
 			engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes = hostLive, holding
 			engine.buildsWidthSlack = slack
 			// A test's width in place of the gate's fallback too, so a test holds builds at the gate at a width it
 			// knows whatever their shares.
-			if engine.buildsWidthAtGateForced > 0 && engine.takesShareGate() {
+			if engine.buildsWidthAtGateForced > 0 && gated {
 				measured = min(engine.buildsWidthAtGateForced, max(len(extras), 1))
 			}
 			return measured
@@ -154,9 +156,10 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 // (load.Caching.AtGate) until every build has reported its share or ended. When every share is low the width is
 // fromHostLive's, decided then. Otherwise it is measure's: the first build in order passes alone, and measure decides
 // the width by what it holds as its load ends, which a first build whose load failed decides as one at a time. Builds
-// pass in order, each once every build before it has passed or ended and fewer than the width are past the gate. The
-// gate is for runs without a store alone: on Shackler it cost about 3 CPU-s at cohere's root cold with a store at every
-// width tried, cause unmeasured, and read 0.26 s faster without one, its CPU level.
+// pass in order, each once every build before it has passed or ended and fewer than the width are past the gate. A run
+// with a store takes it only when its host mostly restored (takesShareGate, #ybjbqm2): on Shackler it cost about 3
+// CPU-s at cohere's root cold with a store at every width tried, cause unmeasured, and read 0.26 s faster without one,
+// its CPU level.
 //
 // With neither the width is fixed, and each build starts once fewer than width are running, in order.
 //
@@ -854,6 +857,7 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.WrittenThrough = run.result.Cache.WrittenThrough
 			record.SystemCacheRestored = run.result.Cache.FromSystemCache
 			record.SystemCacheWritten = run.systemCacheWritten
+			record.SharedBodyHits = run.result.Cache.SharedBodyHits
 			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
 			record.DeclinedAtCheck = fromHost.DeclinedAtCheck
 			if len(fromHost.DeclinedBy) > 0 {

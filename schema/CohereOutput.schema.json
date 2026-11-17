@@ -667,6 +667,10 @@
                                 "type": "integer",
                                 "description": "The entries this build added to its table of the system cache. Absent when 0."
                             },
+                            "sharedBodyHits": {
+                                "type": "integer",
+                                "description": "The packages this build hit in its own findings cache whose body it took from the run's memo of decoded bodies, the bodies the host's run read from its store and those an earlier build read, rather than read and decode it again. Absent when 0: a cold run, whose host read nothing from its store, and a run under --no-cache write none."
+                            },
                             "inheritedFiles": {
                                 "type": "integer",
                                 "description": "The distinct files this build took the host's findings of at least one syntax-only rule on, rather than walk them again in a package it checked from source. Absent when 0, and always under --timing, which restores nothing from the host's run."
@@ -768,7 +772,7 @@
                 },
                 "buildsWidthFromHostLive": {
                     "type": "boolean",
-                    "description": "Whether buildsAtOnce was decided from the host's live heap alone, every build beside it budgeted 1.2 times that heap, because every build's share at the share gate, its checkedFromSourceAtGate over its packagesLoaded, was at or under 0.10. Only a run without a findings store waits at the gate. Absent when the first build's holding was measured instead, the run had a store, or the decision needed no heap."
+                    "description": "Whether buildsAtOnce was decided from the host's live heap alone, every build beside it budgeted 1.2 times that heap, because every build's share at the share gate, its checkedFromSourceAtGate over its packagesLoaded, was at or under 0.10. A run waits at the gate without a findings store, or with one when the host missed at most 0.10 of the packages its store hit or missed, the binary's standard-library packages left out. Absent when the first build's holding was measured instead, the run had a store its host mostly missed, or the decision needed no heap."
                 },
                 "typeErrors": { "type": "integer" },
                 "findings": { "type": "integer", "description": "Rule findings, type errors not included." },

@@ -148,7 +148,7 @@ func TestSortingReadsOfOneObjectWritesNothing(test *testing.T) {
 	receiver := types.NewTypeName(token.NoPos, other, "Wide", nil)
 	types.NewNamed(receiver, types.NewStruct(fields, nil), nil)
 	reads := &Reads{}
-	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[string]Selection{}}
+	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
 	for index, field := range fields {
 		selection := Selection{Receiver: receiver, Name: field.Name(), Index: []int{index}, Selected: field}
 		collected.selections[selectionKey(selection)] = selection

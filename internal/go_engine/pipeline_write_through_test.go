@@ -51,6 +51,19 @@ func TestTheRunAfterAColdOneHitsEveryBuildsOwnStore(test *testing.T) {
 				counts.WrittenThrough)
 		}
 	}
+	// The warm host hit every package in its store, so the builds' records name bodies its session decoded, and each
+	// build takes them from the run's memo rather than read and decode them again (#qqyq61s); the cold host read none.
+	shared := 0
+	for _, warmRun := range warm.buildRuns[1:] {
+		shared += warmRun.result.Cache.SharedBodyHits
+	}
+	if shared == 0 || !strings.Contains(warmStream, `"sharedBodyHits":`) {
+		test.Errorf("the warm run's builds took %d bodies from the run's memo, want some, recorded:\n%s", shared,
+			warmStream)
+	}
+	if strings.Contains(coldStream, `"sharedBodyHits"`) {
+		test.Errorf("the cold run's builds record bodies taken from a memo its host left empty:\n%s", coldStream)
+	}
 	if withoutCache(coldStream) != withoutCache(warmStream) {
 		test.Errorf("the warm run's stream differs from the cold run's:\ncold\n%s\nwarm\n%s", coldStream, warmStream)
 	}
@@ -75,5 +88,9 @@ func TestNoBuildWritesThroughWithoutTheCache(test *testing.T) {
 	}
 	if strings.Contains(stream, `"writtenThrough"`) {
 		test.Errorf("a record under --no-cache counts a write-through:\n%s", stream)
+	}
+	// Nor does any build take a body from the run's memo, which only a store's hits fill (#qqyq61s).
+	if strings.Contains(stream, `"sharedBodyHits"`) {
+		test.Errorf("a record under --no-cache counts a body taken from the run's memo:\n%s", stream)
 	}
 }

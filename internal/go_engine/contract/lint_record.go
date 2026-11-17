@@ -72,10 +72,11 @@ type LintRecord struct {
 	BuildsWidthSlack bool `json:"buildsWidthSlack,omitempty"`
 	// BuildsWidthFromHostLive is additive within contract 3, and the Go engine's alone: whether the width was decided
 	// from the host's live heap alone, at the share gate every extra build waits at before its type check in a run
-	// without a findings store, since every build's share there, its CheckedFromSourceAtGate over its PackagesLoaded,
-	// was at or under 0.10 (#ghb3rcn). BuildsWidthBuildBytes is then that heap times 1.2, the holding budgeted each
-	// build, and nothing was measured again. Absent when the first build's holding was measured instead, a share being
-	// over the line or the run having a store, which takes no gate, or the width needed no heap.
+	// without a findings store, or in one with a store whose host missed at most 0.10 of the packages its store hit or
+	// missed (#ybjbqm2), since every build's share there, its CheckedFromSourceAtGate over its PackagesLoaded, was at
+	// or under 0.10 (#ghb3rcn). BuildsWidthBuildBytes is then that heap times 1.2, the holding budgeted each build, and
+	// nothing was measured again. Absent when the first build's holding was measured instead, a share being over the
+	// line or the run having a store its host mostly missed, which takes no gate, or the width needed no heap.
 	BuildsWidthFromHostLive bool `json:"buildsWidthFromHostLive,omitempty"`
 	// BuildsPeakProblems is additive within contract 3, and the Go engine's alone: a sentence for each extra build of
 	// a run under `--timing` whose LintPeakOverLoadEnd passed the largest ratio measured in the run's mode, which the
@@ -161,6 +162,11 @@ type BuildRecord struct {
 	// `--no-system-cache`, or one whose table held everything it reached, writes none.
 	SystemCacheRestored int `json:"systemCacheRestored,omitempty"`
 	SystemCacheWritten  int `json:"systemCacheWritten,omitempty"`
+	// SharedBodyHits, additive within contract 3, counts the packages a build hit in its own findings cache whose body
+	// it took from the run's memo of decoded bodies (#qqyq61s), the bodies the host's session read from its store and
+	// those an earlier build read, rather than read the host's record its own names and decode the body again. Written
+	// only when not 0, so a cold run, whose host read nothing from its store, and a run under `--no-cache` write none.
+	SharedBodyHits int `json:"sharedBodyHits,omitempty"`
 
 	// InheritedFiles counts the distinct files an extra build took the host's findings of at least one syntax-only
 	// rule on, rather than walk them again in a package it checked from source (#y6q1x2j), and InheritedFindings the

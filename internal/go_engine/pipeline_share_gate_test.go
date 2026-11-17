@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
@@ -294,12 +296,12 @@ func TestABuildEndedBeforeTheShareGateStillLetsTheSharesBeJudged(test *testing.T
 	}
 }
 
-// A run with a findings store takes no share gate and keeps the measured rule whole (#ghb3rcn): on Shackler the gate
-// cost about 3 CPU-s at cohere's root cold with a store at every width tried. Over lowShareBuilds, whose shares the
-// gate would read as low, no build steps at the gate, the width is not decided from the host's live heap, and the
-// first build's holding is measured and taken at the store's peak factor, while every build's record still carries
-// what it would check from source at the gate.
-func TestARunWithAStoreTakesNoShareGate(test *testing.T) {
+// A run over an empty store takes no share gate and keeps the measured rule whole (#ghb3rcn, #ybjbqm2): its host
+// missed every package, a cold fill, and cold with a store the gate cost about 3 CPU-s at cohere's root on Shackler at
+// every width tried. Over lowShareBuilds, whose shares the gate would read as low, no build steps at the gate, the
+// width is not decided from the host's live heap, and the first build's holding is measured and taken at the store's
+// peak factor, while every build's record still carries what it would check from source at the gate.
+func TestARunOverAnEmptyStoreTakesNoShareGate(test *testing.T) {
 	test.Parallel()
 	var stepped atomic.Int64
 	engine, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
@@ -309,9 +311,13 @@ func TestARunWithAStoreTakesNoShareGate(test *testing.T) {
 		test.Fatal("the run has no findings store, want one: the cache is on")
 	}
 	lint := lintRecordOf(test, raw)
+	if lint.Cache.Missed == 0 || lint.Cache.Hit != 0 {
+		test.Fatalf("the host hit %d packages and missed %d, want every package missed: the store is empty",
+			lint.Cache.Hit, lint.Cache.Missed)
+	}
 	if stepped.Load() != 0 || engine.buildsWidthFromHostLive || lint.BuildsWidthFromHostLive {
-		test.Errorf("a run with a store stepped %d times at the share gate and decided from the host's live heap "+
-			"%t, want neither", stepped.Load(), engine.buildsWidthFromHostLive)
+		test.Errorf("a run over an empty store stepped %d times at the share gate and decided from the host's live "+
+			"heap %t, want neither", stepped.Load(), engine.buildsWidthFromHostLive)
 	}
 	if engine.buildsWidthBuildBytes == 0 || lint.BuildsWidthPeakFactor != buildPeakOverLoadEndWithStore {
 		test.Errorf("the width was given a holding of %d bytes at a peak factor of %.1f, want one measured at %.1f",
@@ -321,6 +327,87 @@ func TestARunWithAStoreTakesNoShareGate(test *testing.T) {
 		if build.CheckedFromSourceAtGate == 0 {
 			test.Errorf("the build %s's record reads nothing from source at the gate, want its count", build.Target)
 		}
+	}
+}
+
+// A run with a store takes the share gate once its host mostly restored, its own missed share at or under
+// lowShareAtGate (#ybjbqm2): over lowShareBuilds and one store, the first run fills it and takes no gate, and a second
+// after one leaf package's edit, the host missing that one of many, takes it. Every build there restores nearly all it
+// holds, so the width is decided from the host's live heap, at the store's peak factor. A run with every package hit
+// is the decision's alone here (TestTheHostsMissedShareDecidesTheShareGateUnderAStore): a test's host restores nothing
+// from a system cache's table, since each of its runs is given an empty one, so warm it keeps nothing for its builds,
+// which run one at a time whatever the gate says (fixedBuildsWidth).
+func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.T) {
+	test.Parallel()
+	root := lowShareBuilds(test)
+	// run is one run over root's store, its lint record, and how many steps its builds took at the share gate.
+	run := func() (contract.LintRecord, int64) {
+		var stepped atomic.Int64
+		engine, raw, _ := underCapRun(test, root, exitFindings, func(engine *pipeline) {
+			engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+		})
+		if !engine.withFindingsStore() {
+			test.Fatal("the run has no findings store, want one: the cache is on")
+		}
+		return lintRecordOf(test, raw), stepped.Load()
+	}
+	cold, coldSteps := run()
+	if cold.Cache.Hit != 0 || coldSteps != 0 || cold.BuildsWidthFromHostLive {
+		test.Fatalf("the cold run's host hit %d packages and its builds stepped %d times at the share gate, want "+
+			"none and none: the store was empty", cold.Cache.Hit, coldSteps)
+	}
+	writeFixtureFiles(test, root, map[string]string{
+		"internal/shared0/shared.go": "// Package shared0 is compiled alike by every build.\npackage shared0\n\n" +
+			"// Value is the package's value, edited.\nconst Value = 100\n",
+	})
+	edited, editedSteps := run()
+	if edited.Cache.Missed != 1 || edited.Cache.Hit == 0 {
+		test.Fatalf("the run after a leaf edit hit %d packages at the host and missed %d, want the edited one "+
+			"missed alone", edited.Cache.Hit, edited.Cache.Missed)
+	}
+	if editedSteps == 0 || !edited.BuildsWidthFromHostLive ||
+		edited.BuildsWidthPeakFactor != buildPeakOverLoadEndWithStore {
+		test.Errorf("the run after a leaf edit, its host missing 1 of %d, stepped %d times at the share gate, its "+
+			"width from the host's live heap %t at a peak factor of %.1f, want steps, yes and %.1f",
+			edited.Cache.Hit+edited.Cache.Missed, editedSteps, edited.BuildsWidthFromHostLive,
+			edited.BuildsWidthPeakFactor, buildPeakOverLoadEndWithStore)
+	}
+}
+
+// The share gate's line for a run with a store is the host's own missed share, its session's misses over the packages
+// its store hit or missed, the system cache's table left out, at or under lowShareAtGate (#ybjbqm2), the same line
+// every build's share at the gate is read against: warm, after a leaf edit, and exactly at the line it takes the gate,
+// and just over it, or cold, a small tree's among them whose packages from the system cache's table outnumber its
+// misses, it keeps main's schedule. A run without a store takes it whatever the counts.
+func TestTheHostsMissedShareDecidesTheShareGateUnderAStore(test *testing.T) {
+	test.Parallel()
+	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil)}
+	if !withStore.withFindingsStore() {
+		test.Fatal("the engine has no findings store, want one")
+	}
+	for _, each := range []struct {
+		name   string
+		counts check.CacheCounts
+		want   bool
+	}{
+		{name: "warm, every package hit", counts: check.CacheCounts{On: true, Hit: 200}, want: true},
+		{name: "a leaf edit, one of many missed", counts: check.CacheCounts{On: true, Hit: 199, Missed: 1},
+			want: true},
+		{name: "exactly at the line", counts: check.CacheCounts{On: true, Hit: 90, Missed: 10}, want: true},
+		{name: "a leaf edit beside the system cache's table, which is left out", counts: check.CacheCounts{On: true,
+			Hit: 95, FromSystemCache: 260, Missed: 5}, want: true},
+		{name: "just over the line", counts: check.CacheCounts{On: true, Hit: 89, Missed: 11}, want: false},
+		{name: "cold, an empty store", counts: check.CacheCounts{On: true, Missed: 200}, want: false},
+		{name: "a small tree's cold fill beside the system cache's table", counts: check.CacheCounts{On: true,
+			FromSystemCache: 260, Missed: 20}, want: false},
+	} {
+		if got := withStore.takesShareGate(each.counts); got != each.want {
+			test.Errorf("%s, a missed share of %.3f, took the share gate %t, want %t", each.name,
+				hostMissedShare(each.counts), got, each.want)
+		}
+	}
+	if !(&pipeline{}).takesShareGate(check.CacheCounts{On: true, Missed: 200}) {
+		test.Error("a run without a store whose host missed everything takes no share gate, want it taken")
 	}
 }
 

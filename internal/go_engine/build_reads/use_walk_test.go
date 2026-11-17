@@ -29,7 +29,7 @@ const unplacedHolder = "type holder struct {\n\trecord *dependency.Record\n\tite
 //     call's several results (placeAssignment, placeValues, and value's tuple);
 //   - an element appended to, a key deleted from, a value sent on, and an element of a literal of a value whose type is
 //     a type parameter, whose slice, map, channel or literal type the walk cannot read (placeBuiltin, place,
-//     placeComposite).
+//     inspectComposite).
 //
 // Every other expression the walk leaves unplaced is a condition (`if`, `for`) or an array's length, a boolean or an
 // integer, which hold nothing a look could reach past the value itself. A struct literal's key that names no field and
@@ -55,9 +55,18 @@ var unplacedUsers = map[string]string{
 func unplacedReads(test *testing.T, user string) typeReads {
 	test.Helper()
 
-	fileSet := token.NewFileSet()
 	dependencySource := "package dependency\n\ntype Inner struct{ Count int }\n\n" +
 		"type Record struct {\n\tName string\n\tNext *Inner\n}\n"
+	return readsOver(test, dependencySource, "package user\n\nimport \""+unplacedDependency+"\"\n\n"+unplacedHolder+
+		unplacedUsers[user])
+}
+
+// readsOver are the reads userSource records, a file of package unplacedUser, checked over dependencySource, a file of
+// package unplacedDependency.
+func readsOver(test *testing.T, dependencySource string, userSource string) typeReads {
+	test.Helper()
+
+	fileSet := token.NewFileSet()
 	dependencyFile, parseError := parser.ParseFile(fileSet, "dependency.go", dependencySource,
 		parser.SkipObjectResolution)
 	if parseError != nil {
@@ -67,8 +76,7 @@ func unplacedReads(test *testing.T, user string) typeReads {
 	if checkError != nil {
 		test.Fatal(checkError)
 	}
-	source := "package user\n\nimport \"" + unplacedDependency + "\"\n\n" + unplacedHolder + unplacedUsers[user]
-	userFile, parseError := parser.ParseFile(fileSet, "user.go", source, parser.SkipObjectResolution)
+	userFile, parseError := parser.ParseFile(fileSet, "user.go", userSource, parser.SkipObjectResolution)
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
@@ -88,7 +96,7 @@ func unplacedReads(test *testing.T, user string) typeReads {
 	})}
 	checked, checkError := configuration.Check(unplacedUser, fileSet, []*ast.File{userFile}, info)
 	if checkError != nil {
-		test.Fatalf("type-checking the user that reaches by %s: %v", user, checkError)
+		test.Fatalf("type-checking the user: %v", checkError)
 	}
 	return collectTypeReads(checked, info, []*ast.File{userFile})
 }

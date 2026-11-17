@@ -1070,7 +1070,10 @@ entry it then wrote to its own findings cache, once their restore held, so its n
 check them from source, since the host, hitting its own store then, keeps nothing to restore them from; under
 `--no-cache` nothing is written, and it is absent. `"systemCacheRestored":290` counts the standard-library packages
 the build restored from the system cache's table of its own build context, and `"systemCacheWritten":12` the entries
-it added to that table, each absent when 0. `"inheritedFiles":40` counts the distinct files an extra build took
+it added to that table, each absent when 0. `"sharedBodyHits":1561` counts the packages a build hit in its own
+findings cache whose body it took from the run's memo of decoded bodies, the bodies the host's run read from its
+store and those an earlier build read, rather than read and decode it again; a cold run, whose host read nothing
+from its store, and a run under `--no-cache` write none, and it is absent. `"inheritedFiles":40` counts the distinct files an extra build took
 the host's findings of at least one syntax-only rule on, rather than walk them again in a package it checked from
 source, since such a rule's findings on a file are the file's alone, and `"inheritedFindings":12` the findings it took,
 each rule's on each file once. Under `--timing` nothing is restored from the host, and nothing inherited, so every
@@ -1108,7 +1111,9 @@ host's ran side by side, decided once (#b2t9xmf, #rmzehfg, #ghb3rcn). The first 
 then every other in build order, the host's own before the other platforms (#awbzy9y). When the memory decides the
 width in a run with a findings store, the first runs alone until its load has ended; there a collection measures the
 live heap, the build's holding is that heap less the host's, measured the same way as the builds started, and the rest
-start once the width is decided. A run without a store, under `--no-cache`, decides it at a share gate instead,
+start once the width is decided. A run without a store, under `--no-cache`, decides it at a share gate instead, and
+so does a run with a store whose host missed at most 0.10 of the packages its store hit or missed, the binary's
+standard-library packages left out since it holds them cold too, mostly restored (#ybjbqm2),
 unless it judges each build's dependence (`--build-dependence`), whose builds restore nothing from the host, so every
 share would be high and the measured rule is taken from the start: every build starts at once, lists, builds its
 graph and restores, and waits before its type check, until every build has
@@ -1117,8 +1122,9 @@ reported its share there, `checkedFromSourceAtGate` over `packagesLoaded`, or en
 taken as 1.2 times it. Otherwise the first build passes the gate alone and is measured as its load ends, its holding
 taken as 1.2 times what it holds; the others' listings and restores are live then, so it reads high, which errs
 narrow. Builds pass the gate in that order, each once every build before it has passed or ended, and a build after one
-that failed is turned away there, before its type check. The gate and the 1.2 are for runs without a store alone: with
-one, the gate cost about 3 CPU-s at cohere's root cold at every width tried, cause unmeasured. A build is taken to
+that failed is turned away there, before its type check. A run with a store whose host missed more, a cold fill,
+takes no gate and no 1.2: there the gate cost about 3 CPU-s at cohere's root at every width tried, cause unmeasured,
+while warm and after a leaf edit it read 0.07 to 0.10 s faster. A build is taken to
 hold `"buildsWidthPeakFactor":3.5` times its holding at its lint's peak in a run with a findings store, and 2.5 times
 under `--no-cache` (#hv090f4), each the largest ratio measured in its mode across 14 builds of two trees rounded up
 to the next half, and the width is

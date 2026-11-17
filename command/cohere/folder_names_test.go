@@ -48,15 +48,55 @@ func TestTheFolderCheckReportsTheOutermostAbbreviatedFolder(test *testing.T) {
 	if got := folderDirectories(found.Folders); !reflect.DeepEqual(got, want) {
 		test.Fatalf("reported %v, want %v", got, want)
 	}
+	// The message names what the word stands for, never the word twice (#13fpvdf): a folder named the word alone
+	// abbreviates the expansion, and one holding other words abbreviates it as the word.
+	opening := map[string]string{
+		"docs":             `Folder name "docs" abbreviates "documentation". A folder's name is read on every path`,
+		"modules/api-docs": `Folder name "api-docs" abbreviates "documentation" as "docs". A folder's name is read`,
+		"source/docs":      `Folder name "docs" abbreviates "documentation". `,
+		"src/docs":         `Folder name "docs" abbreviates "documentation". `,
+	}
 	for _, finding := range found.Folders {
-		if finding.Directory == "docs" && (finding.MessageId != "abbreviatedFolderName" ||
-			!strings.HasPrefix(finding.Message, `Folder name "docs" abbreviates "docs". Spell it out as `+
-				`"documentation". A folder's name is read on every path`)) {
-			test.Errorf("docs/ reads %s %q", finding.MessageId, finding.Message)
+		if finding.MessageId != "abbreviatedFolderName" ||
+			!strings.HasPrefix(finding.Message, opening[finding.Directory]) {
+			test.Errorf("%s/ reads %s %q", finding.Directory, finding.MessageId, finding.Message)
 		}
-		if finding.Directory == "src/docs" && !strings.Contains(finding.Message, `Folder name "docs" abbreviates`) {
-			test.Errorf("src/docs/ reads %q", finding.Message)
-		}
+	}
+}
+
+// A folder is judged only when it holds, at any depth the walk enters, a file the run covers: tracked, or untracked
+// and not ignored (#13fpvdf). Kirk's root read red over a docs/ left holding only Finder's ignored .DS_Store after git
+// removed its tracked files at a rename. So a docs/ holding only an ignored file passes, and so does one whose only
+// content is a folder of ignored files, or a folder with no file at all; the same docs/ with one untracked file that
+// is not ignored, or one tracked file the ignore rules would otherwise match, fails. A docs/ holding a covered file
+// only deeper down, in a docs/ of its own, qualifies by it, and is the one reported, outermost.
+func TestTheFolderCheckJudgesOnlyFoldersHoldingAFileTheRunCovers(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		".gitignore":                      ".DS_Store\nscratch/\n",
+		"go.mod":                          "module example.com/root\n",
+		"stray/docs/.DS_Store":            "finder\n",
+		"nested/docs/scratch/notes.md":    "# Notes\n",
+		"untracked/docs/README.md":        "# Documentation\n",
+		"tracked/docs/.DS_Store":          "finder\n",
+		"above/docs/.DS_Store":            "finder\n",
+		"above/docs/inner/docs/README.md": "# Inner\n",
+		"documentation/README.md":         "# Documentation\n",
+	})
+	if createDirectoryError := os.MkdirAll(filepath.Join(root, "empty", "docs"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	gitInRepository(test, root, "init", "--quiet")
+	gitInRepository(test, root, "add", "--force", "tracked/docs/.DS_Store")
+	found, discoverProjectsError := discoverProjects(root, nil)
+	if discoverProjectsError != nil {
+		test.Fatal(discoverProjectsError)
+	}
+	// above/docs holds a covered file only below its own docs/ child, so it qualifies, and is the outermost.
+	want := []string{"above/docs", "tracked/docs", "untracked/docs"}
+	if got := folderDirectories(found.Folders); !reflect.DeepEqual(got, want) {
+		test.Fatalf("reported %v, want %v", got, want)
 	}
 }
 

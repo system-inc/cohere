@@ -82,8 +82,8 @@ func TestAUseWalkThatLetsContextsGoReadsAsOneThatKeepsThem(test *testing.T) {
 	set := 0
 	held := 0
 	for own, source := range sources {
-		lettingGo := typeReads{uses: map[ObjectUse]bool{}, selections: map[string]Selection{}}
-		keeping := typeReads{uses: map[ObjectUse]bool{}, selections: map[string]Selection{}}
+		lettingGo := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
+		keeping := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
 		walked := walkUsesKeeping(&lettingGo, own, source.info, source.files, false)
 		kept := walkUsesKeeping(&keeping, own, source.info, source.files, true)
 		if !reflect.DeepEqual(lettingGo, keeping) {

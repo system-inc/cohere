@@ -12,7 +12,8 @@ import (
 // it kept that the merge left out. Then what the build restored from the host's run rather than checked, each count
 // written only when not 0: the host's entries kept for the others, and another's packages restored, declined by its
 // load and by its check, every decline by why, the loads again it took, by why, the packages it wrote through to its
-// own findings cache, and the files and findings it inherited from the host's run. A run of one build writes none, and
+// own findings cache, the hits whose body it took from the run's decodes, and the files and findings it inherited from
+// the host's run. A run of one build writes none, and
 // neither does a Swift run, so their output is as it was.
 type checkedBuild struct {
 	Target           string `json:"target"`
@@ -39,6 +40,9 @@ type checkedBuild struct {
 	// table of its build context and the entries it added to that table (#syscache), each absent when 0.
 	SystemCacheRestored int `json:"systemCacheRestored,omitempty"`
 	SystemCacheWritten  int `json:"systemCacheWritten,omitempty"`
+	// SharedBodyHits is the packages it hit in its own findings cache whose body it took from the run's memo of
+	// decoded bodies rather than read and decode again (#qqyq61s), absent when 0.
+	SharedBodyHits int `json:"sharedBodyHits,omitempty"`
 	// InheritedFiles and InheritedFindings are the files it took the host's findings of a syntax-only rule on rather
 	// than walk again, and the findings it took, each absent when 0.
 	InheritedFiles    int `json:"inheritedFiles,omitempty"`
