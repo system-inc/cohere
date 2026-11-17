@@ -11,7 +11,7 @@ import (
 // them to its Reads under one hold of the lock (see Reads.publishTypes).
 type typeReads struct {
 	uses        map[ObjectUse]bool
-	selections  map[string]Selection
+	selections  map[selectionIdentity]Selection
 	closureOnly string
 }
 
@@ -38,7 +38,7 @@ func (collected *typeReads) add(own *types.Package, object types.Object, kind Us
 // symbol by go:linkname reaches past the type checker, so each of those is judged by every object's closure, as every
 // read was before kinds.
 func collectTypeReads(own *types.Package, info *types.Info, files []*ast.File) typeReads {
-	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[string]Selection{}}
+	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
 	for _, used := range info.Uses {
 		kind := UseMember
 		if _, isTypeName := used.(*types.TypeName); isTypeName {
