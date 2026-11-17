@@ -66,8 +66,8 @@ type DependenceSet struct {
 
 // Dependence is restoring's dependence set for TypesHold and FactsHold, from the reads the host's run made of it, with
 // build the host's memo, which every build shares: memoized there by the package's reads, so each package's set is
-// computed once, when it is first asked, which is once the host's run is over and adds no read to it. Reads the
-// verdict judges read by read reach, by kind:
+// computed once, at the host's keep for every package it kept (keptDependence), once the host's run is over, so it
+// adds no read to it. Reads the verdict judges read by read reach, by kind:
 //
 //   - a use of the whole, and every read of a package with assembly files (Restoring.Assembly), judged by the memo's
 //     whole twin: every package the closure digest's walk visits (closure);
@@ -111,6 +111,9 @@ func knownDependence(restoring Restoring, known any) DependenceSet {
 
 // dependenceOf is restoring's dependence set, computed (Dependence).
 func (build *ReadsBuild) dependenceOf(restoring Restoring) DependenceSet {
+	if build.computing != nil {
+		build.computing(restoring)
+	}
 	if restorable, _ := restoring.Reads.Restorable(); !restorable || restoring.Reads.ClosureOnly() != "" {
 		return DependenceSet{WholeClosure: true}
 	}
