@@ -155,12 +155,20 @@ func TestMarkUsedTouchesOnlyAnEntryOlderThanAnHour(test *testing.T) {
 	store.MarkUsed(stale)
 	store.MarkUsed(fresh)
 	store.MarkUsed(Key{0xCD})
-	if information, statError := os.Stat(store.path(stale)); statError != nil || information.ModTime().Before(before) {
-		test.Errorf("an entry two hours old was not marked used: %v (%v)", information, statError)
+	staleInformation, staleStatError := os.Stat(store.path(stale))
+	if staleStatError != nil {
+		test.Fatal(staleStatError)
 	}
-	if information, statError := os.Stat(store.path(fresh)); statError != nil ||
-		!information.ModTime().Equal(freshTime) {
-		test.Errorf("an entry marked within the hour was marked again: %v (%v)", information, statError)
+	if staleInformation.ModTime().Before(before) {
+		test.Errorf("an entry two hours old was not marked used: its time is %v", staleInformation.ModTime())
+	}
+	freshInformation, freshStatError := os.Stat(store.path(fresh))
+	if freshStatError != nil {
+		test.Fatal(freshStatError)
+	}
+	if !freshInformation.ModTime().Equal(freshTime) {
+		test.Errorf("an entry marked within the hour was marked again: its time is %v, want %v",
+			freshInformation.ModTime(), freshTime)
 	}
 	if present(store.path(Key{0xCD})) {
 		test.Error("marking an entry that is not there made one")
