@@ -14,6 +14,33 @@ import (
 	"testing"
 )
 
+// pickedListingFiles are a module whose listing on linux names a directory its listing on freebsd does not, and
+// nothing else: both builds import base, in a module beside it the project replaces by path, so both kept listings
+// name that module's files, and only linux's file imports lib, in the same module, so lib's directory is in linux's
+// kept listing alone.
+var pickedListingFiles = map[string]string{
+	"project/go.mod": "module example.com/picked\n\ngo 1.24\n\nrequire example.com/outside v0.0.0\n\n" +
+		"replace example.com/outside => ../outside\n",
+	"project/picked.go": "package picked\n\nimport _ \"example.com/outside/base\"\n\n// Picked is one.\n" +
+		"func Picked() int { return 1 }\n",
+	"project/picked_linux.go": "package picked\n\nimport _ \"example.com/outside/lib\"\n",
+	"outside/go.mod":          "module example.com/outside\n\ngo 1.24\n",
+	"outside/base/base.go":    "package base\n\n// Base is one.\nfunc Base() int { return 1 }\n",
+	"outside/lib/lib.go":      "package lib\n\n// Lib is two.\nfunc Lib() int { return 2 }\n",
+}
+
+// twoModuleWorkspaceFiles are a go.work root of two modules, the root's own and second, which the go.work uses beside
+// it: the root's package imports second's, and second holds a directory with no package, which only second's own walk
+// reads.
+var twoModuleWorkspaceFiles = map[string]string{
+	"go.work":               "go 1.27\n\nuse (\n\t.\n\t./second\n)\n",
+	"go.mod":                "module example.com/first\n\ngo 1.27\n",
+	"first.go":              "package first\n\nimport _ \"example.com/second\"\n",
+	"second/go.mod":         "module example.com/second\n\ngo 1.27\n",
+	"second/second.go":      "package second\n",
+	"second/notes/notes.md": "Notes, in a directory with no package.\n",
+}
+
 // The run's one table of go/build's HasSubdir and IsDir answers gives the answer go/build's own default does, so
 // ImportDir reads every directory as it would without it, package for package, error for error (#5jpss95): a link to a
 // file read as a Go file and a link to a directory named like one left out, a directory reached through a link, the
@@ -111,7 +138,9 @@ func TestSharedHooksImportEveryDirectoryAsGoBuildsOwn(test *testing.T) {
 // through the reads, the builds' fingerprints and the builds' walks (#tb538na), a first time, keeping its answer, and
 // a second, reading it kept. A fingerprint read once for every build is each build's own, since a directory's
 // fingerprint is of its entries and headers, which no build changes, and so is a walk, which reads only entries. It
-// holds on a module of targeted files and on the engine's cgo fixture.
+// holds on a module of targeted files, on the engine's cgo fixture, on a module whose builds' kept listings name other
+// directories, and on a go.work root of two modules, whose kept listings name two roots and two go.mod files, each
+// root's walk and each module file its own (#qqyq61s).
 func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
 	test.Parallel()
 	targeted := test.TempDir()
@@ -120,21 +149,42 @@ func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	for _, directory := range []string{targeted, cgoFixture} {
+	picked := test.TempDir()
+	writeListingFiles(test, picked, pickedListingFiles)
+	twoModules := test.TempDir()
+	writeListingFiles(test, twoModules, twoModuleWorkspaceFiles)
+	for _, fixture := range []struct {
+		directory   string
+		environment []string
+		patterns    []string
+		roots       int
+	}{
+		{directory: targeted, environment: []string{"GOWORK=off"}, patterns: []string{"./..."}, roots: 1},
+		{directory: cgoFixture, environment: []string{"GOWORK=off"}, patterns: []string{"./..."}, roots: 1},
+		{
+			directory:   filepath.Join(picked, "project"),
+			environment: []string{"GOWORK=off"},
+			patterns:    []string{"./..."},
+			roots:       1,
+		},
+		{directory: twoModules, patterns: []string{"./...", "example.com/second/..."}, roots: 2},
+	} {
+		directory := fixture.directory
 		shared := NewSharedReads()
 		fingerprints := NewFingerprints()
 		walks := NewPackageWalks()
 		ownListings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
 		sharedListings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
-		patterns := []string{"./..."}
-		hostEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, sharedListingTargets[0]...))
+		patterns := fixture.patterns
+		hostEnvironment := goEnvironmentOf(test, directory, append(slices.Clone(fixture.environment),
+			sharedListingTargets[0]...))
 		if _, _, listError := cachedList(hostEnvironment, patterns, sharedListings, nil, shared, nil, nil,
 			nil); listError != nil {
 			test.Fatalf("%s: the host's listing: %v", directory, listError)
 		}
 		for round := range 2 {
 			for _, target := range sharedListingTargets[1:] {
-				goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
+				goEnvironment := goEnvironmentOf(test, directory, append(slices.Clone(fixture.environment), target...))
 				alone, aloneKept, aloneError := cachedList(goEnvironment, patterns, ownListings, nil, nil, nil, nil,
 					nil)
 				through, throughKept, throughError := cachedList(goEnvironment, patterns, sharedListings, nil, shared,
@@ -154,6 +204,10 @@ func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
 				key := listingKey(goEnvironment, patterns)
 				ownKept, sharedKept := decodedKeptListing(test, ownListings, key), decodedKeptListing(test,
 					sharedListings, key)
+				if len(ownKept.Roots) != fixture.roots {
+					test.Fatalf("%s %v round %d: the kept listing names roots %v, want %d", directory, target, round,
+						ownKept.Roots, fixture.roots)
+				}
 				if sharedKept.Fingerprint != ownKept.Fingerprint {
 					test.Errorf("%s %v round %d: the kept fingerprint shared is %x, its own %x", directory, target,
 						round, sharedKept.Fingerprint, ownKept.Fingerprint)
@@ -286,24 +340,12 @@ func TestAListingFingerprintIsReadOnceARunForEachSetOfInputs(test *testing.T) {
 	}
 }
 
-// pickedListingFiles are a module whose listing on linux names a directory its listing on freebsd does not: only
-// linux's file imports lib, in a module beside it the project replaces by path, so lib's directory is in linux's
-// kept listing alone.
-var pickedListingFiles = map[string]string{
-	"project/go.mod": "module example.com/picked\n\ngo 1.24\n\nrequire example.com/outside v0.0.0\n\n" +
-		"replace example.com/outside => ../outside\n",
-	"project/picked.go":       "package picked\n\n// Picked is one.\nfunc Picked() int { return 1 }\n",
-	"project/picked_linux.go": "package picked\n\nimport _ \"example.com/outside/lib\"\n",
-	"outside/go.mod":          "module example.com/outside\n\ngo 1.24\n",
-	"outside/lib/lib.go":      "package lib\n\n// Lib is two.\nfunc Lib() int { return 2 }\n",
-}
-
-// A kept listing's fingerprint is keyed by every input it names (#qqyq61s): of two builds of one run, linux's kept
-// listing names lib's directory and freebsd's does not, so linux's reads a fingerprint of its own rather than
-// freebsd's, read first, and its listing is kept while nothing moved. A file added in lib, the directory linux's alone
-// names, asks go list again for linux and not for freebsd, and linux's listing is then the one it makes with nothing
-// kept. The two sets share their root's walk and their common module files.
-func TestAListingFingerprintIsKeyedByEveryInputItNames(test *testing.T) {
+// A kept listing's fingerprint is keyed by the directories it names (#qqyq61s): of two builds of one run, whose kept
+// listings name the same roots and module files, linux's names lib's directory and freebsd's does not, so linux's
+// reads a fingerprint of its own rather than freebsd's, read first, and its listing is kept while nothing moved. A file
+// added in lib, the directory linux's alone names, asks go list again for linux and not for freebsd, and linux's
+// listing is then the one it makes with nothing kept. The two sets share their root's walk and their module files.
+func TestAListingFingerprintIsKeyedByTheDirectoriesItNames(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	writeListingFiles(test, root, pickedListingFiles)
@@ -326,13 +368,18 @@ func TestAListingFingerprintIsKeyedByEveryInputItNames(test *testing.T) {
 	}
 	runBuilds("the first run")
 	libDirectory := filepath.Join(root, "outside", "lib")
-	linuxNames := decodedKeptListing(test, listings, listingKey(linux, []string{"./..."})).Directories
-	if !slices.Contains(linuxNames, libDirectory) {
-		test.Fatalf("linux's kept listing names %v, without lib's directory", linuxNames)
+	linuxListing := decodedKeptListing(test, listings, listingKey(linux, []string{"./..."}))
+	if !slices.Contains(linuxListing.Directories, libDirectory) {
+		test.Fatalf("linux's kept listing names %v, without lib's directory", linuxListing.Directories)
 	}
-	freebsdNames := decodedKeptListing(test, listings, listingKey(freebsd, []string{"./..."})).Directories
-	if slices.Contains(freebsdNames, libDirectory) {
-		test.Fatalf("freebsd's kept listing names lib's directory: %v", freebsdNames)
+	freebsdListing := decodedKeptListing(test, listings, listingKey(freebsd, []string{"./..."}))
+	if slices.Contains(freebsdListing.Directories, libDirectory) {
+		test.Fatalf("freebsd's kept listing names lib's directory: %v", freebsdListing.Directories)
+	}
+	if !slices.Equal(linuxListing.Roots, freebsdListing.Roots) ||
+		!slices.Equal(linuxListing.ModuleFiles, freebsdListing.ModuleFiles) {
+		test.Fatalf("linux's kept listing names roots %v and module files %v, freebsd's %v and %v, want the same",
+			linuxListing.Roots, linuxListing.ModuleFiles, freebsdListing.Roots, freebsdListing.ModuleFiles)
 	}
 	freebsdKept, linuxKept, _, fingerprints := runBuilds("the second run")
 	if !freebsdKept || !linuxKept {
@@ -369,7 +416,8 @@ func TestAListingFingerprintIsKeyedByEveryInputItNames(test *testing.T) {
 
 // A run's fingerprints are never carried into the next (#qqyq61s): a build keeps its listing under one run's
 // fingerprints, an import is added to a file's header, and the next run's build, under fingerprints of its own, reads
-// the edit and asks go list again.
+// the edit and asks go list again. It guards that NewFingerprints carries nothing from one to the next; that one is
+// made for each run, in newPipeline, the engine's TestEachRunsPipelineHoldsFingerprintsOfItsOwn pins.
 func TestAListingFingerprintIsReadAgainEachRun(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -502,6 +550,79 @@ func TestGoFlagsRewriteModulesUnderTheLastModAlone(test *testing.T) {
 	} {
 		if rewrites := goFlagsRewriteModules(goFlags); rewrites != wanted {
 			test.Errorf("GOFLAGS %q: rewrites modules %v, want %v", goFlags, rewrites, wanted)
+		}
+	}
+}
+
+// A steady fingerprint is keyed by each list it is read from alone (#qqyq61s): a set that differs from one read first
+// in its roots alone, its directories alone, its module files alone, or by a part moved from one list into the next,
+// reads its own fingerprint, the one read with nothing shared. No two kept listings differ in their module files
+// alone, since keepListing names a module's files only beside a directory of its packages, so the sets are asked here
+// directly.
+func TestASteadyFingerprintIsKeyedByEachListAlone(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeListingFiles(test, root, map[string]string{
+		"first/first.go":   "package first\n",
+		"second/second.go": "package second\n",
+		"go.mod":           "module example.com/keyed\n\ngo 1.27\n",
+		"go.sum":           "",
+	})
+	first, second := filepath.Join(root, "first"), filepath.Join(root, "second")
+	moduleFile, sumFile := filepath.Join(root, "go.mod"), filepath.Join(root, "go.sum")
+	readFirst := [3][]string{{first}, {second}, {moduleFile}}
+	readFirstAlone, _ := steadyFingerprint(readFirst[0], readFirst[1], readFirst[2], nil, nil)
+	for name, other := range map[string][3][]string{
+		"its roots":                         {{second}, {second}, {moduleFile}},
+		"its directories":                   {{first}, {first}, {moduleFile}},
+		"its module files":                  {{first}, {second}, {sumFile}},
+		"a directory moved among its roots": {{first, second}, nil, {moduleFile}},
+	} {
+		fingerprints := NewFingerprints()
+		fingerprints.steady(readFirst[0], readFirst[1], readFirst[2], nil)
+		shared, sharedCertain := fingerprints.steady(other[0], other[1], other[2], nil)
+		alone, aloneCertain := steadyFingerprint(other[0], other[1], other[2], nil, nil)
+		if alone == readFirstAlone {
+			test.Fatalf("a set that differs in %s reads the fingerprint of the set read first", name)
+		}
+		if shared != alone || !sharedCertain || !aloneCertain {
+			test.Errorf("a set that differs in %s read %x through the run's fingerprints, certain %v, and %x alone, "+
+				"certain %v", name, shared, sharedCertain, alone, aloneCertain)
+		}
+	}
+}
+
+// A doubt the run's fingerprints hold is a doubt for every build that asks after it (#qqyq61s). With go.sum a
+// directory, a module file that cannot be read and is not absent, two builds through one run's fingerprints keep no
+// listing, and neither reads one kept at its second ask; and a root that cannot be walked, one that is not there, reads
+// as a doubt at its first ask and its second.
+func TestADoubtIsADoubtForEveryBuildThatAsks(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeListingFiles(test, directory, targetedModuleFiles)
+	if makeError := os.Mkdir(filepath.Join(directory, "go.sum"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	fingerprints := NewFingerprints()
+	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
+	for ask := range 2 {
+		for _, target := range [][]string{sharedListingTargets[1], sharedListingTargets[3]} {
+			goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
+			_, kept, listError := cachedList(goEnvironment, []string{"./..."}, listings, nil, NewSharedReads(),
+				fingerprints, nil, nil)
+			if listError != nil || kept {
+				test.Errorf("%v ask %d: kept %v with %v, want go list asked", target, ask, kept, listError)
+			}
+		}
+	}
+	if len(listings.listings) != 0 || len(fingerprints.listings) != 1 {
+		test.Errorf("with go.sum unreadable the builds kept %d listings over %d sets of inputs, want none over one",
+			len(listings.listings), len(fingerprints.listings))
+	}
+	missing := filepath.Join(directory, "missing")
+	for ask := range 2 {
+		if _, certain := listingFingerprint([]string{missing}, nil, nil, false, nil, fingerprints); certain {
+			test.Errorf("ask %d: a root that is not there read as walked whole", ask)
 		}
 	}
 }
