@@ -829,6 +829,7 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.RestoredFromHost = len(fromHost.Restored)
 			record.Untouched, record.Visited = len(fromHost.Untouched), fromHost.Visited
 			record.WrittenThrough = run.result.Cache.WrittenThrough
+			record.SharedBodyHits = run.result.Cache.SharedBodyHits
 			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
 			record.DeclinedAtCheck = fromHost.DeclinedAtCheck
 			if len(fromHost.DeclinedBy) > 0 {
