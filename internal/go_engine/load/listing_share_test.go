@@ -626,3 +626,31 @@ func TestADoubtIsADoubtForEveryBuildThatAsks(test *testing.T) {
 		}
 	}
 }
+
+// A module file a go command of the run can rewrite that cannot be read is a doubt too, though it is read at every
+// ask and never through the run's fingerprints (#qqyq61s): with a go.work root's go.work.sum a directory, its listing's
+// fingerprint is a doubt at its first ask and its second, read through one run's fingerprints or with none, and a
+// listing that names it is never kept.
+func TestAnUnreadableRewritableModuleFileIsADoubt(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeListingFiles(test, directory, targetedModuleFiles)
+	writeListingFiles(test, directory, map[string]string{"go.work": "go 1.27\n\nuse .\n"})
+	if makeError := os.Mkdir(filepath.Join(directory, "go.work.sum"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	moduleFiles := []string{filepath.Join(directory, "go.mod"), filepath.Join(directory, "go.work.sum")}
+	fingerprints := NewFingerprints()
+	for ask := range 2 {
+		for name, through := range map[string]*Fingerprints{"the run's fingerprints": fingerprints, "none": nil} {
+			if _, certain := listingFingerprint([]string{directory}, nil, moduleFiles, false, nil,
+				through); certain {
+				test.Errorf("ask %d through %s: a listing naming an unreadable go.work.sum read as certain", ask, name)
+			}
+		}
+	}
+	listed := &listing{byPath: map[string]*listedPackage{}, roots: map[string]bool{}, testOnly: map[string]bool{}}
+	if kept, keepable := keepListing(directory, "", "", listed, false, nil, NewFingerprints()); keepable {
+		test.Errorf("a listing naming an unreadable go.work.sum was kept, over module files %v", kept.ModuleFiles)
+	}
+}
