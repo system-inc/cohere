@@ -64,7 +64,10 @@ const placedDependency = "package dependency\n\n" +
 	"func (box Box) Area() int { return box.Side * box.Side }\n\n" +
 	"type Holder struct{ Shape Shape }\n\n" +
 	"type Inner struct{ Count int }\n\n" +
-	"type Record struct{ Count int }\n"
+	"type Record struct{ Count int }\n\n" +
+	"type Size int\n\nconst Count Size = 3\n\n" +
+	"type Key struct{ Name string }\n\ntype Value struct{ Count int }\n\n" +
+	"type Generic[Element any] struct{ Value Element }\n\ntype Argument struct{ Count int }\n"
 
 // placedUsers are uses whose kind the walk reads from a destination it places (#deb8gq9), each named with the kind
 // of the dependency's type it must record, which no other part of its source records:
@@ -159,5 +162,56 @@ func TestSelectionsAreTheSameOnlyByReceiverNameAndPath(test *testing.T) {
 		"\treturn record.Count + inner.Count + box.Side + box.Area()\n}\n")
 	if len(collected.selections) != 4 {
 		test.Errorf("collected %d selections, want 4: %v", len(collected.selections), collected.selections)
+	}
+}
+
+// literalTypeUsers are composite literals whose own type expression holds a use below the type's name, each taken by
+// address and compared with nil, so nothing moves the literal and only the walk of its type records the use (#deb8gq9):
+// an anonymous struct's field type, declared, whole; an array length of a constant of another package's named type, a
+// value of it; a map literal's key type, whole; and a generic type's argument, which its instance's own record reads
+// whole.
+var literalTypeUsers = map[string]struct {
+	source string
+	name   string
+	kind   UseKind
+}{
+	"an anonymous struct's field type": {
+		source: "func use() bool { return &struct{ Field dependency.Record }{} != nil }\n",
+		name:   "Record", kind: UseWhole,
+	},
+	"an array's length": {
+		source: "func use() bool { return &[dependency.Count]int{} != nil }\n",
+		name:   "Size", kind: UseWhole,
+	},
+	"a map's key type": {
+		source: "func use() bool { return &map[dependency.Key]dependency.Value{} != nil }\n",
+		name:   "Key", kind: UseWhole,
+	},
+	"a generic type's argument": {
+		source: "func use() bool { return &dependency.Generic[dependency.Argument]{} != nil }\n",
+		name:   "Argument", kind: UseWhole,
+	},
+}
+
+// A composite literal's own type expression is walked, so what it holds below the type's name records its kind of use:
+// each literal type user records the dependency type's kind its type expression gives, which nothing else in its
+// source records.
+func TestALiteralsOwnTypeRecordsWhatItHolds(test *testing.T) {
+	test.Parallel()
+
+	for user, literal := range literalTypeUsers {
+		test.Run(user, func(test *testing.T) {
+			test.Parallel()
+
+			collected := readsOver(test, placedDependency,
+				"package user\n\nimport \""+unplacedDependency+"\"\n\n"+literal.source)
+			for use := range collected.uses {
+				if use.Kind == literal.kind && use.Object.Name() == literal.name &&
+					use.Object.Pkg().Path() == unplacedDependency {
+					return
+				}
+			}
+			test.Errorf("%s: want dependency.%s used %v, got %v", user, literal.name, literal.kind, collected.uses)
+		})
 	}
 }
