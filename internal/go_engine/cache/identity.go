@@ -1,35 +1,17 @@
 package cache
 
-import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"io"
-	"os"
-	"sync"
-)
+import "sync"
 
-// executableIdentity hashes the executable once per process: it is tens of megabytes, and it cannot change under
-// a running process in any way that matters, since the code running is what was loaded.
-var executableIdentity = sync.OnceValues(func() (string, error) {
-	executable, executableError := os.Executable()
-	if executableError != nil {
-		return "", fmt.Errorf("finding the running executable: %w", executableError)
-	}
-	opened, openError := os.Open(executable)
-	if openError != nil {
-		return "", fmt.Errorf("hashing the running executable %s: %w", executable, openError)
-	}
-	defer func() {
-		// Ignored: the file was only read, and every byte of it hashed or the copy failed.
-		_ = opened.Close()
-	}()
-	digester := sha256.New()
-	if _, copyError := io.Copy(digester, opened); copyError != nil {
-		return "", fmt.Errorf("hashing the running executable %s: %w", executable, copyError)
-	}
-	return hex.EncodeToString(digester.Sum(nil)), nil
-})
+// executableAtStart is the running executable, opened as this package initializes, before any of the engine's code
+// runs. The identity is hashed through this descriptor, never by path: a `go build` or `go install` that renames a new
+// binary over the path while the process runs leaves the old file under the old descriptor, so the process hashes the
+// bytes it runs, and never writes the system cache's tables or the project's entries under the new binary's identity.
+// The one window left is from exec to this package's initialization, before any of the engine's code has run.
+var executableAtStart = openExecutable()
+
+// executableIdentity hashes the executable once per process: it is tens of megabytes, and the code running is what was
+// loaded, which the descriptor opened at start reads.
+var executableIdentity = sync.OnceValues(executableAtStart.digest)
 
 // ExecutableIdentity is the sha256 of the running executable, memoized for the process. It stands for every rule's
 // code and embedded policy at once, so an entry another build of the engine wrote is never read.
