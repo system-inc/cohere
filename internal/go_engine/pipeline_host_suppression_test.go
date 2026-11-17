@@ -6,12 +6,14 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_else_return"
+	"github.com/system-inc/cohere/internal/go_engine/suppression"
 )
 
 // splitFile is a file every build of the other-builds fixture compiles, with two elses after a return, the first
@@ -103,5 +105,70 @@ func TestTheHostsSuppressionIsComputedOnlyWhenNoMergeReplacesIt(test *testing.T)
 					consistency_no_else_return.Name, inSplit)
 			}
 		})
+	}
+}
+
+// A run whose builds merge indexes each file's //cohere:ignore comments once, however many builds compile it
+// (#qqyq61s): every build's outcome reads the run's one index of the bytes it holds, rather than each build indexing
+// every file it compiles again. Its findings are the same as before: Head's withheld, Tail's kept.
+func TestARunWhoseBuildsMergeIndexesEachFileOnce(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	writeFixtureFiles(test, root, map[string]string{"internal/separator/split.go": splitFile})
+	var lock sync.Mutex
+	builtByFile := map[string]int{}
+	built := 0
+	engine, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.suppressionIndexes.built = func(file string) {
+			lock.Lock()
+			defer lock.Unlock()
+			builtByFile[file]++
+			built++
+		}
+	}, "--no-cache", "--no-fix", "--other-builds")
+	if len(engine.buildRuns) < 2 {
+		test.Fatalf("the merge was handed %d runs, want the host's and at least one other", len(engine.buildRuns))
+	}
+	if built != len(builtByFile) {
+		test.Errorf("the run indexed %d times over %d files, want each once: %v", built, len(builtByFile), builtByFile)
+	}
+	if builtByFile[filepath.Join(root, "internal", "separator", "split.go")] != 1 {
+		test.Errorf("the run indexed split.go, which more than one build has a say on, %d times, want once: %v",
+			builtByFile[filepath.Join(root, "internal", "separator", "split.go")], builtByFile)
+	}
+	lint := lintRecordOf(test, stream)
+	if lint.WithheldBySuppression[consistency_no_else_return.Name] != 1 {
+		test.Errorf("the run withheld %v, want Head's one %s", lint.WithheldBySuppression,
+			consistency_no_else_return.Name)
+	}
+}
+
+// A file the run holds new bytes of is indexed again, since its directives' lines may have moved: the rename's
+// rewrite and a reread after the fix phase writes each replace the bytes, and the index of the old bytes would cover
+// the wrong line. The same bytes read again are the index already built.
+func TestTheRunsSuppressionIndexFollowsTheBytesItHolds(test *testing.T) {
+	test.Parallel()
+	ruleName := consistency_no_else_return.Name
+	first := []byte("package moved\n\n//cohere:ignore " + ruleName + " the planted reason\nvar First = 1\n")
+	moved := []byte("package moved\n\n// Second is first's line now.\n//cohere:ignore " + ruleName +
+		" the planted reason\nvar First = 1\n")
+	var indexes suppressionIndexes
+	coveredLine := func(index *suppression.Index) int {
+		keepings := index.Keepings(ruleName)
+		if len(keepings) != 1 {
+			test.Fatalf("the index keeps %d lines for %s, want one", len(keepings), ruleName)
+		}
+		return keepings[0].CoveredLine
+	}
+	firstIndex := indexes.of("moved.go", first)
+	if again := indexes.of("moved.go", first); again != firstIndex {
+		test.Errorf("the same bytes read again were indexed again, want the index already built")
+	}
+	if got := coveredLine(firstIndex); got != 4 {
+		test.Errorf("the first bytes' directive covers line %d, want 4", got)
+	}
+	if got := coveredLine(indexes.of("moved.go", moved)); got != 5 {
+		test.Errorf("the moved bytes' directive covers line %d, want 5: the index of the bytes the run held before "+
+			"was read", got)
 	}
 }
