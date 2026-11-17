@@ -272,10 +272,21 @@ func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 		withoutRoot(everyGraphVerdict(test, sideLoaded), sideRoot), withoutRoot(everyGraphVerdict(test, fromStore),
 			storedRoot))
 	// The fixture's windows build meets facts the host holds by a member's path alone, and places every answer, its
-	// parameters' among them, through their functions' units.
-	if parts := expectSameCensus(test, sideStream, storeStream)["windows/arm64"]; parts.PathOnly == 0 ||
-		parts.Answers != 0 {
-		test.Errorf("the windows build leaves out %+v, want facts held by a path alone and every answer placed", parts)
+	// parameters' among them, through their functions' units. It is found by its operating system: its architecture is
+	// the host's, windows/amd64 on a linux/amd64 box (#mzet8xg).
+	census := expectSameCensus(test, sideStream, storeStream)
+	var windowsTargets []string
+	for target := range census {
+		if strings.HasPrefix(target, "windows/") {
+			windowsTargets = append(windowsTargets, target)
+		}
+	}
+	if len(windowsTargets) != 1 {
+		test.Fatalf("the census holds the windows builds %v, want one", windowsTargets)
+	}
+	if parts := census[windowsTargets[0]]; parts.PathOnly == 0 || parts.Answers != 0 {
+		test.Errorf("the windows build %s leaves out %+v, want facts held by a path alone and every answer placed",
+			windowsTargets[0], parts)
 	}
 	withoutRootLines := func(lines []string, root string) []string {
 		moved := make([]string, 0, len(lines))
