@@ -1,13 +1,14 @@
 package go_engine
 
 // shareGate is where the extra builds wait before their type checks when the width is the memory's to decide in a run
-// without a findings store (#ghb3rcn), a run with one taking the measured rule whole: every build starts at once,
-// lists, builds its graph and restores, then reports its share, the packages it will check from source over the
-// packages its load holds, and waits (report). A build that ends before it reaches the gate arrives with no share
-// (end). Once every build has arrived the shares are judged: when none is over lowShareAtGate the width is decided from
-// the host's live heap alone, and otherwise it is measured by the first build in start order, which passes the gate
-// alone (open). Builds pass in start order, each once every build before it has passed or ended (turn, admit). Every
-// field is read and written under extraBuildRuns' admitLock.
+// without a findings store (#ghb3rcn), or in one with a store whose host mostly restored (takesShareGate, #ybjbqm2), a
+// cold run with one taking the measured rule whole: every build starts at once, lists, builds its graph and restores,
+// then reports its share, the packages it will check from source over the packages its load holds, and waits (report).
+// A build that ends before it reaches the gate arrives with no share (end). Once every build has arrived the shares are
+// judged: when none is over lowShareAtGate the width is decided from the host's live heap alone, and otherwise it is
+// measured by the first build in start order, which passes the gate alone (open). Builds pass in start order, each once
+// every build before it has passed or ended (turn, admit). Every field is read and written under extraBuildRuns'
+// admitLock.
 //
 // A build waiting here holds its load open (loadPackages, loadMemory), so the late raise of the memory limit waits
 // until the last waiting build's load has ended rather than landing while the first builds lint, as it did when a

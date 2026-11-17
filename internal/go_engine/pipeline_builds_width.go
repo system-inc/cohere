@@ -31,7 +31,7 @@ const markPollInterval = time.Millisecond
 // host, the host's run, as a plain run's do (wouldRestoreFromHost), a test's forced width when it set one, one at a
 // time for the release's standard-library child, and one at a time when no heap could make it more (buildsWidth over
 // the smallest heap). It is false when the width is the memory's to decide: by what the first build holds
-// (measuredBuildsWidth), and in a run without a findings store at the share gate (shareGate), by the host's live heap
+// (measuredBuildsWidth), and in a run that takes the share gate (takesShareGate, shareGate), by the host's live heap
 // when every share is low (hostLiveBuildsWidth). The width never reaches a key or the verdict, only the lint record's
 // buildsAtOnce and the heap it was decided by: the builds' results and notes are taken in one order whatever it is
 // (extraBuildRuns).
@@ -66,10 +66,9 @@ func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun) (int, 
 
 // lowShareAtGate is the largest share of its packages a build may report at the share gate, checked from source over
 // held, for the width to be decided from the host's live heap alone (shareGate, hostLiveBuildsWidth): when every
-// build's share is at or under it, each is taken to hold about what the host does (#ghb3rcn). The gate, and so the
-// line, is for a run without a findings store alone (withFindingsStore): with one, the run takes the measured rule
-// whole, since on Shackler the gate cost about 3 CPU-s at cohere's root cold with a store at every width tried, 3, 4
-// and 5 alike, cause unmeasured, while without one it read 0.26 s faster with its CPU level.
+// build's share is at or under it, each is taken to hold about what the host does (#ghb3rcn). One line, one meaning,
+// mostly restored: it is also the line a run with a findings store takes the gate under, the host's own share, what
+// its session missed over what it held (hostMissedShare, takesShareGate, #ybjbqm2).
 //
 // It is a heuristic, not a proof. Nearly every restore is decided late (load.Restored.Holds), so the share the gate
 // reads is a lower bound: on the platform builds the upper bound, every late restore declined, read 0.96 to 0.97 at
@@ -85,9 +84,10 @@ const lowShareAtGate = 0.10
 // (measuredBuildsWidth). It is fitted to one tree's best width without a store, cohere's root's 6 against 7, where the
 // peak factor is 2.5, not a holding anyone measured: the heaviest low-share build there, windows, holds about 1.3 to
 // 1.4 times the host's live heap, and linux 0.95 (#bg2ffdw). 1.2, with the peak factor's own margin, is the narrowest
-// value that kept the root's best width. That margin does not carry to a store's factor of 3.5, so a run that takes no
-// share gate, one with a store among them, budgets each build at its measured holding, as before the gate
-// (holdingBudget). A row at 1.4 is owed and may move it.
+// value that kept the root's best width. A run with a store that takes the gate, its host mostly restored, budgets
+// the same 1.2 at a store's factor of 3.5, which read the same width warm and after a leaf edit at cohere's root and
+// deeafbf4 (#ybjbqm2); a run that takes no share gate, a cold one with a store among them, budgets each build at its
+// measured holding, as before the gate (holdingBudget). A row at 1.4 is owed and may move it.
 const buildHoldingBudget = 1.2
 
 // holdingBudget is how many times its holding the width budgets each build: buildHoldingBudget in a run whose width the
@@ -99,14 +99,34 @@ func holdingBudget(gated bool) float64 {
 	return buildHoldingBudget
 }
 
-// takesShareGate reports whether a width the memory decides is decided at the share gate (shareGate): only in a run
-// without a findings store, since with one the gate cost about 3 CPU-s at cohere's root cold at every width tried
-// (#ghb3rcn), cause unmeasured, and only when the builds restore from the host's run. A run judging each build's
-// dependence restores nothing from it for the facts census (censusKeepsHostRestoreOff, #f9br7sg), so every build's
-// share would be high and the gate would fall back to the measured rule after holding every build for nothing: it
-// takes the measured rule whole from the start.
-func (engine *pipeline) takesShareGate() bool {
-	return !engine.withFindingsStore() && !engine.censusKeepsHostRestoreOff
+// takesShareGate reports whether a width the memory decides is decided at the share gate (shareGate), given hostCache,
+// what the host's session did, final once its lint has saved: in a run without a findings store, and in one with a
+// store whose host mostly restored, its missed share (hostMissedShare) at or under lowShareAtGate, the gate's own
+// line read the same way, mostly restored (#ybjbqm2). Otherwise a run with a store keeps main's schedule, its first
+// build alone until the width is measured: a cold fill misses everything, and there the gate cost about 3 CPU-s at
+// cohere's root at every width tried (#ghb3rcn), cause unmeasured. Warm and after a leaf edit, the gate bought 0.10 s
+// at cohere's root and 0.07 to 0.08 s at deeafbf4 (p 0.000), findings and width unchanged. A build whose own share at
+// the gate is high still falls back to the measured rule whole (shareGate.overLine), as without a store.
+//
+// Only when the builds restore from the host's run: a run judging each build's dependence restores nothing from it for
+// the facts census (censusKeepsHostRestoreOff, #f9br7sg), so every build's share would be high and the gate would fall
+// back to the measured rule after holding every build for nothing: it takes the measured rule whole from the start.
+func (engine *pipeline) takesShareGate(hostCache check.CacheCounts) bool {
+	if engine.censusKeepsHostRestoreOff {
+		return false
+	}
+	if !engine.withFindingsStore() {
+		return true
+	}
+	return hostMissedShare(hostCache) <= lowShareAtGate
+}
+
+// hostMissedShare is the share of the packages the host's session held that it missed, checked from source over held,
+// from counts, its findings cache's counts: every package its load reached is a hit, from the store or the binary's
+// table, or a miss (check.CacheCounts). A session that held no package has a share of none, as a build's load of no
+// package does at the gate (shareGate.report).
+func hostMissedShare(counts check.CacheCounts) float64 {
+	return float64(counts.Missed) / float64(max(counts.Hit+counts.FromBinary+counts.Missed, 1))
 }
 
 // budgetedHolding is holding times budget, rounded up to the byte, what the width budgets each build.
@@ -115,9 +135,9 @@ func budgetedHolding(holding uint64, budget float64) uint64 {
 }
 
 // hostLiveBuildsWidth is how many of extras extra builds run side by side when every build's share at the gate is low
-// (lowShareAtGate), in a run without a findings store: each build is budgeted at the host's live heap, hostLive,
-// measured by a collection as the builds started, times buildHoldingBudget, and nothing is measured again (#ghb3rcn).
-// It returns the width, whether the slack added its last build (buildsWidth), and the budgeted holding.
+// (lowShareAtGate), in a run that takes the gate (takesShareGate): each build is budgeted at the host's live heap,
+// hostLive, measured by a collection as the builds started, times buildHoldingBudget, and nothing is measured again
+// (#ghb3rcn). It returns the width, whether the slack added its last build (buildsWidth), and the budgeted holding.
 func (engine *pipeline) hostLiveBuildsWidth(extras int, hostLive uint64) (int, bool, uint64) {
 	holding := budgetedHolding(hostLive, buildHoldingBudget)
 	width, slack := buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding,
@@ -128,15 +148,16 @@ func (engine *pipeline) hostLiveBuildsWidth(extras int, hostLive uint64) (int, b
 // measuredBuildsWidth is how many of extras extra builds run side by side by what the first build to start holds
 // (#rmzehfg), the heaviest the run has (heaviestFirst): the live heap with that build's load ended, measured by a
 // collection run for it (forcedLiveHeapBytes), less hostLive, the host's live heap measured the same way as the builds
-// started, times the run's holdingBudget. It returns the width and the budgeted holding, at least one byte. The first
-// build calls it between its load and its rules, holding none of the run's slots, and the rest are admitted once it is
-// decided (extraBuildRuns). In a run that takes no share gate (takesShareGate), one with a findings store among them,
-// it is main's rule whole: the first build runs alone, and its holding is not budgeted. In a run that takes the gate it
-// is the gate's fallback, a share there over lowShareAtGate: the other builds' listings, graphs and restores are live
-// as it measures, since they wait at the gate, so the holding reads high, which errs narrow, and it is budgeted at
-// buildHoldingBudget times. Beside the width it returns whether the slack added its last build (buildsWidth).
-func (engine *pipeline) measuredBuildsWidth(extras int, hostLive uint64) (int, bool, uint64) {
-	holding := budgetedHolding(holdingAbove(forcedLiveHeapBytes(), hostLive), holdingBudget(engine.takesShareGate()))
+// started, times the run's holdingBudget, by gated, whether the run takes the share gate (takesShareGate). It returns
+// the width and the budgeted holding, at least one byte. The first build calls it between its load and its rules,
+// holding none of the run's slots, and the rest are admitted once it is decided (extraBuildRuns). In a run that takes
+// no share gate, a cold one with a findings store among them, it is main's rule whole: the first build runs alone, and
+// its holding is not budgeted. In a run that takes the gate it is the gate's fallback, a share there over
+// lowShareAtGate: the other builds' listings, graphs and restores are live as it measures, since they wait at the gate,
+// so the holding reads high, which errs narrow, and it is budgeted at buildHoldingBudget times. Beside the width it
+// returns whether the slack added its last build (buildsWidth).
+func (engine *pipeline) measuredBuildsWidth(extras int, hostLive uint64, gated bool) (int, bool, uint64) {
+	holding := budgetedHolding(holdingAbove(forcedLiveHeapBytes(), hostLive), holdingBudget(gated))
 	width, slack := buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding,
 		engine.withFindingsStore())
 	return width, slack, holding

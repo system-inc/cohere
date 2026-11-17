@@ -578,7 +578,9 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	}
 
 	runtime.GC()
-	collectedWidth, _, collectedHolding := engine.measuredBuildsWidth(8, hostLive)
+	// A run without a store takes the share gate whatever its host's counts, so its holding is budgeted.
+	gated := engine.takesShareGate(check.CacheCounts{})
+	collectedWidth, _, collectedHolding := engine.measuredBuildsWidth(8, hostLive, gated)
 
 	garbage := make([]byte, garbageBytes)
 	for index := range garbage {
@@ -587,7 +589,7 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	runtime.GC()
 	runtime.KeepAlive(garbage)
 	// garbage is unreachable from here, and no collection has run since the last one counted it.
-	staleWidth, _, staleHolding := engine.measuredBuildsWidth(8, hostLive)
+	staleWidth, _, staleHolding := engine.measuredBuildsWidth(8, hostLive, gated)
 	runtime.KeepAlive(build)
 
 	if collectedWidth != staleWidth {
@@ -604,10 +606,11 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	}
 }
 
-// A run with a findings store budgets the first build at what it measured, its holding itself, since the share gate's
-// 1.2, buildHoldingBudget, was fitted without a store, where the peak factor is 2.5, and its margin does not carry to
-// a store's 3.5 (#ghb3rcn). A retained 256 MiB stands for the first build, measured by an engine whose session has a
-// store, and the holding it is given is within a sixteenth of it, well short of the 1.2 a run without one takes.
+// A run with a findings store whose host missed everything, a cold fill, takes no share gate and budgets the first
+// build at what it measured, its holding itself, since the share gate's 1.2, buildHoldingBudget, was fitted without a
+// store, where the peak factor is 2.5 (#ghb3rcn), and a cold run with a store keeps main's schedule (#ybjbqm2). A
+// retained 256 MiB stands for the first build, measured by an engine whose session has a store, and the holding it is
+// given is within a sixteenth of it, well short of the 1.2 a run that takes the gate takes.
 //
 // Not parallel: it measures this process's live heap, which another test's run would move.
 func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
@@ -626,7 +629,12 @@ func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
 	for index := range build {
 		build[index] = 1
 	}
-	_, _, holding := engine.measuredBuildsWidth(8, hostLive)
+	// Every package the host held missed, as over an empty store.
+	gated := engine.takesShareGate(check.CacheCounts{On: true, Missed: 100})
+	if gated {
+		test.Fatal("a run with a store whose host missed every package takes the share gate, want main's schedule")
+	}
+	_, _, holding := engine.measuredBuildsWidth(8, hostLive, gated)
 	runtime.KeepAlive(build)
 	// Within a sixteenth either way, since the rest of the heap moves by a little between the two collections.
 	if holding < buildBytes-buildBytes/16 || holding > buildBytes+buildBytes/16 {
