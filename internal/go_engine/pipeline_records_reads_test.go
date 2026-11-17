@@ -58,6 +58,7 @@ func TestTheHostRecordsReadsOnlyWithAnExtraBuild(test *testing.T) {
 		// What the description started beside its reads ends before the test and its directory do.
 		test.Cleanup(described.awaitStarted)
 		engine := newPipeline(request, described, ruleSettings, registered, io.Discard, io.Discard, nil)
+		isolatePipeline(test, engine)
 		// The load alone is asked, so no lint starts beside it.
 		engine.overlaps = false
 		loaded, loadError := engine.loadWorkspacePackages()

@@ -84,12 +84,6 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		return lintedLoad
 	}
 	result := pass.result
-	// A run collecting the standard library's entries for the release's table persists each one's reads beside it once
-	// every type-read walk has ended, so the table carries them and a host restoring a package from it can keep it for
-	// its extra builds (#pcv6eff).
-	if engine.request.standardLibrary.collected != nil && engine.session != nil {
-		engine.session.PersistCollectedReads(wholeReads(pass.result))
-	}
 	var verdict *buildsVerdict
 	var outcome suppressedFindings
 	if engine.request.switches["other-builds"] {
@@ -153,8 +147,18 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.write(finding)
 	}
 
-	// Every build has read its table of the system cache by now, so a trim takes none from under a build of this run.
-	// A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it did not keep.
+	// A run that collected the standard library's entries, for its system cache's table or the release's, persists each
+	// one's reads beside it once every type-read walk has ended, so the table carries them and a host restoring a
+	// package from it can keep it for its extra builds (#pcv6eff), and then writes the host's table, the extra builds
+	// having written theirs as each ended (extraBuildRun). A warm run collects nothing, and so never waits for the
+	// walks, which a run with no extra builds otherwise leaves running past its verdict.
+	if engine.session != nil && engine.session.HasCollected() {
+		engine.session.PersistCollectedReads(wholeReads(pass.result))
+		engine.systemCache.write(engine.session)
+	}
+	// Every build has read and written its table of the system cache by now, so a trim takes none from under a build
+	// of this run. A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it
+	// did not keep.
 	systemCacheNotKept := ""
 	if engine.timing == nil {
 		engine.systemCache.trim()
@@ -403,12 +407,15 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // session without a store when lintCache gives none, since the host's keeps its packages' entries for the extra
 // builds and theirs restore from them (#b2t9xmf); under `--timing` it gets none, so nothing is restored from the host.
 // files must be of the files as they are on disk when the load runs (see extraBuildRun). Why the cache sat out is
-// noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns).
+// noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns). system is the
+// system cache the build reads its table from and writes it to: the run's, or none for an extra build that must
+// compute its own standard library (extraBuildSystemCache).
 func (engine *pipeline) cacheSession(
 	environment []string,
 	goEnvironment *load.GoEnvironment,
 	files cache.FileDigests,
 	notes io.Writer,
+	system *systemCache,
 ) *check.CacheSession {
 	// A run under `--timing` is a measurement, and a package the cache restores, its load's or its rules', runs
 	// nothing, so a table over it would read as measured where it is not. Such a run reads and writes no cache at all,
@@ -418,7 +425,7 @@ func (engine *pipeline) cacheSession(
 	}
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
-		enabled, engine.described.children, engine.systemCache)
+		enabled, engine.described.children, system)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}

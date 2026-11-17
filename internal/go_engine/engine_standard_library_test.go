@@ -47,9 +47,11 @@ func standardLibraryTableOf(
 		prepare(root)
 	}
 	collected := map[cache.Key]check.StandardLibraryRunEntry{}
+	// Without the system cache, as the release's generator collects, so every standard-library package is computed
+	// and collected whatever the test's system cache already holds.
 	engine, _, _ := runOverRegistered(test, root, exitFindings, registered, func(engine *pipeline) {
 		engine.request.standardLibrary = standardLibrarySource{stamp: stamp, collected: collected}
-	}, "--no-fix")
+	}, "--no-fix", "--no-system-cache")
 	if len(collected) == 0 {
 		test.Fatal("want the cached run to collect the standard library's entries")
 	}
@@ -217,7 +219,7 @@ func TestOnlyTheSystemCachesEntriesAreReadUnderNoCache(test *testing.T) {
 	collected := map[cache.Key]check.StandardLibraryRunEntry{}
 	engine, _, _ := runOverNoted(test, root, exitFindings, func(engine *pipeline) {
 		engine.request.standardLibrary = standardLibrarySource{stamp: engineTestsStamp, collected: collected}
-	}, "--no-fix")
+	}, "--no-fix", "--no-system-cache")
 	context, keyed := engine.session.StandardLibraryContext()
 	if !keyed {
 		test.Fatal("want the cached run to key the standard library")
@@ -307,7 +309,9 @@ func TestOnlyTheSystemCachesEntriesAreReadUnderNoCache(test *testing.T) {
 	if uncached.withoutCounts != plain.withoutCounts {
 		test.Fatalf("from the system cache\n%s\nplain\n%s", uncached.withoutCounts, plain.withoutCounts)
 	}
-	if cached := runCachedEngine(test, root); !strings.Contains(cached.stream, "planted_by_the_test") {
+	// Without the system cache, which the runs above warmed with log/slog's entry, so the store is what is read.
+	if cached := runCachedEngine(test, root, "--no-system-cache"); !strings.Contains(cached.stream,
+		"planted_by_the_test") {
 		test.Fatalf("want a cached run to read the planted entry, so it is whole and under log/slog's key, got\n%s",
 			cached.stream)
 	}

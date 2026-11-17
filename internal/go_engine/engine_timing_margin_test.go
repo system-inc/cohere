@@ -52,7 +52,8 @@ func runTimingMarginChild(arguments []string, standardOutput io.Writer, standard
 			},
 		},
 	}
-	return run(arguments, standardOutput, standardError, []rule.Rule{spinning}, nil)
+	return runWithStandardLibrary(arguments, standardOutput, standardError, []rule.Rule{spinning}, nil,
+		standardLibrarySource{})
 }
 
 // The timing table bills a planted rule's known CPU to that rule, once, and its rows never sum past the process's

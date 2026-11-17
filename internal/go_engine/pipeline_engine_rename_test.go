@@ -342,7 +342,7 @@ func TestANamingRuleLearningFactsThroughItsRequirementsGetsOneRound(test *testin
 	root := copyFixture(test, filepath.Join("testdata", "rename"))
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	exitCode := run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
+	exitCode := runIsolated(test, []string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
 		&standardOutput, &standardError, registered, nil)
 	if exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())

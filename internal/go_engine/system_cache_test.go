@@ -1,6 +1,8 @@
 package go_engine
 
 import (
+	"crypto/sha256"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/system_cache_testing"
 )
@@ -22,6 +25,63 @@ func TestTheTestsSystemCacheIsNotTheUsers(test *testing.T) {
 	// Ignored: a machine with no user cache directory has none a test could reach.
 	usersCache, _ := os.UserCacheDir()
 	system_cache_testing.ExpectIsolated(test, usersCache)
+}
+
+// testsSystemCache is the system cache TestMain gave this test binary, which every run reads unless a test names
+// another.
+var testsSystemCache string
+
+// isolatedSource is source with a new, empty system cache of the run's own, unless source names one or the test set
+// the variable to one of its own, which the run then reads. Each run of a test that names none computes the standard
+// library and writes its table where no other run reads it, so its records are what they are for a cold system cache
+// whatever ran before: tests run side by side, and a test that compares two of its own runs, or counts what one
+// restored, would otherwise read tables another run wrote. A test of what a warm system cache does names one, shared by
+// the runs it compares (sharingSystemCache).
+func isolatedSource(test *testing.T, source standardLibrarySource) standardLibrarySource {
+	test.Helper()
+	if source.systemCacheRoot == "" && os.Getenv(system_cache_testing.Variable) == testsSystemCache {
+		source.systemCacheRoot = test.TempDir()
+	}
+	return source
+}
+
+// sharingSystemCache has a pipeline read from and write to the system cache at root, which every run of a test given
+// the same root shares, as a person's runs share theirs.
+func sharingSystemCache(root string) func(*pipeline) {
+	return func(engine *pipeline) {
+		sharing := engine.request.standardLibrary
+		sharing.systemCacheRoot = root
+		engine.request.standardLibrary = sharing
+		engine.systemCache = openSystemCache(engine.request)
+	}
+}
+
+// runIsolated is the engine run over arguments as Main runs it, with registered as the rules and no standard input, and
+// a plain run's standard library read from and written to a system cache of the run's own (isolatedSource).
+func runIsolated(
+	test *testing.T,
+	arguments []string,
+	standardOutput io.Writer,
+	standardError io.Writer,
+	registered []rule.Rule,
+	memory *engineMemory,
+) int {
+	test.Helper()
+	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, memory,
+		isolatedSource(test, standardLibrarySource{}))
+}
+
+// isolatePipeline gives engine a system cache of its own (isolatedSource), unless its request names one: the pipeline
+// found its own as it was made, from the request it was made with.
+//
+// Mutates: engine gains the system cache, in its request and its own
+func isolatePipeline(test *testing.T, engine *pipeline) {
+	test.Helper()
+	isolated := isolatedSource(test, engine.request.standardLibrary)
+	if isolated.systemCacheRoot != engine.request.standardLibrary.systemCacheRoot {
+		engine.request.standardLibrary = isolated
+		engine.systemCache = openSystemCache(engine.request)
+	}
 }
 
 // systemCacheListing is every file below root, a link as itself, by its path with its size and modification time,
@@ -198,5 +258,75 @@ func TestAnUnusableSystemCacheRootIsNotKept(test *testing.T) {
 	}
 	if contents, readError := os.ReadFile(file); readError != nil || string(contents) != "a file, not a directory" {
 		test.Errorf("the file where the root goes was changed: %q (%v)", contents, readError)
+	}
+}
+
+// tableIn is the one table the system cache at root holds, failing unless it holds exactly one, as a run over a fixture
+// with no other build writes.
+func tableIn(test *testing.T, root string) *cache.StandardLibraryTable {
+	test.Helper()
+	var tables []string
+	for path := range systemCacheListing(test, standardLibraryTablesDirectory(root)) {
+		tables = append(tables, path)
+	}
+	if len(tables) != 1 {
+		test.Fatalf("want one table in the test's system cache, got %v", tables)
+	}
+	contents, readError := os.ReadFile(tables[0])
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	// The store's file holds the table after the sha256 of it (cache.Store).
+	return cache.NewStandardLibraryTable(contents[sha256.Size:])
+}
+
+// A cold run keeping a system cache writes the table of what it computed of the standard library, whole, and a warm
+// run restores every package of it, its records those of a run without the system cache: the warm run computes no
+// standard-library package the cold one computed whole, and finds what it would have found computing them.
+func TestAColdRunWritesTheTableAWarmRunRestoresWhole(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, standardLibraryFixture)
+	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
+	cold := runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
+	if cold.counts.FromSystemCache != 0 {
+		test.Fatalf("want the cold run to restore nothing, got %+v", cold.counts)
+	}
+	table := tableIn(test, systemCache.systemCacheRoot)
+	if problem := table.Problem(); problem != nil || len(table.Keys()) == 0 {
+		test.Fatalf("want the cold run's table whole and holding its standard library, got %d keys (%v)",
+			len(table.Keys()), problem)
+	}
+	warm := runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
+	if warm.counts.FromSystemCache != len(table.Keys()) {
+		test.Errorf("want every one of the table's %d packages restored warm, got %+v", len(table.Keys()), warm.counts)
+	}
+	for name, ran := range map[string]cachedRun{"cold": cold, "warm": warm} {
+		if ran.withoutCounts != plain.withoutCounts {
+			test.Errorf("%s\n%s\nwithout the system cache\n%s", name, ran.withoutCounts, plain.withoutCounts)
+		}
+	}
+}
+
+// A warm run, which restores every standard-library package it reaches from the table and computes none it could
+// add, writes nothing to the system cache: every file of it keeps its bytes and its time, the table's and the trim's
+// record's alike, the table read too recently to be marked used again (cache.Store.MarkUsed).
+func TestAWarmRunWritesNothingToTheSystemCache(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, standardLibraryFixture)
+	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	runEngineWith(test, root, systemCache, rules.All())
+	before := systemCacheListing(test, systemCache.systemCacheRoot)
+	if len(before) == 0 {
+		test.Fatal("the cold run wrote nothing to the system cache, so the warm run tells nothing")
+	}
+	// The modification times are the file system's, which a write in the same instant could leave equal.
+	time.Sleep(10 * time.Millisecond)
+	runEngineWith(test, root, systemCache, rules.All())
+	after := systemCacheListing(test, systemCache.systemCacheRoot)
+	if len(after) != len(before) || !equalEntries(before, after) {
+		test.Errorf("want the system cache as the cold run left it, before %v, after %v", before, after)
 	}
 }

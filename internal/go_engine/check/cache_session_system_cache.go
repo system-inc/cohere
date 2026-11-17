@@ -2,6 +2,7 @@ package check
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -9,10 +10,13 @@ import (
 	"slices"
 	"sync"
 
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // tableHit is what the host's session holds of one package it restored from the system cache's table, for its extra
@@ -57,6 +61,7 @@ func (session *CacheSession) restoreFromSystemCache(
 	session.standardLibraryKeys = keys
 	session.standardLibraryContext = &shared
 	table := session.readSystemCacheTable(shared)
+	session.systemCacheTable = table
 	if table == nil {
 		return
 	}
@@ -266,9 +271,11 @@ func learnedFactTypes(known *cacheAnalyzers) map[string]reflect.Type {
 }
 
 // PersistCollectedReads gives each standard-library package the run collected an entry of (collect) its reads of
-// other packages, reads, persisted by a memo measured by the run's sizes, its target's, as the release's table carries
-// them beside each entry (#pcv6eff). The caller hands the reads once every type-read walk has ended. A package whose
-// reads cannot be persisted, never recorded or marked never, keeps none, and a build declines it as unpersisted.
+// other packages, reads, persisted by a memo measured by the run's sizes, its target's, as a table carries them beside
+// each entry (#pcv6eff). The caller hands the reads once every type-read walk has ended, nil for a run that records
+// none, as an extra build's, and every entry it visits is judged (ReadsJudged), which a table asks of each it takes. A
+// package whose reads cannot be persisted, never recorded or marked never, keeps none, and a build declines it as
+// unpersisted.
 func (session *CacheSession) PersistCollectedReads(reads map[*packages.Package]*build_reads.Reads) {
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.Collected == nil {
@@ -287,23 +294,27 @@ func (session *CacheSession) PersistCollectedReads(reads map[*packages.Package]*
 		if !held {
 			continue
 		}
-		record, persisted := persistReads(restoringOf(keyed, reads[keyed]), memo, ReadsRendererVersion)
-		if !persisted {
-			continue
+		collected.ReadsJudged = true
+		if record, persisted := persistReads(restoringOf(keyed, reads[keyed]), memo,
+			ReadsRendererVersion); persisted {
+			encoded, encodeError := encodePersistedReads(record)
+			if encodeError != nil {
+				session.problem(fmt.Sprintf("persisting the reads of %s: %v", keyed.ID, encodeError))
+				continue
+			}
+			collected.Reads = encoded
 		}
-		encoded, encodeError := encodePersistedReads(record)
-		if encodeError != nil {
-			session.problem(fmt.Sprintf("persisting the reads of %s: %v", keyed.ID, encodeError))
-			continue
-		}
-		collected.Reads = encoded
 		standardLibrary.Collected[key] = collected
 	}
 }
 
-// collect adds a standard-library package the run just encoded to the entries the run collects, when it collects
-// any (see StandardLibraryCaching's Collected). The caller holds the lock the save counts under.
-func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry) {
+// collect adds a standard-library package the run just encoded, with demanded, the answers and reads its entry holds,
+// to the entries the run collects, when it collects any (see StandardLibraryCaching's Collected). It records what
+// standardLibraryEntryWhole later judges the entry by, which no table takes before then: the slots of the run's fact
+// analyzers, each of which a whole entry holds an analysis of, since every action on a package leaves its analysis in
+// the entry, facts or none, so the entry says which ran and the session says which had to; and whether its answers
+// were computed whole. The caller holds the lock the save counts under.
+func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry, demanded entryDemand) {
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.Collected == nil {
 		return
@@ -312,18 +323,126 @@ func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry
 	if !standard {
 		return
 	}
-	// The table is written from whole entries, reads and body together, as the run collects them only when a release
-	// writes the table.
+	// The table is written from whole entries, reads and body together.
 	whole, wholeError := wholeEntry(entry)
 	if wholeError != nil {
 		session.problem(fmt.Sprintf("collecting %s for the standard library's table: %v", saved.ID, wholeError))
 		return
 	}
-	standardLibrary.Collected[key] = StandardLibraryRunEntry{
-		PackagePath: saved.PkgPath,
-		Entry:       whole,
-		ExportData:  entry.exportData,
+	factAnalyzers := make([]string, 0, len(session.known.facts))
+	for _, analyzer := range session.known.facts {
+		factAnalyzers = append(factAnalyzers, session.known.slots[analyzer])
 	}
+	// The resolver learns a package as ctrlflow's action on it ends, and answers a question only of a package it
+	// learned (fact_resolver's Owner), so a rule that asks a fact on demand runs ctrlflow. In a run with no ctrlflow
+	// nothing is ever asked, and neither is anything in a run that reads this table, since its key holds the fact
+	// analyzers, ctrlflow among them whenever a rule asks: the answers it holds, none, are all there will ever be.
+	asksOnDemand := slices.Contains(session.known.facts, ctrlflow.Analyzer)
+	standardLibrary.Collected[key] = StandardLibraryRunEntry{
+		PackagePath:   saved.PkgPath,
+		Entry:         whole,
+		ExportData:    entry.exportData,
+		FactAnalyzers: factAnalyzers,
+		AnswersWhole:  demanded.answersWhole || !asksOnDemand,
+	}
+}
+
+// collectWithoutStore collects, in a session with no store, as under `--no-cache`, each standard-library package the
+// last load computed: one the run keyed apart and did not restore, with no load error, every action of graph on it
+// finished clean and nothing unsettled below it, as saveMisses saves a miss. Such a session writes nothing to a store,
+// so saveMisses never runs in it, and the system cache is the one place its work on the standard library is kept.
+func (session *CacheSession) collectWithoutStore(
+	graph *checker.Graph,
+	withheld map[*packages.Package]load.PackageWithheld,
+) {
+	standardLibrary := session.caching.StandardLibrary
+	if standardLibrary == nil || standardLibrary.Collected == nil || session.known == nil {
+		return
+	}
+	actionsOf := map[*packages.Package][]*checker.Action{}
+	if graph != nil {
+		for action := range graph.All() {
+			actionsOf[action.Package] = append(actionsOf[action.Package], action)
+		}
+	}
+	unsettled := session.unsettledBelow()
+	var saving []*packages.Package
+	for keyed, key := range session.standardLibraryKeys {
+		if _, collected := standardLibrary.Collected[key]; collected || session.restored(keyed) || unsettled[keyed] ||
+			!session.savable("collectWithoutStore", keyed, actionsOf[keyed]) {
+			continue
+		}
+		saving = append(saving, keyed)
+	}
+	var collectLock sync.Mutex
+	session.fanOutWriting(len(saving), func(index int) func() {
+		saved := saving[index]
+		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
+		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved], withheld[saved],
+			demanded, nil, nil, nil, true)
+		return func() {
+			collectLock.Lock()
+			defer collectLock.Unlock()
+			switch {
+			case errors.Is(encodeError, errorUnstorable):
+				session.counts.Unstorable++
+			case encodeError != nil:
+				session.problem(encodeError.Error())
+			default:
+				session.collect(saved, entry, demanded)
+			}
+		}
+	})
+}
+
+// HasCollected reports whether the session collected any standard-library entry, whose reads the run then persists
+// (PersistCollectedReads) and whose table it writes (WriteSystemCacheTable), which a run that collected none, as a
+// warm one, spares itself: the host's reads are whole only once its type-read walks end, which nothing else waits for.
+func (session *CacheSession) HasCollected() bool {
+	standardLibrary := session.caching.StandardLibrary
+	return standardLibrary != nil && len(standardLibrary.Collected) > 0
+}
+
+// WriteSystemCacheTable writes back to the system cache the table of the build's context, once the run's reads are
+// whole (PersistCollectedReads): the table as the run read it, every entry kept as it was, and beside it each entry
+// the run collected whole (standardLibraryEntryWhole) that the table did not hold, all under the table's key in one
+// Put, which renames a whole file into place. It returns how many entries it added, and writes nothing when that is
+// none, as on a warm run, so a run writes its table only when it has something to add.
+//
+// Two runs writing the same table each write what they read and their own, and the later rename wins: the earlier
+// one's entries are lost and computed again by the next run, a miss and never a wrong read, since each entry stands
+// under its package's full key. A table that did not parse, or was damaged, is written anew from this run's entries.
+// An error is the run's reason it could not keep the system cache, never a finding's.
+func (session *CacheSession) WriteSystemCacheTable() (int, error) {
+	standardLibrary := session.caching.StandardLibrary
+	if standardLibrary == nil || standardLibrary.System == nil || len(standardLibrary.Collected) == 0 ||
+		session.standardLibraryContext == nil {
+		return 0, nil
+	}
+	shared := *session.standardLibraryContext
+	held := map[cache.Key]cache.StandardLibraryEntry{}
+	if read := session.systemCacheTable; read != nil && read.Problem() == nil {
+		for _, key := range read.Keys() {
+			// Ignored: the key is one of the table's own.
+			held[key], _ = read.Lookup(key)
+		}
+	}
+	readAgainst := make(map[cache.Key]bool, len(session.standardLibraryKeys))
+	for _, key := range session.standardLibraryKeys {
+		readAgainst[key] = true
+	}
+	table, added, tableError := standardLibraryTableWith(standardLibrary.Collected, held, readAgainst, shared.Goroot,
+		nil)
+	if tableError != nil {
+		return 0, fmt.Errorf("writing the system cache's table of the standard library: %w", tableError)
+	}
+	if added == 0 {
+		return 0, nil
+	}
+	if putError := standardLibrary.System.Put(cache.StandardLibraryTableKey(shared), table); putError != nil {
+		return 0, fmt.Errorf("writing the system cache's table of the standard library: %w", putError)
+	}
+	return added, nil
 }
 
 // factAnalyzerSet is each analyzer that learns facts as its slot, then its flags with their values as one JSON object,

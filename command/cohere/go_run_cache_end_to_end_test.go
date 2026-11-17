@@ -556,6 +556,11 @@ func goHostIsLinux() bool {
 	return outputError == nil && strings.TrimSpace(string(output)) == "linux"
 }
 
+// packageCacheOffLine is the account's lint line of a run whose engine's per-package cache was off, the standard
+// library's packages from the system cache beside it or not.
+var packageCacheOffLine = regexp.MustCompile(
+	`\n  lint: package cache off(, standard library: [0-9,]+ from the system cache)?\n`)
+
 // TestAGoRunUnderNoCacheNeitherReplaysNorRecords: on a module whose run replays, `--no-cache` checks it fresh, says
 // its cache was off in the account and in `--json`, and leaves the cache table exactly as it found it.
 func TestAGoRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
@@ -579,8 +584,10 @@ func TestAGoRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 			if !strings.Contains(cold.stdout, "  cache: off, by --no-cache: no recorded run was replayed") {
 				test.Errorf("the account does not say the cache was off:\n%s", cold.stdout)
 			}
-			// The flag reached the engine, whose own per-package cache it turns off too.
-			if !strings.Contains(cold.stdout, "\n  lint: package cache off\n") {
+			// The flag reached the engine, whose own per-package cache it turns off too. The standard library's
+			// packages the engine restored from its system cache, which `--no-cache` still reads, are said beside it
+			// when an earlier run of the package's tests warmed it.
+			if !packageCacheOffLine.MatchString(cold.stdout) {
 				test.Errorf("the engine's package cache was not off:\n%s", cold.stdout)
 			}
 		case "--json":

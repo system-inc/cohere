@@ -21,7 +21,8 @@ func typesRecordOf(test *testing.T, fixture string) contract.TypesRecord {
 	arguments := []string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix", "--no-cache"}
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	if exitCode := run(arguments, &standardOutput, &standardError, rules.All(), nil); exitCode > exitFindings {
+	if exitCode := runIsolated(test, arguments, &standardOutput, &standardError, rules.All(),
+		nil); exitCode > exitFindings {
 		test.Fatalf("exit %d; stderr:\n%s", exitCode, standardError.String())
 	}
 	for line := range strings.Lines(standardOutput.String()) {

@@ -124,23 +124,26 @@ func TestAReloadsChecksFromSourceReachTheRecord(test *testing.T) {
 }
 
 // The merged verdict is the same whether the extra builds restore from the host's run or check every package
-// themselves, byte for byte but for each build's counts of the restore, without the findings cache and with it.
+// themselves, byte for byte but for each build's counts of the restore, without the findings cache and with it. Every
+// run is without the system cache, which would have each run after the first restore the standard library the first
+// computed, and count it.
 func TestTheMergeIsTheSameWhetherTheBuildsRestoreFromTheHostOrNot(test *testing.T) {
 	test.Parallel()
 
 	fixture := filepath.Join("testdata", "restore-from-host")
 	restoringNothing := func(engine *pipeline) { engine.keepsHostRestoreOff = true }
 	offRoot := copyFixture(test, fixture)
-	_, offRaw := runOverConfigured(test, offRoot, exitFindings, restoringNothing, "--other-builds", "--no-cache")
+	_, offRaw := runOverConfigured(test, offRoot, exitFindings, restoringNothing, "--other-builds", "--no-cache",
+		"--no-system-cache")
 	off := normalize(offRaw, offRoot)
-	_, on := runOver(test, copyFixture(test, fixture), exitFindings, "--other-builds")
+	_, on := runOver(test, copyFixture(test, fixture), exitFindings, "--other-builds", "--no-system-cache")
 	if withoutHostRestore(on) != withoutHostRestore(off) {
 		test.Errorf("restoring from the host changed the stream:\nrestoring\n%s\nchecking every package\n%s", on, off)
 	}
 	if on == off {
 		test.Error("the run restoring from the host wrote no count of it, so nothing tells the two runs apart")
 	}
-	_, cached := runOverWith(test, copyFixture(test, fixture), exitFindings, "--other-builds")
+	_, cached := runOverWith(test, copyFixture(test, fixture), exitFindings, "--other-builds", "--no-system-cache")
 	if withoutCache(cached) != withoutCache(off) {
 		test.Errorf("restoring from the host with the findings cache on changed the stream:\ncached\n%s\nchecking "+
 			"every package\n%s", cached, off)

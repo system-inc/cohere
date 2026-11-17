@@ -260,18 +260,22 @@ func TestAnUntouchedPackageAboveACheckDeclineStaysUntouched(test *testing.T) {
 }
 
 // A warm run after a cold one restores what the cold run's walk left untouched from each build's own store, where the
-// cold run wrote it through on the walk's induction: no build restores or leaves untouched anything of the host's run
-// then, none checks a package from source or misses, and the stream is a run's under --no-cache but for the counts of
-// the cache and the restore.
+// cold run wrote it through on the walk's induction, and the standard library from the system cache: no build restores
+// or leaves untouched anything of the host's run then, none checks a package from source or misses, and the stream is
+// a run's under --no-cache but for the counts of the cache and the restore.
 func TestAWarmRunRestoresTheUntouchedFromItsOwnStore(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "walk-square"))
-	cold, _ := runOverWith(test, root, exitFindings, "--other-builds")
+	// One system cache for both runs, as a person's: the standard library each build computed cold is kept there, and
+	// never in the build's own store.
+	sharing := sharingSystemCache(test.TempDir())
+	cold, _ := runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
 	if untouched := buildRunOf(test, cold, "cohere_extra").result.FromHost.Untouched; len(untouched) == 0 {
 		test.Fatal("the cold run's tag build left nothing untouched, so nothing tells the warm run's restore apart")
 	}
-	warm, warmStream := runOverWith(test, root, exitFindings, "--other-builds")
+	warm, warmRaw := runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+	warmStream := normalize(warmRaw, root)
 	for _, run := range warm.buildRuns[1:] {
 		fromHost, counts := run.result.FromHost, run.result.Cache
 		if len(fromHost.Untouched)+len(fromHost.Restored) != 0 || run.checkedFromSource != 0 || counts.Missed != 0 {

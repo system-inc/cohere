@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"encoding/gob"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
@@ -147,6 +149,7 @@ func TestAStandardLibraryPackageFromTheSystemCacheIsNeverAnalyzedOrParsed(test *
 		Collected: collected,
 	}
 	cold := runWithSession(test, directory, collecting, rules)
+	cold.session.PersistCollectedReads(cold.result.Reads)
 	if len(collected) == 0 || len(collected) >= cold.result.Cache.Written {
 		test.Fatalf("want every standard-library package written collected, and the module not, got %d of %+v",
 			len(collected), cold.result.Cache)
@@ -222,7 +225,8 @@ func TestAStandardLibraryTableUnderAnotherKeyRestoresNothing(test *testing.T) {
 		Context:   standardLibraryContext("release one", goRoot),
 		Collected: collected,
 	}
-	runWithSession(test, directory, collecting, rules)
+	collectingRun := runWithSession(test, directory, collecting, rules)
+	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
 	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
@@ -280,7 +284,8 @@ func TestATableIsReadOnlyUnderItsOwnContextsKey(test *testing.T) {
 	collecting := testCaching(test, rules)
 	collected := map[cache.Key]StandardLibraryRunEntry{}
 	collecting.StandardLibrary = &StandardLibraryCaching{Context: own, Collected: collected}
-	runWithSession(test, directory, collecting, rules)
+	collectingRun := runWithSession(test, directory, collecting, rules)
+	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
 	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
@@ -331,7 +336,8 @@ func TestADamagedTableIsANamedProblem(test *testing.T) {
 	collecting := testCaching(test, rules)
 	collected := map[cache.Key]StandardLibraryRunEntry{}
 	collecting.StandardLibrary = &StandardLibraryCaching{Context: context, Collected: collected}
-	runWithSession(test, directory, collecting, rules)
+	collectingRun := runWithSession(test, directory, collecting, rules)
+	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
 	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
@@ -393,7 +399,7 @@ func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
 	}
 	key := cache.Key{0x01}
 	written, writeError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
-		key: {PackagePath: "net", Entry: encoded(portable)},
+		key: {PackagePath: "net", Entry: encoded(portable), AnswersWhole: true, ReadsJudged: true},
 	}, goRoot, nil)
 	if writeError != nil {
 		test.Fatalf("writing a portable entry: %v", writeError)
@@ -423,7 +429,7 @@ func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
 	walked.Files = []storedFile{{Name: inRoot, Nodes: 1}}
 	for name, refused := range map[string]cacheEntry{"outside GOROOT": outside, "with its files' walk": walked} {
 		if _, refusedError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
-			key: {PackagePath: "net", Entry: encoded(refused)},
+			key: {PackagePath: "net", Entry: encoded(refused), AnswersWhole: true, ReadsJudged: true},
 		}, goRoot, nil); refusedError == nil {
 			test.Errorf("%s: want the entry refused", name)
 		}
@@ -477,5 +483,297 @@ func TestARunHashesEachFileOnce(test *testing.T) {
 	if hashed := cache.FilesHashed() - before; hashed != int64(files-moduleFiles) {
 		test.Errorf("want the %d standard-library files hashed once with no store, got %d hashed",
 			files-moduleFiles, hashed)
+	}
+}
+
+// moduleImporting writes a module of the test's own whose one package imports each of imported, a standard-library
+// package, and returns its directory.
+func moduleImporting(test *testing.T, imported ...string) string {
+	test.Helper()
+	directory := test.TempDir()
+	source := "package importing\n\nimport (\n"
+	for _, path := range imported {
+		source += "\t_ \"" + path + "\"\n"
+	}
+	source += ")\n"
+	for name, contents := range map[string]string{
+		"go.mod":       "module example.com/importing\n\ngo 1.24\n",
+		"importing.go": source,
+	} {
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
+		}
+	}
+	return directory
+}
+
+// systemCacheCaching is a findings cache with no store that reads and writes the system cache's store of tables
+// system under context, collecting what it computes, as a run under `--no-cache` keeping a system cache does.
+func systemCacheCaching(system *cache.Store, context cache.StandardLibraryContext) *Caching {
+	return &Caching{StandardLibrary: &StandardLibraryCaching{
+		System:    system,
+		Context:   context,
+		Collected: map[cache.Key]StandardLibraryRunEntry{},
+	}}
+}
+
+// runSessionWith is runWithSession with the session opened for sessionRules and the run made of runRules, so a test
+// can have the session expect an analyzer the run never runs.
+func runSessionWith(
+	test *testing.T,
+	directory string,
+	caching *Caching,
+	sessionRules []rule.Rule,
+	runRules []rule.Rule,
+) sessionRun {
+	test.Helper()
+	session := NewCacheSession(caching, sessionRules)
+	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
+		load.Caching{Restorer: session, Listings: session})
+	if loadError != nil {
+		test.Fatalf("loading %s: %v", directory, loadError)
+	}
+	result, runError := Run(loaded.Packages, runRules, Options{Cache: session, Withheld: loaded.Withheld})
+	if runError != nil {
+		test.Fatalf("running %d rules: %v", len(runRules), runError)
+	}
+	return sessionRun{loaded: loaded, result: result, session: session}
+}
+
+// writtenTable has run's session write its table back (WriteSystemCacheTable), its reads judged first as a finished
+// run's are, and returns how many entries it added.
+func writtenTable(test *testing.T, run sessionRun) int {
+	test.Helper()
+	run.session.PersistCollectedReads(run.result.Reads)
+	added, writeError := run.session.WriteSystemCacheTable()
+	if writeError != nil {
+		test.Fatalf("writing the system cache's table: %v", writeError)
+	}
+	return added
+}
+
+// standardKeyOf is the standard-library key run's session gave the package at path.
+func standardKeyOf(test *testing.T, run sessionRun, path string) cache.Key {
+	test.Helper()
+	for keyed, key := range run.session.standardLibraryKeys {
+		if keyed.PkgPath == path {
+			return key
+		}
+	}
+	test.Fatalf("the session keyed no standard-library package %s", path)
+	return cache.Key{}
+}
+
+// A short entry never reaches the system cache's table (standardLibraryEntryWhole, #e6wnn8r), as a table hit is taken
+// as whole and an entry the table holds is never written again. A package checked where no fact analyzer's action
+// reached it, here every standard-library package of a run whose session expects a fact analyzer the run never runs,
+// is left out, and a table of nothing is never written. A package whose answers were computed in part (AnswersInPart)
+// is left out of a table that takes every whole entry beside it, and so is each package that imports it, whose export
+// data could not be read without it.
+func TestAShortEntryNeverReachesTheTable(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	goRoot := goRootOf(test)
+	context := standardLibraryContext("check tests", goRoot)
+	factless := cache.OpenAt(filepath.Join(test.TempDir(), "go", "standard-library"))
+	counting := countingFactRule(&sync.Map{})
+	clauses := houseRule(packageClauseAnalyzer)
+	run := runSessionWith(test, directory, systemCacheCaching(factless, context), []rule.Rule{counting, clauses},
+		[]rule.Rule{clauses})
+	if added := writtenTable(test, run); added != 0 {
+		test.Errorf("want no entry checked without its fact analyzer in the table, got %d added", added)
+	}
+	if factless.Holds(tableKeyOf(test, context, []rule.Rule{counting, clauses})) {
+		test.Error("want no table written of entries that are all short")
+	}
+
+	inPart := cache.OpenAt(filepath.Join(test.TempDir(), "go", "standard-library"))
+	rules := []rule.Rule{counting, houseRule(ctrlflow.Analyzer)}
+	caching := systemCacheCaching(inPart, context)
+	caching.AnswersInPart = map[string]bool{"strings": true}
+	partial := runSessionWith(test, directory, caching, rules, rules)
+	if added := writtenTable(test, partial); added == 0 {
+		test.Fatal("want the whole entries beside strings' in the table")
+	}
+	contents, found := inPart.Get(tableKeyOf(test, context, rules))
+	if !found {
+		test.Fatal("want the table written")
+	}
+	table := cache.NewStandardLibraryTable(contents)
+	if _, held := table.Lookup(standardKeyOf(test, partial, "strings")); held {
+		test.Error("want strings, its answers computed in part, left out of the table")
+	}
+	if _, held := table.Lookup(standardKeyOf(test, partial, "unicode/utf8")); !held {
+		test.Error("want unicode/utf8, whole and importing nothing short, in the table")
+	}
+}
+
+// Two sessions that read the same table and each add entries of their own write in turn, and the later rename wins:
+// the table reads whole, and a run over either module restores what the table holds and computes the rest, its
+// result the one of a run without the cache, so every key hits or misses and never reads wrong.
+func TestTwoWritersOfOneTableNeverReadWrong(test *testing.T) {
+	test.Parallel()
+
+	goRoot := goRootOf(test)
+	context := standardLibraryContext("check tests", goRoot)
+	system := cache.OpenAt(filepath.Join(test.TempDir(), "go", "standard-library"))
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	first, second := moduleImporting(test, "errors"), moduleImporting(test, "unicode/utf8")
+	// Both read the table before either writes, as two runs at once do.
+	firstRun := runSessionWith(test, first, systemCacheCaching(system, context), rules, rules)
+	secondRun := runSessionWith(test, second, systemCacheCaching(system, context), rules, rules)
+	if writtenTable(test, firstRun) == 0 || writtenTable(test, secondRun) == 0 {
+		test.Fatal("want each writer to add entries of its own")
+	}
+	contents, found := system.Get(tableKeyOf(test, context, rules))
+	if !found {
+		test.Fatal("want the table written")
+	}
+	if problem := cache.NewStandardLibraryTable(contents).Problem(); problem != nil {
+		test.Fatalf("want the table to read whole, got %v", problem)
+	}
+	for _, directory := range []string{first, second} {
+		plainLoad, loadError := load.Packages(directory, []string{"./..."}, []string{"GOWORK=off"}, nil)
+		if loadError != nil {
+			test.Fatal(loadError)
+		}
+		plain, plainError := Run(plainLoad.Packages, rules, Options{})
+		if plainError != nil {
+			test.Fatal(plainError)
+		}
+		read := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+		if !reflect.DeepEqual(withoutTimesOrCache(read.result), withoutTimesOrCache(plain)) {
+			test.Errorf("%s: over the table two writers wrote\n%+v\nwithout the cache\n%+v", directory,
+				withoutTimesOrCache(read.result), withoutTimesOrCache(plain))
+		}
+	}
+	reread := runSessionWith(test, second, systemCacheCaching(system, context), rules, rules)
+	if reread.result.Cache.FromSystemCache != len(reread.session.standardLibraryKeys) {
+		test.Errorf("want the later writer's every package restored, got %d of %d", reread.result.Cache.FromSystemCache,
+			len(reread.session.standardLibraryKeys))
+	}
+}
+
+// An entry the table already holds under a key is kept as it is, never written again, so two runs never churn one
+// key: a table whose entry of unicode/utf8 does not decode, so a run computes utf8 again, and which lacks strings, so
+// the run adds an entry and writes, still holds utf8's entry byte for byte after the write.
+func TestAnEntryTheTableHoldsIsNeverRewritten(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	goRoot := goRootOf(test)
+	context := standardLibraryContext("check tests", goRoot)
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	collecting := systemCacheCaching(nil, context)
+	collected := collecting.StandardLibrary.Collected
+	collectingRun := runSessionWith(test, directory, collecting, rules, rules)
+	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
+	stringsKey, utf8Key := standardKeyOf(test, collectingRun, "strings"), standardKeyOf(test, collectingRun,
+		"unicode/utf8")
+	written, writeError := StandardLibraryTableOf(collected, goRoot, nil)
+	if writeError != nil {
+		test.Fatal(writeError)
+	}
+	whole := cache.NewStandardLibraryTable(written)
+	seeded := map[cache.Key]cache.StandardLibraryEntry{}
+	for _, key := range whole.Keys() {
+		// Ignored: the key is one of the table's own.
+		seeded[key], _ = whole.Lookup(key)
+	}
+	delete(seeded, stringsKey)
+	undecodable := []byte("not an entry")
+	planted := seeded[utf8Key]
+	planted.Entry = undecodable
+	seeded[utf8Key] = planted
+	system := systemCacheHolding(test, cache.WriteStandardLibraryTable(seeded, nil), tableKeyOf(test, context, rules))
+
+	run := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+	if added := writtenTable(test, run); added == 0 {
+		test.Fatal("want the run to add strings, which the table lacked")
+	}
+	contents, found := system.Get(tableKeyOf(test, context, rules))
+	if !found {
+		test.Fatal("want the table written")
+	}
+	table := cache.NewStandardLibraryTable(contents)
+	if entry, held := table.Lookup(utf8Key); !held || !bytes.Equal(entry.Entry, undecodable) {
+		test.Errorf("want utf8's entry kept as the table held it, got %q (held %v)", entry.Entry, held)
+	}
+	if _, held := table.Lookup(stringsKey); !held {
+		test.Error("want strings added")
+	}
+}
+
+// A run keeping a system cache writes no standard-library package to the project's store (keptBySystemCache): after
+// a cached run, the store holds the module's package under its key and none of the standard library's packages under
+// theirs, which the run collected for the system cache's table.
+func TestTheProjectStoreTakesNoStandardLibraryEntry(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	goRoot := goRootOf(test)
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	caching := testCaching(test, rules)
+	caching.StandardLibrary = systemCacheCaching(cache.OpenAt(filepath.Join(test.TempDir(), "go",
+		"standard-library")), standardLibraryContext("check tests", goRoot)).StandardLibrary
+	run := runWithSession(test, directory, caching, rules)
+	if len(run.session.standardLibraryKeys) == 0 {
+		test.Fatal("want the run to key the standard library apart")
+	}
+	for keyed := range run.session.standardLibraryKeys {
+		if caching.Store.Holds(run.session.keys[keyed]) {
+			test.Errorf("the project's store holds %s, a standard-library package", keyed.PkgPath)
+		}
+	}
+	if !caching.Store.Holds(sessionKey(test, run.session, "example.com/standard")) {
+		test.Error("want the module's own package in the project's store")
+	}
+	if len(caching.StandardLibrary.Collected) == 0 {
+		test.Error("want the standard library collected for the system cache's table")
+	}
+}
+
+// Two Go versions keep two tables side by side in one system cache, neither read by the other's run: the version is
+// in each table's key, so a run under the second finds no table of its own beside the first's, computes its standard
+// library and writes its own, and a later run under each restores every package from its own.
+func TestTwoGoVersionsKeepTablesSideBySide(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	goRoot := goRootOf(test)
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	tables := filepath.Join(test.TempDir(), "go", "standard-library")
+	system := cache.OpenAt(tables)
+	contexts := map[string]cache.StandardLibraryContext{}
+	for _, version := range []string{"go1.27.3", "go1.26.0"} {
+		context := standardLibraryContext("check tests", goRoot)
+		context.Build = append(context.Build, "GOVERSION="+version)
+		contexts[version] = context
+		run := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+		if run.result.Cache.FromSystemCache != 0 {
+			test.Errorf("%s: want nothing read of the other version's table, got %d restored", version,
+				run.result.Cache.FromSystemCache)
+		}
+		if writtenTable(test, run) == 0 {
+			test.Fatalf("%s: want its table written", version)
+		}
+	}
+	files := 0
+	walkError := filepath.WalkDir(tables, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError == nil && entry.Type().IsRegular() {
+			files++
+		}
+		return pathError
+	})
+	if walkError != nil || files != 2 {
+		test.Errorf("want two tables side by side, got %d files (%v)", files, walkError)
+	}
+	for version, context := range contexts {
+		run := runSessionWith(test, directory, systemCacheCaching(system, context), rules, rules)
+		if run.result.Cache.FromSystemCache != len(run.session.standardLibraryKeys) {
+			test.Errorf("%s: want every package restored from its own table, got %d of %d", version,
+				run.result.Cache.FromSystemCache, len(run.session.standardLibraryKeys))
+		}
 	}
 }

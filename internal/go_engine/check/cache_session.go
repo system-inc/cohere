@@ -58,8 +58,10 @@ type Caching struct {
 // system cache's store of tables, one for each build context, and what every standard-library key shares but the fact
 // analyzers and the loader, which the session names. Once it has, the session reads the table of its context
 // (cache.StandardLibraryTableKey) from System. A System that is nil holds nothing, as in a run that only collects
-// entries. Collected, when it is not nil, gains each standard-library package the run saves to the store, by its
-// standard-library key, for StandardLibraryTableOf; a run under `--no-cache` saves nothing, so it collects nothing.
+// entries; one that is not keeps the standard library alone, so no standard-library package keyed apart is written to
+// the project's store. Collected, when it is not nil, gains each standard-library package the run computed, by its
+// standard-library key, for the table WriteSystemCacheTable writes back to System, or the release's, which
+// StandardLibraryTableOf writes; a run without a store collects too (collectWithoutStore).
 type StandardLibraryCaching struct {
 	System    *cache.Store
 	Context   cache.StandardLibraryContext
@@ -70,15 +72,27 @@ type StandardLibraryCaching struct {
 	Toolchain string
 }
 
-// StandardLibraryRunEntry is one standard-library package a run saved: its import path, its entry and export data as
-// saveMisses encoded them, which still name this machine's files, and its reads of other packages as persistReads
+// StandardLibraryRunEntry is one standard-library package a run computed: its import path, its entry and export data
+// as the run encoded them, which still name this machine's files, and its reads of other packages as persistReads
 // persisted them once the run's reads were whole (PersistCollectedReads), nil until then and for reads that cannot be
-// persisted.
+// persisted. The rest is what standardLibraryEntryWhole judges it by before any table takes it.
 type StandardLibraryRunEntry struct {
 	PackagePath string
 	Entry       []byte
 	ExportData  []byte
 	Reads       []byte
+
+	// FactAnalyzers are the slots of every analyzer that learns facts in the run that computed the entry, each of
+	// which a whole entry holds an analysis of.
+	FactAnalyzers []string
+
+	// AnswersWhole is whether the entry's answers are every answer of its package, computed whole (demandOf's
+	// answersWhole), rather than those the run's questions happened to compute in it.
+	AnswersWhole bool
+
+	// ReadsJudged is set once the run's reads were whole and PersistCollectedReads judged the package's: persisted in
+	// Reads, or left nil for reads no record can hold, which an extra build declines.
+	ReadsJudged bool
 }
 
 // CacheCounts is what the cache did in one run, by package: every package the load reached is a hit, restored from
@@ -203,7 +217,10 @@ type CacheSession struct {
 
 	// standardLibraryContext is what every standard-library key of the last Restore shared, the fact analyzers
 	// named, which the system cache's table of the build's context is keyed by, nil before a Restore keyed any.
+	// systemCacheTable is that table as the last Restore read it, nil when there was none, which
+	// WriteSystemCacheTable writes back with the run's new entries beside its own.
 	standardLibraryContext *cache.StandardLibraryContext
+	systemCacheTable       *cache.StandardLibraryTable
 
 	// fromSystemCache are the hits restored from the system cache's table, which are never written to the store, and
 	// tableHits what the host's session of a run with extra builds holds of each, which it keeps for them
@@ -323,6 +340,7 @@ func (session *CacheSession) Restore(
 	session.buildKeys = nil
 	session.standardLibraryKeys = nil
 	session.standardLibraryContext = nil
+	session.systemCacheTable = nil
 	session.fromSystemCache = map[*packages.Package]bool{}
 	session.tableHits = map[*packages.Package]tableHit{}
 	session.given = make(map[*packages.Package]bool, len(analyzed))
@@ -711,6 +729,7 @@ func (session *CacheSession) save(
 	session.counts.ReloadRoundsBy = maps.Clone(session.answering.roundsBy)
 	session.answering.lock.Unlock()
 	if session.caching.Store == nil {
+		session.collectWithoutStore(graph, withheld)
 		return
 	}
 	session.rewriteEarlier()
@@ -768,11 +787,7 @@ func (session *CacheSession) saveMisses(
 			continue
 		}
 		session.attempted[keyed] = true
-		// A package whose analysis was handed a placeholder ran on a guess (fact_resolver.Unsure), and is analyzed
-		// again by the round that loads what the placeholder stood for.
-		unsure := !session.readAfterKeep("saveMisses, asking whether "+keyed.ID+" ran on a guess") &&
-			session.resolver != nil && keyed.Types != nil && session.resolver.Unsure(keyed.Types)
-		if len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actionsOf[keyed]) && !unsure {
+		if session.savable("saveMisses", keyed, actionsOf[keyed]) {
 			saving = append(saving, keyed)
 		}
 	}
@@ -784,11 +799,16 @@ func (session *CacheSession) saveMisses(
 		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
 		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
 			withheld[saved], demanded, files[saved], knownFiles, nil, true)
+		// A standard-library package keyed apart is kept by the system cache alone, when the run keeps one: encoded
+		// all the same, for the table and for the second wave, which restores it from the entry, and never written to
+		// the project's store, so no project holds a copy of what every project shares.
+		systemCacheOnly := session.keptBySystemCache(saved)
 		record, keepsRecord := session.dependenceRecordToWrite(saved)
+		keepsRecord = keepsRecord && !systemCacheOnly
 		// The writes and their counting run with no slot held: the counting is a map's and a counter's, under a lock.
 		return func() {
 			var putError error
-			if encodeError == nil {
+			if encodeError == nil && !systemCacheOnly {
 				putError = session.putEntry(session.keys[saved], entry)
 			}
 			// A dependence record follows its entry, and only an entry whose write held (#6a3kjvz).
@@ -812,13 +832,15 @@ func (session *CacheSession) saveMisses(
 				if entry.hasOutput {
 					session.outputs[saved] = entry.output
 				}
-				session.collect(saved, entry)
+				session.collect(saved, entry, demanded)
 			}
 			switch {
 			case errors.Is(encodeError, errorUnstorable):
 				session.counts.Unstorable++
 			case encodeError != nil:
 				session.problem(encodeError.Error())
+			case systemCacheOnly:
+				// Collected for the system cache's table, and never put in the store, so neither written nor failed.
 			case putError != nil:
 				if session.counts.WriteFailed == 0 {
 					session.problem(putError.Error())
@@ -848,6 +870,29 @@ func (session *CacheSession) saveMisses(
 	}
 	session.alias(aliases)
 	return encoded
+}
+
+// savable reports whether keyed, a package the run checked, can be saved from actions, every action on it: it has no
+// load error, every action finished clean, and its analysis ran on no guess, as one handed a placeholder did
+// (fact_resolver.Unsure), which the round that loads what the placeholder stood for analyzes again. saver names the
+// caller, which a read of the resolver after the keep names as its reader (readAfterKeep).
+func (session *CacheSession) savable(saver string, keyed *packages.Package, actions []*checker.Action) bool {
+	unsure := !session.readAfterKeep(saver+", asking whether "+keyed.ID+" ran on a guess") &&
+		session.resolver != nil && keyed.Types != nil && session.resolver.Unsure(keyed.Types)
+	return len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actions) && !unsure
+}
+
+// keptBySystemCache reports whether keyed is a standard-library package the session keys apart in a run that keeps a
+// system cache, which keeps it alone (#syscache): the project's store never takes its entry. A run that keeps no system
+// cache, under `--no-system-cache` or with no root, keys no package apart, and the store takes every one as it always
+// has.
+func (session *CacheSession) keptBySystemCache(keyed *packages.Package) bool {
+	standardLibrary := session.caching.StandardLibrary
+	if standardLibrary == nil || standardLibrary.System == nil {
+		return false
+	}
+	_, standard := session.standardLibraryKeys[keyed]
+	return standard
 }
 
 // aliasWritten gives each package of written whose entry, of encoded, has no finding naming a file outside it an alias

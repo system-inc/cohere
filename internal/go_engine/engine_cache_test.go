@@ -88,8 +88,8 @@ func runEngineNoting(
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, registered, nil, source, true,
-		answersInPart)
+	exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, registered, nil,
+		isolatedSource(test, source), true, answersInPart)
 	if exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
 	}
@@ -145,12 +145,13 @@ func entriesIn(test *testing.T, root string) map[string]string {
 // A warm run writes the cold run's stream but for the cache counts, restoring every package the cold run wrote and
 // running nothing on them. After an edit to the project's one file only that package misses, and printf's finding in
 // it, which needs the fact fmt.Sprintf has, comes back from fmt's restored facts. `--no-cache` reads nothing and
-// writes nothing: it hits nothing, and leaves the store as it was.
+// writes nothing: it hits nothing, and leaves the store as it was. Every run is without the system cache, so the store
+// is the one cache, the standard library's packages among what it holds, as the counts below take it.
 func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "vet-finding"))
-	cold := runCachedEngine(test, root)
+	cold := runCachedEngine(test, root, "--no-system-cache")
 	if !cold.counts.On || cold.counts.Hit != 0 || cold.counts.Written == 0 ||
 		cold.counts.Written+cold.counts.Unstorable > cold.counts.Missed {
 		test.Fatalf("want a cold run that hit nothing and wrote what it missed, got %+v", cold.counts)
@@ -164,7 +165,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 			"files", cold.counts.Written, len(written))
 	}
 
-	warm := runCachedEngine(test, root)
+	warm := runCachedEngine(test, root, "--no-system-cache")
 	if warm.counts.Hit != cold.counts.Written || warm.counts.Missed != cold.counts.Missed-cold.counts.Written {
 		test.Fatalf("want every package written cold hit warm and the rest missed, cold %+v, warm %+v", cold.counts,
 			warm.counts)
@@ -182,7 +183,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 		0o644); writeError != nil {
 		test.Fatalf("editing %s: %v", file, writeError)
 	}
-	edited := runCachedEngine(test, root)
+	edited := runCachedEngine(test, root, "--no-system-cache")
 	if edited.counts.Hit != cold.counts.Written-1 || edited.counts.Written != 1 {
 		test.Fatalf("want only the edited package missed and written, cold %+v, edited %+v", cold.counts,
 			edited.counts)
@@ -192,7 +193,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	}
 
 	before := entriesIn(test, root)
-	uncached := runCachedEngine(test, root, "--no-cache")
+	uncached := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
 	if uncached.counts != (contract.LintCache{}) {
 		test.Fatalf("want a run under --no-cache to count nothing, got %+v", uncached.counts)
 	}
@@ -205,7 +206,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	}
 
 	fresh := copyFixture(test, filepath.Join("testdata", "vet-finding"))
-	runCachedEngine(test, fresh, "--no-cache")
+	runCachedEngine(test, fresh, "--no-cache", "--no-system-cache")
 	if _, statError := os.Stat(filepath.Join(fresh, ".cache", "cohere", "go")); !os.IsNotExist(statError) {
 		test.Fatalf("want no store made under --no-cache, got %v", statError)
 	}
@@ -512,8 +513,8 @@ func TestACleanVerdictWithoutTheWrapStillWraps(test *testing.T) {
 
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
-		rules.All(), nil)
+	runIsolated(test, []string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput,
+		&standardError, rules.All(), nil)
 	if !strings.Contains(standardOutput.String(), `"fixedBy":{"cohere-go/consistency-no-long-line":3}`) {
 		test.Fatalf("want the run that writes to wrap three lines after gofmt's verdict was kept, got\n%s\n%s",
 			standardOutput.String(), standardError.String())
@@ -541,8 +542,8 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput, &standardError,
-		rules.All(), nil)
+	runIsolated(test, []string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput,
+		&standardError, rules.All(), nil)
 	var record contract.FixRecord
 	for line := range strings.Lines(standardOutput.String()) {
 		if strings.HasPrefix(line, `{"kind":"fix"`) {

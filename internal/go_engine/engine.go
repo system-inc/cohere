@@ -113,23 +113,11 @@ func Main(
 		standardLibrarySource{}, true, nil)
 }
 
-// run is Main with the analyzer rules handed in and no standard input, so a test can run the engine with a rule
-// planted in place of the registry's, such as one that panics. memory is what Main decided about the memory limit, nil
-// in a test, which decides nothing and never raises the limit. Its standard library is a plain run's, read from the
-// system cache.
-func run(
-	arguments []string,
-	standardOutput io.Writer,
-	standardError io.Writer,
-	registered []rule.Rule,
-	memory *engineMemory,
-) int {
-	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, memory,
-		standardLibrarySource{})
-}
-
-// runWithStandardLibrary is run with source as where its standard library comes from and goes, so a test can give a
-// run a system cache and a stamp of its own, or collect the entries a run saves, without a release build.
+// runWithStandardLibrary is Main with the analyzer rules handed in, no standard input, and source as where its standard
+// library comes from and goes, so a test can run the engine with a rule planted in place of the registry's, such as
+// one that panics, give a run a system cache and a stamp of its own, or collect the entries a run saves, without a
+// release build. memory is what Main decided about the memory limit, nil in a test, which decides nothing and never
+// raises the limit.
 func runWithStandardLibrary(
 	arguments []string,
 	standardOutput io.Writer,

@@ -25,7 +25,7 @@ func TestTheDuplicatesReportNeverMovesTheVerdict(test *testing.T) {
 					extra...)
 				var standardOutput bytes.Buffer
 				var standardError bytes.Buffer
-				exitCode := run(arguments, &standardOutput, &standardError, rules.All(), nil)
+				exitCode := runIsolated(test, arguments, &standardOutput, &standardError, rules.All(), nil)
 				return normalize(standardOutput.String(), root), exitCode
 			}
 			without, withoutExit := check()

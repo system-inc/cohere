@@ -668,8 +668,11 @@ func (session *CacheSession) writeThrough(
 		hosted.lock.Lock()
 		held := hosted.settled && hosted.declined == ""
 		hosted.lock.Unlock()
-		// A package pending a reload is checked from source by the next load, which writes its entry as a miss.
+		// A package pending a reload is checked from source by the next load, which writes its entry as a miss. A
+		// standard-library package the system cache keeps is never written to the build's store (keptBySystemCache):
+		// the build restores it from the host's run again, or from its own table once it computes it.
 		if _, keyed := session.keys[candidate]; !held || !keyed || unsettled[candidate] ||
+			session.keptBySystemCache(candidate) ||
 			session.host.writtenThrough[candidate] ||
 			session.reloading(candidate) || !finishedClean(actionsOf[candidate]) {
 			continue

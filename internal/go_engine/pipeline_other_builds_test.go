@@ -112,6 +112,7 @@ func runOverRegistered(
 	if configure != nil {
 		configure(engine)
 	}
+	isolatePipeline(test, engine)
 	if exitCode := engine.run(); exitCode != wantExit {
 		test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, wantExit, standardOutput.String(),
 			standardError.String())

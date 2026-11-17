@@ -78,7 +78,7 @@ func runLinked(test *testing.T, root string, extra ...string) linkedRun {
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"}, extra...)
-	written := linkedRun{exitCode: run(arguments, &standardOutput, &standardError, rules.All(), nil),
+	written := linkedRun{exitCode: runIsolated(test, arguments, &standardOutput, &standardError, rules.All(), nil),
 		standardError: standardError.String()}
 	checkStream(test, standardOutput.String(), written.exitCode)
 	for line := range strings.Lines(standardOutput.String()) {

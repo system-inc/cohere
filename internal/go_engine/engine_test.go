@@ -629,7 +629,7 @@ func renamedTreeUnder(fixture string, caseName string, extra ...string) func(tes
 		var standardOutput bytes.Buffer
 		var standardError bytes.Buffer
 		arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
-		run(arguments, &standardOutput, &standardError, registered, nil)
+		runIsolated(test, arguments, &standardOutput, &standardError, registered, nil)
 		for line := range strings.Lines(standardOutput.String()) {
 			var record contract.FixRecord
 			if strings.HasPrefix(line, `{"kind":"fix"`) && json.Unmarshal([]byte(line), &record) == nil &&
@@ -803,8 +803,8 @@ func wrapped(relative string, caseName string) func(test *testing.T, root string
 		}
 		var standardOutput bytes.Buffer
 		var standardError bytes.Buffer
-		run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
-			rules.All(), nil)
+		runIsolated(test, []string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput,
+			&standardError, rules.All(), nil)
 		for line := range strings.Lines(standardOutput.String()) {
 			var record contract.FixRecord
 			if strings.HasPrefix(line, `{"kind":"fix"`) && json.Unmarshal([]byte(line), &record) == nil &&
@@ -860,7 +860,7 @@ func runCase(test *testing.T, endToEnd endToEndCase) {
 
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	exitCode := run(arguments, &standardOutput, &standardError, registered, nil)
+	exitCode := runIsolated(test, arguments, &standardOutput, &standardError, registered, nil)
 	stream := normalize(standardOutput.String(), root)
 	prose := strings.ReplaceAll(standardError.String(), root, "/project")
 

@@ -526,7 +526,7 @@ func (engine *pipeline) extraBuildRun(
 		if engine.session != nil {
 			hostFiles = engine.session.Files()
 		}
-		session = engine.cacheSession(environment, goEnvironment, hostFiles, notes)
+		session = engine.cacheSession(environment, goEnvironment, hostFiles, notes, engine.extraBuildSystemCache())
 		if session != nil && !engine.keepsHostRestoreOff && !engine.censusKeepsHostRestoreOff {
 			session.RestoreFromHost(host)
 			if engine.keepsWalkOff {
@@ -723,6 +723,12 @@ func (engine *pipeline) extraBuildRun(
 	run.said = compiledFiles(loaded.Packages, ours)
 	run.untouchedFiles = compiledFiles(loaded.Untouched, ours)
 	run.result = result
+	// The build writes its table of the system cache as it ends, its reads whole, with what it computed of the
+	// standard library beside what the table held, as the host writes its own once every build has ended.
+	if session != nil && session.HasCollected() {
+		session.PersistCollectedReads(wholeReads(result))
+		engine.systemCache.write(session)
+	}
 	// The facts census reads the last load's facts, whose result stands, beside the host's (#0ghk7vj).
 	if run.judged != nil && run.dependence != nil {
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
@@ -738,6 +744,17 @@ func (engine *pipeline) extraBuildRun(
 		}
 	}
 	return run, nil
+}
+
+// extraBuildSystemCache is the system cache an extra build reads its table from and writes it to: the run's, but none
+// in a run judging each build's dependence. There the facts census compares each build's facts and answers with the
+// host's through the build's standard library's syntax, which a package restored from the build's own table does not
+// have, so such a build computes its standard library, as the census needs, and keeps none of it.
+func (engine *pipeline) extraBuildSystemCache() *systemCache {
+	if engine.request.judgesDependence() {
+		return &systemCache{off: true}
+	}
+	return engine.systemCache
 }
 
 // wholeReads is result's reads once every type-read walk the run left running has ended (check.Result.ReadWalks):

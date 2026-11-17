@@ -171,7 +171,10 @@ func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
 		test.Fatalf("editing utf8.go: %v, %v", writeError, closeError)
 	}
 	warm, warmStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
-	sideLoaded, _, _ := runOverNoted(test, root, exitClean, reading, append(recordsSwitches, "--no-cache")...)
+	// The table as it was before the edit, which the warm run added utf8 and its importers to: the run under
+	// `--no-cache` computes what the warm run computed, and side-loads what it restored.
+	sideLoaded, _, _ := runOverNoted(test, root, exitClean, readingTableAs(test, table, context, ""),
+		append(recordsSwitches, "--no-cache")...)
 	if read := recordCounts(test, warmStream).StandardLibraryRead; read == 0 {
 		test.Fatal("the warm run read no standard-library record, so its verdicts prove nothing")
 	}

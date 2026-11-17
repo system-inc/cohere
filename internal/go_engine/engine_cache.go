@@ -93,6 +93,11 @@ func lintCache(
 			Toolchain: cmp.Or(source.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
 		}
 	}
+	// A run keeping a system cache collects what it computes of the standard library for its build's table, each build
+	// into a map of its own, since each writes the table of its own context (WriteSystemCacheTable).
+	if standardLibrary != nil && standardLibrary.Collected == nil && system.store != nil {
+		standardLibrary.Collected = map[cache.Key]check.StandardLibraryRunEntry{}
+	}
 	if noCache {
 		return &check.Caching{StandardLibrary: standardLibrary}, nil
 	}

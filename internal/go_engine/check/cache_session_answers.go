@@ -277,9 +277,12 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 
 // entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, the answers its
 // analysis read of other packages, with whether those could all be named, and what it declares without a body, with
-// whether the load recorded that (see cacheEntry's Bodiless).
+// whether the load recorded that (see cacheEntry's Bodiless). answersWhole is whether the answers are every answer of
+// the package, computed whole, as the system cache's table must hold them (standardLibraryEntryWhole), rather than
+// those the run's questions happened to compute in it.
 type entryDemand struct {
 	answers         []kindAnswers
+	answersWhole    bool
 	reads           []storedRead
 	readsIncomplete bool
 	bodiless        []objectpath.Path
@@ -307,7 +310,7 @@ func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand)
 	if !session.caching.AnswersInPart[saved.PkgPath] {
 		if home := session.resolver.Package(saved.Types); home != nil {
 			if whole, complete := session.resolver.WholeIfComplete(home); complete {
-				demanded.answers = sortedAnswers(whole, true)
+				demanded.answers, demanded.answersWhole = sortedAnswers(whole, true), true
 			}
 		}
 	}

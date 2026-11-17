@@ -35,7 +35,8 @@ func TestTheCanonicalTableHoldsTheSameEntriesByValue(test *testing.T) {
 		Context:   standardLibraryContext("check tests", goRoot),
 		Collected: collected,
 	}
-	runWithSession(test, directory, collecting, rules)
+	collectingRun := runWithSession(test, directory, collecting, rules)
+	collectingRun.session.PersistCollectedReads(collectingRun.result.Reads)
 	variant := cache.StandardLibraryVariant{Target: runtime.GOOS + "/" + runtime.GOARCH, CgoEnabled: "1",
 		GoVersion: runtime.Version(), Packages: len(collected)}
 	written, writeError := StandardLibraryTableOf(collected, goRoot, []cache.StandardLibraryVariant{variant})
@@ -180,6 +181,7 @@ func TestATableEntryRestoresAsTheStoreEntryItWasWrittenFrom(test *testing.T) {
 		Collected: collected,
 	}
 	cold := runWithSession(test, directory, collecting, rules)
+	cold.session.PersistCollectedReads(cold.result.Reads)
 	written, writeError := StandardLibraryTableOf(collected, goRoot, nil)
 	if writeError != nil {
 		test.Fatalf("writing the table: %v", writeError)

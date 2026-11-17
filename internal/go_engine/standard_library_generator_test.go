@@ -49,12 +49,14 @@ func TestMain(suite *testing.M) {
 		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
 	}
 	// Every run in this process, and every child it starts, reads a system cache of this test binary's own rather
-	// than the person's (#syscache). A test that gives a run a system cache of its own names it on the run
-	// (standardLibrarySource's systemCacheRoot), or sets the variable itself.
+	// than the person's (#syscache). The engine's test helpers give each run a system cache of its own beside that
+	// (isolatedSource), and a test that names one on the run (standardLibrarySource's systemCacheRoot), or sets the
+	// variable itself, reads that one.
 	removeSystemCache, isolateError := system_cache_testing.Isolate()
 	if isolateError != nil {
 		os.Exit(refuse(os.Stderr, isolateError))
 	}
+	testsSystemCache = os.Getenv(system_cache_testing.Variable)
 	code := suite.Run()
 	removeSystemCache()
 	os.Exit(code)
