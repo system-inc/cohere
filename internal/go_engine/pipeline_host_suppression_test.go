@@ -171,4 +171,16 @@ func TestTheRunsSuppressionIndexFollowsTheBytesItHolds(test *testing.T) {
 		test.Errorf("the moved bytes' directive covers line %d, want 5: the index of the bytes the run held before "+
 			"was read", got)
 	}
+	// A fix or a rename can keep a file's length and move its lines: here the blank line moves to the end, so the
+	// directive covers line 3 in bytes exactly as long as the first's, which only their address tells apart.
+	swapped := []byte("package moved\n//cohere:ignore " + ruleName + " the planted reason\nvar First = 1\n\n")
+	if len(swapped) != len(first) {
+		test.Fatalf("the swapped bytes are %d long and the first %d, so the case proves nothing", len(swapped),
+			len(first))
+	}
+	indexes.of("moved.go", first)
+	if got := coveredLine(indexes.of("moved.go", swapped)); got != 3 {
+		test.Errorf("bytes as long as the first's with the directive moved cover line %d, want 3: the index of "+
+			"the first bytes was read", got)
+	}
 }
