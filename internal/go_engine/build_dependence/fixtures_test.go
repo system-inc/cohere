@@ -3,6 +3,7 @@ package build_dependence
 import (
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"maps"
@@ -585,6 +586,91 @@ func TestAnInferredVariableReadsTheTypesItsInitializerPasses(test *testing.T) {
 		if bits.Name != name.dependent {
 			test.Errorf("%s: want its name bit %t on windows, got %t", name.local, name.dependent, bits.Name)
 		}
+	}
+}
+
+// On linux, Target gains Describe in a file only the build compiles, declared on local, `type local = Target`, which
+// that file declares beside the method and the host's package never does, so it is Target's method set that moves:
+// the receiver is found through the alias's right-hand side, Target's name bit is set, in the live graph and in one
+// read back from its records alike, and so every use of Target counts, its conversion to an interface among them.
+// Other, a type of the same package the alias does not name, stays as the host has it.
+func TestABuildOnlyMethodOnABuildOnlyAliasMovesItsTargetsMethodSet(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "localaliases", linuxBuild)
+	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
+		"type Target": true,
+		"func Boxed":  true,
+		"type Other":  false,
+		"func Others": false,
+	})
+	host := judged.host["example.com/localaliases"]
+	if host == nil {
+		test.Fatal("the localaliases fixture's host holds no example.com/localaliases")
+	}
+	if bits := judged.dependence.ObjectBits(host.Types.Scope().Lookup("Target")); !bits.Name {
+		test.Errorf("want Target's name bit set on linux, got %+v", bits)
+	}
+	recorded := recordedGraphOf(test, graphOf(judged.host, nil)).Against(judged.difference)
+	if bits, isDeclared := recorded.NameBits("example.com/localaliases", "Target"); !isDeclared || !bits.Name {
+		test.Errorf("want Target's name bit set on linux in the graph read back from its records, got %+v, "+
+			"declared %t", bits, isDeclared)
+	}
+}
+
+// A method in a file only the build compiles whose receiver the judgment cannot resolve to a type of the host's
+// package seeds every type name of the package, failing wide: a receiver no file declares, an alias that file declares
+// of a name no file declares, and an alias of another package's type, each a build the type checker refuses, stand
+// for any receiver the syntax alone cannot follow. Target and Other then have their name bits set, and every unit of
+// the localaliases fixture is dependent, in the live graph and in one read back from its records alike. A method on a
+// type the file declares itself, defined there, moves no method set the host has, and seeds nothing.
+func TestABuildOnlyMethodOnAReceiverThatResolvesNowhereSeedsEveryTypeName(test *testing.T) {
+	test.Parallel()
+
+	for _, step := range []struct {
+		name      string
+		source    string
+		dependent bool
+	}{
+		{name: "an undeclared receiver", source: "func (Missing) Describe() string { return \"\" }\n",
+			dependent: true},
+		{name: "an alias of an undeclared name", source: "type local = Missing\n\n" +
+			"func (local) Describe() string { return \"\" }\n", dependent: true},
+		{name: "an alias of another package's type", source: "import \"strings\"\n\ntype local = strings.Builder\n\n" +
+			"func (local) Describe() string { return \"\" }\n", dependent: true},
+		{name: "a type the file defines", source: "type local struct{}\n\n" +
+			"func (local) Describe() string { return \"\" }\n", dependent: false},
+	} {
+		test.Run(step.name, func(test *testing.T) {
+			test.Parallel()
+
+			judged := judge(test, "localaliases", linuxBuild)
+			file, parseError := parser.ParseFile(token.NewFileSet(), "describe_linux.go",
+				"package localaliases\n\n"+step.source, 0)
+			if parseError != nil {
+				test.Fatal(parseError)
+			}
+			difference := judged.difference
+			difference.Packages = maps.Clone(difference.Packages)
+			differing := difference.Packages["example.com/localaliases"]
+			differing.BuildOnlyFiles = []*ast.File{file}
+			difference.Packages["example.com/localaliases"] = differing
+			dependence := graphOf(judged.host, nil).Against(difference)
+			expectVerdicts(test, verdicts(test, judged.host, dependence), map[string]bool{
+				"type Target": step.dependent,
+				"func Boxed":  step.dependent,
+				"type Other":  step.dependent,
+				"func Others": step.dependent,
+			})
+			recorded := recordedGraphOf(test, graphOf(judged.host, nil)).Against(difference)
+			for _, name := range []string{"Target", "Other"} {
+				if bits, isDeclared := recorded.NameBits("example.com/localaliases", name); !isDeclared ||
+					bits.Name != step.dependent {
+					test.Errorf("want %s's name bit %t in the graph read back from its records, got %+v, declared %t",
+						name, step.dependent, bits, isDeclared)
+				}
+			}
+		})
 	}
 }
 
