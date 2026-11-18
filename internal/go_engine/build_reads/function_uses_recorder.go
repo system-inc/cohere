@@ -166,7 +166,8 @@ func (recorder *functionUsesRecorder) beginSpec(keyword token.Token, spec ast.Sp
 	}
 }
 
-// begin begins a declaration of kind, named name, declaring objects, whose own objects lie between start and end.
+// begin begins a declaration of kind, named name, declaring objects, which starts at start, its offset in its file
+// recorded, and whose own objects lie between start and end.
 func (recorder *functionUsesRecorder) begin(
 	kind declarationKindIndex,
 	name string,
@@ -177,8 +178,8 @@ func (recorder *functionUsesRecorder) begin(
 	recorder.declaring, recorder.recording = true, true
 	recorder.rangeStart, recorder.rangeEnd, recorder.bodyStart = start, end, nil
 	uses := recorder.usesLength()
-	recorder.declaration = declarationRecord{kind: kind, name: name, file: recorder.fileStart, usesStart: uses,
-		signatureEnd: uses, bodyEnd: uses}
+	recorder.declaration = declarationRecord{kind: kind, name: name, file: recorder.fileStart,
+		start: uint32(start - recorder.fileStart), usesStart: uses, signatureEnd: uses, bodyEnd: uses}
 	recorder.declaration.objectsStart = uint32(len(recorder.record.declared))
 	recorder.record.declared = append(recorder.record.declared, objects...)
 	recorder.declaration.objectsEnd = uint32(len(recorder.record.declared))

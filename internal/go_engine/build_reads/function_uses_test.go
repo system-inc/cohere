@@ -505,6 +505,59 @@ func TestAPartHoldingAnUnknownUseIsUnknown(test *testing.T) {
 	checkWrittenUses(test, written, want)
 }
 
+// Each declaration's offset is where the dependence graph places its unit (#w72zxtq): a function at its `func`, past
+// its doc comment, and a type or value spec at its first name, a const spec repeating the one before at its own name
+// rather than that one's, and an init function and a blank value at their own place too, so the census can ask the
+// graph about each.
+func TestEachDeclarationsOffsetIsWhereItStarts(test *testing.T) {
+	test.Parallel()
+
+	sources := []fixtureFile{{"first", "first.go", `package first
+
+// Documented has a doc comment its offset passes.
+func Documented() int { return 1 }
+
+type (
+	Kind  int
+	Other struct{ Count int }
+)
+
+const (
+	Low Kind = iota
+	High
+)
+
+var _, Blank = 1, 2
+
+func init() {}
+`}}
+	_, packagesChecked := checkedFixture(test, sources)
+	last := packagesChecked[len(packagesChecked)-1]
+	reads := &Reads{}
+	reads.RecordTypes(last.own, last.source.info, last.source.files)
+	uses, recorded := reads.FunctionUses()
+	if !recorded {
+		test.Fatal("want the package's function uses recorded")
+	}
+	var got []string
+	for declared := range uses.Declarations() {
+		started := strings.Fields(sources[0].source[declared.Declaration.Offset:])[0]
+		got = append(got, string(declared.Declaration.Kind)+" "+declared.Declaration.Name+": "+started)
+	}
+	want := []string{
+		"Function Documented: func",
+		"Type Kind: Kind",
+		"Type Other: Other",
+		"Value : Low",
+		"Value : High",
+		"Value : _,",
+		"Function init: func",
+	}
+	if !slices.Equal(got, want) {
+		test.Errorf("each declaration starts at\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 // The selection fixture's packages: other, whose T first's Holder embeds in a struct of no name, and first, whose
 // Promoted selects T's field through Holder and whose method Again selects itself.
 var selectionSources = []fixtureFile{

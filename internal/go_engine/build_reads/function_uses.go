@@ -34,11 +34,14 @@ const (
 // Declaration is one top-level declaration of a package's files. Objects are what it declares by name, each but a
 // blank one; an init function and a declaration of `_` alone have no objectpath and declare none, and are told apart
 // by File, the start of the file that declares them, and Ordinal, their place among such in the file from 0. Name is
-// the name a function or type is declared by, and `_` for a value spec of blank names alone.
+// the name a function or type is declared by, and `_` for a value spec of blank names alone. Offset is where it starts
+// in its file, a function at its `func`, a spec at its first name, as the dependence graph places a unit, so a reader
+// can ask that graph about the same declaration (build_dependence.Dependence.UnitDependent, #w72zxtq).
 type Declaration struct {
 	Kind    DeclarationKind
 	Objects []types.Object
 	File    token.Pos
+	Offset  int
 	Ordinal int
 	Name    string
 }
@@ -92,10 +95,11 @@ type usedSelection struct {
 
 // declarationRecord is one declaration as its record holds it: where its objects lie in declared, where its signature's
 // and its body's uses lie in uses, the body's from signatureEnd, whether each part is unknown, and the rest of what
-// Declaration names it by.
+// Declaration names it by, its offset in its file as start, which fits the padding the record had beside its ordinal.
 type declarationRecord struct {
 	file             token.Pos
 	name             string
+	start            uint32
 	objectsStart     uint32
 	objectsEnd       uint32
 	usesStart        uint32
@@ -129,7 +133,7 @@ func (record *FunctionUses) Declarations() iter.Seq[DeclarationUses] {
 		for _, declared := range record.declarations {
 			uses := DeclarationUses{
 				Declaration: Declaration{Kind: declarationKinds[declared.kind], File: declared.file,
-					Ordinal: int(declared.ordinal), Name: declared.name},
+					Offset: int(declared.start), Ordinal: int(declared.ordinal), Name: declared.name},
 				Signature:        record.uses[declared.usesStart:declared.signatureEnd:declared.signatureEnd],
 				Body:             record.uses[declared.signatureEnd:declared.bodyEnd:declared.bodyEnd],
 				HasBody:          declared.hasBody,
