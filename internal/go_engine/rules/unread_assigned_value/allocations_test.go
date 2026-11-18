@@ -50,8 +50,8 @@ func untagged(value int) int {
 `
 
 // TestCheckAllocatesOnlyItsWalkerWithoutATaggedSwitch holds Check, for a function without a tagged switch, to the one
-// walker both its walks share, where a map of switch tags, a closure for each ast.Inspect and one for the use test
-// cost four.
+// walker its walk makes, where a map of switch tags, a closure for each of two ast.Inspect walks and one for the use
+// test cost four. A clean function keeps no value as unread, so its walk allocates none.
 //
 // Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would
 // add to.
