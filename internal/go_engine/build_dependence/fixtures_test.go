@@ -595,9 +595,10 @@ func TestAnInferredVariableReadsTheTypesItsInitializerPasses(test *testing.T) {
 // method set that moves: Target's name bit is set, in the live graph and in one read back from its records alike, and
 // so every use of Target counts, its conversion to an interface among them. In the aliases fixture the alias is the
 // host's, `type Alias = Target` in a shared file, so Target's name bit is seeded through Alias's, which depends on it,
-// and Alias, whose bits are Target's, counts too. In the localaliases fixture it is declared in linux's file beside the
+// and Alias, whose bits are Target's, counts too; the sharedlocalaliases fixture spells it the same way, unexported,
+// `type local = Target` in a shared file. In the localaliases fixture it is declared in linux's file beside the
 // method, `type local = Target`, which the host's package never declares, so the receiver is found through the alias's
-// right-hand side. Other, a type of the same package the alias does not name, stays as the host has it in both.
+// right-hand side. Other, a type of the same package the alias does not name, stays as the host has it in each.
 func TestABuildOnlyMethodOnAnAliasMovesItsTargetsMethodSet(test *testing.T) {
 	test.Parallel()
 
@@ -608,6 +609,13 @@ func TestABuildOnlyMethodOnAnAliasMovesItsTargetsMethodSet(test *testing.T) {
 		{fixture: "aliases", want: map[string]bool{
 			"type Target": true,
 			"type Alias":  true,
+			"func Boxed":  true,
+			"type Other":  false,
+			"func Others": false,
+		}},
+		{fixture: "sharedlocalaliases", want: map[string]bool{
+			"type Target": true,
+			"type local":  true,
 			"func Boxed":  true,
 			"type Other":  false,
 			"func Others": false,
