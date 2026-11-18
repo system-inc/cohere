@@ -43,7 +43,7 @@ func StandardLibraryDependenceRecordKey(
 func (session *CacheSession) standardLibraryRecordKey(keyed *packages.Package) (cache.Key, bool) {
 	standardLibrary := session.caching.StandardLibrary
 	key, isKeyed := session.standardLibraryKeys[keyed]
-	if !isKeyed || standardLibrary == nil || !session.fromSystemCache[keyed] {
+	if !isKeyed || standardLibrary == nil || !session.restoredFromSystemCache(keyed) {
 		return cache.Key{}, false
 	}
 	return StandardLibraryDependenceRecordKey(key, session.caching.Context.EngineIdentity, standardLibrary.Toolchain),
@@ -114,7 +114,7 @@ func (session *CacheSession) WriteStandardLibraryRecords(
 	}
 	var writing []*packages.Package
 	var keys []cache.Key
-	for each := range session.fromSystemCache {
+	for each := range session.hits {
 		key, isKeyed := session.standardLibraryRecordKey(each)
 		if _, isFound := records.standardLibrary[each]; isKeyed && !isFound {
 			writing = append(writing, each)

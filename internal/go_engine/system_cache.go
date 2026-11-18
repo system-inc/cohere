@@ -8,24 +8,25 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check"
 )
 
-// systemCache is the run's system cache (#syscache): the standard library's tables, one for each build context, in
-// the user's cache directory rather than any project's, read by every run of the same engine on the machine, whatever
-// project it checks. It is found once a run, before any build reads it, and read by every build's lintCache.
+// systemCache is the run's system cache (#syscache): a second store beside the project's, in the user's cache
+// directory rather than any project's, which holds every standard-library package's entry under its key in its
+// build's context, read and written as the project's store is, by every run of the same engine on the machine,
+// whatever project it checks. It is found once a run, before any build reads it, and handed to every build's
+// lintCache.
 type systemCache struct {
 	// root is the system cache's root, empty when the run keeps none.
 	root string
 
-	// store holds the standard library's tables, at `<root>/go/standard-library`, nil when the run keeps no system
-	// cache: under `--no-system-cache`, or when it has no root.
+	// store holds the standard library's entries, at `<root>/go/store`, nil when the run keeps no system cache: under
+	// `--no-system-cache`, or when it has no root.
 	store *cache.Store
 
 	// off is set under `--no-system-cache`, which neither reads nor writes the system cache.
 	off bool
 
-	// notKept is why the run keeps no system cache though it was on, or could not keep it as it should, as when a
-	// table's write or the trim failed, nil when it kept it. The run says it and goes on: it computes what the cache
-	// would have held, and its findings and exit are as without it. notKeptLock guards it, since each extra build
-	// writes its table as it ends, beside the others.
+	// notKept is why the run keeps no system cache though it was on, or could not keep it as it should, as when the
+	// trim failed, nil when it kept it. The run says it and goes on: it computes what the cache would have held, and
+	// its findings and exit are as without it. notKeptLock guards it.
 	notKept     *cache.NotKept
 	notKeptLock sync.Mutex
 }
@@ -44,28 +45,23 @@ func openSystemCache(request invocation) *systemCache {
 		}
 		root = found
 	}
-	return &systemCache{root: root, store: cache.OpenAt(standardLibraryTablesDirectory(root))}
+	return &systemCache{root: root, store: cache.OpenAt(systemStoreDirectory(root))}
 }
 
-// standardLibraryTablesDirectory is where the system cache at root keeps the standard library's tables.
-func standardLibraryTablesDirectory(root string) string {
-	return filepath.Join(root, "go", "standard-library")
+// systemStoreDirectory is where the system cache at root keeps its store of the standard library's entries.
+func systemStoreDirectory(root string) string {
+	return filepath.Join(root, "go", "store")
 }
 
-// write writes back session's table of its build's context, once its reads are whole, with what the build computed
-// of the standard library whole beside what the table held (check.CacheSession.WriteSystemCacheTable), and nothing
-// when it computed nothing new, and returns how many entries it added, for the build's record. A write that fails is
-// why the system cache is not kept as it should be, never an error: the next run computes what this one could not
-// keep.
-func (system *systemCache) write(session *check.CacheSession) int {
-	if system.store == nil || session == nil {
-		return 0
+// failedAt records why the system cache is not kept as it should be when session, a build's, failed to write to it
+// (check.CacheSession.SystemCacheFailure): never an error, since the next run computes what this one could not keep.
+func (system *systemCache) failedAt(session *check.CacheSession) {
+	if session == nil {
+		return
 	}
-	added, writeError := session.WriteSystemCacheTable()
-	if writeError != nil {
-		system.notKeptBecause(cache.NotKeptBecause(writeError))
+	if failure := session.SystemCacheFailure(); failure != nil {
+		system.notKeptBecause(cache.NotKeptBecause(failure))
 	}
-	return added
 }
 
 // notKeptBecause records why the system cache is not kept as it should be, the first reason the run met, which the
@@ -78,13 +74,13 @@ func (system *systemCache) notKeptBecause(notKept *cache.NotKept) {
 	}
 }
 
-// trim trims the standard library's tables, at most once a day (cache.TrimSystemCache), once a run, after every
-// build has read its table. A trim that fails is why the system cache is not kept as it should be, never an error.
+// trim trims the system cache's store, at most once a day (cache.TrimSystemCache), once a run, after every build has
+// read and written it. A trim that fails is why the system cache is not kept as it should be, never an error.
 func (system *systemCache) trim() {
 	if system.store == nil {
 		return
 	}
-	if notKept := cache.TrimSystemCache(system.root, standardLibraryTablesDirectory(system.root),
+	if notKept := cache.TrimSystemCache(system.root, systemStoreDirectory(system.root),
 		cache.SystemCacheSizeCap); notKept != nil {
 		system.notKeptBecause(notKept)
 	}

@@ -13,8 +13,8 @@ import (
 const rootMarker = "$GOROOT/"
 
 // StandardLibraryContext is what every standard-library package's key shares in one run. It names nothing of the
-// machine but what can change a standard-library entry, so a key computed on one machine equals the key on any other
-// with the same engine, Go version, target and fact analyzers.
+// machine but what can change a standard-library entry, its installation's root among them, so a key computed on one
+// machine equals the key on any other with the same engine, Go version, target, fact analyzers and `GOROOT`.
 type StandardLibraryContext struct {
 	// FormatVersion is the cache's own format version, so an entry written in another format is never read.
 	FormatVersion string
@@ -42,8 +42,10 @@ type StandardLibraryContext struct {
 	// digest holds the toolchain beside the loader, and only then: under the source loader the cgo tool never runs.
 	CgoToolchain []string
 
-	// Goroot is the Go installation's root, `GOROOT` as go env reports it, absolute. It is never hashed: each file is
-	// keyed by its path below it, so the same Go installed elsewhere keys alike.
+	// Goroot is the Go installation's root, `GOROOT` as go env reports it, absolute. It is hashed into every key: the
+	// system cache's store holds each entry with this machine's paths in it, its files, its withheld errors and its
+	// export data's positions, so an installation moved, or another beside it, keys apart (#syscache). Each file is
+	// keyed by its path below it besides.
 	Goroot string
 }
 
@@ -57,11 +59,11 @@ type StandardLibraryContext struct {
 //
 // A key is a sha256 over two parts, each length-prefixed: the package's own digest, then the keys of the packages it
 // imports, sorted by import path, as Keys' are. The own digest is a sha256 over, in this order and each part
-// length-prefixed: the context (its format version, engine identity, fact analyzers and build, hashed once for every
-// package); the package's ID, PkgPath and Name; each of its GoFiles, CompiledGoFiles, OtherFiles, EmbedFiles and
-// IgnoredFiles as its path below Goroot, written `$GOROOT/` and then slash-separated, and the sha256 of its bytes;
-// and, for a package with cgo files alone, the loader, then the C toolchain when the loader is cgo-translated. No
-// absolute path goes in, and nothing of the process: only what the context names and the files' bytes.
+// length-prefixed: the context (its format version, engine identity, fact analyzers, build and Goroot, hashed once
+// for every package); the package's ID, PkgPath and Name; each of its GoFiles, CompiledGoFiles, OtherFiles,
+// EmbedFiles and IgnoredFiles as its path below Goroot, written `$GOROOT/` and then slash-separated, and the sha256 of
+// its bytes; and, for a package with cgo files alone, the loader, then the C toolchain when the loader is
+// cgo-translated. Nothing of the process goes in: only what the context names and the files' bytes.
 func StandardLibraryKeys(
 	reachable []*packages.Package,
 	shared StandardLibraryContext,
@@ -112,8 +114,8 @@ func StandardLibraryKeys(
 }
 
 // standardLibraryContextDigest is the run's StandardLibraryContext hashed once, in the key's order: a marker that sets
-// these keys apart from Keys', the format version, the engine identity, the fact analyzers, the build. The loader, the
-// C toolchain and Goroot are not in it, since none belongs in every package's key.
+// these keys apart from Keys', the format version, the engine identity, the fact analyzers, the build and Goroot.
+// The loader and the C toolchain are not in it, since neither belongs in every package's key.
 func standardLibraryContextDigest(shared StandardLibraryContext) Key {
 	parts := newPartHash()
 	parts.text("standard library")
@@ -121,22 +123,7 @@ func standardLibraryContextDigest(shared StandardLibraryContext) Key {
 	parts.text(shared.EngineIdentity)
 	parts.texts(shared.Facts)
 	parts.texts(shared.Build)
-	return parts.sum()
-}
-
-// StandardLibraryTableKey is the key of the table the system cache keeps of one build context's standard library: a
-// sha256 over a marker that sets it apart from every package's key, then, in standardLibraryContextDigest's order, the
-// format version, the engine identity, the fact analyzers and the build. So a table is found only by the engine that
-// wrote it, for the target, toolchain and fact analyzers it was written under. Neither the loader, the C toolchain nor
-// Goroot is in it: the loader and the C toolchain are in the key of each package with cgo files, which the table holds
-// under its own key, and every path in a table's entries stands below the marker for Goroot.
-func StandardLibraryTableKey(shared StandardLibraryContext) Key {
-	parts := newPartHash()
-	parts.text("standard library table")
-	parts.text(shared.FormatVersion)
-	parts.text(shared.EngineIdentity)
-	parts.texts(shared.Facts)
-	parts.texts(shared.Build)
+	parts.text(shared.Goroot)
 	return parts.sum()
 }
 

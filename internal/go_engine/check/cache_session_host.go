@@ -658,7 +658,7 @@ func (session *CacheSession) writeThrough(
 	unsettled map[*packages.Package]bool,
 	knownFiles *knownFiles,
 ) map[*packages.Package]bool {
-	if session.host == nil || session.caching.Store == nil {
+	if session.host == nil || session.caching.Store == nil && !session.KeepsSystemCache() {
 		return nil
 	}
 	var through []*packages.Package
@@ -670,8 +670,10 @@ func (session *CacheSession) writeThrough(
 		hosted.lock.Lock()
 		held := hosted.settled && hosted.declined == ""
 		hosted.lock.Unlock()
-		// A package pending a reload is checked from source by the next load, which writes its entry as a miss.
-		if _, keyed := session.keys[candidate]; !held || !keyed || unsettled[candidate] ||
+		// A package pending a reload is checked from source by the next load, which writes its entry as a miss. One
+		// with no store, a project package under `--no-cache`, has no key either (keyStandardLibraryApart).
+		if _, keyed := session.keys[candidate]; !held || !keyed || session.storeFor(candidate) == nil ||
+			unsettled[candidate] ||
 			session.host.writtenThrough[candidate] ||
 			session.reloading(candidate) || !finishedClean(actionsOf[candidate]) {
 			continue
@@ -693,33 +695,47 @@ func (session *CacheSession) writeThrough(
 		key := session.keys[saved]
 		// The writes run with no slot held (fanOutWriting), as putEntry writes a miss's: the export data first, so an
 		// entry is never in the store before what it needs to be read, and only when the store does not hold it by its
-		// digest already, as it does for every package the host wrote, whose export data the build read.
+		// digest already, as it does for every package the host wrote, whose export data the build read. A
+		// standard-library package goes to the system cache's store under the build's own key, as its miss would.
 		hosted := throughHosted[index]
+		store := session.storeFor(saved)
 		return func() {
 			// A record of the host's the store holds, as it holds every one the host wrote there, is named and never
 			// read; a body with none, or whose record is not in this store, is held in the build's own record.
-			if encoded[index].record.BodyAt == nil ||
-				!session.caching.Store.Holds(cache.Key(encoded[index].record.BodyAt)) {
+			if encoded[index].record.BodyAt == nil || !store.Holds(cache.Key(encoded[index].record.BodyAt)) {
 				encoded[index].record.BodyAt = nil
 				encoded[index].record.Inline, writeErrors[index] = hostBody(hosted)
 				if writeErrors[index] != nil {
 					return
 				}
 			}
-			writeErrors[index] = session.putEntry(key, encoded[index])
+			writeErrors[index] = putEntry(store, key, encoded[index])
 		}
 	})
 	positionDependent := map[*packages.Package]bool{}
 	for index, saved := range through {
 		if writeErrors[index] != nil {
-			// A failed write is a problem, never a finding: the next run checks the package from source.
+			// A failed write is a problem, never a finding: the next run checks the package from source. One to the
+			// system cache's store is why the run could not keep it (SystemCacheFailure).
+			if session.storeFor(saved) != session.caching.Store {
+				if session.systemCacheFailure == nil {
+					session.systemCacheFailure = writeErrors[index]
+				}
+				continue
+			}
 			session.problem(fmt.Sprintf("writing through the entry of %s restored from the host: %v", saved.ID,
 				writeErrors[index]))
 			continue
 		}
 		if writable[index] {
 			session.host.writtenThrough[saved] = true
-			session.counts.WrittenThrough++
+			// A standard-library package written through to the system cache's store is counted as its miss would be
+			// there, apart from the project's.
+			if session.storeFor(saved) != session.caching.Store {
+				session.counts.SystemCacheWritten++
+			} else {
+				session.counts.WrittenThrough++
+			}
 			dependent, judgeError := encoded[index].positionDependent.read(saved.ID)
 			if judgeError != nil {
 				// Left out, the package is given no alias.
@@ -906,7 +922,9 @@ func (session *CacheSession) keepForBuilds(
 		reachable = append(reachable, keyedPackage)
 	}
 	session.know(reachable...)
-	if session.keys == nil {
+	// A run without the project's store names its reads' owners by the keys it computed for its builds, though it may
+	// key the standard library apart in session.keys for the system cache.
+	if session.caching.Store == nil {
 		session.buildKeys = keyed.Keys
 	}
 	actionsOf := map[*packages.Package][]*checker.Action{}
@@ -933,16 +951,6 @@ func (session *CacheSession) keepForBuilds(
 	}
 	var encoding []*packages.Package
 	for keptPackage := range keyed.Portable {
-		// A package restored from the system cache's table is kept from the table's entry and the reads it persisted.
-		if hit, fromTable := session.tableHits[keptPackage]; fromTable && session.fromSystemCache[keptPackage] {
-			kept, keepError := session.keepTableHit(keptPackage, hit, keyed.Portable[keptPackage])
-			if keepError != nil {
-				session.problem(keepError.Error())
-				continue
-			}
-			host.entries[keptPackage.ID] = kept
-			continue
-		}
 		packageReads := reads[keptPackage]
 		if packageReads == nil || packageReads.Never() != "" || session.restored(keptPackage) {
 			continue
@@ -950,20 +958,22 @@ func (session *CacheSession) keepForBuilds(
 		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage]}
 		if session.written[keptPackage] {
 			key := session.keys[keptPackage]
-			// The record the run wrote of it holds its body, which a build writing the package through names.
+			// The record the run wrote of it holds its body, which a build writing the package through names, in the
+			// store the run wrote it to, the system cache's for a standard-library package (storeFor).
+			store := session.storeFor(keptPackage)
 			kept.bodyAt, kept.holdsBodyAt = key, true
 			kept.contents = func() ([]byte, entryRecord, func() ([]byte, error), error) {
-				contents, stored := session.caching.Store.Get(key)
+				contents, stored := store.Get(key)
 				if !stored {
 					return nil, entryRecord{}, nil, fmt.Errorf("the store holds no entry of %s", keptPackage.ID)
 				}
-				body, record, whole := storedEntry(session.caching.Store, contents)
+				body, record, whole := storedEntry(store, contents)
 				if !whole {
 					return nil, entryRecord{}, nil, fmt.Errorf("the store holds no whole entry of %s", keptPackage.ID)
 				}
 				// The export data is the one the record names by digest, read only when a load asks for it.
 				return body, record, func() ([]byte, error) {
-					return readExportDataByDigest(session.caching.Store, keptPackage, record.ExportData)
+					return readExportDataByDigest(store, keptPackage, record.ExportData)
 				}, nil
 			}
 			host.entries[keptPackage.ID] = kept

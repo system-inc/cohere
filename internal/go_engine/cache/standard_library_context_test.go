@@ -175,21 +175,21 @@ func TestStandardLibraryKeysCoverEveryStandardPackageAndAreTheSameAcrossCalls(te
 	expectChanged(test, "keying twice", keys, keyStandard(test, graph, standardContextAt(goroot)))
 }
 
-// relocatedKeys keys the same tree written below another root, so a key that holds where the installation is
-// fails the comparison with the tree's keys.
+// relocatedKeys keys the same tree written below another root, every key of which must differ from the tree's, since
+// a key holds where the installation is.
 func relocatedKeys(test *testing.T, keys map[string]Key) {
 	test.Helper()
 
 	elsewhere, elsewhereGraph := newStandardTree(test)
 	moved := keyStandard(test, elsewhereGraph, standardContextAt(elsewhere))
-	expectChanged(test, "the same files below another root", keys, moved)
+	expectChanged(test, "the same files below another root", keys, moved, everyStandardId...)
 }
 
 // Each field of the context changes what it must, and only that: the format version, the engine identity, each
 // entry of the build and a fact analyzer's flag change every key; the loader changes the key of a package with cgo
 // files and of every package that imports one, and of no other; the C toolchain, `CGO_CFLAGS` alone, changes those
 // same keys under the cgo-translated loader and none under the source loader, where the cgo tool never runs; and the
-// root changes none when the files below it are the same. A new field without a case here fails, since the fields
+// root changes every key, the files below it the same. A new field without a case here fails, since the fields
 // are found by reflection.
 func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 	test.Parallel()
@@ -256,9 +256,10 @@ func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 	}
 }
 
-// The same standard library below two different roots keys alike, each copy's files read from its own root: a key
-// holds where a file is in the installation, never where the installation is, so a release's keys are a user's.
-func TestTheSameStandardLibraryBelowAnotherRootKeysAlike(test *testing.T) {
+// The same standard library below two different roots keys apart, each copy's files read from its own root: the
+// system cache's entries hold their installation's paths, so a key holds where the installation is (#syscache), and an
+// installation moved, or another beside it, never reads the other's entries.
+func TestTheSameStandardLibraryBelowAnotherRootKeysApart(test *testing.T) {
 	test.Parallel()
 
 	goroot, graph := newStandardTree(test)

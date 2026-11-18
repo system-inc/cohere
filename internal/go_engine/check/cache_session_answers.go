@@ -258,15 +258,13 @@ func (session *CacheSession) reloadsOf(resolver *fact_resolver.Resolver) []strin
 // build, and both stay in the entry the run writes for it.
 func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 	session.previous = map[*packages.Package]entryDemand{}
-	if session.caching.Store == nil {
-		return
-	}
 	for _, reloaded := range reachable {
 		key, keyed := session.keys[reloaded]
-		if !keyed || !session.reloading(reloaded) {
+		store := session.storeFor(reloaded)
+		if !keyed || store == nil || !session.reloading(reloaded) {
 			continue
 		}
-		entry, _, stored := storedEntryAt(session.caching.Store, key)
+		entry, _, stored := storedEntryAt(store, key)
 		if !stored {
 			continue
 		}
@@ -309,7 +307,6 @@ func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand)
 	demanded := entryDemand{}
 	if !session.caching.AnswersInPart[saved.PkgPath] {
 		if home := session.resolver.Package(saved.Types); home != nil {
-			session.answersComputedWhole.Add(1)
 			if whole, complete := session.resolver.WholeIfComplete(home); complete {
 				demanded.answers, demanded.answersWhole = sortedAnswers(whole, true), true
 			}
@@ -366,7 +363,8 @@ func (session *CacheSession) rewriteEarlier() {
 		slots <- struct{}{}
 		group.Go(func() {
 			defer func() { <-slots }()
-			entry, record, stored := storedEntryAt(session.caching.Store, key)
+			store := session.storeFor(saved)
+			entry, record, stored := storedEntryAt(store, key)
 			if !stored {
 				return
 			}
@@ -381,7 +379,7 @@ func (session *CacheSession) rewriteEarlier() {
 			rewritten := encodedEntry{body: body, record: entryRecord{Version: CacheFormatVersion,
 				Body: contentDigest(body), Inline: body, ExportData: record.ExportData, Reads: demanded.reads,
 				ReadsIncomplete: demanded.readsIncomplete}}
-			if putError := session.putEntry(key, rewritten); putError != nil {
+			if putError := putEntry(store, key, rewritten); putError != nil {
 				session.problem(putError.Error())
 			}
 		})

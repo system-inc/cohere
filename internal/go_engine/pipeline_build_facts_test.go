@@ -145,14 +145,14 @@ func TestAPlainRunComparesNoFacts(test *testing.T) {
 func TestTheFactsCensusFollowsACallerChainAcrossBothGraphs(test *testing.T) {
 	test.Parallel()
 
-	table, _, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	for _, each := range []struct {
 		name      string
 		configure func(*pipeline)
 		restores  bool
 	}{
 		{name: "checked from source"},
-		{name: "restored from the table", configure: readingTableAs(test, table, context, ""), restores: true},
+		{name: "restored from the table", configure: readingSystemCache(filled, ""), restores: true},
 	} {
 		engine, census := windowsCensus(test, "build-facts-chain", each.configure)
 		hasGraph := engine.dependence.standardLibrary != nil && engine.dependence.standardLibrary.graph != nil

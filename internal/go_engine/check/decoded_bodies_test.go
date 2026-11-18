@@ -309,10 +309,7 @@ func TestTheHostsAnalysisWritesNothingOfASharedDecode(test *testing.T) {
 	result, session := hostSessionWith(test, root, cachingAt(store, throughRules()), throughRules(),
 		func(session *CacheSession) {
 			for hit, restored := range session.hits {
-				if session.fromSystemCache[hit] {
-					continue
-				}
-				decoded, decodeError := decodedStoredEntry(test, session.caching.Store, session.known, hit,
+				decoded, decodeError := decodedStoredEntry(test, session.storeFor(hit), session.known, hit,
 					session.stored[hit])
 				if decodeError != nil || !bytes.Equal(decoded.bodyDigest, restored.bodyDigest) {
 					test.Fatalf("%s: decoded afresh to body %x (%v), the hit's %x", hit.ID, decoded.bodyDigest,
@@ -348,44 +345,6 @@ func TestTheHostsAnalysisWritesNothingOfASharedDecode(test *testing.T) {
 	}
 	if len(fresh) == 0 {
 		test.Fatal("the host hit nothing, so the memo shared nothing to write")
-	}
-}
-
-// The run's memo holds the bodies the host's session read from its store, never a decode from the system cache's
-// table (#qqyq61s), whose Withheld is renamed to the run's `GOROOT` after it: warm, the module's one package hits the
-// store and every standard-library package the table, and the memo holds the module's body alone.
-func TestTheRunsMemoHoldsNoDecodeFromTheSystemCachesTable(test *testing.T) {
-	test.Parallel()
-
-	directory := standardLibraryModule(test)
-	context := standardLibraryContext("check tests", goRootOf(test))
-	rules := throughRules()
-	system, _ := seededTable(test, directory, context, rules,
-		func(sessionRun, map[cache.Key]cache.StandardLibraryEntry) {
-			// The table as the run wrote it, whole.
-		})
-	caching := testCaching(test, rules)
-	caching.StandardLibrary = &StandardLibraryCaching{System: system, Context: context}
-	hostSessionWith(test, directory, caching, rules, nil)
-	warm, session := hostSessionWith(test, directory, caching, rules, nil)
-	host := warm.Host
-	if len(session.fromSystemCache) == 0 || len(session.hits) == len(session.fromSystemCache) {
-		test.Fatalf("want hits from the table and the store both, got %d hits, %d from the table", len(session.hits),
-			len(session.fromSystemCache))
-	}
-	fromStore := map[cache.Key]bool{}
-	for hit, restored := range session.hits {
-		if !session.fromSystemCache[hit] {
-			fromStore[cache.Key(restored.bodyDigest)] = true
-		}
-	}
-	held := map[cache.Key]bool{}
-	for digest := range host.bodies.byDigest {
-		held[digest] = true
-	}
-	if !maps.Equal(held, fromStore) {
-		test.Errorf("the run's memo holds %d bodies, want the %d of the store's hits alone", len(held),
-			len(fromStore))
 	}
 }
 

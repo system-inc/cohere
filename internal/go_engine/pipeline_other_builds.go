@@ -393,16 +393,10 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 // load.Caching.RecordReads takes it. Every package, when the host keeps its packages for extra builds
 // (keepsForBuilds), and when the run collects the standard library's entries for the release's table, which persists
 // each one's reads beside it (#pcv6eff), so a host restoring the package from the table keeps it for its builds as it
-// keeps a package it checked. A run that keeps a system cache and does neither records the standard library's alone
-// that its table did not restore, as the session judged them (check.CacheSession.RecordsReadsForTable): its table
-// takes no entry without them (check.standardLibraryEntryWhole), holds no other package, and never takes again what
-// it holds. A run that does none of these records nothing, since it would pay for reads nothing reads.
+// keeps a package it checked. A run that does neither records nothing, since it would pay for reads nothing reads.
 func (engine *pipeline) recordsReadsOf() func(*packages.Package) bool {
 	if engine.keepsForBuilds() || engine.request.standardLibrary.collected != nil {
 		return load.EveryPackage
-	}
-	if engine.systemCache.store != nil && engine.session != nil {
-		return engine.session.RecordsReadsForTable
 	}
 	return nil
 }
@@ -570,7 +564,6 @@ func (engine *pipeline) extraBuildRun(
 		if session.HasStore() {
 			caching.Listings = session
 		}
-		caching.RecordReads = extraBuildRecordsReads(session)
 	}
 	// The first load's count at its gate, which a reload's never replaces, as checkedFromSource's first round is the
 	// first load's: the gauge reads the gate's share beside the final one.
@@ -668,10 +661,6 @@ func (engine *pipeline) extraBuildRun(
 			Cache:          session,
 			Withheld:       over.Withheld,
 			Bodiless:       over.Bodiless,
-			// The standard library's reads, when the build keeps a system cache (extraBuildRecordsReads), walked in the
-			// load's slots below its work, for its table's entries.
-			Reads:     over.Reads,
-			WalkSlots: over.WalkSlots,
 			// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
 			ReleaseAnalyzed: true,
 			ReadFile:        engine.sourceReader(nil, over.Rewritten),
@@ -740,12 +729,7 @@ func (engine *pipeline) extraBuildRun(
 	run.said = compiledFiles(loaded.Packages, ours)
 	run.untouchedFiles = compiledFiles(loaded.Untouched, ours)
 	run.result = result
-	// The build writes its table of the system cache as it ends, its reads whole, with what it computed of the
-	// standard library beside what the table held, as the host writes its own once every build has ended.
-	if session != nil && session.HasCollected() {
-		session.PersistCollectedReads(wholeReads(result))
-		run.systemCacheWritten = engine.systemCache.write(session)
-	}
+	engine.systemCache.failedAt(session)
 	// The facts census reads the last load's facts, whose result stands, beside the host's (#0ghk7vj).
 	if run.judged != nil && run.dependence != nil {
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
@@ -763,22 +747,11 @@ func (engine *pipeline) extraBuildRun(
 	return run, nil
 }
 
-// extraBuildRecordsReads is which packages an extra build's load and lint record what each read of other packages, as
-// load.Caching.RecordReads takes it: the standard library's that its own table did not restore, as session judged
-// them (RecordsReadsForTable), in a build that keeps a system cache, so its own table takes the entries it computes
-// (check.standardLibraryEntryWhole) and a warm run restores them from it; none in a build that keeps none, which keeps
-// nothing for a build of its own.
-func extraBuildRecordsReads(session *check.CacheSession) func(*packages.Package) bool {
-	if !session.KeepsSystemCache() {
-		return nil
-	}
-	return session.RecordsReadsForTable
-}
-
-// extraBuildSystemCache is the system cache an extra build reads its table from and writes it to: the run's, but none
-// in a run judging each build's dependence. There the facts census compares each build's facts and answers with the
-// host's through the build's standard library's syntax, which a package restored from the build's own table does not
-// have, so such a build computes its standard library, as the census needs, and keeps none of it.
+// extraBuildSystemCache is the system cache an extra build reads its standard library from and writes it to: the
+// run's, but none in a run judging each build's dependence. There the facts census compares each build's facts and
+// answers with the host's through the build's standard library's syntax, which a package restored from the system
+// cache's store does not have, so such a build computes its standard library, as the census needs, and keeps it in
+// the project's store, as before the system cache.
 func (engine *pipeline) extraBuildSystemCache() *systemCache {
 	if engine.request.judgesDependence() {
 		return &systemCache{off: true}
@@ -873,7 +846,7 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.Untouched, record.Visited = len(fromHost.Untouched), fromHost.Visited
 			record.WrittenThrough = run.result.Cache.WrittenThrough
 			record.SystemCacheRestored = run.result.Cache.FromSystemCache
-			record.SystemCacheWritten = run.systemCacheWritten
+			record.SystemCacheWritten = run.result.Cache.SystemCacheWritten
 			record.SharedBodyHits = run.result.Cache.SharedBodyHits
 			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
 			record.DeclinedAtCheck = fromHost.DeclinedAtCheck

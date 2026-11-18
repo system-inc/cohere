@@ -147,8 +147,7 @@ func (session *CacheSession) holdAliasHits(reachable []*packages.Package) {
 		if _, hit := session.hits[current]; !hit {
 			return
 		}
-		if key, keyed := session.keys[current]; session.fromSystemCache[current] ||
-			keyed && session.stored[current] == key {
+		if key, keyed := session.keys[current]; keyed && session.stored[current] == key {
 			session.trusted[current] = true
 			return
 		}

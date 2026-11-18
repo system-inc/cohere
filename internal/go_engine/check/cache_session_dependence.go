@@ -166,7 +166,7 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	for _, each := range keyed {
 		_, hit := session.hits[each]
 		_, isFound := records.found[each]
-		if !hit || isFound || session.fromSystemCache[each] {
+		if !hit || isFound || session.restoredFromSystemCache(each) {
 			continue
 		}
 		if session.stored[each] != session.keys[each] {
@@ -186,7 +186,7 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 // store under either.
 func (session *CacheSession) recordKeyOf(keyed *packages.Package) (cache.Key, bool) {
 	stored, isStored := session.stored[keyed]
-	if session.restored(keyed) && isStored && !session.fromSystemCache[keyed] && stored != session.keys[keyed] {
+	if session.restored(keyed) && isStored && !session.restoredFromSystemCache(keyed) && stored != session.keys[keyed] {
 		return stored, true
 	}
 	return session.keys[keyed], false

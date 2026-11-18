@@ -79,24 +79,6 @@ func decodeStandardLibraryEntry(contents []byte) (standardLibraryEntry, error) {
 	return entry, nil
 }
 
-// cacheEntryOf is the cacheEntry a table's entry stands for, which a restore reads as it reads the store's.
-func cacheEntryOf(entry standardLibraryEntry) cacheEntry {
-	analyzers := make(map[string]storedAnalysis, len(entry.Analyzers))
-	for _, analysis := range entry.Analyzers {
-		analyzers[analysis.Slot] = analysis.Analysis
-	}
-	return cacheEntry{
-		Version:         entry.Version,
-		Analyzers:       analyzers,
-		Imports:         entry.Imports,
-		Withheld:        entry.Withheld,
-		Output:          entry.Output,
-		Answers:         entry.Answers,
-		Reads:           entry.Reads,
-		ReadsIncomplete: entry.ReadsIncomplete,
-	}
-}
-
 // StandardLibraryTableOf is the table that holds entries, a finished run's standard-library packages by their
 // standard-library keys (see StandardLibraryCaching's Collected), and says it holds variants, written for any machine
 // (standardLibraryTableWith), the release's: it holds nothing it did not compute. An entry that is not whole

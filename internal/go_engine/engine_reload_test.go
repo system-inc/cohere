@@ -44,13 +44,16 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 
 	root := copyFixture(test, filepath.Join("testdata", "reload-answer"))
 	inPart := map[string]bool{"example.com/reloadanswer/bottom": true, "example.com/reloadanswer/side": true}
-	cold := runEngineAnsweringInPart(test, root, standardLibrarySource{}, rules.All(), inPart)
+	// One system cache for every run, as a person's, so each run after the first restores the standard library the
+	// first wrote, and the counts below are of the module's packages alone.
+	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	cold := runEngineAnsweringInPart(test, root, systemCache, rules.All(), inPart)
 	if cold.counts.Reloads != 0 || cold.counts.Written == 0 {
 		test.Fatalf("want a cold run that wrote its entries and reloaded nothing, got %+v", cold.counts)
 	}
 
 	appendToTop(test, root, dropCalls)
-	edited := runCachedEngine(test, root)
+	edited := runEngineWith(test, root, systemCache, rules.All())
 	if strings.Count(edited.stream, `"rule":"cohere-go/SA4017"`) != 2 {
 		test.Fatalf("want SA4017's two findings, on the dropped calls to bottom.Double and side.Triple, got\n%s",
 			edited.stream)
@@ -65,7 +68,7 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 	}
 
 	appendToTop(test, root, "\n// Edited again, so top misses and asks again.\n")
-	stored := runCachedEngine(test, root)
+	stored := runEngineWith(test, root, systemCache, rules.All())
 	if stored.counts.Reloads != 0 || stored.counts.Missed != edited.counts.Missed-edited.counts.Reloads {
 		test.Fatalf("want the stored answers read with no reload and only top missed, edited %+v, again %+v",
 			edited.counts, stored.counts)

@@ -147,22 +147,16 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.write(finding)
 	}
 
-	// A run that collected the standard library's entries, for its system cache's table or the release's, persists each
-	// one's reads beside it once every type-read walk has ended, so the table carries them and a host restoring a
-	// package from it can keep it for its extra builds (#pcv6eff), and then writes the host's table, the extra builds
-	// having written theirs as each ended (extraBuildRun). A warm run collects nothing, and so never waits for the
-	// walks, which a run with no extra builds otherwise leaves running past its verdict.
-	hostWritten := 0
+	// A run that collected the standard library's entries for the release's table persists each one's reads beside it
+	// once every type-read walk has ended, so the table carries them and a host restoring a package from it can keep it
+	// for its extra builds (#pcv6eff). A run that collected none never waits for the walks, which a run with no extra
+	// builds otherwise leaves running past its verdict.
 	if engine.session != nil && engine.session.HasCollected() {
 		engine.session.PersistCollectedReads(wholeReads(pass.result))
-		hostWritten = engine.systemCache.write(engine.session)
 	}
-	// The host's build record was made with the merge, before its table was written.
-	if verdict != nil && len(verdict.records) > 0 {
-		verdict.records[0].SystemCacheWritten = hostWritten
-	}
-	// Every build has read and written its table of the system cache by now, so a trim takes none from under a build
-	// of this run. A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it
+	engine.systemCache.failedAt(engine.session)
+	// Every build has read and written the system cache's store by now, so a trim takes nothing from under a build of
+	// this run. A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it
 	// did not keep.
 	systemCacheNotKept := ""
 	if engine.timing == nil {
@@ -193,7 +187,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		Problems:        len(result.Cache.Problems),
 		WriteFailed:     result.Cache.WriteFailed,
 
-		SystemCacheWritten: hostWritten,
+		SystemCacheWritten: result.Cache.SystemCacheWritten,
 		SystemCacheOff:     engine.systemCache.off,
 		SystemCacheNotKept: systemCacheNotKept,
 	}
@@ -232,7 +226,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				record.Cache.Problems += len(run.result.Cache.Problems)
 				record.Cache.WriteFailed += run.result.Cache.WriteFailed
 				record.Cache.FromSystemCache += run.result.Cache.FromSystemCache
-				record.Cache.SystemCacheWritten += run.systemCacheWritten
+				record.Cache.SystemCacheWritten += run.result.Cache.SystemCacheWritten
 			}
 		}
 		record.BuildsAtOnce = engine.buildsAtOnce
@@ -416,8 +410,8 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // builds and theirs restore from them (#b2t9xmf); under `--timing` it gets none, so nothing is restored from the host.
 // files must be of the files as they are on disk when the load runs (see extraBuildRun). Why the cache sat out is
 // noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns). system is the
-// system cache the build reads its table from and writes it to: the run's, or none for an extra build that must
-// compute its own standard library (extraBuildSystemCache).
+// system cache the build reads its standard library from and writes it to under its own keys: the run's, or none for
+// an extra build that must compute its own standard library (extraBuildSystemCache).
 func (engine *pipeline) cacheSession(
 	environment []string,
 	goEnvironment *load.GoEnvironment,

@@ -1,9 +1,7 @@
 package go_engine
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/gob"
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -14,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
@@ -111,40 +108,31 @@ func systemCacheListing(test *testing.T, root string) map[string]string {
 	return listing
 }
 
-// tableFileOf is the file reading's system cache keeps the table of context in, as the store names it.
-func tableFileOf(reading standardLibrarySource, context cache.StandardLibraryContext) string {
-	name := cache.StandardLibraryTableKey(context).String()
-	return filepath.Join(standardLibraryTablesDirectory(reading.systemCacheRoot), name[:2], name)
-}
-
-// A plain run, its standard library the zero source, reads the system cache `$COHERE_SYSTEM_CACHE` names: a table a
-// session of the same engine collected, put there under its build context's key, restores every standard-library
-// package, cached and under `--no-cache` alike, and the records are those of a run without the system cache.
+// A plain run, its standard library the zero source, reads and writes the system cache `$COHERE_SYSTEM_CACHE` names:
+// a cold run under `--no-cache` writes there every standard-library package it computes, keyed by the engine's own
+// identity, and every later run restores each one, cached and under `--no-cache` alike, the records those of a run
+// without the system cache.
 //
 // Not parallel: it sets `COHERE_SYSTEM_CACHE`, which test.Setenv refuses beside parallel tests.
 func TestARunRestoresTheStandardLibraryFromTheSystemCacheItNames(test *testing.T) {
-	table, collected, context := standardLibraryTableOf(test, rules.All(), "", nil)
-	identity, identityError := cache.ExecutableIdentity()
-	if identityError != nil {
-		test.Fatal(identityError)
-	}
-	if context.EngineIdentity != identity {
-		test.Fatalf("want the table keyed by the engine's identity %s, got %s", identity, context.EngineIdentity)
-	}
 	systemCache := test.TempDir()
-	if putError := cache.OpenAt(standardLibraryTablesDirectory(systemCache)).Put(
-		cache.StandardLibraryTableKey(context), table); putError != nil {
-		test.Fatal(putError)
-	}
 	test.Setenv("COHERE_SYSTEM_CACHE", systemCache)
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
-	// Under `--no-cache` first, which makes no store, so the cached run after it is cold.
+	cold := runCachedEngine(test, root, "--no-cache")
+	if cold.counts.FromSystemCache != 0 || cold.counts.SystemCacheWritten == 0 {
+		test.Fatalf("want the cold run to write the standard library to the system cache it names, got %+v",
+			cold.counts)
+	}
+	if listing := systemCacheListing(test, systemStoreDirectory(systemCache)); len(listing) == 0 {
+		test.Fatal("want the entries under the system cache's store")
+	}
+	// Under `--no-cache` first, which makes no store, so the cached run after it is cold for the project.
 	for _, extra := range [][]string{{"--no-cache"}, {}} {
 		read := runCachedEngine(test, root, extra...)
-		if read.counts.FromSystemCache != len(collected) || read.counts.SystemCacheNotKept != "" {
+		if read.counts.FromSystemCache != cold.counts.SystemCacheWritten || read.counts.SystemCacheNotKept != "" {
 			test.Errorf("%v: want all %d standard-library packages from the system cache it names, got %+v", extra,
-				len(collected), read.counts)
+				cold.counts.SystemCacheWritten, read.counts)
 		}
 		if read.withoutCounts != plain.withoutCounts {
 			test.Errorf("%v: from the system cache\n%s\nwithout it\n%s", extra, read.withoutCounts,
@@ -154,16 +142,16 @@ func TestARunRestoresTheStandardLibraryFromTheSystemCacheItNames(test *testing.T
 }
 
 // `--no-cache` turns off the project's store and nothing else: the run still reads the system cache, restoring every
-// standard-library package from its table, and makes no store in the project.
+// standard-library package from its store, and makes no store in the project.
 func TestNoCacheStillReadsTheSystemCache(test *testing.T) {
 	test.Parallel()
 
-	table, collected, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
-	read := runEngineWith(test, root, readingTable(test, table, context), rules.All(), "--no-cache")
-	if read.counts.On || read.counts.FromSystemCache != len(collected) {
+	read := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	if read.counts.On || read.counts.FromSystemCache != written {
 		test.Errorf("want the store off and all %d standard-library packages from the system cache, got %+v",
-			len(collected), read.counts)
+			written, read.counts)
 	}
 	if _, statError := os.Stat(filepath.Join(root, ".cache")); !os.IsNotExist(statError) {
 		test.Errorf("want no store made under --no-cache, got %v", statError)
@@ -171,64 +159,37 @@ func TestNoCacheStillReadsTheSystemCache(test *testing.T) {
 }
 
 // `--no-system-cache` neither reads nor writes the system cache: a run under it over a system cache holding the
-// fixture's table, an hour and more old so a read would mark it used, and due a trim, restores nothing from it, and
-// leaves every file of it as it was, the table's time and the absent trim record among them. Its records are those of
-// a run reading the table.
+// fixture's standard library, every file an hour and more old so a read would mark it used, and due a trim, restores
+// nothing from it, and leaves every file of it as it was, the times and the absent trim record among them. Its
+// records are those of a run reading the system cache.
 func TestNoSystemCacheLeavesTheSystemCacheAsItWas(test *testing.T) {
 	test.Parallel()
 
-	table, collected, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
-	reading := readingTable(test, table, context)
+	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	aged := time.Now().Add(-2 * time.Hour)
-	if timesError := os.Chtimes(tableFileOf(reading, context), aged, aged); timesError != nil {
-		test.Fatal(timesError)
+	for path := range systemCacheListing(test, reading.systemCacheRoot) {
+		if timesError := os.Chtimes(path, aged, aged); timesError != nil {
+			test.Fatal(timesError)
+		}
+	}
+	if removeError := os.Remove(filepath.Join(reading.systemCacheRoot, "trim.txt")); removeError != nil &&
+		!errors.Is(removeError, fs.ErrNotExist) {
+		test.Fatal(removeError)
 	}
 	before := systemCacheListing(test, reading.systemCacheRoot)
 	root := copyFixture(test, standardLibraryFixture)
 	off := runEngineWith(test, root, reading, rules.All(), "--no-cache", "--no-system-cache")
-	if off.counts.FromSystemCache != 0 || off.counts.SystemCacheNotKept != "" {
-		test.Errorf("want nothing from the system cache under --no-system-cache, got %+v", off.counts)
+	if off.counts.FromSystemCache != 0 || off.counts.SystemCacheWritten != 0 || off.counts.SystemCacheNotKept != "" {
+		test.Errorf("want nothing from or to the system cache under --no-system-cache, got %+v", off.counts)
 	}
 	after := systemCacheListing(test, reading.systemCacheRoot)
 	if len(after) != len(before) || !equalEntries(before, after) {
 		test.Errorf("want the system cache as it was under --no-system-cache, before %v, after %v", before, after)
 	}
 	on := runEngineWith(test, root, reading, rules.All(), "--no-cache")
-	if on.counts.FromSystemCache != len(collected) || on.withoutCounts != off.withoutCounts {
+	if on.counts.FromSystemCache != written || on.withoutCounts != off.withoutCounts {
 		test.Errorf("want all %d packages from the system cache without the switch, and the same records, got %+v\n"+
-			"%s\nunder the switch\n%s", len(collected), on.counts, on.withoutCounts, off.withoutCounts)
-	}
-}
-
-// A table damaged in the system cache, one byte of its file changed, is a problem the run names on stderr and counts,
-// never an error: every standard-library package is computed, the exit is the plain run's, and so is every record but
-// the cache's counts.
-func TestADamagedSystemCacheTableIsComputedAndNamed(test *testing.T) {
-	test.Parallel()
-
-	table, _, context := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
-	reading := readingTable(test, table, context)
-	file := tableFileOf(reading, context)
-	contents, readError := os.ReadFile(file)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	contents[len(contents)/2]++
-	if writeError := os.WriteFile(file, contents, 0o644); writeError != nil {
-		test.Fatal(writeError)
-	}
-	root := copyFixture(test, standardLibraryFixture)
-	plain := runEngineWith(test, root, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
-	damaged, standardError := runEngineNoting(test, root, reading, rules.All(), nil, "--no-cache")
-	if damaged.counts.FromSystemCache != 0 || damaged.counts.Problems != 1 {
-		test.Errorf("want nothing from the damaged table and one problem counted, got %+v", damaged.counts)
-	}
-	if !strings.Contains(standardError, "damaged") {
-		test.Errorf("want the damaged table named on stderr, got %q", standardError)
-	}
-	if damaged.withoutCounts != plain.withoutCounts {
-		test.Errorf("beside a damaged table\n%s\nwithout the system cache\n%s", damaged.withoutCounts,
-			plain.withoutCounts)
+			"%s\nunder the switch\n%s", written, on.counts, on.withoutCounts, off.withoutCounts)
 	}
 }
 
@@ -265,46 +226,23 @@ func TestAnUnusableSystemCacheRootIsNotKept(test *testing.T) {
 	}
 }
 
-// tableIn is the one table the system cache at root holds, failing unless it holds exactly one, as a run over a fixture
-// with no other build writes.
-func tableIn(test *testing.T, root string) *cache.StandardLibraryTable {
-	test.Helper()
-	var tables []string
-	for path := range systemCacheListing(test, standardLibraryTablesDirectory(root)) {
-		tables = append(tables, path)
-	}
-	if len(tables) != 1 {
-		test.Fatalf("want one table in the test's system cache, got %v", tables)
-	}
-	contents, readError := os.ReadFile(tables[0])
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	// The store's file holds the table after the sha256 of it (cache.Store).
-	return cache.NewStandardLibraryTable(contents[sha256.Size:])
-}
-
-// A cold run keeping a system cache writes the table of what it computed of the standard library, whole, and a warm
-// run restores every package of it, its records those of a run without the system cache: the warm run computes no
-// standard-library package the cold one computed whole, and finds what it would have found computing them.
-func TestAColdRunWritesTheTableAWarmRunRestoresWhole(test *testing.T) {
+// A cold run keeping a system cache writes there every standard-library package it computes, and a warm run restores
+// every one of them, its records those of a run without the system cache: the warm run computes no standard-library
+// package the cold one wrote, and finds what it would have found computing them.
+func TestAColdRunWritesTheSystemCacheAWarmRunRestoresIt(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, standardLibraryFixture)
 	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
 	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
 	cold := runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
-	if cold.counts.FromSystemCache != 0 {
-		test.Fatalf("want the cold run to restore nothing, got %+v", cold.counts)
-	}
-	table := tableIn(test, systemCache.systemCacheRoot)
-	if problem := table.Problem(); problem != nil || len(table.Keys()) == 0 {
-		test.Fatalf("want the cold run's table whole and holding its standard library, got %d keys (%v)",
-			len(table.Keys()), problem)
+	if cold.counts.FromSystemCache != 0 || cold.counts.SystemCacheWritten == 0 {
+		test.Fatalf("want the cold run to restore nothing and write the standard library, got %+v", cold.counts)
 	}
 	warm := runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
-	if warm.counts.FromSystemCache != len(table.Keys()) {
-		test.Errorf("want every one of the table's %d packages restored warm, got %+v", len(table.Keys()), warm.counts)
+	if warm.counts.FromSystemCache != cold.counts.SystemCacheWritten || warm.counts.SystemCacheWritten != 0 {
+		test.Errorf("want every one of the %d packages written cold restored warm, and none written, got %+v",
+			cold.counts.SystemCacheWritten, warm.counts)
 	}
 	for name, ran := range map[string]cachedRun{"cold": cold, "warm": warm} {
 		if ran.withoutCounts != plain.withoutCounts {
@@ -313,9 +251,9 @@ func TestAColdRunWritesTheTableAWarmRunRestoresWhole(test *testing.T) {
 	}
 }
 
-// A warm run, which restores every standard-library package it reaches from the table and computes none it could
-// add, writes nothing to the system cache: every file of it keeps its bytes and its time, the table's and the trim's
-// record's alike, the table read too recently to be marked used again (cache.Store.MarkUsed).
+// A warm run, which restores every standard-library package it reaches from the system cache and computes none,
+// writes nothing to it: every file of it keeps its bytes and its time, the entries' and the trim's record's alike,
+// each read too recently to be marked used again (cache.Store.MarkUsed).
 func TestAWarmRunWritesNothingToTheSystemCache(test *testing.T) {
 	test.Parallel()
 
@@ -335,48 +273,10 @@ func TestAWarmRunWritesNothingToTheSystemCache(test *testing.T) {
 	}
 }
 
-// A warm extra build hits in its own store the standard-library packages it checked cold only for the types of a
-// package above them restored from the host's run, where no fact analyzer's action reached them: the system cache's
-// table refuses such a short entry (check.standardLibraryEntryWhole), and the store takes it, as it took every
-// standard-library entry before the system cache. The host's table is the generator's, some of whose entries carry no
-// persisted reads, so the build declines those from the host and checks them, and what they import, from source. Over
-// the fixture with a file only another target compiles, the run after a cold one, with that file edited so library
-// misses in the build, checks library alone from source there, where a store that refused the short entries too would
-// have the build check them from source again every run: 11 of them on darwin, beside library.
-func TestAWarmExtraBuildHitsItsShortStandardLibraryEntriesInItsOwnStore(test *testing.T) {
-	test.Parallel()
-
-	root := copyFixture(test, standardLibraryFixture)
-	other := map[bool]string{true: "freebsd", false: "linux"}[runtime.GOOS == "linux"]
-	otherFile := filepath.Join(root, "library_"+other+".go")
-	if writeError := os.WriteFile(otherFile, []byte("package library\n"), 0o644); writeError != nil {
-		test.Fatal(writeError)
-	}
-	systemCache := generatedTableReading(test, localTable(test))
-	cold := extraBuildRecords(test, runEngineWith(test, root, systemCache, rules.All(), "--other-builds").stream)
-	if writeError := os.WriteFile(otherFile, []byte("// Package library is edited.\npackage library\n"),
-		0o644); writeError != nil {
-		test.Fatal(writeError)
-	}
-	warm := extraBuildRecords(test, runEngineWith(test, root, systemCache, rules.All(), "--other-builds").stream)
-	if len(warm) == 0 || len(warm) != len(cold) {
-		test.Fatalf("want the warm run to run the cold run's %d extra builds, got %d", len(cold), len(warm))
-	}
-	for index, build := range warm {
-		if cold[index].CheckedFromSource <= 1 {
-			test.Fatalf("%s checked %d packages from source cold, so the warm run tells nothing", build.Target,
-				cold[index].CheckedFromSource)
-		}
-		if build.CheckedFromSource != 1 || len(build.CheckedFromSourceRounds) > 0 {
-			test.Errorf("%s checked %d packages from source warm over the rounds %v, of %d cold, want library alone",
-				build.Target, build.CheckedFromSource, build.CheckedFromSourceRounds, cold[index].CheckedFromSource)
-		}
-	}
-}
-
 // Every build's record says what the system cache did for it, and the lint record sums them (#syscache): over a
-// fixture with a file only another target compiles, a cold run's host build writes its table and restores nothing, a
-// warm run's host restores every package it wrote and writes nothing, the lint record's counts are the builds' summed,
+// fixture with a file only another target compiles, a cold run's host build writes the standard library to it and
+// restores nothing, a warm run's host restores every package it wrote and writes nothing, the lint record's counts are
+// the builds' summed,
 // and a run under `--no-system-cache` says the system cache was off and counts nothing of it.
 func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 	test.Parallel()
@@ -398,7 +298,7 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
 		"--other-builds").stream)
 	if len(cold.Builds) < 2 || cold.Builds[0].SystemCacheWritten == 0 || cold.Builds[0].SystemCacheRestored != 0 {
-		test.Fatalf("want the cold host to write its table and restore nothing, got %+v", cold.Builds)
+		test.Fatalf("want the cold host to write to the system cache and restore nothing, got %+v", cold.Builds)
 	}
 	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
 		"--other-builds").stream)
@@ -424,34 +324,13 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 	}
 }
 
-// A run with no extra builds records what each package read of others when it keeps a system cache, so every entry
-// its table takes carries its persisted reads, as the release's generator writes them: over the standard library
-// fixture, none of whose packages reads what no record can hold, every entry of the cold run's table has its reads.
-// A table written by such a run without them would have every later run's extra builds decline those packages from
-// the host as unpersisted, for good, since an entry the table holds is never written again.
-func TestAHostOnlyRunWritesEveryEntryWithItsReads(test *testing.T) {
-	test.Parallel()
-
-	root := copyFixture(test, standardLibraryFixture)
-	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
-	table := tableIn(test, systemCache.systemCacheRoot)
-	if len(table.Keys()) == 0 {
-		test.Fatal("want the run's table to hold the standard library")
-	}
-	for _, key := range table.Keys() {
-		// Ignored: the key is one of the table's own.
-		if entry, _ := table.Lookup(key); entry.Reads == nil {
-			test.Errorf("the table holds an entry under %s with no persisted reads", key)
-		}
-	}
-}
-
-// A warm run over a system cache with an extra build of another target restores that build's standard library from its
-// own context's table and declines no package of it at the check (#syscache): over the fixture with a file only another
-// target compiles, a cold run under `--no-cache` writes the host's table and the build's, and the warm run's build
-// restores from its own table and declines nothing, so it loads no second round.
-func TestAWarmExtraBuildRestoresItsStandardLibraryFromItsOwnTable(test *testing.T) {
+// A warm extra build of another target restores from the system cache's store every standard-library package it
+// computed or wrote through from the host's run cold, under its own context's keys, and checks none of them from source
+// (#syscache's must): over the fixture with a file only another target compiles, a cold run under `--no-cache` has the
+// build write its standard library to the system cache, and the warm run's build restores all of it, checks the
+// module's own package alone from source, declines nothing at the check and loads no second round. A build whose
+// standard-library writes went nowhere, or to a project's store, would check them from source again.
+func TestAWarmExtraBuildRestoresTheStandardLibraryItWroteFromTheSystemCache(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, standardLibraryFixture)
@@ -471,53 +350,14 @@ func TestAWarmExtraBuildRestoresItsStandardLibraryFromItsOwnTable(test *testing.
 	for index, build := range warm.Builds[1:] {
 		coldBuild := cold.Builds[index+1]
 		if coldBuild.SystemCacheWritten == 0 {
-			test.Errorf("%s wrote no table of its own cold, %+v", coldBuild.Target, coldBuild)
+			test.Errorf("%s wrote nothing to the system cache cold, %+v", coldBuild.Target, coldBuild)
 		}
-		if build.SystemCacheRestored == 0 || build.DeclinedAtCheck != 0 || build.ReloadRounds != 0 {
-			test.Errorf("%s warm restored %d from its own table and declined %d at the check over %d reloads, "+
-				"want its own table restored from and nothing declined: %+v", build.Target,
-				build.SystemCacheRestored, build.DeclinedAtCheck, build.ReloadRounds, build)
+		if build.SystemCacheRestored != coldBuild.SystemCacheWritten || build.CheckedFromSource != 1 ||
+			build.DeclinedAtCheck != 0 || build.ReloadRounds != 0 {
+			test.Errorf("%s warm restored %d of the %d it wrote cold, checked %d from source, declined %d at the "+
+				"check over %d reloads, want all restored, the module's package alone checked and nothing declined: "+
+				"%+v", build.Target, build.SystemCacheRestored, coldBuild.SystemCacheWritten, build.CheckedFromSource,
+				build.DeclinedAtCheck, build.ReloadRounds, build)
 		}
-	}
-}
-
-// tableEntryReads is what a test reads of a table entry's answer reads, by the field names check's
-// standardLibraryEntry encodes them under, which gob matches by name: whether one could not be named, and each read's
-// owner.
-type tableEntryReads struct {
-	PackagePath     string
-	ReadsIncomplete bool
-	Reads           []struct{ Owner string }
-}
-
-// A run under `--no-cache`, whose lint runs beside the load and keys no package but the standard library's, names the
-// owner of every answer its standard-library packages read (check's readsOf), so its table holds no entry with reads it
-// could not name: such an entry would have every extra build decline it, and what imports it, at the check, and load
-// again, for as long as the table holds it. Over the fixture, 36 of the table's 78 entries read answers of others.
-func TestANoCacheRunsTableNamesEveryAnswerItsEntriesRead(test *testing.T) {
-	test.Parallel()
-
-	root := copyFixture(test, standardLibraryFixture)
-	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
-	table := tableIn(test, systemCache.systemCacheRoot)
-	withReads := 0
-	for _, key := range table.Keys() {
-		// Ignored: the key is one of the table's own.
-		entry, _ := table.Lookup(key)
-		var decoded tableEntryReads
-		if decodeError := gob.NewDecoder(bytes.NewReader(entry.Entry)).Decode(&decoded); decodeError != nil {
-			test.Fatal(decodeError)
-		}
-		if decoded.ReadsIncomplete {
-			test.Errorf("the table holds %s with answer reads it could not name", decoded.PackagePath)
-		}
-		if len(decoded.Reads) > 0 {
-			withReads++
-		}
-	}
-	if withReads == 0 {
-		test.Errorf("no entry of the table's %d read an answer of another package, so the run tells nothing",
-			len(table.Keys()))
 	}
 }
