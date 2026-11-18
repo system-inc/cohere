@@ -475,6 +475,23 @@ func TestAnEveryBuildNightReplacesAHostBuildBaseline(test *testing.T) {
 		test.Errorf("the baseline moves on record are %q", moves)
 	}
 
+	// From here the every-build baseline guards as any baseline does: a quiet night past the threshold is refused as
+	// regressed and moves nothing, and one within it passes against that baseline, again moving nothing.
+	slower := writeEveryBuildRecord(test, records, "every-slower.json", 8.4, true)
+	if exit, printed, said := runGuard("-state", state, "-tonight", slower); exit != regressedExit {
+		test.Errorf("a night of every build 20%% slower than the every-build baseline exited %d, want %d:\n%s%s",
+			exit, regressedExit, printed, said)
+	}
+	within := judged(writeEveryBuildRecord(test, records, "every-within.json", 7.2, true))
+	if within.Verdict != bench_results.GuardVerdictPass || within.Reason == everyBuildBaselineReason ||
+		within.BaselineMedianSeconds != 7 {
+		test.Errorf("a night of every build within the threshold printed %+v, want a pass against the baseline of 7s",
+			within)
+	}
+	if moves := lines(test, filepath.Join(state, "baselines-ahra.jsonl")); len(moves) != 2 {
+		test.Errorf("the guarded nights moved the baseline: the moves on record are %q", moves)
+	}
+
 	hostAgain := writeCheckingRecord(test, records, "host-again.json", 4, true)
 	exit, _, said := runGuard("-state", state, "-tonight", hostAgain)
 	if exit != 1 || !strings.Contains(said, "runs of different builds are never compared") {
