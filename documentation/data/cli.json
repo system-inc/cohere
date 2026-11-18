@@ -75,6 +75,10 @@
             "usage": "leave formatting out of a bare run, --fix or --no-fix: fix, type-check and lint only"
         },
         {
+            "name": "no-system-cache",
+            "usage": "in a Go project, neither read nor write the Go engine's system cache, the standard library's entries it keeps in the user's cache directory for every project, so the standard library is computed; changes nothing in TypeScript and Swift projects yet"
+        },
+        {
             "name": "open",
             "usage": "open files with remaining findings in code after the run (composes with --types and --lint)"
         },
