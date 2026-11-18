@@ -34,6 +34,48 @@ type flowAnalysis struct {
 	reached []*foreignMethods
 	// paired is the buffer valuesOf pairs values in, reused by every assignment, var declaration and return.
 	paired []flowingValue
+	// leadingFixed is how many candidates, from the first, allFixed has found fixed. A candidate once fixed stays
+	// fixed, so they are never asked about again.
+	leadingFixed int
+}
+
+// recordUntilFixed records the flows of the package under root, the files holding a candidate first and then the
+// rest, a top-level declaration at a time, until every candidate is fixed or every flow is recorded.
+func (flows *flowAnalysis) recordUntilFixed(root inspector.Cursor, candidates []candidate) {
+	for _, holdingCandidate := range []bool{true, false} {
+		for file := range root.Children() {
+			if holdsCandidate(file.Node(), candidates) != holdingCandidate {
+				continue
+			}
+			for declaration := range file.Children() {
+				if flows.allFixed(candidates) {
+					return
+				}
+				for cursor := range declaration.Preorder(handingKinds...) {
+					flows.record(cursor)
+				}
+			}
+		}
+	}
+}
+
+// holdsCandidate is whether any of candidates is written in file.
+func holdsCandidate(file ast.Node, candidates []candidate) bool {
+	for _, found := range candidates {
+		if file.Pos() <= found.node.Pos() && found.node.End() <= file.End() {
+			return true
+		}
+	}
+	return false
+}
+
+// allFixed is whether every candidate has a declaration fixed by the flows recorded so far or by a method, before
+// settle has spread them.
+func (flows *flowAnalysis) allFixed(candidates []candidate) bool {
+	for flows.leadingFixed < len(candidates) && flows.anyFixed(candidates[flows.leadingFixed].declarations) {
+		flows.leadingFixed++
+	}
+	return flows.leadingFixed == len(candidates)
 }
 
 // record notes every place the node at cursor hands a value on.
@@ -577,10 +619,25 @@ func (flows *flowAnalysis) signatureOwning(functionType *ast.FuncType, above []a
 	return nil
 }
 
-// settle finishes the analysis once every flow is recorded: a place fixing a defined variable fixes what it was
-// defined from, a method matching another package's is fixed, a fixed function's parameters and results hold what
-// that fixing hands them, and a declaration fed by a fixed one takes its type.
-func (flows *flowAnalysis) settle(candidates []candidate) {
+// matchMethods decides, for each method among the candidates' declarations, whether its signature matches a method
+// of another package, which fixes it. The answer reads no flow, so it is decided before any is recorded.
+func (flows *flowAnalysis) matchMethods(candidates []candidate) {
+	flows.methodFixed = map[*types.Func]bool{}
+	for _, found := range candidates {
+		for _, key := range found.declarations {
+			if method, isMethod := key.object.(*types.Func); isMethod && method.Signature().Recv() != nil {
+				if _, decided := flows.methodFixed[method]; !decided {
+					flows.methodFixed[method] = flows.matchesForeignMethod(method)
+				}
+			}
+		}
+	}
+}
+
+// settle finishes the analysis once the flows are recorded and the methods matched: a place fixing a defined variable
+// fixes what it was defined from, a fixed function's parameters and results hold what that fixing hands them, and a
+// declaration fed by a fixed one takes its type.
+func (flows *flowAnalysis) settle() {
 	// Each walk starts from the keys marked fixed, by their value rather than their presence in the map, so an entry
 	// ever written false could not spread.
 	pending := []flowKey{}
@@ -596,16 +653,6 @@ func (flows *flowAnalysis) settle(candidates []candidate) {
 			if !flows.sinkFixed[from] {
 				flows.sinkFixed[from] = true
 				pending = append(pending, from)
-			}
-		}
-	}
-	flows.methodFixed = map[*types.Func]bool{}
-	for _, found := range candidates {
-		for _, key := range found.declarations {
-			if method, isMethod := key.object.(*types.Func); isMethod && method.Signature().Recv() != nil {
-				if _, decided := flows.methodFixed[method]; !decided {
-					flows.methodFixed[method] = flows.matchesForeignMethod(method)
-				}
 			}
 		}
 	}
