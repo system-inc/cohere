@@ -361,3 +361,74 @@ func TestAWarmExtraBuildRestoresTheStandardLibraryItWroteFromTheSystemCache(test
 		}
 	}
 }
+
+// A run marks every system cache file it reads used, so the trim, which deletes what has gone unread for days, keeps
+// what runs read every day: over a system cache filled by a cold run, its files made two hours old, a warm run that
+// restores the whole standard library from it leaves every file of its store newer than that.
+func TestAWarmRunMarksTheSystemCacheItReadsUsed(test *testing.T) {
+	test.Parallel()
+
+	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	store := systemStoreDirectory(reading.systemCacheRoot)
+	aged := time.Now().Add(-2 * time.Hour)
+	for path := range systemCacheListing(test, store) {
+		if timesError := os.Chtimes(path, aged, aged); timesError != nil {
+			test.Fatal(timesError)
+		}
+	}
+	warm := runEngineWith(test, copyFixture(test, standardLibraryFixture), reading, rules.All(), "--no-cache")
+	if warm.counts.FromSystemCache != written {
+		test.Fatalf("want all %d packages restored from the system cache, got %+v", written, warm.counts)
+	}
+	for path := range systemCacheListing(test, store) {
+		information, statError := os.Stat(path)
+		if statError != nil {
+			test.Fatal(statError)
+		}
+		if !information.ModTime().After(aged) {
+			test.Errorf("%s was read and left unmarked, so a trim would take it", path)
+		}
+	}
+}
+
+// A write to the system cache's store that fails is why the run says it could not keep the system cache, never an
+// error and never the project's problem: over a system cache whose store cannot be written, and whose trim is not due,
+// so it gives no reason of its own, a cold run under `--no-cache` says the system cache was not kept, once, and exits
+// as a run without it does.
+func TestAFailedSystemCacheWriteIsWhyItWasNotKept(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := systemStoreDirectory(root)
+	if makeError := os.MkdirAll(store, 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	// Trimmed a moment ago, so the trim is not due and says nothing.
+	if writeError := os.WriteFile(filepath.Join(root, "trim.txt"), []byte(strconv.FormatInt(time.Now().Unix(), 10)),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	if modeError := os.Chmod(store, 0o500); modeError != nil {
+		test.Fatal(modeError)
+	}
+	test.Cleanup(func() {
+		// Ignored: the directory goes with the test's own, which a failure here only leaves behind.
+		_ = os.Chmod(store, 0o755)
+	})
+	project := copyFixture(test, standardLibraryFixture)
+	plain := runEngineWith(test, project, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
+	unwritable, standardError := runEngineNoting(test, project, standardLibrarySource{systemCacheRoot: root},
+		rules.All(), nil, "--no-cache")
+	if reason := unwritable.counts.SystemCacheNotKept; reason == "" || unwritable.counts.SystemCacheWritten != 0 ||
+		unwritable.counts.Problems != 0 {
+		test.Errorf("want the failed write as why the system cache was not kept, nothing written and no problem, "+
+			"got %+v", unwritable.counts)
+	}
+	if strings.Count(standardError, "the system cache was not kept") != 1 {
+		test.Errorf("want stderr to say once that the system cache was not kept, got %q", standardError)
+	}
+	if unwritable.exitCode != plain.exitCode || unwritable.withoutCounts != plain.withoutCounts {
+		test.Errorf("over an unwritable store the run exited %d, want %d, or its records differ:\n%s\nplain\n%s",
+			unwritable.exitCode, plain.exitCode, unwritable.withoutCounts, plain.withoutCounts)
+	}
+}

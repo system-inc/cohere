@@ -17,7 +17,7 @@ import (
 )
 
 // standardLibrarySource is where a run's standard-library entries come from and go, the zero value a plain run's:
-// the system cache, its tables keyed by the executable's identity (see systemCache). stamp, when not empty, stands for
+// the system cache, its entries keyed by the executable's identity (see systemCache). stamp, when not empty, stands for
 // that identity in every standard-library key, as the release's generator keys the table it builds before the
 // executable it ships in exists. collected, when it is not nil, gains the standard-library entries a cached run saves
 // (see check.StandardLibraryCaching), for a test, or the release, to write a table from.
@@ -34,21 +34,20 @@ type standardLibrarySource struct {
 	systemCacheRoot string
 }
 
-// lintCache is the per-package findings cache the lint phase reads and writes, at the root's `.cache/cohere/go`,
-// beside the front door's own cache in `.cache/cohere`, with the standard library's table of the build's context read
-// from the system cache, system, when the run keeps one (#syscache). Under `--no-cache` it reads and writes no store:
-// it is nil, or, when the run keeps a system cache, a Caching with the system cache alone, since the standard
-// library's entries are of cohere and the Go installation and nothing of the project's tree. Under
-// `--no-system-cache` the standard library is keyed and stored as any other package, as it is when the run keeps no
-// system cache. A run judging each build's dependence reads the system cache as any other run does: the standard
-// library it restores is judged on a graph of its own (buildDependenceGraph, #ss4t5g6). It is nil with an error when
-// what every key shares cannot be read, which the run says on stderr and runs without it. environment is what the
-// load the cache serves runs under, the workspace's own for the host's build and with an extra build's target after
-// it for that build, and goEnvironment is go env's answer the load reads there, so the build context every key shares
-// is the one of the build the load is of, read from the go env the load asked rather than from one of its own
-// (#4rpt1jh), and so each build reads its own context's table. goEnvironment is nil only for a host whose census
-// judged no file, which asked go env nothing; then it is read here, recorded in children, the run's account of the go
-// commands it starts (see load.Children).
+// lintCache is the per-package findings cache the lint phase reads and writes, at the root's `.cache/cohere/go`, beside
+// the front door's own cache in `.cache/cohere`, with the standard library's entries in the system cache's store,
+// system, when the run keeps one (#syscache). Under `--no-cache` it reads and writes no store: it is nil, or, when the
+// run keeps a system cache, a Caching with the system cache alone, since the standard library's entries are of cohere
+// and the Go installation and nothing of the project's tree. Under `--no-system-cache` the standard library is keyed
+// and stored as any other package, as it is when the run keeps no system cache. A run judging each build's dependence
+// reads the system cache as any other run does: the standard library it restores is judged on a graph of its own
+// (buildDependenceGraph, #ss4t5g6). It is nil with an error when what every key shares cannot be read, which the run
+// says on stderr and runs without it. environment is what the load the cache serves runs under, the workspace's own for
+// the host's build and with an extra build's target after it for that build, and goEnvironment is go env's answer the
+// load reads there, so the build context every key shares is the one of the build the load is of, read from the go env
+// the load asked rather than from one of its own (#4rpt1jh), and so each build reads its own context's standard-library
+// entries. goEnvironment is nil only for a host whose census judged no file, which asked go env nothing; then it is
+// read here, recorded in children, the run's account of the go commands it starts (see load.Children).
 func lintCache(
 	request invocation,
 	workspace project.Workspace,
@@ -59,7 +58,8 @@ func lintCache(
 	system *systemCache,
 ) (*check.Caching, error) {
 	source := request.standardLibrary
-	// The standard library is keyed apart when there is a table to read or entries to collect for one.
+	// The standard library is keyed apart when there is a system cache to keep it or entries to collect for the
+	// release's table.
 	keysStandardLibrary := system.store != nil || source.collected != nil
 	noCache := request.switches["no-cache"]
 	if noCache && system.store == nil {

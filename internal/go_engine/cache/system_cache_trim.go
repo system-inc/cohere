@@ -14,7 +14,8 @@ import (
 )
 
 // The system cache is trimmed as Go's build cache is (cmd/go/internal/cache): every dev rebuild is a new engine
-// identity, and so a new table for each target it meets, which nothing reads again once the next rebuild runs.
+// identity, and so a new entry of each standard-library package for each target it meets, which nothing reads again
+// once the next rebuild runs.
 const (
 	// trimInterval is how often a run trims at most: a run trims when the last trim was longer ago than this.
 	trimInterval = 24 * time.Hour
@@ -29,8 +30,8 @@ const (
 )
 
 // SystemCacheSizeCap is how large the files under a trimmed directory may be summed: past it, the oldest go first.
-// By guess a table is about 2 MB a target, so a rebuild meeting seven targets adds 14 MB, and the five days of
-// unusedAge would rarely reach it.
+// The size of one target's standard library in the store, its entries with their export data, is not yet measured;
+// the cap bounds what many rebuilds over many targets can leave before unusedAge takes them.
 const SystemCacheSizeCap int64 = 1 << 30
 
 // TrimSystemCache deletes the files under directory, a part of the system cache whose root is root, that no run has

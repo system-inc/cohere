@@ -72,8 +72,8 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 // key in this run, or the key a run without a store keyed it by for its builds, or its standard-library key. A run
 // without a store keys its packages only once it keeps them for its builds, after its saves, but it keys the standard
 // library before any: a standard-library package reads only the standard library's, so its entry's reads are always
-// named, as the system cache's table needs them, which drops each owner's key as it takes the entry. It reports false
-// for an owner it cannot name.
+// named, and an extra build restoring it declines none of them as unnamed. It reports false for an owner it cannot
+// name.
 func (session *CacheSession) ownerKeyOf(ownerTypes *types.Package) (*packages.Package, cache.Key, bool) {
 	owner := session.packageOf(ownerTypes)
 	if owner == nil {
@@ -124,10 +124,10 @@ func standardLibraryPackagesByPath(keys map[*packages.Package]cache.Key) map[str
 	return byPath
 }
 
-// holdAliasHits trusts every hit whose entry is its own: one from the system cache's table, keyed by everything it
-// read, and one the store holds under the package's own first key, which holds every key below it. A hit an alias led
-// to is trusted once its reads hold (see readsHold), checked below it first, each package after everything it imports;
-// one whose reads do not hold is a miss, which the second key may restore once the first wave has run.
+// holdAliasHits trusts every hit whose entry is its own: one its store, the project's or the system cache's, holds
+// under the package's own first key, which holds every key below it. A hit an alias led to is trusted once its reads
+// hold (see readsHold), checked below it first, each package after everything it imports; one whose reads do not hold
+// is a miss, which the second key may restore once the first wave has run.
 func (session *CacheSession) holdAliasHits(reachable []*packages.Package) {
 	session.trusted = map[*packages.Package]bool{}
 	session.byIdentifier = make(map[string]*packages.Package, len(reachable))

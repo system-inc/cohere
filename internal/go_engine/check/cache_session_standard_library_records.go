@@ -10,9 +10,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
-// The standard library's dependence records in the project's own store (#6a3kjvz piece 3, @system_cohere's choice of
-// the store over the system cache's table, engine's ruling on its key and writes). A standard-library package the host
-// restores from the system cache's table has no entry in the store, and so no record beside one: the switch loads it
+// The standard library's dependence records in the project's own store (#6a3kjvz piece 3, engine's ruling on its key
+// and writes). A standard-library package the host restores from the system cache's store has no entry in the
+// project's store, and so no record beside one: the switch loads it
 // from source beside the host's lint for its graph (the side load). When it does, the host's session writes each such
 // package's record, built from the side load's live packages, into the store under a key derived from the package's
 // own standard-library key (StandardLibraryDependenceRecordKey), and a later run with a store reads it back in place
@@ -39,7 +39,7 @@ func StandardLibraryDependenceRecordKey(
 }
 
 // standardLibraryRecordKey is keyed's record key, and whether it has one: a standard-library package the session
-// restored from the system cache's table, keyed by the table's key, in a session with a store.
+// restored from the system cache's store, keyed by its standard-library key, in a session with a store.
 func (session *CacheSession) standardLibraryRecordKey(keyed *packages.Package) (cache.Key, bool) {
 	standardLibrary := session.caching.StandardLibrary
 	key, isKeyed := session.standardLibraryKeys[keyed]
@@ -51,13 +51,14 @@ func (session *CacheSession) standardLibraryRecordKey(keyed *packages.Package) (
 }
 
 // readStandardLibraryRecords looks up, beside readDependenceRecords, the record of every standard-library package the
-// session restored from the system cache's table, and decodes each, as many at once as readHits reads entries. A record
+// session restored from the system cache's store, and decodes each, as many at once as readHits reads entries. A record
 // that does not decode is a problem, said, and its package has none, so the side load loads it and its record is
 // written again.
 func (session *CacheSession) readStandardLibraryRecords(reachable []*packages.Package) {
 	records := session.dependence
 	records.standardLibrary = map[*packages.Package]*build_dependence.Record{}
-	// A run that reads no table restores no standard-library package from it, and has none of its records to read.
+	// A run that keys no standard library apart restores no standard-library package from the system cache, and has
+	// none of these records to read.
 	if session.caching.StandardLibrary == nil {
 		return
 	}
@@ -89,7 +90,7 @@ func (session *CacheSession) readStandardLibraryRecords(reachable []*packages.Pa
 }
 
 // StandardLibraryRecord is the record the store holds of restored, a standard-library package the last load restored
-// from the system cache's table, decoded, and whether it holds one that decodes.
+// from the system cache's store, decoded, and whether it holds one that decodes.
 func (session *CacheSession) StandardLibraryRecord(restored *packages.Package) (*build_dependence.Record, bool) {
 	if session.dependence == nil {
 		return nil, false
@@ -99,7 +100,7 @@ func (session *CacheSession) StandardLibraryRecord(restored *packages.Package) (
 }
 
 // WriteStandardLibraryRecords writes into the store the record of every standard-library package the last load
-// restored from the system cache's table with none, as recordOf gives it by the package's path: the host's side load's
+// restored from the system cache's store with none, as recordOf gives it by the package's path: the host's side load's
 // graph, once it has ended, which gives only the records it built from live packages. Each record is encoded on the
 // run's pool and written with no slot held (fanOutWriting), as saveMisses writes the host's entries, since about 260
 // writes one after another took some 40 ms at the run's tail. It is called after the session's counts were handed on,

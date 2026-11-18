@@ -565,3 +565,70 @@ func TestTheProjectStoreHoldsNoStandardLibraryEntryWhileTheSystemCacheIsKept(tes
 		}
 	}
 }
+
+// optionClauseAnalyzer reports each file's package clause with its own option's value, so its findings change with the
+// option alone, as a rule's do whose options a person changes, while it learns no fact. Its analyzer is new for each
+// call, so a test that sets the option sets it on no other test's.
+func optionClauseAnalyzer() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{Name: "optionClause", Doc: "optionClause reports each package clause by its option"}
+	mode := analyzer.Flags.String("mode", "first", "the word each finding says")
+	analyzer.Run = func(pass *analysis.Pass) (any, error) {
+		for _, file := range pass.Files {
+			pass.Reportf(file.Name.Pos(), "%s package %s", *mode, file.Name.Name)
+		}
+		return nil, nil
+	}
+	return analyzer
+}
+
+// A standard-library package Analyze was given, as in a run over the standard library's own tree, is never kept in
+// the system cache's store, whose standard-library key holds no rule set: its entry holds its rules' findings, so it
+// keeps its project key in the project's store, which holds its rules and their options. Over unicode/utf8 in the
+// installation's own source, a run writes no package it was given to the system store, and a run after the rule's
+// option changed reports the new option's findings, where a given package kept in the system store would restore the
+// old ones.
+func TestAGivenStandardLibraryPackageIsNeverKeptInTheSystemCache(test *testing.T) {
+	test.Parallel()
+
+	goRoot := goRootOf(test)
+	directory := filepath.Join(goRoot, "src", "unicode", "utf8")
+	analyzer := optionClauseAnalyzer()
+	rules := []rule.Rule{houseRule(analyzer)}
+	system := systemStore(test)
+	store := test.TempDir()
+	context := standardLibraryContext("check tests", goRoot)
+	cachingFor := func(mode string) *Caching {
+		caching := cachingAt(store, rules)
+		caching.Context.RuleSet = []string{rules[0].Name + ` {"mode":"` + mode + `"}`}
+		caching.StandardLibrary = &StandardLibraryCaching{System: system, Context: context}
+		return caching
+	}
+	first := runWithSession(test, directory, cachingFor("first"), rules)
+	given := 0
+	for keyed, key := range first.session.standardLibraryKeys {
+		if !first.session.given[keyed] {
+			continue
+		}
+		given++
+		if system.Holds(key) || first.session.keys[keyed] == key {
+			test.Errorf("%s, given, is keyed by its standard-library key or held by the system cache's store",
+				keyed.ID)
+		}
+	}
+	if given == 0 {
+		test.Fatal("the session was given no standard-library package, so the run tells nothing")
+	}
+	if setError := analyzer.Flags.Set("mode", "second"); setError != nil {
+		test.Fatal(setError)
+	}
+	second := runWithSession(test, directory, cachingFor("second"), rules)
+	for _, finding := range second.result.Findings {
+		if !strings.HasPrefix(finding.Message, "second ") {
+			test.Errorf("after the option changed, %s says %q, the old option's finding", finding.File,
+				finding.Message)
+		}
+	}
+	if len(second.result.Findings) == 0 {
+		test.Error("want the given package's findings")
+	}
+}

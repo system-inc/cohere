@@ -12,8 +12,9 @@ import (
 // It is speculative because the load's end decides whether the lint phase runs at all: a load with any diagnostic, or
 // one that failed, means main never ran the rules, so the pass is abandoned and nothing it found, crashed on, learned
 // or counted reaches a record or a note (runLint's two abandonSpeculation calls). Only a clean load reads it
-// (speculativePass). It never writes the cache, since it runs only when the run has no store, whose session restores
-// only the standard library from the system cache, decided before the load checks anything.
+// (speculativePass). It runs only when the run has no project store, so the one cache it can write is the system
+// cache's store, the standard library's misses its save writes there, and only a pass that ends does: an abandoned
+// one returns before its save (check.ErrAbandoned).
 //
 // A run that fixes keeps the pass while its fixes leave the load standing. The long-line wrap runs beside it and
 // stops it only when it writes a file (wrapAfterLoad), before rereading what it wrote, since the pass reads the held

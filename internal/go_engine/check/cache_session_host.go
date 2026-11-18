@@ -366,7 +366,7 @@ func loadedSizes(loaded []*packages.Package) types.Sizes {
 }
 
 // unrestorableReads is why a visited package's reads can never hold, as a reason the record counts by its first word,
-// empty for reads a verdict judges: a package kept with persisted reads, as a table hit is, has its record judged by
+// empty for reads a verdict judges: a package kept with persisted reads has its record judged by
 // the verdict, which declines a record it cannot read or match before any read; one kept with none, or whose reads
 // are marked never or were never recorded, is declined here.
 func unrestorableReads(restoring Restoring) string {
@@ -718,9 +718,7 @@ func (session *CacheSession) writeThrough(
 			// A failed write is a problem, never a finding: the next run checks the package from source. One to the
 			// system cache's store is why the run could not keep it (SystemCacheFailure).
 			if session.storeFor(saved) != session.caching.Store {
-				if session.systemCacheFailure == nil {
-					session.systemCacheFailure = writeErrors[index]
-				}
+				session.systemCacheFailed(writeErrors[index])
 				continue
 			}
 			session.problem(fmt.Sprintf("writing through the entry of %s restored from the host: %v", saved.ID,
@@ -787,12 +785,13 @@ func (session *CacheSession) throughEntry(
 		}
 	}
 	// The body is the host's, named in the host's record, which the build's store holds once the host wrote it there;
-	// one it does not hold, kept from the system cache's table or written to another store, writeThrough holds in the
+	// one it does not hold, written to another store, as a standard-library body the host wrote to the system cache's
+	// store is for a build under `--build-dependence`, which keeps none, writeThrough holds in the
 	// record itself, read from the host's entry (hostBody). Nothing of the body is decoded or encoded again: the record
 	// alone is the build's (#fq7dxvx).
 	encoded := encodedEntry{output: hosted.restored.output, hasOutput: hosted.restored.hasOutput}
 	// unsafe's entry holds no export data, as the build's own from source holds none (carriesExportData); the reader of
-	// one kept from the system cache's table, which holds none for it, would refuse (#27r8r24).
+	// one that holds none for it would refuse (#27r8r24).
 	if carriesExportData(saved) && hosted.restored.types.ReadExportData != nil {
 		exportData, exportError := hosted.restored.types.ReadExportData()
 		if exportError != nil {
@@ -801,7 +800,7 @@ func (session *CacheSession) throughEntry(
 		encoded.exportData = exportData
 	}
 	// The record names the export data the build read by its digest, which is the host's record's own when the host
-	// wrote it, and new for one kept from the system cache's table or from the host's memory under `--no-cache`.
+	// wrote it, and new for one kept from the host's memory under `--no-cache`.
 	reads, readsIncomplete := session.readsInBuild(saved.ID, hosted.restored.reads, hosted.restored.readsIncomplete)
 	encoded.record = entryRecord{Version: CacheFormatVersion, Body: hosted.restored.bodyDigest,
 		ExportData: exportDataDigest(encoded.exportData), Reads: reads, ReadsIncomplete: readsIncomplete}
@@ -829,8 +828,11 @@ func hostBody(hosted *hostRestore) ([]byte, error) {
 //
 // Neither can happen to an entry written through, so each is a problem the run reports, and the entry is still marked
 // incomplete so a next run never trusts it. Its restore held, and a restore holds only while readsHold finds every
-// read's owner among the build's packages by identifier; a write-through runs only with a store, and with a store the
-// session keys every package it reaches (cache.Keys keys all of them or fails), the same packages byIdentifier names.
+// read's owner among the build's packages by identifier; a write-through runs only for a package with a store, and the
+// session keys every owner such a package reads: with the project's store cache.Keys keys every package it reaches
+// (all of them or it fails), the same packages byIdentifier names, and under `--no-cache` only the standard library
+// is written through, whose packages read only the standard library's, which the session keys
+// (keyStandardLibraryApart).
 func (session *CacheSession) readsInBuild(written string, reads []storedRead, incomplete bool) ([]storedRead, bool) {
 	inBuild := make([]storedRead, 0, len(reads))
 	unnamed := incomplete
@@ -896,12 +898,12 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 
 // keepForBuilds is what the host's run keeps of each package it analyzed from source, among analyzed and what they
 // reach, whose reads can hold, for its extra builds to restore from (#b2t9xmf): the package's entry, read back from the
-// store when the run wrote one there, or else encoded here, as saveMisses encodes it, and held in memory, which a run
-// under `--no-cache` never stores. A package restored from the system cache's table is kept from the table's entry,
-// with the reads the table persisted beside it (keepTableHit, #pcv6eff). Each package's portable digest is the one
-// Restore keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it,
-// so a run without pays nothing. gathered gives the findings the run's gather made of each root action, which an
-// encoded entry holds rather than convert them again (see encodeEntry).
+// store the run wrote it to, the system cache's for a standard-library package (storeFor), or else encoded here, as
+// saveMisses encodes it, and held in memory, which a run under `--no-cache` never stores. A package the run restored,
+// from either store, is not kept: each build reads its own. Each package's portable digest is the one Restore keyed
+// it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
+// without pays nothing. gathered gives the findings the run's gather made of each root action, which an encoded entry
+// holds rather than convert them again (see encodeEntry).
 func (session *CacheSession) keepForBuilds(
 	graphs []*checker.Graph,
 	analyzed []*packages.Package,
