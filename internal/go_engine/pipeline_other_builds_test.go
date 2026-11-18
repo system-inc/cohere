@@ -199,12 +199,12 @@ func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 			windowsFile)
 	}
 	for _, run := range on.buildRuns {
-		if len(run.inputs.Files) == 0 || len(run.inputs.Directories) == 0 {
-			test.Errorf("%s's run carries no inputs: %+v", run.build, run.inputs)
+		if len(run.inputs().Files) == 0 || len(run.inputs().Directories) == 0 {
+			test.Errorf("%s's run carries no inputs: %+v", run.build, run.inputs())
 		}
 	}
-	if !slices.Contains(windows.inputs.Files, windowsFile) {
-		test.Errorf("windows's inputs %v leave out %s, which it compiles", windows.inputs.Files, windowsFile)
+	if !slices.Contains(windows.inputs().Files, windowsFile) {
+		test.Errorf("windows's inputs %v leave out %s, which it compiles", windows.inputs().Files, windowsFile)
 	}
 
 	// The windows file's else after a return is found by windows's run and by no other, since no other build

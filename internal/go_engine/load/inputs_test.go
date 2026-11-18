@@ -117,7 +117,7 @@ func TestInputsHoldEveryFileTheLoadListed(test *testing.T) {
 
 	loadedInputsFixture(test)
 	named := map[string]bool{}
-	for _, file := range inputsFixture.loaded.Inputs.Files {
+	for _, file := range inputsFixture.loaded.Inputs().Files {
 		named[file] = true
 	}
 	packageType := reflect.TypeFor[packages.Package]()
@@ -164,7 +164,7 @@ func TestInputsNameWhatTheLoadRead(test *testing.T) {
 	test.Parallel()
 
 	loadedInputsFixture(test)
-	inputs := inputsFixture.loaded.Inputs
+	inputs := inputsFixture.loaded.Inputs()
 	for _, list := range [][]string{inputs.Files, inputs.Directories, inputs.Absent} {
 		if !slices.IsSorted(list) || len(slices.Compact(slices.Clone(list))) != len(list) {
 			test.Errorf("a list is not sorted without duplicates: %q", list)
@@ -243,8 +243,8 @@ func TestInputsOfAnUnchangedTreeAreTheSameEveryLoad(test *testing.T) {
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
-	first, firstError := json.Marshal(inputsFixture.loaded.Inputs)
-	second, secondError := json.Marshal(again.Inputs)
+	first, firstError := json.Marshal(inputsFixture.loaded.Inputs())
+	second, secondError := json.Marshal(again.Inputs())
 	if firstError != nil || secondError != nil {
 		test.Fatalf("encoding the inputs: %v, %v", firstError, secondError)
 	}
@@ -272,7 +272,7 @@ func TestInputsNameTheToolchainThatRan(test *testing.T) {
 	}
 	translated := filepath.Join(buildCache, "ab", "translated.go")
 	inputs := collectInputs(test.TempDir(), reportedEnvironment{goRoot: switched, workspaceFile: "off",
-		buildCache: buildCache}, []*packages.Package{{ID: "p", CompiledGoFiles: []string{translated}}}, nil)
+		buildCache: buildCache}, []*packages.Package{{ID: "p", CompiledGoFiles: []string{translated}}}, nil, nil)
 	for _, name := range []string{filepath.Join("bin", "go"), "VERSION", "go.env"} {
 		if !slices.Contains(inputs.Files, filepath.Join(switched, name)) {
 			test.Errorf("the files do not name the toolchain's %s", name)

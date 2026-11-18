@@ -84,10 +84,16 @@ func (engine *pipeline) unguardedWorkspaceSums() []string {
 // watchedCaching is caching as it is, unless a test watches inside its loads (engineMemory.duringLoad): then its held
 // reader calls the watch before each lookup, which is during the load.
 func (engine *pipeline) watchedCaching(caching load.Caching) load.Caching {
-	// Every cached load of the run, the host's and every extra build's, takes its slots from the run's one pool, and
-	// records the go commands it starts in the run's account.
+	// Every cached load of the run, the host's and every extra build's, takes its slots from the run's one pool,
+	// records the go commands it starts in the run's account, and names the directories of its roots from the run's
+	// walks of them.
 	caching.Pool = engine.workPool()
 	caching.Children = engine.described.children
+	caching.ModuleRootWalks = engine.moduleRootWalks
+	// Each load collects its inputs beside it only in a run whose findings cache reads a store, the run's own fact
+	// (withFindingsStore, the host's session), the same for every load of the run: warm, beside wins, and cold, under
+	// `--no-cache`, every core is busy to the end and inline wins (load.Caching.InputsBeside).
+	caching.InputsBeside = engine.withFindingsStore()
 	if engine.memory == nil || engine.memory.duringLoad == nil {
 		return caching
 	}

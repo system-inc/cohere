@@ -196,6 +196,11 @@ type pipeline struct {
 	// need know which writes a walk reads past.
 	walks *load.PackageWalks
 
+	// moduleRootWalks are the walks of the module roots every load's inputs name, the host's and each extra build's,
+	// each root walked once for the run (#ybjbqm2): a walk reads directory entries alone, which no write of the run
+	// changes, so the host's load may share them as the builds' do.
+	moduleRootWalks *load.ModuleRootWalks
+
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
 	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
 	renamed bool
@@ -279,6 +284,7 @@ func newPipeline(
 		reads:                     load.NewSharedReads(),
 		fingerprints:              load.NewFingerprints(),
 		walks:                     load.NewPackageWalks(),
+		moduleRootWalks:           load.NewModuleRootWalks(),
 	}
 }
 

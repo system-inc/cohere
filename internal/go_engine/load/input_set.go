@@ -108,11 +108,20 @@ func (set *inputSet) addGoFlagFiles(workspace string, goFlags []string) {
 	}
 }
 
-// addReachableDirectories names every directory under a module root that a `./...` pattern could reach, walked as go
-// walks one: never into a directory whose name starts with `.` or `_`, nor testdata, nor below a directory with a
+// addReachableDirectories names every directory under a module root that a `./...` pattern could reach
+// (reachableDirectories), from the run's walk of root when walks is set, walked once for every load.
+func (set *inputSet) addReachableDirectories(root string, walks *ModuleRootWalks) {
+	for _, directory := range walks.reachable(root) {
+		set.directories[directory] = true
+	}
+}
+
+// reachableDirectories is every directory under a module root that a `./...` pattern could reach, cleaned, walked as
+// go walks one: never into a directory whose name starts with `.` or `_`, nor testdata, nor below a directory with a
 // go.mod of its own, which is named, since a go.mod leaving it would make its packages the module's. More is named
 // than go matches (a vendor tree, a directory a go.mod `ignore` directive names), which only costs a miss.
-func (set *inputSet) addReachableDirectories(root string) {
+func reachableDirectories(root string) []string {
+	var directories []string
 	// Ignored: the walk's callback returns no error, so neither does the walk.
 	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
 		if pathError != nil || !entry.IsDir() {
@@ -126,12 +135,13 @@ func (set *inputSet) addReachableDirectories(root string) {
 				return filepath.SkipDir
 			}
 		}
-		set.directories[filepath.Clean(path)] = true
+		directories = append(directories, filepath.Clean(path))
 		if path != root && exists(filepath.Join(path, "go.mod")) {
 			return filepath.SkipDir
 		}
 		return nil
 	})
+	return directories
 }
 
 // addFileOrAbsent names path as a file when it exists and as absent when it does not.
