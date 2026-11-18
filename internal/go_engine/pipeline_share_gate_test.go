@@ -334,9 +334,7 @@ func TestARunOverAnEmptyStoreTakesNoShareGate(test *testing.T) {
 // lowShareAtGate (#ybjbqm2): over lowShareBuilds and one store, the first run fills it and takes no gate, and a second
 // after one leaf package's edit, the host missing that one of many, takes it. Every build there restores nearly all it
 // holds, so the width is decided from the host's live heap, at the store's peak factor. A run with every package hit
-// is the decision's alone here (TestTheHostsMissedShareDecidesTheShareGateUnderAStore): a test's host restores nothing
-// from a system cache's table, since each of its runs is given an empty one, so warm it keeps nothing for its builds,
-// which run one at a time whatever the gate says (fixedBuildsWidth).
+// is TestAnAllHitWarmRunTakesTheShareGatesWidth's.
 func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.T) {
 	test.Parallel()
 	root := lowShareBuilds(test)
@@ -371,6 +369,59 @@ func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.
 			"width from the host's live heap %t at a peak factor of %.1f, want steps, yes and %.1f",
 			edited.Cache.Hit+edited.Cache.Missed, editedSteps, edited.BuildsWidthFromHostLive,
 			edited.BuildsWidthPeakFactor, buildPeakOverLoadEndWithStore)
+	}
+}
+
+// A warm run with a store whose every package hit takes the share gate and the width the host's live heap gives
+// there, more than one build at once under the cap (#s1hdd3z): its host hit every package in its store and keeps none
+// for its builds, as since #syscache it keeps no standard-library package either, and that alone held every warm run
+// at one at a time before the gate read anything. Over lowShareBuilds and one store, the first run fills it, and the
+// second, every package hit and nothing kept, steps at the gate and runs its three builds as the host's live heap says.
+func TestAnAllHitWarmRunTakesTheShareGatesWidth(test *testing.T) {
+	test.Parallel()
+	root := lowShareBuilds(test)
+	underCapRun(test, root, exitFindings, nil)
+	var stepped atomic.Int64
+	engine, raw, _ := underCapRun(test, root, exitFindings, func(engine *pipeline) {
+		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+	})
+	lint := lintRecordOf(test, raw)
+	if lint.Cache.Missed != 0 || lint.Cache.Hit == 0 || len(engine.buildRuns) != 4 ||
+		engine.buildRuns[0].result.Host.EntriesKept() != 0 {
+		test.Fatalf("the warm run's host hit %d packages and missed %d, keeping %d entries for %d runs beside it, "+
+			"want every package hit, none kept, and three builds: the premise", lint.Cache.Hit, lint.Cache.Missed,
+			engine.buildRuns[0].result.Host.EntriesKept(), len(engine.buildRuns)-1)
+	}
+	if stepped.Load() == 0 || !lint.BuildsWidthFromHostLive || lint.BuildsAtOnce <= 1 {
+		test.Fatalf("the warm run stepped %d times at the share gate and ran %d builds at once, from the host's live "+
+			"heap %t, want steps and more than one at once from the host's live heap", stepped.Load(),
+			lint.BuildsAtOnce, lint.BuildsWidthFromHostLive)
+	}
+	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes, true)
+	if lint.BuildsAtOnce != want {
+		test.Errorf("the warm run ran %d builds at once, want %d, the width the host's live heap gives",
+			lint.BuildsAtOnce, want)
+	}
+}
+
+// A run with a store that takes no share gate, its host mostly missed, still runs builds that would restore nothing
+// from the host's run one at a time, and one that takes the gate leaves their width to it (fixedBuildsWidth,
+// #s1hdd3z): over a host that kept nothing, a run whose plain twin takes no gate is fixed at one before a test's forced
+// width is read, and one whose plain twin takes it is given that forced width, as builds that restore are.
+func TestOnlyARunWithoutTheShareGateHoldsBuildsThatRestoreNothing(test *testing.T) {
+	test.Parallel()
+	engine := &pipeline{
+		memory: &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
+			Source: contract.MemorySourceCap}},
+		buildsWidthForced: 3,
+	}
+	if width, fixed := engine.fixedBuildsWidth(3, nil, false); width != 1 || !fixed {
+		test.Errorf("a run taking no share gate over a host that kept nothing was given a width of %d, fixed %t, "+
+			"want 1, fixed", width, fixed)
+	}
+	if width, fixed := engine.fixedBuildsWidth(3, nil, true); width != 3 || !fixed {
+		test.Errorf("a run taking the share gate over a host that kept nothing was given a width of %d, fixed %t, "+
+			"want the forced 3: the guard is the gate's to judge", width, fixed)
 	}
 }
 
