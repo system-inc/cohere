@@ -148,6 +148,20 @@ outer:
 	}
 }
 
+// Found: the function's only label is a goto's, which no break or continue names, so the port never builds its map of
+// labels, and the loop is judged as the original judges it.
+func labelOfGotoAlone() {
+	for {
+		if condition() {
+			println()
+		}
+		break
+	}
+	goto done
+done:
+	println()
+}
+
 // Not found: an unlabelled continue anywhere, even in a nested loop or a function literal, gives up.
 func continueNested(values []int) {
 	for {
@@ -245,6 +259,69 @@ func nestedLiteral() {
 		}
 	}
 	run()
+}
+
+// Found twice: a loop in a function literal in a loop's header is judged by the walk of the function, which goes into
+// the header of a loop it reads and of one it leaves alone, and by the walk of the literal.
+func loopInHeader(values []int) {
+	for range func() []int {
+		for {
+			if condition() {
+				println()
+			}
+			break
+		}
+		return values
+	}() {
+		println()
+	}
+}
+
+// Found once: a loop over a map is not judged, but the walk still goes into it, so the loop nested in it is.
+func loopInRangeOverMap(table map[int]int) {
+	for range table {
+		for {
+			if condition() {
+				println()
+			}
+			break
+		}
+		break
+	}
+}
+
+// Found once, by the walk of the literal alone: the outer loop has no exit at its top level, so the walk of the
+// function skips its header with its body, and the loop in the literal there goes unjudged by it.
+func headerOfLoopWithoutExit(values []int) {
+	for range func() []int {
+		for {
+			if condition() {
+				println()
+			}
+			break
+		}
+		return values
+	}() {
+		if condition() {
+			println()
+		}
+		println()
+	}
+}
+
+// Found: only the loop's body is searched for a continue, so one in a function literal in the loop's condition never
+// gives up on it.
+func continueInHeader() {
+	for index := 0; index < func() int {
+		for {
+			continue
+		}
+	}(); index++ {
+		if condition() {
+			println()
+		}
+		break
+	}
 }
 
 type element struct{}
