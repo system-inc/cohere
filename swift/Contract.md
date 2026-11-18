@@ -989,6 +989,33 @@ written. A problem never changes a finding. Of the misses whose write failed, on
 problem, so `"writeFailed":412` counts every one, every build's, and a store that refused 412
 writes says 412. Each is written only when it is not 0.
 
+`"packs"`, additive within contract 3 and the Go engine's alone, is what the extra builds did with their packs,
+every build's summed (#b2t9xmf), and each build's record carries its own as `"packs"` too: `{"read":14,
+"missing":0, "recordsServed":10920, "recordsStale":0, "recordsMissed":0, "shardReads":512, "written":0}`. Each extra
+build keeps one pack of each store it reads records from, its findings cache's and the system cache's, a single file
+holding every record its last run read or wrote there, named by the build's context and the engine, and the system
+cache's by the project too, so another build, engine or project never reads it. The build reads it once before it
+reads its hits, rather than open each record. A pack also holds, for each shard directory of the store its records
+were read from, the directory's modification time taken before they were read, and a record is served only while its
+shard's time is still that one: the store changes a file only by adding or removing a name in its shard's directory,
+so any write, removal or trim there since moves it, and the record is read from the store, as a run with no pack
+reads it. A time within two seconds of the clock when the run read it is never trusted, as git distrusts a file
+changed in the second it read it, so a file system with coarse times cannot hide a write later in the same tick. `"read"` counts the packs read whole, and `"missing"` those there were none of, as on a
+build's first run or a new engine's, which is no refusal. `"recordsServed"` counts the records the packs served, for
+which no record file was opened, `"recordsStale"` those a pack held whose shard had moved, and `"recordsMissed"` the
+records asked that no pack held, each read from the store, found or not. `"shardReads"` counts the shard times read,
+each shard of each store once a run whatever the builds. Everything past the record is read as without a pack, its
+body and export data from the store, so a record a pack serves whose body or export data the store no longer holds
+is a miss, checked from source. `"refusedBy"` counts each pack that was there and was ignored whole, by the first word
+of why: `unreadable`, `short`, `sum`, `version` or `malformed`, and is absent when none was; a pack carries its
+format's version and one sha256 over its contents, and no record is ever served from one that does not match them, so
+a build whose pack was refused reads its store as it would with none, and its findings are the same. `"written"`
+counts the packs written at a build's save, which happens when its run read or wrote a record its pack did not hold,
+a shard's time moved, or its pack was missing or refused, so a warm run whose packs served every record writes none.
+The system cache's trim counts a pack in its size cap and deletes it once unread for five days, as any entry there;
+the project's store is never trimmed, so its packs stay, one for each build and engine, as its entries do. The
+host's build keeps no pack, and a run with no extra build writes no `"packs"`.
+
 Under `--build-dependence`, with a store, the Go engine keeps block 1's dependence record of each package the host
 checks beside the package's entry, and reads it back for each package it restores, so its graph of the host is built
 from records rather than syntax (#6a3kjvz); the cache record then writes `"dependenceRecords"`, additive within
@@ -1073,7 +1100,8 @@ the build restored from the system cache's table of its own build context, and `
 it added to that table, each absent when 0. `"sharedBodyHits":1561` counts the packages a build hit in its own
 findings cache whose body it took from the run's memo of decoded bodies, the bodies the host's run read from its
 store and those an earlier build read, rather than read and decode it again; a cold run, whose host read nothing
-from its store, and a run under `--no-cache` write none, and it is absent. `"inheritedFiles":40` counts the distinct files an extra build took
+from its store, and a run under `--no-cache` write none, and it is absent. `"packs"` is what an extra build did with
+its packs, as the cache record's `"packs"` sums them, absent on the host's record. `"inheritedFiles":40` counts the distinct files an extra build took
 the host's findings of at least one syntax-only rule on, rather than walk them again in a package it checked from
 source, since such a rule's findings on a file are the file's alone, and `"inheritedFindings":12` the findings it took,
 each rule's on each file once. Under `--timing` nothing is restored from the host, and nothing inherited, so every

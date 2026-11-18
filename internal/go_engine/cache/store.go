@@ -121,7 +121,13 @@ func (store *Store) PutAbsent(key Key, entry []byte) error {
 // Put keeps entry under key. It writes a temporary file beside the entry's and renames it into place, so a reader,
 // or another Put of the same key, sees a whole file or none.
 func (store *Store) Put(key Key, entry []byte) error {
-	path := store.path(key)
+	return store.writeWhole(store.path(key), entry)
+}
+
+// writeWhole writes the sha256 of contents, then contents, to path, through a temporary file beside it renamed into
+// place, so a reader, or another writer of the same path, sees a whole file or none: an entry's (Put) or a pack's
+// (WritePack).
+func (store *Store) writeWhole(path string, entry []byte) error {
 	directory := filepath.Dir(path)
 	if _, known := store.made.Load(directory); !known {
 		if makeError := store.makeDirectory(directory); makeError != nil {

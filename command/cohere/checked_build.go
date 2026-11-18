@@ -43,6 +43,9 @@ type checkedBuild struct {
 	// SharedBodyHits is the packages it hit in its own findings cache whose body it took from the run's memo of
 	// decoded bodies rather than read and decode again (#qqyq61s), absent when 0.
 	SharedBodyHits int `json:"sharedBodyHits,omitempty"`
+	// Packs is what another build did with its packs (#b2t9xmf), carried for `--json`, absent on the host's build,
+	// which keeps none.
+	Packs *buildPacksUse `json:"packs,omitempty"`
 	// InheritedFiles and InheritedFindings are the files it took the host's findings of a syntax-only rule on rather
 	// than walk again, and the findings it took, each absent when 0.
 	InheritedFiles    int `json:"inheritedFiles,omitempty"`

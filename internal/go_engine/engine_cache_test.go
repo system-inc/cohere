@@ -19,14 +19,52 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
-// cacheFieldPattern is the lint record's cache counts, and childProcessesPattern the go commands it counts started
-// after the first load began, which a listing the store kept spares the lister's of (#sktb2y8): all a cached run may
-// change in the stream once the elapsed times are normalized.
-var (
-	cacheFieldPattern     = regexp.MustCompile(`,"cache":\{[^}]*\}`)
-	childProcessesPattern = regexp.MustCompile(
-		`,"childProcessesAfterLoad":\d+,"childProcessesAfterLoadNamed":\[[^\]]*\]`)
-)
+// childProcessesPattern is the go commands the lint record counts started after the first load began, which a listing
+// the store kept spares the lister's of (#sktb2y8): with the record's cache counts (withoutJsonObject), all a cached
+// run may change in the stream once the elapsed times are normalized.
+var childProcessesPattern = regexp.MustCompile(
+	`,"childProcessesAfterLoad":\d+,"childProcessesAfterLoadNamed":\[[^\]]*\]`)
+
+// withoutJsonObject is stream with every object under field left out, with the comma before it, each to its own
+// closing brace: an object nested in it, as the cache counts' packs and their refusals (#b2t9xmf), is left out with it
+// rather than end it. A brace within a string is the string's.
+func withoutJsonObject(stream string, field string) string {
+	opening := `,"` + field + `":{`
+	var kept strings.Builder
+	// remaining is what of stream is still to be read, past every object left out so far.
+	remaining := stream
+	for {
+		start := strings.Index(remaining, opening)
+		if start < 0 {
+			kept.WriteString(remaining)
+			return kept.String()
+		}
+		kept.WriteString(remaining[:start])
+		depth, inString, escaped := 0, false, false
+		end := len(remaining)
+		for index := start + len(opening) - 1; index < len(remaining); index++ {
+			character := remaining[index]
+			switch {
+			case escaped:
+				escaped = false
+			case inString && character == '\\':
+				escaped = true
+			case character == '"':
+				inString = !inString
+			case inString:
+			case character == '{':
+				depth++
+			case character == '}':
+				depth--
+			}
+			if depth == 0 {
+				end = index + 1
+				break
+			}
+		}
+		remaining = remaining[end:]
+	}
+}
 
 // cachedRun is one engine run over root with extra after the contract and root, its stream normalized, its stream
 // without the cache counts, its lint record's cache counts, and its exit code.
@@ -96,7 +134,7 @@ func runEngineNoting(
 	stream := elapsedPattern.ReplaceAllString(standardOutput.String(), `"elapsedMilliseconds":0`)
 	ran := cachedRun{
 		stream:        stream,
-		withoutCounts: childProcessesPattern.ReplaceAllString(cacheFieldPattern.ReplaceAllString(stream, ""), ""),
+		withoutCounts: childProcessesPattern.ReplaceAllString(withoutJsonObject(stream, "cache"), ""),
 		exitCode:      exitCode,
 	}
 	for line := range strings.Lines(stream) {

@@ -15,6 +15,44 @@
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
+        "buildPacks": {
+            "description": "What extra Go builds did with their packs: each extra build keeps one pack of each store it reads records from, its findings cache's and the system cache's, a file holding every record its last run read or wrote there, which it reads once rather than open each record. A record is served from a pack only while its shard of the store is exactly as the pack recorded it.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["read", "missing", "recordsServed", "recordsStale", "recordsMissed", "shardReads", "written"],
+            "properties": {
+                "read": { "type": "integer", "description": "The packs read whole." },
+                "missing": {
+                    "type": "integer",
+                    "description": "The packs there were none of, as on a build's first run or a new engine's. No refusal."
+                },
+                "recordsServed": {
+                    "type": "integer",
+                    "description": "The records the packs served, for which no record file was opened."
+                },
+                "recordsStale": {
+                    "type": "integer",
+                    "description": "The records a pack held whose shard of the store had changed since the pack was written, each read from the store."
+                },
+                "recordsMissed": {
+                    "type": "integer",
+                    "description": "The records asked that no pack held, read from the store, found or not."
+                },
+                "shardReads": {
+                    "type": "integer",
+                    "description": "The shard directories' stamps read, each shard of each store once a run whatever the builds."
+                },
+                "refusedBy": {
+                    "type": "object",
+                    "additionalProperties": { "type": "integer" },
+                    "description": "Each pack that was there and was ignored whole, by the first word of why: unreadable, short, sum, version or malformed. A build whose pack was refused reads its store as it would with none, and its findings are the same. Absent when none was."
+                },
+                "written": {
+                    "type": "integer",
+                    "description": "The packs written at a build's save, since its run read or wrote a record its pack did not hold, a shard of the store changed, or its pack was missing or refused. A warm run whose packs served every record writes none."
+                }
+            }
+        },
         "finding": {
             "description": "One finding: a rule's, or a type error, whose rule is its TypeScript code (TS2322).",
             "type": "object",
@@ -578,6 +616,10 @@
                         "writeFailed": {
                             "type": "integer",
                             "description": "Entries whose write failed, every build's. Stderr and problems say only the first, so this is how many the store refused. Absent when zero."
+                        },
+                        "packs": {
+                            "$ref": "#/$defs/buildPacks",
+                            "description": "What every extra build did with its packs, summed: each build reads one file of each store holding every record its last run read or wrote there, rather than open each record. Absent in a run with no extra build."
                         }
                     }
                 },
@@ -670,6 +712,10 @@
                             "sharedBodyHits": {
                                 "type": "integer",
                                 "description": "The packages this build hit in its own findings cache whose body it took from the run's memo of decoded bodies, the bodies the host's run read from its store and those an earlier build read, rather than read and decode it again. Absent when 0: a cold run, whose host read nothing from its store, and a run under --no-cache write none."
+                            },
+                            "packs": {
+                                "$ref": "#/$defs/buildPacks",
+                                "description": "What this extra build did with its packs. Absent on the host's build, which keeps none, and for a build whose rules never ran."
                             },
                             "inheritedFiles": {
                                 "type": "integer",

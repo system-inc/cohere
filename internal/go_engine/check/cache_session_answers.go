@@ -381,7 +381,7 @@ func (session *CacheSession) rewriteEarlier() {
 				ReadsIncomplete: demanded.readsIncomplete}}
 			// A write to the system cache's store that failed is why the run could not keep it, never the project's
 			// problem.
-			if putError := putEntry(store, key, rewritten); putError != nil && store != session.caching.Store {
+			if putError := session.putRecord(store, key, rewritten); putError != nil && store != session.caching.Store {
 				session.systemCacheFailed(putError)
 			} else if putError != nil {
 				session.problem(putError.Error())

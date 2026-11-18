@@ -227,6 +227,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				record.Cache.WriteFailed += run.result.Cache.WriteFailed
 				record.Cache.FromSystemCache += run.result.Cache.FromSystemCache
 				record.Cache.SystemCacheWritten += run.result.Cache.SystemCacheWritten
+				record.Cache.Packs = summedPacks(record.Cache.Packs, run.result.Cache.Packs)
 			}
 		}
 		record.BuildsAtOnce = engine.buildsAtOnce

@@ -78,6 +78,10 @@ type pipeline struct {
 	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache).
 	systemCache *systemCache
 
+	// shardStamps are the run's stamps of its stores' shard directories, which every extra build's packs read, each
+	// shard once a run (#b2t9xmf). A test replaces them with stamps judged by a clock of its own.
+	shardStamps *cache.ShardStamps
+
 	// keepsHostRestoreOff, set only by a test, has every extra build check every package itself rather than restore any
 	// from the host's run, so a test can compare the two (#b2t9xmf), and in a run that takes no share gate the builds
 	// run one at a time, as builds that restore nothing do there (fixedBuildsWidth).
@@ -282,6 +286,7 @@ func newPipeline(
 		censusKeepsHostRestoreOff: request.judgesDependence(),
 		timing:                    newTiming(request),
 		systemCache:               openSystemCache(request),
+		shardStamps:               cache.NewShardStamps(nil),
 		reads:                     load.NewSharedReads(),
 		fingerprints:              load.NewFingerprints(),
 		walks:                     load.NewPackageWalks(),

@@ -167,6 +167,9 @@ type BuildRecord struct {
 	// those an earlier build read, rather than read the host's record its own names and decode the body again. Written
 	// only when not 0, so a cold run, whose host read nothing from its store, and a run under `--no-cache` write none.
 	SharedBodyHits int `json:"sharedBodyHits,omitempty"`
+	// Packs, additive within contract 3, is what an extra build did with its packs (#b2t9xmf), absent on the host's
+	// record, which keeps none, and for a build whose rules never ran.
+	Packs *BuildPacks `json:"packs,omitempty"`
 
 	// InheritedFiles counts the distinct files an extra build took the host's findings of at least one syntax-only
 	// rule on, rather than walk them again in a package it checked from source (#y6q1x2j), and InheritedFindings the
@@ -412,7 +415,8 @@ type DependenceCounts struct {
 // first as a problem, so a store that refused 400 writes says 400 rather than 1; a dependence record that could not be
 // written beside its entry counts there too. Each is written only when not 0. DependenceRecords, additive within
 // contract 3 and the Go engine's alone, is written only by a run under `--build-dependence` with a store
-// (#6a3kjvz).
+// (#6a3kjvz). Packs, additive within contract 3, is what every extra build did with its packs, summed (#b2t9xmf),
+// absent in a run with no extra build.
 type LintCache struct {
 	On                 bool   `json:"on"`
 	Hit                int    `json:"hit"`
@@ -433,6 +437,32 @@ type LintCache struct {
 	WriteFailed        int    `json:"writeFailed,omitempty"`
 
 	DependenceRecords *DependenceRecords `json:"dependenceRecords,omitempty"`
+	Packs             *BuildPacks        `json:"packs,omitempty"`
+}
+
+// BuildPacks counts what extra builds did with their packs (#b2t9xmf): each build keeps one pack of each store it reads
+// records from, its findings cache's and the system cache's, a file holding every record it read or wrote there in its
+// last run, with the stamp of each shard directory of the store they were read from, which it reads once rather than
+// open each record. Read counts the packs read whole, and Missing those there were none of, as on a build's first run
+// or a new engine's, which is no refusal. RecordsServed counts the records the packs served, which the build opened no
+// file for: a record is served only while its shard's stamp is the one the pack holds, so the store holds exactly what
+// the pack was made of. RecordsStale counts the records a pack held whose shard had moved since, as any write, removal
+// or trim of a file there moves it, and RecordsMissed the records asked that no pack held, each read from the store,
+// found or not. ShardReads counts the shard stamps read, each shard of each store once a run whatever the builds.
+// RefusedBy counts each pack that was there and was ignored whole, by the first word of why: unreadable, short, sum,
+// version or malformed, absent when none was; a build whose pack was refused reads its store as it would with none, and
+// its findings are the same. Written counts the packs written at a build's save, since its run read or wrote a record
+// its pack did not hold, a shard's stamp moved, or its pack was missing or refused, so a warm run whose packs served
+// every record writes none.
+type BuildPacks struct {
+	Read          int            `json:"read"`
+	Missing       int            `json:"missing"`
+	RecordsServed int            `json:"recordsServed"`
+	RecordsStale  int            `json:"recordsStale"`
+	RecordsMissed int            `json:"recordsMissed"`
+	ShardReads    int            `json:"shardReads"`
+	RefusedBy     map[string]int `json:"refusedBy,omitempty"`
+	Written       int            `json:"written"`
 }
 
 // DependenceRecords counts what the host's run did with block 1's dependence records, which the findings store keeps

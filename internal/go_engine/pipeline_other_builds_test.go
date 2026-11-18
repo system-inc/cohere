@@ -436,14 +436,7 @@ func TestOtherBuildsReadTheDigestsOfTheBytesTheWrapWrote(test *testing.T) {
 // otherwise than a cold one, and each build's counts of what it restored from the host's run, which a warm host's
 // run, restoring from its own store, keeps nothing for (withoutHostRestore).
 func withoutCache(stream string) string {
-	lines := strings.Split(withoutHostRestore(stream), "\n")
-	for index, line := range lines {
-		if start := strings.Index(line, `"cache":{`); start >= 0 {
-			end := strings.Index(line[start:], "}")
-			lines[index] = line[:start] + line[start+end+1:]
-		}
-	}
-	return strings.Join(lines, "\n")
+	return withoutJsonObject(withoutHostRestore(stream), "cache")
 }
 
 // hostRestoreCounts are a build record's counts of what the host's run kept for the extra builds, what each restored
@@ -466,7 +459,9 @@ var extraAnalyzedPackages = regexp.MustCompile(`("host":false,"compiledFiles":[0
 // extra build's packages analyzed, the one thing a run that restores writes otherwise than one that checks every
 // package of every build.
 func withoutHostRestore(stream string) string {
-	return extraAnalyzedPackages.ReplaceAllString(hostRestoreCounts.ReplaceAllString(stream, ""), "${1}N")
+	// Each build's packs too (#b2t9xmf), which a warm run reads and a cold one writes.
+	return withoutJsonObject(extraAnalyzedPackages.ReplaceAllString(hostRestoreCounts.ReplaceAllString(stream, ""),
+		"${1}N"), "packs")
 }
 
 // A module whose every file the host builds needs no other build, so `--other-builds` hands the merge nothing, and the

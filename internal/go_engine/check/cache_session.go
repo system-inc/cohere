@@ -161,6 +161,10 @@ type CacheCounts struct {
 	// beside it, the first reason among Problems.
 	WriteFailed int
 
+	// Packs are what an extra build's session did with its packs over every load of the run (#b2t9xmf), nil for any
+	// other session and before the save.
+	Packs *PackCounts
+
 	// DependenceRecords are what the host's session did with block 1's dependence records under
 	// `--build-dependence` (#6a3kjvz), nil for any other session.
 	DependenceRecords *DependenceRecordCounts
@@ -301,6 +305,9 @@ type CacheSession struct {
 	// dependence is the host's session's block 1 dependence records, under `--build-dependence`, nil for any other
 	// session (KeepDependenceRecords, #6a3kjvz).
 	dependence *dependenceRecords
+
+	// packs are an extra build's packs of its stores (KeepBuildPacks), nil for any other session.
+	packs *buildPacks
 
 	// kept is set once keepForBuilds has let go of the resolver and the answer memo, and cleared by the next Restore,
 	// which starts both afresh. A read of either while it is set is a problem the run reports (readAfterKeep), never
@@ -470,6 +477,8 @@ func (session *CacheSession) Restore(
 	}
 	session.keyStandardLibrary(loader, reachable, hashed)
 	session.keyStandardLibraryApart()
+	// Once the standard library is keyed, which names the system cache's pack, and before any record is read.
+	session.openPacks(loader)
 	session.readHits(reachable)
 	session.readPrevious(reachable)
 	session.holdAliasHits(reachable)
@@ -697,24 +706,6 @@ func (session *CacheSession) sharedBodies() *decodedBodies {
 		return nil
 	}
 	return bodies
-}
-
-// entryAt is the entry store holds under key, or, when there is none, the entry the alias under key names, with the
-// key it is stored under. Only the project's store has aliases: the system cache's store holds the standard library
-// under first keys alone (keyStandardLibraryApart).
-func (session *CacheSession) entryAt(store *cache.Store, key cache.Key) ([]byte, cache.Key, bool) {
-	if contents, stored := store.Get(key); stored {
-		return contents, key, true
-	}
-	if session.aliases == nil || store != session.caching.Store {
-		return nil, cache.Key{}, false
-	}
-	storedKey, aliased := session.aliases.target(key)
-	if !aliased {
-		return nil, cache.Key{}, false
-	}
-	contents, stored := store.Get(storedKey)
-	return contents, storedKey, stored
 }
 
 // storeFor is the store keyed's entry is read from and written to: the system cache's store for a standard-library
@@ -950,6 +941,8 @@ func (session *CacheSession) save(
 	if session.keys != nil {
 		session.saveMisses([]*checker.Graph{graph}, missed, withheld, files)
 	}
+	// Once every entry of the run is written, the waves' and this save's, written through and rewritten.
+	session.writePacks()
 	if session.caching.Store == nil {
 		return
 	}
@@ -1021,7 +1014,7 @@ func (session *CacheSession) saveMisses(
 		return func() {
 			var putError error
 			if encodeError == nil && store != nil {
-				putError = putEntry(store, session.keys[saved], entry)
+				putError = session.putRecord(store, session.keys[saved], entry)
 			}
 			writesRecord := keepsRecord && store != nil
 			// A dependence record follows its entry, and only an entry whose write held (#6a3kjvz).
@@ -1148,22 +1141,22 @@ func (session *CacheSession) aliasWritten(
 }
 
 // putEntry writes entry's record under key in store, the package's (storeFor), its export data first, so a record is
-// never in the store before what it needs to be read. saveMisses and writeThrough run it with no slot of the run's
-// pool held (fanOutWriting). The export data is kept by its digest in the same store, and not written again when the
-// store holds it whole, as it does for a package another build wrote with the same types. The record holds its body,
-// or names the record that does (throughEntry).
-func putEntry(store *cache.Store, key cache.Key, entry encodedEntry) error {
+// never in the store before what it needs to be read, and returns the record's bytes as written. saveMisses and
+// writeThrough run it with no slot of the run's pool held (fanOutWriting). The export data is kept by its digest in the
+// same store, and not written again when the store holds it whole, as it does for a package another build wrote with
+// the same types. The record holds its body, or names the record that does (throughEntry).
+func putEntry(store *cache.Store, key cache.Key, entry encodedEntry) ([]byte, error) {
 	if entry.exportData != nil {
 		digest := exportDataDigest(entry.exportData)
 		if putError := store.PutAbsent(exportDataKey(digest), entry.exportData); putError != nil {
-			return putError
+			return nil, putError
 		}
 	}
 	record, encodeError := encodeRecord(entry.record)
 	if encodeError != nil {
-		return encodeError
+		return nil, encodeError
 	}
-	return store.Put(key, record)
+	return record, store.Put(key, record)
 }
 
 // storedEntry is the body and the record of an entry whose record's bytes are contents, read from store, and whether
