@@ -97,8 +97,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	// about 3 CPU-s at cohere's root at every width tried (#ghb3rcn), cause unmeasured, and warm it bought 0.10 s
 	// (#ybjbqm2). The host's counts are final here, its lint saved, so the decision reads them once.
 	gated := engine.takesShareGate(pass.result.Cache)
-	width, fixed := engine.fixedBuildsWidth(len(extras), pass.result.Host,
-		engine.plainRunTakesShareGate(pass.result.Cache))
+	width, fixed := engine.fixedBuildsWidth(len(extras), pass.result.Host, engine.hostMostlyHitStore(pass.result.Cache))
 	// Under `--timing` each build's heap is measured as its own (extraBuildRun), which holds only with every build
 	// running alone: a timed run keeps nothing for its builds, so they restore nothing and run one at a time already.
 	if engine.timing != nil {

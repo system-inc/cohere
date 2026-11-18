@@ -404,11 +404,45 @@ func TestAnAllHitWarmRunTakesTheShareGatesWidth(test *testing.T) {
 	}
 }
 
-// A run with a store that takes no share gate, its host mostly missed, still runs builds that would restore nothing
-// from the host's run one at a time, and one that takes the gate leaves their width to it (fixedBuildsWidth,
-// #s1hdd3z): over a host that kept nothing, a run whose plain twin takes no gate is fixed at one before a test's forced
-// width is read, and one whose plain twin takes it is given that forced width, as builds that restore are.
-func TestOnlyARunWithoutTheShareGateHoldsBuildsThatRestoreNothing(test *testing.T) {
+// A warm run judging each build's dependence takes the measured rule, as on 6a06be201 (#f9br7sg, #s1hdd3z): it takes
+// no share gate, and its host hit every package in its store and keeps none, which lets its builds past the guard for
+// builds that restore nothing, so the first build's holding is measured and decides the width. Over lowShareBuilds and
+// one store under `--build-dependence`, the first run fills it, and the second, every package hit, steps nothing at the
+// gate and runs its three builds at the width the first build's measured holding gives, more than one.
+func TestAWarmDependenceRunTakesTheMeasuredRule(test *testing.T) {
+	test.Parallel()
+	root := lowShareBuilds(test)
+	underCapRun(test, root, exitFindings, nil, "--build-dependence")
+	var stepped atomic.Int64
+	engine, raw, _ := underCapRun(test, root, exitFindings, func(engine *pipeline) {
+		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+	}, "--build-dependence")
+	lint := lintRecordOf(test, raw)
+	if !engine.censusKeepsHostRestoreOff || lint.Cache.Missed != 0 || lint.Cache.Hit == 0 ||
+		len(engine.buildRuns) != 4 {
+		test.Fatalf("the warm dependence run kept the census's restore off %t, its host hitting %d packages and "+
+			"missing %d, with %d runs beside it, want on, every package hit, and three builds: the premise",
+			engine.censusKeepsHostRestoreOff, lint.Cache.Hit, lint.Cache.Missed, len(engine.buildRuns)-1)
+	}
+	if stepped.Load() != 0 || lint.BuildsWidthFromHostLive || lint.BuildsWidthBuildBytes == 0 ||
+		lint.BuildsAtOnce <= 1 {
+		test.Fatalf("the warm dependence run stepped %d times at the share gate and ran %d builds at once, from the "+
+			"host's live heap %t, with a holding of %d bytes, want no step and more than one at once from a measured "+
+			"holding", stepped.Load(), lint.BuildsAtOnce, lint.BuildsWidthFromHostLive, lint.BuildsWidthBuildBytes)
+	}
+	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes, true)
+	if lint.BuildsAtOnce != want {
+		test.Errorf("the warm dependence run ran %d builds at once, want %d, the width the measured holding gives",
+			lint.BuildsAtOnce, want)
+	}
+}
+
+// Only a run whose host mostly hit its findings store lets builds that would restore nothing from the host's run past
+// the guard that runs them one at a time (fixedBuildsWidth, #s1hdd3z): over a host that kept nothing, a run whose host
+// did not is fixed at one before a test's forced width is read, and one whose host did is given that forced width, as
+// builds that restore are. A host mostly hit its store at or under lowShareAtGate's missed share, and never in a run
+// without a store, whatever its counts (hostMostlyHitStore).
+func TestOnlyAHostThatMostlyHitItsStoreLiftsTheGuard(test *testing.T) {
 	test.Parallel()
 	engine := &pipeline{
 		memory: &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
@@ -416,12 +450,31 @@ func TestOnlyARunWithoutTheShareGateHoldsBuildsThatRestoreNothing(test *testing.
 		buildsWidthForced: 3,
 	}
 	if width, fixed := engine.fixedBuildsWidth(3, nil, false); width != 1 || !fixed {
-		test.Errorf("a run taking no share gate over a host that kept nothing was given a width of %d, fixed %t, "+
-			"want 1, fixed", width, fixed)
+		test.Errorf("a run whose host did not mostly hit its store, over a host that kept nothing, was given a width "+
+			"of %d, fixed %t, want 1, fixed", width, fixed)
 	}
 	if width, fixed := engine.fixedBuildsWidth(3, nil, true); width != 3 || !fixed {
-		test.Errorf("a run taking the share gate over a host that kept nothing was given a width of %d, fixed %t, "+
-			"want the forced 3: the guard is the gate's to judge", width, fixed)
+		test.Errorf("a run whose host mostly hit its store, over a host that kept nothing, was given a width of %d, "+
+			"fixed %t, want the forced 3", width, fixed)
+	}
+	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil)}
+	for _, each := range []struct {
+		name   string
+		engine *pipeline
+		counts check.CacheCounts
+		want   bool
+	}{
+		{name: "a store, every package hit", engine: withStore, counts: check.CacheCounts{On: true, Hit: 200},
+			want: true},
+		{name: "a store, exactly at the line", engine: withStore, counts: check.CacheCounts{On: true, Hit: 90,
+			Missed: 10}, want: true},
+		{name: "a store, cold", engine: withStore, counts: check.CacheCounts{On: true, Missed: 200}, want: false},
+		{name: "no store, nothing missed", engine: &pipeline{}, counts: check.CacheCounts{On: true, Hit: 200},
+			want: false},
+	} {
+		if got := each.engine.hostMostlyHitStore(each.counts); got != each.want {
+			test.Errorf("%s: the host mostly hit its store %t, want %t", each.name, got, each.want)
+		}
 	}
 }
 

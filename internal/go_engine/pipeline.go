@@ -86,7 +86,7 @@ type pipeline struct {
 	// census alone (#0ghk7vj): a build's facts must be its own to be compared with the host's, and a package restored
 	// from the host's run carries the host's. Such a run checks every build from source, so a cold one is far slower
 	// than a plain one. It turns off the restore and nothing else: the builds' width is decided as a plain run's
-	// (wouldRestoreFromHost, plainRunTakesShareGate), since a warm run's builds each hit their own store whatever the
+	// (wouldRestoreFromHost, hostMostlyHitStore), since a warm run's builds each hit their own store whatever the
 	// restore, and one at a time cost such a run 1.0 to 1.5 s of wall over a plain warm run for the same CPU
 	// (#f9br7sg).
 	keepsHostRestoreOff       bool

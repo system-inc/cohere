@@ -643,12 +643,30 @@ func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
 	}
 }
 
-// Builds that restore nothing from the host's run run one at a time in a run that takes no share gate, whatever width
-// is asked: each checks every package, and two of those side by side under the cap made a run slower
-// (fixedBuildsWidth). With the restore off, a cold run over an empty store, its host missing every package, asked for
-// three at once over three extra builds runs one at a time and says so. A run that takes the gate leaves their width to
-// it (TestOnlyARunWithoutTheShareGateHoldsBuildsThatRestoreNothing).
+// Builds that restore nothing from the host's run run one at a time, whatever width is asked: each checks every
+// package, and two of those side by side under the cap made a run slower (extraBuildsWidth). With the restore off, a
+// run asked for three at once over three extra builds runs one at a time and says so.
 func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
+	test.Parallel()
+
+	engine, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
+		engine.keepsHostRestoreOff = true
+		engine.buildsWidthForced = 3
+	}, "--no-cache", "--other-builds")
+	if len(engine.buildRuns) != 4 || engine.buildsAtOnce != 1 {
+		test.Fatalf("with the restore off the run ran %d builds beside the host's, %d at once, want 3, one at a time",
+			len(engine.buildRuns)-1, engine.buildsAtOnce)
+	}
+	if !strings.Contains(raw, `"buildsAtOnce":1`) {
+		test.Errorf("the lint record does not say one build at a time:\n%s", raw)
+	}
+}
+
+// Builds that restore nothing from the host's run still run one at a time in a run with a findings store whose host
+// mostly missed it, a cold fill, which takes no share gate (fixedBuildsWidth, #s1hdd3z): only a host that mostly hit
+// its store lets their width past the guard. With the restore off, a cold run over an empty store asked for three at
+// once over three extra builds runs one at a time and says so.
+func TestBuildsThatRestoreNothingOverAColdStoreRunOneAtATime(test *testing.T) {
 	test.Parallel()
 
 	engine, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
@@ -660,8 +678,8 @@ func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
 			"package missed: the premise", engine.withFindingsStore(), lint.Cache.Hit, lint.Cache.Missed)
 	}
 	if len(engine.buildRuns) != 4 || engine.buildsAtOnce != 1 {
-		test.Fatalf("with the restore off the run ran %d builds beside the host's, %d at once, want 3, one at a time",
-			len(engine.buildRuns)-1, engine.buildsAtOnce)
+		test.Fatalf("with the restore off over a cold store the run ran %d builds beside the host's, %d at once, "+
+			"want 3, one at a time", len(engine.buildRuns)-1, engine.buildsAtOnce)
 	}
 	if !strings.Contains(raw, `"buildsAtOnce":1`) {
 		test.Errorf("the lint record does not say one build at a time:\n%s", raw)
@@ -674,8 +692,8 @@ func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
 // warm one under `--other-builds --build-dependence` keep as many host entries for the builds as under
 // `--other-builds` alone, and run as many builds at once, which the lint record says, while the switch's builds still
 // restore nothing from the host. Cold, the host keeps its packages and the width is the one a test forces, 3; warm,
-// it restored every package from its store, which it keeps none of, and a plain run of those counts takes the share
-// gate, which judges the width, so both run at the forced width again (#s1hdd3z).
+// it restored every package from its store, which it keeps none of, and a host that mostly hit its store lets the
+// builds past the guard for builds that restore nothing, so both run at the forced width again (#s1hdd3z).
 func TestADependenceRunKeepsAPlainRunsWidth(test *testing.T) {
 	test.Parallel()
 	// runsUnder runs a cold run and then a warm one over a fresh copy of threeExtraBuilds under switches at the forced
