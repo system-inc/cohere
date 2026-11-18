@@ -242,6 +242,15 @@ func (session *CacheSession) restoreFromHost(
 		case session.reloading(candidate) || state.excluded[candidate.ID]:
 			changes.changed[candidate.PkgPath] = true
 			continue
+		// A standard-library package the build holds in its own system store, which the host restored from its own
+		// and so kept no entry of, is no change when its own inputs are the host's, by the portable digest: it joins
+		// the walk as any package the build's own store holds does (ownHits), taken by its whole import closure, so
+		// it is visited, and what reads it with it, the moment anything below it is in D. One whose inputs differ is
+		// in D, as a package the host kept with other inputs is below.
+		case kept == nil && hit && session.KeptBySystemCache(candidate) &&
+			state.host.portables[candidate.ID] == portable[candidate] && portable[candidate] != (cache.Key{}):
+			ownHits = append(ownHits, candidate)
+			continue
 		case kept == nil:
 			changes.changed[candidate.PkgPath], changes.rewritten[candidate.PkgPath] = true, true
 			changes.reshaped[candidate.PkgPath] = true
@@ -366,7 +375,7 @@ func loadedSizes(loaded []*packages.Package) types.Sizes {
 }
 
 // unrestorableReads is why a visited package's reads can never hold, as a reason the record counts by its first word,
-// empty for reads a verdict judges: a package kept with persisted reads, as a table hit is, has its record judged by
+// empty for reads a verdict judges: a package kept with persisted reads has its record judged by
 // the verdict, which declines a record it cannot read or match before any read; one kept with none, or whose reads
 // are marked never or were never recorded, is declined here.
 func unrestorableReads(restoring Restoring) string {
@@ -658,7 +667,7 @@ func (session *CacheSession) writeThrough(
 	unsettled map[*packages.Package]bool,
 	knownFiles *knownFiles,
 ) map[*packages.Package]bool {
-	if session.host == nil || session.caching.Store == nil {
+	if session.host == nil || session.caching.Store == nil && !session.KeepsSystemCache() {
 		return nil
 	}
 	var through []*packages.Package
@@ -670,8 +679,10 @@ func (session *CacheSession) writeThrough(
 		hosted.lock.Lock()
 		held := hosted.settled && hosted.declined == ""
 		hosted.lock.Unlock()
-		// A package pending a reload is checked from source by the next load, which writes its entry as a miss.
-		if _, keyed := session.keys[candidate]; !held || !keyed || unsettled[candidate] ||
+		// A package pending a reload is checked from source by the next load, which writes its entry as a miss. One
+		// with no store, a project package under `--no-cache`, has no key either (keyStandardLibraryApart).
+		if _, keyed := session.keys[candidate]; !held || !keyed || session.storeFor(candidate) == nil ||
+			unsettled[candidate] ||
 			session.host.writtenThrough[candidate] ||
 			session.reloading(candidate) || !finishedClean(actionsOf[candidate]) {
 			continue
@@ -693,33 +704,45 @@ func (session *CacheSession) writeThrough(
 		key := session.keys[saved]
 		// The writes run with no slot held (fanOutWriting), as putEntry writes a miss's: the export data first, so an
 		// entry is never in the store before what it needs to be read, and only when the store does not hold it by its
-		// digest already, as it does for every package the host wrote, whose export data the build read.
+		// digest already, as it does for every package the host wrote, whose export data the build read. A
+		// standard-library package goes to the system cache's store under the build's own key, as its miss would.
 		hosted := throughHosted[index]
+		store := session.storeFor(saved)
 		return func() {
 			// A record of the host's the store holds, as it holds every one the host wrote there, is named and never
 			// read; a body with none, or whose record is not in this store, is held in the build's own record.
-			if encoded[index].record.BodyAt == nil ||
-				!session.caching.Store.Holds(cache.Key(encoded[index].record.BodyAt)) {
+			if encoded[index].record.BodyAt == nil || !store.Holds(cache.Key(encoded[index].record.BodyAt)) {
 				encoded[index].record.BodyAt = nil
 				encoded[index].record.Inline, writeErrors[index] = hostBody(hosted)
 				if writeErrors[index] != nil {
 					return
 				}
 			}
-			writeErrors[index] = session.putEntry(key, encoded[index])
+			writeErrors[index] = putEntry(store, key, encoded[index])
 		}
 	})
 	positionDependent := map[*packages.Package]bool{}
 	for index, saved := range through {
 		if writeErrors[index] != nil {
-			// A failed write is a problem, never a finding: the next run checks the package from source.
+			// A failed write is a problem, never a finding: the next run checks the package from source. One to the
+			// system cache's store is why the run could not keep it (SystemCacheFailure).
+			if session.storeFor(saved) != session.caching.Store {
+				session.systemCacheFailed(writeErrors[index])
+				continue
+			}
 			session.problem(fmt.Sprintf("writing through the entry of %s restored from the host: %v", saved.ID,
 				writeErrors[index]))
 			continue
 		}
 		if writable[index] {
 			session.host.writtenThrough[saved] = true
-			session.counts.WrittenThrough++
+			// A standard-library package written through to the system cache's store is counted as its miss would be
+			// there, apart from the project's.
+			if session.storeFor(saved) != session.caching.Store {
+				session.counts.SystemCacheWritten++
+			} else {
+				session.counts.WrittenThrough++
+			}
 			dependent, judgeError := encoded[index].positionDependent.read(saved.ID)
 			if judgeError != nil {
 				// Left out, the package is given no alias.
@@ -771,12 +794,13 @@ func (session *CacheSession) throughEntry(
 		}
 	}
 	// The body is the host's, named in the host's record, which the build's store holds once the host wrote it there;
-	// one it does not hold, kept from the binary's table or written to another store, writeThrough holds in the record
-	// itself, read from the host's entry (hostBody). Nothing of the body is decoded or encoded again: the record alone
-	// is the build's (#fq7dxvx).
+	// one it does not hold, written to another store, as a standard-library body the host wrote to the system cache's
+	// store is for a build under `--build-dependence`, which keeps none, writeThrough holds in the
+	// record itself, read from the host's entry (hostBody). Nothing of the body is decoded or encoded again: the record
+	// alone is the build's (#fq7dxvx).
 	encoded := encodedEntry{output: hosted.restored.output, hasOutput: hosted.restored.hasOutput}
 	// unsafe's entry holds no export data, as the build's own from source holds none (carriesExportData); the reader of
-	// one kept from the binary's table, which holds none for it, would refuse (#27r8r24).
+	// one that holds none for it would refuse (#27r8r24).
 	if carriesExportData(saved) && hosted.restored.types.ReadExportData != nil {
 		exportData, exportError := hosted.restored.types.ReadExportData()
 		if exportError != nil {
@@ -785,7 +809,7 @@ func (session *CacheSession) throughEntry(
 		encoded.exportData = exportData
 	}
 	// The record names the export data the build read by its digest, which is the host's record's own when the host
-	// wrote it, and new for one kept from the binary's table or from the host's memory under `--no-cache`.
+	// wrote it, and new for one kept from the host's memory under `--no-cache`.
 	reads, readsIncomplete := session.readsInBuild(saved.ID, hosted.restored.reads, hosted.restored.readsIncomplete)
 	encoded.record = entryRecord{Version: CacheFormatVersion, Body: hosted.restored.bodyDigest,
 		ExportData: exportDataDigest(encoded.exportData), Reads: reads, ReadsIncomplete: readsIncomplete}
@@ -813,8 +837,11 @@ func hostBody(hosted *hostRestore) ([]byte, error) {
 //
 // Neither can happen to an entry written through, so each is a problem the run reports, and the entry is still marked
 // incomplete so a next run never trusts it. Its restore held, and a restore holds only while readsHold finds every
-// read's owner among the build's packages by identifier; a write-through runs only with a store, and with a store the
-// session keys every package it reaches (cache.Keys keys all of them or fails), the same packages byIdentifier names.
+// read's owner among the build's packages by identifier; a write-through runs only for a package with a store, and the
+// session keys every owner such a package reads: with the project's store cache.Keys keys every package it reaches
+// (all of them or it fails), the same packages byIdentifier names, and under `--no-cache` only the standard library
+// is written through, whose packages read only the standard library's, which the session keys
+// (keyStandardLibraryApart).
 func (session *CacheSession) readsInBuild(written string, reads []storedRead, incomplete bool) ([]storedRead, bool) {
 	inBuild := make([]storedRead, 0, len(reads))
 	unnamed := incomplete
@@ -880,10 +907,10 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 
 // keepForBuilds is what the host's run keeps of each package it analyzed from source, among analyzed and what they
 // reach, whose reads can hold, for its extra builds to restore from (#b2t9xmf): the package's entry, read back from the
-// store when the run wrote one there, or else encoded here, as saveMisses encodes it, and held in memory, which a run
-// under `--no-cache` never stores. A package restored from the binary's table is kept from the table's entry, with the
-// reads the table persisted beside it (keepBinaryHit, #pcv6eff). Each package's portable digest is the one Restore
-// keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
+// store the run wrote it to, the system cache's for a standard-library package (storeFor), or else encoded here, as
+// saveMisses encodes it, and held in memory, which a run under `--no-cache` never stores. A package the run restored,
+// from either store, is not kept: each build reads its own. Each package's portable digest is the one Restore keyed
+// it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
 // without pays nothing. gathered gives the findings the run's gather made of each root action, which an encoded entry
 // holds rather than convert them again (see encodeEntry).
 func (session *CacheSession) keepForBuilds(
@@ -908,7 +935,9 @@ func (session *CacheSession) keepForBuilds(
 		reachable = append(reachable, keyedPackage)
 	}
 	session.know(reachable...)
-	if session.keys == nil {
+	// A run without the project's store names its reads' owners by the keys it computed for its builds, though it may
+	// key the standard library apart in session.keys for the system cache.
+	if session.caching.Store == nil {
 		session.buildKeys = keyed.Keys
 	}
 	actionsOf := map[*packages.Package][]*checker.Action{}
@@ -925,7 +954,10 @@ func (session *CacheSession) keepForBuilds(
 	// same memo, so a host that analyzes again after a reload keeps what its earlier loads decoded, and the run its
 	// last keep hands the builds holds all of it.
 	host := &HostRun{entries: map[string]*hostEntry{}, renderings: NewReadsBuild(), files: keyed.Files,
-		bodies: session.bodies}
+		bodies: session.bodies, portables: make(map[string]cache.Key, len(keyed.Portable))}
+	for keyedPackage, portable := range keyed.Portable {
+		host.portables[keyedPackage.ID] = portable
+	}
 	// Every package of one load has the load's sizes, the host's build's.
 	for keyedPackage := range keyed.Keys {
 		if keyedPackage.TypesSizes != nil {
@@ -935,16 +967,6 @@ func (session *CacheSession) keepForBuilds(
 	}
 	var encoding []*packages.Package
 	for keptPackage := range keyed.Portable {
-		// A package restored from the binary's table is kept from the table's entry and the reads it persisted.
-		if hit, fromTable := session.binaryHits[keptPackage]; fromTable && session.fromBinary[keptPackage] {
-			kept, keepError := session.keepBinaryHit(keptPackage, hit, keyed.Portable[keptPackage])
-			if keepError != nil {
-				session.problem(keepError.Error())
-				continue
-			}
-			host.entries[keptPackage.ID] = kept
-			continue
-		}
 		packageReads := reads[keptPackage]
 		if packageReads == nil || packageReads.Never() != "" || session.restored(keptPackage) {
 			continue
@@ -952,20 +974,22 @@ func (session *CacheSession) keepForBuilds(
 		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage]}
 		if session.written[keptPackage] {
 			key := session.keys[keptPackage]
-			// The record the run wrote of it holds its body, which a build writing the package through names.
+			// The record the run wrote of it holds its body, which a build writing the package through names, in the
+			// store the run wrote it to, the system cache's for a standard-library package (storeFor).
+			store := session.storeFor(keptPackage)
 			kept.bodyAt, kept.holdsBodyAt = key, true
 			kept.contents = func() ([]byte, entryRecord, func() ([]byte, error), error) {
-				contents, stored := session.caching.Store.Get(key)
+				contents, stored := store.Get(key)
 				if !stored {
 					return nil, entryRecord{}, nil, fmt.Errorf("the store holds no entry of %s", keptPackage.ID)
 				}
-				body, record, whole := storedEntry(session.caching.Store, contents)
+				body, record, whole := storedEntry(store, contents)
 				if !whole {
 					return nil, entryRecord{}, nil, fmt.Errorf("the store holds no whole entry of %s", keptPackage.ID)
 				}
 				// The export data is the one the record names by digest, read only when a load asks for it.
 				return body, record, func() ([]byte, error) {
-					return readExportDataByDigest(session.caching.Store, keptPackage, record.ExportData)
+					return readExportDataByDigest(store, keptPackage, record.ExportData)
 				}, nil
 			}
 			host.entries[keptPackage.ID] = kept
@@ -1070,9 +1094,8 @@ func (session *CacheSession) recordedDemandOf(saved *packages.Package) entryDema
 // portableKeys are reachable's keys as an extra build without a store computes them for the portable digests alone,
 // reading the digests of the files the host's run hashed rather than hash them again.
 func (session *CacheSession) portableKeys(loader string, reachable []*packages.Package) (*cache.Keyed, error) {
-	keyContext := session.caching.Context
-	keyContext.Build = append(slices.Clone(keyContext.Build), "loader="+loader)
-	return cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.host.host.files, session.caching.Held)
+	return cache.Keys(reachable, session.keyContextOf(loader), session.caching.ExtraInputs, session.host.host.files,
+		session.caching.Held)
 }
 
 // hostPortableKeys are portableKeys, nil when they cannot be computed, which restoreFromHost computes again and says

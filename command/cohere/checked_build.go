@@ -36,6 +36,10 @@ type checkedBuild struct {
 	// WrittenThrough is the packages it restored from the host's run whose entry it wrote to its own findings cache,
 	// so its next run hits them there, absent when 0.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
+	// SystemCacheRestored and SystemCacheWritten are the standard-library packages it restored from the system cache's
+	// table of its build context and the entries it added to that table (#syscache), each absent when 0.
+	SystemCacheRestored int `json:"systemCacheRestored,omitempty"`
+	SystemCacheWritten  int `json:"systemCacheWritten,omitempty"`
 	// SharedBodyHits is the packages it hit in its own findings cache whose body it took from the run's memo of
 	// decoded bodies rather than read and decode again (#qqyq61s), absent when 0.
 	SharedBodyHits int `json:"sharedBodyHits,omitempty"`
@@ -82,7 +86,8 @@ type checkedBuild struct {
 
 // line is the build's clause of the --verbose account, after "lint: ". The host's says what it covered, and the
 // findings the merge dropped of it only when there were any, since it adds none by definition; another's says what it
-// changed of the verdict, which is the point of checking it.
+// changed of the verdict, which is the point of checking it. Each says where its standard library came from
+// (systemCacheClause).
 func (build checkedBuild) line() string {
 	covered := counted(build.CompiledFiles, "file compiled", "files compiled") + ", " +
 		counted(build.AnalyzedPackages, "package analyzed", "packages analyzed")
@@ -91,7 +96,7 @@ func (build checkedBuild) line() string {
 		if build.FindingsDropped > 0 {
 			line += ", " + counted(build.FindingsDropped, "finding", "findings") + " dropped by the merge"
 		}
-		return line
+		return line + build.systemCacheClause()
 	}
 	// An untouched package is the host's checked package, never analyzed here, so its count stands beside the packages
 	// analyzed, which leave it out.
@@ -106,5 +111,19 @@ func (build checkedBuild) line() string {
 	if len(build.NotLinted) > 0 {
 		line += ", " + counted(len(build.NotLinted), "file", "files") + " compiled and not linted"
 	}
-	return line
+	return line + build.systemCacheClause()
+}
+
+// systemCacheClause is where the build's standard library came from and went (#syscache): the packages it restored
+// from its table of the system cache, or none, which says it computed its standard library or took it from the host's
+// run, and the entries it added to the table when it added any.
+func (build checkedBuild) systemCacheClause() string {
+	clause := ", standard library: none from the system cache"
+	if build.SystemCacheRestored > 0 {
+		clause = ", standard library: " + grouped(build.SystemCacheRestored) + " from the system cache"
+	}
+	if build.SystemCacheWritten > 0 {
+		clause += ", " + counted(build.SystemCacheWritten, "entry", "entries") + " written to it"
+	}
+	return clause
 }

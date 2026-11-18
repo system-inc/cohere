@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"cmp"
+	"go/types"
 	"slices"
 
 	"golang.org/x/tools/go/packages"
@@ -24,7 +25,8 @@ import (
 
 // readsOf is the reads the entry of saved holds: those held before, the entry's before a reload or the first wave's,
 // with every read the run's analysis of saved made, each naming its owner by ID and the owner's first key in this run,
-// sorted, and whether one could not be named, an object with no objectpath or an owner this run did not key.
+// or its standard-library key in a run that keyed no other, sorted, and whether one could not be named, an object with
+// no objectpath or an owner this run did not key.
 func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) ([]storedRead, bool) {
 	if session.readAfterKeep("readsOf, the reads of " + saved.ID) {
 		return held.reads, held.readsIncomplete
@@ -42,14 +44,7 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 	reads, complete := session.resolver.Reads(saved.Types)
 	incomplete = incomplete || !complete
 	for _, read := range reads {
-		owner := session.packageOf(read.Owner)
-		key, keyed := cache.Key{}, false
-		if owner != nil {
-			key, keyed = session.keys[owner]
-			if !keyed {
-				key, keyed = session.buildKeys[owner]
-			}
-		}
+		owner, key, keyed := session.ownerKeyOf(read.Owner)
 		if !keyed {
 			incomplete = true
 			continue
@@ -73,10 +68,66 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 	return sorted, incomplete
 }
 
-// holdAliasHits trusts every hit whose entry is its own: one from the binary's table, keyed by everything it read,
-// and one the store holds under the package's own first key, which holds every key below it. A hit an alias led to is
-// trusted once its reads hold (see readsHold), checked below it first, each package after everything it imports; one
-// whose reads do not hold is a miss, which the second key may restore once the first wave has run.
+// ownerKeyOf is the package whose types are ownerTypes, an answer's owner, and the key readsOf names it by: its first
+// key in this run, or the key a run without a store keyed it by for its builds, or its standard-library key. A run
+// without a store keys its packages only once it keeps them for its builds, after its saves, but it keys the standard
+// library before any: a standard-library package reads only the standard library's, so its entry's reads are always
+// named, and an extra build restoring it declines none of them as unnamed. It reports false for an owner it cannot
+// name.
+func (session *CacheSession) ownerKeyOf(ownerTypes *types.Package) (*packages.Package, cache.Key, bool) {
+	owner := session.packageOf(ownerTypes)
+	if owner == nil {
+		owner = session.standardLibraryOwnerOf(ownerTypes)
+	}
+	if owner == nil {
+		return nil, cache.Key{}, false
+	}
+	if key, keyed := session.keys[owner]; keyed {
+		return owner, key, true
+	}
+	if key, keyed := session.buildKeys[owner]; keyed {
+		return owner, key, true
+	}
+	key, keyed := session.standardLibraryKeys[owner]
+	return owner, key, keyed
+}
+
+// standardLibraryOwnerOf is the standard-library package whose types are owner, among those the session keyed, or nil.
+// A run beside the load tells the session of a package only as an action restores it, since no package's types are
+// final as the run starts (check.Run), so a standard-library package the run computed is unknown to packageOf when a
+// package above it is saved; its types are final by then, since the read was of them, so it is found by its import
+// path, then by its types. A path may name two packages the standard library's keys hold: a run over the standard
+// library itself loads a package beside its in-package test variant, both with the plain package's path, and the
+// keyer judges both its own (cache's isStandard reads files, module and imports, never the ID). Each has its own key,
+// so the package taken is the one whose types are owner's, never another under the same path.
+func (session *CacheSession) standardLibraryOwnerOf(owner *types.Package) *packages.Package {
+	for _, candidate := range session.standardLibraryByPath[owner.Path()] {
+		if candidate.Types == owner {
+			return candidate
+		}
+	}
+	return nil
+}
+
+// standardLibraryPackagesByPath are the packages of keys by import path, each path's in ID order, for
+// standardLibraryOwnerOf.
+func standardLibraryPackagesByPath(keys map[*packages.Package]cache.Key) map[string][]*packages.Package {
+	byPath := make(map[string][]*packages.Package, len(keys))
+	for keyed := range keys {
+		byPath[keyed.PkgPath] = append(byPath[keyed.PkgPath], keyed)
+	}
+	for _, sharing := range byPath {
+		slices.SortFunc(sharing, func(left *packages.Package, right *packages.Package) int {
+			return cmp.Compare(left.ID, right.ID)
+		})
+	}
+	return byPath
+}
+
+// holdAliasHits trusts every hit whose entry is its own: one its store, the project's or the system cache's, holds
+// under the package's own first key, which holds every key below it. A hit an alias led to is trusted once its reads
+// hold (see readsHold), checked below it first, each package after everything it imports; one whose reads do not hold
+// is a miss, which the second key may restore once the first wave has run.
 func (session *CacheSession) holdAliasHits(reachable []*packages.Package) {
 	session.trusted = map[*packages.Package]bool{}
 	session.byIdentifier = make(map[string]*packages.Package, len(reachable))
@@ -96,7 +147,7 @@ func (session *CacheSession) holdAliasHits(reachable []*packages.Package) {
 		if _, hit := session.hits[current]; !hit {
 			return
 		}
-		if key, keyed := session.keys[current]; session.fromBinary[current] || keyed && session.stored[current] == key {
+		if key, keyed := session.keys[current]; keyed && session.stored[current] == key {
 			session.trusted[current] = true
 			return
 		}

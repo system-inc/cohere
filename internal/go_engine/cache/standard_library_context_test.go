@@ -50,8 +50,8 @@ var everyStandardId = []string{errorsId, unsafeId, runtimeCgoId, fmtId, netId, h
 // standardContext is the context every test keys under unless it is the context being changed, its Goroot set to
 // the tree's.
 var standardContext = StandardLibraryContext{
-	FormatVersion: "1",
-	ReleaseStamp:  "v0.2.0 4e1427954",
+	FormatVersion:  "1",
+	EngineIdentity: "v0.2.0 4e1427954",
 	Build: []string{"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=-tags=probe", "GOVERSION=go1.27.3",
 		"GOEXPERIMENT="},
 	Facts:  []string{`fact_purity {"strict":"false"}`, "nilness"},
@@ -175,20 +175,22 @@ func TestStandardLibraryKeysCoverEveryStandardPackageAndAreTheSameAcrossCalls(te
 	expectChanged(test, "keying twice", keys, keyStandard(test, graph, standardContextAt(goroot)))
 }
 
-// relocatedKeys keys the same tree written below another root, so a key that holds where the installation is
-// fails the comparison with the tree's keys.
+// relocatedKeys keys the same tree written below another root, every key of which must differ from the tree's, since
+// a key holds where the installation is.
 func relocatedKeys(test *testing.T, keys map[string]Key) {
 	test.Helper()
 
 	elsewhere, elsewhereGraph := newStandardTree(test)
 	moved := keyStandard(test, elsewhereGraph, standardContextAt(elsewhere))
-	expectChanged(test, "the same files below another root", keys, moved)
+	expectChanged(test, "the same files below another root", keys, moved, everyStandardId...)
 }
 
-// Each field of the context changes what it must, and only that: the format version, the release stamp, each
+// Each field of the context changes what it must, and only that: the format version, the engine identity, each
 // entry of the build and a fact analyzer's flag change every key; the loader changes the key of a package with cgo
-// files and of every package that imports one, and of no other; and the root changes none when the files below it
-// are the same. A new field without a case here fails, since the fields are found by reflection.
+// files and of every package that imports one, and of no other; the C toolchain, `CGO_CFLAGS` alone, changes those
+// same keys under the cgo-translated loader and none under the source loader, where the cgo tool never runs; and the
+// root changes every key, the files below it the same. A new field without a case here fails, since the fields
+// are found by reflection.
 func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 	test.Parallel()
 
@@ -202,8 +204,8 @@ func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 		}
 	}
 	cases := map[string]func(*testing.T){
-		"FormatVersion": changeEvery(func(changed *StandardLibraryContext) { changed.FormatVersion += "+" }),
-		"ReleaseStamp":  changeEvery(func(changed *StandardLibraryContext) { changed.ReleaseStamp += "+" }),
+		"FormatVersion":  changeEvery(func(changed *StandardLibraryContext) { changed.FormatVersion += "+" }),
+		"EngineIdentity": changeEvery(func(changed *StandardLibraryContext) { changed.EngineIdentity += "+" }),
 		"Build": func(test *testing.T) {
 			for index, entry := range standardContext.Build {
 				name, _, _ := strings.Cut(entry, "=")
@@ -221,6 +223,18 @@ func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 			changed := standardContextAt(goroot)
 			changed.Loader = load.LoaderCgoTranslated
 			expectChanged(test, "the loader", keys, keyStandard(test, graph, changed), runtimeCgoId, netId, httpId)
+		},
+		"CgoToolchain": func(test *testing.T) {
+			translated := standardContextAt(goroot)
+			translated.Loader = load.LoaderCgoTranslated
+			translated.CgoToolchain = []string{"CC=clang", "CGO_CFLAGS=-O2 -g"}
+			flagged := translated
+			flagged.CgoToolchain = []string{"CC=clang", "CGO_CFLAGS=-O2 -g -DPROBE"}
+			expectChanged(test, "CGO_CFLAGS alone under the cgo-translated loader",
+				keyStandard(test, graph, translated), keyStandard(test, graph, flagged), runtimeCgoId, netId, httpId)
+			fromSource := standardContextAt(goroot)
+			fromSource.CgoToolchain = flagged.CgoToolchain
+			expectChanged(test, "the C toolchain under the source loader", keys, keyStandard(test, graph, fromSource))
 		},
 		"Goroot": func(test *testing.T) {
 			relocatedKeys(test, keys)
@@ -242,9 +256,10 @@ func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 	}
 }
 
-// The same standard library below two different roots keys alike, each copy's files read from its own root: a key
-// holds where a file is in the installation, never where the installation is, so a release's keys are a user's.
-func TestTheSameStandardLibraryBelowAnotherRootKeysAlike(test *testing.T) {
+// The same standard library below two different roots keys apart, each copy's files read from its own root: the
+// system cache's entries hold their installation's paths, so a key holds where the installation is (#syscache), and an
+// installation moved, or another beside it, never reads the other's entries.
+func TestTheSameStandardLibraryBelowAnotherRootKeysApart(test *testing.T) {
 	test.Parallel()
 
 	goroot, graph := newStandardTree(test)
@@ -375,17 +390,17 @@ func TestUnsafeIsKeyedByItsPathAloneInTheStandardLibrary(test *testing.T) {
 	expectChanged(test, "unsafe's file", keys, keyStandard(test, graph, standardContextAt(goroot)))
 }
 
-// No release stamp, or a root that is not absolute, keys nothing, and a standard-library file that cannot be read is
+// No engine identity, or a root that is not absolute, keys nothing, and a standard-library file that cannot be read is
 // an error naming it, as in Keys.
 func TestStandardLibraryKeysRefuseWhatTheyCannotVouchFor(test *testing.T) {
 	test.Parallel()
 
 	goroot, graph := newStandardTree(test)
-	unstamped := standardContextAt(goroot)
-	unstamped.ReleaseStamp = ""
+	unidentified := standardContextAt(goroot)
+	unidentified.EngineIdentity = ""
 	relative := standardContextAt(goroot)
 	relative.Goroot = filepath.Join("go", "root")
-	for name, refused := range map[string]StandardLibraryContext{"no release stamp": unstamped,
+	for name, refused := range map[string]StandardLibraryContext{"no engine identity": unidentified,
 		"a relative root": relative} {
 		keys, keysError := StandardLibraryKeys([]*packages.Package{graph[httpId]}, refused, FileDigests{})
 		if keysError == nil {

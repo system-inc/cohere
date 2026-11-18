@@ -14,43 +14,40 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
-	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 )
 
-// builtInStandardLibrary is the standard library's entries a run may read from the binary: the table, and the release
-// stamp it was written under, empty in a build that is no release. collected, when it is not nil, gains the
-// standard-library entries a cached run saves (see check.StandardLibraryCaching), for a test, or the release, to write
-// a table from.
-type builtInStandardLibrary struct {
-	table     *cache.StandardLibraryTable
+// standardLibrarySource is where a run's standard-library entries come from and go, the zero value a plain run's:
+// the system cache, its entries keyed by the executable's identity (see systemCache). stamp, when not empty, stands for
+// that identity in every standard-library key, as the release's generator keys the table it builds before the
+// executable it ships in exists. collected, when it is not nil, gains the standard-library entries a cached run saves
+// (see check.StandardLibraryCaching), for a test, or the release, to write a table from.
+type standardLibrarySource struct {
 	stamp     string
 	collected map[cache.Key]check.StandardLibraryRunEntry
 
 	// toolchain, when not empty, stands for go env's toolchain in the standard library's dependence records' keys,
 	// for a test that fakes a toolchain the records were written under (#6a3kjvz); every run leaves it empty.
 	toolchain string
+
+	// systemCacheRoot, when not empty, is the system cache's root in place of cache.SystemCacheRoot's, for a test that
+	// gives a run a system cache of its own beside others running in parallel; every run leaves it empty.
+	systemCacheRoot string
 }
 
-// embeddedStandardLibrary is the binary's own, parsed on its first lookup.
-var embeddedStandardLibrary = builtInStandardLibrary{
-	table: cache.NewStandardLibraryTable(standard_library_table.Contents),
-	stamp: standard_library_table.ReleaseStamp,
-}
-
-// lintCache is the per-package findings cache the lint phase reads and writes, at the root's `.cache/cohere/go`,
-// beside the front door's own cache in `.cache/cohere`, with the standard library's entries the binary carries when
-// it carries any under a release stamp. An empty stamp reads no table at all, so a build that is no release computes
-// the standard library as it always has. Under `--no-cache` it reads and writes no store: it is nil, or, when the
-// binary carries a table, a Caching with that table alone, since the standard library's entries are part of cohere
-// itself and nothing of the project's tree. A run judging each build's dependence reads them as any other run does: the
-// standard library it restores is judged on a graph of its own (buildDependenceGraph, #ss4t5g6). It is nil with an
-// error when what every key shares cannot be read, which
-// the run says on stderr and runs without it. environment is what the load the cache serves runs under, the
-// workspace's own for the host's build and with an extra build's target after it for that build, and goEnvironment
-// is go env's answer the load reads there, so the build context every key shares is the one of the build the load is
-// of, read from the go env the load asked rather than from one of its own (#4rpt1jh). goEnvironment is nil only for a
-// host whose census judged no file, which asked go env nothing; then it is read here, recorded in children, the run's
-// account of the go commands it starts (see load.Children).
+// lintCache is the per-package findings cache the lint phase reads and writes, at the root's `.cache/cohere/go`, beside
+// the front door's own cache in `.cache/cohere`, with the standard library's entries in the system cache's store,
+// system, when the run keeps one (#syscache). Under `--no-cache` it reads and writes no store: it is nil, or, when the
+// run keeps a system cache, a Caching with the system cache alone, since the standard library's entries are of cohere
+// and the Go installation and nothing of the project's tree. Under `--no-system-cache` the standard library is keyed
+// and stored as any other package, as it is when the run keeps no system cache. A run judging each build's dependence
+// reads the system cache as any other run does: the standard library it restores is judged on a graph of its own
+// (buildDependenceGraph, #ss4t5g6). It is nil with an error when what every key shares cannot be read, which the run
+// says on stderr and runs without it. environment is what the load the cache serves runs under, the workspace's own for
+// the host's build and with an extra build's target after it for that build, and goEnvironment is go env's answer the
+// load reads there, so the build context every key shares is the one of the build the load is of, read from the go env
+// the load asked rather than from one of its own (#4rpt1jh), and so each build reads its own context's standard-library
+// entries. goEnvironment is nil only for a host whose census judged no file, which asked go env nothing; then it is
+// read here, recorded in children, the run's account of the go commands it starts (see load.Children).
 func lintCache(
 	request invocation,
 	workspace project.Workspace,
@@ -58,12 +55,14 @@ func lintCache(
 	goEnvironment *load.GoEnvironment,
 	enabled []rule.Rule,
 	children *load.Children,
+	system *systemCache,
 ) (*check.Caching, error) {
-	builtIn := request.standardLibrary
-	holdsTable := builtIn.table != nil && !builtIn.table.Empty()
-	readsBuiltIn := builtIn.stamp != "" && (holdsTable || builtIn.collected != nil)
+	source := request.standardLibrary
+	// The standard library is keyed apart when there is a system cache to keep it or entries to collect for the
+	// release's table.
+	keysStandardLibrary := system.store != nil || source.collected != nil
 	noCache := request.switches["no-cache"]
-	if noCache && (!readsBuiltIn || !holdsTable) {
+	if noCache && system.store == nil {
 		return nil, nil
 	}
 	answered := goEnvironment
@@ -75,29 +74,28 @@ func lintCache(
 		}
 	}
 	values := answered.Values()
-	var standardLibrary *check.StandardLibraryCaching
-	if readsBuiltIn {
-		standardLibrary = &check.StandardLibraryCaching{
-			Context: cache.StandardLibraryContext{
-				FormatVersion: check.CacheFormatVersion,
-				ReleaseStamp:  builtIn.stamp,
-				Build:         standardLibraryBuild(values),
-				Goroot:        values["GOROOT"],
-			},
-			Collected: builtIn.collected,
-			// A standard-library dependence record is written under the toolchain that loaded it (#6a3kjvz).
-			Toolchain: cmp.Or(builtIn.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
-		}
-		if holdsTable {
-			standardLibrary.Table = builtIn.table
-		}
-	}
-	if noCache {
-		return &check.Caching{StandardLibrary: standardLibrary}, nil
-	}
 	identity, identityError := cache.ExecutableIdentity()
 	if identityError != nil {
 		return nil, fmt.Errorf("identifying the engine: %w", identityError)
+	}
+	var standardLibrary *check.StandardLibraryCaching
+	if keysStandardLibrary {
+		standardLibrary = &check.StandardLibraryCaching{
+			System: system.store,
+			Context: cache.StandardLibraryContext{
+				FormatVersion:  check.CacheFormatVersion,
+				EngineIdentity: cmp.Or(source.stamp, identity),
+				Build:          standardLibraryBuild(values),
+				CgoToolchain:   cgoToolchain(values),
+				Goroot:         values["GOROOT"],
+			},
+			Collected: source.collected,
+			// A standard-library dependence record is written under the toolchain that loaded it (#6a3kjvz).
+			Toolchain: cmp.Or(source.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
+		}
+	}
+	if noCache {
+		return &check.Caching{StandardLibrary: standardLibrary, CgoToolchain: cgoToolchain(values)}, nil
 	}
 	return &check.Caching{
 		Store:       cache.Open(workspace.Root),
@@ -109,15 +107,33 @@ func lintCache(
 			RuleSet:        cacheRuleSet(enabled),
 		},
 		StandardLibrary: standardLibrary,
+		CgoToolchain:    cgoToolchain(values),
 		AnswersInPart:   request.answersInPart,
 	}, nil
 }
 
+// cgoToolchain is the C toolchain of values, go env's answer as cacheBuild reads it, each of load.CgoToolchainNames
+// as "NAME=value" in its order, which every key holds under the cgo-translated loader (check.Caching.CgoToolchain,
+// cache.StandardLibraryContext.CgoToolchain).
+func cgoToolchain(values map[string]string) []string {
+	toolchain := make([]string, 0, len(load.CgoToolchainNames))
+	for _, name := range load.CgoToolchainNames {
+		toolchain = append(toolchain, name+"="+values[name])
+	}
+	return toolchain
+}
+
+// processGodebug is the process variable both the project's keys and the standard library's hold
+// (standardLibraryBuild), since the check of a package nothing reports on reads it as much as one's that is.
+const processGodebug = "GODEBUG"
+
 // processEnvironment are the engine process's own variables an analyzer reads, each named in the build context
 // whether it is set or not. asmdecl and framepointer read the target from go/build's build.Default, which comes from
 // the process's `GOOS` and `GOARCH`, not from go env, so the two can differ. staticcheck's TOML parser, which reads
-// staticcheck.conf, reads `BURNTSUSHI_TOML_110`.
-var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110"}
+// staticcheck.conf, reads `BURNTSUSHI_TOML_110`. The engine's own `GODEBUG` can change what go/types makes of a
+// package, as gotypesalias did until go1.27 removed it (export_data/predeclared.go), so every key holds it, the
+// standard library's too (processGodebug): no go/types setting is honored now, and holding it costs only a miss.
+var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110", processGodebug}
 
 // buildNames are what go env reports that every key's build context holds, in its order, each among what
 // load.GoEnvironment asks go env (a test holds it to that).
@@ -139,14 +155,18 @@ func cacheBuild(values map[string]string) []string {
 		build = append(build, name+"="+values[name])
 	}
 	for _, name := range processEnvironment {
-		value, set := os.LookupEnv(name)
-		if !set {
-			build = append(build, "process "+name+" unset")
-			continue
-		}
-		build = append(build, "process "+name+"="+value)
+		build = append(build, processVariable(name))
 	}
 	return build
+}
+
+// processVariable is the engine process's own variable name as a build context names it, whether it is set or not.
+func processVariable(name string) string {
+	value, set := os.LookupEnv(name)
+	if !set {
+		return "process " + name + " unset"
+	}
+	return "process " + name + "=" + value
 }
 
 // flagsNoStandardLibraryReads are the go flags that, beyond those load.VerdictFlags leaves out, change nothing of a
@@ -165,11 +185,12 @@ var flagsNoStandardLibraryReads = []string{"trimpath", "mod", "modfile", "modcac
 
 // standardLibraryBuild is the build context every standard-library key shares, in cacheBuild's order: of values,
 // go env's answer as cacheBuild reads it, the target, cgo, the flags narrowed for the standard library (see
-// flagsNoStandardLibraryReads), the toolchain and its experiments. It holds none of the process's own variables, since
-// nothing on the fact path reads them: asmdecl and framepointer, which read the process's target, have no facts, and
-// no fact analyzer reads staticcheck's config, whose reading `BURNTSUSHI_TOML_110` changes.
+// flagsNoStandardLibraryReads), the toolchain and its experiments, then the process's `GODEBUG` (processGodebug). It
+// holds none of the process's other variables, since nothing on the fact path reads them: asmdecl and framepointer,
+// which read the process's target, have no facts, and no fact analyzer reads staticcheck's config, whose reading
+// `BURNTSUSHI_TOML_110` changes.
 func standardLibraryBuild(values map[string]string) []string {
-	build := make([]string, 0, len(buildNames))
+	build := make([]string, 0, len(buildNames)+1)
 	for _, name := range buildNames {
 		if name != "GOFLAGS" {
 			build = append(build, name+"="+values[name])
@@ -184,7 +205,7 @@ func standardLibraryBuild(values map[string]string) []string {
 		}
 		build = append(build, name+"="+strings.Join(kept, " "))
 	}
-	return build
+	return append(build, processVariable(processGodebug))
 }
 
 // cacheRuleSet is each enabled rule as its name, then its analyzer's options as they were resolved from the

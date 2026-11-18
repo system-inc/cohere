@@ -1,92 +1,79 @@
 package go_engine
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/gob"
-	"encoding/hex"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
 
-	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
-	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
-// engineTestsStamp is the release stamp the engine's tests write their tables under.
+// engineTestsStamp is the stamp the engine's tests write their tables under, in the engine's identity's place.
 const engineTestsStamp = "engine tests"
 
 // standardLibraryFixture is the fixture whose standard-library packages the tests write tables of: it reaches
 // errors, fmt, log/slog, strings and unicode/utf8, and its two findings read fmt's facts and slog's positions.
 var standardLibraryFixture = filepath.Join("testdata", "standard-library")
 
-// standardLibraryTableOf is the table of every standard-library package a cached run over a fresh copy of the fixture
-// saves, under stamp, with registered as the rules and prepare, when it is not nil, run over the copy first, and the
-// entries it was written from.
-func standardLibraryTableOf(
+// filledSystemCache is a run's standard library from a system cache of the test's own, filled by a run under
+// `--no-cache` over a fresh copy of the fixture, under stamp, or the executable's identity when it is empty, with
+// registered as the rules and prepare, when it is not nil, run over the copy first, and how many standard-library
+// entries that run wrote there: a later run under the same identity, build, fact analyzers and `GOROOT` restores
+// them, and one under any other keys every package apart.
+func filledSystemCache(
 	test *testing.T,
 	registered []rule.Rule,
 	stamp string,
 	prepare func(root string),
-) ([]byte, map[cache.Key]check.StandardLibraryRunEntry) {
+) (standardLibrarySource, int) {
 	test.Helper()
 	root := copyFixture(test, standardLibraryFixture)
 	if prepare != nil {
 		prepare(root)
 	}
-	collected := map[cache.Key]check.StandardLibraryRunEntry{}
-	runEngineWith(test, root, builtInStandardLibrary{stamp: stamp, collected: collected}, registered)
-	if len(collected) == 0 {
-		test.Fatal("want the cached run to collect the standard library's entries")
+	source := standardLibrarySource{stamp: stamp, systemCacheRoot: test.TempDir()}
+	filling := runEngineWith(test, root, source, registered, "--no-cache")
+	if filling.counts.SystemCacheWritten == 0 {
+		test.Fatalf("want the filling run to write the standard library to the system cache, got %+v", filling.counts)
 	}
-	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
-	if tableError != nil {
-		test.Fatalf("writing the table: %v", tableError)
-	}
-	return table, collected
+	return source, filling.counts.SystemCacheWritten
 }
 
-// readingTable is the binary's entries as a run reads table under stamp.
-func readingTable(table []byte, stamp string) builtInStandardLibrary {
-	return builtInStandardLibrary{table: cache.NewStandardLibraryTable(table), stamp: stamp}
+// onlyFromSystemCache is counts with only what a run under `--no-cache` may count kept: how many packages came from
+// the system cache and how many entries it wrote there, and the facts restored from it whose object a package's export
+// data lacks, which are skipped and counted.
+func onlyFromSystemCache(counts contract.LintCache) contract.LintCache {
+	return contract.LintCache{FromSystemCache: counts.FromSystemCache, SystemCacheWritten: counts.SystemCacheWritten,
+		FactsSkipped: counts.FactsSkipped}
 }
 
-// onlyFromBinary is counts with only what a run under `--no-cache` may count kept: how many packages came from the
-// binary, and the facts restored from it whose object a package's export data lacks, which are skipped and counted.
-func onlyFromBinary(counts contract.LintCache) contract.LintCache {
-	return contract.LintCache{FromBinary: counts.FromBinary, FactsSkipped: counts.FactsSkipped}
-}
-
-// A run under `--no-cache` restores every standard-library package from the binary's table: the count says how many,
-// no store count moves, no store is made, and every record is the plain `--no-cache` run's, printf's finding from
-// fmt's restored facts and structtag's, which names a line of log/slog's from its export data, among them.
-func TestTheStandardLibraryComesFromTheBinaryUnderNoCache(test *testing.T) {
+// A run under `--no-cache` restores every standard-library package from the system cache's table: the count says how
+// many, no store count moves, no store is made, and every record is the plain `--no-cache` run's, printf's finding
+// from fmt's restored facts and structtag's, which names a line of log/slog's from its export data, among them.
+func TestTheStandardLibraryComesFromTheSystemCacheUnderNoCache(test *testing.T) {
 	test.Parallel()
 
-	table, collected := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache")
-	fromBinary := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-	if fromBinary.counts != onlyFromBinary(fromBinary.counts) || fromBinary.counts.FromBinary != len(collected) {
-		test.Fatalf("want all %d standard-library packages from the binary and nothing else counted, got %+v",
-			len(collected), fromBinary.counts)
+	fromSystemCache := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	if fromSystemCache.counts != onlyFromSystemCache(fromSystemCache.counts) ||
+		fromSystemCache.counts.FromSystemCache != written || fromSystemCache.counts.SystemCacheWritten != 0 {
+		test.Fatalf("want all %d standard-library packages from the system cache, none written and nothing else "+
+			"counted, got %+v", written, fromSystemCache.counts)
 	}
-	if fromBinary.withoutCounts != plain.withoutCounts {
-		test.Fatalf("from the binary\n%s\nplain\n%s", fromBinary.withoutCounts, plain.withoutCounts)
+	if fromSystemCache.withoutCounts != plain.withoutCounts {
+		test.Fatalf("from the system cache\n%s\nplain\n%s", fromSystemCache.withoutCounts, plain.withoutCounts)
 	}
 	for _, expected := range []string{`"rule":"cohere-go/printf"`, `"rule":"cohere-go/structtag"`, "also at"} {
-		if !strings.Contains(fromBinary.stream, expected) {
-			test.Errorf("want %s in\n%s", expected, fromBinary.stream)
+		if !strings.Contains(fromSystemCache.stream, expected) {
+			test.Errorf("want %s in\n%s", expected, fromSystemCache.stream)
 		}
 	}
 	if _, statError := os.Stat(filepath.Join(root, ".cache")); !os.IsNotExist(statError) {
@@ -94,69 +81,35 @@ func TestTheStandardLibraryComesFromTheBinaryUnderNoCache(test *testing.T) {
 	}
 }
 
-// A cached run restores the standard library from the binary and the rest from its store: no standard-library package
-// from the binary is written to the store, so the run misses and writes only what a run without the table misses
-// beyond it, and every record, warm or cold, is the plain `--no-cache` run's.
-func TestTheBinaryEntriesChangeNoRecordInACachedRun(test *testing.T) {
+// A cached run restores the standard library from the system cache and the rest from its store: no standard-library
+// package from the system cache is written to the store, so the run misses and writes only what a run without the
+// table misses beyond it, and every record, warm or cold, is the plain `--no-cache` run's.
+func TestTheSystemCachesEntriesChangeNoRecordInACachedRun(test *testing.T) {
 	test.Parallel()
 
-	table, collected := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
-	withoutTable := runCachedEngine(test, copyFixture(test, standardLibraryFixture))
+	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	withoutTable := runCachedEngine(test, copyFixture(test, standardLibraryFixture), "--no-system-cache")
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache")
-	builtIn := readingTable(table, engineTestsStamp)
-	cold := runEngineWith(test, root, builtIn, rules.All())
-	if !cold.counts.On || cold.counts.Hit != 0 || cold.counts.FromBinary != len(collected) ||
-		cold.counts.Missed != withoutTable.counts.Missed-len(collected) || cold.counts.Written == 0 ||
+	cold := runEngineWith(test, root, reading, rules.All())
+	if !cold.counts.On || cold.counts.Hit != 0 || cold.counts.FromSystemCache != written ||
+		cold.counts.Missed != withoutTable.counts.Missed-written || cold.counts.Written == 0 ||
 		cold.counts.Written+cold.counts.Unstorable > cold.counts.Missed {
-		test.Fatalf("want the %d standard-library packages from the binary, and only the rest missed and written, "+
-			"without the table %+v, with it %+v", len(collected), withoutTable.counts, cold.counts)
+		test.Fatalf("want the %d standard-library packages from the system cache, and only the rest missed and "+
+			"written, without the table %+v, with it %+v", written, withoutTable.counts, cold.counts)
 	}
 	if cold.withoutCounts != plain.withoutCounts {
 		test.Fatalf("cold with the table\n%s\nplain\n%s", cold.withoutCounts, plain.withoutCounts)
 	}
-	warm := runEngineWith(test, root, builtIn, rules.All())
-	if warm.counts.Hit != cold.counts.Written || warm.counts.FromBinary != len(collected) ||
+	warm := runEngineWith(test, root, reading, rules.All())
+	if warm.counts.Hit != cold.counts.Written || warm.counts.FromSystemCache != written ||
 		warm.counts.Missed != cold.counts.Missed-cold.counts.Written {
-		test.Fatalf("want every package written cold hit warm, beside the same from the binary, cold %+v, warm %+v",
-			cold.counts, warm.counts)
+		test.Fatalf("want every package written cold hit warm, beside the same from the system cache, cold %+v, "+
+			"warm %+v", cold.counts, warm.counts)
 	}
 	if warm.withoutCounts != plain.withoutCounts {
 		test.Fatalf("warm with the table\n%s\nplain\n%s", warm.withoutCounts, plain.withoutCounts)
 	}
-}
-
-// plantedRecord is the findings cache's record of an entry as gob reads it, field for field by name, holding the
-// entry's body (Inline) when it was written from source, so a test can change what a stored entry holds and write it
-// back whole.
-type plantedRecord struct {
-	Version         string
-	Body            []byte
-	Inline          []byte
-	BodyAt          []byte
-	ExportData      []byte
-	Reads           []plantedRead
-	ReadsIncomplete bool
-}
-
-// plantedRead is one read a plantedRecord holds.
-type plantedRead struct {
-	Kind     string
-	Owner    string
-	OwnerKey []byte
-	Path     string
-	Value    []byte
-}
-
-// plantedEntry is the findings cache's entry as gob reads it, field for field by name, so a test can change what a
-// stored entry's body holds and write it back.
-type plantedEntry struct {
-	Version   string
-	Analyzers map[string]plantedAnalysis
-	Imports   []string
-	Withheld  load.PackageWithheld
-	Files     []plantedFile
-	Output    []byte
 }
 
 // plantedAnalysis is one analyzer's part of a plantedEntry.
@@ -178,118 +131,6 @@ type plantedFact struct {
 	Encoded []byte
 }
 
-// plantedFile is one file's walk.
-type plantedFile struct {
-	Name      string
-	Nodes     int
-	Generated bool
-	Copied    bool
-}
-
-// Under `--no-cache` the binary's entries are read and nothing else. A store a cached run wrote holds log/slog's entry
-// under the key a cached run reads it by, planted with a withheld error the types record would name, and the table
-// holds every standard-library package but log/slog. The run under `--no-cache` restores the rest from the table and
-// computes log/slog, never reading the planted body, and leaves the store as it was; the cached run after it reads the
-// planted body, so the entry was whole and under the key that matches. log/slog is the one package the table leaves
-// out because no other standard-library package the fixture reaches imports it: export data is shallow, so a package
-// left out of the table leaves every package that reaches it unreadable from the table too.
-func TestOnlyTheBinaryEntriesAreReadUnderNoCache(test *testing.T) {
-	test.Parallel()
-
-	root := copyFixture(test, standardLibraryFixture)
-	collected := map[cache.Key]check.StandardLibraryRunEntry{}
-	runEngineWith(test, root, builtInStandardLibrary{stamp: engineTestsStamp, collected: collected}, rules.All())
-	var slogEntry plantedEntry
-	found := false
-	for key, entry := range collected {
-		var decoded plantedEntry
-		if decodeError := gob.NewDecoder(bytes.NewReader(entry.Entry)).Decode(&decoded); decodeError != nil {
-			test.Fatalf("reading %s's collected entry: %v", entry.PackagePath, decodeError)
-		}
-		if slices.Contains(decoded.Imports, "log/slog") {
-			test.Fatalf("want no standard-library package to import log/slog, got %s", entry.PackagePath)
-		}
-		if entry.PackagePath == "log/slog" {
-			slogEntry = decoded
-			found = true
-			delete(collected, key)
-		}
-	}
-	if !found {
-		test.Fatal("want log/slog among the collected entries")
-	}
-	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
-	if tableError != nil {
-		test.Fatalf("writing the table: %v", tableError)
-	}
-
-	store := cache.Open(root)
-	var stored []cache.Key
-	var record plantedRecord
-	walkError := filepath.WalkDir(filepath.Join(root, ".cache", "cohere", "go"),
-		func(path string, entry fs.DirEntry, pathError error) error {
-			if pathError != nil || entry.IsDir() {
-				return pathError
-			}
-			decoded, decodeError := hex.DecodeString(entry.Name())
-			if decodeError != nil || len(decoded) != len(cache.Key{}) {
-				return nil
-			}
-			contents, found := store.Get(cache.Key(decoded))
-			var read plantedRecord
-			if !found || gob.NewDecoder(bytes.NewReader(contents)).Decode(&read) != nil || read.Inline == nil {
-				return nil
-			}
-			var body plantedEntry
-			if gob.NewDecoder(bytes.NewReader(read.Inline)).Decode(&body) == nil && reflect.DeepEqual(body,
-				slogEntry) {
-				stored, record = append(stored, cache.Key(decoded)), read
-			}
-			return nil
-		})
-	if walkError != nil || len(stored) != 1 {
-		test.Fatalf("want log/slog's entry in the store once, found it under %v (%v)", stored, walkError)
-	}
-	planted := slogEntry
-	planted.Withheld.Errors = append(planted.Withheld.Errors, load.WithheldError{
-		File: filepath.Join(root, "planted_by_the_test.go"), Line: 1, Column: 1, Message: "planted by the test",
-	})
-	var body bytes.Buffer
-	if encodeError := gob.NewEncoder(&body).Encode(planted); encodeError != nil {
-		test.Fatalf("writing the planted body: %v", encodeError)
-	}
-	digest := sha256.Sum256(body.Bytes())
-	record.Inline, record.Body = body.Bytes(), digest[:]
-	var encoded bytes.Buffer
-	if encodeError := gob.NewEncoder(&encoded).Encode(record); encodeError != nil {
-		test.Fatalf("writing the planted record: %v", encodeError)
-	}
-	if putError := store.Put(stored[0], encoded.Bytes()); putError != nil {
-		test.Fatalf("planting the entry: %v", putError)
-	}
-
-	before := entriesIn(test, root)
-	uncached := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-	if strings.Contains(uncached.stream, "planted_by_the_test") {
-		test.Fatalf("want the planted body never read under --no-cache, got\n%s", uncached.stream)
-	}
-	if uncached.counts != onlyFromBinary(uncached.counts) || uncached.counts.FromBinary != len(collected) {
-		test.Fatalf("want the %d packages in the table from the binary and nothing from the store, got %+v",
-			len(collected), uncached.counts)
-	}
-	if after := entriesIn(test, root); len(after) != len(before) || !equalEntries(before, after) {
-		test.Fatalf("want the store untouched under --no-cache, before %v, after %v", before, after)
-	}
-	plain := runCachedEngine(test, root, "--no-cache")
-	if uncached.withoutCounts != plain.withoutCounts {
-		test.Fatalf("from the binary\n%s\nplain\n%s", uncached.withoutCounts, plain.withoutCounts)
-	}
-	if cached := runCachedEngine(test, root); !strings.Contains(cached.stream, "planted_by_the_test") {
-		test.Fatalf("want a cached run to read the planted entry, so it is whole and under log/slog's key, got\n%s",
-			cached.stream)
-	}
-}
-
 // equalEntries reports whether two listings of a store name the same files with the same modification times.
 func equalEntries(before map[string]string, after map[string]string) bool {
 	for path, modified := range before {
@@ -300,40 +141,19 @@ func equalEntries(before map[string]string, after map[string]string) bool {
 	return len(before) == len(after)
 }
 
-// A build with no release stamp reads no table, whatever it embeds: under `--no-cache` it is the run without the
-// cache it always was, making no store, and a cached run restores nothing from the binary. A stamp that reached the
-// session empty would be refused there, which the run would say on stderr.
-func TestAnEmptyStampReadsNoTable(test *testing.T) {
+// The system cache's entries written under one engine identity restore nothing under another: every standard-library
+// package computes, and the records are the plain run's.
+func TestASystemCacheUnderAnotherIdentityRestoresNothing(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
-	root := copyFixture(test, standardLibraryFixture)
-	unstamped := readingTable(table, "")
-	if uncached := runEngineWith(test, root, unstamped, rules.All(), "--no-cache"); uncached.counts !=
-		(contract.LintCache{}) {
-		test.Fatalf("want nothing counted under --no-cache without a stamp, got %+v", uncached.counts)
-	}
-	if _, statError := os.Stat(filepath.Join(root, ".cache")); !os.IsNotExist(statError) {
-		test.Fatalf("want no store made under --no-cache, got %v", statError)
-	}
-	if cached := runEngineWith(test, root, unstamped, rules.All()); cached.counts.FromBinary != 0 ||
-		cached.counts.Hit != 0 {
-		test.Fatalf("want nothing from the binary without a stamp, got %+v", cached.counts)
-	}
-}
-
-// A table written under one release stamp restores nothing under another: every standard-library package computes,
-// and the records are the plain run's.
-func TestATableUnderAnotherStampRestoresNothing(test *testing.T) {
-	test.Parallel()
-
-	table, _ := standardLibraryTableOf(test, rules.All(), "release one", nil)
+	reading, _ := filledSystemCache(test, rules.All(), "release one", nil)
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache")
-	other := runEngineWith(test, root, readingTable(table, "release two"), rules.All(), "--no-cache")
-	if other.counts != (contract.LintCache{}) || other.withoutCounts != plain.withoutCounts {
-		test.Fatalf("want nothing from the binary and the plain run's records, got %+v\n%s\nplain\n%s", other.counts,
-			other.withoutCounts, plain.withoutCounts)
+	reading.stamp = "release two"
+	other := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	if other.counts.FromSystemCache != 0 || other.withoutCounts != plain.withoutCounts {
+		test.Fatalf("want nothing from the system cache and the plain run's records, got %+v\n%s\nplain\n%s",
+			other.counts, other.withoutCounts, plain.withoutCounts)
 	}
 }
 
@@ -361,9 +181,10 @@ func probeFactsRule() rule.Rule {
 	return rule.Rule{Name: rule.Namespace + "correctness-probe-facts", Origin: rule.OriginHouse, Analyzer: analyzer}
 }
 
-// A table written while a fact analyzer had one option value restores nothing in a run where it has another, since
-// every standard-library key holds the fact analyzers' options, and restores everything under the same value.
-func TestATableUnderAnotherFactOptionRestoresNothing(test *testing.T) {
+// The system cache's entries written while a fact analyzer had one option value restore nothing in a run where it has
+// another, since every standard-library key holds the fact analyzers' options, and restore everything under the same
+// value.
+func TestASystemCacheUnderAnotherFactOptionRestoresNothing(test *testing.T) {
 	test.Parallel()
 
 	registered := append(rules.All(), probeFactsRule())
@@ -376,35 +197,35 @@ func TestATableUnderAnotherFactOptionRestoresNothing(test *testing.T) {
 			}
 		}
 	}
-	table, collected := standardLibraryTableOf(test, registered, engineTestsStamp, settingMode("first"))
+	filled, written := filledSystemCache(test, registered, engineTestsStamp, settingMode("first"))
 	for _, reading := range []struct {
-		mode       string
-		fromBinary int
-	}{{mode: "first", fromBinary: len(collected)}, {mode: "second"}} {
+		mode            string
+		fromSystemCache int
+	}{{mode: "first", fromSystemCache: written}, {mode: "second"}} {
 		root := copyFixture(test, standardLibraryFixture)
 		settingMode(reading.mode)(root)
-		plain := runEngineWith(test, root, embeddedStandardLibrary, registered, "--no-cache")
-		read := runEngineWith(test, root, readingTable(table, engineTestsStamp), registered, "--no-cache")
-		if read.counts.FromBinary != reading.fromBinary || read.withoutCounts != plain.withoutCounts {
-			test.Errorf("mode %s: want %d from the binary and the plain run's records, got %+v\n%s\nplain\n%s",
-				reading.mode, reading.fromBinary, read.counts, read.withoutCounts, plain.withoutCounts)
+		plain := runEngineWith(test, root, standardLibrarySource{}, registered, "--no-cache")
+		read := runEngineWith(test, root, filled, registered, "--no-cache")
+		if read.counts.FromSystemCache != reading.fromSystemCache || read.withoutCounts != plain.withoutCounts {
+			test.Errorf("mode %s: want %d from the system cache and the plain run's records, got %+v\n%s\nplain\n%s",
+				reading.mode, reading.fromSystemCache, read.counts, read.withoutCounts, plain.withoutCounts)
 		}
 	}
 }
 
-// A table written under one build restores nothing under another: a run whose go flags name a build tag keys every
-// standard-library package apart, though no file the tag could choose is among them.
+// The system cache's entries written under one build restore nothing under another: a run whose go flags name a build
+// tag keys every standard-library package apart, though no file the tag could choose is among them.
 //
 // Not parallel: it sets the process's own `GOFLAGS`, which every go command the engine runs reads.
-func TestATableUnderAnotherBuildRestoresNothing(test *testing.T) {
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+func TestASystemCacheUnderAnotherBuildRestoresNothing(test *testing.T) {
+	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	test.Setenv("GOFLAGS", "-tags=probe")
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache")
-	other := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-	if other.counts != (contract.LintCache{}) || other.withoutCounts != plain.withoutCounts {
-		test.Fatalf("want nothing from the binary and the plain run's records, got %+v\n%s\nplain\n%s", other.counts,
-			other.withoutCounts, plain.withoutCounts)
+	other := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	if other.counts.FromSystemCache != 0 || other.withoutCounts != plain.withoutCounts {
+		test.Fatalf("want nothing from the system cache and the plain run's records, got %+v\n%s\nplain\n%s",
+			other.counts, other.withoutCounts, plain.withoutCounts)
 	}
 }
 
@@ -451,35 +272,46 @@ func mirroredGoRoot(test *testing.T, goRoot string, changed string, suffix strin
 	return mirror
 }
 
-// A standard-library file whose bytes are not the ones the table was written from misses its package, and every
-// package that imports it, directly or not: an installation like the local one but for a comment added to
-// unicode/utf8's utf8.go restores some packages from the binary and computes the rest, and the records are the plain
-// run's under that installation.
+// A standard-library file edited in place, its installation where it was, misses its package and every package that
+// imports it, directly or not: over an installation like the local one but for its own copy of unicode/utf8's
+// utf8.go, the system cache filled there restores some packages and computes the rest once a comment is added to that
+// copy, and the records are the plain run's under the edited installation.
 //
 // Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
-func TestAStandardLibraryFileWithOtherBytesMisses(test *testing.T) {
-	table, collected := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+func TestAStandardLibraryFileEditedInPlaceMisses(test *testing.T) {
 	root := copyFixture(test, standardLibraryFixture)
 	goRoot := goEnvironmentIn(test, root, nil)["GOROOT"]
-	test.Setenv("GOROOT", mirroredGoRoot(test, goRoot, "src/unicode/utf8/utf8.go", "\n// Changed by the test.\n"))
+	mirror := mirroredGoRoot(test, goRoot, "src/unicode/utf8/utf8.go", "")
+	test.Setenv("GOROOT", mirror)
+	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	edited, openError := os.OpenFile(filepath.Join(mirror, "src", "unicode", "utf8", "utf8.go"),
+		os.O_APPEND|os.O_WRONLY, 0)
+	if openError != nil {
+		test.Fatal(openError)
+	}
+	_, appendError := edited.WriteString("\n// Changed by the test.\n")
+	if closeError := edited.Close(); appendError != nil || closeError != nil {
+		test.Fatalf("editing utf8.go: %v %v", appendError, closeError)
+	}
 	plain := runCachedEngine(test, root, "--no-cache")
-	changed := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-	if changed.counts.FromBinary == 0 || changed.counts.FromBinary >= len(collected) {
-		test.Fatalf("want some of the %d packages from the binary and unicode/utf8's importers computed, got %+v",
-			len(collected), changed.counts)
+	changed := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	if changed.counts.FromSystemCache == 0 || changed.counts.FromSystemCache >= written {
+		test.Fatalf("want some of the %d packages from the system cache and unicode/utf8's importers computed, got %+v",
+			written, changed.counts)
 	}
 	if changed.withoutCounts != plain.withoutCounts {
 		test.Fatalf("with utf8.go changed\n%s\nplain\n%s", changed.withoutCounts, plain.withoutCounts)
 	}
 }
 
-// The same Go installation reached through a symbolic link at another path restores every package the table holds,
-// its export data renamed to the path the run names it by: structtag's finding names log/slog's line by that path, as
-// the plain run's does, so the records are the plain run's.
+// The same Go installation reached through a symbolic link at another path is another `GOROOT`, which every
+// standard-library key holds, since an entry holds its installation's paths: the system cache filled through the
+// real path restores nothing through the link, and the records are the plain run's there, structtag's finding naming
+// log/slog's line by the link.
 //
 // Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
-func TestTheBinaryEntriesReadThroughASymlinkedGoroot(test *testing.T) {
-	table, collected := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+func TestTheSystemCacheKeysAGorootReachedThroughALinkApart(test *testing.T) {
+	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
 	goRoot := goEnvironmentIn(test, root, nil)["GOROOT"]
 	linked, resolveError := filepath.EvalSymlinks(test.TempDir())
@@ -495,9 +327,9 @@ func TestTheBinaryEntriesReadThroughASymlinkedGoroot(test *testing.T) {
 		test.Fatalf("want go to report GOROOT as the link %s, got %s", linked, reported)
 	}
 	plain := runCachedEngine(test, root, "--no-cache")
-	read := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-	if read.counts.FromBinary != len(collected) {
-		test.Fatalf("want all %d packages from the binary through the link, got %+v", len(collected), read.counts)
+	read := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	if read.counts.FromSystemCache != 0 {
+		test.Fatalf("want nothing from the system cache through the link, got %+v", read.counts)
 	}
 	if !strings.Contains(plain.stream, "linked-goroot") {
 		test.Fatalf("want the plain run's structtag finding to name slog's file through the link, got\n%s",
@@ -505,5 +337,22 @@ func TestTheBinaryEntriesReadThroughASymlinkedGoroot(test *testing.T) {
 	}
 	if read.withoutCounts != plain.withoutCounts {
 		test.Fatalf("through the link\n%s\nplain\n%s", read.withoutCounts, plain.withoutCounts)
+	}
+}
+
+// The system cache's entries written under one `CGO_ENABLED` restore nothing under the other, since every
+// standard-library key holds it, and a package checked with cgo is another package than one checked without.
+//
+// Not parallel: it sets the process's own `CGO_ENABLED`, which every go command the engine runs reads.
+func TestASystemCacheUnderAnotherCgoSettingRestoresNothing(test *testing.T) {
+	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	root := copyFixture(test, standardLibraryFixture)
+	other := map[string]string{"1": "0", "0": "1"}[goEnvironmentIn(test, root, nil)["CGO_ENABLED"]]
+	test.Setenv("CGO_ENABLED", other)
+	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
+	read := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	if read.counts.FromSystemCache != 0 || read.withoutCounts != plain.withoutCounts {
+		test.Fatalf("CGO_ENABLED=%s: want nothing from the system cache and the plain run's records, got %+v\n%s\n"+
+			"plain\n%s", other, read.counts, read.withoutCounts, plain.withoutCounts)
 	}
 }

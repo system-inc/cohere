@@ -29,31 +29,32 @@ var (
 )
 
 // cachedRun is one engine run over root with extra after the contract and root, its stream normalized, its stream
-// without the cache counts, and its lint record's cache counts.
+// without the cache counts, its lint record's cache counts, and its exit code.
 type cachedRun struct {
 	stream        string
 	withoutCounts string
 	counts        contract.LintCache
+	exitCode      int
 }
 
 // runCachedEngine runs the engine over root, in process, and fails the test unless it exits with a summary, 0 or 1,
 // says nothing on stderr and writes a lint record.
 func runCachedEngine(test *testing.T, root string, extra ...string) cachedRun {
 	test.Helper()
-	return runEngineWith(test, root, embeddedStandardLibrary, rules.All(), extra...)
+	return runEngineWith(test, root, standardLibrarySource{}, rules.All(), extra...)
 }
 
-// runEngineWith is runCachedEngine with builtIn as the binary's standard-library entries and registered as the
-// rules.
+// runEngineWith is runCachedEngine with source as where its standard library comes from and goes and registered as
+// the rules.
 func runEngineWith(
 	test *testing.T,
 	root string,
-	builtIn builtInStandardLibrary,
+	source standardLibrarySource,
 	registered []rule.Rule,
 	extra ...string,
 ) cachedRun {
 	test.Helper()
-	return runEngineAnsweringInPart(test, root, builtIn, registered, nil, extra...)
+	return runEngineAnsweringInPart(test, root, source, registered, nil, extra...)
 }
 
 // runEngineAnsweringInPart is runEngineWith writing the entries of the packages answersInPart names, by import path,
@@ -61,26 +62,42 @@ func runEngineWith(
 func runEngineAnsweringInPart(
 	test *testing.T,
 	root string,
-	builtIn builtInStandardLibrary,
+	source standardLibrarySource,
 	registered []rule.Rule,
 	answersInPart map[string]bool,
 	extra ...string,
 ) cachedRun {
 	test.Helper()
+	ran, standardError := runEngineNoting(test, root, source, registered, answersInPart, extra...)
+	if standardError != "" {
+		test.Fatalf("want nothing on stderr, got:\n%s", standardError)
+	}
+	return ran
+}
+
+// runEngineNoting is runEngineAnsweringInPart with what the run said on stderr, which it leaves to the test.
+func runEngineNoting(
+	test *testing.T,
+	root string,
+	source standardLibrarySource,
+	registered []rule.Rule,
+	answersInPart map[string]bool,
+	extra ...string,
+) (cachedRun, string) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	if exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, registered, nil, builtIn, true,
-		answersInPart); exitCode != exitClean && exitCode != exitFindings {
+	exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, registered, nil,
+		isolatedSource(test, source), true, answersInPart)
+	if exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
-	}
-	if standardError.Len() > 0 {
-		test.Fatalf("want nothing on stderr, got:\n%s", standardError.String())
 	}
 	stream := elapsedPattern.ReplaceAllString(standardOutput.String(), `"elapsedMilliseconds":0`)
 	ran := cachedRun{
 		stream:        stream,
 		withoutCounts: childProcessesPattern.ReplaceAllString(cacheFieldPattern.ReplaceAllString(stream, ""), ""),
+		exitCode:      exitCode,
 	}
 	for line := range strings.Lines(stream) {
 		if !strings.HasPrefix(line, `{"kind":"lint"`) {
@@ -93,10 +110,10 @@ func runEngineAnsweringInPart(
 			test.Fatalf("reading the lint record %s: %v", line, decodeError)
 		}
 		ran.counts = record.Cache
-		return ran
+		return ran, standardError.String()
 	}
 	test.Fatalf("no lint record in\n%s", stream)
-	return ran
+	return ran, standardError.String()
 }
 
 // entriesIn is each entry in root's store by its path in the store, with its modification time, so a run that wrote
@@ -128,12 +145,13 @@ func entriesIn(test *testing.T, root string) map[string]string {
 // A warm run writes the cold run's stream but for the cache counts, restoring every package the cold run wrote and
 // running nothing on them. After an edit to the project's one file only that package misses, and printf's finding in
 // it, which needs the fact fmt.Sprintf has, comes back from fmt's restored facts. `--no-cache` reads nothing and
-// writes nothing: it hits nothing, and leaves the store as it was.
+// writes nothing: it hits nothing, and leaves the store as it was. Every run is without the system cache, so the store
+// is the one cache, the standard library's packages among what it holds, as the counts below take it.
 func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "vet-finding"))
-	cold := runCachedEngine(test, root)
+	cold := runCachedEngine(test, root, "--no-system-cache")
 	if !cold.counts.On || cold.counts.Hit != 0 || cold.counts.Written == 0 ||
 		cold.counts.Written+cold.counts.Unstorable > cold.counts.Missed {
 		test.Fatalf("want a cold run that hit nothing and wrote what it missed, got %+v", cold.counts)
@@ -147,7 +165,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 			"files", cold.counts.Written, len(written))
 	}
 
-	warm := runCachedEngine(test, root)
+	warm := runCachedEngine(test, root, "--no-system-cache")
 	if warm.counts.Hit != cold.counts.Written || warm.counts.Missed != cold.counts.Missed-cold.counts.Written {
 		test.Fatalf("want every package written cold hit warm and the rest missed, cold %+v, warm %+v", cold.counts,
 			warm.counts)
@@ -165,7 +183,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 		0o644); writeError != nil {
 		test.Fatalf("editing %s: %v", file, writeError)
 	}
-	edited := runCachedEngine(test, root)
+	edited := runCachedEngine(test, root, "--no-system-cache")
 	if edited.counts.Hit != cold.counts.Written-1 || edited.counts.Written != 1 {
 		test.Fatalf("want only the edited package missed and written, cold %+v, edited %+v", cold.counts,
 			edited.counts)
@@ -175,8 +193,8 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	}
 
 	before := entriesIn(test, root)
-	uncached := runCachedEngine(test, root, "--no-cache")
-	if uncached.counts != (contract.LintCache{}) {
+	uncached := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
+	if uncached.counts != (contract.LintCache{SystemCacheOff: true}) {
 		test.Fatalf("want a run under --no-cache to count nothing, got %+v", uncached.counts)
 	}
 	if uncached.withoutCounts != edited.withoutCounts {
@@ -188,7 +206,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	}
 
 	fresh := copyFixture(test, filepath.Join("testdata", "vet-finding"))
-	runCachedEngine(test, fresh, "--no-cache")
+	runCachedEngine(test, fresh, "--no-cache", "--no-system-cache")
 	if _, statError := os.Stat(filepath.Join(fresh, ".cache", "cohere", "go")); !os.IsNotExist(statError) {
 		test.Fatalf("want no store made under --no-cache, got %v", statError)
 	}
@@ -398,16 +416,17 @@ func TestAFlagNoVerdictReadsStaysOutOfTheBuildContext(test *testing.T) {
 // The standard library's build context is the target, cgo, the toolchain and its experiments, and the go flags but
 // those no verdict reads and those that change nothing of the standard library: -trimpath, the module flags and
 // -buildvcs drop out, while -n, -tags, -race and every other flag stay and key apart. It names none of the process's
-// own variables, and go env's `GOROOT`, which the standard library's keys name each file below, is read beside it and
-// is in neither context.
+// own variables but `GODEBUG`, and go env's `GOROOT`, which the standard library's keys name each file below, is read
+// beside it and is in neither context.
 //
-// Not parallel: it sets the process's own `GOARCH`, which every test in the process reads.
+// Not parallel: it sets the process's own `GOARCH` and `GODEBUG`, which every test in the process reads.
 func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSee(test *testing.T) {
 	root, absoluteError := filepath.Abs(filepath.Join("testdata", "vet-finding"))
 	if absoluteError != nil {
 		test.Fatalf("resolving the fixture: %v", absoluteError)
 	}
 	test.Setenv("GOARCH", "arm64")
+	test.Setenv("GODEBUG", "probe=1")
 	contextUnder := func(goFlags string) []string {
 		test.Helper()
 		return standardLibraryBuild(goEnvironmentIn(test, root, []string{"GOFLAGS=" + goFlags,
@@ -418,7 +437,7 @@ func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSe
 		keptFlags)
 	values := goEnvironmentIn(test, root, nil)
 	want := []string{"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=" + keptFlags,
-		"GOVERSION=" + values["GOVERSION"], "GOEXPERIMENT="}
+		"GOVERSION=" + values["GOVERSION"], "GOEXPERIMENT=", "process GODEBUG=probe=1"}
 	if !slices.Equal(narrowed, want) {
 		test.Errorf("want\n%q\ngot\n%q", want, narrowed)
 	}
@@ -437,14 +456,45 @@ func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSe
 		test.Errorf("want go env's GOROOT read, absolute, got %q", values["GOROOT"])
 	}
 	for _, entry := range narrowed {
-		if strings.HasPrefix(entry, "process ") {
-			test.Errorf("want no process variable in the standard library's build context, got %q", entry)
+		if strings.HasPrefix(entry, "process ") && !strings.HasPrefix(entry, "process GODEBUG") {
+			test.Errorf("want no process variable but GODEBUG in the standard library's build context, got %q", entry)
 		}
 	}
 	for _, entry := range slices.Concat(narrowed, cacheBuild(values)) {
 		if strings.HasPrefix(entry, "GOROOT=") {
 			test.Errorf("want GOROOT in neither build context, got %q", entry)
 		}
+	}
+}
+
+// Both build contexts, the project's and the standard library's, hold the process's own `GODEBUG`, which can change
+// what go/types makes of a package, so the machine-wide store never hands one shell's entries to a run under
+// another's: two contexts that differ only in it key apart, and so does one where it is unset.
+//
+// Not parallel: it sets the process's own `GODEBUG`, which every test in the process reads.
+func TestBothKeysHoldTheProcesssGodebug(test *testing.T) {
+	values := map[string]string{"GOOS": "linux", "GOARCH": "amd64", "CGO_ENABLED": "1", "GOFLAGS": "",
+		"GOVERSION": "go1.27.0", "GOEXPERIMENT": ""}
+	contextsUnder := func(godebug string) ([]string, []string) {
+		test.Helper()
+		test.Setenv("GODEBUG", godebug)
+		return standardLibraryBuild(values), cacheBuild(values)
+	}
+	firstStandard, firstProject := contextsUnder("probe=1")
+	secondStandard, secondProject := contextsUnder("probe=2")
+	if slices.Equal(firstStandard, secondStandard) {
+		test.Errorf("two GODEBUG values give the standard library one build context %q", firstStandard)
+	}
+	if slices.Equal(firstProject, secondProject) {
+		test.Errorf("two GODEBUG values give the project one build context %q", firstProject)
+	}
+	test.Setenv("GODEBUG", "")
+	if unsetError := os.Unsetenv("GODEBUG"); unsetError != nil {
+		test.Fatal(unsetError)
+	}
+	if unset := standardLibraryBuild(values); slices.Equal(unset, firstStandard) ||
+		!slices.Contains(unset, "process GODEBUG unset") {
+		test.Errorf("want an unset GODEBUG named unset in the standard library's build context, got %q", unset)
 	}
 }
 
@@ -495,8 +545,8 @@ func TestACleanVerdictWithoutTheWrapStillWraps(test *testing.T) {
 
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
-		rules.All(), nil)
+	runIsolated(test, []string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput,
+		&standardError, rules.All(), nil)
 	if !strings.Contains(standardOutput.String(), `"fixedBy":{"cohere-go/consistency-no-long-line":3}`) {
 		test.Fatalf("want the run that writes to wrap three lines after gofmt's verdict was kept, got\n%s\n%s",
 			standardOutput.String(), standardError.String())
@@ -519,13 +569,16 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 
 	renamed := copyFixture(test, filepath.Join("testdata", "rename"))
 	edited := copyFixture(test, filepath.Join("testdata", "rename"))
-	runCachedEngine(test, renamed)
-	runCachedEngine(test, edited)
+	// One system cache for every run of both copies, as a person's, so each restores the standard library alike and
+	// the counts compare the project's own packages.
+	shared := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	runEngineWith(test, renamed, shared, rules.All())
+	runEngineWith(test, edited, shared, rules.All())
 
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput, &standardError,
-		rules.All(), nil)
+	runWithStandardLibrary([]string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput,
+		&standardError, rules.All(), nil, shared)
 	var record contract.FixRecord
 	for line := range strings.Lines(standardOutput.String()) {
 		if strings.HasPrefix(line, `{"kind":"fix"`) {
@@ -551,14 +604,14 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 		}
 	}
 
-	next := runCachedEngine(test, renamed)
-	byHand := runCachedEngine(test, edited)
+	next := runEngineWith(test, renamed, shared, rules.All())
+	byHand := runEngineWith(test, edited, shared, rules.All())
 	if next.counts.Hit == 0 || next.counts.Missed == 0 || next.counts.Hit != byHand.counts.Hit ||
 		next.counts.Missed != byHand.counts.Missed {
 		test.Fatalf("want the run after the rename to hit and miss as the run after the same edit by hand, after the "+
 			"rename %+v, by hand %+v", next.counts, byHand.counts)
 	}
-	uncached := runCachedEngine(test, renamed, "--no-cache")
+	uncached := runEngineWith(test, renamed, shared, rules.All(), "--no-cache")
 	if next.withoutCounts != uncached.withoutCounts {
 		test.Fatalf("after the rename, cached\n%s\nunder --no-cache\n%s", next.withoutCounts, uncached.withoutCounts)
 	}

@@ -16,10 +16,12 @@ import (
 // corpus runs in well under a minute on the machines a pair is measured on, so a run past this is stuck, not slow.
 const runDeadline = 15 * time.Minute
 
-// The directories under --out that hold each run's raw output and every .cache a cache-on run moved aside.
+// The directories under --out that hold each run's raw output and every .cache a cache-on run moved aside, and the
+// prefix of each side's system cache's (sideSystemCache).
 const (
 	rawDirectoryName   = "raw"
 	trashDirectoryName = "trash"
+	systemCachePrefix  = "system-cache-"
 )
 
 // measure runs the schedule, appending each run's record to runs.jsonl as it ends, and returns every record. It
@@ -50,15 +52,25 @@ func measure(checked preflight, base builtBinary, branch builtBinary, rounds int
 	records := []runRecord{}
 	for _, planned := range schedule(corpusOrder, rounds) {
 		corpusRoot := corpusDirectory(checked.output, planned.corpus)
+		systemCache := sideSystemCache(checked.output, planned.side)
 		if planned.mode == modeCache {
 			moved, moveError := moveCachesAside(corpusRoot, filepath.Join(checked.output, trashDirectoryName), trashed)
 			if moveError != nil {
 				return records, moveError
 			}
 			trashed += moved
+			// The cache-on run is cold in the system cache too, which it fills for the side's `--no-cache` run after
+			// it, as it fills the corpus's .cache.
+			emptied, emptyError := emptySystemCache(systemCache, filepath.Join(checked.output, trashDirectoryName),
+				trashed)
+			if emptyError != nil {
+				return records, emptyError
+			}
+			trashed += emptied
 		}
 		rawDirectory := filepath.Join(checked.output, rawDirectoryName)
-		record := runEngine(binaries[planned.side], corpusRoot, planned, rawDirectory, checked.goEnvironment)
+		record := runEngine(binaries[planned.side], corpusRoot, planned, rawDirectory, checked.goEnvironment,
+			systemCache)
 		record.CorpusCommit = commits[planned.corpus]
 		changed, restoreError := restoreChangedFiles(corpusRoot, layers[planned.corpus])
 		record.ChangedFiles = changed
@@ -86,16 +98,16 @@ func measure(checked preflight, base builtBinary, branch builtBinary, rounds int
 
 // runEngine runs one side's engine over a corpus and returns its record, the corpus's commit and the files it changed
 // left for the caller. The engine is run as the front door runs it, marked as its child, from the corpus, in
-// goEnvironment, which holds the go list it starts off the network (offlineGoEnvironment), less `GOFLAGS`, which a
-// developer's run does not have, in a process group of its own, which the deadline stops whole; its stdout and stderr
-// go to the raw directory, and it is timed from here: the wall by the clock, user, sys and the peak resident set from
-// its rusage.
+// engineEnvironment, with systemCache the side's own; in a process group of its own, which the deadline stops whole;
+// its stdout and stderr go to the raw directory, and it is timed from here: the wall by the clock, user, sys and the
+// peak resident set from its rusage.
 func runEngine(
 	binary builtBinary,
 	corpusRoot string,
 	planned plannedRun,
 	rawDirectory string,
 	goEnvironment []string,
+	systemCache string,
 ) runRecord {
 	record := runRecord{
 		Corpus:       planned.corpus,
@@ -133,9 +145,7 @@ func runEngine(
 	}
 	command := exec.Command(binary.path, arguments...)
 	command.Dir = corpusRoot
-	// `PWD` is the corpus's, as a shell's would be in it; the inherited one names where this command was started.
-	command.Env = append(environmentWithout(goEnvironment, "GOFLAGS", "PWD"), "COHERE_GO_ENGINE_CHILD=1",
-		"PWD="+corpusRoot)
+	command.Env = engineEnvironment(goEnvironment, corpusRoot, systemCache)
 	command.Stdout, command.Stderr = output, standardError
 	command.SysProcAttr = ownProcessGroup()
 
@@ -212,6 +222,36 @@ func moveCachesAside(corpusRoot string, trash string, already int) (int, error) 
 		}
 	}
 	return len(found), nil
+}
+
+// engineEnvironment is the environment an engine run gets: goEnvironment, which holds the go list it starts off the
+// network (offlineGoEnvironment), less `GOFLAGS`, which a developer's run does not have; marked as the front door's
+// child; `PWD` the corpus's, as a shell's would be in it, where the inherited one names where this command was
+// started; and `COHERE_SYSTEM_CACHE` the side's own system cache (#syscache), so a pair controls what the engine's
+// system cache holds rather than inherit the person's, and neither side reads the other's tables.
+func engineEnvironment(goEnvironment []string, corpusRoot string, systemCache string) []string {
+	return append(environmentWithout(goEnvironment, "GOFLAGS", "PWD", "COHERE_SYSTEM_CACHE"),
+		"COHERE_GO_ENGINE_CHILD=1", "PWD="+corpusRoot, "COHERE_SYSTEM_CACHE="+systemCache)
+}
+
+// sideSystemCache is side's system cache under output, which every run of the side reads and writes: warm for the
+// side's binary once its cache-on run has filled it, and emptied before each cache-on run (emptySystemCache). A release
+// before the system cache reads none of it.
+func sideSystemCache(output string, side string) string {
+	return filepath.Join(output, systemCachePrefix+side)
+}
+
+// emptySystemCache moves systemCache aside into trash, numbered after already as moveCachesAside numbers what it moves,
+// so the next run finds it empty, and returns how many it moved: 0 when there was none yet.
+func emptySystemCache(systemCache string, trash string, already int) (int, error) {
+	if _, statError := os.Lstat(systemCache); os.IsNotExist(statError) {
+		return 0, nil
+	}
+	destination := filepath.Join(trash, fmt.Sprintf("%05d-%s", already+1, filepath.Base(systemCache)))
+	if renameError := os.Rename(systemCache, destination); renameError != nil {
+		return 0, fmt.Errorf("moving the system cache %s aside: %w", systemCache, renameError)
+	}
+	return 1, nil
 }
 
 // describeStopped says, after a run's exit code, that this command stopped it.

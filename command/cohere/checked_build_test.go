@@ -63,3 +63,31 @@ func TestCheckedBuildCarriesEveryFieldOfTheBuildRecord(test *testing.T) {
 		}
 	}
 }
+
+// Each build's line of the --verbose account says where its standard library came from (#syscache): the packages it
+// restored from the system cache, and the entries it added to it, or none restored, which says it computed its
+// standard library or took it from the host's run.
+func TestABuildsLineSaysWhereItsStandardLibraryCameFrom(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		build checkedBuild
+		want  string
+	}{
+		{
+			build: checkedBuild{Target: "darwin/arm64", Host: true, CompiledFiles: 3, AnalyzedPackages: 2,
+				SystemCacheRestored: 1258},
+			want: "the host's build, darwin/arm64: 3 files compiled, 2 packages analyzed, standard library: 1,258 " +
+				"from the system cache",
+		},
+		{
+			build: checkedBuild{Target: "windows/arm64", CompiledFiles: 3, AnalyzedPackages: 2, SystemCacheWritten: 12},
+			want: "build windows/arm64: 3 files compiled, 2 packages analyzed, 0 findings added, 0 dropped by the " +
+				"merge, standard library: none from the system cache, 12 entries written to it",
+		},
+	} {
+		if got := testCase.build.line(); got != testCase.want {
+			test.Errorf("got %q, want %q", got, testCase.want)
+		}
+	}
+}

@@ -168,7 +168,7 @@ func runCacheAdmits(arguments []string) bool {
 	for _, argument := range arguments {
 		switch argument {
 		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases", "--adamic-readiness",
-			"--other-builds":
+			"--other-builds", "--no-system-cache":
 		default:
 			return false
 		}

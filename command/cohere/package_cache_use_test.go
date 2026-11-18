@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-// The account's cache clause says the standard library's packages from the binary whether the store was on or not,
-// so a `--no-cache` run that reused them reads as such, and says nothing of them when there were none. `--json`
+// The account's cache clause says the standard library's packages from the system cache whether the store was on or
+// not, so a `--no-cache` run that reused them reads as such, and says nothing of them when there were none. `--json`
 // carries the count only when it is not 0, so a run without it encodes as it always has.
-func TestThePackageCacheLineSaysTheStandardLibraryFromTheBinary(test *testing.T) {
+func TestThePackageCacheLineSaysTheStandardLibraryFromTheSystemCache(test *testing.T) {
 	test.Parallel()
 
 	for _, testCase := range []struct {
@@ -20,13 +20,13 @@ func TestThePackageCacheLineSaysTheStandardLibraryFromTheBinary(test *testing.T)
 	}{
 		{name: "off", cache: packageCacheUse{}, want: "package cache off"},
 		{
-			name: "off, with the binary's entries", cache: packageCacheUse{FromBinary: 258},
-			want: "package cache off, standard library: 258 from the binary",
+			name: "off, with the system cache's entries", cache: packageCacheUse{FromSystemCache: 258},
+			want: "package cache off, standard library: 258 from the system cache",
 		},
 		{
-			name: "on, with the binary's entries", cache: packageCacheUse{On: true, Hit: 4, Missed: 1, Written: 1,
-				FromBinary: 258},
-			want: "package cache hit 4, missed 1, wrote 1, standard library: 258 from the binary",
+			name: "on, with the system cache's entries", cache: packageCacheUse{On: true, Hit: 4, Missed: 1, Written: 1,
+				FromSystemCache: 258},
+			want: "package cache hit 4, missed 1, wrote 1, standard library: 258 from the system cache",
 		},
 		{name: "on", cache: packageCacheUse{On: true, Hit: 4}, want: "package cache hit 4, missed 0, wrote 0"},
 	} {
@@ -37,18 +37,52 @@ func TestThePackageCacheLineSaysTheStandardLibraryFromTheBinary(test *testing.T)
 	for _, testCase := range []struct {
 		cache    packageCacheUse
 		carrying bool
-	}{{cache: packageCacheUse{FromBinary: 258}, carrying: true}, {cache: packageCacheUse{On: true}}} {
+	}{{cache: packageCacheUse{FromSystemCache: 258}, carrying: true}, {cache: packageCacheUse{On: true}}} {
 		encoded, encodeError := json.Marshal(testCase.cache)
 		if encodeError != nil {
 			test.Fatal(encodeError)
 		}
-		if carries := strings.Contains(string(encoded), `"standardLibraryFromBinary":258`); carries !=
+		if carries := strings.Contains(string(encoded), `"standardLibraryFromSystemCache":258`); carries !=
 			testCase.carrying {
 			test.Errorf("want the count carried %t in %s", testCase.carrying, encoded)
 		}
-		if !testCase.carrying && strings.Contains(string(encoded), "standardLibraryFromBinary") {
+		if !testCase.carrying && strings.Contains(string(encoded), "standardLibraryFromSystemCache") {
 			test.Errorf("want no count when it is 0, got %s", encoded)
 		}
+	}
+}
+
+// The account's cache clause says what the system cache did (#syscache): the entries the run wrote to it beside the
+// packages it restored, and, under `--no-system-cache`, that it was off, so a run that computed the standard library
+// says why. `--json` carries each only when it is set.
+func TestThePackageCacheLineSaysWhatTheSystemCacheDid(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		cache packageCacheUse
+		want  string
+	}{
+		{
+			cache: packageCacheUse{On: true, Hit: 4, FromSystemCache: 258, SystemCacheWritten: 12},
+			want: "package cache hit 4, missed 0, wrote 0, standard library: 258 from the system cache, 12 entries " +
+				"written to the system cache",
+		},
+		{cache: packageCacheUse{SystemCacheOff: true}, want: "package cache off, system cache off (--no-system-cache)"},
+		{
+			cache: packageCacheUse{On: true, Hit: 4, SystemCacheOff: true},
+			want:  "package cache hit 4, missed 0, wrote 0, system cache off (--no-system-cache)",
+		},
+	} {
+		if got := testCase.cache.line(); got != testCase.want {
+			test.Errorf("got %q, want %q", got, testCase.want)
+		}
+	}
+	encoded, encodeError := json.Marshal(packageCacheUse{On: true})
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if strings.Contains(string(encoded), "systemCache") {
+		test.Errorf("want no system cache field when nothing is set, got %s", encoded)
 	}
 }
 
@@ -64,8 +98,8 @@ func TestThePackageCacheLineSaysTheReloads(test *testing.T) {
 	}{
 		{cache: packageCacheUse{On: true, Hit: 4, Missed: 2, Written: 2, Reloads: 1, ReloadRounds: 1},
 			want: "package cache hit 4, missed 2, wrote 2, 1 reloaded from source in 1 rounds"},
-		{cache: packageCacheUse{FromBinary: 258, Reloads: 3, ReloadRounds: 2},
-			want: "package cache off, standard library: 258 from the binary, 3 reloaded from source in 2 rounds"},
+		{cache: packageCacheUse{FromSystemCache: 258, Reloads: 3, ReloadRounds: 2},
+			want: "package cache off, standard library: 258 from the system cache, 3 reloaded from source in 2 rounds"},
 		{cache: packageCacheUse{Replays: 35}, want: "package cache off, 35 answers replayed"},
 		{cache: packageCacheUse{On: true, Hit: 4}, want: "package cache hit 4, missed 0, wrote 0"},
 	} {

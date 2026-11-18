@@ -20,7 +20,8 @@ func memoryRun(test *testing.T, memory *engineMemory) (line string, record contr
 	root := copyFixture(test, filepath.Join("testdata", "clean"))
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	exitCode := run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix", "--no-cache"},
+	exitCode := runIsolated(test,
+		[]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix", "--no-cache"},
 		&standardOutput, &standardError, []rule.Rule{everyFileRule}, memory)
 	stream := standardOutput.String()
 	checkStream(test, stream, exitCode)

@@ -15,9 +15,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
-// kindAnswers is one kind's answers in one package, as the store and the binary's table hold them (#w7zmvat wave 3):
-// each answer by its object's objectpath, sorted, and whether the package was computed whole in the kind, so an object
-// with no answer has no fact.
+// kindAnswers is one kind's answers in one package, as the stores and the release's table hold them (#w7zmvat wave
+// 3): each answer by its object's objectpath, sorted, and whether the package was computed whole in the kind, so an
+// object with no answer has no fact.
 type kindAnswers struct {
 	Kind     string
 	Complete bool
@@ -135,11 +135,11 @@ func (session *CacheSession) packageOf(packageTypes *types.Package) *packages.Pa
 }
 
 // Answers is what the run can read of the answers of the package whose types are packageTypes, for the resolver: its
-// entry's, for a package the run trusts the entry of (see trusted), restored from the binary's table, complete in every
-// kind its release computed, or from the store by its own first key, or by an alias or its second key once its reads
-// held; or, for a package loaded from source to answer a question, its entry's under its own first key, which the run
-// did not restore. A trusted entry's record of what its package declares without a body comes with them. It is nil
-// when there are none and no such record.
+// entry's, for a package the run trusts the entry of (see trusted), restored from its store by its own first key, or by
+// an alias or its second key once its reads held, each kind complete or not as its entry says; or, for a package loaded
+// from source to answer a question, its entry's under its own first key, which the run did not restore. A trusted
+// entry's record of what its package declares without a body comes with them. It is nil when there are none and no such
+// record.
 func (session *CacheSession) Answers(packageTypes *types.Package) *fact_resolver.Answers {
 	asked := session.packageOf(packageTypes)
 	if asked == nil {
@@ -258,15 +258,13 @@ func (session *CacheSession) reloadsOf(resolver *fact_resolver.Resolver) []strin
 // build, and both stay in the entry the run writes for it.
 func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 	session.previous = map[*packages.Package]entryDemand{}
-	if session.caching.Store == nil {
-		return
-	}
 	for _, reloaded := range reachable {
 		key, keyed := session.keys[reloaded]
-		if !keyed || !session.reloading(reloaded) {
+		store := session.storeFor(reloaded)
+		if !keyed || store == nil || !session.reloading(reloaded) {
 			continue
 		}
-		entry, _, stored := storedEntryAt(session.caching.Store, key)
+		entry, _, stored := storedEntryAt(store, key)
 		if !stored {
 			continue
 		}
@@ -277,9 +275,12 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 
 // entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, the answers its
 // analysis read of other packages, with whether those could all be named, and what it declares without a body, with
-// whether the load recorded that (see cacheEntry's Bodiless).
+// whether the load recorded that (see cacheEntry's Bodiless). answersWhole is whether the answers are every answer of
+// the package, computed whole, as the release's table must hold them (standardLibraryEntryWhole), rather than
+// those the run's questions happened to compute in it.
 type entryDemand struct {
 	answers         []kindAnswers
+	answersWhole    bool
 	reads           []storedRead
 	readsIncomplete bool
 	bodiless        []objectpath.Path
@@ -294,7 +295,7 @@ func (session *CacheSession) withBodiless(saved *packages.Package, demanded entr
 }
 
 // demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are every answer of its
-// package, computed whole, as the binary's table holds them, so a later run that restores it never reloads it to
+// package, computed whole, as the release's table holds them, so a later run that restores it never reloads it to
 // answer a question, when the resolver can compute them all without a reload and Caching's AnswersInPart does not
 // name it; otherwise those held before, the entry's before a reload or the first wave's (held), with every answer the
 // run computed in it. Its reads are those held before with every read the run's analysis of it made.
@@ -307,7 +308,7 @@ func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand)
 	if !session.caching.AnswersInPart[saved.PkgPath] {
 		if home := session.resolver.Package(saved.Types); home != nil {
 			if whole, complete := session.resolver.WholeIfComplete(home); complete {
-				demanded.answers = sortedAnswers(whole, true)
+				demanded.answers, demanded.answersWhole = sortedAnswers(whole, true), true
 			}
 		}
 	}
@@ -362,7 +363,8 @@ func (session *CacheSession) rewriteEarlier() {
 		slots <- struct{}{}
 		group.Go(func() {
 			defer func() { <-slots }()
-			entry, record, stored := storedEntryAt(session.caching.Store, key)
+			store := session.storeFor(saved)
+			entry, record, stored := storedEntryAt(store, key)
 			if !stored {
 				return
 			}
@@ -377,7 +379,11 @@ func (session *CacheSession) rewriteEarlier() {
 			rewritten := encodedEntry{body: body, record: entryRecord{Version: CacheFormatVersion,
 				Body: contentDigest(body), Inline: body, ExportData: record.ExportData, Reads: demanded.reads,
 				ReadsIncomplete: demanded.readsIncomplete}}
-			if putError := session.putEntry(key, rewritten); putError != nil {
+			// A write to the system cache's store that failed is why the run could not keep it, never the project's
+			// problem.
+			if putError := putEntry(store, key, rewritten); putError != nil && store != session.caching.Store {
+				session.systemCacheFailed(putError)
+			} else if putError != nil {
 				session.problem(putError.Error())
 			}
 		})

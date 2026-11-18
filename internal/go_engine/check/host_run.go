@@ -29,6 +29,11 @@ type HostRun struct {
 	known      *cacheAnalyzers
 	bodies     *decodedBodies
 
+	// portables are the portable digests of every package the host keyed, by ID, those it kept and those it restored
+	// alike, so a build tells a package it holds itself, whose inputs are the host's, from one whose inputs differ,
+	// though the host kept no entry of it (restoreFromHost).
+	portables map[string]cache.Key
+
 	// keeping is the time the run spent keeping its packages for the extra builds over every load (Keeping).
 	keeping time.Duration
 

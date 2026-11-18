@@ -22,9 +22,9 @@ type heldReads struct {
 }
 
 // newHeldReads is record as a build holds it, its fact types read by learned, every fact type the build's analyzers
-// learn by its factTypeName. A record read from the binary's table or a store is checked here, once, so a reference
-// past what it holds, or a use of a kind no verdict judges, declines the package as unreadable (declined) rather than
-// reach an accessor, which trusts every reference it is handed.
+// learn by its factTypeName. A record read from the system cache's table or a store is checked here, once, so a
+// reference past what it holds, or a use of a kind no verdict judges, declines the package as unreadable (declined)
+// rather than reach an accessor, which trusts every reference it is handed.
 func newHeldReads(record persistedReads, learned map[string]reflect.Type) *heldReads {
 	held := &heldReads{record: record, unreadable: unreadableReads(record)}
 	if held.unreadable != "" {
