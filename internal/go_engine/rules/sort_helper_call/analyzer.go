@@ -46,7 +46,7 @@ var Listener = rule.Listener{
 		// itself. A variable holding sort.Sort is no call of it. So a function in a file of another package that
 		// imports no "sort" holds no call Check would judge, and skipping it before Check walks its body finds the
 		// same.
-		if context.Package.Path() != "sort" && !importsSort(context.WalkedFile()) {
+		if !mayCallSort(context.Package.Path(), context.WalkedFile()) {
 			return
 		}
 		rule.State[Findings](context).record(Check(context, node))
@@ -66,6 +66,13 @@ var Analyzer = dispatch.RuleAnalyzer(
 		"of sort.Ints, sort.Float64s or sort.Strings: staticcheck's S1032, ported.",
 	&Listener,
 )
+
+// mayCallSort is whether a file of the package at packagePath can call package sort's Sort: package sort itself,
+// whose own files call it unqualified, as a run checking the standard library from source reaches, or a file that
+// imports it.
+func mayCallSort(packagePath string, file *ast.File) bool {
+	return packagePath == "sort" || importsSort(file)
+}
 
 // importsSort is whether file imports package sort under any name, its path read unquoted, so a raw string's
 // spelling, `sort` in backquotes, imports it too.

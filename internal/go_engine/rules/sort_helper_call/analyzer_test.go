@@ -65,3 +65,20 @@ func TestImportsSortReadsThePathUnquoted(test *testing.T) {
 		}
 	}
 }
+
+// mayCallSort lets package sort itself through, whose own files call Sort unqualified and import no sort, which no
+// fixture can hold, since a fixture at path sort would be the standard library's; and it refuses a file of another
+// package that imports no sort.
+func TestMayCallSortLetsPackageSortThrough(test *testing.T) {
+	test.Parallel()
+	file, parseError := parser.ParseFile(token.NewFileSet(), "sort.go", "package sort\n", parser.ImportsOnly)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	if !mayCallSort("sort", file) {
+		test.Error("mayCallSort of package sort's own file is false, want true")
+	}
+	if mayCallSort("example", file) {
+		test.Error("mayCallSort of another package's file that imports no sort is true, want false")
+	}
+}
