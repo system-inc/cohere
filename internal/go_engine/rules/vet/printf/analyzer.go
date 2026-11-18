@@ -147,11 +147,11 @@ func checkCalls(pass *analysis.Pass, kinds wrapperKinds) {
 			}
 			switch kinds.of(pass, callee) {
 			case kindPrintf:
-				checkPrintf(pass, fileVersion, kindPrintf, visited, fullName(callee))
+				checkPrintf(pass, fileVersion, kindPrintf, visited, calleeName{callee: callee})
 			case kindErrorf:
-				checkPrintf(pass, fileVersion, kindErrorf, visited, fullName(callee))
+				checkPrintf(pass, fileVersion, kindErrorf, visited, calleeName{callee: callee})
 			case kindPrint:
-				checkPrint(pass, visited, fullName(callee))
+				checkPrint(pass, visited, calleeName{callee: callee})
 			case kindNone:
 			}
 		}

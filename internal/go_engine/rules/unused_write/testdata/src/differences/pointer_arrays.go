@@ -143,6 +143,17 @@ func pointerArrayLiteralInIterator(sequence func(func(int) bool)) {
 	}
 }
 
+// Beside a pointer to a struct literal given to a variable and never read, in one statement, so the one walk of the
+// function's syntax gathers both literals from the one node: both find the struct literal's field. The port names the
+// element's index by its value, 0, since the source gives it by position and writes none, where the original prints
+// value and type, 0:int.
+func pointerArrayLiteralBesideStructLiteral() int {
+	value := &pair{left: 1}
+	total := value.left
+	values, value := &[1]int{7}, &pair{right: 2} // port renames: unused write to array index 0:int => unused write to array index 0
+	return total + len(values)
+}
+
 // An element written through a pointer to an empty array literal, which both forms keep. The port names the index as
 // written, 0, where the original prints 0:int.
 func pointerEmptyArrayLiteralWritten() int {

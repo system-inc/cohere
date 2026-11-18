@@ -16,7 +16,7 @@ type printfCall struct {
 	call *ast.CallExpr
 
 	// name is the called function's full name, the subject of every message.
-	name string
+	name calleeName
 
 	// fileVersion is the language version of the call's file, "" when unknown.
 	fileVersion string

@@ -241,6 +241,17 @@ func deadLoadStraightThrough(other passing) passing {
 	return copied
 }
 
+// Reassigned and never read again in a function literal that is a loop's iterator function, which the walk of the
+// function around the loop reaches too, and which is judged as a function of its own, so its field is found once.
+func reassignedInIteratorFunction() {
+	for range func(yield func(int) bool) {
+		good := &passing{strict: true}
+		consume(good)
+		good = &passing{strict: true}
+	} {
+	}
+}
+
 // A value literal reassigned and never read again, which x/tools builds in a temporary and copies.
 func valueReassignedNeverReadAgain() {
 	good := passing{machine: machine{label: "good"}}

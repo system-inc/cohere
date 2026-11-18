@@ -32,51 +32,15 @@ import (
 // Only a literal whose pointer an assignment or a declaration gives straight to a variable, or that a whole struct is
 // stored straight through, `*&T{...} = x`, is judged. Any other use of `&T{...}` that staticcheck lifts is a load
 // straight through it, `*&T{...}` or a value method called on it, which the original counts as a use.
-func liftedStructLiteralWrites(context *rule.Context, function *intermediate_representation.Function) []write {
-	body := functionBody(function.Source())
-	if body == nil {
-		return nil
-	}
-	// judged is the literals given straight to a variable or stored straight through.
-	judged := map[*ast.CompositeLit]bool{}
-	given := func(left ast.Expr, right ast.Expr) {
-		identifier, isIdentifier := ast.Unparen(left).(*ast.Ident)
-		literal, isLiteral := addressedLiteral(context, right)
-		if !isIdentifier || !isLiteral {
-			return
-		}
-		if _, isVariable := context.TypesInfo.ObjectOf(identifier).(*types.Var); isVariable {
-			judged[literal] = true
-		}
-	}
-	inspectOwnSyntax(context, body, func(node ast.Node) {
-		switch statement := node.(type) {
-		case *ast.AssignStmt:
-			if statement.Tok == token.ASSIGN {
-				for _, left := range statement.Lhs {
-					// The pointer goes nowhere but the store, so no variable holds it.
-					if star, isStar := ast.Unparen(left).(*ast.StarExpr); isStar {
-						if literal, isLiteral := addressedLiteral(context, star.X); isLiteral {
-							judged[literal] = true
-						}
-					}
-				}
-			}
-			if (statement.Tok == token.ASSIGN || statement.Tok == token.DEFINE) &&
-				len(statement.Lhs) == len(statement.Rhs) {
-				for index, left := range statement.Lhs {
-					given(left, statement.Rhs[index])
-				}
-			}
-		case *ast.ValueSpec:
-			if len(statement.Names) == len(statement.Values) {
-				for index, name := range statement.Names {
-					given(name, statement.Values[index])
-				}
-			}
-		}
-	})
-	if len(judged) == 0 {
+//
+// own is what the one walk of the function's own syntax gathered (gatherOwnSyntax), its judged literals this file's
+// gatherJudgedStructLiterals'.
+func liftedStructLiteralWrites(
+	context *rule.Context,
+	function *intermediate_representation.Function,
+	own ownSyntax,
+) []write {
+	if own.body == nil || len(own.judgedStructLiterals) == 0 {
 		return nil
 	}
 	writes := []write{}
@@ -91,7 +55,7 @@ func liftedStructLiteralWrites(context *rule.Context, function *intermediate_rep
 			if !isLiteral {
 				continue
 			}
-			if !judged[literal] {
+			if !own.judgedStructLiterals[literal] {
 				continue
 			}
 			structure, isStruct := core_type.Of(value.Type()).(*types.Struct)
@@ -102,6 +66,48 @@ func liftedStructLiteralWrites(context *rule.Context, function *intermediate_rep
 		}
 	}
 	return writes
+}
+
+// gatherJudgedStructLiterals records in judged each literal node, one node of a function's own syntax, gives straight
+// to a variable or stores straight through: the literals liftedStructLiteralWrites judges.
+//
+// Mutates: judged each such literal is recorded, the one set gatherOwnSyntax fills across every node
+func gatherJudgedStructLiterals(context *rule.Context, node ast.Node, judged map[*ast.CompositeLit]bool) {
+	given := func(left ast.Expr, right ast.Expr) {
+		identifier, isIdentifier := ast.Unparen(left).(*ast.Ident)
+		literal, isLiteral := addressedLiteral(context, right)
+		if !isIdentifier || !isLiteral {
+			return
+		}
+		if _, isVariable := context.TypesInfo.ObjectOf(identifier).(*types.Var); isVariable {
+			judged[literal] = true
+		}
+	}
+	switch statement := node.(type) {
+	case *ast.AssignStmt:
+		if statement.Tok == token.ASSIGN {
+			for _, left := range statement.Lhs {
+				// The pointer goes nowhere but the store, so no variable holds it.
+				if star, isStar := ast.Unparen(left).(*ast.StarExpr); isStar {
+					if literal, isLiteral := addressedLiteral(context, star.X); isLiteral {
+						judged[literal] = true
+					}
+				}
+			}
+		}
+		if (statement.Tok == token.ASSIGN || statement.Tok == token.DEFINE) &&
+			len(statement.Lhs) == len(statement.Rhs) {
+			for index, left := range statement.Lhs {
+				given(left, statement.Rhs[index])
+			}
+		}
+	case *ast.ValueSpec:
+		if len(statement.Names) == len(statement.Values) {
+			for index, name := range statement.Names {
+				given(name, statement.Values[index])
+			}
+		}
+	}
 }
 
 // addressedLiteral is the literal expression takes the address of, `&T{...}`, when it does, looked through as
