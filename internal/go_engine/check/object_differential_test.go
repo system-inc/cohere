@@ -204,14 +204,50 @@ func firstDifference(host []string, build []string) (string, bool) {
 	return "", false
 }
 
+// objectKind is what kind of object object is, as a tally counts it and a failure names it: a constant, a variable,
+// a function, a type name, a field or a method, each a Go type of object of its own but the last two, which are a
+// variable and a function a type holds, and never share a name with a package-level one.
+func objectKind(object types.Object) string {
+	switch kinded := object.(type) {
+	case *types.Const:
+		return "const"
+	case *types.Var:
+		if kinded.IsField() {
+			return "field"
+		}
+		return "var"
+	case *types.Func:
+		if kinded.Signature().Recv() != nil {
+			return "method"
+		}
+		return "func"
+	case *types.TypeName:
+		return "type name"
+	default:
+		return fmt.Sprintf("%T", object)
+	}
+}
+
+// objectsByName are the objects of declaring objectsOf finds, by the name it gives each, those of one name in the
+// order it finds them: several blank fields of one struct share their name, and the nth of the host's is the nth of
+// the build's.
+func objectsByName(declaring *types.Package) map[string][]types.Object {
+	byName := map[string][]types.Object{}
+	for _, declared := range objectsOf(declaring) {
+		byName[declared.name] = append(byName[declared.name], declared.object)
+	}
+	return byName
+}
+
 // objectTally is what one build's object differential found: the objects compared, those with no counterpart in the
-// build, each kind of line that differed and was covered by a bit, and every failure, naming the object, which line
-// differs and which bit is unset.
+// build, by kind (objectKind), each kind of line that differed and was covered by a bit, and every failure, naming the
+// object, which line differs and which bit is unset.
 type objectTally struct {
-	compared        int
-	noCounterpart   int
-	differedCovered int
-	failures        []string
+	compared            int
+	noCounterpart       int
+	noCounterpartByKind map[string]int
+	differedCovered     int
+	failures            []string
 }
 
 // closureWholeReads are the objects a whole read of object reads, as dependenceReach.closure follows its closure digest
@@ -240,9 +276,13 @@ func closureWholeReads(memo *ReadsBuild, object types.Object) map[types.Object]b
 
 // objectDifferences holds block 1's bits to the lines TypesHold writes: every object block 1 calls unchanged must
 // render alike in both builds. For every object of every package both loads hold without errors, each the host's read
-// in the host's memo and its counterpart in the build's, found by its objectpath as the verdict finds it
-// (verdict.counterpart), it compares the lines TypesHold's renderer writes of it (useLines, closureDigest), and fails
-// where
+// in the host's memo and its counterpart in the build's, the object the build's package of the same ID declares
+// under the same name (objectsByName), it compares the lines TypesHold's renderer writes of it (useLines,
+// closureDigest). The counterpart is found by name, not by objectpath as the verdict finds it (verdict.counterpart),
+// since objectpath names no unexported package-level func, var or const, and those are most of what a body within its
+// own package uses: by objectpath, over a quarter of the standard library's objects went uncompared. An object with no
+// counterpart is one the build does not declare. It fails where
+//   - the build declares an object of the name of another kind (objectKind), and its bit is unset;
 //   - a member, any object but a type name, has its own line differ and its bit unset (a UseMember read, judged by
 //     its own line, and gated by its own bit alone);
 //   - a type name has its name line (UseName) or its method set lines (UseMethodSet) differ and its name bit unset;
@@ -260,29 +300,38 @@ func objectDifferences(host objectLoad, build objectLoad, dependence *build_depe
 		buildMemo.measureBy(loaded.TypesSizes)
 		break
 	}
-	var tally objectTally
+	tally := objectTally{noCounterpartByKind: map[string]int{}}
 	for _, identifier := range slices.Sorted(maps.Keys(host.packages)) {
 		hosted, built := host.packages[identifier], build.packages[identifier]
 		if built == nil || hosted.Types == nil || built.Types == nil || slices.Contains(host.broken, identifier) ||
 			slices.Contains(build.broken, identifier) {
 			continue
 		}
-		closure := map[string]*types.Package{}
-		for reached := range build_reads.ClosurePackages([]*types.Package{built.Types}) {
-			closure[reached.Path()] = reached
-		}
-		judged := verdict{host: hostMemo, build: buildMemo, closure: closureLookupOf(closure)}
+		builtByName := objectsByName(built.Types)
+		met := map[string]int{}
 		for _, declared := range objectsOf(hosted.Types) {
-			counterpart, _ := judged.counterpart(declared.object)
-			if counterpart == nil {
+			occurrence := met[declared.name]
+			met[declared.name]++
+			if occurrence >= len(builtByName[declared.name]) {
 				tally.noCounterpart++
+				tally.noCounterpartByKind[objectKind(declared.object)]++
 				continue
 			}
+			counterpart := builtByName[declared.name][occurrence]
 			tally.compared++
 			bits := dependence.ObjectBits(declared.object)
 			named := declared.name
 			if identifier != hosted.PkgPath {
 				named += " in " + identifier
+			}
+			if hostKind, buildKind := objectKind(declared.object), objectKind(counterpart); hostKind != buildKind {
+				if !bits.Name {
+					tally.failures = append(tally.failures, named+": it is a "+hostKind+" on the host and a "+
+						buildKind+" in the build, and its bit is unset")
+				} else {
+					tally.differedCovered++
+				}
+				continue
 			}
 			typeName, isTypeName := declared.object.(*types.TypeName)
 			if !isTypeName {
@@ -334,9 +383,13 @@ func objectDifferences(host objectLoad, build objectLoad, dependence *build_depe
 // reportObjectDifferences logs what tally compared under the build named name and fails naming each failure.
 func reportObjectDifferences(test *testing.T, name string, tally objectTally, started time.Time) {
 	test.Helper()
-	test.Logf("%s: %d objects compared, %d with no counterpart, %d differing lines covered by a bit, %d failures, "+
-		"in %s", name, tally.compared, tally.noCounterpart, tally.differedCovered, len(tally.failures),
-		time.Since(started).Round(time.Millisecond))
+	var byKind []string
+	for _, kind := range slices.Sorted(maps.Keys(tally.noCounterpartByKind)) {
+		byKind = append(byKind, fmt.Sprintf("%d %s", tally.noCounterpartByKind[kind], kind))
+	}
+	test.Logf("%s: %d objects compared, %d with no counterpart (%s), %d differing lines covered by a bit, %d "+
+		"failures, in %s", name, tally.compared, tally.noCounterpart, strings.Join(byKind, ", "),
+		tally.differedCovered, len(tally.failures), time.Since(started).Round(time.Millisecond))
 	for _, failure := range tally.failures {
 		test.Errorf("%s: %s", name, failure)
 	}
