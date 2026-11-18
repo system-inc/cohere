@@ -548,7 +548,11 @@ func (engine *pipeline) extraBuildRun(
 				session.VisitEvery()
 			}
 			if engine.judgedSkipped != nil {
-				session.JudgeSkipped(func(identifier string, judgment check.SkippedJudgment, why string) {
+				session.JudgeSkipped(func(identifier string) {
+					if engine.skippedAtLoad != nil {
+						engine.skippedAtLoad(extra, identifier)
+					}
+				}, func(identifier string, judgment check.SkippedJudgment, why string) {
 					engine.judgedSkipped(extra, identifier, judgment, why)
 				})
 			}

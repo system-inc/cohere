@@ -90,8 +90,10 @@ type hostState struct {
 	visitsEvery bool
 
 	// judgesSkipped, set only by a test (JudgeSkipped), is told each package the build skipped without judging as the
-	// plain path judges a visited one, by which judgment and with why it declines, nil in every run.
+	// plain path judges a visited one, by which judgment and with why it declines, and skipsTold each such package as
+	// a load skips it, once a load, so the test counts every load's skips; both nil in every run.
 	judgesSkipped func(identifier string, judgment SkippedJudgment, why string)
+	skipsTold     func(identifier string)
 
 	// writtenThrough are this load's packages written through to the build's own store (writeThrough), each once: an
 	// untouched package is settled from the start, so the first wave's save would write it, and every later one again.
@@ -159,10 +161,15 @@ const (
 // it holds, from the load's goroutines. A skip must be a cheaper proof of what the plain path would conclude, so a test
 // sets it to fail on a why. The package stays untouched whatever the judgment says, and nothing else of the run
 // changes but that the load reads the types of what the package reaches, as it does for a visited one, which a
-// hookless run leaves unread where nothing checked imports it. Only a test calls it, after RestoreFromHost; a run never
-// does.
-func (session *CacheSession) JudgeSkipped(judged func(identifier string, judgment SkippedJudgment, why string)) {
+// hookless run leaves unread where nothing checked imports it. skipped is told each such package, by ID, as a load
+// skips it, before it is judged, once in each load that skips it, so a test counts the skips of every load and not
+// the last load's alone (HostRestoreCounts.Untouched). Only a test calls it, after RestoreFromHost; a run never does.
+func (session *CacheSession) JudgeSkipped(
+	skipped func(identifier string),
+	judged func(identifier string, judgment SkippedJudgment, why string),
+) {
 	if session.host != nil {
+		session.host.skipsTold = skipped
 		session.host.judgesSkipped = judged
 	}
 }
@@ -459,13 +466,16 @@ func (session *CacheSession) typesHoldFunction(
 	}
 }
 
-// judgeSkipped tells a test's JudgeSkipped how the plain path judges candidate, hosted's package, which the build
-// skipped: by unrestorableReads at once, or by TypesHold as the load decides it (typesHoldFunction), whose answer is
+// judgeSkipped tells a test's JudgeSkipped that the load skipped candidate, hosted's package, and how the plain path
+// judges it: by unrestorableReads at once, or by TypesHold as the load decides it (typesHoldFunction), whose answer is
 // told and never kept, so the package is read from the host's export data, untouched, as it would be without the
 // hook.
 //
 // Mutates: hosted its restore gains a late decision that always holds
 func (session *CacheSession) judgeSkipped(candidate *packages.Package, hosted *hostRestore) {
+	if session.host.skipsTold != nil {
+		session.host.skipsTold(candidate.ID)
+	}
 	if why := unrestorableReads(hosted.kept.restoring); why != "" {
 		session.host.judgesSkipped(candidate.ID, SkippedByUnrestorable, why)
 		return

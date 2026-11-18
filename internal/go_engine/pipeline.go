@@ -106,8 +106,10 @@ type pipeline struct {
 	// judgedSkipped, set only by a test, has every extra build also judge each package it skips without judging, as
 	// the plain path judges a visited one, and is told, with the build, each it judged, by which judgment, and why it
 	// declines, empty where it holds: a package the build must never have skipped when why is not (#wcwx8vf,
-	// check.CacheSession's JudgeSkipped). It is called from the builds' loads, side by side.
+	// check.CacheSession's JudgeSkipped). skippedAtLoad, set only by a test beside it, is told each package a load of
+	// the build skips, as it skips it, once a load. Both are called from the builds' loads, side by side.
 	judgedSkipped func(build project.Build, identifier string, judgment check.SkippedJudgment, why string)
+	skippedAtLoad func(build project.Build, identifier string)
 
 	// keepsInheritanceOff, set only by a test, has every extra build run its syntax-only rules on every file it checks
 	// rather than take the host's findings on the files the host checked (#y6q1x2j), so the test can compare the two.

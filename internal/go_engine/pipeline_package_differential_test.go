@@ -1,9 +1,11 @@
 package go_engine
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -15,12 +17,13 @@ import (
 // The package differential (#wcwx8vf): every package an extra build skips without judging is one the plain path's
 // judgment of a visited package, TypesHold against the build's types, would hold. A build skips a package two ways,
 // by TypesHold, which is the judgment itself, and by every other way of leaving it unjudged, which skippedOf names,
-// today the walk's untouched (check's untouchedOf). Under the test's hook (pipeline.judgedSkipped) each of those is
-// judged beside the run as a visited one is (check.CacheSession's JudgeSkipped), and the differential fails naming
-// every one the judgment declines.
+// today the walk's untouched (check's untouchedOf). Under the test's hooks (pipeline.skippedAtLoad and judgedSkipped)
+// each load tells of each package it skips, each of those is judged beside the run as a visited one is
+// (check.CacheSession's JudgeSkipped), and the differential fails naming every one the judgment declines.
 
 // skippedOf is the seam: the packages run, an extra build's, skipped over its last load without judging them by
-// TypesHold, by ID. A later stage that skips a package another way adds its own skip here.
+// TypesHold, by ID, as the run records them, each of which some load must have told the hook of. A later stage that
+// skips a package another way adds its own skip here, and tells the hook of it.
 func skippedOf(run buildRun) []string {
 	if run.result == nil {
 		return nil
@@ -37,13 +40,38 @@ type skippedJudgment struct {
 	why        string
 }
 
-// skippedRecorder gathers every judgment the test's hook is told, from whichever load's goroutine judged it.
-type skippedRecorder struct {
-	lock   sync.Mutex
-	judged []skippedJudgment
+// skippedPackage is one package a load of an extra build skipped, as the test's hook was told it
+// (pipeline.skippedAtLoad): the build and the package's ID.
+type skippedPackage struct {
+	build      string
+	identifier string
 }
 
-// record is the test's hook (pipeline.judgedSkipped).
+// skippedRecorder gathers every skip and every judgment the test's hooks are told, from whichever load's goroutine
+// told it.
+type skippedRecorder struct {
+	lock    sync.Mutex
+	skipped []skippedPackage
+	judged  []skippedJudgment
+}
+
+// hook has engine tell the recorder of every skip of every load and of its judgment (pipeline.skippedAtLoad and
+// judgedSkipped).
+//
+// Mutates: engine its two hooks are the recorder's
+func (recorder *skippedRecorder) hook(engine *pipeline) {
+	engine.skippedAtLoad = recorder.skip
+	engine.judgedSkipped = recorder.record
+}
+
+// skip is the test's hook for a skip (pipeline.skippedAtLoad).
+func (recorder *skippedRecorder) skip(build project.Build, identifier string) {
+	recorder.lock.Lock()
+	defer recorder.lock.Unlock()
+	recorder.skipped = append(recorder.skipped, skippedPackage{build: build.String(), identifier: identifier})
+}
+
+// record is the test's hook for a judgment (pipeline.judgedSkipped).
 func (recorder *skippedRecorder) record(
 	build project.Build,
 	identifier string,
@@ -56,6 +84,13 @@ func (recorder *skippedRecorder) record(
 		judgment: judgment, why: why})
 }
 
+// skips are every skip recorded so far, a slice of their own.
+func (recorder *skippedRecorder) skips() []skippedPackage {
+	recorder.lock.Lock()
+	defer recorder.lock.Unlock()
+	return slices.Clone(recorder.skipped)
+}
+
 // judgments are every judgment recorded so far, a slice of their own.
 func (recorder *skippedRecorder) judgments() []skippedJudgment {
 	recorder.lock.Lock()
@@ -63,30 +98,43 @@ func (recorder *skippedRecorder) judgments() []skippedJudgment {
 	return slices.Clone(recorder.judged)
 }
 
-// skippedTally is what one extra build skipped and how its skips were judged: skipped, the packages its last load
-// skipped (skippedOf); judged, the judgments it made over every load, of which byTypes are TypesHold's; and declined,
-// the judgments that declined.
+// skippedTally is what one extra build skipped and how its skips were judged, each count over every load, so the
+// counts are of the same loads: skipped, the skips its loads told of; judged, the judgments it made, of which byTypes
+// are TypesHold's; and declined, the judgments that declined. lastLoad is the skips its last load recorded
+// (skippedOf), a part of skipped.
 type skippedTally struct {
 	skipped  int
+	lastLoad int
 	judged   int
 	byTypes  int
 	declined int
 }
 
-// judgeSkips fails the test naming every judgment of judged that declined, and every package a build of engine
-// skipped over its last load that no judgment of that build judged, so a hook that judged nothing proves nothing. It
-// returns each extra build's tally, by build.
-func judgeSkips(test *testing.T, engine *pipeline, judged []skippedJudgment) map[string]skippedTally {
+// judgeSkips fails the test naming every judgment of judged that declined, every package a build of engine skipped in
+// more loads than it was judged in, so a hook that judged nothing proves nothing, and every package a build's last
+// load recorded as skipped (skippedOf) that no load told of. It returns each extra build's tally, by build.
+func judgeSkips(
+	test *testing.T,
+	engine *pipeline,
+	skipped []skippedPackage,
+	judged []skippedJudgment,
+) map[string]skippedTally {
 	test.Helper()
 	tallies := map[string]skippedTally{}
-	judgedIn := map[string]bool{}
+	skips, judgments := map[skippedPackage]int{}, map[skippedPackage]int{}
+	for _, skip := range skipped {
+		tally := tallies[skip.build]
+		tally.skipped++
+		tallies[skip.build] = tally
+		skips[skip]++
+	}
 	for _, judgment := range judged {
 		tally := tallies[judgment.build]
 		tally.judged++
 		if judgment.judgment == check.SkippedByTypes {
 			tally.byTypes++
 		}
-		judgedIn[judgment.build+" "+judgment.identifier] = true
+		judgments[skippedPackage{build: judgment.build, identifier: judgment.identifier}]++
 		if judgment.why != "" {
 			tally.declined++
 			test.Errorf("%s: skipped %s, which %s declines: %s", judgment.build, judgment.identifier,
@@ -94,13 +142,19 @@ func judgeSkips(test *testing.T, engine *pipeline, judged []skippedJudgment) map
 		}
 		tallies[judgment.build] = tally
 	}
+	for _, skip := range slices.SortedFunc(maps.Keys(skips), compareSkippedPackages) {
+		if judgments[skip] < skips[skip] {
+			test.Errorf("%s: skipped %s in %d loads and judged it in %d, so the differential proves nothing of the "+
+				"rest", skip.build, skip.identifier, skips[skip], judgments[skip])
+		}
+	}
 	for _, run := range engine.buildRuns[1:] {
 		name := run.build.String()
 		tally := tallies[name]
 		for _, identifier := range skippedOf(run) {
-			tally.skipped++
-			if !judgedIn[name+" "+identifier] {
-				test.Errorf("%s: skipped %s and never judged it, so the differential proves nothing of it", name,
+			tally.lastLoad++
+			if skips[skippedPackage{build: name, identifier: identifier}] == 0 {
+				test.Errorf("%s: its last load skipped %s, which no load told of, so it was never judged", name,
 					identifier)
 			}
 		}
@@ -109,10 +163,18 @@ func judgeSkips(test *testing.T, engine *pipeline, judged []skippedJudgment) map
 	return tallies
 }
 
-// logTallies logs a line for every extra build engine ran, zeros included: its tally, with what its last load visited
-// and restored from the host's run, and every package it never made a candidate or declined, by the first word of
-// why. It fails naming every build the census needs beside the host's that has no line, since a build the
-// differential says nothing of cannot be told apart from one it never judged.
+// compareSkippedPackages orders skips by build, then by package ID.
+func compareSkippedPackages(first skippedPackage, second skippedPackage) int {
+	if order := strings.Compare(first.build, second.build); order != 0 {
+		return order
+	}
+	return strings.Compare(first.identifier, second.identifier)
+}
+
+// logTallies logs a line for every extra build engine ran, zeros included: its tally, how many times it reloaded, what
+// its last load visited and restored from the host's run, and every package it never made a candidate or declined, by
+// the first word of why. It fails naming every build the census needs beside the host's that has no line, since a
+// build the differential says nothing of cannot be told apart from one it never judged.
 func logTallies(test *testing.T, label string, engine *pipeline, tallies map[string]skippedTally) {
 	test.Helper()
 	lined := map[string]bool{}
@@ -122,9 +184,10 @@ func logTallies(test *testing.T, label string, engine *pipeline, tallies map[str
 		if run.result != nil {
 			fromHost = run.result.FromHost
 		}
-		test.Logf("%s, %s: %d skipped by the last load, %d judged (%d by TypesHold), %d declined; the last load "+
-			"visited %d and restored %d, not restored by %v", label, run.build, tally.skipped, tally.judged,
-			tally.byTypes, tally.declined, fromHost.Visited, len(fromHost.Restored), fromHost.DeclinedBy)
+		test.Logf("%s, %s: %d skipped over every load, %d of them by the last, %d judged (%d by TypesHold), %d "+
+			"declined; reloaded %d times, the last load visited %d and restored %d, not restored by %v", label,
+			run.build, tally.skipped, tally.lastLoad, tally.judged, tally.byTypes, tally.declined,
+			fromHost.ReloadRounds, fromHost.Visited, len(fromHost.Restored), fromHost.DeclinedBy)
 		lined[run.build.String()] = true
 	}
 	for _, build := range engine.described.builds[1:] {
@@ -172,13 +235,12 @@ func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 			fixture := filepath.Join("testdata", step.fixture)
 			recorder := &skippedRecorder{}
 			root := copyFixture(test, fixture)
-			engine, judgedRaw := runOverConfigured(test, root, step.wantExit,
-				func(engine *pipeline) { engine.judgedSkipped = recorder.record }, "--no-cache", "--other-builds")
+			engine, judgedRaw := runOverConfigured(test, root, step.wantExit, recorder.hook, "--no-cache",
+				"--other-builds")
 			if len(engine.buildRuns) < 2 {
 				test.Fatalf("the run checked %d builds, want an extra build beside the host's", len(engine.buildRuns))
 			}
-			judged := recorder.judgments()
-			tallies := judgeSkips(test, engine, judged)
+			tallies := judgeSkips(test, engine, recorder.skips(), recorder.judgments())
 			logTallies(test, step.fixture, engine, tallies)
 			byTypes := 0
 			for _, tally := range tallies {
@@ -215,15 +277,15 @@ func TestABuildSkipsNothingTypesHoldDeclinesInARealTree(test *testing.T) {
 		test.Skipf("%s names no tree", packageDifferentialRootVariable)
 	}
 	recorder := &skippedRecorder{}
-	engine, _, standardError, exitCode := runOverExiting(test, root, rules.All(),
-		func(engine *pipeline) { engine.judgedSkipped = recorder.record }, "--no-cache", "--no-fix", "--other-builds")
+	engine, _, standardError, exitCode := runOverExiting(test, root, rules.All(), recorder.hook, "--no-cache",
+		"--no-fix", "--other-builds")
 	if exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("the run over %s exited %d:\n%s", root, exitCode, standardError)
 	}
 	if len(engine.buildRuns) < 2 {
 		test.Skipf("the census of %s needs no extra build", root)
 	}
-	tallies := judgeSkips(test, engine, recorder.judgments())
+	tallies := judgeSkips(test, engine, recorder.skips(), recorder.judgments())
 	logTallies(test, root, engine, tallies)
 	judgedByTypes := 0
 	for _, tally := range tallies {
