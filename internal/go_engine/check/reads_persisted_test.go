@@ -85,8 +85,9 @@ func tableRestoring(test *testing.T, restoring Restoring, host *ReadsBuild) Rest
 		test.Fatal(gobError)
 	}
 	key := cache.DigestOf([]byte(restoring.Path))
-	written, writeError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{key: {
-		PackagePath: restoring.Path, Entry: entry.Bytes(), Reads: reads}}, "/goroot",
+	written, _, writeError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{key: {
+		PackagePath: restoring.Path, Entry: entry.Bytes(), Reads: reads, AnswersWhole: true, ReadsJudged: true}},
+		"/goroot",
 		[]cache.StandardLibraryVariant{{Target: "darwin/amd64", CgoEnabled: "0", GoVersion: "go1.27.0", Packages: 1}})
 	if writeError != nil {
 		test.Fatal(writeError)

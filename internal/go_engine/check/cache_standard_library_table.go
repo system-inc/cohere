@@ -18,9 +18,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
-// standardLibraryEntry is one standard-library package as the binary's table holds it: what a cacheEntry holds that a
-// restore reads, with its import path, and its analyses as a list in the order of their slots rather than a map. gob
-// writes a map in Go's iteration order, which is random, so a map would give the same entry other bytes in each
+// standardLibraryEntry is one standard-library package as the system cache's table holds it: what a cacheEntry holds
+// that a restore reads, with its import path, and its analyses as a list in the order of their slots rather than a map.
+// gob writes a map in Go's iteration order, which is random, so a map would give the same entry other bytes in each
 // process, and a table written twice from the same entries would differ; a list in a fixed order gives one encoding
 // (see CanonicalStandardLibraryTable). It holds no findings and no walk of files, which StandardLibraryTableOf leaves
 // out and refuses.
@@ -79,69 +79,116 @@ func decodeStandardLibraryEntry(contents []byte) (standardLibraryEntry, error) {
 	return entry, nil
 }
 
-// cacheEntryOf is the cacheEntry a table's entry stands for, which a restore reads as it reads the store's.
-func cacheEntryOf(entry standardLibraryEntry) cacheEntry {
-	analyzers := make(map[string]storedAnalysis, len(entry.Analyzers))
-	for _, analysis := range entry.Analyzers {
-		analyzers[analysis.Slot] = analysis.Analysis
-	}
-	return cacheEntry{
-		Version:         entry.Version,
-		Analyzers:       analyzers,
-		Imports:         entry.Imports,
-		Withheld:        entry.Withheld,
-		Output:          entry.Output,
-		Answers:         entry.Answers,
-		Reads:           entry.Reads,
-		ReadsIncomplete: entry.ReadsIncomplete,
-	}
-}
-
 // StandardLibraryTableOf is the table that holds entries, a finished run's standard-library packages by their
-// standard-library keys (see StandardLibraryCaching's Collected), and says it holds variants, written for any machine:
-// each entry is a standardLibraryEntry, every file its Withheld and export data name renamed below goRoot to
-// goRootMarker (see renameToGoRootMarker), and its findings left out, since no run reads a finding of a package it
-// restores from the table, which it never restores when Analyze was given it, and a finding names this machine's
-// files. Each package's export data is read against the others', which are every package it reaches, to be renamed
-// (renameExportDataFiles). It refuses an entry that names a file outside goRoot, which no other machine could
-// resolve, an entry in another format, one that holds the walk of its files, which only a package Analyze was given
-// has, and one whose export data does not read among the others. Its facts and its persisted reads are still gob's
-// bytes from the process that ran, which CanonicalStandardLibraryTable writes again.
+// standard-library keys (see StandardLibraryCaching's Collected), and says it holds variants, written for any machine
+// (standardLibraryTableWith), the release's: it holds nothing it did not compute. An entry that is not whole
+// (standardLibraryEntryWhole) is left out, and so is one whose export data does not read against the others, so it
+// returns the keys the table holds too, which the release's generator checks its probe's imports against.
 func StandardLibraryTableOf(
 	entries map[cache.Key]StandardLibraryRunEntry,
 	goRoot string,
 	variants []cache.StandardLibraryVariant,
-) ([]byte, error) {
+) ([]byte, map[cache.Key]bool, error) {
+	table, holds, _, tableError := standardLibraryTableWith(entries, nil, nil, nil, goRoot, variants)
+	return table, holds, tableError
+}
+
+// standardLibraryTableWith is the table that holds held, a table's entries as a run read them, each kept as it is, and
+// beside them each of entries, a finished run's standard-library packages by their standard-library keys, whose key
+// held does not hold; the keys the table holds; and how many of entries it added. It says it holds variants. Only an
+// entry as whole as the release's generator writes one goes in (standardLibraryEntryWhole): a short one would be
+// restored by every later run that reads the table as if it were whole, since an entry the table holds is never
+// written again, so it is left out and computed again by the next run, which keeps it in its project's store.
+//
+// Never written again means a good entry: one held under a key the run computed again whose entry does not decode,
+// whose export data does not read against the rest of held, or whose restore the reading run refused (refused, see
+// restoreTableEntry), is damage, which no reader can restore, so the run's entry under that key replaces it when it is
+// whole, and what imports it is read against what later readers read.
+//
+// Each entry taken is written for any machine: a standardLibraryEntry, every file its Withheld and export data name
+// renamed below goRoot to goRootMarker (see renameToGoRootMarker), and its findings left out, since no run reads a
+// finding of a package it restores from a table, which it never restores when Analyze was given it, and a finding
+// names this machine's files. Export data is shallow, so each package's is read against the packages it imports:
+// the entries the run computed, taken or not, and of held only those under readAgainst, the reading run's own keys,
+// since held may also hold an older entry of the same path, under the key of a Go installation since changed, which no
+// read may take for this run's. An entry whose export data does not read, an import missing or unreadable, is left out,
+// and so is everything that reads against it. It refuses an entry that names a file outside goRoot, which no other
+// machine could resolve, an entry in another format, and one that holds the walk of its files, which only a package
+// Analyze was given has. Its facts and its persisted reads are still gob's bytes from the process that ran, which
+// CanonicalStandardLibraryTable writes again for the release.
+func standardLibraryTableWith(
+	entries map[cache.Key]StandardLibraryRunEntry,
+	held map[cache.Key]cache.StandardLibraryEntry,
+	refused map[cache.Key]bool,
+	readAgainst map[cache.Key]bool,
+	goRoot string,
+	variants []cache.StandardLibraryVariant,
+) ([]byte, map[cache.Key]bool, int, error) {
 	rename := renameToGoRootMarker(goRoot)
+	good := withoutDamage(held, refused, readAgainst, entries)
 	// In the keys' order, so the same entries refuse with the same error.
 	keys := slices.SortedFunc(maps.Keys(entries), compareCacheKeys)
 	decoded := make(map[cache.Key]cacheEntry, len(entries))
-	exportData := newStandardLibraryExportData()
+	var taking []cache.Key
+	// Entries the run computed under a key held already, as a package whose good held entry was dropped short of what
+	// the run asked of it: held keeps its own, and the run's stands for its path in the reads below, since it is what
+	// the run's packages were checked against.
+	var recomputed []cache.Key
 	for _, key := range keys {
 		var entry cacheEntry
 		if decodeError := gob.NewDecoder(bytes.NewReader(entries[key].Entry)).Decode(&entry); decodeError != nil {
-			return nil, fmt.Errorf("writing the standard library's table: decoding the entry of %s: %w",
+			return nil, nil, 0, fmt.Errorf("writing the standard library's table: decoding the entry of %s: %w",
 				entries[key].PackagePath, decodeError)
 		}
 		if entry.Version != CacheFormatVersion {
-			return nil, fmt.Errorf("writing the standard library's table: the entry of %s is in format %q, not %q",
-				entries[key].PackagePath, entry.Version, CacheFormatVersion)
+			return nil, nil, 0, fmt.Errorf("writing the standard library's table: the entry of %s is in format %q, "+
+				"not %q", entries[key].PackagePath, entry.Version, CacheFormatVersion)
+		}
+		if _, kept := good[key]; kept {
+			decoded[key] = entry
+			recomputed = append(recomputed, key)
+			continue
+		}
+		if !standardLibraryEntryWhole(entries[key], entry) {
+			continue
 		}
 		decoded[key] = entry
-		exportData.add(entries[key].PackagePath, exportDataSource{imports: entry.Imports,
-			exportData: entries[key].ExportData})
+		taking = append(taking, key)
 	}
-	portable := make(map[cache.Key]cache.StandardLibraryEntry, len(entries))
-	for _, key := range keys {
+	// What a read may reach: the run's own entries first, then held's under the run's own keys for every path the run
+	// did not compute. Each path is added once, so two of one path, which add makes ambiguous, can only be held's.
+	exportData := newStandardLibraryExportData()
+	computed := map[string]bool{}
+	for _, key := range slices.Concat(recomputed, taking) {
+		exportData.add(entries[key].PackagePath, exportDataSource{imports: decoded[key].Imports,
+			exportData: entries[key].ExportData})
+		computed[entries[key].PackagePath] = true
+	}
+	for key := range readAgainst {
+		heldEntry, kept := good[key]
+		if !kept {
+			continue
+		}
+		tableEntry, decodeError := decodeStandardLibraryEntry(heldEntry.Entry)
+		if decodeError != nil || computed[tableEntry.PackagePath] {
+			continue
+		}
+		exportData.add(tableEntry.PackagePath, exportDataSource{imports: tableEntry.Imports,
+			exportData: heldEntry.ExportData})
+	}
+	portable := make(map[cache.Key]cache.StandardLibraryEntry, len(good)+len(taking))
+	maps.Copy(portable, good)
+	added := 0
+	for _, key := range taking {
 		collected, entry := entries[key], decoded[key]
 		if len(entry.Files) > 0 {
-			return nil, fmt.Errorf("writing the standard library's table: the entry of %s holds the walk of its "+
-				"files, as only a package the run was asked to analyze does", collected.PackagePath)
+			return nil, nil, 0, fmt.Errorf("writing the standard library's table: the entry of %s holds the walk of "+
+				"its files, as only a package the run was asked to analyze does", collected.PackagePath)
 		}
 		withheld, renameError := renameWithheldFiles(entry.Withheld, rename)
 		if renameError != nil {
-			return nil, fmt.Errorf("writing the standard library's table: the entry of %s: %w", collected.PackagePath,
-				renameError)
+			return nil, nil, 0, fmt.Errorf("writing the standard library's table: the entry of %s: %w",
+				collected.PackagePath, renameError)
 		}
 		tableEntry := standardLibraryEntry{
 			PackagePath:     collected.PackagePath,
@@ -164,22 +211,114 @@ func StandardLibraryTableOf(
 		}
 		encoded, encodeError := encodeStandardLibraryEntry(tableEntry)
 		if encodeError != nil {
-			return nil, fmt.Errorf("writing the standard library's table: %w", encodeError)
+			return nil, nil, 0, fmt.Errorf("writing the standard library's table: %w", encodeError)
 		}
 		var renamed []byte
 		if collected.ExportData != nil {
 			read, readFileSet, readError := exportData.readPackage(collected.PackagePath)
 			if readError != nil {
-				return nil, fmt.Errorf("writing the standard library's table: %w", readError)
+				// An import missing or unreadable: left out, as is whatever reads against it, since readPackage reads
+				// each package's imports first and keeps their failure, and computed again by the next run.
+				continue
 			}
 			renamed, renameError = renameExportDataFiles(read, readFileSet, rename)
 			if renameError != nil {
-				return nil, fmt.Errorf("writing the standard library's table: %w", renameError)
+				return nil, nil, 0, fmt.Errorf("writing the standard library's table: %w", renameError)
 			}
 		}
 		portable[key] = cache.StandardLibraryEntry{Entry: encoded, ExportData: renamed, Reads: collected.Reads}
+		added++
 	}
-	return cache.WriteStandardLibraryTable(portable, variants), nil
+	holds := make(map[cache.Key]bool, len(portable))
+	for key := range portable {
+		holds[key] = true
+	}
+	return cache.WriteStandardLibraryTable(portable, variants), holds, added, nil
+}
+
+// withoutDamage is held less each entry that is damage under a key entries holds too, so the run's entry, when whole,
+// takes its place (standardLibraryTableWith): one that does not decode, whose export data does not read against the
+// rest of held under readAgainst, or whose restore the reading run refused, under a key of refused. The last is
+// restoreTableEntry's own judgment, the session's record of each entry it could not restore, so what a restore
+// refuses is replaced by the judgment that refused it, never by a second one that could drift from it. A held entry
+// the run did not compute again stays as it is: a reader whose restore of it fails computes it again, and the next
+// write replaces it then.
+func withoutDamage(
+	held map[cache.Key]cache.StandardLibraryEntry,
+	refused map[cache.Key]bool,
+	readAgainst map[cache.Key]bool,
+	entries map[cache.Key]StandardLibraryRunEntry,
+) map[cache.Key]cache.StandardLibraryEntry {
+	heldExportData := newStandardLibraryExportData()
+	for key := range readAgainst {
+		heldEntry, kept := held[key]
+		if !kept {
+			continue
+		}
+		if tableEntry, decodeError := decodeStandardLibraryEntry(heldEntry.Entry); decodeError == nil {
+			heldExportData.add(tableEntry.PackagePath, exportDataSource{imports: tableEntry.Imports,
+				exportData: heldEntry.ExportData})
+		}
+	}
+	kept := maps.Clone(held)
+	for key := range entries {
+		heldEntry, isHeld := held[key]
+		if !isHeld {
+			continue
+		}
+		if refused[key] {
+			delete(kept, key)
+			continue
+		}
+		tableEntry, decodeError := decodeStandardLibraryEntry(heldEntry.Entry)
+		if decodeError != nil {
+			delete(kept, key)
+			continue
+		}
+		if heldEntry.ExportData == nil {
+			continue
+		}
+		if _, _, readError := heldExportData.readPackage(tableEntry.PackagePath); readError != nil {
+			delete(kept, key)
+		}
+	}
+	return kept
+}
+
+// standardLibraryEntryWhole reports whether collected, decoded as entry, is as whole as an entry the release's
+// generator writes, which every table entry must be, whoever writes it: a table hit is taken as whole, and an entry a
+// table holds is never written again. It reads three things.
+//
+//   - Facts: entry holds an analysis of every analyzer that learns facts in the run that computed it, so a package
+//     checked where no fact analyzer's action reached it, as one type-checked only for the types of a package above it
+//     the run restored, is left out (#e6wnn8r found debug/pe, debug/buildinfo, hash/maphash and regexp written so).
+//   - Answers: they were computed whole (demandOf), every kind complete, rather than those the run's questions
+//     happened to compute, which a later run would have to load the package from source to add to.
+//   - Reads: the run recorded them and judged them once they were whole (PersistCollectedReads): persisted beside the
+//     entry, or left out for reads no record can hold, as with cgo, as the generator leaves them. Every run that keeps
+//     a system cache records them for its standard library, the host's build and each extra build alike
+//     (recordsReadsOf, extraBuildRecordsReads). An entry whose reads the run never recorded is refused: taken, it would
+//     have every extra build that restores it from the host decline it as unpersisted, on every run of every project
+//     that reads the table, where the generator's carries what the build needs.
+//
+// An entry whose answer reads could not all be named (ReadsIncomplete) is admitted, as the generator admits it: every
+// standard-library owner is named (readsOf), so only a read with no objectpath leaves one so, which costs the builds a
+// decline of it, never a wrong finding, and refusing it here would drop it from the release's table unsaid.
+func standardLibraryEntryWhole(collected StandardLibraryRunEntry, entry cacheEntry) bool {
+	for _, slot := range collected.FactAnalyzers {
+		if _, analyzed := entry.Analyzers[slot]; !analyzed {
+			return false
+		}
+	}
+	if !collected.AnswersWhole || !collected.ReadsJudged {
+		return false
+	}
+	for _, kind := range entry.Answers {
+		if !kind.Complete {
+			return false
+		}
+	}
+	return true
 }
 
 // CanonicalStandardLibraryTable is the one table that holds every entry and every variant of tables, each written by

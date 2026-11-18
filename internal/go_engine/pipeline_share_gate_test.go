@@ -335,8 +335,8 @@ func TestARunOverAnEmptyStoreTakesNoShareGate(test *testing.T) {
 // after one leaf package's edit, the host missing that one of many, takes it. Every build there restores nearly all it
 // holds, so the width is decided from the host's live heap, at the store's peak factor. A run with every package hit
 // is the decision's alone here (TestTheHostsMissedShareDecidesTheShareGateUnderAStore): a test's host restores nothing
-// from the binary's table, so warm it keeps nothing for its builds, which run one at a time whatever the gate says
-// (fixedBuildsWidth).
+// from a system cache's table, since each of its runs is given an empty one, so warm it keeps nothing for its builds,
+// which run one at a time whatever the gate says (fixedBuildsWidth).
 func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.T) {
 	test.Parallel()
 	root := lowShareBuilds(test)
@@ -375,10 +375,10 @@ func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.
 }
 
 // The share gate's line for a run with a store is the host's own missed share, its session's misses over the packages
-// its store hit or missed, the binary's table left out, at or under lowShareAtGate (#ybjbqm2), the same line every
-// build's share at the gate is read against: warm, after a leaf edit, and exactly at the line it takes the gate, and
-// just over it, or cold, a small tree's among them whose packages from the binary's table outnumber its misses, it
-// keeps main's schedule. A run without a store takes it whatever the counts.
+// its store hit or missed, the system cache's table left out, at or under lowShareAtGate (#ybjbqm2), the same line
+// every build's share at the gate is read against: warm, after a leaf edit, and exactly at the line it takes the gate,
+// and just over it, or cold, a small tree's among them whose packages from the system cache's table outnumber its
+// misses, it keeps main's schedule. A run without a store takes it whatever the counts.
 func TestTheHostsMissedShareDecidesTheShareGateUnderAStore(test *testing.T) {
 	test.Parallel()
 	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil)}
@@ -394,12 +394,12 @@ func TestTheHostsMissedShareDecidesTheShareGateUnderAStore(test *testing.T) {
 		{name: "a leaf edit, one of many missed", counts: check.CacheCounts{On: true, Hit: 199, Missed: 1},
 			want: true},
 		{name: "exactly at the line", counts: check.CacheCounts{On: true, Hit: 90, Missed: 10}, want: true},
-		{name: "a leaf edit beside the binary's table, which is left out", counts: check.CacheCounts{On: true,
-			Hit: 95, FromBinary: 260, Missed: 5}, want: true},
+		{name: "a leaf edit beside the system cache's table, which is left out", counts: check.CacheCounts{On: true,
+			Hit: 95, FromSystemCache: 260, Missed: 5}, want: true},
 		{name: "just over the line", counts: check.CacheCounts{On: true, Hit: 89, Missed: 11}, want: false},
 		{name: "cold, an empty store", counts: check.CacheCounts{On: true, Missed: 200}, want: false},
-		{name: "a small tree's cold fill beside the binary's table", counts: check.CacheCounts{On: true,
-			FromBinary: 260, Missed: 20}, want: false},
+		{name: "a small tree's cold fill beside the system cache's table", counts: check.CacheCounts{On: true,
+			FromSystemCache: 260, Missed: 20}, want: false},
 	} {
 		if got := withStore.takesShareGate(each.counts); got != each.want {
 			test.Errorf("%s, a missed share of %.3f, took the share gate %t, want %t", each.name,

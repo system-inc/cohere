@@ -167,6 +167,7 @@ func TestGoRunCacheFactsMoveWithWhatALoadReads(test *testing.T) {
 		{"CXX set", append(slices.Clone(base), "CXX=clang++"), found(link)},
 		{"PKG_CONFIG set", append(slices.Clone(base), "PKG_CONFIG=/opt/bin/pkg-config"), found(link)},
 		{"BURNTSUSHI_TOML_110 set", append(slices.Clone(base), "BURNTSUSHI_TOML_110=1"), found(link)},
+		{"COHERE_SYSTEM_CACHE set", append(slices.Clone(base), "COHERE_SYSTEM_CACHE=/caches/other"), found(link)},
 		{"another go found on PATH", base, found(secondGo)},
 		{"no go found on PATH", base, func(string) (string, error) { return "", os.ErrNotExist }},
 	}
@@ -478,11 +479,12 @@ const goBuildsObject = `[` +
 	`{"target":"windows/arm64","host":false,"compiledFiles":1398,"analyzedPackages":349,"findingsAdded":6,` +
 	`"findingsDropped":1}]`
 
-// goBuildsLines is the account's line for each build of goBuildsObject.
+// goBuildsLines is the account's line for each build of goBuildsObject, each saying it restored no standard library
+// from the system cache, as a record that counts none says.
 const goBuildsLines = "  lint: the host's build, darwin/arm64 cgo: 412 files compiled, 349 packages analyzed, " +
-	"2 findings dropped by the merge\n" +
+	"2 findings dropped by the merge, standard library: none from the system cache\n" +
 	"  lint: build windows/arm64: 1,398 files compiled, 349 packages analyzed, 6 findings added, 1 dropped by the " +
-	"merge\n"
+	"merge, standard library: none from the system cache\n"
 
 // goBuildsJson is goBuildsObject as the `--json` summary writes it.
 const goBuildsJson = goBuildsObject

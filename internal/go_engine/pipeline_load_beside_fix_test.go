@@ -94,6 +94,7 @@ func watchedPipeline(
 	// What the description started beside its reads ends before the test and its directory do.
 	test.Cleanup(described.awaitStarted)
 	engine := newPipeline(request, described, ruleSettings, registered, standardOutput, io.Discard, nil)
+	isolatePipeline(test, engine)
 	engine.watchPrelude = watch.told
 	return engine
 }

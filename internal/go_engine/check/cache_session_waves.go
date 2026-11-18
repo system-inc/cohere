@@ -36,7 +36,9 @@ func (session *CacheSession) firstWave(
 	options *checker.Options,
 	withheld map[*packages.Package]load.PackageWithheld,
 ) (*checker.Graph, error) {
-	if session.known == nil || session.keys == nil {
+	// Waves are the project's store's, beside its second keys: a session without it, which keys the standard library
+	// alone for the system cache, analyzes in one, beside the load as a run without a store does.
+	if session.known == nil || session.keys == nil || session.caching.Store == nil {
 		return nil, nil
 	}
 	missBelow := map[*packages.Package]bool{}

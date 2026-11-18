@@ -32,7 +32,7 @@ var typeReadsFiles = map[string]string{
 func loadRecordingAt(test *testing.T, root string) *load.Loaded {
 	test.Helper()
 	loaded, loadError := load.PackagesCached(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
-		load.Caching{RecordReads: true})
+		load.Caching{RecordReads: load.EveryPackage})
 	if loadError != nil {
 		test.Fatalf("loading %s: %v", root, loadError)
 	}
@@ -154,7 +154,7 @@ func TestEveryPackageEndsItsRunRecordedOrNever(test *testing.T) {
 	for _, run := range []string{"cold", "warm"} {
 		session := NewCacheSession(caching, enabled)
 		loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
-			load.Caching{Restorer: session, Listings: session, RecordReads: true})
+			load.Caching{Restorer: session, Listings: session, RecordReads: load.EveryPackage})
 		if loadError != nil {
 			test.Fatal(loadError)
 		}

@@ -122,12 +122,16 @@ func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(test *testing
 		// The run's own cache line and footer follow the explanation, and differ warm and cold by design. So does
 		// the memory line, which states the ceiling as half the memory available as the run starts: under load
 		// that moved between the two runs, 37 GB warm against 36 GB cold, and failed a land on 2026-10-05.
-		// None of the three says anything about a directive.
+		// So does the total line, whose shape says whether the graph and the phases overlapped in time, "plus phases,
+		// overlapping by" or "phases ..., outside any phase", which the run's timing decides and not its directives:
+		// it failed a land on Sun2 on 2026-11-18 (#wq0c0sv holds what the line guarantees). None of the four says
+		// anything about a directive.
 		var kept []string
 		for _, line := range strings.Split(output[start:], "\n") {
 			trimmed := strings.TrimSpace(line)
 			if strings.HasPrefix(trimmed, "cache:") ||
 				strings.HasPrefix(trimmed, "memory:") ||
+				strings.HasPrefix(trimmed, "total ") ||
 				strings.HasPrefix(trimmed, "✓") ||
 				strings.HasPrefix(trimmed, "✗") {
 				continue

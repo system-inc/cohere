@@ -8,6 +8,20 @@ import (
 	"strings"
 )
 
+// describeSystemCacheKept is whether a run kept its system cache: "kept", "off" under `--no-system-cache`, the reason
+// it was not kept, or "none, the binary's table" for a release before the system cache.
+func describeSystemCacheKept(record runRecord) string {
+	switch {
+	case record.FromBinaryTable:
+		return "none, the binary's table"
+	case record.SystemCacheOff:
+		return "off"
+	case record.SystemCacheNotKept != "":
+		return record.SystemCacheNotKept
+	}
+	return "kept"
+}
+
 // renderTable is the pair's table in markdown, the shape a pair is posted in, from the header and the records alone,
 // so what it prints is what runs.jsonl holds: the binaries and the host, what every run of each corpus agreed on, each
 // corpus's wall seconds by mode with the medians and each round's delta, the medians of user seconds, system seconds
@@ -44,14 +58,13 @@ func renderTable(header tableHeader, records []runRecord) string {
 	for _, corpusName := range corpora {
 		ofCorpus := recordsOf(records, corpusName, "", "")
 		fmt.Fprintf(table, "- **%s** at `%s`, %d runs: exit %s; files in scope %s; findings %s, md5 %s; "+
-			"standardLibraryFromBinary %s; buildsAtOnce base %s, branch %s; stderr bytes %s; "+
+			"buildsAtOnce base %s, branch %s; stderr bytes %s; "+
 			"tracked files changed %s\n",
 			corpusName, shortCommit(ofCorpus[0].CorpusCommit), len(ofCorpus),
 			tally(ofCorpus, func(record runRecord) string { return fmt.Sprint(record.ExitCode) }),
 			tally(ofCorpus, func(record runRecord) string { return describeCount(record.FilesInScope) }),
 			tally(ofCorpus, func(record runRecord) string { return fmt.Sprint(record.Findings) }),
 			tally(ofCorpus, func(record runRecord) string { return "`" + prefix(record.FindingsMd5, 8) + "`" }),
-			tally(ofCorpus, func(record runRecord) string { return describeCount(record.StandardLibraryFromBinary) }),
 			tally(recordsOf(records, corpusName, sideBase, ""), func(record runRecord) string {
 				return fmt.Sprint(record.BuildsAtOnce)
 			}),
@@ -60,6 +73,26 @@ func renderTable(header tableHeader, records []runRecord) string {
 			}),
 			tally(ofCorpus, func(record runRecord) string { return fmt.Sprint(record.StandardErrorBytes) }),
 			tally(ofCorpus, func(record runRecord) string { return fmt.Sprint(len(record.ChangedFiles)) }))
+	}
+
+	// Every pair states what each side's system cache did (#syscache), since a run that restored the standard library
+	// and one that computed it are two measurements: a `--no-cache` run reads a warm system cache.
+	table.WriteString("\n## System cache, by side and mode\n\n")
+	table.WriteString("| corpus | side | mode | standard library restored | written | system cache |\n")
+	table.WriteString("|---|---|---|---|---|---|\n")
+	for _, corpusName := range corpora {
+		for _, side := range []string{sideBase, sideBranch} {
+			for _, mode := range []string{modeCache, modeNoCache} {
+				runs := recordsOf(records, corpusName, side, mode)
+				if len(runs) == 0 {
+					continue
+				}
+				fmt.Fprintf(table, "| %s | %s | %s | %s | %s | %s |\n", corpusName, side, mode,
+					tally(runs, func(record runRecord) string { return describeCount(record.StandardLibraryRestored) }),
+					tally(runs, func(record runRecord) string { return fmt.Sprint(record.SystemCacheWritten) }),
+					tally(runs, describeSystemCacheKept))
+			}
+		}
 	}
 
 	fmt.Fprintf(table, "\n## Tracked files a run changed, each %s\n\n", changedFileOutcome)

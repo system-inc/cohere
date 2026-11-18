@@ -45,7 +45,8 @@ func timedRun(test *testing.T, extra ...string) (stream string, kinds []string) 
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	exitCode := run(arguments, &standardOutput, &standardError, []rule.Rule{everyFileRule, newSpinningRule()}, nil)
+	exitCode := runIsolated(test, arguments, &standardOutput, &standardError,
+		[]rule.Rule{everyFileRule, newSpinningRule()}, nil)
 	stream = standardOutput.String()
 	checkStream(test, stream, exitCode)
 	for line := range strings.Lines(stream) {

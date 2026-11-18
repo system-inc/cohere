@@ -157,7 +157,7 @@ func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 
-	exitCode := run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
+	exitCode := runIsolated(test, []string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
 		&standardOutput, &standardError, rules.All(), memory)
 
 	if exitCode != exitFindings && exitCode != exitClean {

@@ -124,7 +124,8 @@ func TestTheWrapHidesNoUselessConcatenation(test *testing.T) {
 		var standardError bytes.Buffer
 		arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
 			extra...)
-		if exitCode := run(arguments, &standardOutput, &standardError, rules.All(), nil); exitCode != exitFindings {
+		if exitCode := runIsolated(test, arguments, &standardOutput, &standardError, rules.All(),
+			nil); exitCode != exitFindings {
 			test.Fatalf("exit %d, want %d; stderr:\n%s", exitCode, exitFindings, standardError.String())
 		}
 		return strings.Count(standardOutput.String(), `"rule":"`+consistency_no_useless_concatenation.Name+`"`)

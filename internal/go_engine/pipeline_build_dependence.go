@@ -21,7 +21,7 @@ import (
 // hostDependence is the host's graph of its package-level declarations under `--build-dependence` (#qkq4gx5), built
 // once from its load for every extra build to be judged on, and what each judgment compares a build's load with: the
 // host's files of every package as written, and its path, by package ID, the load it was built from, and how long it
-// took. restored are the packages the host read from export data, the binary's standard-library table's or the
+// took. restored are the packages the host read from export data, the system cache's standard-library table's or the
 // store's, by package ID, which the graph does not hold, and standardLibrary is the graph of the standard library's
 // among them, nil when it restored none (#ss4t5g6).
 type hostDependence struct {
@@ -61,10 +61,10 @@ func (engine *pipeline) callIndex() *build_dependence.CallIndex {
 }
 
 // standardLibraryDependence is the standard library's own graph (#ss4t5g6): the host restores the standard library
-// from the binary's table, with no syntax, so its graph holds none of it, and each build's standard library is judged
-// on a graph of its own, loaded from source beside the host's lint, whose judgment answers for the objects the host's
-// units read of it (build_dependence.Counterparts). done is closed once the side load and the graph have ended; graph
-// is then nil when the load failed, which problem says, files are each side-loaded package's files as written, by
+// from the system cache's table, with no syntax, so its graph holds none of it, and each build's standard library is
+// judged on a graph of its own, loaded from source beside the host's lint, whose judgment answers for the objects the
+// host's units read of it (build_dependence.Counterparts). done is closed once the side load and the graph have ended;
+// graph is then nil when the load failed, which problem says, files are each side-loaded package's files as written, by
 // package ID, which each build's are compared with, and fileSet is the side load's, where its objects' positions are,
 // by which the facts census keys the host's facts of a restored package (indexHostFacts). Its packages are counted
 // among the dependencies.

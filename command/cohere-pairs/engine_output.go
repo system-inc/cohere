@@ -18,13 +18,23 @@ type engineOutput struct {
 	// FindingsMd5 is the md5 of the run's finding lines sorted bytewise, each with its newline, as
 	// `grep '"kind":"finding"' | LC_ALL=C sort | md5sum` would print it. The engine's findings never depend on the
 	// cache, so every run of one corpus, both sides and modes, has the same.
-	FindingsMd5               string          `json:"findingsMd5"`
-	FilesInScope              *int            `json:"filesInScope"`
-	FilesWalked               *int            `json:"filesWalked"`
-	StandardLibraryFromBinary *int            `json:"standardLibraryFromBinary"`
-	BuildsAtOnce              int             `json:"buildsAtOnce"`
-	BuildsWidthLiveBytes      uint64          `json:"buildsWidthLiveBytes"`
-	Builds                    json.RawMessage `json:"builds"`
+	FindingsMd5  string `json:"findingsMd5"`
+	FilesInScope *int   `json:"filesInScope"`
+	FilesWalked  *int   `json:"filesWalked"`
+	// StandardLibraryRestored is the standard-library packages the run restored rather than computed, from its system
+	// cache or, for a release before it, the table its binary carried (engineLine), whichever its record names, nil
+	// when the run wrote no lint record. SystemCacheWritten, SystemCacheOff and SystemCacheNotKept are the rest of
+	// what its system cache did, which a release before it never writes.
+	StandardLibraryRestored *int   `json:"standardLibraryRestored"`
+	SystemCacheWritten      int    `json:"systemCacheWritten"`
+	SystemCacheOff          bool   `json:"systemCacheOff,omitempty"`
+	SystemCacheNotKept      string `json:"systemCacheNotKept,omitempty"`
+	// FromBinaryTable is set when the record named its restores by the old name, a release's before the system cache,
+	// whose binary carried its table and kept no system cache.
+	FromBinaryTable      bool            `json:"fromBinaryTable,omitempty"`
+	BuildsAtOnce         int             `json:"buildsAtOnce"`
+	BuildsWidthLiveBytes uint64          `json:"buildsWidthLiveBytes"`
+	Builds               json.RawMessage `json:"builds"`
 	// LinesNotJson counts the lines that did not read as JSON, which are counted and never stop the read.
 	LinesNotJson int `json:"linesNotJson"`
 }
@@ -54,7 +64,13 @@ func readEngineOutput(stream io.Reader) (engineOutput, error) {
 				case "lint":
 					if read.FilesWalked == nil {
 						read.FilesWalked = &parsed.FilesWalked
-						read.StandardLibraryFromBinary = &parsed.Cache.StandardLibraryFromBinary
+						// One of the two names at most is written, by the binary that wrote the record.
+						restored := parsed.Cache.StandardLibraryFromSystemCache + parsed.Cache.StandardLibraryFromBinary
+						read.StandardLibraryRestored = &restored
+						read.SystemCacheWritten = parsed.Cache.SystemCacheWritten
+						read.SystemCacheOff = parsed.Cache.SystemCacheOff
+						read.SystemCacheNotKept = parsed.Cache.SystemCacheNotKept
+						read.FromBinaryTable = parsed.Cache.StandardLibraryFromBinary > 0
 						read.BuildsAtOnce = parsed.BuildsAtOnce
 						read.BuildsWidthLiveBytes = parsed.BuildsWidthLiveBytes
 						read.Builds = parsed.Builds

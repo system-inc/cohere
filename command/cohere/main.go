@@ -135,6 +135,12 @@ func run() error {
 	// incremental build info.
 	noCache := flag.Bool("no-cache", false,
 		"read nothing from and write nothing to this project's caches (the cache table and the tsconfig's incremental build info), so every phase computes from source")
+	// Go's alone for now, forwarded to its engine (goFlags), and accepted by the others, which keep no system cache:
+	// Swift's run answers it at the front door and forwards nothing (swiftFlags), and TypeScript's reads nothing of it.
+	flag.Bool("no-system-cache", false,
+		"in a Go project, neither read nor write the Go engine's system cache, the standard library's entries it "+
+			"keeps in the user's cache directory for every project, so the standard library is computed; changes "+
+			"nothing in TypeScript and Swift projects yet")
 	// Go's alone, forwarded to its engine and to nothing else (goFlags, withoutGoOnlySwitches), and read through given:
 	// a file only another platform, cgo setting or build tag compiles is checked, and otherwise a gap (#72n9mq0).
 	flag.Bool("other-builds", false,

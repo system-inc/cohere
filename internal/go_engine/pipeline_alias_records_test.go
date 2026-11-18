@@ -50,12 +50,13 @@ func holdPartCount(test *testing.T, root string) {
 	editPlatform(test, root, "Part struct{ count base.Count }", "Part struct{ count Holder }")
 }
 
-// coldVerdictsOf are the verdicts of a cold run over a fresh copy of the alias-records fixture, edited by edit.
-func coldVerdictsOf(test *testing.T, edit func(*testing.T, string)) map[string]bool {
+// coldVerdictsOf are the verdicts of a run with a cold store over a fresh copy of the alias-records fixture, edited by
+// edit, configure given the pipeline, as a test shares its system cache (sharingSystemCache), or nil.
+func coldVerdictsOf(test *testing.T, edit func(*testing.T, string), configure func(*pipeline)) map[string]bool {
 	test.Helper()
 	edited := copyFixture(test, aliasRecordsFixture)
 	edit(test, edited)
-	cold, _ := runOverRaw(test, edited, exitClean, recordsSwitches...)
+	cold, _ := runOverConfigured(test, edited, exitClean, configure, recordsSwitches...)
 	return graphVerdicts(test, cold, edited)
 }
 
@@ -68,11 +69,19 @@ func TestAnAliasHitReadsItsTargetsRecord(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, aliasRecordsFixture)
-	runOverRaw(test, root, exitClean, recordsSwitches...)
+	// One system cache for every run, as a person's, so each run after the first restores the standard library the
+	// first computed, as the warm runs restore the rest from the store, and only reader moves.
+	sharing := sharingSystemCache(test.TempDir())
+	runOverConfigured(test, root, exitClean, sharing, recordsSwitches...)
 	makeBodyOnly(test, root)
-	first, _ := runOverRaw(test, root, exitClean, recordsSwitches...)
-	second, secondStream := runOverRaw(test, root, exitClean, recordsSwitches...)
-	coldVerdicts := coldVerdictsOf(test, makeBodyOnly)
+	first, _ := runOverConfigured(test, root, exitClean, sharing, recordsSwitches...)
+	second, secondStream := runOverConfigured(test, root, exitClean, sharing, recordsSwitches...)
+	// The cold reference is cold in both stores, as the first run above was, so its standard library comes from where
+	// the warm runs' first came from: the host computes it and keeps it for the builds, which restore it from the host
+	// as the warm builds restore what that first run wrote through. A cold project over the warm system cache would
+	// have the host restore it and keep none, so the builds, which keep no system cache under `--build-dependence`,
+	// would compute it from source, a provenance no warm run shares (#syscache).
+	coldVerdicts := coldVerdictsOf(test, makeBodyOnly, sharingSystemCache(test.TempDir()))
 	expectSameVerdicts(test, "the first warm run against cold", coldVerdicts, graphVerdicts(test, first, root))
 	expectSameVerdicts(test, "the second warm run against cold", coldVerdicts, graphVerdicts(test, second, root))
 	if counted := recordCounts(test, secondStream); counted.AliasRead != 1 || counted.AliasSkipped != 0 ||
@@ -96,7 +105,7 @@ func TestAnUnexportedFieldsTypeIsNeverReadStaleThroughAnAlias(test *testing.T) {
 	holdPartCount(test, root)
 	runOverRaw(test, root, exitClean, recordsSwitches...)
 	second, _ := runOverRaw(test, root, exitClean, recordsSwitches...)
-	coldVerdicts := coldVerdictsOf(test, holdPartCount)
+	coldVerdicts := coldVerdictsOf(test, holdPartCount, nil)
 	dependent := false
 	for unit, isDependent := range coldVerdicts {
 		dependent = dependent || isDependent && strings.Contains(unit, " "+aliasRecordsReader+" ")

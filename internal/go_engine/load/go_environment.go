@@ -48,11 +48,22 @@ type GoEnvironment struct {
 	listerState *listerState
 }
 
+// CgoToolchainNames are what go env reports of the C toolchain the cgo tool runs, which the cgo-translated loader
+// (LoaderCgoTranslated) type-checks a package with cgo files from the outputs of: the compilers, their flags, the
+// archiver and pkg-config. Every key of a package checked so holds them (#syscache), since each can change what the
+// package checks to. `GOGCCFLAGS` is left out: go env reports it with a `-ffile-prefix-map` naming a build directory
+// of its own each time, so it would differ every run, and the rest of it follows `GOARCH` and `CC`, which keys hold.
+var CgoToolchainNames = []string{
+	"CC", "CXX", "FC", "AR", "GCCGO", "PKG_CONFIG", "CGO_CFLAGS", "CGO_CPPFLAGS", "CGO_CXXFLAGS", "CGO_FFLAGS",
+	"CGO_LDFLAGS",
+}
+
 // goEnvironmentNames are every variable a reader of a GoEnvironment reads, asked of go env in one command: the kept
 // listing's key (listingEnvironment), which holds the lister's `GOVERSION`, `GODEBUG`, `GOFLAGS`, `GOWORK` and
-// `GOFIPS140`, and the findings cache's `GOROOT` and build names (go_engine's buildNames), and then the build
-// target's go env file and build cache, which the inputs record names (constraintContext).
-var goEnvironmentNames = slices.Concat(listingEnvironment, []string{"GOENV", "GOCACHE"})
+// `GOFIPS140`, and the findings cache's `GOROOT` and build names (go_engine's buildNames), then the build target's
+// go env file and build cache, which the inputs record names (constraintContext), and the C toolchain the keys hold
+// under the cgo-translated loader (CgoToolchainNames).
+var goEnvironmentNames = slices.Concat(listingEnvironment, []string{"GOENV", "GOCACHE"}, CgoToolchainNames)
 
 // ReadGoEnvironment asks go env in directory under the current environment plus environment, once, and makes the
 // whole environment every go command of a load runs with from its `GOFLAGS`: the same flags, -pgo=off last, as

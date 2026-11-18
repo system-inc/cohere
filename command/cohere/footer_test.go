@@ -186,14 +186,23 @@ func TestFooterGolden(test *testing.T) {
 			want: "✗ ☠️ 2.4s • 2 type errors (480 rules • 3,926 checked) • ⚠ 👑 lint did not run",
 		},
 		{
-			name: "a Go run whose standard library came from the binary",
+			name: "a Go run whose standard library came from the system cache",
 			summary: func(summary *runSummary) {
-				summary.PackageCache = &packageCacheUse{FromBinary: 1258}
+				summary.PackageCache = &packageCacheUse{FromSystemCache: 1258}
 			},
-			want: "✓ 💎 2.4s (480 rules • 3,926 checked) • standard library: 1,258 from the binary",
+			want: "✓ 💎 2.4s (480 rules • 3,926 checked) • standard library: 1,258 from the system cache",
 		},
 		{
-			name:    "a Go run with nothing from the binary",
+			name: "a Go run that could not keep its system cache",
+			summary: func(summary *runSummary) {
+				summary.PackageCache = &packageCacheUse{On: true, SystemCacheNotKept: "finding the user's cache " +
+					"directory: neither $XDG_CACHE_HOME nor $HOME are defined"}
+			},
+			want: "✓ 💎 2.4s (480 rules • 3,926 checked) • ⚠ system cache not kept: finding the user's cache " +
+				"directory: neither $XDG_CACHE_HOME nor $HOME are defined",
+		},
+		{
+			name:    "a Go run with nothing from the system cache",
 			summary: func(summary *runSummary) { summary.PackageCache = &packageCacheUse{On: true, Hit: 3} },
 			want:    "✓ 💎 2.4s (480 rules • 3,926 checked)",
 		},

@@ -56,9 +56,10 @@ func DependenceRecordKey(key cache.Key) cache.Key {
 // DroppedAfterBackfill counts the hits dropShortHits made misses in a load that backfilled any, which asks the facts
 // of everything below a backfilled package: a backfill that cascaded would show here.
 //
-// The standard library's counts are of the packages the host restored from the binary's table, whose records the
-// store keeps apart (cache_session_standard_library_records.go): read and unreadable over the last load, and written
-// once the side load has ended, whose failed writes the run counts with the entries' (WriteStandardLibraryRecords).
+// The standard library's counts are of the packages the host restored from the system cache's store, whose records the
+// project's store keeps apart (cache_session_standard_library_records.go): read and unreadable over the last load, and
+// written once the side load has ended, whose failed writes the run counts with the entries'
+// (WriteStandardLibraryRecords).
 type DependenceRecordCounts struct {
 	Read                 int
 	Written              int
@@ -84,8 +85,8 @@ type dependenceRecords struct {
 	recordOf     func(*packages.Package) ([]byte, bool)
 	counts       DependenceRecordCounts
 
-	// standardLibrary are the records the store holds of the standard-library packages the load restored from the
-	// binary's table, decoded (readStandardLibraryRecords).
+	// standardLibrary are the records the project's store holds of the standard-library packages the load restored from
+	// the system cache's store, decoded (readStandardLibraryRecords).
 	standardLibrary map[*packages.Package]*build_dependence.Record
 }
 
@@ -124,8 +125,9 @@ func (session *CacheSession) DependenceRecord(keyed *packages.Package) (*build_d
 // none (backfill) and counts each hit by an alias that has none. A hit by an alias looks up its record beside the
 // entry the alias leads to (recordKeyOf). A record that does not decode is a problem, said,
 // and its package has none: a hit by its first key is backfilled, so its record is written again over the one that
-// did not decode, and a miss's is written from its syntax. A hit from the binary's table is never the store's to
-// backfill.
+// did not decode, and a miss's is written from its syntax. A hit from the system cache's store is never backfilled,
+// so no project's census writes its entry again in the store every project shares: its record is the standard
+// library's records' (readStandardLibraryRecords).
 func (session *CacheSession) readDependenceRecords(reachable []*packages.Package) {
 	records := session.dependence
 	if records == nil {
@@ -166,7 +168,7 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	for _, each := range keyed {
 		_, hit := session.hits[each]
 		_, isFound := records.found[each]
-		if !hit || isFound || session.fromBinary[each] {
+		if !hit || isFound || session.restoredFromSystemCache(each) {
 			continue
 		}
 		if session.stored[each] != session.keys[each] {
@@ -182,11 +184,11 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 
 // recordKeyOf is the key keyed's record is kept beside, and whether it is an alias's target: a hit by an alias that
 // holdAliasHits kept, whose entry is under the key the alias leads to (session.stored), finds its record beside that
-// entry, and every other package beside its own first key. A hit from the binary's table has no record in the store
-// under either.
+// entry, and every other package beside its own first key. A hit from the system cache's store has no record in the
+// project's store under either; its record is kept apart (StandardLibraryDependenceRecordKey).
 func (session *CacheSession) recordKeyOf(keyed *packages.Package) (cache.Key, bool) {
 	stored, isStored := session.stored[keyed]
-	if session.restored(keyed) && isStored && !session.fromBinary[keyed] && stored != session.keys[keyed] {
+	if session.restored(keyed) && isStored && !session.restoredFromSystemCache(keyed) && stored != session.keys[keyed] {
 		return stored, true
 	}
 	return session.keys[keyed], false

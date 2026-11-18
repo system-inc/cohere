@@ -37,6 +37,7 @@ func plainRun(test *testing.T, root string) *pipeline {
 	// What the description started beside its reads ends before the test and its directory do.
 	test.Cleanup(described.awaitStarted)
 	engine := newPipeline(request, described, ruleSettings, registered, &bytes.Buffer{}, io.Discard, nil)
+	isolatePipeline(test, engine)
 	engine.run()
 	if engine.session == nil || engine.fix == nil {
 		test.Fatalf("the run had no findings cache (%t) or no fix phase (%t)", engine.session == nil, engine.fix == nil)

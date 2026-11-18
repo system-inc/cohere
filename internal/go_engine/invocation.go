@@ -35,9 +35,9 @@ type invocation struct {
 	stdinPath string
 	buffer    []byte
 
-	// standardLibrary is the standard library's entries the run may read from the binary (see lintCache), never
-	// read from the command line.
-	standardLibrary builtInStandardLibrary
+	// standardLibrary is where the run's standard-library entries come from and go (see lintCache), never read from
+	// the command line.
+	standardLibrary standardLibrarySource
 
 	// answersInPart is check.Caching's AnswersInPart, the packages whose entries the run writes with only the answers
 	// its questions computed, for a test of the reload such an entry makes, never read from the command line.
@@ -162,11 +162,12 @@ func (request invocation) read(file string) ([]byte, error) {
 }
 
 // judgesDependence reports whether the run computes each extra build's dependence (#qkq4gx5): `--build-dependence`
-// beside `--other-builds`, which alone has extra builds to judge. Such a run reads the findings cache and the binary's
-// standard-library entries as any other run does; the standard library it restores is judged on a graph of its own,
-// loaded from source beside the host's lint, and anything else restored fails wide (buildDependenceGraph, #ss4t5g6).
-// Its rules wait for the load's end (lintOverlaps), since they let go of each package's syntax as they finish with it,
-// and its extra builds restore nothing from the host's run (censusKeepsHostRestoreOff), for the facts census.
+// beside `--other-builds`, which alone has extra builds to judge. Such a run reads the findings cache and the system
+// cache's standard-library entries as any other run does; the standard library it restores is judged on a graph of its
+// own, loaded from source beside the host's lint, and anything else restored fails wide (buildDependenceGraph,
+// #ss4t5g6). Its rules wait for the load's end (lintOverlaps), since they let go of each package's syntax as they
+// finish with it, and its extra builds restore nothing from the host's run (censusKeepsHostRestoreOff), for the facts
+// census.
 func (request invocation) judgesDependence() bool {
 	return request.switches["build-dependence"] && request.switches["other-builds"]
 }
@@ -188,4 +189,18 @@ func (request invocation) requests(phase contract.PhaseName) bool {
 		return request.switches["lint"] || !anyNamed
 	}
 	return false
+}
+
+// keysByIdentity reports whether the run may key anything by the engine's identity (cache.ExecutableIdentity), which a
+// run hashes the whole executable for: one that loads its packages, for their types, their lint or a fix's long-line
+// wrap, with a project store or a system cache to key them for. A run with neither, under `--no-cache` and
+// `--no-system-cache` together, keys nothing, and so does one that only formats, which loads nothing. It may say yes
+// of a run that ends up keying nothing, a system cache with no root or a fix that wraps no line, which only hashes
+// beside the run for nothing; it never says no of one that keys.
+func (request invocation) keysByIdentity() bool {
+	if request.switches["no-cache"] && request.switches["no-system-cache"] || request.switches["format-only"] {
+		return false
+	}
+	return request.requests(contract.PhaseTypes) || request.requests(contract.PhaseLint) ||
+		request.requests(contract.PhaseFix)
 }

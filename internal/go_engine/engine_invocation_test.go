@@ -110,6 +110,9 @@ func TestParseInvocationReads(test *testing.T) {
 		// The front door forwards it for a cache the engine will keep of its own, so it is read, never refused.
 		{"no-cache", append(slices.Clone(contractArguments), "--no-cache", "--no-fix"), modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, nil},
+		// The system cache's switch is read as the project store's is (#syscache).
+		{"no-system-cache", append(slices.Clone(contractArguments), "--no-system-cache", "--no-fix"), modeCheck,
+			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, nil},
 		{"values after an equals sign", []string{"--contract=3", "--root=/project", "/project/a"}, modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, []string{"/project/a"}},
 		{"a path after -- that looks like a flag", append(slices.Clone(contractArguments), "--", "/project/--fix"),
@@ -189,5 +192,34 @@ func TestMainRefusesASecondRun(test *testing.T) {
 	if secondOutput.Len() != 0 || !strings.Contains(secondError.String(), "second engine run in one process") {
 		test.Errorf("the second run wrote %q to stdout and %q to stderr, want nothing and the refusal",
 			secondOutput.String(), secondError.String())
+	}
+}
+
+// A run hashes the engine's executable early only when it may key something by the engine's identity
+// (keysByIdentity): never under `--no-cache --no-system-cache`, which keys nothing, nor for a run that only formats,
+// and always for a run that loads its packages with a project store or a system cache to key.
+func TestOnlyARunThatMayKeyHashesTheEngineEarly(test *testing.T) {
+	test.Parallel()
+
+	for _, each := range []struct {
+		arguments []string
+		want      bool
+	}{
+		{arguments: nil, want: true},
+		{arguments: []string{"--no-cache"}, want: true},
+		{arguments: []string{"--no-system-cache"}, want: true},
+		{arguments: []string{"--lint", "--no-cache"}, want: true},
+		{arguments: []string{"--no-cache", "--no-system-cache"}, want: false},
+		{arguments: []string{"--lint", "--no-cache", "--no-system-cache"}, want: false},
+		{arguments: []string{"--format-only"}, want: false},
+	} {
+		request, parseError := parseInvocation(append([]string{"--contract", fmt.Sprint(contract.Version), "--root",
+			test.TempDir()}, each.arguments...))
+		if parseError != nil {
+			test.Fatalf("%q: %v", each.arguments, parseError)
+		}
+		if got := request.keysByIdentity(); got != each.want {
+			test.Errorf("%q: hashes the engine early %t, want %t", each.arguments, got, each.want)
+		}
 	}
 }

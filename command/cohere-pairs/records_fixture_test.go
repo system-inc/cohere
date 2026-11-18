@@ -48,14 +48,22 @@ func fixtureRecords() []runRecord {
 		record.PeakResidentBytes = 8_130_000_000 + int64(planned.round)*10_000_000
 		load := 0.4 + float64(len(records))
 		record.LoadBefore = &load
-		filesInScope, filesWalked, fromBinary := 1200, 1180, 180
+		filesInScope, filesWalked, restored := 1200, 1180, 180
 		record.engineOutput = engineOutput{
-			Findings:                  findings,
-			FindingsMd5:               md5,
-			FilesInScope:              &filesInScope,
-			FilesWalked:               &filesWalked,
-			StandardLibraryFromBinary: &fromBinary,
-			BuildsAtOnce:              2,
+			Findings:                findings,
+			FindingsMd5:             md5,
+			FilesInScope:            &filesInScope,
+			FilesWalked:             &filesWalked,
+			StandardLibraryRestored: &restored,
+			BuildsAtOnce:            2,
+			// The base is a release before the system cache, which restores from the table its binary carries.
+			FromBinaryTable: planned.side == sideBase,
+		}
+		// The branch has the system cache: its cold cache-on run of the first round computes the standard library and
+		// writes it, and every run after restores it.
+		if planned.side == sideBranch && planned.round == 1 && planned.mode == modeCache {
+			cold := 0
+			record.StandardLibraryRestored, record.SystemCacheWritten = &cold, 180
 		}
 		if planned.side == sideBranch {
 			record.BuildsAtOnce = 3

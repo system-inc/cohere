@@ -40,6 +40,7 @@ func saveRun(test *testing.T, root string, file string, buffer []byte) {
 	var output bytes.Buffer
 	var standardError bytes.Buffer
 	engine := newPipeline(request, described, ruleSettings, registered, io.Discard, &standardError, nil)
+	isolatePipeline(test, engine)
 	if exitCode := engine.runStdin(&output); exitCode != exitClean || output.Len() == 0 {
 		test.Fatalf("the save of %s exited %d with %d bytes of text, want exit 0 and text:\n%s", file, exitCode,
 			output.Len(), standardError.String())

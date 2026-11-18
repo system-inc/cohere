@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
@@ -18,12 +17,15 @@ import (
 // has a file only windows builds, so a run under `--other-builds` judges a windows build.
 var standardLibraryRecordsFixture = filepath.Join("testdata", "std-records")
 
-// readingTableAs is the binary's entries as a run reads table under stamp, its standard library's dependence records
-// keyed by toolchain in place of go env's when it is not empty.
-func readingTableAs(table []byte, stamp string, toolchain string) func(*pipeline) {
+// readingSystemCache is a run reading and writing the system cache filled holds (filledSystemCache), its standard
+// library's dependence records keyed by toolchain in place of go env's when it is not empty.
+func readingSystemCache(filled standardLibrarySource, toolchain string) func(*pipeline) {
+	reading := filled
+	reading.toolchain = toolchain
 	return func(engine *pipeline) {
-		engine.request.standardLibrary = builtInStandardLibrary{table: cache.NewStandardLibraryTable(table),
-			stamp: stamp, toolchain: toolchain}
+		engine.request.standardLibrary = reading
+		// The pipeline found its system cache before this ran, from the request it was made with.
+		engine.systemCache = openSystemCache(engine.request)
 	}
 }
 
@@ -73,9 +75,9 @@ func restoredOf(test *testing.T, stream string) contract.RestoredDependence {
 func TestTheStandardLibrarysRecordsComeFromTheStore(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	reading := readingSystemCache(filled, "")
 	cold, coldStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	warm, warmStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	coldCounts, warmCounts := recordCounts(test, coldStream), recordCounts(test, warmStream)
@@ -100,11 +102,11 @@ func TestTheStandardLibrarysRecordsComeFromTheStore(test *testing.T) {
 func TestAStandardLibraryRecordOfAnotherToolchainIsNeverRead(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
-	_, firstStream, _ := runOverNoted(test, root, exitClean, readingTableAs(table, engineTestsStamp, "go1.0 /one"),
+	_, firstStream, _ := runOverNoted(test, root, exitClean, readingSystemCache(filled, "go1.0 /one"),
 		recordsSwitches...)
-	_, otherStream, _ := runOverNoted(test, root, exitClean, readingTableAs(table, engineTestsStamp, "go1.0 /two"),
+	_, otherStream, _ := runOverNoted(test, root, exitClean, readingSystemCache(filled, "go1.0 /two"),
 		recordsSwitches...)
 	written := recordCounts(test, firstStream).StandardLibraryWritten
 	other, otherRestored := recordCounts(test, otherStream), restoredOf(test, otherStream)
@@ -119,9 +121,9 @@ func TestAStandardLibraryRecordOfAnotherToolchainIsNeverRead(test *testing.T) {
 func TestANoCacheRunSideLoadsTheStandardLibrary(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	reading := readingSystemCache(filled, "")
 	runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	_, stream, _ := runOverNoted(test, root, exitClean, reading, append(recordsSwitches, "--no-cache")...)
 	if restored := restoredOf(test, stream); restored.StandardLibrarySideLoaded == 0 ||
@@ -137,15 +139,17 @@ func TestANoCacheRunSideLoadsTheStandardLibrary(test *testing.T) {
 // #6a3kjvz piece 3): in a copy of the local Go installation, a run under `--build-dependence` writes the standard
 // library's records, and once unicode/utf8's utf8.go gains a declaration, a run reading the store judges every unit of
 // both graphs, in every build, as a run under `--no-cache` does, which side-loads every package it restored. utf8 and
-// its importers miss the binary's table, whose keys hold each file's bytes, and so does each record keyed from one.
+// its importers miss the system cache's table, whose keys hold each file's bytes, and so does each record keyed from
+// one.
 //
 // Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
 func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	mirror := mirroredGoRoot(test, goEnvironmentIn(test, root, nil)["GOROOT"], "src/unicode/utf8/utf8.go", "")
 	test.Setenv("GOROOT", mirror)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	// Filled under the mirror, since every standard-library key holds `GOROOT`.
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading := readingSystemCache(filled, "")
 	_, coldStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	if written := recordCounts(test, coldStream).StandardLibraryWritten; written == 0 {
 		test.Fatal("the cold run wrote no standard-library record")
@@ -160,8 +164,14 @@ func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
 	if closeError := edited.Close(); writeError != nil || closeError != nil {
 		test.Fatalf("editing utf8.go: %v, %v", writeError, closeError)
 	}
+	// The system cache as the warm run finds it, which that run then adds utf8 and its importers to: the run under
+	// `--no-cache` reads this copy, so it computes what the warm run computed, and side-loads what it restored, as the
+	// table era's reference read the table as it was before the edit (#syscache).
+	beforeWarm := filled
+	beforeWarm.systemCacheRoot = copyFixture(test, filled.systemCacheRoot)
 	warm, warmStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
-	sideLoaded, _, _ := runOverNoted(test, root, exitClean, reading, append(recordsSwitches, "--no-cache")...)
+	sideLoaded, _, _ := runOverNoted(test, root, exitClean, readingSystemCache(beforeWarm, ""),
+		append(recordsSwitches, "--no-cache")...)
 	if read := recordCounts(test, warmStream).StandardLibraryRead; read == 0 {
 		test.Fatal("the warm run read no standard-library record, so its verdicts prove nothing")
 	}
@@ -233,8 +243,8 @@ func expectSameCensus(test *testing.T, want string, got string) map[string]contr
 func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 	test.Parallel()
 
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading := readingSystemCache(filled, "")
 	sideRoot := copyFixture(test, standardLibraryRecordsFixture)
 	sideLoaded, sideStream, _ := runOverNoted(test, sideRoot, exitClean, reading, recordsSwitches...)
 	if restored := restoredOf(test, sideStream); restored.StandardLibrarySideLoaded == 0 {
@@ -298,5 +308,33 @@ func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 	if !slices.Equal(withoutRootLines(findingLines(sideStream), sideRoot),
 		withoutRootLines(findingLines(storeStream), storedRoot)) {
 		test.Error("the findings over the stored records are not the side-loaded run's")
+	}
+}
+
+// A warm run under `--build-dependence` writes nothing to the system cache's store: a standard-library package the host
+// restores from it with no dependence record in the project's store is side-loaded for its record, which goes to the
+// project's store, and is never made a miss whose entry is written again (readDependenceRecords leaves the system
+// cache's hits to the standard library's records), so no project's census rewrites what every project on the machine
+// shares. The project's store is fresh here, as a project new to a machine whose system cache is warm.
+func TestAWarmBuildDependenceRunWritesNothingToTheSystemCache(test *testing.T) {
+	test.Parallel()
+
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	before := systemCacheListing(test, filled.systemCacheRoot)
+	root := copyFixture(test, standardLibraryRecordsFixture)
+	_, stream, _ := runOverNoted(test, root, exitClean, readingSystemCache(filled, ""), recordsSwitches...)
+	record := lintRecordOf(test, stream)
+	if record.Cache.FromSystemCache == 0 || record.Cache.SystemCacheWritten != 0 {
+		test.Errorf("want the standard library restored from the system cache and nothing written to it, got %+v",
+			record.Cache)
+	}
+	if written := recordCounts(test, stream).StandardLibraryWritten; written == 0 {
+		test.Error("want the restored standard library's records written to the project's store")
+	}
+	after := systemCacheListing(test, filled.systemCacheRoot)
+	for path, information := range after {
+		if strings.HasPrefix(path, systemStoreDirectory(filled.systemCacheRoot)) && before[path] != information {
+			test.Errorf("the run changed %s in the system cache's store", path)
+		}
 	}
 }
