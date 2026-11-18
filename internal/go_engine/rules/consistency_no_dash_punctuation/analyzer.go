@@ -66,6 +66,11 @@ const (
 	enDash = '\u2013'
 )
 
+// dashEncodingStart is the two bytes both dashes' UTF-8 encodings start with: the em-dash is `e2 80 94` and the en-dash
+// `e2 80 93`. The flagged fixture holds a text with only an em-dash and one with only an en-dash, so a prefix that
+// missed either is caught.
+const dashEncodingStart = "\xe2\x80"
+
 // dashNames is how a message names each dash.
 var dashNames = []struct {
 	dash rune
@@ -142,6 +147,13 @@ func reportDashes(
 	source string,
 	kind textKind,
 ) {
+	// Almost no comment or literal holds a dash, so one fast search for the bytes every dash starts with skips the
+	// rune-by-rune walk for them. Ranging over a string yields the em-dash or the en-dash only where their whole UTF-8
+	// encoding is written, and both start with these two bytes, so a text without them holds no dash to report. A text
+	// that has them for another character, a curly quote or the Unicode hyphen, is still walked and judged below.
+	if !strings.Contains(source, dashEncodingStart) {
+		return
+	}
 	// The scanner drops every carriage return from a block comment's and a raw string's text, so in a file with CRLF
 	// line endings an offset into source falls one byte short of the file for each line it crosses. Each line is
 	// placed at the file's own start of that line instead, from the line table the scanner built from the real
