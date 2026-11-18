@@ -7,6 +7,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 )
 
 // inputsHoldLimit is how long a test's hold on a load's inputs waits for the load to return before letting the
@@ -44,6 +46,39 @@ func TestALoadReturnsBeforeItsInputsAreCollected(test *testing.T) {
 	if !slices.Equal(inputs.Files, unheld.Files) || !slices.Equal(inputs.Directories, unheld.Directories) ||
 		!slices.Equal(inputs.Absent, unheld.Absent) {
 		test.Errorf("the inputs collected beside the load\n%+v\ndiffer from an unheld load's\n%+v", inputs, unheld)
+	}
+}
+
+// A load's inputs are collected with none of the run's slots held (#ybjbqm2): under a slot at a priority below the
+// lint's, a run without a store, busy on every core to its end, granted the collection last and its records waited
+// for it. So with every slot of the load's pool held by other work, the collection still ends.
+func TestALoadsInputsAreCollectedWithEverySlotHeld(test *testing.T) {
+	test.Parallel()
+
+	loadedInputsFixture(test)
+	pool := bounded.NewPool(1)
+	slotHeld := make(chan struct{})
+	caching := Caching{Pool: pool, beforeInputs: func() { <-slotHeld }}
+	loaded, loadError := PackagesCached(inputsFixture.module, []string{"./..."}, inputsFixtureEnvironment(),
+		inputsFixtureCensus(), caching)
+	if loadError != nil {
+		test.Fatal(loadError)
+	}
+	// The pool's one slot is taken by other work, at the top of the scale, before the collection goes on.
+	go func() {
+		pool.Acquire(bounded.PriorityScale)
+		close(slotHeld)
+	}()
+	collected := make(chan struct{})
+	go func() {
+		loaded.Inputs()
+		close(collected)
+	}()
+	select {
+	case <-collected:
+		pool.Release()
+	case <-time.After(inputsHoldLimit):
+		test.Errorf("the inputs were not collected within %s while the pool's every slot was held", inputsHoldLimit)
 	}
 }
 

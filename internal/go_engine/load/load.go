@@ -125,8 +125,7 @@ type Loaded struct {
 	// returns it, the same on every call. It is collected beside the load, which returns without waiting for it
 	// (#ybjbqm2): it is read only as the run's records are written, after the lint, so collecting it at the load's end
 	// put 33 to 55 ms of the host's load, and about 67 ms of each extra build's, on the run's path. A panic in the
-	// collection is raised on the goroutine that calls it. Whoever calls it holds none of the run's slots, since the
-	// collection takes one (bounded.Beside).
+	// collection is raised on the goroutine that calls it.
 	Inputs func() Inputs
 
 	// Reads are, by package, what every package of the graph read of other packages, for an extra build to restore it
@@ -435,9 +434,11 @@ func loadUnder(
 	reported := goEnvironment.reported
 	// Collected beside, so the load returns at once and the run waits for its inputs only where they are read (see
 	// Loaded.Inputs). The collection reads only the load's roots, its census and reported, every one final once the
-	// load has ended, and the disk, so nothing the run does after the load races it. It takes a slot of the run's pool
-	// at walkPriority, below every package's work, so a cold run's CPU is still counted in its slots.
-	loaded.Inputs = bounded.Beside(caching.Pool, walkPriority, func() Inputs {
+	// load has ended, and the disk, so nothing the run does after the load races it. It takes no slot of the run's
+	// pool, as it took none when it ran on the load's own goroutine: under a slot at any priority below the lint's, a
+	// run without a store, busy on every core to its end, granted it last, and its records waited for it, 0.03 s
+	// later at cohere's root on Shackler.
+	loaded.Inputs = bounded.Beside(nil, 0, func() Inputs {
 		if caching.beforeInputs != nil {
 			caching.beforeInputs()
 		}
