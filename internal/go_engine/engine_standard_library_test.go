@@ -339,3 +339,20 @@ func TestTheSystemCacheKeysAGorootReachedThroughALinkApart(test *testing.T) {
 		test.Fatalf("through the link\n%s\nplain\n%s", read.withoutCounts, plain.withoutCounts)
 	}
 }
+
+// The system cache's entries written under one `CGO_ENABLED` restore nothing under the other, since every
+// standard-library key holds it, and a package checked with cgo is another package than one checked without.
+//
+// Not parallel: it sets the process's own `CGO_ENABLED`, which every go command the engine runs reads.
+func TestASystemCacheUnderAnotherCgoSettingRestoresNothing(test *testing.T) {
+	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	root := copyFixture(test, standardLibraryFixture)
+	other := map[string]string{"1": "0", "0": "1"}[goEnvironmentIn(test, root, nil)["CGO_ENABLED"]]
+	test.Setenv("CGO_ENABLED", other)
+	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
+	read := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	if read.counts.FromSystemCache != 0 || read.withoutCounts != plain.withoutCounts {
+		test.Fatalf("CGO_ENABLED=%s: want nothing from the system cache and the plain run's records, got %+v\n%s\n"+
+			"plain\n%s", other, read.counts, read.withoutCounts, plain.withoutCounts)
+	}
+}

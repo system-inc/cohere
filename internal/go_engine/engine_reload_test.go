@@ -122,3 +122,29 @@ func TestAReplayedAnswerIsCountedWithTheCacheAndWithout(test *testing.T) {
 		}
 	}
 }
+
+// A standard-library entry in the system cache's store whose answers were computed in part restores as a store hit
+// does, and a question it holds no answer to reloads the package from source, as for a project's entry (#syscache):
+// a cold run writes os to the system cache with only the answers its questions computed, its first wave saving os
+// before any question of os.Getpagesize, and the run after top gains Drop restores os from it, asks the purity of
+// os.Getpagesize, reloads os rather than read no answer as no fact, and finds what a run without either cache finds.
+func TestAStandardLibraryEntryWithAnswersInPartIsReloaded(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "reload-answer"))
+	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	cold := runEngineAnsweringInPart(test, root, systemCache, rules.All(), map[string]bool{"os": true})
+	if cold.counts.SystemCacheWritten == 0 || cold.counts.Reloads != 0 {
+		test.Fatalf("want a cold run that wrote the standard library to the system cache and reloaded nothing, got %+v",
+			cold.counts)
+	}
+	appendToTop(test, root, dropCalls)
+	edited := runEngineWith(test, root, systemCache, rules.All())
+	if edited.counts.FromSystemCache == 0 || edited.counts.Reloads == 0 || edited.counts.ReloadRounds == 0 {
+		test.Errorf("want os restored from the system cache, its missing answer reloading it, got %+v", edited.counts)
+	}
+	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
+	if edited.withoutCounts != plain.withoutCounts {
+		test.Errorf("after the reload\n%s\nwithout either cache\n%s", edited.withoutCounts, plain.withoutCounts)
+	}
+}
