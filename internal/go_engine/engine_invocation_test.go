@@ -28,6 +28,12 @@ func TestParseInvocationRefuses(test *testing.T) {
 			"the front door speaks contract 4 and this engine speaks contract 3",
 		},
 		{"an unknown flag", append(slices.Clone(contractArguments), "--frobnicate"), "--frobnicate is not a flag"},
+		// Every build is checked unless `--host-build-only` is named (#qqyq61s), so the switch that asked for them is
+		// gone, refused as any flag the engine does not take.
+		{
+			"the switch that asked for every build", append(slices.Clone(contractArguments), "--other-builds"),
+			"--other-builds is not a flag the Go engine takes",
+		},
 		{"a flag with one dash", append(slices.Clone(contractArguments), "-fix"), "spelled with two dashes"},
 		{"a switch neither true nor false", append(slices.Clone(contractArguments), "--fix=maybe"), "true or false"},
 		{"a valued flag with no value", []string{"--contract", "3", "--root"}, "--root needs a value"},
@@ -146,7 +152,6 @@ func TestParseInvocationReads(test *testing.T) {
 
 // A run checks every build the census needs beside the host's unless `--host-build-only` is named (#qqyq61s): no switch
 // at all checks every build, the switch narrows the run to the host's, and the switch turned off asks for nothing.
-// `--other-builds`, kept one land for the self-hosting gate, is taken and changes nothing.
 func TestEveryBuildIsCheckedUnlessHostBuildOnlyIsNamed(test *testing.T) {
 	test.Parallel()
 	for _, read := range []struct {
@@ -157,7 +162,6 @@ func TestEveryBuildIsCheckedUnlessHostBuildOnlyIsNamed(test *testing.T) {
 		{"no switch", contractArguments, true},
 		{"the switch", append(slices.Clone(contractArguments), "--host-build-only"), false},
 		{"the switch turned off", append(slices.Clone(contractArguments), "--host-build-only=false"), true},
-		{"the switch that asked for every build", append(slices.Clone(contractArguments), "--other-builds"), true},
 	} {
 		request, parseError := parseInvocation(read.arguments)
 		if parseError != nil {
