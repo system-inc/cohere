@@ -109,10 +109,13 @@ func judgeSkips(test *testing.T, engine *pipeline, judged []skippedJudgment) map
 	return tallies
 }
 
-// logTallies logs each extra build of engine's tally, with what its last load visited and restored from the host's
-// run, and every package it never made a candidate or declined, by the first word of why.
+// logTallies logs a line for every extra build engine ran, zeros included: its tally, with what its last load visited
+// and restored from the host's run, and every package it never made a candidate or declined, by the first word of
+// why. It fails naming every build the census needs beside the host's that has no line, since a build the
+// differential says nothing of cannot be told apart from one it never judged.
 func logTallies(test *testing.T, label string, engine *pipeline, tallies map[string]skippedTally) {
 	test.Helper()
+	lined := map[string]bool{}
 	for _, run := range engine.buildRuns[1:] {
 		tally := tallies[run.build.String()]
 		var fromHost check.HostRestoreCounts
@@ -122,6 +125,13 @@ func logTallies(test *testing.T, label string, engine *pipeline, tallies map[str
 		test.Logf("%s, %s: %d skipped by the last load, %d judged (%d by TypesHold), %d declined; the last load "+
 			"visited %d and restored %d, not restored by %v", label, run.build, tally.skipped, tally.judged,
 			tally.byTypes, tally.declined, fromHost.Visited, len(fromHost.Restored), fromHost.DeclinedBy)
+		lined[run.build.String()] = true
+	}
+	for _, build := range engine.described.builds[1:] {
+		if !lined[build.String()] {
+			test.Errorf("%s, %s: the census needs this build and the differential has no line for it, so a build it "+
+				"never judged reads as one that skipped nothing", label, build)
+		}
 	}
 }
 

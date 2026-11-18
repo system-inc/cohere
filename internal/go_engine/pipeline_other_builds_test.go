@@ -117,6 +117,9 @@ func runOverExiting(
 	if optionsError := configureRules(ruleSettings, registered); optionsError != nil {
 		test.Fatal(optionsError)
 	}
+	// The settings' targets are builds the census checks, handed to the description as the engine hands them, so
+	// a tree whose settings name a target is checked under it here too (runOverlapping).
+	request.targets = ruleSettings.Targets
 	described, describeError := describeProject(request)
 	if describeError != nil {
 		test.Fatal(describeError)
