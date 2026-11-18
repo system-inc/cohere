@@ -127,6 +127,23 @@ func TestTheOtherBuildsSwitchChangesNothing(test *testing.T) {
 	}
 }
 
+// TestTheOtherBuildsSwitchRefusesAValue: `--other-builds` given a value is refused by name for the land it lives
+// (#qqyq61s), since `--other-builds=false`, dropped as the bare switch is, would check every build while it asks for
+// the host's alone. The run fails before checking anything, so no finding is reported.
+func TestTheOtherBuildsSwitchRefusesAValue(test *testing.T) {
+	test.Parallel()
+	fixture := newEveryBuildFixture(test)
+	for _, argument := range []string{"--other-builds=false", "-other-builds=true"} {
+		refused := fixture.run(false, "--no-fix", "--json", argument)
+		if refused.exitCode != 1 || !strings.Contains(refused.stderr, argument[strings.Index(argument, "o"):]) ||
+			len(everyBuildFindingFiles(refused.stdout)) != 0 {
+			test.Errorf("a run naming %s exited %d with findings in %v, want it refused by name before any check:\n"+
+				"%s%s", argument, refused.exitCode, everyBuildFindingFiles(refused.stdout), refused.stdout,
+				refused.stderr)
+		}
+	}
+}
+
 // TestAPlainRunAndAHostBuildOnlyRunNeverReplayEachOther: the run cache keys a plain run, which checks every build, and
 // a `--host-build-only` run of the same tree apart, since their verdicts differ (#qqyq61s): each recorded after the
 // other is never answered by the other's record, and each run again replays its own.

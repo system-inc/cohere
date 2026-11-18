@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -797,5 +798,63 @@ func TestTheBuildsOfARunShareTheirDirectoryReads(test *testing.T) {
 	if directories == 0 || reads <= int64(directories) {
 		test.Errorf("the run's shared reads hold %d directories, asked %d times, so the extra builds did not read "+
 			"through the host's", directories, reads)
+	}
+}
+
+// A run that asks for no lint phase names no file checked by a build (#qqyq61s): every extra build is loaded and
+// checked in that phase (runLint), so a run of types alone, of the format alone, of the fixes alone or the editor's
+// save, though it checks every build by default, leaves each file only another build compiles with its constraint's
+// reason. A run that lints names the build that checks it, so the case can tell.
+func TestARunThatLintsNothingNamesNoBuild(test *testing.T) {
+	test.Parallel()
+	const constraintPrefix = "excluded by build constraints on "
+	windowsFile := filepath.Join("internal", "separator", "separator_windows.go")
+	describedReasons := func(root string, arguments ...string) (map[string]string, bool) {
+		test.Helper()
+		request, parseError := parseInvocation(append([]string{"--contract", strconv.Itoa(contract.Version),
+			"--root", root}, arguments...))
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		if slices.Contains(arguments, "--stdin-filepath") {
+			request.buffer = []byte("package separator\n")
+		}
+		described, describeError := describeProject(request)
+		if describeError != nil {
+			test.Fatal(describeError)
+		}
+		test.Cleanup(described.awaitStarted)
+		byFile := map[string]string{}
+		for _, excluded := range described.record.Excluded {
+			relative, relativeError := filepath.Rel(root, excluded.File)
+			if relativeError != nil {
+				test.Fatal(relativeError)
+			}
+			byFile[relative] = excluded.Reason
+		}
+		return byFile, request.requests(contract.PhaseLint)
+	}
+
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	linting, lints := describedReasons(root, "--no-fix")
+	if !lints || strings.HasPrefix(linting[windowsFile], constraintPrefix) || linting[windowsFile] == "" {
+		test.Fatalf("a run that lints left %s out for %q (lints %t), want it named checked by a build", windowsFile,
+			linting[windowsFile], lints)
+	}
+	saved := filepath.Join(root, "internal", "separator", "separator.go")
+	for _, arguments := range [][]string{
+		{"--types"},
+		{"--format-only"},
+		{"--fix", "--no-format"},
+		{"--fix", "--stdin-filepath", saved},
+	} {
+		reasons, lints := describedReasons(root, arguments...)
+		if lints {
+			test.Fatalf("%v asks for the lint phase, so it tells nothing here", arguments)
+		}
+		if !strings.HasPrefix(reasons[windowsFile], constraintPrefix) {
+			test.Errorf("a run of %v, which lints nothing, left %s out for %q, want the constraint's reason",
+				arguments, windowsFile, reasons[windowsFile])
+		}
 	}
 }

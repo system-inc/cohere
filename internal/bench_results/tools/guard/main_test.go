@@ -405,3 +405,80 @@ func TestACheckingNightReplacesAFixingBaseline(test *testing.T) {
 		test.Errorf("a fixing night against the checking baseline exited %d and said %q, want refused", exit, said)
 	}
 }
+
+// writeEveryBuildRecord writes, under directory, a checking record whose runs checked every build, as a plain run does
+// since the default flipped (#qqyq61s).
+func writeEveryBuildRecord(test *testing.T, directory string, name string, medianSeconds float64, quiet bool) string {
+	test.Helper()
+	path := writeCheckingRecord(test, directory, name, medianSeconds, quiet)
+	record, readRecordError := readRecord(path)
+	if readRecordError != nil {
+		test.Fatal(readRecordError)
+	}
+	record.EveryBuild = true
+	encoded, encodeError := bench_results.Encode(record)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if writeError := os.WriteFile(path, encoded, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	return path
+}
+
+// A plain run checks every build since the default flipped (#qqyq61s), so the nightly does too, and a night of every
+// build against a baseline of the host's build alone is not an error that loses every night from then on: a loaded one
+// is Unmeasured, saying the host's baseline is never compared with it, and leaves the baseline alone; the first quiet
+// one becomes the new baseline, the move on record with why. The other direction, a night of the host's build alone
+// against a baseline of every build, is no change the guard was told of, and is still refused.
+func TestAnEveryBuildNightReplacesAHostBuildBaseline(test *testing.T) {
+	test.Parallel()
+	state := test.TempDir()
+	records := test.TempDir()
+	hostPath := writeCheckingRecord(test, records, "host.json", 4, true)
+	if exit, _, said := runGuard("-state", state, "-accept", hostPath, "-because", "the host's start"); exit != 0 {
+		test.Fatalf("accepting the host's baseline exited %d:\n%s", exit, said)
+	}
+	baselinePath := filepath.Join(state, "baseline-ahra.json")
+	judged := func(recordPath string) printedResult {
+		test.Helper()
+		exit, printed, said := runGuard("-state", state, "-tonight", recordPath)
+		if exit != 0 {
+			test.Fatalf("judging %s exited %d:\n%s%s", filepath.Base(recordPath), exit, printed, said)
+		}
+		var result printedResult
+		if decodeError := json.Unmarshal([]byte(printed), &result); decodeError != nil {
+			test.Fatalf("printed %q: %v", printed, decodeError)
+		}
+		return result
+	}
+
+	loaded := judged(writeEveryBuildRecord(test, records, "every-loaded.json", 7, false))
+	if loaded.Verdict != bench_results.GuardVerdictUnmeasured ||
+		!strings.Contains(loaded.Reason, "is never compared with them") {
+		test.Errorf("a loaded night of every build against the host's baseline printed %+v", loaded)
+	}
+	if baseline, readRecordError := readRecord(baselinePath); readRecordError != nil || baseline.EveryBuild {
+		test.Fatalf("a loaded night of every build moved the host's baseline (%v)", readRecordError)
+	}
+
+	quiet := judged(writeEveryBuildRecord(test, records, "every-quiet.json", 7, true))
+	if quiet.Verdict != bench_results.GuardVerdictPass || quiet.Reason != everyBuildBaselineReason ||
+		quiet.BaselineMedianSeconds != 7 {
+		test.Errorf("the first quiet night of every build printed %+v", quiet)
+	}
+	if baseline, readRecordError := readRecord(baselinePath); readRecordError != nil || !baseline.EveryBuild {
+		test.Fatalf("the first quiet night of every build is not the baseline (%v)", readRecordError)
+	}
+	if moves := lines(test, filepath.Join(state, "baselines-ahra.jsonl")); len(moves) != 2 ||
+		!strings.Contains(moves[1], "every build") {
+		test.Errorf("the baseline moves on record are %q", moves)
+	}
+
+	hostAgain := writeCheckingRecord(test, records, "host-again.json", 4, true)
+	exit, _, said := runGuard("-state", state, "-tonight", hostAgain)
+	if exit != 1 || !strings.Contains(said, "runs of different builds are never compared") {
+		test.Errorf("a night of the host's build against the every-build baseline exited %d and said %q, want refused",
+			exit, said)
+	}
+}

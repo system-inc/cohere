@@ -81,6 +81,15 @@ func run() error {
 	// help, no run cache key and no child's arguments. It lives one land between two of our own commits, for the
 	// self-hosting gate: `cohere-dev land` runs main's land_cohere.go, which passes it to the binary it builds from the
 	// landing tree. The next commit removes it, and it then fails as any flag cohere does not define does.
+	// Only the bare switch is dropped. Given a value it is refused by name: `--other-builds=false`, dropped as the bare
+	// switch is, would check every build while it asks for the host's alone.
+	for _, argument := range os.Args[1:] {
+		name, value, valued := strings.Cut(strings.TrimLeft(argument, "-"), "=")
+		if strings.HasPrefix(argument, "-") && name == "other-builds" && valued {
+			return fmt.Errorf("--other-builds=%s asks for what no run does now: a Go run checks every build its "+
+				"files name, and --host-build-only checks this machine's build alone", value)
+		}
+	}
 	os.Args = append([]string{os.Args[0]}, withoutSwitches(os.Args[1:], []string{"other-builds"})...)
 
 	configurationFileName := flag.String("tsconfig", projectMarker,
