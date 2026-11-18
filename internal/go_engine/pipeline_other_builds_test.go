@@ -88,6 +88,23 @@ func runOverRegistered(
 	extra ...string,
 ) (*pipeline, string, string) {
 	test.Helper()
+	engine, standardOutput, standardError, exitCode := runOverExiting(test, root, registered, configure, extra...)
+	if exitCode != wantExit {
+		test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, wantExit, standardOutput, standardError)
+	}
+	return engine, standardOutput, standardError
+}
+
+// runOverExiting is runOverRegistered's run with the exit it made returned rather than required, for a run over a
+// tree whose exit is not known ahead.
+func runOverExiting(
+	test *testing.T,
+	root string,
+	registered []rule.Rule,
+	configure func(*pipeline),
+	extra ...string,
+) (*pipeline, string, string, int) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
@@ -113,11 +130,8 @@ func runOverRegistered(
 		configure(engine)
 	}
 	isolatePipeline(test, engine)
-	if exitCode := engine.run(); exitCode != wantExit {
-		test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, wantExit, standardOutput.String(),
-			standardError.String())
-	}
-	return engine, standardOutput.String(), standardError.String()
+	exitCode := engine.run()
+	return engine, standardOutput.String(), standardError.String(), exitCode
 }
 
 // Under `--other-builds` a module with a file only windows builds and one only the cohere_extra tag builds is

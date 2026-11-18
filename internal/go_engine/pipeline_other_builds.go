@@ -547,6 +547,11 @@ func (engine *pipeline) extraBuildRun(
 			if engine.keepsWalkOff {
 				session.VisitEvery()
 			}
+			if engine.judgedSkipped != nil {
+				session.JudgeSkipped(func(identifier string, judgment check.SkippedJudgment, why string) {
+					engine.judgedSkipped(extra, identifier, judgment, why)
+				})
+			}
 			// Only a build restoring from the host's run inherits from it: the same run read the same bytes for both.
 			if !engine.keepsInheritanceOff {
 				inheritance = host.Inheritance(enabled)

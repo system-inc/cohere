@@ -89,6 +89,10 @@ type hostState struct {
 	// visitsEvery has the walk visit every package the host kept, leaving none untouched (VisitEvery).
 	visitsEvery bool
 
+	// judgesSkipped, set only by a test (JudgeSkipped), is told each package the build skipped without judging as the
+	// plain path judges a visited one, by which judgment and with why it declines, nil in every run.
+	judgesSkipped func(identifier string, judgment SkippedJudgment, why string)
+
 	// writtenThrough are this load's packages written through to the build's own store (writeThrough), each once: an
 	// untouched package is settled from the start, so the first wave's save would write it, and every later one again.
 	writtenThrough map[*packages.Package]bool
@@ -135,6 +139,31 @@ func (session *CacheSession) RestoreFromHost(host *HostRun) {
 func (session *CacheSession) VisitEvery() {
 	if session.host != nil {
 		session.host.visitsEvery = true
+	}
+}
+
+// SkippedJudgment names how JudgeSkipped judged a package the build skipped: by TypesHold, or by unrestorableReads
+// alone, for reads no verdict can judge, which the plain path declines before TypesHold is asked.
+type SkippedJudgment string
+
+// The judgments JudgeSkipped tells of.
+const (
+	SkippedByTypes        SkippedJudgment = "TypesHold"
+	SkippedByUnrestorable SkippedJudgment = "Unrestorable"
+)
+
+// JudgeSkipped has the session's restore from the host's run also judge each package the build skips without judging,
+// today each the walk leaves untouched (untouchedOf), as the plain path judges a visited one (#wcwx8vf): one whose
+// reads no verdict can judge is told at once, by unrestorableReads's why; every other by TypesHold against the build's
+// types once its imports are done. judged is told each, by ID, by which judgment and with why it declines, empty where
+// it holds, from the load's goroutines. A skip must be a cheaper proof of what the plain path would conclude, so a test
+// sets it to fail on a why. The package stays untouched whatever the judgment says, and nothing else of the run
+// changes but that the load reads the types of what the package reaches, as it does for a visited one, which a
+// hookless run leaves unread where nothing checked imports it. Only a test calls it, after RestoreFromHost; a run never
+// does.
+func (session *CacheSession) JudgeSkipped(judged func(identifier string, judgment SkippedJudgment, why string)) {
+	if session.host != nil {
+		session.host.judgesSkipped = judged
 	}
 }
 
@@ -325,6 +354,9 @@ func (session *CacheSession) restoreFromHost(
 			// Its reads are never judged: by the walk's induction they read as on the host, so its restore is settled.
 			restored.types.Untouched = true
 			hosted.settled = true
+			if state.judgesSkipped != nil {
+				session.judgeSkipped(candidate, hosted)
+			}
 			session.hits[candidate] = restored
 			session.trusted[candidate] = true
 			state.untouched[candidate] = hosted
@@ -424,6 +456,26 @@ func (session *CacheSession) typesHoldFunction(
 			hosted.lock.Unlock()
 		}
 		return holds
+	}
+}
+
+// judgeSkipped tells a test's JudgeSkipped how the plain path judges candidate, hosted's package, which the build
+// skipped: by unrestorableReads at once, or by TypesHold as the load decides it (typesHoldFunction), whose answer is
+// told and never kept, so the package is read from the host's export data, untouched, as it would be without the
+// hook.
+//
+// Mutates: hosted its restore gains a late decision that always holds
+func (session *CacheSession) judgeSkipped(candidate *packages.Package, hosted *hostRestore) {
+	if why := unrestorableReads(hosted.kept.restoring); why != "" {
+		session.host.judgesSkipped(candidate.ID, SkippedByUnrestorable, why)
+		return
+	}
+	hosted.restored.types.Holds = func(closure map[string]*types.Package) bool {
+		session.host.renderings.measureBy(candidate.TypesSizes)
+		_, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
+			session.host.host.renderings, session.host.renderings)
+		session.host.judgesSkipped(candidate.ID, SkippedByTypes, why)
+		return true
 	}
 }
 
