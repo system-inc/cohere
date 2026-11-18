@@ -160,3 +160,44 @@ func assignment() {
 	// Found by both: an assignment, not a variable's declaration.
 	_ = point{} == point{}
 }
+
+type pair struct {
+	left, right int
+	inner       point
+}
+
+// Found by both: two identifiers of one name, which the check tells alike by their names without printing them.
+func sameIdentifiers(count int) {
+	_ = count == count
+}
+
+// Found by neither: two identifiers of two names.
+func differentIdentifiers(count int, total int) {
+	_ = count != total
+}
+
+// Found by neither: selectors that differ only in the name selected, which the check tells apart without printing.
+func selectorsDifferingInSel(value pair) {
+	_ = value.left == value.right
+	_ = value.inner.x < value.inner.y
+}
+
+// Found by both: selectors printed alike, which the check still prints to compare.
+func sameSelectors(value pair) {
+	_ = value.left == value.left
+	_ = value.inner.x - value.inner.x
+}
+
+// Found by neither: selectors of one name selected from different operands, and one broken across lines, which print
+// differently though their names selected are one.
+func selectorsOfOneSel(value pair, other pair) {
+	_ = value.left == other.left
+	_ = value.
+		left == value.left
+}
+
+// Found by both: identical operands in parentheses, which are printed, not told by name.
+func parenthesizedNames(count int, value pair) {
+	_ = (count) == (count)
+	_ = (value.left) != (value.left)
+}

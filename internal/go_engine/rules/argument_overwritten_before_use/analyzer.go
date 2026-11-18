@@ -10,10 +10,11 @@
 // judges each parameter by that same function's intermediate representation. So the port judges one function at a
 // time and finds what the original finds. The syntax of a function holds the syntax of the function literals inside
 // it, whose parameters are none of the enclosing function's, so each literal's parameters are judged only by the
-// literal's own function, and each is reported once. The registry runs the port in the original's place, under its
-// name, and the original stays only as the oracle: the parity tests beside this file run both over the same packages,
-// comparing the related information too, and they differ nowhere, since the port walks the same syntax and asks the
-// same function the same questions of it.
+// literal's own function, and each is reported once, save a literal a range-over-func loop's yield signature is
+// inferred from, which the original reports again from the loop's body, and the port with it. The registry runs the
+// port in the original's place, under its name, and the original stays only as the oracle: the parity tests beside
+// this file run both over the same packages, comparing the related information too, and they differ nowhere, since the
+// port reads the syntax the original walks, and asks the same function the same questions of it.
 package argument_overwritten_before_use
 
 import (
@@ -48,57 +49,77 @@ var Analyzer = dispatch.RuleAnalyzer(
 // it, so the value the caller passed is lost unread. The intermediate representation lifts a parameter into the
 // values it flows to, so one with no readers is one whose passed value nothing reads, not even a closure capturing it
 // or a pointer taken to it, which would read it into memory.
+//
+// The original walks the whole syntax of the function, the literals inside it included, judging every header it meets
+// by the function's own parameters. A declared function or a literal takes its parameters from its own header, or for
+// an instance from its own signature, never from the header of a literal inside it, so a walk from either judges only
+// the header it starts at, which it meets first. Judging that header alone finds the same findings in the same order,
+// without walking the body for headers. Any other syntax, a range-over-func loop's body, holds no header of its own,
+// and its yield function's parameters can be those of a literal inside it, when the yield signature is inferred from
+// the literal's, so it is walked as the original walks it, and the literal is found there as well as by its own
+// function.
 func Check(context *rule.Context, function *intermediate_representation.Function) {
-	source := function.Source()
-	if source == nil {
+	switch source := function.Source().(type) {
+	case nil:
 		// A function with no syntax, a wrapper or a synthesized init, holds no parameter to judge.
 		return
-	}
-	ast.Inspect(source, func(node ast.Node) bool {
-		var functionType *ast.FuncType
-		var body *ast.BlockStmt
-		switch node := node.(type) {
-		case *ast.FuncDecl:
-			functionType = node.Type
-			body = node.Body
-		case *ast.FuncLit:
-			functionType = node.Type
-			body = node.Body
-		}
-		// A declaration without a body is implemented elsewhere, and any other node is no function.
-		if body == nil {
-			return true
-		}
-		for _, field := range functionType.Params.List {
-			for _, name := range field.Names {
-				object := context.TypesInfo.ObjectOf(name)
-				parameter := parameterOf(function, object)
-				// A literal's parameters are none of the enclosing function's, and are judged by the literal.
-				if parameter == nil {
-					continue
-				}
-				referrers := parameter.Referrers()
-				if referrers == nil || len(*referrers) != 0 {
-					continue
-				}
-				assignment := firstAssignment(context, body, object)
-				if assignment == nil {
-					continue
-				}
-				context.Report(analysis.Diagnostic{
-					Pos:     name.Pos(),
-					End:     name.End(),
-					Message: fmt.Sprintf("argument %s is overwritten before first use", name.Name),
-					Related: []analysis.RelatedInformation{{
-						Pos:     assignment.Pos(),
-						End:     assignment.End(),
-						Message: fmt.Sprintf("assignment to %s", name.Name),
-					}},
-				})
+	case *ast.FuncDecl:
+		judgeHeader(context, function, source.Type, source.Body)
+	case *ast.FuncLit:
+		judgeHeader(context, function, source.Type, source.Body)
+	default:
+		ast.Inspect(source, func(node ast.Node) bool {
+			switch node := node.(type) {
+			case *ast.FuncDecl:
+				judgeHeader(context, function, node.Type, node.Body)
+			case *ast.FuncLit:
+				judgeHeader(context, function, node.Type, node.Body)
 			}
+			return true
+		})
+	}
+}
+
+// judgeHeader judges the parameters functionType declares by function's own, reporting each of them function never
+// reads and body assigns to. A parameter function does not hold is a literal's, and is judged by the literal.
+func judgeHeader(
+	context *rule.Context,
+	function *intermediate_representation.Function,
+	functionType *ast.FuncType,
+	body *ast.BlockStmt,
+) {
+	// A declaration without a body is implemented elsewhere.
+	if body == nil {
+		return
+	}
+	for _, field := range functionType.Params.List {
+		for _, name := range field.Names {
+			object := context.TypesInfo.ObjectOf(name)
+			parameter := parameterOf(function, object)
+			// A literal's parameters are none of the enclosing function's, and are judged by the literal.
+			if parameter == nil {
+				continue
+			}
+			referrers := parameter.Referrers()
+			if referrers == nil || len(*referrers) != 0 {
+				continue
+			}
+			assignment := firstAssignment(context, body, object)
+			if assignment == nil {
+				continue
+			}
+			context.Report(analysis.Diagnostic{
+				Pos:     name.Pos(),
+				End:     name.End(),
+				Message: fmt.Sprintf("argument %s is overwritten before first use", name.Name),
+				Related: []analysis.RelatedInformation{{
+					Pos:     assignment.Pos(),
+					End:     assignment.End(),
+					Message: fmt.Sprintf("assignment to %s", name.Name),
+				}},
+			})
 		}
-		return true
-	})
+	}
 }
 
 // parameterOf is the parameter of function declared as object, or nil when function has none.

@@ -29,6 +29,20 @@ func constant() {
 	use(value)
 }
 
+// Not found: switch tags that read values assigned before them, an extraction and the phi a loop carries.
+func switchTagAfter(rows int) {
+	first, err := pair()
+	use(first)
+	switch err {
+	}
+	value := produce()
+	for row := 0; row < rows; row++ {
+		value = row
+	}
+	switch value {
+	}
+}
+
 // Found: operating assignments nothing reads after; the increment is read by the next.
 func increments(count int, text string) {
 	count++    // Not found: count += 2 reads it.
@@ -113,6 +127,42 @@ func inClosure() {
 		value = produce()
 		use(value)
 	})
+}
+
+// Found once each, by the innermost closure's own function: a value overwritten and an increment nothing reads, two
+// literals deep, where neither enclosing function holds a value.
+func inClosureTwoDeep() {
+	use(func() {
+		use(func() {
+			value := produce() // Found.
+			value = produce()
+			count := produce()
+			count++ // Found.
+			use(value)
+		})
+	})
+}
+
+// Not found: what a closure reads, a value of its own, a captured variable it assigns and the outer function reads,
+// and the tag of its own switch.
+func readInClosure() {
+	captured := produce()
+	use(func() {
+		value := produce()
+		use(value)
+		captured = produce()
+		tag := produce()
+		switch tag {
+		}
+	})
+	use(captured)
+}
+
+// Found, by the literal's own function: a literal at package level, whose function's syntax is the literal itself.
+var literal = func() {
+	value := produce() // Found.
+	value = produce()
+	use(value)
 }
 
 // Not found: a named result is read by the return.

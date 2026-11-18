@@ -7,8 +7,9 @@
 // where the original reports through report.Report. The original walks every source function of a package in one
 // run, but keeps nothing from one function to the next: it walks each function's syntax, nested function literals
 // included, and asks that function's representation for the value of each assignment, its own switch tags and its
-// phis. So Check judges one function at a time and finds what the original finds. The message writes the assigned
-// expression as the original's fmt verb writes an ast.Expr, a name for an identifier.
+// phis. So Check judges one function at a time and finds what the original finds. It walks no nested literal, where
+// the enclosing function's representation holds no value and the literal's own function is judged in its turn. The
+// message writes the assigned expression as the original's fmt verb writes an ast.Expr, a name for an identifier.
 //
 // It asks which tool generated a file, to leave alone what goyacc writes, and rule.Context carries only whether a file
 // was generated, so its listener requires staticcheck's generated pass and reads the pass's map of generators through
@@ -98,24 +99,28 @@ func Check(
 		// goyacc's state machine assigns hundreds of values it never reads.
 		return
 	}
-	// One walker serves both walks, the one allocation Check makes for a function without a tagged switch, where a
-	// map of tags, a closure for each walk and one for the use test cost four. No finding can change: ast.Inspect is
-	// ast.Walk with a visitor that returns itself, so each walk visits the nodes in the order it did, and the slice of
-	// tags holds what the map did but the nil of a switch with no tag, which hasUse is never asked about.
-	walker := &functionWalker{context: context, function: function}
+	// One walker, the one allocation Check makes for a clean function without a tagged switch, where a map of tags, a
+	// closure for each of two walks and one for the use test cost four. No finding can change: ast.Inspect is ast.Walk
+	// with a visitor that returns itself, so the walk visits the nodes in the order it did, and the slice of tags holds
+	// what the map did but the nil of a switch with no tag, which hasUse is never asked about.
+	//
+	// The original gathers every tag in one walk and judges in a second, since a tag can follow the assignment it
+	// reads. This walk judges each value against the tags gathered so far and keeps it when none of them reads it.
+	// More tags can only find a read, never lose one: hasUse follows the same referrers with more tags until it meets
+	// one of the tags, which is a read. So every value the original reports is kept, in the order it reports them,
+	// and each is judged again here against every tag, as the original judges it.
+	walker := &functionWalker{function: function}
 	ast.Walk(walker, body)
-	walker.hasSwitchTags = true
-	ast.Walk(walker, body)
+	for _, unread := range walker.unread {
+		if !hasUse(unread.value, walker.switchTags) {
+			staticcheck_report.Report(context, unread.statement, fmt.Sprintf(messageFormat, unread.assigned))
+		}
+	}
 }
 
-// checkIncrement reports an increment or decrement whose result nothing reads.
-func checkIncrement(
-	context *rule.Context,
-	function *intermediate_representation.Function,
-	statement *ast.IncDecStmt,
-	switchTags []intermediate_representation.Value,
-) {
-	value, _ := function.ValueForExpression(statement.X)
+// checkIncrement judges an increment or decrement by whether anything reads its result.
+func checkIncrement(walker *functionWalker, statement *ast.IncDecStmt) {
+	value, _ := walker.function.ValueForExpression(statement.X)
 	if value == nil {
 		return
 	}
@@ -123,22 +128,15 @@ func checkIncrement(
 		// A zero-valued constant, for example in `values := []string(nil)`.
 		return
 	}
-	if !hasUse(value, switchTags) {
-		staticcheck_report.Report(context, statement, fmt.Sprintf(messageFormat, statement.X))
-	}
+	walker.judge(statement, statement.X, value)
 }
 
-// checkAssignment reports each value an assignment gives a named variable, not the blank identifier, that nothing
-// reads.
-func checkAssignment(
-	context *rule.Context,
-	function *intermediate_representation.Function,
-	statement *ast.AssignStmt,
-	switchTags []intermediate_representation.Value,
-) {
+// checkAssignment judges each value an assignment gives a named variable, not the blank identifier, by whether
+// anything reads it.
+func checkAssignment(walker *functionWalker, statement *ast.AssignStmt) {
 	if len(statement.Lhs) > 1 && len(statement.Rhs) == 1 {
 		// A call of several results, or a comma-ok form: each variable takes one extraction of the one value.
-		value, _ := function.ValueForExpression(statement.Rhs[0])
+		value, _ := walker.function.ValueForExpression(statement.Rhs[0])
 		if value == nil {
 			return
 		}
@@ -148,14 +146,10 @@ func checkAssignment(
 		}
 		for _, referrer := range *referrers {
 			extraction, isExtraction := referrer.(*intermediate_representation.Extract)
-			if !isExtraction || hasUse(extraction, switchTags) {
+			if !isExtraction || !isNamedVariable(statement.Lhs[extraction.Index]) {
 				continue
 			}
-			assigned := statement.Lhs[extraction.Index]
-			if !isNamedVariable(assigned) {
-				continue
-			}
-			staticcheck_report.Report(context, statement, fmt.Sprintf(messageFormat, assigned))
+			walker.judge(statement, statement.Lhs[extraction.Index], extraction)
 		}
 		return
 	}
@@ -163,11 +157,11 @@ func checkAssignment(
 		if !isNamedVariable(assigned) {
 			continue
 		}
-		value, _ := function.ValueForExpression(statement.Rhs[index])
+		value, _ := walker.function.ValueForExpression(statement.Rhs[index])
 		if value == nil {
 			// An assignment that operates, `+=` and the like, holds its value at the variable it assigns.
 			if statement.Tok != token.ASSIGN {
-				value, _ = function.ValueForExpression(assigned)
+				value, _ = walker.function.ValueForExpression(assigned)
 			}
 			if value == nil {
 				continue
@@ -177,9 +171,7 @@ func checkAssignment(
 			// A zero-valued constant, for example in `values := []string(nil)`.
 			continue
 		}
-		if !hasUse(value, switchTags) {
-			staticcheck_report.Report(context, statement, fmt.Sprintf(messageFormat, assigned))
-		}
+		walker.judge(statement, assigned, value)
 	}
 }
 

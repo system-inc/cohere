@@ -194,13 +194,25 @@ func reportOddLengths(context *rule.Context, marks facts, functions []*intermedi
 					if _, isSlice := argument.Type().Underlying().(*types.Slice); !isSlice {
 						continue
 					}
+					// The length is read before the mark is asked, since a finding needs both and only the mark is
+					// costly: of another package's parameter it is a question of the resolver, which records the
+					// answer and the read for the cache. A slice of unknown or even length is never reported, whatever
+					// the mark, so leaving its question unasked changes only what the cache holds, never a finding.
+					// A slice of an allocation of no array, which the builder makes for an array whose type is a
+					// type parameter, has no length the scan can read, and asking the mark first as the original
+					// does keeps its invariant reached exactly where the original reaches it, at a marked parameter.
+					length, unreadable := knownSliceLength(argument)
+					if unreadable == nil && (length < 0 || length%2 == 0) {
+						continue
+					}
 					parameter := callee.Signature.Params().At(parameterIndex)
 					if !marks.marked(parameter) {
 						continue
 					}
-					length := sliceLength(argument)
-					if length < 0 || length%2 == 0 {
-						continue
+					if unreadable != nil {
+						// Invariant: a slice expression with no high bound slices an array it allocated, a slice or
+						// a string, and only the array is an Allocation.
+						panic(fmt.Sprintf("odd_slice_argument: a slice of an allocation of %s", unreadable.Type()))
 					}
 					label := "argument"
 					signature := call.Common().Signature()
@@ -234,10 +246,13 @@ func callExpression(call intermediate_representation.CallInstruction) *ast.CallE
 	}
 }
 
-// sliceLength is the length of value when it is a slice expression whose bounds are constants, of an array, of a
-// literal or make with a constant length, or of another such slice, and -1 when it is not known. Phis are looked
-// through as intermediate_representation.Flatten, staticcheck's irutil.Flatten translated, looks through them.
-func sliceLength(value intermediate_representation.Value) int {
+// knownSliceLength is the length of value when it is a slice expression whose bounds are constants, of an array, of
+// a literal or make with a constant length, or of another such slice, and -1 when it is not known. Phis are looked
+// through as intermediate_representation.Flatten, staticcheck's irutil.Flatten translated, looks through them. A slice
+// with no high bound of an allocation of no array is returned as unreadable, -1 beside it, for the caller to judge.
+func knownSliceLength(
+	value intermediate_representation.Value,
+) (length int, unreadable *intermediate_representation.Allocation) {
 	constantOf := func(bound intermediate_representation.Value) int {
 		if known, isConstant := bound.(*intermediate_representation.Constant); isConstant {
 			return int(known.Int64())
@@ -246,7 +261,7 @@ func sliceLength(value intermediate_representation.Value) int {
 	}
 	slice, isSlice := intermediate_representation.Flatten(value).(*intermediate_representation.Slice)
 	if !isSlice {
-		return -1
+		return -1, nil
 	}
 	low := 0
 	high := -1
@@ -260,17 +275,18 @@ func sliceLength(value intermediate_representation.Value) int {
 		case *intermediate_representation.Allocation:
 			array, isArray := typeutil.Dereference(sliced.Type()).Underlying().(*types.Array)
 			if !isArray {
-				// Invariant: a slice expression with no high bound slices an array it allocated, a slice or a
-				// string, and only the array is an Allocation.
-				panic(fmt.Sprintf("odd_slice_argument: a slice of an allocation of %s", sliced.Type()))
+				return -1, sliced
 			}
 			high = int(array.Len())
 		case *intermediate_representation.Slice:
-			high = sliceLength(sliced)
+			high, unreadable = knownSliceLength(sliced)
+			if unreadable != nil {
+				return -1, unreadable
+			}
 		}
 	}
 	if low == -1 || high == -1 {
-		return -1
+		return -1, nil
 	}
-	return high - low
+	return high - low, nil
 }

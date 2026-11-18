@@ -1,6 +1,8 @@
 package sort_helper_call
 
 import (
+	"go/parser"
+	"go/token"
 	"testing"
 
 	"honnef.co/go/tools/simple/s1032"
@@ -23,20 +25,60 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 }
 
 // Over staticcheck's fixture and parity's, the second holding every shape the check branches on and the near miss of
-// each, a renamed import of package sort and a generated file, the original and the port find the same multiset, each
-// finding the same to its end, which is the whole call of sort.Sort. S1032 suggests no fix, so a fix either side made
-// would be a difference.
+// each, a renamed import of package sort, a file importing no package sort whose own function and type are named as
+// sort's are, and a generated file, the original and the port find the same multiset, each finding the same to its end,
+// which is the whole call of sort.Sort. S1032 suggests no fix, so a fix either side made would be a difference.
 func TestPortMatchesOriginal(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, s1032.Analyzer, Analyzer, analysistest.TestData(), upstream, "parity")
 }
 
-// The differences fixture holds every conversion to a helper the original misses for its spelling, through
-// parentheses, a local alias, another package's alias and a dot import, and the plainly spelled calls the original
-// silences beside each, all recorded `// port finds:` on their lines, and the original finds nothing there the port
-// does not. Its nested package, differences/aliased, only declares the alias it converts to, finds nothing and records
-// nothing, so it is no differences package of its own.
+// The differences fixture holds every conversion to a helper the original misses for its spelling, through parentheses,
+// a local alias, another package's alias and a dot import, beside a plain import and alone in its file, and the plainly
+// spelled calls the original silences beside each, all recorded `// port finds:` on their lines, and the original finds
+// nothing there the port does not. Its nested package, differences/aliased, only declares the alias it converts to,
+// finds nothing and records nothing, so it is no differences package of its own.
 func TestPortDiffersFromOriginalOnlyWhereRecorded(test *testing.T) {
 	test.Parallel()
 	parity.RequireOnlyAdjudicated(test, s1032.Analyzer, Analyzer, analysistest.TestData(), "differences")
+}
+
+// importsSort reads an import's path unquoted, so an import of package sort spelled as a raw string, which gofmt
+// rewrites and so no fixture can hold, imports it, and an import of another path or none does not.
+func TestImportsSortReadsThePathUnquoted(test *testing.T) {
+	test.Parallel()
+	for _, example := range []struct {
+		source string
+		want   bool
+	}{
+		{source: "package example\n\nimport ordered `sort`\n", want: true},
+		{source: "package example\n\nimport \"sort\"\n", want: true},
+		{source: "package example\n\nimport \"sorts\"\n", want: false},
+		{source: "package example\n", want: false},
+	} {
+		file, parseError := parser.ParseFile(token.NewFileSet(), "example.go", example.source, parser.ImportsOnly)
+		if parseError != nil {
+			test.Fatalf("parsing %q: %v", example.source, parseError)
+		}
+		if got := importsSort(file); got != example.want {
+			test.Errorf("importsSort of %q is %t, want %t", example.source, got, example.want)
+		}
+	}
+}
+
+// mayCallSort lets package sort itself through, whose own files call Sort unqualified and import no sort, which no
+// fixture can hold, since a fixture at path sort would be the standard library's; and it refuses a file of another
+// package that imports no sort.
+func TestMayCallSortLetsPackageSortThrough(test *testing.T) {
+	test.Parallel()
+	file, parseError := parser.ParseFile(token.NewFileSet(), "sort.go", "package sort\n", parser.ImportsOnly)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	if !mayCallSort("sort", file) {
+		test.Error("mayCallSort of package sort's own file is false, want true")
+	}
+	if mayCallSort("example", file) {
+		test.Error("mayCallSort of another package's file that imports no sort is true, want false")
+	}
 }

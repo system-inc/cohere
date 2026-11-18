@@ -25,6 +25,8 @@ package sort_helper_call
 import (
 	"go/ast"
 	"go/types"
+	"slices"
+	"strconv"
 
 	"honnef.co/go/tools/knowledge"
 
@@ -39,6 +41,14 @@ import (
 var Listener = rule.Listener{
 	Nodes: []ast.Node{(*ast.FuncLit)(nil), (*ast.FuncDecl)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		// A call is judged only when CallIndex names its callee's object package sort's Sort, and code reaches that
+		// object only by importing package sort, a renamed or dot import among the ways, or by being package sort
+		// itself. A variable holding sort.Sort is no call of it. So a function in a file of another package that
+		// imports no "sort" holds no call Check would judge, and skipping it before Check walks its body finds the
+		// same.
+		if !mayCallSort(context.Package.Path(), context.WalkedFile()) {
+			return
+		}
 		rule.State[Findings](context).record(Check(context, node))
 	},
 	PackageExit: func(context *rule.Context) {
@@ -56,6 +66,22 @@ var Analyzer = dispatch.RuleAnalyzer(
 		"of sort.Ints, sort.Float64s or sort.Strings: staticcheck's S1032, ported.",
 	&Listener,
 )
+
+// mayCallSort is whether a file of the package at packagePath can call package sort's Sort: package sort itself,
+// whose own files call it unqualified, as a run checking the standard library from source reaches, or a file that
+// imports it.
+func mayCallSort(packagePath string, file *ast.File) bool {
+	return packagePath == "sort" || importsSort(file)
+}
+
+// importsSort is whether file imports package sort under any name, its path read unquoted, so a raw string's
+// spelling, `sort` in backquotes, imports it too.
+func importsSort(file *ast.File) bool {
+	return slices.ContainsFunc(file.Imports, func(specification *ast.ImportSpec) bool {
+		path, unquoteError := strconv.Unquote(specification.Path.Value)
+		return unquoteError == nil && path == "sort"
+	})
+}
 
 // helperMessages is the original's message for each of package sort's helper slices, keyed by the type's name.
 var helperMessages = map[string]string{
