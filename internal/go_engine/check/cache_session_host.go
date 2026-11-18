@@ -920,6 +920,8 @@ func (session *CacheSession) keepForBuilds(
 	withheld map[*packages.Package]load.PackageWithheld,
 	files map[*packages.Package][]storedFile,
 	gathered func(action *checker.Action) ([]Finding, bool),
+	walks *build_reads.Walks,
+	asking func(owner *packages.Package, restoring Restoring),
 ) *HostRun {
 	keyed := session.keptKeys
 	if session.known == nil || keyed == nil {
@@ -1029,10 +1031,15 @@ func (session *CacheSession) keepForBuilds(
 			return body, record, readExportData, nil
 		}
 	}
-	// Each entry knows the files the host compiled into it, which the builds' inheritance indexes (holdersOf).
+	// Each entry knows the files the host compiled into it, which the builds' inheritance indexes (holdersOf), and
+	// its package, whose walk its dependence set waits for (computeDependence).
+	var owners []*packages.Package
+	var ownersKept []*hostEntry
 	for keptPackage := range keyed.Portable {
 		if kept := host.entries[keptPackage.ID]; kept != nil {
 			kept.compiledFiles = keptPackage.CompiledGoFiles
+			owners = append(owners, keptPackage)
+			ownersKept = append(ownersKept, kept)
 		}
 	}
 	// Each entry is decoded the first time a build considers it, and never again by another (hostEntry.decoded).
@@ -1050,6 +1057,9 @@ func (session *CacheSession) keepForBuilds(
 	session.answering.lock.Lock()
 	session.answering.byTypes = nil
 	session.answering.lock.Unlock()
+	// Every kept package's dependence set, computed once by the host as its walk ends, rather than by the builds
+	// racing to ask it; the keep does not wait for them.
+	host.computeDependence(walks, session.caching.Pool, owners, ownersKept, asking)
 	session.kept.Store(true)
 	session.keeping += time.Since(started)
 	host.keeping = session.keeping

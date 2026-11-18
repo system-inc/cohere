@@ -145,9 +145,11 @@ func (pool *Pool) Release() {
 // ForEach runs work for every index below count on the pool's slots, each index under a slot taken at priority, on at
 // most as many goroutines as the pool has slots, and returns once every one has. Each goroutine takes one slot per
 // index and gives it back before the next, so none holds two, and the caller holds none while it waits. work must keep
-// what it makes in its own index's place, since the indexes finish in no set order.
+// what it makes in its own index's place, since the indexes finish in no set order. A panic in work reaches the caller
+// (panicCarrier): every other index still runs, and the first panic recovered is raised again once they have.
 func (pool *Pool) ForEach(count int, priority int, work func(index int)) {
 	var next atomic.Int64
+	var carrier panicCarrier
 	var group sync.WaitGroup
 	for range min(count, pool.size) {
 		group.Go(func() {
@@ -157,12 +159,14 @@ func (pool *Pool) ForEach(count int, priority int, work func(index int)) {
 					return
 				}
 				pool.Acquire(priority)
-				work(index)
+				// Recovered, so the slot is given back and the next index taken whatever work does (#z8ym3x5).
+				carrier.run(func() { work(index) })
 				pool.Release()
 			}
 		})
 	}
 	group.Wait()
+	carrier.raise()
 }
 
 // ForEachWriting is ForEach for work that writes to the file system (#g2e4mz8): compute runs for every index under a
@@ -171,9 +175,11 @@ func (pool *Pool) ForEach(count int, priority int, work func(index int)) {
 // many goroutines as the pool has slots, so while every slot's holder has gone on to write, as many more can compute,
 // and no more than that many ever write at once, however slow the disk. Like ForEach it returns once every index's
 // writes have, so whatever it wrote is in place when it returns, and no goroutine holds two slots. compute may return
-// nil, an index with nothing to write.
+// nil, an index with nothing to write. A panic in compute or in a write reaches the caller as one in ForEach's work
+// does, and an index whose compute panicked writes nothing.
 func (pool *Pool) ForEachWriting(count int, priority int, compute func(index int) (write func())) {
 	var next atomic.Int64
+	var carrier panicCarrier
 	var group sync.WaitGroup
 	for range min(count, 2*pool.size) {
 		group.Go(func() {
@@ -183,15 +189,20 @@ func (pool *Pool) ForEachWriting(count int, priority int, compute func(index int
 					return
 				}
 				pool.Acquire(priority)
-				write := compute(index)
+				var write func()
+				// Recovered, so the slot is given back whatever compute does (#z8ym3x5); a compute that panicked
+				// returned no write, which leaves write nil.
+				carrier.run(func() { write = compute(index) })
 				pool.Release()
 				if write != nil {
-					write()
+					// Recovered too, so the goroutine goes on to its next index (#z8ym3x5).
+					carrier.run(write)
 				}
 			}
 		})
 	}
 	group.Wait()
+	carrier.raise()
 }
 
 // Waiters is how many askers wait for a slot now.

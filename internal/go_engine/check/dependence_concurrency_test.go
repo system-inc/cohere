@@ -81,6 +81,18 @@ func genericHost(test *testing.T) (map[string]*types.Package, *ReadsBuild) {
 // and syntax, as the run records them.
 func genericRestoring(test *testing.T, host map[string]*types.Package, user string) Restoring {
 	test.Helper()
+	return genericRestoringInto(test, host, user, &build_reads.Reads{})
+}
+
+// genericRestoringInto is genericRestoring with its reads recorded into reads, which a test may have asked of before
+// they were recorded, as a build asks of a package whose walk is still running.
+func genericRestoringInto(
+	test *testing.T,
+	host map[string]*types.Package,
+	user string,
+	reads *build_reads.Reads,
+) Restoring {
+	test.Helper()
 
 	fileSet := token.NewFileSet()
 	file, parseError := parser.ParseFile(fileSet, "user.go", "package user\n\n"+genericUsers[user],
@@ -106,7 +118,6 @@ func genericRestoring(test *testing.T, host map[string]*types.Package, user stri
 	if checkError != nil {
 		test.Fatalf("type-checking the %s user: %v", user, checkError)
 	}
-	reads := &build_reads.Reads{}
 	reads.RecordTypes(checked, info, []*ast.File{file})
 	imports := make([]string, 0, len(checked.Imports()))
 	for _, imported := range checked.Imports() {

@@ -103,6 +103,10 @@ func hostSessionWith(
 	}
 	// The builds judge the host's reads, which are whole only once their walks end, as the engine waits for them.
 	result.ReadWalks.Wait()
+	// And they start only once the host's dependence sets are in, as the engine joins them before its first build
+	// (#ybjbqm2), so a test that changes a kept entry before its build changes nothing a set is still being computed
+	// from.
+	result.Host.DependenceComputed()
 	return result, session
 }
 

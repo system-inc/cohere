@@ -1,6 +1,7 @@
 package check
 
 import (
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -9,6 +10,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -38,6 +40,11 @@ type HostRun struct {
 	// kept is how many entries the run kept, which outlives Release (EntriesKept).
 	kept int
 
+	// computing are the sets of the kept packages the host computes as each package's walk ends (computeDependence),
+	// and joining, nil outside tests, is told as a reader starts waiting for them (DependenceComputed).
+	computing sync.WaitGroup
+	joining   func()
+
 	// holders is the IDs of the kept packages that compiled each file, by the file's name, sorted, made once a run by
 	// the first build to ask (holdersOf).
 	holdersOnce sync.Once
@@ -52,6 +59,19 @@ func (host *HostRun) EntriesKept() int {
 	return host.kept
 }
 
+// DependenceComputed returns once the host has computed the dependence set of every package it kept, each as its walk
+// ended (computeDependence), so a build started after it finds every set it asks in the memo, rather than compute one
+// beside the pass, the duplicate work the pass exists to remove (#ybjbqm2). A nil host, which kept nothing, has none.
+func (host *HostRun) DependenceComputed() {
+	if host == nil {
+		return
+	}
+	if host.joining != nil {
+		host.joining()
+	}
+	host.computing.Wait()
+}
+
 // Release lets go of everything the host's run kept for the extra builds once the last of them has run, since no
 // build can ask for an entry, or a verdict render a host type, after that: the entries, with the host's types their
 // export data is written from, each with its decode the builds shared (hostEntry.decoded), the bodies decoded from the
@@ -61,6 +81,8 @@ func (host *HostRun) Release() {
 	if host == nil {
 		return
 	}
+	// A set still being computed writes to the memo, so the memo goes only once none is.
+	host.computing.Wait()
 	host.entries = nil
 	host.renderings = nil
 	host.known = nil
@@ -95,6 +117,55 @@ func importPaths(importer *packages.Package) []string {
 	}
 	slices.Sort(paths)
 	return paths
+}
+
+// computeDependence has host's memo compute the dependence set of every package the host kept, each once its own
+// type-read walk on walks has ended (build_reads.Walks.Ended), on a slot of pool at the priority below every load's and
+// check's work, as the session's fanOut takes them, or of as many slots as there are cores when pool is nil, so each
+// extra build's walk (restoreFromHost) finds every set it asks in the memo (#ybjbqm2). Asked there instead, each set
+// was computed by the first of seven builds racing to ask it, the others waiting or computing it again before the memo
+// stored one: each build's walk took 223 ms at cohere's root, and 4 to 5 ms with the sets computed by the host, in a
+// pass of 111 ms on about three cores, the run's wall 0.11 s less there and 0.07 s at deeafbf4, its user and system
+// time level, with the same findings.
+//
+// A set reads its own package's reads and the host's types alone, so it waits for that package's walk and no other:
+// asked while the walk still runs, its reads are never recorded and its set the whole closure (Dependence). The keep
+// runs inside check.Run, before the walks are waited for, and waiting there for all of them put the pass on the run's
+// serial path, about 110 ms at cohere's root. So each set waits with no slot held, as the walk it waits for may need
+// one, and the keep returns at once. The run joins the pass once the walks are over, before any build starts
+// (DependenceComputed), which waits for the last sets alone, and Release waits for it too, so no set is computed into
+// a memo let go of. kept are the entries, owners their packages, index by index, and asking, nil outside tests, is
+// told of each as its set is asked.
+func (host *HostRun) computeDependence(
+	walks *build_reads.Walks,
+	pool *bounded.Pool,
+	owners []*packages.Package,
+	kept []*hostEntry,
+	asking func(owner *packages.Package, restoring Restoring),
+) {
+	// Read once here, so a set computed late never reads the field Release clears.
+	renderings := host.renderings
+	var cores chan struct{}
+	if pool == nil {
+		cores = make(chan struct{}, runtime.GOMAXPROCS(0))
+	}
+	for index, owner := range owners {
+		ended := walks.Ended(owner)
+		host.computing.Go(func() {
+			<-ended
+			if pool != nil {
+				pool.Acquire(0)
+				defer pool.Release()
+			} else {
+				cores <- struct{}{}
+				defer func() { <-cores }()
+			}
+			if asking != nil {
+				asking(owner, kept[index].restoring)
+			}
+			renderings.Dependence(kept[index].restoring)
+		})
+	}
 }
 
 // Inheritance is an extra build's take of host for the rules enabled, nil when host kept nothing, as under `--timing`.
