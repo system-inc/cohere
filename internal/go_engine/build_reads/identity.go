@@ -54,3 +54,11 @@ func (identity Identity) String() string {
 	}
 	return identity.PackagePath + "." + string(identity.Path) + " (" + identity.File + ")"
 }
+
+// UsedIdentity is a used entry's identity (UsedEntry): its object's, and for a selection, its Index and its receiver's,
+// the zero Identity when it starts from no named type. Any other use has neither.
+type UsedIdentity struct {
+	Object   Identity
+	Receiver Identity
+	Index    string
+}

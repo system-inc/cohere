@@ -8,11 +8,13 @@ import (
 )
 
 // typeReads are the type reads of one package as its walk collects them, on the walk's own goroutine, and publishes
-// them to its Reads under one hold of the lock (see Reads.publishTypes).
+// them to its Reads under one hold of the lock (see Reads.publishTypes), with what each of its top-level declarations
+// uses, which the same walk records (#kr1m304), nil when it could not be told.
 type typeReads struct {
-	uses        map[ObjectUse]bool
-	selections  map[selectionIdentity]Selection
-	closureOnly string
+	uses         map[ObjectUse]bool
+	selections   map[selectionIdentity]Selection
+	closureOnly  string
+	functionUses *FunctionUses
 }
 
 // add records a use of kind of object, when object is another package's than own, as that package declares it.
@@ -36,7 +38,8 @@ func (collected *typeReads) add(own *types.Package, object types.Object, kind Us
 //
 // Without the syntax or the expression types, no use can be told apart from another, and a package that names a
 // symbol by go:linkname reaches past the type checker, so each of those is judged by every object's closure, as every
-// read was before kinds.
+// read was before kinds. The walk records what each top-level declaration uses too, a linknamed package's as well,
+// whose walk then collects its type reads for nothing.
 func collectTypeReads(own *types.Package, info *types.Info, files []*ast.File) typeReads {
 	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
 	for _, used := range info.Uses {
@@ -58,6 +61,9 @@ func collectTypeReads(own *types.Package, info *types.Info, files []*ast.File) t
 		collected.closureOnly = "its syntax or expression types were not there to tell its uses apart"
 	case linknamed(files):
 		collected.closureOnly = "it names a symbol by go:linkname, past the type checker"
+		discarded := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
+		walkUses(&discarded, own, info, files)
+		collected.functionUses = discarded.functionUses
 	default:
 		walkUses(&collected, own, info, files)
 	}

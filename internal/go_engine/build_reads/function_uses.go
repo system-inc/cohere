@@ -3,6 +3,7 @@ package build_reads
 import (
 	"go/token"
 	"go/types"
+	"iter"
 )
 
 // What each top-level declaration of a package uses, its signature and its body apart (#kr1m304), so an extra build
@@ -42,19 +43,19 @@ type Declaration struct {
 	Name    string
 }
 
-// PartUse is one object a part of a declaration used, with every kind of use it made of it. A selection is its own
-// use, of Object from Receiver, the named type the selection starts from as its generic declares it, nil when it
+// UsedEntry is one thing a package's parts use, as its record holds it once however many parts use it. A selection is
+// a use of Object from Receiver, the named type the selection starts from as its generic declares it, nil when it
 // starts from no named type, at Index, the path through embedded fields, each index written in decimal and ended by a
-// comma. Any other use has no Receiver nor Index.
-type PartUse struct {
+// comma. Any other use is of Object alone, with no Receiver nor Index.
+type UsedEntry struct {
 	Object   types.Object
 	Receiver *types.TypeName
 	Index    string
-	Kinds    UseKinds
 }
 
-// DeclarationUses is what one declaration uses, its signature and its body apart. HasBody says it has a body, a
-// function's or a value's initializer, which a type and a function declared without one have not.
+// DeclarationUses is what one declaration uses, its signature and its body apart, as a reader sees it (see
+// FunctionUses.Declarations). HasBody says it has a body, a function's or a value's initializer, which a type and a
+// function declared without one have not.
 type DeclarationUses struct {
 	Declaration Declaration
 	Signature   []PartUse
@@ -62,9 +63,93 @@ type DeclarationUses struct {
 	HasBody     bool
 }
 
-// partUseKey is what makes two uses of a part one use, whose kinds are joined.
-type partUseKey struct {
-	object   types.Object
+// FunctionUses is one package's record of what its declarations use, kept compact while it is held through the
+// builds: every thing used once in a table, objects and selections apart, and every part's uses back to back as
+// packed entries and kinds, each declaration holding where its parts lie.
+type FunctionUses struct {
+	// objects are the objects the parts use other than by a selection, and selections the selections, each once: a
+	// PartUse's entry indexes one or the other.
+	objects    []types.Object
+	selections []usedSelection
+
+	// declarations are each declaration in the order its files declare them, declared every declaration's objects back
+	// to back, and uses every part's uses back to back.
+	declarations []declarationRecord
+	declared     []types.Object
+	uses         []PartUse
+}
+
+// usedSelection is a selection's entry: Object from Receiver at Index (see UsedEntry).
+type usedSelection struct {
 	receiver *types.TypeName
+	object   types.Object
 	index    string
+}
+
+// declarationRecord is one declaration as its record holds it: where its objects lie in declared, where its signature's
+// and its body's uses lie in uses, the body's from signatureEnd, and the rest of what Declaration names it by.
+type declarationRecord struct {
+	file         token.Pos
+	name         string
+	objectsStart uint32
+	objectsEnd   uint32
+	usesStart    uint32
+	signatureEnd uint32
+	bodyEnd      uint32
+	ordinal      int32
+	kind         declarationKindIndex
+	hasBody      bool
+}
+
+// declarationKindIndex is a DeclarationKind as a record holds it, a byte rather than a string's two words: its index
+// in declarationKinds.
+type declarationKindIndex uint8
+
+// declarationKinds are the kinds a declarationKindIndex indexes.
+var declarationKinds = [...]DeclarationKind{DeclaredFunction, DeclaredType, DeclaredValue}
+
+// The index of each kind in declarationKinds.
+const (
+	indexOfFunction declarationKindIndex = iota
+	indexOfType
+	indexOfValue
+)
+
+// Declarations yields what each declaration uses, in the order its files declare them, each part a view of the
+// record's own uses, which a reader never writes.
+func (record *FunctionUses) Declarations() iter.Seq[DeclarationUses] {
+	return func(yield func(DeclarationUses) bool) {
+		for _, declared := range record.declarations {
+			uses := DeclarationUses{
+				Declaration: Declaration{Kind: declarationKinds[declared.kind], File: declared.file,
+					Ordinal: int(declared.ordinal), Name: declared.name},
+				Signature: record.uses[declared.usesStart:declared.signatureEnd:declared.signatureEnd],
+				Body:      record.uses[declared.signatureEnd:declared.bodyEnd:declared.bodyEnd],
+				HasBody:   declared.hasBody,
+			}
+			if declared.objectsEnd > declared.objectsStart {
+				objects := record.declared[declared.objectsStart:declared.objectsEnd:declared.objectsEnd]
+				uses.Declaration.Objects = objects
+			}
+			if len(uses.Signature) == 0 {
+				uses.Signature = nil
+			}
+			if len(uses.Body) == 0 {
+				uses.Body = nil
+			}
+			if !yield(uses) {
+				return
+			}
+		}
+	}
+}
+
+// Used is the entry use is of.
+func (record *FunctionUses) Used(use PartUse) UsedEntry {
+	entry := uint32(use) >> partUseEntryShift
+	if use&partUseSelected == 0 {
+		return UsedEntry{Object: record.objects[entry]}
+	}
+	selection := record.selections[entry]
+	return UsedEntry{Object: selection.object, Receiver: selection.receiver, Index: selection.index}
 }

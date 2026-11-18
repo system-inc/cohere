@@ -65,6 +65,15 @@ func (renderer *IdentityRenderer) object(object types.Object) Identity {
 	return renderer.placed(identity, object.Pos())
 }
 
+// Used is entry's identity: its object's, and a selection's receiver's, each counted as Object counts it.
+func (renderer *IdentityRenderer) Used(entry UsedEntry) UsedIdentity {
+	identity := UsedIdentity{Object: renderer.Object(entry.Object), Index: entry.Index}
+	if entry.Receiver != nil {
+		identity.Receiver = renderer.Object(entry.Receiver)
+	}
+	return identity
+}
+
 // Declaration is the identity of each object declaration declares, or its file and ordinal when it declares none.
 func (renderer *IdentityRenderer) Declaration(declaration Declaration) []Identity {
 	if len(declaration.Objects) == 0 {

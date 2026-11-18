@@ -61,10 +61,8 @@ type Reads struct {
 	never string
 
 	// functionUses are what each top-level declaration of the package uses, its signature and its body apart
-	// (#kr1m304), walked after its type reads, and functionUsesRecorded whether they were: unrecorded uses are
-	// unknown, never empty.
-	functionUses         []DeclarationUses
-	functionUsesRecorded bool
+	// (#kr1m304), recorded in its type reads' walk, nil while unrecorded: unrecorded uses are unknown, never empty.
+	functionUses *FunctionUses
 }
 
 // UseKind is how a package used an object of another package, which decides what of the object another build must
@@ -317,31 +315,23 @@ func (reads *Reads) Claimed() bool {
 }
 
 // Record walks own's type information, info, and its syntax, files, for every object of another package it reaches
-// and the kind of each use (see collectTypeReads), and publishes what it collected, marking the reads recorded, then
-// walks them again for what each top-level declaration uses (see collectFunctionUses) and publishes that. The caller
-// holds the walk's claim (Claim), and the syntax is whole: the kinds are read from where each expression sits.
+// and the kind of each use, and in the same pass for what each top-level declaration uses (see collectTypeReads), and
+// publishes what it collected, marking the reads recorded. The caller holds the walk's claim (Claim), and the syntax
+// is whole: the kinds are read from where each expression sits.
 func (reads *Reads) Record(own *types.Package, info *types.Info, files []*ast.File) {
 	reads.publishTypes(collectTypeReads(own, info, files))
-	reads.publishFunctionUses(collectFunctionUses(own, info, files))
 }
 
-// publishFunctionUses keeps collected, what each declaration uses, and whether it was recorded, under one hold of the
-// lock.
-func (reads *Reads) publishFunctionUses(collected []DeclarationUses, recorded bool) {
+// FunctionUses are what each top-level declaration of the package uses, its signature and its body apart, and
+// whether they were recorded: unrecorded, they are nil, which is unknown, never empty.
+func (reads *Reads) FunctionUses() (*FunctionUses, bool) {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
-	reads.functionUses, reads.functionUsesRecorded = collected, recorded
+	return reads.functionUses, reads.functionUses != nil
 }
 
-// FunctionUses are what each top-level declaration of the package uses, its signature and its body apart, in the
-// order its files declare them, and whether they were recorded: unrecorded, they are unknown, never empty.
-func (reads *Reads) FunctionUses() ([]DeclarationUses, bool) {
-	reads.lock.Lock()
-	defer reads.lock.Unlock()
-	return reads.functionUses, reads.functionUsesRecorded
-}
-
-// publishTypes adds collected to the reads under one hold of the lock, and marks them recorded.
+// publishTypes adds collected to the reads under one hold of the lock, marks them recorded, and keeps what each
+// declaration uses, when it was recorded.
 func (reads *Reads) publishTypes(collected typeReads) {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
@@ -358,6 +348,7 @@ func (reads *Reads) publishTypes(collected typeReads) {
 	if reads.closureOnly == "" {
 		reads.closureOnly = collected.closureOnly
 	}
+	reads.functionUses = collected.functionUses
 	reads.recorded = true
 }
 

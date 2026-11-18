@@ -121,7 +121,7 @@ func functionUsesOfFixture(test *testing.T) (map[string][]string, int) {
 		}
 		return nil, fmt.Errorf("no package %s", path)
 	})}
-	var uses []DeclarationUses
+	var uses *FunctionUses
 	var recorded bool
 	for _, source := range functionUsesSources {
 		file, parseError := parser.ParseFile(fileSet, source.file, source.source, parser.SkipObjectResolution)
@@ -150,35 +150,37 @@ func functionUsesOfFixture(test *testing.T) (map[string][]string, int) {
 	}
 	renderer := NewIdentityRenderer(fileSet, nil)
 	written := map[string][]string{}
-	for _, declared := range uses {
+	for declared := range uses.Declarations() {
 		var names []string
 		for _, identity := range renderer.Declaration(declared.Declaration) {
 			names = append(names, identity.String())
 		}
 		name := string(declared.Declaration.Kind) + " " + strings.Join(names, ", ")
-		written[name+" signature"] = writtenPartUses(renderer, declared.Signature)
+		written[name+" signature"] = writtenPartUses(renderer, uses, declared.Signature)
 		if declared.HasBody {
-			written[name+" body"] = writtenPartUses(renderer, declared.Body)
+			written[name+" body"] = writtenPartUses(renderer, uses, declared.Body)
 		}
 	}
 	return written, renderer.Unknown
 }
 
-// writtenPartUses are uses written out, sorted: a selection as its receiver's identity, the name selected at its path,
-// and the selected object's identity, and any other use as its object's identity, each with its kinds.
-func writtenPartUses(renderer *IdentityRenderer, uses []PartUse) []string {
+// writtenPartUses are uses, of record, written out, sorted: a selection as its receiver's identity, the name selected
+// at its path, and the selected object's identity, and any other use as its object's identity, each with its kinds.
+func writtenPartUses(renderer *IdentityRenderer, record *FunctionUses, uses []PartUse) []string {
 	written := make([]string, 0, len(uses))
 	for _, use := range uses {
-		object := renderer.Object(use.Object).String()
-		if use.Index == "" {
-			written = append(written, object+" "+use.Kinds.String())
+		used := record.Used(use)
+		object := renderer.Object(used.Object).String()
+		if used.Index == "" {
+			written = append(written, object+" "+use.Kinds().String())
 			continue
 		}
 		receiver := "none"
-		if use.Receiver != nil {
-			receiver = renderer.Object(use.Receiver).String()
+		if used.Receiver != nil {
+			receiver = renderer.Object(used.Receiver).String()
 		}
-		written = append(written, receiver+" ."+use.Object.Name()+"@"+use.Index+" "+object+" "+use.Kinds.String())
+		written = append(written, receiver+" ."+used.Object.Name()+"@"+used.Index+" "+object+" "+
+			use.Kinds().String())
 	}
 	slices.Sort(written)
 	return written
