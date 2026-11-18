@@ -70,6 +70,8 @@ func liftedStructLiteralWrites(
 
 // gatherJudgedStructLiterals records in judged each literal node, one node of a function's own syntax, gives straight
 // to a variable or stores straight through: the literals liftedStructLiteralWrites judges.
+//
+// Mutates: judged each such literal is recorded, the one set gatherOwnSyntax fills across every node
 func gatherJudgedStructLiterals(context *rule.Context, node ast.Node, judged map[*ast.CompositeLit]bool) {
 	given := func(left ast.Expr, right ast.Expr) {
 		identifier, isIdentifier := ast.Unparen(left).(*ast.Ident)

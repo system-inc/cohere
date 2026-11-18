@@ -61,6 +61,8 @@ func reportLiftedArrayLiterals(
 
 // gatherBoundArrayLiterals records in bound each variable node, one node of a function's own syntax, declares with a
 // pointer to an array literal of one element, with its literal.
+//
+// Mutates: bound each such variable is recorded with its literal, the one map gatherOwnSyntax fills across every node
 func gatherBoundArrayLiterals(context *rule.Context, node ast.Node, bound map[*types.Var]*ast.CompositeLit) {
 	switch statement := node.(type) {
 	case *ast.AssignStmt:

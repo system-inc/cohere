@@ -126,8 +126,8 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 }
 
 // ownSyntax is what one walk of a function's own syntax (inspectOwnSyntax) gathers for the two checks that read it,
-// reportLiftedArrayLiterals and liftedStructLiteralWrites, so the walk, the larger part of the rule's cost, is made once
-// a function and not once for each.
+// reportLiftedArrayLiterals and liftedStructLiteralWrites, so the walk, the larger part of the rule's cost, is made
+// once a function and not once for each.
 type ownSyntax struct {
 	// body is the function's statements (functionBody), and nil for a function with none, where neither check judges.
 	body *ast.BlockStmt
