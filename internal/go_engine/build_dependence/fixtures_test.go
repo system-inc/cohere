@@ -518,6 +518,45 @@ func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 	test.Fatal("the layout fixture has no unit Mapped")
 }
 
+// An array's length in a spelled type is a value, so whatever it reads is read in full, as a constant's value is:
+// runtime's mPadded pads itself past `unsafe.Sizeof(m{})`, and m's layout moves by platform. In the lengths fixture
+// inner is one int64 on the host and two on windows, so Shared's field Pad, an array of `64 - unsafe.Sizeof(inner{})`
+// bytes, is a [56]byte on the host and a [48]byte on windows, and Sized's result, an array of `unsafe.Sizeof(inner{})`
+// bytes, a [8]byte and a [16]byte: both are dependent, and Shared's underlying bit is set. Steady and Even read a
+// steady the same way, one int64 in every build, and are not; inner, declared in a file only the host compiles, is a
+// seed.
+func TestAnArrayLengthInASpelledTypeIsReadInFull(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "lengths", fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
+	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
+		"type Shared": true,
+		"func Sized":  true,
+		"type steady": false,
+		"func Steady": false,
+		"type Even":   false,
+		"type inner":  true,
+	})
+	for _, name := range []struct {
+		local string
+		want  Bits
+	}{
+		{"Shared", Bits{Name: false, Underlying: true}},
+		{"Sized", Bits{Name: true}},
+		{"Steady", Bits{}},
+		{"Even", Bits{}},
+	} {
+		bits, isDeclared := judged.dependence.NameBits("example.com/lengths/p", name.local)
+		if !isDeclared {
+			test.Errorf("%s: no unit of the lengths fixture declares it", name.local)
+			continue
+		}
+		if bits != name.want {
+			test.Errorf("%s: want its bits %+v on windows, got %+v", name.local, name.want, bits)
+		}
+	}
+}
+
 // Each unit carries the units it calls statically: CallsReadsSize calls ReadsSize, PassesHolder calls Forward,
 // NewHolder and the method Capacity, and Untouched calls nothing. An object's position finds its declaring unit, as
 // another build's fact on it is matched (#0ghk7vj): Length's name sits in Length's unit, and no unit holds the package
