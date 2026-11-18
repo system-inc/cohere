@@ -289,8 +289,14 @@ func closureWholeReads(memo *ReadsBuild, object types.Object) map[types.Object]b
 //   - a type name has its closure digest differ and no type name its closure reaches has either bit set, the objects
 //     a whole read of it reads (closureWholeReads), itself among them.
 //
-// Each memo is measured by its own load's sizes, as the host's renderings and a build's are (measureBy).
-func objectDifferences(host objectLoad, build objectLoad, dependence *build_dependence.Dependence) objectTally {
+// Each object's bits are bitsOf's, block 1's Dependence.ObjectBits, or a test's that blanks some of them to show a
+// leg failing (TestTheClosureDigestLegFailsWhereNoNameItReachesHasABit). Each memo is measured by its own load's
+// sizes, as the host's renderings and a build's are (measureBy).
+func objectDifferences(
+	host objectLoad,
+	build objectLoad,
+	bitsOf func(types.Object) build_dependence.Bits,
+) objectTally {
 	hostMemo, buildMemo := NewReadsBuild(), NewReadsBuild()
 	for _, loaded := range host.packages {
 		hostMemo.measureBy(loaded.TypesSizes)
@@ -319,7 +325,7 @@ func objectDifferences(host objectLoad, build objectLoad, dependence *build_depe
 			}
 			counterpart := builtByName[declared.name][occurrence]
 			tally.compared++
-			bits := dependence.ObjectBits(declared.object)
+			bits := bitsOf(declared.object)
 			named := declared.name
 			if identifier != hosted.PkgPath {
 				named += " in " + identifier
@@ -364,7 +370,7 @@ func objectDifferences(host objectLoad, build objectLoad, dependence *build_depe
 			wholeReads := closureWholeReads(hostMemo, typeName)
 			covered := false
 			for reached := range wholeReads {
-				if reachedBits := dependence.ObjectBits(reached); reachedBits.Name || reachedBits.Underlying {
+				if reachedBits := bitsOf(reached); reachedBits.Name || reachedBits.Underlying {
 					covered = true
 					break
 				}
@@ -444,13 +450,65 @@ func TestEveryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 					continue
 				}
 				judgedUnder++
-				tally := objectDifferences(host, built, objectDependence(host, built, objectFixtureWorkspace))
+				dependence := objectDependence(host, built, objectFixtureWorkspace)
+				tally := objectDifferences(host, built, dependence.ObjectBits)
 				reportObjectDifferences(test, build.name, tally, started)
 			}
 			if judgedUnder == 0 {
 				test.Error("the fixture type-checks under no build, so nothing of it is judged")
 			}
 		})
+	}
+}
+
+// The closure-digest leg of objectDifferences fails a type name whose closure digest differs where no type name its
+// closure reaches has a bit set, which no fixture reaches while block 1 holds. In the closures fixture Holder points
+// at Inner, whose underlying moves on linux, so Holder's and Inner's closure digests differ there and only Inner's
+// underlying bit covers them: with block 1's bits as they are, Inner's underlying bit is set and nothing fails, and
+// with Inner's bits blanked, the two closure digests fail and nothing else does, two fewer lines covered than block
+// 1's bits cover, so the two block 1 covers are those.
+func TestTheClosureDigestLegFailsWhereNoNameItReachesHasABit(test *testing.T) {
+	test.Parallel()
+
+	directory := filepath.Join("..", "build_dependence", "testdata", "closures")
+	host := loadObjects(test, directory, objectEnvironment("darwin", ""), "./...", true)
+	built := loadObjects(test, directory, objectEnvironment("linux", ""), "./...", true)
+	if len(host.broken) > 0 || len(built.broken) > 0 {
+		test.Fatalf("the closures fixture does not type-check: %q on the host, %q on linux", host.broken, built.broken)
+	}
+	hosted := host.packages["example.com/closures"]
+	if hosted == nil {
+		test.Fatal("the closures fixture's host holds no example.com/closures")
+	}
+	inner := hosted.Types.Scope().Lookup("Inner")
+	dependence := objectDependence(host, built, objectFixtureWorkspace)
+
+	// Both tallies on this goroutine, one after the other: ObjectBits is asked from one goroutine at a time.
+	if bits := dependence.ObjectBits(inner); !bits.Underlying {
+		test.Errorf("want Inner's underlying bit set on linux, got %+v", bits)
+	}
+	asSet := objectDifferences(host, built, dependence.ObjectBits)
+	if len(asSet.failures) > 0 {
+		test.Errorf("want nothing failing with block 1's bits, got %q", asSet.failures)
+	}
+	blanked := objectDifferences(host, built, func(object types.Object) build_dependence.Bits {
+		if object == inner {
+			return build_dependence.Bits{}
+		}
+		return dependence.ObjectBits(object)
+	})
+	want := []string{
+		"example.com/closures.Holder: its closure digest differs, and neither bit is set on any of the 2 names its " +
+			"closure reaches",
+		"example.com/closures.Inner: its closure digest differs, and neither bit is set on any of the 1 names its " +
+			"closure reaches",
+	}
+	if !slices.Equal(blanked.failures, want) {
+		test.Errorf("with Inner's bits blanked, want the failures %q, got %q", want, blanked.failures)
+	}
+	if blanked.differedCovered != asSet.differedCovered-len(want) {
+		test.Errorf("with Inner's bits blanked, want %d differing lines covered, %d fewer than block 1's bits cover, "+
+			"got %d", asSet.differedCovered-len(want), len(want), blanked.differedCovered)
 	}
 }
 
@@ -491,7 +549,7 @@ func TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet(test *testing.T)
 			if len(built.broken) > 0 {
 				test.Logf("%d packages with errors left out: %q", len(built.broken), built.broken)
 			}
-			tally := objectDifferences(host, built, objectDependence(host, built, notWorkspace))
+			tally := objectDifferences(host, built, objectDependence(host, built, notWorkspace).ObjectBits)
 			reportObjectDifferences(test, target.GoOperatingSystem, tally, started)
 			if tally.compared == 0 {
 				test.Error("compared no object, so the load found nothing")
@@ -643,7 +701,7 @@ func TestEveryObjectOfARealTreeWhoseLinesDifferHasItsBitSet(test *testing.T) {
 		started := time.Now()
 		built := loadObjects(test, workspace.Root, environmentOf(build), "./...", true)
 		test.Logf("%s: %d packages loaded, %d with errors left out", build, len(built.packages), len(built.broken))
-		tally := objectDifferences(host, built, objectDependence(host, built, inWorkspace))
+		tally := objectDifferences(host, built, objectDependence(host, built, inWorkspace).ObjectBits)
 		reportObjectDifferences(test, build.String(), tally, started)
 	}
 }
