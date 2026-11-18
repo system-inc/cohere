@@ -97,8 +97,9 @@ func (judging *judgment) seedFiles() {
 // base name, since the file was parsed for its syntax alone (receiverTypeName): an alias a build-only file declares is
 // followed to the name it stands for, a type a build-only file defines moves no method set the host has, and the rest
 // is found among the host package's type names, as its record holds them (packageRecord.typeNames), a package-level
-// type's local name being its name. A receiver that resolves to none of these seeds the name bit of every type name of
-// the package, failing wide.
+// type's local name being its name. The name found may be a host alias's, whose method set is its target's, so the
+// target's name bit is seeded too (seedAliasTargets). A receiver that resolves to none of these seeds the name bit of
+// every type name of the package, failing wide.
 func (judging *judgment) seedMethodSets() {
 	for index, receiver := range judging.resolved.unitReceiver {
 		if judging.seedUnit[index] && receiver >= 0 {
@@ -112,6 +113,7 @@ func (judging *judgment) seedMethodSets() {
 		}
 		record := judging.resolved.packages[packageIndex]
 		var buildOnlyTypes map[string]*ast.TypeSpec
+		var receivers map[int32]bool
 		for _, file := range differing.BuildOnlyFiles {
 			for _, declaration := range file.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
@@ -133,8 +135,56 @@ func (judging *judgment) seedMethodSets() {
 				key := nodeKey{packageIndex: int32(packageIndex), local: name}
 				if node, isNode := judging.resolved.nodes[key]; isNode {
 					judging.seedBits = append(judging.seedBits, bit(node, false))
+					if receivers == nil {
+						receivers = judging.packageReceivers(packageIndex)
+					}
+					judging.seedAliasTargets(packageIndex, node, receivers)
 				}
 			}
+		}
+	}
+}
+
+// packageReceivers are the nodes of the package at packageIndex that a unit of it has for its receiver, each a defined
+// type, since a method's receiver is found through its named type and never through an alias (collectFunction).
+func (judging *judgment) packageReceivers(packageIndex int) map[int32]bool {
+	receivers := map[int32]bool{}
+	span := judging.resolved.packageUnits[packageIndex]
+	for index := span[0]; index < span[1]; index++ {
+		if receiver := judging.resolved.unitReceiver[index]; receiver >= 0 {
+			receivers[receiver] = true
+		}
+	}
+	return receivers
+}
+
+// seedAliasTargets seeds the name bit of what a build-only method's receiver, at node, may alias: `type A = T` makes a
+// method declared on A one of T's, which moves T's method set, and A's bits depend on T's, never T's on A's. A record
+// keeps no mark of an alias, only its kind edges, which resolution turns into the bits that depend on each bit
+// (resolvedGraph.dependents), and a live record and a decoded one must judge alike, so the alias is not read from the
+// live types. Each type of the package whose name bit the receiver's name bit depends on directly is seeded, and so on
+// through each of those in turn, for a chain of aliases: an alias's target, and for a defined type the types it embeds
+// or constrains its parameters by, a larger set, which a doubt takes. A type some unit of the host has for its receiver
+// is defined, no alias (packageReceivers), so nothing is seeded through it. A receiver must be of the method's own
+// package, so no other package's type is looked at.
+func (judging *judgment) seedAliasTargets(packageIndex int, node int32, receivers map[int32]bool) {
+	seen := map[int32]bool{node: true}
+	pending := []int32{node}
+	for len(pending) > 0 {
+		current := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		if receivers[current] {
+			continue
+		}
+		for _, name := range judging.resolved.packages[packageIndex].typeNames {
+			target, isNode := judging.resolved.nodes[nodeKey{packageIndex: int32(packageIndex), local: name}]
+			if !isNode || seen[target] ||
+				!slices.Contains(judging.resolved.dependents.row(int(bit(target, false))), bit(current, false)) {
+				continue
+			}
+			seen[target] = true
+			judging.seedBits = append(judging.seedBits, bit(target, false))
+			pending = append(pending, target)
 		}
 	}
 }
