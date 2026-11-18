@@ -10,11 +10,20 @@ var (
 	twoControls = ""
 	// A delete and a next line, the C1 control, both control characters.
 	otherControls = "abc"
+	// A delete alone, the one ASCII control above a space, in a literal otherwise all printable ASCII.
+	deleteAlone = "ab"
+	// A unit separator alone, the last ASCII control below a space, in a literal otherwise all printable ASCII.
+	unitSeparator = "ab"
+	// A vertical tab alone, a control between the three the check allows and a space, in a literal otherwise all
+	// printable ASCII.
+	verticalTab = "ab"
 	// A tab, a newline in a raw string, and escape sequences are allowed.
 	allowedControls = "tab	here"
 	rawNewline      = `line
 line`
 	escapes = "\a\u200b\x1a"
+	// A literal of printable ASCII alone, from a space to a tilde, with a tab and escape sequences, is allowed.
+	printableAscii = " a~	b\x7f\x1f\u200b\"\\"
 	// A zero-width space, a format character, in an interpreted string and in a raw one.
 	zeroWidth    = "zero​width"
 	rawZeroWidth = `zero​width`

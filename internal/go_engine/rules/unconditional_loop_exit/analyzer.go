@@ -23,6 +23,7 @@ import (
 	"go/token"
 	"go/types"
 
+	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -69,23 +70,24 @@ func Check(context *rule.Context, function ast.Node) {
 		// A function declared without a body, implemented elsewhere, holds no loop.
 		return
 	}
-	labels := map[types.Object]ast.Stmt{}
-	ast.Inspect(body, func(node ast.Node) bool {
-		if labeled, isLabeled := node.(*ast.LabeledStmt); isLabeled {
-			labels[context.TypesInfo.ObjectOf(labeled.Label)] = labeled.Stmt
-		}
-		return true
-	})
-	ast.Inspect(body, func(node ast.Node) bool {
-		return checkLoop(context, labels, node)
+	// The walks read the inspector's cursor of the body rather than ast.Inspect, so a subtree holding no loop, label or
+	// branch statement is skipped by the inspector's type masks. The findings stay the same: the cursor visits the
+	// nodes of the kinds it is asked for in ast.Inspect's preorder, descends into every node of another kind, which
+	// ast.Inspect's callback here always descended into, and skips a loop's subtree when checkLoop returns false, as
+	// ast.Inspect's pruning did.
+	bodyCursor := context.Cursor().Child(body)
+	labels := &labelTargets{body: bodyCursor}
+	bodyCursor.Inspect([]ast.Node{(*ast.ForStmt)(nil), (*ast.RangeStmt)(nil)}, func(loopCursor inspector.Cursor) bool {
+		return checkLoop(context, labels, loopCursor)
 	})
 }
 
-// checkLoop judges node if it is a loop the check reads, and is whether the walk goes on into node's children.
-func checkLoop(context *rule.Context, labels map[types.Object]ast.Stmt, node ast.Node) bool {
+// checkLoop judges the loop at loopCursor if it is one the check reads, and is whether the walk goes on into the
+// loop's children.
+func checkLoop(context *rule.Context, labels *labelTargets, loopCursor inspector.Cursor) bool {
 	var loop ast.Stmt
 	var body *ast.BlockStmt
-	switch node := node.(type) {
+	switch node := loopCursor.Node().(type) {
 	case *ast.ForStmt:
 		loop = node
 		body = node.Body
@@ -96,7 +98,8 @@ func checkLoop(context *rule.Context, labels map[types.Object]ast.Stmt, node ast
 		loop = node
 		body = node.Body
 	default:
-		return true
+		// Invariant: Check's walk hands checkLoop only the for and range statements it filters for.
+		panic(fmt.Sprintf("unconditional_loop_exit: checkLoop was handed a %T, not a loop", node))
 	}
 	// A body of one statement cannot both branch and exit unconditionally, and it is the common way to take the first
 	// element of a slice or the first rune of a string, so it is left alone and its children still walked.
@@ -129,7 +132,7 @@ func checkLoop(context *rule.Context, labels map[types.Object]ast.Stmt, node ast
 	if unconditionalExit == nil || !hasBranching {
 		return false
 	}
-	if mayRunAgain(context, labels, body, loop) {
+	if mayRunAgain(context, labels, loopCursor.Child(body), loop) {
 		return true
 	}
 	staticcheck_report.Report(context, unconditionalExit, "the surrounding loop is unconditionally terminated")
@@ -158,28 +161,53 @@ func rangesOverSequence(context *rule.Context, loop *ast.RangeStmt) bool {
 // mayRunAgain is whether the body of loop holds, at any depth, a goto, which might jump past the exit, or a continue
 // that might run the loop again: an unlabelled one even in a nested loop or function literal, where it continues
 // something else, or one labelled with this loop.
-func mayRunAgain(context *rule.Context, labels map[types.Object]ast.Stmt, body *ast.BlockStmt, loop ast.Stmt) bool {
-	found := false
-	ast.Inspect(body, func(node ast.Node) bool {
-		if found {
-			return false
-		}
-		branch, isBranch := node.(*ast.BranchStmt)
+//
+// body is the cursor of the loop's body, never of the loop, so a branch statement in a function literal in the loop's
+// header is not read, as the original's walk of the body alone never reads it. It answers at the first such statement,
+// where the original's walk reads on, but nothing it reads after that changes the original's verdict.
+func mayRunAgain(context *rule.Context, labels *labelTargets, body inspector.Cursor, loop ast.Stmt) bool {
+	for branchCursor := range body.Preorder((*ast.BranchStmt)(nil)) {
+		branch, isBranch := branchCursor.Node().(*ast.BranchStmt)
 		if !isBranch {
-			return true
+			// The walk hands only the branch statements it filters for, so this is never taken.
+			continue
 		}
 		switch branch.Tok {
 		case token.GOTO:
-			found = true
+			return true
 		case token.CONTINUE:
-			found = branch.Label == nil || targets(context, labels, branch.Label, loop)
+			if branch.Label == nil || targets(context, labels, branch.Label, loop) {
+				return true
+			}
 		}
-		return !found
-	})
-	return found
+	}
+	return false
 }
 
-// targets is whether label names loop, from the labels of the function being judged.
-func targets(context *rule.Context, labels map[types.Object]ast.Stmt, label *ast.Ident, loop ast.Stmt) bool {
-	return labels[context.TypesInfo.ObjectOf(label)] == loop
+// labelTargets is the statement each label in the body of the function being judged names, by the label's object, the
+// map the original builds by walking the whole body before it judges a loop. It is built only on the first lookup,
+// since a labelled break or continue is the only thing that reads it and most functions hold none. The findings stay
+// the same: targets is its only reader, and the build walks the whole body, a function literal's labels included, as
+// the original's does, so the first lookup reads the map the original would have read, and nothing changes it after.
+type labelTargets struct {
+	// body is the cursor of the body of the function being judged, whose labels the map holds, read only during the
+	// Node call that judges the function, where the cursor holds.
+	body inspector.Cursor
+	// statements is the statement each label names, by its object, and nil until the first lookup builds it.
+	statements map[types.Object]ast.Stmt
+}
+
+// targets is whether label names loop, from the labels of the function being judged, built on the first call.
+//
+// Mutates: labels gains its map of the body's labels on the first call, read again on every call after
+func targets(context *rule.Context, labels *labelTargets, label *ast.Ident, loop ast.Stmt) bool {
+	if labels.statements == nil {
+		labels.statements = map[types.Object]ast.Stmt{}
+		for labeledCursor := range labels.body.Preorder((*ast.LabeledStmt)(nil)) {
+			if labeled, isLabeled := labeledCursor.Node().(*ast.LabeledStmt); isLabeled {
+				labels.statements[context.TypesInfo.ObjectOf(labeled.Label)] = labeled.Stmt
+			}
+		}
+	}
+	return labels.statements[context.TypesInfo.ObjectOf(label)] == loop
 }

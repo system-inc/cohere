@@ -122,6 +122,10 @@ func calls(values []int, words []string, array [5]int, item logger) {
 	item.pairs("", 1, 2, 3)
 	logger.pairs(item, "", 1, 2, 3)
 	pairs.Pairs("one")
+	pairs.Pairs("one", "two")
+	pairs.Pairs([]string{"one", "two", "three"}...)
+	pairs.Unchecked("one")
+	pairs.Unchecked("one", "two", "three")
 	pairs.Forward("one", "two", "three")
 	pairs.Pairs(words...)
 	pairs.Pairs(words[:1]...)
@@ -132,4 +136,14 @@ func calls(values []int, words []string, array [5]int, item logger) {
 	func() {
 		notEqualZero(1, 2, 3)
 	}()
+}
+
+// genericArraySink takes a slice and checks nothing of its length, so it marks nothing.
+func genericArraySink(values []int) {}
+
+// sliceOfAGenericArray slices an array whose type is a type parameter, whose allocation's underlying type is the
+// constraint, not an array, so its length is never read where the parameter is unmarked.
+func sliceOfAGenericArray[Array ~[4]int]() {
+	var array Array
+	genericArraySink(array[:])
 }

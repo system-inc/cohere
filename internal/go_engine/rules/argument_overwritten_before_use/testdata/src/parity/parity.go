@@ -112,6 +112,15 @@ func readFirst(value int) int {
 	return value
 }
 
+// Found by neither: a function literal's parameter is read before it is overwritten.
+func literalReadFirst() func(int) int {
+	return func(value int) int {
+		consume(value)
+		value = 1
+		return value
+	}
+}
+
 // Found by neither: overwritten on only one path, so the passed value reaches the return on the other.
 func overwrittenSometimes(value int, condition bool) int {
 	if condition {

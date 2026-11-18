@@ -66,6 +66,11 @@ func checkLiteral(context *rule.Context, node ast.Node, _ []ast.Node) {
 	if !isLiteral || literal.Kind != token.STRING {
 		return
 	}
+	// Nearly every literal is written in printable ASCII, which never holds a character the check refuses, so a byte
+	// scan clears it without asking the unicode tables of each of its characters.
+	if holdsOnlyPrintableAscii(literal.Value) {
+		return
+	}
 	invisibleCharacters := []invisibleCharacter{}
 	hasFormat := false
 	hasControl := false
@@ -129,6 +134,24 @@ func checkLiteral(context *rule.Context, node ast.Node, _ []ast.Node) {
 				TextEdits: deletions,
 			},
 		))
+}
+
+// holdsOnlyPrintableAscii is whether every byte of value is printable ASCII, a space to a tilde, or a tab, a newline or
+// a carriage return, the three controls the check allows. Such a value holds nothing the check reports, by the same
+// tables checkLiteral reads: no format character is ASCII, the first being U+00AD, the soft hyphen; the ASCII controls
+// are the bytes below a space and the delete, `0x7F`, which the bounds here leave out but for those three; and the one
+// character judged by the character before it, the zero-width joiner, is not ASCII. A byte of invalid UTF-8 is `0x80`
+// or above, so a value holding one is read rune by rune, as before.
+func holdsOnlyPrintableAscii(value string) bool {
+	for index := range len(value) {
+		switch {
+		case value[index] >= ' ' && value[index] <= '~':
+		case value[index] == '\t' || value[index] == '\n' || value[index] == '\r':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // isAllowedFormat is whether character, a format character following previous, is one the check lets a string hold:

@@ -25,7 +25,17 @@ func (graph *graph) read(syntax ast.Node, by types.Object) {
 	case *ast.Ident:
 		// Among many other things, this handles
 		// (7.1) field accesses use fields
-		graph.use(graph.typesInfo.ObjectOf(syntax), by)
+		//
+		// ObjectOf asks Defs and then Uses, two lookups for the use nearly every identifier read reaches, so read asks
+		// Uses first and ObjectOf only on a miss. The object is the same: go/types puts an identifier in both maps
+		// with different objects only for an embedded field, its field in Defs and its type in Uses, and read is
+		// never handed one, as embeddedField resolves every embedded field's identifier itself. A receiver's type
+		// parameter is in both too, with the same object.
+		used, isUse := graph.typesInfo.Uses[syntax]
+		if !isUse {
+			used = graph.typesInfo.ObjectOf(syntax)
+		}
+		graph.use(used, by)
 
 	case *ast.BasicLit:
 		// Nothing to do

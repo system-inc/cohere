@@ -82,6 +82,31 @@ func genericLiteral[T any](replacement T) {
 	}(replacement)
 }
 
+// sequenceOf is a sequence whose yield function's type is yield's, so ranging over it makes a yield function with the
+// parameters of the signature yield has.
+func sequenceOf[Yield any](yield Yield) func(Yield) { return func(Yield) {} }
+
+// Found by both, twice: a literal whose signature the range-over-func loop's yield signature is inferred from, so its
+// parameter is the yield function's as well, and the walk of the loop's body judges the literal's header too.
+func rangeOverLiteralSignature() {
+	for range sequenceOf(func(value int) bool {
+		value = 10
+		return value > 0
+	}) {
+	}
+}
+
+// Found by both, once: a literal inside a range-over-func loop's body, met by the walk of the loop's yield function,
+// whose parameters it does not share.
+func literalInRangeBody(sequence func(func(int) bool)) {
+	for element := range sequence {
+		func(value int) {
+			value = 11
+			consume(value)
+		}(element)
+	}
+}
+
 // Found by neither: a type switch reads the parameter before it is overwritten.
 func typeSwitchThenAssign(value any) any {
 	switch value.(type) {
