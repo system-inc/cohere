@@ -28,3 +28,13 @@ func Steady() (sized [unsafe.Sizeof(steady{})]byte) {
 type Even struct {
 	Pad [64 - unsafe.Sizeof(steady{})]byte
 }
+
+// Buffered declares a local array of platformSize bytes and a local type of platformSize ints, 4 of each on the host
+// and 8 on windows, so its body moves while its signature, which names no type, does not: its unit is dependent, by
+// the body alone, and its own bits, which a reader of it reads, stay unset.
+func Buffered() int {
+	var buffer [platformSize]byte
+	type row [platformSize]int
+	var cells row
+	return len(buffer) + len(cells)
+}

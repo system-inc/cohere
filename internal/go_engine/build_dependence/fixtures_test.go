@@ -525,18 +525,22 @@ func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 // bytes, is a [56]byte on the host and a [48]byte on windows, and Sized's result, an array of `unsafe.Sizeof(inner{})`
 // bytes, a [8]byte and a [16]byte: both are dependent, and Shared's underlying bit is set. Steady and Even read a
 // steady the same way, one int64 in every build, and are not; inner, declared in a file only the host compiles, is a
-// seed.
+// seed. An array's length inside a body is the body's to read (bodyWalk): Buffered declares a local [platformSize]byte
+// and a local type of platformSize ints, 4 on the host and 8 on windows, so its unit is dependent by the
+// body's read of platformSize, a seed, while its own bits, its signature's, which names no type, stay unset.
 func TestAnArrayLengthInASpelledTypeIsReadInFull(test *testing.T) {
 	test.Parallel()
 
 	judged := judge(test, "lengths", fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
 	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
-		"type Shared": true,
-		"func Sized":  true,
-		"type steady": false,
-		"func Steady": false,
-		"type Even":   false,
-		"type inner":  true,
+		"type Shared":        true,
+		"func Sized":         true,
+		"type steady":        false,
+		"func Steady":        false,
+		"type Even":          false,
+		"type inner":         true,
+		"func Buffered":      true,
+		"value platformSize": true,
 	})
 	for _, name := range []struct {
 		local string
@@ -546,6 +550,7 @@ func TestAnArrayLengthInASpelledTypeIsReadInFull(test *testing.T) {
 		{"Sized", Bits{Name: true}},
 		{"Steady", Bits{}},
 		{"Even", Bits{}},
+		{"Buffered", Bits{}},
 	} {
 		bits, isDeclared := judged.dependence.NameBits("example.com/lengths/p", name.local)
 		if !isDeclared {
