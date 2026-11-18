@@ -557,6 +557,37 @@ func TestAnArrayLengthInASpelledTypeIsReadInFull(test *testing.T) {
 	}
 }
 
+// A var with no declared type takes its type from whatever its initializer passes through, a named type's underlying
+// included, so its bit reads every type there in full. In the inferred fixture Length is 4 on the host and 8 on
+// windows, and Rows, two arrays of Length ints, is a literal, so its name bit stays unset: on windows Row, `rows[0]`,
+// is an [8]int where the host's is a [4]int, and so are RowThrough, the same element through a pointer to rows, and
+// RowInferred, a generic's result inferred from Rows' underlying, so each is dependent. PairRow, an element of a Pair
+// whose length no build changes, is not.
+func TestAnInferredVarReadsTheTypesItsInitializerPasses(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "inferred", fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
+	for _, name := range []struct {
+		local     string
+		dependent bool
+	}{
+		{"Rows", false},
+		{"Row", true},
+		{"RowThrough", true},
+		{"RowInferred", true},
+		{"PairRow", false},
+	} {
+		bits, isDeclared := judged.dependence.NameBits("example.com/inferred/p", name.local)
+		if !isDeclared {
+			test.Errorf("%s: no unit of the inferred fixture declares it", name.local)
+			continue
+		}
+		if bits.Name != name.dependent {
+			test.Errorf("%s: want its name bit %t on windows, got %t", name.local, name.dependent, bits.Name)
+		}
+	}
+}
+
 // Each unit carries the units it calls statically: CallsReadsSize calls ReadsSize, PassesHolder calls Forward,
 // NewHolder and the method Capacity, and Untouched calls nothing. An object's position finds its declaring unit, as
 // another build's fact on it is matched (#0ghk7vj): Length's name sits in Length's unit, and no unit holds the package
