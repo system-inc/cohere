@@ -236,6 +236,12 @@ type pipeline struct {
 	// switch builds no graph and judges nothing (buildDependenceGraph).
 	dependence *hostDependence
 
+	// bodyReachCensus is the file the body reach census is written to, from `COHERE_BODY_REACH_CENSUS`, empty for a
+	// run that writes none, and bodyReachHost the census's side of the host, made as the extra builds start in a run
+	// that judges their dependence, nil in any other (body_reach.go, #w72zxtq).
+	bodyReachCensus string
+	bodyReachHost   *bodyReachHost
+
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
 	// beside the host's to check.
 	buildRuns []buildRun

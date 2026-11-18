@@ -81,4 +81,7 @@ type buildRun struct {
 	// judged is an extra build's alone, under `--build-dependence`: the judgment its record was counted from and the
 	// files it shares with the host's, which its facts are compared through once its lint has run (compareFacts).
 	judged *buildJudgment
+	// bodyReach is an extra build's alone, under the body reach census: which of the host's bodies its difference
+	// reaches (body_reach.go, #w72zxtq), nil otherwise.
+	bodyReach *buildBodyReach
 }

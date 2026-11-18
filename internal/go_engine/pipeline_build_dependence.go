@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"slices"
 	"sync"
 	"time"
@@ -39,6 +40,10 @@ type hostDependence struct {
 	// restoredAnswers are the answers the host's store holds of each package it restored, by package ID, indexed with
 	// its facts (indexHostFacts), which the facts census reads by objectpath.
 	restoredAnswers map[string]*fact_resolver.Answers
+	// decoded are the types of the packages the host checked from source whose graph it took from the findings store's
+	// records rather than their syntax, which hold no live object, so the body reach census asks of their objects by
+	// name (bodyReacher.bits).
+	decoded map[*types.Package]bool
 	// calls is the units of graph and of the standard library's graph and the calls between them, which every build's
 	// facts census counts by its own verdicts (#f9br7sg), built once a run by the first census to ask (callIndex,
 	// under callsOnce), since the builds' censuses run at once.
@@ -120,6 +125,7 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		files:    make(map[string][]string, len(every)),
 		paths:    make(map[string]string, len(every)),
 		restored: map[string]bool{},
+		decoded:  map[*types.Package]bool{},
 	}
 	var restoredStandardLibrary []string
 	recordedStandardLibrary := map[string]*build_dependence.Record{}
@@ -129,6 +135,9 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		host.paths[each.ID] = each.PkgPath
 		if engine.session != nil {
 			records[index], _ = engine.session.DependenceRecord(each)
+		}
+		if records[index] != nil && each.Types != nil {
+			host.decoded[each.Types] = true
 		}
 		if each.TypesInfo != nil || records[index] != nil {
 			continue
