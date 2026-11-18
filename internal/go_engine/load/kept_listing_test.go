@@ -131,6 +131,14 @@ var listingEdits = []listingEdit{
 	{name: "an assembly file added", files: map[string]string{
 		"project/user/stub.s": "// An assembly file go list names among the package's files.\n",
 	}},
+	// Directories go's walk leaves out, as the findings store's `.cache` is (#78whs52), each with a Go file go never
+	// reads, keep the answer. Each is beside packages that embed nothing: below one that does, the embed's walk reads
+	// it.
+	{name: "directories go's walk leaves out added", kept: true, files: map[string]string{
+		"project/.cache/cohere/hidden.go":  "package hidden\n",
+		"project/_skipped/skipped.go":      "package skipped\n",
+		"project/user/testdata/fixture.go": "package fixture\n",
+	}},
 	{name: "a package added", files: map[string]string{
 		"project/extra/extra.go": "package extra\n\n// Extra is three.\nfunc Extra() int { return 3 }\n",
 	}},

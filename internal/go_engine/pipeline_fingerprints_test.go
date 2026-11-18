@@ -2,8 +2,10 @@ package go_engine
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/format"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 )
@@ -72,8 +75,46 @@ func TestAChangeToTheHeldBytesStartsTheFingerprintsOver(test *testing.T) {
 // of them again.
 func TestTheHostsWarmLoadFillsTheFingerprintsTheBuildsRead(test *testing.T) {
 	test.Parallel()
+	root := fingerprintsModule(test)
+	hostLoad(test, root, "the first run")
+	warm, _ := hostLoad(test, root, "the second run")
+	directories, computed := warm.fingerprints.DirectoriesFingerprinted()
+	if directories != 3 || computed != int64(directories) {
+		test.Errorf("the warm host load fingerprinted %d directories %d times, want the module's 3, once each",
+			directories, computed)
+	}
+}
+
+// The findings store's own directory leaves the host's listing kept (#78whs52): on a fresh tree the first run keeps
+// its listing, and the store's first write makes `.cache` in the root after that listing's fingerprint was read. go's
+// walk never reads a dot directory, so the second run reads the listing it kept, with neither go list nor the
+// in-process lister asked again: the second run is the first warm one, not the third.
+func TestTheStoresOwnDirectoryLeavesTheHostsListingKept(test *testing.T) {
+	test.Parallel()
+	root := fingerprintsModule(test)
+	storeDirectory := filepath.Join(root, ".cache")
+	if _, statError := os.Stat(storeDirectory); !errors.Is(statError, fs.ErrNotExist) {
+		test.Fatalf("want a fresh tree without %s, got %v", storeDirectory, statError)
+	}
+	_, cold := hostLoad(test, root, "the first run")
+	if cold.ListingKept {
+		test.Fatalf("the first run on a fresh tree read a kept listing, want it listed")
+	}
+	if information, statError := os.Stat(storeDirectory); statError != nil || !information.IsDir() {
+		test.Fatalf("want the first run's store to have made %s, got %v", storeDirectory, statError)
+	}
+	_, warm := hostLoad(test, root, "the second run")
+	if !warm.ListingKept || warm.ListedInProcess || warm.GoListReason != "" {
+		test.Errorf("the second run's listing kept %t, listed in process %t, go list's reason %q, want it kept "+
+			"and listed by neither", warm.ListingKept, warm.ListedInProcess, warm.GoListReason)
+	}
+}
+
+// fingerprintsModule is a fresh module in a directory of its own, with three directories the walk reads: the module's
+// own, which holds no package, and its two packages'.
+func fingerprintsModule(test *testing.T) string {
+	test.Helper()
 	root := test.TempDir()
-	// Three directories the walk reads: the module's own, which holds no package, and its two packages'.
 	for name, contents := range map[string]string{
 		"go.mod":         "module example.com/fingerprints\n\ngo 1.21\n",
 		"first/first.go": "package first\n\n// First is one.\nconst First = 1\n",
@@ -88,43 +129,40 @@ func TestTheHostsWarmLoadFillsTheFingerprintsTheBuildsRead(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	// hostLoad is one run's host load, through a findings cache whose store is the project's, under root, and the
-	// pipeline it ran in.
-	hostLoad := func(run string) *pipeline {
-		request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root})
-		if parseError != nil {
-			test.Fatal(parseError)
-		}
-		registered := rules.All()
-		ruleSettings, settingsError := loadSettings(request, registered)
-		if settingsError != nil {
-			test.Fatal(settingsError)
-		}
-		described, describeError := describeProject(request)
-		if describeError != nil {
-			test.Fatal(describeError)
-		}
-		// What the description started beside its reads ends before the test and its directory do.
-		test.Cleanup(described.awaitStarted)
-		engine := newPipeline(request, described, ruleSettings, registered, io.Discard, io.Discard, nil)
-		isolatePipeline(test, engine)
-		// The load alone is asked, so no lint starts beside it.
-		engine.overlaps = false
-		engine.session = engine.cacheSession(engine.described.workspace.Environment(),
-			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError, engine.systemCache)
-		if engine.session == nil || !engine.session.HasStore() {
-			test.Fatalf("%s has no findings cache with a store, so its load keeps no listing", run)
-		}
-		if _, loadError := engine.loadWorkspacePackages(); loadError != nil {
-			test.Fatalf("%s: %v", run, loadError)
-		}
-		return engine
+	return root
+}
+
+// hostLoad is one run's host load of root, through a findings cache whose store is the project's, under root, and the
+// pipeline it ran in.
+func hostLoad(test *testing.T, root string, run string) (*pipeline, *load.Loaded) {
+	test.Helper()
+	request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root})
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
-	hostLoad("the first run")
-	warm := hostLoad("the second run")
-	directories, computed := warm.fingerprints.DirectoriesFingerprinted()
-	if directories != 3 || computed != int64(directories) {
-		test.Errorf("the warm host load fingerprinted %d directories %d times, want the module's 3, once each",
-			directories, computed)
+	registered := rules.All()
+	ruleSettings, settingsError := loadSettings(request, registered)
+	if settingsError != nil {
+		test.Fatal(settingsError)
 	}
+	described, describeError := describeProject(request)
+	if describeError != nil {
+		test.Fatal(describeError)
+	}
+	// What the description started beside its reads ends before the test and its directory do.
+	test.Cleanup(described.awaitStarted)
+	engine := newPipeline(request, described, ruleSettings, registered, io.Discard, io.Discard, nil)
+	isolatePipeline(test, engine)
+	// The load alone is asked, so no lint starts beside it.
+	engine.overlaps = false
+	engine.session = engine.cacheSession(engine.described.workspace.Environment(),
+		engine.described.goEnvironment, cache.FileDigests{}, engine.standardError, engine.systemCache)
+	if engine.session == nil || !engine.session.HasStore() {
+		test.Fatalf("%s has no findings cache with a store, so its load keeps no listing", run)
+	}
+	loaded, loadError := engine.loadWorkspacePackages()
+	if loadError != nil {
+		test.Fatalf("%s: %v", run, loadError)
+	}
+	return engine, loaded
 }
