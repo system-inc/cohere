@@ -422,6 +422,10 @@
                 "YER",
                 "ZAR"
             ]
+        },
+        {
+            "reason": "Added through `ahra shouting`, which adds a token to this file and to Nexus's list at once: `GFCI`, a ground-fault circuit interrupter outlet; `ZAP`, a Zigbee access point; `RMA`, a returned-merchandise authorization. Each was refused as shouting in hardware prose, Nov 17.",
+            "tokens": ["GFCI", "RMA", "ZAP"]
         }
     ],
     "shoutedTwoLetterWords": {
