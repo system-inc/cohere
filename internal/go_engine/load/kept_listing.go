@@ -395,8 +395,7 @@ func packageDirectories(root string) ([]string, bool) {
 			return nil
 		}
 		if path != root {
-			name := entry.Name()
-			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" {
+			if walkSkips(entry.Name()) {
 				return filepath.SkipDir
 			}
 			if _, moduleError := os.Stat(filepath.Join(path, "go.mod")); moduleError == nil {
@@ -409,10 +408,23 @@ func packageDirectories(root string) ([]string, bool) {
 	return directories, whole && walkError == nil
 }
 
+// walkSkips reports whether go's walk for a pattern's packages leaves out a directory named name, and everything below
+// it: a name that starts with a dot or an underscore, and testdata. It is go's own rule, read in go1.27.0's
+// cmd/go/internal/modload/search.go:105 (walkPkgs) and :234 (walkFromIndex), and cmd/go/internal/search/search.go:151.
+func walkSkips(name string) bool {
+	return strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata"
+}
+
 // directoryFingerprint is the sha256 of one directory's entries, each by name and kind, and of each Go file's header.
 // A directory with a `//go:embed` line has every entry below it hashed too, since the files a pattern embeds are
 // listed, and a pattern can reach into a subdirectory and into testdata. It reports whether it read all of it. A Go
 // file held holds is read from its held bytes.
+//
+// A subdirectory go's walk leaves out (walkSkips) is left out of the entries: no pattern's walk reaches it, and a
+// package's own listing never reads a subdirectory, since go/build's Import passes over every entry that is a
+// directory (go1.27.0's go/build/build.go:887). So the findings store's `.cache`, which the store's first write makes
+// in the root after the first run's fingerprint was read, moves no kept listing (#78whs52). The embed walk below still
+// hashes it, since `//go:embed` can name a dot directory and `all:` reaches one.
 func directoryFingerprint(directory string, held Held) ([sha256.Size]byte, bool) {
 	digest := sha256.New()
 	entries, readError := os.ReadDir(directory)
@@ -422,6 +434,9 @@ func directoryFingerprint(directory string, held Held) ([sha256.Size]byte, bool)
 	whole := true
 	embeds := false
 	for _, entry := range entries {
+		if entry.IsDir() && walkSkips(entry.Name()) {
+			continue
+		}
 		writeParts(digest, []string{entry.Name(), entry.Type().String()})
 		if !entry.Type().IsRegular() || filepath.Ext(entry.Name()) != ".go" {
 			continue
