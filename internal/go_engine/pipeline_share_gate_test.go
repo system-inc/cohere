@@ -372,17 +372,20 @@ func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.
 	}
 }
 
-// A warm run with a store whose every package hit takes the share gate and the width the host's live heap gives
-// there, more than one build at once under the cap (#s1hdd3z): its host hit every package in its store and keeps none
-// for its builds, as since #syscache it keeps no standard-library package either, and that alone held every warm run
-// at one at a time before the gate read anything. Over lowShareBuilds and one store, the first run fills it, and the
-// second, every package hit and nothing kept, steps at the gate and runs its three builds as the host's live heap says.
+// A warm run with a store whose every package hit takes the share gate and decides its width there from the host's
+// live heap (#s1hdd3z): its host hit every package in its store and keeps none for its builds, as since #syscache it
+// keeps no standard-library package either, and that alone held every warm run at one at a time before the gate read
+// anything. What width that heap gives is the box's memory's to say, one on a box whose test heap is large, so the
+// gate's decision is forced to three (buildsWidthAtGateForced), which takes its place only once the gate has decided
+// from the host's live heap, and the record still says it did. Over lowShareBuilds and one store, the first run fills
+// it, and the second, every package hit and nothing kept, steps at the gate and runs its three builds at once.
 func TestAnAllHitWarmRunTakesTheShareGatesWidth(test *testing.T) {
 	test.Parallel()
 	root := lowShareBuilds(test)
 	underCapRun(test, root, exitFindings, nil)
 	var stepped atomic.Int64
 	engine, raw, _ := underCapRun(test, root, exitFindings, func(engine *pipeline) {
+		engine.buildsWidthAtGateForced = 3
 		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	})
 	lint := lintRecordOf(test, raw)
@@ -392,29 +395,30 @@ func TestAnAllHitWarmRunTakesTheShareGatesWidth(test *testing.T) {
 			"want every package hit, none kept, and three builds: the premise", lint.Cache.Hit, lint.Cache.Missed,
 			engine.buildRuns[0].result.Host.EntriesKept(), len(engine.buildRuns)-1)
 	}
-	if stepped.Load() == 0 || !lint.BuildsWidthFromHostLive || lint.BuildsAtOnce <= 1 {
-		test.Fatalf("the warm run stepped %d times at the share gate and ran %d builds at once, from the host's live "+
-			"heap %t, want steps and more than one at once from the host's live heap", stepped.Load(),
-			lint.BuildsAtOnce, lint.BuildsWidthFromHostLive)
-	}
-	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes, true)
-	if lint.BuildsAtOnce != want {
-		test.Errorf("the warm run ran %d builds at once, want %d, the width the host's live heap gives",
-			lint.BuildsAtOnce, want)
+	if stepped.Load() == 0 || !lint.BuildsWidthFromHostLive || lint.BuildsAtOnce != 3 {
+		test.Errorf("the warm run stepped %d times at the share gate and ran %d builds at once, from the host's live "+
+			"heap %t, want steps and the gate's forced 3 from the host's live heap", stepped.Load(), lint.BuildsAtOnce,
+			lint.BuildsWidthFromHostLive)
 	}
 }
 
 // A warm run judging each build's dependence takes the measured rule, as on 6a06be201 (#f9br7sg, #s1hdd3z): it takes
 // no share gate, and its host hit every package in its store and keeps none, which lets its builds past the guard for
-// builds that restore nothing, so the first build's holding is measured and decides the width. Over lowShareBuilds and
-// one store under `--build-dependence`, the first run fills it, and the second, every package hit, steps nothing at the
-// gate and runs its three builds at the width the first build's measured holding gives, more than one.
+// builds that restore nothing, so the first build's holding is measured and decides the width. What width that
+// holding gives is the box's memory's to say, so the run is under a limit no fixture's builds could fill, and every
+// build fits whatever its holding. Over lowShareBuilds and one store under `--build-dependence`, the first run fills
+// it, and the second, every package hit, steps nothing at the gate, measures a holding, and runs its three builds at
+// once.
 func TestAWarmDependenceRunTakesTheMeasuredRule(test *testing.T) {
 	test.Parallel()
 	root := lowShareBuilds(test)
 	underCapRun(test, root, exitFindings, nil, "--build-dependence")
 	var stepped atomic.Int64
 	engine, raw, _ := underCapRun(test, root, exitFindings, func(engine *pipeline) {
+		// A pebibyte under the cap: three builds held at the store's peak factor fill it only past 100 TB each. The
+		// limit is the record's alone, since a test's memory sets no limit on the runtime (newLoadMemory).
+		engine.memory = &engineMemory{record: contract.Memory{LimitBytes: 1 << 50, CapBytes: 1 << 50,
+			Source: contract.MemorySourceCap}}
 		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	}, "--build-dependence")
 	lint := lintRecordOf(test, raw)
@@ -425,15 +429,10 @@ func TestAWarmDependenceRunTakesTheMeasuredRule(test *testing.T) {
 			engine.censusKeepsHostRestoreOff, lint.Cache.Hit, lint.Cache.Missed, len(engine.buildRuns)-1)
 	}
 	if stepped.Load() != 0 || lint.BuildsWidthFromHostLive || lint.BuildsWidthBuildBytes == 0 ||
-		lint.BuildsAtOnce <= 1 {
-		test.Fatalf("the warm dependence run stepped %d times at the share gate and ran %d builds at once, from the "+
-			"host's live heap %t, with a holding of %d bytes, want no step and more than one at once from a measured "+
-			"holding", stepped.Load(), lint.BuildsAtOnce, lint.BuildsWidthFromHostLive, lint.BuildsWidthBuildBytes)
-	}
-	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes, true)
-	if lint.BuildsAtOnce != want {
-		test.Errorf("the warm dependence run ran %d builds at once, want %d, the width the measured holding gives",
-			lint.BuildsAtOnce, want)
+		lint.BuildsAtOnce != 3 {
+		test.Errorf("the warm dependence run stepped %d times at the share gate and ran %d builds at once, from the "+
+			"host's live heap %t, with a holding of %d bytes, want no step and all 3 at once from a measured holding",
+			stepped.Load(), lint.BuildsAtOnce, lint.BuildsWidthFromHostLive, lint.BuildsWidthBuildBytes)
 	}
 }
 
