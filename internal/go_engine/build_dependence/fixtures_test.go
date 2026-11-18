@@ -561,9 +561,10 @@ func TestAnArrayLengthInASpelledTypeIsReadInFull(test *testing.T) {
 // A var with no declared type takes its type from whatever its initializer passes through, a named type's underlying
 // included, so its bit reads every type there in full. In the inferred fixture Length is 4 on the host and 8 on
 // windows, and Rows, two arrays of Length ints, is a literal, so its name bit stays unset: on windows Row, `rows[0]`,
-// is an [8]int where the host's is a [4]int, and so are RowThrough, the same element through a pointer to rows, and
-// RowInferred, a generic's result inferred from Rows' underlying, so each is dependent. PairRow, an element of a Pair
-// whose length no build changes, is not.
+// is an [8]int where the host's is a [4]int, and so are RowThrough, the same element through a pointer to rows,
+// RowDeclared, the same through a pointer whose type is declared, so its own bit stays unset and only a walk that
+// enters the pointer reaches Rows' underlying, and RowInferred, a generic's result inferred from Rows' underlying, so
+// each is dependent. PairRow, an element of a Pair whose length no build changes, is not.
 func TestAnInferredVariableReadsTheTypesItsInitializerPasses(test *testing.T) {
 	test.Parallel()
 
@@ -575,6 +576,7 @@ func TestAnInferredVariableReadsTheTypesItsInitializerPasses(test *testing.T) {
 		{"Rows", false},
 		{"Row", true},
 		{"RowThrough", true},
+		{"RowDeclared", true},
 		{"RowInferred", true},
 		{"PairRow", false},
 	} {

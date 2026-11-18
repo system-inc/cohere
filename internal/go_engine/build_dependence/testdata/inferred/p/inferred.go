@@ -17,6 +17,13 @@ var rowsPointer = &rows
 // RowThrough is Row reached through a pointer.
 var RowThrough = rowsPointer[0]
 
+// declaredPointer declares its type, a pointer to Rows, so its own bit reads Rows by name alone and stays unset.
+var declaredPointer *Rows
+
+// RowDeclared takes its type from Rows' element through declaredPointer, whose bit says nothing of Rows' underlying,
+// so only a walk that enters the pointer reaches it: dependent.
+var RowDeclared = declaredPointer[0]
+
 // Front is the first of two values of any type.
 func Front[Value any](values [2]Value) Value { return values[0] }
 
