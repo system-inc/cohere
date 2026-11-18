@@ -589,32 +589,53 @@ func TestAnInferredVariableReadsTheTypesItsInitializerPasses(test *testing.T) {
 	}
 }
 
-// On linux, Target gains Describe in a file only the build compiles, declared on local, `type local = Target`, which
-// that file declares beside the method and the host's package never does, so it is Target's method set that moves:
-// the receiver is found through the alias's right-hand side, Target's name bit is set, in the live graph and in one
-// read back from its records alike, and so every use of Target counts, its conversion to an interface among them.
-// Other, a type of the same package the alias does not name, stays as the host has it.
-func TestABuildOnlyMethodOnABuildOnlyAliasMovesItsTargetsMethodSet(test *testing.T) {
+// On linux, Target gains Describe in a file only the build compiles, declared on an alias of it, so it is Target's
+// method set that moves: Target's name bit is set, in the live graph and in one read back from its records alike, and
+// so every use of Target counts, its conversion to an interface among them. In the aliases fixture the alias is the
+// host's, `type Alias = Target` in a shared file, so Target's name bit is seeded through Alias's, which depends on it,
+// and Alias, whose bits are Target's, counts too. In the localaliases fixture it is declared in linux's file beside the
+// method, `type local = Target`, which the host's package never declares, so the receiver is found through the alias's
+// right-hand side. Other, a type of the same package the alias does not name, stays as the host has it in both.
+func TestABuildOnlyMethodOnAnAliasMovesItsTargetsMethodSet(test *testing.T) {
 	test.Parallel()
 
-	judged := judge(test, "localaliases", linuxBuild)
-	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
-		"type Target": true,
-		"func Boxed":  true,
-		"type Other":  false,
-		"func Others": false,
-	})
-	host := judged.host["example.com/localaliases"]
-	if host == nil {
-		test.Fatal("the localaliases fixture's host holds no example.com/localaliases")
-	}
-	if bits := judged.dependence.ObjectBits(host.Types.Scope().Lookup("Target")); !bits.Name {
-		test.Errorf("want Target's name bit set on linux, got %+v", bits)
-	}
-	recorded := recordedGraphOf(test, graphOf(judged.host, nil)).Against(judged.difference)
-	if bits, isDeclared := recorded.NameBits("example.com/localaliases", "Target"); !isDeclared || !bits.Name {
-		test.Errorf("want Target's name bit set on linux in the graph read back from its records, got %+v, "+
-			"declared %t", bits, isDeclared)
+	for _, step := range []struct {
+		fixture string
+		want    map[string]bool
+	}{
+		{fixture: "aliases", want: map[string]bool{
+			"type Target": true,
+			"type Alias":  true,
+			"func Boxed":  true,
+			"type Other":  false,
+			"func Others": false,
+		}},
+		{fixture: "localaliases", want: map[string]bool{
+			"type Target": true,
+			"func Boxed":  true,
+			"type Other":  false,
+			"func Others": false,
+		}},
+	} {
+		test.Run(step.fixture, func(test *testing.T) {
+			test.Parallel()
+
+			judged := judge(test, step.fixture, linuxBuild)
+			expectVerdicts(test, verdicts(test, judged.host, judged.dependence), step.want)
+			path := "example.com/" + step.fixture
+			host := judged.host[path]
+			if host == nil {
+				test.Fatalf("the %s fixture's host holds no %s", step.fixture, path)
+			}
+			if bits := judged.dependence.ObjectBits(host.Types.Scope().Lookup("Target")); !bits.Name {
+				test.Errorf("want Target's name bit set on linux, got %+v", bits)
+			}
+			recorded := recordedGraphOf(test, graphOf(judged.host, nil)).Against(judged.difference)
+			if bits, isDeclared := recorded.NameBits(path, "Target"); !isDeclared || !bits.Name {
+				test.Errorf("want Target's name bit set on linux in the graph read back from its records, got %+v, "+
+					"declared %t", bits, isDeclared)
+			}
+		})
 	}
 }
 
