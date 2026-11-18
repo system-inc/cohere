@@ -504,6 +504,61 @@ func TestAPartHoldingAnUnknownUseIsUnknown(test *testing.T) {
 	checkWrittenUses(test, written, want)
 }
 
+// The selection fixture's packages: other, whose T first's Holder embeds in a struct of no name, and first, whose
+// Promoted selects T's field through Holder and whose method Again selects itself.
+var selectionSources = []fixtureFile{
+	{"other", "other.go", `package other
+
+type T struct{ A int }
+`},
+	{"first", "first.go", `package first
+
+import "other"
+
+var Holder struct{ other.T }
+
+func Promoted() int { return Holder.A }
+
+type Own struct{}
+
+func (own Own) Again() { own.Again() }
+`},
+}
+
+// A selection that starts from no named type is recorded with no receiver, each embedded field on its way too, and a
+// selection of the declaration's own method from a type of its package is recorded: only one whose selected object
+// and receiver are both the declaration's own is left out.
+func TestASelectionIsLeftOutOnlyWhenItAndItsReceiverAreOwn(test *testing.T) {
+	test.Parallel()
+
+	written, _ := functionUsesOf(test, selectionSources)
+	want := map[string][]string{
+		"Function (first.Own).Again (first.go) body": {
+			"first.Own (first.go) .Again@0, (first.Own).Again (first.go) Selected",
+			"first.Own (first.go) ValueType",
+		},
+		"Function (first.Own).Again (first.go) signature": {
+			"first.Own (first.go) Named|ValueType",
+		},
+		"Function first.Promoted (first.go) body": {
+			"first.Holder (first.go) Named",
+			"none .A@0,0, other.T.UF0 (other.go) Selected",
+			"none .T@0, first.Holder.F0 (first.go) Selected",
+			"other.T (other.go) ValueType",
+			"other.T.UF0 (other.go) Named",
+		},
+		"Function first.Promoted (first.go) signature": {
+			"universe.int Named",
+		},
+		"Type first.Own (first.go) signature": nil,
+		"Value first.Holder (first.go) signature": {
+			"import other (first.go) Named",
+			"other.T (other.go) Named|ValueType",
+		},
+	}
+	checkWrittenUses(test, written, want)
+}
+
 // Without the syntax or a map a use is read from, a use could go unseen, so the function uses are unrecorded, which
 // is unknown, never empty, while the type reads beside them are recorded.
 func TestFunctionUsesWithoutTypeInformationAreUnrecorded(test *testing.T) {
