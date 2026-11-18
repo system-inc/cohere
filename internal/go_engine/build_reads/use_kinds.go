@@ -25,6 +25,9 @@ const (
 
 	// UsedConstant is a constant read by its value.
 	UsedConstant
+
+	// usedKindsEnd is one past the highest kind, kept last, so a PartUse can assert its kind bits hold every kind.
+	usedKindsEnd
 )
 
 // useKindNames are the kinds' names, by bit, in the order String writes them.

@@ -13,6 +13,10 @@ const (
 	partUseEntryLimit = 1 << (32 - partUseEntryShift)
 )
 
+// Every kind fits in partUseKindBits, below partUseSelected: a kind added past them makes this index one past the
+// array's one element, which fails to compile.
+var _ = [1]struct{}{}[(usedKindsEnd-1)&^partUseKindBits]
+
 // Kinds are every kind of use the part made of the use's entry.
 func (use PartUse) Kinds() UseKinds {
 	return UseKinds(use & partUseKindBits)
