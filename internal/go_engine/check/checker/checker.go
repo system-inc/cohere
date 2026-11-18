@@ -414,8 +414,9 @@ type Options struct {
 	// cohere: Pool, when set, is the run's one set of slots, which every
 	// load and check of the run shares (#ckm0hsp): a worker holds one of
 	// them while it runs an action, taken at the action's group's priority
-	// on the pool's scale, so builds side by side never run more actions
-	// at once than the run has cores. Unset, the workers alone bound them.
+	// on the pool's scale and kept across its consecutive actions (see
+	// work), so builds side by side never run more actions at once than
+	// the run has cores. Unset, the workers alone bound them.
 	Pool *bounded.Pool
 
 	// cohere: Recorded, when Reads is set too, keys in every pass's
