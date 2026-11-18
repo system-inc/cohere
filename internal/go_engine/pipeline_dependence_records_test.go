@@ -350,9 +350,9 @@ func storedRecordKeys(test *testing.T, root string) (map[cache.Key]bool, map[cac
 //
 // Not parallel: cache.ObserveReads is the process's, and one observer at a time can be set.
 func TestAPlainRunReadsNoRecord(test *testing.T) {
-	table, _ := standardLibraryTableOf(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
-	reading := readingTableAs(table, engineTestsStamp, "")
+	reading := readingSystemCache(filled, "")
 	runOverNoted(test, root, exitClean, reading, "--other-builds")
 	if host, standardLibrary := storedRecordKeys(test, root); len(host) != 0 || len(standardLibrary) != 0 {
 		test.Errorf("a plain cold run wrote %d records of the host's and %d of the standard library's, want none",

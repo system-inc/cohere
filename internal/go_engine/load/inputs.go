@@ -57,12 +57,14 @@ type reportedEnvironment struct {
 // read about is still named, so the front door, which cannot read it either, counts it as moved.
 //
 // A file in the build cache is never named: go writes it during the run (a translated cgo file), so its time is
-// always past the front door's clock, and its bytes follow from the source files and settings named already.
+// always past the front door's clock, and its bytes follow from the source files and settings named already. Each
+// root's directories are walks' walk of it when walks is set, the run's, read once (ModuleRootWalks).
 func collectInputs(
 	workspace string,
 	reported reportedEnvironment,
 	roots []*packages.Package,
 	census []string,
+	walks *ModuleRootWalks,
 ) Inputs {
 	set := &inputSet{files: map[string]bool{}, directories: map[string]bool{}, absent: map[string]bool{}}
 	moduleRoots := map[string]bool{}
@@ -115,11 +117,11 @@ func collectInputs(
 		set.files[filepath.Join(root, "go.mod")] = true
 		set.addFileOrAbsent(filepath.Join(root, "go.sum"))
 		set.addFileOrAbsent(filepath.Join(root, "vendor", "modules.txt"))
-		set.addReachableDirectories(root)
+		set.addReachableDirectories(root, walks)
 	}
 	walked := slices.Concat(slices.Sorted(maps.Keys(moduleRoots)), slices.Sorted(maps.Keys(localReplacements)))
 	for _, root := range slices.Sorted(maps.Keys(localReplacements)) {
-		set.addReachableDirectories(root)
+		set.addReachableDirectories(root, walks)
 	}
 	for directory := range packageDirectories {
 		set.directories[directory] = true

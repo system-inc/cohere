@@ -71,9 +71,12 @@ type pipeline struct {
 	censusMissed []contract.CensusMissedFile
 
 	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, under
-	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads,
+	// `--no-cache` unless the run keeps a system cache, whose standard-library tables a session without a store reads,
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
+
+	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache).
+	systemCache *systemCache
 
 	// keepsHostRestoreOff, set only by a test, has every extra build check every package itself rather than restore any
 	// from the host's run, so a test can compare the two (#b2t9xmf), and the builds run one at a time, as builds that
@@ -193,6 +196,11 @@ type pipeline struct {
 	// need know which writes a walk reads past.
 	walks *load.PackageWalks
 
+	// moduleRootWalks are the walks of the module roots every load's inputs name, the host's and each extra build's,
+	// each root walked once for the run (#ybjbqm2): a walk reads directory entries alone, which no write of the run
+	// changes, so the host's load may share them as the builds' do.
+	moduleRootWalks *load.ModuleRootWalks
+
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
 	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
 	renamed bool
@@ -272,9 +280,11 @@ func newPipeline(
 		// The facts census reads each build's own facts, which a restore from the host's run would replace.
 		censusKeepsHostRestoreOff: request.judgesDependence(),
 		timing:                    newTiming(request),
+		systemCache:               openSystemCache(request),
 		reads:                     load.NewSharedReads(),
 		fingerprints:              load.NewFingerprints(),
 		walks:                     load.NewPackageWalks(),
+		moduleRootWalks:           load.NewModuleRootWalks(),
 	}
 }
 
@@ -348,7 +358,7 @@ func (engine *pipeline) run() int {
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
 		engine.session = engine.cacheSession(engine.described.workspace.Environment(),
-			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError)
+			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError, engine.systemCache)
 		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
 		if engine.session != nil && engine.keepsForBuilds() {
 			engine.session.KeepForBuilds()

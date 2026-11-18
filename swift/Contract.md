@@ -924,7 +924,7 @@ are, so a front door that does not read it yet loses only what it counts:
 `"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1,"factsSkipped":0,"waves":1}`.
 It is what the engine's per-package findings cache did, by package. Every package the load reached,
 each analyzed package and test variant and each dependency, was either `hit` or `missed`, or
-restored from the binary (see `standardLibraryFromBinary` below). A hit is
+restored from the system cache (see `standardLibraryFromSystemCache` below). A hit is
 restored from its entry, and no analyzer runs on it. A package's key holds its dependencies' keys, so
 an edit misses every package above the one edited, though most come out of an analysis as before.
 So the packages whose own inputs moved are analyzed first, and each package above them is then
@@ -950,19 +950,26 @@ under `--no-cache` write the same stream but for this field and the elapsed time
 the engine reads and writes no entry, and every count is 0 with `"on":false`. A project with cgo of
 its own is cached the same way, its packages with cgo files keyed on the cgo tool's outputs.
 
-A release binary also carries the Go standard library's entries, computed when the release was
-built and keyed on everything they read: the release, the Go version, the target, cgo, the go flags,
-the analyzers that learn facts with their options, and each file's bytes by its path below `GOROOT`.
-A standard-library package whose key matches is restored from the binary, in a cached run and under
-`--no-cache` alike, since those entries are part of cohere and nothing of the project's tree; any
-mismatch computes it. `"standardLibraryFromBinary":258` counts those packages, which are neither
-`hit` nor `missed`, and is written only when it is not 0, so a build that carries none, as every
-build but a release does, writes the field as it always has. Under `--no-cache` it, and
-`factsSkipped` of what it restored, are the only counts that can be other than 0, with `reloads`.
+The Go engine also keeps a system cache: the Go standard library's entries, one table for each build
+context, in the user's cache directory (`$COHERE_SYSTEM_CACHE` when set, an absolute directory, and
+otherwise `cohere` in the directory Go's `os.UserCacheDir` names), shared by every project the same
+engine checks. Each table is keyed on everything its entries read: the engine's own identity, the Go
+version, the target, cgo, the go flags, and the analyzers that learn facts with their options, and
+each entry in it on its files' bytes by their paths below `GOROOT`. A standard-library package whose
+key matches is restored from it, in a cached run and under `--no-cache` alike, since those entries are
+of cohere and the Go installation and nothing of the project's tree; any mismatch computes it.
+`"standardLibraryFromSystemCache":258` counts those packages, every build's summed, which are neither
+`hit` nor `missed`, and is written only when it is not 0. Under `--no-cache` it, and `factsSkipped`
+of what it restored, are the only counts that can be other than 0, with `reloads`. Under
+`--no-system-cache` the engine neither reads nor writes the system cache. A system cache the run
+cannot keep, a directory it cannot find or write, is never an error: the run computes what it would
+have held, and `"systemCacheNotKept"` says why in one line, written only when there is a reason.
+`"systemCacheWritten"` counts the entries the run's builds added to their tables, summed, and `"systemCacheOff":true`
+says the run was under `--no-system-cache`, each written only when not 0 or false.
 
 A few facts are computed only when a rule asks of a function (#w7zmvat), from the function's
 package's syntax, which a restored package does not have. Every entry a run writes holds every
-answer of its package, computed whole under its key, as the binary's entries do, so a question of
+answer of its package, computed whole under its key, as the system cache's entries do, so a question of
 a restored package reads its answer from the entry and reloads nothing. An entry can still hold
 only some, as one a run writes when computing them all would need a package it restored and
 nothing answers. A question of a restored package that nothing holds an answer to is never
@@ -995,7 +1002,7 @@ packages are checked from source so their records are written again, one restore
 counts the hits made misses in a load that backfilled any: a backfilled package asks the facts of everything below
 it. `"aliasRead"`, written only when not 0, counts the packages restored by a second key's alias whose record is the
 one beside the entry the alias leads to, read in place of their syntax as `"read"`'s are (#6a3kjvz piece 4). A record that could not be written counts in `"writeFailed"`. The standard library the host restores from the
-binary's table has no entry in the store: when the switch loads it from source for its graph, its packages' records
+system cache's table has no entry in the store: when the switch loads it from source for its graph, its packages' records
 are written into the store under keys derived from each package's own standard-library key, the engine and the
 toolchain, and read back by a later run in place of that load (#6a3kjvz). `"standardLibraryRead"`,
 `"standardLibraryWritten"` and `"standardLibraryUnreadable"` count those, each written only when not 0, and a
@@ -1061,7 +1068,9 @@ reason it had: `hostDecline` (a package its check declined, at most 2 such round
 reached a restored package with no answer of it kept). `"writtenThrough":301` counts the packages it restored whose
 entry it then wrote to its own findings cache, once their restore held, so its next run hits them there rather than
 check them from source, since the host, hitting its own store then, keeps nothing to restore them from; under
-`--no-cache` nothing is written, and it is absent. `"sharedBodyHits":1561` counts the packages a build hit in its own
+`--no-cache` nothing is written, and it is absent. `"systemCacheRestored":290` counts the standard-library packages
+the build restored from the system cache's table of its own build context, and `"systemCacheWritten":12` the entries
+it added to that table, each absent when 0. `"sharedBodyHits":1561` counts the packages a build hit in its own
 findings cache whose body it took from the run's memo of decoded bodies, the bodies the host's run read from its
 store and those an earlier build read, rather than read and decode it again; a cold run, whose host read nothing
 from its store, and a run under `--no-cache` write none, and it is absent. `"inheritedFiles":40` counts the distinct files an extra build took
@@ -1169,7 +1178,7 @@ when not 0. The host's record never writes it, and neither does a run without th
 
 Its `"facts"` is the build's facts census (#0ghk7vj), written once its lint has run. Under the switch every extra build
 restores nothing from the host's run, so its facts are its own, and such a run is slower than a plain one. The standard
-library the host restored from the binary's table is compared through the table: its facts by their objects'
+library the host restored from the system cache's table is compared through the table: its facts by their objects'
 counterparts in the standard library's graph, its answers by the unit of that graph declaring each function, an answer
 the build asked compared with the table's for the function the build's answer is about, never by the build's own
 objectpath, which names a method by its place in a method set another build's files can change, and its units counted

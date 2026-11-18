@@ -156,6 +156,12 @@ type BuildRecord struct {
 	// Written only when not 0, so a run under `--no-cache` writes none.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
 
+	// SystemCacheRestored counts the standard-library packages the build restored from the system cache's table of its
+	// own build context (#syscache), and SystemCacheWritten the entries it added to that table this run. Additive
+	// within contract 3, and the Go engine's alone. Each is written only when not 0, so a build under
+	// `--no-system-cache`, or one whose table held everything it reached, writes none.
+	SystemCacheRestored int `json:"systemCacheRestored,omitempty"`
+	SystemCacheWritten  int `json:"systemCacheWritten,omitempty"`
 	// SharedBodyHits, additive within contract 3, counts the packages a build hit in its own findings cache whose body
 	// it took from the run's memo of decoded bodies (#qqyq61s), the bodies the host's session read from its store and
 	// those an earlier build read, rather than read the host's record its own names and decode the body again. Written
@@ -262,17 +268,17 @@ type BuildDependence struct {
 }
 
 // RestoredDependence is one build's judgment of what the host restored from export data rather than checked from
-// source, which its graph does not hold: the binary's standard-library table's packages, and a warm store's. Packages
-// counts them. The standard library's are judged on a graph of their own, loaded from source beside the host's lint:
-// StandardLibraryPackages counts the packages that load reached, LoadMilliseconds is its list, parse and type check
-// and GraphMilliseconds its graph, both once a run, and StandardLibraryUnits and StandardLibraryDependentUnits are this
-// build's judgment of it, which the dependencies' counts include. Each object of a restored package a unit of the host
-// reads is answered by its counterpart in that graph: Answered counts those, WithoutCounterpart those whose path names
-// nothing alike there, and WithoutPackage those of a package the graph does not hold, a store's or every one when the
-// side load failed, the last two answered dependent, failing wide. StandardLibraryFromRecords, additive (#6a3kjvz),
-// counts the standard library's packages the graph took from the records the findings store keeps of them, which the
-// side load skipped, and StandardLibrarySideLoaded those the side load loaded, whose records it then writes; each is
-// written only when not 0.
+// source, which its graph does not hold: the system cache's standard-library table's packages, and a warm store's.
+// Packages counts them. The standard library's are judged on a graph of their own, loaded from source beside the host's
+// lint: StandardLibraryPackages counts the packages that load reached, LoadMilliseconds is its list, parse and type
+// check and GraphMilliseconds its graph, both once a run, and StandardLibraryUnits and StandardLibraryDependentUnits
+// are this build's judgment of it, which the dependencies' counts include. Each object of a restored package a unit of
+// the host reads is answered by its counterpart in that graph: Answered counts those, WithoutCounterpart those whose
+// path names nothing alike there, and WithoutPackage those of a package the graph does not hold, a store's or every one
+// when the side load failed, the last two answered dependent, failing wide. StandardLibraryFromRecords, additive
+// (#6a3kjvz), counts the standard library's packages the graph took from the records the findings store keeps of them,
+// which the side load skipped, and StandardLibrarySideLoaded those the side load loaded, whose records it then writes;
+// each is written only when not 0.
 type RestoredDependence struct {
 	Packages                      int `json:"packages"`
 	StandardLibraryPackages       int `json:"standardLibraryPackages"`
@@ -291,12 +297,12 @@ type RestoredDependence struct {
 // DependenceFacts is one build's facts beside the host's: Kinds counts them by analyzer and fact type, and Workspace
 // and Dependencies count, by the scope of the unit, the units a differing fact reaches. Milliseconds is the
 // comparison's wall time. Every build restores nothing from the host's run under the census, so its facts are its own.
-// The standard library the host restored from the binary's table is compared through the table's facts and answers
-// (#ss4t5g6), but for a fact about an object no objectpath names, which no table holds. Unkeyed, additive (#h660y7d),
-// counts the facts the census left out of the comparison, on either side, of a package the host restored whose
-// standard-library graph is records, the store's, and the answers it could not place in any package that graph holds,
-// and UnkeyedParts says why, part by part, their sum being Unkeyed. Both are always written, beside the callers the
-// census counts, since those leave the facts out.
+// The standard library the host restored from the system cache's table is compared through the table's facts and
+// answers (#ss4t5g6), but for a fact about an object no objectpath names, which no table holds. Unkeyed, additive
+// (#h660y7d), counts the facts the census left out of the comparison, on either side, of a package the host restored
+// whose standard-library graph is records, the store's, and the answers it could not place in any package that graph
+// holds, and UnkeyedParts says why, part by part, their sum being Unkeyed. Both are always written, beside the callers
+// the census counts, since those leave the facts out.
 type DependenceFacts struct {
 	Kinds        []FactKindCounts `json:"kinds"`
 	Workspace    FactCallers      `json:"workspace"`
@@ -385,16 +391,21 @@ type DependenceCounts struct {
 // written entries left out because nothing outside their package can name their object, and FactsSkipped the
 // restored facts whose object the package's export data does not hold. Waves counts the times the lint phase analyzed
 // packages: at most two, those whose own inputs moved and then the rest that missed, once the hits the early cutoff
-// found among the packages above the first were restored. FromBinary counts the standard-library packages restored
-// from the entries the binary carries, which nothing analyzed, apart from hit; it is written only when it is not 0,
-// so a build with none writes the record it always has. Reloads counts the packages the run loaded again from source,
+// found among the packages above the first were restored. FromSystemCache counts the standard-library packages
+// restored from the system cache's tables (#syscache), the host's build's and every other build's summed, which
+// nothing analyzed, apart from hit; it is written only when it is not 0. SystemCacheWritten counts the entries the
+// run's builds added to their tables, summed, written only when not 0, and SystemCacheOff is set under
+// `--no-system-cache`, which neither reads nor writes the system cache. SystemCacheNotKept is why the run kept no
+// system cache though it was on, or could not keep it as it should, in one line, as a root it could not find, a
+// directory it could not write or a trim that failed; it is written only when there is one, and a run under
+// `--no-system-cache` has none. Reloads counts the packages the run loaded again from source,
 // though the cache held them, because a question of a fact computed on demand reached one restored with no answer
 // stored (#w7zmvat wave 3), and ReloadRounds how many times the run loaded and linted again for them; each is written
 // only when it is not 0. The timing record carries neither: a run under `--timing` reads no cache, so it restores
 // nothing and never reloads. Replays, beside them though no cache count, is how many questions of a fact computed
 // on demand the lint phase answered by replaying the push's walk of a package, which a cold run makes too; it is
-// written only when it is not 0. On is false under `--no-cache`, and every count 0
-// but FromBinary, which the binary's entries can still give, FactsSkipped of what they restored, and Reloads of them.
+// written only when it is not 0. On is false under `--no-cache`, and every count 0 but FromSystemCache, which the
+// system cache can still give, FactsSkipped of what they restored, and Reloads of them.
 // Problems counts what kept the cache from being read or written, the host's build's and every other build's alike,
 // each of which the engine also notes on stderr, so a run read through `--json` alone still shows it (#27r8r24).
 // WriteFailed counts every miss whose entry could not be written, every build's, of which the engine notes only the
@@ -403,20 +414,23 @@ type DependenceCounts struct {
 // contract 3 and the Go engine's alone, is written only by a run under `--build-dependence` with a store
 // (#6a3kjvz).
 type LintCache struct {
-	On           bool `json:"on"`
-	Hit          int  `json:"hit"`
-	FromBinary   int  `json:"standardLibraryFromBinary,omitempty"`
-	Missed       int  `json:"missed"`
-	Written      int  `json:"written"`
-	Unstorable   int  `json:"unstorable"`
-	FactsDropped int  `json:"factsDropped"`
-	FactsSkipped int  `json:"factsSkipped"`
-	Waves        int  `json:"waves"`
-	Reloads      int  `json:"reloads,omitempty"`
-	ReloadRounds int  `json:"reloadRounds,omitempty"`
-	Replays      int  `json:"replays,omitempty"`
-	Problems     int  `json:"problems,omitempty"`
-	WriteFailed  int  `json:"writeFailed,omitempty"`
+	On                 bool   `json:"on"`
+	Hit                int    `json:"hit"`
+	FromSystemCache    int    `json:"standardLibraryFromSystemCache,omitempty"`
+	SystemCacheWritten int    `json:"systemCacheWritten,omitempty"`
+	SystemCacheOff     bool   `json:"systemCacheOff,omitempty"`
+	SystemCacheNotKept string `json:"systemCacheNotKept,omitempty"`
+	Missed             int    `json:"missed"`
+	Written            int    `json:"written"`
+	Unstorable         int    `json:"unstorable"`
+	FactsDropped       int    `json:"factsDropped"`
+	FactsSkipped       int    `json:"factsSkipped"`
+	Waves              int    `json:"waves"`
+	Reloads            int    `json:"reloads,omitempty"`
+	ReloadRounds       int    `json:"reloadRounds,omitempty"`
+	Replays            int    `json:"replays,omitempty"`
+	Problems           int    `json:"problems,omitempty"`
+	WriteFailed        int    `json:"writeFailed,omitempty"`
 
 	DependenceRecords *DependenceRecords `json:"dependenceRecords,omitempty"`
 }
@@ -432,9 +446,9 @@ type LintCache struct {
 // package asks the facts of everything below it, written only when not 0. aliasRead, additive (#6a3kjvz piece 4),
 // counts the hits by an alias that hold whose record is the one beside the alias's target, written only when not 0.
 // The standard library's, additive (#6a3kjvz piece 3), count the records of the packages the host restored from the
-// binary's table, which the store keeps apart: standardLibraryRead and standardLibraryUnreadable over the load, and
-// standardLibraryWritten once the side load has ended, a write that failed counted in the cache's writeFailed. Each is
-// written only when not 0.
+// system cache's table, which the store keeps apart: standardLibraryRead and standardLibraryUnreadable over the load,
+// and standardLibraryWritten once the side load has ended, a write that failed counted in the cache's writeFailed. Each
+// is written only when not 0.
 type DependenceRecords struct {
 	Read         int `json:"read"`
 	Written      int `json:"written"`

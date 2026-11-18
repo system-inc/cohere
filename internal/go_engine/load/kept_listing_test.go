@@ -352,7 +352,7 @@ func TestAKeptListingReadsTheInputsGoListsAnswerReads(test *testing.T) {
 		if loadError != nil {
 			test.Fatalf("loading %s: %v", project, loadError)
 		}
-		return loaded.Inputs, loaded.ListingKept
+		return loaded.Inputs(), loaded.ListingKept
 	}
 	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
 	asked, _ := inputsOf(listings)

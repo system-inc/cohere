@@ -20,8 +20,8 @@ import (
 // persisted digest, and a record's header names it: a record of another renderer is declined, never matched. It
 // changes whenever either digest would change for the same types or the same fact, which the golden of a fixed
 // fixture's renderings catches (testdata/reads_renderings.golden). The store's keys hold the executable's identity
-// already, but the binary's table of standard-library entries outlives a store, so the version stands on its own. It
-// changes too when a record gains a field whose zero value, as gob decodes an older record without it, would judge
+// already, but the system cache's table of standard-library entries outlives a store, so the version stands on its own.
+// It changes too when a record gains a field whose zero value, as gob decodes an older record without it, would judge
 // a read more loosely than its writer meant: reads-renderer-4 added a lookup's Instantiates (#dscc341), and
 // reads-renderer-5 a generic candidate's type parameters to its own lines and an answer's, with its Unconstrained
 // (#8fbkkp4).

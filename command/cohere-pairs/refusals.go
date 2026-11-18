@@ -7,10 +7,14 @@ import (
 
 // refusals names every reason the records cannot be reported, empty when they can. A run refuses when it never
 // started, could not be read, was stopped, or exited with anything but 0, a clean tree, or 1, findings; when it says
-// it checked no file; and when its binary read no standard library entry from its table, since that run measured
-// the work a local build does. A corpus refuses when its runs do not all share one findings md5: the engine's
-// findings never depend on the side's cache, so two md5s in one corpus mean a run checked something else. Stderr that
-// is not empty refuses nothing, and the table shows it.
+// it checked no file; and when its standard library came from nowhere and went nowhere: it restored none, from a
+// release's table or the system cache, and wrote none to the system cache, so it computed the standard library and
+// kept nothing of it, as a local build of a release before the system cache, or a run that could not keep its system
+// cache, does, and measured work no run of the binary pays twice. A run of a binary with the system cache restores
+// none on its first, cold run and writes what it computed, so restoring none is no refusal on its own, as it was when
+// every release carried its table (#syscache). A corpus refuses when its runs do not all share one findings md5: the
+// engine's findings never depend on the side's cache, so two md5s in one corpus mean a run checked something else.
+// Stderr that is not empty refuses nothing, and the table shows it.
 func refusals(records []runRecord) []string {
 	failures := []string{}
 	corpora := []string{}
@@ -41,9 +45,15 @@ func refusals(records []runRecord) []string {
 		if record.FilesWalked == nil || *record.FilesWalked == 0 {
 			failures = append(failures, fmt.Sprintf("%s has filesWalked %s", run, describeCount(record.FilesWalked)))
 		}
-		if record.StandardLibraryFromBinary == nil || *record.StandardLibraryFromBinary == 0 {
-			failures = append(failures, fmt.Sprintf("%s has standardLibraryFromBinary %s", run,
-				describeCount(record.StandardLibraryFromBinary)))
+		switch {
+		case record.StandardLibraryRestored == nil:
+			failures = append(failures, fmt.Sprintf("%s has standardLibraryRestored missing", run))
+		case *record.StandardLibraryRestored == 0 && record.SystemCacheWritten == 0:
+			failure := fmt.Sprintf("%s restored no standard library and wrote none to the system cache", run)
+			if record.SystemCacheNotKept != "" {
+				failure += ": system cache not kept: " + record.SystemCacheNotKept
+			}
+			failures = append(failures, failure)
 		}
 		if _, seen := findingsByCorpus[record.Corpus]; !seen {
 			corpora = append(corpora, record.Corpus)

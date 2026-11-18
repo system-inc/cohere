@@ -38,10 +38,15 @@ func TestRefusalsNameEachRunThatBreaksACheck(test *testing.T) {
 			[]string{"root-base-1-cache has filesInScope missing"}},
 		{"no files walked", func(record *runRecord) { record.FilesWalked = &zero },
 			[]string{"root-base-1-cache has filesWalked 0"}},
-		{"no standard library from the binary", func(record *runRecord) { record.StandardLibraryFromBinary = &zero },
-			[]string{"root-base-1-cache has standardLibraryFromBinary 0"}},
-		{"no lint record", func(record *runRecord) { record.StandardLibraryFromBinary = nil },
-			[]string{"root-base-1-cache has standardLibraryFromBinary missing"}},
+		{"no standard library restored and none written", func(record *runRecord) {
+			record.StandardLibraryRestored = &zero
+		}, []string{"root-base-1-cache restored no standard library and wrote none to the system cache"}},
+		{"no standard library restored, none written, and the system cache not kept", func(record *runRecord) {
+			record.StandardLibraryRestored, record.SystemCacheNotKept = &zero, "no HOME"
+		}, []string{"root-base-1-cache restored no standard library and wrote none to the system cache: system " +
+			"cache not kept: no HOME"}},
+		{"no lint record", func(record *runRecord) { record.StandardLibraryRestored = nil },
+			[]string{"root-base-1-cache has standardLibraryRestored missing"}},
 		{"changed tracked files", func(record *runRecord) { record.ChangedFiles = []string{"go.work.sum", "go.sum"} },
 			[]string{"root-base-1-cache changed tracked files: go.work.sum, go.sum"}},
 		{"another findings md5", func(record *runRecord) { record.FindingsMd5 = "ffff" }, []string{

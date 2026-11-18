@@ -1,8 +1,6 @@
 package check
 
 import (
-	"bytes"
-	"encoding/gob"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -65,14 +63,4 @@ func rewriteStoredEntry(test *testing.T, store *cache.Store, key cache.Key, chan
 	if putError := store.Put(key, encoded); putError != nil {
 		test.Fatal(putError)
 	}
-}
-
-// decodeWholeEntry is a whole entry's gob, body and reads in one, as the standard library's table is written from,
-// decoded as a hit decodes one.
-func decodeWholeEntry(known *cacheAnalyzers, restoring *packages.Package, whole []byte) (*restoredPackage, error) {
-	var entry cacheEntry
-	if decodeError := gob.NewDecoder(bytes.NewReader(whole)).Decode(&entry); decodeError != nil {
-		return nil, decodeError
-	}
-	return restoredOf(known, restoring, entry, nil)
 }

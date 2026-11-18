@@ -26,11 +26,13 @@ func TestAStoreThatRefusesAWriteCountsItsProblems(test *testing.T) {
 	if writeError := os.WriteFile(filepath.Join(root, ".cache"), nil, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	arguments := []string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}
+	// Without the system cache, so the store is asked to write every package that missed, the standard library's
+	// among them, which a run keeping a system cache never writes there.
+	arguments := []string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix", "--no-system-cache"}
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	if exitCode := runOverlapping(arguments, nil, &standardOutput, &standardError, rules.All(), nil,
-		embeddedStandardLibrary, true, nil); exitCode != exitClean && exitCode != exitFindings {
+		isolatedSource(test, standardLibrarySource{}), true, nil); exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
 	}
 	var record contract.LintRecord

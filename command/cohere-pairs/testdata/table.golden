@@ -8,8 +8,21 @@
 
 ## Checked in all
 
-- **root** at `aaaaaaaaaaaa`, 8 runs: exit 1 in all; files in scope 1200 in all; findings 120 in all, md5 `0df9cf54` in all; standardLibraryFromBinary 180 in all; buildsAtOnce base 2 in all, branch 3 in all; stderr bytes 0 in all; tracked files changed 0 (4), 1 (4)
-- **loom** at `9510c6baddda`, 8 runs: exit 1 in all; files in scope 1200 in all; findings 94167 in all, md5 `51daa020` in all; standardLibraryFromBinary 180 in all; buildsAtOnce base 2 in all, branch 3 in all; stderr bytes 0 (7), 201 (1); tracked files changed 0 (7), 2 (1)
+- **root** at `aaaaaaaaaaaa`, 8 runs: exit 1 in all; files in scope 1200 in all; findings 120 in all, md5 `0df9cf54` in all; buildsAtOnce base 2 in all, branch 3 in all; stderr bytes 0 in all; tracked files changed 0 (4), 1 (4)
+- **loom** at `9510c6baddda`, 8 runs: exit 1 in all; files in scope 1200 in all; findings 94167 in all, md5 `51daa020` in all; buildsAtOnce base 2 in all, branch 3 in all; stderr bytes 0 (7), 201 (1); tracked files changed 0 (7), 2 (1)
+
+## System cache, by side and mode
+
+| corpus | side | mode | standard library restored | written | system cache |
+|---|---|---|---|---|---|
+| root | base | cache | 180 in all | 0 in all | none, the binary's table in all |
+| root | base | no-cache | 180 in all | 0 in all | none, the binary's table in all |
+| root | branch | cache | 0 (1), 180 (1) | 180 (1), 0 (1) | kept in all |
+| root | branch | no-cache | 180 in all | 0 in all | kept in all |
+| loom | base | cache | 180 in all | 0 in all | none, the binary's table in all |
+| loom | base | no-cache | 180 in all | 0 in all | none, the binary's table in all |
+| loom | branch | cache | 0 (1), 180 (1) | 180 (1), 0 (1) | kept in all |
+| loom | branch | no-cache | 180 in all | 0 in all | kept in all |
 
 ## Tracked files a run changed, each put back from its commit, and the pair is refused for it (#34r3v1y)
 

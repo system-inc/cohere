@@ -143,9 +143,9 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		line += " " + style.dim("("+strings.Join(inside, " • ")+")")
 	}
 
-	// The standard library's packages a Go run restored from the binary rather than analyzed, which no file count
-	// holds, so a cold run that reused them reads as such.
-	if summary.PackageCache != nil && summary.PackageCache.FromBinary > 0 {
+	// The standard library's packages a Go run restored from the system cache rather than analyzed, which no file
+	// count holds, so a cold run that reused them reads as such.
+	if summary.PackageCache != nil && summary.PackageCache.FromSystemCache > 0 {
 		line += " • " + summary.PackageCache.segment()
 	}
 	// A Go run whose findings cache could not be read or written, which stderr says one by one, says how many where
@@ -153,6 +153,12 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	// went unchecked: a problem never changes a finding.
 	if summary.PackageCache != nil && (summary.PackageCache.Problems > 0 || summary.PackageCache.WriteFailed > 0) {
 		line += " • ⚠ " + summary.PackageCache.problemsSegment()
+	}
+	// A Go run that could not keep its system cache says why where people look, in one line, as the engine says it on
+	// stderr: the run computed what the cache would have held, so the next run pays for it too, and a finding never
+	// changes for it.
+	if summary.PackageCache != nil && summary.PackageCache.SystemCacheNotKept != "" {
+		line += " • ⚠ system cache not kept: " + summary.PackageCache.SystemCacheNotKept
 	}
 	// Said apart from the time, which leaves them out, so a build is never read as checking (#ket0hrp).
 	for _, segment := range engineBuildSegments(summary.EngineBuilds) {

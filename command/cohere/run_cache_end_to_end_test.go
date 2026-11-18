@@ -14,18 +14,28 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/system_cache_testing"
 )
 
-// TestMain gives every binary this package's tests launch a user cache of its own.
+// usersCacheDirectory is the user cache directory of the person running the tests, read before TestMain moved the
+// home, empty when the machine has none.
+var usersCacheDirectory string
+
+// TestMain gives every binary this package's tests launch a user cache of its own, and the Go engine a system cache
+// of its own.
 //
 // Child processes inherit the test process's environment, so without this every test that runs the
-// binary would read and write the developer's real cache table. Each fixture is a fresh directory and
+// binary would read and write the developer's real cache table and system cache. Each fixture is a fresh directory and
 // the table is keyed by the project root, so no two tests share a table; a test that needs a cold run
 // says `--no-cache`, and TestRunCacheEndToEnd sets a home of its own for its runs.
 func TestMain(suite *testing.M) {
 	// In-process, the tests read the verbose account, as the binary tests do through verboseArguments.
 	activeOutput = outputSettings{Mode: outputVerbose}
 	pinGoEnvironment()
+	// Ignored: a machine with no user cache directory has none a test could reach, which the guard's test reads as
+	// nothing to compare with.
+	usersCacheDirectory, _ = os.UserCacheDir()
 	home, temporaryDirectoryError := os.MkdirTemp("", "cohere-test-home-")
 	if temporaryDirectoryError != nil {
 		panic(temporaryDirectoryError)
@@ -36,8 +46,14 @@ func TestMain(suite *testing.M) {
 	// See held_output_guard_test.go: a command whose output never closes fails the binary with its holder
 	// named, rather than at -timeout with nothing said.
 	stopWatching := watchForHeldOutput(heldOutputDeadline, 10*time.Second, failHeldOutput)
+	// The Go engine's system cache, a directory of this test binary's own, whatever the shell set (#syscache).
+	removeSystemCache, isolateError := system_cache_testing.Isolate()
+	if isolateError != nil {
+		panic(isolateError)
+	}
 	code := suite.Run()
 	stopWatching()
+	removeSystemCache()
 	// Ignored: a temporary directory of this test binary's own, which costs only its space if it outlives the
 	// run, and the run's verdict is already decided. So for each removal below.
 	_ = os.RemoveAll(home)
@@ -50,6 +66,14 @@ func TestMain(suite *testing.M) {
 		}
 	}
 	os.Exit(code)
+}
+
+// Every binary the tests start, and every engine run in process, reads a system cache of the tests' own, never the
+// person's: `COHERE_SYSTEM_CACHE` is set, absolute, and outside their user cache directory (#syscache).
+func TestTheTestsSystemCacheIsNotTheUsers(test *testing.T) {
+	test.Parallel()
+
+	system_cache_testing.ExpectIsolated(test, usersCacheDirectory)
 }
 
 // nodeCounts is the lint line's node account: what the walk visited, and what the cache covered by replay.

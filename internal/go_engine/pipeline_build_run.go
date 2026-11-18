@@ -36,9 +36,9 @@ type buildRun struct {
 	// typeErrors are the load's compiler diagnostics for every package of the build, since a build type-checks the
 	// whole workspace, and a call that type-checks on one platform only shows here.
 	typeErrors []load.Diagnostic
-	// inputs are what the build's load read to decide what it returned (load.Inputs), the host's load's for the host's
-	// build, so a run's replay key can stand for every build it checked.
-	inputs load.Inputs
+	// inputs waits for what the build's load read to decide what it returned (load.Loaded.Inputs), the host's load's
+	// for the host's build, so a run's replay key can stand for every build it checked.
+	inputs func() load.Inputs
 	// files are the digests of every file the build's findings cache keyed, those the host's gave an extra build's
 	// included, and none for a build without one, kept so a test reads which files each build's keys hashed.
 	files cache.FileDigests

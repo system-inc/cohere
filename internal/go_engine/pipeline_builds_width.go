@@ -122,9 +122,10 @@ func (engine *pipeline) takesShareGate(hostCache check.CacheCounts) bool {
 }
 
 // hostMissedShare is the share of the packages the host's store answered for that it missed, checked from source over
-// hit and missed, from counts, its findings cache's counts (check.CacheCounts). The packages restored from the binary's
-// table (FromBinary) are left out: the binary holds them on every run, a cold fill's too, so counting them would bring
-// a small tree's cold fill under lowShareAtGate, 20 missed beside 260 from the table reading 0.07, and a cold run with
+// hit and missed, from counts, its findings cache's counts (check.CacheCounts). The packages restored from the system
+// cache's table (FromSystemCache) are left out: a warm system cache holds them whatever the project's store holds, a
+// cold fill's too, so counting them would bring a small tree's cold fill under lowShareAtGate, 20 missed beside 260
+// from the table reading 0.07, and a cold run with
 // a store is where the gate's cost was measured (#ghb3rcn, #ph5532e). A session whose store answered for no package
 // has a share of none, as a build's load of no package does at the gate (shareGate.report).
 func hostMissedShare(counts check.CacheCounts) float64 {

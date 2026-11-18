@@ -58,7 +58,9 @@
 //	release-base, release-branch  each side's release-shaped package for this host, built by its own cohere-release
 //	release-<side>.log            what that release build printed
 //	corpora/<name>                each corpus checked out at its pin, a nested pin a repository inside it
-//	trash                         every .cache directory a cache-on run found, moved aside rather than deleted
+//	trash                         every .cache directory a cache-on run found, moved aside rather than deleted,
+//	                              and each side's system cache before the side's cache-on run
+//	system-cache-base, -branch    each side's own system cache (COHERE_SYSTEM_CACHE), filled by its cache-on run
 //	raw/<corpus>-<side>-<round>-<mode>.jsonl and .stderr   what each run of the engine printed
 //	runs.jsonl                    one record per run (runRecord)
 //	table.md                      the table, also printed, written only when every check holds

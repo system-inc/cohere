@@ -12,8 +12,12 @@ import (
 
 // switchNames are the switches the front door forwards, each `--name` or `--name=true|false`.
 //
-// `no-cache` turns off the per-package findings cache (see lintCache), as the front door's run cache is off for the
-// same run, so a run under it computes every package from source.
+// `no-cache` turns off the per-package findings cache's project store (see lintCache), as the front door's run cache
+// is off for the same run, so a run under it computes every package from source but what the system cache holds.
+//
+// `no-system-cache` turns off the system cache (#syscache), the standard library's tables in the user's cache
+// directory, which a run neither reads nor writes under it, so it computes the standard library. Beside `no-cache`,
+// a run computes everything from scratch.
 //
 // `other-builds` checks, beside the host's build, every other build the census needs (otherBuilds), and the project
 // record names each file only such a build compiles as checked by it (#72n9mq0). The front door forwards it to this
@@ -31,7 +35,8 @@ import (
 // alone: the Swift engine refuses it as a flag it does not know.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing", "duplicates", "build-dependence",
+	"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "other-builds", "timing", "duplicates",
+	"build-dependence",
 }
 
 // notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a

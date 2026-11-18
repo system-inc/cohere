@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -59,14 +60,17 @@ func sizesRun(test *testing.T, root string, storeDirectory string, environment [
 	// Each build's keys hold its target, as the engine's do, so they never meet another's.
 	caching.Context.Build = append(caching.Context.Build, environment...)
 	session := NewCacheSession(caching, rules)
+	// The host records every package's reads, for the build to restore from; the build records none.
+	var recordReads func(*packages.Package) bool
 	if host == nil {
 		session.KeepForBuilds()
+		recordReads = load.EveryPackage
 	} else {
 		session.RestoreFromHost(host)
 	}
 	for {
 		loaded, loadError := load.PackagesCached(root, []string{"./..."}, append([]string{"GOWORK=off"},
-			environment...), nil, load.Caching{Restorer: session, RecordReads: host == nil})
+			environment...), nil, load.Caching{Restorer: session, RecordReads: recordReads})
 		if loadError != nil || len(loaded.Diagnostics) > 0 {
 			test.Fatalf("loading the build under %q: %v %+v", environment, loadError, loaded.Diagnostics)
 		}

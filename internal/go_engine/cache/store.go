@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/system-inc/cohere/internal/cache_directory"
 )
@@ -25,6 +26,9 @@ type Store struct {
 	// and a MkdirAll before each cost 2.5 s of stat and lstat calls summed (#m8hcs4n).
 	made sync.Map
 
+	// projectCacheDirectory is the project's `.cache/cohere` a store from Open lives in, empty for one from OpenAt,
+	// whose directory is no project's.
+	projectCacheDirectory string
 	// cacheRoot is made once per store, before the first shard, through cache_directory.Make, so a store that
 	// creates the project's `.cache/cohere` leaves it ignoring itself (#6vhp0vd).
 	cacheRoot sync.Once
@@ -35,7 +39,21 @@ type Store struct {
 // Open is the store under root, at `<root>/.cache/cohere/go`, beside the TypeScript cache in `.cache/cohere`.
 // Nothing is made until the first Put.
 func Open(root string) *Store {
-	return &Store{directory: filepath.Join(cache_directory.Of(root), "go")}
+	return &Store{
+		directory:             filepath.Join(cache_directory.Of(root), "go"),
+		projectCacheDirectory: cache_directory.Of(root),
+	}
+}
+
+// OpenAt is the store whose directory is exactly directory, the system cache's, outside any project. Nothing is made
+// until the first Put, and then only directory and the parents it needs.
+//
+// It writes no ignore file, as Open's store does into the project's `.cache/cohere`. That file keeps a cache out of
+// a repository's `git status`, and the system cache is in the user's cache directory, where no repository is. And
+// cache_directory.Make writes it into the store's parent, which a store given its directory exactly does not own:
+// `$COHERE_SYSTEM_CACHE` names any directory the person chose.
+func OpenAt(directory string) *Store {
+	return &Store{directory: directory}
 }
 
 // readObserver, when a test sets it (ObserveReads), is told the key of every Get of every store, nil in every run.
@@ -114,8 +132,8 @@ func (store *Store) Put(key Key, entry []byte) error {
 	// A directory removed while the store runs, by someone clearing the cache, is made again once, the cache root
 	// through Make again so a root this store makes a second time ignores itself too.
 	if errors.Is(createError, fs.ErrNotExist) {
-		if makeError := cache_directory.Make(filepath.Dir(store.directory)); makeError != nil {
-			return fmt.Errorf("making the cache directory %s: %w", filepath.Dir(store.directory), makeError)
+		if makeError := store.makeProjectCacheDirectory(); makeError != nil {
+			return makeError
 		}
 		if makeError := store.makeDirectory(directory); makeError != nil {
 			return makeError
@@ -145,17 +163,33 @@ func (store *Store) Put(key Key, entry []byte) error {
 // makeDirectory makes directory and every parent it needs, and remembers it made. The project's cache directory, the
 // store's parent, is made first by cache_directory.Make, so the run that creates it writes its ignore file.
 func (store *Store) makeDirectory(directory string) error {
-	store.cacheRoot.Do(func() {
-		store.cacheRootError = cache_directory.Make(filepath.Dir(store.directory))
-	})
+	store.cacheRoot.Do(func() { store.cacheRootError = store.makeProjectCacheDirectory() })
 	if store.cacheRootError != nil {
-		return fmt.Errorf("making the cache directory %s: %w", filepath.Dir(store.directory), store.cacheRootError)
+		return store.cacheRootError
 	}
 	if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
 		return fmt.Errorf("making the cache directory %s: %w", directory, makeError)
 	}
 	store.made.Store(directory, true)
 	return nil
+}
+
+// makeProjectCacheDirectory makes the project's cache directory through cache_directory.Make, so one made again after
+// a clearing ignores itself too. A store from OpenAt has none, and makes nothing here.
+func (store *Store) makeProjectCacheDirectory() error {
+	if store.projectCacheDirectory == "" {
+		return nil
+	}
+	if makeError := cache_directory.Make(store.projectCacheDirectory); makeError != nil {
+		return fmt.Errorf("making the cache directory %s: %w", store.projectCacheDirectory, makeError)
+	}
+	return nil
+}
+
+// MarkUsed tells a trim that key's entry is in use, by setting its modification time to now when it is more than an
+// hour old (markUsed). A read of the system cache calls it after a Get that hit.
+func (store *Store) MarkUsed(key Key) {
+	markUsed(store.path(key), time.Now())
 }
 
 // path is where key's entry lives: `ab/abcdef...`.

@@ -165,6 +165,33 @@ func TestOtherBuildsReachTheGoEngineAlone(test *testing.T) {
 	}
 }
 
+// TestNoSystemCacheReachesTheGoEngineAndIsAcceptedElsewhere: `--no-system-cache` is forwarded to the Go engine, which
+// neither reads nor writes its system cache under it (#syscache). Swift's run accepts it and forwards nothing, since
+// its engine keeps no system cache, and another engine's child is handed it as it is, unlike a switch only Go takes.
+func TestNoSystemCacheReachesTheGoEngineAndIsAcceptedElsewhere(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	given := map[string]bool{"no-fix": true, "no-system-cache": true}
+	arguments, _, argumentsError := engineArguments(goLanguage("module"), goFlags, goTestLocation(root), given,
+		typedTrue, nil)
+	if argumentsError != nil {
+		test.Fatalf("--no-system-cache was refused for Go: %v", argumentsError)
+	}
+	if expected := []string{"--contract", "3", "--root", root, "--no-fix", "--no-system-cache"}; !slices.Equal(
+		arguments, expected) {
+		test.Errorf("Go's arguments are %q, want %q", arguments, expected)
+	}
+	swiftArguments, _, swiftError := engineArguments(swiftLanguage, swiftFlags, goTestLocation(root), given,
+		typedTrue, nil)
+	if swiftError != nil || slices.Contains(swiftArguments, "--no-system-cache") {
+		test.Errorf("Swift's run took %q (%v), want it accepted and not forwarded", swiftArguments, swiftError)
+	}
+	if kept := withoutGoOnlySwitches([]string{"--no-fix", "--no-system-cache"}); !slices.Equal(kept,
+		[]string{"--no-fix", "--no-system-cache"}) {
+		test.Errorf("another engine's child is handed %q, want --no-system-cache kept", kept)
+	}
+}
+
 // TestOtherBuildsAreRefusedAtARootWithNoGoProject: discovery hands `--other-builds` to a Go project's run alone, so
 // at a root of only TypeScript and Swift projects it would reach no run and the run would read as one that checked
 // what was asked. Such a root refuses it before any project runs, the way a run at a TypeScript project does, while

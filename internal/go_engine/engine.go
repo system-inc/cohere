@@ -19,9 +19,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/format"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
 )
 
@@ -99,7 +101,7 @@ func Main(
 			return refuse(standardError, generatorError)
 		}
 		return runStandardLibraryVerb(arguments, standardOutput, standardError, rules.All(),
-			embeddedStandardLibrary.table, generator)
+			cache.NewStandardLibraryTable(standard_library_table.Contents), generator)
 	}
 	// A save writes no file, refused where every write of a source file passes (format.RefuseWrites), so no phase, one
 	// added later included, can write over a file the editor holds unsaved. Here rather than in run, as the memory
@@ -108,35 +110,23 @@ func Main(
 		format.RefuseWrites()
 	}
 	return runOverlapping(arguments, standardInput, standardOutput, standardError, rules.All(), &memory,
-		embeddedStandardLibrary, true, nil)
+		standardLibrarySource{}, true, nil)
 }
 
-// run is Main with the analyzer rules handed in and no standard input, so a test can run the engine with a rule
-// planted in place of the registry's, such as one that panics. memory is what Main decided about the memory limit, nil
-// in a test, which decides nothing and never raises the limit. It reads the standard library's entries the binary
-// carries.
-func run(
-	arguments []string,
-	standardOutput io.Writer,
-	standardError io.Writer,
-	registered []rule.Rule,
-	memory *engineMemory,
-) int {
-	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, memory,
-		embeddedStandardLibrary)
-}
-
-// runWithStandardLibrary is run reading builtIn in place of the binary's own standard-library entries, so a test can
-// give a run a table and a stamp of its own, or collect the entries a run saves, without a release build.
+// runWithStandardLibrary is Main with the analyzer rules handed in, no standard input, and source as where its standard
+// library comes from and goes, so a test can run the engine with a rule planted in place of the registry's, such as
+// one that panics, give a run a system cache and a stamp of its own, or collect the entries a run saves, without a
+// release build. memory is what Main decided about the memory limit, nil in a test, which decides nothing and never
+// raises the limit.
 func runWithStandardLibrary(
 	arguments []string,
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
 	memory *engineMemory,
-	builtIn builtInStandardLibrary,
+	source standardLibrarySource,
 ) int {
-	return runOverlapping(arguments, nil, standardOutput, standardError, registered, memory, builtIn, true, nil)
+	return runOverlapping(arguments, nil, standardOutput, standardError, registered, memory, source, true, nil)
 }
 
 // runOverlapping is runWithStandardLibrary, with the standard input the editor's save reads its buffer from, nil for a
@@ -151,7 +141,7 @@ func runOverlapping(
 	standardError io.Writer,
 	registered []rule.Rule,
 	memory *engineMemory,
-	builtIn builtInStandardLibrary,
+	source standardLibrarySource,
 	overlaps bool,
 	answersInPart map[string]bool,
 ) int {
@@ -159,7 +149,7 @@ func runOverlapping(
 	if parseError != nil {
 		return refuse(standardError, parseError)
 	}
-	request.standardLibrary = builtIn
+	request.standardLibrary = source
 	request.answersInPart = answersInPart
 	switch request.mode() {
 	case modeVersion:
@@ -177,6 +167,11 @@ func runOverlapping(
 				request.stdinPath, readError))
 		}
 		request.buffer = buffer
+	}
+	// Begun before the settings, go env and go list, so the run's first key finds the engine's identity hashed, or
+	// nearly, rather than hashing it there, between the listing and the type check (cache.StartExecutableIdentity).
+	if request.keysByIdentity() {
+		cache.StartExecutableIdentity()
 	}
 
 	// Everything that can refuse is read before the first record, so exit 2 never leaves half a stream.

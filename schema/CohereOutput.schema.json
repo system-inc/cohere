@@ -519,15 +519,27 @@
                     "properties": {
                         "on": {
                             "type": "boolean",
-                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromBinary, factsSkipped and reloads."
+                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromSystemCache, factsSkipped and reloads."
                         },
                         "hit": {
                             "type": "integer",
                             "description": "Packages restored from an entry, with nothing run on them."
                         },
-                        "standardLibraryFromBinary": {
+                        "standardLibraryFromSystemCache": {
                             "type": "integer",
-                            "description": "Go standard-library packages restored from the entries a release binary carries, with nothing run on them, apart from hit. `--no-cache` reads them too. Absent when zero."
+                            "description": "Go standard-library packages restored from the system cache, the engine's tables in the user's cache directory, every build's summed, with nothing run on them, apart from hit. `--no-cache` reads them too. Absent when zero."
+                        },
+                        "systemCacheWritten": {
+                            "type": "integer",
+                            "description": "Entries the run's builds added to their tables of the system cache, summed. Absent when zero."
+                        },
+                        "systemCacheOff": {
+                            "type": "boolean",
+                            "description": "True under --no-system-cache, which neither reads nor writes the system cache, so the standard library is computed. Absent otherwise."
+                        },
+                        "systemCacheNotKept": {
+                            "type": "string",
+                            "description": "Why the run kept no system cache though it was on, or could not keep it as it should, in one line, such as a cache directory it could not find or write. Absent when there is none."
                         },
                         "missed": { "type": "integer", "description": "Packages analyzed from source." },
                         "written": { "type": "integer", "description": "Missed packages that got an entry." },
@@ -646,6 +658,14 @@
                             "writtenThrough": {
                                 "type": "integer",
                                 "description": "The packages this build restored from the host's run whose entry it wrote to its own findings cache once their restore held, so its next run hits them there rather than check them from source. Absent when 0, and always under --no-cache, which writes nothing."
+                            },
+                            "systemCacheRestored": {
+                                "type": "integer",
+                                "description": "The Go standard-library packages this build restored from the system cache's table of its build context. Absent when 0."
+                            },
+                            "systemCacheWritten": {
+                                "type": "integer",
+                                "description": "The entries this build added to its table of the system cache. Absent when 0."
                             },
                             "sharedBodyHits": {
                                 "type": "integer",

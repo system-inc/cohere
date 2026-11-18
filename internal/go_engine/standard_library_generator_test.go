@@ -19,6 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/system_cache_testing"
 )
 
 // standardLibraryChildVariable marks a test binary a test started as a generator, or a generator started as its
@@ -47,7 +48,18 @@ func TestMain(suite *testing.M) {
 	if os.Getenv(timingMarginChildVariable) != "" {
 		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
 	}
-	os.Exit(suite.Run())
+	// Every run in this process, and every child it starts, reads a system cache of this test binary's own rather
+	// than the person's (#syscache). The engine's test helpers give each run a system cache of its own beside that
+	// (isolatedSource), and a test that names one on the run (standardLibrarySource's systemCacheRoot), or sets the
+	// variable itself, reads that one.
+	removeSystemCache, isolateError := system_cache_testing.Isolate()
+	if isolateError != nil {
+		os.Exit(refuse(os.Stderr, isolateError))
+	}
+	testsSystemCache = os.Getenv(system_cache_testing.Variable)
+	code := suite.Run()
+	removeSystemCache()
+	os.Exit(code)
 }
 
 // childGenerator is testGenerator as a test binary TestMain runs as a generator rebuilds it from its environment, in
@@ -145,89 +157,6 @@ func localTable(test *testing.T) []byte {
 	return sharedTable.table
 }
 
-// A table the generator writes, as the release would, restores every standard-library package a run over the
-// fixture reaches, and the run's records are the plain run's: the table says it holds the local variant, with as many
-// packages as the run restores.
-func TestAGeneratedTableIsReadByARun(test *testing.T) {
-	test.Parallel()
-
-	table := localTable(test)
-	variants := cache.NewStandardLibraryTable(table).Variants()
-	request := localVariant(test, "")
-	if len(variants) != 1 || variants[0].GoVersion != request.goVersion || variants[0].Target != request.target ||
-		variants[0].CgoEnabled != request.cgoEnabled || variants[0].Packages == 0 {
-		test.Fatalf("want the table to hold %s alone, got %+v", variantLabel(request), variants)
-	}
-	root := copyFixture(test, standardLibraryFixture)
-	plain := runCachedEngine(test, root, "--no-cache")
-	read := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-	if read.counts.FromBinary != variants[0].Packages {
-		test.Fatalf("want all %d packages from the generated table, got %+v", variants[0].Packages, read.counts)
-	}
-	if read.withoutCounts != plain.withoutCounts {
-		test.Fatalf("from the generated table\n%s\nplain\n%s", read.withoutCounts, plain.withoutCounts)
-	}
-}
-
-// A table the generator writes carries the persisted reads of the packages it holds, and a host that restores the
-// standard library from it keeps those packages for its extra builds as a host that checked them does (#pcv6eff): over
-// the fixture with a file only another target compiles, that build checks from source exactly the packages it checks
-// when the host computed the standard library itself, and the run's findings are that run's. Without the keep, the
-// build checks every standard-library package of its graph from source.
-func TestATableHitIsKeptForTheExtraBuilds(test *testing.T) {
-	test.Parallel()
-
-	table := localTable(test)
-	entries, _ := tableParts(test, table)
-	withReads := 0
-	for _, entry := range entries {
-		if entry.Reads != nil {
-			withReads++
-		}
-	}
-	if withReads == 0 {
-		test.Fatalf("none of the table's %d entries carries persisted reads", len(entries))
-	}
-	root := copyFixture(test, standardLibraryFixture)
-	// A file of another target than this machine's, so the run has one extra build.
-	other := map[bool]string{true: "freebsd", false: "linux"}[runtime.GOOS == "linux"]
-	if writeError := os.WriteFile(filepath.Join(root, "library_"+other+".go"), []byte("package library\n"),
-		0o644); writeError != nil {
-		test.Fatal(writeError)
-	}
-	computed := runCachedEngine(test, root, "--no-cache", "--other-builds")
-	fromTable := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache",
-		"--other-builds")
-	if fromTable.counts.FromBinary == 0 {
-		test.Fatalf("want the host to restore the standard library from the table, got %+v", fromTable.counts)
-	}
-	computedBuild, tableBuild := extraBuildRecords(test, computed.stream)[0], extraBuildRecords(test,
-		fromTable.stream)[0]
-	if computedBuild.PackagesLoaded == 0 {
-		test.Fatalf("the extra build %s loaded nothing, so it tells nothing", computedBuild.Target)
-	}
-	if tableBuild.CheckedFromSource != computedBuild.CheckedFromSource {
-		test.Errorf("%s checked %d of %d packages from source with the host's standard library from the table, "+
-			"want %d of %d, as with it computed (%d of the table's %d entries carry reads)", tableBuild.Target,
-			tableBuild.CheckedFromSource, tableBuild.PackagesLoaded, computedBuild.CheckedFromSource,
-			computedBuild.PackagesLoaded, withReads, len(entries))
-	}
-	findings := func(stream string) []string {
-		var lines []string
-		for line := range strings.Lines(stream) {
-			if strings.Contains(line, `"kind":"finding"`) {
-				lines = append(lines, line)
-			}
-		}
-		return lines
-	}
-	if computedFindings, tableFindings := findings(computed.stream), findings(fromTable.stream); !slices.Equal(
-		tableFindings, computedFindings) {
-		test.Errorf("the findings with the table\n%s\nwant those with the standard library computed\n%s",
-			strings.Join(tableFindings, ""), strings.Join(computedFindings, ""))
-	}
-}
-
 // Two generations of the same variant, each a generator process of its own with children of their own, write the
 // same bytes: the canonical child writes every entry again in one order, its facts sorted and numbered alike.
 func TestAGeneratedTableIsTheSameEveryTime(test *testing.T) {
@@ -237,30 +166,6 @@ func TestAGeneratedTableIsTheSameEveryTime(test *testing.T) {
 	first := generatedTable(test, request)
 	if second := generatedTable(test, request); !bytes.Equal(first, second) {
 		test.Fatalf("want two generations byte for byte alike, got %d and %d bytes", len(first), len(second))
-	}
-}
-
-// The generator sets `CGO_ENABLED` explicitly for the variant it computes: a table of the variant this machine does
-// not default to restores everything in a run under that value and nothing in a run under the other, since every key
-// holds it.
-//
-// Not parallel: it sets the process's own `CGO_ENABLED`, which every go command the engine runs reads.
-func TestAGeneratedVariantIsKeyedByItsCgo(test *testing.T) {
-	local := localVariant(test, "").cgoEnabled
-	other := map[string]string{"1": "0", "0": "1"}[local]
-	table := generatedTable(test, localVariant(test, other))
-	packages := cache.NewStandardLibraryTable(table).Variants()[0].Packages
-	for _, reading := range []struct {
-		cgoEnabled string
-		fromBinary int
-	}{{cgoEnabled: other, fromBinary: packages}, {cgoEnabled: local}} {
-		test.Setenv("CGO_ENABLED", reading.cgoEnabled)
-		root := copyFixture(test, standardLibraryFixture)
-		read := runEngineWith(test, root, readingTable(table, engineTestsStamp), rules.All(), "--no-cache")
-		if read.counts.FromBinary != reading.fromBinary {
-			test.Errorf("CGO_ENABLED=%s: want %d from the table of cgo %s, got %+v", reading.cgoEnabled,
-				reading.fromBinary, other, read.counts)
-		}
 	}
 }
 
