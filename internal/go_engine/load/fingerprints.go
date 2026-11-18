@@ -28,11 +28,12 @@ import (
 // and folds it in after the steady fingerprint, so a build asking after another build's go list rewrote one reads the
 // bytes it left, and keeps its listing against them.
 //
-// It is shared by loads after which the engine writes nothing else, which the extra builds' are and the host's first
-// load is not: the long-line wrap writes between that load and the builds, and a header it rewrote would keep the
-// fingerprint of the bytes before it. A writer outside the run, an editor saving while the builds run, is read by the
-// next run: the builds check the tree as they first read it. One is made for each run (newPipeline), never kept past
-// it, since any file can move between runs. A nil Fingerprints shares nothing, and each fingerprint is read again.
+// It is shared by the loads that read the same bytes: a run's are the host's and every extra build's, and the run
+// starts its Fingerprints over at every change to the bytes it holds (the pipeline's heldChanged), so a header the
+// fix, the wrap or a rename rewrote is read again by the load after it and never keeps the fingerprint of the bytes
+// before it (#t7h2sm4). A writer outside the run, an editor saving while the builds run, is read by the next run: the
+// builds check the tree as the host's last load read it. One is made for each run (newPipeline), never kept past it,
+// since any file can move between runs. A nil Fingerprints shares nothing, and each fingerprint is read again.
 type Fingerprints struct {
 	// computed counts the directories fingerprinted, which a test reads: one for each directory however many builds
 	// ask.
@@ -91,6 +92,14 @@ func NewFingerprints() *Fingerprints {
 		roots:       map[string]*walkedRoot{},
 		moduleFiles: map[string]*readModuleFile{},
 	}
+}
+
+// DirectoriesFingerprinted is how many directories fingerprints holds and how many times one was fingerprinted, which
+// the engine's tests read to see that a load of the run filled the ones the loads after it share (#t7h2sm4).
+func (fingerprints *Fingerprints) DirectoriesFingerprinted() (int, int64) {
+	fingerprints.mutex.Lock()
+	defer fingerprints.mutex.Unlock()
+	return len(fingerprints.directories), fingerprints.computed.Load()
 }
 
 // steady is steadyFingerprint of roots, directories and moduleFiles, read once for the run for each distinct set of

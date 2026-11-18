@@ -873,6 +873,13 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 	for file, contents := range overlay {
 		engine.described.contents[file] = contents
 	}
+	// A guard, not what keeps the fingerprints right today (#t7h2sm4): no load between here and writeRenamed reads
+	// the run's fingerprints, since each is a loadPackages without the host's caching, and a proven round, which
+	// every call here follows, always reaches writeRenamed, whose reread of each file of the overlay starts them over,
+	// written or not. The editor's save, whose rereads change nothing, names its renames rather than making them, so
+	// it never comes here. The call keeps a load added here later from reading the fingerprints of the bytes before
+	// the rename.
+	engine.heldChanged()
 	suppressed := engine.suppress(names, engine.inScope(result.Findings), engine.described.readable())
 	return engine.askedRenames(suppressed.kept)
 }

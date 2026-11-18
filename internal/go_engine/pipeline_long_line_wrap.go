@@ -43,6 +43,8 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 		Timing:        engine.timing,
 		Analyzes:      engine.described.hasFileInScope,
 		SharedReads:   engine.reads,
+		// The fingerprints the builds share (#t7h2sm4): the host's last load reads the bytes the builds read.
+		Fingerprints: engine.fingerprints,
 	}
 	if engine.session != nil {
 		caching.Restorer = engine.session

@@ -12,8 +12,8 @@ import (
 // and whether each holds a go.mod, and wanted decides by path alone, so no build's target, tags or cgo changes what
 // it finds, and every extra build walked what the first had just walked, about 0.3 CPU-s a run at cohere's root.
 //
-// It is shared by loads after which nothing writes, which the extra builds' are and the host's first load is not, as
-// Fingerprints is: the long-line wrap writes between that load and the builds. A nil PackageWalks shares nothing, and
+// It is shared by loads after which nothing writes, which the extra builds' are and the host's first load is not: the
+// long-line wrap writes between that load and the builds. A nil PackageWalks shares nothing, and
 // each walk is walked again.
 type PackageWalks struct {
 	// computed counts the walks walked, which a test reads: one for each root and pattern however many builds ask.
