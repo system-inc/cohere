@@ -163,6 +163,11 @@ type graph struct {
 	// path for 64-bit keys. Keyed by the object itself, a key is two words, its type and its pointer, and every
 	// lookup hashes and compares both through the interface.
 	objects map[unsafe.Pointer]nodeIndex
+	// lastBy and lastByNode are the user use last asked node for and its node. A walk passes one user to every use
+	// in a body, so use asks node only when the user changes. The zero value is the root's own pair, as node(nil) is
+	// 0.
+	lastBy     types.Object
+	lastByNode nodeIndex
 
 	// namedTypes is every named type the package declares, a function's own among them, but no alias. The original
 	// calls them package-level, and its walk collects the local ones too.
@@ -452,7 +457,14 @@ func (graph *graph) use(used types.Object, by types.Object) {
 	}
 
 	usedNode := graph.node(used)
-	graph.addUse(graph.node(by), usedNode)
+	// The user's node is node(by), remembered from the last use by the same user. node gives an object the same index
+	// every time it is asked: the first ask makes the node, here or elsewhere, and no later ask changes it, the list or
+	// the map, so a remembered index is the one asking again would give, and the nodes are made in the same order.
+	if by != graph.lastBy {
+		graph.lastBy = by
+		graph.lastByNode = graph.node(by)
+	}
+	graph.addUse(graph.lastByNode, usedNode)
 }
 
 // colorAndQuieten is each node's state: seen from the root, and quiet when an unseen node owns it. The original colors

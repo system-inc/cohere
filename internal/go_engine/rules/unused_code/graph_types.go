@@ -114,12 +114,17 @@ func (graph *graph) namedType(typeName *types.TypeName, specification ast.Expr) 
 
 	hasHostLayout := false
 
+	// The struct's own type, which each field's search for exported fields starts having seen. The original asks for it
+	// once a field; the syntax is the same each time and the walk never writes typesInfo, so asking once gives the
+	// same type to every field.
+	declaredStruct, isDeclaredStruct := graph.typesInfo.TypeOf(structSyntax).(*types.Struct)
+
 	// Named structs are special in that their unexported fields are only used if they're being written to. That is,
 	// the fields are not used by the named type itself, nor are the types of the fields.
 	for _, field := range structSyntax.Fields.List {
 		seen := map[*types.Struct]struct{}{}
 		// For `type x struct { *x; F int }`, don't visit the embedded x
-		if declaredStruct, isDeclaredStruct := graph.typesInfo.TypeOf(structSyntax).(*types.Struct); isDeclaredStruct {
+		if isDeclaredStruct {
 			seen[declaredStruct] = struct{}{}
 		}
 		var hasExportedField func(goType types.Type) bool
