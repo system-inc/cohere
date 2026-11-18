@@ -57,7 +57,9 @@ func wholeDeclarationTypeReads(own *types.Package, info *types.Info, files []*as
 // leaves the general declaration's node and comment unvisited, and it reads every foreign type exactly as the walk of
 // each whole declaration did: over the standard library's packages named in useWalkSources and every one they import,
 // checked from source, and the function uses fixture's packages, both collect the same uses, selections and
-// closure-only reason.
+// closure-only reason. It proves the type reads alone, never the record: it sets the walk's function uses to nil
+// before it compares, and the reference returns early for a linknamed package and one without types, so those compare
+// equal without the walk being tried. What the record holds is the function uses tests' to pin.
 func TestTheUseWalkReadsAsTheWalkOfEachWholeDeclaration(test *testing.T) {
 	test.Parallel()
 
@@ -72,7 +74,8 @@ func TestTheUseWalkReadsAsTheWalkOfEachWholeDeclaration(test *testing.T) {
 		if walked.functionUses != nil {
 			recorded++
 		}
-		// The whole-declaration walk records no function uses: only the type reads are compared.
+		// The whole-declaration walk records no function uses, so the record is set to nil here and goes unchecked:
+		// only the type reads are compared.
 		walked.functionUses = nil
 		whole := wholeDeclarationTypeReads(own, source.info, source.files)
 		if !reflect.DeepEqual(walked, whole) {
