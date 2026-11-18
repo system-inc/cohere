@@ -34,8 +34,8 @@ func renderTable(header tableHeader, records []runRecord) string {
 	fmt.Fprintf(table, "# cohere pair: base %s against branch %s\n\n", shortCommit(header.base.commit),
 		shortCommit(header.branch.commit))
 	for _, binary := range []builtBinary{header.base, header.branch} {
-		fmt.Fprintf(table, "- %s `%s`, binary sha256 `%s`, %s\n", binary.side, binary.commit, prefix(binary.sha256, 8),
-			binary.tableLine)
+		fmt.Fprintf(table, "- %s `%s`, binary sha256 `%s`, %s, every build checked, given %s\n", binary.side,
+			binary.commit, prefix(binary.sha256, 8), binary.tableLine, describeEveryBuildArguments(binary))
 	}
 	fmt.Fprintf(table, "- host %s, %s/%s, %d cores, %s\n", header.host, header.goOperatingSystem,
 		header.goArchitecture, header.cores, header.goVersion)
