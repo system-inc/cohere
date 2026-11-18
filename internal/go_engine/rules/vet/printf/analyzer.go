@@ -147,11 +147,11 @@ func checkCalls(pass *analysis.Pass, kinds wrapperKinds) {
 			}
 			switch kinds.of(pass, callee) {
 			case kindPrintf:
-				checkPrintf(pass, fileVersion, kindPrintf, visited, fullName(callee))
+				checkPrintf(pass, fileVersion, kindPrintf, visited, calleeName{callee: callee})
 			case kindErrorf:
-				checkPrintf(pass, fileVersion, kindErrorf, visited, fullName(callee))
+				checkPrintf(pass, fileVersion, kindErrorf, visited, calleeName{callee: callee})
 			case kindPrint:
-				checkPrint(pass, visited, fullName(callee))
+				checkPrint(pass, visited, calleeName{callee: callee})
 			case kindNone:
 			}
 		}
@@ -164,6 +164,18 @@ func fullName(object types.Object) string {
 		return function.FullName()
 	}
 	return object.Name()
+}
+
+// calleeName is a called print function's full name, as fullName gives it, formatted only when a message is: every
+// message reads it with %s, which calls String. Formatting it for every call of a print function, though most calls
+// report nothing, was a share of checking each call a profile could see.
+type calleeName struct {
+	callee types.Object
+}
+
+// String is the callee's full name.
+func (name calleeName) String() string {
+	return fullName(name.callee)
 }
 
 // origin is the generic declaration of a function or variable, which facts are about.

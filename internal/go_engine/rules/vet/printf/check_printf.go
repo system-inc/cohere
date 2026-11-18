@@ -67,7 +67,7 @@ var printVerbs = []printVerb{
 }
 
 // checkPrintf checks a call of a printf function of kind, named name, in a file of fileVersion.
-func checkPrintf(pass *analysis.Pass, fileVersion string, kind wrapperKind, call *ast.CallExpr, name string) {
+func checkPrintf(pass *analysis.Pass, fileVersion string, kind wrapperKind, call *ast.CallExpr, name calleeName) {
 	formatIndex := formatStringIndex(pass, call)
 	if formatIndex < 0 || formatIndex >= len(call.Args) {
 		return
