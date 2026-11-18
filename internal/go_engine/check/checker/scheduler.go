@@ -327,12 +327,25 @@ func (scheduler *scheduler) run() {
 // work grants the free slots and runs the highest-priority ready action, again and again, until every group has
 // run or the graph is stuck.
 //
+// A worker keeps its slot of the run's pool across consecutive actions, and gives it back only before it waits,
+// before it returns, and before an action that only restores, which takes none (restoresOnly): an Acquire and a
+// Release around every action, about 389,000 a run, cost about 0.64 CPU-s of an every-build `--no-cache` run at
+// cohere's root, and keeping the slot took 0.07 s and 0.64 CPU-s off it on Shackler (#ybjbqm2). This cannot deadlock:
+// a holder still never waits while it holds a slot, since it gives it back before every wait and return, its actions
+// never wait (see schedule), and the scheduler's lock it takes between them is never held by anyone blocked on the
+// pool, since Acquire runs outside that lock and Release never blocks. The price is priority: a worker holding its
+// slot through a run of actions can keep a higher-priority action of another build waiting one action longer, which
+// left no cell slower, at cohere's root or the deeafbf4 corpus.
+//
 // The lock is released by hand rather than deferred: a panic out of an action's pass, which runs outside the lock,
 // would otherwise unlock an unlocked mutex, a fatal error, in place of the pass's own panic.
 func (scheduler *scheduler) work() {
+	// held is whether this worker holds a slot of the run's pool now, kept from one action to the next.
+	held := false
 	scheduler.lock.Lock()
 	for {
 		if scheduler.abandoned {
+			held = scheduler.giveBack(held)
 			// What has started finishes, since an action is never stopped part way; nothing more starts.
 			if scheduler.executing == 0 {
 				scheduler.wake.Broadcast()
@@ -344,33 +357,36 @@ func (scheduler *scheduler) work() {
 		}
 		scheduler.admit()
 		if scheduler.stuck != "" || scheduler.remaining == 0 && scheduler.running == 0 {
+			// The worker returns, so what giveBack leaves held is not needed.
+			scheduler.giveBack(held)
 			scheduler.lock.Unlock()
 			return
 		}
 		if scheduler.queue.length() > 0 {
 			next := scheduler.queue.take()
 			scheduler.executing++
-			scheduler.lock.Unlock()
-			// The run's pool, when there is one, bounds the actions of every build at once; a worker holds no other
-			// slot, and its action never waits on one (see schedule), so taking it here cannot deadlock. An action that
-			// only restores takes none (restoresOnly).
-			pool := scheduler.options.Pool
-			if next.action.restoresOnly() {
-				pool = nil
+			// takesSlot is whether next runs a pass under a slot of the run's pool, which, when there is one, bounds
+			// the actions of every build at once; an action that only restores takes none.
+			takesSlot := scheduler.options.Pool != nil && !next.action.restoresOnly()
+			if !takesSlot {
+				held = scheduler.giveBack(held)
 			}
-			if pool != nil {
-				pool.Acquire(bounded.ScaledPriority(next.group.priority, scheduler.longest))
+			scheduler.lock.Unlock()
+			if takesSlot && !held {
+				// A worker holds no other slot here, and its action never waits on one (see schedule), so taking it
+				// cannot deadlock.
+				scheduler.options.Pool.Acquire(bounded.ScaledPriority(next.group.priority, scheduler.longest))
+				held = true
 			}
 			next.action.exec()
-			if pool != nil {
-				pool.Release()
-			}
 			scheduler.lock.Lock()
 			scheduler.executing--
 			scheduler.finish(next)
 			scheduler.wake.Broadcast()
 			continue
 		}
+		// Given back before the worker waits, or returns as stuck below.
+		held = scheduler.giveBack(held)
 		if scheduler.executing == 0 && scheduler.awaiting == 0 {
 			// Invariant: a group waits only on actions on the packages its package imports, and on its package being
 			// final, and an action only on the actions on its own package that it requires, so with nothing queued,
@@ -383,6 +399,15 @@ func (scheduler *scheduler) work() {
 		}
 		scheduler.wake.Wait()
 	}
+}
+
+// giveBack gives the run's pool the slot a worker holds, when held, and returns false, what held is after. Release
+// never blocks, so it runs under the lock without holding it up. The lock is held.
+func (scheduler *scheduler) giveBack(held bool) bool {
+	if held {
+		scheduler.options.Pool.Release()
+	}
+	return false
 }
 
 // admit grants a slot to each ready group while one is free, the longest path first (takeFirst), and queues each
