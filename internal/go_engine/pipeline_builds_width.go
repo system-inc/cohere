@@ -27,23 +27,36 @@ const forcedCyclesMetric = "/gc/cycles/forced:gc-cycles"
 const markPollInterval = time.Millisecond
 
 // fixedBuildsWidth is how many of the run's extras extra builds run side by side when no heap need be measured for it,
-// and true then, decided once as they start (#b2t9xmf): one at a time unless the builds would restore packages from
-// host, the host's run, as a plain run's do (wouldRestoreFromHost), a test's forced width when it set one, one at a
-// time for the release's standard-library child, and one at a time when no heap could make it more (buildsWidth over
-// the smallest heap). It is false when the width is the memory's to decide: by what the first build holds
-// (measuredBuildsWidth), and in a run that takes the share gate (takesShareGate, shareGate), by the host's live heap
-// when every share is low (hostLiveBuildsWidth). The width never reaches a key or the verdict, only the lint record's
-// buildsAtOnce and the heap it was decided by: the builds' results and notes are taken in one order whatever it is
-// (extraBuildRuns).
+// and true then, decided once as they start (#b2t9xmf): one at a time when the builds would restore no package from
+// host, the host's run, as a plain run's do (wouldRestoreFromHost), unless hostMostlyHit, the host mostly hit its
+// findings store (hostMostlyHitStore), a test's forced width when it set one, one at a time for the release's
+// standard-library child, and one at a time when no heap could make it more (buildsWidth over the smallest heap). It
+// is false when the width is the memory's to decide: by what the first build holds (measuredBuildsWidth), and in a run
+// that takes the share gate (takesShareGate, shareGate), by the host's live heap when every share is low
+// (hostLiveBuildsWidth). The width never reaches a key or the verdict, only the lint record's buildsAtOnce and the heap
+// it was decided by: the builds' results and notes are taken in one order whatever it is (extraBuildRuns).
 //
 // Builds that restore nothing each check every package, about what the host's did: two of those side by side under
 // the cap drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
-// builds that restore most of their packages from the host ran 22% faster side by side. A run judging each build's
-// dependence restores nothing for its facts census alone and keeps a plain run's width (#f9br7sg): warm, its builds
-// each hit their own store, and cold, each build that checks most of its packages from source lints alone at the gate
-// (lintGate), so only their loads overlap.
-func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun) (int, bool) {
-	if !engine.buildsWidthUnguarded && !engine.wouldRestoreFromHost(host) {
+// builds that restore most of their packages from the host ran 22% faster side by side. The guard reads the entries
+// the host kept, and those say what the builds check only when the host had to check its packages itself. Three runs
+// keep none:
+//   - A host that mostly hit its store keeps none, since a hit is never kept, yet its builds mostly hit theirs, the
+//     same tree under their own keys. Before #syscache such a host still kept the standard library's packages it
+//     restored from the binary's table, so a warm run was never held here; #syscache removed the table, and those
+//     packages are hits of the system store now, kept no more, so every all-hit warm run was held at one at a time:
+//     1.39 s at cohere's root on Shackler, where it had read 7 at once and 1.05 s (#s1hdd3z). This run alone is let
+//     through, and a build that does check much from source is still bounded: in a plain run the share gate judges
+//     each build's share before its type check, and one over lowShareAtGate has the first build measured alone
+//     (measuredBuildsWidth), the case of a build whose own store is cold (#s8e6z0n); in a run judging each build's
+//     dependence, which takes no gate (takesShareGate), the measured rule bounds it the same way, and the run keeps a
+//     plain run's width, as on 6a06be201 (#f9br7sg).
+//   - A host that mostly missed its store, a cold fill, keeps every package it checked, so it keeps none only when
+//     its builds read nothing of it, the restore off: they check every package, and stay one at a time.
+//   - A run without a store whose builds restore nothing, after a rename that wrote or with the restore off, never
+//     regressed: it read one at a time before #syscache too, and nothing has measured that it should widen.
+func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun, hostMostlyHit bool) (int, bool) {
+	if !hostMostlyHit && !engine.buildsWidthUnguarded && !engine.wouldRestoreFromHost(host) {
 		return 1, true
 	}
 	if engine.buildsWidthForced > 0 {
@@ -115,10 +128,15 @@ func (engine *pipeline) takesShareGate(hostCache check.CacheCounts) bool {
 	if engine.censusKeepsHostRestoreOff {
 		return false
 	}
-	if !engine.withFindingsStore() {
-		return true
-	}
-	return hostMissedShare(hostCache) <= lowShareAtGate
+	return !engine.withFindingsStore() || engine.hostMostlyHitStore(hostCache)
+}
+
+// hostMostlyHitStore reports whether the run has a findings store and hostCache, what the host's session did, says
+// the host mostly hit it: its missed share (hostMissedShare) at or under lowShareAtGate, the share gate's line
+// (takesShareGate). A run without a store is never one, whatever its counts. Its builds then mostly hit their own
+// stores, which is what lets their width past the guard for builds that restore nothing (fixedBuildsWidth, #s1hdd3z).
+func (engine *pipeline) hostMostlyHitStore(hostCache check.CacheCounts) bool {
+	return engine.withFindingsStore() && hostMissedShare(hostCache) <= lowShareAtGate
 }
 
 // hostMissedShare is the share of the packages the host's store answered for that it missed, checked from source over
