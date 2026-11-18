@@ -253,6 +253,10 @@ type CacheSession struct {
 	// run computes again and its write replaces (withoutDamage).
 	refusedFromTable map[cache.Key]bool
 
+	// answersComputedWhole counts the packages whose every answer demandOf had the resolver compute (WholeIfComplete),
+	// the dearest part of an entry, which a test reads to see what a run computed only to collect it.
+	answersComputedWhole atomic.Int64
+
 	counts       CacheCounts
 	factsSkipped atomic.Int64
 

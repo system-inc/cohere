@@ -309,6 +309,7 @@ func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand)
 	demanded := entryDemand{}
 	if !session.caching.AnswersInPart[saved.PkgPath] {
 		if home := session.resolver.Package(saved.Types); home != nil {
+			session.answersComputedWhole.Add(1)
 			if whole, complete := session.resolver.WholeIfComplete(home); complete {
 				demanded.answers, demanded.answersWhole = sortedAnswers(whole, true), true
 			}

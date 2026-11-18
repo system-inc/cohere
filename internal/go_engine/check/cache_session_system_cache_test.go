@@ -917,6 +917,14 @@ func TestAnEntryTheTableWouldRefuseIsNeverCollected(test *testing.T) {
 	if collected := len(factless.StandardLibrary.Collected); collected != 0 {
 		test.Errorf("want no entry checked without its fact analyzer collected, got %d", collected)
 	}
+	// Judged before its answers are computed whole: a run that answers on demand, with ctrlflow, but never runs the
+	// counting fact analyzer its session expects, computes no package's answers.
+	answering := houseRule(ctrlflow.Analyzer)
+	unanswered := runSessionWith(test, directory, systemCacheCaching(nil, context), []rule.Rule{counting, answering},
+		[]rule.Rule{answering})
+	if whole := unanswered.session.answersComputedWhole.Load(); whole != 0 {
+		test.Errorf("want no answers computed whole for entries short of a fact analyzer, got %d", whole)
+	}
 
 	rules := []rule.Rule{counting, houseRule(ctrlflow.Analyzer)}
 	inPart := systemCacheCaching(nil, context)
@@ -955,6 +963,86 @@ func TestAPackageTheTableRestoredRecordsNoReads(test *testing.T) {
 	}
 	if loaded.ReadsRecorded != 0 {
 		test.Errorf("want no package's reads recorded, got %d", loaded.ReadsRecorded)
+	}
+}
+
+// storelessSystemCacheRun is a session without a store keeping a system cache at system, as under `--no-cache`, run
+// over directory under environment with rules, the host's run of a run with extra builds when host is nil, kept for
+// them, or a build restoring from host, each recording the reads its system cache records.
+func storelessSystemCacheRun(
+	test *testing.T,
+	directory string,
+	system *cache.Store,
+	rules []rule.Rule,
+	environment []string,
+	host *HostRun,
+) (*CacheSession, *Result) {
+	test.Helper()
+	context := standardLibraryContext("check tests", goRootOf(test))
+	context.Build = append(context.Build, environment...)
+	caching := systemCacheCaching(system, context)
+	caching.Context.Build = environment
+	session := NewCacheSession(caching, rules)
+	recordReads := session.RecordsReadsForTable
+	if host == nil {
+		session.KeepForBuilds()
+		recordReads = load.EveryPackage
+	} else {
+		session.RestoreFromHost(host)
+	}
+	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, append([]string{"GOWORK=off"},
+		environment...), nil, load.Caching{Restorer: session, RecordReads: recordReads})
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading under %q: %v %+v", environment, loadError, loaded.Diagnostics)
+	}
+	result, runError := Run(loaded.Packages, rules, Options{Cache: session, Withheld: loaded.Withheld,
+		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots, KeepForBuilds: host == nil})
+	if runError != nil || len(result.Crashes) > 0 {
+		test.Fatalf("running under %q: %v %+v", environment, runError, result.Crashes)
+	}
+	result.ReadWalks.Wait()
+	return session, result
+}
+
+// A warm extra build without a store never computes the answers of a standard-library package whole only for its
+// table's write to leave it out (importsReadableAtWrite): a windows build restoring its standard library from the
+// host's run checks from source the packages windows compiles otherwise, above packages restored from the host, which
+// its own table never holds, so the write could read none of their export data. Its cold run writes the few it can
+// read, those importing only what it computed too, and its warm run restores those and computes no package's answers
+// whole, where judging them after the answers, as the profile of #syscache's pair found, computes them for each of the
+// others on every run.
+func TestAWarmBuildComputesNoAnswersForAnEntryItsTableCouldNotRead(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	rules := []rule.Rule{countingFactRule(&sync.Map{}), houseRule(ctrlflow.Analyzer)}
+	system := cache.OpenAt(filepath.Join(test.TempDir(), "go", "standard-library"))
+	_, hostResult := storelessSystemCacheRun(test, directory, system, rules, nil, nil)
+	if hostResult.Host.EntriesKept() == 0 {
+		test.Fatal("the host's run kept no entry, so the build restores nothing from it")
+	}
+	cold, coldResult := storelessSystemCacheRun(test, directory, system, rules, []string{"GOOS=windows"},
+		hostResult.Host)
+	persistRunReads(sessionRun{result: coldResult, session: cold})
+	if added, writeError := cold.WriteSystemCacheTable(); writeError != nil || added == 0 {
+		test.Fatalf("want the cold windows build to write its table, added %d: %v", added, writeError)
+	}
+	build, _ := storelessSystemCacheRun(test, directory, system, rules, []string{"GOOS=windows"}, hostResult.Host)
+	if len(build.fromSystemCache) == 0 {
+		test.Error("want the warm windows build to restore from its own table")
+	}
+	computed := 0
+	for keyed := range build.standardLibraryKeys {
+		if !build.restored(keyed) {
+			computed++
+		}
+	}
+	if computed == 0 {
+		test.Fatal("the windows build restored every standard-library package, so it tells nothing")
+	}
+	if whole := build.answersComputedWhole.Load(); whole != 0 {
+		test.Errorf("the windows build computed the answers of %d packages whole, of the %d it checked, want none",
+			whole, computed)
 	}
 }
 

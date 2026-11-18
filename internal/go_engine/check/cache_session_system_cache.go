@@ -399,13 +399,27 @@ func (session *CacheSession) tableHoldsNot(key cache.Key) bool {
 }
 
 // wholeForTable reports whether an entry of a package the run computed with actions, holding demanded, has the facts
-// and answers standardLibraryEntryWhole takes: an action of every fact analyzer, each of which leaves its analysis in
-// the entry (encodeEntry), and answers computed whole, every kind complete. Its reads are judged once they are whole
-// (PersistCollectedReads), and the write judges the entry again whole. An entry short of these is left out before it
-// is collected, or encoded when nothing else takes it (collectWithoutStore), so a run never collects an entry, persists
-// its reads and merges the table on every run only for the table to refuse it again, as an extra build's runtime, whose
-// answers a build cannot compute whole, would be.
+// and answers standardLibraryEntryWhole takes: an action of every fact analyzer (factsForTable), and answers computed
+// whole, every kind complete. Its reads are judged once they are whole (PersistCollectedReads), and the write judges
+// the entry again whole. An entry short of these is left out before it is collected, or encoded when nothing else
+// takes it (collectWithoutStore), so a run never collects an entry, persists its reads and merges the table on every
+// run only for the table to refuse it again, as an extra build's runtime, whose answers a build cannot compute whole,
+// would be.
 func (session *CacheSession) wholeForTable(actions []*checker.Action, demanded entryDemand) bool {
+	if !session.factsForTable(actions) || !session.answersWholeForTable(demanded) {
+		return false
+	}
+	for _, kind := range demanded.answers {
+		if !kind.Complete {
+			return false
+		}
+	}
+	return true
+}
+
+// factsForTable reports whether actions, a package's, hold an action of every fact analyzer, each of which leaves its
+// analysis in the package's entry (encodeEntry), as a table entry holds an analysis of each.
+func (session *CacheSession) factsForTable(actions []*checker.Action) bool {
 	ran := make(map[*analysis.Analyzer]bool, len(actions))
 	for _, action := range actions {
 		ran[action.Analyzer] = true
@@ -415,15 +429,49 @@ func (session *CacheSession) wholeForTable(actions []*checker.Action, demanded e
 			return false
 		}
 	}
-	if !session.answersWholeForTable(demanded) {
-		return false
-	}
-	for _, kind := range demanded.answers {
-		if !kind.Complete {
-			return false
-		}
-	}
 	return true
+}
+
+// importsReadableAtWrite is, of computed, the standard-library packages a store-less run could collect, those whose
+// export data the table's write could read: export data is shallow, so the write reads each entry against the entries
+// of the packages it imports, the table's and the run's (standardLibraryTableWith), and leaves out one whose import it
+// holds no entry of. So a package is readable when every package it imports, unsafe aside, which the type checker
+// holds, is one the table read at the run's start holds well, or one of computed that is readable in turn. An extra
+// build restores most of its standard library from the host's run, which its own table never holds, so the packages
+// it checks from source above them, those its own target compiles otherwise, would each have their answers computed
+// whole on every run, only for the write to leave them out (#syscache's pair, ccd884342's profile).
+func (session *CacheSession) importsReadableAtWrite(computed []*packages.Package) map[*packages.Package]bool {
+	isComputed := make(map[*packages.Package]bool, len(computed))
+	for _, keyed := range computed {
+		isComputed[keyed] = true
+	}
+	readable := make(map[*packages.Package]bool, len(computed))
+	judged := make(map[*packages.Package]bool, len(computed))
+	var judge func(keyed *packages.Package) bool
+	judge = func(keyed *packages.Package) bool {
+		if judged[keyed] {
+			return readable[keyed]
+		}
+		judged[keyed] = true
+		for _, imported := range keyed.Imports {
+			if imported.PkgPath == "unsafe" {
+				continue
+			}
+			key, standard := session.standardLibraryKeys[imported]
+			if standard && !session.tableHoldsNot(key) {
+				continue
+			}
+			if !isComputed[imported] || !judge(imported) {
+				return false
+			}
+		}
+		readable[keyed] = true
+		return true
+	}
+	for _, keyed := range computed {
+		judge(keyed)
+	}
+	return readable
 }
 
 // answersWholeForTable reports whether demanded's answers are every answer of its package, computed whole, as a table
@@ -467,14 +515,26 @@ func (session *CacheSession) collectWithoutStore(
 			actionsOf[action.Package] = append(actionsOf[action.Package], action)
 		}
 	}
+	// What the table could take is judged before anything is computed for it, the cheapest first: a package restored,
+	// from the table or the host's run, or one the table holds, or one with an action short or unsettled below it, is
+	// never collected; then one whose export data the write could not read; and only then are its answers computed
+	// whole (demandOf), which builds every function of the package again for the analyzers that answer on demand.
 	unsettled := session.unsettledBelow()
-	var saving []*packages.Package
+	var computed []*packages.Package
 	for keyed, key := range session.standardLibraryKeys {
 		if _, collected := standardLibrary.Collected[key]; collected || session.restored(keyed) || unsettled[keyed] ||
-			!session.tableHoldsNot(key) || !session.savable("collectWithoutStore", keyed, actionsOf[keyed]) {
+			!session.tableHoldsNot(key) || !session.savable("collectWithoutStore", keyed, actionsOf[keyed]) ||
+			!session.factsForTable(actionsOf[keyed]) {
 			continue
 		}
-		saving = append(saving, keyed)
+		computed = append(computed, keyed)
+	}
+	readable := session.importsReadableAtWrite(computed)
+	var saving []*packages.Package
+	for _, keyed := range computed {
+		if readable[keyed] {
+			saving = append(saving, keyed)
+		}
 	}
 	var collectLock sync.Mutex
 	session.fanOutWriting(len(saving), func(index int) func() {
