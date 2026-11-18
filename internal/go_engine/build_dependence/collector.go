@@ -358,8 +358,9 @@ func (collecting *collector) collectValue(
 }
 
 // addUses makes from's bit depend on the own bit of each object an identifier or selector under roots resolves to.
-// Type names are left to the structural walk of from's type, except where full, in a constant's value, where a type
-// name or a var is read in full. A package name, a builtin, nil and a label are the same in every build.
+// Type names are left to the structural walk of from's type, except where full, in a constant's value or an array's
+// length (usesVisitor.Visit), where a type name or a var is read in full. A package name, a builtin, nil and a label
+// are the same in every build.
 func (collecting *collector) addUses(from types.Object, fromUnderlying bool, full bool, roots ...ast.Node) {
 	collecting.usesWalk = usesVisitor{collecting: collecting, from: from, fromUnderlying: fromUnderlying, full: full}
 	for _, root := range roots {
