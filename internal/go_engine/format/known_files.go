@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
+	"maps"
 	"sync"
 )
 
@@ -37,6 +38,10 @@ type KnownFiles struct {
 
 	// seen are the verdicts the run read or learned, which are what Encode keeps, so files long gone are dropped.
 	seen map[[sha256.Size]byte]Verdict
+
+	// decoded are the verdicts as the run read them, which Changed compares seen with, so a run that kept them as it
+	// found them writes nothing (#b2t9xmf).
+	decoded map[[sha256.Size]byte]Verdict
 }
 
 // DecodeKnownFiles is the verdicts encoded, none when they do not decode.
@@ -46,7 +51,18 @@ func DecodeKnownFiles(encoded []byte) *KnownFiles {
 		// Ignored: verdicts that do not decode are none, and every file is formatted as if never seen.
 		_ = gob.NewDecoder(bytes.NewReader(encoded)).Decode(&known.verdicts)
 	}
+	known.decoded = maps.Clone(known.verdicts)
 	return known
+}
+
+// Changed reports whether what Encode would keep differs from what the run read: a verdict learned, changed or no
+// longer read. Encode's bytes can't say, since gob writes a map in no fixed order, so a run that would keep the
+// verdicts it read writes nothing: an all-hit warm run then writes no file of the store, whose writes move a shard
+// every build's pack must then read again (#b2t9xmf).
+func (known *KnownFiles) Changed() bool {
+	known.lock.Lock()
+	defer known.lock.Unlock()
+	return !maps.Equal(known.seen, known.decoded)
 }
 
 // Encode is the verdicts the run read or learned, to be decoded by DecodeKnownFiles.
