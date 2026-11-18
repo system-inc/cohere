@@ -106,11 +106,16 @@ func enterFile(context *rule.Context, file *ast.File) {
 func judgeNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 	switch declaring := node.(type) {
 	case *ast.Ident:
+		// The spelling is read first: a name spelled as words is never a finding, and that answers nearly every
+		// identifier from its own bytes, before the lookup in Defs, and builds the interface index only for a package
+		// where a method's name could be a finding.
+		if wordCased(declaring.Name) == declaring.Name {
+			return
+		}
 		// Defs holds an identifier only where it declares, so a use of a name declared elsewhere, another package's
-		// included, is never judged here. The spelling is read first, so the interface index is built only for a
-		// package where a method's name could be a finding.
+		// included, is never judged here.
 		object := context.TypesInfo.Defs[declaring]
-		if object == nil || wordCased(declaring.Name) == declaring.Name {
+		if object == nil {
 			return
 		}
 		state := rule.State[packageState](context)
@@ -248,6 +253,12 @@ func isScreamingSnakeCase(name string) bool {
 // followed by a lone s that ends the word is a plural initialism, so IDs becomes Ids. A name with no initialism comes
 // back unchanged, which is how the rule knows there is nothing to report.
 func wordCased(name string) string {
+	// A run of one capital lowers nothing, since the walk lowers from the run's second capital on, so a name whose
+	// capitals all stand alone comes back as it is. Nearly every name is one, and this answers it without the rune
+	// copy and the string built back from it.
+	if hasLoneCapitalsOnly(name) {
+		return name
+	}
 	runes := []rune(name)
 	start := 0
 	for start < len(runes) {
@@ -269,6 +280,24 @@ func wordCased(name string) string {
 		start = end
 	}
 	return string(runes)
+}
+
+// hasLoneCapitalsOnly is whether name is ASCII with no two capitals side by side. Only an ASCII name is read here,
+// where a byte is a rune and a capital is `A` to `Z`, exactly what unicode.IsUpper calls upper case below
+// utf8.RuneSelf; a name with any other byte goes to wordCased's walk, which reads its runes.
+func hasLoneCapitalsOnly(name string) bool {
+	previousIsCapital := false
+	for index := range len(name) {
+		if name[index] >= utf8.RuneSelf {
+			return false
+		}
+		isCapital := 'A' <= name[index] && name[index] <= 'Z'
+		if isCapital && previousIsCapital {
+			return false
+		}
+		previousIsCapital = isCapital
+	}
+	return true
 }
 
 // isPluralEnding is whether the lower-case letter at index is an s that ends its word: the end of the name, or a rune

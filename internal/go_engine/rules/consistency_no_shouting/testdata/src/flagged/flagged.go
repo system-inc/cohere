@@ -171,6 +171,11 @@ func ExampleLoud() {
  * // want +2 `^"NEVER" in a comment` `^"ALWAYS" in a comment`
  */
 
+// The group is asked for a shout before it is masked, and the asking reads past every acronym before one.
+
+// the API and the HTTP client, the JSON and the SQL,
+// and a retry is NEVER safe // want `^"NEVER" in a comment`
+
 // A word said twice is two findings, one at each.
 
 // NEVER, and I mean NEVER // want `^"NEVER" in a comment` `^"NEVER" in a comment`

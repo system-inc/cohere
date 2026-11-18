@@ -2,6 +2,7 @@ package consistency_no_any
 
 import (
 	"flag"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -42,10 +43,11 @@ func flowSource(withAny bool, assignments int) string {
 		"}\n"
 }
 
-// checkedPackage is one type-checked file, the pass the rule is run on, and each node the syntax dispatcher would call
-// the listener on.
+// checkedPackage is a type-checked package, its first file, the pass the rule is run on, and each node the syntax
+// dispatcher would call the listener on, in the order of its files.
 type checkedPackage struct {
 	file  *ast.File
+	files []*ast.File
 	pass  *analysis.Pass
 	heard []heardNode
 }
@@ -56,14 +58,19 @@ type heardNode struct {
 	stack []ast.Node
 }
 
-// checkedPackageOf parses and type-checks source, gives its pass the package's inspector, as the dispatcher's pass
-// holds it, and keeps each node of a kind the listener lists, as the dispatcher's walk calls Node on no other.
-func checkedPackageOf(test *testing.T, source string) checkedPackage {
+// checkedPackageOf parses and type-checks sources, a file each in that order, gives its pass the package's inspector,
+// as the dispatcher's pass holds it, and keeps each node of a kind the listener lists, as the dispatcher's walk calls
+// Node on no other.
+func checkedPackageOf(test *testing.T, sources ...string) checkedPackage {
 	test.Helper()
 	fileSet := token.NewFileSet()
-	file, parseError := parser.ParseFile(fileSet, "flows.go", source, parser.ParseComments)
-	if parseError != nil {
-		test.Fatalf("parsing the package: %v", parseError)
+	files := []*ast.File{}
+	for index, source := range sources {
+		file, parseError := parser.ParseFile(fileSet, fmt.Sprintf("flows_%d.go", index), source, parser.ParseComments)
+		if parseError != nil {
+			test.Fatalf("parsing the package: %v", parseError)
+		}
+		files = append(files, file)
 	}
 	information := &types.Info{
 		Types:      map[ast.Expr]types.TypeAndValue{},
@@ -74,7 +81,7 @@ func checkedPackageOf(test *testing.T, source string) checkedPackage {
 		Selections: map[*ast.SelectorExpr]*types.Selection{},
 		Scopes:     map[ast.Node]*types.Scope{},
 	}
-	checked, checkError := (&types.Config{}).Check("example.com/flows", fileSet, []*ast.File{file}, information)
+	checked, checkError := (&types.Config{}).Check("example.com/flows", fileSet, files, information)
 	if checkError != nil {
 		test.Fatalf("type-checking the package: %v", checkError)
 	}
@@ -83,26 +90,29 @@ func checkedPackageOf(test *testing.T, source string) checkedPackage {
 		listed[reflect.TypeOf(kind)] = true
 	}
 	heard := []heardNode{}
-	stack := []ast.Node{}
-	ast.Inspect(file, func(node ast.Node) bool {
-		if node == nil {
-			stack = stack[:len(stack)-1]
+	for _, file := range files {
+		stack := []ast.Node{}
+		ast.Inspect(file, func(node ast.Node) bool {
+			if node == nil {
+				stack = stack[:len(stack)-1]
+				return true
+			}
+			if listed[reflect.TypeOf(node)] {
+				heard = append(heard, heardNode{node: node, stack: append([]ast.Node{}, stack...)})
+			}
+			stack = append(stack, node)
 			return true
-		}
-		if listed[reflect.TypeOf(node)] {
-			heard = append(heard, heardNode{node: node, stack: append([]ast.Node{}, stack...)})
-		}
-		stack = append(stack, node)
-		return true
-	})
+		})
+	}
 	return checkedPackage{
-		file: file,
+		file:  files[0],
+		files: files,
 		pass: &analysis.Pass{
 			Fset:      fileSet,
-			Files:     []*ast.File{file},
+			Files:     files,
 			Pkg:       checked,
 			TypesInfo: information,
-			ResultOf:  map[*analysis.Analyzer]any{inspect.Analyzer: inspector.New([]*ast.File{file})},
+			ResultOf:  map[*analysis.Analyzer]any{inspect.Analyzer: inspector.New(files)},
 		},
 		heard: heard,
 	}
@@ -114,6 +124,7 @@ func (checked checkedPackage) run() (*packageState, []analysis.Diagnostic) {
 	reported := []analysis.Diagnostic{}
 	context := rule.NewContext(Name, checked.pass, listener.Requires, flag.NewFlagSet(Name, flag.ContinueOnError), nil,
 		func(_ string, diagnostic analysis.Diagnostic) { reported = append(reported, diagnostic) })
+	// The walk enters each file before hearing its nodes, and the rule reads only its first entry.
 	enterFile(context, checked.file)
 	for _, each := range checked.heard {
 		judgeNode(context, each.node, each.stack)

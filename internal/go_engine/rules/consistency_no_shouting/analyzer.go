@@ -128,8 +128,9 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 		spans = append(spans, commentSpan{comment: comment, start: start, end: joined.Len(), bodyStart: bodyStart})
 	}
 	text := joined.String()
-	// The shared gate: without two capitals in a row nothing can be reported, so most groups skip the masking.
-	if !shouting.HasAdjacentUppercaseLetters(text) {
+	// The shared gate: a word masking leaves is a word of the text, so a text whose capital words are all acronyms
+	// reports nothing, and most groups that reach here skip the masking.
+	if !shouting.HasShoutedToken(text) {
 		return
 	}
 	masked := shouting.MaskCodeAndCommands(text)

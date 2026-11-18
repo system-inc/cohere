@@ -95,3 +95,6 @@ var MD5 = "digest" // want `"MD5" .* Use "Md5"`
 
 // A sentence in a comment never names anything, so URL here is quiet; the declaration below is not.
 var sessionTTL = 3 // want `"sessionTTL" .* Use "sessionTtl"`
+
+// A capital outside ASCII is a capital too, so Δ and T are a run of two, and only a walk of the name's runes sees it.
+var averageΔT = 4 // want `"averageΔT" .* Use "averageΔt"`

@@ -106,6 +106,15 @@ func judgeNode(context *rule.Context, node ast.Node, stack []ast.Node) {
 // walked for the nodes that hand a value on, rather than every package keeping each one as the dispatcher's walk met
 // it. The walk covers the inspector's whole root, the same files the dispatcher's walk covers, and settle marks the
 // same declarations in any order the flows are recorded, so no finding changes.
+//
+// The walk takes the files holding a candidate first, where a candidate's type is most often fixed, and stops before
+// the next top-level declaration once every candidate is fixed. A package writing a few anys that are all fixed
+// near where they are written, as nearly every package holding one does, then records a fraction of its flows rather
+// than all of them. That changes no finding: a flow only ever marks a declaration fixed, and settle only marks more,
+// so a candidate fixed by the flows recorded so far stays fixed however many more are recorded, and with every
+// candidate fixed there is nothing to report. A package with a candidate left unfixed is walked whole, in another
+// order of its files, which settle does not see. The methods are matched before the walk, so a candidate a method
+// fixes counts as fixed from the start, and the lookups each match records are the same ones, in the same order.
 func exitPackage(context *rule.Context) {
 	state := rule.State[packageState](context)
 	if state.flows == nil || len(state.candidates) == 0 {
@@ -118,10 +127,9 @@ func exitPackage(context *rule.Context) {
 		// package reports nothing.
 		return
 	}
-	for cursor := range walker.Root().Preorder(handingKinds...) {
-		state.flows.record(cursor)
-	}
-	state.flows.settle(state.candidates)
+	state.flows.matchMethods(state.candidates)
+	state.flows.recordUntilFixed(walker.Root(), state.candidates)
+	state.flows.settle()
 	for _, found := range state.candidates {
 		if !state.flows.anyFixed(found.declarations) {
 			context.Report(analysis.Diagnostic{

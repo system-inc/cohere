@@ -120,6 +120,17 @@ func isAsciiUppercase(character byte) bool {
 	return character >= 'A' && character <= 'Z'
 }
 
+// containsAsciiUppercase reports whether any byte of the name is a capital A to Z. A byte of a multibyte rune is
+// never one, so a non-ASCII capital, which no form's literal text holds, does not count.
+func containsAsciiUppercase(name string) bool {
+	for index := range len(name) {
+		if isAsciiUppercase(name[index]) {
+			return true
+		}
+	}
+	return false
+}
+
 func isAsciiLowercase(character byte) bool {
 	return character >= 'a' && character <= 'z'
 }
@@ -143,6 +154,15 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 
 	if entry, found := vocabulary.WholeByName[name]; found {
 		return wholeFinding(entry, name), true
+	}
+
+	// Past the whole word every form needs an ASCII capital in the name, so a name with none, most of the names an
+	// engine declares, finds nothing and is answered here. Load accepts only letters a to z in an abbreviation, which
+	// is what makes each form's capital certain: a prefix ends at one (prefixEntry), a suffix and a segment are the
+	// abbreviation capitalized, the millisecond word holds `Ms`, and an allowed segment only ever says nothing is
+	// found. find_equivalence_test.go and prefix_index_test.go hold this to the Finds without it.
+	if !containsAsciiUppercase(name) {
+		return Finding{}, false
 	}
 
 	prefix := vocabulary.prefixEntry(name)
