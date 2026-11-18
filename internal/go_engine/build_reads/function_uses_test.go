@@ -107,10 +107,15 @@ const (
 `},
 }
 
-// functionUsesOfFixture are the fixture's first package's declarations' uses, each declaration's identity, then each
-// part's uses, signature and body apart, written out and sorted (see writtenPartUses), and how many of the identities
-// written were unknown.
-func functionUsesOfFixture(test *testing.T) (map[string][]string, int) {
+// checkedFixturePackage is one of the function uses fixture's packages, checked: its types and its source.
+type checkedFixturePackage struct {
+	own    *types.Package
+	source checkedSource
+}
+
+// checkedFunctionUsesFixture is the function uses fixture's packages checked, in the order functionUsesSources lists
+// them, and the file set that places them.
+func checkedFunctionUsesFixture(test *testing.T) (*token.FileSet, []checkedFixturePackage) {
 	test.Helper()
 
 	fileSet := token.NewFileSet()
@@ -121,8 +126,7 @@ func functionUsesOfFixture(test *testing.T) (map[string][]string, int) {
 		}
 		return nil, fmt.Errorf("no package %s", path)
 	})}
-	var uses *FunctionUses
-	var recorded bool
+	packagesChecked := make([]checkedFixturePackage, 0, len(functionUsesSources))
 	for _, source := range functionUsesSources {
 		file, parseError := parser.ParseFile(fileSet, source.file, source.source, parser.SkipObjectResolution)
 		if parseError != nil {
@@ -141,10 +145,23 @@ func functionUsesOfFixture(test *testing.T) (map[string][]string, int) {
 			test.Fatalf("type-checking %s: %v", source.path, checkError)
 		}
 		checked[source.path] = own
-		reads := &Reads{}
-		reads.RecordTypes(own, info, []*ast.File{file})
-		uses, recorded = reads.FunctionUses()
+		packagesChecked = append(packagesChecked, checkedFixturePackage{own: own,
+			source: checkedSource{files: []*ast.File{file}, info: info}})
 	}
+	return fileSet, packagesChecked
+}
+
+// functionUsesOfFixture are the fixture's first package's declarations' uses, each declaration's identity, then each
+// part's uses, signature and body apart, written out and sorted (see writtenPartUses), and how many of the identities
+// written were unknown.
+func functionUsesOfFixture(test *testing.T) (map[string][]string, int) {
+	test.Helper()
+
+	fileSet, packagesChecked := checkedFunctionUsesFixture(test)
+	first := packagesChecked[len(packagesChecked)-1]
+	reads := &Reads{}
+	reads.RecordTypes(first.own, first.source.info, first.source.files)
+	uses, recorded := reads.FunctionUses()
 	if !recorded {
 		test.Fatal("want the first package's function uses recorded")
 	}
