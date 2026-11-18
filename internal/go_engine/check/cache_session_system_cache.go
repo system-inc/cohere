@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sync"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
 
@@ -337,14 +338,31 @@ type waitingEntry struct {
 // analyzers, each of which a whole entry holds an analysis of, since every action on a package leaves its analysis in
 // the entry, facts or none, so the entry says which ran and the session says which had to; and whether its answers
 // were computed whole. An entry whose write to the store waits for the table (KeptBySystemCache) is kept as encoded
-// until then. The caller holds the lock the save counts under.
-func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry, demanded entryDemand) {
+// until then. An entry the table would not take, under a key the table holds already or short of what it takes
+// (tableTakes), is not collected, so a run that computes nothing new collects nothing and its write does nothing; one
+// that waits for the table still waits, and the store takes it at the write, as any entry the table refuses. The
+// caller holds the lock the save counts under.
+func (session *CacheSession) collect(
+	saved *packages.Package,
+	entry encodedEntry,
+	demanded entryDemand,
+	actions []*checker.Action,
+) {
 	standardLibrary := session.caching.StandardLibrary
 	if standardLibrary == nil || standardLibrary.Collected == nil {
 		return
 	}
 	key, standard := session.standardLibraryKeys[saved]
 	if !standard {
+		return
+	}
+	if session.caching.Store != nil && session.KeptBySystemCache(saved) {
+		if session.waitingForTable == nil {
+			session.waitingForTable = map[cache.Key]waitingEntry{}
+		}
+		session.waitingForTable[key] = waitingEntry{storeKey: session.keys[saved], entry: entry}
+	}
+	if !session.tableHoldsNot(key) || !session.wholeForTable(actions, demanded) {
 		return
 	}
 	// The table is written from whole entries, reads and body together.
@@ -357,24 +375,64 @@ func (session *CacheSession) collect(saved *packages.Package, entry encodedEntry
 	for _, analyzer := range session.known.facts {
 		factAnalyzers = append(factAnalyzers, session.known.slots[analyzer])
 	}
-	// The resolver learns a package as ctrlflow's action on it ends, and answers a question only of a package it
-	// learned (fact_resolver's Owner), so a rule that asks a fact on demand runs ctrlflow. In a run with no ctrlflow
-	// nothing is ever asked, and neither is anything in a run that reads this table, since its key holds the fact
-	// analyzers, ctrlflow among them whenever a rule asks: the answers it holds, none, are all there will ever be.
-	asksOnDemand := slices.Contains(session.known.facts, ctrlflow.Analyzer)
 	standardLibrary.Collected[key] = StandardLibraryRunEntry{
 		PackagePath:   saved.PkgPath,
 		Entry:         whole,
 		ExportData:    entry.exportData,
 		FactAnalyzers: factAnalyzers,
-		AnswersWhole:  demanded.answersWhole || !asksOnDemand,
+		AnswersWhole:  session.answersWholeForTable(demanded),
 	}
-	if session.caching.Store != nil && session.KeptBySystemCache(saved) {
-		if session.waitingForTable == nil {
-			session.waitingForTable = map[cache.Key]waitingEntry{}
+}
+
+// tableHoldsNot reports whether the system cache's table, as the run read it, holds no good entry under key: none at
+// all, or one whose restore the run refused (refusedFromTable), which the run's entry replaces at its write
+// (withoutDamage). An entry the table holds is never written again, so the run's entry of a key it holds well, a
+// package the run computed again only because its hit fell short of what the run asked (dropShortHits), is never
+// collected.
+func (session *CacheSession) tableHoldsNot(key cache.Key) bool {
+	read := session.systemCacheTable
+	if read == nil || read.Problem() != nil || session.refusedFromTable[key] {
+		return true
+	}
+	_, holds := read.Lookup(key)
+	return !holds
+}
+
+// wholeForTable reports whether an entry of a package the run computed with actions, holding demanded, has the facts
+// and answers standardLibraryEntryWhole takes: an action of every fact analyzer, each of which leaves its analysis in
+// the entry (encodeEntry), and answers computed whole, every kind complete. Its reads are judged once they are whole
+// (PersistCollectedReads), and the write judges the entry again whole. An entry short of these is left out before it
+// is collected, or encoded when nothing else takes it (collectWithoutStore), so a run never collects an entry, persists
+// its reads and merges the table on every run only for the table to refuse it again, as an extra build's runtime, whose
+// answers a build cannot compute whole, would be.
+func (session *CacheSession) wholeForTable(actions []*checker.Action, demanded entryDemand) bool {
+	ran := make(map[*analysis.Analyzer]bool, len(actions))
+	for _, action := range actions {
+		ran[action.Analyzer] = true
+	}
+	for _, analyzer := range session.known.facts {
+		if !ran[analyzer] {
+			return false
 		}
-		session.waitingForTable[key] = waitingEntry{storeKey: session.keys[saved], entry: entry}
 	}
+	if !session.answersWholeForTable(demanded) {
+		return false
+	}
+	for _, kind := range demanded.answers {
+		if !kind.Complete {
+			return false
+		}
+	}
+	return true
+}
+
+// answersWholeForTable reports whether demanded's answers are every answer of its package, computed whole, as a table
+// entry's are. The resolver learns a package as ctrlflow's action on it ends, and answers a question only of a package
+// it learned (fact_resolver's Owner), so a rule that asks a fact on demand runs ctrlflow. In a run with no ctrlflow
+// nothing is ever asked, and neither is anything in a run that reads this table, since its key holds the fact
+// analyzers, ctrlflow among them whenever a rule asks: the answers it holds, none, are all there will ever be.
+func (session *CacheSession) answersWholeForTable(demanded entryDemand) bool {
+	return demanded.answersWhole || !slices.Contains(session.known.facts, ctrlflow.Analyzer)
 }
 
 // waitWithRecord gives saved's entry, waiting for the system cache's table, its dependence record, which the store
@@ -413,7 +471,7 @@ func (session *CacheSession) collectWithoutStore(
 	var saving []*packages.Package
 	for keyed, key := range session.standardLibraryKeys {
 		if _, collected := standardLibrary.Collected[key]; collected || session.restored(keyed) || unsettled[keyed] ||
-			!session.savable("collectWithoutStore", keyed, actionsOf[keyed]) {
+			!session.tableHoldsNot(key) || !session.savable("collectWithoutStore", keyed, actionsOf[keyed]) {
 			continue
 		}
 		saving = append(saving, keyed)
@@ -422,6 +480,13 @@ func (session *CacheSession) collectWithoutStore(
 	session.fanOutWriting(len(saving), func(index int) func() {
 		saved := saving[index]
 		demanded := session.withBodiless(saved, session.demandOf(saved, session.previous[saved]))
+		// Nothing but the table takes the entry here, so one it would refuse is not encoded at all.
+		if !session.wholeForTable(actionsOf[saved], demanded) {
+			return func() {
+				// Neither collected nor counted: the table refuses it, and a session without a store keeps nothing
+				// else.
+			}
+		}
 		entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved], withheld[saved],
 			demanded, nil, nil, nil, true)
 		return func() {
@@ -433,7 +498,7 @@ func (session *CacheSession) collectWithoutStore(
 			case encodeError != nil:
 				session.problem(encodeError.Error())
 			default:
-				session.collect(saved, entry, demanded)
+				session.collect(saved, entry, demanded, actionsOf[saved])
 			}
 		}
 	})
@@ -470,12 +535,6 @@ func (session *CacheSession) WriteSystemCacheTable() (added int, returned error)
 	// waited and is not among them is in the store by then, the first write that failed joined to what this returns.
 	inTable := map[cache.Key]bool{}
 	defer func() { returned = errors.Join(returned, session.storeWhatTheTableRefused(inTable)) }()
-	standardLibrary := session.caching.StandardLibrary
-	if standardLibrary == nil || standardLibrary.System == nil || len(standardLibrary.Collected) == 0 ||
-		session.standardLibraryContext == nil {
-		return 0, nil
-	}
-	shared := *session.standardLibraryContext
 	held := map[cache.Key]cache.StandardLibraryEntry{}
 	if read := session.systemCacheTable; read != nil && read.Problem() == nil {
 		for _, key := range read.Keys() {
@@ -484,6 +543,14 @@ func (session *CacheSession) WriteSystemCacheTable() (added int, returned error)
 			inTable[key] = true
 		}
 	}
+	// With nothing collected, as in a warm run whose table held all it computed, or where the table would take none
+	// of it, nothing is merged or written: what waited is stored or not by the table as read.
+	standardLibrary := session.caching.StandardLibrary
+	if standardLibrary == nil || standardLibrary.System == nil || len(standardLibrary.Collected) == 0 ||
+		session.standardLibraryContext == nil {
+		return 0, nil
+	}
+	shared := *session.standardLibraryContext
 	readAgainst := make(map[cache.Key]bool, len(session.standardLibraryKeys))
 	for _, key := range session.standardLibraryKeys {
 		readAgainst[key] = true

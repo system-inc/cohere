@@ -958,7 +958,7 @@ func (session *CacheSession) saveMisses(
 				if entry.hasOutput {
 					session.outputs[saved] = entry.output
 				}
-				session.collect(saved, entry, demanded)
+				session.collect(saved, entry, demanded, actionsOf[saved])
 				if systemCacheOnly && keepsRecord {
 					session.waitWithRecord(saved, record)
 				}
@@ -1016,17 +1016,23 @@ func (session *CacheSession) savable(saver string, keyed *packages.Package, acti
 // system cache, whose entry waits for the system cache's table (#syscache): the project's store takes it only when the
 // table refuses it (WriteSystemCacheTable). A run that keeps no system cache, under `--no-system-cache` or with no
 // root, keys no package apart, and the store takes every one as it always has.
-//
-// It is the load's load.Caching.RecordReads in a run that records reads for the system cache alone, asked once the
-// restore has keyed the standard library, so the reads recorded are of the packages the table could take, by the set
-// the restore judged, and of nothing a table never holds. A package restored from the table is never checked, so its
-// reads are marked never as restored and never walked: a warm run pays nothing for them.
 func (session *CacheSession) KeptBySystemCache(keyed *packages.Package) bool {
 	if !session.KeepsSystemCache() {
 		return false
 	}
 	_, standard := session.standardLibraryKeys[keyed]
 	return standard
+}
+
+// RecordsReadsForTable reports whether a run that records reads for the system cache alone records keyed's: a
+// standard-library package the session keys apart (KeptBySystemCache) that its table did not restore. It is the
+// load's load.Caching.RecordReads in such a run, asked once the restore has keyed the standard library and read the
+// table, so the reads recorded are of the packages the table could still take, by the set the restore judged, and of
+// nothing a table never holds or holds already: a warm run whose table held all of it records nothing. A package
+// restored from the host's run is recorded still, since a decline at the load or the check has it checked from source
+// after the reads are made, and then its entry is one the build's table takes; restored, it is never walked.
+func (session *CacheSession) RecordsReadsForTable(keyed *packages.Package) bool {
+	return session.KeptBySystemCache(keyed) && !session.fromSystemCache[keyed]
 }
 
 // aliasWritten gives each package of written whose entry, of encoded, has no finding naming a file outside it an alias

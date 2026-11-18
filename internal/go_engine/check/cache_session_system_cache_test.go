@@ -858,6 +858,106 @@ func TestARunWithoutAStoreNamesEveryStandardLibraryRead(test *testing.T) {
 	}
 }
 
+// A run whose table holds every standard-library package it computes collects nothing, so it persists no reads and
+// merges no table (tableHoldsNot): a table whose unicode/utf8 lacks the analysis of the run's fact analyzer, which
+// dropShortHits drops so the run computes utf8 again, holds utf8 still, so the run's utf8 is never collected, and with
+// nothing else new the write adds nothing.
+func TestARunTheTableHoldsAllItComputesCollectsNothing(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	context := standardLibraryContext("check tests", goRootOf(test))
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	system, _ := seededTable(test, directory, context, rules,
+		func(collecting sessionRun, entries map[cache.Key]cache.StandardLibraryEntry) {
+			utf8Key := standardKeyOf(test, collecting, "unicode/utf8")
+			held := entries[utf8Key]
+			tableEntry, decodeError := decodeStandardLibraryEntry(held.Entry)
+			if decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			tableEntry.Analyzers = nil
+			short, encodeError := encodeStandardLibraryEntry(tableEntry)
+			if encodeError != nil {
+				test.Fatal(encodeError)
+			}
+			held.Entry = short
+			entries[utf8Key] = held
+		})
+	caching := systemCacheCaching(system, context)
+	run := runSessionWith(test, directory, caching, rules, rules)
+	if run.result.Cache.FromSystemCache == len(run.session.standardLibraryKeys) {
+		test.Fatal("the run restored every package from the table, so it computed utf8 nowhere and tells nothing")
+	}
+	if collected := caching.StandardLibrary.Collected; len(collected) != 0 {
+		paths := make([]string, 0, len(collected))
+		for _, entry := range collected {
+			paths = append(paths, entry.PackagePath)
+		}
+		test.Errorf("want nothing collected of what the table holds, got %q", paths)
+	}
+	if added := writtenTable(test, run); added != 0 {
+		test.Errorf("want the write to add nothing, got %d", added)
+	}
+}
+
+// An entry the table would refuse is never collected (wholeForTable), nor encoded where nothing else takes it, so a run
+// never persists its reads and merges the table only for the table to refuse it again: a run whose session expects a
+// fact analyzer it never runs collects no standard-library package, and one whose strings answers were computed in
+// part collects no strings.
+func TestAnEntryTheTableWouldRefuseIsNeverCollected(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	context := standardLibraryContext("check tests", goRootOf(test))
+	counting := countingFactRule(&sync.Map{})
+	clauses := houseRule(packageClauseAnalyzer)
+	factless := systemCacheCaching(nil, context)
+	runSessionWith(test, directory, factless, []rule.Rule{counting, clauses}, []rule.Rule{clauses})
+	if collected := len(factless.StandardLibrary.Collected); collected != 0 {
+		test.Errorf("want no entry checked without its fact analyzer collected, got %d", collected)
+	}
+
+	rules := []rule.Rule{counting, houseRule(ctrlflow.Analyzer)}
+	inPart := systemCacheCaching(nil, context)
+	inPart.AnswersInPart = map[string]bool{"strings": true}
+	partial := runSessionWith(test, directory, inPart, rules, rules)
+	if _, collected := inPart.StandardLibrary.Collected[standardKeyOf(test, partial, "strings")]; collected {
+		test.Error("want strings, its answers computed in part, never collected")
+	}
+	if _, collected := inPart.StandardLibrary.Collected[standardKeyOf(test, partial, "unicode/utf8")]; !collected {
+		test.Error("want unicode/utf8, whole, collected")
+	}
+}
+
+// A run that records reads for the system cache alone records none of a package its table restored
+// (RecordsReadsForTable): over a table that holds every standard-library package of the module, the load records the
+// reads of nothing, since the module's own package is no table's.
+func TestAPackageTheTableRestoredRecordsNoReads(test *testing.T) {
+	test.Parallel()
+
+	directory := standardLibraryModule(test)
+	context := standardLibraryContext("check tests", goRootOf(test))
+	rules := []rule.Rule{countingFactRule(&sync.Map{})}
+	system, _ := seededTable(test, directory, context, rules,
+		func(sessionRun, map[cache.Key]cache.StandardLibraryEntry) {
+			// The table as the run wrote it, whole.
+		})
+	session := NewCacheSession(systemCacheCaching(system, context), rules)
+	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
+		load.Caching{Restorer: session, Listings: session, RecordReads: session.RecordsReadsForTable})
+	if loadError != nil {
+		test.Fatal(loadError)
+	}
+	if len(session.fromSystemCache) != len(session.standardLibraryKeys) {
+		test.Fatalf("want every one of the %d standard-library packages restored from the table, got %d",
+			len(session.standardLibraryKeys), len(session.fromSystemCache))
+	}
+	if loaded.ReadsRecorded != 0 {
+		test.Errorf("want no package's reads recorded, got %d", loaded.ReadsRecorded)
+	}
+}
+
 // A read takes, of what the table held, only the entries under the reading run's own keys: a table holding a second
 // entry of unicode/utf8's path, under the key of a Go installation since changed, beside the run's own, still has the
 // run's new strings read against the run's utf8 and taken. Read against every held entry, utf8's path would be two

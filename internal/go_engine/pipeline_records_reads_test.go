@@ -75,8 +75,8 @@ func TestTheHostRecordsReadsOnlyWithAnExtraBuild(test *testing.T) {
 }
 
 // A host that keeps a system cache and has no extra build records the reads of the standard library's packages alone,
-// by the set its session keyed for the table (check.CacheSession.KeptBySystemCache): the table takes no entry without
-// them, and holds no package of the module, whose reads nothing would read.
+// by the set its session keyed for the table (check.CacheSession.RecordsReadsForTable): the table takes no entry
+// without them, and holds no package of the module, whose reads nothing would read.
 func TestAHostWithOnlyASystemCacheRecordsTheStandardLibrarysReads(test *testing.T) {
 	test.Parallel()
 
