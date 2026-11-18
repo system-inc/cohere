@@ -23,8 +23,8 @@ import (
 
 // StandardLibraryDependenceRecordVersion is the format of a standard-library dependence record as the store keeps it,
 // hashed into its key apart from the host's records' version, so either changes alone. It moves with
-// DependenceRecordVersion when what the collector records changes, as it did at 2.
-const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-2"
+// DependenceRecordVersion when what the collector records changes, as it did at 2 and 3.
+const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-3"
 
 // StandardLibraryDependenceRecordKey is where the store keeps the dependence record of the standard-library package
 // whose standard-library key is standardLibraryKey (cache.StandardLibraryKeys), written by the engine whose identity is

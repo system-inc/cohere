@@ -563,7 +563,7 @@ func TestAnArrayLengthInASpelledTypeIsReadInFull(test *testing.T) {
 // is an [8]int where the host's is a [4]int, and so are RowThrough, the same element through a pointer to rows, and
 // RowInferred, a generic's result inferred from Rows' underlying, so each is dependent. PairRow, an element of a Pair
 // whose length no build changes, is not.
-func TestAnInferredVarReadsTheTypesItsInitializerPasses(test *testing.T) {
+func TestAnInferredVariableReadsTheTypesItsInitializerPasses(test *testing.T) {
 	test.Parallel()
 
 	judged := judge(test, "inferred", fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
