@@ -560,6 +560,95 @@ func TestASelectionIsLeftOutOnlyWhenItAndItsReceiverAreOwn(test *testing.T) {
 	checkWrittenUses(test, written, want)
 }
 
+// The branches fixture's packages: other, whose vars each hold T only through one kind of unnamed type, whose Union
+// holds it only as a union term, and whose Ignored holds it only as an alias's type argument, and first, which reads
+// each of them and never names T.
+var branchesSources = []fixtureFile{
+	{"other", "other.go", `package other
+
+type T struct{ A int }
+
+type I[X any] interface{ M() X }
+
+type Ignoring[X any] = int
+
+type Union = interface{ T | int }
+
+var (
+	MapKey       map[T]int
+	MapElement   map[int]T
+	Result       func() T
+	Parameter    func(T)
+	Channel      chan T
+	Slice        []T
+	PointerArray *[1]T
+	Field        struct{ F T }
+	Method       interface{ M() T }
+	Embedded     interface{ I[T] }
+	Ignored      Ignoring[T]
+)
+`},
+	{"first", "first.go", `package first
+
+import "other"
+
+func MapKey() { _ = other.MapKey }
+
+func MapElement() { _ = other.MapElement }
+
+func Result() { _ = other.Result }
+
+func Parameter() { _ = other.Parameter }
+
+func Channel() { _ = other.Channel }
+
+func Slice() { _ = other.Slice }
+
+func PointerArray() { _ = other.PointerArray }
+
+func Field() { _ = other.Field }
+
+func Method() { _ = other.Method }
+
+func Embedded() { _ = other.Embedded }
+
+func Constrained[S other.Union](s S) {}
+
+func Ignored() { _ = other.Ignored }
+`},
+}
+
+// Each branch of the named-type walk reaches T on its own: a map's key and its element, a signature's results and
+// its parameters, a channel's, a slice's, a pointer's and an array's element, a struct's field, an interface's method
+// and its embedded instance, a union's term in a constraint, and an alias's type argument its right side ignores.
+// Each part holds a type that reaches T through its one branch alone, so a walk that skips the branch leaves T out.
+func TestEachBranchOfTheNamedTypeWalkReachesItsNamedType(test *testing.T) {
+	test.Parallel()
+
+	written, _ := functionUsesOf(test, branchesSources)
+	for _, branch := range []struct {
+		part string
+		want string
+	}{
+		{"Function first.MapKey (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.MapElement (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.Result (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.Parameter (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.Channel (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.Slice (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.PointerArray (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.Field (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.Method (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.Embedded (first.go) body", "other.T (other.go) ValueType"},
+		{"Function first.Constrained (first.go) signature", "other.T (other.go) ValueType"},
+		{"Function first.Ignored (first.go) body", "other.T (other.go) ValueType"},
+	} {
+		if !slices.Contains(written[branch.part], branch.want) {
+			test.Errorf("%s: want %s, got\n%s", branch.part, branch.want, strings.Join(written[branch.part], "\n"))
+		}
+	}
+}
+
 // A package that names a symbol by go:linkname records no function uses, which is unknown, never empty, since its
 // bodies depend on a symbol no use names, while the type reads beside them are recorded.
 func TestALinknamedPackageRecordsNoFunctionUses(test *testing.T) {
