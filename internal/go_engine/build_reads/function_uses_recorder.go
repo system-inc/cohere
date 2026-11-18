@@ -37,6 +37,13 @@ type functionUsesRecorder struct {
 	lastSelectionUses []uint32
 	partStart         uint32
 
+	// namedReached are, by type, the named types its structure reaches (addNamed), each type walked once a package
+	// however many expressions hold it, and visited and reaching the types one walk has reached so far and the named
+	// types among them.
+	namedReached map[types.Type][]*types.TypeName
+	visited      map[types.Type]bool
+	reaching     []*types.TypeName
+
 	// declaring is whether the walk is in a declaration, declaration the one it is in, and recording whether its uses
 	// are recorded as the walk reaches them, which a const spec repeating another's are not. rangeStart and rangeEnd
 	// are its range, which bounds its own objects, and bodyStart the node its body starts at, where its signature
@@ -68,7 +75,8 @@ func newFunctionUsesRecorder(own *types.Package, info *types.Info, files []*ast.
 		return nil
 	}
 	return &functionUsesRecorder{own: own, info: info, objectEntries: map[types.Object]uint32{},
-		selectionEntries: map[usedSelection]uint32{}, indexes: map[string]string{}, inherited: -1}
+		selectionEntries: map[usedSelection]uint32{}, indexes: map[string]string{},
+		namedReached: map[types.Type][]*types.TypeName{}, visited: map[types.Type]bool{}, inherited: -1}
 }
 
 // startFile starts file, whose declarations' ordinals count from 0.
@@ -249,7 +257,7 @@ func (recorder *functionUsesRecorder) reach(node ast.Node) {
 	}
 }
 
-// valueType records the named type of an expression's type, typed, as the walk applies the expression.
+// valueType records every named type an expression's type, typed, reaches, as the walk applies the expression.
 func (recorder *functionUsesRecorder) valueType(typed types.Type) {
 	if recorder == nil || !recorder.recording {
 		return
@@ -348,17 +356,94 @@ func (recorder *functionUsesRecorder) use(entry uint32, selected PartUse, last u
 	return recorder.usesLength()
 }
 
-// addNamed records a use of kinds of the named type typed is or points to, as its generic declares it, and of each
-// such type among its type arguments; any other type records nothing, a type parameter being the declaration's own.
+// addNamed records a use of kinds of every named type typed reaches, as its generic declares it: typed itself when it
+// is named, or the named types its structure holds, the elements, keys, parameters, results, fields, methods and
+// embedded types of an unnamed type, and each named type's type arguments at any depth, since comparing, copying or
+// converting `[1]other.T`, or checking it against a constraint, reads T as surely as a value of T does. The walk stops
+// at each named type, whose own structure is its declaration's, and records each alias on the way as well as what it
+// stands for. A type parameter records nothing, being the declaration's own.
 func (recorder *functionUsesRecorder) addNamed(typed types.Type, kinds UseKinds) {
-	named := namedAt(typed)
-	if named == nil {
+	// A basic type, and a named type with no type arguments, held directly or through a pointer, are most expressions'
+	// and reach nothing more, so they skip the walk and its memo.
+	held := typed
+	if pointer, isPointer := held.(*types.Pointer); isPointer {
+		held = pointer.Elem()
+	}
+	switch held := held.(type) {
+	case nil, *types.Basic, *types.TypeParam:
+		return
+	case *types.Named:
+		if held.TypeArgs().Len() == 0 {
+			recorder.add(held.Origin().Obj(), kinds)
+			return
+		}
+	}
+	reached, walked := recorder.namedReached[typed]
+	if !walked {
+		clear(recorder.visited)
+		recorder.reaching = recorder.reaching[:0]
+		recorder.reachNamed(typed)
+		reached = slices.Clone(recorder.reaching)
+		recorder.namedReached[typed] = reached
+	}
+	for _, name := range reached {
+		recorder.add(name, kinds)
+	}
+}
+
+// reachNamed adds to reaching every named type and alias typed reaches, as its generic declares it (see addNamed),
+// each type walked once by visited, which also ends a walk that comes round to a type again.
+func (recorder *functionUsesRecorder) reachNamed(typed types.Type) {
+	if typed == nil || recorder.visited[typed] {
 		return
 	}
-	recorder.add(named.Origin().Obj(), kinds)
-	for index := range named.TypeArgs().Len() {
-		if argumentNamed := namedAt(named.TypeArgs().At(index)); argumentNamed != nil {
-			recorder.add(argumentNamed.Origin().Obj(), kinds)
+	recorder.visited[typed] = true
+	switch typed := typed.(type) {
+	case *types.Alias:
+		recorder.reaching = append(recorder.reaching, typed.Origin().Obj())
+		for index := range typed.TypeArgs().Len() {
+			recorder.reachNamed(typed.TypeArgs().At(index))
+		}
+		recorder.reachNamed(types.Unalias(typed))
+	case *types.Named:
+		recorder.reaching = append(recorder.reaching, typed.Origin().Obj())
+		for index := range typed.TypeArgs().Len() {
+			recorder.reachNamed(typed.TypeArgs().At(index))
+		}
+	case *types.Pointer:
+		recorder.reachNamed(typed.Elem())
+	case *types.Slice:
+		recorder.reachNamed(typed.Elem())
+	case *types.Array:
+		recorder.reachNamed(typed.Elem())
+	case *types.Chan:
+		recorder.reachNamed(typed.Elem())
+	case *types.Map:
+		recorder.reachNamed(typed.Key())
+		recorder.reachNamed(typed.Elem())
+	case *types.Signature:
+		// A receiver is left out: only an interface's method has one in a type the walk reaches, and it is that
+		// interface.
+		recorder.reachNamed(typed.Params())
+		recorder.reachNamed(typed.Results())
+	case *types.Tuple:
+		for index := range typed.Len() {
+			recorder.reachNamed(typed.At(index).Type())
+		}
+	case *types.Struct:
+		for index := range typed.NumFields() {
+			recorder.reachNamed(typed.Field(index).Type())
+		}
+	case *types.Interface:
+		for index := range typed.NumExplicitMethods() {
+			recorder.reachNamed(typed.ExplicitMethod(index).Type())
+		}
+		for index := range typed.NumEmbeddeds() {
+			recorder.reachNamed(typed.EmbeddedType(index))
+		}
+	case *types.Union:
+		for index := range typed.Len() {
+			recorder.reachNamed(typed.Term(index).Type())
 		}
 	}
 }

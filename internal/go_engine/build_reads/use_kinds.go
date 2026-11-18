@@ -14,12 +14,13 @@ const (
 	// a field, a method called, a method value or a method expression.
 	UsedSelected
 
-	// UsedValueType is the named type of an expression's type the part holds, or the named type a pointer points to,
-	// and each such type among its type arguments, since moving a value to an interface, comparing it or copying it
-	// reads a method set or a layout another build can change.
+	// UsedValueType is each named type an expression's type the part holds reaches: the type itself when it is named,
+	// or each named type its structure holds, and every type argument's at any depth (functionUsesRecorder.addNamed),
+	// since moving a value to an interface, comparing it or copying it reads a method set or a layout another build can
+	// change.
 	UsedValueType
 
-	// UsedTypeArgument is the named type an instance's type argument is, or points to.
+	// UsedTypeArgument is each named type an instance's type argument reaches, as UsedValueType's are reached.
 	UsedTypeArgument
 
 	// UsedConstant is a constant read by its value.

@@ -12,13 +12,16 @@ import (
 	"testing"
 )
 
-// The function uses fixture's packages: second, whose types first embeds, instantiates and selects through, dot, which
-// first imports by a dot, and first, whose declarations the test reads.
-var functionUsesSources = []struct {
+// fixtureFile is one file of a fixture's package of path.
+type fixtureFile struct {
 	path   string
 	file   string
 	source string
-}{
+}
+
+// The function uses fixture's packages: second, whose types first embeds, instantiates and selects through, dot, which
+// first imports by a dot, and first, whose declarations the test reads.
+var functionUsesSources = []fixtureFile{
 	{"second", "second.go", `package second
 
 type Inner struct{ Count int }
@@ -107,15 +110,15 @@ const (
 `},
 }
 
-// checkedFixturePackage is one of the function uses fixture's packages, checked: its types and its source.
+// checkedFixturePackage is one of a fixture's packages, checked: its types and its source.
 type checkedFixturePackage struct {
 	own    *types.Package
 	source checkedSource
 }
 
-// checkedFunctionUsesFixture is the function uses fixture's packages checked, in the order functionUsesSources lists
-// them, and the file set that places them.
-func checkedFunctionUsesFixture(test *testing.T) (*token.FileSet, []checkedFixturePackage) {
+// checkedFixture is the packages of sources checked, each of the files sources lists in a row under one path, in the
+// order sources lists them, and the file set that places them.
+func checkedFixture(test *testing.T, sources []fixtureFile) (*token.FileSet, []checkedFixturePackage) {
 	test.Helper()
 
 	fileSet := token.NewFileSet()
@@ -126,11 +129,19 @@ func checkedFunctionUsesFixture(test *testing.T) (*token.FileSet, []checkedFixtu
 		}
 		return nil, fmt.Errorf("no package %s", path)
 	})}
-	packagesChecked := make([]checkedFixturePackage, 0, len(functionUsesSources))
-	for _, source := range functionUsesSources {
-		file, parseError := parser.ParseFile(fileSet, source.file, source.source, parser.SkipObjectResolution)
-		if parseError != nil {
-			test.Fatal(parseError)
+	var packagesChecked []checkedFixturePackage
+	for start := 0; start < len(sources); {
+		end := start + 1
+		for end < len(sources) && sources[end].path == sources[start].path {
+			end++
+		}
+		var files []*ast.File
+		for _, source := range sources[start:end] {
+			file, parseError := parser.ParseFile(fileSet, source.file, source.source, parser.SkipObjectResolution)
+			if parseError != nil {
+				test.Fatal(parseError)
+			}
+			files = append(files, file)
 		}
 		info := &types.Info{
 			Types:      map[ast.Expr]types.TypeAndValue{},
@@ -140,30 +151,31 @@ func checkedFunctionUsesFixture(test *testing.T) (*token.FileSet, []checkedFixtu
 			Implicits:  map[ast.Node]types.Object{},
 			Instances:  map[*ast.Ident]types.Instance{},
 		}
-		own, checkError := configuration.Check(source.path, fileSet, []*ast.File{file}, info)
+		own, checkError := configuration.Check(sources[start].path, fileSet, files, info)
 		if checkError != nil {
-			test.Fatalf("type-checking %s: %v", source.path, checkError)
+			test.Fatalf("type-checking %s: %v", sources[start].path, checkError)
 		}
-		checked[source.path] = own
+		checked[sources[start].path] = own
 		packagesChecked = append(packagesChecked, checkedFixturePackage{own: own,
-			source: checkedSource{files: []*ast.File{file}, info: info}})
+			source: checkedSource{files: files, info: info}})
+		start = end
 	}
 	return fileSet, packagesChecked
 }
 
-// functionUsesOfFixture are the fixture's first package's declarations' uses, each declaration's identity, then each
+// functionUsesOf are the declarations' uses of the last package of sources, each declaration's identity, then each
 // part's uses, signature and body apart, written out and sorted (see writtenPartUses), and how many of the identities
 // written were unknown.
-func functionUsesOfFixture(test *testing.T) (map[string][]string, int) {
+func functionUsesOf(test *testing.T, sources []fixtureFile) (map[string][]string, int) {
 	test.Helper()
 
-	fileSet, packagesChecked := checkedFunctionUsesFixture(test)
-	first := packagesChecked[len(packagesChecked)-1]
+	fileSet, packagesChecked := checkedFixture(test, sources)
+	last := packagesChecked[len(packagesChecked)-1]
 	reads := &Reads{}
-	reads.RecordTypes(first.own, first.source.info, first.source.files)
+	reads.RecordTypes(last.own, last.source.info, last.source.files)
 	uses, recorded := reads.FunctionUses()
 	if !recorded {
-		test.Fatal("want the first package's function uses recorded")
+		test.Fatal("want the last package's function uses recorded")
 	}
 	renderer := NewIdentityRenderer(fileSet, nil)
 	written := map[string][]string{}
@@ -179,6 +191,27 @@ func functionUsesOfFixture(test *testing.T) (map[string][]string, int) {
 		}
 	}
 	return written, renderer.Unknown
+}
+
+// checkWrittenUses fails test for each part written and want differ on, either missing one or the two holding other
+// uses.
+func checkWrittenUses(test *testing.T, written map[string][]string, want map[string][]string) {
+	test.Helper()
+
+	names := slices.Sorted(maps.Keys(written))
+	for name := range want {
+		if _, found := written[name]; !found {
+			names = append(names, name)
+		}
+	}
+	for _, name := range names {
+		_, wanted := want[name]
+		got, found := written[name]
+		if wanted != found || !slices.Equal(got, want[name]) {
+			test.Errorf("%s (wanted %t, found %t): want\n%s\ngot\n%s", name, wanted, found,
+				strings.Join(want[name], "\n"), strings.Join(got, "\n"))
+		}
+	}
 }
 
 // writtenPartUses are uses, of record, written out, sorted: a selection as its receiver's identity, the name selected
@@ -213,7 +246,7 @@ func writtenPartUses(renderer *IdentityRenderer, record *FunctionUses, uses []Pa
 func TestEachDeclarationRecordsWhatEachPartUses(test *testing.T) {
 	test.Parallel()
 
-	written, unknown := functionUsesOfFixture(test)
+	written, unknown := functionUsesOf(test, functionUsesSources)
 	if unknown != 0 {
 		test.Errorf("want every identity known, got %d unknown", unknown)
 	}
@@ -347,20 +380,79 @@ func TestEachDeclarationRecordsWhatEachPartUses(test *testing.T) {
 			"universe.iota Named|Constant",
 		},
 	}
-	names := slices.Sorted(maps.Keys(written))
-	for name := range want {
-		if _, found := written[name]; !found {
-			names = append(names, name)
-		}
+	checkWrittenUses(test, written, want)
+}
+
+// The structure fixture's packages: other, whose Values returns an array of its T and whose Pairs returns T inside two
+// instances, and first, which never names T.
+var structureSources = []fixtureFile{
+	{"other", "other.go", `package other
+
+type T struct{ A int }
+
+func Values() [1]T { return [1]T{} }
+
+type Pair[First, Second any] struct {
+	First  First
+	Second Second
+}
+
+type Box[Item any] struct{ Item Item }
+
+func Pairs() Pair[int, Box[T]] { return Pair[int, Box[T]]{} }
+`},
+	{"first", "first.go", `package first
+
+import "other"
+
+func Compare() bool { return other.Values() == other.Values() }
+
+func Infer() { generic(other.Values()) }
+
+func Nested() { generic(other.Pairs()) }
+
+func generic[S comparable](s S) {}
+`},
+}
+
+// A value's type and a type argument record every named type their structure reaches, though no identifier names it:
+// comparing `[1]other.T` reads T's comparability, inferring it as a type argument checks T against comparable, and
+// T held two instances deep in another type argument is reached as surely.
+func TestAValueTypeRecordsEveryNamedTypeItsStructureReaches(test *testing.T) {
+	test.Parallel()
+
+	written, _ := functionUsesOf(test, structureSources)
+	want := map[string][]string{
+		"Function first.Compare (first.go) body": {
+			"import other (first.go) Named",
+			"other.T (other.go) ValueType",
+			"other.Values (other.go) Named",
+		},
+		"Function first.Compare (first.go) signature": {
+			"universe.bool Named",
+		},
+		"Function first.Infer (first.go) body": {
+			"first.generic (first.go) Named",
+			"import other (first.go) Named",
+			"other.T (other.go) ValueType|TypeArgument",
+			"other.Values (other.go) Named",
+		},
+		"Function first.Infer (first.go) signature": nil,
+		"Function first.Nested (first.go) body": {
+			"first.generic (first.go) Named",
+			"import other (first.go) Named",
+			"other.Box (other.go) ValueType|TypeArgument",
+			"other.Pair (other.go) ValueType|TypeArgument",
+			"other.Pairs (other.go) Named",
+			"other.T (other.go) ValueType|TypeArgument",
+		},
+		"Function first.Nested (first.go) signature": nil,
+		"Function first.generic (first.go) body":     nil,
+		"Function first.generic (first.go) signature": {
+			"universe.comparable Named|ValueType",
+		},
 	}
-	for _, name := range names {
-		_, wanted := want[name]
-		got, found := written[name]
-		if wanted != found || !slices.Equal(got, want[name]) {
-			test.Errorf("%s (wanted %t, found %t): want\n%s\ngot\n%s", name, wanted, found,
-				strings.Join(want[name], "\n"), strings.Join(got, "\n"))
-		}
-	}
+	checkWrittenUses(test, written, want)
 }
 
 // Without the syntax or a map a use is read from, a use could go unseen, so the function uses are unrecorded, which

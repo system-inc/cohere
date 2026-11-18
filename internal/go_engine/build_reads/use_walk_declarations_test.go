@@ -62,7 +62,7 @@ func TestTheUseWalkReadsAsTheWalkOfEachWholeDeclaration(test *testing.T) {
 	test.Parallel()
 
 	sources := checkedStandardLibrary(test, useWalkSources)
-	_, fixture := checkedFunctionUsesFixture(test)
+	_, fixture := checkedFixture(test, functionUsesSources)
 	for _, checked := range fixture {
 		sources[checked.own] = checked.source
 	}
