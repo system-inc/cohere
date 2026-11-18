@@ -242,6 +242,15 @@ func (session *CacheSession) restoreFromHost(
 		case session.reloading(candidate) || state.excluded[candidate.ID]:
 			changes.changed[candidate.PkgPath] = true
 			continue
+		// A standard-library package the build holds in its own system store, which the host restored from its own
+		// and so kept no entry of, is no change when its own inputs are the host's, by the portable digest: it joins
+		// the walk as any package the build's own store holds does (ownHits), taken by its whole import closure, so
+		// it is visited, and what reads it with it, the moment anything below it is in D. One whose inputs differ is
+		// in D, as a package the host kept with other inputs is below.
+		case kept == nil && hit && session.KeptBySystemCache(candidate) &&
+			state.host.portables[candidate.ID] == portable[candidate] && portable[candidate] != (cache.Key{}):
+			ownHits = append(ownHits, candidate)
+			continue
 		case kept == nil:
 			changes.changed[candidate.PkgPath], changes.rewritten[candidate.PkgPath] = true, true
 			changes.reshaped[candidate.PkgPath] = true
@@ -943,7 +952,10 @@ func (session *CacheSession) keepForBuilds(
 	// same memo, so a host that analyzes again after a reload keeps what its earlier loads decoded, and the run its
 	// last keep hands the builds holds all of it.
 	host := &HostRun{entries: map[string]*hostEntry{}, renderings: NewReadsBuild(), files: keyed.Files,
-		bodies: session.bodies}
+		bodies: session.bodies, portables: make(map[string]cache.Key, len(keyed.Portable))}
+	for keyedPackage, portable := range keyed.Portable {
+		host.portables[keyedPackage.ID] = portable
+	}
 	// Every package of one load has the load's sizes, the host's build's.
 	for keyedPackage := range keyed.Keys {
 		if keyedPackage.TypesSizes != nil {

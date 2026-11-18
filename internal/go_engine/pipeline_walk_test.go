@@ -202,6 +202,52 @@ func TestATagBuildLeavesUntouchedAllButTheLeafsReaders(test *testing.T) {
 	}
 }
 
+// warmSystemCacheRun is a `--no-cache --other-builds` run over a copy of the walk-square fixture whose system cache a
+// cold run filled first, so the host restores the standard library from it and keeps no entry of any of it, and each
+// extra build hits its own there (#syscache).
+func warmSystemCacheRun(test *testing.T) *pipeline {
+	test.Helper()
+	sharing := sharingSystemCache(test.TempDir())
+	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings, sharing,
+		"--no-cache", "--other-builds")
+	warm, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings,
+		sharing, "--no-cache", "--other-builds")
+	if restored := warm.buildRuns[0].result.Cache.FromSystemCache; restored == 0 {
+		test.Fatal("the warm run's host restored nothing from the system cache, so it kept the standard library and " +
+			"the case proves nothing")
+	}
+	return warm
+}
+
+// A standard-library package a build hits in its own system store, whose own inputs are the host's, is no change,
+// though the host restored it from its own system cache and so kept no entry of it: with the system cache warm, the
+// tag build leaves every package the host kept untouched but needsleaf, as it does cold. Were each such package in D,
+// as one the host kept nothing of is, the build would visit every package that reads one, hasher among them, by hash.
+func TestATagBuildOverAWarmSystemCacheLeavesUntouchedAllButTheLeafsReaders(test *testing.T) {
+	test.Parallel()
+
+	tagged := buildRunOf(test, warmSystemCacheRun(test), "cohere_extra")
+	want := []string{walkDormant, walkH, walkHasher, walkLonely, walkOther, walkS1, walkS2, walkU}
+	slices.Sort(want)
+	if got := tagged.result.FromHost.Untouched; !slices.Equal(got, want) {
+		test.Errorf("%s left %q untouched, want %q", tagged.build, got, want)
+	}
+}
+
+// A standard-library package a build hits in its own system store, whose own inputs differ from the host's, is in D:
+// with the system cache warm, windows visits hasher, as it does cold, since hash's closure reaches the packages whose
+// files differ on windows. Were each package windows hit taken as unchanged, hasher, which reads nothing else that
+// windows changes, would be left untouched and handed the host's findings.
+func TestAWarmSystemCacheHitWithOtherInputsThanTheHostsIsAChange(test *testing.T) {
+	test.Parallel()
+
+	windows := buildRunOf(test, warmSystemCacheRun(test), "windows")
+	if slices.Contains(windows.result.FromHost.Untouched, walkHasher) {
+		test.Errorf("windows left hasher untouched, %q, want it visited, hash's closure changed",
+			windows.result.FromHost.Untouched)
+	}
+}
+
 // An untouched package's files are the host's checked files (Square's condition (b) on #154dr43): the tag build has no
 // say on dormant, so the host's unused finding of helper there stands, though unused code stands only where every
 // build with a say on its file finds it; no build counts dormant's file as compiled and not linted; and the tag build
