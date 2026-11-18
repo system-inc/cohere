@@ -38,7 +38,7 @@ func TestALoadReadsTheGoEnvironmentItIsHanded(test *testing.T) {
 		if loadError != nil {
 			test.Fatal(loadError)
 		}
-		return slices.Contains(loaded.Inputs.Absent, planted)
+		return slices.Contains(loaded.Inputs().Absent, planted)
 	}
 	if !readsPlanted(project, environment) {
 		test.Error("a load handed go env's answer for its own workspace and environment asked go env again")

@@ -34,7 +34,7 @@ func TestALoadNamesItsInputsAtTheRootItWasGivenWhateverItsCallersWorkingDirector
 		if loadError != nil {
 			test.Fatalf("loading %s: %v", root, loadError)
 		}
-		return loaded.Inputs
+		return loaded.Inputs()
 	}
 	throughLink := inputsUnder([]string{"PWD=" + linked})
 	for _, path := range slices.Concat(throughLink.Files, throughLink.Directories, throughLink.Absent) {

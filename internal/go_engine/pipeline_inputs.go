@@ -39,7 +39,7 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 	// host's never does, the standard library's and a module's that only its platform builds among them, and its
 	// verdict is the run's as much as the host's is, so a replay keyed on the host's load alone would serve a stale
 	// verdict after an edit to one of them.
-	for _, inputs := range append([]load.Inputs{loaded.Inputs}, engine.buildInputs()...) {
+	for _, inputs := range append([]load.Inputs{loaded.Inputs()}, engine.buildInputs()...) {
 		for _, file := range inputs.Files {
 			files[file] = true
 		}
@@ -150,15 +150,15 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 }
 
 // buildInputs is what every build beside the host's loaded, in the order the merge was handed them, and nil for a run
-// of one build. The host's run is first in engine.buildRuns and carries the host's load's inputs, which the record
-// names already.
+// of one build, each waited for here, since each build's load collected its inputs beside it (load.Loaded.Inputs).
+// The host's run is first in engine.buildRuns and carries the host's load's inputs, which the record names already.
 func (engine *pipeline) buildInputs() []load.Inputs {
 	if len(engine.buildRuns) < 2 {
 		return nil
 	}
 	inputs := make([]load.Inputs, 0, len(engine.buildRuns)-1)
 	for _, run := range engine.buildRuns[1:] {
-		inputs = append(inputs, run.inputs)
+		inputs = append(inputs, run.inputs())
 	}
 	return inputs
 }

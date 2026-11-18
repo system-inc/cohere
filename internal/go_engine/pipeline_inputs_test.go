@@ -54,9 +54,11 @@ func TestTheInputsRecordNamesWhatDescribingTheProjectRead(test *testing.T) {
 	}
 	loaded := &load.Loaded{
 		Packages: []*packages.Package{{Dir: filepath.Join(root, "sub")}},
-		Inputs: load.Inputs{
-			Files:       []string{filepath.Join(root, "go.work")},
-			Directories: []string{root, filepath.Join(root, "sub")},
+		Inputs: func() load.Inputs {
+			return load.Inputs{
+				Files:       []string{filepath.Join(root, "go.work")},
+				Directories: []string{root, filepath.Join(root, "sub")},
+			}
 		},
 	}
 
@@ -123,7 +125,7 @@ func TestTheInputsRecordNamesNoTrackedIgnoredIndexThatIsNotThere(test *testing.T
 		request:   invocation{root: root},
 		described: &describedProject{workspace: project.Workspace{Root: root}},
 	}
-	record := engine.inputsRecord(&load.Loaded{})
+	record := engine.inputsRecord(&load.Loaded{Inputs: func() load.Inputs { return load.Inputs{} }})
 	if !slices.Contains(record.Absent, filepath.Join(root, ".git", "index")) {
 		test.Errorf("the absent paths do not name the missing index: %q", record.Absent)
 	}
@@ -159,7 +161,7 @@ func TestTheInputsRecordNamesAWorktreesSharedExclude(test *testing.T) {
 		request:   invocation{root: root},
 		described: &describedProject{workspace: project.Workspace{Root: root}},
 	}
-	record := engine.inputsRecord(&load.Loaded{})
+	record := engine.inputsRecord(&load.Loaded{Inputs: func() load.Inputs { return load.Inputs{} }})
 	shared := filepath.Join(main, ".git", "info", "exclude")
 	if !slices.Contains(record.Absent, shared) {
 		test.Errorf("the absent paths do not name the shared exclude %s: %q", shared, record.Absent)
