@@ -190,3 +190,17 @@ func (request invocation) requests(phase contract.PhaseName) bool {
 	}
 	return false
 }
+
+// keysByIdentity reports whether the run may key anything by the engine's identity (cache.ExecutableIdentity), which a
+// run hashes the whole executable for: one that loads its packages, for their types, their lint or a fix's long-line
+// wrap, with a project store or a system cache to key them for. A run with neither, under `--no-cache` and
+// `--no-system-cache` together, keys nothing, and so does one that only formats, which loads nothing. It may say yes
+// of a run that ends up keying nothing, a system cache with no root or a fix that wraps no line, which only hashes
+// beside the run for nothing; it never says no of one that keys.
+func (request invocation) keysByIdentity() bool {
+	if request.switches["no-cache"] && request.switches["no-system-cache"] || request.switches["format-only"] {
+		return false
+	}
+	return request.requests(contract.PhaseTypes) || request.requests(contract.PhaseLint) ||
+		request.requests(contract.PhaseFix)
+}

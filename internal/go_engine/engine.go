@@ -168,6 +168,11 @@ func runOverlapping(
 		}
 		request.buffer = buffer
 	}
+	// Begun before the settings, go env and go list, so the run's first key finds the engine's identity hashed, or
+	// nearly, rather than hashing it there, between the listing and the type check (cache.StartExecutableIdentity).
+	if request.keysByIdentity() {
+		cache.StartExecutableIdentity()
+	}
 
 	// Everything that can refuse is read before the first record, so exit 2 never leaves half a stream.
 	ruleSettings, settingsError := loadSettings(request, registered)

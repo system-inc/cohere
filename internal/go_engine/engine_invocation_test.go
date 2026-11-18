@@ -194,3 +194,32 @@ func TestMainRefusesASecondRun(test *testing.T) {
 			secondOutput.String(), secondError.String())
 	}
 }
+
+// A run hashes the engine's executable early only when it may key something by the engine's identity
+// (keysByIdentity): never under `--no-cache --no-system-cache`, which keys nothing, nor for a run that only formats,
+// and always for a run that loads its packages with a project store or a system cache to key.
+func TestOnlyARunThatMayKeyHashesTheEngineEarly(test *testing.T) {
+	test.Parallel()
+
+	for _, each := range []struct {
+		arguments []string
+		want      bool
+	}{
+		{arguments: nil, want: true},
+		{arguments: []string{"--no-cache"}, want: true},
+		{arguments: []string{"--no-system-cache"}, want: true},
+		{arguments: []string{"--lint", "--no-cache"}, want: true},
+		{arguments: []string{"--no-cache", "--no-system-cache"}, want: false},
+		{arguments: []string{"--lint", "--no-cache", "--no-system-cache"}, want: false},
+		{arguments: []string{"--format-only"}, want: false},
+	} {
+		request, parseError := parseInvocation(append([]string{"--contract", fmt.Sprint(contract.Version), "--root",
+			test.TempDir()}, each.arguments...))
+		if parseError != nil {
+			test.Fatalf("%q: %v", each.arguments, parseError)
+		}
+		if got := request.keysByIdentity(); got != each.want {
+			test.Errorf("%q: hashes the engine early %t, want %t", each.arguments, got, each.want)
+		}
+	}
+}
