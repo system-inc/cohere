@@ -188,13 +188,15 @@ type pipeline struct {
 	// removes no file.
 	reads *load.SharedReads
 
-	// fingerprints are the kept listing's directory fingerprints the extra builds share, each directory hashed once
-	// for every build (#5jpss95), and each set of inputs' steady fingerprint, each root's walk and each steady module
-	// file's digest beside them (#qqyq61s). Only the extra builds read them: the long-line wrap writes between the
-	// host's first load and the builds, so a fingerprint the host's load read could be of bytes since rewritten, while
-	// the engine writes nothing once the builds start (extraBuildRun). A build's own go list still may, go.work.sum
-	// when the workspace's guard runs it in the tree, and go.mod and go.sum under -mod=mod, so those are never held,
-	// and every build reads them again (load.Fingerprints). One a run, made here, so nothing is carried to the next.
+	// fingerprints are the kept listing's directory fingerprints every load of the run shares, the host's and each
+	// extra build's, each directory hashed once for the run (#5jpss95, #t7h2sm4), and each set of inputs' steady
+	// fingerprint, each root's walk and each steady module file's digest beside them (#qqyq61s). A fingerprint is of
+	// the bytes the run held when it was read, so every change to those bytes, a fix written or held, a wrap, a
+	// rename, starts them over (heldChanged), and a load after the change reads the bytes it left. The host's last
+	// load is after the run's last write, and the engine writes nothing once the builds start (extraBuildRun), so the
+	// builds take the fingerprints of the bytes they read. A build's own go list still may write, go.work.sum when the
+	// workspace's guard runs it in the tree, and go.mod and go.sum under -mod=mod, so those are never held, and every
+	// load reads them again (load.Fingerprints). One a run, made here, so nothing is carried to the next.
 	fingerprints *load.Fingerprints
 
 	// walks are the package directories each pattern's walk finds, which the extra builds share, each walked once for
@@ -785,6 +787,7 @@ func (engine *pipeline) keepKnownFiles(known *format.KnownFiles) {
 func (engine *pipeline) hold(changed format.ChangedFile) {
 	if changed.Output != nil {
 		engine.described.contents[changed.File] = changed.Output
+		engine.heldChanged()
 		return
 	}
 	engine.reread(changed.File)
@@ -800,6 +803,8 @@ func (engine *pipeline) reread(file string) {
 	if format.WritesRefused() {
 		return
 	}
+	// Whether the read finds the file or not, the bytes the run holds of it are no longer the ones it fingerprinted.
+	engine.heldChanged()
 	contents, readError := os.ReadFile(file)
 	if readError != nil {
 		// Without its contents the file gets no suppression index, so its findings are kept rather than
@@ -810,6 +815,12 @@ func (engine *pipeline) reread(file string) {
 		return
 	}
 	engine.described.contents[file] = contents
+}
+
+// heldChanged starts the run's fingerprints over, since the bytes they were read from have changed: a load after it
+// reads every directory again from the bytes the change left, and keeps what it reads for the loads after it.
+func (engine *pipeline) heldChanged() {
+	engine.fingerprints = load.NewFingerprints()
 }
 
 // held is the bytes the run holds for file, as load.Held asks: described.contents, every readable file in scope as it
