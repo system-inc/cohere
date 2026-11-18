@@ -27,36 +27,15 @@ import (
 // the index alone of a loop ranging over it, a store of a whole array through it, `*values = x`, an assignment of
 // another pointer to the variable, and a copy of it into another variable, whose uses count as its own. A use the
 // syntax cannot place among those counts as a read, so the check never reports what the original does not.
-func reportLiftedArrayLiterals(context *rule.Context, function *intermediate_representation.Function) {
-	syntax := function.Source()
-	body := functionBody(syntax)
-	if body == nil {
-		return
-	}
-	bound := map[*types.Var]*ast.CompositeLit{}
-	inspectOwnSyntax(context, body, func(node ast.Node) {
-		switch statement := node.(type) {
-		case *ast.AssignStmt:
-			if statement.Tok != token.DEFINE || len(statement.Lhs) != len(statement.Rhs) {
-				return
-			}
-			for index, left := range statement.Lhs {
-				if variable, literal, isBound := boundArrayLiteral(context, left, statement.Rhs[index]); isBound {
-					bound[variable] = literal
-				}
-			}
-		case *ast.ValueSpec:
-			if len(statement.Names) != len(statement.Values) {
-				return
-			}
-			for index, name := range statement.Names {
-				if variable, literal, isBound := boundArrayLiteral(context, name, statement.Values[index]); isBound {
-					bound[variable] = literal
-				}
-			}
-		}
-	})
-	if len(bound) == 0 {
+//
+// own is what the one walk of the function's own syntax gathered (gatherOwnSyntax), its bound literals this file's
+// gatherBoundArrayLiterals'.
+func reportLiftedArrayLiterals(
+	context *rule.Context,
+	function *intermediate_representation.Function,
+	own ownSyntax,
+) {
+	if own.body == nil || len(own.boundArrayLiterals) == 0 {
 		return
 	}
 	// A literal staticcheck kept an allocation for is deadWrites' to judge.
@@ -68,14 +47,41 @@ func reportLiftedArrayLiterals(context *rule.Context, function *intermediate_rep
 			}
 		}
 	}
-	readers := readersOf(context, syntax, bound)
-	for variable, literal := range bound {
+	readers := readersOf(context, function.Source(), own.boundArrayLiterals)
+	for variable, literal := range own.boundArrayLiterals {
 		if allocated[literal] || readers[variable] {
 			continue
 		}
 		position, index, isReported := arrayLiteralElement(context, literal)
 		if isReported {
 			context.Report(analysis.Diagnostic{Pos: position, Message: "unused write to array index " + index})
+		}
+	}
+}
+
+// gatherBoundArrayLiterals records in bound each variable node, one node of a function's own syntax, declares with a
+// pointer to an array literal of one element, with its literal.
+//
+// Mutates: bound each such variable is recorded with its literal, the one map gatherOwnSyntax fills across every node
+func gatherBoundArrayLiterals(context *rule.Context, node ast.Node, bound map[*types.Var]*ast.CompositeLit) {
+	switch statement := node.(type) {
+	case *ast.AssignStmt:
+		if statement.Tok != token.DEFINE || len(statement.Lhs) != len(statement.Rhs) {
+			return
+		}
+		for index, left := range statement.Lhs {
+			if variable, literal, isBound := boundArrayLiteral(context, left, statement.Rhs[index]); isBound {
+				bound[variable] = literal
+			}
+		}
+	case *ast.ValueSpec:
+		if len(statement.Names) != len(statement.Values) {
+			return
+		}
+		for index, name := range statement.Names {
+			if variable, literal, isBound := boundArrayLiteral(context, name, statement.Values[index]); isBound {
+				bound[variable] = literal
+			}
 		}
 	}
 }

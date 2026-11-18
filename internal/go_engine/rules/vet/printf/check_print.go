@@ -23,7 +23,7 @@ var printFormatPattern = regexp.MustCompile(`%` + flagsPattern + optionalNumberP
 	optionalNumberPattern + optionalIndexPattern + verbPattern)
 
 // checkPrint checks a call of a print function such as fmt.Println, named name.
-func checkPrint(pass *analysis.Pass, call *ast.CallExpr, name string) {
+func checkPrint(pass *analysis.Pass, call *ast.CallExpr, name calleeName) {
 	calleeType := pass.TypesInfo.Types[call.Fun].Type
 	if calleeType == nil {
 		return // The callee's type is unknown.
@@ -81,7 +81,7 @@ func isStandardStream(expression ast.Expr) bool {
 
 // reportPossibleDirective reports the first match of printFormatPattern in text, the constant first argument of a
 // print call. A match like %XX of two hex digits is passed by, as common in URLs.
-func reportPossibleDirective(pass *analysis.Pass, call *ast.CallExpr, name string, text string) {
+func reportPossibleDirective(pass *analysis.Pass, call *ast.CallExpr, name calleeName, text string) {
 	if !strings.Contains(text, "%") {
 		return
 	}
