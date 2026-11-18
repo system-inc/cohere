@@ -282,25 +282,32 @@ func (recorder *functionUsesRecorder) selection(selection *types.Selection) {
 	if recorder == nil || !recorder.recording {
 		return
 	}
+	recorder.selectionAt(selection.Recv(), selection.Index(), selection.Obj())
+}
+
+// selectionAt records the selection of selected from start, the type the selection starts from, at path (see
+// selection). A step through a type that is no struct, which the type checker never selects through, leaves the
+// embedded fields from there on unrecorded, so it marks the part unknown rather than record a shorter way.
+func (recorder *functionUsesRecorder) selectionAt(start types.Type, path []int, selected types.Object) {
 	var receiver *types.TypeName
-	if named := namedAt(selection.Recv()); named != nil {
+	if named := namedAt(start); named != nil {
 		receiver = named.Origin().Obj()
 	}
-	path := selection.Index()
-	current := selection.Recv()
+	current := start
 	for position, step := range path[:len(path)-1] {
 		if pointer, isPointer := current.Underlying().(*types.Pointer); isPointer {
 			current = pointer.Elem()
 		}
 		structure, isStruct := current.Underlying().(*types.Struct)
 		if !isStruct {
+			recorder.partUnknown = true
 			break
 		}
 		embedded := structure.Field(step)
 		recorder.addSelected(receiver, embedded, path[:position+1])
 		current = embedded.Type()
 	}
-	recorder.addSelected(receiver, selection.Obj(), path)
+	recorder.addSelected(receiver, selected, path)
 }
 
 // add records a use of kinds of object, as its generic declares it, unless it is the declaration's own.

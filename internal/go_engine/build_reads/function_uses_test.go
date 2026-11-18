@@ -586,6 +586,43 @@ func Read() int64 {
 	}
 }
 
+// A selection whose way runs through a type that is no struct, which the type checker never produces, marks its part
+// unknown rather than record the embedded fields it could follow and leave the rest out, while the declaration's other
+// part stays known.
+func TestASelectionThroughNoStructMarksItsPartUnknown(test *testing.T) {
+	test.Parallel()
+
+	_, packagesChecked := checkedFixture(test, unknownSources)
+	first := packagesChecked[0]
+	recorder := newFunctionUsesRecorder(first.own, first.source.info, first.source.files)
+	recorder.startFile(first.source.files[0])
+	var read *ast.FuncDecl
+	for _, declaration := range first.source.files[0].Decls {
+		if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Name.Name == "Read" {
+			read = function
+		}
+	}
+	if read == nil {
+		test.Fatal("want the fixture's Read")
+	}
+	recorder.beginFunction(read)
+	recorder.reach(read.Body)
+	recorder.selectionAt(types.Typ[types.Int], []int{0, 0}, first.own.Scope().Lookup("cfg"))
+	recorder.end()
+	uses := recorder.finish()
+	if uses == nil {
+		test.Fatal("want the record recorded")
+	}
+	declarations := slices.Collect(uses.Declarations())
+	if len(declarations) != 1 {
+		test.Fatalf("want Read alone recorded, got %d declarations", len(declarations))
+	}
+	if !declarations[0].BodyUnknown || declarations[0].SignatureUnknown {
+		test.Errorf("want the body alone unknown, got the body %t and the signature %t", declarations[0].BodyUnknown,
+			declarations[0].SignatureUnknown)
+	}
+}
+
 // Without the syntax or a map a use is read from, a use could go unseen, so the function uses are unrecorded, which
 // is unknown, never empty, while the type reads beside them are recorded.
 func TestFunctionUsesWithoutTypeInformationAreUnrecorded(test *testing.T) {
