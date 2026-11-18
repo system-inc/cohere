@@ -438,13 +438,64 @@ type ShoutedToken struct {
 // word, or inside code masked before it, included.
 func ShoutedTokensInMasked(masked string) []ShoutedToken {
 	var tokens []ShoutedToken
-	for _, location := range uppercaseToken.FindAllStringIndex(masked, -1) {
-		token := masked[location[0]:location[1]]
+	for start, end := nextUppercaseToken(masked, 0); start >= 0; start, end = nextUppercaseToken(masked, end) {
+		token := masked[start:end]
 		if isShoutedToken(token) {
-			tokens = append(tokens, ShoutedToken{Text: token, Offset: location[0]})
+			tokens = append(tokens, ShoutedToken{Text: token, Offset: start})
 		}
 	}
 	return tokens
+}
+
+// HasShoutedToken reports whether text, before masking, holds a shouted token, so a caller can skip masking a text
+// whose capitals are all acronyms, which is most of the texts HasAdjacentUppercaseLetters admits.
+//
+// It cannot skip a finding, because every token of the masked text is a token of the text, the same bytes at the same
+// offset. Masking only blanks, and every mask blanks a run that opens on a quote, a backtick or a line's start and
+// closes on a quote, a backtick or a line's end. None of those is a word character, so a mask never cuts into a word:
+// a word left in the masked text has the same bytes as before, and its neighbours are word characters or not just as
+// they were, so it is a token after masking exactly when it was one before. TestMaskingMakesNoNewToken pins that
+// against every mask, so a mask taught to blank inside a word fails there before it silences a shout here.
+func HasShoutedToken(text string) bool {
+	for start, end := nextUppercaseToken(text, 0); start >= 0; start, end = nextUppercaseToken(text, end) {
+		if isShoutedToken(text[start:end]) {
+			return true
+		}
+	}
+	return false
+}
+
+// nextUppercaseToken is where the first match of uppercaseToken at or after from starts and ends in text, or -1 for
+// both when there is none, found by one scan of the bytes rather than the regular expression, which backtracks at
+// every capital and was most of the Go rule's cost.
+//
+// The pattern's `\b` is an `ASCII` word boundary, so a match is exactly a whole run of `ASCII` word characters,
+// `[0-9A-Za-z_]`, that opens with a capital and holds no lowercase letter: inside a run the boundary cannot hold, and a
+// run with a lowercase letter cannot be crossed by `[A-Z0-9_]*`. A byte of a multi-byte rune, or of invalid `UTF-8`,
+// is not a word character to the pattern or here. TestNextUppercaseTokenMatchesThePattern holds the two equal.
+func nextUppercaseToken(text string, from int) (int, int) {
+	index := from
+	for index < len(text) {
+		if !isAsciiWordCharacter(text[index]) {
+			index++
+			continue
+		}
+		start := index
+		holdsLowercase := false
+		for index < len(text) && isAsciiWordCharacter(text[index]) {
+			holdsLowercase = holdsLowercase || (text[index] >= 'a' && text[index] <= 'z')
+			index++
+		}
+		if text[start] >= 'A' && text[start] <= 'Z' && !holdsLowercase {
+			return start, index
+		}
+	}
+	return -1, -1
+}
+
+// isAsciiWordCharacter reports whether a byte is a word character to the `\b` of a Go regular expression.
+func isAsciiWordCharacter(character byte) bool {
+	return isAsciiLetterOrDigit(character) || character == '_'
 }
 
 // commandStarters are the literal prefixes promptLine and commandWordLine can match after their
