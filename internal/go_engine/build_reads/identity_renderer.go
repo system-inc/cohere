@@ -38,6 +38,17 @@ func (renderer *IdentityRenderer) Object(object types.Object) Identity {
 
 // object is Object, uncounted.
 func (renderer *IdentityRenderer) object(object types.Object) Identity {
+	identity := unplacedIdentity(&renderer.encoder, object)
+	if identity.Kind == IdentityUniverse || identity.Kind == IdentityUnknown {
+		return identity
+	}
+	return renderer.placed(identity, object.Pos())
+}
+
+// unplacedIdentity is object's identity (IdentityRenderer.Object) but for the file that declares it, by encoder, which
+// keeps each package's objectpaths. The recorder reads it too, so a part it marks unknown is one holding a use that
+// renders unknown (functionUsesRecorder).
+func unplacedIdentity(encoder *objectpath.Encoder, object types.Object) Identity {
 	if object.Pkg() == nil {
 		if types.Universe.Lookup(object.Name()) == object {
 			return Identity{Kind: IdentityUniverse, Path: objectpath.Path(object.Name())}
@@ -50,7 +61,7 @@ func (renderer *IdentityRenderer) object(object types.Object) Identity {
 		return Identity{Kind: IdentityUnknown}
 	}
 	if imported, isPackageName := object.(*types.PkgName); isPackageName {
-		return renderer.placed(Identity{Kind: IdentityImport, PackagePath: imported.Imported().Path()}, object.Pos())
+		return Identity{Kind: IdentityImport, PackagePath: imported.Imported().Path()}
 	}
 	if function, isFunction := object.(*types.Func); isFunction && function.Signature().Recv() != nil {
 		// An interface literal's method has no named type to be named by, and its objectpath indexes the interface's
@@ -60,21 +71,18 @@ func (renderer *IdentityRenderer) object(object types.Object) Identity {
 			if receiver.Pkg() == nil || receiver.Pkg().Scope().Lookup(receiver.Name()) != receiver {
 				return Identity{Kind: IdentityUnknown}
 			}
-			return renderer.placed(Identity{Kind: IdentityMethod, PackagePath: receiver.Pkg().Path(),
-				Path: objectpath.Path(receiver.Name()), Method: object.Name()}, object.Pos())
+			return Identity{Kind: IdentityMethod, PackagePath: receiver.Pkg().Path(),
+				Path: objectpath.Path(receiver.Name()), Method: object.Name()}
 		}
 	}
-	identity := Identity{Kind: IdentityObject, PackagePath: object.Pkg().Path()}
 	if object.Pkg().Scope().Lookup(object.Name()) == object {
-		identity.Path = objectpath.Path(object.Name())
-		return renderer.placed(identity, object.Pos())
+		return Identity{Kind: IdentityObject, PackagePath: object.Pkg().Path(), Path: objectpath.Path(object.Name())}
 	}
-	path, pathError := renderer.encoder.For(object)
+	path, pathError := encoder.For(object)
 	if pathError != nil {
 		return Identity{Kind: IdentityUnknown}
 	}
-	identity.Path = path
-	return renderer.placed(identity, object.Pos())
+	return Identity{Kind: IdentityObject, PackagePath: object.Pkg().Path(), Path: path}
 }
 
 // Used is entry's identity: its object's, and a selection's receiver's, each counted as Object counts it.

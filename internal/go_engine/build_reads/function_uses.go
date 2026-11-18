@@ -55,12 +55,16 @@ type UsedEntry struct {
 
 // DeclarationUses is what one declaration uses, its signature and its body apart, as a reader sees it (see
 // FunctionUses.Declarations). HasBody says it has a body, a function's or a value's initializer, which a type and a
-// function declared without one have not.
+// function declared without one have not. SignatureUnknown and BodyUnknown say the part holds a use whose identity
+// renders unknown, or one the recorder could not follow: such a part matches no other build's, so a reader takes it
+// as differing and never compares its uses.
 type DeclarationUses struct {
-	Declaration Declaration
-	Signature   []PartUse
-	Body        []PartUse
-	HasBody     bool
+	Declaration      Declaration
+	Signature        []PartUse
+	Body             []PartUse
+	HasBody          bool
+	SignatureUnknown bool
+	BodyUnknown      bool
 }
 
 // FunctionUses is one package's record of what its declarations use, kept compact while it is held through the
@@ -87,18 +91,21 @@ type usedSelection struct {
 }
 
 // declarationRecord is one declaration as its record holds it: where its objects lie in declared, where its signature's
-// and its body's uses lie in uses, the body's from signatureEnd, and the rest of what Declaration names it by.
+// and its body's uses lie in uses, the body's from signatureEnd, whether each part is unknown, and the rest of what
+// Declaration names it by.
 type declarationRecord struct {
-	file         token.Pos
-	name         string
-	objectsStart uint32
-	objectsEnd   uint32
-	usesStart    uint32
-	signatureEnd uint32
-	bodyEnd      uint32
-	ordinal      int32
-	kind         declarationKindIndex
-	hasBody      bool
+	file             token.Pos
+	name             string
+	objectsStart     uint32
+	objectsEnd       uint32
+	usesStart        uint32
+	signatureEnd     uint32
+	bodyEnd          uint32
+	ordinal          int32
+	kind             declarationKindIndex
+	hasBody          bool
+	signatureUnknown bool
+	bodyUnknown      bool
 }
 
 // declarationKindIndex is a DeclarationKind as a record holds it, a byte rather than a string's two words: its index
@@ -123,9 +130,11 @@ func (record *FunctionUses) Declarations() iter.Seq[DeclarationUses] {
 			uses := DeclarationUses{
 				Declaration: Declaration{Kind: declarationKinds[declared.kind], File: declared.file,
 					Ordinal: int(declared.ordinal), Name: declared.name},
-				Signature: record.uses[declared.usesStart:declared.signatureEnd:declared.signatureEnd],
-				Body:      record.uses[declared.signatureEnd:declared.bodyEnd:declared.bodyEnd],
-				HasBody:   declared.hasBody,
+				Signature:        record.uses[declared.usesStart:declared.signatureEnd:declared.signatureEnd],
+				Body:             record.uses[declared.signatureEnd:declared.bodyEnd:declared.bodyEnd],
+				HasBody:          declared.hasBody,
+				SignatureUnknown: declared.signatureUnknown,
+				BodyUnknown:      declared.bodyUnknown,
 			}
 			if declared.objectsEnd > declared.objectsStart {
 				objects := record.declared[declared.objectsStart:declared.objectsEnd:declared.objectsEnd]

@@ -164,8 +164,8 @@ func checkedFixture(test *testing.T, sources []fixtureFile) (*token.FileSet, []c
 }
 
 // functionUsesOf are the declarations' uses of the last package of sources, each declaration's identity, then each
-// part's uses, signature and body apart, written out and sorted (see writtenPartUses), and how many of the identities
-// written were unknown.
+// part's uses, signature and body apart, written out and sorted (see writtenPartUses), `part unknown` among them for a
+// part the record marks unknown, and how many of the identities written were unknown.
 func functionUsesOf(test *testing.T, sources []fixtureFile) (map[string][]string, int) {
 	test.Helper()
 
@@ -185,9 +185,9 @@ func functionUsesOf(test *testing.T, sources []fixtureFile) (map[string][]string
 			names = append(names, identity.String())
 		}
 		name := string(declared.Declaration.Kind) + " " + strings.Join(names, ", ")
-		written[name+" signature"] = writtenPartUses(renderer, uses, declared.Signature)
+		written[name+" signature"] = writtenPartUses(renderer, uses, declared.Signature, declared.SignatureUnknown)
 		if declared.HasBody {
-			written[name+" body"] = writtenPartUses(renderer, uses, declared.Body)
+			written[name+" body"] = writtenPartUses(renderer, uses, declared.Body, declared.BodyUnknown)
 		}
 	}
 	return written, renderer.Unknown
@@ -215,9 +215,13 @@ func checkWrittenUses(test *testing.T, written map[string][]string, want map[str
 }
 
 // writtenPartUses are uses, of record, written out, sorted: a selection as its receiver's identity, the name selected
-// at its path, and the selected object's identity, and any other use as its object's identity, each with its kinds.
-func writtenPartUses(renderer *IdentityRenderer, record *FunctionUses, uses []PartUse) []string {
+// at its path, and the selected object's identity, and any other use as its object's identity, each with its kinds,
+// and `part unknown` when unknown marks the part so.
+func writtenPartUses(renderer *IdentityRenderer, record *FunctionUses, uses []PartUse, unknown bool) []string {
 	written := make([]string, 0, len(uses))
+	if unknown {
+		written = append(written, "part unknown")
+	}
 	for _, use := range uses {
 		used := record.Used(use)
 		object := renderer.Object(used.Object).String()
@@ -450,6 +454,51 @@ func TestAValueTypeRecordsEveryNamedTypeItsStructureReaches(test *testing.T) {
 		"Function first.generic (first.go) body":     nil,
 		"Function first.generic (first.go) signature": {
 			"universe.comparable Named|ValueType",
+		},
+	}
+	checkWrittenUses(test, written, want)
+}
+
+// The unknown fixture's package: cfg, an unexported var of an unnamed struct type, whose field A no objectpath
+// reaches, read by Read, and Settled, which reads cfg whole and nothing unknown.
+var unknownSources = []fixtureFile{
+	{"first", "first.go", `package first
+
+var cfg struct{ A int }
+
+func Read() int { return cfg.A }
+
+func Settled() any { return cfg }
+`},
+}
+
+// A part holding a use whose identity renders unknown is marked unknown itself, so a reader never compares its uses,
+// while every other part of the package, its signature included, is known.
+func TestAPartHoldingAnUnknownUseIsUnknown(test *testing.T) {
+	test.Parallel()
+
+	written, unknown := functionUsesOf(test, unknownSources)
+	if unknown == 0 {
+		test.Error("want an identity unknown, got none")
+	}
+	want := map[string][]string{
+		"Function first.Read (first.go) body": {
+			"first.cfg (first.go) Named",
+			"none .A@0, unknown Selected",
+			"part unknown",
+			"unknown Named",
+		},
+		"Function first.Read (first.go) signature": {
+			"universe.int Named",
+		},
+		"Function first.Settled (first.go) body": {
+			"first.cfg (first.go) Named",
+		},
+		"Function first.Settled (first.go) signature": {
+			"universe.any Named|ValueType",
+		},
+		"Value first.cfg (first.go) signature": {
+			"universe.int Named",
 		},
 	}
 	checkWrittenUses(test, written, want)

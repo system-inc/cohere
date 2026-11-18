@@ -6,6 +6,8 @@ import (
 	"go/types"
 	"slices"
 	"strconv"
+
+	"golang.org/x/tools/go/types/objectpath"
 )
 
 // functionUsesRecorder records what each top-level declaration of one package uses as the use walk reaches each node
@@ -36,6 +38,14 @@ type functionUsesRecorder struct {
 	lastObjectUses    []uint32
 	lastSelectionUses []uint32
 	partStart         uint32
+
+	// objectsUnknown and selectionsUnknown are, by entry, whether its identity renders unknown, its object's or, for a
+	// selection, its receiver's, as encoder renders it (unplacedIdentity), and partUnknown whether the current part
+	// holds a use of one, which marks the part unknown.
+	encoder           objectpath.Encoder
+	objectsUnknown    []bool
+	selectionsUnknown []bool
+	partUnknown       bool
 
 	// namedReached are, by type, the named types its structure reaches (addNamed), each type walked once a package
 	// however many expressions hold it, and visited and reaching the types one walk has reached so far and the named
@@ -177,7 +187,7 @@ func (recorder *functionUsesRecorder) begin(
 		recorder.declaration.ordinal = recorder.ordinal
 		recorder.ordinal++
 	}
-	recorder.partStart = uses
+	recorder.partStart, recorder.partUnknown = uses, false
 }
 
 // end ends the declaration begun last, if any: its signature, when its body never started, and its body end where
@@ -190,14 +200,16 @@ func (recorder *functionUsesRecorder) end() {
 	if recorder.recording {
 		uses := recorder.usesLength()
 		if recorder.bodyStart != nil {
-			declaration.bodyEnd = uses
+			declaration.bodyEnd, declaration.bodyUnknown = uses, recorder.partUnknown
 		} else {
 			declaration.signatureEnd, declaration.bodyEnd = uses, uses
+			declaration.signatureUnknown = recorder.partUnknown
 		}
 	} else {
 		repeated := recorder.record.declarations[recorder.inherited]
 		declaration.usesStart, declaration.signatureEnd = repeated.usesStart, repeated.signatureEnd
 		declaration.bodyEnd, declaration.hasBody = repeated.bodyEnd, repeated.hasBody
+		declaration.signatureUnknown, declaration.bodyUnknown = repeated.signatureUnknown, repeated.bodyUnknown
 	}
 	recorder.record.declarations = append(recorder.record.declarations, declaration)
 	recorder.declaring, recorder.recording, recorder.bodyStart = false, false, nil
@@ -231,7 +243,8 @@ func (recorder *functionUsesRecorder) reach(node ast.Node) {
 	}
 	if node == recorder.bodyStart {
 		recorder.declaration.signatureEnd = recorder.usesLength()
-		recorder.partStart = recorder.declaration.signatureEnd
+		recorder.declaration.signatureUnknown = recorder.partUnknown
+		recorder.partStart, recorder.partUnknown = recorder.declaration.signatureEnd, false
 	}
 	switch node := node.(type) {
 	case *ast.Ident:
@@ -307,8 +320,10 @@ func (recorder *functionUsesRecorder) add(object types.Object, kinds UseKinds) {
 		recorder.objectEntries[generic] = entry
 		recorder.record.objects = append(recorder.record.objects, generic)
 		recorder.lastObjectUses = append(recorder.lastObjectUses, 0)
+		recorder.objectsUnknown = append(recorder.objectsUnknown, recorder.unknown(generic))
 	}
 	recorder.lastObjectUses[entry] = recorder.use(entry, 0, recorder.lastObjectUses[entry], kinds)
+	recorder.partUnknown = recorder.partUnknown || recorder.objectsUnknown[entry]
 }
 
 // addSelected records the selection of selected, as its generic declares it, from receiver, nil when the selection
@@ -335,9 +350,18 @@ func (recorder *functionUsesRecorder) addSelected(receiver *types.TypeName, sele
 		recorder.selectionEntries[key] = entry
 		recorder.record.selections = append(recorder.record.selections, key)
 		recorder.lastSelectionUses = append(recorder.lastSelectionUses, 0)
+		recorder.selectionsUnknown = append(recorder.selectionsUnknown,
+			recorder.unknown(generic) || receiver != nil && recorder.unknown(receiver))
 	}
 	recorder.lastSelectionUses[entry] = recorder.use(entry, partUseSelected, recorder.lastSelectionUses[entry],
 		UsedSelected)
+	recorder.partUnknown = recorder.partUnknown || recorder.selectionsUnknown[entry]
+}
+
+// unknown reports whether object's identity renders unknown, so a part that uses it can never be matched to another
+// build's.
+func (recorder *functionUsesRecorder) unknown(object types.Object) bool {
+	return unplacedIdentity(&recorder.encoder, object).Kind == IdentityUnknown
 }
 
 // use records a use of kinds of entry, of the table selected names, in the part being walked: joined to its use

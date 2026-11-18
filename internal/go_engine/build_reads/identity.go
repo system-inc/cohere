@@ -37,8 +37,11 @@ const (
 
 // Identity is an object's identity, the same in every build where the object is declared alike: what crosses builds
 // in place of the object. Method is a method's name, and Digest the declaring file's digest, when the renderer was
-// given a way to read it.
+// given a way to read it. Two identities are compared by Equal alone, never by `==`, which the field of no size keeps
+// from compiling, nor by String, since an unknown identity names no object and so matches none, another unknown's
+// included.
 type Identity struct {
+	_           [0]func()
 	Kind        IdentityKind
 	PackagePath string
 	Path        objectpath.Path
@@ -67,10 +70,12 @@ func (identity Identity) String() string {
 	return identity.PackagePath + "." + string(identity.Path) + " (" + identity.File + ")"
 }
 
-// UsedIdentity is a used entry's identity (UsedEntry): its object's, and for a selection, its Index and its receiver's,
-// the zero Identity when it starts from no named type. Any other use has neither.
-type UsedIdentity struct {
-	Object   Identity
-	Receiver Identity
-	Index    string
+// Equal reports whether identity and other name the same object: never when either is unknown.
+func (identity Identity) Equal(other Identity) bool {
+	if identity.Kind == IdentityUnknown || other.Kind == IdentityUnknown {
+		return false
+	}
+	return identity.Kind == other.Kind && identity.PackagePath == other.PackagePath && identity.Path == other.Path &&
+		identity.Method == other.Method && identity.File == other.File && identity.Ordinal == other.Ordinal &&
+		identity.Digest == other.Digest
 }
