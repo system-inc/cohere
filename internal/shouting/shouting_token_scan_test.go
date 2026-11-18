@@ -15,7 +15,8 @@ var tokenScanCases = []string{
 	"éABC", "ABCé", "café NEVER crème", "\xffABC\xff", "AB\x80CD", "ABC.DEF", "ABC-DEF", "ABC'S", "BOSS'S ORDERS'",
 	"ABC`x`DEF", "`NEVER`ABC", "ABC\"x\"DEF", "\"NEVER\"ABC", "ABC'x'DEF", "'NOT NULL'ABC", "a 'RENAME COLUMN'd table",
 	"ABC```x```DEF", "```\nNEVER\n```ABC", "the \"quiet\nphrase\" is NEVER loud", "a 5\" board\nis NEVER\"xAB",
-	"prose\n\n    HOME=/x NEVER\nThen ALWAYS", "@example\nNEVER\n@param ALWAYS", " * @example\n * LOUD()\n * @returns X",
+	"prose\n\n    HOME=/x NEVER\nThen ALWAYS", "@example\nNEVER\n@param ALWAYS",
+	" * @example\n * LOUD()\n * @returns X",
 	"git commit NEVER\nthe NEVER", "$ ls ALWAYS\nNEVER", "s  c ALWAYS\nLOUD", "said\ngit and go are NEVER quiet",
 }
 
