@@ -38,8 +38,9 @@ func (collected *typeReads) add(own *types.Package, object types.Object, kind Us
 //
 // Without the syntax or the expression types, no use can be told apart from another, and a package that names a
 // symbol by go:linkname reaches past the type checker, so each of those is judged by every object's closure, as every
-// read was before kinds. The walk records what each top-level declaration uses too, a linknamed package's as well,
-// whose walk then collects its type reads for nothing.
+// read was before kinds. The walk records what each top-level declaration uses too, and a linknamed package records
+// none: a body that names a symbol by go:linkname depends on one no use names, so the package fails wide, unrecorded,
+// as one that overflows does.
 func collectTypeReads(own *types.Package, info *types.Info, files []*ast.File) typeReads {
 	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
 	for _, used := range info.Uses {
@@ -61,9 +62,6 @@ func collectTypeReads(own *types.Package, info *types.Info, files []*ast.File) t
 		collected.closureOnly = "its syntax or expression types were not there to tell its uses apart"
 	case linknamed(files):
 		collected.closureOnly = "it names a symbol by go:linkname, past the type checker"
-		discarded := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
-		walkUses(&discarded, own, info, files)
-		collected.functionUses = discarded.functionUses
 	default:
 		walkUses(&collected, own, info, files)
 	}

@@ -117,7 +117,7 @@ type checkedFixturePackage struct {
 }
 
 // checkedFixture is the packages of sources checked, each of the files sources lists in a row under one path, in the
-// order sources lists them, and the file set that places them.
+// order sources lists them, their comments kept as a build's are, and the file set that places them.
 func checkedFixture(test *testing.T, sources []fixtureFile) (*token.FileSet, []checkedFixturePackage) {
 	test.Helper()
 
@@ -137,7 +137,8 @@ func checkedFixture(test *testing.T, sources []fixtureFile) (*token.FileSet, []c
 		}
 		var files []*ast.File
 		for _, source := range sources[start:end] {
-			file, parseError := parser.ParseFile(fileSet, source.file, source.source, parser.SkipObjectResolution)
+			file, parseError := parser.ParseFile(fileSet, source.file, source.source,
+				parser.SkipObjectResolution|parser.ParseComments)
 			if parseError != nil {
 				test.Fatal(parseError)
 			}
@@ -557,6 +558,32 @@ func TestASelectionIsLeftOutOnlyWhenItAndItsReceiverAreOwn(test *testing.T) {
 		},
 	}
 	checkWrittenUses(test, written, want)
+}
+
+// A package that names a symbol by go:linkname records no function uses, which is unknown, never empty, since its
+// bodies depend on a symbol no use names, while the type reads beside them are recorded.
+func TestALinknamedPackageRecordsNoFunctionUses(test *testing.T) {
+	test.Parallel()
+
+	// The type checker reads no go:linkname, so the fixture needs no unsafe import, which no fixture importer serves.
+	_, packagesChecked := checkedFixture(test, []fixtureFile{{"first", "first.go", `package first
+
+//go:linkname now time.now
+func now() (int64, int32, int64)
+
+func Read() int64 {
+	seconds, _, _ := now()
+	return seconds
+}
+`}})
+	reads := &Reads{}
+	reads.RecordTypes(packagesChecked[0].own, packagesChecked[0].source.info, packagesChecked[0].source.files)
+	if uses, recorded := reads.FunctionUses(); recorded || uses != nil {
+		test.Fatalf("want the function uses unrecorded, got %t, %v", recorded, uses)
+	}
+	if !reads.Recorded() {
+		test.Fatal("want the type reads recorded")
+	}
 }
 
 // Without the syntax or a map a use is read from, a use could go unseen, so the function uses are unrecorded, which
