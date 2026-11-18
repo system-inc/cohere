@@ -10,8 +10,12 @@ const (
 	partUseKindBits   = 1<<5 - 1
 	partUseSelected   = 1 << 5
 	partUseEntryShift = 6
-	partUseEntryLimit = 1 << (32 - partUseEntryShift)
 )
+
+// partUseEntryLimit is one past the highest entry a PartUse can index, an entry of either table; an entry at it
+// overflows the package, which leaves its uses unrecorded. A variable only so a test can lower it below a fixture's
+// table and see that happen.
+var partUseEntryLimit uint32 = 1 << (32 - partUseEntryShift)
 
 // Every kind fits in partUseKindBits, below partUseSelected: a kind added past them makes this index one past the
 // array's one element, which fails to compile.

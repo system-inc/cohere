@@ -623,6 +623,28 @@ func TestASelectionThroughNoStructMarksItsPartUnknown(test *testing.T) {
 	}
 }
 
+// A package that uses more things than a PartUse can index overflows and records no function uses at all, never a
+// part of them, which is unknown, while the type reads beside them are recorded. The limit is lowered below the
+// fixture's table, and every parallel test waits until this one has ended and put it back.
+//
+// Not parallel: it lowers partUseEntryLimit, which every recorder of every test reads.
+func TestAPackageThatOverflowsRecordsNoFunctionUses(test *testing.T) {
+	limit := partUseEntryLimit
+	partUseEntryLimit = 2
+	test.Cleanup(func() { partUseEntryLimit = limit })
+
+	_, packagesChecked := checkedFixture(test, functionUsesSources)
+	first := packagesChecked[len(packagesChecked)-1]
+	reads := &Reads{}
+	reads.RecordTypes(first.own, first.source.info, first.source.files)
+	if uses, recorded := reads.FunctionUses(); recorded || uses != nil {
+		test.Fatalf("want the function uses unrecorded, got %t, %v", recorded, uses)
+	}
+	if !reads.Recorded() {
+		test.Fatal("want the type reads recorded")
+	}
+}
+
 // Without the syntax or a map a use is read from, a use could go unseen, so the function uses are unrecorded, which
 // is unknown, never empty, while the type reads beside them are recorded.
 func TestFunctionUsesWithoutTypeInformationAreUnrecorded(test *testing.T) {
