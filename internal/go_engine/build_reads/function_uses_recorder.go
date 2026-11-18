@@ -12,10 +12,9 @@ import (
 
 // functionUsesRecorder records what each top-level declaration of one package uses as the use walk reaches each node
 // of it (useWalk), in the walk's one pass rather than a second (#kr1m304): an identifier's resolved object and its
-// instance's type arguments as the walk reaches the identifier, a selection as it places the selector, an
-// expression's named type as it applies the expression, and an implicit object as it reaches the clause or field
-// that declares it. The use walk reaches each node of a declaration once, a function literal's and a composite
-// literal's included, so each is recorded once.
+// instance's type arguments as the walk reaches the identifier, a selection as it places the selector, and the named
+// types an expression's type reaches as it applies the expression. The use walk reaches each node of a declaration
+// once, a function literal's and a composite literal's included, so each is recorded once.
 //
 // It keeps the package's record compact as it goes (FunctionUses): each thing used gets an entry once, by
 // objectEntries and selectionEntries, and each part's uses are appended to the record's as packed entries, an entry
@@ -81,7 +80,7 @@ type functionUsesRecorder struct {
 // unknown, never empty.
 func newFunctionUsesRecorder(own *types.Package, info *types.Info, files []*ast.File) *functionUsesRecorder {
 	if len(files) == 0 || info.Types == nil || info.Uses == nil || info.Defs == nil || info.Selections == nil ||
-		info.Instances == nil || info.Implicits == nil {
+		info.Instances == nil {
 		return nil
 	}
 	return &functionUsesRecorder{own: own, info: info, objectEntries: map[types.Object]uint32{},
@@ -235,8 +234,10 @@ func (recorder *functionUsesRecorder) finish() *FunctionUses {
 }
 
 // reach records what node itself uses, as the walk reaches it, and ends the signature where the body starts: an
-// identifier's resolved object and its instance's type arguments, and the implicit object a clause or field declares.
-// A selector's selection and an expression's type are recorded where the walk reads them (selection, valueType).
+// identifier's resolved object and its instance's type arguments. A selector's selection and an expression's type are
+// recorded where the walk reads them (selection, valueType). No implicit object is recorded: a type switch clause's
+// variable and an unnamed parameter are always the declaration's own, and an import's name is declared by no
+// declaration the recorder begins, each use of it recorded at the identifier that names it.
 func (recorder *functionUsesRecorder) reach(node ast.Node) {
 	if recorder == nil || !recorder.recording || node == nil {
 		return
@@ -246,26 +247,20 @@ func (recorder *functionUsesRecorder) reach(node ast.Node) {
 		recorder.declaration.signatureUnknown = recorder.partUnknown
 		recorder.partStart, recorder.partUnknown = recorder.declaration.signatureEnd, false
 	}
-	switch node := node.(type) {
-	case *ast.Ident:
-		if used := recorder.info.Uses[node]; used != nil {
-			kinds := UsedNamed
-			if _, isConstant := used.(*types.Const); isConstant {
-				kinds |= UsedConstant
-			}
-			recorder.add(used, kinds)
+	identifier, isIdentifier := node.(*ast.Ident)
+	if !isIdentifier {
+		return
+	}
+	if used := recorder.info.Uses[identifier]; used != nil {
+		kinds := UsedNamed
+		if _, isConstant := used.(*types.Const); isConstant {
+			kinds |= UsedConstant
 		}
-		if instance, instantiated := recorder.info.Instances[node]; instantiated {
-			for index := range instance.TypeArgs.Len() {
-				recorder.addNamed(instance.TypeArgs.At(index), UsedTypeArgument)
-			}
-		}
-	case *ast.CaseClause, *ast.Field, *ast.ImportSpec:
-		// The only nodes an implicit object is recorded at. A case clause's implicit variable is the declaration's
-		// own, left out by add, and an embedded field's is a use of its type the identifier records; any other is
-		// recorded by name, as the identifier it stands for would be.
-		if implicit := recorder.info.Implicits[node]; implicit != nil {
-			recorder.add(implicit, UsedNamed)
+		recorder.add(used, kinds)
+	}
+	if instance, instantiated := recorder.info.Instances[identifier]; instantiated {
+		for index := range instance.TypeArgs.Len() {
+			recorder.addNamed(instance.TypeArgs.At(index), UsedTypeArgument)
 		}
 	}
 }
