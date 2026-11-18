@@ -24,7 +24,7 @@ func TestALoadReturnsBeforeItsInputsAreCollected(test *testing.T) {
 	loadedInputsFixture(test)
 	returned := make(chan struct{})
 	heldPastTheLoad := false
-	caching := Caching{beforeInputs: func() {
+	caching := Caching{InputsBeside: true, beforeInputs: func() {
 		select {
 		case <-returned:
 			heldPastTheLoad = true
@@ -58,7 +58,7 @@ func TestALoadsInputsAreCollectedWithEverySlotHeld(test *testing.T) {
 	loadedInputsFixture(test)
 	pool := bounded.NewPool(1)
 	slotHeld := make(chan struct{})
-	caching := Caching{Pool: pool, beforeInputs: func() { <-slotHeld }}
+	caching := Caching{Pool: pool, InputsBeside: true, beforeInputs: func() { <-slotHeld }}
 	loaded, loadError := PackagesCached(inputsFixture.module, []string{"./..."}, inputsFixtureEnvironment(),
 		inputsFixtureCensus(), caching)
 	if loadError != nil {
@@ -90,7 +90,7 @@ func TestAPanicCollectingALoadsInputsReachesItsWaiter(test *testing.T) {
 	loadedInputsFixture(test)
 	sentinel := errors.New("load: the sentinel panic collecting inputs")
 	loaded, loadError := PackagesCached(inputsFixture.module, []string{"./..."}, inputsFixtureEnvironment(),
-		inputsFixtureCensus(), Caching{beforeInputs: func() { panic(sentinel) }})
+		inputsFixtureCensus(), Caching{InputsBeside: true, beforeInputs: func() { panic(sentinel) }})
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
@@ -105,6 +105,31 @@ func TestAPanicCollectingALoadsInputsReachesItsWaiter(test *testing.T) {
 	}
 }
 
+// A load not told to collect its inputs beside it collects them before it returns, on the caller's goroutine
+// (Caching.InputsBeside): a panic in the collection is raised by the load itself, which never returns.
+func TestALoadCollectsItsInputsInlineUnlessToldBeside(test *testing.T) {
+	test.Parallel()
+
+	loadedInputsFixture(test)
+	sentinel := errors.New("load: the sentinel panic collecting inputs inline")
+	returned := false
+	recovered := func() (recovered any) {
+		defer func() { recovered = recover() }()
+		// Ignored: a load that returns at all has collected beside it, which the check below fails on.
+		_, _ = PackagesCached(inputsFixture.module, []string{"./..."}, inputsFixtureEnvironment(),
+			inputsFixtureCensus(), Caching{beforeInputs: func() { panic(sentinel) }})
+		returned = true
+		return nil
+	}()
+	if returned {
+		test.Error("the load returned with its inputs' collection to come, want them collected before it returned")
+	}
+	// Compared by identity, so a wrapped or copied value fails.
+	if recovered != sentinel {
+		test.Errorf("the load raised %v, want the sentinel itself", recovered)
+	}
+}
+
 // Two loads sharing the run's walks of their module roots walk each root once between them: the module, its sibling
 // replacement and the directory above it, which the other replacement names. Each names the directories a load
 // sharing nothing names.
@@ -116,7 +141,7 @@ func TestLoadsSharingModuleRootWalksWalkEachRootOnce(test *testing.T) {
 	unshared := inputsFixture.loaded.Inputs().Directories
 	for round := range 2 {
 		loaded, loadError := PackagesCached(inputsFixture.module, []string{"./..."}, inputsFixtureEnvironment(),
-			inputsFixtureCensus(), Caching{ModuleRootWalks: walks})
+			inputsFixtureCensus(), Caching{ModuleRootWalks: walks, InputsBeside: true})
 		if loadError != nil {
 			test.Fatal(loadError)
 		}

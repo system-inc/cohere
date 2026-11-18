@@ -122,10 +122,9 @@ type Loaded struct {
 	UnguardedWorkspaceSum string
 
 	// Inputs waits for what the load read to decide what it returned, for the inputs record (see inputs.go), and
-	// returns it, the same on every call. It is collected beside the load, which returns without waiting for it
-	// (#ybjbqm2): it is read only as the run's records are written, after the lint, so collecting it at the load's end
-	// put 33 to 55 ms of the host's load, and about 67 ms of each extra build's, on the run's path. A panic in the
-	// collection is raised on the goroutine that calls it.
+	// returns it, the same on every call. Under Caching.InputsBeside it is collected beside the load, which returns
+	// without waiting for it (#ybjbqm2), and a panic in the collection is raised on the goroutine that calls it;
+	// otherwise the load collected it before returning, and it returns that.
 	Inputs func() Inputs
 
 	// Reads are, by package, what every package of the graph read of other packages, for an extra build to restore it
@@ -283,12 +282,22 @@ type Caching struct {
 	// each root itself.
 	ModuleRootWalks *ModuleRootWalks
 
+	// InputsBeside has the load collect its inputs beside it and return without waiting for them (Loaded.Inputs);
+	// unset, it collects them on its own goroutine before it returns. The inputs are read only as the run's records
+	// are written, after the lint, so collected at the load's end they put 33 to 55 ms of the host's load, and about
+	// 67 ms of each extra build's, on the run's path (#ybjbqm2). Which placement wins was measured at cohere's root on
+	// Shackler, over every build: warm, with a findings store, beside beat inline by 0.05 s whatever slot the
+	// collection took; cold, under `--no-cache`, every core is busy to the run's end, and each build's lint paid more
+	// for the collection beside it than the host's load gained, inline winning by 0.02 to 0.05 s. So the engine sets it
+	// on a run with a findings store alone.
+	InputsBeside bool
+
 	// rootSyntaxOnly has every dependency type-checked with no type maps and left without its syntax (see
 	// PackagesWithRootSyntax).
 	rootSyntaxOnly bool
 
 	// beforeInputs, set only by a test, is called on the goroutine that collects the load's inputs, before it does,
-	// so a test can hold the collection, or panic in it, while the load returns.
+	// so a test can hold the collection, or panic in it, beside the load or within it (InputsBeside).
 	beforeInputs func()
 }
 
@@ -432,18 +441,25 @@ func loadUnder(
 	// Read now, on the load's goroutine, so the collection reads nothing a caller of the load could change after it
 	// returns.
 	reported := goEnvironment.reported
+	collect := func() Inputs {
+		if caching.beforeInputs != nil {
+			caching.beforeInputs()
+		}
+		return collectInputs(workspace, reported, roots, census, caching.ModuleRootWalks)
+	}
+	if !caching.InputsBeside {
+		// Collected here, on the load's goroutine, where a cold run spends least on it (Caching.InputsBeside).
+		inputs := collect()
+		loaded.Inputs = func() Inputs { return inputs }
+		return loaded, nil
+	}
 	// Collected beside, so the load returns at once and the run waits for its inputs only where they are read (see
 	// Loaded.Inputs). The collection reads only the load's roots, its census and reported, every one final once the
 	// load has ended, and the disk, so nothing the run does after the load races it. It takes no slot of the run's
 	// pool, as it took none when it ran on the load's own goroutine: under a slot at any priority below the lint's, a
 	// run without a store, busy on every core to its end, granted it last, and its records waited for it, 0.03 s
 	// later at cohere's root on Shackler.
-	loaded.Inputs = bounded.Beside(nil, 0, func() Inputs {
-		if caching.beforeInputs != nil {
-			caching.beforeInputs()
-		}
-		return collectInputs(workspace, reported, roots, census, caching.ModuleRootWalks)
-	})
+	loaded.Inputs = bounded.Beside(nil, 0, collect)
 	return loaded, nil
 }
 

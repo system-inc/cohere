@@ -90,6 +90,10 @@ func (engine *pipeline) watchedCaching(caching load.Caching) load.Caching {
 	caching.Pool = engine.workPool()
 	caching.Children = engine.described.children
 	caching.ModuleRootWalks = engine.moduleRootWalks
+	// Each load collects its inputs beside it only in a run whose findings cache reads a store, the run's own fact
+	// (withFindingsStore, the host's session), the same for every load of the run: warm, beside wins, and cold, under
+	// `--no-cache`, every core is busy to the end and inline wins (load.Caching.InputsBeside).
+	caching.InputsBeside = engine.withFindingsStore()
 	if engine.memory == nil || engine.memory.duringLoad == nil {
 		return caching
 	}
