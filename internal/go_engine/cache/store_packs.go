@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -20,9 +21,10 @@ import (
 // read through an alias. Beside them it holds, for each shard its entries were read from, the shard directory's stamp
 // (ShardStamps) taken before they were read, so a run serves an entry only while the store holds exactly what the pack
 // was made of. A pack is the store's own file, the sha256 of its contents then its contents, as an entry is (Put),
-// under the store's `packs` directory, which no shard's two hex characters can name, so no Get reads it. Its contents
-// are packMagic, packFormatVersion, each stamp in order of its shard, and each entry in order of the key it was asked
-// by.
+// under the store's `packs` directory, which no shard's two hex characters can name, so no Get reads it, in the
+// directory of the engine identity whose runs read it (PackPlace), so a new engine's runs can remove the packs no run
+// will read again (RemoveOtherEnginesPacks). Its contents are packMagic, packFormatVersion, each stamp in order of its
+// shard, and each entry in order of the key it was asked by.
 
 // packDirectoryName is the directory of a store that holds its packs.
 const packDirectoryName = "packs"
@@ -65,6 +67,19 @@ type Pack struct {
 	Stamps  map[byte]int64
 }
 
+// PackPlace is where a store keeps a pack: in the directory of the engine identity whose runs read it (PackIdentity),
+// by its name (PackName).
+type PackPlace struct {
+	Identity Key
+	Name     Key
+}
+
+// PackIdentity is the directory of the packs that runs of the engine identity read: its digest, since an identity is
+// any string.
+func PackIdentity(engineIdentity string) Key {
+	return sha256.Sum256([]byte(engineIdentity))
+}
+
 // PackName is the name of a pack, from sections, each a list of parts, which the caller makes of whatever tells one
 // pack from another: a section is hashed with its length first and each part ends in a zero byte, so no two lists of
 // sections name the same pack.
@@ -81,11 +96,11 @@ func PackName(sections ...[]string) Key {
 	return Key(digest.Sum(nil))
 }
 
-// ReadPack is the pack named name, or the first word of why it was not read (PackMissing, or a refusal), with nothing
+// ReadPack is the pack at place, or the first word of why it was not read (PackMissing, or a refusal), with nothing
 // of it: a pack is read whole or not at all, so no entry is ever given from one that does not match its sum or is of
 // another format.
-func (store *Store) ReadPack(name Key) (Pack, string) {
-	contents, readError := os.ReadFile(store.packPath(name))
+func (store *Store) ReadPack(place PackPlace) (Pack, string) {
+	contents, readError := os.ReadFile(store.packPath(place))
 	if errors.Is(readError, fs.ErrNotExist) {
 		return Pack{}, PackMissing
 	}
@@ -162,10 +177,10 @@ func decodePack(body []byte) (Pack, string) {
 	return pack, ""
 }
 
-// WritePack keeps entries and stamps as the pack named name, the stamps in order of their shard and the entries in
+// WritePack keeps entries and stamps as the pack at place, the stamps in order of their shard and the entries in
 // order of the key each was asked by, so the same pack makes the same file. It writes as Put does, a temporary file
 // renamed into place, so two runs writing one pack at once leave one of theirs whole, never a mix.
-func (store *Store) WritePack(name Key, entries []PackEntry, stamps map[byte]int64) error {
+func (store *Store) WritePack(place PackPlace, entries []PackEntry, stamps map[byte]int64) error {
 	ordered := slices.SortedFunc(slices.Values(entries), func(left PackEntry, right PackEntry) int {
 		return bytes.Compare(left.Asked[:], right.Asked[:])
 	})
@@ -188,20 +203,60 @@ func (store *Store) WritePack(name Key, entries []PackEntry, stamps map[byte]int
 		body = binary.AppendUvarint(body, uint64(len(entry.Entry)))
 		body = append(body, entry.Entry...)
 	}
-	return store.writeWhole(store.packPath(name), body)
+	return store.writeWhole(store.packPath(place), body)
 }
 
-// MarkPackUsed tells a trim the pack named name is in use, as MarkUsed tells it of an entry: a run that read the
+// RemoveOtherEnginesPacks removes every pack of the store that runs of another engine identity than identity read,
+// once a run for the store (ShardStamps), file by file and then its identity's directory: each new engine, a release or
+// a rebuild, leaves every pack of the one before it where no run reads it again, about 21 MB at cohere's root
+// (#b2t9xmf). The project's store calls it, which nothing else trims; the system cache's trim ages its packs out. A
+// directory that is not an identity's, or a file in one that is neither a pack nor a pack's temporary file, is left
+// alone. It removes nothing recursively, so a link or a directory where a pack goes stays, and keeps its identity's
+// directory with it.
+func (store *Store) RemoveOtherEnginesPacks(identity Key) {
+	if !store.stamps.firstSweep(store.directory) {
+		return
+	}
+	directory := filepath.Join(store.directory, packDirectoryName)
+	// Ignored: a store with no packs directory has nothing to remove, and one that cannot be listed is swept by a
+	// later run's, its packs never read meanwhile.
+	identities, _ := os.ReadDir(directory)
+	for _, other := range identities {
+		if !other.IsDir() || !isKeyName(other.Name()) || other.Name() == identity.String() {
+			continue
+		}
+		otherDirectory := filepath.Join(directory, other.Name())
+		// Ignored: as above, a directory that cannot be listed is left for a later run.
+		packs, _ := os.ReadDir(otherDirectory)
+		for _, pack := range packs {
+			if !pack.Type().IsRegular() || !isKeyName(strings.Split(pack.Name(), ".")[0]) {
+				continue
+			}
+			// Ignored: a pack that cannot be removed is read by no run, and a later run's sweep tries it again.
+			_ = os.Remove(filepath.Join(otherDirectory, pack.Name()))
+		}
+		// Ignored: a directory left holding what was not removed stays, and a later run's sweep tries it again.
+		_ = os.Remove(otherDirectory)
+	}
+}
+
+// isKeyName reports whether name is a key's hex, as every pack's name and every identity's directory is.
+func isKeyName(name string) bool {
+	decoded, decodeError := hex.DecodeString(name)
+	return decodeError == nil && len(decoded) == len(Key{})
+}
+
+// MarkPackUsed tells a trim the pack at place is in use, as MarkUsed tells it of an entry: a run that read the
 // system cache's pack calls it, so the trim counts the pack in the size cap and deletes it only once it has gone
 // unread for five days (TrimSystemCache), as it does any entry. It changes the pack's time alone, never its
 // directory's, and never a shard's (ShardStamps).
-func (store *Store) MarkPackUsed(name Key) {
-	markUsed(store.packPath(name), time.Now())
+func (store *Store) MarkPackUsed(place PackPlace) {
+	markUsed(store.packPath(place), time.Now())
 }
 
-// packPath is where the pack named name lives: `packs/abcdef...`.
-func (store *Store) packPath(name Key) string {
-	return filepath.Join(store.directory, packDirectoryName, name.String())
+// packPath is where the pack at place lives: `packs/<identity>/<name>`, each a key's hex.
+func (store *Store) packPath(place PackPlace) string {
+	return filepath.Join(store.directory, packDirectoryName, place.Identity.String(), place.Name.String())
 }
 
 // ShardOf is the shard key's file is in: its first byte, whose two hex characters name the directory (path).

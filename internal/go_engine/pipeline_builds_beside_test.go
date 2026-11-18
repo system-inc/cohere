@@ -620,7 +620,7 @@ func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
 	engine := &pipeline{
 		memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
 			Source: contract.MemorySourceCap}},
-		session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil),
+		session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir(), nil)}, nil),
 	}
 	if !engine.withFindingsStore() {
 		test.Fatal("the engine has no findings store, want one")

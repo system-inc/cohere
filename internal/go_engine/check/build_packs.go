@@ -12,10 +12,6 @@ type buildPacks struct {
 	// project on the machine reads that store and each reaches its own part of the standard library.
 	project string
 
-	// stamps are the run's shard stamps, which every build's session of the run shares, so each shard of each store is
-	// read once a run, and each judged trusted or not as it is read (cache.ShardStamps).
-	stamps *cache.ShardStamps
-
 	// opened is set once the first Restore has read the packs; a reload's Restore serves from what that read.
 	opened bool
 
@@ -34,17 +30,17 @@ type buildPacks struct {
 	counts PackCounts
 }
 
-// open reads store's pack named name into the packs, and counts it read, missing or refused.
-func (packs *buildPacks) open(store *cache.Store, system bool, name cache.Key) {
-	read, refused := store.ReadPack(name)
-	pack := &buildPack{store: store, name: name, system: system, served: read.Entries, stamps: read.Stamps,
+// open reads store's pack at place into the packs, and counts it read, missing or refused.
+func (packs *buildPacks) open(store *cache.Store, system bool, place cache.PackPlace) {
+	read, refused := store.ReadPack(place)
+	pack := &buildPack{store: store, place: place, system: system, served: read.Entries, stamps: read.Stamps,
 		held: make(map[cache.Key]cache.PackEntry, len(read.Entries)), changed: refused != ""}
 	packs.byStore = append(packs.byStore, pack)
 	switch refused {
 	case "":
 		packs.counts.Read++
 		if system {
-			store.MarkPackUsed(name)
+			store.MarkPackUsed(place)
 		}
 	case cache.PackMissing:
 		// No refusal: a first run, or a new engine's, has none to read.
@@ -67,9 +63,11 @@ func (packs *buildPacks) of(store *cache.Store) *buildPack {
 	return nil
 }
 
-// stamp is shard's stamp in store as the run read it, counting the read when this asked it.
+// stamp is shard's stamp in store as the run read it, by the run's stamps the store holds, which mark it moved once a
+// store of the run changes it, counting the read when this asked it. openPacks keeps a pack only of a store holding
+// stamps.
 func (packs *buildPacks) stamp(store *cache.Store, shard byte) cache.ShardReading {
-	reading, read := packs.stamps.Of(store, shard)
+	reading, read := store.ShardStamps().Of(store, shard)
 	if read {
 		packs.shardReads.Add(1)
 	}
@@ -77,7 +75,9 @@ func (packs *buildPacks) stamp(store *cache.Store, shard byte) cache.ShardReadin
 }
 
 // fresh reports whether every shard of shards, which an entry of pack was read from, holds the stamp pack holds of it,
-// so the store holds exactly what the pack was made of there, and the entry may be served.
+// so the store holds exactly what the pack was made of there, and the entry may be served. A shard a store of the run
+// has changed since its stamp was read is never fresh, whatever its stamp, so a reload's Restore never serves what
+// the run itself, or another session of it, wrote over.
 func (packs *buildPacks) fresh(pack *buildPack, shards []byte) bool {
 	for _, shard := range shards {
 		recorded, trusted := pack.stamps[shard]
@@ -86,7 +86,7 @@ func (packs *buildPacks) fresh(pack *buildPack, shards []byte) bool {
 		}
 		// The pack records only a stamp trusted as it was read, more than racyStampWindow behind the clock, so no
 		// write since can have left the shard's time where it was, and an equal stamp is an unchanged shard.
-		if reading := packs.stamp(pack.store, shard); !reading.Known || reading.Stamp != recorded {
+		if reading := packs.stamp(pack.store, shard); !reading.Known || reading.Moved || reading.Stamp != recorded {
 			return false
 		}
 	}

@@ -134,7 +134,7 @@ func TestATrimWithinADayOfTheLastDoesNothing(test *testing.T) {
 func TestMarkUsedTouchesOnlyAnEntryOlderThanAnHour(test *testing.T) {
 	test.Parallel()
 
-	store := OpenAt(filepath.Join(test.TempDir(), "go", "standard-library"))
+	store := OpenAt(filepath.Join(test.TempDir(), "go", "standard-library"), nil)
 	stale := Key{0xAB, 0x01}
 	fresh := Key{0xAB, 0x02}
 	for _, key := range []Key{stale, fresh} {

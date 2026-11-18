@@ -429,7 +429,7 @@ func (engine *pipeline) cacheSession(
 	}
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
-		enabled, engine.described.children, system)
+		enabled, engine.described.children, system, engine.shardStamps)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}

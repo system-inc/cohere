@@ -79,7 +79,9 @@ type pipeline struct {
 	systemCache *systemCache
 
 	// shardStamps are the run's stamps of its stores' shard directories, which every extra build's packs read, each
-	// shard once a run (#b2t9xmf). A test replaces them with stamps judged by a clock of its own.
+	// shard once a run (#b2t9xmf), and which every store the run opens holds, so a write through any of them marks its
+	// shard moved (cache.Open). A test replaces them with stamps judged by a clock of its own, and opens the system
+	// cache again with them.
 	shardStamps *cache.ShardStamps
 
 	// keepsHostRestoreOff, set only by a test, has every extra build check every package itself rather than restore any
@@ -272,6 +274,8 @@ func newPipeline(
 	standardError io.Writer,
 	memory *engineMemory,
 ) *pipeline {
+	// Made before the system cache's store, which holds them, as every store the run opens does (cache.Open).
+	shardStamps := cache.NewShardStamps(nil)
 	return &pipeline{
 		request:       request,
 		described:     described,
@@ -285,8 +289,8 @@ func newPipeline(
 		// The facts census reads each build's own facts, which a restore from the host's run would replace.
 		censusKeepsHostRestoreOff: request.judgesDependence(),
 		timing:                    newTiming(request),
-		systemCache:               openSystemCache(request),
-		shardStamps:               cache.NewShardStamps(nil),
+		systemCache:               openSystemCache(request, shardStamps),
+		shardStamps:               shardStamps,
 		reads:                     load.NewSharedReads(),
 		fingerprints:              load.NewFingerprints(),
 		walks:                     load.NewPackageWalks(),

@@ -18,17 +18,18 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 )
 
-// projectStoreDirectory is the findings store of the project at root, whose packs are in its `packs` directory.
+// projectStoreDirectory is the findings store of the project at root, whose packs are in its `packs` directory, each
+// in its engine identity's.
 func projectStoreDirectory(root string) string {
 	return filepath.Join(root, ".cache", "cohere", "go")
 }
 
-// packFiles are the pack files of every store directory of directories, sorted.
+// packFiles are the pack files of every store directory of directories, of every engine identity, sorted.
 func packFiles(test *testing.T, directories ...string) []string {
 	test.Helper()
 	var files []string
 	for _, directory := range directories {
-		listed, listError := filepath.Glob(filepath.Join(directory, "packs", "*"))
+		listed, listError := filepath.Glob(filepath.Join(directory, "packs", "*", "*"))
 		if listError != nil {
 			test.Fatal(listError)
 		}
@@ -43,7 +44,7 @@ func packedKeys(test *testing.T, directories ...string) map[cache.Key]bool {
 	test.Helper()
 	keys := map[cache.Key]bool{}
 	for _, file := range packFiles(test, directories...) {
-		read, refused := cache.OpenAt(filepath.Dir(filepath.Dir(file))).ReadPack(packNameOf(test, file))
+		read, refused := cache.OpenAt(storeOfPack(file), nil).ReadPack(packPlaceOf(test, file))
 		if refused != "" {
 			test.Fatalf("the pack %s was refused as %s", file, refused)
 		}
@@ -56,11 +57,12 @@ func packedKeys(test *testing.T, directories ...string) map[cache.Key]bool {
 
 // packingLater has a run share the system cache at systemRoot, as sharingSystemCache does, and judge its builds' shard
 // stamps by a clock an hour ahead, so every stamp of the test's stores is far enough behind its reading to be trusted,
-// as a run's would be had its stores been written a while before (#b2t9xmf).
+// as a run's would be had its stores been written a while before (#b2t9xmf). The stamps are set first, so the system
+// cache's store, which sharingSystemCache opens, holds them, as every store of the run does.
 func packingLater(systemRoot string) func(*pipeline) {
 	return func(engine *pipeline) {
-		sharingSystemCache(systemRoot)(engine)
 		engine.shardStamps = cache.NewShardStamps(func() time.Time { return time.Now().Add(time.Hour) })
+		sharingSystemCache(systemRoot)(engine)
 	}
 }
 
@@ -237,9 +239,9 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 		test.Fatal("the cold run left no export data in the stores to remove")
 	}
 	for _, file := range packFiles(test, stores...) {
-		store := cache.OpenAt(filepath.Dir(filepath.Dir(file)))
-		name := packNameOf(test, file)
-		read, refused := store.ReadPack(name)
+		store := cache.OpenAt(storeOfPack(file), nil)
+		place := packPlaceOf(test, file)
+		read, refused := store.ReadPack(place)
 		if refused != "" {
 			test.Fatalf("the pack %s was refused as %s", file, refused)
 		}
@@ -252,7 +254,7 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 				restamped[cache.ShardOf(entry.Stored)] = reading.Stamp
 			}
 		}
-		if writeError := store.WritePack(name, entries, restamped); writeError != nil {
+		if writeError := store.WritePack(place, entries, restamped); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}
@@ -294,12 +296,41 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 	}
 }
 
-// packNameOf is the name of the pack file at path, its key in hex.
-func packNameOf(test *testing.T, path string) cache.Key {
+// packPlaceOf is the place of the pack file at path, its engine identity's directory and its name, each a key in hex.
+func packPlaceOf(test *testing.T, path string) cache.PackPlace {
 	test.Helper()
-	decoded, decodeError := hex.DecodeString(filepath.Base(path))
-	if decodeError != nil || len(decoded) != len(cache.Key{}) {
-		test.Fatalf("a pack file named %s, want a key's hex", path)
+	keyOf := func(name string) cache.Key {
+		decoded, decodeError := hex.DecodeString(name)
+		if decodeError != nil || len(decoded) != len(cache.Key{}) {
+			test.Fatalf("a pack file at %s, want its directory and its name a key's hex", path)
+		}
+		return cache.Key(decoded)
 	}
-	return cache.Key(decoded)
+	return cache.PackPlace{Identity: keyOf(filepath.Base(filepath.Dir(path))), Name: keyOf(filepath.Base(path))}
+}
+
+// storeOfPack is the directory of the store the pack file at path is in: `<store>/packs/<identity>/<name>`.
+func storeOfPack(path string) string {
+	return filepath.Dir(filepath.Dir(filepath.Dir(path)))
+}
+
+// The host's session keeps no pack (#b2t9xmf): a run of the host's build alone, cold and then warm, reads and writes
+// none in either store, and its lint record counts none.
+func TestTheHostKeepsNoPack(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	systemRoot := test.TempDir()
+	sharing := packingLater(systemRoot)
+	for _, run := range []string{"cold", "warm"} {
+		_, stream := runOverConfigured(test, root, exitClean, sharing)
+		if packs := lintRecordOf(test, stream).Cache.Packs; packs != nil {
+			test.Errorf("the %s run of the host alone counts packs: %+v", run, *packs)
+		}
+		for _, directory := range []string{projectStoreDirectory(root), systemStoreDirectory(systemRoot)} {
+			if _, statError := os.Stat(filepath.Join(directory, "packs")); !os.IsNotExist(statError) {
+				test.Errorf("the %s run of the host alone made %s/packs: %v", run, directory, statError)
+			}
+		}
+	}
 }

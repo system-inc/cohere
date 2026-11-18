@@ -7,16 +7,18 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
-// samplePackName is a pack's name for the tests, samplePackEntries what it holds: one entry read for its own key, one
+// samplePackPlace is a pack's place for the tests, samplePackEntries what it holds: one entry read for its own key, one
 // read through an alias, whose asked and stored keys differ, and an empty one, and samplePackStamps its shards' stamps.
 var (
-	samplePackName    = PackName([]string{"test"}, []string{"pack"})
+	samplePackPlace = PackPlace{Identity: PackIdentity("test engine"),
+		Name: PackName([]string{"test"}, []string{"pack"})}
 	samplePackStamps  = map[byte]int64{0x01: 1_700_000_000_123_456_789, 0x03: -1, 0x04: 0}
 	samplePackEntries = []PackEntry{
 		{Asked: Key{0x01}, Stored: Key{0x01}, Entry: []byte("a record held whole")},
@@ -26,21 +28,22 @@ var (
 )
 
 // A pack written is read back whole, each entry under the key it was asked by with the key it was stored under, and
-// each shard's stamp, and lives in the store's `packs` directory, where no Get reads it.
+// each shard's stamp, and lives in the store's `packs` directory, in its engine identity's, where no Get reads it.
 func TestAPackWrittenIsReadBack(test *testing.T) {
 	test.Parallel()
 
-	store := Open(test.TempDir())
-	if _, refused := store.ReadPack(samplePackName); refused != PackMissing {
+	store := Open(test.TempDir(), nil)
+	if _, refused := store.ReadPack(samplePackPlace); refused != PackMissing {
 		test.Fatalf("an empty store's pack was refused as %q, want %q", refused, PackMissing)
 	}
-	if writeError := store.WritePack(samplePackName, samplePackEntries, samplePackStamps); writeError != nil {
+	if writeError := store.WritePack(samplePackPlace, samplePackEntries, samplePackStamps); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if _, statError := os.Stat(filepath.Join(store.directory, "packs", samplePackName.String())); statError != nil {
-		test.Fatalf("the pack is not in the store's packs directory: %v", statError)
+	if _, statError := os.Stat(filepath.Join(store.directory, "packs", samplePackPlace.Identity.String(),
+		samplePackPlace.Name.String())); statError != nil {
+		test.Fatalf("the pack is not in its engine's directory of the store's packs directory: %v", statError)
 	}
-	read, refused := store.ReadPack(samplePackName)
+	read, refused := store.ReadPack(samplePackPlace)
 	if refused != "" {
 		test.Fatalf("the pack written was refused as %q", refused)
 	}
@@ -93,11 +96,11 @@ func TestADamagedPackIsRefusedWhole(test *testing.T) {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 
-			store := Open(test.TempDir())
-			if writeError := store.WritePack(samplePackName, samplePackEntries, samplePackStamps); writeError != nil {
+			store := Open(test.TempDir(), nil)
+			if writeError := store.WritePack(samplePackPlace, samplePackEntries, samplePackStamps); writeError != nil {
 				test.Fatal(writeError)
 			}
-			path := store.packPath(samplePackName)
+			path := store.packPath(samplePackPlace)
 			contents, readError := os.ReadFile(path)
 			if readError != nil {
 				test.Fatal(readError)
@@ -105,10 +108,71 @@ func TestADamagedPackIsRefusedWhole(test *testing.T) {
 			if damageError := damage.damage(path, contents); damageError != nil {
 				test.Fatal(damageError)
 			}
-			read, refused := store.ReadPack(samplePackName)
+			read, refused := store.ReadPack(samplePackPlace)
 			if refused != damage.want || read.Entries != nil || read.Stamps != nil {
 				test.Errorf("want the pack refused as %q with nothing of it, got %q and %d entries", damage.want,
 					refused, len(read.Entries))
+			}
+		})
+	}
+}
+
+// A pack whose contents match their sum but do not read whole as stamps and entries, its stamps' count or its entries'
+// past what follows, an entry cut short within its bytes, or bytes after the last entry, is refused whole as
+// malformed, with no stamp and no entry of it, those read before the fault included (#b2t9xmf). Each holds two
+// entries of fifty bytes and one stamp; its sum is made again, so only its contents refuse it.
+func TestASummedButMalformedPackIsRefusedWhole(test *testing.T) {
+	test.Parallel()
+
+	entries := []PackEntry{
+		{Asked: Key{0x01}, Stored: Key{0x01}, Entry: bytes.Repeat([]byte{0x01}, 50)},
+		{Asked: Key{0x02}, Stored: Key{0x02}, Entry: bytes.Repeat([]byte{0x02}, 50)},
+	}
+	// The stamps' count follows the magic and the version, one byte for one stamp, and the entries' count follows the
+	// one stamp's bytes, one byte for two entries.
+	stampCount := len(packMagic) + 4
+	entryCount := stampCount + 1 + stampSize
+	for name, malform := range map[string]func(body []byte) []byte{
+		"the stamps' count past what follows": func(body []byte) []byte {
+			body[stampCount] = 100
+			return body
+		},
+		"the entries' count past what follows": func(body []byte) []byte {
+			// Three entries fit the bytes left by count alone, so only reading the third finds it missing.
+			body[entryCount] = 3
+			return body
+		},
+		"an entry cut short": func(body []byte) []byte {
+			return body[:len(body)-10]
+		},
+		"bytes after the last entry": func(body []byte) []byte {
+			return append(body, 0x00)
+		},
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+
+			store := Open(test.TempDir(), nil)
+			if writeError := store.WritePack(samplePackPlace, entries, map[byte]int64{0x01: 1}); writeError != nil {
+				test.Fatal(writeError)
+			}
+			path := store.packPath(samplePackPlace)
+			contents, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatal(readError)
+			}
+			if contents[sha256.Size+stampCount] != 1 || contents[sha256.Size+entryCount] != 2 {
+				test.Fatalf("the counts are not where the test reads them: %x", contents[sha256.Size:][:entryCount+1])
+			}
+			body := malform(slices.Clone(contents[sha256.Size:]))
+			sum := sha256.Sum256(body)
+			if writeError := os.WriteFile(path, append(sum[:], body...), 0o644); writeError != nil {
+				test.Fatal(writeError)
+			}
+			read, refused := store.ReadPack(samplePackPlace)
+			if refused != PackMalformed || read.Entries != nil || read.Stamps != nil {
+				test.Errorf("want the pack refused as %q with nothing of it, got %q, %d entries and %d stamps",
+					PackMalformed, refused, len(read.Entries), len(read.Stamps))
 			}
 		})
 	}
@@ -120,7 +184,7 @@ func TestADamagedPackIsRefusedWhole(test *testing.T) {
 func TestPacksWrittenSideBySideLeaveOneWhole(test *testing.T) {
 	test.Parallel()
 
-	store := Open(test.TempDir())
+	store := Open(test.TempDir(), nil)
 	// Each writer's entries are its own, and large enough that a write is many system calls, so a reader would catch
 	// one half written were the pack written in place.
 	entriesOf := func(writer int) []PackEntry {
@@ -128,7 +192,7 @@ func TestPacksWrittenSideBySideLeaveOneWhole(test *testing.T) {
 			{Asked: Key{0x01}, Stored: Key{byte(writer)}, Entry: bytes.Repeat([]byte{byte(writer)}, 1<<20)},
 		}
 	}
-	if writeError := store.WritePack(samplePackName, entriesOf(0), nil); writeError != nil {
+	if writeError := store.WritePack(samplePackPlace, entriesOf(0), nil); writeError != nil {
 		test.Fatal(writeError)
 	}
 	const writers = 2
@@ -139,7 +203,7 @@ func TestPacksWrittenSideBySideLeaveOneWhole(test *testing.T) {
 	for writer := range writers {
 		writing.Go(func() {
 			for range rounds {
-				if writeError := store.WritePack(samplePackName, entriesOf(writer+1), nil); writeError != nil {
+				if writeError := store.WritePack(samplePackPlace, entriesOf(writer+1), nil); writeError != nil {
 					writeErrors[writer] = writeError
 					return
 				}
@@ -151,7 +215,7 @@ func TestPacksWrittenSideBySideLeaveOneWhole(test *testing.T) {
 	var firstRefusal atomic.Value
 	reading.Go(func() {
 		for !done.Load() {
-			if _, refused := store.ReadPack(samplePackName); refused != "" {
+			if _, refused := store.ReadPack(samplePackPlace); refused != "" {
 				refusals.Add(1)
 				firstRefusal.CompareAndSwap(nil, refused)
 			}
@@ -169,13 +233,13 @@ func TestPacksWrittenSideBySideLeaveOneWhole(test *testing.T) {
 		test.Errorf("a reader beside the writers found the pack refused %d times, the first as %v", refusals.Load(),
 			firstRefusal.Load())
 	}
-	read, refused := store.ReadPack(samplePackName)
+	read, refused := store.ReadPack(samplePackPlace)
 	entry, held := read.Entries[Key{0x01}]
 	if refused != "" || !held || len(entry.Entry) != 1<<20 || entry.Stored[0] != entry.Entry[0] ||
 		!bytes.Equal(entry.Entry, bytes.Repeat(entry.Entry[:1], 1<<20)) {
 		test.Fatalf("want one writer's whole pack left, got %q, held %v, %d bytes", refused, held, len(entry.Entry))
 	}
-	files, listError := os.ReadDir(filepath.Dir(store.packPath(samplePackName)))
+	files, listError := os.ReadDir(filepath.Dir(store.packPath(samplePackPlace)))
 	if listError != nil {
 		test.Fatal(listError)
 	}
@@ -191,15 +255,15 @@ func TestTheTrimTakesAPackAsAnEntry(test *testing.T) {
 
 	root := test.TempDir()
 	directory := filepath.Join(root, "go", "store")
-	store := OpenAt(directory)
-	unread := PackName([]string{"unread"})
-	read := PackName([]string{"read"})
-	for _, name := range []Key{unread, read} {
-		if writeError := store.WritePack(name, samplePackEntries, nil); writeError != nil {
+	store := OpenAt(directory, nil)
+	unread := PackPlace{Identity: PackIdentity("an engine"), Name: PackName([]string{"unread"})}
+	read := PackPlace{Identity: PackIdentity("an engine"), Name: PackName([]string{"read"})}
+	for _, place := range []PackPlace{unread, read} {
+		if writeError := store.WritePack(place, samplePackEntries, nil); writeError != nil {
 			test.Fatal(writeError)
 		}
 		aged := time.Now().Add(-6 * 24 * time.Hour)
-		if timesError := os.Chtimes(store.packPath(name), aged, aged); timesError != nil {
+		if timesError := os.Chtimes(store.packPath(place), aged, aged); timesError != nil {
 			test.Fatal(timesError)
 		}
 	}
@@ -217,7 +281,7 @@ func TestTheTrimTakesAPackAsAnEntry(test *testing.T) {
 	// Under a cap that holds the newest entry alone, the pack, read an hour before it, goes, which only a trim that
 	// counts the pack's bytes does: without them the files left fit.
 	capped := filepath.Join(test.TempDir(), "go", "store")
-	cappedStore := OpenAt(capped)
+	cappedStore := OpenAt(capped, nil)
 	if writeError := cappedStore.WritePack(read, samplePackEntries, nil); writeError != nil {
 		test.Fatal(writeError)
 	}

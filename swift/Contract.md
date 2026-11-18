@@ -999,7 +999,9 @@ reads its hits, rather than open each record. A pack also holds, for each shard 
 were read from, the directory's modification time taken before they were read, and a record is served only while its
 shard's time is still that one: the store changes a file only by adding or removing a name in its shard's directory,
 so any write, removal or trim there since moves it, and the record is read from the store, as a run with no pack
-reads it. A time within two seconds of the clock when the run read it is never trusted, as git distrusts a file
+reads it. A shard the run itself writes to after reading its time is read from the store for the rest of the run, a
+reload's included, and its time is not kept in the pack, so the next run reads it from the store too. A time within
+two seconds of the clock when the run read it is never trusted, as git distrusts a file
 changed in the second it read it, so a file system with coarse times cannot hide a write later in the same tick. `"read"` counts the packs read whole, and `"missing"` those there were none of, as on a
 build's first run or a new engine's, which is no refusal. `"recordsServed"` counts the records the packs served, for
 which no record file was opened, `"recordsStale"` those a pack held whose shard had moved, and `"recordsMissed"` the
@@ -1012,8 +1014,9 @@ format's version and one sha256 over its contents, and no record is ever served 
 a build whose pack was refused reads its store as it would with none, and its findings are the same. `"written"`
 counts the packs written at a build's save, which happens when its run read or wrote a record its pack did not hold,
 a shard's time moved, or its pack was missing or refused, so a warm run whose packs served every record writes none.
-The system cache's trim counts a pack in its size cap and deletes it once unread for five days, as any entry there;
-the project's store is never trimmed, so its packs stay, one for each build and engine, as its entries do. The
+The system cache's trim counts a pack in its size cap and deletes it once unread for five days, as any entry there.
+The project's store is never trimmed, so its packs are kept in a directory of the engine that reads them, and the
+first pack a run writes there removes every other engine's, file by file, so they stay one for each build. The
 host's build keeps no pack, and a run with no extra build writes no `"packs"`.
 
 Under `--build-dependence`, with a store, the Go engine keeps block 1's dependence record of each package the host

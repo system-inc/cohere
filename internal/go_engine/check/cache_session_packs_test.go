@@ -21,20 +21,25 @@ func laterClock() time.Time {
 	return time.Now().Add(time.Hour)
 }
 
-// packedSession is an extra build's session over store with its packs opened under the source loader, as the build's
-// first Restore opens them before it reads its hits, its shard stamps its own, as a new run's are, judged by clock.
-func packedSession(store *cache.Store, clock func() time.Time) *CacheSession {
+// runStore is the project's store at root as a new run opens it, holding shard stamps of its own judged by clock.
+func runStore(root string, clock func() time.Time) *cache.Store {
+	return cache.Open(root, cache.NewShardStamps(clock))
+}
+
+// packedSession is an extra build's session over store, a run's, with its packs opened under the source loader, as
+// the build's first Restore opens them before it reads its hits.
+func packedSession(store *cache.Store) *CacheSession {
 	session := NewCacheSession(&Caching{Store: store}, nil)
-	session.KeepBuildPacks("project", cache.NewShardStamps(clock))
+	session.KeepBuildPacks("project")
 	session.openPacks("source")
 	return session
 }
 
-// packedOnce is a run over store that reads key through its pack, finding want, its stamps judged by clock, and writes
-// its pack at its save, returning the pack's name.
-func packedOnce(test *testing.T, store *cache.Store, key cache.Key, want string, clock func() time.Time) cache.Key {
+// packedOnce is a run over store, a run's, that reads key through its pack, finding want, and writes its pack at its
+// save, returning the pack's place.
+func packedOnce(test *testing.T, store *cache.Store, key cache.Key, want string) cache.PackPlace {
 	test.Helper()
-	session := packedSession(store, clock)
+	session := packedSession(store)
 	if contents, _, found := session.entryAt(store, key); !found || string(contents) != want {
 		test.Fatalf("the first run read %q (found %v), want %q", contents, found, want)
 	}
@@ -42,7 +47,7 @@ func packedOnce(test *testing.T, store *cache.Store, key cache.Key, want string,
 	if counts := session.counts.Packs; counts == nil || counts.Written != 1 {
 		test.Fatalf("want the first run's pack written, got %+v", counts)
 	}
-	return session.packs.byStore[0].name
+	return session.packs.byStore[0].place
 }
 
 // A key the build's pack holds is served from it, and a key it does not hold is read from the store, never answered
@@ -51,32 +56,33 @@ func packedOnce(test *testing.T, store *cache.Store, key cache.Key, want string,
 func TestAKeyThePackDoesNotHoldIsReadFromTheStore(test *testing.T) {
 	test.Parallel()
 
-	store := cache.Open(test.TempDir())
+	root := test.TempDir()
+	store := cache.Open(root, nil)
 	// packed shares stored's shard, which the store holds, so the shard has a stamp the pack can hold.
 	packed, stored, absent := cache.Key{0x02, 0x01}, cache.Key{0x02}, cache.Key{0x03}
 	if putError := store.Put(stored, []byte("the store's record")); putError != nil {
 		test.Fatal(putError)
 	}
-	// The pack's name is the session's own, as the first session opened it and found none, which is no refusal.
-	opening := packedSession(store, laterClock)
+	// The pack's place is the session's own, as the first session opened it and found none, which is no refusal.
+	opening := packedSession(runStore(root, laterClock))
 	if opening.packs.counts.Missing != 1 || len(opening.packs.counts.RefusedBy) != 0 {
 		test.Fatalf("want the store's pack missing and nothing refused before one is written, got %+v",
 			opening.packs.counts)
 	}
-	name := opening.packs.byStore[0].name
+	place := opening.packs.byStore[0].place
 	// The pack holds packed, which the store does not, so what is served of it can only be the pack's, with the stamp
 	// of its shard as it is.
 	packedReading, _ := cache.NewShardStamps(nil).Of(store, cache.ShardOf(packed))
 	if !packedReading.Known {
 		test.Fatal("the store has no shard of the packed key")
 	}
-	if writeError := store.WritePack(name, []cache.PackEntry{
+	if writeError := store.WritePack(place, []cache.PackEntry{
 		{Asked: packed, Stored: packed, Entry: []byte("the pack's record")},
 	}, map[byte]int64{cache.ShardOf(packed): packedReading.Stamp}); writeError != nil {
 		test.Fatal(writeError)
 	}
 
-	session := packedSession(store, laterClock)
+	session := packedSession(runStore(root, laterClock))
 	for _, testCase := range []struct {
 		key   cache.Key
 		want  string
@@ -86,7 +92,7 @@ func TestAKeyThePackDoesNotHoldIsReadFromTheStore(test *testing.T) {
 		{key: stored, want: "the store's record", found: true},
 		{key: absent},
 	} {
-		contents, storedKey, found := session.entryAt(store, testCase.key)
+		contents, storedKey, found := session.entryAt(session.caching.Store, testCase.key)
 		if found != testCase.found || !bytes.Equal(contents, []byte(testCase.want)) ||
 			found && storedKey != testCase.key {
 			test.Errorf("%x: want %q stored under itself (found %v), got %q under %x (found %v)", testCase.key[:1],
@@ -101,7 +107,7 @@ func TestAKeyThePackDoesNotHoldIsReadFromTheStore(test *testing.T) {
 			"got %+v", counts)
 	}
 	// The pack written holds what the run found, the store's record beside the pack's, and nothing of absent.
-	read, refused := store.ReadPack(name)
+	read, refused := store.ReadPack(place)
 	if refused != "" || len(read.Entries) != 2 || string(read.Entries[stored].Entry) != "the store's record" ||
 		string(read.Entries[packed].Entry) != "the pack's record" {
 		test.Errorf("want the pack written with the two records found, got %d entries (refused %q)",
@@ -114,17 +120,19 @@ func TestAKeyThePackDoesNotHoldIsReadFromTheStore(test *testing.T) {
 func TestAKeyWrittenAgainSinceThePackIsReadFromTheStore(test *testing.T) {
 	test.Parallel()
 
-	store := cache.Open(test.TempDir())
+	root := test.TempDir()
+	store := cache.Open(root, nil)
 	key := cache.Key{0x07}
 	if putError := store.Put(key, []byte("the record the pack was made of")); putError != nil {
 		test.Fatal(putError)
 	}
-	packedOnce(test, store, key, "the record the pack was made of", laterClock)
+	packedOnce(test, runStore(root, laterClock), key, "the record the pack was made of")
 	if putError := store.Put(key, []byte("the record another run wrote")); putError != nil {
 		test.Fatal(putError)
 	}
-	session := packedSession(store, laterClock)
-	if contents, _, found := session.entryAt(store, key); !found || string(contents) != "the record another run wrote" {
+	session := packedSession(runStore(root, laterClock))
+	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
+		string(contents) != "the record another run wrote" {
 		test.Errorf("want the record the store holds now, got %q (found %v)", contents, found)
 	}
 	if served, stale := session.packs.served.Load(), session.packs.stale.Load(); served != 0 || stale != 1 {
@@ -139,12 +147,12 @@ func TestAKeyTrimmedSinceThePackReadsAsAMiss(test *testing.T) {
 
 	root := test.TempDir()
 	directory := filepath.Join(root, "go", "store")
-	store := cache.OpenAt(directory)
+	store := cache.OpenAt(directory, nil)
 	key := cache.Key{0x09}
 	if putError := store.Put(key, []byte("a record no run read for days")); putError != nil {
 		test.Fatal(putError)
 	}
-	packedOnce(test, store, key, "a record no run read for days", laterClock)
+	packedOnce(test, cache.OpenAt(directory, cache.NewShardStamps(laterClock)), key, "a record no run read for days")
 	aged := time.Now().Add(-6 * 24 * time.Hour)
 	recordPath := filepath.Join(directory, key.String()[:2], key.String())
 	if timesError := os.Chtimes(recordPath, aged, aged); timesError != nil {
@@ -156,8 +164,8 @@ func TestAKeyTrimmedSinceThePackReadsAsAMiss(test *testing.T) {
 	if _, statError := os.Stat(recordPath); !os.IsNotExist(statError) {
 		test.Fatalf("the trim kept the record unread for six days: %v", statError)
 	}
-	session := packedSession(store, laterClock)
-	if contents, _, found := session.entryAt(store, key); found {
+	session := packedSession(cache.OpenAt(directory, cache.NewShardStamps(laterClock)))
+	if contents, _, found := session.entryAt(session.caching.Store, key); found {
 		test.Errorf("want the trimmed record a miss, got %q", contents)
 	}
 }
@@ -171,7 +179,7 @@ func TestARacyShardIsNeverServed(test *testing.T) {
 	test.Parallel()
 
 	root := test.TempDir()
-	store := cache.Open(root)
+	store := cache.Open(root, nil)
 	key := cache.Key{0x0B}
 	if putError := store.Put(key, []byte("the record the pack was made of")); putError != nil {
 		test.Fatal(putError)
@@ -195,33 +203,37 @@ func TestARacyShardIsNeverServed(test *testing.T) {
 		}
 		return tick.Add(3 * time.Second)
 	}
-	session := packedSession(store, clock)
-	if contents, _, found := session.entryAt(store, key); !found ||
+	session := packedSession(runStore(root, clock))
+	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
 		string(contents) != "the record the pack was made of" {
 		test.Fatalf("the first run read %q (found %v)", contents, found)
 	}
-	// Written again within the tick the stamp was read in, after the reading: the shard's time is where it was.
+	// Written again within the tick the stamp was read in, after the reading, by another run: the shard's time is where
+	// it was, and no store of this run marks it moved.
 	if putError := store.Put(key, []byte("the record written in the same tick")); putError != nil {
 		test.Fatal(putError)
 	}
 	holdTick()
 	session.writePacks()
-	name := session.packs.byStore[0].name
-	if read, _ := store.ReadPack(name); len(read.Stamps) != 0 {
+	place := session.packs.byStore[0].place
+	if read, _ := store.ReadPack(place); len(read.Stamps) != 0 {
 		test.Errorf("want the stamp read half a second into its tick recorded as none, got %v", read.Stamps)
 	}
-	next := packedSession(store, laterClock)
-	if contents, _, found := next.entryAt(store, key); !found ||
+	next := packedSession(runStore(root, laterClock))
+	if contents, _, found := next.entryAt(next.caching.Store, key); !found ||
 		string(contents) != "the record written in the same tick" {
 		test.Errorf("want the record the store holds now, got %q (found %v)", contents, found)
 	}
 }
 
-// runPackedSession is runWithSession with the session an extra build's, keeping its packs by laterClock.
-func runPackedSession(test *testing.T, directory string, caching *Caching, rules []rule.Rule) sessionRun {
+// runPackedSession is runWithSession with the session an extra build's, keeping its packs, over a cache in
+// storeDirectory as cachingAt keys it, its store a new run's, with shard stamps of its own judged by laterClock.
+func runPackedSession(test *testing.T, directory string, storeDirectory string, rules []rule.Rule) sessionRun {
 	test.Helper()
+	caching := cachingAt(storeDirectory, rules)
+	caching.Store = runStore(storeDirectory, laterClock)
 	session := NewCacheSession(caching, rules)
-	session.KeepBuildPacks("project", cache.NewShardStamps(laterClock))
+	session.KeepBuildPacks("project")
 	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
 		load.Caching{Restorer: session, Listings: session})
 	if loadError != nil {
@@ -243,10 +255,11 @@ func TestAShortRecordThePackServedIsCheckedAndPackedAgain(test *testing.T) {
 	root := test.TempDir()
 	writeFiles(test, root, unimportedFiles)
 	rules := []rule.Rule{houseRule(markedAnalyzer)}
-	caching := testCaching(test, rules)
+	storeDirectory := test.TempDir()
+	store := cache.Open(storeDirectory, nil)
 	// The first run packs what it wrote, the second what it read, by stamps taken before its reads.
-	runPackedSession(test, root, caching, rules)
-	settled := runPackedSession(test, root, caching, rules)
+	runPackedSession(test, root, storeDirectory, rules)
+	settled := runPackedSession(test, root, storeDirectory, rules)
 	if counts := settled.result.Cache.Packs; counts == nil || counts.Read != 1 {
 		test.Fatalf("want the second run to read the first's pack, got %+v", counts)
 	}
@@ -260,23 +273,23 @@ func TestAShortRecordThePackServedIsCheckedAndPackedAgain(test *testing.T) {
 		return nil, cache.Key{}
 	}
 	_, baseKey := base(settled.session)
-	name := settled.session.packs.byStore[0].name
-	before, _ := caching.Store.ReadPack(name)
+	place := settled.session.packs.byStore[0].place
+	before, _ := store.ReadPack(place)
 	packedBefore, held := before.Entries[baseKey]
 	if !held {
 		test.Fatal("the pack holds no record of base")
 	}
 
 	writeFiles(test, root, map[string]string{"user/user.go": userFile})
-	imported := runPackedSession(test, root, caching, rules)
+	imported := runPackedSession(test, root, storeDirectory, rules)
 	if counts := imported.result.Cache.Packs; counts == nil || counts.RecordsServed == 0 || counts.Written != 1 {
 		test.Fatalf("want the pack to serve records, base's among them, and be written again, got %+v", counts)
 	}
 	if baseImported, _ := base(imported.session); imported.session.restored(baseImported) {
 		test.Error("want base, served without facts, a miss once user imports it, got a hit")
 	}
-	after, _ := caching.Store.ReadPack(name)
-	stored, found := caching.Store.Get(baseKey)
+	after, _ := store.ReadPack(place)
+	stored, found := store.Get(baseKey)
 	if !found || bytes.Equal(packedBefore.Entry, stored) || !bytes.Equal(after.Entries[baseKey].Entry, stored) {
 		test.Errorf("want the pack written with base's new record, the store's (found %v)", found)
 	}
@@ -291,5 +304,201 @@ func TestAShortRecordThePackServedIsCheckedAndPackedAgain(test *testing.T) {
 	if !reflect.DeepEqual(withoutTimesOrCache(imported.result), withoutTimesOrCache(uncached)) {
 		test.Fatalf("cached\n%+v\nwithout the cache\n%+v", withoutTimesOrCache(imported.result),
 			withoutTimesOrCache(uncached))
+	}
+}
+
+// keysApartFrom are count keys, each in a shard of its own and none in shard's, so a write to one moves no other's
+// shard.
+func keysApartFrom(shard byte, count int) []cache.Key {
+	keys := make([]cache.Key, 0, count)
+	for first := byte(0x21); len(keys) < count; first++ {
+		if first != shard {
+			keys = append(keys, cache.Key{first})
+		}
+	}
+	return keys
+}
+
+// An entry read through an alias was read from the alias table's shard too, so a write to that shard alone, the table
+// rewritten with the alias standing for another key, moves what the pack was made of: the next run reads the alias
+// from the store, as a run with no pack does, and finds the entry it stands for now (#b2t9xmf).
+func TestAnEntryReadThroughAnAliasIsReadAgainOnceItsTableIsRewritten(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	// The session's alias table is the one of its context, which packedSession leaves empty.
+	tableShard := cache.ShardOf(newAliasTable(store, cache.Context{}).key)
+	keys := keysApartFrom(tableShard, 3)
+	alias, first, second := keys[0], keys[1], keys[2]
+	// The alias's shard holds a file too, so each of the three shards the entry was read from has a stamp to hold.
+	besideTheAlias := alias
+	besideTheAlias[1] = 0x01
+	for key, contents := range map[cache.Key]string{
+		first:          "the entry the alias stood for",
+		second:         "the entry it stands for now",
+		besideTheAlias: "another entry of the alias's shard",
+	} {
+		if putError := store.Put(key, []byte(contents)); putError != nil {
+			test.Fatal(putError)
+		}
+	}
+	if addError := newAliasTable(store, cache.Context{}).add(map[cache.Key]cache.Key{alias: first},
+		aliasTableFloor); addError != nil {
+		test.Fatal(addError)
+	}
+	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stood for")
+	// Only the table's shard is written.
+	if addError := newAliasTable(store, cache.Context{}).add(map[cache.Key]cache.Key{alias: second},
+		aliasTableFloor); addError != nil {
+		test.Fatal(addError)
+	}
+	session := packedSession(runStore(root, laterClock))
+	contents, storedKey, found := session.entryAt(session.caching.Store, alias)
+	if !found || string(contents) != "the entry it stands for now" || storedKey != second {
+		test.Errorf("want the entry the alias stands for now, got %q under %x (found %v)", contents, storedKey[:1],
+			found)
+	}
+	if served := session.packs.served.Load(); served != 0 {
+		test.Errorf("want nothing served from the pack, got %d", served)
+	}
+}
+
+// A shard is stamped before the session reads a key of it from the store, so a write there between the read and the
+// save, another run's, which no store of this run marks moved, is after the stamp the pack records, and the next run
+// reads the key from the store rather than serve what this one read (#b2t9xmf).
+func TestAWriteBetweenAReadAndTheSaveIsReadFromTheStoreNextRun(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	key := cache.Key{0x0D}
+	if putError := store.Put(key, []byte("the record the run read")); putError != nil {
+		test.Fatal(putError)
+	}
+	session := packedSession(runStore(root, laterClock))
+	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
+		string(contents) != "the record the run read" {
+		test.Fatalf("the run read %q (found %v)", contents, found)
+	}
+	if putError := store.Put(key, []byte("the record another run wrote meanwhile")); putError != nil {
+		test.Fatal(putError)
+	}
+	session.writePacks()
+	next := packedSession(runStore(root, laterClock))
+	if contents, _, found := next.entryAt(next.caching.Store, key); !found ||
+		string(contents) != "the record another run wrote meanwhile" {
+		test.Errorf("want the record the store holds now, got %q (found %v)", contents, found)
+	}
+}
+
+// A key the run writes without asking it first has its shard stamped before the write (putRecord), so the write marks
+// it moved and the pack records no stamp of it: a stamp taken after the write would hold whatever landed there since,
+// another run's write of the same key here, and the next run would serve the record this run wrote over the store's
+// (#b2t9xmf).
+func TestAKeyTheRunWritesIsNeverStampedAfterItsWrite(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	key := cache.Key{0x0E}
+	session := packedSession(runStore(root, laterClock))
+	if putError := session.putRecord(session.caching.Store, key,
+		encodedEntry{record: entryRecord{Version: "the record this run wrote"}}); putError != nil {
+		test.Fatal(putError)
+	}
+	if putError := store.Put(key, []byte("the record another run wrote")); putError != nil {
+		test.Fatal(putError)
+	}
+	session.writePacks()
+	if read, _ := store.ReadPack(session.packs.byStore[0].place); len(read.Stamps) != 0 {
+		test.Errorf("want no stamp of the shard the run wrote, got %v", read.Stamps)
+	}
+	next := packedSession(runStore(root, laterClock))
+	if contents, _, found := next.entryAt(next.caching.Store, key); !found ||
+		string(contents) != "the record another run wrote" {
+		test.Errorf("want the record the store holds now, got %q (found %v)", contents, found)
+	}
+}
+
+// A record the pack served that the run then writes anew under the same key, as one dropShortHits drops, checked from
+// source and saved again, is never served from the pack again in the run: the write marks its shard moved, so a
+// reload's Restore asking the key reads the store's new record, here after a save whose pack write failed, which
+// leaves the pack as the run read it (#b2t9xmf).
+func TestARecordTheRunWroteAgainIsNeverServedOldOnAReload(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	key := cache.Key{0x0F}
+	if putError := store.Put(key, []byte("the record the pack was made of")); putError != nil {
+		test.Fatal(putError)
+	}
+	// The first run packs the record, and the second reads its stamps' shards before they are written.
+	packedOnce(test, runStore(root, laterClock), key, "the record the pack was made of")
+	session := packedSession(runStore(root, laterClock))
+	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
+		string(contents) != "the record the pack was made of" || session.packs.served.Load() != 1 {
+		test.Fatalf("want the record served from the pack, got %q (found %v, %d served)", contents, found,
+			session.packs.served.Load())
+	}
+	if putError := session.putRecord(session.caching.Store, key,
+		encodedEntry{record: entryRecord{Version: "the record checked from source"}}); putError != nil {
+		test.Fatal(putError)
+	}
+	// A directory where the pack goes fails its rename, so the save writes no pack.
+	place := session.packs.byStore[0].place
+	packPath := filepath.Join(root, ".cache", "cohere", "go", "packs", place.Identity.String(), place.Name.String())
+	if removeError := os.Remove(packPath); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if makeError := os.MkdirAll(filepath.Join(packPath, "held"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	session.writePacks()
+	if counts := session.counts.Packs; counts == nil || counts.Written != 0 {
+		test.Fatalf("want the save's pack write to fail, got %+v", counts)
+	}
+	stored, _ := store.Get(key)
+	if contents, _, found := session.entryAt(session.caching.Store, key); !found || !bytes.Equal(contents, stored) {
+		test.Errorf("want the reload to read the record the run wrote, got %q (found %v)", contents, found)
+	}
+}
+
+// The project's first pack write of a run removes every pack of another engine identity, file by file and then its
+// directory, a pack's temporary file left behind among them, and keeps every pack of its own engine, another build's
+// included: each new engine would otherwise leave every pack of the one before where no run reads it (#b2t9xmf).
+func TestAPackOfAnotherEngineIsRemovedAtTheSave(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	key := cache.Key{0x10}
+	if putError := store.Put(key, []byte("a record")); putError != nil {
+		test.Fatal(putError)
+	}
+	// The session's engine identity is its context's, as a session opening its pack finds it.
+	identity := packedSession(runStore(root, laterClock)).packs.byStore[0].place.Identity
+	other := cache.PackPlace{Identity: cache.PackIdentity("another engine"), Name: cache.PackName([]string{"other"})}
+	ours := cache.PackPlace{Identity: identity, Name: cache.PackName([]string{"another build"})}
+	for _, place := range []cache.PackPlace{other, ours} {
+		if writeError := store.WritePack(place, nil, nil); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	packs := filepath.Join(root, ".cache", "cohere", "go", "packs")
+	otherDirectory := filepath.Join(packs, other.Identity.String())
+	leftBehind := filepath.Join(otherDirectory, other.Name.String()+".123.temporary")
+	if writeError := os.WriteFile(leftBehind, []byte("half a pack"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	written := packedOnce(test, runStore(root, laterClock), key, "a record")
+	if _, statError := os.Stat(otherDirectory); !os.IsNotExist(statError) {
+		test.Errorf("want another engine's packs and their directory removed, got %v", statError)
+	}
+	for _, place := range []cache.PackPlace{ours, written} {
+		if _, refused := store.ReadPack(place); refused != "" {
+			test.Errorf("want this engine's pack %x kept, got it %s", place.Name[:2], refused)
+		}
 	}
 }

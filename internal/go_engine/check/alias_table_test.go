@@ -20,7 +20,7 @@ func aliasKeyNamed(name string) cache.Key {
 func TestABuildsAliasTableKeepsEveryAliasExactAndTheNewestWithinItsBound(test *testing.T) {
 	test.Parallel()
 
-	store := cache.Open(test.TempDir())
+	store := cache.Open(test.TempDir(), nil)
 	context := cache.Context{FormatVersion: "test", EngineIdentity: "engine", Build: []string{"GOOS=darwin"},
 		RuleSet: []string{"rule"}}
 	first, second, third := aliasKeyNamed("first"), aliasKeyNamed("second"), aliasKeyNamed("third")

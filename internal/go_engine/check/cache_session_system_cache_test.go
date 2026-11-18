@@ -240,7 +240,7 @@ func collectingCaching(test *testing.T, rules []rule.Rule, context cache.Standar
 // systemStore is a system cache's store of the test's own.
 func systemStore(test *testing.T) *cache.Store {
 	test.Helper()
-	return cache.OpenAt(filepath.Join(test.TempDir(), "go", "store"))
+	return cache.OpenAt(filepath.Join(test.TempDir(), "go", "store"), nil)
 }
 
 // runSessionWith is runWithSession with the session opened for sessionRules and the run made of runRules, so a test

@@ -62,7 +62,7 @@ func cachingAt(directory string, rules []rule.Rule) *Caching {
 	}
 	slices.Sort(names)
 	return &Caching{
-		Store: cache.Open(directory),
+		Store: cache.Open(directory, nil),
 		Context: cache.Context{
 			FormatVersion:  CacheFormatVersion,
 			EngineIdentity: "check tests",

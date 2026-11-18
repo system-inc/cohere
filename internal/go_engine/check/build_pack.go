@@ -11,7 +11,7 @@ import (
 // of that store's records, which the next pack holds.
 type buildPack struct {
 	store *cache.Store
-	name  cache.Key
+	place cache.PackPlace
 
 	// system is whether the pack is the system cache's, whose write failing is why the run could not keep the system
 	// cache, never a problem of the project's store (systemCacheFailed).

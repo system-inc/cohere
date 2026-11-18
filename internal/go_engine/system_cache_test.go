@@ -53,7 +53,7 @@ func sharingSystemCache(root string) func(*pipeline) {
 		sharing := engine.request.standardLibrary
 		sharing.systemCacheRoot = root
 		engine.request.standardLibrary = sharing
-		engine.systemCache = openSystemCache(engine.request)
+		engine.systemCache = openSystemCache(engine.request, engine.shardStamps)
 	}
 }
 
@@ -81,7 +81,7 @@ func isolatePipeline(test *testing.T, engine *pipeline) {
 	isolated := isolatedSource(test, engine.request.standardLibrary)
 	if isolated.systemCacheRoot != engine.request.standardLibrary.systemCacheRoot {
 		engine.request.standardLibrary = isolated
-		engine.systemCache = openSystemCache(engine.request)
+		engine.systemCache = openSystemCache(engine.request, engine.shardStamps)
 	}
 }
 

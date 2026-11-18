@@ -540,7 +540,7 @@ func (engine *pipeline) extraBuildRun(
 		// Each extra build reads one pack of each store rather than open every record it hits (#b2t9xmf); the host's
 		// session keeps none.
 		if session != nil {
-			session.KeepBuildPacks(engine.described.workspace.Root, engine.shardStamps)
+			session.KeepBuildPacks(engine.described.workspace.Root)
 		}
 		if session != nil && !engine.keepsHostRestoreOff && !engine.censusKeepsHostRestoreOff {
 			session.RestoreFromHost(host)
