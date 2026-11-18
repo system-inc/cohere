@@ -24,10 +24,6 @@ import (
 // checked by it (#72n9mq0); with it each such file keeps its constraint's reason, a gap. The engine reads it through
 // checksEveryBuild. The front door forwards it to this engine alone, and off changes nothing.
 //
-// `other-builds` asked for every build when the host's alone was the default, and changes nothing now. It lives one
-// land between two of our own commits, for the self-hosting gate: `cohere-dev land` runs main's land_cohere.go, which
-// passes it to the binary it builds from the landing tree (#qqyq61s). The next commit removes it.
-//
 // `build-dependence` has the engine compute, for every extra build the run checks, which of the host's package-level
 // declarations the build can change (#qkq4gx5), and write the counts on the build's record, observed only: it changes
 // no finding. Under `host-build-only` it does nothing. The engine reads it alone for now, and the census runs the
@@ -40,8 +36,7 @@ import (
 // alone: the Swift engine refuses it as a flag it does not know.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "host-build-only", "other-builds", "timing",
-	"duplicates",
+	"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "host-build-only", "timing", "duplicates",
 	"build-dependence",
 }
 

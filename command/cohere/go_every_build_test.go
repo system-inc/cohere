@@ -114,32 +114,17 @@ func TestHostBuildOnlyLeavesAnotherBuildsFileAGap(test *testing.T) {
 	}
 }
 
-// TestTheOtherBuildsSwitchChangesNothing: `--other-builds` asked for what every run now does, and is dropped before
-// the flags are read for one land, so the self-hosting gate main still runs can pass it (#qqyq61s): a run naming it
-// checks every build, as a plain run does, and the next commit removes it.
-func TestTheOtherBuildsSwitchChangesNothing(test *testing.T) {
+// TestTheOtherBuildsSwitchIsGone: `--other-builds` asked for what every run now does, and is gone with no forwarder
+// (#qqyq61s), so it fails as any flag cohere does not define does, exit 2 before anything is checked, bare or given a
+// value.
+func TestTheOtherBuildsSwitchIsGone(test *testing.T) {
 	test.Parallel()
 	fixture := newEveryBuildFixture(test)
-	named := fixture.run(false, "--no-fix", "--json", "--other-builds")
-	if named.exitCode != 1 || !slices.Contains(everyBuildFindingFiles(named.stdout), everyBuildWindowsFile) {
-		test.Errorf("a run naming --other-builds exited %d without the finding in %s, want a plain run's:\n%s%s",
-			named.exitCode, everyBuildWindowsFile, named.stdout, named.stderr)
-	}
-}
-
-// TestTheOtherBuildsSwitchRefusesAValue: `--other-builds` given a value is refused by name for the land it lives
-// (#qqyq61s), since `--other-builds=false`, dropped as the bare switch is, would check every build while it asks for
-// the host's alone. The run fails before checking anything, so no finding is reported.
-func TestTheOtherBuildsSwitchRefusesAValue(test *testing.T) {
-	test.Parallel()
-	fixture := newEveryBuildFixture(test)
-	for _, argument := range []string{"--other-builds=false", "-other-builds=true"} {
-		refused := fixture.run(false, "--no-fix", "--json", argument)
-		if refused.exitCode != 1 || !strings.Contains(refused.stderr, argument[strings.Index(argument, "o"):]) ||
-			len(everyBuildFindingFiles(refused.stdout)) != 0 {
-			test.Errorf("a run naming %s exited %d with findings in %v, want it refused by name before any check:\n"+
-				"%s%s", argument, refused.exitCode, everyBuildFindingFiles(refused.stdout), refused.stdout,
-				refused.stderr)
+	for _, argument := range []string{"--other-builds", "--other-builds=false", "-other-builds=true"} {
+		refused := fixture.run(false, "--no-fix", argument)
+		if refused.exitCode != 2 || !strings.Contains(refused.stderr, "flag provided but not defined: -other-builds") {
+			test.Errorf("%s exited %d, want it refused as an unknown flag:\n%s%s", argument, refused.exitCode,
+				refused.stdout, refused.stderr)
 		}
 	}
 }
