@@ -14,6 +14,9 @@ var (
 	deleteAlone = "ab"
 	// A unit separator alone, the last ASCII control below a space, in a literal otherwise all printable ASCII.
 	unitSeparator = "ab"
+	// A vertical tab alone, a control between the three the check allows and a space, in a literal otherwise all
+	// printable ASCII.
+	verticalTab = "ab"
 	// A tab, a newline in a raw string, and escape sequences are allowed.
 	allowedControls = "tab	here"
 	rawNewline      = `line
