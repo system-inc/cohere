@@ -295,13 +295,11 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 		}
 		return restored, written
 	}
-	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--other-builds").stream)
+	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if len(cold.Builds) < 2 || cold.Builds[0].SystemCacheWritten == 0 || cold.Builds[0].SystemCacheRestored != 0 {
 		test.Fatalf("want the cold host to write to the system cache and restore nothing, got %+v", cold.Builds)
 	}
-	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--other-builds").stream)
+	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if warm.Builds[0].SystemCacheRestored != cold.Builds[0].SystemCacheWritten ||
 		warm.Builds[0].SystemCacheWritten != 0 {
 		test.Errorf("want the warm host to restore the %d entries the cold one wrote and write none, got %+v",
@@ -316,7 +314,7 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 		}
 	}
 	off := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--no-system-cache", "--other-builds").stream)
+		"--no-system-cache").stream)
 	if restored, written := summed(off); !off.Cache.SystemCacheOff || off.Cache.FromSystemCache != 0 ||
 		restored+written != 0 {
 		test.Errorf("want a run under --no-system-cache to say the system cache was off and count nothing of it, "+
@@ -340,10 +338,8 @@ func TestAWarmExtraBuildRestoresTheStandardLibraryItWroteFromTheSystemCache(test
 		test.Fatal(writeError)
 	}
 	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--other-builds").stream)
-	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--other-builds").stream)
+	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
+	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if len(warm.Builds) < 2 || len(warm.Builds) != len(cold.Builds) {
 		test.Fatalf("want the warm run to run the cold run's builds and one beside the host's, got %+v", warm.Builds)
 	}

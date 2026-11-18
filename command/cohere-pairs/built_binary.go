@@ -28,6 +28,9 @@ type builtBinary struct {
 	sha256 string
 	// tableLine is the binary's `--version` line saying which standard library table it carries.
 	tableLine string
+	// everyBuildArguments are what every run of the binary's engine is given to check every build the corpus's files
+	// name, read from the binary once it is built (see everyBuildArguments).
+	everyBuildArguments []string
 }
 
 // sideDirectory is where under output a side's source is checked out.
@@ -110,8 +113,20 @@ func buildSide(checked preflight, side string, say progress) (builtBinary, error
 	if readTableError != nil {
 		return builtBinary{}, fmt.Errorf("%s: %w", binaryPath, readTableError)
 	}
-	say.say("%s: %s, sha256 %s, %s\n", side, binaryPath, digest, tableLine)
-	return builtBinary{side: side, commit: commit, path: binaryPath, sha256: digest, tableLine: tableLine}, nil
+	everyBuild, everyBuildError := everyBuildArguments(binaryPath, source, checked.goEnvironment)
+	if everyBuildError != nil {
+		return builtBinary{}, everyBuildError
+	}
+	say.say("%s: %s, sha256 %s, %s, given %q to check every build\n", side, binaryPath, digest, tableLine,
+		everyBuild)
+	return builtBinary{
+		side:                side,
+		commit:              commit,
+		path:                binaryPath,
+		sha256:              digest,
+		tableLine:           tableLine,
+		everyBuildArguments: everyBuild,
+	}, nil
 }
 
 // releaseTableLine is a `--version` output's standard library table line, refusing an output whose line does not say

@@ -14,7 +14,7 @@ import (
 )
 
 // standardLibraryRecordsFixture reaches errors, fmt, strings and unicode/utf8, which the engine tests' table holds, and
-// has a file only windows builds, so a run under `--other-builds` judges a windows build.
+// has a file only windows builds, so a run of every build judges a windows build.
 var standardLibraryRecordsFixture = filepath.Join("testdata", "std-records")
 
 // readingSystemCache is a run reading and writing the system cache filled holds (filledSystemCache), its standard

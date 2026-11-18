@@ -24,6 +24,8 @@ func TestRenderTableMatchesTheGolden(test *testing.T) {
 			commit:    "1111111111111111111111111111111111111111",
 			sha256:    "0a4601b8ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			tableLine: "go standard library table: release 0.2.0-measure.111111111111 1111 go1.27.3, 51234567 bytes",
+			// A base from before every build was the default, which is asked for them (#qqyq61s).
+			everyBuildArguments: []string{"--other-builds"},
 		},
 		branch: builtBinary{
 			side:      sideBranch,

@@ -87,8 +87,8 @@ func TestAWarmBuildOpensNoRecordItsPacksHold(test *testing.T) {
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 	systemRoot := test.TempDir()
 	sharing := packingLater(systemRoot)
-	runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
-	runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+	runOverConfigured(test, root, exitFindings, sharing)
+	runOverConfigured(test, root, exitFindings, sharing)
 	held := packedKeys(test, projectStoreDirectory(root), systemStoreDirectory(systemRoot))
 	if len(held) == 0 {
 		test.Fatal("the warm runs left no pack holding a key")
@@ -102,7 +102,7 @@ func TestAWarmBuildOpensNoRecordItsPacksHold(test *testing.T) {
 			opened++
 		}
 	})
-	_, stream := runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+	_, stream := runOverConfigured(test, root, exitFindings, sharing)
 	stop()
 	if opened != 0 {
 		test.Errorf("the warm run opened %d record files for keys of the %d its packs hold, want none", opened,
@@ -151,7 +151,7 @@ func TestADamagedPackIsRefusedAndChangesNoFinding(test *testing.T) {
 			root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 			systemRoot := test.TempDir()
 			sharing := packingLater(systemRoot)
-			runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+			runOverConfigured(test, root, exitFindings, sharing)
 			files := packFiles(test, projectStoreDirectory(root), systemStoreDirectory(systemRoot))
 			if len(files) == 0 {
 				test.Fatal("the cold run wrote no pack")
@@ -165,7 +165,7 @@ func TestADamagedPackIsRefusedAndChangesNoFinding(test *testing.T) {
 					test.Fatal(damageError)
 				}
 			}
-			_, damaged := runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+			_, damaged := runOverConfigured(test, root, exitFindings, sharing)
 			packs := packsOf(test, damaged)
 			if packs.Read != 0 || packs.Missing != 0 || packs.RecordsServed != 0 ||
 				packs.RefusedBy[damage.want] != len(files) || len(packs.RefusedBy) != 1 || packs.Written != len(files) {
@@ -178,7 +178,7 @@ func TestADamagedPackIsRefusedAndChangesNoFinding(test *testing.T) {
 					test.Fatal(removeError)
 				}
 			}
-			_, unpacked := runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+			_, unpacked := runOverConfigured(test, root, exitFindings, sharing)
 			if got, want := findingLines(damaged), findingLines(unpacked); !slices.Equal(got, want) || len(want) == 0 {
 				test.Errorf("the run over damaged packs found\n%s\nthe run with none\n%s", got, want)
 			}
@@ -203,7 +203,7 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 		packingLater(systemRoot)(engine)
 		engine.keepsHostRestoreOff = true
 	}
-	runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+	runOverConfigured(test, root, exitFindings, sharing)
 	stores := []string{projectStoreDirectory(root), systemStoreDirectory(systemRoot)}
 	// An export data file is kept under the digest of the digest of its bytes (check's exportDataKey), so it is told
 	// from every other file by its name alone, and each goes, one by one.
@@ -268,7 +268,7 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 		0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	engine, emptied := runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+	engine, emptied := runOverConfigured(test, root, exitFindings, sharing)
 	packs := packsOf(test, emptied)
 	if packs.RecordsServed == 0 {
 		test.Fatalf("want the packs to serve the records whose export data went, got %+v", packs)
@@ -289,7 +289,7 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 	if windows != 1 {
 		test.Fatalf("the run checked %d windows builds, want one", windows)
 	}
-	_, uncached := runOver(test, root, exitFindings, "--other-builds")
+	_, uncached := runOver(test, root, exitFindings)
 	if got, want := findingLines(normalize(emptied, root)), findingLines(uncached); !slices.Equal(got, want) ||
 		len(want) == 0 {
 		test.Errorf("the run over stores without their export data found\n%s\na run with no cache\n%s", got, want)
@@ -323,7 +323,7 @@ func TestTheHostKeepsNoPack(test *testing.T) {
 	systemRoot := test.TempDir()
 	sharing := packingLater(systemRoot)
 	for _, run := range []string{"cold", "warm"} {
-		_, stream := runOverConfigured(test, root, exitClean, sharing)
+		_, stream := runOverConfigured(test, root, exitClean, sharing, "--host-build-only")
 		if packs := lintRecordOf(test, stream).Cache.Packs; packs != nil {
 			test.Errorf("the %s run of the host alone counts packs: %+v", run, *packs)
 		}

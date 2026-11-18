@@ -146,16 +146,16 @@ func goLanguage(container string) engineLanguage {
 		// vendor/) the census never lists, so it has no reason here. Every other reason is a gap, and so is whatever
 		// sentence comes next: a file only another platform builds, `excluded by build constraints on darwin/arm64`,
 		// and one that imports "C" while cgo is off.
-		// Those are files of the project that someone builds, and a run without `--other-builds` checks the host's
+		// Those are files of the project that someone builds, and a run under `--host-build-only` checks the host's
 		// build alone, so a run on a Mac never loaded the `_windows.go` file it would otherwise read green over
 		// (#72n9mq0).
 		ExpectedExclusionReasons: map[string]bool{
 			project.IgnoredByGit:         true,
 			project.InRepositoryOfItsOwn: true,
 		},
-		// Under `--other-builds` a file only another build compiles is checked by that build, and the record says
-		// which, "checked by the windows/arm64 build" (project.CheckedByBuild), so the reason is matched by how it
-		// begins. One no build compiles keeps its constraint's reason and stays a gap.
+		// A run checks every build by default (#qqyq61s): a file only another build compiles is checked by that build,
+		// and the record says which, "checked by the windows/arm64 build" (project.CheckedByBuild), so the reason is
+		// matched by how it begins. One no build compiles keeps its constraint's reason and stays a gap.
 		ExpectedExclusionReasonPrefixes: []string{project.CheckedByBuildPrefix},
 		// A Go run's cache is the run cache's table, which replays a verdict with nothing changed (beginGoRunCache).
 		// The engine loads the packages through the go command, whose build cache is go's

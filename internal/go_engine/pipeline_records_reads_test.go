@@ -13,7 +13,7 @@ import (
 )
 
 // The host records what each package reads of others only when the run has an extra build to restore packages into
-// (#b2t9xmf): under `--other-builds`, a module the host builds whole records nothing, and the same module with a file
+// (#b2t9xmf): in a run of every build, a module the host builds whole records nothing, and the same module with a file
 // only another platform builds records every package its load reaches.
 func TestTheHostRecordsReadsOnlyWithAnExtraBuild(test *testing.T) {
 	test.Parallel()
@@ -42,7 +42,7 @@ func TestTheHostRecordsReadsOnlyWithAnExtraBuild(test *testing.T) {
 			}
 		}
 		request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root,
-			"--no-cache", "--other-builds"})
+			"--no-cache"})
 		if parseError != nil {
 			test.Fatal(parseError)
 		}

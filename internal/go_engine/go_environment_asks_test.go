@@ -9,7 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
-// A whole run under `--other-builds` over a module whose census needs one extra build asks go env once per build,
+// A whole run of every build over a module whose census needs one extra build asks go env once per build,
 // twice: the census's answer serves the host's findings cache and its load, the lister and the kept listing among
 // it, and the extra build's one answer serves its own cache and load alike (#4rpt1jh). A second run, over the tree
 // and the findings cache the first left, asks the same.
@@ -25,7 +25,7 @@ func TestARunAsksGoEnvironmentOncePerBuild(test *testing.T) {
 	defer stop()
 	for _, run := range []string{"first", "second"} {
 		asks.Store(0)
-		engine, _ := runOverWith(test, root, exitClean, "--other-builds")
+		engine, _ := runOverWith(test, root, exitClean)
 		if len(engine.buildRuns) != 2 {
 			test.Fatalf("the %s run checked %d builds, want the host's and one extra", run, len(engine.buildRuns))
 		}

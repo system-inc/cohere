@@ -18,8 +18,8 @@ func TestACachedColdRunsBuildDeclinesAndReloadsAsUnderNoCache(test *testing.T) {
 	test.Parallel()
 
 	fixture := filepath.Join("testdata", "restore-from-host")
-	plain, plainStream := runOver(test, copyFixture(test, fixture), exitFindings, "--other-builds")
-	cached, cachedStream := runOverWith(test, copyFixture(test, fixture), exitFindings, "--other-builds")
+	plain, plainStream := runOver(test, copyFixture(test, fixture), exitFindings)
+	cached, cachedStream := runOverWith(test, copyFixture(test, fixture), exitFindings)
 	plainWindows, cachedWindows := windowsRun(test, plain).result, windowsRun(test, cached).result
 	atCheck := func(declined map[string]string) map[string]string {
 		kept := maps.Clone(declined)
@@ -53,7 +53,7 @@ func TestARenameAfterTheKeepReadsNothingTheKeepLetGo(test *testing.T) {
 	test.Parallel()
 
 	engine, _, noted := runOverNoted(test, copyFixture(test, filepath.Join("testdata", "rename-platforms")),
-		exitClean, nil, "--other-builds")
+		exitClean, nil)
 	if !engine.renamed {
 		test.Fatal("the run renamed nothing, so it tells nothing of the rounds after the first lint")
 	}

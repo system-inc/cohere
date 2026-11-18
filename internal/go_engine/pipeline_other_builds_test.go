@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -120,19 +121,20 @@ func runOverRegistered(
 	return engine, standardOutput.String(), standardError.String()
 }
 
-// Under `--other-builds` a module with a file only windows builds and one only the cohere_extra tag builds is
-// checked under three builds, the host's first, and mergeBuildRuns is handed a run for each: every extra build
+// By default a module with a file only windows builds and one only the cohere_extra tag builds is checked under
+// three builds, the host's first, and mergeBuildRuns is handed a run for each (#qqyq61s): every extra build
 // analyzes every package its load holds but those its walk left untouched, which the host's run analyzed, and has a
 // say on every file it compiles but theirs, and every run
 // carries the inputs its load read. Only windows's run finds the else after a return planted in its windows file.
-// Without the switch nothing is handed over and the run is clean, as it was.
+// Under `--host-build-only` nothing is handed over and the run is clean, since the host never compiles that file.
 func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 	test.Parallel()
-	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitClean)
+	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitClean,
+		"--host-build-only")
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	on, _ := runOver(test, root, exitFindings, "--other-builds")
+	on, _ := runOver(test, root, exitFindings)
 	if off.buildRuns != nil {
-		test.Errorf("without the switch the merge was handed %d runs, want none", len(off.buildRuns))
+		test.Errorf("under --host-build-only the merge was handed %d runs, want none", len(off.buildRuns))
 	}
 
 	if len(on.buildRuns) != 3 {
@@ -223,12 +225,12 @@ func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 	}
 }
 
-// The project record is written before any build runs, so under `--other-builds` describeProject reads the builds
+// The project record is written before any build runs, so in a run of every build describeProject reads the builds
 // and names each file the host's build constraints leave out and an extra build compiles as checked by that build, in
 // the build's own words, which the front door counts as checked (#72n9mq0): the windows file by windows's build, the
 // tagged file by the cohere_extra one, each the build the lint phase ran. A file no build compiles, one whose
 // constraint names `ignore`, stays a gap for the selection's reason, that no build sets `ignore` (#ntamp9e), and adds
-// no build. Without the switch every one of the three keeps the constraint's reason.
+// no build. Under `--host-build-only` every one of the three keeps the constraint's reason.
 func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 	test.Parallel()
 	const constraintPrefix = "excluded by build constraints on "
@@ -258,17 +260,17 @@ func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 	}
 
 	offRoot := copyWithIgnored()
-	off, _ := runOver(test, offRoot, exitClean)
+	off, _ := runOver(test, offRoot, exitClean, "--host-build-only")
 	offReasons := reasons(off, offRoot)
 	for _, file := range []string{windowsFile, taggedFile, ignoredFile} {
 		if !strings.HasPrefix(offReasons[file], constraintPrefix) {
-			test.Errorf("without the switch %s is left out for %q, want the constraint's reason", file,
+			test.Errorf("under --host-build-only %s is left out for %q, want the constraint's reason", file,
 				offReasons[file])
 		}
 	}
 
 	onRoot := copyWithIgnored()
-	on, _ := runOver(test, onRoot, exitFindings, "--other-builds")
+	on, _ := runOver(test, onRoot, exitFindings)
 	if len(on.buildRuns) != 3 {
 		test.Fatalf("the merge was handed %d runs, want 3: the file no build compiles adds none", len(on.buildRuns))
 	}
@@ -302,8 +304,8 @@ func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 	restoringNothing := func(engine *pipeline) { engine.keepsHostRestoreOff = true }
-	cold, coldRaw := runOverConfigured(test, root, exitFindings, restoringNothing, "--other-builds")
-	warm, warmRaw := runOverConfigured(test, root, exitFindings, restoringNothing, "--other-builds")
+	cold, coldRaw := runOverConfigured(test, root, exitFindings, restoringNothing)
+	warm, warmRaw := runOverConfigured(test, root, exitFindings, restoringNothing)
 	coldStream, warmStream := normalize(coldRaw, root), normalize(warmRaw, root)
 	if len(cold.buildRuns) != 3 || len(warm.buildRuns) != 3 {
 		test.Fatalf("the runs handed the merge %d and %d runs, want 3 each", len(cold.buildRuns), len(warm.buildRuns))
@@ -327,7 +329,7 @@ func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
 	}
 }
 
-// Under `--other-builds` each extra build's keys read the digests of the files the host's keys hashed, so a run hashes
+// In a run of every build each extra build's keys read the digests of the files the host's keys hashed, so a run hashes
 // every file of the host's build once, and of each extra build only the files its load holds that the host's does
 // not. The fixture gains a package importing os, so windows reaches standard-library packages the host's build never
 // does, and has files of its own to hash.
@@ -345,7 +347,7 @@ func TestOtherBuildsHashOnlyTheFilesTheHostsDidNot(test *testing.T) {
 		test.Fatal(writeError)
 	}
 	before := cache.FilesHashed()
-	engine, _ := runOverWith(test, root, exitFindings, "--other-builds")
+	engine, _ := runOverWith(test, root, exitFindings)
 	hashed := cache.FilesHashed() - before
 	if len(engine.buildRuns) != 3 {
 		test.Fatalf("the merge was handed %d runs, want 3", len(engine.buildRuns))
@@ -388,7 +390,7 @@ const describeFile = "package label\n\nimport \"fmt\"\n\n" +
 	"\treturn fmt.Sprintf(\"%s sends a parcel to %s, who lives at %s in %s, and it arrives on %s\", " +
 	"sender, recipient, street, city, weekday)\n}\n"
 
-// When the long-line wrap writes a file in a run under `--other-builds`, the load the lint reads is a second one, whose
+// When the long-line wrap writes a file in a run of every build, the load the lint reads is a second one, whose
 // Restore keys every file again, and each extra build reads the digests of that Restore, of the bytes on disk after
 // the wrap, never the first's, of the bytes it replaced: an extra build keyed on the replaced bytes would save entries
 // under keys of a file no longer on disk. The digests are what this holds every build to. Once the wrapped file is put
@@ -401,7 +403,7 @@ func TestOtherBuildsReadTheDigestsOfTheBytesTheWrapWrote(test *testing.T) {
 	if writeError := os.WriteFile(file, []byte(describeFile), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	engine, stream := runOverWith(test, root, exitFindings, "--other-builds")
+	engine, stream := runOverWith(test, root, exitFindings)
 	if !strings.Contains(stream, `"fixedBy":{"cohere-go/consistency-no-long-line":1}`) {
 		test.Fatalf("want the wrap to break the long line of %s, got\n%s", file, stream)
 	}
@@ -424,8 +426,8 @@ func TestOtherBuildsReadTheDigestsOfTheBytesTheWrapWrote(test *testing.T) {
 	if writeError := os.WriteFile(file, []byte(describeFile), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	_, cached := runOverWith(test, root, exitFindings, "--other-builds", "--no-fix")
-	_, uncached := runOverWith(test, root, exitFindings, "--other-builds", "--no-fix", "--no-cache")
+	_, cached := runOverWith(test, root, exitFindings, "--no-fix")
+	_, uncached := runOverWith(test, root, exitFindings, "--no-fix", "--no-cache")
 	if withoutCache(cached) != withoutCache(uncached) {
 		test.Errorf("over the bytes the wrap replaced, the cached run's stream differs from a --no-cache run's:\n"+
 			"cached\n%s\nwithout the cache\n%s", cached, uncached)
@@ -464,30 +466,30 @@ func withoutHostRestore(stream string) string {
 		"${1}N"), "packs")
 }
 
-// A module whose every file the host builds needs no other build, so `--other-builds` hands the merge nothing, and the
-// run writes the stream it writes without the switch, byte for byte, with no builds in its lint record.
+// A module whose every file the host builds needs no other build, so a run of every build hands the merge nothing,
+// and writes the stream a run under `--host-build-only` writes, byte for byte, with no builds in its lint record.
 func TestOtherBuildsOverOneBuildRunNothingExtra(test *testing.T) {
 	test.Parallel()
 	clean := filepath.Join("testdata", "clean")
-	engine, onStream := runOver(test, copyFixture(test, clean), exitClean, "--other-builds")
+	engine, onStream := runOver(test, copyFixture(test, clean), exitClean)
 	if engine.buildRuns != nil {
 		test.Errorf("the merge was handed %d runs over a module one build covers", len(engine.buildRuns))
 	}
-	_, offStream := runOver(test, copyFixture(test, clean), exitClean)
+	_, offStream := runOver(test, copyFixture(test, clean), exitClean, "--host-build-only")
 	if onStream != offStream {
-		test.Errorf("the switch changed the stream over one build:\nwith it\n%s\nwithout it\n%s", onStream,
-			offStream)
+		test.Errorf("--host-build-only changed the stream over one build:\nevery build\n%s\nthe host's alone\n%s",
+			onStream, offStream)
 	}
 }
 
-// Under `--other-builds` the lint phase writes the merge of every build's findings (#72n9mq0): the windows file's else
-// after a return, which only windows's run finds, is written as a finding, the run exits with findings, and the lint
-// record names the three builds, the host's first, with windows's the one that added it. Without the switch the same
-// tree reads clean, since the host never compiles that file.
+// In a run of every build the lint phase writes the merge of every build's findings (#72n9mq0): the windows file's
+// else after a return, which only windows's run finds, is written as a finding, the run exits with findings, and the
+// lint record names the three builds, the host's first, with windows's the one that added it. Under
+// `--host-build-only` the same tree reads clean, since the host never compiles that file.
 func TestOtherBuildsWriteTheMergedVerdict(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	engine, stream := runOver(test, root, exitFindings, "--other-builds")
+	engine, stream := runOver(test, root, exitFindings)
 	var lint contract.LintRecord
 	var found []contract.FindingRecord
 	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
@@ -552,13 +554,13 @@ func TestOtherBuildsHonorADirectiveInAFileOnlyAnotherBuildCompiles(test *testing
 	if writeError := os.WriteFile(windowsFile, []byte(strings.Join(lines, "\n")), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	_, stream := runOver(test, root, exitClean, "--other-builds")
+	_, stream := runOver(test, root, exitClean)
 	if !strings.Contains(stream, `"withheldBySuppression":{"`+consistency_no_else_return.Name+`":1}`) {
 		test.Errorf("the run withheld nothing of %s:\n%s", consistency_no_else_return.Name, stream)
 	}
 }
 
-// Under `--other-builds` the inputs record names what every build's load read, not the host's alone (#e4b08k7), so
+// In a run of every build the inputs record names what every build's load read, not the host's alone (#e4b08k7), so
 // the front door's replay misses when a file only another build reads moves. A windows-only file of the fixture's
 // imports os, which nothing the host's build compiles imports, so the standard library's os/file_windows.go is read
 // by windows's load alone, and the record must name it.
@@ -571,7 +573,7 @@ func TestOtherBuildsNameEveryBuildsInputs(test *testing.T) {
 	if writeError := os.WriteFile(consoleFile, []byte(console), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache")
 	var inputs contract.InputsRecord
 	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
 		if strings.Contains(line, `"kind":"inputs"`) {
@@ -607,7 +609,7 @@ func TestAnOtherBuildsTypeErrorIsCountedInTheLintRecord(test *testing.T) {
 		0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache")
 	inLint := false
 	compilerRecords, ruleRecords := 0, 0
 	var lint contract.LintRecord
@@ -651,7 +653,7 @@ func TestEachBuildSaysWhatItAloneCoveredAndWhatNoRuleRanOn(test *testing.T) {
 	test.Parallel()
 	windowsRecord := func(root string, wantExit int) contract.BuildRecord {
 		test.Helper()
-		_, stream := runOverRaw(test, root, wantExit, "--no-cache", "--other-builds")
+		_, stream := runOverRaw(test, root, wantExit, "--no-cache")
 		for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
 			var lint contract.LintRecord
 			if !strings.HasPrefix(line, `{"kind":"lint"`) {
@@ -725,7 +727,7 @@ func TestAFileTwoBuildsCompileIsLintedWhenEitherAnalyzesIt(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache")
 	var lint contract.LintRecord
 	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
 		if strings.HasPrefix(line, `{"kind":"lint"`) {
@@ -757,7 +759,7 @@ func TestATargetTheToolchainDoesNotListIsRefusedAtLoad(test *testing.T) {
 	describe := func(targets []string) (*describedProject, error) {
 		test.Helper()
 		request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root,
-			"--no-cache", "--other-builds"})
+			"--no-cache"})
 		if parseError != nil {
 			test.Fatal(parseError)
 		}
@@ -788,8 +790,7 @@ func TestATargetTheToolchainDoesNotListIsRefusedAtLoad(test *testing.T) {
 // got before the listing ended, so the count is held to more than one listing's, never to an exact multiple.
 func TestTheBuildsOfARunShareTheirDirectoryReads(test *testing.T) {
 	test.Parallel()
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings,
-		"--other-builds")
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
 	if len(engine.buildRuns) != 3 {
 		test.Fatalf("the run checked %d builds, want 3", len(engine.buildRuns))
 	}
@@ -797,5 +798,63 @@ func TestTheBuildsOfARunShareTheirDirectoryReads(test *testing.T) {
 	if directories == 0 || reads <= int64(directories) {
 		test.Errorf("the run's shared reads hold %d directories, asked %d times, so the extra builds did not read "+
 			"through the host's", directories, reads)
+	}
+}
+
+// A run that asks for no lint phase names no file checked by a build (#qqyq61s): every extra build is loaded and
+// checked in that phase (runLint), so a run of types alone, of the format alone, of the fixes alone or the editor's
+// save, though it checks every build by default, leaves each file only another build compiles with its constraint's
+// reason. A run that lints names the build that checks it, so the case can tell.
+func TestARunThatLintsNothingNamesNoBuild(test *testing.T) {
+	test.Parallel()
+	const constraintPrefix = "excluded by build constraints on "
+	windowsFile := filepath.Join("internal", "separator", "separator_windows.go")
+	describedReasons := func(root string, arguments ...string) (map[string]string, bool) {
+		test.Helper()
+		request, parseError := parseInvocation(append([]string{"--contract", strconv.Itoa(contract.Version),
+			"--root", root}, arguments...))
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		if slices.Contains(arguments, "--stdin-filepath") {
+			request.buffer = []byte("package separator\n")
+		}
+		described, describeError := describeProject(request)
+		if describeError != nil {
+			test.Fatal(describeError)
+		}
+		test.Cleanup(described.awaitStarted)
+		byFile := map[string]string{}
+		for _, excluded := range described.record.Excluded {
+			relative, relativeError := filepath.Rel(root, excluded.File)
+			if relativeError != nil {
+				test.Fatal(relativeError)
+			}
+			byFile[relative] = excluded.Reason
+		}
+		return byFile, request.requests(contract.PhaseLint)
+	}
+
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	linting, lints := describedReasons(root, "--no-fix")
+	if !lints || strings.HasPrefix(linting[windowsFile], constraintPrefix) || linting[windowsFile] == "" {
+		test.Fatalf("a run that lints left %s out for %q (lints %t), want it named checked by a build", windowsFile,
+			linting[windowsFile], lints)
+	}
+	saved := filepath.Join(root, "internal", "separator", "separator.go")
+	for _, arguments := range [][]string{
+		{"--types"},
+		{"--format-only"},
+		{"--fix", "--no-format"},
+		{"--fix", "--stdin-filepath", saved},
+	} {
+		reasons, lints := describedReasons(root, arguments...)
+		if lints {
+			test.Fatalf("%v asks for the lint phase, so it tells nothing here", arguments)
+		}
+		if !strings.HasPrefix(reasons[windowsFile], constraintPrefix) {
+			test.Errorf("a run of %v, which lints nothing, left %s out for %q, want the constraint's reason",
+				arguments, windowsFile, reasons[windowsFile])
+		}
 	}
 }

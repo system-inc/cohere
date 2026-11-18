@@ -409,7 +409,7 @@ func (engine *pipeline) recordsReadsOf() func(*packages.Package) bool {
 // only when the run checks extra builds and the census needs at least one.
 func (engine *pipeline) keepsForBuilds() bool {
 	_, extras, buildsError := engine.buildsBeside()
-	return engine.request.switches["other-builds"] && buildsError == nil && len(extras) > 0
+	return engine.request.checksEveryBuild() && buildsError == nil && len(extras) > 0
 }
 
 // readBuilds is the host's build, as go env's answer reads it, then the extra builds the census needs beside it

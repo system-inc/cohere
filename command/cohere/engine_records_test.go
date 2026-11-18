@@ -1159,14 +1159,14 @@ func TestEngineRunRendersAGoStreamInGoWords(test *testing.T) {
 	}
 }
 
-// TestAGoRunNamesAFileOnlyAnotherPlatformBuilds: the Go engine checks the host's build alone, so a file only another
-// platform builds was never loaded, whatever it holds, and an `_windows.go` file's finding is one no run on a Mac
-// reports. A green run there names each such file as a Go file not checked: an `_windows.go` file, a file
-// `//go:build linux`, and one that imports "C" while cgo is off, in the footer, under `--json` with its reason, and
-// in the account file by file. It stays green with the exit it had, since a gap is never a failure. A file git
-// ignores is one nobody expects checked and stays out of the gap, and so is one a run under `--other-builds` says
-// another build checked, whose reason names the build and whose account line says that build checked it
-// (#72n9mq0).
+// TestAGoRunNamesAFileOnlyAnotherPlatformBuilds: under `--host-build-only` the Go engine checks the host's build
+// alone, so a file only another platform builds was never loaded, whatever it holds, and an `_windows.go` file's
+// finding is one no run on a Mac reports. A green run there names each such file as a Go file not checked: an
+// `_windows.go` file, a file `//go:build linux`, and one that imports "C" while cgo is off, in the footer, under
+// `--json` with its reason, and in the account file by file. It stays green with the exit it had, since a gap is
+// never a failure. A file git ignores is one nobody expects checked and stays out of the gap, and so is one a run of
+// every build says another build checked, whose reason names the build and whose account line says that build
+// checked it (#72n9mq0).
 // Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
 // activeSummary, which it reads back
 func TestAGoRunNamesAFileOnlyAnotherPlatformBuilds(test *testing.T) {

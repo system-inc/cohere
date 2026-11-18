@@ -399,10 +399,13 @@ var endToEndCases = []endToEndCase{
 	{name: "duplicates", extra: []string{"--lint", "--duplicates"}, exitCode: 0},
 	// A load with a type error never reaches lint, so the report says it did not run, and why.
 	{name: "duplicates-type-error", fixture: "type-error", extra: []string{"--duplicates"}, exitCode: 1},
-	// A file only windows builds and one only the cohere_extra tag builds: `--other-builds` checks both beside the
-	// host's build and writes the merge of every build's findings, the windows file's else after a return among them,
-	// and the lint record names each build (#72n9mq0).
-	{name: "other-builds", extra: []string{"--other-builds"}, exitCode: 1},
+	// A file only windows builds and one only the cohere_extra tag builds: a run checks both beside the host's build
+	// and writes the merge of every build's findings, the windows file's else after a return among them, and the lint
+	// record names each build (#72n9mq0, #qqyq61s).
+	{name: "other-builds", exitCode: 1},
+	// The same module under `--host-build-only`: the host's build alone, so the windows file's else is never read, the
+	// run is clean, and the project record names both files with their constraint's reason, a gap.
+	{name: "host-build-only", fixture: "other-builds", extra: []string{"--host-build-only"}, exitCode: 0},
 	{name: "lint-only-type-error", fixture: "type-error", extra: []string{"--lint"}, exitCode: 1},
 	{
 		name: "format-only-no-fix", fixture: "unformatted", extra: []string{"--format-only", "--no-fix"},
@@ -1200,6 +1203,7 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 			Detail             string            `json:"detail"`
 			Diagnostics        int               `json:"diagnostics"`
 			Findings           int               `json:"findings"`
+			TypeErrors         int               `json:"typeErrors"`
 			FilesRewritten     int               `json:"filesRewritten"`
 			ChangedFiles       []json.RawMessage `json:"changedFiles"`
 			NotWritten         []json.RawMessage `json:"notWritten"`
@@ -1238,8 +1242,11 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 			}
 		case "lint":
 			gap = gap || len(record.Crashes) > 0
-			if record.Findings != findingsInPhase {
-				test.Errorf("the lint record counts %d and %d findings came with it", record.Findings, findingsInPhase)
+			// Another build's type errors come as finding records of the phase beside the findings it counts, as
+			// the front door adds them (#rw6tg3a).
+			if record.Findings+record.TypeErrors != findingsInPhase {
+				test.Errorf("the lint record counts %d findings and %d type errors of other builds, and %d finding "+
+					"records came with it", record.Findings, record.TypeErrors, findingsInPhase)
 			}
 		case "phase":
 			phases = append(phases, record.Name)

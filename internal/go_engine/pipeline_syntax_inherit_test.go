@@ -73,7 +73,7 @@ func plantedProbe(entered *enteredFiles) rule.Rule {
 }
 
 // runInheriting runs the engine over a copy of the syntax-inherit fixture with the registry's rules and the planted
-// probe, under `--no-cache --other-builds` and extra, inheriting or not, and returns the pipeline, its stream,
+// probe, under `--no-cache` and extra, checking every build, inheriting or not, and returns the pipeline, its stream,
 // normalized, the files the probe entered over every build, and the copy's root.
 func runInheriting(test *testing.T, inherits bool, extra ...string) (*pipeline, string, map[string]int, string) {
 	test.Helper()
@@ -81,7 +81,7 @@ func runInheriting(test *testing.T, inherits bool, extra ...string) (*pipeline, 
 	root := copyFixture(test, syntaxInheritFixture)
 	engine, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), plantedProbe(entered)),
 		func(engine *pipeline) { engine.keepsInheritanceOff = !inherits },
-		append([]string{"--no-cache", "--other-builds"}, extra...)...)
+		append([]string{"--no-cache"}, extra...)...)
 	entered.lock.Lock()
 	defer entered.lock.Unlock()
 	return engine, normalize(stream, root), maps.Clone(entered.entered), root
@@ -267,7 +267,7 @@ func TestAFindingAnotherFileWithholdsIsNotInherited(test *testing.T) {
 		root := copyFixture(test, syntaxInheritGeneratedFixture)
 		engine, _, _ := runOverRegistered(test, root, exitFindings, rules.All(),
 			func(engine *pipeline) { engine.keepsInheritanceOff = !inherits },
-			"--no-cache", "--no-fix", "--other-builds")
+			"--no-cache", "--no-fix")
 		found := []string{}
 		for _, finding := range windowsRun(test, engine).result.Findings {
 			if finding.Rule == redundantReturn {
@@ -310,7 +310,7 @@ func TestARenamedRunInheritsNothing(test *testing.T) {
 		test.Fatal(writeError)
 	}
 	engine, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), plantedProbe(entered)), nil,
-		"--no-cache", "--other-builds")
+		"--no-cache")
 	if !engine.renamed {
 		test.Fatalf("the run renamed nothing, so it shows nothing of a renamed run:\n%s", normalize(stream, root))
 	}
