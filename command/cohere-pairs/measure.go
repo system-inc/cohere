@@ -139,7 +139,8 @@ func runEngine(
 	// Ignored: as above.
 	defer func() { _ = standardError.Close() }()
 
-	arguments := []string{"go-engine", "--contract", "3", "--root", corpusRoot, "--no-fix", "--other-builds"}
+	// Every build the corpus's files name is checked, as a run without `--host-build-only` checks them (#qqyq61s).
+	arguments := []string{"go-engine", "--contract", "3", "--root", corpusRoot, "--no-fix"}
 	if planned.mode == modeNoCache {
 		arguments = append(arguments, "--no-cache")
 	}

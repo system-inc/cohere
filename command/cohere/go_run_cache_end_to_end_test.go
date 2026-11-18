@@ -71,8 +71,9 @@ func newGoReplayFixture(test *testing.T) *goReplayFixture {
 	fixture.write("embedded.go", "package replay\n\nimport _ \"embed\"\n\n// Message is embedded.\n//\n"+
 		"//go:embed data/message.txt\nvar Message string\n")
 	fixture.write("data/message.txt", "hello\n")
-	// Files no load reads until a scenario's environment builds them, each with a finding so the verdict says when
-	// one is loaded.
+	// Files no load of the host's build reads until a scenario's environment builds them, each with a finding so the
+	// verdict says when one is loaded. A run of every build checks each under a build of its own (#qqyq61s), so a
+	// test that reads them as unread runs under `--host-build-only`.
 	fixture.write("tagged.go", "//go:build replaytest\n\n"+goReplaySource("replay", "Tagged"))
 	fixture.write("only_linux.go", goReplaySource("replay", "OnLinux"))
 	fixture.write("with_cgo.go", "//go:build cgo\n\n"+goReplaySource("replay", "WithCgo"))
@@ -194,10 +195,11 @@ func (fixture *goReplayFixture) establishHit(arguments ...string) {
 // goReplayFooter is the footer a `--verbose` replay renders of its own, which says it was replayed.
 var goReplayFooter = regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s(?: •[^\n]*)? • replayed`)
 
-// goEveryFileCachedFooter is the default view's footer when no file was checked and every one was cached, followed
-// by whatever the run did not check, such as the fixture's files only another platform or cgo builds.
+// goEveryFileCachedFooter is the default view's footer when no file was checked and every one was cached, with the
+// builds a run of every build names (#qqyq61s), followed by whatever the run did not check, such as the fixture's
+// files only another platform or cgo builds under `--host-build-only`.
 var goEveryFileCachedFooter = regexp.MustCompile(
-	`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s •.*\(\d+ rules • \d+ cached\)(?: • ⚠ [^\n]*)?$`,
+	`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s •.*\(\d+ rules • \d+ cached(?: • \d+ builds?)?\)(?: • ⚠ [^\n]*)?$`,
 )
 
 // isGoReplay reports a run the cache answered, by what the run itself says: the framing on its first line and the
@@ -224,6 +226,8 @@ func goKeepLines(output string, drop ...string) string {
 // which a replay deliberately does not print and a cold run does, and without the footer, which is the
 // invocation's too. A replay's own framing comes off in goReplayBody. These are the lines the TypeScript run
 // cache's end-to-end test drops, with the Go project line, for a module or a workspace, in place of the graph line.
+// Each build's line under lint goes too, since a run of every build counts there what each build analyzed, restored
+// or left untouched, which moves with what the findings cache held as the package cache's line does (#qqyq61s).
 func goVerdict(cold string) string {
 	return goKeepLines(cold,
 		"module described in ",
@@ -231,6 +235,8 @@ func goVerdict(cold string) string {
 		"types: ",
 		"lint: ",
 		"  lint: package cache ",
+		"  lint: the host's build, ",
+		"  lint: build ",
 		"phases: ",
 		"  total ",
 		"  memory: ",
@@ -282,18 +288,18 @@ func goSummaryVerdict(test *testing.T, output string) map[string]json.RawMessage
 	return summary
 }
 
-// TestAGoReplayIsTheColdRunsVerdict: with nothing changed, the second run replays the first without starting the
-// engine, and what it prints is a `--no-cache` run's verdict byte for byte in every view, with the same exit:
-// `--verbose` once the replay's framing and the cold run's invocation lines are off, as the TypeScript run cache's
-// test compares them; `--json` line for line, the summary but for what is the invocation's; and the default view
-// but for the footer, which is the invocation's and says it was replayed.
+// TestAGoReplayIsTheColdRunsVerdict: with nothing changed, the second run of the host's build alone replays the first
+// without starting the engine, and what it prints is a `--no-cache` run's verdict byte for byte in every view, with the
+// same exit: `--verbose` once the replay's framing and the cold run's invocation lines are off, as the TypeScript run
+// cache's test compares them; `--json` line for line, the summary but for what is the invocation's; and the default
+// view but for the footer, which is the invocation's and says it was replayed.
 func TestAGoReplayIsTheColdRunsVerdict(test *testing.T) {
 	test.Parallel()
 	for _, view := range []string{"--verbose", "--json", "the default view"} {
 		test.Run(view, func(test *testing.T) {
 			test.Parallel()
 			fixture := newGoReplayFixture(test)
-			arguments := []string{"--no-fix"}
+			arguments := []string{"--no-fix", "--host-build-only"}
 			if strings.HasPrefix(view, "--") {
 				arguments = append(arguments, view)
 			}
@@ -380,7 +386,8 @@ func jsonText(test *testing.T, summary map[string]json.RawMessage) string {
 // TestAGoRunWithAStaleInputIsNeverReplayed: for every kind of input a Go verdict depends on, a module that replays
 // is changed in that input alone, and the next run is not a replay and prints what a cold run prints. One
 // scenario per kind, since each reaches the record by its own path: the engine's files, its listed directories,
-// its absent paths, the settings file the front door declares, and the key's environment and toolchain.
+// its absent paths, the settings file the front door declares, and the key's environment and toolchain. Each run checks
+// the host's build alone, so a file only the scenario's environment builds joins the load only once it is changed.
 func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 	test.Parallel()
 	scenarios := []struct {
@@ -524,7 +531,7 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			if scenario.prepare != nil {
 				scenario.prepare(fixture)
 			}
-			arguments := []string{"--no-fix", "--verbose"}
+			arguments := []string{"--no-fix", "--verbose", "--host-build-only"}
 			fixture.establishHit(arguments...)
 			scenario.change(fixture)
 			afterChange := fixture.run(true, arguments...)
@@ -575,9 +582,10 @@ func TestAGoReplayNeverCrossesTheSystemCache(test *testing.T) {
 }
 
 // packageCacheOffLine is the account's lint line of a run whose engine's per-package cache was off, the standard
-// library's packages from the system cache beside it or not.
+// library's packages from the system cache beside it or not, and what the extra builds did with their packs, which a
+// plain run has since it checks every build (#qqyq61s).
 var packageCacheOffLine = regexp.MustCompile(
-	`\n  lint: package cache off(, standard library: [0-9,]+ from the system cache)?\n`)
+	`\n  lint: package cache off(, standard library: [0-9,]+ from the system cache)?(, builds' packs: [^\n]*)?\n`)
 
 // TestAGoRunUnderNoCacheNeitherReplaysNorRecords: on a module whose run replays, `--no-cache` checks it fresh, says
 // its cache was off in the account and in `--json`, and leaves the cache table exactly as it found it.

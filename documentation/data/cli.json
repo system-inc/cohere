@@ -49,6 +49,10 @@
             "usage": "format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit gate's format check: every file formatting would change here or in a nested repository is a finding, and so is one the formatter could not read, and the exit is 0 only when there are none"
         },
         {
+            "name": "host-build-only",
+            "usage": "in a Go project, check only this machine's build, not every build its files name (another GOOS, cgo, a build tag), and name each file only another build compiles as not checked"
+        },
+        {
             "name": "json",
             "usage": "print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json"
         },
@@ -81,10 +85,6 @@
         {
             "name": "open",
             "usage": "open files with remaining findings in code after the run (composes with --types and --lint)"
-        },
-        {
-            "name": "other-builds",
-            "usage": "in a Go project, check every build its files name beside this machine's (another GOOS, cgo, a build tag) and merge their findings, so only a file no build compiles is left unchecked"
         },
         {
             "name": "phases",

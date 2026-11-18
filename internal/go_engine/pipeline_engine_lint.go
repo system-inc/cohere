@@ -33,11 +33,11 @@ var lintSuppressionRules = []string{suppression.RuleNoUnusedIgnore, suppression.
 // over this load, written as it is, or nil to run one here. It returns the load its pass ran over: loaded, or the last
 // a reload loaded again (reloadedPass), which the inputs record reads.
 //
-// Under `--other-builds`, every other build the census needs checks what can differ from the host's,
-// read beside the host's pass before anything is written, and the phase writes the merge of every build's findings
-// (#72n9mq0): the findings, the withheld counts and the crashes are every build's, merged; another build's type
-// errors are written as the compiler's findings, since the host's lint ran only on a host load without any; and the
-// lint record names each build.
+// Unless `--host-build-only` narrows the run to the host's build, every other build the census needs checks what can
+// differ from the host's, read beside the host's pass before anything is written, and the phase writes the merge of
+// every build's findings (#72n9mq0, #qqyq61s): the findings, the withheld counts and the crashes are every build's,
+// merged; another build's type errors are written as the compiler's findings, since the host's lint ran only on a host
+// load without any; and the lint record names each build.
 func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *lintPass) *load.Loaded {
 	if !engine.request.requests(contract.PhaseLint) {
 		engine.phase(contract.PhaseLint, contract.OutcomeSkipped, 0, detailNotRequested)
@@ -86,7 +86,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	result := pass.result
 	var verdict *buildsVerdict
 	var outcome suppressedFindings
-	if engine.request.switches["other-builds"] {
+	if engine.request.checksEveryBuild() {
 		// The host's reads, pass.result.Reads, are what an extra build will restore a package by (#b2t9xmf). Their
 		// type-read walks run beside the host's lint and past its end, so otherBuilds waits for every one before any
 		// build decides anything (wholeReads); a run with no extra builds never waits, so the host's verdict never

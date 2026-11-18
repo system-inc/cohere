@@ -14,7 +14,7 @@ import (
 
 // staleWorkspaceFiles is a workspace whose go.work.sum is stale: a requires example.com/dep, whose go.mod's sum
 // go.work.sum lacks and no go.sum holds, so go list -m all, the lister's, writes it there, as go writes a workspace's
-// sums whatever -mod says. a has a file only windows builds, so `--other-builds` checks a second build.
+// sums whatever -mod says. a has a file only windows builds, so a run checks a second build.
 var staleWorkspaceFiles = map[string]string{
 	"go.work":        "go 1.21\n\nuse ./a\n",
 	"go.work.sum":    "example.com/stale v1.0.0/go.mod h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n",
@@ -48,7 +48,7 @@ func writeStaleWorkspace(test *testing.T, extra map[string]string) string {
 	return workspace
 }
 
-// A check under `--other-builds` of a workspace whose go.work.sum is stale leaves it byte for byte as it was, under
+// A check of every build of a workspace whose go.work.sum is stale leaves it byte for byte as it was, under
 // the host's build and the extra one's, its summary names no file go may have rewritten, and its inputs name the
 // tree's go.work and go.work.sum, never the side copy's every go list ran beside, so a replay reads what it always
 // read (#34r3v1y). Beside a vendor directory, where no side copy answers exactly, go list runs in the tree, rewrites
@@ -68,7 +68,7 @@ func TestACheckLeavesAStaleGoWorkSumAsItWasUnderEveryBuild(test *testing.T) {
 		// Not parallel: it sets the go environment of the process, which every go command of the run in it reads
 		test.Run(each.name, func(test *testing.T) {
 			workspace := writeStaleWorkspace(test, each.extra)
-			engine, stream := runOverRaw(test, workspace, exitClean, "--no-fix", "--other-builds")
+			engine, stream := runOverRaw(test, workspace, exitClean, "--no-fix")
 			if len(engine.buildRuns) != 2 {
 				test.Errorf("the run checked %d builds, want the host's and windows's", len(engine.buildRuns))
 			}

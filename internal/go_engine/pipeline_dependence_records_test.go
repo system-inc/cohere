@@ -28,7 +28,7 @@ const (
 
 // recordsSwitches are a run judging every build's dependence, the findings cache on in the fixture's own store. Every
 // run here is read raw (runOverRaw), since normalize zeroes the cache's counts.
-var recordsSwitches = []string{"--other-builds", "--build-dependence"}
+var recordsSwitches = []string{"--build-dependence"}
 
 // graphVerdicts are every unit of every build's judgment of the host's graph, by build, package, file and start,
 // each file relative to root, and whether the build makes it dependent, so two runs over two copies of a fixture
@@ -353,7 +353,7 @@ func TestAPlainRunReadsNoRecord(test *testing.T) {
 	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	reading := readingSystemCache(filled, "")
-	runOverNoted(test, root, exitClean, reading, "--other-builds")
+	runOverNoted(test, root, exitClean, reading)
 	if host, standardLibrary := storedRecordKeys(test, root); len(host) != 0 || len(standardLibrary) != 0 {
 		test.Errorf("a plain cold run wrote %d records of the host's and %d of the standard library's, want none",
 			len(host), len(standardLibrary))
@@ -381,7 +381,7 @@ func TestAPlainRunReadsNoRecord(test *testing.T) {
 		stop()
 		return hostReads, standardLibraryReads
 	}
-	if hostReads, standardLibraryReads := readsOf("--other-builds"); hostReads != 0 || standardLibraryReads != 0 {
+	if hostReads, standardLibraryReads := readsOf(); hostReads != 0 || standardLibraryReads != 0 {
 		test.Errorf("a plain run read %d record keys of the host's and %d of the standard library's, want none",
 			hostReads, standardLibraryReads)
 	}

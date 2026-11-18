@@ -231,13 +231,13 @@ type pipeline struct {
 	// whose finding still stands is not asked for, and counted, again by the next.
 	refusedRenames map[[3]string]bool
 
-	// dependence is the host's graph of its package-level declarations under `--build-dependence` beside
-	// `--other-builds` (#qkq4gx5), which every extra build is judged on, nil in any other run, so a run without the
-	// switch builds no graph and judges nothing (buildDependenceGraph).
+	// dependence is the host's graph of its package-level declarations under `--build-dependence` in a run of every
+	// build (#qkq4gx5), which every extra build is judged on, nil in any other run, so a run without the switch builds
+	// no graph and judges nothing (buildDependenceGraph).
 	dependence *hostDependence
 
-	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
-	// beside the host's to check.
+	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil under `--host-build-only` and when the
+	// run found no build beside the host's to check.
 	buildRuns []buildRun
 
 	// overlaps is whether a run whose findings cache has no store may start the lint phase's rules beside the load,

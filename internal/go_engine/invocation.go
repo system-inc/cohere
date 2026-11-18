@@ -111,9 +111,9 @@ func (request *invocation) resolveRoot() {
 }
 
 // checkStdin refuses a save's command line that asks more than a save answers: what `--fix` writes for the one file,
-// so `--fix` and no other phase, no paths beside it, and no other build, since the file is checked as the host builds
-// it. The front door refuses the same before it starts the engine (errorStdinNeedsFix); this is for a caller that
-// does not.
+// so `--fix` and no other phase and no paths beside it. The file is checked as the host builds it, since only the lint
+// phase checks another build and a save asks for none, so `--host-build-only` says what a save already does. The front
+// door refuses the same before it starts the engine (errorStdinNeedsFix); this is for a caller that does not.
 func (request invocation) checkStdin() error {
 	if request.stdinPath == "" {
 		return nil
@@ -126,11 +126,13 @@ func (request invocation) checkStdin() error {
 		return errors.New("--stdin-filepath answers what --fix writes for one file, so it takes --fix, no other " +
 			"phase and no other path")
 	}
-	if request.switches["other-builds"] {
-		return errors.New("--stdin-filepath answers for one file as the host builds it, so it takes no " +
-			"--other-builds")
-	}
 	return nil
+}
+
+// checksEveryBuild reports whether the run checks, beside the host's build, every other build the census needs
+// (otherBuilds): always, unless `--host-build-only` narrows it to the host's alone (#qqyq61s).
+func (request invocation) checksEveryBuild() bool {
+	return !request.switches["host-build-only"]
 }
 
 // mode is the question the command line asks, by the precedence the front door gives the same switches.
@@ -162,14 +164,14 @@ func (request invocation) read(file string) ([]byte, error) {
 }
 
 // judgesDependence reports whether the run computes each extra build's dependence (#qkq4gx5): `--build-dependence`
-// beside `--other-builds`, which alone has extra builds to judge. Such a run reads the findings cache and the system
+// in a run of every build, which alone has extra builds to judge. Such a run reads the findings cache and the system
 // cache's standard-library entries as any other run does; the standard library it restores is judged on a graph of its
 // own, loaded from source beside the host's lint, and anything else restored fails wide (buildDependenceGraph,
 // #ss4t5g6). Its rules wait for the load's end (lintOverlaps), since they let go of each package's syntax as they
 // finish with it, and its extra builds restore nothing from the host's run (censusKeepsHostRestoreOff), for the facts
 // census.
 func (request invocation) judgesDependence() bool {
-	return request.switches["build-dependence"] && request.switches["other-builds"]
+	return request.switches["build-dependence"] && request.checksEveryBuild()
 }
 
 // requests reports whether the command line asks for a phase, read as the front door reads it: no phase switch

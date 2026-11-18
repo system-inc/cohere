@@ -106,13 +106,14 @@ func TestEachArgumentFunctionTakesNoArgumentUnderNounset(test *testing.T) {
 	}
 }
 
-// Every run of a bench asked for every build checks every build the Go files name, `--other-builds`, and a bench of
-// the host's build alone passes nothing, as every record before #ccqee0e measured.
+// Every run of a bench asked for every build passes nothing, since a plain run checks every build the Go files name
+// (#qqyq61s), and a bench of the host's build alone passes `--host-build-only`, as every record before #ccqee0e
+// measured.
 func TestTheBenchAsksForEveryBuildWhenToldTo(test *testing.T) {
 	test.Parallel()
 	for builds, want := range map[string][]string{
-		"every": {"--other-builds"},
-		"host":  nil,
+		"every": nil,
+		"host":  {"--host-build-only"},
 	} {
 		test.Run("builds "+builds, func(test *testing.T) {
 			test.Parallel()

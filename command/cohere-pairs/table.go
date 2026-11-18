@@ -40,7 +40,7 @@ func renderTable(header tableHeader, records []runRecord) string {
 	fmt.Fprintf(table, "- host %s, %s/%s, %d cores, %s\n", header.host, header.goOperatingSystem,
 		header.goArchitecture, header.cores, header.goVersion)
 	fmt.Fprintf(table, "- %d rounds per corpus, base first in odd rounds and branch first in even ones, each side a "+
-		"cache-on cold run then a `--no-cache` run, `go-engine --contract 3 --no-fix --other-builds`; one-minute load "+
+		"cache-on cold run then a `--no-cache` run, `go-engine --contract 3 --no-fix`; one-minute load "+
 		"before each run %s\n", header.rounds, describeLoads(records))
 	// A corpus's name says which tree it is only alongside its commit and its files: two trees called deeafbf4 can
 	// differ by tens of thousands of findings, so every number below compares only with a pair over the same commits.

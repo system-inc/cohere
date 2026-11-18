@@ -66,8 +66,8 @@ func (target Build) String() string {
 // every other constraint reason as a gap.
 const CheckedByBuildPrefix = "checked by the "
 
-// CheckedByBuild is the project record's reason for a file the host's build leaves out and target, an extra build of
-// a run under `--other-builds`, compiles and checks: "checked by the windows/arm64 build".
+// CheckedByBuild is the project record's reason for a file the host's build leaves out and target, an extra build a
+// run checks unless `--host-build-only` is named, compiles and checks: "checked by the windows/arm64 build".
 func CheckedByBuild(target Build) string {
 	return CheckedByBuildPrefix + target.String() + " build"
 }

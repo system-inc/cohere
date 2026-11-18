@@ -66,11 +66,6 @@ func TestParseInvocationRefuses(test *testing.T) {
 				"/project/value.go", "/project/other.go"),
 			"--stdin-filepath answers what --fix writes for one file",
 		},
-		{
-			"a save of other builds", append(slices.Clone(contractArguments), "--fix", "--other-builds",
-				"--stdin-filepath", "/project/value.go"),
-			"takes no --other-builds",
-		},
 	}
 	for _, refused := range cases {
 		test.Run(refused.name, func(test *testing.T) {
@@ -146,6 +141,31 @@ func TestParseInvocationReads(test *testing.T) {
 				test.Errorf("paths %q, want %q", request.paths, read.paths)
 			}
 		})
+	}
+}
+
+// A run checks every build the census needs beside the host's unless `--host-build-only` is named (#qqyq61s): no switch
+// at all checks every build, the switch narrows the run to the host's, and the switch turned off asks for nothing.
+// `--other-builds`, kept one land for the self-hosting gate, is taken and changes nothing.
+func TestEveryBuildIsCheckedUnlessHostBuildOnlyIsNamed(test *testing.T) {
+	test.Parallel()
+	for _, read := range []struct {
+		name       string
+		arguments  []string
+		everyBuild bool
+	}{
+		{"no switch", contractArguments, true},
+		{"the switch", append(slices.Clone(contractArguments), "--host-build-only"), false},
+		{"the switch turned off", append(slices.Clone(contractArguments), "--host-build-only=false"), true},
+		{"the switch that asked for every build", append(slices.Clone(contractArguments), "--other-builds"), true},
+	} {
+		request, parseError := parseInvocation(read.arguments)
+		if parseError != nil {
+			test.Fatalf("%s was refused: %v", read.name, parseError)
+		}
+		if request.checksEveryBuild() != read.everyBuild {
+			test.Errorf("%s checks every build %t, want %t", read.name, request.checksEveryBuild(), read.everyBuild)
+		}
 	}
 }
 

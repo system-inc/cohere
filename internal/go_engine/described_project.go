@@ -15,8 +15,7 @@ import (
 type describedProject struct {
 	workspace project.Workspace
 
-	// census is the workspace's census, which the builds a run under `--other-builds` checks are read from
-	// (project.BuildsFor).
+	// census is the workspace's census, which the builds a run of every build checks are read from (project.BuildsFor).
 	census project.Census
 
 	// readableOurs are the census's files that are ours and could be read, before the build constraints narrow
@@ -38,10 +37,10 @@ type describedProject struct {
 	// has it, started none.
 	started *earlyStart
 
-	// builds are what a run under `--other-builds` checks, the host's first, read from the census before the first
-	// record (readBuilds), so the project record names a file only another build compiles as checked by it, and the
-	// lint phase checks these and reads them no second time (otherBuilds). Nil without the switch, and when the census
-	// judged no file. buildsError is why they could not be read, which the lint phase notes, leaving the run
+	// builds are what a run of every build checks, the host's first, read from the census before the first record
+	// (readBuilds), so the project record names a file only another build compiles as checked by it, and the lint
+	// phase checks these and reads them no second time (otherBuilds). Nil under `--host-build-only`, and when the
+	// census judged no file. buildsError is why they could not be read, which the lint phase notes, leaving the run
 	// incomplete, and leaves every file the host's build constraints exclude a gap.
 	builds      []project.Build
 	buildsError error

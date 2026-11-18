@@ -15,8 +15,8 @@ func TestTheRunAfterAColdOneHitsEveryBuildsOwnStore(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	cold, coldStream := runOverWith(test, root, exitFindings, "--other-builds")
-	warm, warmStream := runOverWith(test, root, exitFindings, "--other-builds")
+	cold, coldStream := runOverWith(test, root, exitFindings)
+	warm, warmStream := runOverWith(test, root, exitFindings)
 	if len(cold.buildRuns) != 3 || len(warm.buildRuns) != 3 {
 		test.Fatalf("the runs handed the merge %d and %d runs, want 3 each", len(cold.buildRuns), len(warm.buildRuns))
 	}
@@ -74,8 +74,7 @@ func TestTheRunAfterAColdOneHitsEveryBuildsOwnStore(test *testing.T) {
 func TestNoBuildWritesThroughWithoutTheCache(test *testing.T) {
 	test.Parallel()
 
-	engine, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings,
-		"--other-builds")
+	engine, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
 	restored := 0
 	for _, run := range engine.buildRuns {
 		restored += len(run.result.FromHost.Restored) + len(run.result.FromHost.Untouched)

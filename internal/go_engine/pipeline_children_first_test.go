@@ -7,15 +7,14 @@ import (
 	"testing"
 )
 
-// A run under `--other-builds` over a module whose census needs two extra builds starts every go command it needs
+// A run of every build over a module whose census needs two extra builds starts every go command it needs
 // before the host's first load (#sktb2y8): the host's lister state, and each build's go env and lister state, so its
 // lint record counts no go command started after that load began. On darwin each child started once the heap has grown
 // makes every resident page fault again. A build that read its go env or its lister state itself, as each did before,
 // would be counted and named there.
 func TestARunWithBuildsStartsEveryGoCommandBeforeItsFirstLoad(test *testing.T) {
 	test.Parallel()
-	engine, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings,
-		"--other-builds")
+	engine, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
 	if len(engine.buildRuns) != 3 {
 		test.Fatalf("the run checked %d builds, want the host's and two extra", len(engine.buildRuns))
 	}

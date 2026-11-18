@@ -115,9 +115,10 @@
 #                        to the Go engine always does: the same work every night whatever the tree holds, never
 #                        rewriting the copy. The record keeps which (noFix), and the guard never compares the two
 #                        (default: a whole-root run fixes)
-#   --builds WHICH       the Go builds every run checks: host, the machine's own build alone, or every, each build
-#                        the Go files name (`--other-builds`, cold_arguments.zsh's build_arguments). The record keeps
-#                        which, and the builds the cold runs checked, and the guard never compares the two (default host)
+#   --builds WHICH       the Go builds every run checks: every, each build the Go files name, as a plain run checks,
+#                        or host, the machine's own build alone (`--host-build-only`, cold_arguments.zsh's
+#                        build_arguments). The record keeps which, and the builds the cold runs checked, and the guard
+#                        never compares the two (default every)
 #   --generate COMMAND   the project's own generator, run in the copy once, with no network, before its
 #                        tree is hashed, so the copy holds what a checkout's generators wrote, as ahra's route
 #                        types: `NEXT_TELEMETRY_DISABLED=1 node_modules/.bin/next typegen` (see run_generator)
@@ -157,7 +158,7 @@ record=false
 record_directory=
 project_engine=
 no_fix=false
-builds=host
+builds=every
 
 while (( $# > 0 )); do
   case $1 in

@@ -72,13 +72,13 @@ changed in cohere outside the sets is written under the same heading.
   projects, and the worst exit wins. A workspace checks every module its `go.work` uses, and a module
   no workspace uses runs on its own, with a note when a workspace above it leaves it out. A Go engine
   that crashes, prints nothing or stops early is reported as nothing checked, never as green.
-- A Go file only another build compiles (another `GOOS`, cgo, a build tag) is never read green over. A plain
-  run checks the machine's own build and names each such file as a gap, `⚠ 21 Go files not checked`, listed
-  with its reason under `--verbose` and in `--json` as `gaps.unchecked`, and the exit is unchanged.
-  `--other-builds` checks every build the project's files name beside the machine's and merges their findings,
-  so only a file no build compiles stays a gap; a Swift run, a TypeScript project and a root with no Go project
-  each refuse it. A run that checked more than one build says `N builds` in its footer, and `--verbose` and
-  `--json` name each.
+- A Go file only another build compiles (another `GOOS`, cgo, a build tag) is never read green over. A run
+  checks every build the project's files name beside the machine's and merges their findings, so only a file
+  no build compiles stays a gap, listed with its reason under `--verbose` and in `--json` as `gaps.unchecked`.
+  A run that checked more than one build says `N builds` in its footer, and `--verbose` and `--json` name
+  each. `--host-build-only` checks the machine's own build alone and names each file only another build
+  compiles as a gap, `⚠ 21 Go files not checked`, and the exit is unchanged; a Swift run, a TypeScript
+  project and a root with no Go project each refuse it.
 - `--timing` covers Go. A Go run under it prints what its CPU went to in the shape of TypeScript's table: each
   rule's CPU from each analyzer's own thread clock, most expensive first with its share, the intermediate
   representation's build and each dispatcher's walk as rows of their own, the load's list, parse, type-check and
@@ -181,7 +181,7 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
 - `--directory` naming a directory that holds more than one engine's project, a `tsconfig.json` beside a `go.work`
   as Adamic's root holds them, checks each project there, as a run standing in that directory does, and reports them
   as one. It used to read the directory as TypeScript's alone and check nothing else, without saying so, and refused
-  `--other-builds` as having no Go project.
+  a Go switch as having no Go project.
 - The format walk never enters `testdata`, whose fixtures are what their tests read, and the account counts
   each one it skipped.
 - A declared submodule the root's `ignorePatterns` name isn't read by the nested format check, and a note

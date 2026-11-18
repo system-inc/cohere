@@ -1152,7 +1152,7 @@ const excludedNamedLimit = 5
 // act on. A language that names no such reasons keeps no gap (see engineLanguage.ExpectedExclusionReasons).
 //
 // A file another build checked was checked, so its line leads with the reason that says by which build, in place
-// of "not checked": `checked by the freebsd/arm64 build: …/memory_other.go`, under Go's `--other-builds` (#72n9mq0).
+// of "not checked": `checked by the freebsd/arm64 build: …/memory_other.go`, in a Go run of every build (#72n9mq0).
 func (run *engineRun) writeExcluded() {
 	if run.excludedPrinted || run.project == nil {
 		return
