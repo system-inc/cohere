@@ -765,9 +765,9 @@ func (engine *pipeline) knownFiles() *format.KnownFiles {
 	return format.DecodeKnownFiles(encoded)
 }
 
-// keepKnownFiles keeps gofmt's verdicts for the next run.
+// keepKnownFiles keeps gofmt's verdicts for the next run, and writes nothing when they are the ones the run read.
 func (engine *pipeline) keepKnownFiles(known *format.KnownFiles) {
-	if known == nil {
+	if known == nil || !known.Changed() {
 		return
 	}
 	encoded, encodeError := known.Encode()
