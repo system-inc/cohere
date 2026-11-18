@@ -60,10 +60,7 @@ func (session *CacheSession) restoreFromSystemCache(
 		return
 	}
 	session.standardLibraryKeys = keys
-	session.standardLibraryByPath = make(map[string]*packages.Package, len(keys))
-	for keyed := range keys {
-		session.standardLibraryByPath[keyed.PkgPath] = keyed
-	}
+	session.standardLibraryByPath = standardLibraryPackagesByPath(keys)
 	session.standardLibraryContext = &shared
 	table := session.readSystemCacheTable(shared)
 	session.systemCacheTable = table

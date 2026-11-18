@@ -44,24 +44,7 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 	reads, complete := session.resolver.Reads(saved.Types)
 	incomplete = incomplete || !complete
 	for _, read := range reads {
-		owner := session.packageOf(read.Owner)
-		if owner == nil {
-			owner = session.standardLibraryOwnerOf(read.Owner)
-		}
-		key, keyed := cache.Key{}, false
-		if owner != nil {
-			key, keyed = session.keys[owner]
-			if !keyed {
-				key, keyed = session.buildKeys[owner]
-			}
-			// A run without a store keys its packages only once it keeps them for its builds, after its saves, but it
-			// keys the standard library before any: a standard-library package reads only the standard library's, so
-			// its entry's reads are always named, as the system cache's table needs them, which drops each owner's key
-			// as it takes the entry.
-			if !keyed {
-				key, keyed = session.standardLibraryKeys[owner]
-			}
-		}
+		owner, key, keyed := session.ownerKeyOf(read.Owner)
 		if !keyed {
 			incomplete = true
 			continue
@@ -85,17 +68,60 @@ func (session *CacheSession) readsOf(saved *packages.Package, held entryDemand) 
 	return sorted, incomplete
 }
 
+// ownerKeyOf is the package whose types are ownerTypes, an answer's owner, and the key readsOf names it by: its first
+// key in this run, or the key a run without a store keyed it by for its builds, or its standard-library key. A run
+// without a store keys its packages only once it keeps them for its builds, after its saves, but it keys the standard
+// library before any: a standard-library package reads only the standard library's, so its entry's reads are always
+// named, as the system cache's table needs them, which drops each owner's key as it takes the entry. It reports false
+// for an owner it cannot name.
+func (session *CacheSession) ownerKeyOf(ownerTypes *types.Package) (*packages.Package, cache.Key, bool) {
+	owner := session.packageOf(ownerTypes)
+	if owner == nil {
+		owner = session.standardLibraryOwnerOf(ownerTypes)
+	}
+	if owner == nil {
+		return nil, cache.Key{}, false
+	}
+	if key, keyed := session.keys[owner]; keyed {
+		return owner, key, true
+	}
+	if key, keyed := session.buildKeys[owner]; keyed {
+		return owner, key, true
+	}
+	key, keyed := session.standardLibraryKeys[owner]
+	return owner, key, keyed
+}
+
 // standardLibraryOwnerOf is the standard-library package whose types are owner, among those the session keyed, or nil.
 // A run beside the load tells the session of a package only as an action restores it, since no package's types are
 // final as the run starts (check.Run), so a standard-library package the run computed is unknown to packageOf when a
 // package above it is saved; its types are final by then, since the read was of them, so it is found by its import
-// path, which names one package of the standard library in a load, and held only when its types are owner's.
+// path, then by its types. A path may name two packages the standard library's keys hold: a run over the standard
+// library itself loads a package beside its in-package test variant, both with the plain package's path, and the
+// keyer judges both its own (cache's isStandard reads files, module and imports, never the ID). Each has its own key,
+// so the package taken is the one whose types are owner's, never another under the same path.
 func (session *CacheSession) standardLibraryOwnerOf(owner *types.Package) *packages.Package {
-	candidate := session.standardLibraryByPath[owner.Path()]
-	if candidate == nil || candidate.Types != owner {
-		return nil
+	for _, candidate := range session.standardLibraryByPath[owner.Path()] {
+		if candidate.Types == owner {
+			return candidate
+		}
 	}
-	return candidate
+	return nil
+}
+
+// standardLibraryPackagesByPath are the packages of keys by import path, each path's in ID order, for
+// standardLibraryOwnerOf.
+func standardLibraryPackagesByPath(keys map[*packages.Package]cache.Key) map[string][]*packages.Package {
+	byPath := make(map[string][]*packages.Package, len(keys))
+	for keyed := range keys {
+		byPath[keyed.PkgPath] = append(byPath[keyed.PkgPath], keyed)
+	}
+	for _, sharing := range byPath {
+		slices.SortFunc(sharing, func(left *packages.Package, right *packages.Package) int {
+			return cmp.Compare(left.ID, right.ID)
+		})
+	}
+	return byPath
 }
 
 // holdAliasHits trusts every hit whose entry is its own: one from the system cache's table, keyed by everything it

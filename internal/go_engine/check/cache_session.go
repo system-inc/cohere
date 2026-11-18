@@ -228,9 +228,9 @@ type CacheSession struct {
 	// when the run reads no table and collects nothing.
 	standardLibraryKeys map[*packages.Package]cache.Key
 
-	// standardLibraryByPath are the packages of standardLibraryKeys by import path, which readsOf names an answer's
-	// owner by when the session was never told of it (standardLibraryOwnerOf).
-	standardLibraryByPath map[string]*packages.Package
+	// standardLibraryByPath are the packages of standardLibraryKeys by import path, each path's in ID order, which
+	// readsOf names an answer's owner by when the session was never told of it (standardLibraryOwnerOf).
+	standardLibraryByPath map[string][]*packages.Package
 
 	// waitingForTable are the entries of the standard-library packages the run computed whose write to the store waits
 	// for the system cache's table, by their standard-library key, with the package each is of (KeptBySystemCache).
