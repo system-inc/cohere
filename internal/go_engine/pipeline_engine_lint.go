@@ -227,6 +227,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				record.Cache.WriteFailed += run.result.Cache.WriteFailed
 				record.Cache.FromSystemCache += run.result.Cache.FromSystemCache
 				record.Cache.SystemCacheWritten += run.result.Cache.SystemCacheWritten
+				record.Cache.Packs = summedPacks(record.Cache.Packs, run.result.Cache.Packs)
 			}
 		}
 		record.BuildsAtOnce = engine.buildsAtOnce
@@ -428,7 +429,7 @@ func (engine *pipeline) cacheSession(
 	}
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
-		enabled, engine.described.children, system)
+		enabled, engine.described.children, system, engine.shardStamps)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}

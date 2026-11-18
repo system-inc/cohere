@@ -18,7 +18,7 @@ func TestOnlyARunWithAFindingsStoreCollectsItsInputsBeside(test *testing.T) {
 		session *check.CacheSession
 		beside  bool
 	}{
-		{"with a store", check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil), true},
+		{"with a store", check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir(), nil)}, nil), true},
 		{"with a session and no store", check.NewCacheSession(&check.Caching{}, nil), false},
 		{"with no session", nil, false},
 	} {

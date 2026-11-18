@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -536,6 +537,11 @@ func (engine *pipeline) extraBuildRun(
 			hostFiles = engine.session.Files()
 		}
 		session = engine.cacheSession(environment, goEnvironment, hostFiles, notes, engine.extraBuildSystemCache())
+		// Each extra build reads one pack of each store rather than open every record it hits (#b2t9xmf); the host's
+		// session keeps none.
+		if session != nil {
+			session.KeepBuildPacks(engine.described.workspace.Root)
+		}
 		if session != nil && !engine.keepsHostRestoreOff && !engine.censusKeepsHostRestoreOff {
 			session.RestoreFromHost(host)
 			if engine.keepsWalkOff {
@@ -851,6 +857,7 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.SystemCacheRestored = run.result.Cache.FromSystemCache
 			record.SystemCacheWritten = run.result.Cache.SystemCacheWritten
 			record.SharedBodyHits = run.result.Cache.SharedBodyHits
+			record.Packs = summedPacks(nil, run.result.Cache.Packs)
 			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
 			record.DeclinedAtCheck = fromHost.DeclinedAtCheck
 			if len(fromHost.DeclinedBy) > 0 {
@@ -869,6 +876,33 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 	}
 	engine.recordBuildCoverage(runs, verdict.records)
 	return verdict
+}
+
+// summedPacks is sum, a record's count of what extra builds did with their packs, with counted, one build's, added,
+// nil while both are, for a session that kept no packs. sum is never written: a new count is returned.
+func summedPacks(sum *contract.BuildPacks, counted *check.PackCounts) *contract.BuildPacks {
+	if counted == nil {
+		return sum
+	}
+	summed := contract.BuildPacks{}
+	if sum != nil {
+		summed = *sum
+		summed.RefusedBy = maps.Clone(sum.RefusedBy)
+	}
+	summed.Read += counted.Read
+	summed.Missing += counted.Missing
+	summed.RecordsServed += counted.RecordsServed
+	summed.RecordsStale += counted.RecordsStale
+	summed.RecordsMissed += counted.RecordsMissed
+	summed.ShardReads += counted.ShardReads
+	summed.Written += counted.Written
+	for word, count := range counted.RefusedBy {
+		if summed.RefusedBy == nil {
+			summed.RefusedBy = map[string]int{}
+		}
+		summed.RefusedBy[word] += count
+	}
+	return &summed
 }
 
 // checkedFromSource is how many packages of roots' whole graph a load checked from source. A package the load checked

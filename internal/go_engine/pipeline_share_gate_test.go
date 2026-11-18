@@ -456,7 +456,7 @@ func TestOnlyAHostThatMostlyHitItsStoreLiftsTheGuard(test *testing.T) {
 		test.Errorf("a run whose host mostly hit its store, over a host that kept nothing, was given a width of %d, "+
 			"fixed %t, want the forced 3", width, fixed)
 	}
-	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil)}
+	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir(), nil)}, nil)}
 	for _, each := range []struct {
 		name   string
 		engine *pipeline
@@ -484,7 +484,7 @@ func TestOnlyAHostThatMostlyHitItsStoreLiftsTheGuard(test *testing.T) {
 // misses, it keeps main's schedule. A run without a store takes it whatever the counts.
 func TestTheHostsMissedShareDecidesTheShareGateUnderAStore(test *testing.T) {
 	test.Parallel()
-	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir())}, nil)}
+	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir(), nil)}, nil)}
 	if !withStore.withFindingsStore() {
 		test.Fatal("the engine has no findings store, want one")
 	}

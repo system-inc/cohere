@@ -47,7 +47,9 @@ type standardLibrarySource struct {
 // load reads there, so the build context every key shares is the one of the build the load is of, read from the go env
 // the load asked rather than from one of its own (#4rpt1jh), and so each build reads its own context's standard-library
 // entries. goEnvironment is nil only for a host whose census judged no file, which asked go env nothing; then it is
-// read here, recorded in children, the run's account of the go commands it starts (see load.Children).
+// read here, recorded in children, the run's account of the go commands it starts (see load.Children). The project's
+// store holds stamps, the run's shard stamps, as the system cache's does, so a write by any session of the run marks
+// the shard it changes moved for every build's pack (cache.Open).
 func lintCache(
 	request invocation,
 	workspace project.Workspace,
@@ -56,6 +58,7 @@ func lintCache(
 	enabled []rule.Rule,
 	children *load.Children,
 	system *systemCache,
+	stamps *cache.ShardStamps,
 ) (*check.Caching, error) {
 	source := request.standardLibrary
 	// The standard library is keyed apart when there is a system cache to keep it or entries to collect for the
@@ -98,7 +101,7 @@ func lintCache(
 		return &check.Caching{StandardLibrary: standardLibrary, CgoToolchain: cgoToolchain(values)}, nil
 	}
 	return &check.Caching{
-		Store:       cache.Open(workspace.Root),
+		Store:       cache.Open(workspace.Root, stamps),
 		ExtraInputs: newStaticcheckConfigurationInputs().inputs,
 		Context: cache.Context{
 			FormatVersion:  check.CacheFormatVersion,

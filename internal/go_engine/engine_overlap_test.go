@@ -239,11 +239,12 @@ func TestEveryCaseReadsTheSameWithTheLintBesideTheLoad(test *testing.T) {
 				test.Fatalf("reading the expected stream: %v", readError)
 			}
 			// The expected stream is of a run with the cache, which a run that renamed has turned off already, and
-			// whose extra builds wrote through to their stores what a run without one never writes.
-			cacheOff := writtenThroughCount.ReplaceAllString(
-				strings.ReplaceAll(string(expected), `"cache":{"on":true`, `"cache":{"on":false`), "")
+			// whose extra builds wrote through to their stores what a run without one never writes, and kept a pack
+			// of the store a run without one has none of (#b2t9xmf), so the packs are left out of both.
+			cacheOff := withoutJsonObject(writtenThroughCount.ReplaceAllString(
+				strings.ReplaceAll(string(expected), `"cache":{"on":true`, `"cache":{"on":false`), ""), "packs")
 			expectedLines := strings.Split(cacheOff, "\n")
-			actualLines := strings.Split(overlapped.stream, "\n")
+			actualLines := strings.Split(withoutJsonObject(overlapped.stream, "packs"), "\n")
 			for index := range max(len(expectedLines), len(actualLines)) {
 				if want, got := lineAt(expectedLines, index), lineAt(actualLines, index); want != got {
 					test.Errorf("expected.jsonl line %d:\nwant %s\ngot  %s", index+1, want, got)

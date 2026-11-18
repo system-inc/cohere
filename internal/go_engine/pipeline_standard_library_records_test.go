@@ -25,7 +25,7 @@ func readingSystemCache(filled standardLibrarySource, toolchain string) func(*pi
 	return func(engine *pipeline) {
 		engine.request.standardLibrary = reading
 		// The pipeline found its system cache before this ran, from the request it was made with.
-		engine.systemCache = openSystemCache(engine.request)
+		engine.systemCache = openSystemCache(engine.request, engine.shardStamps)
 	}
 }
 

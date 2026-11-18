@@ -15,7 +15,7 @@ func TestAStoreOpenedAtADirectoryWritesOnlyThere(test *testing.T) {
 
 	root := test.TempDir()
 	directory := filepath.Join(root, "go", "standard-library")
-	store := OpenAt(directory)
+	store := OpenAt(directory, nil)
 	if _, found := store.Get(sampleKey); found {
 		test.Fatal("an empty store had an entry")
 	}

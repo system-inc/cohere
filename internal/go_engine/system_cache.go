@@ -32,8 +32,9 @@ type systemCache struct {
 }
 
 // openSystemCache is the system cache request's run keeps: none under `--no-system-cache`, and otherwise the one at
-// the root cache.SystemCacheRoot finds, or why it keeps none. Nothing is made or written here.
-func openSystemCache(request invocation) *systemCache {
+// the root cache.SystemCacheRoot finds, or why it keeps none, its store holding stamps, the run's shard stamps
+// (cache.OpenAt). Nothing is made or written here.
+func openSystemCache(request invocation, stamps *cache.ShardStamps) *systemCache {
 	if request.switches["no-system-cache"] {
 		return &systemCache{off: true}
 	}
@@ -45,7 +46,7 @@ func openSystemCache(request invocation) *systemCache {
 		}
 		root = found
 	}
-	return &systemCache{root: root, store: cache.OpenAt(systemStoreDirectory(root))}
+	return &systemCache{root: root, store: cache.OpenAt(systemStoreDirectory(root), stamps)}
 }
 
 // systemStoreDirectory is where the system cache at root keeps its store of the standard library's entries.

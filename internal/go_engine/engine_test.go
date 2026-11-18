@@ -945,14 +945,17 @@ func lineAt(lines []string, index int) string {
 var (
 	elapsedPattern = regexp.MustCompile(`"elapsedMilliseconds":\d+`)
 	packagesLoaded = regexp.MustCompile(`(holds its export data|restoring analysis only): \d+ packages`)
-	// The packages the findings cache missed, wrote and could not store, the facts it dropped, and the waves it
-	// analyzed them in, count the toolchain's own packages, which a Go release changes, as it changes the packages
-	// loaded. Hit stays, since a fresh copy hits nothing.
+	// The packages the findings cache missed, wrote and could not store, the facts it dropped, the waves it
+	// analyzed them in, and the records the builds' packs served, found stale and did not hold (#b2t9xmf), count the
+	// toolchain's own packages, which a Go release changes, as it changes the packages loaded; the shard stamps the
+	// builds read turn on which shards the engine's keys fall in, and which build asked first. Hit stays, since a fresh
+	// copy hits nothing.
 	// The milliseconds the cgo tool's load took vary like any elapsed time.
 	cgoMillisecondsPattern = regexp.MustCompile(`("cgoTranslation":\{"packages":\d+,"milliseconds":)\d+`)
-	cachePackagesPattern   = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped|waves)":\d+`)
-	panicFramesPattern     = regexp.MustCompile(`, at [^"]*"`)
-	buildTargetPattern     = regexp.MustCompile(`"target":"[^"]*"`)
+	cachePackagesPattern   = regexp.MustCompile(
+		`"(missed|written|unstorable|factsDropped|factsSkipped|waves|records(Served|Stale|Missed)|shardReads)":\d+`)
+	panicFramesPattern = regexp.MustCompile(`, at [^"]*"`)
+	buildTargetPattern = regexp.MustCompile(`"target":"[^"]*"`)
 	// buildTimingPattern is a build record's times and, under `--timing`, its heap holdings, each written only when not
 	// 0, so one that took under a millisecond on one run and more on the next would appear and vanish: each is
 	// normalized to 0, which the record writes by leaving it out.

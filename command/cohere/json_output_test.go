@@ -132,6 +132,7 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 		"summary.cache":        {summary.Properties["cache"], cacheUse{}},
 		"summary.packageCache": {summary.Properties["packageCache"], packageCacheUse{}},
 		"summary.builds":       {*summary.Properties["builds"].Items, checkedBuild{}},
+		"buildPacks":           {schema.Defs["buildPacks"], buildPacksUse{}},
 		"summary.gaps":         {summary.Properties["gaps"], runGaps{}},
 		"summary.gaps.unchecked": {
 			*summary.Properties["gaps"].Properties["unchecked"].Items,

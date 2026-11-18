@@ -543,7 +543,7 @@ func TestUnresolvablePersistedReadsDecline(test *testing.T) {
 func TestPersistedReadsAreKeptOnlyBesideTheirEntry(test *testing.T) {
 	test.Parallel()
 
-	store := cache.Open(test.TempDir())
+	store := cache.Open(test.TempDir(), nil)
 	key := cache.DigestOf([]byte("an entry"))
 	restoring, _ := hostReads(test, "stable")
 	record, persisted := persistReads(restoring, measuredReadsBuild(), ReadsRendererVersion)

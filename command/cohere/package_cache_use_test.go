@@ -152,3 +152,33 @@ func TestThePackageCacheNamesItsProblems(test *testing.T) {
 		}
 	}
 }
+
+// The account says what the extra builds did with their packs (#b2t9xmf): a warm run whose packs served every record
+// says only the packs read and the records served, and a run that found a pack missing, read records whose shard had
+// moved or that no pack held, refused a pack or wrote one says each, the refusals by why. `--json` carries the packs
+// whole, and a run with no extra build carries none.
+func TestThePackageCacheLineSaysWhatTheBuildsPacksDid(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		packs *buildPacksUse
+		want  string
+	}{
+		{packs: &buildPacksUse{Read: 14, RecordsServed: 10920},
+			want: "package cache hit 4, missed 0, wrote 0, builds' packs: 14 read, 10,920 records served"},
+		{packs: &buildPacksUse{Read: 12, Missing: 2, RecordsServed: 1, RecordsStale: 5, RecordsMissed: 3,
+			RefusedBy: map[string]int{"sum": 1, "version": 1}, Written: 4},
+			want: "package cache hit 4, missed 0, wrote 0, builds' packs: 12 read, 1 record served, 2 missing, " +
+				"5 stale, 3 not held, 2 refused (sum 1, version 1), 4 written"},
+		{want: "package cache hit 4, missed 0, wrote 0"},
+	} {
+		cache := packageCacheUse{On: true, Hit: 4, Packs: testCase.packs}
+		if got := cache.line(); got != testCase.want {
+			test.Errorf("got %q, want %q", got, testCase.want)
+		}
+		encoded := jsonLine(summaryAsJson(runSummary{PackageCache: &cache}))
+		if carries := strings.Contains(encoded, `"packs":{"read":`); carries != (testCase.packs != nil) {
+			test.Errorf("want the packs carried %t in %s", testCase.packs != nil, encoded)
+		}
+	}
+}

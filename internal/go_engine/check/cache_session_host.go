@@ -718,7 +718,7 @@ func (session *CacheSession) writeThrough(
 					return
 				}
 			}
-			writeErrors[index] = putEntry(store, key, encoded[index])
+			writeErrors[index] = session.putRecord(store, key, encoded[index])
 		}
 	})
 	positionDependent := map[*packages.Package]bool{}

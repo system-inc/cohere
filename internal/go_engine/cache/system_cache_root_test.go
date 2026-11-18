@@ -120,7 +120,7 @@ func TestAnUnwritableRootIsNotKeptAtTheFirstWrite(test *testing.T) {
 	}
 
 	directory := filepath.Join(root, "go", "standard-library")
-	putError := OpenAt(directory).Put(sampleKey, []byte("a standard library table"))
+	putError := OpenAt(directory, nil).Put(sampleKey, []byte("a standard library table"))
 	if putError == nil {
 		test.Fatal("a Put under a file succeeded")
 	}

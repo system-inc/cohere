@@ -21,7 +21,7 @@ func TestAnEntryPutIsGotBack(test *testing.T) {
 	test.Parallel()
 
 	root := test.TempDir()
-	store := Open(root)
+	store := Open(root, nil)
 	if _, found := store.Get(sampleKey); found {
 		test.Fatal("an empty store had an entry")
 	}
@@ -68,7 +68,7 @@ func TestABrokenEntryIsAMiss(test *testing.T) {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 
-			store := Open(test.TempDir())
+			store := Open(test.TempDir(), nil)
 			if putError := store.Put(sampleKey, bytes.Repeat([]byte("entry "), 20)); putError != nil {
 				test.Fatal(putError)
 			}
@@ -104,7 +104,7 @@ func changeLastByte(path string) error {
 func TestConcurrentPutsOfOneKeyLeaveAWholeEntry(test *testing.T) {
 	test.Parallel()
 
-	store := Open(test.TempDir())
+	store := Open(test.TempDir(), nil)
 	const writers = 16
 	const size = 1 << 20
 	putErrors := make([]error, writers)
@@ -146,7 +146,7 @@ func TestAPutThatCannotWriteIsAnError(test *testing.T) {
 	if writeError := os.WriteFile(filepath.Join(root, ".cache"), nil, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	store := Open(root)
+	store := Open(root, nil)
 	if putError := store.Put(sampleKey, []byte("entry")); putError == nil {
 		test.Error("a Put under a file succeeded")
 	}
@@ -160,7 +160,7 @@ func TestAPutThatCannotWriteIsAnError(test *testing.T) {
 func TestAStoreMakesEachShardDirectoryOnce(test *testing.T) {
 	test.Parallel()
 
-	store := Open(test.TempDir())
+	store := Open(test.TempDir(), nil)
 	for index := range 20 {
 		if putError := store.Put(Key{0xAB, byte(index)}, []byte("entry")); putError != nil {
 			test.Fatal(putError)
@@ -191,7 +191,7 @@ func TestAShardDirectoryRemovedUnderTheStoreIsMadeAgain(test *testing.T) {
 	test.Parallel()
 
 	root := test.TempDir()
-	store := Open(root)
+	store := Open(root, nil)
 	if putError := store.Put(sampleKey, []byte("first")); putError != nil {
 		test.Fatal(putError)
 	}
@@ -215,7 +215,7 @@ func TestAStoreThatMakesTheCacheDirectoryLeavesItIgnoringItself(test *testing.T)
 	test.Parallel()
 
 	root := test.TempDir()
-	store := Open(root)
+	store := Open(root, nil)
 	if putError := store.Put(sampleKey, []byte("first")); putError != nil {
 		test.Fatal(putError)
 	}
@@ -239,7 +239,7 @@ func TestAStoreThatMakesTheCacheDirectoryLeavesItIgnoringItself(test *testing.T)
 	if createDirectoryError := os.MkdirAll(cache_directory.Of(existing), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if putError := Open(existing).Put(sampleKey, []byte("entry")); putError != nil {
+	if putError := Open(existing, nil).Put(sampleKey, []byte("entry")); putError != nil {
 		test.Fatal(putError)
 	}
 	if _, statError := os.Lstat(filepath.Join(cache_directory.Of(existing), ".gitignore")); !os.IsNotExist(statError) {

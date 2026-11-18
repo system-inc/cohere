@@ -16,7 +16,7 @@ import (
 func TestConcurrentPutAbsentsOfOneContentLeaveOneWholeFile(test *testing.T) {
 	test.Parallel()
 
-	store := Open(test.TempDir())
+	store := Open(test.TempDir(), nil)
 	const writers = 16
 	content := bytes.Repeat([]byte("export data "), 1<<16)
 	putErrors := make([]error, writers)
@@ -51,7 +51,7 @@ func TestConcurrentPutAbsentsOfOneContentLeaveOneWholeFile(test *testing.T) {
 func TestPutAbsentWritesOnlyWhatIsNotThereWhole(test *testing.T) {
 	test.Parallel()
 
-	store := Open(test.TempDir())
+	store := Open(test.TempDir(), nil)
 	content := []byte("export data by its digest")
 	if putError := store.PutAbsent(sampleKey, content); putError != nil {
 		test.Fatal(putError)

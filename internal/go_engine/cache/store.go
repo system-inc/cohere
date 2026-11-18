@@ -34,26 +34,40 @@ type Store struct {
 	cacheRoot sync.Once
 	// cacheRootError is the error making the cache root ended with, which every Put that needs it returns.
 	cacheRootError error
+
+	// stamps are the shard stamps of the run that opened the store, which every change it makes to a shard's files
+	// marks moved (ShardStamps), nil for a store no pack is read through. Every store of a run holds the same, so a
+	// write by any session, the host's or a build's, moves the shard for every build reading it.
+	stamps *ShardStamps
 }
 
-// Open is the store under root, at `<root>/.cache/cohere/go`, beside the TypeScript cache in `.cache/cohere`.
-// Nothing is made until the first Put.
-func Open(root string) *Store {
+// Open is the store under root, at `<root>/.cache/cohere/go`, beside the TypeScript cache in `.cache/cohere`, which
+// marks the shards it changes moved in stamps, the run's, or nil for a store no pack is read through: each opener names
+// them, so no store a run writes through can leave a build's pack serving what it replaced (#b2t9xmf). Nothing is made
+// until the first Put.
+func Open(root string, stamps *ShardStamps) *Store {
 	return &Store{
 		directory:             filepath.Join(cache_directory.Of(root), "go"),
 		projectCacheDirectory: cache_directory.Of(root),
+		stamps:                stamps,
 	}
 }
 
-// OpenAt is the store whose directory is exactly directory, the system cache's, outside any project. Nothing is made
-// until the first Put, and then only directory and the parents it needs.
+// OpenAt is the store whose directory is exactly directory, the system cache's, outside any project, marking the shards
+// it changes moved in stamps as Open's store does. Nothing is made until the first Put, and then only directory and the
+// parents it needs.
 //
 // It writes no ignore file, as Open's store does into the project's `.cache/cohere`. That file keeps a cache out of
 // a repository's `git status`, and the system cache is in the user's cache directory, where no repository is. And
 // cache_directory.Make writes it into the store's parent, which a store given its directory exactly does not own:
 // `$COHERE_SYSTEM_CACHE` names any directory the person chose.
-func OpenAt(directory string) *Store {
-	return &Store{directory: directory}
+func OpenAt(directory string, stamps *ShardStamps) *Store {
+	return &Store{directory: directory, stamps: stamps}
+}
+
+// ShardStamps are the stamps of the run that opened the store, nil for a store no pack is read through.
+func (store *Store) ShardStamps() *ShardStamps {
+	return store.stamps
 }
 
 // readObserver, when a test sets it (ObserveReads), is told the key of every Get of every store, nil in every run.
@@ -80,23 +94,24 @@ func (store *Store) Get(key Key) ([]byte, bool) {
 		return nil, false
 	}
 	if len(contents) < sha256.Size {
-		store.forget(path)
+		store.forget(key)
 		return nil, false
 	}
 	entry := contents[sha256.Size:]
 	sum := sha256.Sum256(entry)
 	if !bytes.Equal(contents[:sha256.Size], sum[:]) {
-		store.forget(path)
+		store.forget(key)
 		return nil, false
 	}
 	return entry, true
 }
 
-// forget removes the damaged file at path. A Put that renamed a whole file into place since it was read may be
-// removed with it, which leaves a miss, never a wrong read.
-func (store *Store) forget(path string) {
+// forget removes the damaged file under key, and marks its shard moved. A Put that renamed a whole file into place
+// since it was read may be removed with it, which leaves a miss, never a wrong read.
+func (store *Store) forget(key Key) {
 	// Ignored: a file that cannot be removed reads as a miss again, as it just did.
-	_ = os.Remove(path)
+	_ = os.Remove(store.path(key))
+	store.stamps.moved(store.directory, ShardOf(key))
 }
 
 // Holds reports whether a file is under key, whole or not: a reader that finds it damaged removes it (Get), so a
@@ -119,9 +134,17 @@ func (store *Store) PutAbsent(key Key, entry []byte) error {
 }
 
 // Put keeps entry under key. It writes a temporary file beside the entry's and renames it into place, so a reader,
-// or another Put of the same key, sees a whole file or none.
+// or another Put of the same key, sees a whole file or none. The shard is marked moved once the write is over, held
+// or not: a write that failed may still have added and removed its temporary file there.
 func (store *Store) Put(key Key, entry []byte) error {
-	path := store.path(key)
+	defer store.stamps.moved(store.directory, ShardOf(key))
+	return store.writeWhole(store.path(key), entry)
+}
+
+// writeWhole writes the sha256 of contents, then contents, to path, through a temporary file beside it renamed into
+// place, so a reader, or another writer of the same path, sees a whole file or none: an entry's (Put) or a pack's
+// (WritePack).
+func (store *Store) writeWhole(path string, entry []byte) error {
 	directory := filepath.Dir(path)
 	if _, known := store.made.Load(directory); !known {
 		if makeError := store.makeDirectory(directory); makeError != nil {
