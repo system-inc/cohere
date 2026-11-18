@@ -194,12 +194,16 @@ func reportOddLengths(context *rule.Context, marks facts, functions []*intermedi
 					if _, isSlice := argument.Type().Underlying().(*types.Slice); !isSlice {
 						continue
 					}
-					parameter := callee.Signature.Params().At(parameterIndex)
-					if !marks.marked(parameter) {
-						continue
-					}
+					// The length is read before the mark is asked, since a finding needs both and only the mark is
+					// costly: of another package's parameter it is a question of the resolver, which records the
+					// answer and the read for the cache. A slice of unknown or even length is never reported, whatever
+					// the mark, so leaving its question unasked changes only what the cache holds, never a finding.
 					length := sliceLength(argument)
 					if length < 0 || length%2 == 0 {
+						continue
+					}
+					parameter := callee.Signature.Params().At(parameterIndex)
+					if !marks.marked(parameter) {
 						continue
 					}
 					label := "argument"
