@@ -21,6 +21,7 @@ import (
 	"unicode"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/ast/inspector"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -68,11 +69,16 @@ func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
 	if buffer := rule.State[ioReader](context).bufferOf(context, function); buffer != nil {
 		outParameters[buffer] = true
 	}
-	parameters := judgedParameters(context, function, outParameters)
+	// Both walks read the body through the inspector's cursor, already built for the file, rather than through
+	// ast.Inspect, which calls back on every node. The cursor's Preorder visits the nodes ast.Inspect would, in the
+	// same order, handing over only the kinds a walk's switch reads and skipping a subtree that holds none of them, so
+	// the walks see the same statements and report in the same order.
+	body := context.Cursor().Child(function.Body)
+	parameters := judgedParameters(context, function, body, outParameters)
 	if len(parameters) == 0 {
 		return
 	}
-	judgeWrites(context, function.Body, parameters)
+	judgeWrites(context, body, parameters)
 }
 
 // findIoReader is io.Reader's interface, found among the imports of analyzed and each package they reach, or nil when
@@ -93,6 +99,7 @@ func findIoReader(analyzed *types.Package, reads *build_reads.Reads) *types.Inte
 func judgedParameters(
 	context *rule.Context,
 	function *ast.FuncDecl,
+	body inspector.Cursor,
 	outParameters map[*types.Var]bool,
 ) map[*types.Var]bool {
 	parameters := map[*types.Var]bool{}
@@ -104,7 +111,11 @@ func judgedParameters(
 			}
 		}
 	}
-	for parameter := range reassignedParameters(context, function.Body, parameters) {
+	// With no parameter left to judge there is nothing a reassignment could take out of the set.
+	if len(parameters) == 0 {
+		return parameters
+	}
+	for parameter := range reassignedParameters(context, body, parameters) {
 		delete(parameters, parameter)
 	}
 	return parameters
@@ -116,7 +127,7 @@ func judgedParameters(
 // the same variable.
 func reassignedParameters(
 	context *rule.Context,
-	body *ast.BlockStmt,
+	body inspector.Cursor,
 	parameters map[*types.Var]bool,
 ) map[*types.Var]bool {
 	reassigned := map[*types.Var]bool{}
@@ -125,8 +136,14 @@ func reassignedParameters(
 			reassigned[parameter] = true
 		}
 	}
-	ast.Inspect(body, func(node ast.Node) bool {
-		switch statement := node.(type) {
+	for cursor := range body.Preorder(
+		(*ast.AssignStmt)(nil),
+		(*ast.RangeStmt)(nil),
+		(*ast.IncDecStmt)(nil),
+		(*ast.UnaryExpr)(nil),
+		(*ast.SelectorExpr)(nil),
+	) {
+		switch statement := cursor.Node().(type) {
 		case *ast.AssignStmt:
 			// go/types records a name a := reuses in Uses and a new one in Defs, so only the reuse resolves here.
 			for _, left := range statement.Lhs {
@@ -148,8 +165,7 @@ func reassignedParameters(
 				mark(statement.X)
 			}
 		}
-		return true
-	})
+	}
 	return reassigned
 }
 
@@ -172,13 +188,18 @@ func callsPointerMethodOnValue(context *rule.Context, selector *ast.SelectorExpr
 }
 
 // judgeWrites reports every direct write in body at one of parameters that reaches the caller's data.
-func judgeWrites(context *rule.Context, body *ast.BlockStmt, parameters map[*types.Var]bool) {
-	ast.Inspect(body, func(node ast.Node) bool {
-		switch statement := node.(type) {
+func judgeWrites(context *rule.Context, body inspector.Cursor, parameters map[*types.Var]bool) {
+	for cursor := range body.Preorder(
+		(*ast.AssignStmt)(nil),
+		(*ast.IncDecStmt)(nil),
+		(*ast.RangeStmt)(nil),
+		(*ast.CallExpr)(nil),
+	) {
+		switch statement := cursor.Node().(type) {
 		case *ast.AssignStmt:
 			// A := declares names and writes through none, so its left side never holds a write at a parameter.
 			if statement.Tok == token.DEFINE {
-				return true
+				continue
 			}
 			for _, left := range statement.Lhs {
 				judgeTarget(context, left, parameters)
@@ -194,8 +215,7 @@ func judgeWrites(context *rule.Context, body *ast.BlockStmt, parameters map[*typ
 		case *ast.CallExpr:
 			judgeBuiltinCall(context, statement, parameters)
 		}
-		return true
-	})
+	}
 }
 
 // judgeTarget reports target when it is a direct write at a parameter that lands in the caller's data: an element of
