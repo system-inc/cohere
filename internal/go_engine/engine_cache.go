@@ -123,11 +123,17 @@ func cgoToolchain(values map[string]string) []string {
 	return toolchain
 }
 
+// processGodebug is the process variable both the project's keys and the standard library's hold
+// (standardLibraryBuild), since the check of a package nothing reports on reads it as much as one's that is.
+const processGodebug = "GODEBUG"
+
 // processEnvironment are the engine process's own variables an analyzer reads, each named in the build context
 // whether it is set or not. asmdecl and framepointer read the target from go/build's build.Default, which comes from
 // the process's `GOOS` and `GOARCH`, not from go env, so the two can differ. staticcheck's TOML parser, which reads
-// staticcheck.conf, reads `BURNTSUSHI_TOML_110`.
-var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110"}
+// staticcheck.conf, reads `BURNTSUSHI_TOML_110`. The engine's own `GODEBUG` can change what go/types makes of a
+// package, as gotypesalias did until go1.27 removed it (export_data/predeclared.go), so every key holds it, the
+// standard library's too (processGodebug): no go/types setting is honored now, and holding it costs only a miss.
+var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110", processGodebug}
 
 // buildNames are what go env reports that every key's build context holds, in its order, each among what
 // load.GoEnvironment asks go env (a test holds it to that).
@@ -149,14 +155,18 @@ func cacheBuild(values map[string]string) []string {
 		build = append(build, name+"="+values[name])
 	}
 	for _, name := range processEnvironment {
-		value, set := os.LookupEnv(name)
-		if !set {
-			build = append(build, "process "+name+" unset")
-			continue
-		}
-		build = append(build, "process "+name+"="+value)
+		build = append(build, processVariable(name))
 	}
 	return build
+}
+
+// processVariable is the engine process's own variable name as a build context names it, whether it is set or not.
+func processVariable(name string) string {
+	value, set := os.LookupEnv(name)
+	if !set {
+		return "process " + name + " unset"
+	}
+	return "process " + name + "=" + value
 }
 
 // flagsNoStandardLibraryReads are the go flags that, beyond those load.VerdictFlags leaves out, change nothing of a
@@ -175,11 +185,12 @@ var flagsNoStandardLibraryReads = []string{"trimpath", "mod", "modfile", "modcac
 
 // standardLibraryBuild is the build context every standard-library key shares, in cacheBuild's order: of values,
 // go env's answer as cacheBuild reads it, the target, cgo, the flags narrowed for the standard library (see
-// flagsNoStandardLibraryReads), the toolchain and its experiments. It holds none of the process's own variables, since
-// nothing on the fact path reads them: asmdecl and framepointer, which read the process's target, have no facts, and
-// no fact analyzer reads staticcheck's config, whose reading `BURNTSUSHI_TOML_110` changes.
+// flagsNoStandardLibraryReads), the toolchain and its experiments, then the process's `GODEBUG` (processGodebug). It
+// holds none of the process's other variables, since nothing on the fact path reads them: asmdecl and framepointer,
+// which read the process's target, have no facts, and no fact analyzer reads staticcheck's config, whose reading
+// `BURNTSUSHI_TOML_110` changes.
 func standardLibraryBuild(values map[string]string) []string {
-	build := make([]string, 0, len(buildNames))
+	build := make([]string, 0, len(buildNames)+1)
 	for _, name := range buildNames {
 		if name != "GOFLAGS" {
 			build = append(build, name+"="+values[name])
@@ -194,7 +205,7 @@ func standardLibraryBuild(values map[string]string) []string {
 		}
 		build = append(build, name+"="+strings.Join(kept, " "))
 	}
-	return build
+	return append(build, processVariable(processGodebug))
 }
 
 // cacheRuleSet is each enabled rule as its name, then its analyzer's options as they were resolved from the

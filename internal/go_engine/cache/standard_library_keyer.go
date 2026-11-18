@@ -139,6 +139,10 @@ func (keyer *standardLibraryKeyer) ownDigest(keyed *packages.Package) Key {
 	}
 	parts.count(1)
 	parts.text(keyer.loader)
+	// Under the cgo-translated loader a package with cgo files has the cgo tool's outputs among its CompiledGoFiles,
+	// which go keeps in its build cache, outside goroot, so isStandard never judges it the standard library's, nor what
+	// imports it: it gets a project key, as intended, and the toolchain here keys whatever such a package a future
+	// loader keeps below goroot.
 	if keyer.loader == load.LoaderCgoTranslated {
 		parts.texts(keyer.cgoToolchain)
 	}

@@ -416,16 +416,17 @@ func TestAFlagNoVerdictReadsStaysOutOfTheBuildContext(test *testing.T) {
 // The standard library's build context is the target, cgo, the toolchain and its experiments, and the go flags but
 // those no verdict reads and those that change nothing of the standard library: -trimpath, the module flags and
 // -buildvcs drop out, while -n, -tags, -race and every other flag stay and key apart. It names none of the process's
-// own variables, and go env's `GOROOT`, which the standard library's keys name each file below, is read beside it and
-// is in neither context.
+// own variables but `GODEBUG`, and go env's `GOROOT`, which the standard library's keys name each file below, is read
+// beside it and is in neither context.
 //
-// Not parallel: it sets the process's own `GOARCH`, which every test in the process reads.
+// Not parallel: it sets the process's own `GOARCH` and `GODEBUG`, which every test in the process reads.
 func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSee(test *testing.T) {
 	root, absoluteError := filepath.Abs(filepath.Join("testdata", "vet-finding"))
 	if absoluteError != nil {
 		test.Fatalf("resolving the fixture: %v", absoluteError)
 	}
 	test.Setenv("GOARCH", "arm64")
+	test.Setenv("GODEBUG", "probe=1")
 	contextUnder := func(goFlags string) []string {
 		test.Helper()
 		return standardLibraryBuild(goEnvironmentIn(test, root, []string{"GOFLAGS=" + goFlags,
@@ -436,7 +437,7 @@ func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSe
 		keptFlags)
 	values := goEnvironmentIn(test, root, nil)
 	want := []string{"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=" + keptFlags,
-		"GOVERSION=" + values["GOVERSION"], "GOEXPERIMENT="}
+		"GOVERSION=" + values["GOVERSION"], "GOEXPERIMENT=", "process GODEBUG=probe=1"}
 	if !slices.Equal(narrowed, want) {
 		test.Errorf("want\n%q\ngot\n%q", want, narrowed)
 	}
@@ -455,14 +456,45 @@ func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSe
 		test.Errorf("want go env's GOROOT read, absolute, got %q", values["GOROOT"])
 	}
 	for _, entry := range narrowed {
-		if strings.HasPrefix(entry, "process ") {
-			test.Errorf("want no process variable in the standard library's build context, got %q", entry)
+		if strings.HasPrefix(entry, "process ") && !strings.HasPrefix(entry, "process GODEBUG") {
+			test.Errorf("want no process variable but GODEBUG in the standard library's build context, got %q", entry)
 		}
 	}
 	for _, entry := range slices.Concat(narrowed, cacheBuild(values)) {
 		if strings.HasPrefix(entry, "GOROOT=") {
 			test.Errorf("want GOROOT in neither build context, got %q", entry)
 		}
+	}
+}
+
+// Both build contexts, the project's and the standard library's, hold the process's own `GODEBUG`, which can change
+// what go/types makes of a package, so the machine-wide store never hands one shell's entries to a run under
+// another's: two contexts that differ only in it key apart, and so does one where it is unset.
+//
+// Not parallel: it sets the process's own `GODEBUG`, which every test in the process reads.
+func TestBothKeysHoldTheProcesssGodebug(test *testing.T) {
+	values := map[string]string{"GOOS": "linux", "GOARCH": "amd64", "CGO_ENABLED": "1", "GOFLAGS": "",
+		"GOVERSION": "go1.27.0", "GOEXPERIMENT": ""}
+	contextsUnder := func(godebug string) ([]string, []string) {
+		test.Helper()
+		test.Setenv("GODEBUG", godebug)
+		return standardLibraryBuild(values), cacheBuild(values)
+	}
+	firstStandard, firstProject := contextsUnder("probe=1")
+	secondStandard, secondProject := contextsUnder("probe=2")
+	if slices.Equal(firstStandard, secondStandard) {
+		test.Errorf("two GODEBUG values give the standard library one build context %q", firstStandard)
+	}
+	if slices.Equal(firstProject, secondProject) {
+		test.Errorf("two GODEBUG values give the project one build context %q", firstProject)
+	}
+	test.Setenv("GODEBUG", "")
+	if unsetError := os.Unsetenv("GODEBUG"); unsetError != nil {
+		test.Fatal(unsetError)
+	}
+	if unset := standardLibraryBuild(values); slices.Equal(unset, firstStandard) ||
+		!slices.Contains(unset, "process GODEBUG unset") {
+		test.Errorf("want an unset GODEBUG named unset in the standard library's build context, got %q", unset)
 	}
 }
 
