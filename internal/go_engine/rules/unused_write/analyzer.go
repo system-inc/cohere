@@ -91,8 +91,9 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 			return
 		}
 	}
-	reportLiftedArrayLiterals(context, function)
-	for _, dead := range append(deadWrites(function), liftedStructLiteralWrites(context, function)...) {
+	own := gatherOwnSyntax(context, function)
+	reportLiftedArrayLiterals(context, function, own)
+	for _, dead := range append(deadWrites(function), liftedStructLiteralWrites(context, function, own)...) {
 		switch address := dead.address.(type) {
 		case *intermediate_representation.FieldAddress:
 			field, isField := fieldOf(address)
@@ -122,6 +123,37 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 			})
 		}
 	}
+}
+
+// ownSyntax is what one walk of a function's own syntax (inspectOwnSyntax) gathers for the two checks that read it,
+// reportLiftedArrayLiterals and liftedStructLiteralWrites, so the walk, the larger part of the rule's cost, is made once
+// a function and not once for each.
+type ownSyntax struct {
+	// body is the function's statements (functionBody), and nil for a function with none, where neither check judges.
+	body *ast.BlockStmt
+	// boundArrayLiterals is each variable given a pointer to an array literal of one element, and its literal
+	// (gatherBoundArrayLiterals).
+	boundArrayLiterals map[*types.Var]*ast.CompositeLit
+	// judgedStructLiterals is the literals whose pointer is given straight to a variable or stored straight through
+	// (gatherJudgedStructLiterals).
+	judgedStructLiterals map[*ast.CompositeLit]bool
+}
+
+// gatherOwnSyntax walks function's own syntax once and gathers from each node what each check reads.
+func gatherOwnSyntax(context *rule.Context, function *intermediate_representation.Function) ownSyntax {
+	own := ownSyntax{
+		body:                 functionBody(function.Source()),
+		boundArrayLiterals:   map[*types.Var]*ast.CompositeLit{},
+		judgedStructLiterals: map[*ast.CompositeLit]bool{},
+	}
+	if own.body == nil {
+		return own
+	}
+	inspectOwnSyntax(context, own.body, func(node ast.Node) {
+		gatherBoundArrayLiterals(context, node, own.boundArrayLiterals)
+		gatherJudgedStructLiterals(context, node, own.judgedStructLiterals)
+	})
+	return own
 }
 
 // deadWrites is the writes in function whose address is written to but never used.
