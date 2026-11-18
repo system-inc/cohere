@@ -282,13 +282,13 @@ func TestEachDeclarationRecordsWhatEachPartUses(test *testing.T) {
 			"universe.int Named",
 		},
 		"Function first.Generic (first.go) body": {
+			"(second.Box).Get (second.go) Named",
 			"first.Shown (first.go) .Name@0, first.Shown.UF0 (first.go) Selected",
 			"first.Shown (first.go) ValueType|TypeArgument",
 			"first.Shown.UF0 (first.go) Named",
 			"import second (first.go) Named",
-			"second.Box (second.go) .Get@0, second.Box.M0 (second.go) Selected",
+			"second.Box (second.go) .Get@0, (second.Box).Get (second.go) Selected",
 			"second.Box (second.go) ValueType|TypeArgument",
-			"second.Box.M0 (second.go) Named",
 			"second.Identity (second.go) Named",
 			"universe.len Named",
 		},
@@ -299,14 +299,14 @@ func TestEachDeclarationRecordsWhatEachPartUses(test *testing.T) {
 			"universe.int Named",
 		},
 		"Function first.Methods (first.go) body": {
+			"(second.Inner).Describe (second.go) Named",
 			"first.Local (first.go) .Base@0, first.Local.UF0 (first.go) Selected",
-			"first.Local (first.go) .Describe@0,0,0, second.Inner.M0 (second.go) Selected",
+			"first.Local (first.go) .Describe@0,0,0, (second.Inner).Describe (second.go) Selected",
 			"first.Local (first.go) .Inner@0,0, second.Base.UF0 (second.go) Selected",
 			"first.Local (first.go) ValueType",
 			"import second (first.go) Named",
-			"second.Inner (second.go) .Describe@0, second.Inner.M0 (second.go) Selected",
+			"second.Inner (second.go) .Describe@0, (second.Inner).Describe (second.go) Selected",
 			"second.Inner (second.go) Named|ValueType",
-			"second.Inner.M0 (second.go) Named",
 		},
 		"Function first.Methods (first.go) signature": {
 			"first.Local (first.go) Named|ValueType",
@@ -322,17 +322,17 @@ func TestEachDeclarationRecordsWhatEachPartUses(test *testing.T) {
 			"first.Shown (first.go) Named|ValueType",
 			"first.shower (first.go) Named|ValueType",
 		},
-		"Function first.Shown.M0 (first.go) body": {
+		"Function (first.Shown).show (first.go) body": {
 			"first.Shown (first.go) .Name@0, first.Shown.UF0 (first.go) Selected",
 			"first.Shown (first.go) ValueType",
 			"first.Shown.UF0 (first.go) Named",
 		},
-		"Function first.Shown.M0 (first.go) signature": {
+		"Function (first.Shown).show (first.go) signature": {
 			"first.Shown (first.go) Named|ValueType",
 			"universe.string Named",
 		},
-		"Function first.own.M0 (first.go) body": nil,
-		"Function first.own.M0 (first.go) signature": {
+		"Function (first.own).Level (first.go) body": nil,
+		"Function (first.own).Level (first.go) signature": {
 			"first.own (first.go) Named|ValueType",
 			"universe.int Named",
 		},

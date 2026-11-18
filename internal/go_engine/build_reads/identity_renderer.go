@@ -25,8 +25,8 @@ func NewIdentityRenderer(fileSet *token.FileSet, digest func(file string) string
 }
 
 // Object is object's identity. A package-level object is named by its name, an unexported one too, since the
-// package's own are what a differing file of it changes, and any other by its objectpath; one with neither is
-// unknown.
+// package's own are what a differing file of it changes, a method of a named type by the type's name and its own
+// (IdentityMethod), and any other by its objectpath; one with none of these is unknown.
 func (renderer *IdentityRenderer) Object(object types.Object) Identity {
 	renderer.Rendered++
 	identity := renderer.object(object)
@@ -51,6 +51,18 @@ func (renderer *IdentityRenderer) object(object types.Object) Identity {
 	}
 	if imported, isPackageName := object.(*types.PkgName); isPackageName {
 		return renderer.placed(Identity{Kind: IdentityImport, PackagePath: imported.Imported().Path()}, object.Pos())
+	}
+	if function, isFunction := object.(*types.Func); isFunction && function.Signature().Recv() != nil {
+		// An interface literal's method has no named type to be named by, and its objectpath indexes the interface's
+		// methods sorted by name, which no file's order shifts.
+		if named := namedAt(function.Signature().Recv().Type()); named != nil {
+			receiver := named.Origin().Obj()
+			if receiver.Pkg() == nil || receiver.Pkg().Scope().Lookup(receiver.Name()) != receiver {
+				return Identity{Kind: IdentityUnknown}
+			}
+			return renderer.placed(Identity{Kind: IdentityMethod, PackagePath: receiver.Pkg().Path(),
+				Path: objectpath.Path(receiver.Name()), Method: object.Name()}, object.Pos())
+		}
 	}
 	identity := Identity{Kind: IdentityObject, PackagePath: object.Pkg().Path()}
 	if object.Pkg().Scope().Lookup(object.Name()) == object {
