@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are fourteen.
+// The changes are fifteen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -203,6 +203,18 @@
 // inherits and reports the host's findings there as its own. The checker
 // never reads it. Unset, ResultOf holds no inheritance.
 //
+// The fifteenth is Options.FactHosts, the seam an extra build takes the
+// host's side of a package through for the facts' reach (#5vbs1np). An
+// extra build lints only the function bodies a difference reaches and
+// takes the host's findings for the rest, which holds only while every
+// fact and answer those bodies' rules read is equal in the build, so the
+// build's pass on the package compares the host's with its own before
+// any rule runs there. FactHosts answers that host's side for a package,
+// by its ID, and Options.FactHost keys it in the ResultOf of every pass
+// on that package, as Options.Recorded keys the package's reads. The
+// checker never reads it. Unset, or for a package FactHosts answers nil
+// of, ResultOf holds no host's side.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -278,6 +290,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 	// cohere: the inheritance Options.Inheritance hands every pass.
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	// cohere: the host's side Options.FactHosts hands a package's passes.
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 )
 
 // Options specifies options that control the analysis driver.
@@ -386,6 +400,17 @@ type Options struct {
 	// no inheritance.
 	Inheritance rule.Inheritance
 	Inherited   *analysis.Analyzer
+
+	// cohere: FactHosts, when set, answers the host's side of the package
+	// whose ID is packageId for the facts' reach in an extra build, nil
+	// for a package with none. It is called for every action as the
+	// action starts, on the action's goroutine, so it must be safe to
+	// call from several at once. FactHost, when FactHosts is set too,
+	// keys what it answers in the ResultOf of every pass on that package,
+	// a key never run, as Dependents is. Unset, ResultOf holds no host's
+	// side.
+	FactHosts func(packageId string) fact_reach.Host
+	FactHost  *analysis.Analyzer
 
 	// cohere: Reads, when set, holds the reads of each package whose
 	// fact reads are recorded: every ObjectFact and PackageFact an action
@@ -910,6 +935,13 @@ func (act *Action) execOnce() {
 	// cohere: Options.Recorded, the package's reads under Options.Reads.
 	if act.opts.Recorded != nil && act.opts.Reads != nil {
 		inputs[act.opts.Recorded] = act.opts.Reads[act.Package]
+	}
+	// cohere: Options.FactHost, the package's host's side under
+	// Options.FactHosts, absent for a package it answers nil of.
+	if act.opts.FactHost != nil && act.opts.FactHosts != nil {
+		if host := act.opts.FactHosts(act.Package.ID); host != nil {
+			inputs[act.opts.FactHost] = host
+		}
 	}
 
 	// cohere: a restored package's own facts come from the cache, in
