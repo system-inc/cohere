@@ -530,10 +530,12 @@ func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 	test.Fatal("the layout fixture has no unit Mapped")
 }
 
-// A unit after a //line directive in a file only the host compiles is a seed, though a reader sees it in a file no
-// build lists (#ss4t5g6): the directives fixture's p declares Helper an int in gen_unix.go under `//line gen.tmpl:1`
-// and a string in gen_windows.go, so on windows Helper and q's Prints, which formats it with %d, are dependent. Shared,
-// in a file both builds compile, and PrintsShared, which formats it, are not.
+// A unit after a //line directive in a file only the host compiles is a seed, though a reader sees it in a file both
+// builds compile (#ss4t5g6): the directives fixture's p declares Helper an int in gen_other.go under
+// `//line shared.go:1` and a string in gen_windows.go, so on windows Helper and q's Prints, which formats it with %d,
+// are dependent. A directive in a file the builds do not share can name any file, so every unit of its package is a
+// seed: Shared, in shared.go, and PrintsShared, which formats it, are dependent too, and only q's Alone, which reads
+// nothing of p, is not.
 func TestAUnitAfterALineDirectiveInAHostOnlyFileIsASeed(test *testing.T) {
 	test.Parallel()
 
@@ -554,9 +556,10 @@ func TestAUnitAfterALineDirectiveInAHostOnlyFileIsASeed(test *testing.T) {
 	}
 	expectVerdicts(test, judgedUnits, map[string]bool{
 		"func Helper":       true,
-		"func Shared":       false,
+		"func Shared":       true,
 		"func Prints":       true,
-		"func PrintsShared": false,
+		"func PrintsShared": true,
+		"func Alone":        false,
 	})
 }
 
