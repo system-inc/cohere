@@ -809,6 +809,9 @@ func (engine *pipeline) extraBuildRun(
 	}
 	// The facts' reach the last load's passes settled, whose result stands, and each package they failed to settle on,
 	// noted under the build's name.
+	if result.FactReachUnsettled != "" {
+		run.factReach = &buildFactReach{unsettled: result.FactReachUnsettled}
+	}
 	if result.FactReachSettled != nil {
 		run.factReach = newBuildFactReach(run.factHosts, result)
 		for _, crash := range result.FactReachCrashes {

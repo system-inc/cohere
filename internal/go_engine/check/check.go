@@ -137,9 +137,11 @@ type Options struct {
 	// FactReachSettle, when not nil, is the analyzer an extra build settles each package's standing bodies by for the
 	// facts' reach (#aswfm7a), standing_facts', which this package never imports: rooted beside the rules on every
 	// package the run analyzes from source, never on one it restores, its result on each is in
-	// Result.FactReachSettled. It is no rule and no report: it reports nothing, an entry holds nothing of it, and no
-	// cache key and no finding count reads it (checker.Options.Beside), so the findings and the entries are the same
-	// either way. Its failure on a package is in Result.FactReachCrashes, never a finding and never a failed run.
+	// Result.FactReachSettled. A run none of whose rules requires ctrlflow roots it nowhere, and says why in
+	// Result.FactReachUnsettled (settlingIn). It is no rule and no report: it reports nothing, an entry holds nothing
+	// of it, and no cache key and no finding count reads it (checker.Options.Beside), so the findings and the entries
+	// are the same either way. Its failure on a package is in Result.FactReachCrashes, never a finding and never a
+	// failed run.
 	FactReachSettle *analysis.Analyzer
 
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
@@ -266,6 +268,10 @@ type Result struct {
 	FactReachSettled map[string]any
 	FactReachCrashes []Crash
 
+	// FactReachUnsettled is why the run rooted no Options.FactReachSettle though it was set, empty when it did or was
+	// not asked to: "ctrlflow not in the run", for rules none of which requires ctrlflow (settlingIn).
+	FactReachUnsettled string
+
 	// Reloads are the IDs of the packages a question of a fact computed on demand reached restored, with no answer
 	// stored, sorted (#w7zmvat wave 3). Each question was answered with a placeholder, and its pass ran on, so one run
 	// names every package its passes need; the result is not the run's, and every package handed a placeholder is a
@@ -351,8 +357,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		}
 		roots = append(slices.Clone(analyzers), options.Report)
 	}
-	// The analyzer the facts' reach settles by is rooted apart from roots (checker.Options.Beside), which a rule's or
-	// the report's own root on a package would be instead.
+	// The analyzer the facts' reach settles by, only beside rules that run ctrlflow (settlingIn), is rooted apart from
+	// roots (checker.Options.Beside), which a rule's or the report's own root on a package would be instead.
+	settler, unsettled := settlingIn(analyzers, options.FactReachSettle)
 	if settle := options.FactReachSettle; settle != nil {
 		if settling, isRule := ruleOf[settle]; isRule {
 			return nil, fmt.Errorf("settling the facts' reach by %s: it is the analyzer of rule %s, so the run could "+
@@ -363,8 +370,8 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		}
 	}
 	wrapped := roots
-	if options.FactReachSettle != nil {
-		wrapped = append(slices.Clone(roots), options.FactReachSettle)
+	if settler != nil {
+		wrapped = append(slices.Clone(roots), settler)
 	}
 	if wrapError := wrapRuns(wrapped); wrapError != nil {
 		return nil, wrapError
@@ -382,7 +389,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Reads = options.Reads
 	checkerOptions.Inheritance = options.Inheritance
 	checkerOptions.FactHosts = options.FactHosts
-	checkerOptions.Beside = options.FactReachSettle
+	checkerOptions.Beside = settler
 	checkerOptions.ListingsRead = listingsRead
 	checkerOptions.Pool = options.Pool
 	// The walks run beside the rules, and on past Run's return, so no package's walk sits at the end of the run's
@@ -562,9 +569,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if len(result.Findings) == 0 {
 		result.Findings = nil
 	}
-	if options.FactReachSettle != nil {
+	if settler != nil {
 		result.FactReachSettled, result.FactReachCrashes = settledOf(graphs)
 	}
+	result.FactReachUnsettled = unsettled
 	if options.Report != nil {
 		// The report is the last of roots.
 		result.Reports, result.ReportCrashes, result.ReportsRestored = reportsOf(options.Report, analyzed, session,

@@ -122,6 +122,10 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 // functions of a body that left with no record of a kind, by kind, and the bodies the facts took out of the standing
 // set.
 type buildFactReach struct {
+	// unsettled is why the build settled nothing though it was asked to (check.Result.FactReachUnsettled), and every
+	// other count is zero then.
+	unsettled string
+
 	sides             int
 	settled           int
 	crashed           int
@@ -178,6 +182,10 @@ func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *
 
 // writeBuildFactReach writes one build's census of the facts' reach to written.
 func writeBuildFactReach(written *strings.Builder, census *buildFactReach) {
+	if census.unsettled != "" {
+		fmt.Fprintf(written, "  fact reach: no settle: %s\n", census.unsettled)
+		return
+	}
 	fmt.Fprintf(written, "  fact reach: sides %d, settled %d, crashed %d\n", census.sides, census.settled,
 		census.crashed)
 	fmt.Fprintf(written, "    functions compared %d, named %d; imported asked %d, named %d; order bound named %d\n",

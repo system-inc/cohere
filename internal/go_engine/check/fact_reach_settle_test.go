@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/packages"
 	"honnef.co/go/tools/analysis/facts/deprecated"
@@ -55,7 +56,7 @@ func settledPaths(analyzed []*packages.Package) map[string]any {
 // out, so a run with it compares with one without.
 func withoutSettled(result *Result) Result {
 	compared := withoutTimesOrCache(result)
-	compared.FactReachSettled, compared.FactReachCrashes = nil, nil
+	compared.FactReachSettled, compared.FactReachCrashes, compared.FactReachUnsettled = nil, nil, ""
 	return compared
 }
 
@@ -115,7 +116,8 @@ func requireSameStores(
 func TestRunRootsTheFactReachAnalyzerBesideTheRulesAndHandsBackItsResults(test *testing.T) {
 	test.Parallel()
 
-	rules := []rule.Rule{houseRule(targetAnalyzer), packageClauseRule}
+	// reachProbe's rule requires ctrlflow, without which a run settles nothing (settlingIn).
+	rules := []rule.Rule{houseRule(targetAnalyzer), packageClauseRule, houseRule(reachProbeAnalyzer)}
 	var runs atomic.Int32
 	without := runRules(test, Options{}, rules...)
 	with := runRules(test, Options{FactReachSettle: settlingAnalyzer("settling_live", &runs, false)}, rules...)
@@ -146,7 +148,7 @@ func TestTheFactReachAnalyzerChangesNoEntryAndNeverRunsOnARestoredPackage(test *
 	loadedFixtures(test)
 	counts := &runCounts{}
 	rules := []rule.Rule{countedRule("countedSettled", counts), houseRule(targetAnalyzer), packageClauseRule,
-		houseRule(markedAnalyzer)}
+		houseRule(markedAnalyzer), houseRule(reachProbeAnalyzer)}
 	plainDirectory, settledDirectory := test.TempDir(), test.TempDir()
 	plainCaching, settledCaching := cachingAt(plainDirectory, rules), cachingAt(settledDirectory, rules)
 	var runs atomic.Int32
@@ -194,57 +196,74 @@ func TestTheFactReachAnalyzerChangesNoEntryAndNeverRunsOnARestoredPackage(test *
 // cold run rooting it writes the same entries under the same keys as one without it, with rules that leave printf
 // and SA1019 out. With no host's side handed, it settles nothing, and hands back an empty result on each package.
 //
-// One rule requires ctrlflow, reachProbe's, as every real run's rules do: standing_facts requires ctrlflow too, and
-// where no rule does, its running there has the resolver learn the package, and the save then writes the package's
-// answers, each kind complete and empty, into an entry a run without it writes none of.
+// It requires ctrlflow too, whose run on a package has the resolver learn it, and the save then writes the package's
+// answers, each kind complete and empty, into an entry a run without it writes none of. So a run whose rules require
+// no ctrlflow roots it nowhere and says why, and its entries are the plain run's too; with reachProbe's rule, which
+// requires ctrlflow, as every real run's rules do, it is rooted on every package.
 func TestStandingFactsRunsPrintfForItselfAndChangesNoEntry(test *testing.T) {
 	test.Parallel()
 
 	loadedFixtures(test)
-	counts := &runCounts{}
-	rules := []rule.Rule{countedRule("countedStanding", counts), houseRule(targetAnalyzer), packageClauseRule,
-		houseRule(markedAnalyzer), houseRule(reachProbeAnalyzer)}
-	for _, enabled := range rules {
-		if enabled.Analyzer == printf.Analyzer || requires(enabled.Analyzer, printf.Analyzer) ||
-			requires(enabled.Analyzer, deprecated.Analyzer) {
-			test.Fatalf("the rule %s is or requires printf or the deprecation facts, which this test runs without",
-				enabled.Name)
-		}
+	for _, each := range []struct {
+		name     string
+		ctrlflow bool
+	}{{"without ctrlflow", false}, {"with ctrlflow", true}} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+			counts := &runCounts{}
+			rules := []rule.Rule{countedRule("countedStanding", counts), houseRule(targetAnalyzer),
+				packageClauseRule, houseRule(markedAnalyzer)}
+			if each.ctrlflow {
+				rules = append(rules, houseRule(reachProbeAnalyzer))
+			}
+			ranCtrlflow := false
+			for _, enabled := range rules {
+				if requiresAnalyzer(enabled.Analyzer, printf.Analyzer) ||
+					requiresAnalyzer(enabled.Analyzer, deprecated.Analyzer) {
+					test.Fatalf("the rule %s is or requires printf or the deprecation facts", enabled.Name)
+				}
+				ranCtrlflow = ranCtrlflow || requiresAnalyzer(enabled.Analyzer, ctrlflow.Analyzer)
+			}
+			if ranCtrlflow != each.ctrlflow {
+				test.Fatalf("the rules require ctrlflow %t, want %t", ranCtrlflow, each.ctrlflow)
+			}
+			plainDirectory, settledDirectory := test.TempDir(), test.TempDir()
+			plainCaching, settledCaching := cachingAt(plainDirectory, rules), cachingAt(settledDirectory, rules)
+			run := func(analyzed []*packages.Package, caching *Caching, settle *analysis.Analyzer) *Result {
+				test.Helper()
+				result, runError := Run(analyzed, rules, Options{Cache: NewCacheSession(caching, rules),
+					FactReachSettle: settle})
+				if runError != nil {
+					test.Fatalf("running %d rules: %v", len(rules), runError)
+				}
+				return result
+			}
+			plain := run(ownLoad(test, "."), plainCaching, nil)
+			analyzed := ownLoad(test, ".")
+			settled := run(analyzed, settledCaching, standing_facts.Analyzer)
+			if each.ctrlflow {
+				// A package the second wave analyzes over an import the first wave's entry restores gets no printf
+				// facts of it, the rule being off, so its printf fails, and standing_facts with it: a crash, which
+				// lints the package whole, never a finding.
+				if len(settled.FactReachSettled) == 0 ||
+					len(settled.FactReachSettled)+len(settled.FactReachCrashes) != len(analyzed) ||
+					settled.FactReachUnsettled != "" {
+					test.Errorf("standing_facts settled %d of %d packages, crashing on %+v, unsettled %q, want each "+
+						"settled or crashed, one settled at least", len(settled.FactReachSettled), len(analyzed),
+						settled.FactReachCrashes, settled.FactReachUnsettled)
+				}
+			} else if settled.FactReachSettled != nil || settled.FactReachUnsettled != withoutCtrlflow {
+				test.Errorf("with no rule requiring ctrlflow standing_facts settled %v, unsettled %q, want nothing, "+
+					"for %q", settled.FactReachSettled, settled.FactReachUnsettled, withoutCtrlflow)
+			}
+			if !reflect.DeepEqual(settled.Cache, plain.Cache) || !reflect.DeepEqual(withoutSettled(settled),
+				withoutSettled(plain)) {
+				test.Errorf("with standing_facts the cold run is\n%+v\nwant the run without it\n%+v",
+					withoutSettled(settled), withoutSettled(plain))
+			}
+			requireSameStores(test, plainDirectory, plainCaching, settledDirectory, settledCaching)
+		})
 	}
-	plainDirectory, settledDirectory := test.TempDir(), test.TempDir()
-	plainCaching, settledCaching := cachingAt(plainDirectory, rules), cachingAt(settledDirectory, rules)
-	run := func(analyzed []*packages.Package, caching *Caching, settle *analysis.Analyzer) *Result {
-		test.Helper()
-		result, runError := Run(analyzed, rules, Options{Cache: NewCacheSession(caching, rules),
-			FactReachSettle: settle})
-		if runError != nil {
-			test.Fatalf("running %d rules: %v", len(rules), runError)
-		}
-		return result
-	}
-	plain := run(ownLoad(test, "."), plainCaching, nil)
-	analyzed := ownLoad(test, ".")
-	settled := run(analyzed, settledCaching, standing_facts.Analyzer)
-	if len(settled.FactReachSettled) == 0 {
-		test.Fatalf("standing_facts settled none of %d packages, crashing on %+v, so printf ran beside the rules on "+
-			"none", len(analyzed), settled.FactReachCrashes)
-	}
-	if !reflect.DeepEqual(settled.Cache, plain.Cache) || !reflect.DeepEqual(withoutSettled(settled),
-		withoutSettled(plain)) {
-		test.Errorf("with standing_facts the cold run is\n%+v\nwant the run without it\n%+v", withoutSettled(settled),
-			withoutSettled(plain))
-	}
-	requireSameStores(test, plainDirectory, plainCaching, settledDirectory, settledCaching)
-}
-
-// requires is whether analyzer requires wanted, directly or through what it requires.
-func requires(analyzer *analysis.Analyzer, wanted *analysis.Analyzer) bool {
-	for _, required := range analyzer.Requires {
-		if required == wanted || requires(required, wanted) {
-			return true
-		}
-	}
-	return false
 }
 
 // Options.FactReachSettle failing on every package fails no run and is no finding (#aswfm7a): each package is in
@@ -253,7 +272,7 @@ func TestTheFactReachAnalyzerFailingIsNoCrashOfTheRun(test *testing.T) {
 	test.Parallel()
 
 	loadedFixtures(test)
-	rules := []rule.Rule{houseRule(targetAnalyzer), packageClauseRule}
+	rules := []rule.Rule{houseRule(targetAnalyzer), packageClauseRule, houseRule(reachProbeAnalyzer)}
 	var runs atomic.Int32
 	analyzed := ownLoad(test, ".")
 	failed, runError := Run(analyzed, rules, Options{Cache: NewCacheSession(testCaching(test, rules), rules),
