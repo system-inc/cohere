@@ -247,7 +247,9 @@ func (reacher *bodyReacher) carryLoadMode(record *build_reads.FunctionUses, decl
 // of its value specs read what the load mode reaches, as carryLoadMode tells of a recorded one's: `const Scale =
 // math.Pi / 180` in a package checked for its types alone holds the other load's value, and every use of Scale
 // elsewhere reaches. Carrying each is wider than needed, costing re-checks and never a body left unreached. A build
-// loading every package as the host does carries nothing, since no value can then hold another load's.
+// that checks from source exactly the packages the host checked from source carries nothing, since no value can then
+// hold another load's. One that lacks a package the host checked from source carries every value: fromSource names no
+// package the build lacks, so identifiedLoadModeDiffers reads that package as loaded in another mode, failing wide.
 func (reacher *bodyReacher) carryUnrecorded(own *types.Package) {
 	if own == nil || !reacher.anyLoadModeDiffers() {
 		return

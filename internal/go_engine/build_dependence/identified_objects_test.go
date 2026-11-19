@@ -46,3 +46,39 @@ func TestAnObjectIdentifiedObjectsCannotNameAnswersBothBits(test *testing.T) {
 		}
 	}
 }
+
+// IdentifiedObjects reads an object of a package the graph took from a record by its name there (#w72zxtq), and an
+// object no unit of the record declares through its type, or wide where it has no name: the methods fixture's graph,
+// every package added from its record's bytes, is judged on linux, where Plain gains Describe and Wrapper, which
+// embeds Plain, moves with it. Wrapped's parameter has a name, its objectpath, but no node, and reads Wrapper through
+// its type, both bits set; a local of an int has no name at all, so not even its type is read, and it answers both
+// bits set though an int reads nothing the build changes.
+func TestAnObjectNoRecordDeclaresIsReadThroughItsTypeOrFailsWide(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "methods", linuxBuild)
+	held, isHeld := judged.host["example.com/methods"]
+	if !isHeld {
+		test.Fatal("the methods fixture has no package example.com/methods")
+	}
+	identified := NewIdentifiedObjects(recordedGraphOf(test, graphOf(judged.host, nil)).Against(judged.difference),
+		map[*types.Package]string{held.Types: held.ID})
+	wrapped, isFunction := held.Types.Scope().Lookup("Wrapped").(*types.Func)
+	if !isFunction {
+		test.Fatal("the methods fixture declares no func Wrapped")
+	}
+	for _, each := range []struct {
+		name   string
+		object types.Object
+		want   Bits
+	}{
+		{"Wrapped's parameter, which no unit declares", wrapped.Signature().Params().At(0),
+			Bits{Name: true, Underlying: true}},
+		{"a held package's local of an int, which no name can name",
+			types.NewVar(token.NoPos, held.Types, "local", types.Typ[types.Int]), Bits{Name: true, Underlying: true}},
+	} {
+		if got := identified.Bits(each.object); got != each.want {
+			test.Errorf("%s answers %+v, want %+v", each.name, got, each.want)
+		}
+	}
+}
