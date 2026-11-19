@@ -131,14 +131,14 @@ func objectDependence(
 				differing.SharedFiles = append(differing.SharedFiles, file)
 			} else {
 				differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
-				differing.LineDirective = differing.LineDirective ||
+				differing.EveryUnitDependent = differing.EveryUnitDependent ||
 					build_dependence.HoldsLineDirective(file, os.ReadFile)
 			}
 		}
 		for _, file := range built.Syntax {
 			if name := built.Fset.File(file.FileStart).Name(); !slices.Contains(hosted.GoFiles, name) {
 				differing.BuildOnlyFiles = append(differing.BuildOnlyFiles, file)
-				differing.LineDirective = differing.LineDirective ||
+				differing.EveryUnitDependent = differing.EveryUnitDependent ||
 					build_dependence.HoldsLineDirective(name, os.ReadFile)
 			}
 		}

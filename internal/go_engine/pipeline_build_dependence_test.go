@@ -53,8 +53,9 @@ func findingLines(stream string) []string {
 // libraryDependence is the library's own judgment of the fixture at root: the host and the build loaded whole with
 // go/packages under the environments the engine's run loaded them under, the graph built from every package of the
 // host's, the module's the workspace, and the difference of the two loads' files as written, a build-only file parsed
-// for its syntax alone. It shares appendParsed with the engine, the one parse both must make alike, and the scan for a
-// line directive in each file of a package both have that the two do not share (build_dependence.HoldsLineDirective).
+// for its syntax alone. It shares appendParsed with the engine, the one parse both must make alike, and marks a
+// package both have as the engine does: by a build-only file that parse cannot read or parse, and by a line directive
+// in a file the two do not share (build_dependence.HoldsLineDirective).
 func libraryDependence(test *testing.T, root string, hostEnvironment []string, buildEnvironment []string) Counts {
 	test.Helper()
 	load := func(environment []string) map[string]*packages.Package {
@@ -101,9 +102,10 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 		// nodes count alike.
 		for _, file := range buildPackage.GoFiles {
 			if !isShared || !slices.Contains(hostPackage.GoFiles, file) {
-				differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file, os.ReadFile)
-				differing.LineDirective = differing.LineDirective ||
-					isShared && build_dependence.HoldsLineDirective(file, os.ReadFile)
+				var parsed bool
+				differing.BuildOnlyFiles, parsed = appendParsed(differing.BuildOnlyFiles, fileSet, file, os.ReadFile)
+				differing.EveryUnitDependent = differing.EveryUnitDependent ||
+					isShared && (!parsed || build_dependence.HoldsLineDirective(file, os.ReadFile))
 			}
 		}
 		if isShared {
@@ -112,12 +114,13 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 					differing.SharedFiles = append(differing.SharedFiles, file)
 				} else {
 					differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
-					differing.LineDirective = differing.LineDirective ||
+					differing.EveryUnitDependent = differing.EveryUnitDependent ||
 						build_dependence.HoldsLineDirective(file, os.ReadFile)
 				}
 			}
 		}
-		if !isShared || len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
+		if !isShared || len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 ||
+			differing.EveryUnitDependent {
 			difference.Packages[identifier] = differing
 		}
 	}

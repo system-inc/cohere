@@ -388,9 +388,9 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 				}
 			}
 		}
-		// A build-only file that holds a directive and cannot be read or parsed is left out of BuildOnlyFiles
-		// (appendParsed) but still marks the package, which may differ by that file alone.
-		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.LineDirective {
+		// A build-only file that cannot be read or parsed is left out of BuildOnlyFiles (appendParsed) but still marks
+		// the package, which may differ by that file alone.
+		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.EveryUnitDependent {
 			difference.Packages[identifier] = differing
 		}
 	}
@@ -401,7 +401,9 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 		difference.BuildOnlyPackages[identifier] = true
 		buildOnly := build_dependence.PackageDifference{Workspace: engine.described.hasFileInScope(each)}
 		for _, file := range each.GoFiles {
-			buildOnly.BuildOnlyFiles = appendParsed(buildOnly.BuildOnlyFiles, fileSet, file, read)
+			// Ignored: a package only the build has has no unit of the host's to seed, and a file of it that cannot
+			// be read or parsed only goes uncounted.
+			buildOnly.BuildOnlyFiles, _ = appendParsed(buildOnly.BuildOnlyFiles, fileSet, file, read)
 		}
 		difference.Packages[identifier] = buildOnly
 	}
@@ -483,8 +485,8 @@ func standardLibraryDifference(
 			continue
 		}
 		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, read, holdsLineDirective)
-		// Kept when the directive is its one difference, as dependenceOf keeps the host's packages.
-		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.LineDirective {
+		// Kept when the mark is its one difference, as dependenceOf keeps the host's packages.
+		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.EveryUnitDependent {
 			difference.Packages[identifier] = differing
 		}
 	}
@@ -493,10 +495,11 @@ func standardLibraryDifference(
 
 // filesDiffer is how one package's files differ, as written: hostFiles the host compiles and builtFiles the build
 // does, each host-only file named and each shared one too, by which a unit a //line directive names apart is seeded,
-// and each build-only file parsed for its syntax alone from the bytes read gives (appendParsed). The host-only files,
-// then the build-only ones, are scanned by holdsLineDirective, by path as written, until one holds a directive, which
-// could name a shared file, so it marks the package (PackageDifference.LineDirective); the files after it are not
-// scanned, since the mark is all a scan can add.
+// and each build-only file parsed for its syntax alone from the bytes read gives (appendParsed). A build-only file that
+// cannot be read or parsed marks the package (PackageDifference.EveryUnitDependent), since what it declares is unknown.
+// The host-only files, then the build-only ones, are scanned by holdsLineDirective, by path as written, until one
+// holds a directive, which could name a shared file, so it marks the package too; once it is marked no file is
+// scanned, since the mark is all a scan can add, though each build-only file is still parsed.
 func filesDiffer(
 	hostFiles []string,
 	builtFiles []string,
@@ -510,38 +513,40 @@ func filesDiffer(
 			differing.SharedFiles = append(differing.SharedFiles, file)
 		} else {
 			differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
-			differing.LineDirective = differing.LineDirective || holdsLineDirective(file)
+			differing.EveryUnitDependent = differing.EveryUnitDependent || holdsLineDirective(file)
 		}
 	}
 	for _, file := range builtFiles {
 		if !slices.Contains(hostFiles, file) {
-			differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file, read)
-			differing.LineDirective = differing.LineDirective || holdsLineDirective(file)
+			var parsed bool
+			differing.BuildOnlyFiles, parsed = appendParsed(differing.BuildOnlyFiles, fileSet, file, read)
+			differing.EveryUnitDependent = differing.EveryUnitDependent || !parsed || holdsLineDirective(file)
 		}
 	}
 	return differing
 }
 
-// appendParsed is files with file's syntax after them, parsed alone from the bytes read gives, when it parses. The
+// appendParsed is files with file's syntax after them, parsed alone from the bytes read gives, and whether it was. The
 // engine's read is the run's held bytes (sourceReader), those the build's load parsed, never the disk's again, which a
 // file rewritten once the run read it would make differ, hiding a method or a name the build was checked with. A
 // build-only file that cannot be read or does not parse fails the build's own load, whose type errors the record
-// already holds, so its units are left uncounted.
+// already holds, so its units are left uncounted, and it is reported unparsed, for its package to be marked
+// (filesDiffer).
 func appendParsed(
 	files []*ast.File,
 	fileSet *token.FileSet,
 	file string,
 	read func(file string) ([]byte, error),
-) []*ast.File {
+) ([]*ast.File, bool) {
 	source, readError := read(file)
 	if readError != nil {
-		return files
+		return files, false
 	}
 	parsed, parseError := parser.ParseFile(fileSet, file, source, parser.SkipObjectResolution)
 	if parseError != nil || parsed == nil {
-		return files
+		return files, false
 	}
-	return append(files, parsed)
+	return append(files, parsed), true
 }
 
 // dependenceCounts is one scope's counts as the record writes them.

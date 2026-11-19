@@ -150,13 +150,13 @@ func differenceOf(host loadedBuild, build loadedBuild) Difference {
 				differing.SharedFiles = append(differing.SharedFiles, file)
 			} else {
 				differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
-				differing.LineDirective = differing.LineDirective || HoldsLineDirective(file, os.ReadFile)
+				differing.EveryUnitDependent = differing.EveryUnitDependent || HoldsLineDirective(file, os.ReadFile)
 			}
 		}
 		for _, file := range built.Syntax {
 			if name := built.Fset.File(file.FileStart).Name(); !slices.Contains(hosted.GoFiles, name) {
 				differing.BuildOnlyFiles = append(differing.BuildOnlyFiles, file)
-				differing.LineDirective = differing.LineDirective || HoldsLineDirective(name, os.ReadFile)
+				differing.EveryUnitDependent = differing.EveryUnitDependent || HoldsLineDirective(name, os.ReadFile)
 			}
 		}
 		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
