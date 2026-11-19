@@ -75,7 +75,8 @@ func expectVerdicts(test *testing.T, judged map[string]bool, want map[string]boo
 
 // On linux, the layout fixture's Size is 2 where the host's is 4. Every unit that reads Size by value, or touches the
 // underlying of a type whose layout hangs on it, is dependent; a unit that hands such a type on by pointer, uses it by
-// name, or merely calls a function whose body reads Size is not. The dependency's Width differs the same way.
+// name, or merely calls a function whose body reads Size is not. The dependency's Width differs the same way. Mapped,
+// which a reader sees in mapped.source, a file neither build lists, is a seed of a package with a host-only file.
 func TestLayoutVerdictsOnLinux(test *testing.T) {
 	test.Parallel()
 
@@ -109,7 +110,7 @@ func TestLayoutVerdictsOnLinux(test *testing.T) {
 		"func Cells":             true,
 		"func Labelled":          false,
 		"func CallsWide":         false,
-		"func Mapped":            false,
+		"func Mapped":            true,
 		"value Width":            true,
 		"type Cell":              true,
 		"value Label":            false,
@@ -117,7 +118,8 @@ func TestLayoutVerdictsOnLinux(test *testing.T) {
 	})
 }
 
-// Under the tag build, only Mode's file differs, so only Mode and what reads it are dependent.
+// Under the tag build, only Mode's file differs, so only Mode and what reads it are dependent, and Mapped, seen in a
+// file neither build lists, in a package with a host-only file.
 func TestLayoutVerdictsUnderATag(test *testing.T) {
 	test.Parallel()
 
@@ -128,6 +130,7 @@ func TestLayoutVerdictsUnderATag(test *testing.T) {
 	}
 	want["value Mode"] = true
 	want["func Describe"] = true
+	want["func Mapped"] = true
 	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), want)
 }
 
@@ -236,7 +239,7 @@ func TestLayoutCountsOnLinux(test *testing.T) {
 		counts ScopeCounts
 		want   ScopeCounts
 	}{
-		{"workspace", counts.Workspace, ScopeCounts{Units: 29, DependentUnits: 17, Nodes: nodes[true], Packages: 1,
+		{"workspace", counts.Workspace, ScopeCounts{Units: 29, DependentUnits: 18, Nodes: nodes[true], Packages: 1,
 			DependentPackages: 1, DependentPackageNodes: nodes[true], BuildOnlyUnits: 2}},
 		{"dependencies", counts.Dependencies, ScopeCounts{Units: 4, DependentUnits: 3, Nodes: nodes[false],
 			Packages: 1, DependentPackages: 1, DependentPackageNodes: nodes[false], BuildOnlyUnits: 1}},
@@ -487,7 +490,8 @@ func TestOnlyUnselectedUnexportedFieldsAreExempt(test *testing.T) {
 // A unit under a //line directive is named by the file a reader sees, as a cgo package's units are named by the .go
 // file the cgo tool translated: the layout fixture's Mapped sits in mapped.go under `//line mapped.source:1`, and the
 // judgment knows it in mapped.source, at its offset in mapped.go, and by mapped.go's name knows no unit there, which
-// it never calls independent.
+// it never calls independent. On linux layout has a file only the host compiles, and mapped.source is no file both
+// builds compile, so Mapped is a seed (#ss4t5g6).
 func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 	test.Parallel()
 
@@ -505,8 +509,15 @@ func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 						seen)
 				}
 				offset := tokenFile.Offset(unit.Pos())
-				if judged.dependence.UnitDependent(loaded.ID, seen, offset) {
-					test.Errorf("want Mapped independent where a reader sees it, %s at %d", seen, offset)
+				if index, isUnit := judged.dependence.UnitContaining(loaded.ID, seen, offset); !isUnit ||
+					judged.dependence.Units()[index].File != seen {
+					test.Errorf("want Mapped's unit known where a reader sees it, %s at %d", seen, offset)
+				}
+				if !judged.dependence.UnitDependent(loaded.ID, seen, offset) {
+					test.Errorf("want Mapped a seed where a reader sees it, %s at %d", seen, offset)
+				}
+				if _, isUnit := judged.dependence.UnitContaining(loaded.ID, tokenFile.Name(), offset); isUnit {
+					test.Errorf("want no unit known in %s at %d", tokenFile.Name(), offset)
 				}
 				if !judged.dependence.UnitDependent(loaded.ID, tokenFile.Name(), offset) {
 					test.Errorf("want no unit known in %s at %d, which is never read as independent",
@@ -517,6 +528,39 @@ func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 		}
 	}
 	test.Fatal("the layout fixture has no unit Mapped")
+}
+
+// A unit after a //line directive in a file only the host compiles is a seed, though a reader sees it in a file both
+// builds compile (#ss4t5g6): the directives fixture's p declares Helper an int in gen_other.go under
+// `//line shared.go:1` and a string in gen_windows.go, so on windows Helper and q's Prints, which formats it with %d,
+// are dependent. A directive in a file the builds do not share can name any file, so every unit of its package is a
+// seed: Shared, in shared.go, and PrintsShared, which formats it, are dependent too, and only q's Alone, which reads
+// nothing of p, is not.
+func TestAUnitAfterALineDirectiveInAHostOnlyFileIsASeed(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "directives", fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
+	judgedUnits := map[string]bool{}
+	for _, identifier := range []string{"example.com/directives/p", "example.com/directives/q"} {
+		loaded, isLoaded := judged.host[identifier]
+		if !isLoaded {
+			test.Fatalf("the directives fixture's host has no package %s", identifier)
+		}
+		for _, file := range loaded.Syntax {
+			tokenFile := loaded.Fset.File(file.FileStart)
+			for _, unit := range unitDeclarations(file) {
+				judgedUnits[unitName(unit)] = judged.dependence.UnitDependent(loaded.ID,
+					tokenFile.Position(unit.Pos()).Filename, tokenFile.Offset(unit.Pos()))
+			}
+		}
+	}
+	expectVerdicts(test, judgedUnits, map[string]bool{
+		"func Helper":       true,
+		"func Shared":       true,
+		"func Prints":       true,
+		"func PrintsShared": true,
+		"func Alone":        false,
+	})
 }
 
 // An array's length in a spelled type is a value, so whatever it reads is read in full, as a constant's value is:

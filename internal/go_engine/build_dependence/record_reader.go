@@ -165,7 +165,10 @@ func (reader *recordReader) unit(path string, objects int) recordedUnit {
 	}
 	unit.start, unit.end, unit.nodes = int(start), int(start+length), int(nodes)
 	unit.universeNames = reader.number()
-	if reader.number() == 1 {
+	unitFlags := reader.number()
+	unit.fromCgo = unitFlags&2 != 0
+	unit.withheld = unitFlags&4 != 0
+	if unitFlags&1 != 0 {
 		unit.receiver = reader.text()
 	}
 	unit.declares = make([]recordedObject, reader.count())

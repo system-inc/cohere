@@ -14,6 +14,7 @@ func (graph *Graph) Against(difference Difference) *Dependence {
 		answers:    make([]uint8, len(resolved.externalObjects)),
 	}
 	judging.seedFiles()
+	judging.seedWithheld()
 	judging.seedMethodSets()
 	judging.seedShadowed()
 	for _, edge := range resolved.externalEdges {

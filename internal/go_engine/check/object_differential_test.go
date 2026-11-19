@@ -94,7 +94,8 @@ func loadObjects(test *testing.T, directory string, environment []string, patter
 // objectDependence is block 1's judgment of build against host: the graph of every package the host loaded, each
 // added from a goroutine of its own, workspace saying which belong to the checked modules, judged against the
 // difference of the two loads' files as block 1's fixture tests take it (build_dependence's differenceOf), each file
-// matched by its path as written, a build-only one taken from the build's syntax.
+// matched by its path as written, a build-only one taken from the build's syntax, and each file the two do not share
+// scanned for a line directive as the disk holds it, the bytes the loads parsed (build_dependence.HoldsLineDirective).
 func objectDependence(
 	host objectLoad,
 	build objectLoad,
@@ -103,7 +104,7 @@ func objectDependence(
 	graph := build_dependence.NewGraph()
 	var group sync.WaitGroup
 	for _, loaded := range host.packages {
-		group.Go(func() { graph.AddPackage(loaded, workspace(loaded)) })
+		group.Go(func() { graph.AddPackage(loaded, workspace(loaded), nil) })
 	}
 	group.Wait()
 	difference := build_dependence.Difference{
@@ -126,13 +127,19 @@ func objectDependence(
 		}
 		var differing build_dependence.PackageDifference
 		for _, file := range hosted.GoFiles {
-			if !slices.Contains(built.GoFiles, file) {
+			if slices.Contains(built.GoFiles, file) {
+				differing.SharedFiles = append(differing.SharedFiles, file)
+			} else {
 				differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
+				differing.EveryUnitDependent = differing.EveryUnitDependent ||
+					build_dependence.HoldsLineDirective(file, os.ReadFile)
 			}
 		}
 		for _, file := range built.Syntax {
-			if !slices.Contains(hosted.GoFiles, built.Fset.File(file.FileStart).Name()) {
+			if name := built.Fset.File(file.FileStart).Name(); !slices.Contains(hosted.GoFiles, name) {
 				differing.BuildOnlyFiles = append(differing.BuildOnlyFiles, file)
+				differing.EveryUnitDependent = differing.EveryUnitDependent ||
+					build_dependence.HoldsLineDirective(name, os.ReadFile)
 			}
 		}
 		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
