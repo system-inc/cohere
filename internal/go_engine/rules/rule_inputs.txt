@@ -3,6 +3,11 @@
 # Composes, as inputs.go defines each), and FullKind when the inventory's section 2 found it reading more of a named
 # type than its name. Sorted by name.
 #
+# A constant's value is part of what a unit names, so a unit that reads a constant's folded value is PerUnit, the
+# body reach reaching it by its Constant reason when the value differs. A same-package callee's no-return is a fact the
+# unit reads, though ctrlflow computes it in place, so a unit whose findings turn on it is PerUnit too, the facts' reach
+# taking it out of the standing set when the fact differs (#3rcmc3h).
+#
 # TestEveryRegisteredRuleHasItsInputsInTheTable holds the registry to this table both ways: a rule with no line here
 # fails, so a new rule is read for its inputs before it lands, and so does a line naming no registered rule. A change
 # here is a change to the inventory, made with the reading behind it, and cohere-dev's land gate isolates every rule a
