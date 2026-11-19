@@ -15,10 +15,10 @@ import (
 // for a rule that is never confined, one the inputs table declares Composes, whose run hears every function and is
 // never confined on a file. The code cannot tell such a read from one of the handed function's own, a closure's
 // included, since both read a *Function's Blocks, so the list is kept by hand: a listener that comes to read another
-// function's blocks joins it with its reason, or calls Build.
-var readsAnotherFunctionsBlocks = map[string]string{
-	rule.Namespace + "SA2002": "reads the body of the function a go statement starts (test_failure_in_goroutine.Check)",
-}
+// function's blocks joins it with its reason, or calls Build. None does today: SA2002, which read the body of the
+// function a go statement starts, asks the fact resolver for that function's stopping calls, and the resolver builds
+// the function it reads (test_failure_in_goroutine.callsIn).
+var readsAnotherFunctionsBlocks = map[string]string{}
 
 // Every rule that reads another function's blocks without building it is a registered rule listening on the
 // representation's walk, and one the inputs table declares Composes, so it is never confined and the dispatcher builds
