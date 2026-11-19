@@ -101,6 +101,7 @@ func checkedFactReachFixture(
 	}
 	fixture.own = own
 	reads := &build_reads.Reads{}
+	reads.RecordFunctionUses()
 	reads.RecordTypes(own, info, files)
 	record, isRecorded := reads.FunctionUses()
 	if !isRecorded {

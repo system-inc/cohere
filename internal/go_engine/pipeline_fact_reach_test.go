@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 )
 
-// Under the body reach census, with `--other-builds --build-dependence`, the host's lint hands back what its run held
+// Under the body reach census, with `--build-dependence`, the host's lint hands back what its run held
 // of its facts for the facts' reach (#aswfm7a), and the run makes of it, as the builds start, the body-reach fixture's
 // one package's side, from its record and its answers, then lets the capture go. A run without the census asks for
 // none and makes no side, its findings the same as the census's.
@@ -22,9 +22,9 @@ func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testi
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	on, onStream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 		engine.bodyReachCensus = censusFile
-	}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+	}, "--no-cache", "--no-fix", "--build-dependence")
 	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
-		"--no-fix", "--other-builds", "--build-dependence")
+		"--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || len(off.buildRuns) != 2 {
 		test.Fatalf("want the host's build and windows's in both runs, got %d and %d runs", len(on.buildRuns),
@@ -67,9 +67,9 @@ func TestEachBuildHandsItsPassesTheHostsSideWithItsUnreachedBodiesStanding(test 
 
 	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
 		func(engine *pipeline) { engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt") }, "--no-cache",
-		"--no-fix", "--other-builds", "--build-dependence")
+		"--no-fix", "--build-dependence")
 	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings, "--no-fix",
-		"--other-builds", "--build-dependence")
+		"--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyReach == nil {
 		test.Fatalf("want the host's build and windows's census, got %d runs", len(on.buildRuns))
@@ -107,10 +107,9 @@ func TestEachBuildSettlesItsStandingBodiesAndTheCensusCountsThem(test *testing.T
 
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
-		func(engine *pipeline) { engine.bodyReachCensus = censusFile }, "--no-cache", "--no-fix", "--other-builds",
-		"--build-dependence")
+		func(engine *pipeline) { engine.bodyReachCensus = censusFile }, "--no-cache", "--no-fix", "--build-dependence")
 	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings, "--no-fix",
-		"--other-builds", "--build-dependence")
+		"--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].factReach == nil {
 		test.Fatalf("want windows's census of the facts' reach, got %d runs", len(on.buildRuns))
@@ -144,10 +143,10 @@ func TestAWarmRunGivesARestoredPackageNoSideForTheFactsReach(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
-	runOverConfigured(test, root, exitFindings, nil, "--no-fix", "--other-builds", "--build-dependence")
+	runOverConfigured(test, root, exitFindings, nil, "--no-fix", "--build-dependence")
 	warm, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-	}, "--no-fix", "--other-builds", "--build-dependence")
+	}, "--no-fix", "--build-dependence")
 
 	if warm.factReachSides == nil {
 		test.Fatal("the warm run under the census made no sides for the facts' reach")
@@ -172,7 +171,7 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 		func(engine *pipeline) {
 			engine.bodyReachCensus = censusFile
 			engine.bodyDifferential = true
-		}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+		}, "--no-cache", "--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
 		test.Fatalf("want windows's body differential, got %d runs", len(on.buildRuns))
