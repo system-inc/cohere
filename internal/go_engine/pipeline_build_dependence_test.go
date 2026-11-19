@@ -101,7 +101,7 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 		// nodes count alike.
 		for _, file := range buildPackage.GoFiles {
 			if !isShared || !slices.Contains(hostPackage.GoFiles, file) {
-				differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file)
+				differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file, os.ReadFile)
 				differing.LineDirective = differing.LineDirective ||
 					isShared && build_dependence.HoldsLineDirective(file, os.ReadFile)
 			}
