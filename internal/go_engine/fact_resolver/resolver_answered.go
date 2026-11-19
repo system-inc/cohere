@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
+	"iter"
 	"slices"
 )
 
@@ -31,10 +32,6 @@ type Answered struct {
 // by the answer's bytes, so they come in the same order on every run, whatever order the questions were asked in and
 // the load parsed the files in. A place is used rather than a position, which counts from wherever the load happened
 // to add the file.
-//
-// Each answer is encoded here from the value held, as an any, and the bytes are the ones encodeAnswer gave for the
-// kind's typed value when it recorded it or told a hand of it: encodeAnswer hands json.Marshal its value as an any
-// either way, and an any keeps the value's own type, so a nil slice, no fact, encodes as null from both.
 func (resolver *Resolver) Answered() []Answered {
 	resolver.mutex.Lock()
 	program := resolver.program
@@ -43,9 +40,33 @@ func (resolver *Resolver) Answered() []Answered {
 		// No package was learned, so no question was asked: a question is asked by a learned package's reader.
 		return nil
 	}
+	answers := heldOnce(resolver.answers.Range, resolver.kept.Range)
+	places := make(map[types.Object]token.Position, len(answers))
+	for _, answer := range answers {
+		places[answer.Object] = program.FileSet.Position(answer.Object.Pos())
+	}
+	slices.SortFunc(answers, func(left Answered, right Answered) int {
+		return cmp.Or(cmp.Compare(left.Object.Pkg().Path(), right.Object.Pkg().Path()),
+			cmp.Compare(places[left.Object].Filename, places[right.Object].Filename),
+			cmp.Compare(places[left.Object].Line, places[right.Object].Line),
+			cmp.Compare(places[left.Object].Column, places[right.Object].Column),
+			cmp.Compare(left.Kind, right.Kind), bytes.Compare(left.Encoded, right.Encoded))
+	})
+	return answers
+}
+
+// heldOnce is the answers memoized and kept range over, each an answer by its answerKey, the memo's as Ask holds them
+// and Keep's, every one held once and encoded, in no order: the one reading Answered and PlacedIn share, so what the
+// run holds of a package never differs between them. A kept answer a question was asked of afterwards is memoized too,
+// and is held once. It is the same answer, since a kept answer is final (see Keep), and so the same bytes, and
+// heldOnce panics when the two differ.
+//
+// Each answer is encoded here from the value held, as an any, and the bytes are the ones encodeAnswer gave for the
+// kind's typed value when it recorded it or told a hand of it: encodeAnswer hands json.Marshal its value as an any
+// either way, and an any keeps the value's own type, so a nil slice, no fact, encodes as null from both.
+func heldOnce(memoized iter.Seq2[any, any], kept iter.Seq2[any, any]) []Answered {
 	var answers []Answered
-	places := map[types.Object]token.Position{}
-	memoized := map[answerKey][]byte{}
+	memoizedEncoded := map[answerKey][]byte{}
 	keyOf := func(key any) answerKey {
 		answered, isKey := key.(answerKey)
 		if !isKey {
@@ -56,23 +77,19 @@ func (resolver *Resolver) Answered() []Answered {
 	}
 	hold := func(answered answerKey, encoded []byte) {
 		answers = append(answers, Answered{Kind: answered.kind.Name, Object: answered.object, Encoded: encoded})
-		places[answered.object] = program.FileSet.Position(answered.object.Pos())
 	}
-	resolver.answers.Range(func(key any, answer any) bool {
+	for key, answer := range memoized {
 		answered := keyOf(key)
-		memoized[answered] = encodeAnswer(answered.kind, answered.object, answer)
-		hold(answered, memoized[answered])
-		return true
-	})
-	// A kept answer a question was asked of afterwards is memoized too, and is held once. It is the same answer, since
-	// a kept answer is final (see Keep), and so the same bytes.
-	resolver.kept.Range(func(key any, answer any) bool {
+		memoizedEncoded[answered] = encodeAnswer(answered.kind, answered.object, answer)
+		hold(answered, memoizedEncoded[answered])
+	}
+	for key, answer := range kept {
 		answered := keyOf(key)
 		encoded := encodeAnswer(answered.kind, answered.object, answer)
-		held, isMemoized := memoized[answered]
+		held, isMemoized := memoizedEncoded[answered]
 		if !isMemoized {
 			hold(answered, encoded)
-			return true
+			continue
 		}
 		if !bytes.Equal(held, encoded) {
 			// Invariant: a kind keeps only a final answer, the one its compute answers from then on, so a question
@@ -80,14 +97,27 @@ func (resolver *Resolver) Answered() []Answered {
 			panic(fmt.Sprintf("fact_resolver: %s's answer about %s was kept as %s and memoized as %s",
 				answered.kind.Name, objectName(answered.object), encoded, held))
 		}
-		return true
-	})
-	slices.SortFunc(answers, func(left Answered, right Answered) int {
-		return cmp.Or(cmp.Compare(left.Object.Pkg().Path(), right.Object.Pkg().Path()),
-			cmp.Compare(places[left.Object].Filename, places[right.Object].Filename),
-			cmp.Compare(places[left.Object].Line, places[right.Object].Line),
-			cmp.Compare(places[left.Object].Column, places[right.Object].Column),
-			cmp.Compare(left.Kind, right.Kind), bytes.Compare(left.Encoded, right.Encoded))
-	})
+	}
 	return answers
+}
+
+// memoize holds answer under key in the memo Ask reads, and notes it among its object's package's answers.
+func (resolver *Resolver) memoize(key answerKey, answer any) {
+	resolver.answers.Store(key, answer)
+	resolver.noteAnswered(key)
+}
+
+// noteAnswered notes key, an answer just memoized or kept, among the answers its object's package holds, which
+// PlacedIn reads, when the resolver learned the package: only a learned package has the syntax that places an answer.
+func (resolver *Resolver) noteAnswered(key answerKey) {
+	home := resolver.Package(key.object.Pkg())
+	if home == nil {
+		return
+	}
+	home.answeredLock.Lock()
+	defer home.answeredLock.Unlock()
+	if home.answered == nil {
+		home.answered = map[answerKey]bool{}
+	}
+	home.answered[key] = true
 }

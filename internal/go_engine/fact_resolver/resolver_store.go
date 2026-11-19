@@ -122,7 +122,7 @@ func answerOf[Value any](
 		if stored, held := resolver.stored(kind, object.Pkg(), path); held {
 			answer := decodeAnswer[Value](kind, object, stored, "stored")
 			resolver.storeHits.Add(1)
-			resolver.answers.Store(key, answer)
+			resolver.memoize(key, answer)
 			return answer, false
 		}
 	}
@@ -133,7 +133,7 @@ func answerOf[Value any](
 		if hasPath && resolver.storedBodiless(object.Pkg(), path) {
 			answer := bodiless()
 			resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
-			resolver.answers.Store(key, answer)
+			resolver.memoize(key, answer)
 			return answer, false
 		}
 		resolver.reload(kind, object)
@@ -143,7 +143,7 @@ func answerOf[Value any](
 	if resolver.held != nil {
 		if encoded, isHeld := resolver.held.Answer(kind.Name, object); isHeld {
 			answer := decodeAnswer[Value](kind, object, encoded, "held")
-			resolver.answers.Store(key, answer)
+			resolver.memoize(key, answer)
 			return answer, false
 		}
 	}
@@ -157,7 +157,7 @@ func answerOf[Value any](
 	if hasPath && resolver.store != nil {
 		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
 	}
-	resolver.answers.Store(key, answer)
+	resolver.memoize(key, answer)
 	if resolver.held != nil {
 		// A test's hand hears each answer once, and it heard this one already when the kind kept it, in this compute
 		// or in an earlier judgment that judged object with its caller (see Keep).
@@ -216,6 +216,7 @@ func Keep[Value any](resolver *Resolver, home *Package, kind *Kind, object types
 		}
 		return
 	}
+	resolver.noteAnswered(key)
 	if resolver.held != nil {
 		resolver.held.Computed(kind.Name, object, encodeAnswer(kind, object, answer))
 	}
