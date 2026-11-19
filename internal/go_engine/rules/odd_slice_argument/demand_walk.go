@@ -165,7 +165,8 @@ func (walk *demandWalk) holder(
 }
 
 // settle passes the definition over the reached functions until a pass adds no mark and keeps each one's marks, final,
-// leaving the walk with none reached.
+// leaving the walk with none reached. Each function's marks are handed to the resolver there too (keepMarks), and only
+// there: until the last pass has added nothing a reached function's marks may still grow, so none is final before.
 func (walk *demandWalk) settle() {
 	for added := true; added; {
 		added = false
@@ -185,11 +186,35 @@ func (walk *demandWalk) settle() {
 	}
 	for _, reached := range walk.reached {
 		walk.state.functions[reached.function] = reached.marked
+		walk.keepMarks(reached)
 		walk.resolver.Counts(Kind).Computed.Add(1)
 	}
 	walk.reached = nil
 	walk.cyclic = false
 	clear(walk.byFunction)
+}
+
+// keepMarks hands the resolver the mark of each parameter settled's function declares, as the answer fact_resolver.Ask
+// would give a reader who asked of that parameter: what judgeIn answers from the marks just kept, marked or not, so
+// not marked, no fact, is handed over as marked is, and every parameter of a settled function has an answer of its
+// own. One judgment settles every function the asked mark rests on and asks the resolver of none of home's, so
+// without this only the parameter asked of had an answer among the ones the resolver holds, and the marks its answer
+// was built from had none (#z9fze0t). A parameter with no name, which no check or pass can read, is never marked, and
+// judgeIn, finding no name of home that declares it, answers the same.
+//
+// The resolver records nothing for the store of a mark handed over (fact_resolver.Keep): the record stays the marks
+// questions asked, which is what keeps it the same whichever judgment settled a mark first (see judgeIn). And a mark
+// handed over is final, which the resolver needs of it: settle hands marks over only after its last pass, and a
+// function settled is never reached again.
+func (walk *demandWalk) keepMarks(settled *reachedFunction) {
+	parameters := settled.function.Signature.Params()
+	if declared, isDeclared := settled.function.Object().(*types.Func); isDeclared {
+		// The function's parameters as it declares them, which a pass names (declaredParameter).
+		parameters = declared.Signature().Params()
+	}
+	for parameter := range parameters.Variables() {
+		fact_resolver.Keep(walk.resolver, walk.home, Kind, parameter, settled.marked[parameter])
+	}
 }
 
 // marked is whether the parameter pass passes to is marked, as far as settle has come: by its holder's marks, final

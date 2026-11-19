@@ -93,8 +93,9 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, parame
 // would be recorded where a question of its `v` judges Insert, and not where slices's whole marks, computed as the run
 // saves, settle Insert before that question comes, so two runs over the same standard library would record different
 // answers.
-// A reader comparing two builds at an answer needs the marks this judgment read from the kind's state on record too,
-// beside the answer, and the resolver has no seam yet for recording an answer nobody asked.
+// A reader comparing two builds at an answer needs the marks this judgment read from the kind's state too, beside the
+// answer, so each mark settled is handed to the resolver as an answer of its own, held apart from the record
+// (demandWalk.keepMarks, #z9fze0t).
 func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, parameter *types.Var) bool {
 	home.Lock()
 	defer home.Unlock()
