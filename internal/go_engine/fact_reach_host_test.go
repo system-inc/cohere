@@ -1,7 +1,6 @@
 package go_engine
 
 import (
-	"cmp"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -21,12 +20,14 @@ import (
 
 // factReachFixture is one package of the fact-reach fixture, checked from its source by the test itself, with no
 // engine run: its file set, its types, stage 1's record of it, and the place of each function declared with a body, by
-// its name, a method's as `Type.Method`, read from the syntax and never from the record under test.
+// its name, a method's as `Type.Method`, and in the order declared, file by file in the order of their names, read from
+// the syntax and never from the record under test.
 type factReachFixture struct {
-	fileSet *token.FileSet
-	own     *types.Package
-	record  *build_reads.FunctionUses
-	places  map[string]fact_reach.Place
+	fileSet  *token.FileSet
+	own      *types.Package
+	record   *build_reads.FunctionUses
+	places   map[string]fact_reach.Place
+	declared []fact_reach.Place
 }
 
 // checkedFactReachFixture is the package of path in directory, a directory of the fact-reach fixture, empty for its
@@ -78,8 +79,12 @@ func checkedFactReachFixture(
 				}
 				declared = receiver.Name + "." + declared
 			}
-			fixture.places[declared] = fact_reach.Place{File: name,
-				Offset: fixture.fileSet.Position(function.Pos()).Offset}
+			// A place is in the file a //line directive names, at the offset in the file as parsed: a position's Filename
+			// follows the directive, and its Offset never does.
+			position := fixture.fileSet.Position(function.Pos())
+			place := fact_reach.Place{File: position.Filename, Offset: position.Offset}
+			fixture.places[declared] = place
+			fixture.declared = append(fixture.declared, place)
 		}
 	}
 	info := &types.Info{
@@ -215,17 +220,34 @@ func TestAnObjectsUsersAreTheBodiesThatNameOrSelectIt(test *testing.T) {
 	}
 }
 
-// A package's places are its function bodies in the order its file declares them, a function declared without a body
+// A package's places are its function bodies in the order its files declare them, a function declared without a body
 // not among them.
 func TestAPackagesPlacesAreItsFunctionBodiesInTheOrderDeclared(test *testing.T) {
 	test.Parallel()
 
 	fixture, _ := checkedFactsFixture(test)
-	want := slices.SortedFunc(maps.Values(fixture.places), func(first fact_reach.Place, second fact_reach.Place) int {
-		return cmp.Compare(first.Offset, second.Offset)
-	})
-	if got := newFactReachPackage(fixture.inputs()).Places(); !slices.Equal(got, want) {
-		test.Errorf("the places are %v, want the %d bodies by their offsets in the one file, %v", got, len(want), want)
+	if got := newFactReachPackage(fixture.inputs()).Places(); !slices.Equal(got, fixture.declared) {
+		test.Errorf("the places are %v, want the %d bodies in the order declared, %v", got, len(fixture.declared),
+			fixture.declared)
+	}
+}
+
+// A body declared after a //line directive is placed in the file the directive names, at its offset in the file as
+// parsed, as stage 1 places its unit (build_dependence's newUnit), and an answer about its function is recorded under
+// that place. Renamed's `func` is at byte 207 of renamed.go, after a directive naming renamed_as_written.go.
+func TestABodyAfterALineDirectiveIsPlacedInTheFileItNames(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	inputs := fixture.inputs()
+	inputs.answers = []check.ExportedFact{purity(fixture.function(test, "Renamed"), "true")}
+	hosted := newFactReachPackage(inputs)
+	want := fact_reach.Place{File: filepath.Join("testdata", "fact-reach", "renamed_as_written.go"), Offset: 207}
+	if places := hosted.Places(); len(places) == 0 || places[len(places)-1] != want {
+		test.Errorf("the places are %v, want the last, Renamed's, %v", places, want)
+	}
+	if recorded := hosted.Recorded(want); len(recorded) != 1 || recorded[0].Kind != "function_purity" {
+		test.Errorf("Renamed's place holds %+v, want its one question of function_purity", recorded)
 	}
 }
 
@@ -240,7 +262,7 @@ func TestTheFunctionsAFactIsComparedOnAreEachDeclaredOrUsedOnce(test *testing.T)
 	fixture, lower := checkedFactsFixture(test)
 	want := []string{"platformSize", "size", "Warm", "Pair", "Box.Open", "Box.Close", "Open", "Use", "Closer", "First",
 		"Leading", "Sized", "declared", "Labelled", "Through", "Deep", "lower.Depth", "Halved", "lower.Halve",
-		"Joined"}
+		"Joined", "Renamed"}
 	objects := map[string]*types.Func{}
 	names := map[fact_reach.Object]string{}
 	for _, name := range want {

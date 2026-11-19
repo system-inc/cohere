@@ -2,7 +2,8 @@
 // calls, a method called and one taken as a value, a generic function called by an instance, a parameter an answer is
 // about, a function declared without a body, whose stub.s makes this a package go build takes, a value whose
 // initializer calls, a type only a signature names, an interface's method called, another package's functions
-// called, and a function literal with a parameter of its own.
+// called, a function literal with a parameter of its own, and, in renamed.go, a function declared after a `//line`
+// directive, whose place is in the file the directive names.
 package facts
 
 import "example.com/facts/lower"

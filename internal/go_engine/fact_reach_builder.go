@@ -84,7 +84,12 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		place, isPlaced := fact_reach.Place{}, false
 		if declared.HasBody {
 			if tokenFile := inputs.fileSet.File(declared.Declaration.File); tokenFile != nil {
-				place = fact_reach.Place{File: tokenFile.Name(), Offset: declared.Declaration.Offset}
+				// The file a reader sees, past any //line directive, at the offset in the file as parsed: stage 1's rule
+				// (build_dependence's newUnit), so an answer is kept at the place it is looked up by.
+				place = fact_reach.Place{
+					File:   tokenFile.Position(tokenFile.Pos(declared.Declaration.Offset)).Filename,
+					Offset: declared.Declaration.Offset,
+				}
 				isPlaced = true
 				builder.hosted.places = append(builder.hosted.places, place)
 			} else {

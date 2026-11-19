@@ -18,8 +18,8 @@ package fact_reach
 
 import "maps"
 
-// Place is a function declaration with a body, by the file it was parsed from and the offset of its `func`, as
-// build_reads.Declaration places one.
+// Place is a function declaration with a body, by the file a reader sees, past any `//line` directive, and the offset
+// of its `func` in the file as parsed: stage 1's rule for a unit (build_dependence's newUnit).
 type Place struct {
 	File   string
 	Offset int
