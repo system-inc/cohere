@@ -44,7 +44,7 @@ func (result *Result) Asking(asking string) *Result {
 
 // IsTrivial is whether function, a function or method the package itself declares, is trivial, as
 // intermediate_representation.IsTrivial answers of it. Asked of another package's function it panics: that one has no
-// syntax where a reader walks, so a reader asks IsTrivial itself, which refuses it without reading a body.
+// syntax where a reader walks, which IsTrivial answers not trivial, so a reader takes it as not trivial and never asks.
 func (result *Result) IsTrivial(function *types.Func) bool {
 	var answer triviality
 	result.resolver.Question(result.asking, func() { answer = ask(result.resolver, result.reader, function) })
