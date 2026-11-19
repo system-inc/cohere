@@ -1,10 +1,15 @@
 // Package parity holds the shapes SA2002 depends on, each with a comment saying whether the two are expected to find
-// it: what the go statement starts, a literal, a named function, a closure held in a variable, a method, a method
-// value, an interface's method, and what the started function calls, each stopping method of T, B and F, the other
-// methods of testing's common type, and calls through interfaces, defers, nested goroutines and helpers.
+// it: what the go statement starts, a literal, closing over the test or over nothing, a named function, of this
+// package or another, a closure held in a variable, a method, a method value, an interface's method, and what the
+// started function calls, each stopping method of T, B and F, the other methods of testing's common type, and calls
+// through interfaces, defers, nested goroutines and helpers.
 package parity
 
-import "testing"
+import (
+	"testing"
+
+	"parity/other"
+)
 
 // Found by both: each stopping method, one finding per call, each with its call as related entry. Each is in a case
 // of its own, since a call that never returns ends its block (see sequentialStops).
@@ -223,9 +228,62 @@ func startedTwice(t *testing.T) {
 	go fails(t)
 }
 
+// Found by both, twice: a named function whose own instructions stop the test in two branches, one finding for each
+// call, in the order of its instructions, each with its own call as related entry.
+func namedWithTwoStops(t *testing.T, skipped bool) {
+	go stopsEitherWay(t, skipped)
+}
+
+func stopsEitherWay(t *testing.T, skipped bool) {
+	if skipped {
+		t.SkipNow()
+	} else {
+		t.Fatal("failed")
+	}
+}
+
+// Found by both: a named function declared in another file of the package, second_file.go, where the related entry
+// is, a file other than the go statement's.
+func startsAcrossFiles(t *testing.T) {
+	go stopsInSecondFile(t)
+}
+
+// Found by both: a named function declared under a //line directive in line_directive.go, its related entry placed
+// where the directive says, moved.go, though the answer names the file it was parsed from.
+func startsUnderLineDirective(t *testing.T) {
+	go stopsUnderLineDirective(t)
+}
+
+// Found by both, twice: a named function whose own instructions call the same stopping method in two branches, one
+// finding for each call, each with its own call as related entry, though the two name the same method.
+func namedWithOneMethodTwice(t *testing.T, early bool) {
+	go fatalEitherWay(t, early)
+}
+
+func fatalEitherWay(t *testing.T, early bool) {
+	if early {
+		t.Fatal("early")
+	} else {
+		t.Fatal("late")
+	}
+}
+
 // Found by neither: the goroutine closes over the test and only reads it.
 func readsOnly(t *testing.T) {
 	go func() {
 		_ = t.Name()
 	}()
+}
+
+// Found by both: a literal that closes over nothing is a function of its own, started as it is, with no closure made.
+func literalWithoutCaptures(t *testing.T) {
+	go func(passed *testing.T) {
+		passed.FailNow()
+	}(t)
+}
+
+// Found by neither: a function another package declares, whose body staticcheck does not build, though it stops the
+// test.
+func otherPackage(t *testing.T) {
+	go other.Stops(t)
 }

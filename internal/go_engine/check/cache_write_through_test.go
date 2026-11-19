@@ -98,8 +98,12 @@ func hostSessionWith(
 	}
 	result, runError := Run(loaded.Packages, rules, Options{Cache: session, Withheld: loaded.Withheld,
 		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots, KeepForBuilds: true})
-	if runError != nil || len(result.Crashes) > 0 {
-		test.Fatalf("running the host's build: %v %+v", runError, result.Crashes)
+	// A run that failed hands back no result, so its error is said alone.
+	if runError != nil {
+		test.Fatalf("running the host's build: %v", runError)
+	}
+	if len(result.Crashes) > 0 {
+		test.Fatalf("running the host's build: %+v", result.Crashes)
 	}
 	// The builds judge the host's reads, which are whole only once their walks end, as the engine waits for them.
 	result.ReadWalks.Wait()
