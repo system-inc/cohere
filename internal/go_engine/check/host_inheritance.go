@@ -99,15 +99,7 @@ func (inheritance *HostInheritance) held(ruleName string, filename string) ([]Fi
 		slices.Reverse(holders)
 	}
 	for _, identifier := range holders {
-		kept := inheritance.host.entries[identifier]
-		if kept == nil {
-			continue
-		}
-		decoded, decodeError := kept.decoded()
-		if decodeError != nil {
-			continue
-		}
-		analyzed, holds := decoded.analyses[analyzer]
+		analyzed, holds := inheritance.host.analysisOf(identifier, analyzer)
 		if !holds {
 			continue
 		}

@@ -614,7 +614,7 @@
                     "properties": {
                         "on": {
                             "type": "boolean",
-                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromSystemCache, modulesFromSystemCache, factsSkipped and reloads."
+                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromSystemCache, factsSkipped and reloads."
                         },
                         "hit": {
                             "type": "integer",
@@ -624,13 +624,9 @@
                             "type": "integer",
                             "description": "Go standard-library packages restored from the system cache, the engine's tables in the user's cache directory, every build's summed, with nothing run on them, apart from hit. `--no-cache` reads them too. Absent when zero."
                         },
-                        "modulesFromSystemCache": {
-                            "type": "integer",
-                            "description": "Third-party modules' packages, every file of them in the module cache, restored from the system cache, every build's summed, with nothing run on them, apart from hit and standardLibraryFromSystemCache. `--no-cache` reads them too. Absent when zero."
-                        },
                         "systemCacheWritten": {
                             "type": "integer",
-                            "description": "Entries the run's builds added to their tables of the system cache, the standard library's and modules', summed. Absent when zero."
+                            "description": "Entries the run's builds added to their tables of the system cache, summed. Absent when zero."
                         },
                         "systemCacheOff": {
                             "type": "boolean",
@@ -785,6 +781,14 @@
                             "inheritedFindings": {
                                 "type": "integer",
                                 "description": "The findings this build took from the host's run on the files it inherited, each rule's on each file once. Absent when 0."
+                            },
+                            "standingDeclarations": {
+                                "type": "integer",
+                                "description": "The standing declarations this build's confined rules took the host's findings in, rather than hear those function bodies again, under COHERE_STANDING_BODIES=1 on the body reach census's path, each counted once per file of each package that took it. Absent when 0."
+                            },
+                            "standingFindings": {
+                                "type": "integer",
+                                "description": "The findings this build's confined rules took from the host's run in its standing declarations. Absent when 0."
                             },
                             "loadMilliseconds": {
                                 "type": "integer",

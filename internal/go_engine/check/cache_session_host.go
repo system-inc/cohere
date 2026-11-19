@@ -691,12 +691,12 @@ func (session *CacheSession) unsettledBelow() map[*packages.Package]bool {
 }
 
 // writeThrough writes, under the build's own first key, the entry of each package restored from the host's run whose
-// restore has settled and held, with nothing declined below it (outside unsettled), no reload pending, every action
-// on it restored without an error and an entry the build would write (throughEntry), so the build's next run hits it
-// in its own store rather than check it from source once the host, hitting its own, keeps nothing to restore from
-// (#b2t9xmf). It returns whether each package written has a finding that names a file outside it (see
-// positionDependent), which keeps its second key from an alias. actionsOf are the actions of the run's graphs on each
-// package and knownFiles every file the load reached.
+// restore has settled and held, with nothing declined below it (outside unsettled), no reload pending, nothing that
+// stood in it in any load (stoodIn), every action on it restored without an error and an entry the build would write
+// (throughEntry), so the build's next run hits it in its own store rather than check it from source once the host,
+// hitting its own, keeps nothing to restore from (#b2t9xmf). It returns whether each package written has a finding that
+// names a file outside it (see positionDependent), which keeps its second key from an alias. actionsOf are the actions
+// of the run's graphs on each package and knownFiles every file the load reached.
 //
 // The entry is exactly as sound as the restore, and no sounder. It persists a verdict that held because what the
 // package read of other packages read the same in this run: its types' reads at the load, its facts' and answers' at
@@ -735,7 +735,7 @@ func (session *CacheSession) writeThrough(
 		// with no store, a project package under `--no-cache`, has no key either (keyStandardLibraryApart).
 		if _, keyed := session.keys[candidate]; !held || !keyed || session.storeFor(candidate) == nil ||
 			unsettled[candidate] ||
-			session.host.writtenThrough[candidate] ||
+			session.host.writtenThrough[candidate] || session.stoodIn(candidate.ID) ||
 			session.reloading(candidate) || !finishedClean(actionsOf[candidate]) {
 			continue
 		}

@@ -26,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
@@ -150,6 +151,18 @@ type Options struct {
 	// nil for a run that did not ask, which tells nothing (#3v2zp7g). A field rather than package state, so two runs in
 	// one process never stamp each other's timeline. The findings are the same either way.
 	Timeline func(label string)
+
+	// StandingBodies, when not nil, is an extra build's standing bodies (#e4rd5dw): asked once for each package with
+	// StandingAfter's result there, what it answers is handed every pass on the package under rule.Standing (see
+	// checker.Options.StandingBodies), so a confined rule hears no standing body and reports the host's findings there
+	// as its own. StandingAfter, when StandingBodies is set too, is the analyzer every follower's action on a package
+	// follows, a dispatcher's and the representation's build (followsStanding), and whose result there StandingBodies
+	// is asked with, standing_facts' on the census path, which this package never imports. Where it is FactReachSettle
+	// and the run roots that nowhere (settlingIn), nothing stands. Both are called from several actions at once. Only
+	// an extra build sets them, and no package StandingBodies answers anything for is written to the findings cache
+	// (CacheSession.markStood).
+	StandingBodies func(packageId string, after any) rule.StandingBodies
+	StandingAfter  *analysis.Analyzer
 
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
@@ -396,6 +409,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Reads = options.Reads
 	checkerOptions.Inheritance = options.Inheritance
 	checkerOptions.FactHosts = options.FactHosts
+	// The standing bodies follow StandingAfter, on the census path the analyzer the facts' reach settles by, so a run
+	// that roots that nowhere (settlingIn) hands none: following it there would run it, and the answers it learns would
+	// reach the entries.
+	if options.StandingAfter == nil || options.StandingAfter != options.FactReachSettle || settler != nil {
+		checkerOptions.StandingBodies, checkerOptions.StandingAfter = options.StandingBodies, options.StandingAfter
+	}
 	checkerOptions.Beside = settler
 	checkerOptions.ListingsRead = listingsRead
 	checkerOptions.Pool = options.Pool
@@ -418,6 +437,16 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		resolver.RecordAskers()
 	}
 	session := options.Cache
+	// A package anything stands in is never written to the store, whose entry would carry the host's findings there.
+	if answer := checkerOptions.StandingBodies; answer != nil && session != nil {
+		checkerOptions.StandingBodies = func(packageId string, after any) rule.StandingBodies {
+			standing := answer(packageId, after)
+			if standing != nil {
+				session.markStood(packageId)
+			}
+			return standing
+		}
+	}
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.
 		return nil, fmt.Errorf("running report %s: the findings cache was opened without it", options.Report.Name)
@@ -810,19 +839,32 @@ func abandoned(abandon <-chan struct{}) bool {
 // store, which Run gives the resolver of a run with the findings cache. Recorded hands each rule its package's reads,
 // to record its lookups of other packages in, once Run sets Reads (#b2t9xmf). Inherited hands each syntax-only rule the
 // host's findings it inherits, once Run sets Inheritance (#y6q1x2j). FactHost hands each pass on a package the host's
-// side of it for the facts' reach, once Run sets FactHosts (#5vbs1np).
+// side of it for the facts' reach, once Run sets FactHosts (#5vbs1np). Standing hands each pass on a package what
+// stands there, once Run sets StandingBodies (#e4rd5dw), and FollowsStanding names the actions that follow
+// StandingAfter's there: each dispatcher's, and the representation's build, which then leaves unbuilt what stands for
+// every rule its dispatcher starts (followsStanding).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
-		Dependents:    rule.Dependents,
-		Failed:        rule.Failed,
-		Tolerant:      dispatch.IsDispatcher,
-		ForDependents: dispatch.ListenerRequirement,
-		Resolver:      fact_resolver.New(nil),
-		Resolved:      rule.Resolved,
-		Recorded:      rule.Recorded,
-		Inherited:     rule.Inherited,
-		FactHost:      rule.FactHost,
+		Dependents:      rule.Dependents,
+		Failed:          rule.Failed,
+		Tolerant:        dispatch.IsDispatcher,
+		ForDependents:   dispatch.ListenerRequirement,
+		Resolver:        fact_resolver.New(nil),
+		Resolved:        rule.Resolved,
+		Recorded:        rule.Recorded,
+		Inherited:       rule.Inherited,
+		FactHost:        rule.FactHost,
+		Standing:        rule.Standing,
+		FollowsStanding: followsStanding,
 	}
+}
+
+// followsStanding is whether analyzer's action on a package follows checker.Options.StandingAfter's there (#e4rd5dw):
+// a dispatcher's, whose confined rules hear no standing body, and build_intermediate_representation's, so the
+// representation is built less what stands for every rule its dispatcher starts rather than whole. Neither is required
+// by standing_facts, the analyzer the census path follows, so no follower waits on itself.
+func followsStanding(analyzer *analysis.Analyzer) bool {
+	return dispatch.IsDispatcher(analyzer) || analyzer == build_intermediate_representation.Analyzer
 }
 
 // actionFindings is what action found, as newFinding makes it.

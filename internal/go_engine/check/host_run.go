@@ -183,6 +183,27 @@ func (host *HostRun) Inheritance(enabled []rule.Rule) *HostInheritance {
 	return &HostInheritance{host: host, analyzerOf: analyzerOf, taken: map[inheritedKey]int{}}
 }
 
+// Standing is an extra build's standing bodies over host, for the rules of enabled that confined names, over the
+// bodies stands answers for, nil when host kept nothing, as under `--timing`. stands is asked from several goroutines
+// at once.
+func (host *HostRun) Standing(
+	enabled []rule.Rule,
+	confined map[string]bool,
+	stands func(packageIdentifier string, filename string, offset int) bool,
+) *HostStanding {
+	if host == nil {
+		return nil
+	}
+	analyzerOf := make(map[string]*analysis.Analyzer, len(confined))
+	for _, each := range enabled {
+		if confined[each.Name] {
+			analyzerOf[each.Name] = each.Analyzer
+		}
+	}
+	return &HostStanding{host: host, analyzerOf: analyzerOf, stands: stands,
+		declarations: map[standingFile]int{}, taken: map[standingTake]int{}}
+}
+
 // holdersOf is the IDs of the host's kept packages that compiled filename, sorted, read from an index of every kept
 // entry's files made once a run, the first time any build asks.
 func (host *HostRun) holdersOf(filename string) []string {
@@ -212,4 +233,21 @@ func (host *HostRun) placedOf(identifier string) ([]fact_resolver.PlacedAnswer, 
 		return nil, false
 	}
 	return restored.placed, true
+}
+
+// analysisOf is what analyzer left on the package the host kept under identifier, read from that entry's shared decode
+// (hostEntry.decoded), its findings before any dedupe or withholding, and false when the host kept no entry under
+// identifier, the entry does not decode, or it holds no slot for analyzer, as where the rule never ran. A false is
+// never a rule that found nothing: whoever asks runs the rule itself.
+func (host *HostRun) analysisOf(identifier string, analyzer *analysis.Analyzer) (restoredAnalysis, bool) {
+	kept := host.entries[identifier]
+	if kept == nil {
+		return restoredAnalysis{}, false
+	}
+	decoded, decodeError := kept.decoded()
+	if decodeError != nil {
+		return restoredAnalysis{}, false
+	}
+	analyzed, holds := decoded.analyses[analyzer]
+	return analyzed, holds
 }

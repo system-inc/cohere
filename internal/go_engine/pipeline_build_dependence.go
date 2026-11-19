@@ -185,8 +185,7 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		}
 		host.restored[each.ID] = true
 		// The standard library is the only package in no module that a module's load reaches, and none of it is a
-		// test variant here, since only the workspace's packages have tests built. A module's package the system cache
-		// restored with no record is not side-loaded, so it stays restored with no graph and fails wide (#57wgzhp S1).
+		// test variant here, since only the workspace's packages have tests built.
 		if each.Module == nil && each.ForTest == "" {
 			if engine.session != nil {
 				if record, isRecorded := engine.session.StandardLibraryRecord(each); isRecorded {

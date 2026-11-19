@@ -25,6 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -267,6 +268,14 @@ type pipeline struct {
 	// factReachSides are the host's side of each package for the facts' reach, made beside bodyReachHost from what the
 	// host's lint captured of its facts, and nil whenever it is (fact_reach_sides.go, #aswfm7a).
 	factReachSides *factReachSides
+
+	// standingBodies is whether an extra build on the census path leaves the bodies that stand to the host's findings,
+	// from `COHERE_STANDING_BODIES=1`, off by default (pipeline_standing_bodies.go, #e4rd5dw), and standingConfined the
+	// rules confined there, by name, made once as the extra builds start in a run that leaves bodies standing, nil in
+	// any other. plantedInputs, a test's alone, are inputs declared for rules it planted, which the table never names.
+	standingBodies   bool
+	standingConfined map[string]bool
+	plantedInputs    map[string]rules.Declared
 
 	// bodyReachFromSourceRecord is the directory each extra build's from-source packages are recorded into, and
 	// bodyReachFromSource the one the census reads them back from, each empty unless asked

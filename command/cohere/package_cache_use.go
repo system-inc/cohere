@@ -14,10 +14,8 @@ import (
 // skipped, whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at
 // most two. FromSystemCache is the standard-library packages restored from the Go engine's system cache, its tables
 // in the user's cache directory, every build's summed, apart from hit, which `--no-cache` reads too, since they are
-// of cohere and the Go installation and nothing of the project; it is absent when 0. ModulesFromSystemCache is the
-// third-party modules' packages restored from it the same way, apart from FromSystemCache, absent when 0, which the
-// account does not say yet (#57wgzhp). SystemCacheWritten is the entries the run's builds added to their tables of the
-// system cache, the standard library's and modules', summed, absent when 0, and SystemCacheOff is set
+// of cohere and the Go installation and nothing of the project; it is absent when 0. SystemCacheWritten is the
+// entries the run's builds added to their tables of the system cache, summed, absent when 0, and SystemCacheOff is set
 // under `--no-system-cache`, which neither reads nor writes it. SystemCacheNotKept is why the run kept no system cache
 // though it was on, or could not keep it as it should, in one line, absent when there is none (#syscache). Reloads
 // is the packages
@@ -31,24 +29,23 @@ import (
 // On is false under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as
 // it was.
 type packageCacheUse struct {
-	On                     bool   `json:"on"`
-	Hit                    int    `json:"hit"`
-	FromSystemCache        int    `json:"standardLibraryFromSystemCache,omitempty"`
-	ModulesFromSystemCache int    `json:"modulesFromSystemCache,omitempty"`
-	SystemCacheWritten     int    `json:"systemCacheWritten,omitempty"`
-	SystemCacheOff         bool   `json:"systemCacheOff,omitempty"`
-	SystemCacheNotKept     string `json:"systemCacheNotKept,omitempty"`
-	Missed                 int    `json:"missed"`
-	Written                int    `json:"written"`
-	Unstorable             int    `json:"unstorable"`
-	FactsDropped           int    `json:"factsDropped"`
-	FactsSkipped           int    `json:"factsSkipped"`
-	Waves                  int    `json:"waves"`
-	Reloads                int    `json:"reloads,omitempty"`
-	ReloadRounds           int    `json:"reloadRounds,omitempty"`
-	Replays                int    `json:"replays,omitempty"`
-	Problems               int    `json:"problems,omitempty"`
-	WriteFailed            int    `json:"writeFailed,omitempty"`
+	On                 bool   `json:"on"`
+	Hit                int    `json:"hit"`
+	FromSystemCache    int    `json:"standardLibraryFromSystemCache,omitempty"`
+	SystemCacheWritten int    `json:"systemCacheWritten,omitempty"`
+	SystemCacheOff     bool   `json:"systemCacheOff,omitempty"`
+	SystemCacheNotKept string `json:"systemCacheNotKept,omitempty"`
+	Missed             int    `json:"missed"`
+	Written            int    `json:"written"`
+	Unstorable         int    `json:"unstorable"`
+	FactsDropped       int    `json:"factsDropped"`
+	FactsSkipped       int    `json:"factsSkipped"`
+	Waves              int    `json:"waves"`
+	Reloads            int    `json:"reloads,omitempty"`
+	ReloadRounds       int    `json:"reloadRounds,omitempty"`
+	Replays            int    `json:"replays,omitempty"`
+	Problems           int    `json:"problems,omitempty"`
+	WriteFailed        int    `json:"writeFailed,omitempty"`
 
 	Packs *buildPacksUse `json:"packs,omitempty"`
 }

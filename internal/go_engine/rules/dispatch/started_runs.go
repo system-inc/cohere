@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"go/token"
 	"reflect"
 
 	"github.com/system-inc/cohere/internal/go_engine/timing"
@@ -20,6 +21,11 @@ type startedRuns struct {
 	// host's findings on them, which its outcome reports after its own (rule.InheritedFiles). Only the runs over the
 	// whole package hold them, however the package is split, so each is reported once.
 	inherited map[string]inheritedTake
+	// standing is, for each started rule confined on a file of the package, those files with their standing spans and
+	// the host's findings inside them, which its outcome carries for the rule's action to report in place of its own
+	// there (rule.StandingFiles). Nil until a rule takes something, and held only by the runs over the whole package,
+	// as inherited is.
+	standing map[string]standingTake
 	// timing is the run's collector under `--timing`, which the checker hands the pass under rule.Timed, nil
 	// otherwise, and dispatcher is the name of the dispatcher's own analyzer, whose row finish takes the listeners'
 	// calls out of.
@@ -33,4 +39,17 @@ func (started *startedRuns) add(run *listenerRun) {
 	for _, kind := range run.registered.kinds {
 		started.byKind[kind] = append(started.byKind[kind], run)
 	}
+}
+
+// notConfinedOn is the runs of started whose rules are not confined on tokenFile, in started's order and by kind as
+// started holds its own, which are the runs that hear a function standing there (#e4rd5dw). It holds nothing else of
+// started: the walk over the representation calls its runs for such a function, and finishes started itself.
+func (started *startedRuns) notConfinedOn(tokenFile *token.File) *startedRuns {
+	hearing := &startedRuns{byKind: map[reflect.Type][]*listenerRun{}}
+	for _, run := range started.runs {
+		if len(run.standing[tokenFile]) == 0 {
+			hearing.add(run)
+		}
+	}
+	return hearing
 }

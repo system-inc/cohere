@@ -134,12 +134,8 @@ func (session *CacheSession) DependenceRecord(keyed *packages.Package) (*build_d
 // entry the alias leads to (recordKeyOf). A record that does not decode is a problem, said,
 // and its package has none: a hit by its first key is backfilled, so its record is written again over the one that
 // did not decode, and a miss's is written from its syntax. A hit from the system cache's store is never backfilled,
-// so no project's census writes its entry again in the store every project shares. A standard-library hit's record is
-// the standard library's records' (readStandardLibraryRecords), which its side load writes. A module's hit has a
-// record only when this project's store holds one beside its system key, written by a run under `--build-dependence`
-// that checked it from source; one whose entry another project, or a run without the switch, wrote has none and gets
-// none, since only the standard library is side-loaded (buildDependenceGraph): the host restores it with no graph,
-// and every object of it a unit reads fails wide (#57wgzhp S1, the record comes with a later stage).
+// so no project's census writes its entry again in the store every project shares: its record is the standard
+// library's records' (readStandardLibraryRecords).
 func (session *CacheSession) readDependenceRecords(reachable []*packages.Package) {
 	records := session.dependence
 	if records == nil {
