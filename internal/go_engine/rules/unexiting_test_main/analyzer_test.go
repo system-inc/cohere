@@ -33,9 +33,9 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 }
 
 // The differences fixture holds the TestMains whose judgment hangs on the state the walk carries, a call to os.Exit at
-// package level and calls inside a call's arguments. It records no difference, since there is none, so the two must
-// agree there finding for finding.
+// package level and calls inside a call's arguments. The two agree on every one but the TestMain after a call to
+// os.Exit at package level, which the port alone finds, as its record there says (#zvwfe26).
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
-	parity.RequireIdentical(test, sa3000.Analyzer, Analyzer, analysistest.TestData(), "differences")
+	parity.RequireOnlyAdjudicated(test, sa3000.Analyzer, Analyzer, analysistest.TestData(), "differences")
 }

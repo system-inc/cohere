@@ -1,7 +1,7 @@
-// Package differences holds the TestMains where the port and the original could plausibly disagree, and records no
-// difference, since there is none: both keep the same state over the same walk of the package. Whether os.Exit was
-// called carries from one TestMain's end to the next, through calls at package level, and calls inside a call's
-// arguments go unseen once the call is judged.
+// Package differences holds the TestMains where the port and the original could plausibly disagree. Both clear what
+// they saw as each TestMain ends, and leave calls inside a call's arguments unseen once the call is judged. They differ
+// in one place: the original counts a call to os.Exit at package level for the TestMain after it, and the port counts
+// only the calls inside a TestMain (#zvwfe26).
 package differences
 
 import (
@@ -16,7 +16,7 @@ func (first) TestMain(m *testing.M) {
 	m.Run()
 }
 
-// exitAtPackageLevel calls os.Exit at package level, outside any TestMain, and the original counts it for the next
+// exitAtPackageLevel calls os.Exit at package level, outside any TestMain, which the original counts for the next
 // TestMain.
 var exitAtPackageLevel = func() int {
 	if len(os.Args) > 100 {
@@ -27,9 +27,9 @@ var exitAtPackageLevel = func() int {
 
 type second struct{}
 
-// Found by neither: the call to os.Exit above, at package level, counts for this TestMain, the original's false
-// negative.
-func (second) TestMain(m *testing.M) {
+// Found by the port alone: the call to os.Exit above, at package level, is no exit of this TestMain's, though the
+// original counts it for this one and misses it.
+func (second) TestMain(m *testing.M) { // port finds: TestMain should call os.Exit to set exit code
 	m.Run()
 }
 
