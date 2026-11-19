@@ -38,7 +38,9 @@ func (heard *heardQuestions) Answer(kindName string, object types.Object) ([]byt
 	return nil, false
 }
 
-func (*heardQuestions) Computed(string, types.Object, []byte) {}
+func (*heardQuestions) Computed(string, types.Object, []byte) {
+	// The test reads the questions asked, which Answer hears, and nothing of the answers computed.
+}
 
 // The rule asks a callee's triviality last, and only of a callee the nilness leaves flagged (#h0k644s): over the order
 // fixture, it asks the nilness of both typedNil and mayBeNil, whose comparisons it reaches, and the triviality of
