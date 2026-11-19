@@ -46,7 +46,8 @@ type listenerRun struct {
 
 	// standing is the files the run's rule is confined on, each with its standing spans (rule.StandingFiles), nil for
 	// a rule confined on none, and confined is whether the file the walk is in is one of them, when the syntax walk
-	// calls the run for no node inside a standing body.
+	// calls the run for no node inside a standing body. The walk over the representation, which is in no file, reads
+	// standing for each function that stands and calls the run for none standing in one of its files.
 	standing map[*token.File][]rule.StandingSpan
 	confined bool
 
@@ -63,7 +64,8 @@ type listenerRun struct {
 // A fileLocal run hears only some of the package's files, a shard of a large package's, and its context's State
 // panics (see rule.Listener.FileLocal). A listener marked SyntaxOnly always has a syntax-only context, on every build,
 // and hears none of the inherited files, whose findings are the host's. Over the syntax, a run hears nothing inside the
-// standing bodies of the files in standing, whose findings there are the host's too.
+// standing bodies of the files in standing, and over the representation no function standing in one, whose findings
+// there are the host's too.
 func newListenerRun(
 	registered *registeredRule,
 	pass *analysis.Pass,

@@ -272,9 +272,10 @@ func (listeners *listeners) register(
 // Every started listener, of either walk, takes the host's findings inside the standing declarations of the files its
 // rule is confined on (rule.StandingFiles), over the package's standing spans, read here once for all of them, and
 // whole holds that take too, which finish hands its outcome and the rule's action swaps for its own findings there.
-// The syntax walk leaves a run confined on a file deaf inside its standing bodies (see syntaxWalk.callNodes). A file
-// the rule inherits stands in no part, being skipped whole. A pass with no standing spans, every host's, takes
-// nothing, at the cost of reading their length for each listener.
+// The syntax walk leaves a run confined on a file deaf inside its standing bodies (see syntaxWalk.callNodes), and the
+// walk over the representation calls it for no function standing there (see walkFunctions). A file the rule inherits
+// stands in no part, being skipped whole. A pass with no standing spans, every host's, takes nothing, at the cost of
+// reading their length for each listener.
 func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns, []*startedRuns, error) {
 	// Absent under a driver that runs nothing past a failure, where the pass runs only once everything it requires
 	// finished, and the nil map reads as nothing failed.
