@@ -83,6 +83,31 @@ func TestACyclesMarksAreTheDefinitionsInEitherOrder(test *testing.T) {
 	requireDepartures(test, found, []string{"order/forward.back values"})
 }
 
+// A parameter passed through a stand-in is marked the same wherever its package declares what the stand-in stands for
+// (#8d9r2rh): in standin/first and standin/last, with no cycle of calls anywhere, each caller's slice reaches the
+// length check through an instantiation, a bound method or a thunk, so the definition holds every slice marked in
+// both, and every way the rule computes its marks must too. The push departs in standin/first alone, on all three
+// callers, which proves each kind of stand-in bites its order.
+func TestAStandInsMarksAreTheDefinitionsInEitherOrder(test *testing.T) {
+	test.Parallel()
+	found := holdToDefinition(test, analysistest.TestData(), []string{"standin/first", "standin/last"},
+		inTheOrderGiven)
+	want := map[string]bool{}
+	for _, variant := range []string{"standin/first", "standin/last"} {
+		for _, name := range []string{".throughInstance", ".throughMethodValue", ".throughMethodExpression",
+			".generic", ".pairs"} {
+			want[variant+name+" values"] = true
+		}
+		want["("+variant+".holder).method values"] = true
+	}
+	requireDefined(test, found, want)
+	requireDepartures(test, found, []string{
+		"standin/first.throughInstance values",
+		"standin/first.throughMethodExpression values",
+		"standin/first.throughMethodValue values",
+	})
+}
+
 // held is what holding packages' marks to the definition found.
 type held struct {
 	// defined is the definition's mark on each parameter of each function and method in a root's reach, by the
