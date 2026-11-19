@@ -308,9 +308,9 @@ func checkNarrowedProjectFolders(
 }
 
 // goOnlySwitches are the switches only a Go run takes (goFlags): every other engine's child is run without them, so
-// one command line at a root holding several projects checks the Go one's other builds, where Swift's run would
-// refuse the switch and TypeScript's has no other build to check.
-var goOnlySwitches = []string{"other-builds"}
+// one command line at a root holding several projects narrows the Go one's check to the host's build, where Swift's
+// run would refuse the switch and TypeScript's has no other build to leave out.
+var goOnlySwitches = []string{"host-build-only"}
 
 // refuseGoOnlySwitches refuses a run that is no Go project's and was typed one of goOnlySwitches, rather than
 // ignoring it, since a flag accepted and ignored reads as a run that did what was asked. Discovery hands them to a Go
@@ -320,8 +320,8 @@ var goOnlySwitches = []string{"other-builds"}
 func refuseGoOnlySwitches(given map[string]bool, value func(string) string) error {
 	for _, name := range goOnlySwitches {
 		if given[name] && value(name) == "true" {
-			return fmt.Errorf("--%s checks the other builds of a Go project's files, and this is no Go project, so "+
-				"nothing was checked", name)
+			return fmt.Errorf("--%s narrows which builds of a Go project's files are checked, and this is no Go "+
+				"project, so nothing was checked", name)
 		}
 	}
 	return nil

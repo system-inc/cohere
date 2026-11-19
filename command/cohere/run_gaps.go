@@ -70,9 +70,9 @@ type runGaps struct {
 	// says nobody expects checked (engineLanguage.ExpectedExclusionReasons). In a Swift run that today means no
 	// target of the package compiles them and they are no standalone script the run checks alone (#13nbb1s), less
 	// those the runs of the Swift projects below it account for (#ybspptb). In a Go run it means a file only another
-	// platform builds, or one that imports "C" while cgo is off, since the engine checks the host's build alone; under
-	// `--other-builds` a file another build checked is expected, and only one no build the run checked compiles stays
-	// (#72n9mq0). A gap, not a failure.
+	// platform builds, or one that imports "C" while cgo is off, under `--host-build-only`, since the engine then
+	// checks the host's build alone; by default a file another build checked is expected, and only one no build the
+	// run checked compiles stays (#72n9mq0, #qqyq61s). A gap, not a failure.
 	// Each is named, never only counted: a gap nobody can find is half a gap.
 	Unchecked []uncheckedEngineFile `json:"unchecked,omitempty"`
 	// NotWritten is the files an engine's fix phase would have written and did not, since each is reached through a

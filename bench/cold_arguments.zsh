@@ -9,12 +9,12 @@
 # them alone (internal/bench_results' cold_arguments_test.go) rather than through a measurement. The nightly speed guard
 # asks every root to check without fixing (--no-fix): a fixing run's work moves with whatever the tree holds that
 # night, and can rewrite the copy it is timed in, so the guard would compare different work night to night (#8sqsgee).
-# build_arguments prints, one to a line, the arguments every run gives cohere for the builds it checks: none for the
-# host's build alone, as every record before #ccqee0e measured, and `--other-builds` for every build the Go files name.
-# Every run takes them, primes, warm and edit runs too, so each mode measures the same run. When every build becomes a
-# plain run's default (#qqyq61s), every prints none here and host prints the switch that asks for the host's alone.
+# build_arguments prints, one to a line, the arguments every run gives cohere for the builds it checks: none for every
+# build the Go files name, which a plain run checks (#qqyq61s), and `--host-build-only` for the host's build alone, as
+# every record before #ccqee0e measured. Every run takes them, primes, warm and edit runs too, so each mode measures
+# the same run.
 build_arguments() {
-  [[ ${1:-} == every ]] && print -r -- --other-builds
+  [[ ${1:-} == host ]] && print -r -- --host-build-only
   return 0
 }
 

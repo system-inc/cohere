@@ -50,7 +50,7 @@ func TestTheBuildsStartOnlyOnceTheHostsSetsAreComputed(test *testing.T) {
 				release("a build's end")
 				return nil
 			}
-		}, "--other-builds", "--no-cache")
+		}, "--no-cache")
 	lock.Lock()
 	defer lock.Unlock()
 	if !held {

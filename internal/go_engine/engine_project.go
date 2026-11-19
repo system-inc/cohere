@@ -70,7 +70,7 @@ func describeProject(request invocation) (described *describedProject, describeE
 	}
 	// Only a run whose lint phase is asked for reads them, since that phase is where every extra build is loaded and
 	// checked (runLint): a file said checked by a build is one that build's run checks.
-	readsBuilds := request.switches["other-builds"] && request.requests(contract.PhaseLint)
+	readsBuilds := request.checksEveryBuild() && request.requests(contract.PhaseLint)
 	// Under `--timing` the lister states and the builds' go commands run where they always have, one at a time
 	// (startChildrenFirst), so each measurement of their children's CPU is of its own commands alone. A run that asks
 	// for neither types nor lint, as the editor's save, may never load, so it fetches no lister state it might not
@@ -176,8 +176,8 @@ func describeProject(request invocation) (described *describedProject, describeE
 		// a house rule's, so excluding it here would hide the bugs a generator ships.
 		reason, excluded := constraintReasons[file]
 		if excluded {
-			// Under `--other-builds` a file an extra build compiles is checked by it, and said so; one no build
-			// compiles keeps the constraint's reason, a gap.
+			// In a run of every build a file an extra build compiles is checked by it, and said so; one no build
+			// compiles keeps the constraint's reason, a gap, as every such file does under `--host-build-only`.
 			checkedBy, checked, checkedError := checkingBuild(described.builds, file, contents[file])
 			if checkedError != nil {
 				return nil, fmt.Errorf("describing %s: %w", root, checkedError)

@@ -712,7 +712,7 @@ out, said once in `measuringCpuMicroseconds` beside `measuredCalls`, the pieces 
 - `processCpuMicroseconds` is every CPU microsecond the process spent up to the record. The rows (rules, shared, the
   load's own phases and measuring) are said against it, and what they leave is printed as its own line, what no row
   measures, never spread over the rows.
-- `extraBuildsFromSource` is how many builds beside the host's the run checked under `--other-builds`, written only
+- `extraBuildsFromSource` is how many builds beside the host's the run checked, written only
   when there were any and absent otherwise. None of them restored anything from the host's run, since a timed run keeps
   nothing for them, so every package of every build was checked from source and the rows include that work
   (#4y4qd3z). The front door says so in a sentence beside the table, so the rows are never read as a run that restored.
@@ -910,8 +910,8 @@ The Go engine's lint record carries `childProcessesAfterLoad` and `childProcesse
 after its first load began, and each by go and its first arguments, sorted, as
 `"childProcessesAfterLoad":2,"childProcessesAfterLoadNamed":["go list -e -f","go list -m -json"]`. On
 darwin go starts a child with fork, which marks the whole address space copy-on-write, so each child
-started once the engine's heap has grown makes every resident page fault again; a run under
-`--other-builds` with builds beside the host's starts every go command they need before that load, and
+started once the engine's heap has grown makes every resident page fault again; a run of
+every build with builds beside the host's starts every go command they need before that load, and
 reads 0. A run of one build starts its lister's two beside its census (#q9ezwvw), and reads 0 too,
 except under `--timing`, where it starts them inside its first load, as it always has. Both are absent
 when none started, and no key and no verdict reads them. They count the go commands of the run's
@@ -1039,8 +1039,8 @@ toolchain, and read back by a later run in place of that load (#6a3kjvz). `"stan
 standard-library record that could not be written counts in `"writeFailed"` too.
 
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
-which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive
-within contract 3, the host's first:
+which every file compiles at least once (#72n9mq0), unless `--host-build-only` names the host's alone (#qqyq61s), and
+when it checks more than one it writes `builds`, additive within contract 3, the host's first:
 
 ```
 {
@@ -1184,7 +1184,7 @@ run's mode, 2.16 for a timed run, which reads no store, is named with its ratio 
 build under `--timing` restores nothing from the host's run, so it holds more as its load ends than one that restores,
 and its ratio reads lower than the width's case.
 
-Under `--build-dependence` beside `--other-builds`, each extra build's record writes `"dependence"`, additive within
+Under `--build-dependence` in a run of every build, each extra build's record writes `"dependence"`, additive within
 contract 3 and the Go engine's alone (#qkq4gx5): which of the host's package-level declarations the build can change,
 observed only, so no finding, key or verdict reads it. A unit is a function, a type spec, or a var or const spec, and
 it is dependent when its file is not one both builds compile, when an object it declares reaches a dependent object,
@@ -1342,6 +1342,7 @@ it where a run that did not finish prints green.
 | `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last check's and counts every file that check did not see as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report.                                                              |
 | `--duplicates`                              | The front door's for Swift, never given to the engine, which has no duplicates report: the run checks as it would and prints a duplicates report that did not run, saying why. The Go engine answers it with a `duplicates` record (see that record).                                                                                                                                                                                                                                                                                                                                                                                                |
 | `--timing`                                  | Go takes it: the Go engine writes one `timing` record after lint (see that record), which the front door prints as TypeScript's timing table. Not implemented for Swift yet: the Swift engine refuses it with exit 2 and names the flag.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `--host-build-only`                         | Go takes it: the Go engine checks the host's build alone, and names each file only another build compiles as a gap, where without it every build is checked (#qqyq61s). Not implemented for Swift: the front door refuses it by name against a Swift root, and never gives it to the engine.                                                                                                                                                                                                                                                                                                                                                         |
 | `--explain <file>`                          | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `--tsconfig`                                | Meaningless for Swift. The front door refuses it against a Swift root.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `--directory`                               | Resolved by the front door into `--root`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |

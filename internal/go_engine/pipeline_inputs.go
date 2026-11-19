@@ -29,13 +29,13 @@ import (
 // The rules read more: staticcheck's config analyzer reads a staticcheck.conf in each analyzed package's directory
 // and every directory above it, to the filesystem's root, so each is named, there or absent.
 //
-// Under `--other-builds` the record is every build's (#e4b08k7): each build's load is named, and the directories of
+// In a run of every build the record is every build's (#e4b08k7): each build's load is named, and the directories of
 // the files each build compiled are read for staticcheck.conf, so a replay misses when anything any build read moves.
 func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord {
 	files := map[string]bool{}
 	absent := map[string]bool{}
 	directories := map[string]bool{}
-	// Under `--other-builds` every build's load is named beside the host's (#e4b08k7): another build reads files the
+	// In a run of every build each build's load is named beside the host's (#e4b08k7): another build reads files the
 	// host's never does, the standard library's and a module's that only its platform builds among them, and its
 	// verdict is the run's as much as the host's is, so a replay keyed on the host's load alone would serve a stale
 	// verdict after an edit to one of them.

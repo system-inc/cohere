@@ -39,11 +39,11 @@ func windowsFacts(
 	return engine, lint.Builds[1]
 }
 
-// windowsCensus is the facts census of the windows build of the fixture under testdata, under `--other-builds
-// --build-dependence`, configure given the pipeline as windowsFacts gives it, and the pipeline it ran.
+// windowsCensus is the facts census of the windows build of the fixture under testdata, under `--build-dependence`,
+// configure given the pipeline as windowsFacts gives it, and the pipeline it ran.
 func windowsCensus(test *testing.T, fixture string, configure func(*pipeline)) (*pipeline, contract.DependenceFacts) {
 	test.Helper()
-	engine, windows := windowsFacts(test, fixture, configure, exitClean, "--other-builds", "--build-dependence")
+	engine, windows := windowsFacts(test, fixture, configure, exitClean, "--build-dependence")
 	if windows.Dependence == nil || windows.Dependence.Facts == nil {
 		test.Fatalf("the windows build's record has no facts census: %+v", windows.Dependence)
 	}
@@ -115,12 +115,12 @@ func TestAnEqualFactLeavesItsCallerAlone(test *testing.T) {
 	}
 }
 
-// A plain run under `--other-builds` compares no facts: it builds no graph, collects no facts from the host's lint or
+// A plain run of every build compares no facts: it builds no graph, collects no facts from the host's lint or
 // any build's, and its builds restore from the host's run as they always have.
 func TestAPlainRunComparesNoFacts(test *testing.T) {
 	test.Parallel()
 
-	engine, windows := windowsFacts(test, "build-facts", nil, exitClean, "--other-builds")
+	engine, windows := windowsFacts(test, "build-facts", nil, exitClean)
 	if engine.dependence != nil || windows.Dependence != nil || engine.censusKeepsHostRestoreOff {
 		test.Errorf("a plain run built the graph (%t), wrote the dependence %+v, or kept the host's restore off (%t)",
 			engine.dependence != nil, windows.Dependence, engine.censusKeepsHostRestoreOff)

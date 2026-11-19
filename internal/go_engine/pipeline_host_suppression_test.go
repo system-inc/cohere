@@ -52,14 +52,14 @@ func TestTheHostsSuppressionIsComputedOnlyWhenNoMergeReplacesIt(test *testing.T)
 		failBuild bool
 		wantCount int32
 	}{
-		{name: "builds merged", arguments: []string{"--no-fix", "--other-builds"}, wantCount: 0},
-		{name: "no builds", arguments: []string{"--no-fix"}, wantCount: 1},
-		{name: "builds failed", arguments: []string{"--no-fix", "--other-builds"}, failBuild: true, wantCount: 1},
+		{name: "builds merged", arguments: []string{"--no-fix"}, wantCount: 0},
+		{name: "no builds", arguments: []string{"--no-fix", "--host-build-only"}, wantCount: 1},
+		{name: "builds failed", arguments: []string{"--no-fix"}, failBuild: true, wantCount: 1},
 		// A fixing run's rename reads the host's kept findings for the renames they ask, before any build runs.
-		{name: "builds merged in a fixing run", arguments: []string{"--other-builds"}, wantCount: 1},
+		{name: "builds merged in a fixing run", wantCount: 1},
 		// The rename reads it, asks nothing, and the lint phase reads the same pass again: the second read is the
 		// first's, never computed twice.
-		{name: "no builds in a fixing run", wantCount: 1},
+		{name: "no builds in a fixing run", arguments: []string{"--host-build-only"}, wantCount: 1},
 	}
 	for _, each := range cases {
 		test.Run(each.name, func(test *testing.T) {
@@ -125,7 +125,7 @@ func TestARunWhoseBuildsMergeIndexesEachFileOnce(test *testing.T) {
 			builtByFile[file]++
 			built++
 		}
-	}, "--no-cache", "--no-fix", "--other-builds")
+	}, "--no-cache", "--no-fix")
 	if len(engine.buildRuns) < 2 {
 		test.Fatalf("the merge was handed %d runs, want the host's and at least one other", len(engine.buildRuns))
 	}

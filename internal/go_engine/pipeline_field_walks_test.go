@@ -100,8 +100,7 @@ func foundBy(run buildRun, file string, upstream string) bool {
 func TestEveryWalkOfAnotherPackagesTypeStartsFromAWholeRead(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "field-walks")), exitFindings,
-		"--other-builds")
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "field-walks")), exitFindings)
 	host, windows := engine.buildRuns[0], windowsRun(test, engine)
 	for _, row := range fieldWalkRows {
 		test.Run(row.name, func(test *testing.T) {

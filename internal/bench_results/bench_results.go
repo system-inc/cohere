@@ -96,9 +96,9 @@ type Record struct {
 	// to the Go engine does: #pff7xhr's bar is a checking run's seconds, and a fixing run formats first (#jp0cqkk).
 	// Absent, they fixed, as every record before it did, so Guard never compares a fixing number with a checking one.
 	NoFix bool `json:"noFix,omitempty"`
-	// EveryBuild is whether the runs asked to check every build the Go files name, `--other-builds`, rather than the
-	// host's build alone, which every record before it measured. The two measure different work, so Guard never
-	// compares one with the other (#ccqee0e).
+	// EveryBuild is whether the runs checked every build the Go files name, as a plain run does (#qqyq61s), rather
+	// than the host's build alone, `--host-build-only`, which every record before it measured. The two measure
+	// different work, so Guard never compares one with the other (#ccqee0e).
 	EveryBuild bool `json:"everyBuild,omitempty"`
 	// Builds are the builds the Cold and Idle runs' Go project checked, as its summary names them, the host's first,
 	// the same in every one of those runs. Absent when they name none: no Go project, or a record written before the

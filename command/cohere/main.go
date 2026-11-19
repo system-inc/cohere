@@ -141,11 +141,13 @@ func run() error {
 		"in a Go project, neither read nor write the Go engine's system cache, the standard library's entries it "+
 			"keeps in the user's cache directory for every project, so the standard library is computed; changes "+
 			"nothing in TypeScript and Swift projects yet")
-	// Go's alone, forwarded to its engine and to nothing else (goFlags, withoutGoOnlySwitches), and read through given:
-	// a file only another platform, cgo setting or build tag compiles is checked, and otherwise a gap (#72n9mq0).
-	flag.Bool("other-builds", false,
-		"in a Go project, check every build its files name beside this machine's (another GOOS, cgo, a build tag) "+
-			"and merge their findings, so only a file no build compiles is left unchecked")
+	// Go's alone, forwarded to its engine and to nothing else (goFlags, withoutGoOnlySwitches), and read through given.
+	// A Go run checks every build its files name by default (#qqyq61s), so a file only another platform, cgo setting
+	// or build tag compiles is checked; this narrows the run to the machine's own build, and names each such file as
+	// a gap (#72n9mq0).
+	flag.Bool("host-build-only", false,
+		"in a Go project, check only this machine's build, not every build its files name (another GOOS, cgo, a "+
+			"build tag), and name each file only another build compiles as not checked")
 	// A binary that implements no rule and a binary whose rule found nothing produce the same empty
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
 	// it asks.

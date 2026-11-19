@@ -115,9 +115,10 @@ func recordRunSummary(summary runSummary) {
 // `--adamic-readiness` measures what the run without it does not, so it is its own record too, and a run
 // with it never replays one without it, nor one without it a run with it (#9tgm3dq).
 //
-// `--other-builds` checks a Go project's other builds too, which a run without it does not, so it is its own record
-// as well. Its verdict is replayed only while every build's inputs are unchanged, since the Go engine's inputs record
-// names what every build's load read (#e4b08k7), and the land gate runs with it (#72n9mq0).
+// `--host-build-only` checks a Go project's host build alone, where a run without it checks every build its files
+// name (#qqyq61s), so it is its own record as well, and neither replays the other. A run without it is replayed only
+// while every build's inputs are unchanged, since the Go engine's inputs record names what every build's load read
+// (#e4b08k7), and the land gate runs without it (#72n9mq0).
 //
 // `--timing` is never admitted, on any engine, so such a run neither replays nor is recorded. A timing run is a
 // measurement, and a replay would print the last run's CPU as this run's, a table of costs this run never spent.
@@ -168,7 +169,7 @@ func runCacheAdmits(arguments []string) bool {
 	for _, argument := range arguments {
 		switch argument {
 		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases", "--adamic-readiness",
-			"--other-builds", "--no-system-cache":
+			"--host-build-only", "--no-system-cache":
 		default:
 			return false
 		}
