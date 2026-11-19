@@ -288,7 +288,7 @@
             }
         },
         "timeline": {
-            "description": "When each phase and each build of a Go run began and ended, under --timeline: the Go engine's timeline record, written through once before the summary. Every stamp is on one clock from the engine process's start, with the process's user and system CPU from that start to then, so the cores busy between two stamps are their CPU's difference over their wall's. It changes nothing of the run. A run that is not Go, or not under --timeline, writes none.",
+            "description": "When each phase and each build of a Go run began and ended, under --timeline: the Go engine's timeline record, written through once before the summary. Every stamp's wall is from the moment the engine package initialized and its CPU the process's user and system CPU from the process's start, so the cores busy between two stamps are their CPU's difference over their wall's, and the first stamp's ratio is no figure. No two stamps share their build, round and label, and begins and ends need not pair: a run with no extra build has no handover.end, and a build that fails or finds type errors has no end. It changes nothing of the run. A run that is not Go, or not under --timeline, writes none.",
             "type": "object",
             "additionalProperties": false,
             "required": ["kind", "stamps"],
@@ -310,14 +310,23 @@
                         "additionalProperties": false,
                         "required": ["label", "wallMicroseconds", "userMicroseconds", "systemMicroseconds"],
                         "properties": {
+                            "build": {
+                                "type": "string",
+                                "description": "The extra build the stamp is of, as the summary's builds name it, such as windows/amd64. Absent for the host's run and the run's own steps."
+                            },
+                            "round": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "description": "1 for a load or a check that runs again after its first, as the long-line wrap's load or a reload for a question does, 2 for the next. Absent for the first."
+                            },
                             "label": {
                                 "type": "string",
-                                "description": "The moment, such as host.load.end, handover.begin, or a build's target name, a dot and its step, as build windows/amd64.gate.taken."
+                                "description": "The moment, such as host.load.end, handover.begin, or a build's step, such as gate.taken."
                             },
                             "wallMicroseconds": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "description": "Wall time from the engine process's start."
+                                "description": "Wall time from the moment the engine package initialized."
                             },
                             "userMicroseconds": {
                                 "type": "integer",

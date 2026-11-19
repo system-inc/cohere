@@ -190,6 +190,12 @@ type pipeline struct {
 	hostLoading atomic.Int64
 	hostLinting atomic.Int64
 
+	// hostLoads and hostChecks count the host's loads of the workspace (loadWorkspacePackages) and its lint passes
+	// (lintPackages) as each starts, so under `--timeline` each one's stamps carry its round, 0 for the first, and no
+	// two stamps of the run are alike (#3v2zp7g). A pass beside the load starts on a goroutine of its own.
+	hostLoads  atomic.Int32
+	hostChecks atomic.Int32
+
 	// reads are the directory and file reads every in-process listing of the run shares, the host's and each extra
 	// build's, so an extra build's listing reads nothing the host's already did (#yyvstj6). Every load of the run may
 	// share them: each reads a file the run holds from its held bytes, which follow every write, and the run adds or
@@ -426,7 +432,6 @@ func (engine *pipeline) run() int {
 			loaded, loadError = engine.loadWorkspace(needsTypes)
 		}
 	}
-	engine.request.timeline.Stamp("host.load.end")
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
 	// The host's graph is built from the load's syntax before any rules let go of it, the rename's first pass's
 	// included, for the extra builds to be judged on under `--build-dependence`.

@@ -107,9 +107,10 @@ type loader struct {
 	// of export data is added to, measured on the goroutine that does it. Nil measures nothing.
 	timing *timing.Collector
 
-	// timeline is the load's Caching.Timeline, told the load's first parse once, as firstParse has it, nil for none.
-	timeline   func(label string)
-	firstParse sync.Once
+	// timeline is the load's Caching.Timeline, told the load's first parse once, by the parse that sets firstParsed,
+	// nil for none.
+	timeline    func(label string)
+	firstParsed atomic.Bool
 }
 
 // parsedFile is one file's parse, ready once done is closed. reserved is closed once the package that claimed the file
@@ -534,9 +535,10 @@ func (loader *loader) parseClaimed(taken *claim, current *node) ([]*ast.File, []
 			defer close(parse.done)
 			loader.acquire(current, slotWorkParse)
 			defer loader.slots.Release()
-			// The load's first parse, its slot held, under `--timeline`.
-			if loader.timeline != nil {
-				loader.firstParse.Do(func() { loader.timeline("parse.first") })
+			// The load's first parse, its slot held, under `--timeline`. Only the parse that wins the swap stamps, and
+			// every other passes straight on, so no parse holding a slot ever waits for the stamp.
+			if loader.timeline != nil && loader.firstParsed.CompareAndSwap(false, true) {
+				loader.timeline("parse.first")
 			}
 			loader.timing.Parse(loader.timing.Measure(func() {
 				parse.file, parse.parseError = loader.parseInto(

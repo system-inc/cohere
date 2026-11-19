@@ -9,10 +9,13 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
 // goTimelineStream is the Go contract's timeline fixture: a clean run whose timeline record, four stamps, comes last
@@ -128,10 +131,49 @@ func TestTimelineIsRefusedAtARootWithNoGoProject(test *testing.T) {
 	}
 }
 
+// TestANarrowedRunOfNoGoProjectRefusesAGoOnlySwitch: a run given `--directory` into a TypeScript project whose folder
+// check finds a folder runs the project as a child of its own (checkNarrowedProjectFolders), which is handed no switch
+// only a Go run takes, so `--timeline` and `--host-build-only` there would reach no run and the run would read as one
+// that did what was asked. Each is refused before the project runs, by name, and the same run without either judges
+// the folder, so the refusal is that path's.
+func TestANarrowedRunOfNoGoProjectRefusesAGoOnlySwitch(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		".gitignore": ".cache/\n",
+		"apps/web/CohereSettings.json": "{\n    \"extends\": \"cohere:typescript\",\n    \"rules\": {\n" +
+			"        \"" + configuration.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n",
+		"apps/web/tsconfig.json": "{ \"compilerOptions\": { \"strict\": true, \"noEmit\": true }, " +
+			"\"include\": [\"source\"] }\n",
+		"apps/web/source/tidy.ts": "export const tidy = 1;\n",
+		"apps/web/docs/README.md": "# Documentation\n",
+	})
+	folder := filepath.Join(root, "apps", "web", "docs")
+	output, exit := runCohere(test, binary, root, "--no-fix", "--directory", "apps/web")
+	if exit != 1 || !strings.Contains(output, folder+"/ - error "+configuration.AbbreviatedFolderName) {
+		test.Fatalf("the control exited %d, want 1 naming the folder, so the run reaches the folder check:\n%s", exit,
+			output)
+	}
+	for switchName, refusal := range map[string]string{
+		"timeline": "--timeline maps when each phase and each build of a Go run began and ended, and this is no " +
+			"Go project",
+		"host-build-only": "--host-build-only narrows which builds of a Go project's files are checked, and this " +
+			"is no Go project",
+	} {
+		output, exit := runCohere(test, binary, root, "--no-fix", "--directory", "apps/web", "--"+switchName)
+		if exit == 0 || !strings.Contains(output, refusal) || strings.Contains(output, folder+"/ - error") {
+			test.Errorf("--%s over a TypeScript project with a folder finding exited %d, want it refused before "+
+				"the project ran:\n%s", switchName, exit, output)
+		}
+	}
+}
+
 // TestAGoRunPrintsItsTimeline: a Go run under `--timeline` prints the engine's timeline record as a table (#3v2zp7g),
 // in the verbose view and the default one alike, since the switch asked for it by name: the unit first, then each
-// stamp in the order taken with its wall and the cores busy since the stamp before, the first since the process's
-// start, and `-` where no wall passed. A record of a timed run says its shape once.
+// stamp in the order taken with its wall and the cores busy since the stamp before, a build's indented under its name
+// and a step taken again with its round, `-` on the first row, whose wall and CPU start at different moments, and `-`
+// where no wall passed. A record of a timed run says its shape once.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoRunPrintsItsTimeline(test *testing.T) {
 	saved, savedSummary := activeOutput, activeSummary
@@ -147,10 +189,12 @@ func TestAGoRunPrintsItsTimeline(test *testing.T) {
 			"\ntimeline: when each step began or ended, as wall time since the engine started, and the cores busy "+
 				"since the step before, the process's CPU over the wall between them\n",
 			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "step", "wall", "cores"),
-			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "engine.main.begin", "3.0ms", "1.00"),
+			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "engine.main.begin", "3.0ms", "-"),
 			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "host.load.end", "403ms", "3.50"),
-			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "build windows/amd64.end", "403ms", "-"),
-			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "run.end", "803ms", "0.50"),
+			"  windows/amd64\n",
+			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "  load.end", "603ms", "2.50"),
+			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "  check.analyze.begin, round 1", "603ms", "-"),
+			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "run.end", "803ms", "1.50"),
 		)
 		forbidLines(test, output, "a timed run's shape")
 	}

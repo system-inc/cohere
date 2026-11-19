@@ -1,9 +1,19 @@
 package contract
 
 // TimelineRecord is additive within contract 3, and the Go engine's alone: under `--timeline` it says when each phase
-// of the run and each build began and ended, on one clock from the engine process's start, with the process's CPU so
-// far at each, so a reader sees where the wall time went and how many cores were busy between any two stamps. It is
-// written once, the last record before the summary, after the inputs record when there is one.
+// of the run and each build began and ended, on one clock from the moment the engine package initialized, with the
+// process's CPU so far at each, so a reader sees where the wall time went and how many cores were busy between any two
+// stamps. It is written once, the last record before the summary, after the inputs record when there is one.
+//
+// The wall and the CPU start at different moments: the CPU at the process's start, the wall once the runtime and every
+// package the engine imports have initialized. So the cores between two stamps are a true figure, and the first
+// stamp's CPU over its wall is not one.
+//
+// A stamp is one of the run's by its build, its round and its label together, never two alike. A load or a check that
+// runs again, the long-line wrap's load, a reload for a question, carries its round, so its steps are told apart from
+// the first's. Begins and ends do not always pair: a run with no extra build stamps `handover.begin` and no
+// `handover.end`, and a build that fails or finds type errors stamps no `end`, so a reader pairing them expects
+// orphans.
 //
 // It changes nothing about the run: the cache, the builds' width and every finding are what they are without it. A run
 // also under `--timing` has a timed run's shape, no cache and builds one at a time, which Timed says, so its timeline
@@ -39,9 +49,14 @@ func (record TimelineRecord) MarshalJSON() ([]byte, error) {
 	return encodeWithoutHtmlEscaping(declared)
 }
 
-// TimelineStamp is one moment of the run: its label, such as `host.load.end` or `build windows/amd64.gate.taken`, the
-// wall since the engine process started, and the process's user and system CPU from its start to then.
+// TimelineStamp is one moment of the run: the extra build it is of, empty for the host's run and the run's own steps,
+// its round, its label, such as `host.load.end` or a build's `gate.taken`, the wall since the engine package
+// initialized, and the process's user and system CPU from the process's start to then.
 type TimelineStamp struct {
+	// Build is the extra build's name (project.Build.String), such as `windows/amd64`, and omitted for the host's.
+	Build string `json:"build,omitempty"`
+	// Round is 1 for a load or a check that runs again after its first, 2 for the next, and omitted for the first.
+	Round              int    `json:"round,omitempty"`
 	Label              string `json:"label"`
 	WallMicroseconds   int64  `json:"wallMicroseconds"`
 	UserMicroseconds   int64  `json:"userMicroseconds"`

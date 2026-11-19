@@ -868,6 +868,14 @@ project, and the front door records nothing for either.
             "wallMicroseconds": 412000,
             "userMicroseconds": 1630000,
             "systemMicroseconds": 210000
+        },
+        {
+            "build": "windows/amd64",
+            "round": 1,
+            "label": "check.analyze.begin",
+            "wallMicroseconds": 618000,
+            "userMicroseconds": 2410000,
+            "systemMicroseconds": 260000
         }
     ]
 }
@@ -876,14 +884,21 @@ project, and the front door records nothing for either.
 Additive within contract 3, and the Go engine's alone: under `--timeline` it says when each phase of the run and each
 build began and ended, so a reader sees where the wall time went. It is written once, the last record before the
 summary, after `inputs` when there is one, and never in a run that did not ask, which the front door refuses as a
-broken stream, as it does a second one and any record but the summary after it. The Swift engine refuses
-`--timeline` and writes none.
+broken stream, as it does a second one and any record but the summary after it. The engine refuses `--timeline` on a
+run that is no check, `--rules`, `--rules-enabled`, `--version` and the editor's save, by name with exit 2, rather
+than accept it and write nothing. The Swift engine refuses `--timeline` and writes none.
 
-Each stamp is taken on one clock, the engine process's start, and holds the process's user and system CPU from that
-start to then, all in microseconds, so the cores busy between two stamps are their CPU's difference over their wall's.
-`stamps` are in the order taken, which is the order of their wall, and `[]` when there are none, never left out. A
-label names a moment, such as `host.load.end`, `handover.begin` or `build windows/amd64.gate.taken`; a build's labels
-are its target's name, a dot, and the step.
+Each stamp holds its wall from the moment the engine package initialized and the process's user and system CPU from
+the process's start, all in microseconds, so the cores busy between two stamps are their CPU's difference over their
+wall's. The two start at different moments, so the first stamp's CPU over its wall is no figure. `stamps` are in the
+order taken, which is the order of their wall, and `[]` when there are none, never left out.
+
+A stamp's `label` names a moment, such as `host.load.end`, `handover.begin` or a build's `gate.taken`. `build` is the
+extra build the stamp is of, its name as the lint record's `builds` name it, and omitted for the host's run and the
+run's own steps. `round` is 1 for a load or a check that runs again after its first, as the long-line wrap's load or
+a reload for a question does, 2 for the next, and omitted for the first. No two stamps of a record share their build,
+round and label. Begins and ends do not always pair: a run with no extra build stamps `handover.begin` and no
+`handover.end`, and a build that fails or finds type errors stamps no `end`.
 
 The switch changes nothing of the run: the cache, the builds' width and every finding are what they are without it.
 `--timing` does change a run's shape, turning every cache off and running the builds one at a time, so a run under
@@ -901,9 +916,9 @@ cores out rather than print zeros:
 }
 ```
 
-The front door prints the record as a table, each stamp's wall and the cores busy since the stamp before it, and under
-`--json` writes it through as a `timeline` line before the summary (schema/CohereOutput.schema.json). A run under
-`--timeline` prints another run's clock if replayed, so the run cache never replays it and never records it.
+The front door prints the record as a table, each stamp's build, round, wall and the cores busy since the stamp before
+it, and under `--json` writes it through as a `timeline` line before the summary (schema/CohereOutput.schema.json). A
+run under `--timeline` prints another run's clock if replayed, so the run cache never replays it and never records it.
 
 ### `lint`
 

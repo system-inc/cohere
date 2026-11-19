@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_file"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
 // loadWorkspace loads the workspace's packages, through the findings cache when the run has one, keeping go list's
@@ -46,9 +47,11 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 		SharedReads:   engine.reads,
 		// The fingerprints the builds share (#t7h2sm4): the host's last load reads the bytes the builds read.
 		Fingerprints: engine.fingerprints,
-		// Under `--timeline` the host's load stamps its listing's end and its first parse.
-		Timeline: engine.request.timeline.Prefixed("host."),
 	}
+	// Under `--timeline` the host's load stamps its listing's end, its restore and its first parse, and its end below,
+	// each in the load's round: 0 for the run's first, 1 for the wrap's load or a reload for a question after it.
+	timelineHook := engine.request.timeline.Hook(nil, int(engine.hostLoads.Add(1)-1), "host.")
+	caching.Timeline = timelineHook
 	if engine.session != nil {
 		caching.Restorer = engine.session
 		if engine.session.HasStore() {
@@ -70,7 +73,9 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 		engine.request.judgesDependence()
 	started := time.Now()
 	defer func() { engine.hostLoading.Add(int64(time.Since(started))) }()
-	return engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})
+	loaded, loadError := engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})
+	timeline.Tell(timelineHook, "load.end")
+	return loaded, loadError
 }
 
 // wrapAfterLoad is the fix phase's long-line wrap, run after the load and only over a load that found the types sound,

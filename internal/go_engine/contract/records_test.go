@@ -415,7 +415,8 @@ func populatedRecords() []Record {
 			Unavailable: "the process's CPU clock could not be read",
 			Timed:       true,
 			Stamps: []TimelineStamp{
-				{Label: "engine.main.begin", WallMicroseconds: 3200, UserMicroseconds: 2100, SystemMicroseconds: 900},
+				{Build: "windows/amd64", Round: 1, Label: "listing.end", WallMicroseconds: 3200, UserMicroseconds: 2100,
+					SystemMicroseconds: 900},
 			},
 		},
 		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1, UnguardedWorkspaceSums: []string{"/work/go.work.sum"}},

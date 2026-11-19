@@ -534,8 +534,10 @@ func (engine *pipeline) extraBuildRun(
 	afterLoad func(loaded bool),
 	atGate func(fromSource int, packages int) error,
 ) (buildRun, error) {
-	// Under `--timeline` the build's stamps, each label after the build's name, its check's too.
-	stamp := engine.request.timeline.Prefixed("build " + extra.String() + ".")
+	// Under `--timeline` the build's stamps, each under the build's name, in its first round: its own steps, and its
+	// first load's and check's. A reload's are in the reload's round, the rounds checkedFromSourceRounds counts. The
+	// name is asked only of a run that stamps.
+	stamp := engine.request.timeline.Hook(extra, 0, "")
 	timeline.Tell(stamp, "start")
 	environment := extraBuildEnvironment(engine.described.workspace, extra)
 	// The build's one go env, which its findings cache's key and its load, the lister and the kept listing among it,
@@ -753,7 +755,8 @@ func (engine *pipeline) extraBuildRun(
 			// differential the build's own facts are captured, for its second leg to compare those left standing by.
 			FactReachSettle: engine.factReachSettle(factHosts != nil),
 			FactReach:       engine.bodyDifferential && factHosts != nil,
-			Timeline:        stamp,
+			// Under `--timeline` the check stamps in the round of the load it runs over, the last one counted.
+			Timeline: engine.request.timeline.Hook(extra, len(run.checkedFromSourceRounds)-1, ""),
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -776,6 +779,8 @@ func (engine *pipeline) extraBuildRun(
 		// package restored from the host's run whose facts or answers do not hold here (check.Result.Reloads).
 		for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
 			reloads := strings.Join(result.Reloads, ", ")
+			// The reload's load, and the check over it, stamp in the round this load is of: 1 for the first reload.
+			caching.Timeline = engine.request.timeline.Hook(extra, len(run.checkedFromSourceRounds), "")
 			started := time.Now()
 			loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 			elapsed := time.Since(started)

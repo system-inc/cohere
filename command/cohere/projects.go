@@ -268,11 +268,14 @@ func lintsWholeLocatedProject(
 // path does; reported is then true. With none, the run goes on in this process as it always did.
 //
 // flags are the run's arguments less its paths, which are the root's alone when it has any, and which the project's
-// run, named by its directory, needs no more.
+// run, named by its directory, needs no more. given is the flags the run was typed, read for a switch only a Go run
+// takes, which a project that is no Go one's refuses here rather than run without (refuseGoOnlySwitchesWithoutGo):
+// the project's run is handed none of them, and would read as one that did what was asked.
 func checkNarrowedProjectFolders(
 	location projectLocation,
 	lintConfigFileName string,
 	flags []string,
+	given map[string]bool,
 ) (int, bool, error) {
 	ignoreEntries, rootIgnoreEntriesError := rootIgnoreEntries(location.Root)
 	if rootIgnoreEntriesError != nil {
@@ -302,6 +305,9 @@ func checkNarrowedProjectFolders(
 		Projects:       []discoveredProject{located},
 		Folders:        walked.Folders,
 		FolderSeverity: severity,
+	}
+	if refuseError := refuseGoOnlySwitchesWithoutGo(found, given, flagValue); refuseError != nil {
+		return 0, false, refuseError
 	}
 	// The project's run is named by the directory and tsconfig runProject gives it, so this run's own go.
 	arguments := childArguments(withoutValuedFlags(flags, []string{"directory", "tsconfig"}), lintConfigFileName, false)

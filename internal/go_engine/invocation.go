@@ -48,9 +48,22 @@ type invocation struct {
 	// that did not ask, never read from the command line.
 	timeline *timeline.Recorder
 
+	// timelineClock is the clock the run's recorder reads (newTimeline), the zero Clock for the system's unless a test
+	// counts the run's reads of it, never read from the command line.
+	timelineClock timeline.Clock
+
 	// readFromDisk is how read reads a file from disk, os.ReadFile unless a test watches the run's reads, never read
 	// from the command line.
 	readFromDisk func(file string) ([]byte, error)
+}
+
+// timelineRefusals are the runs that refuse `--timeline`, by mode, each with what it does in place of a check: only a
+// check run has phases and builds to map, and a switch accepted and ignored reads as a run that did what was asked.
+var timelineRefusals = map[mode]string{
+	modeRules:        "lists the rules",
+	modeRulesEnabled: "lists the rules the settings turn on",
+	modeVersion:      "prints the version",
+	modeStdin:        "is the editor's save, which prints one file's text",
 }
 
 // check refuses what each flag allows alone but the command line does not allow as a whole.
@@ -71,6 +84,10 @@ func (request invocation) check() error {
 	}
 	if stdinError := request.checkStdin(); stdinError != nil {
 		return stdinError
+	}
+	if refused, isRefused := timelineRefusals[request.mode()]; isRefused && request.switches["timeline"] {
+		return fmt.Errorf("--timeline maps a check run's phases and builds, and this run %s, so it was refused "+
+			"rather than run without it", refused)
 	}
 	for _, refused := range refusedTogether {
 		if !request.switches[refused.name] {

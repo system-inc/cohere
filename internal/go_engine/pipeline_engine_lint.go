@@ -20,6 +20,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
 // lintSuppressionRules are suppression's two rules, which run in the lint phase on the directives themselves.
@@ -318,10 +319,11 @@ func (engine *pipeline) lintPackages(
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
 	}
-	// Under `--timeline` the host's check stamps its analysis and its save.
-	options.Timeline = engine.request.timeline.Prefixed("host.")
+	// Under `--timeline` the host's check stamps its analysis and its save, and its end below, in the pass's round: 0
+	// for the run's first, 1 for the pass over the wrap's load, a rename's or a reload's after it.
+	options.Timeline = engine.request.timeline.Hook(nil, int(engine.hostChecks.Add(1)-1), "host.")
 	result, checkError := check.Run(analyzed, enabled, options)
-	engine.request.timeline.Stamp("host.lint.check.end")
+	timeline.Tell(options.Timeline, "lint.check.end")
 	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}

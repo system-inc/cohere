@@ -357,6 +357,7 @@ func run() error {
 			location,
 			namedLintConfiguration,
 			flags,
+			given,
 		)
 		if checkNarrowedProjectFoldersError != nil {
 			return checkNarrowedProjectFoldersError

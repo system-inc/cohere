@@ -146,9 +146,9 @@ type Options struct {
 	FactReachSettle *analysis.Analyzer
 
 	// Timeline is told each boundary of the run's analysis and its save under `--timeline`, as `check.analyze.begin`
-	// and `.end` and `check.save.begin` and `.end`, nil for a run that did not ask, which tells nothing (#3v2zp7g). A
-	// field rather than package state, so two runs in one process never stamp each other's timeline. The findings are
-	// the same either way.
+	// and `.end` and `check.save.begin` and `.end`, the analysis holding the findings cache's first wave and its save,
+	// nil for a run that did not ask, which tells nothing (#3v2zp7g). A field rather than package state, so two runs in
+	// one process never stamp each other's timeline. The findings are the same either way.
 	Timeline func(label string)
 
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
@@ -449,6 +449,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		checkerOptions.FactsBelowRestored = func(restoring *packages.Package) bool {
 			return session.fromHost(restoring) != nil
 		}
+		// The first wave is analysis too, of the misses with no miss below them, and the save of what it analyzed, so
+		// the check's analysis begins before it.
+		timeline.Tell(options.Timeline, "check.analyze.begin")
 		firstGraph, waveError := session.firstWave(roots, checkerOptions, options.Withheld)
 		if waveError != nil {
 			return nil, waveError
@@ -468,7 +471,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			session.counts.Waves++
 		}
 	}
-	timeline.Tell(options.Timeline, "check.analyze.begin")
+	if session == nil {
+		timeline.Tell(options.Timeline, "check.analyze.begin")
+	}
 	graph, analyzeError := checker.Analyze(roots, toAnalyze, checkerOptions)
 	timeline.Tell(options.Timeline, "check.analyze.end")
 	if analyzeError != nil {

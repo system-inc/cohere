@@ -1,12 +1,13 @@
 package go_engine
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -17,13 +18,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
-)
-
-// timelineBuildPrefix is how a build's stamps begin, before its target's name, and timelineBuildShape what the shape
-// of a build's label puts in place of that name.
-const (
-	timelineBuildPrefix = "build "
-	timelineBuildShape  = "build <target>."
 )
 
 // hostTimeline is every stamp a cold run of every build over the other-builds fixture takes outside its extra builds,
@@ -49,7 +43,7 @@ var hostTimeline = []string{
 	"run.end",
 }
 
-// buildTimeline is every stamp each extra build takes, after its target's name, in the order taken.
+// buildTimeline is every stamp each extra build takes, under its name, in the order taken.
 var buildTimeline = []string{
 	"start",
 	"listing.end",
@@ -65,21 +59,43 @@ var buildTimeline = []string{
 	"end",
 }
 
-// timelineStream is the engine's stream over root with the registry's rules and its findings cache in root's own
-// store, under `--no-fix`, so nothing is written to the tree, and extra, and the exit it made, which the stream agrees
-// with.
-func timelineStream(test *testing.T, root string, extra ...string) []string {
+// timelineRun is the engine's stream over root with the registry's rules and its findings cache in root's own store,
+// under `--no-fix` unless fixes, so nothing is written to the tree, and extra, its request changed by change when not
+// nil, its extra builds run width at once, as a test forces it (buildsWidthForced), and its exit, which the stream
+// agrees with, wantExit.
+func timelineRun(
+	test *testing.T,
+	root string,
+	width int,
+	change func(request *invocation),
+	wantExit int,
+	extra ...string,
+) []string {
 	test.Helper()
-	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
-	var standardOutput bytes.Buffer
-	var standardError bytes.Buffer
-	exitCode := runIsolated(test, arguments, &standardOutput, &standardError, rules.All(), nil)
-	checkStream(test, standardOutput.String(), exitCode)
-	if exitCode != exitFindings {
-		test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, exitFindings, standardOutput.String(),
-			standardError.String())
+	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
+	request, parseError := parseInvocation(arguments)
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
-	return strings.Split(strings.TrimSuffix(standardOutput.String(), "\n"), "\n")
+	if change != nil {
+		change(&request)
+	}
+	_, standardOutput, standardError, exitCode := runOverRequest(test, request, rules.All(), func(engine *pipeline) {
+		engine.buildsWidthForced = width
+		// The width applies whether or not the builds restore from the host's run.
+		engine.buildsWidthUnguarded = true
+	})
+	checkStream(test, standardOutput, exitCode)
+	if exitCode != wantExit {
+		test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, wantExit, standardOutput, standardError)
+	}
+	return strings.Split(strings.TrimSuffix(standardOutput, "\n"), "\n")
+}
+
+// otherBuildsRun is timelineRun over root, a copy of the other-builds fixture, under `--no-fix`, which finds one.
+func otherBuildsRun(test *testing.T, root string, width int, change func(*invocation), extra ...string) []string {
+	test.Helper()
+	return timelineRun(test, root, width, change, exitFindings, append([]string{"--no-fix"}, extra...)...)
 }
 
 // recordOfKind is the one record of kind in lines, decoded into record, with its index, -1 when there is none, and a
@@ -102,91 +118,147 @@ func recordOfKind[Record contract.Record](test *testing.T, lines []string, kind 
 	return found
 }
 
-// A cold run of every build under `--timeline` writes one timeline record, the last before the summary, whose stamps
-// are the host's in their order with each extra build's in theirs between the handover's end and the builds' end, no
-// stamp of any other shape, every build the lint record names stamped, and a wall that never goes back (#3v2zp7g).
-func TestATimelineMapsEveryPhaseAndBuildInOrder(test *testing.T) {
-	test.Parallel()
-	lines := timelineStream(test, copyFixture(test, filepath.Join("testdata", "other-builds")), "--timeline")
+// timelineOf is the timeline record of lines, which must be the last before the summary.
+func timelineOf(test *testing.T, lines []string) contract.TimelineRecord {
+	test.Helper()
 	var record contract.TimelineRecord
 	index := recordOfKind(test, lines, contract.KindTimeline, &record)
 	if index < 0 || index != len(lines)-2 {
 		test.Fatalf("the timeline record is line %d of %d, want the last before the summary", index+1, len(lines))
 	}
-	if record.Timed || record.Unavailable != "" {
-		test.Errorf("an untimed run's timeline is timed %v, unavailable %q", record.Timed, record.Unavailable)
-	}
+	return record
+}
 
-	var shapes []string
-	byBuild := map[string][]string{}
-	var host []string
-	handoverEnd, buildsEnd := -1, -1
+// timelineIdentity is what makes a stamp one of its run's: its build, its round and its label.
+type timelineIdentity struct {
+	build string
+	round int
+	label string
+}
+
+// requireUniqueStamps fails the test for each stamp of record that shares its build, round and label with one before
+// it, and for a wall that goes back.
+func requireUniqueStamps(test *testing.T, record contract.TimelineRecord) {
+	test.Helper()
+	seen := map[timelineIdentity]bool{}
 	for position, stamp := range record.Stamps {
+		identity := timelineIdentity{build: stamp.Build, round: stamp.Round, label: stamp.Label}
+		if seen[identity] {
+			test.Errorf("stamp %+v is a second one of build %q, round %d, label %s", stamp, stamp.Build,
+				stamp.Round, stamp.Label)
+		}
+		seen[identity] = true
 		if position > 0 && stamp.WallMicroseconds < record.Stamps[position-1].WallMicroseconds {
-			test.Errorf("stamp %s's wall %dµs is before %s's, the stamp before it, %dµs", stamp.Label,
-				stamp.WallMicroseconds, record.Stamps[position-1].Label, record.Stamps[position-1].WallMicroseconds)
-		}
-		if stamp.UserMicroseconds <= 0 || stamp.SystemMicroseconds < 0 {
-			test.Errorf("stamp %s holds no CPU: %+v", stamp.Label, stamp)
-		}
-		named, isBuild := strings.CutPrefix(stamp.Label, timelineBuildPrefix)
-		if !isBuild {
-			host = append(host, stamp.Label)
-			shapes = append(shapes, stamp.Label)
-			switch stamp.Label {
-			case "handover.end":
-				handoverEnd = position
-			case "builds.end":
-				buildsEnd = position
-			}
-			continue
-		}
-		// A target's name holds no dot of its own, so the build's is the first.
-		target, step, _ := strings.Cut(named, ".")
-		byBuild[target] = append(byBuild[target], step)
-		shapes = append(shapes, timelineBuildShape+step)
-		if handoverEnd < 0 || buildsEnd >= 0 {
-			test.Errorf("build %s stamped %s outside the handover's end and the builds' end", target, step)
+			test.Errorf("stamp %+v's wall is before the stamp's before it, %+v", stamp, record.Stamps[position-1])
 		}
 	}
-	if !slices.Equal(host, hostTimeline) {
-		test.Errorf("the run stamped, outside its builds,\n  %q\nwant\n  %q", host, hostTimeline)
+}
+
+// A cold run of every build under `--timeline`, its builds one at a time and two at once, writes one timeline record,
+// the last before the summary, whose stamps are the host's in their order with each extra build's in theirs, under its
+// name, between the handover's end and the builds' end, however the two builds' interleave, no stamp of any other
+// label, every build the lint record names stamped, no two stamps alike, and a wall that never goes back (#3v2zp7g).
+func TestATimelineMapsEveryPhaseAndBuildInOrder(test *testing.T) {
+	test.Parallel()
+	for _, width := range []int{1, 2} {
+		test.Run(fmt.Sprintf("%d at once", width), func(test *testing.T) {
+			test.Parallel()
+			lines := otherBuildsRun(test, copyFixture(test, filepath.Join("testdata", "other-builds")), width, nil,
+				"--timeline")
+			record := timelineOf(test, lines)
+			if record.Timed || record.Unavailable != "" {
+				test.Errorf("an untimed run's timeline is timed %v, unavailable %q", record.Timed, record.Unavailable)
+			}
+			requireUniqueStamps(test, record)
+
+			byBuild := map[string][]string{}
+			var host []string
+			handoverEnd, buildsEnd := -1, -1
+			for position, stamp := range record.Stamps {
+				if stamp.UserMicroseconds <= 0 || stamp.SystemMicroseconds < 0 || stamp.Round != 0 {
+					test.Errorf("stamp %+v holds no CPU or is of a round past the first", stamp)
+				}
+				if stamp.Build == "" {
+					host = append(host, stamp.Label)
+					switch stamp.Label {
+					case "handover.end":
+						handoverEnd = position
+					case "builds.end":
+						buildsEnd = position
+					}
+					continue
+				}
+				byBuild[stamp.Build] = append(byBuild[stamp.Build], stamp.Label)
+				if handoverEnd < 0 || buildsEnd >= 0 {
+					test.Errorf("build %s stamped %s outside the handover's end and the builds' end", stamp.Build,
+						stamp.Label)
+				}
+			}
+			if !slices.Equal(host, hostTimeline) {
+				test.Errorf("the run stamped, outside its builds,\n  %q\nwant\n  %q", host, hostTimeline)
+			}
+
+			var lint contract.LintRecord
+			recordOfKind(test, lines, contract.KindLint, &lint)
+			if lint.BuildsAtOnce != width {
+				test.Errorf("the builds ran %d at once, want %d", lint.BuildsAtOnce, width)
+			}
+			var extraTargets []string
+			for _, build := range lint.Builds {
+				if !build.Host {
+					extraTargets = append(extraTargets, build.Target)
+				}
+			}
+			if len(extraTargets) < 2 {
+				test.Fatalf("the lint record names extra builds %q, and the fixture has two", extraTargets)
+			}
+			if targets := slices.Sorted(maps.Keys(byBuild)); !slices.Equal(targets,
+				slices.Sorted(slices.Values(extraTargets))) {
+				test.Errorf("the timeline stamped builds %q, and the lint record names %q", targets, extraTargets)
+			}
+			for target, steps := range byBuild {
+				if !slices.Equal(steps, buildTimeline) {
+					test.Errorf("build %s stamped\n  %q\nwant\n  %q", target, steps, buildTimeline)
+				}
+			}
+		})
+	}
+}
+
+// A load or a check that runs again stamps in its own round: a fixing run whose long-line wrap wrote loads the
+// workspace a second time, whose steps carry round 1, every load's steps end in their own `host.load.end`, and no two
+// stamps are alike. A run that loads nothing, `--format-only`, stamps no load at all.
+func TestATimelineTellsALoadThatRunsAgainByItsRound(test *testing.T) {
+	test.Parallel()
+	record := timelineOf(test, timelineRun(test, copyFixture(test, filepath.Join("testdata", "long-lines")), 0, nil,
+		exitFindings, "--timeline"))
+	requireUniqueStamps(test, record)
+	loads := map[int][]string{}
+	for _, stamp := range record.Stamps {
+		if strings.HasPrefix(stamp.Label, "host.") && !strings.HasPrefix(stamp.Label, "host.check.") &&
+			stamp.Label != "host.lint.check.end" {
+			loads[stamp.Round] = append(loads[stamp.Round], stamp.Label)
+		}
+	}
+	for round := range 2 {
+		if steps := loads[round]; len(steps) == 0 || steps[len(steps)-1] != "host.load.end" ||
+			!slices.Contains(steps, "host.listing.end") {
+			test.Errorf("the load of round %d stamped %q, want its listing and its own end last", round, steps)
+		}
+	}
+	if len(loads) != 2 {
+		test.Errorf(
+			"the run stamped loads of rounds %v, want the first and the wrap's",
+			slices.Sorted(maps.Keys(loads)),
+		)
 	}
 
-	var lint contract.LintRecord
-	recordOfKind(test, lines, contract.KindLint, &lint)
-	var extraTargets []string
-	for _, build := range lint.Builds {
-		if !build.Host {
-			extraTargets = append(extraTargets, build.Target)
+	formatOnly := timelineOf(test, timelineRun(test, copyFixture(test, filepath.Join("testdata", "unformatted")), 0,
+		nil, exitFindings, "--timeline", "--format-only", "--no-fix"))
+	for _, stamp := range formatOnly.Stamps {
+		if strings.HasPrefix(stamp.Label, "host.") {
+			test.Errorf("a run that loads nothing stamped %+v", stamp)
 		}
-	}
-	if len(extraTargets) < 2 {
-		test.Fatalf("the lint record names extra builds %q, and the fixture has two", extraTargets)
-	}
-	if targets := slices.Sorted(func(yield func(string) bool) {
-		for target := range byBuild {
-			if !yield(target) {
-				return
-			}
-		}
-	}); !slices.Equal(targets, slices.Sorted(slices.Values(extraTargets))) {
-		test.Errorf("the timeline stamped builds %q, and the lint record names %q", targets, extraTargets)
-	}
-	for target, steps := range byBuild {
-		if !slices.Equal(steps, buildTimeline) {
-			test.Errorf("build %s stamped\n  %q\nwant\n  %q", target, steps, buildTimeline)
-		}
-	}
-
-	// Every shape a stamp may take, so a stamp renamed, added or dropped anywhere fails here by its name.
-	want := slices.Clone(hostTimeline)
-	for _, step := range buildTimeline {
-		want = append(want, timelineBuildShape+step)
-	}
-	slices.Sort(want)
-	if got := slices.Compact(slices.Sorted(slices.Values(shapes))); !slices.Equal(got, want) {
-		test.Errorf("the timeline's label shapes are\n  %q\nwant\n  %q", got, want)
 	}
 }
 
@@ -210,19 +282,16 @@ func (counting *countingClock) clock() timeline.Clock {
 	}
 }
 
-// A run without `--timeline` makes no recorder: it reads the timeline's clock not once and writes no timeline record,
-// so the switch costs a run that did not ask nothing. The same run under the switch reads it, so a count of 0 is the
-// switch's and not a clock the run never reached.
-//
-// Not parallel: it replaces the package-level timelineClock, which every run of this package reads as it starts.
+// A run without `--timeline` makes no recorder: it reads the clock its request hands a timeline not once and writes no
+// timeline record. The same run under the switch reads it, so a count of 0 is the switch's and not a clock the run
+// never reached. It counts the reads of that clock alone: a bare read of the system's clock at a stamp site is no
+// read of it.
 func TestARunWithoutTheTimelineReadsNoClock(test *testing.T) {
-	saved := timelineClock
-	defer func() { timelineClock = saved }()
+	test.Parallel()
 	counting := &countingClock{}
-	timelineClock = counting.clock()
-
+	counted := func(request *invocation) { request.timelineClock = counting.clock() }
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	lines := timelineStream(test, root)
+	lines := otherBuildsRun(test, root, 1, counted)
 	if reads := counting.reads.Load(); reads != 0 {
 		test.Errorf("a run without --timeline read the timeline's clock %d times, want none", reads)
 	}
@@ -231,9 +300,9 @@ func TestARunWithoutTheTimelineReadsNoClock(test *testing.T) {
 		test.Errorf("a run without --timeline wrote a timeline record on line %d", index+1)
 	}
 
-	timelineStream(test, root, "--timeline")
+	otherBuildsRun(test, root, 1, counted, "--timeline")
 	if counting.reads.Load() == 0 {
-		test.Error("a run under --timeline read no clock through timelineClock, so a count of 0 proves nothing")
+		test.Error("a run under --timeline read no clock its request handed it, so a count of 0 proves nothing")
 	}
 }
 
@@ -261,28 +330,46 @@ func storeListing(test *testing.T, root string) []string {
 	return listing
 }
 
-// lintBuildsAtOnce is the lint record's buildsAtOnce in lines.
-func lintBuildsAtOnce(test *testing.T, lines []string) int {
-	test.Helper()
-	var lint contract.LintRecord
-	if recordOfKind(test, lines, contract.KindLint, &lint) < 0 {
-		test.Fatal("the run wrote no lint record")
-	}
-	return lint.BuildsAtOnce
+// buildReads is what an extra build read of the host's run and of its stores, as its record in the lint record says.
+type buildReads struct {
+	target           string
+	restoredFromHost int
+	untouched        int
+	writtenThrough   int
+	packs            contract.BuildPacks
 }
 
-// `--timeline` changes nothing about the run: over one tree, each from an empty store, a run with it and one without
-// write the same findings, the same files into the findings cache's store, and run the same builds at once (#3v2zp7g),
-// where `--timing` turns the cache off and runs the builds one at a time.
+// buildReadsOf is each extra build's reads in lint, in the record's order.
+func buildReadsOf(lint contract.LintRecord) []buildReads {
+	var reads []buildReads
+	for _, build := range lint.Builds {
+		if build.Host {
+			continue
+		}
+		read := buildReads{target: build.Target, restoredFromHost: build.RestoredFromHost,
+			untouched: build.Untouched, writtenThrough: build.WrittenThrough}
+		if build.Packs != nil {
+			read.packs = *build.Packs
+		}
+		reads = append(reads, read)
+	}
+	return reads
+}
+
+// `--timeline` changes nothing about the run: over one tree, each from an empty store and an empty system cache, a run
+// with it and one without, their builds forced two at once, write the same findings, the same files into the findings
+// cache's store, the same cache counts, the system cache's among them, each build restoring, leaving untouched and
+// writing through as many packages and reading its packs alike, and run two builds at once (#3v2zp7g), where
+// `--timing` turns the cache off and runs the builds one at a time.
 func TestTheTimelineChangesNothingAboutTheRun(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	mapped := timelineStream(test, root, "--timeline")
+	mapped := otherBuildsRun(test, root, 2, nil, "--timeline")
 	mappedStore := storeListing(test, root)
 	if removeError := os.RemoveAll(cache_directory.Of(root)); removeError != nil {
 		test.Fatal(removeError)
 	}
-	plain := timelineStream(test, root)
+	plain := otherBuildsRun(test, root, 2, nil)
 	plainStore := storeListing(test, root)
 	if len(plainStore) == 0 {
 		test.Fatal("the run without --timeline wrote nothing to its store, so there is nothing to compare")
@@ -296,8 +383,19 @@ func TestTheTimelineChangesNothingAboutTheRun(test *testing.T) {
 		test.Errorf("the findings are\n%s\nwithout --timeline, and\n%s\nwith it", strings.Join(plainFindings, ""),
 			strings.Join(mappedFindings, ""))
 	}
-	if plainWidth, mappedWidth := lintBuildsAtOnce(test, plain), lintBuildsAtOnce(test, mapped); plainWidth == 0 ||
-		plainWidth != mappedWidth {
-		test.Errorf("the builds ran %d at once without --timeline and %d with it", plainWidth, mappedWidth)
+	plainLint := lintRecordOf(test, strings.Join(plain, "\n"))
+	mappedLint := lintRecordOf(test, strings.Join(mapped, "\n"))
+	for name, lint := range map[string]contract.LintRecord{"without --timeline": plainLint, "with it": mappedLint} {
+		if lint.BuildsAtOnce != 2 {
+			test.Errorf("the builds ran %d at once %s, want the 2 forced", lint.BuildsAtOnce, name)
+		}
+	}
+	if !reflect.DeepEqual(plainLint.Cache, mappedLint.Cache) {
+		test.Errorf("the cache counts are\n  %+v\nwithout --timeline, and\n  %+v\nwith it", plainLint.Cache,
+			mappedLint.Cache)
+	}
+	if plainReads, mappedReads := buildReadsOf(plainLint), buildReadsOf(mappedLint); len(plainReads) == 0 ||
+		!reflect.DeepEqual(plainReads, mappedReads) {
+		test.Errorf("the builds read\n  %+v\nwithout --timeline, and\n  %+v\nwith it", plainReads, mappedReads)
 	}
 }

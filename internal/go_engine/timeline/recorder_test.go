@@ -32,35 +32,39 @@ func (counted *countedClock) clock() Clock {
 }
 
 // A nil recorder is a run that did not ask: every method does nothing and reads no clock, its hook is nil, which Tell
-// reads as nothing to stamp, and its record is the zero record.
+// reads as nothing to stamp, a build's name is never asked, so no label is built, and its record is the zero record.
 func TestANilRecorderDoesNothingAndReadsNoClock(test *testing.T) {
 	test.Parallel()
 	var recorder *Recorder
 	recorder.Stamp("engine.main.begin")
-	if hook := recorder.Prefixed("host."); hook != nil {
+	asked := &atomic.Int64{}
+	if hook := recorder.Hook(countedName{asked: asked}, 0, ""); hook != nil {
 		test.Error("a nil recorder handed a hook, which would stamp a run that did not ask")
 	}
-	Tell(recorder.Prefixed("host."), "listing.end")
+	if asked.Load() != 0 {
+		test.Errorf("a nil recorder asked a build's name %d times, want none", asked.Load())
+	}
+	Tell(recorder.Hook(nil, 0, "host."), "listing.end")
 	if record := recorder.Record(true); record.Timed || record.Stamps != nil || record.Unavailable != "" {
 		test.Errorf("a nil recorder's record is %+v, want the zero record", record)
 	}
 }
 
-// A recorder keeps each stamp in arrival order, a hook's under its prefix, each with its wall since the start and the
-// process's user and system CPU apart, and writes timed only when told.
+// A recorder keeps each stamp in arrival order, a hook's under its build, its round and its prefix, each with its wall
+// since the start and the process's user and system CPU apart, and writes timed only when told.
 func TestARecorderKeepsEachStampInOrderWithItsWallAndCpu(test *testing.T) {
 	test.Parallel()
 	counted := &countedClock{start: time.Now(), known: true}
 	recorder := New(counted.start, counted.clock())
 	recorder.Stamp("engine.main.begin")
-	Tell(recorder.Prefixed("build windows/amd64."), "gate.taken")
+	Tell(recorder.Hook(countedName{asked: &atomic.Int64{}}, 1, ""), "gate.taken")
 	record := recorder.Record(false)
 	if record.Timed || record.Unavailable != "" {
 		test.Errorf("the record is timed %v, unavailable %q, want neither", record.Timed, record.Unavailable)
 	}
 	want := []contract.TimelineStamp{
 		{Label: "engine.main.begin", WallMicroseconds: 1000, UserMicroseconds: 500, SystemMicroseconds: 250},
-		{Label: "build windows/amd64.gate.taken", WallMicroseconds: 3000, UserMicroseconds: 1000,
+		{Build: "windows/amd64", Round: 1, Label: "gate.taken", WallMicroseconds: 3000, UserMicroseconds: 1000,
 			SystemMicroseconds: 500},
 	}
 	if !slices.Equal(record.Stamps, want) {
