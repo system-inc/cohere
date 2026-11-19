@@ -62,7 +62,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
-	if (engine.bodyReachCensus != "" || engine.bodyDifferential) && engine.dependence != nil {
+	if engine.takesBodyReach() {
 		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
 	}
 	// And the host's dependence sets are in its memo, each computed as its package's walk ended, so no build computes
