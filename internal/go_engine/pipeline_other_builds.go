@@ -963,7 +963,7 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.RestoredFromHost = len(fromHost.Restored)
 			record.Untouched, record.Visited = len(fromHost.Untouched), fromHost.Visited
 			record.WrittenThrough = run.result.Cache.WrittenThrough
-			record.SystemCacheRestored = run.result.Cache.FromSystemCache + run.result.Cache.ModulesFromSystemCache
+			record.SystemCacheRestored = run.result.Cache.FromSystemCache
 			record.SystemCacheWritten = run.result.Cache.SystemCacheWritten
 			record.SharedBodyHits = run.result.Cache.SharedBodyHits
 			record.Packs = summedPacks(nil, run.result.Cache.Packs)

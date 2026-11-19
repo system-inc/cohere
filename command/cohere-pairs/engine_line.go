@@ -12,12 +12,10 @@ type engineLine struct {
 	FilesWalked  int    `json:"filesWalked"`
 	Cache        struct {
 		// StandardLibraryFromSystemCache is the standard-library packages the run restored from the engine's system
-		// cache, every build's summed (#syscache), ModulesFromSystemCache the third-party modules' packages restored
-		// from it apart (#57wgzhp), SystemCacheWritten the entries it added to it, SystemCacheOff whether it ran under
-		// `--no-system-cache`, and SystemCacheNotKept why it could not keep it. Each is left out of the record when it
-		// is 0, false or empty, so a record without it, as every record before #57wgzhp, reads so.
+		// cache, every build's summed (#syscache), SystemCacheWritten the entries it added to it, SystemCacheOff
+		// whether it ran under `--no-system-cache`, and SystemCacheNotKept why it could not keep it. Each is left out
+		// of the record when it is 0, false or empty, so a record without it reads so.
 		StandardLibraryFromSystemCache int    `json:"standardLibraryFromSystemCache"`
-		ModulesFromSystemCache         int    `json:"modulesFromSystemCache"`
 		SystemCacheWritten             int    `json:"systemCacheWritten"`
 		SystemCacheOff                 bool   `json:"systemCacheOff"`
 		SystemCacheNotKept             string `json:"systemCacheNotKept"`

@@ -165,21 +165,20 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	record.WithheldAsGenerated = result.WithheldAsGenerated
 	record.WithheldAsCopied = result.WithheldAsCopied
 	record.Cache = contract.LintCache{
-		On:                     result.Cache.On,
-		Hit:                    result.Cache.Hit,
-		FromSystemCache:        result.Cache.FromSystemCache,
-		ModulesFromSystemCache: result.Cache.ModulesFromSystemCache,
-		Missed:                 result.Cache.Missed,
-		Written:                result.Cache.Written,
-		Unstorable:             result.Cache.Unstorable,
-		FactsDropped:           result.Cache.FactsDropped,
-		FactsSkipped:           result.Cache.FactsSkipped,
-		Waves:                  result.Cache.Waves,
-		Reloads:                result.Cache.Reloads,
-		ReloadRounds:           result.Cache.ReloadRounds,
-		Replays:                result.Replays,
-		Problems:               len(result.Cache.Problems),
-		WriteFailed:            result.Cache.WriteFailed,
+		On:              result.Cache.On,
+		Hit:             result.Cache.Hit,
+		FromSystemCache: result.Cache.FromSystemCache,
+		Missed:          result.Cache.Missed,
+		Written:         result.Cache.Written,
+		Unstorable:      result.Cache.Unstorable,
+		FactsDropped:    result.Cache.FactsDropped,
+		FactsSkipped:    result.Cache.FactsSkipped,
+		Waves:           result.Cache.Waves,
+		Reloads:         result.Cache.Reloads,
+		ReloadRounds:    result.Cache.ReloadRounds,
+		Replays:         result.Replays,
+		Problems:        len(result.Cache.Problems),
+		WriteFailed:     result.Cache.WriteFailed,
 
 		SystemCacheWritten: result.Cache.SystemCacheWritten,
 		SystemCacheOff:     engine.systemCache.off,
@@ -220,7 +219,6 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				record.Cache.Problems += len(run.result.Cache.Problems)
 				record.Cache.WriteFailed += run.result.Cache.WriteFailed
 				record.Cache.FromSystemCache += run.result.Cache.FromSystemCache
-				record.Cache.ModulesFromSystemCache += run.result.Cache.ModulesFromSystemCache
 				record.Cache.SystemCacheWritten += run.result.Cache.SystemCacheWritten
 				record.Cache.Packs = summedPacks(record.Cache.Packs, run.result.Cache.Packs)
 			}
