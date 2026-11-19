@@ -340,9 +340,10 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 // own file, windows's in every module but abbreviated-closure, whose other build is the tag audit_b's, or the host's
 // own file opens or closes the gate that judges a body in shared.go, or in example_test.go, which both builds compile
 // and whose declaration, stood, is one the other build's difference never reaches. stood names that declaration as
-// the census does, and want the finding the gate decides there: its rule, its line in file, a fragment of its
-// message, and finder, the build that finds it, "host" or "build" for the other, the second finding nothing of the
-// rule on that line with that fragment.
+// the census does. The finding the gate decides there is named by its rule, its line in file, a fragment of its
+// message, and fix, where not empty, a fragment one of its suggestions holds in its message or an edit's text; finder
+// is the build that finds it, "host" or "build" for the other, the second finding nothing of the rule on that line
+// that matches. standing is how many declarations the other build took the host's findings in with the switch on.
 type standingGate struct {
 	module   string
 	stood    string
@@ -350,50 +351,77 @@ type standingGate struct {
 	rule     string
 	line     int
 	fragment string
+	fix      string
 	finder   string
+	standing int
 }
 
-// standingGates are the modules, two for each gate the table holds Composes for, one of each direction: the gate
-// opened in the other build's file alone, a finding the host's would hide, and in the host's alone, one the host's
-// would invent.
+// standingGates are the modules, two for each gate the table holds Composes for: the thing that opens or closes it in
+// the other build's file alone (-win), and in the host's alone (-host). In each pair one module's finding is the
+// host's alone, which the other build would invent were the body left to the host for the rule, and the other's is
+// the other build's alone, which it would lose.
 //   - SA4029 by a method of sort used through an alias (sort-alias-*), from a shared file that imports no sort, and by
 //     a bare import of sort (sort-import-*): either puts sort's slice types in the package's type index.
 //   - SA5008 by an import of go-flags (import-goflags-*), a stub by the module's replace, after which a repeated
 //     `default` key in a struct tag is accepted anywhere in the package.
-//   - tests by the package's scope: `ExampleFoo` refers to an unknown identifier unless some file declares Foo
-//     (example-*).
+//   - tests by the package's scope, `ExampleFoo` referring to an unknown identifier unless some file declares Foo
+//     (example-*), and by its imports, `ExampleBuffer` unless some file imports bytes (example-import-*).
 //   - consistency-no-abbreviated-identifier by the package's scope, `callerContext` being the name it suggests for a
 //     context parameter only while no file declares it (abbreviated-scope-*), by a use of sort, after which it leaves
 //     a method named Len alone (abbreviated-sort-*), and by the package's whole import closure, whose packages' names
 //     it keeps free (abbreviated-closure): the package imports dep alone in both builds, and dep imports context
 //     under the tag alone, so `context` is the name it suggests for a local ctx on the host only.
+//   - S1018, S1025 and stringintconv by a universe name the package may declare in any file: S1018 offers copy() for a
+//     sliding loop only while copy is the builtin (copy-scope-*), S1025 a conversion only while string is
+//     (sprintf-scope-*), and stringintconv imports fmt under its own name only while no file declares fmt
+//     (stringint-scope-*).
 var standingGates = []standingGate{
 	{module: "sort-alias-win", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
-		fragment: "sort.IntSlice is a type, not a function", finder: "build"},
+		fragment: "sort.IntSlice is a type, not a function", finder: "build", standing: 2},
 	{module: "sort-alias-host", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
-		fragment: "sort.IntSlice is a type, not a function", finder: "host"},
+		fragment: "sort.IntSlice is a type, not a function", finder: "host", standing: 2},
 	{module: "sort-import-win", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
-		fragment: "sort.IntSlice is a type, not a function", finder: "build"},
+		fragment: "sort.IntSlice is a type, not a function", finder: "build", standing: 2},
 	{module: "sort-import-host", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
-		fragment: "sort.IntSlice is a type, not a function", finder: "host"},
+		fragment: "sort.IntSlice is a type, not a function", finder: "host", standing: 2},
 	{module: "import-goflags-win", stood: "Target", file: "shared.go", rule: "SA5008", line: 5,
-		fragment: `duplicate struct tag "default"`, finder: "host"},
+		fragment: `duplicate struct tag "default"`, finder: "host", standing: 1},
 	{module: "import-goflags-host", stood: "Target", file: "shared.go", rule: "SA5008", line: 5,
-		fragment: `duplicate struct tag "default"`, finder: "build"},
+		fragment: `duplicate struct tag "default"`, finder: "build", standing: 1},
 	{module: "example-win", stood: "ExampleFoo", file: "example_test.go", rule: "tests", line: 3,
-		fragment: "ExampleFoo refers to unknown identifier: Foo", finder: "host"},
+		fragment: "ExampleFoo refers to unknown identifier: Foo", finder: "host", standing: 2},
 	{module: "example-host", stood: "ExampleFoo", file: "example_test.go", rule: "tests", line: 3,
-		fragment: "ExampleFoo refers to unknown identifier: Foo", finder: "build"},
+		fragment: "ExampleFoo refers to unknown identifier: Foo", finder: "build", standing: 2},
+	{module: "example-import-win", stood: "ExampleBuffer", file: "example_test.go", rule: "tests", line: 3,
+		fragment: "ExampleBuffer refers to unknown identifier: Buffer", finder: "host", standing: 2},
+	{module: "example-import-host", stood: "ExampleBuffer", file: "example_test.go", rule: "tests", line: 3,
+		fragment: "ExampleBuffer refers to unknown identifier: Buffer", finder: "build", standing: 2},
 	{module: "abbreviated-scope-win", stood: "target", file: "shared.go", rule: "consistency-no-abbreviated-identifier",
-		line: 5, fragment: `Use "callerContext"`, finder: "host"},
+		line: 5, fragment: `Use "callerContext"`, finder: "host", standing: 1},
 	{module: "abbreviated-scope-host", stood: "target", file: "shared.go",
-		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Use "callerContext"`, finder: "build"},
+		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Use "callerContext"`, finder: "build",
+		standing: 1},
 	{module: "abbreviated-sort-win", stood: "Items.Len", file: "shared.go",
-		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "host"},
+		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "host", standing: 3},
 	{module: "abbreviated-sort-host", stood: "Items.Len", file: "shared.go",
-		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "build"},
+		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "build",
+		standing: 3},
 	{module: "abbreviated-closure", stood: "Target", file: "shared.go",
-		rule: "consistency-no-abbreviated-identifier", line: 9, fragment: `Use "context"`, finder: "host"},
+		rule: "consistency-no-abbreviated-identifier", line: 9, fragment: `Use "context"`, finder: "host", standing: 2},
+	{module: "copy-scope-win", stood: "target", file: "shared.go", rule: "S1018", line: 4,
+		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "host", standing: 1},
+	{module: "copy-scope-host", stood: "target", file: "shared.go", rule: "S1018", line: 4,
+		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "build", standing: 1},
+	{module: "sprintf-scope-win", stood: "target", file: "shared.go", rule: "S1025", line: 8,
+		fragment: "should use a simple conversion", fix: "Replace with conversion to string", finder: "host",
+		standing: 1},
+	{module: "sprintf-scope-host", stood: "target", file: "shared.go", rule: "S1025", line: 8,
+		fragment: "should use a simple conversion", fix: "Replace with conversion to string", finder: "build",
+		standing: 1},
+	{module: "stringint-scope-win", stood: "target", file: "shared.go", rule: "stringintconv", line: 4,
+		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "host", standing: 1},
+	{module: "stringint-scope-host", stood: "target", file: "shared.go", rule: "stringintconv", line: 4,
+		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "build", standing: 1},
 }
 
 // runStandingGate runs the engine over a copy of the standing gate module named with the registry's rules, under the
@@ -410,11 +438,17 @@ func runStandingGate(test *testing.T, module string, switched bool) (*pipeline, 
 }
 
 // findsGate is whether run's own findings, before the merge, hold gate's: its rule, at its line in its file, with its
-// fragment in the message.
+// fragment in the message, and its fix, where it names one, in a suggestion's message or an edit's text.
 func findsGate(run buildRun, gate standingGate) bool {
 	return slices.ContainsFunc(run.result.Findings, func(finding check.Finding) bool {
 		return finding.Rule == rule.Namespace+gate.rule && filepath.Base(finding.File) == gate.file &&
-			finding.Line == gate.line && strings.Contains(finding.Message, gate.fragment)
+			finding.Line == gate.line && strings.Contains(finding.Message, gate.fragment) &&
+			(gate.fix == "" || slices.ContainsFunc(finding.Suggestions, func(suggestion check.Suggestion) bool {
+				return strings.Contains(suggestion.Message, gate.fix) ||
+					slices.ContainsFunc(suggestion.Edits, func(edit check.Edit) bool {
+						return strings.Contains(edit.Text, gate.fix)
+					})
+			}))
 	})
 }
 
@@ -457,6 +491,13 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 			if !stoodIn(on.buildRuns[1], gate.stood, gate.file) {
 				test.Errorf("with the switch on %s did not stand in the other build, so the module holds nothing of "+
 					"the gate", gate.stood)
+			}
+			// The settled set is settled with the switch off too, so what stood in effect is the count of declarations
+			// the other build took the host's findings in: the module's own with the switch on, none with it off.
+			if on.buildRuns[1].standingDeclarations != gate.standing || off.buildRuns[1].standingDeclarations != 0 {
+				test.Errorf("the other build took the host's findings in %d declarations with the switch on and %d off, "+
+					"want %d and 0", on.buildRuns[1].standingDeclarations, off.buildRuns[1].standingDeclarations,
+					gate.standing)
 			}
 			for _, each := range []struct {
 				switched string
