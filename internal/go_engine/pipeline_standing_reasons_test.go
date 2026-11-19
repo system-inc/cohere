@@ -20,21 +20,29 @@ import (
 // platform under a tag, nothing but the module's own pair differs.
 //
 // The constant modules declare `other` itself in the pair, a typed constant whose folded value differs, and the body
-// reach must reach `target` by its Constant reason. The callee modules keep the auditor's `other` in shared.go, where
-// it is the same declaration in both builds, and have it call `stop`, which the pair declares returning on the host
-// and panicking under the tag: `other`'s no-return fact differs though nothing `target` names does, so the body reach
-// leaves `target` unreached and the facts' reach must take it out of the standing set for `other`'s no-return.
+// reach must reach `target` by its Constant reason. The derived constant modules keep `other` in shared.go, the same
+// declaration in both builds, as `base` and a suffix, and declare `base` in the pair, so `other`'s value differs
+// though its declaration does not, and the reason must be Constant still. The callee modules keep the auditor's
+// `other` in shared.go, where it is the same declaration in both builds, and have it call `stop`, which the pair
+// declares returning on the host and panicking under the tag: `other`'s no-return fact differs though nothing
+// `target` names does, so the body reach leaves `target` unreached and the facts' reach must take it out of the
+// standing set for `other`'s no-return. They go that one way only, a callee that stops in the build where it returns
+// on the host; TestEachFactKindTakesOutTheUserOfADifferingCalleeAndAnEqualOnesForNoRecord (fact_kinds_test.go) holds
+// the other, a callee that stops on the host and returns in the build (testdata/fact-kinds' halt).
 type standingReason struct {
 	module     string
 	bodyReach  bodyReachReason
 	factsReach fact_reach.Reason
 }
 
-// standingReasons are the six modules, two of a package constant's folded value and four of a same-package callee
-// that stops returning, ctrlflow's no-return decision and the representation's cut after the call.
+// standingReasons are the eight modules, four of a package constant's folded value, declared in the pair or derived
+// from one that is, and four of a same-package callee that stops returning, ctrlflow's no-return decision and the
+// representation's cut after the call.
 var standingReasons = []standingReason{
 	{module: "constant-sql", bodyReach: reachedConstant},
 	{module: "constant-command", bodyReach: reachedConstant},
+	{module: "constant-derived-sql", bodyReach: reachedConstant},
+	{module: "constant-derived-command", bodyReach: reachedConstant},
 	{module: "callee-flow", factsReach: "no-return"},
 	{module: "callee-drain", factsReach: "no-return"},
 	{module: "callee-ir", factsReach: "no-return"},
