@@ -333,13 +333,14 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 	}
 }
 
-// standingGates are the modules of testdata/standing-gates, the body differential's five of a package-wide gate (the
-// seat's h-shadow return, #zvwfe26): in each, windows's own file flips or keeps a gate another file's function is
-// judged by, and that function's body is one the difference never reaches. sort-win and sort-host flip whether a
+// standingGates are the modules of testdata/standing-gates, the body differential's four of SA4029's package-wide gate
+// (the seat's h-shadow return, #zvwfe26): in each, windows's own file flips or keeps the gate another file's function
+// is judged by, and that function's body is one the difference never reaches. sort-win and sort-host flip whether a
 // method of package sort is used, which opens SA4029, beside a shared file that imports sort itself; sort-alias-win
-// and sort-alias-host flip it through an alias, from a shared file that imports no sort; import-unsafe imports unsafe
-// in windows's file alone, which closes unusedwrite on the whole package.
-var standingGates = []string{"sort-win", "sort-host", "sort-alias-win", "sort-alias-host", "import-unsafe"}
+// and sort-alias-host flip it through an alias, from a shared file that imports no sort. The seat's fifth,
+// import-unsafe, where windows's import of unsafe closes unusedwrite, waits on the reach carrying a package whose
+// imports differ between builds, on a branch of its own.
+var standingGates = []string{"sort-win", "sort-host", "sort-alias-win", "sort-alias-host"}
 
 // runStandingGate runs the engine over a copy of the standing gate module named with the registry's rules, under the
 // body reach census with `--no-cache --no-fix --build-dependence`, with the standing bodies' switch as switched, and
