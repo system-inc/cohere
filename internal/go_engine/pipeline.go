@@ -244,6 +244,24 @@ type pipeline struct {
 	// no graph and judges nothing (buildDependenceGraph).
 	dependence *hostDependence
 
+	// bodyReachCensus is the file the body reach census is written to, from `COHERE_BODY_REACH_CENSUS`, empty for a
+	// run that writes none; bodyDifferential whether each body the reach leaves unreached is compared with the host's,
+	// from `COHERE_BODY_DIFFERENTIAL=1` (build_body_differential.go); and bodyReachHost the census's side of the host,
+	// made as the extra builds start in a run that judges their dependence and asked for either, nil in any other
+	// (body_reach_host.go, #w72zxtq).
+	bodyReachCensus  string
+	bodyDifferential bool
+	bodyReachHost    *bodyReachHost
+	// bodyDifferentialCensus, a test's alone, hands the body differential another census than the reach's, so a test
+	// can show it failing on bodies the reach would wrongly leave unreached.
+	bodyDifferentialCensus func(*buildBodyReach) *buildBodyReach
+
+	// bodyReachFromSourceRecord is the directory each extra build's from-source packages are recorded into, and
+	// bodyReachFromSource the one the census reads them back from, each empty unless asked
+	// (pipeline_body_reach_from_source.go).
+	bodyReachFromSourceRecord string
+	bodyReachFromSource       string
+
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil under `--host-build-only` and when the
 	// run found no build beside the host's to check.
 	buildRuns []buildRun

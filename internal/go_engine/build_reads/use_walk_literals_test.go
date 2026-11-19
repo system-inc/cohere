@@ -46,7 +46,7 @@ func TestWalkingALiteralsElementsHoldsNoContextForEach(test *testing.T) {
 		var before runtime.MemStats
 		var after runtime.MemStats
 		runtime.ReadMemStats(&before)
-		walkUses(&collected, checked, info, []*ast.File{file})
+		walkUses(&collected, checked, info, []*ast.File{file}, true)
 		runtime.ReadMemStats(&after)
 		least = min(least, after.TotalAlloc-before.TotalAlloc)
 	}

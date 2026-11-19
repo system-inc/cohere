@@ -98,7 +98,7 @@ func readsOver(test *testing.T, dependencySource string, userSource string) type
 	if checkError != nil {
 		test.Fatalf("type-checking the user: %v", checkError)
 	}
-	return collectTypeReads(checked, info, []*ast.File{userFile})
+	return collectTypeReads(checked, info, []*ast.File{userFile}, false)
 }
 
 // importerOf is a types.Importer of a function.

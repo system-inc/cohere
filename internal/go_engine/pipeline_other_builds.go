@@ -61,6 +61,10 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
+	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
+	if (engine.bodyReachCensus != "" || engine.bodyDifferential) && engine.dependence != nil {
+		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
+	}
 	// And the host's dependence sets are in its memo, each computed as its package's walk ended, so no build computes
 	// one again beside the pass; the walks are over, so this waits for the last sets alone.
 	pass.result.Host.DependenceComputed()
@@ -142,7 +146,10 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		engine.otherBuildsFailed(extraError)
 		return nil
 	}
-	return append(runs, extraRuns...)
+	runs = append(runs, extraRuns...)
+	engine.writeBodyReachCensus(runs)
+	engine.writeFromSourceRecord(runs)
+	return runs
 }
 
 // extraBuildRuns is every extra build's run, in build order, at most width of them at once, each into a slot of its
@@ -669,6 +676,35 @@ func (engine *pipeline) extraBuildRun(
 		inherits = inheritance
 	}
 	runRules := func(over *load.Loaded) (*check.Result, error) {
+		// The body reach census of the build's last load, and its bodies the reach leaves unreached compared with the
+		// host's, taken before its rules let its syntax and types go, under the census alone. On the build's own
+		// goroutine, before the facts census, so its judgment is asked from one goroutine at a time.
+		if engine.bodyReachFromSourceRecord != "" {
+			run.fromSourceIdentifiers = fromSourceIdentifiers(over)
+		}
+		if engine.bodyReachHost != nil && run.judged != nil {
+			built := reachBuiltPackages(over, engine.dependence.files)
+			fromSource := make(map[string]bool, len(built))
+			for _, read := range built {
+				fromSource[read.identifier] = true
+			}
+			sizesDiffer := buildSizesDiffer(engine.dependence.from, over)
+			run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence, built, fromSource, sizesDiffer)
+			// The same census again over the packages a plain run of the build checks from source, beside the whole.
+			if recorded := engine.recordedFromSource(extra); recorded != nil {
+				run.bodyReachFromSource = engine.bodyReachHost.reach(run.judged.dependence,
+					slices.DeleteFunc(slices.Clone(built), func(read *reachBuiltPackage) bool {
+						return !recorded[read.identifier]
+					}), fromSource, sizesDiffer)
+			}
+			if engine.bodyDifferential {
+				census := run.bodyReach
+				if engine.bodyDifferentialCensus != nil {
+					census = engine.bodyDifferentialCensus(census)
+				}
+				run.bodyDifferential = newBuildBodyDifferential(engine.bodyReachHost, over, census)
+			}
+		}
 		started := time.Now()
 		defer func() { linting += time.Since(started) }()
 		return check.Run(over.Packages, enabled, check.Options{
@@ -749,6 +785,14 @@ func (engine *pipeline) extraBuildRun(
 	// The facts census reads the last load's facts, whose result stands, beside the host's (#0ghk7vj).
 	if run.judged != nil && run.dependence != nil {
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
+	}
+	// The findings of each body the differential compared, the last load's, whose result stands, a difference classed
+	// under a later stage only where the judgment shows its cause (findingCauses). A differential is made only of a
+	// judged build (runRules).
+	if run.bodyDifferential != nil {
+		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings),
+			findingStagesOf(enabled), &findingCauses{dependence: run.judged.dependence,
+				filesDiffer: run.judged.filesDiffer})
 	}
 	run.loading, run.linting, run.shareGateWait = loading, linting, shareGateWait
 	if engine.buildLoadTimes != nil {

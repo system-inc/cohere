@@ -31,6 +31,9 @@ var raceGated = []raceEntry{
 		"are cores"},
 	{"internal/go_engine/build_dependence", "TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild adds packages " +
 		"from many goroutines, each through a scratch of the shared pool (scratch_test.go, #86qvr6b)"},
+	{"internal/go_engine/build_reads", "TestOneRecordReadByManyAtOnceIsJudgedOnce reads one package's record of " +
+		"function uses from several goroutines, each asking first for the judgment it makes once " +
+		"(function_uses_judgment_test.go, #kr1m304)"},
 	{"internal/go_engine/cache", "TestConcurrentPutsOfOneKeyLeaveAWholeEntry writes one key from several goroutines"},
 	{"internal/go_engine/check", "dependence sets and type graph digests are computed at once over one host " +
 		"(dependence_concurrency_test.go, type_graph_concurrency_test.go)"},

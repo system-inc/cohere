@@ -307,30 +307,40 @@ func (judging *judgment) seedShadowed() {
 	}
 }
 
-// declaredUniverseNames are the bits of the universe's names file declares at package level: a function without a
-// receiver, a type or a value.
+// declaredUniverseNames are the bits of the universe's names file declares at package level (PackageLevelNames).
 func declaredUniverseNames(file *ast.File) uint64 {
 	var declared uint64
+	for _, name := range PackageLevelNames(file) {
+		declared |= universeNameBit(name)
+	}
+	return declared
+}
+
+// PackageLevelNames are the names file declares at package level: a function without a receiver, a type or a value.
+// The body reach reads them of a build-only file too, for every name it shadows, a dot import's as well as the
+// universe's (#w72zxtq).
+func PackageLevelNames(file *ast.File) []string {
+	var names []string
 	for _, declaration := range file.Decls {
 		switch declaration := declaration.(type) {
 		case *ast.FuncDecl:
 			if declaration.Recv == nil || len(declaration.Recv.List) == 0 {
-				declared |= universeNameBit(declaration.Name.Name)
+				names = append(names, declaration.Name.Name)
 			}
 		case *ast.GenDecl:
 			for _, spec := range declaration.Specs {
 				switch spec := spec.(type) {
 				case *ast.TypeSpec:
-					declared |= universeNameBit(spec.Name.Name)
+					names = append(names, spec.Name.Name)
 				case *ast.ValueSpec:
 					for _, name := range spec.Names {
-						declared |= universeNameBit(name.Name)
+						names = append(names, name.Name)
 					}
 				}
 			}
 		}
 	}
-	return declared
+	return names
 }
 
 // receiverBaseName is T in `func (t *T[K]) m()`.
@@ -381,10 +391,15 @@ func (judging *judgment) answer(packed uint32, through []uint32) bool {
 
 // answerObject is whether object's bit, its underlying bit with underlying set, is set in the build, for a live object
 // of a package the graph does not hold, as answer says, asked once per object whether a unit reads it or ObjectBits
-// meets it.
+// meets it. A build with no DependentObject has nothing to answer by, and ObjectBits's caller, the stage 2 reach
+// (#w72zxtq), asks of objects a unit may never read, so the object is called dependent, failing wide, but for one of
+// the universe, which is the same in every build.
 func (judging *judgment) answerObject(object types.Object, underlying bool) bool {
-	if judging.difference.DependentObject == nil {
+	if universal(object) {
 		return false
+	}
+	if judging.difference.DependentObject == nil {
+		return true
 	}
 	if index, isExternal := judging.resolved.externalObjectIndex[object]; isExternal {
 		return judging.answer(externalObjectBit(index, underlying), nil)

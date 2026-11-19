@@ -267,6 +267,16 @@ type Caching struct {
 	// Overlap.Reads are nil.
 	RecordReads func(reachable *packages.Package) bool
 
+	// BodyNamedTypes, when set, has each package's reads render its bodies as well, by the load's file set, for stage
+	// 2's body differential (build_reads.BodyRenderings, #w72zxtq), writing by it the named types each expression's
+	// type names beside the type. Nil, as in every run but that one, nothing is rendered.
+	BodyNamedTypes func(types.Type) string
+
+	// RecordFunctionUses has each package's reads record what each top-level declaration uses as well, for stage 2's
+	// body reach census and its body differential (build_reads.FunctionUses, #w72zxtq), their only readers. Unset, as
+	// in every run but those, nothing is recorded, and a package's function uses read as unrecorded.
+	RecordFunctionUses bool
+
 	// AnalyzedRootsOnly leaves out of the load every root no action reaches: a package whose in-package test variant
 	// "p [p.test]" is analyzed in its place (analyzedOfGraph) and which no package of the graph imports, as a command
 	// main with tests is. The variant holds every file of it, so nothing goes unanalyzed, and the files a load reports
@@ -551,7 +561,14 @@ func fromSource(
 		typeChecker.reads = make(map[*packages.Package]*build_reads.Reads, len(reachable))
 		for _, current := range reachable {
 			if caching.RecordReads(current.loaded) {
-				typeChecker.reads[current.loaded] = &build_reads.Reads{}
+				packageReads := &build_reads.Reads{}
+				if caching.RecordFunctionUses {
+					packageReads.RecordFunctionUses()
+				}
+				if caching.BodyNamedTypes != nil {
+					packageReads.RenderBodiesBy(typeChecker.fileSet, caching.BodyNamedTypes)
+				}
+				typeChecker.reads[current.loaded] = packageReads
 			}
 		}
 	}

@@ -388,7 +388,7 @@ func hostSizesDiffer(host *HostRun, sizes types.Sizes) string {
 	if !hostMeasured || sizes == nil {
 		return "sizes: the host's run or the build is measured by no sizes"
 	}
-	wordSize, maximumAlignment := measureOf(sizes)
+	wordSize, maximumAlignment := MeasureOf(sizes)
 	if wordSize != hostWordSize || maximumAlignment != hostMaximumAlignment {
 		return fmt.Sprintf("sizes: the host's run was checked under word size %d, maximum alignment %d, the build "+
 			"is under %d, %d", hostWordSize, hostMaximumAlignment, wordSize, maximumAlignment)
@@ -396,9 +396,9 @@ func hostSizesDiffer(host *HostRun, sizes types.Sizes) string {
 	return ""
 }
 
-// loadedSizes are the sizes the packages of a load were checked by, each package's the load's, nil when none was
+// LoadedSizes are the sizes the packages of a load were checked by, each package's the load's, nil when none was
 // checked.
-func loadedSizes(loaded []*packages.Package) types.Sizes {
+func LoadedSizes(loaded []*packages.Package) types.Sizes {
 	for _, each := range loaded {
 		if each.TypesSizes != nil {
 			return each.TypesSizes
