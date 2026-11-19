@@ -16,6 +16,7 @@ func recordedUses(test *testing.T, checked checkedFixturePackage) *FunctionUses 
 	test.Helper()
 
 	reads := &Reads{}
+	reads.RecordFunctionUses()
 	reads.RecordTypes(checked.own, checked.source.info, checked.source.files)
 	uses, recorded := reads.FunctionUses()
 	if !recorded {

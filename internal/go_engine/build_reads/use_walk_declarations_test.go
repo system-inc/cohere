@@ -70,7 +70,7 @@ func TestTheUseWalkReadsAsTheWalkOfEachWholeDeclaration(test *testing.T) {
 	}
 	compared, recorded := 0, 0
 	for own, source := range sources {
-		walked := collectTypeReads(own, source.info, source.files)
+		walked := collectTypeReads(own, source.info, source.files, true)
 		if walked.functionUses != nil {
 			recorded++
 		}

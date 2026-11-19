@@ -63,7 +63,9 @@ type Reads struct {
 
 	// functionUses are what each top-level declaration of the package uses, its signature and its body apart
 	// (#kr1m304), recorded in its type reads' walk, nil while unrecorded: unrecorded uses are unknown, never empty.
-	functionUses *FunctionUses
+	// recordsFunctionUses is whether the walk records them (RecordFunctionUses), unset in a run that reads none.
+	functionUses        *FunctionUses
+	recordsFunctionUses bool
 
 	// bodyFileSet is the file set the walk renders the package's bodies by, for the body differential (#w72zxtq),
 	// nil in a run that renders none (RenderBodies), bodyNamedTypes what writes the named types beside each
@@ -323,14 +325,14 @@ func (reads *Reads) Claimed() bool {
 }
 
 // Record walks own's type information, info, and its syntax, files, for every object of another package it reaches
-// and the kind of each use, and in the same pass for what each top-level declaration uses (see collectTypeReads), and
-// publishes what it collected, marking the reads recorded. The caller holds the walk's claim (Claim), and the syntax
-// is whole: the kinds are read from where each expression sits.
+// and the kind of each use, and in the same pass, when asked (RecordFunctionUses), for what each top-level declaration
+// uses (see collectTypeReads), and publishes what it collected, marking the reads recorded. The caller holds the
+// walk's claim (Claim), and the syntax is whole: the kinds are read from where each expression sits.
 func (reads *Reads) Record(own *types.Package, info *types.Info, files []*ast.File) {
-	reads.publishTypes(collectTypeReads(own, info, files))
 	reads.lock.Lock()
-	fileSet, namedTypes := reads.bodyFileSet, reads.bodyNamedTypes
+	recordsFunctionUses, fileSet, namedTypes := reads.recordsFunctionUses, reads.bodyFileSet, reads.bodyNamedTypes
 	reads.lock.Unlock()
+	reads.publishTypes(collectTypeReads(own, info, files, recordsFunctionUses))
 	if fileSet == nil {
 		return
 	}
@@ -338,6 +340,15 @@ func (reads *Reads) Record(own *types.Package, info *types.Info, files []*ast.Fi
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
 	reads.bodyRenderings = rendered
+}
+
+// RecordFunctionUses has the walk record what each top-level declaration uses as well (FunctionUses), for stage 2's
+// body reach census and its body differential (#w72zxtq): asked before the walk, under either alone, since nothing
+// else reads the record, so a plain run pays for none.
+func (reads *Reads) RecordFunctionUses() {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	reads.recordsFunctionUses = true
 }
 
 // RenderBodiesBy has the walk render the package's bodies as well, each placed by fileSet, the load's, with the named
@@ -357,7 +368,8 @@ func (reads *Reads) BodyRenderings() (*BodyRenderings, bool) {
 }
 
 // FunctionUses are what each top-level declaration of the package uses, its signature and its body apart, and
-// whether they were recorded: unrecorded, they are nil, which is unknown, never empty.
+// whether they were recorded: unrecorded, they are nil, which is unknown, never empty, as they are when never asked
+// for (RecordFunctionUses).
 func (reads *Reads) FunctionUses() (*FunctionUses, bool) {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()

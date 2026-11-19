@@ -93,7 +93,8 @@ type recordedSource struct {
 }
 
 // recordedPackages type-checks sources, each after those it imports, in one file set, and records each one's reads as
-// the host's walk does, by its path as its ID, so the reach's judgment can be held to records it really makes.
+// the host's walk does under the census, its function uses asked for, by its path as its ID, so the reach's judgment
+// can be held to records it really makes.
 func recordedPackages(
 	test *testing.T,
 	sources []recordedSource,
@@ -129,6 +130,7 @@ func recordedPackages(
 		}
 		loaded.Types = typesPackage
 		recorded := &build_reads.Reads{}
+		recorded.RecordFunctionUses()
 		recorded.Claim()
 		recorded.Record(typesPackage, loaded.TypesInfo, loaded.Syntax)
 		checked[source.path], reads[loaded] = loaded, recorded

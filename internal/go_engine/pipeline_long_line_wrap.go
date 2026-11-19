@@ -62,6 +62,10 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 	if engine.bodyDifferential && engine.request.judgesDependence() {
 		caching.BodyNamedTypes = check.NewReadsBuild().NamedTypesWritten
 	}
+	// The body reach census and the body differential read the host's record of what each declaration uses, and
+	// nothing else does, so a run with neither records none (bodyReachHost).
+	caching.RecordFunctionUses = (engine.bodyReachCensus != "" || engine.bodyDifferential) &&
+		engine.request.judgesDependence()
 	started := time.Now()
 	defer func() { engine.hostLoading.Add(int64(time.Since(started))) }()
 	return engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})

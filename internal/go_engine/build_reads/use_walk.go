@@ -108,36 +108,46 @@ type useWalk struct {
 	wholeOperands map[*ast.SelectorExpr]bool
 
 	// recorder records what each top-level declaration uses as the walk reaches each node of it (#kr1m304), nil when
-	// the package's uses cannot be told (newFunctionUsesRecorder).
+	// the walk was not asked to record them or the package's uses cannot be told (newFunctionUsesRecorder).
 	recorder *functionUsesRecorder
 }
 
 // walkUses records every kind of use files make of other packages' types, by where each expression sits, and every
-// instance's type arguments, and in the same pass what each top-level declaration of files uses (see
-// functionUsesRecorder).
+// instance's type arguments, and in the same pass, with recordsFunctionUses, what each top-level declaration of files
+// uses (see functionUsesRecorder).
 //
-// Mutates: collected gains each use, and what each declaration uses
-func walkUses(collected *typeReads, own *types.Package, info *types.Info, files []*ast.File) {
-	walkUsesKeeping(collected, own, info, files, false)
+// Mutates: collected gains each use, and what each declaration uses when asked
+func walkUses(
+	collected *typeReads,
+	own *types.Package,
+	info *types.Info,
+	files []*ast.File,
+	recordsFunctionUses bool,
+) {
+	walkUsesKeeping(collected, own, info, files, false, recordsFunctionUses)
 }
 
 // walkUsesKeeping is walkUses, keeping every context it set when keepsContexts is set (useWalk), and returns the walk.
 // Each declaration is walked as a root, and of a general declaration each spec, so the recorder knows which
 // declaration and which part of it each node is in. The general declaration's own node and its comment are left
-// unvisited: the walk places and records nothing at either.
+// unvisited: the walk places and records nothing at either. Without recordsFunctionUses the walk makes no recorder,
+// and every call on its nil recorder records nothing, so the function uses stay nil, unrecorded.
 //
-// Mutates: collected gains each use, and what each declaration uses
+// Mutates: collected gains each use, and what each declaration uses when asked
 func walkUsesKeeping(
 	collected *typeReads,
 	own *types.Package,
 	info *types.Info,
 	files []*ast.File,
 	keepsContexts bool,
+	recordsFunctionUses bool,
 ) *useWalk {
 	walk := &useWalk{own: own, info: info, collected: collected, contexts: map[ast.Expr]useContext{},
 		keepsContexts: keepsContexts, emptyInterface: types.Universe.Lookup("any").Type(),
-		seen: map[*types.Named]bool{}, wholeOperands: map[*ast.SelectorExpr]bool{},
-		recorder: newFunctionUsesRecorder(own, info, files)}
+		seen: map[*types.Named]bool{}, wholeOperands: map[*ast.SelectorExpr]bool{}}
+	if recordsFunctionUses {
+		walk.recorder = newFunctionUsesRecorder(own, info, files)
+	}
 	for _, file := range files {
 		walk.recorder.startFile(file)
 		for _, declaration := range file.Decls {

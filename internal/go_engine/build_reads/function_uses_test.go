@@ -173,6 +173,7 @@ func functionUsesOf(test *testing.T, sources []fixtureFile) (map[string][]string
 	fileSet, packagesChecked := checkedFixture(test, sources)
 	last := packagesChecked[len(packagesChecked)-1]
 	reads := &Reads{}
+	reads.RecordFunctionUses()
 	reads.RecordTypes(last.own, last.source.info, last.source.files)
 	uses, recorded := reads.FunctionUses()
 	if !recorded {
@@ -631,6 +632,7 @@ func init() {}
 	_, packagesChecked := checkedFixture(test, sources)
 	last := packagesChecked[len(packagesChecked)-1]
 	reads := &Reads{}
+	reads.RecordFunctionUses()
 	reads.RecordTypes(last.own, last.source.info, last.source.files)
 	uses, recorded := reads.FunctionUses()
 	if !recorded {
@@ -816,6 +818,7 @@ func Read() int64 {
 }
 `}})
 	reads := &Reads{}
+	reads.RecordFunctionUses()
 	reads.RecordTypes(packagesChecked[0].own, packagesChecked[0].source.info, packagesChecked[0].source.files)
 	if uses, recorded := reads.FunctionUses(); recorded || uses != nil {
 		test.Fatalf("want the function uses unrecorded, got %t, %v", recorded, uses)
@@ -875,6 +878,7 @@ func TestAPackageThatOverflowsRecordsNoFunctionUses(test *testing.T) {
 	_, packagesChecked := checkedFixture(test, functionUsesSources)
 	first := packagesChecked[len(packagesChecked)-1]
 	reads := &Reads{}
+	reads.RecordFunctionUses()
 	reads.RecordTypes(first.own, first.source.info, first.source.files)
 	if uses, recorded := reads.FunctionUses(); recorded || uses != nil {
 		test.Fatalf("want the function uses unrecorded, got %t, %v", recorded, uses)
@@ -890,6 +894,7 @@ func TestFunctionUsesWithoutTypeInformationAreUnrecorded(test *testing.T) {
 	test.Parallel()
 
 	reads := &Reads{}
+	reads.RecordFunctionUses()
 	reads.RecordTypes(types.NewPackage("example.com/own", "own"), &types.Info{}, nil)
 	if uses, recorded := reads.FunctionUses(); recorded || uses != nil {
 		test.Fatalf("want the function uses unrecorded, got %t, %v", recorded, uses)

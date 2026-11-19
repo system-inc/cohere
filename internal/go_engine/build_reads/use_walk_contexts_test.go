@@ -31,8 +31,8 @@ func TestAUseWalkThatLetsContextsGoReadsAsOneThatKeepsThem(test *testing.T) {
 	for own, source := range sources {
 		lettingGo := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
 		keeping := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
-		walked := walkUsesKeeping(&lettingGo, own, source.info, source.files, false)
-		kept := walkUsesKeeping(&keeping, own, source.info, source.files, true)
+		walked := walkUsesKeeping(&lettingGo, own, source.info, source.files, false, true)
+		kept := walkUsesKeeping(&keeping, own, source.info, source.files, true, true)
 		if !reflect.DeepEqual(lettingGo, keeping) {
 			test.Errorf("%s: the walk letting its contexts go collected %d uses and %d selections, the walk keeping "+
 				"them %d and %d", own.Path(), len(lettingGo.uses), len(lettingGo.selections), len(keeping.uses),

@@ -256,6 +256,18 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 			test.Error("a run without the body differential rendered the host's bodies")
 		}
 	}
+	// Nor does it record what each declaration uses, which only the census and the differential read: the host's walk
+	// of example.com/reach ran, its type reads recorded, and its function uses read as unrecorded.
+	walked := false
+	for hosted, reads := range off.buildRuns[0].reads {
+		if _, isRecorded := reads.FunctionUses(); isRecorded {
+			test.Errorf("a run without the census or the body differential recorded %s's function uses", hosted.ID)
+		}
+		walked = walked || hosted.ID == "example.com/reach" && reads.Recorded()
+	}
+	if !walked {
+		test.Error("the run without the census never walked example.com/reach's reads, so shows nothing unrecorded")
+	}
 	if !slices.Equal(findingLines(normalize(onStream, root)), findingLines(offStream)) {
 		test.Errorf("the findings with the census are\n%q\nwant those without it\n%q",
 			findingLines(normalize(onStream, root)), findingLines(offStream))

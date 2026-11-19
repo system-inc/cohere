@@ -38,10 +38,10 @@ func (collected *typeReads) add(own *types.Package, object types.Object, kind Us
 //
 // Without the syntax or the expression types, no use can be told apart from another, and a package that names a
 // symbol by go:linkname reaches past the type checker, so each of those is judged by every object's closure, as every
-// read was before kinds. The walk records what each top-level declaration uses too, and a linknamed package records
-// none: a body that names a symbol by go:linkname depends on one no use names, so the package fails wide, unrecorded,
-// as one that overflows does.
-func collectTypeReads(own *types.Package, info *types.Info, files []*ast.File) typeReads {
+// read was before kinds. With recordsFunctionUses the walk records what each top-level declaration uses too, and a
+// linknamed package records none: a body that names a symbol by go:linkname depends on one no use names, so the
+// package fails wide, unrecorded, as one that overflows does.
+func collectTypeReads(own *types.Package, info *types.Info, files []*ast.File, recordsFunctionUses bool) typeReads {
 	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
 	for _, used := range info.Uses {
 		kind := UseMember
@@ -63,7 +63,7 @@ func collectTypeReads(own *types.Package, info *types.Info, files []*ast.File) t
 	case linknamed(files):
 		collected.closureOnly = "it names a symbol by go:linkname, past the type checker"
 	default:
-		walkUses(&collected, own, info, files)
+		walkUses(&collected, own, info, files, recordsFunctionUses)
 	}
 	return collected
 }
