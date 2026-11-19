@@ -100,9 +100,12 @@ func callsIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, func
 	}
 	declared := home.Function(function)
 	if declared == nil {
-		// No declared function of the package, as an instantiated method's object is not, which has no instructions
-		// of its own to read.
-		return nil
+		// Invariant: ask refuses a function home does not declare, and fact_resolver.Ask never computes for an
+		// instance's object, so function is one the package declares, which the resolver holds a function for, made
+		// from the declaration. An answer of no calls here would be a finding lost without a word, so a function the
+		// resolver cannot find is a mistake in the rule or the resolver, and the rule's crash on the package.
+		panic(fmt.Sprintf("test_failure_in_goroutine: the fact resolver holds no function for %s, which %s declares",
+			function.FullName(), home.Types.Path()))
 	}
 	return state.read(resolver, function, declared)
 }
