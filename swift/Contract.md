@@ -789,8 +789,9 @@ summary's `memoryRaisedToBytes`. Neither is in the footer, and a replay says nei
 }
 ```
 
-Additive within contract 3, and written once, just before the summary: by the Go engine in a check run whose load
-ran, and by the Swift engine in a check run that described its project (#nkk91tv). It declares what the run's
+Additive within contract 3, and written once, just before the summary, or the `timeline` record under `--timeline`:
+by the Go engine in a check run whose load ran, and by the Swift engine in a check run that described its project
+(#nkk91tv). It declares what the run's
 verdict was decided from, so the front door can replay that verdict without starting the engine when nothing it
 names has moved: `go list`, SwiftPM and the engines read in subprocesses and in their own processes, where the front
 door cannot observe them. The Go engine's record names:
@@ -853,6 +854,71 @@ an unchanged tree write the same record. A superset only costs a miss, and a pat
 stale, so whatever the load, or a later cache of the engine's, reads to decide a verdict must be named here. A
 check run whose load failed, or that asked for no load, writes none, nor does a Swift run that could not describe its
 project, and the front door records nothing for either.
+
+### `timeline`, the Go engine's, the last before `summary`, only under `--timeline`
+
+```json
+{
+    "kind": "timeline",
+    "timed": true,
+    "stamps": [
+        { "label": "engine.main.begin", "wallMicroseconds": 3200, "userMicroseconds": 2100, "systemMicroseconds": 900 },
+        {
+            "label": "host.load.end",
+            "wallMicroseconds": 412000,
+            "userMicroseconds": 1630000,
+            "systemMicroseconds": 210000
+        },
+        {
+            "build": "windows/amd64",
+            "round": 1,
+            "label": "check.analyze.begin",
+            "wallMicroseconds": 618000,
+            "userMicroseconds": 2410000,
+            "systemMicroseconds": 260000
+        }
+    ]
+}
+```
+
+Additive within contract 3, and the Go engine's alone: under `--timeline` it says when each phase of the run and each
+build began and ended, so a reader sees where the wall time went. It is written once, the last record before the
+summary, after `inputs` when there is one, and never in a run that did not ask, which the front door refuses as a
+broken stream, as it does a second one and any record but the summary after it. The engine refuses `--timeline` on a
+run that is no check, `--rules`, `--rules-enabled`, `--version` and the editor's save, by name with exit 2, rather
+than accept it and write nothing. The Swift engine refuses `--timeline` and writes none.
+
+Each stamp holds its wall from the moment the engine package initialized and the process's user and system CPU from
+the process's start, all in microseconds, so the cores busy between two stamps are their CPU's difference over their
+wall's. The two start at different moments, so the first stamp's CPU over its wall is no figure. `stamps` are in the
+order taken, which is the order of their wall, and `[]` when there are none, never left out.
+
+A stamp's `label` names a moment, such as `host.load.end`, `handover.begin` or a build's `gate.taken`. `build` is the
+extra build the stamp is of, its name as the lint record's `builds` name it, and omitted for the host's run and the
+run's own steps. `round` is 1 for a load or a check that runs again after its first, as the long-line wrap's load or
+a reload for a question does, 2 for the next, and omitted for the first. No two stamps of a record share their build,
+round and label. Begins and ends do not always pair: a run with no extra build stamps `handover.begin` and no
+`handover.end`, and a build that fails or finds type errors stamps no `end`.
+
+The switch changes nothing of the run: the cache, the builds' width and every finding are what they are without it.
+`--timing` does change a run's shape, turning every cache off and running the builds one at a time, so a run under
+both writes `timed` true, omitted otherwise, and the front door says so beside the table. When the process's CPU clock
+cannot be read, `unavailable` says why and every CPU figure is 0; the wall is still real, and the front door leaves the
+cores out rather than print zeros:
+
+```json
+{
+    "kind": "timeline",
+    "unavailable": "the process's CPU clock could not be read",
+    "stamps": [
+        { "label": "engine.main.begin", "wallMicroseconds": 3200, "userMicroseconds": 0, "systemMicroseconds": 0 }
+    ]
+}
+```
+
+The front door prints the record as a table, each stamp's build, round, wall and the cores busy since the stamp before
+it, and under `--json` writes it through as a `timeline` line before the summary (schema/CohereOutput.schema.json). A
+run under `--timeline` prints another run's clock if replayed, so the run cache never replays it and never records it.
 
 ### `lint`
 
@@ -1347,6 +1413,7 @@ it where a run that did not finish prints green.
 | `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last check's and counts every file that check did not see as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report.                                                              |
 | `--duplicates`                              | The front door's for Swift, never given to the engine, which has no duplicates report: the run checks as it would and prints a duplicates report that did not run, saying why. The Go engine answers it with a `duplicates` record (see that record).                                                                                                                                                                                                                                                                                                                                                                                                |
 | `--timing`                                  | Go takes it: the Go engine writes one `timing` record after lint (see that record), which the front door prints as TypeScript's timing table. Not implemented for Swift yet: the Swift engine refuses it with exit 2 and names the flag.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `--timeline`                                | Go takes it: the Go engine writes one `timeline` record just before the summary (see that record), which the front door prints as a table. Not implemented for Swift: the front door refuses it by name against a Swift root, and never gives it to the engine.                                                                                                                                                                                                                                                                                                                                                                                      |
 | `--host-build-only`                         | Go takes it: the Go engine checks the host's build alone, and names each file only another build compiles as a gap, where without it every build is checked (#qqyq61s). Not implemented for Swift: the front door refuses it by name against a Swift root, and never gives it to the engine.                                                                                                                                                                                                                                                                                                                                                         |
 | `--explain <file>`                          | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `--tsconfig`                                | Meaningless for Swift. The front door refuses it against a Swift root.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |

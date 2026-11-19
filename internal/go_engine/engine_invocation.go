@@ -31,13 +31,17 @@ import (
 //
 // `timing` measures what the run's CPU goes to and writes it as the timing record (pipeline.timing, #3apgjer).
 //
+// `timeline` records when each phase of the run and each build began and ended, on one clock from the process's start,
+// with the process's CPU at each, and writes it as the timeline record, the last before the summary (#3v2zp7g). It
+// changes nothing of the run, unlike `timing`, which turns the cache off and runs the builds one at a time.
+//
 // `duplicates` asks for the duplicates report (#jfvhbj7): the lint pass hashes every function beside the rules, and
 // one duplicates record after the unused phase's says what it grouped. Additive within contract 3, and this engine's
 // alone: the Swift engine refuses it as a flag it does not know.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "host-build-only", "timing", "duplicates",
-	"build-dependence",
+	"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "host-build-only", "timing", "timeline",
+	"duplicates", "build-dependence",
 }
 
 // notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a

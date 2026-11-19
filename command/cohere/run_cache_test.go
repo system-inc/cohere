@@ -211,6 +211,10 @@ func TestRunCacheEligibility(test *testing.T) {
 		{[]string{"--no-fix", "--host-build-only", "--json"}, true},
 		// A measurement, never replayed and never recorded: a replay would print the last run's CPU as this run's.
 		{[]string{"--no-fix", "--timing"}, false},
+		// The run's own clock, never replayed and never recorded: a replay would print another run's timeline as this
+		// run's (#3v2zp7g).
+		{[]string{"--no-fix", "--timeline"}, false},
+		{[]string{"--timeline"}, false},
 		{[]string{"source/a.ts"}, false},
 	} {
 		os.Args = append([]string{"cohere"}, testCase.arguments...)

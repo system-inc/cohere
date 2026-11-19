@@ -111,6 +111,20 @@ func runOverExiting(
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
+	return runOverRequest(test, request, registered, configure)
+}
+
+// runOverRequest is runOverExiting's run from request as parsed, for a test that sets in it what no command line does,
+// such as the clock its timeline reads.
+func runOverRequest(
+	test *testing.T,
+	request invocation,
+	registered []rule.Rule,
+	configure func(*pipeline),
+) (*pipeline, string, string, int) {
+	test.Helper()
+	// Made as the engine makes it as the command line is read (runOverlapping), nil for a run without `--timeline`.
+	request.timeline = newTimeline(request)
 	ruleSettings, settingsError := loadSettings(request, registered)
 	if settingsError != nil {
 		test.Fatal(settingsError)

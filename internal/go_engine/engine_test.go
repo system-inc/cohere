@@ -1193,7 +1193,7 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 	var phases []string
 	findings, findingsInPhase, filesRewritten, changedFiles := 0, 0, 0, 0
 	gap, summarized := false, false
-	inputsLine := -1
+	inputsLine, timelineLine := -1, -1
 	for index, line := range lines {
 		var record struct {
 			Kind               string            `json:"kind"`
@@ -1261,10 +1261,25 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 			if len(phases) != 4 {
 				test.Errorf("line %d is the inputs record after phases %v, and it follows every phase", index+1, phases)
 			}
+		case "timeline":
+			if timelineLine >= 0 {
+				test.Errorf("line %d is a second timeline record", index+1)
+			}
+			timelineLine = index
 		case "summary":
 			summarized = true
-			if inputsLine >= 0 && inputsLine != index-1 {
-				test.Errorf("the inputs record is on line %d, and it comes just before the summary", inputsLine+1)
+			// The timeline, under `--timeline`, is the last before the summary, and the inputs just before it.
+			last := index - 1
+			if timelineLine >= 0 {
+				if timelineLine != index-1 {
+					test.Errorf("the timeline record is on line %d, and it comes just before the summary",
+						timelineLine+1)
+				}
+				last = index - 2
+			}
+			if inputsLine >= 0 && inputsLine != last {
+				test.Errorf("the inputs record is on line %d, and it comes just before the summary or the timeline",
+					inputsLine+1)
 			}
 			if !slices.Equal(phases, []string{"fix", "types", "lint", "unused"}) {
 				test.Errorf("phases %v, want fix, types, lint and unused once each, in order", phases)

@@ -148,6 +148,12 @@ func run() error {
 	flag.Bool("host-build-only", false,
 		"in a Go project, check only this machine's build, not every build its files name (another GOOS, cgo, a "+
 			"build tag), and name each file only another build compiles as not checked")
+	// Go's alone, forwarded to its engine and to nothing else (goFlags, withoutGoOnlySwitches), and read through given.
+	// It changes nothing of the run, where --timing turns the cache off and runs the builds one at a time, so the map
+	// it prints is of the run a person makes (#3v2zp7g).
+	flag.Bool("timeline", false,
+		"in a Go project, report when each phase and each build began and ended on the run's clock, with the "+
+			"process's CPU at each")
 	// A binary that implements no rule and a binary whose rule found nothing produce the same empty
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
 	// it asks.
@@ -351,6 +357,7 @@ func run() error {
 			location,
 			namedLintConfiguration,
 			flags,
+			given,
 		)
 		if checkNarrowedProjectFoldersError != nil {
 			return checkNarrowedProjectFoldersError

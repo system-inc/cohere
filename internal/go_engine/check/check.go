@@ -28,6 +28,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -144,6 +145,12 @@ type Options struct {
 	// are the same either way. Its failure on a package is in Result.FactReachCrashes, never a finding and never a
 	// failed run.
 	FactReachSettle *analysis.Analyzer
+
+	// Timeline is told each boundary of the run's analysis and its save under `--timeline`, as `check.analyze.begin`
+	// and `.end` and `check.save.begin` and `.end`, the analysis holding the findings cache's first wave and its save,
+	// nil for a run that did not ask, which tells nothing (#3v2zp7g). A field rather than package state, so two runs in
+	// one process never stamp each other's timeline. The findings are the same either way.
+	Timeline func(label string)
 
 	// StandingBodies, when not nil, is an extra build's standing bodies (#e4rd5dw): asked once for each package with
 	// StandingAfter's result there, what it answers is handed every pass on the package under rule.Standing (see
@@ -471,6 +478,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		checkerOptions.FactsBelowRestored = func(restoring *packages.Package) bool {
 			return session.fromHost(restoring) != nil
 		}
+		// The first wave is analysis too, of the misses with no miss below them, and the save of what it analyzed, so
+		// the check's analysis begins before it.
+		timeline.Tell(options.Timeline, "check.analyze.begin")
 		firstGraph, waveError := session.firstWave(roots, checkerOptions, options.Withheld)
 		if waveError != nil {
 			return nil, waveError
@@ -490,7 +500,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			session.counts.Waves++
 		}
 	}
+	if session == nil {
+		timeline.Tell(options.Timeline, "check.analyze.begin")
+	}
 	graph, analyzeError := checker.Analyze(roots, toAnalyze, checkerOptions)
+	timeline.Tell(options.Timeline, "check.analyze.end")
 	if analyzeError != nil {
 		return nil, fmt.Errorf("analyzing %d packages: %w", len(toAnalyze), analyzeError)
 	}
@@ -678,7 +692,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		result.FactReach = captureFactReach(resolver, analyzed, graphs)
 	}
 	if session != nil {
+		timeline.Tell(options.Timeline, "check.save.begin")
 		session.save(graph, options.Withheld, files)
+		timeline.Tell(options.Timeline, "check.save.end")
 		result.Cache = session.counts
 		result.FromHost = session.hostCounts()
 		if options.KeepForBuilds && options.Reads != nil {
