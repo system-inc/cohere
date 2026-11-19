@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"go/token"
 	"go/types"
+	"maps"
 	"slices"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
@@ -75,7 +76,7 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		inputs: inputs,
 		hosted: &factReachPackage{users: map[fact_reach.Object][]fact_reach.Place{},
 			recorded: map[fact_reach.Place][]fact_reach.Question{}, askings: map[string]fact_reach.Asking{},
-			declared: map[fact_reach.Place][]fact_reach.Object{}},
+			declared: map[fact_reach.Place][]fact_reach.Object{}, parameters: map[fact_reach.Object]int{}},
 		rendered: map[types.Object]factReachRendered{}, functions: map[*types.Func]factReachFunction{},
 		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
 		met: map[fact_reach.Object]bool{},
@@ -122,13 +123,18 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 			builder.hosted.shared[name] = true
 		}
 	}
+	// Each kind the host answered about the package, answering about parameters where an answer of it is about a
+	// variable: a function's answers are never about one.
+	answeredKinds := map[string]bool{}
 	for _, answer := range inputs.answers {
 		builder.answer(answer)
-		if !slices.Contains(builder.hosted.kinds, answer.Analyzer) {
-			builder.hosted.kinds = append(builder.hosted.kinds, answer.Analyzer)
-		}
+		_, isVariable := answer.Object.(*types.Var)
+		answeredKinds[answer.Analyzer] = answeredKinds[answer.Analyzer] || isVariable
 	}
-	slices.Sort(builder.hosted.kinds)
+	for _, name := range slices.Sorted(maps.Keys(answeredKinds)) {
+		builder.hosted.kinds = append(builder.hosted.kinds,
+			fact_reach.Kind{Name: name, Parameters: answeredKinds[name]})
+	}
 	for _, answer := range inputs.imported {
 		builder.importedAnswer(answer)
 	}
@@ -208,6 +214,7 @@ func (builder *factReachBuilder) declare(
 		}
 		if rendered := builder.render(function); isPlaced && rendered.known {
 			builder.hosted.declared[place] = append(builder.hosted.declared[place], rendered.key)
+			builder.hosted.parameters[rendered.key] = function.Signature().Params().Len()
 		}
 	}
 }

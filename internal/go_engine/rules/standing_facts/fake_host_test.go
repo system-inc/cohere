@@ -15,7 +15,8 @@ type fakeHost struct {
 	users      map[fact_reach.Object][]fact_reach.Place
 	recorded   map[fact_reach.Place][]fact_reach.Question
 	declared   map[fact_reach.Place][]fact_reach.Object
-	kinds      []string
+	kinds      []fact_reach.Kind
+	parameters map[fact_reach.Object]int
 
 	// calls counts the pass's calls, by method name, and Asking's by `Asking ` and the key too. usersAsked is each
 	// object the pass asked the users of, in order, which are the objects it named.
@@ -78,7 +79,12 @@ func (host *fakeHost) Declared(place fact_reach.Place) []fact_reach.Object {
 	return host.declared[place]
 }
 
-func (host *fakeHost) Kinds() []string {
+func (host *fakeHost) Kinds() []fact_reach.Kind {
 	host.count("Kinds")
 	return host.kinds
+}
+
+func (host *fakeHost) Parameters(key fact_reach.Object) int {
+	host.count("Parameters")
+	return host.parameters[key]
 }

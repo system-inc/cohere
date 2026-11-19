@@ -34,10 +34,11 @@ type Host interface {
 	// order being another (#h0k644s, the order rule): their users leave before anything is asked.
 	OrderBound() []Named
 
-	// Kinds are the fact kinds the host answered about the package's objects, by name, sorted: each a kind a body that
-	// leaves reads unknown for where it holds no record of it, beside every kind the build registers. A kind the host
-	// never answered about the package served no body of it, whatever its judgments read.
-	Kinds() []string
+	// Kinds are the fact kinds the host answered about the package's objects, sorted by name, each answering about
+	// parameters where the host's answers of it are: each a kind a body that leaves reads unknown for where it holds no
+	// record of it, beside every kind the build registers. A kind the host never answered about the package served no
+	// body of it, whatever its judgments read.
+	Kinds() []Kind
 }
 
 // Function is one function the build's facts are compared on: its key, the identity the build finds its own object

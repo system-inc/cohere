@@ -159,8 +159,19 @@ func run(pass *analysis.Pass) (any, error) {
 	// Every kind the build can ask again, and every kind the host answered about the package, which a body that leaves
 	// reads unknown for where it holds no record of it (fact_reach.Settle). A kind the build cannot ask is among them
 	// wherever the host answered it, since its judgments read callees' answers from its state as any kind's may.
-	kinds := slices.Concat(fact_resolver.RegisteredNames(), host.Kinds())
-	slices.Sort(kinds)
-	result.Settlement = fact_reach.Settle(standing, reached, named, slices.Compact(kinds), host, asked.compare)
+	// A registered kind the host answered nothing of here is read by the function: with no record of it anywhere, a
+	// body holds none by either unit.
+	units := map[string]bool{}
+	for _, name := range fact_resolver.RegisteredNames() {
+		units[name] = false
+	}
+	for _, kind := range host.Kinds() {
+		units[kind.Name] = kind.Parameters
+	}
+	var kinds []fact_reach.Kind
+	for _, name := range slices.Sorted(maps.Keys(units)) {
+		kinds = append(kinds, fact_reach.Kind{Name: name, Parameters: units[name]})
+	}
+	result.Settlement = fact_reach.Settle(standing, reached, named, kinds, host, asked.compare)
 	return result, nil
 }

@@ -49,7 +49,7 @@ func factReachQuestion(kind string, function fact_reach.Object, parameter int) f
 	if parameter >= 0 {
 		key += factReachSeparator + strconv.Itoa(parameter)
 	}
-	return fact_reach.Question{Key: key, Kind: kind, About: function}
+	return fact_reach.Question{Key: key, Kind: kind, About: function, Parameter: max(parameter, -1)}
 }
 
 // factReachPackage is the host's side of one package for the facts' fixed point, everything of fact_reach.Host that
@@ -81,8 +81,10 @@ type factReachPackage struct {
 	// orderBound are the objects whose answers hang on the order the host walked the package in, each named for that.
 	orderBound []fact_reach.Named
 
-	// kinds are the fact kinds the host answered about the package's objects, by name, sorted.
-	kinds []string
+	// kinds are the fact kinds the host answered about the package's objects, sorted by name, and parameters how many
+	// parameters each function declared at a place takes, by its key.
+	kinds      []fact_reach.Kind
+	parameters map[fact_reach.Object]int
 
 	// shared are the names a reader sees, past any //line directive, that bodies of two parsed files or more are
 	// placed in (#e4rd5dw). A place is a name and an offset in the file as parsed, so two bodies of two such files at
@@ -149,9 +151,14 @@ func (hosted *factReachPackage) OrderBound() []fact_reach.Named {
 	return hosted.orderBound
 }
 
-// Kinds are the fact kinds the host answered about the package's objects, sorted.
-func (hosted *factReachPackage) Kinds() []string {
+// Kinds are the fact kinds the host answered about the package's objects, sorted by name.
+func (hosted *factReachPackage) Kinds() []fact_reach.Kind {
 	return hosted.kinds
+}
+
+// Parameters is how many parameters the function declared under key takes.
+func (hosted *factReachPackage) Parameters(key fact_reach.Object) int {
+	return hosted.parameters[key]
 }
 
 // Declared are the keys of the functions declared at place.

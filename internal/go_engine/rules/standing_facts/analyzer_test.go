@@ -22,7 +22,8 @@ func purityOf(
 	object fact_reach.Object,
 	asking fact_reach.Asking,
 ) (fact_reach.Question, map[string]fact_reach.Asking) {
-	question := fact_reach.Question{Key: purity + " " + string(object), Kind: purity, About: object}
+	question := fact_reach.Question{Key: purity + " " + string(object), Kind: purity, About: object,
+		Parameter: asking.Parameter}
 	asking.Kind = purity
 	return question, map[string]fact_reach.Asking{question.Key: asking}
 }
@@ -384,7 +385,7 @@ func TestABodyTheBuildLintsWithNoRecordOfAKindTakesItsUsersOut(test *testing.T) 
 	size, warm := found.place(test, "size"), found.place(test, "Warm")
 	question, asking := purityOf("facts.size", fact_reach.Asking{Function: found.identity("size"), Parameter: -1,
 		Encoded: purityInAnotherRun(test, "size")})
-	host := func(kinds ...string) *fakeHost {
+	host := func(kinds ...fact_reach.Kind) *fakeHost {
 		return &fakeHost{
 			standing: map[fact_reach.Place]bool{warm: true},
 			places:   []fact_reach.Place{size, warm},
@@ -396,7 +397,7 @@ func TestABodyTheBuildLintsWithNoRecordOfAKindTakesItsUsersOut(test *testing.T) 
 		}
 	}
 	triviality := "function_triviality"
-	result, _ := settle(test, found, host(purity, triviality))
+	result, _ := settle(test, found, host(fact_reach.Kind{Name: purity}, fact_reach.Kind{Name: triviality}))
 	requireRemoved(test, result,
 		fact_reach.Removal{Place: warm, Object: "facts.size", Reason: fact_reach.UnrecordedReason(triviality)})
 	if want := map[string]int{purity: 1, triviality: 2}; !reflect.DeepEqual(result.Settlement.Unrecorded, want) {
@@ -404,7 +405,7 @@ func TestABodyTheBuildLintsWithNoRecordOfAKindTakesItsUsersOut(test *testing.T) 
 			result.Settlement.Unrecorded, want)
 	}
 	// A run lets go of what it read of the packages below its roots, so the second takes a load of its own.
-	result, _ = settle(test, loadFacts(test), host(purity))
+	result, _ = settle(test, loadFacts(test), host(fact_reach.Kind{Name: purity}))
 	requireRemoved(test, result)
 	if !result.Stands(warm.File, warm.Offset) {
 		test.Errorf("Warm does not stand, though size holds a record of the one kind")

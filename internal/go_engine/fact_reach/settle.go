@@ -13,7 +13,10 @@
 // can read a callee's answer from the kind's own state, which leaves no record, as purity and odd slice read a callee
 // of their package's and triviality walks into one: a body that left with no record of a kind may have served
 // another's answer of that kind all the same. So such a body reads unknown for every kind it holds no record of, and
-// its function's users leave (#5vbs1np, must 1), until each kind records what its judgments read.
+// its function's users leave (#5vbs1np, must 1), until each kind records what its judgments read. A record is read by
+// the kind's own unit: a kind that answers about each of a function's parameters, as odd slice does, is recorded for
+// a parameter only by an answer about that one (round 2's N1). And a place two functions share, as a cgo package may
+// declare, holds no record of any kind for either, whatever is recorded there.
 //
 // This package is the fixed point alone, over places, objects and questions it knows nothing more of. Who fills them,
 // from stage 1's record of what each declaration uses and from the host's facts, is the engine's pipeline.
@@ -47,12 +50,30 @@ type Named struct {
 
 // Question is one answer the host recorded that is asked again in the build once the body it is recorded under is
 // linted there: Key names it apart from every other, so one recorded under two places is asked once, Kind is its fact
-// kind's name, and About is the object whose users leave when the build answers otherwise, the function the answer is
-// of, or the function declaring the parameter it is of.
+// kind's name, About is the object whose users leave when the build answers otherwise, the function the answer is of,
+// or the function declaring the parameter it is of, and Parameter is that parameter's index among the function's,
+// -1 for an answer of the function itself.
 type Question struct {
-	Key   string
-	Kind  string
-	About Object
+	Key       string
+	Kind      string
+	About     Object
+	Parameter int
+}
+
+// Kind is a fact kind as the fixed point reads a body's records of it: its name, and whether it answers about each
+// of a function's parameters rather than about the function, so that a function holds a record of it only with one
+// for each of its parameters.
+type Kind struct {
+	Name       string
+	Parameters bool
+}
+
+// recordUnit is what one record is of: a kind's answer about a function, or about its parameter at an index, -1 for
+// the function itself.
+type recordUnit struct {
+	kind      string
+	about     Object
+	parameter int
 }
 
 // Comparison is how the build's answer to a question reads beside the host's.
@@ -79,6 +100,8 @@ type Source interface {
 	// Declared are the functions declared at place, by key: one for a function's body, two where a cgo package
 	// declares two at one place, and none for a body no identity names.
 	Declared(place Place) []Object
+	// Parameters is how many parameters the function declared under key takes.
+	Parameters(key Object) int
 }
 
 // Removal is one body that left the standing set: the object that took it out, and why that object was named.
@@ -116,13 +139,14 @@ func UnrecordedReason(kind string) Reason { return Reason("unrecorded " + kind) 
 // package). standing is read and never written: what still stands is the settlement's own map. reached are the bodies
 // of files both builds compile that the build lints already, whose recorded answers are asked first; named are the
 // objects known to differ before any answer is asked. kinds are the fact kinds a body's findings can turn on, each of
-// which a body that left reads unknown for where it holds no record of it. compare asks the build one question and
-// reads its answer beside the host's; it is called once for each question, in the order the bodies leave.
+// which a body that left reads unknown for where it holds no record of it, by the kind's unit. compare asks the
+// build one question and reads its answer beside the host's; it is called once for each question, in the order the
+// bodies leave.
 func Settle(
 	standing map[Place]bool,
 	reached []Place,
 	named []Named,
-	kinds []string,
+	kinds []Kind,
 	source Source,
 	compare func(Question) Comparison,
 ) *Settlement {
@@ -153,9 +177,9 @@ func Settle(
 			}
 		}
 		for ; nextPlace < len(left); nextPlace++ {
-			recordedKinds := map[string]bool{}
+			recorded := map[recordUnit]bool{}
 			for _, question := range source.Recorded(left[nextPlace]) {
-				recordedKinds[question.Kind] = true
+				recorded[recordUnit{kind: question.Kind, about: question.About, parameter: question.Parameter}] = true
 				if asked[question.Key] {
 					continue
 				}
@@ -172,16 +196,31 @@ func Settle(
 				}
 			}
 			// After the recorded questions, so a function whose recorded answer differs is named for that first.
+			declared := source.Declared(left[nextPlace])
 			for _, kind := range kinds {
-				if recordedKinds[kind] {
-					continue
-				}
-				for _, object := range source.Declared(left[nextPlace]) {
-					settlement.Unrecorded[kind]++
-					differing = append(differing, Named{Object: object, Reason: UnrecordedReason(kind)})
+				for _, object := range declared {
+					if len(declared) == 1 && isRecorded(recorded, kind, object, source) {
+						continue
+					}
+					settlement.Unrecorded[kind.Name]++
+					differing = append(differing, Named{Object: object, Reason: UnrecordedReason(kind.Name)})
 				}
 			}
 		}
 	}
 	return settlement
+}
+
+// isRecorded is whether recorded holds kind's record of the function declared under object, by the kind's unit: one
+// answer about the function, or one about each of its parameters.
+func isRecorded(recorded map[recordUnit]bool, kind Kind, object Object, source Source) bool {
+	if !kind.Parameters {
+		return recorded[recordUnit{kind: kind.Name, about: object, parameter: -1}]
+	}
+	for index := range source.Parameters(object) {
+		if !recorded[recordUnit{kind: kind.Name, about: object, parameter: index}] {
+			return false
+		}
+	}
+	return true
 }

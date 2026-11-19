@@ -13,6 +13,9 @@ type fixture struct {
 	users    map[fact_reach.Object][]fact_reach.Place
 	recorded map[fact_reach.Place][]fact_reach.Question
 	declared map[fact_reach.Place][]fact_reach.Object
+
+	// parameters are how many parameters each declared function takes, by its key: none for a key it lacks.
+	parameters map[fact_reach.Object]int
 }
 
 func (source fixture) Users(object fact_reach.Object) []fact_reach.Place { return source.users[object] }
@@ -25,6 +28,8 @@ func (source fixture) Declared(place fact_reach.Place) []fact_reach.Object {
 	return source.declared[place]
 }
 
+func (source fixture) Parameters(key fact_reach.Object) int { return source.parameters[key] }
+
 // The bodies of the reviewer's example (#w72zxtq, must 6): `size` names `platformSize`, which a build's file declares
 // otherwise, so the reach lints it; `Warm` names only `size`, and `Outer` only `Warm`.
 var (
@@ -32,8 +37,10 @@ var (
 	warm  = fact_reach.Place{File: "shared.go", Offset: 60}
 	outer = fact_reach.Place{File: "shared.go", Offset: 90}
 
-	purityOfSize = fact_reach.Question{Key: "function_purity size", Kind: "function_purity", About: "size"}
-	purityOfWarm = fact_reach.Question{Key: "function_purity Warm", Kind: "function_purity", About: "Warm"}
+	purityOfSize = fact_reach.Question{Key: "function_purity size", Kind: "function_purity", About: "size",
+		Parameter: -1}
+	purityOfWarm = fact_reach.Question{Key: "function_purity Warm", Kind: "function_purity", About: "Warm",
+		Parameter: -1}
 )
 
 // warmFixture is that package: Warm uses size, Outer uses Warm, and the host recorded the purity of size and of Warm.
@@ -187,7 +194,7 @@ func TestABodyThatLeftWithNoRecordOfAKindReadsUnknownForIt(test *testing.T) {
 	delete(source.recorded, warm)
 	compare, _ := answering(map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Equal})
 	settlement := fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, []fact_reach.Place{size}, nil,
-		[]string{"function_purity", "return_nil_ness"}, source, compare)
+		[]fact_reach.Kind{{Name: "function_purity"}, {Name: "return_nil_ness"}}, source, compare)
 	wantRemoved := []fact_reach.Removal{
 		{Place: warm, Object: "size", Reason: "unrecorded return_nil_ness"},
 		{Place: outer, Object: "Warm", Reason: "unrecorded function_purity"},
@@ -207,9 +214,49 @@ func TestABodyRecordedInEveryKindIsNamedForNone(test *testing.T) {
 	test.Parallel()
 	compare, _ := answering(map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Equal})
 	settlement := fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, []fact_reach.Place{size}, nil,
-		[]string{"function_purity"}, warmFixture(), compare)
+		[]fact_reach.Kind{{Name: "function_purity"}}, warmFixture(), compare)
 	if len(settlement.Removed) != 0 || len(settlement.Unrecorded) != 0 || len(settlement.Standing) != 2 {
 		test.Errorf("removed %v with %v unrecorded, leaving %v, want nothing removed", settlement.Removed,
 			settlement.Unrecorded, settlement.Standing)
+	}
+}
+
+// A kind that answers about each parameter is recorded by the parameter (round 2's N1): size takes two, and the host
+// recorded odd slice's answer about the first alone, so size reads unknown for the kind and Warm leaves; with both
+// recorded, Warm stands. A place two functions share is no record of anything for either: size's, declaring sizeToo
+// beside it, names both for purity, whose one answer it holds is size's.
+func TestAKindRecordedByParameterNeedsEachParameterRecorded(test *testing.T) {
+	test.Parallel()
+	odd := fact_reach.Kind{Name: "odd_slice_argument", Parameters: true}
+	oddOf := func(index int) fact_reach.Question {
+		return fact_reach.Question{Key: "odd size " + string(rune('0'+index)), Kind: odd.Name, About: "size",
+			Parameter: index}
+	}
+	settle := func(source fixture, kinds ...fact_reach.Kind) *fact_reach.Settlement {
+		compare := func(fact_reach.Question) fact_reach.Comparison { return fact_reach.Equal }
+		return fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, []fact_reach.Place{size}, nil,
+			kinds, source, compare)
+	}
+	source := warmFixture()
+	source.parameters = map[fact_reach.Object]int{"size": 2}
+	source.recorded[size] = []fact_reach.Question{oddOf(0)}
+	wantRemoved := []fact_reach.Removal{{Place: warm, Object: "size", Reason: "unrecorded odd_slice_argument"}}
+	if settlement := settle(source, odd); !reflect.DeepEqual(settlement.Removed[:1], wantRemoved) {
+		test.Errorf("with one of two parameters recorded, removed %v, want %v first", settlement.Removed, wantRemoved)
+	}
+	source.recorded[size] = []fact_reach.Question{oddOf(0), oddOf(1)}
+	if settlement := settle(source, odd); len(settlement.Removed) != 0 {
+		test.Errorf("with both parameters recorded, removed %v, want nothing", settlement.Removed)
+	}
+	shared := warmFixture()
+	shared.declared[size] = []fact_reach.Object{"size", "sizeToo"}
+	shared.users["sizeToo"] = []fact_reach.Place{outer}
+	settlement := settle(shared, fact_reach.Kind{Name: "function_purity"})
+	wantShared := []fact_reach.Removal{
+		{Place: warm, Object: "size", Reason: "unrecorded function_purity"},
+		{Place: outer, Object: "sizeToo", Reason: "unrecorded function_purity"},
+	}
+	if !reflect.DeepEqual(settlement.Removed, wantShared) {
+		test.Errorf("at a place two functions share, removed %v, want %v", settlement.Removed, wantShared)
 	}
 }
