@@ -59,12 +59,16 @@ func (resolver *Resolver) PlacedIn(home *Package) []PlacedAnswer {
 		placed = append(placed, PlacedAnswer{Kind: answer.Kind, File: place.file, Offset: place.offset,
 			Parameter: place.parameter, Encoded: answer.Encoded})
 	}
-	slices.SortFunc(placed, func(left PlacedAnswer, right PlacedAnswer) int {
-		return cmp.Or(cmp.Compare(left.File, right.File), cmp.Compare(left.Offset, right.Offset),
-			cmp.Compare(left.Parameter, right.Parameter), cmp.Compare(left.Kind, right.Kind),
-			bytes.Compare(left.Encoded, right.Encoded))
-	})
+	slices.SortFunc(placed, ComparePlaced)
 	return placed
+}
+
+// ComparePlaced orders two placed answers as PlacedIn sorts them: by file, offset, parameter, kind, then the answer's
+// bytes.
+func ComparePlaced(left PlacedAnswer, right PlacedAnswer) int {
+	return cmp.Or(cmp.Compare(left.File, right.File), cmp.Compare(left.Offset, right.Offset),
+		cmp.Compare(left.Parameter, right.Parameter), cmp.Compare(left.Kind, right.Kind),
+		bytes.Compare(left.Encoded, right.Encoded))
 }
 
 // declarationPlace is where an answer about a declared function, or one of its parameters, is placed (see

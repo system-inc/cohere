@@ -1078,15 +1078,19 @@ func lazyExportData(kept *packages.Package) func() ([]byte, error) {
 
 // recordedDemandOf is what an entry kept for the extra builds holds of the fact kinds computed on demand: the answers
 // the run's analysis computed in saved, not every answer of it, which would build the whole of every package's
-// intermediate representation for answers the builds mostly never ask, and the reads its analysis made of other
-// packages. An extra build that asks one it does not hold reloads the package, as a run restoring a partial entry does
-// (see Reload).
+// intermediate representation for answers the builds mostly never ask, every answer the run holds about its declared
+// functions and their parameters by place (fact_resolver's PlacedIn), as an entry the store keeps holds them, and the
+// reads its analysis made of other packages. An extra build that asks one it does not hold reloads the package, as a
+// run restoring a partial entry does (see Reload).
 func (session *CacheSession) recordedDemandOf(saved *packages.Package) entryDemand {
 	if session.readAfterKeep("recordedDemandOf, the kept answers of "+saved.ID) || session.resolver == nil ||
 		saved.Types == nil {
 		return entryDemand{}
 	}
 	demanded := entryDemand{answers: sortedAnswers(session.resolver.Recorded(saved.Types), false)}
+	if home := session.resolver.Package(saved.Types); home != nil {
+		demanded.placed = session.resolver.PlacedIn(home)
+	}
 	demanded.reads, demanded.readsIncomplete = session.readsOf(saved, entryDemand{})
 	return demanded
 }

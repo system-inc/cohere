@@ -268,19 +268,20 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 		if !stored {
 			continue
 		}
-		session.previous[reloaded] = entryDemand{answers: entry.Answers, reads: entry.Reads,
+		session.previous[reloaded] = entryDemand{answers: entry.Answers, placed: entry.Placed, reads: entry.Reads,
 			readsIncomplete: entry.ReadsIncomplete}
 	}
 }
 
-// entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, the answers its
-// analysis read of other packages, with whether those could all be named, and what it declares without a body, with
-// whether the load recorded that (see cacheEntry's Bodiless). answersWhole is whether the answers are every answer of
-// the package, computed whole, as the release's table must hold them (standardLibraryEntryWhole), rather than
-// those the run's questions happened to compute in it.
+// entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, by objectpath and
+// by place, the answers its analysis read of other packages, with whether those could all be named, and what it
+// declares without a body, with whether the load recorded that (see cacheEntry's Bodiless). answersWhole is whether
+// the answers are every answer of the package, computed whole, as the release's table must hold them
+// (standardLibraryEntryWhole), rather than those the run's questions happened to compute in it.
 type entryDemand struct {
 	answers         []kindAnswers
 	answersWhole    bool
+	placed          []fact_resolver.PlacedAnswer
 	reads           []storedRead
 	readsIncomplete bool
 	bodiless        []objectpath.Path
@@ -298,18 +299,20 @@ func (session *CacheSession) withBodiless(saved *packages.Package, demanded entr
 // package, computed whole, as the release's table holds them, so a later run that restores it never reloads it to
 // answer a question, when the resolver can compute them all without a reload and Caching's AnswersInPart does not
 // name it; otherwise those held before, the entry's before a reload or the first wave's (held), with every answer the
-// run computed in it. Its reads are those held before with every read the run's analysis of it made.
+// run computed in it. Its placed answers, in either case, are every answer the run holds about the package's declared
+// functions and their parameters (fact_resolver's PlacedIn), whatever its kind, with those held before at every place
+// the run holds no answer of that kind at. Its reads are those held before with every read the run's analysis of it
+// made.
 func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand) entryDemand {
 	if session.readAfterKeep("demandOf, the saved answers of "+saved.ID) || session.resolver == nil ||
 		saved.Types == nil {
 		return held
 	}
 	demanded := entryDemand{}
-	if !session.caching.AnswersInPart[saved.PkgPath] {
-		if home := session.resolver.Package(saved.Types); home != nil {
-			if whole, complete := session.resolver.WholeIfComplete(home); complete {
-				demanded.answers, demanded.answersWhole = sortedAnswers(whole, true), true
-			}
+	home := session.resolver.Package(saved.Types)
+	if !session.caching.AnswersInPart[saved.PkgPath] && home != nil {
+		if whole, complete := session.resolver.WholeIfComplete(home); complete {
+			demanded.answers, demanded.answersWhole = sortedAnswers(whole, true), true
 		}
 	}
 	if demanded.answers == nil {
@@ -329,14 +332,43 @@ func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand)
 			demanded.answers[index].Complete = complete[demanded.answers[index].Kind]
 		}
 	}
+	// Placed after the whole is computed, so they hold every answer computing it memoized or kept.
+	var placed []fact_resolver.PlacedAnswer
+	if home != nil {
+		placed = session.resolver.PlacedIn(home)
+	}
+	demanded.placed = mergedPlaced(held.placed, placed)
 	demanded.reads, demanded.readsIncomplete = session.readsOf(saved, held)
 	return demanded
 }
 
-// rewriteEarlier writes again the entry of each package the first wave saved whose answers or reads grew since, as
-// the second wave, or a decision by second key between the waves, asked of it, with every answer and read it now
-// holds, as many at once as there are cores. A failed write is a problem, never a finding: the next run loads from
-// source what the entry would have answered, and misses what its reads would have held.
+// placedAt is where a placed answer stands, its kind's at its place: no two answers of one package share one.
+type placedAt struct {
+	kind      string
+	file      string
+	offset    int
+	parameter int
+}
+
+// mergedPlaced is held, the placed answers an entry held before, with the run's, which win at every place both hold an
+// answer of one kind at, in PlacedIn's order. Both are answers of the package's one key, so an answer held before at a
+// place the run holds none at stands: the run's questions only happened not to reach it.
+func mergedPlaced(held []fact_resolver.PlacedAnswer, run []fact_resolver.PlacedAnswer) []fact_resolver.PlacedAnswer {
+	if len(held) == 0 {
+		return run
+	}
+	merged := make(map[placedAt]fact_resolver.PlacedAnswer, len(held)+len(run))
+	for _, answer := range slices.Concat(held, run) {
+		merged[placedAt{kind: answer.Kind, file: answer.File, offset: answer.Offset,
+			parameter: answer.Parameter}] = answer
+	}
+	return slices.SortedFunc(maps.Values(merged), fact_resolver.ComparePlaced)
+}
+
+// rewriteEarlier writes again the entry of each package the first wave saved whose answers, by objectpath or by place,
+// or reads grew since, as the second wave, or a decision by second key between the waves, asked of it, with every
+// answer and read it now holds, as many at once as there are cores. A failed write is a problem, never a finding: the
+// next run loads from source what the entry would have answered, and misses what its reads would have held.
 func (session *CacheSession) rewriteEarlier() {
 	if len(session.earlier) > 0 && session.readAfterKeep("rewriteEarlier") {
 		return
@@ -349,11 +381,12 @@ func (session *CacheSession) rewriteEarlier() {
 			// joins it.
 			continue
 		}
-		held := entryDemand{answers: restored.answers, reads: restored.reads,
+		held := entryDemand{answers: restored.answers, placed: restored.placed, reads: restored.reads,
 			readsIncomplete: restored.readsIncomplete}
 		demanded := session.demandOf(saved, held)
 		if answerCount(demanded.answers) == answerCount(restored.answers) &&
-			len(demanded.reads) == len(restored.reads) && demanded.readsIncomplete == restored.readsIncomplete {
+			len(demanded.placed) == len(restored.placed) && len(demanded.reads) == len(restored.reads) &&
+			demanded.readsIncomplete == restored.readsIncomplete {
 			continue
 		}
 		key, keyed := session.keys[saved]
@@ -370,7 +403,7 @@ func (session *CacheSession) rewriteEarlier() {
 			}
 			// The answers are the body's, so the record rewritten holds a body of its own; a record of another build
 			// naming the body it held reads a miss from then on, which checks that package from source once.
-			entry.Answers = demanded.answers
+			entry.Answers, entry.Placed = demanded.answers, demanded.placed
 			body, encodeError := encodeBody(entry)
 			if encodeError != nil {
 				session.problem(fmt.Sprintf("rewriting the entry of %s with its answers: %v", saved.ID, encodeError))

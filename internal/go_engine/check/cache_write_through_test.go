@@ -192,8 +192,9 @@ func throughEntry(test *testing.T, session *CacheSession, path string) (restored
 // The differential of a write-through (#b2t9xmf): the entry windows writes of a package it restored from the host's
 // run, judged or left untouched by its walk (#qbvtkfm), decodes to the entry it writes when it checks the package from
 // source itself, with the restore off and a store
-// of its own: the same findings, facts, answers, reads and output digest, byte for byte. A digest that differed would
-// have the package's importers hit after one run and miss after the other.
+// of its own: the same findings, facts, answers, reads and output digest, byte for byte, and placed answers that agree
+// wherever both hold one. A digest that differed would have the package's importers hit after one run and miss after
+// the other.
 func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) {
 	test.Parallel()
 
@@ -235,6 +236,13 @@ func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) 
 			test.Errorf("%s: written through with %d reads, incomplete %t, want every read named", path,
 				len(written.reads), written.readsIncomplete)
 		}
+		// Placed answers are what each run held about the package, which follows the questions each asked
+		// (demandOf), so the two agree at every place both hold an answer of one kind at, and differ only in which.
+		if disagreeing := placedDisagreeing(written.placed, checked.placed); len(disagreeing) > 0 {
+			test.Errorf("%s: written through and checked from source, the placed answers disagree at %q", path,
+				disagreeing)
+		}
+		written.placed, checked.placed = nil, nil
 		if !reflect.DeepEqual(written, checked) {
 			test.Errorf("%s: the entry written through\n%+v\nthe entry checked from source\n%+v", path, written,
 				checked)
