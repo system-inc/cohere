@@ -60,10 +60,18 @@ type reachedFunction struct {
 
 // reachedPass is one pass the definition reads: a slice parameter passed as it is to a parameter of holder, the
 // function of home that declares that parameter, reached or final, or, with a nil holder, to another package's
-// parameter, whose mark is asked of the resolver.
+// parameter, whose mark is asked of the resolver as the pass is read and kept in acrossMarked.
+//
+// It is asked there, once, for every such pass, rather than when settle first needs it: settle skips a pass whose
+// caller's slice is already marked, and inside a cycle which slices are marked by then turns on the function the walk
+// entered at, so a question asked only when needed would be asked entered at one function and never at another, and
+// home's reads and the other package's record would turn on the order of home's questions. Every pass of every
+// function reached is asked, and what is reached is every function a question's owner leads to that was not final,
+// each final one's passes asked when it was reached, so the questions asked over a run are the same in any order.
 type reachedPass struct {
 	passedParameter
-	holder *intermediate_representation.Function
+	holder       *intermediate_representation.Function
+	acrossMarked bool
 }
 
 // begin reaches function, a function of home, unless its marks are final or the walk has reached it.
@@ -113,7 +121,11 @@ func (walk *demandWalk) reach(function *intermediate_representation.Function) {
 				}
 			}
 			for _, each := range passed {
-				reached.passes = append(reached.passes, reachedPass{passedParameter: each, holder: holder})
+				pass := reachedPass{passedParameter: each, holder: holder}
+				if holder == nil {
+					pass.acrossMarked = ask(walk.resolver, walk.home, each.calleeParameter)
+				}
+				reached.passes = append(reached.passes, pass)
 			}
 		}
 	}
@@ -181,10 +193,11 @@ func (walk *demandWalk) settle() {
 }
 
 // marked is whether the parameter pass passes to is marked, as far as settle has come: by its holder's marks, final
-// or reached, or, for another package's parameter, by the resolver's answer as home holds it.
+// or reached, or, for another package's parameter, by the resolver's answer as home holds it, asked as the pass was
+// read.
 func (walk *demandWalk) marked(pass reachedPass) bool {
 	if pass.holder == nil {
-		return ask(walk.resolver, walk.home, pass.calleeParameter)
+		return pass.acrossMarked
 	}
 	if reached, isReached := walk.byFunction[pass.holder]; isReached {
 		return reached.marked[pass.calleeParameter]
