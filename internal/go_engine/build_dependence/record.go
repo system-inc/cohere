@@ -45,15 +45,17 @@ type recordedRead struct {
 	through    []recordedBit
 }
 
-// recordedUnit is a unit as its record holds it: unitRecord's place and size, the local names of the objects it
-// declares, its receiver type's local name, empty for no method, its reads, and its static callees, each one a unit
-// of the graph may declare, by its index in the record's table.
+// recordedUnit is a unit as its record holds it: unitRecord's place, size, cgo mark and whether the host's load
+// withheld it, the local names of the objects it declares, its receiver type's local name, empty for no method, its
+// reads, and its static callees, each one a unit of the graph may declare, by its index in the record's table.
 type recordedUnit struct {
 	file          string
 	start         int
 	end           int
 	nodes         int
 	universeNames uint64
+	fromCgo       bool
+	withheld      bool
 
 	declares []recordedObject
 	receiver string
@@ -134,8 +136,9 @@ func newRecord(
 	for unitIndex := range units {
 		unit := &units[unitIndex]
 		recorded := recordedUnit{file: unit.file, start: unit.start, end: unit.end, nodes: unit.nodes,
-			universeNames: unit.universeNames, declares: make([]recordedObject, 0, len(unit.declares)),
-			reads: make([]recordedRead, 0, len(unit.references))}
+			universeNames: unit.universeNames, fromCgo: unit.fromCgo, withheld: unit.withheld,
+			declares: make([]recordedObject, 0, len(unit.declares)),
+			reads:    make([]recordedRead, 0, len(unit.references))}
 		for _, object := range unit.declares {
 			recorded.declares = append(recorded.declares,
 				recordedObject{path: record.path, local: naming.declared[object], object: object})

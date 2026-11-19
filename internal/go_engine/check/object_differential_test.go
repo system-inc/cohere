@@ -104,7 +104,7 @@ func objectDependence(
 	graph := build_dependence.NewGraph()
 	var group sync.WaitGroup
 	for _, loaded := range host.packages {
-		group.Go(func() { graph.AddPackage(loaded, workspace(loaded)) })
+		group.Go(func() { graph.AddPackage(loaded, workspace(loaded), nil) })
 	}
 	group.Wait()
 	difference := build_dependence.Difference{

@@ -9,8 +9,8 @@ import (
 // Difference is what one extra build changes against the host, as its file sets say: the graph's judgment of the
 // build (Against) reads nothing else of it.
 type Difference struct {
-	// Packages are the packages whose files differ, by package ID: each package both builds have whose files differ,
-	// and each package only the build has, with all its files.
+	// Packages are the packages whose files differ, by package ID: each package both builds have whose files differ or
+	// which the cgo tool of either translated, and each package only the build has, with all its files.
 	Packages map[string]PackageDifference
 
 	// HostOnlyPackages are the IDs of the packages only the host has, every unit of which is build-dependent.
@@ -59,6 +59,13 @@ type PackageDifference struct {
 	// Workspace says whether a package only the build has belongs to the checked modules, which the graph cannot
 	// say of a package it does not hold. A package both builds have is counted where the host's record puts it.
 	Workspace bool
+
+	// KeepsCgo says a cgo tool translated the package on either side (KeepsCgo): the build's cgo tool translated it,
+	// under its own tags and flags, or the host's did, and the build translates it again, checks its cgo files as
+	// written with package "C" faked, or drops them. Whatever the host's units hold of the C side may then be another
+	// thing in the build, or nothing at all, with no file a list names saying so. Every unit of the host's that hangs
+	// on the C side is then build-dependent (unitRecord.fromCgo).
+	KeepsCgo bool
 }
 
 // The two spellings that open a line directive. Either anywhere in a file's bytes counts, in a string or a comment's

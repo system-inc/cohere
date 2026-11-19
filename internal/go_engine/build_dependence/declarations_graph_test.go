@@ -50,7 +50,7 @@ func declarationsGraphOf(host loadedBuild, excluded func(*packages.Package) bool
 		if excluded != nil && excluded(loaded) {
 			continue
 		}
-		group.Go(func() { graph.AddPackage(loaded, fixtureWorkspace(loaded)) })
+		group.Go(func() { graph.AddPackage(loaded, fixtureWorkspace(loaded), nil) })
 	}
 	group.Wait()
 	return graph
