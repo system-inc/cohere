@@ -251,7 +251,8 @@ type unitPlace struct {
 // directives switch between two names interleaves those files' units, so the file table keeps an order of its own;
 // two files parsed that name one file put that file's units out of start order, at starts that meet, so UnitDependent
 // reads each of them; and the layout fixture, every file's units together and in order, keeps neither. UnitDependent
-// answers for a unit of a file only the host compiles, a name //line gave, by that unit's verdict.
+// answers for a unit of a file only the host compiles, a name //line gave, by that unit's verdict, beside one of a
+// file both builds compile, another such name.
 func TestUnitsAreFoundAsByMapsWhereverLineDirectivesPlaceThem(test *testing.T) {
 	test.Parallel()
 
@@ -265,7 +266,7 @@ func TestUnitsAreFoundAsByMapsWhereverLineDirectivesPlaceThem(test *testing.T) {
 	}
 	expectUnitsFoundAsByMaps(test, "interleaved", interleaved)
 	dependence := interleaved.Against(Difference{Packages: map[string]PackageDifference{
-		"interleaved": {HostOnlyFiles: []string{"alpha.go"}}}})
+		"interleaved": {HostOnlyFiles: []string{"alpha.go"}, SharedFiles: []string{"beta.go"}}}})
 	for index, unit := range dependence.Units() {
 		if got := dependence.UnitDependent(unit.PackageId, unit.File, unit.Start); got != (unit.File == "alpha.go") {
 			test.Errorf("interleaved: unit %d, %s:%d, dependent %t", index, unit.File, unit.Start, got)

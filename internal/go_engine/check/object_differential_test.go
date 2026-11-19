@@ -126,7 +126,9 @@ func objectDependence(
 		}
 		var differing build_dependence.PackageDifference
 		for _, file := range hosted.GoFiles {
-			if !slices.Contains(built.GoFiles, file) {
+			if slices.Contains(built.GoFiles, file) {
+				differing.SharedFiles = append(differing.SharedFiles, file)
+			} else {
 				differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
 			}
 		}

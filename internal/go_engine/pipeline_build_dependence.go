@@ -447,7 +447,8 @@ func standardLibraryDifference(
 }
 
 // filesDiffer is how one package's files differ, as written: hostFiles the host compiles and builtFiles the build
-// does, each host-only file named, and with buildOnly each build-only file parsed for its syntax alone.
+// does, each host-only file named and each shared one too, by which a unit a //line directive names apart is seeded,
+// and with buildOnly each build-only file parsed for its syntax alone.
 func filesDiffer(
 	hostFiles []string,
 	builtFiles []string,
@@ -456,7 +457,9 @@ func filesDiffer(
 ) build_dependence.PackageDifference {
 	var differing build_dependence.PackageDifference
 	for _, file := range hostFiles {
-		if !slices.Contains(builtFiles, file) {
+		if slices.Contains(builtFiles, file) {
+			differing.SharedFiles = append(differing.SharedFiles, file)
+		} else {
 			differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
 		}
 	}

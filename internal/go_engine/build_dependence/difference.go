@@ -38,6 +38,12 @@ type PackageDifference struct {
 	// they match the graph's units' files, which a reader sees. Every unit in one is build-dependent.
 	HostOnlyFiles []string
 
+	// SharedFiles are the files both compile, as written. A package with a host-only file has every unit build-dependent
+	// whose file, as a reader sees it, is not one of these: a //line directive in a host-only file names its units by
+	// a file the build lists nowhere, which matches no host-only file, and the record keeps no other name of a unit's
+	// file to match instead (#ss4t5g6).
+	SharedFiles []string
+
 	// BuildOnlyFiles are the files only the build compiles, parsed for syntax alone: a method one declares changes
 	// its receiver's method set, a name of the universe one declares changes what that name means in the package's
 	// shared files, and its units are counted apart.

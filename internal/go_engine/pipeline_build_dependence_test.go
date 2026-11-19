@@ -102,7 +102,9 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 		}
 		if isShared {
 			for _, file := range hostPackage.GoFiles {
-				if !slices.Contains(buildPackage.GoFiles, file) {
+				if slices.Contains(buildPackage.GoFiles, file) {
+					differing.SharedFiles = append(differing.SharedFiles, file)
+				} else {
 					differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
 				}
 			}
