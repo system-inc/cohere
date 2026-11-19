@@ -12,11 +12,12 @@
 // The original keeps state across the whole walk of a package's declarations and calls, not across one TestMain
 // alone: whether a call to os.Exit was seen is cleared only when a TestMain's walk ends, so a call to os.Exit at
 // package level, in a variable's initializer, counts for the TestMain after it, which is then not reported. The port
-// keeps the same state in the same walk, so that false negative is the original's and stays (differences'
-// exitAtPackageLevel shows it), as does the original's false positive, a TestMain whose os.Exit is in a function it
-// calls (upstream's CheckTestMainExit-4). The registry runs the port in the original's place, under its name, and the
-// original stays only as the oracle: the parity tests beside this file run both over the same modules, and the two
-// differ nowhere they hold.
+// keeps the same walk but counts only the calls inside a TestMain, so each is judged by its own body (#zvwfe26), and
+// departs from the original there alone: a TestMain after a call to os.Exit at package level, in its file or another,
+// which the differences fixture's records and test_main_file's hold. It keeps the original's false positive, a
+// TestMain whose os.Exit is in a function it calls (upstream's CheckTestMainExit-4). The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same modules, and the two differ nowhere else they hold.
 package unexiting_test_main
 
 import (
@@ -61,9 +62,9 @@ const message = "TestMain should call os.Exit to set exit code"
 
 // walk is what the walk of the package's declarations and calls has seen, kept across it in rule.State as the
 // original keeps it across its one inspector walk: the TestMain it is inside, nil outside one, and that TestMain's
-// parameter, the *testing.M, and since the last TestMain's end, whether a call to os.Exit was seen, inside a TestMain
-// or not, and whether a call to Run on the parameter was. skipped is the last node whose children the original's walk
-// does not enter, nil before any, since the dispatcher hands every node and the port passes over those itself.
+// parameter, the *testing.M, and whether that TestMain has called os.Exit, and Run on the parameter. skipped is the
+// last node whose children the original's walk does not enter, nil before any, since the dispatcher hands every node
+// and the port passes over those itself.
 type walk struct {
 	testMain  *ast.FuncDecl
 	parameter types.Object
@@ -133,6 +134,11 @@ func enter(context *rule.Context, state *walk, node ast.Node) bool {
 		state.parameter = context.TypesInfo.ObjectOf(node.Type.Params.List[0].Names[0])
 		return true
 	case *ast.CallExpr:
+		// A call outside a TestMain, at package level, is no TestMain's, so its os.Exit counts for none, where the
+		// original counts it for the next TestMain.
+		if state.testMain == nil {
+			return true
+		}
 		// A call's arguments are not walked once the call is judged, so `os.Exit(m.Run())` counts as an exit
 		// alone.
 		if staticcheck_code.IsCallTo(context, node, "os.Exit") {

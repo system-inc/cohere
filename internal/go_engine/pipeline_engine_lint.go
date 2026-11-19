@@ -415,15 +415,14 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // session without a store when lintCache gives none, since the host's keeps its packages' entries for the extra
 // builds and theirs restore from them (#b2t9xmf); under `--timing` it gets none, so nothing is restored from the host.
 // files must be of the files as they are on disk when the load runs (see extraBuildRun). Why the cache sat out is
-// noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns). system is the
-// system cache the build reads its standard library from and writes it to under its own keys: the run's, or none for
-// an extra build that must compute its own standard library (extraBuildSystemCache).
+// noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns). Every build
+// reads its standard library from the run's system cache and writes it there under its own keys, the host's and each
+// extra build's, in a run judging each build's dependence as in any other (#wzre5eg).
 func (engine *pipeline) cacheSession(
 	environment []string,
 	goEnvironment *load.GoEnvironment,
 	files cache.FileDigests,
 	notes io.Writer,
-	system *systemCache,
 ) *check.CacheSession {
 	// A run under `--timing` is a measurement, and a package the cache restores, its load's or its rules', runs
 	// nothing, so a table over it would read as measured where it is not. Such a run reads and writes no cache at all,
@@ -433,7 +432,7 @@ func (engine *pipeline) cacheSession(
 	}
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
-		enabled, engine.described.children, system, engine.shardStamps)
+		enabled, engine.described.children, engine.systemCache, engine.shardStamps)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}
