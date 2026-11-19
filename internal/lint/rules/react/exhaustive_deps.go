@@ -476,8 +476,9 @@ func visitHookCall(ruleContext rule.Context, node *ast.Node, run exhaustiveDepsR
 	}
 	callbackIndex, known := hookCallbackIndexes[hookName]
 	if !known {
-		// A match makes the Hook one this rule checks, so a match that overruns the time bound does not.
-		if run.additionalHooks == nil || !run.additionalHooks.Test(hookName) {
+		// A match makes the Hook one this rule checks, so a match that overruns the time bound does not, and
+		// the run names the overrun as a gap.
+		if run.additionalHooks == nil || !run.additionalHooks.Test(hookName, ruleContext.PatternTimedOut) {
 			return
 		}
 		callbackIndex = 0

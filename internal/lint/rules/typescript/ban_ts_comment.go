@@ -259,8 +259,9 @@ func reportBanTsComments(ruleContext rule.Context, options BanTsCommentOptions) 
 			// The format is matched against the description as written, untrimmed, which is what
 			// makes `@ts-ignore    : TS1234` fail a pattern beginning `^:`. A match that overruns
 			// esregexp's time bound counts as a match, so a pathological pattern is silent rather
-			// than reporting every description.
-			if setting.DescriptionFormat != nil && !setting.DescriptionFormat.TestOrTimeout(description) {
+			// than reporting every description, and the run names the overrun as a gap.
+			if setting.DescriptionFormat != nil &&
+				!setting.DescriptionFormat.TestOrTimeout(description, ruleContext.PatternTimedOut) {
 				ruleContext.ReportRange(comment.Range, messageBanTsCommentDescriptionFormat(
 					directive, setting.DescriptionFormat.Source()))
 			}

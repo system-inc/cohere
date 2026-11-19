@@ -152,10 +152,11 @@ func (checker *noRestrictedImportsChecker) patternMatches(
 	pattern noRestrictedImportsCompiledPattern,
 	source string,
 ) bool {
+	// Both restrict: a match that overruns the time bound reports nothing, and the run names it as a gap.
 	if pattern.regularExpression != nil {
-		return pattern.regularExpression.Test(source)
+		return pattern.regularExpression.Test(source, checker.ruleContext.PatternTimedOut)
 	}
-	return pattern.matcher.Ignores(source)
+	return pattern.matcher.Ignores(source, checker.ruleContext.PatternTimedOut)
 }
 
 // checkPaths is upstream's `checkRestrictedPathAndReport`.
@@ -263,19 +264,21 @@ func (checker *noRestrictedImportsChecker) reportForPattern(
 		}
 
 		if noRestrictedImportsContains(entry.ImportNames, binding.name) ||
-			(pattern.importNamePattern != nil && pattern.importNamePattern.Test(binding.name)) {
+			(pattern.importNamePattern != nil &&
+				pattern.importNamePattern.Test(binding.name, checker.ruleContext.PatternTimedOut)) {
 			checker.reportRange(binding.reportRange, noRestrictedImportsPatternAndImportNameMessage(
 				source, binding.name, entry.Message))
 		}
 
 		// An `else if` upstream, not two independent tests: a name permitted by neither list is
-		// reported once, under whichever list was configured.
+		// reported once, under whichever list was configured. The pattern allows, so a match that
+		// overruns the time bound allows too, since no answer here is a report.
 		if len(entry.AllowImportNames) > 0 &&
 			!noRestrictedImportsContains(entry.AllowImportNames, binding.name) {
 			checker.reportRange(binding.reportRange, noRestrictedImportsAllowedImportNameMessage(
 				source, binding.name, entry.AllowImportNames, entry.Message))
 		} else if pattern.allowedNamePattern != nil &&
-			!pattern.allowedNamePattern.Test(binding.name) {
+			!pattern.allowedNamePattern.TestOrTimeout(binding.name, checker.ruleContext.PatternTimedOut) {
 			checker.reportRange(binding.reportRange, noRestrictedImportsAllowedNamePatternMessage(
 				source, binding.name, entry.AllowImportNamePattern, entry.Message))
 		}

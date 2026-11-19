@@ -142,3 +142,42 @@ func TestEveryValueMovedWhereTheWalkCannotSeeRecordsItsWholeReach(test *testing.
 		})
 	}
 }
+
+// channelUsers are the users, each handing to a function that takes any a value whose type reaches dependency's Record
+// only through a channel's element: a channel, one of a single direction, one behind a pointer, and one of arrays. Each
+// type expression names Record and reads no more of it, and no copy of the value holds one.
+var channelUsers = map[string]string{
+	"a channel":              "func use(values chan dependency.Record) { take(values) }\n",
+	"a receive-only channel": "func use(values <-chan dependency.Record) { take(values) }\n",
+	"a pointer to a channel": "func use(values *chan dependency.Record) { take(values) }\n",
+	"a channel of arrays":    "func use(values chan [2]dependency.Record) { take(values) }\n",
+}
+
+// A look through a value handed to an empty interface enters a channel's element: staticcheck's SA1003 judges the data
+// given to binary.Write by the element of a channel, behind one pointer too, and then by the element's fields, so each
+// channel user records Record as a use of the type whole. Recording its name alone would restore a package whose
+// SA1003 finding hangs on a field of Record in a build that declares the field its own way.
+func TestAValueHandedToAnEmptyInterfaceIsLookedThroughAChannel(test *testing.T) {
+	test.Parallel()
+
+	for user, source := range channelUsers {
+		test.Run(user, func(test *testing.T) {
+			test.Parallel()
+
+			collected := readsOver(test, "package dependency\n\ntype Record struct{ Count int32 }\n",
+				"package user\n\nimport \""+unplacedDependency+"\"\n\nfunc take(value any) {}\n\n"+source)
+			if collected.closureOnly != "" {
+				test.Fatalf("the reads are judged by closure alone, so the walk tells nothing: %s",
+					collected.closureOnly)
+			}
+			for use := range collected.uses {
+				if use.Kind == UseWhole && use.Object.Name() == "Record" &&
+					use.Object.Pkg().Path() == unplacedDependency {
+					return
+				}
+			}
+			test.Errorf("handing %s of Records to an empty interface, want dependency.Record read whole, got %v", user,
+				collected.uses)
+		})
+	}
+}

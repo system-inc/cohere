@@ -79,7 +79,10 @@ func noRestrictedImportsCompileGroup(group []string, caseSensitive bool) (*noRes
 // Every pattern is tested and the last one that matches decides, which is how a negation undoes an
 // earlier match. Testing in order and returning on the first hit would make `["foo/*", "!foo/bar"]`
 // report on `foo/bar`, which is the case upstream's corpus tests directly.
-func (matcher *noRestrictedImportsMatcher) Ignores(path string) bool {
+//
+// A glob whose match overruns the time bound is passed to overrun, and reads as the answer that reports
+// nothing: no match for a glob that restricts, a match for a negated one, which allows.
+func (matcher *noRestrictedImportsMatcher) Ignores(path string, overrun esregexp.Overrun) bool {
 	if matcher == nil {
 		return false
 	}
@@ -102,8 +105,10 @@ func (matcher *noRestrictedImportsMatcher) Ignores(path string) bool {
 
 	ignored := false
 	for _, glob := range matcher.globs {
-		if glob.expression.Test(candidate) {
-			ignored = !glob.negated
+		if glob.negated && glob.expression.TestOrTimeout(candidate, overrun) {
+			ignored = false
+		} else if !glob.negated && glob.expression.Test(candidate, overrun) {
+			ignored = true
 		}
 	}
 	return ignored

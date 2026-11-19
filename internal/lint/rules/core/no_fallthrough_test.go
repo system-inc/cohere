@@ -3,6 +3,7 @@ package core
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -795,15 +796,22 @@ func TestNoFallthroughCasesFromOurOwnReading(test *testing.T) {
 
 // TestNoFallthroughCommentPatternOverrunIsNoAnswerEitherWay: a user's pattern whose match overruns the time bound
 // (#7mztrdd) is no answer, which neither use may turn into a report: it spares a fallthrough, and names no unused
-// fallthrough comment. `(a|aa)+$` against a long run of `a` backtracks past the bound.
+// fallthrough comment. Either way the overrun is told, so the run names it as a gap (#s4dy4e0). `(a|aa)+$` against
+// a long run of `a` backtracks past the bound, pulled in here so it stops at regexp2's first tick.
 func TestNoFallthroughCommentPatternOverrunIsNoAnswerEitherWay(test *testing.T) {
 	test.Parallel()
-	excuses, names := fallthroughCommentMatchers("(a|aa)+$")
+	pattern := fallthroughCommentPattern("(a|aa)+$")
+	pattern.Unwrap().MatchTimeout = time.Nanosecond
+	var overran []string
+	excuses, names := fallthroughCommentMatchers(pattern, func(source string) { overran = append(overran, source) })
 	comment := strings.Repeat("a", 64) + "b"
 	if !excuses(comment) {
 		test.Error("an overrun did not spare the fallthrough, so no answer became a report")
 	}
 	if names(comment) {
 		test.Error("an overrun named an unused fallthrough comment, so no answer became a report")
+	}
+	if len(overran) != 2 || overran[0] != "/(a|aa)+$/iu" || overran[1] != "/(a|aa)+$/iu" {
+		test.Errorf("overrun was told %q, want the pattern once for each use", overran)
 	}
 }

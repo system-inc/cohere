@@ -128,7 +128,8 @@ func (checker *noRestrictedExportsChecker) checkExportedName(node *ast.Node) {
 	// the pattern unconditionally would report all five under the wrong message.
 	matchesPattern := false
 	if checker.pattern != nil && name != "default" {
-		matchesPattern = checker.pattern.Test(name)
+		// A restricting pattern: a match that overruns the time bound reports nothing, and the run names it as a gap.
+		matchesPattern = checker.pattern.Test(name, checker.ruleContext.PatternTimedOut)
 	}
 
 	if matchesPattern || checker.restricted[name] {

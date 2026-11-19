@@ -413,8 +413,12 @@ func defaultCaseComment(
 		value = strings.TrimSuffix(value, "*/")
 	}
 	// A match that overruns the time bound counts as the default case too, since the comment excuses a
-	// missing default and no answer here would be a report; overran says so, for the one use that reports.
+	// missing default and no answer here would be a report; overran says so, for the one use that reports, and
+	// the run names the overrun as a gap.
 	matched, overran := pattern.TestOrError(text.TrimWhitespace(value))
+	if overran != nil {
+		ruleContext.PatternTimedOut(pattern.String())
+	}
 	if !matched && overran == nil {
 		return nil, false
 	}

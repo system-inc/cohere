@@ -332,7 +332,7 @@ func reportParameterUse(
 		ruleContext.ReportNode(identifier, messageAssignmentToParameter(name))
 		return
 	}
-	if !properties || ignored.matches(name) {
+	if !properties || ignored.matches(name, ruleContext.PatternTimedOut) {
 		return
 	}
 	if modifiesPropertyThrough(identifier) {

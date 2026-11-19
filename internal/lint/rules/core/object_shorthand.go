@@ -348,9 +348,10 @@ func checkObjectShorthandMember(ruleContext rule.Context, member *ast.Node, sett
 				return
 			}
 			if settings.MethodsIgnorePattern != nil {
-				// A match that overruns the time bound exempts too: no answer here is a report.
+				// A match that overruns the time bound exempts too: no answer here is a report. The run
+				// names the overrun as a gap.
 				if name, ok := property.Name(assignment.Name(), property.Static); ok &&
-					settings.MethodsIgnorePattern.TestOrTimeout(name) {
+					settings.MethodsIgnorePattern.TestOrTimeout(name, ruleContext.PatternTimedOut) {
 					return
 				}
 			}
