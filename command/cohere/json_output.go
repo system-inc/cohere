@@ -86,6 +86,22 @@ func timingAsJson(record contract.TimingRecord) timingJson {
 	return timingJson{Kind: "timing", timingFields: timingFields(record)}
 }
 
+// timelineJson is a Go run's timeline record under `--timeline`, written through as the engine wrote it, its kind
+// beside its fields.
+type timelineJson struct {
+	Kind string `json:"kind"`
+	timelineFields
+}
+
+// timelineFields is contract.TimelineRecord's fields without its methods, for the reason timingFields gives. Its stamps
+// are never nil here, since a record without them is refused (engineRun.acceptTimeline), so they are written `[]` when
+// empty as the contract writes them.
+type timelineFields contract.TimelineRecord
+
+func timelineAsJson(record contract.TimelineRecord) timelineJson {
+	return timelineJson{Kind: "timeline", timelineFields: timelineFields(record)}
+}
+
 // summaryJson is runSummary as the last line. Durations are seconds, as a reader would compare them.
 type summaryJson struct {
 	Kind          string      `json:"kind"`

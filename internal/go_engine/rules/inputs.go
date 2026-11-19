@@ -23,8 +23,9 @@ type Inputs string
 const (
 	// InputsPerUnit is a rule whose finding in a unit is a function of that unit's syntax, its types, and the facts and
 	// resolver answers it reads, never of another unit's body or initializer, so a unit every build judges
-	// independent has the host's findings in each. The unit-isolation test holds it to that by stubbing other units'
-	// bodies and comparing what the rule finds in the units it kept.
+	// independent has the host's findings in each. A constant's value is part of what a unit names, and a same-package
+	// callee's no-return is a fact the unit reads, though ctrlflow computes it in place (#3rcmc3h). The unit-isolation
+	// test holds it to that by stubbing other units' bodies and comparing what the rule finds in the units it kept.
 	InputsPerUnit Inputs = "PerUnit"
 	// InputsFileSyntax is a rule that reads only its file's syntax, bytes and name, as comments, imports and build
 	// constraints, and no types, so a file both builds compile gives every build the same findings and only a file one
