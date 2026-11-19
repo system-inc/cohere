@@ -34,7 +34,8 @@ import (
 //     Paired sizes an array in its signature by settings.B: Unknown by its signature.
 //   - Parted selects box.Part, a field whose type is each build's own: Selected by the field's own name bit, before
 //     Box's underlying bit, which the field sets too.
-//   - Limit reads platformLimit, a constant each build's own file declares: Constant, before Named.
+//   - Limit reads platformLimit, a constant each build's own file declares: Constant, before Named, and so do
+//     limitTwice, declared from it, and Twice, reading limitTwice, a shared file's constant whose value differs.
 //   - Typed instantiates Sized with Number: the type argument is also a type expression, recorded as ValueType, which
 //     reads the same bits first, so it is ValueType; Sized itself is unreached.
 //   - Bytes takes a byte, which windows declares at package level: Shadowed by its signature.
@@ -115,6 +116,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"Paired":       "Unknown",
 		"Parted":       "Selected",
 		"Limit":        "Constant",
+		"limitTwice":   "Constant",
+		"Twice":        "Constant",
 		"Typed":        "ValueType",
 		"Sized":        "unreached",
 		"Bytes":        "Shadowed",
@@ -141,6 +144,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"Paired":       "an unknown identity in the signature",
 		"Parted":       "example.com/reach.Box.UF0 (reach.go) Selected name in the body",
 		"Limit":        "example.com/reach.platformLimit (reach_other.go) Constant name in the body",
+		"limitTwice":   "example.com/reach.platformLimit (reach_other.go) Constant name in the body",
+		"Twice":        "example.com/reach.limitTwice (reach.go) Constant name in the body",
 		"Typed":        "example.com/reach.Number (reach.go) ValueType underlying in the body",
 		"Sized":        "",
 		"Bytes":        "universe.byte shadowed in the signature",
@@ -164,8 +169,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		test.Errorf("want the census within the plain run's from-source packages the whole but linked, got %+v",
 			within)
 	}
-	if census.total != 22 || census.reached != 15 || census.absent != 3 || census.new != 6 {
-		test.Errorf("want 22 bodies, 15 reached, 3 absent and 6 new, got %d, %d, %d and %d", census.total,
+	if census.total != 24 || census.reached != 17 || census.absent != 3 || census.new != 6 {
+		test.Errorf("want 24 bodies, 17 reached, 3 absent and 6 new, got %d, %d, %d and %d", census.total,
 			census.reached, census.absent, census.new)
 	}
 	// linked, and unsafe, which it imports and which holds no body, are unrecorded.
@@ -197,9 +202,9 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		}
 	}
 	if want := map[findingStage]string{
-		stageCalleeFacts: "example.com/reach reach.go:127 Warm: findings differ: host [], build [cohere-go/SA4017 " +
-			"128:2 size doesn't have side effects and its return value is ignored]",
-		stagePackageWide: "example.com/reach reach.go:133 helper: findings differ: host [cohere-go/U1000 133:6 func " +
+		stageCalleeFacts: "example.com/reach reach.go:135 Warm: findings differ: host [], build [cohere-go/SA4017 " +
+			"136:2 size doesn't have side effects and its return value is ignored]",
+		stagePackageWide: "example.com/reach reach.go:141 helper: findings differ: host [cohere-go/U1000 141:6 func " +
 			"helper is unused], build []",
 	}; !maps.Equal(classed, want) {
 		test.Errorf("the differential classes apart\n%v\nwant\n%v", classed, want)
@@ -213,7 +218,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"build " + on.buildRuns[1].build.String(),
 		"The reach stands for no finding that turns on a callee's fact, stage 4's (#h0k644s), nor for a package-wide " +
 			"rule's, stage 5's (#xeafx79): the body differential classes their findings apart.",
-		"  bodies: 22, reached 15, unreached 7, absent 3, new 6",
+		"  bodies: 24, reached 17, unreached 7, absent 3, new 6",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
 		"  body differential: compared 7, failures 0",
 		"  findings differing turning on a callee's fact, stage 4's (#h0k644s): 1",
@@ -242,17 +247,18 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 }
 
 // The body differential is the machine every skip leans on, so it is shown failing (#w72zxtq, the review's must 9):
-// handed a census that leaves unreached six bodies the reach rightly reaches, it fails each by what it compares.
+// handed a census that leaves unreached seven bodies the reach rightly reaches, it fails each by what it compares.
 // PlatformName's call resolves to another declaring file, and Size's len to windows's own function, of another type;
-// Positive's conversion to Number reads apart by
-// Number's whole lines, whose underlying type differs, though both builds print the type alike; Configured's
-// settings.A has no identity, which matches none, another unknown's included; Accepted differs only in its signature,
-// which is rendered with its block; and Shifted's findings differ, vet reporting its shift where Number is an int32.
+// Positive's conversion to Number reads apart by Number's whole lines, whose underlying type differs, though both
+// builds print the type alike; Configured's settings.A has no identity, which matches none, another unknown's
+// included; Accepted differs only in its signature, which is rendered with its block; Twice's limitTwice names one
+// declaration in both, whose value differs; and Shifted's findings differ, vet reporting its shift where Number is an
+// int32.
 // Handed a census that reaches every body, it compares none, and fails for it.
 func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T) {
 	test.Parallel()
 
-	wronglyUnreached := []string{"PlatformName", "Size", "Positive", "Configured", "Accepted", "Shifted"}
+	wronglyUnreached := []string{"PlatformName", "Size", "Positive", "Configured", "Accepted", "Twice", "Shifted"}
 	run := func(census func(*buildBodyReach) *buildBodyReach) *buildBodyDifferential {
 		test.Helper()
 		on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
@@ -276,8 +282,8 @@ func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T
 		}
 		return &altered
 	})
-	if differential.compared != 13 {
-		test.Errorf("want 13 bodies compared, the 7 the reach leaves and the 6 it was told to, got %d",
+	if differential.compared != 14 {
+		test.Errorf("want 14 bodies compared, the 7 the reach leaves and the 7 it was told to, got %d",
 			differential.compared)
 	}
 	failed := map[string][]string{}
@@ -294,6 +300,7 @@ func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T
 		"Positive":     "type example.com/reach.Number example.com/reach.Number{",
 		"Configured":   "an unknown identity matching none",
 		"Accepted":     "type example.com/reach.Number example.com/reach.Number{",
+		"Twice":        "type int = 32",
 		"Shifted":      "findings differ: host [",
 	} {
 		if !slices.ContainsFunc(failed[name], func(failure string) bool { return strings.Contains(failure, wanted) }) {

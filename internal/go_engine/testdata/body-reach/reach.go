@@ -99,6 +99,14 @@ func Limit() int {
 	return platformLimit
 }
 
+// limitTwice is twice platformLimit, so its value is each build's own though its file is shared.
+const limitTwice = platformLimit * 2
+
+// Twice reads limitTwice, whose value alone differs: its use names the same declaration in both builds.
+func Twice() int {
+	return limitTwice
+}
+
 // Sized counts nothing of its type argument.
 func Sized[T any]() int {
 	return 0
