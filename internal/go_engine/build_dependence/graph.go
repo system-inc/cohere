@@ -1,10 +1,10 @@
 // Package build_dependence computes which of the host's package-level declarations an extra build (linux, windows, a
-// tag build) can change, so the engine can judge each declaration once and redo only the build-dependent ones per
-// build (#ewgh523, #qkq4gx5). A unit is a FuncDecl, a TypeSpec or a ValueSpec, several names of one spec making one
-// unit. It is build-dependent in a build when its file is not one both builds compile, when an object it declares
-// reaches a build-dependent object, or when its body uses one by a kind of use the change can reach: a type whose only
-// change is its underlying type counts only where the use touches the underlying, as the engine's reads already judge
-// (#mjdf7ah).
+// tag build) can change, so the engine can judge each declaration once and redo only the build-dependent ones per build
+// (#ewgh523, #qkq4gx5). A unit is a FuncDecl, a TypeSpec or a ValueSpec, several names of one spec making one unit. It
+// is build-dependent in a build when its file is not one both builds compile, or it hangs on the C side of a package
+// the host's cgo tool or the build's translated (cgo_files.go), when an object it declares reaches a build-dependent
+// object, or when its body uses one by a kind of use the change can reach: a type whose only change is its underlying
+// type counts only where the use touches the underlying, as the engine's reads already judge (#mjdf7ah).
 //
 // Each named type has two bits, its name bit and its underlying bit; every other object has one, its name bit. The
 // graph is built from the host's packages while their syntax and type information are live, and keeps only what a
@@ -123,6 +123,17 @@ type unitRecord struct {
 	// callees are the functions the unit's body or initializer calls statically (staticCallees), which a judgment
 	// reads as the units declaring them, so a caller of a function whose facts move in a build can be found.
 	callees []types.Object
+
+	// fromCgo says the unit hangs on the C side (fromCgo): it is in one of the cgo tool's outputs, a cgo file's
+	// translation or the file the tool generates, or in any file of a package checked as written that has a cgo file,
+	// so a build seeds it where the host's cgo tool or its own translated the package (cgo_files.go).
+	fromCgo bool
+
+	// withheld says the host's load gave the unit to the analyzers without its body or its initial value, as it does
+	// of a declaration of a package checked as written that reaches cgo or holds what the faked package "C" left
+	// invalid, another faked package's included (load.withholdCgoDeclarations): the host never checked what it held,
+	// so the unit is a seed in every build (judgment.seedWithheld).
+	withheld bool
 }
 
 // NewGraph is an empty graph.
@@ -130,8 +141,8 @@ func NewGraph() *Graph {
 	return &Graph{packages: map[string]*packageRecord{}, paths: &objectPaths{}}
 }
 
-// NewDeclarationsGraph is an empty graph that collects declarations only (#w72zxtq): a package added from its live
-// load (AddPackage) gives every unit's place, size, universe names and declared objects and every kind edge, as a
+// NewDeclarationsGraph is an empty graph that collects declarations only (#w72zxtq): a package added from its live load
+// (AddPackage) gives every unit's place, size, universe names, cgo mark and declared objects and every kind edge, as a
 // whole graph's does, and no unit's reads or calls. An object's bits come from the seeds and the fixed point over the
 // kind edges alone (Against), so ObjectBits, NameBits and DependentObjects answer as a whole graph's do, and so do
 // UnitDeclaringName and UnitContaining, which read a unit's place. What only a unit's body gives is refused with a
@@ -147,17 +158,20 @@ func NewDeclarationsGraph() *Graph {
 // AddPackage records loaded's units and their edges. It is called while loaded's syntax and TypesInfo are live, since
 // the engine releases them when the package's rules end, and once it returns the graph holds no syntax node and no type
 // maps of it. workspace says whether loaded belongs to the checked modules, its test variants included, or is a
-// dependency, which only the counts tell apart. A package the loader gave no type information declares no units.
+// dependency, which only the counts tell apart. withheld are the positions, "file:line:column" as the load gives them
+// (load.PackageWithheld.Declarations), of the declarations the load gave the analyzers without their bodies or initial
+// values, each one's unit marked so (unitRecord.withheld), and every unit of the package where one names no unit's
+// declaration. A package the loader gave no type information declares no units.
 //
 // It is safe to call concurrently for different packages: the walk runs on the caller's goroutine, in a scratch of
 // its own (workerScratch), and only its publication, and a read of the graph's encoders before the walk, take the lock.
-func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
+func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool, withheld []string) {
 	scratch, isScratch := scratches.Get().(*workerScratch)
 	if !isScratch {
 		// Only AddPackage puts into scratches, and only scratches; its New makes one when it holds none.
 		scratch = newWorkerScratch()
 	}
-	graph.addPackage(loaded, workspace, scratch)
+	graph.addPackage(loaded, workspace, withheld, scratch)
 	// Given back once the record is made, and never on a panic, so the pool holds no scratch a walk left half used.
 	scratch.release()
 	scratches.Put(scratch)
@@ -166,7 +180,7 @@ func (graph *Graph) AddPackage(loaded *packages.Package, workspace bool) {
 // addPackage is AddPackage walking in scratch, which the caller releases before another package's walk. The graph's
 // encoders are read first, so a sealed graph panics (refuseSealed) before the walk starts, and the scratch's namer
 // names the package's objects by them.
-func (graph *Graph) addPackage(loaded *packages.Package, workspace bool, scratch *workerScratch) {
+func (graph *Graph) addPackage(loaded *packages.Package, workspace bool, withheld []string, scratch *workerScratch) {
 	encoders := graph.encoders()
 	imports := make(map[string]string, len(loaded.Imports))
 	for path, imported := range loaded.Imports {
@@ -177,8 +191,29 @@ func (graph *Graph) addPackage(loaded *packages.Package, workspace bool, scratch
 	if loaded.TypesInfo != nil {
 		collecting := scratch.collector(loaded.TypesInfo)
 		collecting.declarationsOnly = graph.declarationsOnly
+		if len(withheld) > 0 {
+			collecting.withheld = make(map[string]bool, len(withheld))
+			// Each unplaced until a unit's declaration starts at it (collector.withheld).
+			for _, position := range withheld {
+				collecting.withheld[position] = false
+			}
+		}
+		cgoFiles, faked := CgoFiles(loaded), fakesCgo(loaded)
 		for _, file := range loaded.Syntax {
-			collecting.collectFile(loaded.Fset.File(file.FileStart), file)
+			tokenFile := loaded.Fset.File(file.FileStart)
+			collecting.fromCgo = fromCgo(loaded, cgoFiles, faked, tokenFile.Name())
+			collecting.collectFile(tokenFile, file)
+		}
+		// A withheld position no unit's declaration starts at is one the graph cannot place, the load and the graph
+		// disagreeing on where a declaration is: every unit of the package is marked withheld, the larger set, so the
+		// unit the load withheld is never left without its mark.
+		for _, isPlaced := range collecting.withheld {
+			if !isPlaced {
+				for index := range collecting.units {
+					collecting.units[index].withheld = true
+				}
+				break
+			}
 		}
 		units, edges = collecting.units, collecting.edges
 	}
@@ -273,8 +308,8 @@ func (graph *Graph) Unnameable() int {
 // go of its own scaffolding, its targets, resolved paths and decoded names, as it ends. What stays of each record is
 // what a judgment and the graph's other answers read: its ID, path, workspace flag, type names, types and unnameable
 // count (NewCounterparts, seedFiles, seedMethodSets, count, Units, CallIndex.Workspace, Unnameable); every unit's file,
-// place, size and universe names are the resolution's own columns, copied while it resolved. Sealing again does
-// nothing.
+// place, size, universe names and cgo mark are the resolution's own columns, copied while it resolved. Sealing again
+// does nothing.
 //
 // The order is safe because resolution reads the records once, all of them, and copies every node, bit, edge, call and
 // unit column a judgment reads, pointing into no record, and encoding reads them only to write a record: once the

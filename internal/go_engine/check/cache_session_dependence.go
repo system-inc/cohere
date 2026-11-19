@@ -39,8 +39,12 @@ import (
 // or what the collector records in it. At 2, an array's length in a spelled type reads what it uses in full, so a
 // record of 1 holds a looser bit. At 3, a var that declares no type reads every type its initializers pass through in
 // full, so a record of 2 holds a looser bit. At 4, the name bit of a type defined from another type's name reads that
-// type in full, since its fields and promoted methods are that type's, so a record of 3 holds a looser bit.
-const DependenceRecordVersion = "dependence-record-4"
+// type in full, since its fields and promoted methods are that type's, so a record of 3 holds a looser bit. At 5, each
+// unit carries whether it hangs on the C side, one in a cgo tool's output or in any file of a package checked as
+// written that has a cgo file (build_dependence's cgo_files.go), which a build seeds wherever the package differs, and
+// whether the host's load withheld its body or initial value, which every build seeds, so a record of 4 holds neither
+// mark, and is encoded otherwise.
+const DependenceRecordVersion = "dependence-record-5"
 
 // DependenceRecordKey is where the store keeps the dependence record of the package whose first key is key: apart from
 // every entry, export data and alias, and derived from the entry's key alone, so a record is read only by a run that

@@ -82,7 +82,7 @@ func encodedRecords(graph *Graph) map[string][]byte {
 func freshRecords(host loadedBuild) map[string][]byte {
 	graph := NewGraph()
 	for _, loaded := range sortedPackages(host) {
-		graph.addPackage(loaded, fixtureWorkspace(loaded), newWorkerScratch())
+		graph.addPackage(loaded, fixtureWorkspace(loaded), nil, newWorkerScratch())
 	}
 	return encodedRecords(graph)
 }
@@ -99,7 +99,7 @@ func addedThrough(test *testing.T, loaded *packages.Package, scratch *workerScra
 				test.Errorf("%s: adding it through a used scratch panicked: %v", loaded.ID, recovered)
 			}
 		}()
-		graph.addPackage(loaded, fixtureWorkspace(loaded), scratch)
+		graph.addPackage(loaded, fixtureWorkspace(loaded), nil, scratch)
 	}()
 	scratch.release()
 	return graph.packages[loaded.ID]
@@ -394,7 +394,7 @@ func TestAReleasedScratchHoldsNothingOfThePackageItAdded(test *testing.T) {
 		test.Fatal("the chain fixture's load holds no package with a declaration")
 	}
 	scratch := newWorkerScratch()
-	NewGraph().addPackage(largest, fixtureWorkspace(largest), scratch)
+	NewGraph().addPackage(largest, fixtureWorkspace(largest), nil, scratch)
 	if len(scratch.collecting.units) == 0 || len(scratch.naming.objects) == 0 ||
 		len(scratch.bodies.typeReferences) == 0 {
 		test.Fatalf("%s left %d units, %d named objects and %d walked types in the scratch, so emptying it shows "+
@@ -431,7 +431,7 @@ func TestAddingAPackageAgainReusesAScratch(test *testing.T) {
 		test.Fatal("the layout fixture's load holds no package example.com/layout")
 	}
 	graph := NewGraph()
-	allocations := testing.AllocsPerRun(100, func() { graph.AddPackage(loaded, true) })
+	allocations := testing.AllocsPerRun(100, func() { graph.AddPackage(loaded, true, nil) })
 	if allocations > reusedAddAllocations {
 		test.Errorf("adding example.com/layout again allocates %.0f objects, more than the %d of an add through a "+
 			"reused scratch, so the add grew a scratch of its own", allocations, reusedAddAllocations)

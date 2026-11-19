@@ -3,7 +3,9 @@ package go_engine
 import (
 	"encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -336,5 +338,67 @@ func TestAWarmBuildDependenceRunWritesNothingToTheSystemCache(test *testing.T) {
 		if strings.HasPrefix(path, systemStoreDirectory(filled.systemCacheRoot)) && before[path] != information {
 			test.Errorf("the run changed %s in the system cache's store", path)
 		}
+	}
+}
+
+// The standard library's side graph is told what its load withheld, as the host's graph is: a package the host
+// restored from the system cache's table and the side load checks as written, cgo on with no cgo of the project's own,
+// has its withheld units marked, and each is a seed in every build. plugin's Open calls open, of plugin_dlopen.go, a
+// cgo file where the host's platform builds one, so the side load withholds Open's body. The fixture imports plugin and
+// has a file only the tag `extra` compiles, so a run of every build judges a build on the host's own platform under
+// that tag, in which plugin's files are the host's to the byte and plugin is in no difference: Open is a seed there by
+// its withheld body alone. The table is filled from a fixture that imports plugin too, so the host restores it.
+func TestTheStandardLibrarysSideGraphSeedsWhatItsLoadWithheld(test *testing.T) {
+	test.Parallel()
+	enabled, goEnvironmentError := exec.Command("go", "env", "CGO_ENABLED").Output()
+	if goEnvironmentError != nil {
+		test.Fatalf("reading CGO_ENABLED with go env: %v", goEnvironmentError)
+	}
+	if strings.TrimSpace(string(enabled)) != "1" || !slices.Contains([]string{"darwin", "linux", "freebsd"},
+		runtime.GOOS) {
+		test.Skipf("plugin has a cgo file only with cgo on under darwin, linux or freebsd, and here GOOS is %s and "+
+			"CGO_ENABLED %s: run `go run ./command/cohere-dev test ./internal/go_engine -run %s` on one with cgo on",
+			runtime.GOOS, strings.TrimSpace(string(enabled)), test.Name())
+	}
+
+	pluginFile := "package library\n\nimport \"plugin\"\n\n// Load opens the plugin at path.\n" +
+		"func Load(path string) (*plugin.Plugin, error) { return plugin.Open(path) }\n"
+	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, func(root string) {
+		if writeError := os.WriteFile(filepath.Join(root, "plugin.go"), []byte(pluginFile), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	})
+	root := copyFixture(test, standardLibraryRecordsFixture)
+	for name, contents := range map[string]string{
+		"plugin.go": pluginFile,
+		"extra.go":  "//go:build extra\n\npackage library\n\n// Extra is the tag's.\nconst Extra = 1\n",
+	} {
+		if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	engine, stream, _ := runOverNoted(test, root, exitClean, readingSystemCache(filled, ""), recordsSwitches...)
+	if restored := restoredOf(test, stream); restored.StandardLibrarySideLoaded == 0 {
+		test.Fatalf("want the standard library side-loaded, got %+v", restored)
+	}
+	judgedTagged := false
+	for _, run := range engine.buildRuns {
+		if run.build.OperatingSystem != runtime.GOOS || !slices.Contains(run.build.Tags, "extra") {
+			continue
+		}
+		judgedTagged = true
+		if run.judged == nil || run.judged.standardLibrary == nil {
+			test.Fatalf("%s: want a judgment of the standard library's graph", run.build)
+		}
+		index, isDeclared := run.judged.standardLibrary.UnitDeclaringName("plugin", "Open")
+		if !isDeclared {
+			test.Fatalf("%s: want plugin's Open in the standard library's graph", run.build)
+		}
+		if !run.judged.standardLibrary.Units()[index].Dependent {
+			test.Errorf("%s: want plugin's Open dependent, its body withheld by the side load", run.build)
+		}
+	}
+	if !judgedTagged {
+		test.Fatalf("want a build on %s under the tag extra among %d builds", runtime.GOOS, len(engine.buildRuns))
 	}
 }

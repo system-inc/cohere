@@ -46,7 +46,8 @@ type resolvedGraph struct {
 	targets [][]objectTarget
 
 	// The unit columns: each unit's package's index, its file's row in files, its start and end offsets in the file
-	// the host parsed and its size in syntax nodes (column), the universe's names it uses, and a method's receiver's
+	// the host parsed and its size in syntax nodes (column), the universe's names it uses, whether it hangs on the C
+	// side (unitRecord.fromCgo), whether the host's load withheld it (unitRecord.withheld), and a method's receiver's
 	// node, -1 for any other unit.
 	unitPackage       []int32
 	unitFile          []int32
@@ -54,6 +55,8 @@ type resolvedGraph struct {
 	unitEnd           []int32
 	unitNodes         []int32
 	unitUniverseNames []uint64
+	unitFromCgo       []bool
+	unitWithheld      []bool
 	unitReceiver      []int32
 
 	// declares are each unit's declared objects' nodes, and bits the bits its reads touch.
@@ -244,6 +247,8 @@ func (resolved *resolvedGraph) resolveUnits() {
 	resolved.unitEnd = make([]int32, 0, units)
 	resolved.unitNodes = make([]int32, 0, units)
 	resolved.unitUniverseNames = make([]uint64, 0, units)
+	resolved.unitFromCgo = make([]bool, 0, units)
+	resolved.unitWithheld = make([]bool, 0, units)
 	resolved.unitReceiver = make([]int32, 0, units)
 	resolved.declares = newPackedRows[int32](units, declares)
 	resolved.packageUnits = make([][2]int32, 0, len(resolved.packages))
@@ -267,12 +272,14 @@ func (resolved *resolvedGraph) resolveUnits() {
 			resolved.unitEnd = append(resolved.unitEnd, column(unit.end))
 			resolved.unitNodes = append(resolved.unitNodes, column(unit.nodes))
 			resolved.unitUniverseNames = append(resolved.unitUniverseNames, unit.universeNames)
+			resolved.unitFromCgo = append(resolved.unitFromCgo, unit.fromCgo)
+			resolved.unitWithheld = append(resolved.unitWithheld, unit.withheld)
 			resolved.unitReceiver = append(resolved.unitReceiver, -1)
 		}
 		resolved.packageUnits = append(resolved.packageUnits,
 			[2]int32{first, narrowed[int32](resolved.unitCount(), "the graph's units")})
 	}
-	resolved.files.placeUnits(resolved.unitFile, resolved.unitStart)
+	resolved.files.placeUnits(resolved.unitFile, resolved.unitStart, resolved.unitEnd)
 	for packageIndex, record := range resolved.packages {
 		for unitIndex := range record.units {
 			receiver := record.units[unitIndex].receiver
@@ -562,13 +569,31 @@ func (resolved *resolvedGraph) lastStartingBy(first uint32, end uint32, offset i
 	return first + uint32(position), true
 }
 
-// unitContaining is UnitContaining on the graph's resolution, which every build's judgment shares (CallIndex).
+// unitContaining is UnitContaining on the graph's resolution, which every build's judgment shares (CallIndex): of the
+// units whose spans in file hold offset, the one that starts last, and of two that start there the later in the
+// graph's order, the one unitStartingAt finds at its start. Where the file's units overlap (fileTable.overlapping)
+// each is read; a place two spans hold is one no file and offset can settle, two files parsed naming the one file.
 func (resolved *resolvedGraph) unitContaining(packageId string, file string, offset int) (int, bool) {
-	first, end, isFile := resolved.fileUnits(packageId, file)
+	row, isFile := resolved.files.rows[fileKey{packageIdentifier: packageId, file: file}]
 	if !isFile {
 		return 0, false
 	}
-	// The last unit starting at or before offset is the only one that can hold it, since a file's units never overlap.
+	first, end := resolved.files.unitOffsets[row], resolved.files.unitOffsets[row+1]
+	if resolved.files.overlapping != nil && resolved.files.overlapping[row] {
+		found, isFound := int32(0), false
+		for position := first; position < end; position++ {
+			index := resolved.files.unitAt(position)
+			if offset < int(resolved.unitStart[index]) || offset >= int(resolved.unitEnd[index]) {
+				continue
+			}
+			if !isFound || resolved.unitStart[index] >= resolved.unitStart[found] {
+				found, isFound = index, true
+			}
+		}
+		return int(found), isFound
+	}
+	// The last unit starting at or before offset is the only one that can hold it, the row's units in start order
+	// and apart.
 	position, isFound := resolved.lastStartingBy(first, end, offset)
 	if !isFound {
 		return 0, false
