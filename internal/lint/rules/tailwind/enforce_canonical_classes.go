@@ -205,7 +205,13 @@ func reportCollapses(
 	designSystem DesignSystemResult,
 	collapse canonicalCollapseOptions,
 ) map[string]bool {
-	collapses, reported := collapsesIn(SplitClasses(literal.Text), ignored, designSystem, collapse)
+	collapses, reported := collapsesIn(
+		SplitClasses(literal.Text),
+		ignored,
+		ruleContext.PatternTimedOut,
+		designSystem,
+		collapse,
+	)
 	for _, found := range collapses {
 		ruleContext.ReportRange(literal.Range, messageCanonicalCollapse(found.inputs, found.output))
 	}
@@ -227,6 +233,7 @@ type canonicalCollapse struct {
 func collapsesIn(
 	classes []string,
 	ignored []*ignorePattern,
+	overrun esregexp.Overrun,
 	designSystem DesignSystemResult,
 	collapse canonicalCollapseOptions,
 ) ([]canonicalCollapse, map[string]bool) {
@@ -239,7 +246,7 @@ func collapsesIn(
 	remaining := make([]string, 0, len(classes))
 	seen := make(map[string]bool, len(classes))
 	for _, className := range classes {
-		if seen[className] || isIgnored(className, ignored) {
+		if seen[className] || isIgnored(className, ignored, overrun) {
 			continue
 		}
 		seen[className] = true
@@ -304,7 +311,7 @@ func reportTemplateCanonical(
 		var merged map[string]bool
 		if collapse.enabled {
 			var collapses []canonicalCollapse
-			collapses, merged = collapsesIn(run.Texts(), ignored, designSystem, collapse)
+			collapses, merged = collapsesIn(run.Texts(), ignored, ruleContext.PatternTimedOut, designSystem, collapse)
 			for _, found := range collapses {
 				ruleContext.ReportRange(run.Range, messageCanonicalCollapse(found.inputs, found.output))
 			}
@@ -317,7 +324,8 @@ func reportTemplateCanonical(
 			if !glued {
 				seenInRun[class.Text] = true
 			}
-			if merged[class.Text] || isIgnored(class.Text, ignored) || !classExistsIn(class.Text, system) {
+			if merged[class.Text] || isIgnored(class.Text, ignored, ruleContext.PatternTimedOut) ||
+				!classExistsIn(class.Text, system) {
 				continue
 			}
 			canonical := canonicalizer.CanonicalizeClass(class.Text)
@@ -384,7 +392,8 @@ func reportSingles(
 	canFix := tokenized && !strings.Contains(literal.Text, "${")
 
 	for index, className := range classes {
-		if merged[className] || isIgnored(className, ignored) || !classExistsIn(className, system) {
+		if merged[className] || isIgnored(className, ignored, ruleContext.PatternTimedOut) ||
+			!classExistsIn(className, system) {
 			continue
 		}
 		canonical := canonicalizer.CanonicalizeClass(className)
@@ -510,10 +519,11 @@ func compileIgnorePatterns(patterns []string) []*ignorePattern {
 //
 // Applied before the merge rather than after, exactly as upstream does, so an ignored class costs
 // one regular expression test rather than participating in a collapse that then has to be discarded.
-func isIgnored(className string, ignored []*ignorePattern) bool {
+func isIgnored(className string, ignored []*ignorePattern, overrun esregexp.Overrun) bool {
 	for _, entry := range ignored {
-		// A match that overruns the time bound exempts too: no answer here is a report.
-		if entry.pattern.TestOrTimeout(className) {
+		// A match that overruns the time bound exempts too: no answer here is a report. Overrun is told, so
+		// the run names it as a gap.
+		if entry.pattern.TestOrTimeout(className, overrun) {
 			return true
 		}
 	}

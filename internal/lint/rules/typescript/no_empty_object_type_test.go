@@ -1,8 +1,11 @@
 package typescript
 
 import (
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -152,6 +155,59 @@ func TestNoEmptyObjectTypeStaysSilent(test *testing.T) {
 				test,
 				rule_testing.Run(test, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
 			)
+		})
+	}
+}
+
+// TestNoEmptyObjectTypeAllowsWhereItsPatternTimedOut is allowWithName overrunning the time bound: the name is
+// allowed, as a match would allow it, since no answer here is a report, and the overrun is noted as the run's gap,
+// for an interface and for a type alias. The control is the same pattern settling on a name it does not match,
+// which reports and notes nothing. The bound is pulled in on the compiled pattern, so the pathological pattern
+// stops at regexp2's first tick rather than after esregexp.MatchTimeout (#s4dy4e0).
+func TestNoEmptyObjectTypeAllowsWhereItsPatternTimedOut(test *testing.T) {
+	test.Parallel()
+	const pathological = `^(?:(a+)+b|a+)$`
+	timedOut := rule.PatternTimedOutNotePrefix + "/" + pathological + "/u"
+	overrunning := strings.Repeat("a", 200)
+
+	cases := []struct {
+		name       string
+		sourceText string
+		bound      time.Duration
+		wantIds    []string
+		wantNotes  int
+	}{
+		{"an interface it timed out on", "export interface " + overrunning + " {}\n", time.Nanosecond, nil, 1},
+		{"a type alias it timed out on", "export type " + overrunning + " = {};\n", time.Nanosecond, nil, 1},
+		{"a name it settles on and does not match", "export interface Thing {}\n", 0, []string{"noEmptyInterface"}, 0},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options, decodeError := DecodeNoEmptyObjectTypeOptions([]byte(`{"allowWithName":"` + pathological + `"}`))
+			if decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			if testCase.bound > 0 {
+				options.allowWithNameTester.Unwrap().MatchTimeout = testCase.bound
+			}
+			result := rule_testing.RunWithOptions(
+				test,
+				NoEmptyObjectType,
+				emptyObjectFile,
+				testCase.sourceText,
+				options,
+			)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			if got := result.Notes[timedOut]; got != testCase.wantNotes {
+				test.Errorf(
+					"noted %q %d times, want %d; every note: %v",
+					timedOut,
+					got,
+					testCase.wantNotes,
+					result.Notes,
+				)
+			}
 		})
 	}
 }

@@ -26,8 +26,10 @@ func (patterns *namePatterns) matchesUnremembered(name string) bool {
 	for _, pattern := range patterns.compiled {
 		// The first match, and only if it is the name: `exec(name)[0] === name`. A pattern whose
 		// first match is shorter does not match, though a longer match exists, exactly as upstream.
-		match, findStringMatchError := pattern.Unwrap().FindStringMatch(compared)
-		if findStringMatchError == nil && match != nil && match.RuneIndex == 0 && match.String() == compared {
+		// One that overruns the time bound reads as no match, unnamed, for the reason matchesPath
+		// gives, and its answer is remembered for every worker with these settings (#s4dy4e0).
+		match, execError := pattern.ExecOrError(compared)
+		if execError == nil && match != nil && match.RuneIndex == 0 && match.String() == compared {
 			return true
 		}
 	}

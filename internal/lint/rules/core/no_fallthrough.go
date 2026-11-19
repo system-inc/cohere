@@ -84,7 +84,10 @@ var NoFallthrough = rule.Rule[NoFallthroughOptions]{
 	Name: "no-fallthrough",
 	Run: func(ruleContext rule.Context, options rule.Given[NoFallthroughOptions]) rule.Listeners {
 		parsed, _ := options.Read()
-		excusesFallthrough, namesFallthrough := fallthroughCommentMatchers(parsed.CommentPattern)
+		excusesFallthrough, namesFallthrough := fallthroughCommentMatchers(
+			fallthroughCommentPattern(parsed.CommentPattern),
+			ruleContext.PatternTimedOut,
+		)
 
 		return rule.Listeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
@@ -156,29 +159,43 @@ var NoFallthrough = rule.Rule[NoFallthroughOptions]{
 	},
 }
 
+// fallthroughCommentPattern compiles a user's commentPattern, or is nil for none, and for one that will not
+// compile, which falls through to the default set. Treating it as "matches everything" would take the rule silent
+// across every file the option touches, which is the failure mode a misconfiguration must not be able to cause.
+//
+// oxc prepends `(?iu)`, so a lower-case pattern matches an upper-case comment, and the `i` is kept. The dialect is
+// JavaScript's rather than the Rust crate's or RE2's: the pattern was written for ESLint's
+// `new RegExp(commentPattern, "u")`, so it compiles as `new RegExp(pattern, "iu")`, oxc's case-insensitivity read the
+// way JavaScript reads it. RE2 refused a lookaround or a backreference its user wrote, and read `\s` and `\b`
+// differently (#7mztrdd).
+func fallthroughCommentPattern(pattern string) *esregexp.RegExp {
+	if pattern == "" {
+		return nil
+	}
+	compiled, compileError := esregexp.Compile(pattern, "iu")
+	if compileError != nil {
+		return nil
+	}
+	return compiled
+}
+
 // fallthroughCommentMatchers builds the predicates deciding whether a comment says a case falls through,
 // one for each way the answer is used: excuses for a fallthrough it spares, names for an unused comment it
 // reports. They differ only on a user's pattern whose match overruns the time bound, which spares a
-// fallthrough and reports nothing, since in either use no answer must not become a report.
+// fallthrough and reports nothing, since in either use no answer must not become a report. Either way the
+// pattern is passed to overrun, so the run names it as a gap rather than as a clean answer.
 //
-// The default set is oxc's four exact spellings rather than ESLint's `/falls?\s?through/iu`, which
-// is a real divergence between the two upstreams and is reproduced rather than resolved: oxc fails
+// With no pattern, the default set is oxc's four exact spellings rather than ESLint's `/falls?\s?through/iu`,
+// which is a real divergence between the two upstreams and is reproduced rather than resolved: oxc fails
 // `/* falling through */` and ESLint's pattern would pass it, and that input is in oxc's corpus as
 // a fail case. Following ESLint here would turn one of the imported fail fixtures green.
-func fallthroughCommentMatchers(pattern string) (excuses func(string) bool, names func(string) bool) {
-	if pattern != "" {
-		// oxc prepends `(?iu)`, so a lower-case pattern matches an upper-case comment, and the `i`
-		// is kept. The dialect is JavaScript's rather than the Rust crate's or RE2's: the pattern
-		// was written for ESLint's `new RegExp(commentPattern, "u")`, so it compiles as
-		// `new RegExp(pattern, "iu")`, oxc's case-insensitivity read the way JavaScript reads it.
-		// RE2 refused a lookaround or a backreference its user wrote, and read `\s` and `\b`
-		// differently (#7mztrdd).
-		if compiled, compileError := esregexp.Compile(pattern, "iu"); compileError == nil {
-			return compiled.TestOrTimeout, compiled.Test
-		}
-		// A pattern that will not compile falls through to the default set. Treating it as
-		// "matches everything" would take the rule silent across every file the option touches,
-		// which is the failure mode a misconfiguration must not be able to cause.
+func fallthroughCommentMatchers(
+	pattern *esregexp.RegExp,
+	overrun esregexp.Overrun,
+) (excuses func(string) bool, names func(string) bool) {
+	if pattern != nil {
+		return func(comment string) bool { return pattern.TestOrTimeout(comment, overrun) },
+			func(comment string) bool { return pattern.Test(comment, overrun) }
 	}
 	exact := func(comment string) bool {
 		switch strings.ToLower(text.TrimWhitespace(comment)) {

@@ -95,6 +95,15 @@ func (ruleContext Context) SkipCovered(cover Cover, reason string) {
 	ruleContext.Note(CoveredSkipNotePrefix + string(cover) + ": " + reason)
 }
 
+// PatternTimedOut records that a regular expression the rule was handed, by its options or by the source under
+// lint, ran past esregexp.MatchTimeout on this file, so the answer the rule acted on there was the stand-in the
+// caller chose and not the pattern's. It is esregexp.Overrun's shape, so a rule passes it to Test or TestOrTimeout
+// as it is. The run names each as a gap, the rule, the pattern and the file, in the footer and in --json: a
+// restricting pattern that ran out of time may have missed a finding, and that must never read as clean (#s4dy4e0).
+func (ruleContext Context) PatternTimedOut(pattern string) {
+	ruleContext.Note(PatternTimedOutNotePrefix + pattern)
+}
+
 func (ruleContext Context) ReportNode(node *ast.Node, message Message) {
 	ruleContext.Report(Diagnostic{
 		Range:      TokenRange(ruleContext.SourceFile, node),

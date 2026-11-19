@@ -54,7 +54,7 @@ func TestNoWarningCommentsLeadAnswersAsThePatternDoes(test *testing.T) {
 					continue
 				}
 				skipped++
-				if matcher.Test(value) {
+				if matcher.Test(value, nil) {
 					test.Errorf("%s: the check skips %q on %q, which its pattern %s matches",
 						configuration.name, compiled.terms[index], value, matcher)
 				}

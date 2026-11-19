@@ -502,7 +502,7 @@ func sortCompMemberName(node *ast.Node) string {
 // literal-name test against `sortCompKnownLifecycleNames` comes before the regex branch, so an
 // order entry spelled `render` is a member name rather than a pattern. Reordering these two changes
 // the answer for any project whose order names a lifecycle method directly.
-func sortCompGroupMatches(group string, member sortCompMember) bool {
+func sortCompGroupMatches(group string, member sortCompMember, overrun esregexp.Overrun) bool {
 	switch group {
 	case "getters":
 		return member.getter
@@ -537,9 +537,10 @@ func sortCompGroupMatches(group string, member sortCompMember) bool {
 	// A match only decides which group the member belongs to; it neither causes nor suppresses a
 	// report by itself. So `Test` is used, and a match that overruns the time bound counts as no
 	// match: the member falls to its default group, exactly as an uncompilable pattern sends it.
+	// Either answer could move a finding, so the run names the overrun as a gap.
 	if submatches := sortCompRegexPattern.FindStringSubmatch(group); submatches != nil {
 		pattern, compiled := sortCompCompilePattern(submatches[1], submatches[2])
-		if compiled && pattern.Test(member.name) {
+		if compiled && pattern.Test(member.name, overrun) {
 			return true
 		}
 		return false
@@ -568,10 +569,10 @@ func sortCompCompilePattern(body string, flags string) (*esregexp.RegExp, bool) 
 // entry either, upstream pushes `Infinity`, which sorts after everything. That is reproduced with
 // `math.MaxInt` rather than a sentinel like -1, because the value is compared with `<` and `>`
 // against real indexes and a negative sentinel would invert every comparison it took part in.
-func sortCompRefIndexes(methodsOrder []string, member sortCompMember) []int {
+func sortCompRefIndexes(methodsOrder []string, member sortCompMember, overrun esregexp.Overrun) []int {
 	indexes := []int{}
 	for index, group := range methodsOrder {
-		if sortCompGroupMatches(group, member) {
+		if sortCompGroupMatches(group, member, overrun) {
 			indexes = append(indexes, index)
 		}
 	}
@@ -610,9 +611,10 @@ func sortCompComparePropsOrder(
 	members []sortCompMember,
 	indexA int,
 	indexB int,
+	overrun esregexp.Overrun,
 ) sortCompComparison {
-	referenceIndexesA := sortCompRefIndexes(methodsOrder, members[indexA])
-	referenceIndexesB := sortCompRefIndexes(methodsOrder, members[indexB])
+	referenceIndexesA := sortCompRefIndexes(methodsOrder, members[indexA], overrun)
+	referenceIndexesB := sortCompRefIndexes(methodsOrder, members[indexB], overrun)
 
 	// Upstream computes these with `propertiesInfos.indexOf(propA)`, an identity lookup that returns
 	// the first structurally-equal element in some engines' terms but is reference equality here.
@@ -711,7 +713,7 @@ func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members
 			if indexA == indexB {
 				continue
 			}
-			comparison := sortCompComparePropsOrder(methodsOrder, members, indexA, indexB)
+			comparison := sortCompComparePropsOrder(methodsOrder, members, indexA, indexB, ruleContext.PatternTimedOut)
 			if comparison.correct {
 				continue
 			}

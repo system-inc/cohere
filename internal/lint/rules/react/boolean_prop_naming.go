@@ -278,7 +278,7 @@ func checkBooleanPropNaming(
 			continue
 		}
 		for _, member := range collectTypeMembers(ruleContext, propertiesType, map[*ast.Node]bool{}) {
-			checkTypeMember(member, pattern, report)
+			checkTypeMember(member, pattern, ruleContext.PatternTimedOut, report)
 		}
 	}
 }
@@ -324,7 +324,13 @@ func checkPropTypesValue(
 	if unwrapped == nil || unwrapped.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
-	runBooleanPropCheck(unwrapped.AsObjectLiteralExpression().Properties, settings, pattern, report)
+	runBooleanPropCheck(
+		unwrapped.AsObjectLiteralExpression().Properties,
+		settings,
+		pattern,
+		ruleContext.PatternTimedOut,
+		report,
+	)
 }
 
 // runBooleanPropCheck walks one propTypes object's own properties.
@@ -336,6 +342,7 @@ func runBooleanPropCheck(
 	properties *ast.NodeList,
 	settings BooleanPropNamingOptions,
 	pattern *esregexp.RegExp,
+	overrun esregexp.Overrun,
 	report func(*ast.Node, string),
 ) {
 	if properties == nil {
@@ -356,7 +363,7 @@ func runBooleanPropCheck(
 				first := skipParenthesesOptional(arguments.Nodes[0])
 				if first != nil && first.Kind == ast.KindObjectLiteralExpression {
 					runBooleanPropCheck(first.AsObjectLiteralExpression().Properties,
-						settings, pattern, report)
+						settings, pattern, overrun, report)
 				}
 			}
 			continue
@@ -366,8 +373,9 @@ func runBooleanPropCheck(
 			continue
 		}
 		name, hasName := propertyTypesKeyName(assignment.Name())
-		// A match that overruns the time bound passes too: no answer here is a report.
-		if pattern.TestOrTimeout(name) && hasName {
+		// A match that overruns the time bound passes too: no answer here is a report. The run names the
+		// overrun as a gap.
+		if pattern.TestOrTimeout(name, overrun) && hasName {
 			continue
 		}
 		report(property, name)
@@ -616,7 +624,12 @@ func resolvedTypeDeclarationBody(ruleContext rule.Context, reference *ast.Node) 
 // `enabled: boolean | undefined` does not. Both are reproduced by testing the annotation kind
 // directly rather than asking the checker whether the type is assignable to boolean, which would be
 // a wider question than upstream asks.
-func checkTypeMember(member *ast.Node, pattern *esregexp.RegExp, report func(*ast.Node, string)) {
+func checkTypeMember(
+	member *ast.Node,
+	pattern *esregexp.RegExp,
+	overrun esregexp.Overrun,
+	report func(*ast.Node, string),
+) {
 	if member == nil || member.Kind != ast.KindPropertySignature {
 		return
 	}
@@ -626,8 +639,9 @@ func checkTypeMember(member *ast.Node, pattern *esregexp.RegExp, report func(*as
 	}
 
 	name, hasName := propertyTypesKeyName(signature.Name())
-	// A match that overruns the time bound passes too: no answer here is a report.
-	if pattern.TestOrTimeout(name) && hasName {
+	// A match that overruns the time bound passes too: no answer here is a report. The run names the
+	// overrun as a gap.
+	if pattern.TestOrTimeout(name, overrun) && hasName {
 		return
 	}
 	report(member, name)
