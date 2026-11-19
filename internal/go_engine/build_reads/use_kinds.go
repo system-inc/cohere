@@ -17,7 +17,8 @@ const (
 	// UsedValueType is each named type an expression's type the part holds reaches: the type itself when it is named,
 	// or each named type its structure holds, and every type argument's at any depth (functionUsesRecorder.addNamed),
 	// since moving a value to an interface, comparing it or copying it reads a method set or a layout another build can
-	// change.
+	// change. A value moved to an empty interface, or to a place the walk cannot see, reaches every named type a look
+	// through it does as well, past each named type into its declaration (functionUsesRecorder.looked).
 	UsedValueType
 
 	// UsedTypeArgument is each named type an instance's type argument reaches, as UsedValueType's are reached.

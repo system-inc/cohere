@@ -460,6 +460,103 @@ func TestAValueTypeRecordsEveryNamedTypeItsStructureReaches(test *testing.T) {
 	checkWrittenUses(test, written, want)
 }
 
+// The moved fixture's packages: other, whose Entries holds Entry behind a slice, Entry holding Value behind a pointer
+// and a Box of Sealed and one of Other, and first, whose Holder reaches them in an array, its own Key and Element in
+// a map, itself through a pointer, and hidden only as a function's parameter.
+var movedSources = []fixtureFile{
+	{"other", "other.go", `package other
+
+type Value struct{ Count int }
+
+type Sealed struct{ Count int }
+
+type Other struct{ Count int }
+
+type Box[Item any] struct {
+	Item *Item
+	Next *Box[Item]
+}
+
+type Entry struct {
+	Value *Value
+	Boxed Box[Sealed]
+	Again Box[Other]
+}
+
+type Entries []Entry
+
+type Teller interface{ Tell() string }
+`},
+	{"first", "first.go", `package first
+
+import "other"
+
+type Holder struct {
+	Items [2]other.Entries
+	Keyed map[Key]*Element
+	Next  *Holder
+	Tell  func(hidden)
+}
+
+type Key string
+
+type Element struct{ Depth int }
+
+type hidden struct{}
+
+type teller struct{ Told Element }
+
+func (teller) Tell() string { return "" }
+
+func Emptied(holder Holder) any { return holder }
+
+func Unseen(holder *Holder) { _ = holder }
+
+func Asked(told teller) other.Teller { return told }
+
+func Copied(holder Holder) Holder { return holder }
+`},
+}
+
+// A value moved to an empty interface, or to a place the walk cannot see, records in its body a use of every named
+// type a look through it reaches (#h0k644s): through an array, a slice, a pointer, a map's key and its element, and
+// through each named type's own declaration, another package's as the package's own, to that type's type arguments
+// too, a second instance's as the first's, though the look enters a generic's declaration once. A type that comes
+// round to itself, as Holder and Box do by a pointer, ends the look. hidden, held only as a function's parameter, is
+// not reached. A value moved to an interface with methods, or copied to its own type, records its own type alone, as
+// before.
+func TestAValueMovedToAnEmptyInterfaceRecordsEveryNamedTypeALookReaches(test *testing.T) {
+	test.Parallel()
+
+	written, _ := functionUsesOf(test, movedSources)
+	looked := []string{
+		"first.Element (first.go) ValueType",
+		"first.Holder (first.go) ValueType",
+		"first.Key (first.go) ValueType",
+		"other.Box (other.go) ValueType",
+		"other.Entries (other.go) ValueType",
+		"other.Entry (other.go) ValueType",
+		"other.Other (other.go) ValueType",
+		"other.Sealed (other.go) ValueType",
+		"other.Value (other.go) ValueType",
+	}
+	want := map[string][]string{
+		"Function first.Emptied (first.go) body": looked,
+		"Function first.Unseen (first.go) body":  looked,
+		"Function first.Asked (first.go) body": {
+			"first.teller (first.go) ValueType",
+		},
+		"Function first.Copied (first.go) body": {
+			"first.Holder (first.go) ValueType",
+		},
+	}
+	for part, uses := range want {
+		if !slices.Equal(written[part], uses) {
+			test.Errorf("%s: want\n%s\ngot\n%s", part, strings.Join(uses, "\n"), strings.Join(written[part], "\n"))
+		}
+	}
+}
+
 // The unknown fixture's package: cfg, an unexported var of an unnamed struct type, whose field A no objectpath
 // reaches, read by Read, and Settled, which reads cfg whole and nothing unknown.
 var unknownSources = []fixtureFile{

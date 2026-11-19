@@ -407,6 +407,92 @@ func TestABuildUnderOtherSizesReachesEveryBody(test *testing.T) {
 	}
 }
 
+// A rule handed a value as an empty interface looks through the value's type past what its own bits say (#h0k644s):
+// printf's verb match, SA1026's marshal walk and SA1003's binary walk each judge a type below a named slice, which
+// reads its element by name alone. The body-reach-moved fixture hands each reader a named slice of a struct holding a
+// type each build's own file declares, and a struct holding that slice, and neither bit of either is set on windows.
+// The use walk records, for a value moved to an empty interface, a use of every named type a look through it reaches
+// (useWalk.reachable), so windows's census reaches all six bodies through the entry struct's underlying bit, ValueType.
+// Without that record none of the six is reached, and the body differential finds the three rules reporting on windows
+// what the host never did in five of them, `binary.Write` refusing a struct that holds a slice in both builds alike.
+// ShowPlain prints a named slice with nothing any build changes below it: unreached, and the same in both builds.
+//
+// The fixture imports the standard library, whose bodies the census counts too, so only the fixture's own are read.
+func TestAValueMovedToAnEmptyInterfaceReachesItsBodyThroughTheTypesBelowIt(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "body-reach-moved"))
+	on, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.bodyDifferential = true
+	}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+
+	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
+		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))
+	}
+	census, differential := on.buildRuns[1].bodyReach, on.buildRuns[1].bodyDifferential
+	if census == nil || differential == nil {
+		test.Fatal("windows's run has no census or no body differential")
+	}
+	got := map[string]string{}
+	drivers := map[string]string{}
+	for _, body := range census.bodies {
+		if body.packageIdentifier != "example.com/moved" {
+			continue
+		}
+		got[body.name] = cmp.Or(string(body.reason), "unreached")
+		drivers[body.name] = strings.ReplaceAll(body.driver, root+string(filepath.Separator), "")
+	}
+	want := map[string]string{
+		"Show":          "ValueType",
+		"ShowNested":    "ValueType",
+		"Marshal":       "ValueType",
+		"MarshalNested": "ValueType",
+		"Write":         "ValueType",
+		"WriteNested":   "ValueType",
+		"ShowPlain":     "unreached",
+	}
+	if !maps.Equal(got, want) {
+		test.Errorf("windows's census judges the fixture's bodies\n%v\nwant\n%v", got, want)
+	}
+	wantDrivers := map[string]string{
+		"Show":          "example.com/moved.PrintedEntry (moved.go) ValueType underlying in the body",
+		"ShowNested":    "example.com/moved.PrintedEntry (moved.go) ValueType underlying in the body",
+		"Marshal":       "example.com/moved.MarshalledEntry (moved.go) ValueType underlying in the body",
+		"MarshalNested": "example.com/moved.MarshalledEntry (moved.go) ValueType underlying in the body",
+		"Write":         "example.com/moved.WrittenEntry (moved.go) ValueType underlying in the body",
+		"WriteNested":   "example.com/moved.WrittenEntry (moved.go) ValueType underlying in the body",
+		"ShowPlain":     "",
+	}
+	if !maps.Equal(drivers, wantDrivers) {
+		test.Errorf("windows's census says each body is reached first by\n%v\nwant\n%v", drivers, wantDrivers)
+	}
+
+	var compared []string
+	for _, each := range differential.bodies {
+		if each.body.packageIdentifier == "example.com/moved" {
+			compared = append(compared, each.body.name)
+		}
+	}
+	if !slices.Equal(compared, []string{"ShowPlain"}) {
+		test.Errorf("want ShowPlain alone of the fixture's bodies compared with the host's, got %v", compared)
+	}
+	for _, failure := range differential.failures {
+		if strings.HasPrefix(failure, "example.com/moved ") {
+			test.Errorf("a body of the fixture left unreached differs on windows: %s", failure)
+		}
+	}
+	// The fixture's premise: each of the three readers reports on the named slice, which windows's types alone draw.
+	for _, message := range []string{
+		"fmt.Printf format %d has arg entries of wrong type example.com/moved.PrintedEntries",
+		"trying to marshal unsupported type marshalledValue, via x[0].Value",
+		"value of type example.com/moved.WrittenEntries cannot be used with binary.Write",
+	} {
+		if !strings.Contains(stream, `"message":"`+message+`"`) {
+			test.Errorf("want the run to report %q, and it does not", message)
+		}
+	}
+}
+
 // On a warm run the host's graph takes a package the findings store holds a record of from that record, which holds
 // no live object, so the reach asks of the package's objects by its ID and their names (bodyReacher.bits). A package
 // beside its in-package test variant shares its path with it, so a name asked by its path names no one package and
