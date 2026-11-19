@@ -15,6 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/return_nil_ness"
 )
 
@@ -284,6 +285,63 @@ func TestTheRunCapturesTheFactsReachUnderItsSwitch(test *testing.T) {
 				test.Errorf("the run's answers %q hold no %s, which a package's answers hold", every, name)
 			}
 		}
+	}
+}
+
+// The capture marks each answer its kind says its object's types alone decide (fact_resolver.Kind.TypesAlone), among a
+// package's answers and among the run's alike, and no other. Under SA4017, which asks the purity of each call's callee
+// whose results nothing reads, the package's initializer calls its `init`, so the run holds purity's answer about a
+// function no identity names: marked, since purity answers not pure for every function with no results. Its answer
+// about double, whose result Twice discards, turns on double's body and is not marked.
+func TestTheCaptureMarksTheAnswersTheirKindSaysTypesAloneDecide(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeFiles(test, root, map[string]string{
+		"go.mod": "module example.com/alone\n\ngo 1.24\n",
+		"alone.go": "// Package alone declares an init beside a call whose result nothing reads.\npackage alone\n\n" +
+			"// started counts the package's starts.\nvar started int\n\n" +
+			"func init() {\n\tstarted++\n}\n\n" +
+			"// double is pure.\nfunc double(value int) int {\n\treturn value * 2\n}\n\n" +
+			"// Twice discards double's result.\nfunc Twice() int {\n\tdouble(2)\n\treturn started\n}\n",
+	})
+	loaded, loadError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading the workspace: %v %+v", loadError, loaded)
+	}
+	var asking []rule.Rule
+	for _, registered := range rules.All() {
+		if registered.Name == rule.Namespace+"SA4017" {
+			asking = append(asking, registered)
+		}
+	}
+	if len(asking) != 1 {
+		test.Fatalf("the registry holds %d rules named SA4017, want 1", len(asking))
+	}
+	on, runError := Run(loaded.Packages, asking, Options{FactReach: true})
+	if runError != nil {
+		test.Fatalf("running with the switch: %v", runError)
+	}
+	if on.FactReach == nil {
+		test.Fatal("with the switch the run captured nothing")
+	}
+	marks := func(answers []ExportedFact) []string {
+		var names []string
+		for _, answer := range answers {
+			if answer.TypesAlone {
+				names = append(names, answer.Analyzer+" "+answer.Object.Name()+" marked")
+			} else {
+				names = append(names, answer.Analyzer+" "+answer.Object.Name())
+			}
+		}
+		return names
+	}
+	want := []string{"function_purity init marked", "function_purity double"}
+	alone := capturedOf(test, on.FactReach, loaded.Packages, "example.com/alone")
+	if got := marks(alone.Answers); !slices.Equal(got, want) {
+		test.Errorf("the package's answers are %q, want %q", got, want)
+	}
+	if got := marks(on.FactReach.Answers); !slices.Equal(got, want) {
+		test.Errorf("the run's answers are %q, want %q", got, want)
 	}
 }
 

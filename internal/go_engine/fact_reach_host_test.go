@@ -377,6 +377,8 @@ func TestAnAnswerIsRecordedUnderItsFunctionsPlaceAndAboutItsFunction(test *testi
 // is left out and counted nowhere, since the host hands a mark for a function literal's parameter too and one closure
 // must not make its package lint whole: a literal's parameter, a result, a receiver and a package-level value. An
 // answer about a function declared without a body is neither recorded nor counted, its answer being its types' alone.
+// So is one about a function no declaration declares that its kind marks as its types' alone, as purity's about an
+// `init` function is, while the same answer unmarked is counted, and a mark never excuses an answer about the package.
 func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 	test.Parallel()
 
@@ -389,25 +391,41 @@ func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 		test.Fatal("want count, in Joined's body, of a function literal's type")
 	}
 	for _, each := range []struct {
-		name     string
-		object   types.Object
-		unplaced int
+		name       string
+		object     types.Object
+		typesAlone bool
+		unplaced   int
 	}{
-		{"the package", nil, 1},
-		{"a function no declaration declares", elsewhere, 1},
-		{"a function literal's parameter", literal.Params().At(0), 0},
-		{"a result", use.Signature().Results().At(0), 0},
-		{"a receiver", open.Signature().Recv(), 0},
-		{"a package-level value", fixture.own.Scope().Lookup("started"), 0},
-		{"a function declared without a body", fixture.function(test, "declared"), 0},
+		{"the package", nil, false, 1},
+		{"the package, marked as its types' alone", nil, true, 1},
+		{"a function no declaration declares", elsewhere, false, 1},
+		{"a function no declaration declares, marked as its types' alone", elsewhere, true, 0},
+		{"a function literal's parameter", literal.Params().At(0), false, 0},
+		{"a result", use.Signature().Results().At(0), false, 0},
+		{"a receiver", open.Signature().Recv(), false, 0},
+		{"a package-level value", fixture.own.Scope().Lookup("started"), false, 0},
+		{"a function declared without a body", fixture.function(test, "declared"), false, 0},
 	} {
 		inputs := fixture.inputs()
-		inputs.answers = []check.ExportedFact{purity(each.object, "true")}
+		answer := purity(each.object, "true")
+		answer.TypesAlone = each.typesAlone
+		inputs.answers = []check.ExportedFact{answer}
 		hosted := newFactReachPackage(inputs)
 		if hosted.unplaced != each.unplaced || len(hosted.askings) != 0 {
 			test.Errorf("an answer about %s: %d unplaced and %d questions, want %d and none", each.name,
 				hosted.unplaced, len(hosted.askings), each.unplaced)
 		}
+	}
+	// A mark leaves out only what no place takes: a marked answer about Use, whose body is placed, is recorded and
+	// asked as any other, so a body the build lints still holds its record of the kind.
+	inputs := fixture.inputs()
+	placed := purity(use, "false")
+	placed.TypesAlone = true
+	inputs.answers = []check.ExportedFact{placed}
+	hosted := newFactReachPackage(inputs)
+	if recorded := hosted.Recorded(fixture.places["Use"]); hosted.unplaced != 0 || len(recorded) != 1 {
+		test.Errorf("a marked answer about Use: %d unplaced and %+v recorded, want none and its one question",
+			hosted.unplaced, recorded)
 	}
 }
 
