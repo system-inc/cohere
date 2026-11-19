@@ -33,8 +33,10 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 }
 
 // The differences fixture holds the TestMains whose judgment hangs on the state the walk carries, a call to os.Exit at
-// package level and calls inside a call's arguments. The two agree on every one but the TestMain after a call to
-// os.Exit at package level, which the port alone finds, as its record there says (#zvwfe26).
+// package level and calls inside a call's arguments. The two agree on every one but a TestMain after a call to os.Exit
+// at package level, in its file or in the file before, which the port alone finds, as each record says (#zvwfe26).
+// shapes.go holds the exits they agree on: direct, in a function literal, deferred, and through a local alias, which
+// neither counts.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	parity.RequireOnlyAdjudicated(test, sa3000.Analyzer, Analyzer, analysistest.TestData(), "differences")

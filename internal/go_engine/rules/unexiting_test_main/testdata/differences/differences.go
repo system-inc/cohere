@@ -1,7 +1,7 @@
 // Package differences holds the TestMains where the port and the original could plausibly disagree. Both clear what
 // they saw as each TestMain ends, and leave calls inside a call's arguments unseen once the call is judged. They differ
-// in one place: the original counts a call to os.Exit at package level for the TestMain after it, and the port counts
-// only the calls inside a TestMain (#zvwfe26).
+// in one way: the original counts a call to os.Exit at package level for the TestMain after it, here and across
+// pair_exit.go and pair_test_main.go, and the port counts only the calls inside a TestMain (#zvwfe26).
 package differences
 
 import (
