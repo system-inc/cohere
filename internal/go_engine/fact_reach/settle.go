@@ -16,6 +16,8 @@
 // from stage 1's record of what each declaration uses and from the host's facts, is the engine's pipeline.
 package fact_reach
 
+import "maps"
+
 // Place is a function declaration with a body, by the file it was parsed from and the offset of its `func`, as
 // build_reads.Declaration places one.
 type Place struct {
@@ -80,9 +82,10 @@ type Removal struct {
 	Reason Reason
 }
 
-// Settlement is what Settle found: the bodies that left the standing set, in the order they left, how many questions
-// the build was asked, and how many of them read different or unknown, by kind.
+// Settlement is what Settle found: the bodies that still stand, those that left the standing set, in the order they
+// left, how many questions the build was asked, and how many of them read different or unknown, by kind.
 type Settlement struct {
+	Standing  map[Place]bool
 	Removed   []Removal
 	Asked     int
 	Differing map[string]int
@@ -94,10 +97,11 @@ type Settlement struct {
 func differsReason(kind string) Reason { return Reason("answer " + kind) }
 func unknownReason(kind string) Reason { return Reason("unknown " + kind) }
 
-// Settle takes out of standing, in place, every body the facts reach, and reports what it took (see the package).
-// reached are the bodies of files both builds compile that the build lints already, whose recorded answers are asked
-// first; named are the objects known to differ before any answer is asked. compare asks the build one question and
-// reads its answer beside the host's; it is called once for each question, in the order the bodies leave.
+// Settle takes out of standing every body the facts reach, and reports what still stands and what it took (see the
+// package). standing is read and never written: what still stands is the settlement's own map. reached are the bodies
+// of files both builds compile that the build lints already, whose recorded answers are asked first; named are the
+// objects known to differ before any answer is asked. compare asks the build one question and reads its answer beside
+// the host's; it is called once for each question, in the order the bodies leave.
 func Settle(
 	standing map[Place]bool,
 	reached []Place,
@@ -105,7 +109,11 @@ func Settle(
 	source Source,
 	compare func(Question) Comparison,
 ) *Settlement {
-	settlement := &Settlement{Differing: map[string]int{}, Unknown: map[string]int{}}
+	settlement := &Settlement{Standing: maps.Clone(standing), Differing: map[string]int{}, Unknown: map[string]int{}}
+	if settlement.Standing == nil {
+		// A clone of no map is none, and what still stands is the settlement's own to answer of either way.
+		settlement.Standing = map[Place]bool{}
+	}
 	asked := map[string]bool{}
 	left := append([]Place{}, reached...)
 	differing := append([]Named{}, named...)
@@ -116,10 +124,10 @@ func Settle(
 		for ; nextObject < len(differing); nextObject++ {
 			object := differing[nextObject]
 			for _, user := range source.Users(object.Object) {
-				if !standing[user] {
+				if !settlement.Standing[user] {
 					continue
 				}
-				delete(standing, user)
+				delete(settlement.Standing, user)
 				settlement.Removed = append(settlement.Removed,
 					Removal{Place: user, Object: object.Object, Reason: object.Reason})
 				left = append(left, user)
