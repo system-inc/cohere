@@ -32,11 +32,18 @@ type keepRun struct {
 	computed int
 }
 
-// learnMiddle runs ctrlflow on middle, loaded from source, which is how a resolver learns a package, with a store that
-// holds stored as keepProbe's answer about middle.Middle, or nothing when stored is nil, and a hand that answers every
-// question with handed, or none when handed is nil. With restoresBottom, bottom is restored, so the resolver never
-// learns it and the store, holding nothing of it, cannot answer a question there.
+// learnMiddle is learnMiddleWith a store that holds stored as keepProbe's answer about middle.Middle, or nothing when
+// stored is nil.
 func learnMiddle(test *testing.T, stored []byte, handed []byte, restoresBottom bool) *keepRun {
+	test.Helper()
+	return learnMiddleWith(test, keepStore{stored: stored}, handed, restoresBottom)
+}
+
+// learnMiddleWith runs ctrlflow on middle, loaded from source, which is how a resolver learns a package, with store,
+// nil for a run with none, and a hand that answers every question with handed, or none when handed is nil. With
+// restoresBottom, bottom is restored, so the resolver never learns it and a store holding nothing of it cannot answer
+// a question there.
+func learnMiddleWith(test *testing.T, store fact_resolver.Store, handed []byte, restoresBottom bool) *keepRun {
 	test.Helper()
 	directory := analysistest.TestData()
 	loaded, loadError := load.Packages(directory, []string{"bodiless/middle"}, []string{
@@ -46,8 +53,7 @@ func learnMiddle(test *testing.T, stored []byte, handed []byte, restoresBottom b
 		test.Fatalf("loading the fixture: %v", loadError)
 	}
 	bottom := loaded.Roots[0].Imports["bodiless/bottom"]
-	run := &keepRun{resolver: fact_resolver.New(keepStore{stored: stored}),
-		hand: &keepHand{answer: handed, heard: map[string][]string{}}}
+	run := &keepRun{resolver: fact_resolver.New(store), hand: &keepHand{answer: handed, heard: map[string][]string{}}}
 	run.resolver.HoldAnswers(run.hand)
 	options := check.DispatchOptions()
 	options.Resolver = run.resolver

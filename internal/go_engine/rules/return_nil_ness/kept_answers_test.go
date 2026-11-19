@@ -1,6 +1,7 @@
 package return_nil_ness_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go/types"
@@ -21,19 +22,21 @@ import (
 )
 
 // keptAnswers is what one question left in the resolver of a fixture package: the resolver, the package as it holds
-// it, every nilness answer it recorded for the package, decoded, nil for no fact, by its function's objectpath, and the
-// kind's counts.
+// it, every nilness answer it recorded for the package, decoded, nil for no fact, by its function's objectpath, every
+// nilness answer it holds about the package's functions (fact_resolver.Answered), decoded alike, by the function's
+// name, and the kind's counts.
 type keptAnswers struct {
 	resolver *fact_resolver.Resolver
 	home     *fact_resolver.Package
 	recorded map[string][]return_nil_ness.ValueNilness
+	answered map[string][]return_nil_ness.ValueNilness
 	counts   *fact_resolver.Counts
 }
 
 // askOnce runs a probe on the fixture package named fixture that asks the resolver the nilness of its function named
-// asked, and of nothing else, and is what the resolver recorded for the package. The run has a store, which answers
-// nothing, since only a run with a store records its answers (fact_resolver.Recorded), as every engine run with the
-// findings cache does; the fixtures import nothing, so the store is asked of no package restored.
+// asked, and of nothing else, and is what the resolver recorded and holds for the package. The run has a store, which
+// answers nothing, since only a run with a store records its answers (fact_resolver.Recorded), as every engine run
+// with the findings cache does; the fixtures import nothing, so the store is asked of no package restored.
 func askOnce(test *testing.T, fixture string, asked string) keptAnswers {
 	test.Helper()
 	directory := analysistest.TestData()
@@ -74,16 +77,36 @@ func askOnce(test *testing.T, fixture string, asked string) keptAnswers {
 		}
 	}
 	kept := keptAnswers{resolver: resolver, home: resolver.Package(loaded.Roots[0].Types),
-		recorded: map[string][]return_nil_ness.ValueNilness{}, counts: resolver.Counts(return_nil_ness.Kind)}
+		recorded: map[string][]return_nil_ness.ValueNilness{}, answered: map[string][]return_nil_ness.ValueNilness{},
+		counts: resolver.Counts(return_nil_ness.Kind)}
 	if kept.home == nil {
 		test.Fatalf("the resolver never learned %s, which the probe ran on", fixture)
 	}
-	for path, encoded := range resolver.Recorded(loaded.Roots[0].Types)[return_nil_ness.Kind.Name] {
+	records := resolver.Recorded(loaded.Roots[0].Types)[return_nil_ness.Kind.Name]
+	for path, encoded := range records {
 		var results []return_nil_ness.ValueNilness
 		if decodeError := json.Unmarshal(encoded, &results); decodeError != nil {
 			test.Fatalf("the answer recorded for %s, %s, does not decode: %v", path, encoded, decodeError)
 		}
 		kept.recorded[string(path)] = results
+	}
+	for _, answer := range resolver.Answered() {
+		if answer.Kind != return_nil_ness.Kind.Name || answer.Object.Pkg() != kept.home.Types {
+			continue
+		}
+		// An answer held and recorded both is the same bytes in each, no fact, a nil slice, among them.
+		if path, pathError := objectpath.For(answer.Object); pathError == nil {
+			if record, isRecorded := records[path]; isRecorded && !bytes.Equal(record, answer.Encoded) {
+				test.Errorf("the answer held about %s is %s, and its record is %s", answer.Object.Name(),
+					answer.Encoded, record)
+			}
+		}
+		var results []return_nil_ness.ValueNilness
+		if decodeError := json.Unmarshal(answer.Encoded, &results); decodeError != nil {
+			test.Fatalf("the answer held about %s, %s, does not decode: %v", answer.Object.Name(), answer.Encoded,
+				decodeError)
+		}
+		kept.answered[answer.Object.Name()] = results
 	}
 	return kept
 }
@@ -100,8 +123,9 @@ func requireRecorded(test *testing.T, kept keptAnswers, want map[string][]return
 // Asked of Caller alone, the resolver holds an answer of its own for each callee Caller's judgment judged, none of
 // which was asked of (#kemy8sq): Fresh never nil, with its results; Following, judged to no more than the defaults, as
 // no fact; and Assembled, which has no body and takes the defaults unjudged, as no fact too. Caller's own answer, no
-// fact, was built from those three, and a reader of the store's entry finds each beside it. No replay ran, so the
-// answers are the ones the demand walk kept.
+// fact, was built from those, and a reader of the store's entry finds each beside it. The unexported hidden, never
+// nil, is judged with them and has an answer among the ones the resolver holds, but no record: it has no objectpath
+// for the store to keep it by. No replay ran, so the answers are the ones the demand walk kept.
 func TestEveryCalleeADemandWalkJudgesHasAnAnswerOfItsOwn(test *testing.T) {
 	test.Parallel()
 	kept := askOnce(test, "kept", "Caller")
@@ -111,6 +135,16 @@ func TestEveryCalleeADemandWalkJudgesHasAnAnswerOfItsOwn(test *testing.T) {
 		"Following": nil,
 		"Assembled": nil,
 	})
+	wantAnswered := map[string][]return_nil_ness.ValueNilness{
+		"Caller":    nil,
+		"Fresh":     {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
+		"hidden":    {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
+		"Following": nil,
+		"Assembled": nil,
+	}
+	if !maps.EqualFunc(kept.answered, wantAnswered, slices.Equal[[]return_nil_ness.ValueNilness]) {
+		test.Errorf("the resolver holds the answers %v, want %v", kept.answered, wantAnswered)
+	}
 	if fallbacks := kept.counts.Fallbacks.Load(); fallbacks != 0 {
 		test.Errorf("asking of Caller replayed %d times, want 0, so the demand walk's answers went untested", fallbacks)
 	}

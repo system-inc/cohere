@@ -12,3 +12,8 @@ func Middle(values []int) {
 func Fresh() *int {
 	return new(int)
 }
+
+// quiet is unexported, so objectpath names no path to it, and an answer about it has no record for the store.
+func quiet() int {
+	return 1
+}
