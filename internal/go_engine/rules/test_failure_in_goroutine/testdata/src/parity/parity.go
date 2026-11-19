@@ -228,6 +228,20 @@ func startedTwice(t *testing.T) {
 	go fails(t)
 }
 
+// Found by both, twice: a named function whose own instructions stop the test in two branches, one finding for each
+// call, in the order of its instructions, each with its own call as related entry.
+func namedWithTwoStops(t *testing.T, skipped bool) {
+	go stopsEitherWay(t, skipped)
+}
+
+func stopsEitherWay(t *testing.T, skipped bool) {
+	if skipped {
+		t.SkipNow()
+	} else {
+		t.Fatal("failed")
+	}
+}
+
 // Found by neither: the goroutine closes over the test and only reads it.
 func readsOnly(t *testing.T) {
 	go func() {
