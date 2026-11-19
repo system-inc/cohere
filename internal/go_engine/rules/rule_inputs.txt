@@ -124,7 +124,7 @@ cohere-go/SA5005 PerUnit
 cohere-go/SA5007 PerUnit
 cohere-go/SA5008 PerUnit FullKind
 cohere-go/SA5010 PerUnit FullKind
-cohere-go/SA5012 Composes
+cohere-go/SA5012 PerUnit
 cohere-go/SA6000 PerUnit
 cohere-go/SA6001 PerUnit
 cohere-go/SA6002 PerUnit
