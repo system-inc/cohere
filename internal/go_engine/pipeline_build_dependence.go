@@ -388,7 +388,9 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 				}
 			}
 		}
-		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
+		// A build-only file that holds a directive and cannot be read or parsed is left out of BuildOnlyFiles
+		// (appendParsed) but still marks the package, which may differ by that file alone.
+		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.LineDirective {
 			difference.Packages[identifier] = differing
 		}
 	}
@@ -481,7 +483,8 @@ func standardLibraryDifference(
 			continue
 		}
 		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, read, holdsLineDirective)
-		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
+		// Kept when the directive is its one difference, as dependenceOf keeps the host's packages.
+		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.LineDirective {
 			difference.Packages[identifier] = differing
 		}
 	}
