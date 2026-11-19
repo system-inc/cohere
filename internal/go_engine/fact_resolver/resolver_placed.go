@@ -17,27 +17,31 @@ import (
 // scope, has one too. Kind is the kind's name. File and Offset place the function's declaration as a build's unit is
 // placed (build_dependence's newUnit): the file a `//line` directive names at the declaration's `func`, else the file
 // as parsed, and the offset of that `func` in the file as parsed. Parameter is the parameter's index among the
-// signature's parameters, its receiver not counted, or -1 for an answer about the function itself. Encoded is the
-// answer as JSON, as Ask encodes one. A cache entry holds these as they are (check's cacheEntry), so a change to their
-// shape is a change to its format.
+// signature's parameters, its receiver not counted, or -1 for an answer about the function itself. FileDigest is the
+// sha256 of the bytes of the file the offset counts in, as the run parsed it, or nil when the run held none, so a
+// reader whose file under the same name holds other bytes, where the offset may name another function, never takes
+// the answer (#k7k3wwc). Encoded is the answer as JSON, as Ask encodes one. A cache entry holds these by column
+// (check's storedPlaced), so a change to their shape is a change to its format.
 type PlacedAnswer struct {
-	Kind      string
-	File      string
-	Offset    int
-	Parameter int
-	Encoded   []byte
+	Kind       string
+	File       string
+	FileDigest []byte
+	Offset     int
+	Parameter  int
+	Encoded    []byte
 }
 
 // PlacedIn is every answer the run holds about home's declared functions and their parameters, as Answered holds them,
 // memoized or kept, each by its place (see PlacedAnswer). An answer about any other object, a result, a receiver, a
 // variable or a type, or about a function none of home's files declares, is left out, which a reader that takes a
-// missing answer as one that differs can afford. They are sorted by file, offset, parameter, kind, then the answer's
-// bytes, so they come in the same order on every run.
+// missing answer as one that differs can afford. Each answer's FileDigest is digestOf's of the file its function is
+// parsed from, by the name the load parsed it under, nil where digestOf holds none. They are sorted as ComparePlaced
+// orders them, so they come in the same order on every run.
 //
 // It reads home's own answers alone, never the run's, so a run that saves every package reads each answer once. An
 // answer a question adds while it reads, as another package's whole asking of home's functions as the run saves, may
 // be among them or not; either is an answer of home's key.
-func (resolver *Resolver) PlacedIn(home *Package) []PlacedAnswer {
+func (resolver *Resolver) PlacedIn(home *Package, digestOf func(parsed string) ([]byte, bool)) []PlacedAnswer {
 	home.answeredLock.Lock()
 	keys := slices.Collect(maps.Keys(home.answered))
 	home.answeredLock.Unlock()
@@ -57,17 +61,22 @@ func (resolver *Resolver) PlacedIn(home *Package) []PlacedAnswer {
 		if !isPlaced {
 			continue
 		}
-		placed = append(placed, PlacedAnswer{Kind: answer.Kind, File: place.File, Offset: place.Offset,
-			Parameter: place.Parameter, Encoded: answer.Encoded})
+		answered := PlacedAnswer{Kind: answer.Kind, File: place.File, Offset: place.Offset,
+			Parameter: place.Parameter, Encoded: answer.Encoded}
+		if parsed := home.fileSet.File(answer.Object.Pos()); parsed != nil {
+			answered.FileDigest, _ = digestOf(parsed.Name())
+		}
+		placed = append(placed, answered)
 	}
 	slices.SortFunc(placed, ComparePlaced)
 	return placed
 }
 
-// ComparePlaced orders two placed answers as PlacedIn sorts them: by file, offset, parameter, kind, then the answer's
-// bytes.
+// ComparePlaced orders two placed answers as PlacedIn sorts them: by file, the file's digest, offset, parameter, kind,
+// then the answer's bytes.
 func ComparePlaced(left PlacedAnswer, right PlacedAnswer) int {
-	return cmp.Or(cmp.Compare(left.File, right.File), cmp.Compare(left.Offset, right.Offset),
+	return cmp.Or(cmp.Compare(left.File, right.File), bytes.Compare(left.FileDigest, right.FileDigest),
+		cmp.Compare(left.Offset, right.Offset),
 		cmp.Compare(left.Parameter, right.Parameter), cmp.Compare(left.Kind, right.Kind),
 		bytes.Compare(left.Encoded, right.Encoded))
 }

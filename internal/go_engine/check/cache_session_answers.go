@@ -320,17 +320,19 @@ func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand)
 	// Placed after the whole is computed, so they hold every answer computing it memoized or kept.
 	var placed []fact_resolver.PlacedAnswer
 	if home != nil {
-		placed = session.resolver.PlacedIn(home)
+		placed = session.resolver.PlacedIn(home, digestsOf(session.files))
 	}
 	demanded.placed = mergedPlaced(held.placed, placed)
 	demanded.reads, demanded.readsIncomplete = session.readsOf(saved, held)
 	return demanded
 }
 
-// placedAt is where a placed answer stands, its kind's at its place: no two answers of one package share one.
+// placedAt is where a placed answer stands, its kind's at its place in the file whose bytes have digest: no two
+// answers of one package share one.
 type placedAt struct {
 	kind      string
 	file      string
+	digest    string
 	offset    int
 	parameter int
 }
@@ -344,7 +346,7 @@ func mergedPlaced(held []fact_resolver.PlacedAnswer, run []fact_resolver.PlacedA
 	}
 	merged := make(map[placedAt]fact_resolver.PlacedAnswer, len(held)+len(run))
 	for _, answer := range slices.Concat(held, run) {
-		merged[placedAt{kind: answer.Kind, file: answer.File, offset: answer.Offset,
+		merged[placedAt{kind: answer.Kind, file: answer.File, digest: string(answer.FileDigest), offset: answer.Offset,
 			parameter: answer.Parameter}] = answer
 	}
 	return slices.SortedFunc(maps.Values(merged), fact_resolver.ComparePlaced)

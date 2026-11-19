@@ -218,12 +218,13 @@ func TestAnEntryWhosePlacedAnswersGrewAfterTheFirstWaveIsWrittenAgain(test *test
 func placedDisagreeing(left []fact_resolver.PlacedAnswer, right []fact_resolver.PlacedAnswer) []string {
 	held := make(map[placedAt][]byte, len(left))
 	for _, answer := range left {
-		held[placedAt{kind: answer.Kind, file: answer.File, offset: answer.Offset,
+		held[placedAt{kind: answer.Kind, file: answer.File, digest: string(answer.FileDigest), offset: answer.Offset,
 			parameter: answer.Parameter}] = answer.Encoded
 	}
 	var disagreeing []string
 	for _, answer := range right {
-		at := placedAt{kind: answer.Kind, file: answer.File, offset: answer.Offset, parameter: answer.Parameter}
+		at := placedAt{kind: answer.Kind, file: answer.File, digest: string(answer.FileDigest), offset: answer.Offset,
+			parameter: answer.Parameter}
 		if encoded, isHeld := held[at]; isHeld && !bytes.Equal(encoded, answer.Encoded) {
 			disagreeing = append(disagreeing, fmt.Sprintf("%s %s:%d %d", at.kind, at.file, at.offset, at.parameter))
 		}
@@ -232,19 +233,25 @@ func placedDisagreeing(left []fact_resolver.PlacedAnswer, right []fact_resolver.
 }
 
 // An entry holds its placed answers by column, each file's and kind's name once, and reads back exactly what it was
-// given, in PlacedIn's order whatever order they came in: answers in two files, of two kinds, a function's own and a
-// parameter's, two at one offset. Columns of different lengths, or a kind the table does not hold, are a miss.
+// given, in PlacedIn's order whatever order they came in: answers in three files, two of one name parsed from other
+// bytes and one with no digest, of three kinds, a function's own and a parameter's, two at one offset. Columns of
+// different lengths, or a kind the table does not hold, are a miss.
 func TestAnEntrysPlacedAnswersReadBackExactly(test *testing.T) {
 	test.Parallel()
 	answers := []fact_resolver.PlacedAnswer{
 		{Kind: "return_nil_ness", File: "/module/b.go", Offset: 40, Parameter: -1, Encoded: []byte("[]")},
-		{Kind: "function_purity", File: "/module/a.go", Offset: 900, Parameter: -1, Encoded: []byte("true")},
-		{Kind: "odd_slice_argument", File: "/module/a.go", Offset: 120, Parameter: 1, Encoded: []byte("true")},
-		{Kind: "function_purity", File: "/module/a.go", Offset: 120, Parameter: -1, Encoded: []byte("false")},
+		{Kind: "return_nil_ness", File: "/module/a.go", FileDigest: []byte("generated"), Offset: 130, Parameter: -1,
+			Encoded: []byte("[]")},
+		{Kind: "function_purity", File: "/module/a.go", FileDigest: []byte("written"), Offset: 900, Parameter: -1,
+			Encoded: []byte("true")},
+		{Kind: "odd_slice_argument", File: "/module/a.go", FileDigest: []byte("written"), Offset: 120, Parameter: 1,
+			Encoded: []byte("true")},
+		{Kind: "function_purity", File: "/module/a.go", FileDigest: []byte("written"), Offset: 120, Parameter: -1,
+			Encoded: []byte("false")},
 	}
 	stored := storedPlacedOf(answers)
-	if len(stored.Kinds) != 3 || len(stored.Files) != 2 || len(stored.Values) != 4 {
-		test.Fatalf("want three kinds and two files, each once, and four rows, got %+v", stored)
+	if len(stored.Kinds) != 3 || len(stored.Files) != 3 || len(stored.Values) != 5 {
+		test.Fatalf("want three kinds and three files, each once, and five rows, got %+v", stored)
 	}
 	placed, placedError := stored.placed()
 	want := slices.SortedFunc(slices.Values(answers), fact_resolver.ComparePlaced)
@@ -323,7 +330,7 @@ func TestAColdEntryReadsBackThePlacedAnswersItsRunHeld(test *testing.T) {
 		test.Fatalf("want bottom's entry to read back the columns it holds, got %+v of %+v (%v)", placed,
 			entry.Placed, placedError)
 	}
-	held := cold.session.resolver.PlacedIn(home)
+	held := cold.session.resolver.PlacedIn(home, digestsOf(cold.session.files))
 	for _, answer := range placed {
 		if !slices.ContainsFunc(held, func(each fact_resolver.PlacedAnswer) bool {
 			return reflect.DeepEqual(each, answer)

@@ -979,7 +979,7 @@ func runPinnedFromStore(test *testing.T, handed bool) pinnedRun {
 	var held fact_resolver.Held
 	if handed {
 		hand := newPlacedHand()
-		hand.hold(variant, placed, func(fact_resolver.Place) bool { return true })
+		hand.hold(variant, placed, func(fact_resolver.Place) bool { return true }, diskDigests(test))
 		held = hand
 	}
 	variantRun, variantError := runIsolated(pinned, []*packages.Package{variant}, held)

@@ -20,6 +20,11 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
+// noDigests is a PlacedIn digestOf that holds no file's digest.
+func noDigests(string) ([]byte, bool) {
+	return nil, false
+}
+
 // learnPlacedFixture is a resolver that learned the fixture package at path, under fact_resolver's testdata, as
 // ctrlflow finishing on it teaches one, the package as it holds it, and as the load gave it.
 func learnPlacedFixture(test *testing.T, path string) (*fact_resolver.Resolver, *fact_resolver.Package,
@@ -67,7 +72,7 @@ func placedNames(placed []fact_resolver.PlacedAnswer) []string {
 // objectpath cannot name, as Exported's; Exported's own, which a walk kept and no question asked of, as a memoized one
 // is; a parameter's at its index, Method's second at 1, its receiver not counted; and directed's in written.go, the
 // file the //line directive above it names, at its offset in placed.go, where the directive moves its line and not its
-// bytes. Method's receiver, no parameter, is left out.
+// bytes, carrying placed.go's digest, the bytes its offset counts in. Method's receiver, no parameter, is left out.
 func TestPlacedInPlacesEveryAnswerAtItsDeclarationsFunc(test *testing.T) {
 	test.Parallel()
 	directory := analysistest.TestData()
@@ -116,8 +121,19 @@ func TestPlacedInPlacesEveryAnswerAtItsDeclarationsFunc(test *testing.T) {
 		fmt.Sprintf("keep_probe %s %d 1 true", path, offsetOf("func (holder Holder) Method(")),
 		fmt.Sprintf("keep_probe %s %d -1 false", written, offsetOf("func directed(")),
 	}
-	if placed := placedNames(resolver.PlacedIn(home)); !slices.Equal(placed, want) {
+	// Each answer carries the digest of the file it is parsed from, placed.go for directed too, whose answer is placed
+	// in written.go: its offset counts in placed.go's bytes.
+	placedAnswers := resolver.PlacedIn(home, func(parsed string) ([]byte, bool) {
+		return []byte("digest of " + filepath.Base(parsed)), true
+	})
+	if placed := placedNames(placedAnswers); !slices.Equal(placed, want) {
 		test.Errorf("want placed\n%q\ngot\n%q", want, placed)
+	}
+	for _, answer := range placedAnswers {
+		if string(answer.FileDigest) != "digest of placed.go" {
+			test.Errorf("want every answer to carry placed.go's digest, got %q at %s:%d", answer.FileDigest,
+				filepath.Base(answer.File), answer.Offset)
+		}
 	}
 }
 
@@ -145,7 +161,7 @@ func TestAPlaceTwoFunctionsShareIsNoPlace(test *testing.T) {
 	if want := []string{"alone shared.go -1", "count shared.go 0"}; !slices.Equal(named, want) {
 		test.Errorf("want only %q placed, got %q", want, named)
 	}
-	if placed := resolver.PlacedIn(home); len(placed) != 2 {
+	if placed := resolver.PlacedIn(home, noDigests); len(placed) != 2 {
 		test.Errorf("want alone's two answers placed and none of one's or two's, got %+v", placed)
 	}
 }
