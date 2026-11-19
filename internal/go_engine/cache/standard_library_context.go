@@ -20,9 +20,8 @@ type StandardLibraryContext struct {
 	FormatVersion string
 
 	// EngineIdentity names the engine whose entries these are, as Context's EngineIdentity does: ExecutableIdentity
-	// for a run reading and writing the system cache, so an engine reads only what it wrote itself, or the release's
-	// stamp for the release's generator, whose table is built before the executable it ships in exists.
-	// StandardLibraryKeys refuses an empty one.
+	// for a run reading and writing the system cache, so an engine reads only what it wrote itself, or a stamp a test
+	// gives in its place. StandardLibraryKeys refuses an empty one.
 	EngineIdentity string
 
 	// Build is the target, cgo, the toolchain, its experiments and the go flags narrowed for the standard library,

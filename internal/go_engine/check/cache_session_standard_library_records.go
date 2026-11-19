@@ -22,8 +22,10 @@ import (
 // toolchain, so a record is never read under another installation.
 
 // StandardLibraryDependenceRecordVersion is the format of a standard-library dependence record as the store keeps it,
-// hashed into its key apart from the host's records' version, so either changes alone.
-const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-1"
+// hashed into its key apart from the host's records' version, so either changes alone. It moves with
+// DependenceRecordVersion when what the collector records changes, as it did at 2, at 3, and at 4, where the name bit
+// of a type defined from another type's name reads that type in full.
+const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-4"
 
 // StandardLibraryDependenceRecordKey is where the store keeps the dependence record of the standard-library package
 // whose standard-library key is standardLibraryKey (cache.StandardLibraryKeys), written by the engine whose identity is

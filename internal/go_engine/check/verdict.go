@@ -207,13 +207,12 @@ func (judged verdict) factHolds(fact build_reads.Fact) (bool, string) {
 	}
 	hostValue := func() (cache.Key, error) { return factValueDigest(fact.Value) }
 	return judged.buildFactHolds("fact "+fact.FactType.String()+" of "+named, fact.Package.Path(), path,
-		fact.FactType, fact.Found, hostValue, func(digest cache.Key) cache.Key { return digest })
+		fact.FactType, fact.Found, hostValue)
 }
 
-// buildFactHolds is a fact read's build half, which a read of this run and a persisted read share: the build's fact of
-// factType on the object at path in the package at owner, or on that package itself when path is empty, found when
-// the host's was, hostFound, and when found, of a value whose digest, mixed as the host's was (mixed), is hostValue's.
-// name is how a reason names the read.
+// buildFactHolds is a fact read's build half: the build's fact of factType on the object at path in the package at
+// owner, or on that package itself when path is empty, found when the host's was, hostFound, and when found, of a value
+// whose digest is hostValue's. name is how a reason names the read.
 func (judged verdict) buildFactHolds(
 	name string,
 	owner string,
@@ -221,7 +220,6 @@ func (judged verdict) buildFactHolds(
 	factType reflect.Type,
 	hostFound bool,
 	hostValue func() (cache.Key, error),
-	mixed func(cache.Key) cache.Key,
 ) (bool, string) {
 	if judged.fact == nil {
 		return false, name + ": the build has no facts to ask"
@@ -238,7 +236,7 @@ func (judged verdict) buildFactHolds(
 	if hostError != nil || buildError != nil {
 		return false, name + ": its value does not encode"
 	}
-	if hostDigest != mixed(buildDigest) {
+	if hostDigest != buildDigest {
 		return false, name + ": its value differs"
 	}
 	return true, ""
@@ -417,11 +415,10 @@ func (judged verdict) buildCandidates(
 // indexBuildCandidates indexes, in the build's memo, every package of the verdict's build closure that buildCandidates
 // takes candidates from under hostHas: all but a package the build restored from the host's run that the host's side
 // stands for, which the walk left unindexed (ReadsBuild.closureOf). It is exact: every package buildCandidates returns
-// candidates of passes that filter, and every such package is indexed before it reads the index, so it returns what
-// an index of the whole closure gives. The filter after methodsNamed stays, since another verdict may have indexed a
-// package this one skips. hostHas differs by caller, the host's closure for a lookup of this run and the host's
-// candidates' owners for a persisted one, which is why the indexing is decided here by the same hostHas, never ahead
-// of it.
+// candidates of passes that filter, and every such package is indexed before it reads the index, so it returns what an
+// index of the whole closure gives. The filter after methodsNamed stays, since another verdict may have indexed a
+// package this one skips. hostHas is the caller's, the host's closure, which is why the indexing is decided here by the
+// same hostHas, never ahead of it.
 //
 // A package once indexed for the verdict leaves buildUnindexed, so after the first lookup each later one passes over
 // only the restored packages the host stood for so far, whichever lookup asks.
@@ -496,10 +493,9 @@ func (judged verdict) deprecationHolds(lookup build_reads.Lookup) (bool, string)
 	return judged.buildDeprecationHolds(name, lookup.Path, path, lookup.Found, lookup.Text)
 }
 
-// buildDeprecationHolds is a Deprecated lookup's build half, which a read of this run and a persisted read share: the
-// build's deprecated fact of the object at path in the package at owner, or of that package itself when path is empty,
-// found when the host's was, hostFound, and when found, with the host's message, hostText. name is how a reason names
-// the lookup.
+// buildDeprecationHolds is a Deprecated lookup's build half: the build's deprecated fact of the object at path in the
+// package at owner, or of that package itself when path is empty, found when the host's was, hostFound, and when found,
+// with the host's message, hostText. name is how a reason names the lookup.
 func (judged verdict) buildDeprecationHolds(
 	name string,
 	owner string,

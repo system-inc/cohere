@@ -104,8 +104,7 @@ func checkedRestoredWorld(test *testing.T, answered bool) restoredWorld {
 // A method lookup holds in a build that restored a package of the closure from the host, though the export data its
 // types were read from lacks the unexported type whose method answered it: the restored package's answer is the host's
 // own, since checked from source it declares what the host's does. The same package checked from source in the build,
-// as its export data stands for here, is asked for the answer there, and the type it lacks fails the lookup. The
-// reads persisted as an entry persists them are judged alike.
+// as its export data stands for here, is asked for the answer there, and the type it lacks fails the lookup.
 func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) {
 	test.Parallel()
 
@@ -124,58 +123,35 @@ func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) 
 		test.Run(step.name, func(test *testing.T) {
 			test.Parallel()
 
-			// Measured as a build's memos are, since persisted reads name the sizes they were measured by.
-			host := measuredReadsBuild()
-			holds, why := TypesHold(world.restoring, closure, step.restored, host, measuredReadsBuild())
+			holds, why := TypesHold(world.restoring, closure, step.restored, measuredReadsBuild(), measuredReadsBuild())
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
-			}
-			persisted := persistedRestoring(test, world.restoring, host, ReadsRendererVersion)
-			persistedHolds, persistedWhy := TypesHold(persisted, closure, step.restored, host, measuredReadsBuild())
-			if persistedHolds != holds || persistedWhy != why {
-				test.Errorf("persisted, want %t, %q as in memory, got %t, %q", holds, why, persistedHolds,
-					persistedWhy)
 			}
 		})
 	}
 }
 
-// A package the build restored from the host's run, which the host's side stands for, is never indexed by the build,
-// through either verdict, of this run's reads or of persisted ones: its candidates are the host's own, and the
-// build's index of it would be read by nobody (#yse6t59). The build still walks the closure the lookup asks of.
+// A package the build restored from the host's run, which the host's side stands for, is never indexed by the build:
+// its candidates are the host's own, and the build's index of it would be read by nobody (#yse6t59). The build still
+// walks the closure the lookup asks of.
 func TestTheBuildNeverIndexesARestoredPackageTheHostStandsFor(test *testing.T) {
 	test.Parallel()
 
 	world := checkedRestoredWorld(test, true)
 	closure := map[string]*types.Package{restoredHiddenPath: world.exportHidden}
 	restored := map[*types.Package]bool{world.exportHidden: true}
-	host := measuredReadsBuild()
-	persisted := persistedRestoring(test, world.restoring, host, ReadsRendererVersion)
-	for _, step := range []struct {
-		name      string
-		restoring Restoring
-	}{
-		{"of this run", world.restoring},
-		{"persisted", persisted},
-	} {
-		test.Run(step.name, func(test *testing.T) {
-			test.Parallel()
-
-			build := measuredReadsBuild()
-			walked, indexed := map[*types.Package]int{}, map[*types.Package]int{}
-			build.walking = func(root *types.Package) { walked[root]++ }
-			build.indexing = func(declaring *types.Package) { indexed[declaring]++ }
-			if holds, why := TypesHold(step.restoring, closure, restored, host, build); !holds {
-				test.Fatalf("the lookup does not hold: %s", why)
-			}
-			if walked[world.exportHidden] != 1 {
-				test.Errorf("the build walked %s %d times, want once", restoredHiddenPath, walked[world.exportHidden])
-			}
-			if indexed[world.exportHidden] != 0 {
-				test.Errorf("the build indexed %s %d times, want never", restoredHiddenPath,
-					indexed[world.exportHidden])
-			}
-		})
+	build := measuredReadsBuild()
+	walked, indexed := map[*types.Package]int{}, map[*types.Package]int{}
+	build.walking = func(root *types.Package) { walked[root]++ }
+	build.indexing = func(declaring *types.Package) { indexed[declaring]++ }
+	if holds, why := TypesHold(world.restoring, closure, restored, measuredReadsBuild(), build); !holds {
+		test.Fatalf("the lookup does not hold: %s", why)
+	}
+	if walked[world.exportHidden] != 1 {
+		test.Errorf("the build walked %s %d times, want once", restoredHiddenPath, walked[world.exportHidden])
+	}
+	if indexed[world.exportHidden] != 0 {
+		test.Errorf("the build indexed %s %d times, want never", restoredHiddenPath, indexed[world.exportHidden])
 	}
 }
 
@@ -196,8 +172,7 @@ var seamSources = map[string]string{
 // The build's filter of which packages a lookup reads is the verdict's, while its index is the build's: a package one
 // verdict skips, restored there with the host's side standing for it, a later verdict of the same build that checked
 // it from source still indexes and reads. Its Closer, whose Close answered the lookup, must be among the later
-// verdict's candidates, or the answer reads as fixing nothing in the build. Of this run's reads and of persisted ones
-// alike.
+// verdict's candidates, or the answer reads as fixing nothing in the build.
 func TestALaterVerdictIndexesAPackageAnEarlierOneSkipped(test *testing.T) {
 	test.Parallel()
 
@@ -235,33 +210,19 @@ func TestALaterVerdictIndexesAPackageAnEarlierOneSkipped(test *testing.T) {
 		Answer: methodSetMember(hostClosers, "Closer", "Close")}))
 	restoring := Restoring{Path: seamUserPath, Imports: []string{seamClosersPath}, Reads: reads}
 	closure := map[string]*types.Package{seamClosersPath: buildClosers}
-	host := measuredReadsBuild()
-	persisted := persistedRestoring(test, restoring, host, ReadsRendererVersion)
-	for _, step := range []struct {
-		name      string
-		restoring Restoring
-	}{
-		{"of this run", restoring},
-		{"persisted", persisted},
-	} {
-		test.Run(step.name, func(test *testing.T) {
-			test.Parallel()
-
-			build := measuredReadsBuild()
-			indexed := map[*types.Package]int{}
-			build.indexing = func(declaring *types.Package) { indexed[declaring]++ }
-			if holds, why := TypesHold(step.restoring, closure, map[*types.Package]bool{buildClosers: true}, host,
-				build); !holds {
-				test.Fatalf("the verdict that restored closers does not hold: %s", why)
-			}
-			if indexed[buildClosers] != 0 {
-				test.Fatalf("the verdict that restored closers indexed it %d times, so the later one tells nothing",
-					indexed[buildClosers])
-			}
-			if holds, why := TypesHold(step.restoring, closure, nil, host, build); !holds {
-				test.Errorf("the later verdict, which checked closers from source, does not hold: %s", why)
-			}
-		})
+	host, build := measuredReadsBuild(), measuredReadsBuild()
+	indexed := map[*types.Package]int{}
+	build.indexing = func(declaring *types.Package) { indexed[declaring]++ }
+	if holds, why := TypesHold(restoring, closure, map[*types.Package]bool{buildClosers: true}, host,
+		build); !holds {
+		test.Fatalf("the verdict that restored closers does not hold: %s", why)
+	}
+	if indexed[buildClosers] != 0 {
+		test.Fatalf("the verdict that restored closers indexed it %d times, so the later one tells nothing",
+			indexed[buildClosers])
+	}
+	if holds, why := TypesHold(restoring, closure, nil, host, build); !holds {
+		test.Errorf("the later verdict, which checked closers from source, does not hold: %s", why)
 	}
 }
 

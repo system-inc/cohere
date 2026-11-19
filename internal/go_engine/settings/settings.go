@@ -136,6 +136,34 @@ func Load(root string, explicitPath string, knownRules []string, modulePaths []s
 	return parse(contents, path, knownRules, modulePaths)
 }
 
+// ReadTargets is the go block's targets in the file Path names, as Load reads them (parseTargets), and none when the
+// file or its go block gives none. It is for a reader that holds no rule list, such as the check package's object
+// differential, which cannot import the engine that knows every rule's name, so it reads the builds the engine checks
+// without judging the rest of the block, which Load refuses on its own.
+func ReadTargets(root string, explicitPath string) ([]string, error) {
+	path := Path(root, explicitPath)
+	contents, readError := os.ReadFile(path)
+	if errors.Is(readError, fs.ErrNotExist) && explicitPath == "" {
+		return nil, nil
+	}
+	if readError != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, readError)
+	}
+	block, hasBlock, blockError := goBlock(contents, path)
+	if blockError != nil || !hasBlock {
+		return nil, blockError
+	}
+	rawTargets, hasTargets := block["targets"]
+	if !hasTargets {
+		return nil, nil
+	}
+	targets, targetsError := parseTargets(rawTargets)
+	if targetsError != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, targetsError)
+	}
+	return targets, nil
+}
+
 // rootManifest is the file that makes root a Go root, so the note says where a config would sit: go.work for
 // a workspace, and go.mod for a module on its own.
 func rootManifest(root string) string {
@@ -154,6 +182,33 @@ func defaults(knownRules []string, note string) Settings {
 	return Settings{Rules: rules, Note: note}
 }
 
+// goBlock is the go block of a settings file's contents, read from path, as raw values by key, with whether the file
+// has one: the one decoding Load (through parse) and ReadTargets share, so the targets a reader with no rule list
+// finds are the engine's. A top level or a go block that is not an object is refused.
+func goBlock(contents []byte, path string) (map[string]json.RawMessage, bool, error) {
+	var document map[string]json.RawMessage
+	if decodeError := json.Unmarshal(contents, &document); decodeError != nil {
+		var typeError *json.UnmarshalTypeError
+		if errors.As(decodeError, &typeError) {
+			return nil, false, fmt.Errorf("reading %s: the top level is not an object", path)
+		}
+		return nil, false, fmt.Errorf("parsing %s: %w", path, decodeError)
+	}
+	// A top level of `null` decodes into a nil map with no error.
+	if document == nil {
+		return nil, false, fmt.Errorf("reading %s: the top level is not an object", path)
+	}
+	rawBlock, hasBlock := document["go"]
+	if !hasBlock {
+		return nil, false, nil
+	}
+	block, isObject := decodeObject(rawBlock)
+	if !isObject {
+		return nil, false, fmt.Errorf("reading %s: the go block is not an object", path)
+	}
+	return block, true, nil
+}
+
 // parse reads a settings file's go block. Every other top-level key, `format` among them, belongs to the
 // TypeScript engine in a repository that holds both, so it is left alone here.
 //
@@ -161,27 +216,13 @@ func defaults(knownRules []string, note string) Settings {
 // `encoding/json` drops a key a struct does not name without a word, and a dropped key is a setting that
 // looks chosen and does nothing.
 func parse(contents []byte, path string, knownRules []string, modulePaths []string) (Settings, error) {
-	var document map[string]json.RawMessage
-	if decodeError := json.Unmarshal(contents, &document); decodeError != nil {
-		var typeError *json.UnmarshalTypeError
-		if errors.As(decodeError, &typeError) {
-			return Settings{}, fmt.Errorf("reading %s: the top level is not an object", path)
-		}
-		return Settings{}, fmt.Errorf("parsing %s: %w", path, decodeError)
+	block, hasBlock, blockError := goBlock(contents, path)
+	if blockError != nil {
+		return Settings{}, blockError
 	}
-	// A top level of `null` decodes into a nil map with no error.
-	if document == nil {
-		return Settings{}, fmt.Errorf("reading %s: the top level is not an object", path)
-	}
-
-	rawBlock, hasBlock := document["go"]
 	if !hasBlock {
 		return defaults(knownRules, fmt.Sprintf("config: %s has no go block, so every house rule ran at error",
 			path)), nil
-	}
-	block, isObject := decodeObject(rawBlock)
-	if !isObject {
-		return Settings{}, fmt.Errorf("reading %s: the go block is not an object", path)
 	}
 	if _, hasFormat := block["format"]; hasFormat {
 		return Settings{}, fmt.Errorf("reading %s: the go block's \"format\" configures formatting, and Go's house "+

@@ -61,43 +61,16 @@ type Caching struct {
 
 // StandardLibraryCaching is the standard library's entries as a run keeps them (#syscache): System, the system
 // cache's store, which holds each standard-library package's entry under its standard-library key in its build's
-// context, and what every such key shares but the fact analyzers and the loader, which the session names. A System
-// that is nil holds nothing, as in a run that only collects entries; one that is not keeps the standard library
-// alone, so no standard-library package keyed apart is written to the project's store (storeFor). Collected, when it
-// is not nil, gains each standard-library package the run computed, by its standard-library key, for the release's
-// table, which StandardLibraryTableOf writes.
+// context, and what every such key shares but the fact analyzers and the loader, which the session names. System is
+// never nil: a run that keeps no system cache is given no StandardLibraryCaching. It keeps the standard library alone,
+// so no standard-library package keyed apart is written to the project's store (storeFor).
 type StandardLibraryCaching struct {
-	System    *cache.Store
-	Context   cache.StandardLibraryContext
-	Collected map[cache.Key]StandardLibraryRunEntry
+	System  *cache.Store
+	Context cache.StandardLibraryContext
 
 	// Toolchain is the Go version and `GOROOT` go env reports, which every standard-library dependence record's key
 	// holds beside the engine (StandardLibraryDependenceRecordKey, #6a3kjvz).
 	Toolchain string
-}
-
-// StandardLibraryRunEntry is one standard-library package a run computed: its import path, its entry and export data
-// as the run encoded them, which still name this machine's files, and its reads of other packages as persistReads
-// persisted them once the run's reads were whole (PersistCollectedReads), nil until then and for reads that cannot be
-// persisted. The rest is what standardLibraryEntryWhole judges it by before the release's table takes it.
-type StandardLibraryRunEntry struct {
-	PackagePath string
-	Entry       []byte
-	ExportData  []byte
-	Reads       []byte
-
-	// FactAnalyzers are the slots of every analyzer that learns facts in the run that computed the entry, each of
-	// which a whole entry holds an analysis of.
-	FactAnalyzers []string
-
-	// AnswersWhole is whether the entry's answers are every answer of its package, computed whole (demandOf's
-	// answersWhole), rather than those the run's questions happened to compute in it.
-	AnswersWhole bool
-
-	// ReadsJudged is set once the run's reads were whole and PersistCollectedReads judged the package's recorded reads:
-	// persisted in Reads, or left nil for reads no record can hold, which an extra build declines, as the generator
-	// leaves them. A package whose reads the run never recorded, in a run keeping no system cache, is never judged.
-	ReadsJudged bool
 }
 
 // CacheCounts is what the cache did in one run, by package: every package the load reached is a hit, restored from
@@ -232,7 +205,7 @@ type CacheSession struct {
 	given map[*packages.Package]bool
 
 	// standardLibraryKeys are the standard-library packages' keys, by which the system cache's store holds their
-	// entries (storeFor) and the release's table its own, nil when the run keeps no system cache and collects nothing.
+	// entries (storeFor), nil when the run keeps no system cache.
 	standardLibraryKeys map[*packages.Package]cache.Key
 
 	// standardLibraryByPath are the packages of standardLibraryKeys by import path, each path's in ID order, which
@@ -521,10 +494,10 @@ func (session *CacheSession) HasStore() bool {
 }
 
 // KeepsSystemCache reports whether the session reads and writes the system cache's store: a run keeping a system
-// cache, under neither `--no-system-cache` nor a root it could not keep.
+// cache, under neither `--no-system-cache` nor a root it could not keep, which is the one run given a
+// StandardLibraryCaching (lintCache), whose System is never nil.
 func (session *CacheSession) KeepsSystemCache() bool {
-	standardLibrary := session.caching.StandardLibrary
-	return standardLibrary != nil && standardLibrary.System != nil
+	return session.caching.StandardLibrary != nil
 }
 
 // Kept is what a run kept in the session's store under key beside the entries, go list's answer for
@@ -1038,7 +1011,6 @@ func (session *CacheSession) saveMisses(
 				if entry.hasOutput {
 					session.outputs[saved] = entry.output
 				}
-				session.collect(saved, entry, demanded, actionsOf[saved])
 			}
 			switch {
 			case errors.Is(encodeError, errorUnstorable):

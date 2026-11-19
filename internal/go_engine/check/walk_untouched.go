@@ -26,7 +26,7 @@ import (
 // base case is a package whose set is empty, which reads nothing of another package. A held package, visited and
 // judged, renders as on the host too: the same source, and every read holding.
 //
-// A package kept with no reads a verdict can judge, never recorded or never persisted, is untouched on another argument
+// A package kept with no reads a verdict can judge, never recorded or none at all, is untouched on another argument
 // than that step, since no verdict on it concludes anything: its set is its whole import closure, so when it is
 // untouched its own inputs are the host's and its whole import closure misses affected, every package it could reach
 // renders as on the host, and its type check, facts and answers are the host's whatever it read. When its closure meets
