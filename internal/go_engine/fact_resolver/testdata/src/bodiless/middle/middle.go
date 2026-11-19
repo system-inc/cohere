@@ -7,3 +7,8 @@ import "bodiless/bottom"
 func Middle(values []int) {
 	bottom.Slices(values)
 }
+
+// Fresh returns a fresh pointer and reaches nothing of bottom, so the nilness of its result is judged in middle alone.
+func Fresh() *int {
+	return new(int)
+}
