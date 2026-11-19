@@ -40,7 +40,7 @@ cohere-go/S1023 PerUnit
 cohere-go/S1024 PerUnit FullKind
 cohere-go/S1025 PerUnit FullKind
 cohere-go/S1028 PerUnit
-cohere-go/S1029 PerUnit
+cohere-go/S1029 PerUnit FullKind
 cohere-go/S1030 PerUnit
 cohere-go/S1031 PerUnit
 cohere-go/S1032 PerUnit
@@ -65,7 +65,7 @@ cohere-go/SA1010 PerUnit
 cohere-go/SA1011 PerUnit
 cohere-go/SA1012 PerUnit
 cohere-go/SA1013 PerUnit FullKind
-cohere-go/SA1014 PerUnit
+cohere-go/SA1014 PerUnit FullKind
 cohere-go/SA1015 PerUnit
 cohere-go/SA1016 PerUnit FullKind
 cohere-go/SA1017 PerUnit
@@ -78,7 +78,7 @@ cohere-go/SA1024 PerUnit
 cohere-go/SA1025 PerUnit FullKind
 cohere-go/SA1026 PerUnit FullKind
 cohere-go/SA1027 PerUnit FullKind
-cohere-go/SA1028 PerUnit
+cohere-go/SA1028 PerUnit FullKind
 cohere-go/SA1029 PerUnit FullKind
 cohere-go/SA1030 PerUnit
 cohere-go/SA1031 PerUnit
@@ -92,7 +92,7 @@ cohere-go/SA3001 PerUnit
 cohere-go/SA4000 PerUnit FullKind
 cohere-go/SA4001 PerUnit
 cohere-go/SA4003 PerUnit FullKind
-cohere-go/SA4004 PerUnit
+cohere-go/SA4004 PerUnit FullKind
 cohere-go/SA4005 PerUnit FullKind
 cohere-go/SA4006 PerUnit
 cohere-go/SA4008 PerUnit
@@ -102,7 +102,7 @@ cohere-go/SA4011 PerUnit
 cohere-go/SA4012 PerUnit
 cohere-go/SA4013 PerUnit
 cohere-go/SA4014 PerUnit
-cohere-go/SA4015 PerUnit
+cohere-go/SA4015 PerUnit FullKind
 cohere-go/SA4016 PerUnit
 cohere-go/SA4017 PerUnit FullKind
 cohere-go/SA4018 PerUnit FullKind
@@ -110,7 +110,7 @@ cohere-go/SA4019 FileSyntax
 cohere-go/SA4020 PerUnit FullKind
 cohere-go/SA4021 PerUnit
 cohere-go/SA4022 PerUnit
-cohere-go/SA4023 PerUnit
+cohere-go/SA4023 PerUnit FullKind
 cohere-go/SA4024 PerUnit
 cohere-go/SA4025 PerUnit
 cohere-go/SA4026 PerUnit
@@ -118,7 +118,7 @@ cohere-go/SA4027 PerUnit
 cohere-go/SA4028 PerUnit
 cohere-go/SA4029 Composes FullKind
 cohere-go/SA4030 PerUnit FullKind
-cohere-go/SA4031 PerUnit
+cohere-go/SA4031 PerUnit FullKind
 cohere-go/SA4032 PerUnit
 cohere-go/SA5000 PerUnit
 cohere-go/SA5001 PerUnit FullKind
@@ -129,11 +129,11 @@ cohere-go/SA5005 PerUnit
 cohere-go/SA5007 PerUnit
 cohere-go/SA5008 PerUnit FullKind
 cohere-go/SA5010 PerUnit FullKind
-cohere-go/SA5012 PerUnit
-cohere-go/SA6000 PerUnit
-cohere-go/SA6001 PerUnit
-cohere-go/SA6002 PerUnit
-cohere-go/SA6003 PerUnit
+cohere-go/SA5012 PerUnit FullKind
+cohere-go/SA6000 PerUnit FullKind
+cohere-go/SA6001 PerUnit FullKind
+cohere-go/SA6002 PerUnit FullKind
+cohere-go/SA6003 PerUnit FullKind
 cohere-go/SA6005 PerUnit FullKind
 cohere-go/SA6006 PerUnit FullKind
 cohere-go/SA9001 PerUnit
