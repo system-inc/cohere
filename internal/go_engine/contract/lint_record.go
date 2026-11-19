@@ -157,11 +157,10 @@ type BuildRecord struct {
 	// Written only when not 0, so a run under `--no-cache` writes none.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
 
-	// SystemCacheRestored counts the packages the build restored from the system cache's table of its own build
-	// context, the standard library's and third-party modules' (#syscache, #57wgzhp), and SystemCacheWritten the
-	// entries it added to that table this run. Additive within contract 3, and the Go engine's alone. Each is written
-	// only when not 0, so a build under `--no-system-cache`, or one whose table held everything it reached, writes
-	// none.
+	// SystemCacheRestored counts the standard-library packages the build restored from the system cache's table of its
+	// own build context (#syscache), and SystemCacheWritten the entries it added to that table this run. Additive
+	// within contract 3, and the Go engine's alone. Each is written only when not 0, so a build under
+	// `--no-system-cache`, or one whose table held everything it reached, writes none.
 	SystemCacheRestored int `json:"systemCacheRestored,omitempty"`
 	SystemCacheWritten  int `json:"systemCacheWritten,omitempty"`
 	// SharedBodyHits, additive within contract 3, counts the packages a build hit in its own findings cache whose body
@@ -405,22 +404,19 @@ type DependenceCounts struct {
 // packages: at most two, those whose own inputs moved and then the rest that missed, once the hits the early cutoff
 // found among the packages above the first were restored. FromSystemCache counts the standard-library packages
 // restored from the system cache's tables (#syscache), the host's build's and every other build's summed, which
-// nothing analyzed, apart from hit; it is written only when it is not 0. ModulesFromSystemCache, additive within
-// contract 3 and the Go engine's alone, counts the third-party modules' packages restored from them the same way, apart
-// from FromSystemCache and hit, written only when not 0 (#57wgzhp). SystemCacheWritten counts the entries the run's
-// builds added to their tables, the standard library's and modules', summed, written only when not 0, and
-// SystemCacheOff is set under `--no-system-cache`, which neither reads nor writes the system cache. SystemCacheNotKept
-// is why the run kept no system cache though it was on, or could not keep it as it should, in one line, as a root it
-// could not find, a directory it could not write or a trim that failed; it is written only when there is one, and a
-// run under `--no-system-cache` has none. Reloads counts the packages the run loaded again from source, though the
-// cache held them, because a question of a fact computed on demand reached one restored with no answer
+// nothing analyzed, apart from hit; it is written only when it is not 0. SystemCacheWritten counts the entries the
+// run's builds added to their tables, summed, written only when not 0, and SystemCacheOff is set under
+// `--no-system-cache`, which neither reads nor writes the system cache. SystemCacheNotKept is why the run kept no
+// system cache though it was on, or could not keep it as it should, in one line, as a root it could not find, a
+// directory it could not write or a trim that failed; it is written only when there is one, and a run under
+// `--no-system-cache` has none. Reloads counts the packages the run loaded again from source,
+// though the cache held them, because a question of a fact computed on demand reached one restored with no answer
 // stored (#w7zmvat wave 3), and ReloadRounds how many times the run loaded and linted again for them; each is written
 // only when it is not 0. The timing record carries neither: a run under `--timing` reads no cache, so it restores
 // nothing and never reloads. Replays, beside them though no cache count, is how many questions of a fact computed
 // on demand the lint phase answered by replaying the push's walk of a package, which a cold run makes too; it is
-// written only when it is not 0. On is false under `--no-cache`, and every count 0 but FromSystemCache and
-// ModulesFromSystemCache, which the system cache can still give, FactsSkipped of what they restored, and Reloads of
-// them.
+// written only when it is not 0. On is false under `--no-cache`, and every count 0 but FromSystemCache, which the
+// system cache can still give, FactsSkipped of what they restored, and Reloads of them.
 // Problems counts what kept the cache from being read or written, the host's build's and every other build's alike,
 // each of which the engine also notes on stderr, so a run read through `--json` alone still shows it (#27r8r24).
 // WriteFailed counts every miss whose entry could not be written, every build's, of which the engine notes only the
@@ -430,24 +426,23 @@ type DependenceCounts struct {
 // (#6a3kjvz). Packs, additive within contract 3, is what every extra build did with its packs, summed (#b2t9xmf),
 // absent in a run with no extra build.
 type LintCache struct {
-	On                     bool   `json:"on"`
-	Hit                    int    `json:"hit"`
-	FromSystemCache        int    `json:"standardLibraryFromSystemCache,omitempty"`
-	ModulesFromSystemCache int    `json:"modulesFromSystemCache,omitempty"`
-	SystemCacheWritten     int    `json:"systemCacheWritten,omitempty"`
-	SystemCacheOff         bool   `json:"systemCacheOff,omitempty"`
-	SystemCacheNotKept     string `json:"systemCacheNotKept,omitempty"`
-	Missed                 int    `json:"missed"`
-	Written                int    `json:"written"`
-	Unstorable             int    `json:"unstorable"`
-	FactsDropped           int    `json:"factsDropped"`
-	FactsSkipped           int    `json:"factsSkipped"`
-	Waves                  int    `json:"waves"`
-	Reloads                int    `json:"reloads,omitempty"`
-	ReloadRounds           int    `json:"reloadRounds,omitempty"`
-	Replays                int    `json:"replays,omitempty"`
-	Problems               int    `json:"problems,omitempty"`
-	WriteFailed            int    `json:"writeFailed,omitempty"`
+	On                 bool   `json:"on"`
+	Hit                int    `json:"hit"`
+	FromSystemCache    int    `json:"standardLibraryFromSystemCache,omitempty"`
+	SystemCacheWritten int    `json:"systemCacheWritten,omitempty"`
+	SystemCacheOff     bool   `json:"systemCacheOff,omitempty"`
+	SystemCacheNotKept string `json:"systemCacheNotKept,omitempty"`
+	Missed             int    `json:"missed"`
+	Written            int    `json:"written"`
+	Unstorable         int    `json:"unstorable"`
+	FactsDropped       int    `json:"factsDropped"`
+	FactsSkipped       int    `json:"factsSkipped"`
+	Waves              int    `json:"waves"`
+	Reloads            int    `json:"reloads,omitempty"`
+	ReloadRounds       int    `json:"reloadRounds,omitempty"`
+	Replays            int    `json:"replays,omitempty"`
+	Problems           int    `json:"problems,omitempty"`
+	WriteFailed        int    `json:"writeFailed,omitempty"`
 
 	DependenceRecords *DependenceRecords `json:"dependenceRecords,omitempty"`
 	Packs             *BuildPacks        `json:"packs,omitempty"`
