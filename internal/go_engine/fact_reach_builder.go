@@ -18,6 +18,8 @@ import (
 //   - answers are the host's answers about the package's objects, each with Answer set.
 //   - imported are the host's answers about other packages' objects, every one it holds, each with Answer set.
 //   - noReturn reports whether the host holds the no-return fact of a function.
+//   - pushed are the host's other pushed facts of each object, by the analyzer that learns them, in their words
+//     (check.FactReachPackage.Pushed).
 //   - orderBound are the objects whose answers hang on the order the host walked the package in.
 type factReachInputs struct {
 	fileSet    *token.FileSet
@@ -26,6 +28,7 @@ type factReachInputs struct {
 	answers    []check.ExportedFact
 	imported   []check.ExportedFact
 	noReturn   func(function *types.Func) bool
+	pushed     map[string]map[types.Object]string
 	orderBound []types.Object
 }
 
@@ -145,9 +148,10 @@ func (builder *factReachBuilder) render(object types.Object) factReachRendered {
 	return rendered
 }
 
-// meet adds function to the functions a no-return fact is compared on, with the host's fact of it, the first time
-// its key is met. A method of an interface is left out: its receiver's type is the interface, it has no body in any
-// build, and no fact is ever about it. So is a function no identity names, which no build could find its own of.
+// meet adds function to the functions facts are compared on, with the host's no-return fact and pushed facts of it,
+// the first time its key is met. A method of an interface is left out: its receiver's type is the interface, it has
+// no body in any build, and no fact is ever about it. So is a function no identity names, which no build could find
+// its own of.
 func (builder *factReachBuilder) meet(function *types.Func) {
 	if receiver := function.Signature().Recv(); receiver != nil && types.IsInterface(receiver.Type()) {
 		return
@@ -157,8 +161,16 @@ func (builder *factReachBuilder) meet(function *types.Func) {
 		return
 	}
 	builder.met[rendered.key] = true
+	var pushed map[string]string
+	if len(builder.inputs.pushed) > 0 {
+		pushed = make(map[string]string, len(builder.inputs.pushed))
+		for analyzer, facts := range builder.inputs.pushed {
+			// A fact is about the generic declaration.
+			pushed[analyzer] = facts[function.Origin()]
+		}
+	}
 	builder.hosted.functions = append(builder.hosted.functions, fact_reach.Function{Object: rendered.key,
-		Identity: rendered.identity, NoReturn: builder.inputs.noReturn(function)})
+		Identity: rendered.identity, NoReturn: builder.inputs.noReturn(function), Pushed: pushed})
 }
 
 // declare keeps each function declared declares, by its object, with the place of its body, and its parameters,

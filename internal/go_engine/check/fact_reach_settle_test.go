@@ -14,10 +14,13 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/packages"
+	"honnef.co/go/tools/analysis/facts/deprecated"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 )
 
 // settlingAnalyzer is an analyzer the facts' reach could settle by, for one test, as standing_facts would be: no rule,
@@ -78,6 +81,32 @@ func storedKeys(test *testing.T, directory string) map[cache.Key]bool {
 		test.Fatalf("reading the store under %s: %v", directory, walkError)
 	}
 	return keys
+}
+
+// requireSameStores fails unless the store under settledDirectory, settledCaching's, holds the keys the one under
+// plainDirectory, plainCaching's, holds, and under each the same entry, compared decoded, since two runs alike encode
+// an entry's bytes in an order of their own.
+func requireSameStores(
+	test *testing.T,
+	plainDirectory string,
+	plainCaching *Caching,
+	settledDirectory string,
+	settledCaching *Caching,
+) {
+	test.Helper()
+	plainKeys, settledKeys := storedKeys(test, plainDirectory), storedKeys(test, settledDirectory)
+	if len(plainKeys) == 0 || !maps.Equal(settledKeys, plainKeys) {
+		test.Errorf("with the analyzer the store holds the keys %v, want those of the run without it, %v",
+			settledKeys, plainKeys)
+	}
+	for key := range plainKeys {
+		plainEntry, _, plainHolds := storedEntryAt(plainCaching.Store, key)
+		settledEntry, _, settledHolds := storedEntryAt(settledCaching.Store, key)
+		if settledHolds != plainHolds || !reflect.DeepEqual(settledEntry, plainEntry) {
+			test.Errorf("with the analyzer the store holds under %s\n%+v\nwant the run's without it\n%+v", key,
+				settledEntry, plainEntry)
+		}
+	}
 }
 
 // Run roots Options.FactReachSettle beside the rules on every package it analyzes and hands back its result on each,
@@ -144,20 +173,7 @@ func TestTheFactReachAnalyzerChangesNoEntryAndNeverRunsOnARestoredPackage(test *
 		test.Errorf("with the analyzer the cold run is\n%+v\nwant the run without it\n%+v", withoutSettled(settled),
 			withoutSettled(plain))
 	}
-	// Compared decoded, since two runs alike encode an entry's bytes in an order of their own.
-	plainKeys, settledKeys := storedKeys(test, plainDirectory), storedKeys(test, settledDirectory)
-	if len(plainKeys) == 0 || !maps.Equal(settledKeys, plainKeys) {
-		test.Errorf("with the analyzer the store holds the keys %v, want those of the run without it, %v",
-			settledKeys, plainKeys)
-	}
-	for key := range plainKeys {
-		plainEntry, _, plainHolds := storedEntryAt(plainCaching.Store, key)
-		settledEntry, _, settledHolds := storedEntryAt(settledCaching.Store, key)
-		if settledHolds != plainHolds || !reflect.DeepEqual(settledEntry, plainEntry) {
-			test.Errorf("with the analyzer the store holds under %s\n%+v\nwant the run's without it\n%+v", key,
-				settledEntry, plainEntry)
-		}
-	}
+	requireSameStores(test, plainDirectory, plainCaching, settledDirectory, settledCaching)
 	if want := settledPaths(analyzed); !maps.Equal(settled.FactReachSettled, want) ||
 		runs.Load() != int32(packageCount) {
 		test.Errorf("the cold run settled %v in %d runs, want %v, once a package", settled.FactReachSettled,
@@ -171,6 +187,64 @@ func TestTheFactReachAnalyzerChangesNoEntryAndNeverRunsOnARestoredPackage(test *
 			"want every package restored and nothing settled", warm.Cache.Hit, packageCount,
 			runs.Load()-int32(packageCount), warm.FactReachSettled, warm.FactReachCrashes)
 	}
+}
+
+// standing_facts requires printf and so runs it, and every analyzer printf requires, on every package it is rooted on,
+// though no enabled rule requires printf (#5vbs1np, must 2): their facts and results reach no entry and no key, so a
+// cold run rooting it writes the same entries under the same keys as one without it, with rules that leave printf
+// and SA1019 out. With no host's side handed, it settles nothing, and hands back an empty result on each package.
+//
+// One rule requires ctrlflow, reachProbe's, as every real run's rules do: standing_facts requires ctrlflow too, and
+// where no rule does, its running there has the resolver learn the package, and the save then writes the package's
+// answers, each kind complete and empty, into an entry a run without it writes none of.
+func TestStandingFactsRunsPrintfForItselfAndChangesNoEntry(test *testing.T) {
+	test.Parallel()
+
+	loadedFixtures(test)
+	counts := &runCounts{}
+	rules := []rule.Rule{countedRule("countedStanding", counts), houseRule(targetAnalyzer), packageClauseRule,
+		houseRule(markedAnalyzer), houseRule(reachProbeAnalyzer)}
+	for _, enabled := range rules {
+		if enabled.Analyzer == printf.Analyzer || requires(enabled.Analyzer, printf.Analyzer) ||
+			requires(enabled.Analyzer, deprecated.Analyzer) {
+			test.Fatalf("the rule %s is or requires printf or the deprecation facts, which this test runs without",
+				enabled.Name)
+		}
+	}
+	plainDirectory, settledDirectory := test.TempDir(), test.TempDir()
+	plainCaching, settledCaching := cachingAt(plainDirectory, rules), cachingAt(settledDirectory, rules)
+	run := func(analyzed []*packages.Package, caching *Caching, settle *analysis.Analyzer) *Result {
+		test.Helper()
+		result, runError := Run(analyzed, rules, Options{Cache: NewCacheSession(caching, rules),
+			FactReachSettle: settle})
+		if runError != nil {
+			test.Fatalf("running %d rules: %v", len(rules), runError)
+		}
+		return result
+	}
+	plain := run(ownLoad(test, "."), plainCaching, nil)
+	analyzed := ownLoad(test, ".")
+	settled := run(analyzed, settledCaching, standing_facts.Analyzer)
+	if len(settled.FactReachSettled) == 0 {
+		test.Fatalf("standing_facts settled none of %d packages, crashing on %+v, so printf ran beside the rules on "+
+			"none", len(analyzed), settled.FactReachCrashes)
+	}
+	if !reflect.DeepEqual(settled.Cache, plain.Cache) || !reflect.DeepEqual(withoutSettled(settled),
+		withoutSettled(plain)) {
+		test.Errorf("with standing_facts the cold run is\n%+v\nwant the run without it\n%+v", withoutSettled(settled),
+			withoutSettled(plain))
+	}
+	requireSameStores(test, plainDirectory, plainCaching, settledDirectory, settledCaching)
+}
+
+// requires is whether analyzer requires wanted, directly or through what it requires.
+func requires(analyzer *analysis.Analyzer, wanted *analysis.Analyzer) bool {
+	for _, required := range analyzer.Requires {
+		if required == wanted || requires(required, wanted) {
+			return true
+		}
+	}
+	return false
 }
 
 // Options.FactReachSettle failing on every package fails no run and is no finding (#aswfm7a): each package is in

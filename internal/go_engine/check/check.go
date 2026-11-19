@@ -630,7 +630,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Read as the rules' passes left the resolver, before the save computes packages whole for the store: that replays
 	// walks no rule asked for and keeps an answer of every function they judge, which no body's rules read.
 	if options.FactReach {
-		result.FactReach = captureFactReach(resolver, analyzed)
+		result.FactReach = captureFactReach(resolver, analyzed, graphs)
 	}
 	if session != nil {
 		session.save(graph, options.Withheld, files)

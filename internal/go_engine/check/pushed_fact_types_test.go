@@ -14,8 +14,9 @@ import (
 // pushedFactTypes are the fact types a run's analyzers export, which the checker pushes from a package to its
 // importers and a build compares with the host's (#wxx4ar6), each by the name the findings cache gives it
 // (factTypeName): ctrlflow's which functions never return, the deprecation facts staticcheck's fact_deprecated
-// exports, and printf's which functions wrap a print and how. The facts' reach compares the first of each function
-// itself (#5vbs1np), so a fourth is read, for what a build must compare of it, before it joins them.
+// exports, and printf's which functions wrap a print and how. The facts' reach compares the first and the last of each
+// function a body uses (#5vbs1np), and its capture holds the deprecation facts too, which no build compares yet, so a
+// fourth is read, for what a build must compare of it, before it joins them.
 var pushedFactTypes = []string{
 	"golang.org/x/tools/go/analysis/passes/ctrlflow.noReturn",
 	"honnef.co/go/tools/analysis/facts/deprecated.IsDeprecated",

@@ -14,6 +14,7 @@ package standing_facts
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 )
 
 // analyzerName is the analyzer's name, and so its row under `--timing`, which its questions are taken out of
@@ -38,12 +40,15 @@ const (
 
 // Analyzer hands the package's rules the bodies that stand in this build, which each asks of one body at a time
 // (Result.Stands). It requires ctrlflow for the build's no-return facts, and because the resolver learns a package as
-// ctrlflow finishes there, so every package a question can reach is held before one is asked.
+// ctrlflow finishes there, so every package a question can reach is held before one is asked; and printf for its
+// wrapper facts, which the checker pushes too (#wxx4ar6), and which it compares. It is rooted only beside a census
+// build's rules, which a run measuring the reach takes, so a project whose rules need no printf runs it there alone,
+// and its facts reach no entry or key (check's fact reach settle tests).
 var Analyzer = &analysis.Analyzer{
 	Name:       analyzerName,
 	Doc:        "settles which function bodies an extra build leaves to the host's findings once facts are compared",
 	Run:        run,
-	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
+	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer, printf.Analyzer},
 	ResultType: reflect.TypeFor[*Result](),
 }
 
@@ -74,6 +79,12 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("settling the standing bodies of %s: ctrlflow's result is a %T", pass.Pkg.Path(),
 			pass.ResultOf[ctrlflow.Analyzer])
 	}
+	wrappers, isWrappers := pass.ResultOf[printf.Analyzer].(*printf.Wrappers)
+	if !isWrappers {
+		return nil, fmt.Errorf("settling the standing bodies of %s: printf's result is a %T", pass.Pkg.Path(),
+			pass.ResultOf[printf.Analyzer])
+	}
+	pushed := pushedFacts{wrappers: wrappers}
 	result := &Result{Partial: true}
 	functions := &functionFinder{pass: pass}
 	// A copy, since the host's own list is not this pass's to append to.
@@ -83,19 +94,32 @@ func run(pass *analysis.Pass) (any, error) {
 	// function of this package CFGs.NoReturn is the fact itself. For another package's it is the fact only where
 	// this package calls the function as a statement, and reads false anywhere else, so a host's fact the package
 	// never reads that way can name an object whose fact is in truth equal. That is the safe side: it only lints a
-	// body the host's findings would have served.
+	// body the host's findings would have served. Then each other fact the checker pushes that the host held of the
+	// function and a build compares, its wrapper fact, where the host ran printf on the package and the build's printf
+	// looked the fact up.
 	for _, function := range host.Functions() {
 		result.FunctionsCompared++
 		own, found := functions.function(function.Identity)
 		switch {
 		case !found:
 			named = append(named, fact_reach.Named{Object: function.Object, Reason: unknownNoReturnReason})
+			result.FunctionsNamed++
+			continue
 		case graphs.NoReturn(own) != function.NoReturn:
 			named = append(named, fact_reach.Named{Object: function.Object, Reason: noReturnReason})
-		default:
-			continue
+			result.FunctionsNamed++
 		}
-		result.FunctionsNamed++
+		for _, analyzer := range slices.Sorted(maps.Keys(function.Pushed)) {
+			words, isCompared := pushed.words(analyzer, own)
+			if !isCompared {
+				continue
+			}
+			result.PushedCompared++
+			if words != function.Pushed[analyzer] {
+				named = append(named, fact_reach.Named{Object: function.Object, Reason: pushedReasons[analyzer]})
+				result.PushedNamed++
+			}
+		}
 	}
 
 	// The answers the host's analysis read from other packages, each asked before any body leaves: no body of this

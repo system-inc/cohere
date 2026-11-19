@@ -73,6 +73,7 @@ func newFactReachSides(
 			answers:    captured.Answers,
 			imported:   imported,
 			noReturn:   captured.NoReturn,
+			pushed:     captured.Pushed,
 			orderBound: captured.OrderBound,
 		})
 	}
@@ -114,7 +115,8 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 // buildFactReach is one build's census of the facts' reach, of its last load: sides, the packages it handed a host's
 // side, and of them settled, those whose standing bodies it settled, the build linting them in part
 // (standing_facts.Result.Partial), crashed, those it failed to settle on; and, summed over the settled ones, the
-// no-return facts compared and the objects they named, the answers the host read from other packages asked before the
+// no-return facts compared and the objects they named, the other pushed facts compared and the functions they named,
+// the answers the host read from other packages asked before the
 // walk and the objects they named, the order-bound objects and the members of the build's own cycles of calls named
 // before anything was asked, the answers the walk asked and those that read differing or unknown, by kind, the
 // functions of a body that left with no record of a kind, by kind, and the bodies the facts took out of the standing
@@ -125,6 +127,8 @@ type buildFactReach struct {
 	crashed           int
 	functionsCompared int
 	functionsNamed    int
+	pushedCompared    int
+	pushedNamed       int
 	importedAsked     int
 	importedNamed     int
 	orderBoundNamed   int
@@ -149,6 +153,8 @@ func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *
 		census.settled++
 		census.functionsCompared += packageSettled.FunctionsCompared
 		census.functionsNamed += packageSettled.FunctionsNamed
+		census.pushedCompared += packageSettled.PushedCompared
+		census.pushedNamed += packageSettled.PushedNamed
 		census.importedAsked += packageSettled.ImportedAsked
 		census.importedNamed += packageSettled.ImportedNamed
 		census.buildOrderNamed += packageSettled.BuildOrderNamed
@@ -179,8 +185,8 @@ func writeBuildFactReach(written *strings.Builder, census *buildFactReach) {
 		census.orderBoundNamed)
 	fmt.Fprintf(written, "    answers asked %d, differing %s, unknown %s; bodies taken out %d\n", census.asked,
 		byKind(census.differing), byKind(census.unknown), census.removed)
-	fmt.Fprintf(written, "    functions with no record of a kind %s; build order named %d\n",
-		byKind(census.unrecordedKinds), census.buildOrderNamed)
+	fmt.Fprintf(written, "    functions with no record of a kind %s; build order named %d; pushed facts compared %d, "+
+		"named %d\n", byKind(census.unrecordedKinds), census.buildOrderNamed, census.pushedCompared, census.pushedNamed)
 }
 
 // byKind is counts written by kind, the kinds in order, or none.

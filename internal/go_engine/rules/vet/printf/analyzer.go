@@ -15,9 +15,10 @@
 // the original stays the oracle: the parity tests beside this file run both over the same packages.
 //
 // Two things differ, neither in what it finds. The original's analyzer has a result, which reports to a client
-// whether a function behaves like fmt.Print or fmt.Printf; nothing in cohere requires it, so the port has none. And
-// where the original asserts a type the type checker always gives, and would panic were it missing, the port checks
-// the assertion and passes the node by.
+// whether a function behaves like fmt.Print or fmt.Printf; the port's, Wrappers, holds the words of each wrapper fact
+// the pass holds instead, which the facts' reach compares across builds (#5vbs1np). And where the original asserts a
+// type the type checker always gives, and would panic were it missing, the port checks the assertion and passes the
+// node by.
 //
 // It is not on the engine's syntax dispatcher, and stays a plain analyzer: it exports and imports a fact, isWrapper,
 // through which a wrapper declared in a dependency is found, and a listener has no facts to export or import.
@@ -27,6 +28,7 @@ import (
 	"go/ast"
 	"go/types"
 	"go/version"
+	"reflect"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -109,22 +111,24 @@ func newAnalyzer() *analysis.Analyzer {
 			"(of number and type) between the verbs and their arguments.\n\n" +
 			"See the documentation of the fmt package for the complete set of\n" +
 			"format operators and their operand types.",
-		URL:       "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/printf",
-		Requires:  []*analysis.Analyzer{inspect.Analyzer},
-		Run:       run,
-		FactTypes: []analysis.Fact{new(isWrapper)},
+		URL:        "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/printf",
+		Requires:   []*analysis.Analyzer{inspect.Analyzer},
+		Run:        run,
+		FactTypes:  []analysis.Fact{new(isWrapper)},
+		ResultType: reflect.TypeFor[*Wrappers](),
 	}
 	analyzer.Flags.Var(knownPrintFunctions, "funcs", "comma-separated list of print function names to check")
 	return analyzer
 }
 
-// run finds the package's wrappers, then checks every call of a print function.
+// run finds the package's wrappers, then checks every call of a print function, and hands back the wrapper facts the
+// pass holds.
 func run(pass *analysis.Pass) (any, error) {
 	// What each function the pass has met is, found or looked up, x/tools' printf Result.
 	kinds := newWrapperKinds()
 	findPrintLike(pass, kinds)
 	checkCalls(pass, kinds)
-	return nil, nil
+	return newWrappers(pass, kinds), nil
 }
 
 // checkCalls checks each call of a print or printf function, as kinds knows it, with the Go version of the file

@@ -18,6 +18,11 @@ type Result struct {
 	FunctionsCompared int
 	FunctionsNamed    int
 
+	// PushedCompared is how many of the functions' other pushed facts, a wrapper's and a deprecation, were compared
+	// with the host's, and PushedNamed how many of them named their function: the fact differed.
+	PushedCompared int
+	PushedNamed    int
+
 	// ImportedAsked is how many answers the host read from other packages were asked of the build before the walk,
 	// and ImportedNamed how many of them named their object: the answer differed, or could not be read.
 	ImportedAsked int

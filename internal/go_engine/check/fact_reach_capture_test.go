@@ -346,7 +346,7 @@ func TestAnUnsurePackageHasNoCapture(test *testing.T) {
 		test.Fatalf("high is unsure %t and learned %t, want both", resolver.Unsure(high.Types),
 			resolver.Package(high.Types) != nil)
 	}
-	capture := captureFactReach(resolver, []*packages.Package{low, high})
+	capture := captureFactReach(resolver, []*packages.Package{low, high}, nil)
 	if len(capture.Packages) != 0 {
 		test.Errorf("the capture holds %d packages, want none: low restored and high unsure", len(capture.Packages))
 	}

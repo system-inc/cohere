@@ -1,11 +1,14 @@
 package check
 
 import (
+	"fmt"
 	"go/types"
 
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
@@ -41,6 +44,13 @@ type FactReachPackage struct {
 	// argued, and then the package is one to lint whole.
 	OrderBound []types.Object
 	OrderKnown bool
+
+	// Pushed are the facts the checker pushes to importers beside ctrlflow's no-return (#wxx4ar6), printf's wrapper
+	// facts and the deprecation facts today, by the name of the analyzer that learns them: each object's
+	// fact the package's action held once it ran, its own objects' and those its imports exported, in the fact's words
+	// (fmt.Sprint), which the build reads alike. An analyzer the run never ran on the package, as where no enabled
+	// rule requires it, has no map, and no build compares its facts there: no finding of the package read them.
+	Pushed map[string]map[types.Object]string
 }
 
 // factReachKinds is what one captured package's answers are, by kind: each kind that answered about its objects, in the
@@ -51,11 +61,16 @@ type factReachKinds struct {
 }
 
 // captureFactReach is what resolver, the run's, holds of its facts for the facts' reach of analyzed, read once the
-// run's passes are done. It reads every answer once (fact_resolver.Answered), then calls each kind's bound once per
+// run's passes are done, and the pushed facts each action of graphs held, a later wave's on a package counting, as
+// the findings read it. It reads every answer once (fact_resolver.Answered), then calls each kind's bound once per
 // package. A kind that answered nothing about a package's objects is not called there: its state holds no judgment of
 // the package, so its bound is empty, and known. An answer about a parameter is no function the kind answered about,
 // and the one kind with a bound, nil-ness, answers only about functions.
-func captureFactReach(resolver *fact_resolver.Resolver, analyzed []*packages.Package) *FactReachCapture {
+func captureFactReach(
+	resolver *fact_resolver.Resolver,
+	analyzed []*packages.Package,
+	graphs []*checker.Graph,
+) *FactReachCapture {
 	capture := &FactReachCapture{Packages: make(map[string]*FactReachPackage, len(analyzed))}
 	captured := make(map[*types.Package]*FactReachPackage, len(analyzed))
 	kinds := make(map[*types.Package]*factReachKinds, len(analyzed))
@@ -72,6 +87,7 @@ func captureFactReach(resolver *fact_resolver.Resolver, analyzed []*packages.Pac
 		capture.Packages[analyzedPackage.ID], captured[analyzedPackage.Types] = hosted, hosted
 		kinds[analyzedPackage.Types] = &factReachKinds{functions: map[*fact_resolver.Kind][]*types.Func{}}
 	}
+	capturePushed(captured, graphs)
 	answered := resolver.Answered()
 	if len(answered) == 0 {
 		return capture
@@ -124,4 +140,30 @@ func captureFactReach(resolver *fact_resolver.Resolver, analyzed []*packages.Pac
 		}
 	}
 	return capture
+}
+
+// capturePushed holds, on each package of captured, the pushed facts each of its actions in graphs held, in their
+// words, of every analyzer that learns facts but ctrlflow, whose facts the resolver holds of each package already
+// (fact_resolver.Package.NoReturn), an action that failed holding none an importer could trust. It reads the actions'
+// facts once their passes are done, which no pass's read records: a listing a pass made would read the whole closure.
+func capturePushed(captured map[*types.Package]*FactReachPackage, graphs []*checker.Graph) {
+	for _, graph := range graphs {
+		for action := range graph.All() {
+			hosted := captured[action.Package.Types]
+			if hosted == nil || action.Err != nil {
+				continue
+			}
+			if len(action.Analyzer.FactTypes) == 0 || action.Analyzer == ctrlflow.Analyzer {
+				continue
+			}
+			facts := map[types.Object]string{}
+			for _, fact := range action.AllObjectFacts() {
+				facts[fact.Object] = fmt.Sprint(fact.Fact)
+			}
+			if hosted.Pushed == nil {
+				hosted.Pushed = map[string]map[types.Object]string{}
+			}
+			hosted.Pushed[action.Analyzer.Name] = facts
+		}
+	}
 }

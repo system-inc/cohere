@@ -40,12 +40,15 @@ type Host interface {
 	Kinds() []string
 }
 
-// Function is one function the build's no-return fact is compared on: its key, the identity the build finds its own
-// object by, and whether the host held the fact of it.
+// Function is one function the build's facts are compared on: its key, the identity the build finds its own object
+// by, whether the host held the no-return fact of it, and the host's other pushed facts of it (#5vbs1np, must 2), by
+// the name of the analyzer that learns them, each in the fact's words, empty for no fact. An analyzer the host never
+// ran on the package has no entry, and nothing of it is compared.
 type Function struct {
 	Object   Object
 	Identity build_reads.Identity
 	NoReturn bool
+	Pushed   map[string]string
 }
 
 // Asking is one question as the build is asked it: the fact kind's name, the function the answer is of, or that
