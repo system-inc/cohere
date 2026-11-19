@@ -83,7 +83,7 @@ var Listener = rule.Listener{
 				// type it declares.
 				panic("odd_slice_argument: MarksAnalyzer's result is missing")
 			}
-			Check(context, marks.Asking(context.RuleName()), function)
+			Check(context, marks.Asking(context.RuleName()).For(function), function)
 		},
 	},
 }

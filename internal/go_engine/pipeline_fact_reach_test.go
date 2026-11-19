@@ -161,9 +161,12 @@ func TestAWarmRunGivesARestoredPackageNoSideForTheFactsReach(test *testing.T) {
 // Under the body reach census and the body differential, the differential's second leg checks what the facts' reach
 // left standing on windows in the standing-facts fixture (#adq5ahd). Wrapped calls value, which each platform's file
 // declares, so the reach lints it; its nil-ness differs, so Outer, its user, leaves, and Outer's differs in turn, so
-// OuterFailed leaves too. What stands, Stable, StableFailed and stableError.Error, has every answer the build's own run
-// holds about it the host's: Stable's nil-ness, asked where StableFailed compares its error with nil, and the three
-// no-return facts. Nothing differs, so the leg has no failure.
+// OuterFailed leaves too. What stands, Stable, StableFailed, stableError.Error, Quiet and Hidden, has every answer the
+// build's own run holds about it the host's, or one only the build holds that no standing body asked: Stable's
+// nil-ness, asked where StableFailed compares its error with nil, the five no-return facts and pushed facts; Quiet's
+// nil-ness, which only windows's quietFailed asks, a body the build lints (#5vbs1np, must 5); and Hidden's, which
+// windows's judgment of viaHidden keeps and no rule asks. Nothing differs, so the leg has no failure, and the census
+// counts the two answers only the build holds apart.
 func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 	test.Parallel()
 
@@ -178,7 +181,7 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 		test.Fatalf("want windows's body differential, got %d runs", len(on.buildRuns))
 	}
 	differential := on.buildRuns[1].bodyDifferential
-	wantCompared := map[string]int{"fact_deprecated": 3, standingNoReturn: 3, "printf": 3, "return_nil_ness": 1}
+	wantCompared := map[string]int{"fact_deprecated": 5, standingNoReturn: 5, "printf": 5, "return_nil_ness": 3}
 	if !maps.Equal(differential.standingCompared, wantCompared) || len(differential.standingFailed) > 0 ||
 		len(differential.failures) > 0 {
 		test.Errorf("windows's second leg compared %v and failed %v, with the failures\n%s\nwant %v compared and "+
@@ -192,7 +195,9 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 	for _, line := range []string{
 		"  fact reach: sides 1, settled 1, crashed 0",
 		"    answers asked 3, differing return_nil_ness 2, unknown return_nil_ness 1; bodies taken out 2",
-		"  standing facts: compared fact_deprecated 3, no-return 3, printf 3, return_nil_ness 1; failures none",
+		"  standing facts: compared fact_deprecated 5, no-return 5, printf 5, return_nil_ness 3; failures none",
+		"  standing facts only the build holds: asked only in the build, by reached bodies 1; held only in the " +
+			"build, asked by no rule 1",
 	} {
 		if !slices.Contains(strings.Split(string(written), "\n"), line) {
 			test.Errorf("the census file has no line %q:\n%s", line, written)
@@ -201,10 +206,12 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 }
 
 // The second leg fails where what stands differs, shown by handing it a host's side that says otherwise of Stable
-// (#5vbs1np, must 4): the build's answer about Stable's nil-ness is its own, so a host's answer of other bytes, or none
-// at all, is a failure on a line of its own, counted under the kind, and in the census; and so is a deprecation of
-// Stable the host held and the build does not, which the facts' reach leaves to the reach by its argument and the
-// leg checks. Nothing else moves: Stable stands, so the facts' reach never asks the answer, and the leg alone reads it.
+// (#5vbs1np, must 4): the build's answer about Stable's nil-ness is its own, so a host's answer of other bytes is a
+// failure on a line of its own, counted under the kind, and in the census, and so is none at all, since StableFailed,
+// the body whose rule asks it, stands (must 5): its findings would rest on an answer the host never had. So is a
+// deprecation of Stable the host held and the build does not, which the facts' reach leaves to the reach by its
+// argument and the leg checks. Nothing else moves: Stable stands, so the facts' reach never asks the answer, and the
+// leg alone reads it.
 func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
 	test.Parallel()
 
@@ -275,7 +282,7 @@ func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
 			if readError != nil {
 				test.Fatal(readError)
 			}
-			line := "  standing facts: compared fact_deprecated 3, no-return 3, printf 3, return_nil_ness 1; " +
+			line := "  standing facts: compared fact_deprecated 5, no-return 5, printf 5, return_nil_ness 3; " +
 				"failures " + each.kind + " 1"
 			if !slices.Contains(strings.Split(string(written), "\n"), line) {
 				test.Errorf("the census file has no line %q:\n%s", line, written)

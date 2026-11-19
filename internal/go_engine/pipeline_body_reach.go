@@ -88,6 +88,9 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		if run.bodyDifferential.standingCompared != nil {
 			fmt.Fprintf(&written, "  standing facts: compared %s; failures %s\n",
 				byKind(run.bodyDifferential.standingCompared), byKind(run.bodyDifferential.standingFailed))
+			fmt.Fprintf(&written, "  standing facts only the build holds: asked only in the build, by reached bodies "+
+				"%d; held only in the build, asked by no rule %d\n", run.bodyDifferential.askedByReached,
+				run.bodyDifferential.heldUnasked)
 		}
 		for _, failure := range run.bodyDifferential.failures {
 			fmt.Fprintf(&written, "    %s\n", failure)

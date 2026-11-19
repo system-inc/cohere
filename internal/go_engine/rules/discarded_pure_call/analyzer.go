@@ -47,7 +47,7 @@ var Listener = rule.Listener{
 	Requires:  []*analysis.Analyzer{function_purity.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function: func(context *rule.Context, function *intermediate_representation.Function) {
-			Check(context, function, purityJudgment(context))
+			Check(context, function, purityJudgment(context, function))
 		},
 	},
 }
@@ -64,15 +64,18 @@ var Analyzer = dispatch.RuleAnalyzer(
 )
 
 // purityJudgment is whether a function has no side effects, as function_purity holds it, asked of the pass's
-// result.
-func purityJudgment(context *rule.Context) func(function *types.Func) bool {
+// result while the rule checks judged.
+func purityJudgment(
+	context *rule.Context,
+	judged *intermediate_representation.Function,
+) func(function *types.Func) bool {
 	pure, isPurity := context.ResultOf(function_purity.Analyzer).(*function_purity.Result)
 	if !isPurity || pure == nil {
 		// Invariant: the listener requires the purity pass, and the dispatcher hands over its result, of the type it
 		// declares.
 		panic("discarded_pure_call: the purity pass's result is missing")
 	}
-	return pure.Asking(context.RuleName()).IsPure
+	return pure.Asking(context.RuleName()).For(judged).IsPure
 }
 
 // Check judges one function: each call whose results nothing reads, of a named function isPure judges free of side

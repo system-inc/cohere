@@ -67,7 +67,8 @@ var Listener = rule.Listener{
 				// the type it declares.
 				panic("typed_nil_interface_comparison: function_triviality's result is missing")
 			}
-			Check(context, nilnesses.Asking(context.RuleName()), trivialities.Asking(context.RuleName()), function)
+			Check(context, nilnesses.Asking(context.RuleName()).For(function),
+				trivialities.Asking(context.RuleName()).For(function), function)
 		},
 	},
 }

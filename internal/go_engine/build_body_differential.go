@@ -16,6 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
@@ -45,8 +46,17 @@ import (
 // Its second leg (#adq5ahd) checks what the facts' reach left standing (#aswfm7a), once the build's rules have run:
 // the build lints whole today, so every answer its own run holds is real, and of each body the facts' fixed point left
 // standing, every answer the build holds about the function declared there, or about one of its parameters, must be
-// the host's, byte for byte, and so must the function's no-return fact. An answer the host's side holds none of
-// differs too: the fixed point never asked it, so it must not have let the body stand.
+// the host's, byte for byte, and so must the function's no-return fact and its other pushed facts.
+//
+// An answer about a standing function the build holds and the host's side holds none of is judged by who asked it in
+// the build (#5vbs1np, must 5). A finding reads an answer only through a rule's question, whose asker, the body the
+// rule was checking, the build's resolver records (fact_resolver.Resolver.RecordAskers). An answer a kind's walk kept,
+// or one asked inside another answer's judgment, is read by no rule: it reaches a finding only through the top-level
+// answer it fed, whose asker is recorded. So such an answer is a failure when a body that asked it stands, since that
+// body's findings are the host's and rest on an answer the host never had; it is counted apart, asked only in the
+// build by reached bodies, when every body that asked it is one the build lints; and it is counted apart again, held
+// only in the build and asked by no rule, when no rule asked it, never a failure. A body no place names, as a wrapper
+// the representation makes, is taken as standing, the side that fails.
 
 // standingNoReturn is the kind the second leg counts a no-return fact's comparison under.
 const standingNoReturn = "no-return"
@@ -69,6 +79,11 @@ type buildBodyDifferential struct {
 	// standingNoReturn; each failure's line is among failures too.
 	standingCompared map[string]int
 	standingFailed   map[string]int
+
+	// askedByReached and heldUnasked count the answers about standing functions only the build holds: those every
+	// asker of which the build lints, and those no rule asked.
+	askedByReached int
+	heldUnasked    int
 }
 
 // findingStage is the later stage of #9paaen9 a rule's findings are owed to, where the reach does not stand for them.
@@ -403,6 +418,19 @@ func (differential *buildBodyDifferential) compareStanding(
 	built map[string]*packages.Package,
 ) {
 	differential.standingCompared, differential.standingFailed = map[string]int{}, map[string]int{}
+	identifiers := make(map[*types.Package]string, len(built))
+	for identifier, builtPackage := range built {
+		identifiers[builtPackage.Types] = identifier
+	}
+	// askerStands is whether asker, a body whose rule asked an answer, stands in this build: placed in no file, it is
+	// taken as standing; in a package the build lints whole, or that has no settlement, nothing stands.
+	askerStands := func(asker fact_resolver.Asker) bool {
+		if asker.File == "" {
+			return true
+		}
+		askerSettled, _ := settled[identifiers[asker.Package]].(*standing_facts.Result)
+		return askerSettled.Stands(asker.File, asker.Offset)
+	}
 	for _, identifier := range slices.Sorted(maps.Keys(settled)) {
 		packageSettled, isResult := settled[identifier].(*standing_facts.Result)
 		if !isResult || !packageSettled.Partial || packageSettled.Settlement == nil ||
@@ -419,7 +447,7 @@ func (differential *buildBodyDifferential) compareStanding(
 			continue
 		}
 		differential.compareStandingPackage(build, identifier, hosted, packageSettled.Settlement.Standing,
-			capturedPackage, builtPackage)
+			capturedPackage, builtPackage, captured.Askers, askerStands)
 	}
 }
 
@@ -432,6 +460,8 @@ func (differential *buildBodyDifferential) compareStandingPackage(
 	standing map[fact_reach.Place]bool,
 	capturedPackage *check.FactReachPackage,
 	builtPackage *packages.Package,
+	askers map[string]map[types.Object][]fact_resolver.Asker,
+	askerStands func(asker fact_resolver.Asker) bool,
 ) {
 	renderer := build_reads.NewIdentityRenderer(builtPackage.Fset, nil)
 	// The build's functions by key: every function and method its package declares at package level, as a body of the
@@ -521,7 +551,16 @@ func (differential *buildBodyDifferential) compareStandingPackage(
 					asking, isAsked := hosted.Asking(question.Key)
 					switch {
 					case !isAsked:
-						fail(place, answeredName, answer.Analyzer, "none", string(answer.Encoded))
+						// Only the build holds the answer: judged by who asked it (see the file's comment).
+						asked := askers[answer.Analyzer][object]
+						switch {
+						case len(asked) == 0:
+							differential.heldUnasked++
+						case slices.ContainsFunc(asked, askerStands):
+							fail(place, answeredName, answer.Analyzer, "none", string(answer.Encoded))
+						default:
+							differential.askedByReached++
+						}
 					case !bytes.Equal(asking.Encoded, answer.Encoded):
 						fail(place, answeredName, answer.Analyzer, string(asking.Encoded), string(answer.Encoded))
 					}

@@ -90,6 +90,10 @@ type Resolver struct {
 	// held is a test's hand on the run's answers, nil in every engine run (see HoldAnswers).
 	held Held
 
+	// askers are the bodies whose rules asked each answer, nil but in a run that measures the facts' reach (see
+	// RecordAskers), set before any pass runs and never after.
+	askers *askerRecord
+
 	// timing is the run's collector under `--timing`, taken from the first pass that hands the resolver over, nil for
 	// a run that did not ask (see Question).
 	timing atomic.Pointer[timing.Collector]

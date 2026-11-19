@@ -9,6 +9,7 @@ import (
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
 // Kind keys the stopping calls kept in each package the resolver holds, and its counts.
@@ -67,6 +68,9 @@ type Result struct {
 
 	// asking is the row under `--timing` whose questions these are, empty until Asking names it.
 	asking string
+
+	// asker is the body whose rule asks, which the resolver records beside each answer, nil until For names it.
+	asker *fact_resolver.Asker
 }
 
 // Asking is the package's stopping calls as the rule whose `--timing` row is named asking asks them, so the resolver's
@@ -75,11 +79,23 @@ func (result *Result) Asking(asking string) *Result {
 	return &Result{resolver: result.resolver, reader: result.reader, asking: asking}
 }
 
+// For is the package's stopping calls as its rule asks while it checks function, so the resolver records function's
+// body, or the declaration a literal of it is in, as the asker of each answer (fact_resolver.Resolver.RecordAskers,
+// #5vbs1np). Where the resolver records no asker, the result itself is handed back, and nothing is made.
+func (result *Result) For(function *intermediate_representation.Function) *Result {
+	if !result.resolver.RecordsAskers() {
+		return result
+	}
+	asker := fact_resolver.AskerOf(function)
+	return &Result{resolver: result.resolver, reader: result.reader, asking: result.asking, asker: &asker}
+}
+
 // StoppingCalls is each call among the own instructions of function, a function or method the package declares, to a
 // method of testing's common type that stops the test, in instruction order, none for a function declared without a
 // body. Calls in functions that body calls in turn are not followed.
 func (result *Result) StoppingCalls(function *types.Func) []StoppingCall {
 	var calls []StoppingCall
+	result.resolver.NoteAsker(Kind, function, result.asker)
 	result.resolver.Question(result.asking, func() { calls = ask(result.resolver, result.reader, function) })
 	return calls
 }

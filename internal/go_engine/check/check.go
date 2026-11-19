@@ -405,6 +405,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// The run's resolver, which reads and keeps answers in the session's store once the session has restored (below).
 	resolver := fact_resolver.New(nil)
 	checkerOptions.Resolver = resolver
+	// A run whose capture the body differential reads records who asked each answer (FactReachCapture.Askers), on
+	// every resolver it asks through, before any pass runs.
+	if options.FactReach {
+		resolver.RecordAskers()
+	}
 	session := options.Cache
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.
@@ -424,6 +429,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		// it, and no store answers a package the run learns, which has none there.
 		resolver = fact_resolver.New(session)
 		checkerOptions.Resolver, session.resolver = resolver, resolver
+		if options.FactReach {
+			resolver.RecordAskers()
+		}
 		session.bodiless = options.Bodiless
 		if options.Ready == nil {
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })

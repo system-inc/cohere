@@ -69,7 +69,7 @@ func judgeFunction(context *rule.Context, function *intermediate_representation.
 		// declares.
 		panic("self_assignment: the purity pass's result is missing")
 	}
-	asking := pure.Asking(context.RuleName())
+	asking := pure.Asking(context.RuleName()).For(function)
 	ast.Inspect(syntax, func(node ast.Node) bool {
 		if assignment, isAssignment := node.(*ast.AssignStmt); isAssignment {
 			Check(context, assignment, asking.IsPure)

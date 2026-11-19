@@ -35,3 +35,15 @@ func Stable() error {
 func StableFailed() bool {
 	return Stable() != nil
 }
+
+// Quiet returns an error that is never nil, and no body of the host's compares it with nil, so the host holds no
+// answer about it; windows's quietFailed, a body the build lints, does (#5vbs1np, must 5).
+func Quiet() error {
+	return stableError{}
+}
+
+// Hidden returns an error that is never nil, and nothing of the host's asks about it; windows's viaHidden returns it,
+// so the build's judgment of viaHidden keeps an answer about Hidden that no rule asked.
+func Hidden() error {
+	return stableError{}
+}

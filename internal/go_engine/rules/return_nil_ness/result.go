@@ -6,6 +6,7 @@ import (
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
 // Kind keys nilness's verdicts in each package the resolver holds, and its counts.
@@ -47,12 +48,26 @@ type Result struct {
 
 	// asking is the row under `--timing` whose questions these are, empty until Asking names it.
 	asking string
+
+	// asker is the body whose rule asks, which the resolver records beside each answer, nil until For names it.
+	asker *fact_resolver.Asker
 }
 
 // Asking is the package's nilness of results as the rule or analyzer whose `--timing` row is named asking asks it,
 // so the resolver's work for it is billed to the resolver's rows rather than to that one (fact_resolver.Question).
 func (judged *Result) Asking(asking string) *Result {
 	return &Result{resolver: judged.resolver, reader: judged.reader, asking: asking}
+}
+
+// For is the package's nilness of results as its rule asks while it checks function, so the resolver records function's
+// body, or the declaration a literal of it is in, as the asker of each answer (fact_resolver.Resolver.RecordAskers,
+// #5vbs1np). Where the resolver records no asker, the result itself is handed back, and nothing is made.
+func (judged *Result) For(function *intermediate_representation.Function) *Result {
+	if !judged.resolver.RecordsAskers() {
+		return judged
+	}
+	asker := fact_resolver.AskerOf(function)
+	return &Result{resolver: judged.resolver, reader: judged.reader, asking: judged.asking, asker: &asker}
 }
 
 // Nilness is the nilness of the result at index result of function: {_ NeverNil} for a result that cannot be nil,
@@ -65,6 +80,7 @@ func (judged *Result) Nilness(function *types.Func, result int) ValueNilness {
 	}
 	var results []ValueNilness
 	var holds bool
+	judged.resolver.NoteAsker(Kind, function, judged.asker)
 	judged.resolver.Question(judged.asking, func() { results, holds = ask(judged.resolver, judged.reader, function) })
 	if !holds {
 		return ValueNilness{Inner: MaybeNil, Outer: MaybeNil}

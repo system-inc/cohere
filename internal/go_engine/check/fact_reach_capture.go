@@ -24,6 +24,10 @@ type FactReachCapture struct {
 	// answers a build is asked of another package's objects before any body leaves. Each is an answer as
 	// computedAnswers makes one, with Package nil for an object of a package the load holds none of.
 	Answers []ExportedFact
+
+	// Askers are the bodies whose rules asked each answer, by kind's name and object (fact_resolver.Resolver.Askers):
+	// an answer no rule asked, one a kind kept or computed inside another's judgment, has none.
+	Askers map[string]map[types.Object][]fact_resolver.Asker
 }
 
 // FactReachPackage is one analyzed package as the run held its facts.
@@ -71,7 +75,8 @@ func captureFactReach(
 	analyzed []*packages.Package,
 	graphs []*checker.Graph,
 ) *FactReachCapture {
-	capture := &FactReachCapture{Packages: make(map[string]*FactReachPackage, len(analyzed))}
+	capture := &FactReachCapture{Packages: make(map[string]*FactReachPackage, len(analyzed)),
+		Askers: resolver.Askers()}
 	captured := make(map[*types.Package]*FactReachPackage, len(analyzed))
 	kinds := make(map[*types.Package]*factReachKinds, len(analyzed))
 	for _, analyzedPackage := range analyzed {
