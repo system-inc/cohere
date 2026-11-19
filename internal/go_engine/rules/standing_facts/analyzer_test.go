@@ -453,3 +453,27 @@ func TestAnAnswerTheBuildIsNotSureOfReadsUnknown(test *testing.T) {
 	requireRemoved(test, result,
 		fact_reach.Removal{Place: total, Object: "below.Pure", Reason: fact_reach.UnknownReason(purity)})
 }
+
+// A wrapper fact the build's printf never looked up reads unknown (#5vbs1np, round 2's N2): no call of the package
+// names gauge's halt, so the build's pass never met it, and once a standing caller is stripped from a build, the one
+// call that would have is gone too. The host held printf's facts of the package, and Caller, which the host's side
+// says uses halt, leaves.
+func TestAWrapperFactTheBuildNeverLookedUpReadsUnknown(test *testing.T) {
+	test.Parallel()
+	found := loadFacts(test)
+	caller := found.place(test, "Caller")
+	host := &fakeHost{
+		standing: map[fact_reach.Place]bool{caller: true},
+		places:   []fact_reach.Place{caller},
+		functions: []fact_reach.Function{{Object: "facts.gauge.halt", Identity: found.method("gauge", "halt"),
+			NoReturn: true, Pushed: map[string]string{"printf": ""}}},
+		users: map[fact_reach.Object][]fact_reach.Place{"facts.gauge.halt": {caller}},
+	}
+	result, _ := settle(test, found, host)
+	requireRemoved(test, result,
+		fact_reach.Removal{Place: caller, Object: "facts.gauge.halt", Reason: "unknown printf wrapper"})
+	if result.PushedCompared != 1 || result.PushedNamed != 1 {
+		test.Errorf("compared %d pushed facts and named %d, want one of each", result.PushedCompared,
+			result.PushedNamed)
+	}
+}

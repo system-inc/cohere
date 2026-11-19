@@ -31,12 +31,15 @@ type pushedFacts struct {
 }
 
 // words is the build's fact of function learned by the analyzer named analyzer, in the fact's words as the host's
-// capture writes them (fmt.Sprint), empty for no fact, and false where the build has nothing to compare: an analyzer
-// whose facts the pass does not read, or a function printf's pass never looked a fact up of, which no finding of the
-// package reads the fact of.
-func (pushed pushedFacts) words(analyzer string, function *types.Func) (string, bool) {
-	if analyzer == printf.Analyzer.Name {
-		return pushed.wrappers.Of(function)
+// capture writes them (fmt.Sprint), empty for no fact; seen, whether the build's pass looked the fact up at all; and
+// read, whether the pass reads the analyzer's facts for function. A function printf's pass never looked up is not
+// seen: no call of the package names it, which holds of a callee only a stripped body calls once standing bodies are
+// stripped, so its fact cannot be checked, and reads unknown (round 2's N2). A print function known by name is not
+// read: its kind is its name's in every build, and no fact of it is.
+func (pushed pushedFacts) words(analyzer string, function *types.Func) (words string, seen bool, read bool) {
+	if analyzer == printf.Analyzer.Name && !pushed.wrappers.ByName(function) {
+		words, seen = pushed.wrappers.Of(function)
+		return words, seen, true
 	}
-	return "", false
+	return "", false, false
 }

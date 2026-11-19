@@ -95,8 +95,8 @@ func run(pass *analysis.Pass) (any, error) {
 	// this package calls the function as a statement, and reads false anywhere else, so a host's fact the package
 	// never reads that way can name an object whose fact is in truth equal. That is the safe side: it only lints a
 	// body the host's findings would have served. Then each other fact the checker pushes that the host held of the
-	// function and a build compares, its wrapper fact, where the host ran printf on the package and the build's printf
-	// looked the fact up.
+	// function and a build compares, its wrapper fact, where the host ran printf on the package: one the build's printf
+	// never looked up reads unknown.
 	for _, function := range host.Functions() {
 		result.FunctionsCompared++
 		own, found := functions.function(function.Identity)
@@ -110,15 +110,21 @@ func run(pass *analysis.Pass) (any, error) {
 			result.FunctionsNamed++
 		}
 		for _, analyzer := range slices.Sorted(maps.Keys(function.Pushed)) {
-			words, isCompared := pushed.words(analyzer, own)
-			if !isCompared {
+			words, isSeen, isRead := pushed.words(analyzer, own)
+			if !isRead {
 				continue
 			}
 			result.PushedCompared++
-			if words != function.Pushed[analyzer] {
+			switch {
+			case !isSeen:
+				named = append(named, fact_reach.Named{Object: function.Object,
+					Reason: "unknown " + pushedReasons[analyzer]})
+			case words != function.Pushed[analyzer]:
 				named = append(named, fact_reach.Named{Object: function.Object, Reason: pushedReasons[analyzer]})
-				result.PushedNamed++
+			default:
+				continue
 			}
+			result.PushedNamed++
 		}
 	}
 
