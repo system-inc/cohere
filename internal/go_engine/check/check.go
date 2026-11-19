@@ -696,7 +696,8 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 //
 // Under declarations (Options.Declarations), each walk here hands its package on first, and a package whose reads are
 // claimed already that no walk was started for, one marked never that no action reached, is walked for its
-// declarations alone; declarations itself passes over a package with no type information, read once the walk runs.
+// declarations alone, but for one the findings cache restored, which has none; declarations itself passes over a
+// package with no type information, read once the walk runs.
 func recordUnreachedTypes(
 	reads map[*packages.Package]*build_reads.Reads,
 	ready func(*packages.Package) <-chan struct{},
@@ -709,8 +710,10 @@ func recordUnreachedTypes(
 			final = ready(unreached)
 		}
 		if packageReads.Claimed() {
-			// The checker walks every package it ran on, so a walk not started is of a package no action reached.
-			if declarations != nil && !walks.Started(unreached) {
+			// The checker walks every package it ran on, so a walk not started is of a package no action reached. One
+			// the findings cache restored has no type information to add, so it is walked for nothing.
+			if declarations != nil && !walks.Started(unreached) &&
+				packageReads.Never() != build_reads.RestoredFromCache {
 				walks.Go(unreached, final, func() { declarations(unreached) })
 			}
 			continue

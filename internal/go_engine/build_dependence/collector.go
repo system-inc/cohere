@@ -1,9 +1,11 @@
 package build_dependence
 
 import (
+	"cmp"
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 )
 
 // kindEdge says the from object's bit depends on the to object's bit (rule 3): from is an object a unit declares, and
@@ -28,9 +30,15 @@ type collector struct {
 	bodies           *bodyWalk
 
 	// declarationsOnly says the walk collects no unit's references or callees, its graph's mode
-	// (Graph.declarationsOnly), set for each package's walk (Graph.addPackage). Every unit's size, universe names
-	// and declares and every kind edge are collected as a whole walk collects them.
+	// (Graph.declarationsOnly), set for each package's walk (Graph.addPackage). Every unit's universe names and
+	// declares and every kind edge are collected as a whole walk collects them, the names from the package's uses at
+	// once (universeNamesFromUses), and no unit's size, which only the counts read and a declarations-only graph
+	// refuses.
 	declarationsOnly bool
+
+	// spans are each unit's token file and offsets there, by its index among units, kept by a declarations-only walk
+	// for universeNamesFromUses, which places each use in its unit.
+	spans []unitSpan
 
 	// fromCgo says the file being collected hangs on the C side (fromCgo), set for each file's walk
 	// (Graph.addPackage), which every unit of the file takes as its mark (unitRecord.fromCgo).
@@ -64,6 +72,15 @@ type collector struct {
 	membersWalk     membersVisitor
 	usesWalk        usesVisitor
 	initializerWalk initializerVisitor
+}
+
+// unitSpan is one unit's place as universeNamesFromUses finds a use in it: its file as the type checker holds it, the
+// unit's start and end offsets there, and its index among the collector's units.
+type unitSpan struct {
+	tokenFile *token.File
+	start     int
+	end       int
+	index     int
 }
 
 // collectFile collects every unit of file, whose place tokenFile holds. Imports are no units.
@@ -101,11 +118,20 @@ func (collecting *collector) collectFile(tokenFile *token.File, file *ast.File) 
 }
 
 // newUnit adds the unit of declaration to the collector's units, sized and placed, and the universe's names it uses,
-// with nothing declared yet, its size and names read in one walk of it. It is the last unit until the next newUnit,
-// and nothing else adds one, so its collector fills it in place through the pointer.
+// with nothing declared yet, its size and names read in one walk of it, or, in a declarations-only walk, placed alone,
+// its names read afterwards with every other unit's (universeNamesFromUses). It is the last unit until the next
+// newUnit, and nothing else adds one, so its collector fills it in place through the pointer.
 func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node) *unitRecord {
 	collecting.unitWalk = unitVisitor{typesInformation: collecting.typesInformation}
-	ast.Walk(&collecting.unitWalk, declaration)
+	if collecting.declarationsOnly {
+		// Placed for universeNamesFromUses, which reads the package's uses once in place of a walk of each declaration,
+		// the larger part of a declarations-only add (#anfjtr3); no node is counted.
+		collecting.spans = append(collecting.spans, unitSpan{tokenFile: tokenFile,
+			start: tokenFile.Offset(declaration.Pos()), end: tokenFile.Offset(declaration.End()),
+			index: len(collecting.units)})
+	} else {
+		ast.Walk(&collecting.unitWalk, declaration)
+	}
 	withheld := false
 	if collecting.withheld != nil {
 		// The position as the load wrote it, past any //line directive, so the two name one declaration alike.
@@ -128,6 +154,41 @@ func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node
 	})
 	collecting.declaresStart = len(collecting.declareStore)
 	return &collecting.units[len(collecting.units)-1]
+}
+
+// universeNamesFromUses gives each unit the universe's names a use in its span resolves to, reading the package's
+// uses once (types.Info.Uses), as newUnit's walk of each declaration would have read them in a whole walk: an
+// identifier the type checker resolved to an object of the universe, placed in the unit whose span in its file holds
+// it. A use in no unit's span, one in an import, is no unit's, as no walk reached it. fileSet is the package's, where
+// each use's file is found.
+func (collecting *collector) universeNamesFromUses(fileSet *token.FileSet) {
+	compareSpans := func(left unitSpan, right unitSpan) int {
+		if left.tokenFile != right.tokenFile {
+			return cmp.Compare(left.tokenFile.Base(), right.tokenFile.Base())
+		}
+		return cmp.Compare(left.start, right.start)
+	}
+	slices.SortFunc(collecting.spans, compareSpans)
+	for identifier, object := range collecting.typesInformation.Uses {
+		if object.Parent() != types.Universe {
+			continue
+		}
+		bit := universeNameBit(object.Name())
+		tokenFile := fileSet.File(identifier.Pos())
+		if bit == 0 || tokenFile == nil {
+			continue
+		}
+		offset := tokenFile.Offset(identifier.Pos())
+		// The last span starting at or before offset is the one that can hold it: units never overlap.
+		after, _ := slices.BinarySearchFunc(collecting.spans, unitSpan{tokenFile: tokenFile, start: offset + 1},
+			compareSpans)
+		if after == 0 {
+			continue
+		}
+		if span := collecting.spans[after-1]; span.tokenFile == tokenFile && offset < span.end {
+			collecting.units[span.index].universeNames |= bit
+		}
+	}
 }
 
 // declare adds object to what unit declares, unit being the one newUnit added last: its declares are a slice of the

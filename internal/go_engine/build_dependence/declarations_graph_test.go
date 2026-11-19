@@ -57,8 +57,8 @@ func declarationsGraphOf(host loadedBuild, excluded func(*packages.Package) bool
 }
 
 // declarationLines are graph's resolution as resolvedLines writes it, less what only a unit's body gives, its reads,
-// its external reads and its calls: every unit by its place, with its size, its universe names, its declared objects
-// and its receiver, and every kind edge.
+// its external reads and its calls, and its size, which a declarations-only graph does not count: every unit by its
+// place, with its end, its universe names, its declared objects and its receiver, and every kind edge.
 func declarationLines(graph *Graph) []string {
 	lines := resolvedLines(graph)
 	for index, line := range lines {
@@ -69,6 +69,12 @@ func declarationLines(graph *Graph) []string {
 			return strings.HasPrefix(part, "reads ") || strings.HasPrefix(part, "external ") ||
 				strings.HasPrefix(part, "calls ")
 		})
+		for at, part := range parts {
+			// "nodes N end E universe U": the size is left out, the rest kept.
+			if _, rest, isSized := strings.Cut(part, " end "); isSized && strings.HasPrefix(part, "nodes ") {
+				parts[at] = "end " + rest
+			}
+		}
 		lines[index] = strings.Join(parts, "; ")
 	}
 	return lines
@@ -436,6 +442,48 @@ func TestADeclarationsGraphGivesEveryObjectAWholeGraphsBitsInATree(test *testing
 			if tally.bitsSet == 0 {
 				test.Errorf("%s under %s: no bit is set, so the comparison compared nothing", tree, name)
 			}
+		}
+	}
+}
+
+// A declarations-only graph reads each unit's universe names from its package's uses at once rather than walk each
+// declaration, and every unit's names are the ones a whole graph's walk reads, over block 1's fixtures and the shadowed
+// fixture, whose Smaller uses min in its body alone. Drop a name a body uses, min, from the uses read, and Smaller's
+// names differ.
+func TestADeclarationsGraphReadsUniverseNamesFromItsUses(test *testing.T) {
+	test.Parallel()
+
+	minimum := universeNameBit("min")
+	for _, fixture := range []string{"shadowed", "layout", "methods", "lowering", "inferred", "aliases"} {
+		host := loadFixture(test, fixture, hostBuild)
+		whole, declarations := graphOf(host, nil).resolve(), declarationsGraphOf(host, nil).resolve()
+		namesOf := func(resolved *resolvedGraph) map[string]uint64 {
+			names := map[string]uint64{}
+			for index := range resolved.unitCount() {
+				names[fmt.Sprintf("%s %s:%d", resolved.packages[resolved.unitPackage[index]].identifier,
+					resolved.files.names[resolved.unitFile[index]], resolved.unitStart[index])] =
+					resolved.unitUniverseNames[index]
+			}
+			return names
+		}
+		wholeNames, declarationsNames := namesOf(whole), namesOf(declarations)
+		if !maps.Equal(wholeNames, declarationsNames) {
+			for _, unit := range slices.Sorted(maps.Keys(wholeNames)) {
+				if wholeNames[unit] != declarationsNames[unit] {
+					test.Errorf("%s, %s: want the walk's universe names %x, read from the uses %x", fixture, unit,
+						wholeNames[unit], declarationsNames[unit])
+				}
+			}
+		}
+		if fixture != "shadowed" {
+			continue
+		}
+		usesMinimum := false
+		for unit, names := range declarationsNames {
+			usesMinimum = usesMinimum || names&minimum != 0 && strings.Contains(unit, "shadowed.go")
+		}
+		if !usesMinimum {
+			test.Error("shadowed: want Smaller's unit to use min, read from its body's use, got no unit that does")
 		}
 	}
 }

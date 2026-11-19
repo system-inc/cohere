@@ -21,11 +21,11 @@
 // lets go of what only resolution and encoding read, the records' units, edges and object tables among them, so the
 // graph every build is judged on holds only what a judgment reads.
 //
-// A graph made by NewDeclarationsGraph collects declarations only: every unit's place, size and declared objects and
-// every kind edge, and no unit's reads or calls, the larger half of an add's work. Its objects' bits are a whole
-// graph's, since they come from the seeds and the kind edges alone, and whatever a unit's body gives, a verdict, the
-// counts or a call, it refuses with a panic rather than answer wrong (#w72zxtq). Its records are declarations-only
-// records, in a format of their own, which only a declarations-only graph takes (#anfjtr3).
+// A graph made by NewDeclarationsGraph collects declarations only: every unit's place, universe names and declared
+// objects and every kind edge, and no unit's reads, calls or size, the larger part of an add's work. Its objects' bits
+// are a whole graph's, since they come from the seeds and the kind edges alone, and whatever a unit's body gives, a
+// verdict, the counts or a call, it refuses with a panic rather than answer wrong (#w72zxtq). Its records are
+// declarations-only records, in a format of their own, which only a declarations-only graph takes (#anfjtr3).
 package build_dependence
 
 import (
@@ -148,14 +148,14 @@ func NewGraph() *Graph {
 }
 
 // NewDeclarationsGraph is an empty graph that collects declarations only (#w72zxtq): a package added from its live load
-// (AddPackage) gives every unit's place, size, universe names, cgo mark and declared objects and every kind edge, as a
-// whole graph's does, and no unit's reads or calls. An object's bits come from the seeds and the fixed point over the
-// kind edges alone (Against), so ObjectBits, NameBits and DependentObjects answer as a whole graph's do, and so do
-// UnitDeclaringName and UnitContaining, which read a unit's place. What only a unit's body gives is refused with a
-// panic (refuseDeclarationsOnly), never answered wrong: a unit's verdict (Dependence.UnitDependent, Units,
-// CallIndex.Dependent), the counts (Dependence.Counts) and a call index (NewCallIndex). A record of a package it
-// collected (EncodedRecord) is a declarations-only record, which holds everything it collected and says it holds no
-// unit's reads or calls (declarationsRecordFormat).
+// (AddPackage) gives every unit's place, universe names, cgo mark and declared objects and every kind edge, as a whole
+// graph's does, and no unit's reads or calls, nor its size, which only the counts read (a unit's nodes are 0). An
+// object's bits come from the seeds and the fixed point over the kind edges alone (Against), so ObjectBits, NameBits
+// and DependentObjects answer as a whole graph's do, and so do UnitDeclaringName and UnitContaining, which read a
+// unit's place. What only a unit's body gives is refused with a panic (refuseDeclarationsOnly), never answered wrong: a
+// unit's verdict (Dependence.UnitDependent, Units, CallIndex.Dependent), the counts (Dependence.Counts) and a call
+// index (NewCallIndex). A record of a package it collected (EncodedRecord) is a declarations-only record, which holds
+// everything it collected and says it holds no unit's reads or calls (declarationsRecordFormat).
 //
 // A whole record added to it (AddRecord, AddDecoded) is sound: the record only holds more than the graph reads, its
 // units' reads and calls, which no answer the graph gives rests on.
@@ -222,6 +222,9 @@ func (graph *Graph) addPackage(loaded *packages.Package, workspace bool, withhel
 				}
 				break
 			}
+		}
+		if collecting.declarationsOnly {
+			collecting.universeNamesFromUses(loaded.Fset)
 		}
 		units, edges = collecting.units, collecting.edges
 	}
