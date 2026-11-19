@@ -11,13 +11,14 @@ import (
 
 // Kind keys triviality's answers in the resolver, and its counts.
 //
-// It is deliberately not registered with fact_resolver.Register (#h0k644s), so no package is computed whole in it and
-// it never enters the standard library's table. Nothing needs it whole, since only a package's own reader asks, of a
-// package the run holds from source, and its values name files by this machine's paths, which a table written for any
-// machine cannot hold. An answer a reader asked for, about a function with an objectpath, is still recorded
-// (fact_resolver.Ask), may be kept in the package's entry, and a store may give it back on a later run. What keeps an
-// answer given back right is the key that entry is under, which holds each of the package's files by its path and
-// contents, so an entry found under the same key names the same files at the same offsets.
+// It is deliberately not registered with fact_resolver.Register (#h0k644s), so no package is computed whole in it.
+// Registered, it would be judged for every function of every package a run saves an entry of, the standard library's
+// entries in the system cache among them, and each of those values names files by absolute path. Nothing needs it
+// whole, since only a package's own reader asks, of a package the run holds from source. An answer a reader asked
+// for, about a function with an objectpath, is still recorded (fact_resolver.Ask), may be kept in the package's entry,
+// and a store may give it back on a later run. What keeps an answer given back right is the key that entry is under,
+// which holds each of the package's files by its path and contents, so an entry found under the same key names the
+// same files at the same offsets.
 var Kind = &fact_resolver.Kind{Name: "function_triviality"}
 
 // bodilessTriviality is the answer about a function declared without a body, from its types alone (fact_resolver.Ask):

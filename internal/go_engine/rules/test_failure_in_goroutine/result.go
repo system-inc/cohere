@@ -13,13 +13,13 @@ import (
 
 // Kind keys the stopping calls kept in each package the resolver holds, and its counts.
 //
-// It is not registered with fact_resolver.Register, so no package is computed whole in it, and it never enters the
-// standard library's table, which holds whole answers alone. It is asked only through fact_resolver.Ask, by the rule,
-// about a function of the package being analyzed. In a run with a store, the answer about a function that has an
-// objectpath is recorded, can be kept in the package's entry under the package's own key, and can be given back by a
-// store on a later run, which then reads no function for it. A StoppingCall names a file by its path and a call by its
-// offsets there, and what keeps an answer given back right is that key, which holds the path and the bytes of each of
-// the package's files (cache/keyer.go, writePortable), not the kind being unregistered.
+// It is not registered with fact_resolver.Register, so no package is computed whole in it, the standard library's,
+// whose entries the system cache keeps, among them. It is asked only through fact_resolver.Ask, by the rule, about a
+// function of the package being analyzed. In a run with a store, the answer about a function that has an objectpath
+// is recorded, can be kept in the package's entry under the package's own key, and can be given back by a store on a
+// later run, which then reads no function for it. A StoppingCall names a file by its path and a call by its offsets
+// there, and what keeps an answer given back right is that key, which holds the path and the bytes of each of the
+// package's files (cache/keyer.go, writePortable), not the kind being unregistered.
 var Kind = &fact_resolver.Kind{Name: "test_stopping_calls"}
 
 // bodilessCalls is the stopping calls of a function declared without a body, from its types alone (fact_resolver.Ask):
