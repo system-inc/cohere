@@ -13,6 +13,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -889,6 +890,112 @@ func TestAKeptUnitKeepsTheFindingThatRestsOnAStubbedCallee(test *testing.T) {
 				"holds nothing a naive stub breaks", unit, naive.variant[unit])
 		}
 	}
+	// Through a store (#k7k3wwc): the host's run writes its entries, and the variant's resolver is handed the placed
+	// hand made of them, every function standing, rather than a test's hand, so every pinned unit keeps its finding,
+	// Compares's SA4023 too, which rests on the nil-ness of typedNil, kept, which rests on missing's, stubbed. The
+	// stubs return as the whole run read each function either way; without the hand, the answers computed from the
+	// stubs lose Discards's and Compares's findings.
+	handed := runPinnedFromStore(test, true)
+	for _, unit := range slices.Sorted(maps.Values(storedPinnedFindings)) {
+		if len(handed.whole[unit]) == 0 {
+			test.Errorf("%s, through a store: the whole package finds nothing there, so the pin pins nothing", unit)
+		}
+		if !slices.Equal(handed.variant[unit], handed.whole[unit]) {
+			test.Errorf("%s, through a store: the variant handed the host's answers finds %q, the whole package %q",
+				unit, handed.variant[unit], handed.whole[unit])
+		}
+	}
+	unhanded := runPinnedFromStore(test, false)
+	for _, unit := range []string{"Discards", "Compares"} {
+		if slices.Equal(unhanded.variant[unit], unhanded.whole[unit]) {
+			test.Errorf("%s, through a store: with no hand the variant still finds %q, so the hand holds nothing "+
+				"the stubs break", unit, unhanded.variant[unit])
+		}
+	}
+}
+
+// storedPinnedFindings are the findings the pin through a store keeps: pinnedFindings', and Compares's SA4023, which
+// rests on the nil-ness of typedNil, whose result is never a nil interface because missing's is not. SA4023
+// reads typedNil's body too, to leave a trivial callee alone, so it is missing the variant stubs, never typedNil.
+var storedPinnedFindings = func() map[string]string {
+	findings := maps.Clone(pinnedFindings)
+	findings[rule.Namespace+"SA4023"] = "Compares"
+	return findings
+}()
+
+// runPinnedFromStore is runPinned through a store: the fixture, written as a module of the test's own, is checked by
+// a host's run with a store, keeping its entries for builds, and then by a variant stubbing halt, proceed, double and
+// missing, each stub returning as the whole run read its function, whose resolver is handed, when handed, the placed
+// hand made of the host's kept entry of the package, the same answers the store's entry holds, with every function
+// standing, and no hand otherwise. The rules are the pinned ones and SA4023.
+func runPinnedFromStore(test *testing.T, handed bool) pinnedRun {
+	test.Helper()
+	source := filepath.Join("testdata", "unit_isolation", "src", "calls")
+	entries, readError := os.ReadDir(source)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	files := map[string]string{"go.mod": "module example.com/calls\n\ngo 1.24\n"}
+	for _, entry := range entries {
+		contents, contentsError := os.ReadFile(filepath.Join(source, entry.Name()))
+		if contentsError != nil {
+			test.Fatal(contentsError)
+		}
+		files[entry.Name()] = string(contents)
+	}
+	root := test.TempDir()
+	writeFiles(test, root, files)
+	pinned := pinnedRules(test)
+	for _, registered := range rules.All() {
+		if registered.Name == rule.Namespace+"SA4023" {
+			pinned = append(pinned, registered)
+		}
+	}
+	caching := cachingAt(test.TempDir(), pinned)
+	hostResult, hostSession := hostSessionWith(test, root, caching, pinned, nil)
+	whole, wholeError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	fresh, freshError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if wholeError != nil || freshError != nil || len(whole.Roots) != 1 || len(fresh.Roots) != 1 {
+		test.Fatalf("loading the module: %v, %v", wholeError, freshError)
+	}
+	placed, kept := hostResult.Host.placedOf(whole.Roots[0].ID)
+	stored, isStored := storedPlacedAt(caching.Store, sessionKey(test, hostSession, whole.Roots[0].PkgPath))
+	if !kept || !isStored || len(placed) == 0 || !reflect.DeepEqual(placed, stored) {
+		test.Fatalf("want the host's kept entry and its stored one to hold the same placed answers, got %d kept "+
+			"(%t) and %d stored (%t)", len(placed), kept, len(stored), isStored)
+	}
+	wholeRun, runError := runIsolated(pinned, whole.Roots, nil)
+	if runError != nil {
+		test.Fatal(runError)
+	}
+	units := functionUnits(whole.Roots[0])
+	stubbed := slices.DeleteFunc(slices.Clone(units), func(unit functionUnit) bool {
+		return !slices.Contains([]string{"halt", "proceed", "double", "missing"}, unit.name)
+	})
+	variant, variantError := variantOf(fresh.Roots[0], 0, stubbed, wholeRun.noReturn)
+	if variantError != nil {
+		test.Fatal(variantError)
+	}
+	var held fact_resolver.Held
+	if handed {
+		hand := newPlacedHand()
+		hand.hold(variant, placed, func(fact_resolver.Place) bool { return true })
+		held = hand
+	}
+	variantRun, variantError := runIsolated(pinned, []*packages.Package{variant}, held)
+	if variantError != nil {
+		test.Fatal(variantError)
+	}
+	inUnits := func(findings []isolationFinding) map[string][]string {
+		found := map[string][]string{}
+		for _, finding := range findings {
+			if unit := unitNamed(units, finding.at); storedPinnedFindings[finding.rule] == unit {
+				found[unit] = append(found[unit], findingLine(finding))
+			}
+		}
+		return found
+	}
+	return pinnedRun{whole: inUnits(wholeRun.findings[whole.Roots[0]]), variant: inUnits(variantRun.findings[variant])}
 }
 
 // treeSampleSize is how many of cohere's own packages the nightly sampled pass isolates, when

@@ -5,6 +5,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
@@ -71,3 +72,31 @@ func (hand *placedHand) Answer(kindName string, object types.Object) ([]byte, bo
 
 // Computed hears an answer the resolver computed, which the hand, answering only from the host's, has no use for.
 func (*placedHand) Computed(string, types.Object, []byte) {}
+
+// placedOf is the placed answers of the entry the host's run kept of the package identified so, decoded as every build
+// shares the decode, and whether it kept one that decodes.
+func (host *HostRun) placedOf(identifier string) ([]fact_resolver.PlacedAnswer, bool) {
+	kept := host.entries[identifier]
+	if kept == nil || kept.decoded == nil {
+		return nil, false
+	}
+	restored, decodeError := kept.decoded()
+	if decodeError != nil {
+		return nil, false
+	}
+	return restored.placed, true
+}
+
+// storedPlacedAt is the placed answers of the entry store holds under key, and whether it holds a whole one whose
+// placed answers read.
+func storedPlacedAt(store *cache.Store, key cache.Key) ([]fact_resolver.PlacedAnswer, bool) {
+	entry, _, stored := storedEntryAt(store, key)
+	if !stored {
+		return nil, false
+	}
+	placed, placedError := entry.Placed.placed()
+	if placedError != nil {
+		return nil, false
+	}
+	return placed, true
+}

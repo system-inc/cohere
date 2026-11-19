@@ -1,7 +1,9 @@
 // Package calls is the unit-isolation test's own fixture (#h350vqr): units that call one another, so a variant that
 // stubs a callee and keeps its caller shows whether the caller's findings rest on the callee's body or only on its
 // answers. The pin stubs halt, proceed and double and keeps their callers, whose findings each rest on one fact or
-// answer about the callee: halt never returns, proceed does, and double is pure.
+// answer about the callee: halt never returns, proceed does, and double is pure. The pin through a store stubs missing
+// too, and keeps typedNil, whose result is never a nil interface because missing's is not, and Compares, which
+// compares that result with nil.
 package calls
 
 import (
@@ -51,6 +53,24 @@ func Leaks(parent context.Context) context.Context {
 // Discards calls double, which is pure, and drops its result.
 func Discards() {
 	double(2)
+}
+
+// missing returns a nil *os.PathError as an error, an interface holding a typed nil, so never a nil interface.
+func missing() error {
+	println("missing")
+	var pathError *os.PathError
+	return pathError
+}
+
+// typedNil returns what missing returns, so never a nil interface either.
+func typedNil() error {
+	println("looking")
+	return missing()
+}
+
+// Compares compares what typedNil returns with nil, which is never true, since typedNil returns a typed value.
+func Compares() bool {
+	return typedNil() == nil
 }
 
 // Joins calls a callee in another file of its package and one of the standard library's.
