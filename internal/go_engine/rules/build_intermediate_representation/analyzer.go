@@ -10,7 +10,10 @@
 // The one package it creates and leaves unbuilt is an extra build's in which a function stands (#e4rd5dw): there the
 // dispatcher over the representation hears nothing of a function that stands for every listener it starts, so it
 // builds only the others (Result.SourceFunctionsBut), and any other reader builds the package whole as it first reads
-// it (Result.SourceFunctions, Result.Package).
+// it (Result.SourceFunctions, Result.Package). On that path its action waits for standing_facts as well as ctrlflow,
+// and so for printf on the package, since it holds the standing bodies only after standing_facts has settled them
+// (check's followsStanding), and the building happens inside the dispatcher's action, which `--timing` bills to the
+// dispatcher's row rather than to this analyzer's.
 //
 // It is named for what it does, as buildir and x/tools' buildssa are, rather than go_ir: every comment in this tree
 // says go/ir for staticcheck's package, which this replaces.

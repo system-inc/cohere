@@ -148,9 +148,9 @@ type Options struct {
 	// StandingBodies, when not nil, is an extra build's standing bodies (#e4rd5dw): asked once for each package with
 	// StandingAfter's result there, what it answers is handed every pass on the package under rule.Standing (see
 	// checker.Options.StandingBodies), so a confined rule hears no standing body and reports the host's findings there
-	// as its own. StandingAfter, when StandingBodies is set too, is the analyzer every dispatcher's action on a package
-	// follows and whose result there StandingBodies is asked with, standing_facts' on the census path, which this
-	// package never imports. Where it is FactReachSettle and the run roots that nowhere (settlingIn), nothing stands.
+	// as its own. StandingAfter, when StandingBodies is set too, is the analyzer every follower's action on a package
+	// follows, a dispatcher's and the representation's build (followsStanding), and whose result there StandingBodies
+	// is asked with, standing_facts' on the census path, which this package never imports. Where it is FactReachSettle and the run roots that nowhere (settlingIn), nothing stands.
 	// Both are called from several actions at once. Only an extra build sets them, and no package StandingBodies
 	// answers anything for is written to the findings cache (CacheSession.markStood).
 	StandingBodies func(packageId string, after any) rule.StandingBodies

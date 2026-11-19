@@ -735,7 +735,8 @@ func (engine *pipeline) extraBuildRun(
 		}
 		settle := engine.factReachSettle(factHosts != nil)
 		// A package whose pass is handed a host's side lints only what does not stand once standing_facts has settled
-		// it there, whose action every dispatcher's action on the package follows.
+		// it there, whose action every dispatcher's action on the package follows, and the representation's build too,
+		// which then leaves unbuilt what stands for every rule its dispatcher starts.
 		var standingBodies func(packageId string, after any) rule.StandingBodies
 		var standingAfter *analysis.Analyzer
 		if standing != nil && settle != nil {
