@@ -245,6 +245,12 @@ type pipeline struct {
 	bodyDifferential bool
 	bodyReachHost    *bodyReachHost
 
+	// bodyReachFromSourceRecord is the directory each extra build's from-source packages are recorded into, and
+	// bodyReachFromSource the one the census reads them back from, each empty unless asked
+	// (pipeline_body_reach_from_source.go).
+	bodyReachFromSourceRecord string
+	bodyReachFromSource       string
+
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
 	// beside the host's to check.
 	buildRuns []buildRun

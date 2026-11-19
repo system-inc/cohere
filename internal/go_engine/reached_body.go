@@ -3,8 +3,8 @@ package go_engine
 import "fmt"
 
 // reachedBody is one body of a recorded package the build compiles, as the census judged it: where its declaration
-// starts, by line and by offset in the file, its name, why it is reached, empty when it is not, and whether the graph's
-// unit verdict calls it dependent.
+// starts, by line and by offset in the file, its name, why it is reached, empty when it is not, what reached it first
+// (bodyReacher.reason), and whether the graph's unit verdict calls it dependent.
 type reachedBody struct {
 	packageIdentifier string
 	file              string
@@ -12,6 +12,7 @@ type reachedBody struct {
 	offset            int
 	name              string
 	reason            bodyReachReason
+	driver            string
 	unitDependent     bool
 }
 

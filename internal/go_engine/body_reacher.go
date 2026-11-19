@@ -15,10 +15,15 @@ import (
 // bodyReacher judges one build's bodies on one goroutine, the build's own: dependence is the build's judgment, whose
 // ObjectBits is safe from one goroutine at a time, and decoded answers, by name, an object of a package the host's
 // graph took from a record, which holds no live object for ObjectBits to find, made at the first such object.
+//
+// identities render the identity of the object that reaches each body first, its driver (reachedBody.driver), by the
+// host's file set, made at the first.
 type bodyReacher struct {
 	host       *bodyReachHost
 	dependence *build_dependence.Dependence
 	decoded    *build_dependence.Counterparts
+	identities *build_reads.IdentityRenderer
+	fileSet    *token.FileSet
 }
 
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
@@ -48,10 +53,13 @@ func (reacher *bodyReacher) reachPackage(
 			absent++
 			continue
 		}
+		if reacher.identities == nil || reacher.fileSet != hosted.Fset {
+			reacher.identities, reacher.fileSet = build_reads.NewIdentityRenderer(hosted.Fset, nil), hosted.Fset
+		}
+		reason, driver := reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
+			read.dotImports[position.Filename])
 		bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
-			line: position.Line, offset: declared.Declaration.Offset, name: name,
-			reason: reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
-				read.dotImports[position.Filename]),
+			line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reason, driver: driver,
 			unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
 				declared.Declaration.Offset)})
 	}
@@ -60,73 +68,99 @@ func (reacher *bodyReacher) reachPackage(
 
 // reason is why declared's body is reached in the build, empty when it is not, own being its package's types,
 // shadowing the names the package's build-only files declare at package level, and dotImported the paths its file
-// imports by a dot.
+// imports by a dot, and its driver: what reached it first, the object's identity, the kind of use and the bits it
+// found set, or the unknown part or the shadowed name, which the census tallies.
 func (reacher *bodyReacher) reason(
 	own *types.Package,
 	record *build_reads.FunctionUses,
 	declared build_reads.DeclarationUses,
 	shadowing map[string]bool,
 	dotImported []string,
-) bodyReachReason {
-	if declared.SignatureUnknown || declared.BodyUnknown {
-		return reachedUnknown
+) (bodyReachReason, string) {
+	switch {
+	case declared.SignatureUnknown:
+		return reachedUnknown, "an unknown identity in the signature"
+	case declared.BodyUnknown:
+		return reachedUnknown, "an unknown identity in the body"
 	}
-	if reacher.partReason(record, declared.Signature) != "" {
-		return reachedSignature
+	if reason, driver := reacher.partReason(record, declared.Signature); reason != "" {
+		return reachedSignature, driver + " in the signature"
 	}
-	if reason := reacher.partReason(record, declared.Body); reason != "" {
-		return reason
+	if reason, driver := reacher.partReason(record, declared.Body); reason != "" {
+		return reason, driver + " in the body"
 	}
-	if len(shadowing) > 0 && (shadowed(own, record, declared.Signature, shadowing, dotImported) ||
-		shadowed(own, record, declared.Body, shadowing, dotImported)) {
-		return reachedShadowed
+	if len(shadowing) == 0 {
+		return "", ""
 	}
-	return ""
+	if name, isShadowed := shadowed(own, record, declared.Signature, shadowing, dotImported); isShadowed {
+		return reachedShadowed, name + " shadowed in the signature"
+	}
+	if name, isShadowed := shadowed(own, record, declared.Body, shadowing, dotImported); isShadowed {
+		return reachedShadowed, name + " shadowed in the body"
+	}
+	return "", ""
 }
 
 // partReason is the kind of the first of uses, in the record's order, that reaches a set bit in the build, empty when
-// none does.
-func (reacher *bodyReacher) partReason(record *build_reads.FunctionUses, uses []build_reads.PartUse) bodyReachReason {
+// none does, and that use written as its driver: its object's identity, its kind and the bits set.
+func (reacher *bodyReacher) partReason(
+	record *build_reads.FunctionUses,
+	uses []build_reads.PartUse,
+) (bodyReachReason, string) {
 	for _, use := range uses {
-		if reason := reacher.useReason(record.Used(use), use.Kinds()); reason != "" {
-			return reason
+		if reason, object, bits := reacher.useReason(record.Used(use), use.Kinds()); reason != "" {
+			return reason, reacher.identities.Object(object).String() + " " + string(reason) + " " + bits
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // useReason is the kind by which entry, used by kinds, reaches a set bit in the build, empty when it reaches none
-// (the mapping body_reach_host.go writes out). A universe object has no bit, the same in every build but where a
-// build-only file shadows its name (shadowed), and an import's name none, being its file's own, which is the same file
-// in both builds or no shared body's.
-func (reacher *bodyReacher) useReason(entry build_reads.UsedEntry, kinds build_reads.UseKinds) bodyReachReason {
+// (the mapping body_reach_host.go writes out), with the object whose bit it found set and which bits those are. A
+// universe object has no bit, the same in every build but where a build-only file shadows its name (shadowed), and an
+// import's name none, being its file's own, which is the same file in both builds or no shared body's.
+func (reacher *bodyReacher) useReason(
+	entry build_reads.UsedEntry,
+	kinds build_reads.UseKinds,
+) (bodyReachReason, types.Object, string) {
 	if entry.Index != "" {
 		if entry.Object.Pkg() != nil && reacher.bits(entry.Object).Name {
-			return reachedSelected
+			return reachedSelected, entry.Object, "name"
 		}
 		if entry.Receiver != nil && entry.Receiver.Pkg() != nil && reacher.bits(entry.Receiver).Underlying {
-			return reachedSelected
+			return reachedSelected, entry.Receiver, "receiver underlying"
 		}
-		return ""
+		return "", nil, ""
 	}
 	if entry.Object.Pkg() == nil {
-		return ""
+		return "", nil, ""
 	}
 	if _, isImport := entry.Object.(*types.PkgName); isImport {
-		return ""
+		return "", nil, ""
 	}
 	bits := reacher.bits(entry.Object)
 	switch {
 	case kinds&build_reads.UsedNamed != 0 && bits.Name && kinds&build_reads.UsedConstant != 0:
-		return reachedConstant
+		return reachedConstant, entry.Object, "name"
 	case kinds&build_reads.UsedNamed != 0 && bits.Name:
-		return reachedNamed
+		return reachedNamed, entry.Object, "name"
 	case kinds&build_reads.UsedValueType != 0 && (bits.Name || bits.Underlying):
-		return reachedValueType
+		return reachedValueType, entry.Object, writtenBits(bits)
 	case kinds&build_reads.UsedTypeArgument != 0 && (bits.Name || bits.Underlying):
-		return reachedTypeArgument
+		return reachedTypeArgument, entry.Object, writtenBits(bits)
 	}
-	return ""
+	return "", nil, ""
+}
+
+// writtenBits are the bits set of bits, as the census's drivers write them.
+func writtenBits(bits build_dependence.Bits) string {
+	switch {
+	case bits.Name && bits.Underlying:
+		return "name and underlying"
+	case bits.Name:
+		return "name"
+	}
+	return "underlying"
 }
 
 // bits are object's bits in the build: by the build's judgment of the host's graph, or, for an object of a package the
@@ -143,33 +177,33 @@ func (reacher *bodyReacher) bits(object types.Object) build_dependence.Bits {
 	return build_dependence.Bits{Name: name, Underlying: underlying}
 }
 
-// shadowed reports whether any of uses names, by an identifier, an object of the universe or of a package its file
-// imports by a dot, dotImported, whose name shadowing holds, a name a build-only file of own declares at package
-// level, so the name means that file's object in the build rather than the one the host recorded.
+// shadowed is the first name any of uses names, by an identifier, of an object of the universe or of a package its
+// file imports by a dot, dotImported, that shadowing holds, a name a build-only file of own declares at package level,
+// so the name means that file's object in the build rather than the one the host recorded, and whether there is one.
 func shadowed(
 	own *types.Package,
 	record *build_reads.FunctionUses,
 	uses []build_reads.PartUse,
 	shadowing map[string]bool,
 	dotImported []string,
-) bool {
+) (string, bool) {
 	for _, use := range uses {
 		entry := record.Used(use)
 		if entry.Index != "" || !shadowing[entry.Object.Name()] {
 			continue
 		}
 		if entry.Object.Pkg() == nil {
-			return true
+			return "universe." + entry.Object.Name(), true
 		}
 		if _, isImport := entry.Object.(*types.PkgName); isImport {
 			continue
 		}
 		if use.Kinds()&build_reads.UsedNamed != 0 && entry.Object.Pkg() != own &&
 			slices.Contains(dotImported, entry.Object.Pkg().Path()) {
-			return true
+			return entry.Object.Pkg().Path() + "." + entry.Object.Name(), true
 		}
 	}
-	return false
+	return "", false
 }
 
 // declarationName is declaration's name as the census lists it: a method's as its receiver's type and its own, a

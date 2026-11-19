@@ -148,6 +148,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	}
 	runs = append(runs, extraRuns...)
 	engine.writeBodyReachCensus(runs)
+	engine.writeFromSourceRecord(runs)
 	return runs
 }
 
@@ -671,9 +672,19 @@ func (engine *pipeline) extraBuildRun(
 		// The body reach census of the build's last load, and its bodies the reach leaves unreached compared with the
 		// host's, taken before its rules let its syntax and types go, under the census alone. On the build's own
 		// goroutine, before the facts census, so its judgment is asked from one goroutine at a time.
+		if engine.bodyReachFromSourceRecord != "" {
+			run.fromSourceIdentifiers = fromSourceIdentifiers(over)
+		}
 		if engine.bodyReachHost != nil && run.judged != nil {
-			run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence,
-				reachBuiltPackages(over, engine.dependence.files))
+			built := reachBuiltPackages(over, engine.dependence.files)
+			run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence, built)
+			// The same census again over the packages a plain run of the build checks from source, beside the whole.
+			if recorded := engine.recordedFromSource(extra); recorded != nil {
+				run.bodyReachFromSource = engine.bodyReachHost.reach(run.judged.dependence,
+					slices.DeleteFunc(slices.Clone(built), func(read *reachBuiltPackage) bool {
+						return !recorded[read.identifier]
+					}))
+			}
 			if engine.bodyDifferential {
 				run.bodyDifferential = newBuildBodyDifferential(engine.bodyReachHost, over, run.bodyReach)
 			}

@@ -87,4 +87,9 @@ type buildRun struct {
 	// bodyDifferential is an extra build's alone, under the body differential: each body its reach leaves unreached
 	// compared with the host's (build_body_differential.go), nil otherwise.
 	bodyDifferential *buildBodyDifferential
+	// fromSourceIdentifiers and bodyReachFromSource are an extra build's alone: the IDs of the packages its last load
+	// checked from source, under the census's from-source record, and its census over the packages a plain run of it
+	// recorded so, under the census reading that record (pipeline_body_reach_from_source.go), each nil otherwise.
+	fromSourceIdentifiers []string
+	bodyReachFromSource   *buildBodyReach
 }

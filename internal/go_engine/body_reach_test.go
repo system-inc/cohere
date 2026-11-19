@@ -29,11 +29,17 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	test.Parallel()
 
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
+	fromSource := test.TempDir()
+	// A plain run records the packages each build checks from source, which the census then counts apart.
+	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
+		func(engine *pipeline) { engine.bodyReachFromSourceRecord = fromSource }, "--no-cache", "--no-fix",
+		"--other-builds")
 	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
 	on, onStream := runOverConfigured(test, root, exitFindings,
 		func(engine *pipeline) {
 			engine.bodyReachCensus = censusFile
 			engine.bodyDifferential = true
+			engine.bodyReachFromSource = fromSource
 		}, "--no-cache", "--no-fix", "--other-builds",
 		"--build-dependence")
 	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
@@ -50,10 +56,12 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		test.Fatal("windows's run has no census")
 	}
 	got := map[string]string{}
+	drivers := map[string]string{}
 	for _, body := range census.bodies {
 		if body.packageIdentifier != "example.com/reach" {
 			continue
 		}
+		drivers[body.name] = strings.ReplaceAll(body.driver, root+string(filepath.Separator), "")
 		got[body.name] = string(body.reason)
 		if body.reason == "" {
 			got[body.name] = "unreached"
@@ -73,6 +81,29 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	}
 	if !maps.Equal(got, want) {
 		test.Errorf("windows's census judges the host's bodies\n%v\nwant\n%v", got, want)
+	}
+	wantDrivers := map[string]string{
+		"PlatformName": "example.com/reach.platformName (reach_other.go) Named name in the body",
+		"Positive":     "example.com/reach.Number (reach.go) ValueType underlying in the body",
+		"Spinner":      "example.com/reach.Holder (reach.go) Selected receiver underlying in the body",
+		"Size":         "universe.len shadowed in the body",
+		"Configured":   "an unknown identity in the body",
+		"Gadget.Spin":  "",
+		"Joined":       "",
+	}
+	if !maps.Equal(drivers, wantDrivers) {
+		test.Errorf("windows's census says each body is reached first by\n%v\nwant\n%v", drivers, wantDrivers)
+	}
+	recorded, recordError := os.ReadFile(fromSourceRecordFile(fromSource, on.buildRuns[1].build))
+	if recordError != nil || string(recorded) != "example.com/reach\n" {
+		test.Errorf("the plain run recorded windows's from-source packages as %q (%v), want the one package",
+			recorded, recordError)
+	}
+	// The plain run checks the one package from source on windows too, so the census within its record is the whole.
+	within := on.buildRuns[1].bodyReachFromSource
+	if within == nil || within.checkedFromSource != 1 || within.total != census.total ||
+		within.reached != census.reached {
+		test.Errorf("want the census within the plain run's from-source packages the whole, got %+v", within)
 	}
 	if census.total != 7 || census.reached != 5 || census.absent != 1 || census.new != 3 {
 		test.Errorf("want 7 bodies, 5 reached, 1 absent and 3 new, got %d, %d, %d and %d", census.total,
