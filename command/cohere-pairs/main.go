@@ -40,14 +40,15 @@
 // is read, and every build and corpus reads only those copies. The sources are read, never changed, and the commits
 // must be in them: both sides, the compiler each pins, and the corpus pins (corpus_pins.go).
 //
-// Measuring never reaches the network: every go command it starts, both release builds, the standard library tables
-// they generate and each engine run's go list, runs with `GOPROXY=off` and no checksum database
-// (offlineGoEnvironment). So the machine must hold, before it measures, the go each side's go.mod asks for, every
-// toolchain the release's tables are generated under, and the module graph of each side and each corpus; the preflight
-// checks each, and refuses naming what is missing. --prepare, run with the network and the same flags into the same
-// `GOMODCACHE`, puts all of it in the module cache and lists it, one "path version" a line, toolchains included, for an
-// image to be baked from. Go's build cache must be writable, as for any go build. On darwin cohere-release also builds
-// the Swift engine, so a Mac needs Swift, and SwiftPM fetches its packages unless its scratch already holds them.
+// Measuring never reaches the network: every go command it starts, both release builds, the standard library tables a
+// side's release from before #znqfjw2 still generates, and each engine run's go list, runs with `GOPROXY=off` and no
+// checksum database (offlineGoEnvironment). So the machine must hold, before it measures, the go each side's go.mod
+// asks for, every toolchain such a side's tables are generated under (a side after #znqfjw2 needs none), and the module
+// graph of each side and each corpus; the preflight checks each, and refuses naming what is missing. --prepare, run
+// with the network and the same flags into the same `GOMODCACHE`, puts all of it in the module cache and lists it, one
+// "path version" a line, toolchains included, for an image to be baked from. Go's build cache must be writable, as for
+// any go build. On darwin cohere-release also builds the Swift engine, so a Mac needs Swift, and SwiftPM fetches its
+// packages unless its scratch already holds them.
 //
 // --out holds:
 //
@@ -65,8 +66,7 @@
 //	runs.jsonl                    one record per run (runRecord)
 //	table.md                      the table, also printed, written only when every check holds
 //
-// Each side is built as a release is, with the standard library's table in the binary, since a local build computes
-// the standard library on every cold run and measures other work (#ccqee0e).
+// Each side is built as a release is, so each measures the binary that ships (#ccqee0e).
 //
 // Its exit code says which of three things happened:
 //

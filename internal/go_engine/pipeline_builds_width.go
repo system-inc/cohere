@@ -29,12 +29,12 @@ const markPollInterval = time.Millisecond
 // fixedBuildsWidth is how many of the run's extras extra builds run side by side when no heap need be measured for it,
 // and true then, decided once as they start (#b2t9xmf): one at a time when the builds would restore no package from
 // host, the host's run, as a plain run's do (wouldRestoreFromHost), unless hostMostlyHit, the host mostly hit its
-// findings store (hostMostlyHitStore), a test's forced width when it set one, one at a time for the release's
-// standard-library child, and one at a time when no heap could make it more (buildsWidth over the smallest heap). It
-// is false when the width is the memory's to decide: by what the first build holds (measuredBuildsWidth), and in a run
-// that takes the share gate (takesShareGate, shareGate), by the host's live heap when every share is low
-// (hostLiveBuildsWidth). The width never reaches a key or the verdict, only the lint record's buildsAtOnce and the heap
-// it was decided by: the builds' results and notes are taken in one order whatever it is (extraBuildRuns).
+// findings store (hostMostlyHitStore), a test's forced width when it set one, and one at a time when no heap could make
+// it more (buildsWidth over the smallest heap). It is false when the width is the memory's to decide: by what the first
+// build holds (measuredBuildsWidth), and in a run that takes the share gate (takesShareGate, shareGate), by the host's
+// live heap when every share is low (hostLiveBuildsWidth). The width never reaches a key or the verdict, only the lint
+// record's buildsAtOnce and the heap it was decided by: the builds' results and notes are taken in one order whatever
+// it is (extraBuildRuns).
 //
 // Builds that restore nothing each check every package, about what the host's did: two of those side by side under
 // the cap drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
@@ -61,12 +61,6 @@ func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun, hostMo
 	}
 	if engine.buildsWidthForced > 0 {
 		return min(engine.buildsWidthForced, max(extras, 1)), true
-	}
-	// The release's standard-library child collects every entry its sessions save into one map, which each session
-	// writes under a lock of its own, so two builds saving at once would write it together. That child checks no
-	// extra build today; one at a time keeps it safe if it ever does.
-	if engine.request.standardLibrary.collected != nil {
-		return 1, true
 	}
 	// A heap of one byte held by each build is the least any can be, so the widest the builds and the limit allow:
 	// when even that is one at a time, no heap can widen it, and the run pays no collection to measure one.

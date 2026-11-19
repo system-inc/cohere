@@ -22,9 +22,9 @@
 // circle.
 //
 // A kind asks through Ask, which reads the run's store first: answers earlier runs computed, by the package's cache
-// key, and the standard library's, computed whole, from the binary's table. A package the run restored has no syntax
-// here, so a question there that the store cannot answer has the run load the package from source and run again
-// (resolver_store.go, #w7zmvat wave 3).
+// key, and the standard library's from the system cache. A package the run restored has no syntax here, so a question
+// there that the store cannot answer has the run load the package from source and run again (resolver_store.go,
+// #w7zmvat wave 3).
 package fact_resolver
 
 import (

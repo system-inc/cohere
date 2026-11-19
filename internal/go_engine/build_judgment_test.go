@@ -23,7 +23,7 @@ const layoutDependency = "example.com/layout/dependency"
 
 // layoutRestored is the build_dependence layout fixture on darwin, its dependency loaded from source and its workspace
 // checked again against the dependency read from export data, as the host checks its workspace against the standard
-// library it restored from the binary's table: the workspace package, and the dependency.
+// library it restored from the system cache: the workspace package, and the dependency.
 func layoutRestored(test *testing.T) (*packages.Package, *packages.Package) {
 	test.Helper()
 	var environment []string

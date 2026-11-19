@@ -147,13 +147,6 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.write(finding)
 	}
 
-	// A run that collected the standard library's entries for the release's table persists each one's reads beside it
-	// once every type-read walk has ended, so the table carries them and a host restoring a package from it can keep it
-	// for its extra builds (#pcv6eff). A run that collected none never waits for the walks, which a run with no extra
-	// builds otherwise leaves running past its verdict.
-	if engine.session != nil && engine.session.HasCollected() {
-		engine.session.PersistCollectedReads(wholeReads(pass.result))
-	}
 	engine.systemCache.failedAt(engine.session)
 	// Every build has read and written the system cache's store by now, so a trim takes nothing from under a build of
 	// this run. A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it
