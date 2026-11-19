@@ -93,8 +93,19 @@ func dependencePath(directory string) string {
 	return dependencePrefix + directory
 }
 
+// amd64Sizes are the sizes a test's memo measures by, as a build's memo does, so another package's unexported field
+// renders by its properties and the whole twin renders apart.
+var amd64Sizes = types.SizesFor("gc", "amd64")
+
+// measuredReadsBuild is a memo told amd64Sizes.
+func measuredReadsBuild() *ReadsBuild {
+	memo := NewReadsBuild()
+	memo.measureBy(amd64Sizes)
+	return memo
+}
+
 // dependenceWorld is one build of the dependence fixture: its packages by path, and a memo of them, measured by
-// persistedSizes as a build's memo is.
+// amd64Sizes as a build's memo is.
 type dependenceWorld struct {
 	packages map[string]*types.Package
 	memo     *ReadsBuild
@@ -434,8 +445,8 @@ func structField(test *testing.T, walked types.Type, name string) *types.Var {
 	return nil
 }
 
-// Reads the set cannot follow one by one are the whole import closure: persisted reads, reads never recorded or marked
-// never, reads judged by closure alone, and a lookup that reads every type name of the import closure with a method of
+// Reads the set cannot follow one by one are the whole import closure: reads never recorded or marked never, reads
+// judged by closure alone, and a lookup that reads every type name of the import closure with a method of
 // its name, Interface or Method, or one of a kind the set does not know.
 func TestReadsTheSetCannotFollowAreTheWholeClosure(test *testing.T) {
 	test.Parallel()
@@ -451,9 +462,6 @@ func TestReadsTheSetCannotFollowAreTheWholeClosure(test *testing.T) {
 		name      string
 		restoring func(test *testing.T, host dependenceWorld) Restoring
 	}{
-		{"persisted reads", func(test *testing.T, host dependenceWorld) Restoring {
-			return persistedRestoring(test, dependenceRestoring(test, host, "member"), host.memo, ReadsRendererVersion)
-		}},
 		{"reads never recorded", func(*testing.T, dependenceWorld) Restoring {
 			return Restoring{Path: dependencePath("user"), Reads: &build_reads.Reads{}}
 		}},

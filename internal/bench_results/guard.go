@@ -46,11 +46,10 @@ type GuardResult struct {
 //
 // Records of different projects or machines are refused, since their numbers measure different work or different
 // hardware, and so are a record of the whole root and one narrowed to one engine's project (Record.Engine), which
-// measure different work on the same project, a host-only record and an every-build one (Record.EveryBuild), two that
-// checked different builds (Record.Builds), and a local build's record and a release binary's
-// (Record.StandardLibraryTable). A baseline with no quiet cold number, or from a modified engine, is refused too: a
-// baseline is a number someone can reproduce. A tonight with neither is Unmeasured, not an error, because a loaded
-// night is the machine's doing, not the record's, and the guard must still say the night was lost.
+// measure different work on the same project, a host-only record and an every-build one (Record.EveryBuild), and two
+// that checked different builds (Record.Builds). A baseline with no quiet cold number, or from a modified engine, is
+// refused too: a baseline is a number someone can reproduce. A tonight with neither is Unmeasured, not an error,
+// because a loaded night is the machine's doing, not the record's, and the guard must still say the night was lost.
 func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, error) {
 	// A NaN threshold compares false with everything, so every night would pass; refuse it with the negatives.
 	if !(threshold >= 0) {
@@ -91,13 +90,6 @@ func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, err
 			"the baseline checked the builds %s and tonight %s, and runs of different builds are never compared",
 			strings.Join(baseline.Builds, BuildsSeparator),
 			strings.Join(tonight.Builds, BuildsSeparator),
-		)
-	}
-	if (baseline.StandardLibraryTable == nil) != (tonight.StandardLibraryTable == nil) {
-		return GuardResult{}, fmt.Errorf(
-			"the baseline's cohere %s and tonight's %s, and a local build is never compared with a release's",
-			binaryKind(baseline.StandardLibraryTable),
-			binaryKind(tonight.StandardLibraryTable),
 		)
 	}
 	if baseline.Machine.Model != tonight.Machine.Model || baseline.Machine.Cores != tonight.Machine.Cores {
@@ -182,14 +174,6 @@ func buildsKind(everyBuild bool) string {
 		return "every build the Go files name"
 	}
 	return "the host's build alone"
-}
-
-// binaryKind says whether a record's engine carried the standard library's table, for a refusal to name.
-func binaryKind(table *StandardLibraryTable) string {
-	if table == nil {
-		return "carried no standard library table (a local build)"
-	}
-	return "carried release " + table.ReleaseStamp + "'s standard library table"
 }
 
 // checkedScope says what a record with engine checked, for a refusal to name: the whole root, or one

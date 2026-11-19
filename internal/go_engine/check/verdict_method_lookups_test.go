@@ -169,8 +169,7 @@ func askedByNoAny(lookup methodLookupOf) methodLookupOf {
 // the steps marked so hold under the one-bit judgment, and the two kept on the closure judgment, a generic candidate
 // of the subject's shape beside the rule that instantiates it and a receiver embedding a foreign type, decline as it
 // does. Each lookup is abbreviated's for Method and initialism's for Interface unless the step names no_any's, and a
-// step's earlier lookup is another rule's of the same subject. Each step's reads, persisted as an entry persists them,
-// are judged alike.
+// step's earlier lookup is another rule's of the same subject.
 func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 	test.Parallel()
 
@@ -608,17 +607,9 @@ func TestAMethodLookupHoldsUnlessItsRulesBitCouldFlip(test *testing.T) {
 			reads.AddLookup(step.lookup(host))
 			restoring := Restoring{Path: methodUserPath, Imports: []string{methodForeignPath}, Reads: reads}
 			closure := map[string]*types.Package{methodForeignPath: built.foreign}
-			hostMemo := measuredReadsBuild()
-			holds, why := TypesHold(restoring, closure, nil, hostMemo, measuredReadsBuild())
+			holds, why := TypesHold(restoring, closure, nil, measuredReadsBuild(), measuredReadsBuild())
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
-			}
-			// The same reads as an entry persists them are judged alike, by the same judgment (methodLookupHolds).
-			persisted := persistedRestoring(test, restoring, hostMemo, ReadsRendererVersion)
-			persistedHolds, persistedWhy := TypesHold(persisted, closure, nil, hostMemo, measuredReadsBuild())
-			if persistedHolds != holds || persistedWhy != why {
-				test.Errorf("persisted, want %t, %q as in memory, got %t, %q", holds, why, persistedHolds,
-					persistedWhy)
 			}
 		})
 	}

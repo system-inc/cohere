@@ -26,7 +26,7 @@ var unrecordedFiles = map[string]string{
 		"// Twice is twice changes' Size.\nfunc Twice() int { return changes.Size * 2 }\n",
 }
 
-// A package the host kept with no reads a verdict can judge, never recorded or never persisted (unrestorableReads),
+// A package the host kept with no reads a verdict can judge, never recorded or none at all (unrestorableReads),
 // is left untouched by the walk when its whole import closure misses what changed, on the walk's argument for it, not
 // a verdict's: its own inputs are the host's and nothing it could reach changed, so its findings, facts and answers
 // are the host's whatever it read. When its closure meets what changed it is visited, and declined as before, its
@@ -41,7 +41,7 @@ func TestAPackageWithoutReadsIsUntouchedOnlyWhenItsClosureIsClean(test *testing.
 		reason    string
 	}{
 		{"reads never recorded", func(kept *hostEntry) { kept.restoring.Reads = &build_reads.Reads{} }, "readsUnknown"},
-		{"reads never persisted", func(kept *hostEntry) { kept.restoring.Reads = nil }, "readsNotPersisted"},
+		{"no reads", func(kept *hostEntry) { kept.restoring.Reads = nil }, "noReads"},
 	} {
 		test.Run(step.name, func(test *testing.T) {
 			test.Parallel()

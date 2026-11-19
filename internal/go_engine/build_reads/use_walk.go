@@ -855,9 +855,11 @@ func (walk *useWalk) pointedToByValue(pointed types.Type) {
 
 // reachable records each named type of another package a look through a value of type looked can reach, as a use of
 // the type whole: through fields, elements, keys and pointers at any depth, and through the declarations of the
-// package's own named types, as printf's matching and a marshaller's walk go, and never into a function or a channel,
-// which no such look enters. printf looks through a pointer only at the top, but a marshaller follows every one, so
-// every pointer is followed. A named interface of another package is its method set.
+// package's own named types, as printf's matching and a marshaller's walk go, and never into a function's parameters
+// or results, which no such look enters. printf looks through a pointer only at the top, but a marshaller follows
+// every one, so every pointer is followed. A channel's element is entered as a slice's is: staticcheck's SA1003 judges
+// the data given to binary.Write by the element of a channel and then by the element's fields. A named interface of
+// another package is its method set.
 func (walk *useWalk) reachable(looked types.Type) {
 	switch looked := types.Unalias(looked).(type) {
 	case *types.Named:
@@ -889,6 +891,8 @@ func (walk *useWalk) reachable(looked types.Type) {
 	case *types.Array:
 		walk.reachable(looked.Elem())
 	case *types.Slice:
+		walk.reachable(looked.Elem())
+	case *types.Chan:
 		walk.reachable(looked.Elem())
 	case *types.Map:
 		walk.reachable(looked.Key())
