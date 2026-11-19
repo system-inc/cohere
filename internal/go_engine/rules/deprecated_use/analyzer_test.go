@@ -66,9 +66,22 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	parity.RequireIdentical(test, sa1019.Analyzer, Analyzer, analysistest.TestData(), "parity", "parity_older")
 }
 
-// The differences fixture holds the uses whose judgment hangs on the state the walk carries or on the shape of a
-// selector, and records no difference, since there is none, so the test holds that the two agree there.
+// The differences fixture holds the uses whose judgment hangs on the enclosing declaration or on the shape of a
+// selector. The two agree on every one but a package-level variable after a deprecated function or method, whose use
+// the port alone finds (#zvwfe26): after_deprecated.go's, and shapes.go's after a deprecated method and with a function
+// literal for its initializer. shapes.go holds the shapes they agree on beside them: a use inside a deprecated method,
+// a standard library deprecation, the package's own deprecated type, and a group with one spec deprecated. The fixture
+// is a module, whose records the harness reads from its own folder and not from the package below it, so they are
+// given here.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
-	parity.RequireIdentical(test, sa1019.Analyzer, Analyzer, analysistest.TestData(), "differences")
+	const reason = "The original keeps the last function declaration it walked until the next one, so it judges a " +
+		"package-level variable after a deprecated function or method as if inside it and misses the use; the port " +
+		"judges each use by the declaration that holds it."
+	const retired = "finds: example.com/differences/library.RetiredFunction is deprecated: use another."
+	parity.RequireOnlyAdjudicated(test, sa1019.Analyzer, Analyzer, analysistest.TestData(), "differences",
+		parity.Record{File: "differences/uses/after_deprecated.go", Line: 13, Text: retired, Reason: reason},
+		parity.Record{File: "differences/uses/shapes.go", Line: 20, Text: retired, Reason: reason},
+		parity.Record{File: "differences/uses/shapes.go", Line: 27, Text: retired, Reason: reason},
+	)
 }

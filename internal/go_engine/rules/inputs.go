@@ -31,10 +31,12 @@ const (
 	// constraints, and no types, so a file both builds compile gives every build the same findings and only a file one
 	// build alone compiles is judged in that build.
 	InputsFileSyntax Inputs = "FileSyntax"
-	// InputsComposes is a package-wide rule, judging every unit of its package together, whose judgment is a union or a
-	// fixed point over per-unit pieces, as the inventory read each. Until it is rewritten into its per-unit
-	// contribution and package-level judgment, a package with a unit some build judges dependent is checked whole for
-	// it in that build, so it is never judged per declaration on a promise it does not keep.
+	// InputsComposes is a package-wide rule, judging every unit of its package together: one whose judgment is a union
+	// or a fixed point over per-unit pieces, as the inventory read each, or one that judges each unit behind a gate the
+	// whole package decides, as an import or a name in any of its files, which a build's own file can flip for a unit
+	// its difference never reaches (#zvwfe26). Until it is rewritten into its per-unit contribution and package-level
+	// judgment, a package with a unit some build judges dependent is checked whole for it in that build, so it is never
+	// judged per declaration on a promise it does not keep.
 	InputsComposes Inputs = "Composes"
 )
 
