@@ -79,8 +79,8 @@ func checkedFactReachFixture(
 				}
 				declared = receiver.Name + "." + declared
 			}
-			// A place is in the file a //line directive names, at the offset in the file as parsed: a position's Filename
-			// follows the directive, and its Offset never does.
+			// A place is in the file a //line directive names, at the offset in the file as parsed: a position's
+			// Filename follows the directive, and its Offset never does.
 			position := fixture.fileSet.Position(function.Pos())
 			place := fact_reach.Place{File: position.Filename, Offset: position.Offset}
 			fixture.places[declared] = place

@@ -108,6 +108,13 @@ func (state *verdicts) replayUntil(
 	state.replayOf(resolver, home).until(target)
 }
 
+// aboveFloor is whether function's verdict says more than the defaults of its signature, or is not known, since no
+// walk has judged it (OrderBound). The caller holds home's lock.
+func (state *verdicts) aboveFloor(function *types.Func) bool {
+	results, judged := state.results[function]
+	return !judged || interesting(function.Signature(), results)
+}
+
 // whole is the nilness of every function of home whose results say more than the defaults, the push's walk replayed to
 // its end, for the standard library's table, where a function absent holds no fact.
 func whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object][]ValueNilness {

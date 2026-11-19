@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
@@ -110,17 +109,6 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 		hosts[identifier] = sides.packages[identifier].inBuild(standing, len(standing) > 0)
 	}
 	return hosts
-}
-
-// factReachSettle is the analyzer a build settles its standing bodies by for the facts' reach, standing_facts'
-// (check.Options.FactReachSettle), when handsSides says it hands its passes the host's sides, which it does under the
-// body reach census or the body differential alone, whose census and second leg read its results (buildFactReach,
-// buildBodyDifferential.compareStanding), and nil otherwise, so nothing is settled.
-func (engine *pipeline) factReachSettle(handsSides bool) *analysis.Analyzer {
-	if !handsSides {
-		return nil
-	}
-	return standing_facts.Analyzer
 }
 
 // buildFactReach is one build's census of the facts' reach, of its last load: sides, the packages it handed a host's

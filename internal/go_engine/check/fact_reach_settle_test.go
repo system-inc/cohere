@@ -225,8 +225,12 @@ func TestTheFactReachAnalyzerIsRootedOnNoPackageRestoredFromTheHost(test *testin
 	if !slices.Contains(build.FromHost.Restored, throughBasePath) {
 		test.Fatalf("windows restored %q from the host, want %s among them", build.FromHost.Restored, throughBasePath)
 	}
-	for _, settledPath := range build.FactReachSettled {
-		if slices.Contains(build.FromHost.Restored, settledPath.(string)) {
+	for _, settled := range build.FactReachSettled {
+		settledPath, isPath := settled.(string)
+		if !isPath {
+			test.Fatalf("windows settled %v, a %T, want the package's path settlingAnalyzer gives", settled, settled)
+		}
+		if slices.Contains(build.FromHost.Restored, settledPath) {
 			test.Errorf("windows settled %s, which it restored from the host", settledPath)
 		}
 	}

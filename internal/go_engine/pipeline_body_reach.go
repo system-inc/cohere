@@ -7,12 +7,33 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"golang.org/x/tools/go/analysis"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
 
 // bodyReachListed is how many disagreements of each direction the census file lists by name per build: every one
 // stage 2 leaves unreached that the graph calls dependent is listed, being a soundness lead, and this many of the
 // other direction, where stage 2 is wider, which is expected.
 const bodyReachListed = 20
+
+// takesBodyReach is whether the run makes the census's host side as its extra builds start (bodyReachHost): one that
+// judges each build's dependence and asked for the census or the body differential.
+func (engine *pipeline) takesBodyReach() bool {
+	return (engine.bodyReachCensus != "" || engine.bodyDifferential) && engine.dependence != nil
+}
+
+// factReachSettle is the analyzer a build settles its standing bodies by for the facts' reach, standing_facts'
+// (check.Options.FactReachSettle), when handsSides says it hands its passes the host's sides, which it does under the
+// body reach census or the body differential alone, whose census and second leg read its results (buildFactReach,
+// buildBodyDifferential.compareStanding), and nil otherwise, so nothing is settled.
+func (engine *pipeline) factReachSettle(handsSides bool) *analysis.Analyzer {
+	if !handsSides {
+		return nil
+	}
+	return standing_facts.Analyzer
+}
 
 // writeBodyReachCensus writes each extra build's census of runs to the census file, when the run asked for one and
 // judged its builds' dependence, after a line of what the reach does not stand for and one of the host's sides for the

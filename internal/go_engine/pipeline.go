@@ -257,7 +257,7 @@ type pipeline struct {
 	bodyDifferentialCensus func(*buildBodyReach) *buildBodyReach
 
 	// factReachSides are the host's side of each package for the facts' reach, made beside bodyReachHost from what the
-	// host's lint captured of its facts, and nil whenever it is (pipeline_fact_reach.go, #aswfm7a).
+	// host's lint captured of its facts, and nil whenever it is (fact_reach_sides.go, #aswfm7a).
 	factReachSides *factReachSides
 
 	// bodyReachFromSourceRecord is the directory each extra build's from-source packages are recorded into, and

@@ -94,12 +94,6 @@ type bodyReachHost struct {
 	identifiers map[*types.Package]string
 }
 
-// takesBodyReach is whether the run makes the census's host side as its extra builds start (bodyReachHost): one that
-// judges each build's dependence and asked for the census or the body differential.
-func (engine *pipeline) takesBodyReach() bool {
-	return (engine.bodyReachCensus != "" || engine.bodyDifferential) && engine.dependence != nil
-}
-
 // newBodyReachHost is the census's host side from the host's whole reads (wholeReads), its graph and its findings.
 func newBodyReachHost(
 	dependence *hostDependence,
