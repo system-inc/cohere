@@ -8,3 +8,9 @@ func platformHook() {
 	println("hook")
 	lastOrder = orderA()
 }
+
+// platformHold is windows's, which calls orderC back, closing the cycle orderC, box.hold, platformHold.
+func platformHold() {
+	println("hold")
+	orderC()
+}

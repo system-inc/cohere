@@ -56,3 +56,22 @@ func stillTail(depth int) int {
 func StillUser() int {
 	return stillHead(3)
 }
+
+// box holds nothing, and its method hold, a generic type's, is a member of a second cycle windows alone forms: orderC
+// calls box[int]'s hold, through the instantiation, hold calls platformHold, and windows's platformHold calls orderC.
+type box[T any] struct{}
+
+// hold calls platformHold.
+func (box[T]) hold() {
+	platformHold()
+}
+
+// orderC calls hold through box[int], an instantiation, whose method is hold's instance.
+func orderC() {
+	box[int]{}.hold()
+}
+
+// OrderCUser calls orderC.
+func OrderCUser() {
+	orderC()
+}

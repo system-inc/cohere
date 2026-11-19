@@ -1,6 +1,7 @@
 package check
 
 import (
+	"errors"
 	"go/types"
 	"slices"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
+	"honnef.co/go/tools/analysis/facts/deprecated"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
@@ -349,5 +351,50 @@ func TestAnUnsurePackageHasNoCapture(test *testing.T) {
 	capture := captureFactReach(resolver, []*packages.Package{low, high}, nil)
 	if len(capture.Packages) != 0 {
 		test.Errorf("the capture holds %d packages, want none: low restored and high unsure", len(capture.Packages))
+	}
+}
+
+// pushingAnalyzer marks every package-level function of its package with markedFact, and fails after when fails is
+// set, for the capture's pushed facts: name names it. No run holds two, nor one beside markedAnalyzer, since an
+// analyzer may not register a fact type another does.
+func pushingAnalyzer(name string, fails bool) *analysis.Analyzer {
+	return &analysis.Analyzer{
+		Name:      name,
+		Doc:       "marks every package-level function, and may fail after",
+		FactTypes: []analysis.Fact{new(markedFact)},
+		Run: func(pass *analysis.Pass) (any, error) {
+			for _, name := range pass.Pkg.Scope().Names() {
+				if function, isFunction := pass.Pkg.Scope().Lookup(name).(*types.Func); isFunction {
+					pass.ExportObjectFact(function, new(markedFact))
+				}
+			}
+			if fails {
+				return nil, errors.New("marking " + pass.Pkg.Path() + " failed after")
+			}
+			return nil, nil
+		},
+	}
+}
+
+// The capture holds no pushed fact of an action that failed, whose facts no importer could trust, though it exported
+// them before it failed (#5vbs1np): reach's marks by the failing analyzer, one for each of its package-level functions,
+// are not held at all, while the deprecation facts' analyzer, which ran to the end, is held, with none.
+func TestTheCaptureHoldsNoPushedFactOfAFailedAction(test *testing.T) {
+	test.Parallel()
+	analyzed := loadReach(test)
+	failing := pushingAnalyzer("pushing_failed", true)
+	result, runError := Run(analyzed, []rule.Rule{houseRule(reachNilnessAnalyzer), houseRule(deprecated.Analyzer),
+		houseRule(failing)}, Options{FactReach: true})
+	if runError != nil {
+		test.Fatalf("running with the capture: %v", runError)
+	}
+	if result.FactReach == nil {
+		test.Fatal("the run with the capture captured nothing")
+	}
+	reach := capturedOf(test, result.FactReach, analyzed, "example.com/reach/reach")
+	_, isHeld := reach.Pushed[deprecated.Analyzer.Name]
+	if failed, isFailedHeld := reach.Pushed[failing.Name]; !isHeld || isFailedHeld {
+		test.Errorf("reach holds the deprecation facts %t and the failed analyzer's %v, want the first alone", isHeld,
+			failed)
 	}
 }
