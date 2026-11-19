@@ -12,6 +12,10 @@
 # unit_isolation_test.go): scannererr and sqlrowserr judge a package-level variable by its uses in every unit, at
 # PackageExit. SA2002 is PerUnit because it asks the fact resolver which calls of the same-package function a go
 # statement starts stop the test (its test_stopping_calls answers), where testinggoroutine reads that function's body.
+#
+# SA4029 is Composes for a package-wide gate the reach does not carry, which the standing gate modules showed
+# (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26): it judges no assignment unless the
+# package's type index holds one of sort's slice types, which a use in any file puts there.
 
 cohere-go/S1000 PerUnit
 cohere-go/S1001 PerUnit FullKind
@@ -112,7 +116,7 @@ cohere-go/SA4025 PerUnit
 cohere-go/SA4026 PerUnit
 cohere-go/SA4027 PerUnit
 cohere-go/SA4028 PerUnit
-cohere-go/SA4029 PerUnit FullKind
+cohere-go/SA4029 Composes FullKind
 cohere-go/SA4030 PerUnit FullKind
 cohere-go/SA4031 PerUnit
 cohere-go/SA4032 PerUnit
