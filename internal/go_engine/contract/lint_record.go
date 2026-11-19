@@ -180,6 +180,13 @@ type BuildRecord struct {
 	InheritedFiles    int `json:"inheritedFiles,omitempty"`
 	InheritedFindings int `json:"inheritedFindings,omitempty"`
 
+	// StandingDeclarations, additive within contract 3, counts the standing declarations an extra build's confined
+	// rules took the host's findings in, rather than hear those function bodies again, under `COHERE_STANDING_BODIES=1`
+	// on the body reach census's path (#e4rd5dw), and StandingFindings the findings they took there. A declaration is
+	// counted once per file of each package that took it, however many rules did. Each is written only when not 0.
+	StandingDeclarations int `json:"standingDeclarations,omitempty"`
+	StandingFindings     int `json:"standingFindings,omitempty"`
+
 	// LoadMilliseconds is the build's wall time loading the workspace and LintMilliseconds running the rules over it,
 	// every reload's included, so a run can be read build by build. DecideMilliseconds is the time an extra build spent
 	// deciding which packages restore from the host's run, summed across the goroutines that decided, so it can exceed

@@ -464,10 +464,11 @@ func withoutCache(stream string) string {
 // (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source, which
 // are what it did not restore, that count load by load, and at the share gate (#ghb3rcn), and the files and findings
 // an extra build inherited from the host for its syntax-only rules, which only a package it checks from source
-// inherits (#y6q1x2j).
+// inherits (#y6q1x2j), and the standing declarations and findings it took from the host (#e4rd5dw).
 var hostRestoreCounts = regexp.MustCompile(
 	`,"(entriesKept|restoredFromHost|untouched|visited|declinedAtLoad|declinedAtCheck|reloadRounds|writtenThrough|` +
-		`sharedBodyHits|checkedFromSource|checkedFromSourceAtGate|inheritedFiles|inheritedFindings)":[0-9]+|` +
+		`sharedBodyHits|checkedFromSource|checkedFromSourceAtGate|inheritedFiles|inheritedFindings|` +
+		`standingDeclarations|standingFindings)":[0-9]+|` +
 		`,"(declinedBy|reloadRoundsBy)":\{[^}]*\}|,"checkedFromSourceRounds":\[[0-9,]*\]`)
 
 // extraAnalyzedPackages is an extra build's record's count of the packages it analyzed, which its walk's untouched

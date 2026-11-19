@@ -1116,8 +1116,11 @@ from its store, and a run under `--no-cache` write none, and it is absent. `"pac
 its packs, as the cache record's `"packs"` sums them, absent on the host's record. `"inheritedFiles":40` counts the distinct files an extra build took
 the host's findings of at least one syntax-only rule on, rather than walk them again in a package it checked from
 source, since such a rule's findings on a file are the file's alone, and `"inheritedFindings":12` the findings it took,
-each rule's on each file once. Under `--timing` nothing is restored from the host, and nothing inherited, so every
-figure is of work that ran.
+each rule's on each file once. `"standingDeclarations":6` counts the standing declarations an extra build's confined
+rules took the host's findings in, rather than hear those function bodies again, under `COHERE_STANDING_BODIES=1` on
+the body reach census's path, each counted once per file of each package that took it, and `"standingFindings":9` the
+findings they took there, each absent when 0. Under `--timing` nothing is restored from the host, and nothing inherited,
+so every figure is of work that ran.
 
 Each build's record also says where its time went, each figure in wall milliseconds and written only when it is not
 0: `"loadMilliseconds":1200` loading the workspace and `"lintMilliseconds":2400` running the rules, every reload

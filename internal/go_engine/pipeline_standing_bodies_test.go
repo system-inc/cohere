@@ -175,8 +175,9 @@ func TestARuleIsConfinedWhenDispatchedAndDeclaredPerUnitOrFileSyntax(test *testi
 // and on, something stood. With the switch on, windows's build leaves PlantedKept's and PlantedKeptAfter's bodies to
 // the host's findings: the probe, confined, never hears PlantedKept's literal, and so reads PlantedKeptAfter as after
 // one literal where the host read two, and in both declarations reports the host's findings in place of its own,
-// counted as two standing declarations with three findings. PlantedReached, which the difference reaches, is heard
-// and judged in both runs. Off, nothing is confined and every body is heard.
+// counted as two standing declarations with three findings, which windows's build record says. PlantedReached, which
+// the difference reaches, is heard and judged in both runs. Off, nothing is confined, every body is heard, and the
+// record writes no standing count.
 func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 	test.Parallel()
 
@@ -196,14 +197,24 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 		test.Errorf("windows's own findings with the switch on are\n%s\nwant those with it off\n%s",
 			strings.Join(onWindows, "\n"), strings.Join(offWindows, "\n"))
 	}
-	if on.buildRuns[1].standingBodies != 2 || on.buildRuns[1].standingFindings != 3 {
+	if on.buildRuns[1].standingDeclarations != 2 || on.buildRuns[1].standingFindings != 3 {
 		test.Errorf("windows's build took the host's findings in %d standing declarations, %d findings, want 2 and 3",
-			on.buildRuns[1].standingBodies, on.buildRuns[1].standingFindings)
+			on.buildRuns[1].standingDeclarations, on.buildRuns[1].standingFindings)
 	}
-	if !on.standingConfined[standingProbeName] || off.standingConfined != nil || off.buildRuns[1].standingBodies != 0 {
+	if !on.standingConfined[standingProbeName] || off.standingConfined != nil ||
+		off.buildRuns[1].standingDeclarations != 0 {
 		test.Errorf("the probe is confined %t with the switch on, and with it off the run confined %v and windows "+
 			"took %d standing declarations, want the probe confined on and nothing off",
-			on.standingConfined[standingProbeName], off.standingConfined, off.buildRuns[1].standingBodies)
+			on.standingConfined[standingProbeName], off.standingConfined, off.buildRuns[1].standingDeclarations)
+	}
+	// The record says how much stood, and with the switch off writes neither count.
+	onRecord, _ := windowsRecord(test, on, onStream)
+	if onRecord.StandingDeclarations != 2 || onRecord.StandingFindings != 3 {
+		test.Errorf("windows's build record counts %d standing declarations and %d findings, want 2 and 3",
+			onRecord.StandingDeclarations, onRecord.StandingFindings)
+	}
+	if _, offWritten := windowsRecord(test, off, offStream); strings.Contains(offWritten, `"standing`) {
+		test.Errorf("with the switch off windows's build record writes a standing count: %s", offWritten)
 	}
 	kept, reached := `"planted kept"`, `" planted reached"`
 	if offHeard[kept] != 2 || offHeard[reached] != 2 || onHeard[kept] != 1 || onHeard[reached] != 2 {

@@ -864,7 +864,7 @@ func (engine *pipeline) extraBuildRun(
 		engine.buildLoadTimes(extra, loadWall, shareGateWait)
 	}
 	run.inheritedFiles, run.inheritedFindings = inheritance.Counts()
-	run.standingBodies, run.standingFindings = standing.counts()
+	run.standingDeclarations, run.standingFindings = standing.counts()
 	if engine.extraBuildEnds != nil {
 		if endError := engine.extraBuildEnds(extra, notes); endError != nil {
 			return buildRun{}, fmt.Errorf("the build %s: %w", extra, endError)
@@ -961,8 +961,10 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			// An extra build's alone, under `--build-dependence`: nil otherwise, which the record leaves out.
 			Dependence: run.dependence,
 			// An extra build's alone: 0 otherwise, which the record leaves out.
-			InheritedFiles:    run.inheritedFiles,
-			InheritedFindings: run.inheritedFindings,
+			InheritedFiles:       run.inheritedFiles,
+			InheritedFindings:    run.inheritedFindings,
+			StandingDeclarations: run.standingDeclarations,
+			StandingFindings:     run.standingFindings,
 		}
 		recordTimes(&record, run)
 		if run.result != nil {

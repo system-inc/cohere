@@ -729,6 +729,14 @@
                                 "type": "integer",
                                 "description": "The findings this build took from the host's run on the files it inherited, each rule's on each file once. Absent when 0."
                             },
+                            "standingDeclarations": {
+                                "type": "integer",
+                                "description": "The standing declarations this build's confined rules took the host's findings in, rather than hear those function bodies again, under COHERE_STANDING_BODIES=1 on the body reach census's path, each counted once per file of each package that took it. Absent when 0."
+                            },
+                            "standingFindings": {
+                                "type": "integer",
+                                "description": "The findings this build's confined rules took from the host's run in its standing declarations. Absent when 0."
+                            },
                             "loadMilliseconds": {
                                 "type": "integer",
                                 "description": "This build's wall time loading the workspace, every reload included, its wait at the share gate left out. Absent when 0."
