@@ -386,7 +386,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	// for one it holds nothing for (sourceReader).
 	read := engine.sourceReader(nil, nil)
 	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
-		filesDiffer: map[string]bool{}}
+		withoutSyntax: map[string]bool{}, filesDiffer: map[string]bool{}}
 	for identifier, hostFiles := range engine.dependence.files {
 		counterpart, isShared := built[identifier]
 		asVariant := false
@@ -399,10 +399,14 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 			continue
 		}
 		// A package the build restored has its facts' objects from export data, whose positions are no offsets in
-		// its files, so the census leaves it out; one the host restored is keyed through its counterpart in the
-		// standard library's graph (indexHostFacts).
-		if !asVariant && counterpart.TypesInfo != nil {
-			judged.sharedPackages[identifier] = true
+		// its files, so the census leaves it out, and counts what it leaves (withoutSyntax); one the host restored is
+		// keyed through its counterpart in the standard library's graph (indexHostFacts).
+		if !asVariant {
+			if counterpart.TypesInfo != nil {
+				judged.sharedPackages[identifier] = true
+			} else {
+				judged.withoutSyntax[identifier] = true
+			}
 		}
 		builtFiles := counterpart.GoFiles
 		if asVariant {

@@ -298,13 +298,15 @@ func (reacher *bodyReacher) anyLoadModeDiffers() bool {
 // point 5, #9paaen9): object's package is one the host and the build load in different modes, one from export data
 // and the other from source, which expose the same files differently. Export data holds an untyped float as a binary
 // fraction of 512 bits, and a check from source holds it exactly, so goja's math.Sqrt2 / 2 type-checks to two values at
-// cohere's root, where the host reads math from the system cache and every build under `--build-dependence` checks it
-// from source, though no declaration differs. The Square ruled the rule general (#w72zxtq): every use of any object
-// of such a package reaches. With constantsOnly, the census's count of the narrower rule it replaced, only an untyped
-// float or complex constant read by its value does, since an integer, string or boolean constant is written exactly in
-// both and a typed float is rounded to its type in both. A package the host does not hold differs. An object a
-// value spec declared from what the load mode reaches reaches it as well, under either rule (carryLoadMode): the
-// constants-only rule reads the general rule's carried objects, of them the untyped float and complex constants alone.
+// cohere's root wherever the host reads math from the system cache and a build checks it from source, though no
+// declaration differs. A build reads the system cache as the host does, under `--build-dependence` too (#wzre5eg), so
+// the two load the standard library alike but where one of them misses. The Square ruled the rule general (#w72zxtq):
+// every use of any object of such a package reaches. With constantsOnly, the census's count of the narrower rule it
+// replaced, only an untyped float or complex constant read by its value does, since an integer, string or boolean
+// constant is written exactly in both and a typed float is rounded to its type in both. A package the host does not
+// hold differs. An object a value spec declared from what the load mode reaches reaches it as well, under either rule
+// (carryLoadMode): the constants-only rule reads the general rule's carried objects, of them the untyped float and
+// complex constants alone.
 func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_reads.UseKinds) bool {
 	if reacher.constantsOnly {
 		constant, isConstant := object.(*types.Const)

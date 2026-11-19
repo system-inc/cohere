@@ -20,8 +20,8 @@ import (
 
 // A use reaches its body by the load mode (#w72zxtq) when its object's package is one the host and the build load in
 // different modes, one from export data and the other from source: export data holds an untyped float as a 512-bit
-// binary fraction and a check from source holds it exactly, so at cohere's root, where the host reads math from the
-// system cache and a build under `--build-dependence` checks it from source, goja's math.Sqrt2 / 2 type-checks to two
+// binary fraction and a check from source holds it exactly, so at cohere's root, wherever the host reads math from the
+// system cache and a build misses its own there and checks it from source, goja's math.Sqrt2 / 2 type-checks to two
 // values. The Square ruled the rule general: every use of any object of such a package reaches, of any kind, and only
 // a package loaded alike reaches nothing. One the host does not hold has no mode to compare, and reaches, failing
 // wide. The census still counts the narrower rule it
