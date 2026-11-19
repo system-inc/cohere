@@ -1,8 +1,10 @@
 package go_engine
 
 import (
+	"bytes"
 	"cmp"
 	"fmt"
+	"go/types"
 	"maps"
 	"slices"
 	"strings"
@@ -12,10 +14,12 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
 
 // The body differential, stage 2's own soundness machine (#w72zxtq), under `COHERE_BODY_DIFFERENTIAL=1` with
@@ -34,6 +38,15 @@ import (
 // 5's, #xeafx79), all owed to one stage, is classed apart under that stage, counted and listed, and no failure, but
 // only where the build shows that stage's cause for the body (findingCauses): the reach does not stand for them, and
 // the later stage redoes the body only where its cause holds.
+//
+// Its second leg (#adq5ahd) checks what the facts' reach left standing (#aswfm7a), once the build's rules have run:
+// the build lints whole today, so every answer its own run holds is real, and of each body the facts' fixed point left
+// standing, every answer the build holds about the function declared there, or about one of its parameters, must be
+// the host's, byte for byte, and so must the function's no-return fact. An answer the host's side holds none of
+// differs too: the fixed point never asked it, so it must not have let the body stand.
+
+// standingNoReturn is the kind the second leg counts a no-return fact's comparison under.
+const standingNoReturn = "no-return"
 
 // buildBodyDifferential is one build's body differential: how many unreached bodies it compared, each one's failure
 // line where it differed, each findings difference a later stage owns by that stage (findingStage), and the bodies
@@ -43,6 +56,11 @@ type buildBodyDifferential struct {
 	failures []string
 	classed  map[findingStage][]string
 	bodies   []comparedBody
+
+	// standingCompared and standingFailed are the second leg's comparisons and failures by kind, an answer's kind or
+	// standingNoReturn; each failure's line is among failures too.
+	standingCompared map[string]int
+	standingFailed   map[string]int
 }
 
 // findingStage is the later stage of #9paaen9 a rule's findings are owed to, where the reach does not stand for them.
@@ -335,4 +353,140 @@ func findingsByFile(findings []check.Finding) map[string][]check.Finding {
 		byFile[finding.File] = append(byFile[finding.File], finding)
 	}
 	return byFile
+}
+
+// compareStanding is the second leg (see the file's comment) over the build named build: each package settled, by its
+// ID, that the build settled in part, whose host's side sides holds, against what captured, the build's own run's
+// capture of its facts, holds of its functions, found in built, the packages the build's last load checked from source,
+// by ID, whose types outlive its rules. Each side's identities are rendered by a renderer of its own, on the build's
+// goroutine.
+func (differential *buildBodyDifferential) compareStanding(
+	build string,
+	sides *factReachSides,
+	settled map[string]any,
+	captured *check.FactReachCapture,
+	built map[string]*packages.Package,
+) {
+	differential.standingCompared, differential.standingFailed = map[string]int{}, map[string]int{}
+	for _, identifier := range slices.Sorted(maps.Keys(settled)) {
+		packageSettled, isResult := settled[identifier].(*standing_facts.Result)
+		if !isResult || !packageSettled.Partial || packageSettled.Settlement == nil ||
+			len(packageSettled.Settlement.Standing) == 0 {
+			continue
+		}
+		hosted, builtPackage := sides.packages[identifier], built[identifier]
+		capturedPackage := captured.Packages[identifier]
+		if hosted == nil || builtPackage == nil || builtPackage.Types == nil || capturedPackage == nil {
+			differential.standingFailed["capture"]++
+			differential.failures = append(differential.failures, fmt.Sprintf("%s %s: not comparable (host's side "+
+				"%t, built %t, captured %t)", build, identifier, hosted != nil, builtPackage != nil,
+				capturedPackage != nil))
+			continue
+		}
+		differential.compareStandingPackage(build, identifier, hosted, packageSettled.Settlement.Standing,
+			capturedPackage, builtPackage)
+	}
+}
+
+// compareStandingPackage is the second leg over one package, identifier, whose host's side is hosted, whose bodies
+// standing still stand, and whose capture and types in the build are capturedPackage's and builtPackage's.
+func (differential *buildBodyDifferential) compareStandingPackage(
+	build string,
+	identifier string,
+	hosted *factReachPackage,
+	standing map[fact_reach.Place]bool,
+	capturedPackage *check.FactReachPackage,
+	builtPackage *packages.Package,
+) {
+	renderer := build_reads.NewIdentityRenderer(builtPackage.Fset, nil)
+	// The build's functions by key: every function and method its package declares at package level, as a body of the
+	// record is declared, rendered once.
+	functions := map[fact_reach.Object]*types.Func{}
+	keep := func(function *types.Func) {
+		if key, known := factReachObject(renderer.Object(function)); known {
+			functions[key] = function
+		}
+	}
+	scope := builtPackage.Types.Scope()
+	for _, name := range scope.Names() {
+		switch object := scope.Lookup(name).(type) {
+		case *types.Func:
+			keep(object)
+		case *types.TypeName:
+			if named, isNamed := object.Type().(*types.Named); isNamed && !object.IsAlias() {
+				for index := range named.Origin().NumMethods() {
+					keep(named.Origin().Method(index))
+				}
+			}
+		}
+	}
+	answered := map[types.Object][]check.ExportedFact{}
+	for _, answer := range capturedPackage.Answers {
+		answered[answer.Object] = append(answered[answer.Object], answer)
+	}
+	hostFunctions := map[fact_reach.Object]fact_reach.Function{}
+	for _, function := range hosted.Functions() {
+		hostFunctions[function.Object] = function
+	}
+	fail := func(place fact_reach.Place, name string, kind string, host string, built string) {
+		differential.standingFailed[kind]++
+		differential.failures = append(differential.failures, fmt.Sprintf("%s %s %s:%d %s %s: host %s, build %s",
+			build, identifier, place.File, place.Offset, name, kind, host, built))
+	}
+	for _, place := range slices.SortedFunc(maps.Keys(standing), func(first, second fact_reach.Place) int {
+		return cmp.Or(cmp.Compare(first.File, second.File), cmp.Compare(first.Offset, second.Offset))
+	}) {
+		for _, key := range hosted.declared[place] {
+			function := functions[key]
+			differential.standingCompared[standingNoReturn]++
+			hostFunction, isHosted := hostFunctions[key]
+			if function == nil {
+				// The build declares no function the key names, so nothing of it can be compared, which is a failure.
+				hostNoReturn := "none"
+				if isHosted {
+					hostNoReturn = fmt.Sprint(hostFunction.NoReturn)
+				}
+				fail(place, hostFunction.Identity.String(), standingNoReturn, hostNoReturn, "none")
+				continue
+			}
+			name := standingName(function)
+			switch {
+			case !isHosted:
+				fail(place, name, standingNoReturn, "none", fmt.Sprint(capturedPackage.NoReturn(function)))
+			case hostFunction.NoReturn != capturedPackage.NoReturn(function):
+				fail(place, name, standingNoReturn, fmt.Sprint(hostFunction.NoReturn),
+					fmt.Sprint(capturedPackage.NoReturn(function)))
+			}
+			// The answers about the function, then about each of its parameters, as fact_reach asks them.
+			objects := []types.Object{function}
+			for index := range function.Signature().Params().Len() {
+				objects = append(objects, function.Signature().Params().At(index))
+			}
+			for parameter, object := range objects {
+				for _, answer := range answered[object] {
+					differential.standingCompared[answer.Analyzer]++
+					question := factReachQuestion(answer.Analyzer, key, parameter-1)
+					answeredName := name
+					if parameter > 0 {
+						answeredName = fmt.Sprintf("%s parameter %d", name, parameter-1)
+					}
+					asking, isAsked := hosted.Asking(question.Key)
+					switch {
+					case !isAsked:
+						fail(place, answeredName, answer.Analyzer, "none", string(answer.Encoded))
+					case !bytes.Equal(asking.Encoded, answer.Encoded):
+						fail(place, answeredName, answer.Analyzer, string(asking.Encoded), string(answer.Encoded))
+					}
+				}
+			}
+		}
+	}
+}
+
+// standingName is how the second leg names function: its name, after its receiver's type's for a method.
+func standingName(function *types.Func) string {
+	if receiver := function.Signature().Recv(); receiver != nil {
+		return types.TypeString(receiver.Type(), func(*types.Package) string { return "" }) + "." + function.Name()
+	}
+	return function.Name()
 }

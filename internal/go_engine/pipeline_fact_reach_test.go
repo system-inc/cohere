@@ -157,3 +157,45 @@ func TestAWarmRunGivesARestoredPackageNoSideForTheFactsReach(test *testing.T) {
 			warm.factReachSides.packages, warm.factReachSides.uncaptured)
 	}
 }
+
+// Under the body reach census and the body differential, the differential's second leg checks what the facts' reach
+// left standing on windows in the standing-facts fixture (#adq5ahd). Wrapped calls value, which each platform's file
+// declares, so the reach lints it; its nil-ness differs, so Outer, its user, leaves, and Outer's differs in turn, so
+// OuterFailed leaves too. What stands, Stable, StableFailed and stableError.Error, has every answer the build's own run
+// holds about it the host's: Stable's nil-ness, asked where StableFailed compares its error with nil, and the three
+// no-return facts. Nothing differs, so the leg has no failure.
+func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
+	test.Parallel()
+
+	censusFile := filepath.Join(test.TempDir(), "reach.txt")
+	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "standing-facts")), exitFindings,
+		func(engine *pipeline) {
+			engine.bodyReachCensus = censusFile
+			engine.bodyDifferential = true
+		}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+
+	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
+		test.Fatalf("want windows's body differential, got %d runs", len(on.buildRuns))
+	}
+	differential := on.buildRuns[1].bodyDifferential
+	wantCompared := map[string]int{standingNoReturn: 3, "return_nil_ness": 1}
+	if !maps.Equal(differential.standingCompared, wantCompared) || len(differential.standingFailed) > 0 ||
+		len(differential.failures) > 0 {
+		test.Errorf("windows's second leg compared %v and failed %v, with the failures\n%s\nwant %v compared and "+
+			"none failed", differential.standingCompared, differential.standingFailed,
+			strings.Join(differential.failures, "\n"), wantCompared)
+	}
+	written, readError := os.ReadFile(censusFile)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	for _, line := range []string{
+		"  fact reach: sides 1, settled 1, crashed 0",
+		"    answers asked 3, differing return_nil_ness 2, unknown return_nil_ness 1; bodies taken out 2",
+		"  standing facts: compared no-return 3, return_nil_ness 1; failures none",
+	} {
+		if !slices.Contains(strings.Split(string(written), "\n"), line) {
+			test.Errorf("the census file has no line %q:\n%s", line, written)
+		}
+	}
+}

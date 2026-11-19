@@ -81,6 +81,11 @@ type factReachPackage struct {
 	// orderBound are the objects whose answers hang on the order the host walked the package in, each named for that.
 	orderBound []fact_reach.Named
 
+	// declared are, by a body's place, the keys of the functions declared there, which the body differential's second
+	// leg finds the build's own functions of a standing body by (build_body_differential.go). A cgo package may declare
+	// two at one place.
+	declared map[fact_reach.Place][]fact_reach.Object
+
 	// unplaced counts what the package's side could not name, each a comparison a build would never make. An answer
 	// no body could take: one about the package, a function no declaration of the record declares or one no identity
 	// names. A body the file set places in no file, whose answers and uses have nowhere to rest. An order-bound

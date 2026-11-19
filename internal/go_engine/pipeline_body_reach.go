@@ -61,6 +61,10 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		}
 		fmt.Fprintf(&written, "  body differential: compared %d, failures %d\n", run.bodyDifferential.compared,
 			len(run.bodyDifferential.failures))
+		if run.bodyDifferential.standingCompared != nil {
+			fmt.Fprintf(&written, "  standing facts: compared %s; failures %s\n",
+				byKind(run.bodyDifferential.standingCompared), byKind(run.bodyDifferential.standingFailed))
+		}
 		for _, failure := range run.bodyDifferential.failures {
 			fmt.Fprintf(&written, "    %s\n", failure)
 			engine.note("the body differential of the build %s: %s", run.build, failure)

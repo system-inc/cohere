@@ -71,7 +71,8 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 	builder := &factReachBuilder{
 		inputs: inputs,
 		hosted: &factReachPackage{users: map[fact_reach.Object][]fact_reach.Place{},
-			recorded: map[fact_reach.Place][]fact_reach.Question{}, askings: map[string]fact_reach.Asking{}},
+			recorded: map[fact_reach.Place][]fact_reach.Question{}, askings: map[string]fact_reach.Asking{},
+			declared: map[fact_reach.Place][]fact_reach.Object{}},
 		rendered: map[types.Object]factReachRendered{}, functions: map[*types.Func]factReachFunction{},
 		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
 		met: map[fact_reach.Object]bool{},
@@ -156,9 +157,9 @@ func (builder *factReachBuilder) meet(function *types.Func) {
 		Identity: rendered.identity, NoReturn: builder.inputs.noReturn(function)})
 }
 
-// declare keeps each function declared declares, by its object, with the place of its body, and its parameters, and
-// meets each declared with a body. An init function and one named `_` declare no object, and no answer or fact is
-// about either.
+// declare keeps each function declared declares, by its object, with the place of its body, and its parameters,
+// meets each declared with a body, and keeps the key of each placed one under its place. An init function and one
+// named `_` declare no object, and no answer or fact is about either.
 func (builder *factReachBuilder) declare(
 	declared build_reads.DeclarationUses,
 	place fact_reach.Place,
@@ -173,6 +174,9 @@ func (builder *factReachBuilder) declare(
 		builder.keepParameters(function)
 		if declared.HasBody {
 			builder.meet(function)
+		}
+		if rendered := builder.render(function); isPlaced && rendered.known {
+			builder.hosted.declared[place] = append(builder.hosted.declared[place], rendered.key)
 		}
 	}
 }

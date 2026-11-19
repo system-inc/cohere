@@ -737,8 +737,10 @@ func (engine *pipeline) extraBuildRun(
 			ExportFacts: engine.dependence != nil,
 			Inheritance: inherits,
 			FactHosts:   factHosts,
-			// Under the census, the standing bodies each pass's side leaves are settled, for the census to count.
+			// The standing bodies each pass's side leaves are settled, for the census to count, and under the body
+			// differential the build's own facts are captured, for its second leg to compare those left standing by.
 			FactReachSettle: engine.factReachSettle(factHosts != nil),
+			FactReach:       engine.bodyDifferential && factHosts != nil,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -814,12 +816,22 @@ func (engine *pipeline) extraBuildRun(
 		}
 	}
 	// The findings of each body the differential compared, the last load's, whose result stands, a difference classed
-	// under a later stage only where the judgment shows its cause (findingCauses). A differential is made only of a
-	// judged build (runRules).
+	// under a later stage only where the judgment shows its cause (findingCauses), and its second leg, over the facts
+	// of each body the facts' reach left standing, whose capture goes once it is read: its no-return predicates hold
+	// the build's resolver's packages. A differential is made only of a judged build (runRules).
 	if run.bodyDifferential != nil {
 		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings),
 			findingStagesOf(enabled), &findingCauses{dependence: run.judged.dependence,
 				filesDiffer: run.judged.filesDiffer})
+		if result.FactReach != nil && result.FactReachSettled != nil {
+			built := make(map[string]*packages.Package, len(loaded.Packages))
+			for _, each := range loaded.Packages {
+				built[each.ID] = each
+			}
+			run.bodyDifferential.compareStanding(extra.String(), engine.factReachSides, result.FactReachSettled,
+				result.FactReach, built)
+		}
+		result.FactReach = nil
 	}
 	run.loading, run.linting, run.shareGateWait = loading, linting, shareGateWait
 	if engine.buildLoadTimes != nil {

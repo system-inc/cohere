@@ -113,10 +113,11 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 }
 
 // factReachSettle is the analyzer a build settles its standing bodies by for the facts' reach, standing_facts'
-// (check.Options.FactReachSettle), when handsSides says it hands its passes the host's sides, under the census alone,
-// whose counts are what read its results (buildFactReach), and nil otherwise, so nothing is settled.
+// (check.Options.FactReachSettle), when handsSides says it hands its passes the host's sides, which it does under the
+// body reach census or the body differential alone, whose census and second leg read its results (buildFactReach,
+// buildBodyDifferential.compareStanding), and nil otherwise, so nothing is settled.
 func (engine *pipeline) factReachSettle(handsSides bool) *analysis.Analyzer {
-	if !handsSides || engine.bodyReachCensus == "" {
+	if !handsSides {
 		return nil
 	}
 	return standing_facts.Analyzer
