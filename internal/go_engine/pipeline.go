@@ -260,6 +260,10 @@ type pipeline struct {
 	// host's lint captured of its facts, and nil whenever it is (fact_reach_sides.go, #aswfm7a).
 	factReachSides *factReachSides
 
+	// standingBodies is whether an extra build on the census path leaves the bodies that stand to the host's findings,
+	// from `COHERE_STANDING_BODIES=1`, off by default (pipeline_standing_bodies.go, #e4rd5dw).
+	standingBodies bool
+
 	// bodyReachFromSourceRecord is the directory each extra build's from-source packages are recorded into, and
 	// bodyReachFromSource the one the census reads them back from, each empty unless asked
 	// (pipeline_body_reach_from_source.go).
