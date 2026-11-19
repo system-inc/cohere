@@ -722,7 +722,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(test *testing.T) {
 			test.Errorf("group %v did not compile", testCase.group)
 			continue
 		}
-		if got := matcher.Ignores(testCase.source); got != testCase.wantIgnores {
+		if got := matcher.Ignores(testCase.source, nil); got != testCase.wantIgnores {
 			test.Errorf("group %v (caseSensitive %v) against %q: got %v, want %v",
 				testCase.group, testCase.caseSensitive, testCase.source, got, testCase.wantIgnores)
 		}

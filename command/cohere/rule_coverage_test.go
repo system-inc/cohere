@@ -795,6 +795,54 @@ func TestCoverageNamesWhatRulesSkipped(test *testing.T) {
 	}
 }
 
+// A pattern a rule noted as running out of time is the run's gap: named by file, rule and pattern in the account,
+// counted in the footer and carried in --json's gaps, never read as a clean answer. A rule's other notes on the same
+// file stay notes (#s4dy4e0).
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
+func TestAPatternThatTimedOutIsNamedAsAGap(test *testing.T) {
+	previous := activeRunCache
+	defer func() { activeRunCache = previous }()
+	activeRunCache = &runCacheSession{}
+	ruleName := "no-restricted-exports"
+	timedOut := rule.PatternTimedOutNotePrefix + "/(a|aa)+$/u"
+	result := program.Result{
+		Coverage: program.Coverage{
+			RulesOffered:   map[string]int{ruleName: 2},
+			RulesListening: map[string]int{ruleName: 2},
+		},
+		Notes: map[string]program.RuleNotes{
+			"/project/b.ts": {ruleName: {timedOut: 2}},
+			"/project/a.ts": {ruleName: {timedOut: 1, "an exemption": 1}},
+		},
+	}
+	rules := rule_testing.EntriesOf(test, rule.Rule[rule.NoOptions]{Name: ruleName})
+
+	output := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s"})
+	requireLines(test, output,
+		"  pattern timed out: /project/a.ts: no-restricted-exports's /(a|aa)+$/u ran past 10s 1 time, "+
+			"so the rule acted on a stand-in for its answer\n"+
+			"  pattern timed out: /project/b.ts: no-restricted-exports's /(a|aa)+$/u ran past 10s 2 times, "+
+			"so the rule acted on a stand-in for its answer\n",
+	)
+	want := []patternTimeout{
+		{Rule: ruleName, Pattern: "/(a|aa)+$/u", Path: "/project/a.ts", Count: 1},
+		{Rule: ruleName, Pattern: "/(a|aa)+$/u", Path: "/project/b.ts", Count: 2},
+	}
+	if !slices.Equal(activeSummary.Gaps.PatternTimeouts, want) {
+		test.Errorf("the gap holds %v, want %v", activeSummary.Gaps.PatternTimeouts, want)
+	}
+	if markers := uncheckedMarkers(runSummary{Gaps: activeSummary.Gaps}); !slices.Contains(
+		markers,
+		"⚠ 2 patterns timed out",
+	) {
+		test.Errorf("the footer's markers are %v", markers)
+	}
+	// Never replayed: the stand-in is one run's accident, not the tree's verdict.
+	if activeRunCache.declined != "a pattern ran out of time" {
+		test.Errorf("the run cache was declined for %q, want the pattern timeout", activeRunCache.declined)
+	}
+}
+
 // A rule that skipped some of the files it was offered and registered nothing on the rest gave no reason
 // for the rest, so it still prints as having checked nothing there
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary

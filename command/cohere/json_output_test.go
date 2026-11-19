@@ -144,6 +144,10 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 			summary.Properties["swift"].Properties["sdkIndexSeed"],
 			sdkIndexSeedUse{},
 		},
+		"summary.gaps.patternTimeouts": {
+			*summary.Properties["gaps"].Properties["patternTimeouts"].Items,
+			patternTimeout{},
+		},
 		"summary.gaps.withheldInDependencyCgo": {
 			*summary.Properties["gaps"].Properties["withheldInDependencyCgo"].Items,
 			withheldCgoFile{},

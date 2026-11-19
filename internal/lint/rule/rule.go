@@ -338,6 +338,10 @@ const CoverTypeCheck Cover = "types"
 // CoveredSkipNotePrefix opens the key of every note SkipCovered records: the cover, then the reason.
 const CoveredSkipNotePrefix = "skipped, covered by "
 
+// PatternTimedOutNotePrefix opens the key of every note PatternTimedOut records, the pattern after it as
+// JavaScript writes it, which is how a run tells a pattern that ran out of time apart from the facts a rule counts.
+const PatternTimedOutNotePrefix = "pattern timed out: "
+
 // TokenRange is a node's own text, without the trivia that precedes it.
 //
 // This distinction is the single sharpest edge in the fix API, and getting it wrong produces damage

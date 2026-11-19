@@ -178,8 +178,9 @@ func defaultCaseHasExcusingComment(
 		return false
 	}
 
-	// A match that overruns the time bound excuses too: no answer here is a report.
-	return pattern.TestOrTimeout(defaultCaseCommentBody(lastComment))
+	// A match that overruns the time bound excuses too: no answer here is a report. The run names the
+	// overrun as a gap.
+	return pattern.TestOrTimeout(defaultCaseCommentBody(lastComment), ruleContext.PatternTimedOut)
 }
 
 // defaultCaseCommentBody strips a comment's delimiters and trims it, matching upstream's

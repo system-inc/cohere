@@ -3,8 +3,12 @@ package regexp
 import (
 	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/dlclark/regexp2/v2"
 )
 
 // Every expectation below is what `new RegExp(source, flags).test(subject)`
@@ -216,7 +220,7 @@ func TestTest(test *testing.T) {
 			if compileError != nil {
 				test.Fatalf("Compile(%q, %q) = %v", testCase.source, testCase.flags, compileError)
 			}
-			if got := re.Test(testCase.subject); got != testCase.want {
+			if got := re.Test(testCase.subject, nil); got != testCase.want {
 				test.Errorf(
 					"/%s/%s.test(%q) = %v, want %v",
 					testCase.source,
@@ -326,30 +330,88 @@ func TestMatchingIsBounded(test *testing.T) {
 	}
 }
 
-// TestOrTimeoutFailsOpen covers the answer a caller wants where a no is what
-// produces a report. The bound is pulled in rather than waited out, so the
-// pathological pattern stops at the first check rather than costing a core for
-// a second.
-func TestTestOrTimeoutFailsOpen(test *testing.T) {
+// TestOverrunIsNamedEitherWay covers the answer each caller wants when a match
+// overruns, and that the overrun is told either way. The bound is pulled in
+// rather than waited out, so the pathological pattern stops at regexp2's first
+// tick rather than costing a core for MatchTimeout.
+func TestOverrunIsNamedEitherWay(test *testing.T) {
 	test.Parallel()
 	re := MustCompile(`^(?:(a+)+b|a+)$`, "")
 	re.Unwrap().MatchTimeout = time.Nanosecond
 	subject := strings.Repeat("a", 200)
 
-	if re.Test(subject) {
-		test.Fatal("the match settled inside the bound, so there is nothing to fail open on")
+	var overran []string
+	overrun := func(pattern string) { overran = append(overran, pattern) }
+
+	if re.Test(subject, overrun) {
+		test.Error("Test read a bound match as a match, which is a restricting pattern reporting what it never matched")
 	}
-	if !re.TestOrTimeout(subject) {
+	if !re.TestOrTimeout(subject, overrun) {
 		test.Error(
 			"TestOrTimeout read a bound match as no match, which is what turns a skipped report into a false positive",
 		)
+	}
+	if want := []string{re.String(), re.String()}; strings.Join(overran, ",") != strings.Join(want, ",") {
+		test.Errorf("overrun was told %q, want the pattern once for each overrun, %q", overran, want)
+	}
+}
+
+// TestAStaleClockIsNoOverrun covers regexp2's clock restarting after it went
+// idle (dlclark/regexp2#117): a burst of callers races to restart it, and one
+// that read the clock before the idle spell keeps a deadline already past, so
+// `Base` against `XBaseY` timed out on its first step. Measured on v2.5.2 over
+// twenty rounds of 128 callers, regexp2 alone timed out 2 of 1,280 such matches,
+// and 7 under -race; through TestOrError none did, the slowest settling in
+// 0.8 ms. So no round here may time out.
+//
+// Not parallel: stopping regexp2's clock is process-wide, and a test beside it
+// reading regexp2 directly would meet the stale clock this sets up. A test that
+// is not parallel runs before the package's parallel ones are let go.
+func TestAStaleClockIsNoOverrun(test *testing.T) {
+	re := MustCompile("Base", "u")
+	// Short enough that a clock idle for the sleep below hands a deadline already past, since regexp2 adds its
+	// tick of a tenth of a second to the bound, and over a thousand times what the match was measured to take.
+	re.Unwrap().MatchTimeout = time.Second
+	var overran atomic.Int64
+	for range 2 {
+		regexp2.StopTimeoutClock()
+		time.Sleep(1200 * time.Millisecond)
+		var group sync.WaitGroup
+		start := make(chan struct{})
+		for range 128 {
+			group.Go(func() {
+				<-start
+				if _, testOrError := re.TestOrError("XBaseY"); testOrError != nil {
+					overran.Add(1)
+				}
+			})
+		}
+		close(start)
+		group.Wait()
+	}
+	if overran.Load() > 0 {
+		test.Errorf("%d matches of /Base/u against XBaseY were read as overrunning off a stale clock", overran.Load())
+	}
+}
+
+// TestASettledMatchIsNoOverrun covers the other side: a pattern that settles is
+// never named, whichever answer stands in for an overrun.
+func TestASettledMatchIsNoOverrun(test *testing.T) {
+	test.Parallel()
+	re := MustCompile("Base", "u")
+	overrun := func(pattern string) { test.Errorf("%s was named as overrunning on a match that settled", pattern) }
+	if !re.Test("XBaseY", overrun) || !re.TestOrTimeout("XBaseY", overrun) {
+		test.Error("/Base/u did not match XBaseY")
+	}
+	if re.Test("Derived", overrun) || re.TestOrTimeout("Derived", overrun) {
+		test.Error("/Base/u matched Derived")
 	}
 }
 
 func TestNilIsSafe(test *testing.T) {
 	test.Parallel()
 	var re *RegExp
-	if re.Test("anything") {
+	if re.Test("anything", nil) {
 		test.Error("a nil RegExp matched")
 	}
 	if re.Unwrap() != nil {

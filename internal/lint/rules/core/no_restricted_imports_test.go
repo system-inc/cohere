@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -429,5 +431,54 @@ func TestNoRestrictedImportsRendersTheWholeMessage(test *testing.T) {
 				test.Errorf("%s: message %q does not contain %q", testCase.name, rendered, want)
 			}
 		}
+	}
+}
+
+// TestNoRestrictedImportsRestrictingPatternTimeoutIsAGap is a restricting `regex` overrunning the time bound: a
+// match would report, so the overrun reads as the answer that reports nothing, and it is noted as the run's gap,
+// never as a clean answer. The control is the same pattern settling on a specifier it restricts, which matches and
+// notes nothing. The checker is built as the rule builds it per file, so the bound can be pulled in on the compiled
+// pattern and the pathological one stops at regexp2's first tick (#s4dy4e0).
+func TestNoRestrictedImportsRestrictingPatternTimeoutIsAGap(test *testing.T) {
+	test.Parallel()
+	const pathological = `^(?:(a+)+b|a+)$`
+	cases := []struct {
+		name       string
+		specifier  string
+		bound      time.Duration
+		wantMatch  bool
+		wantGapped int
+	}{
+		{"a specifier it timed out on", strings.Repeat("a", 200), time.Nanosecond, false, 1},
+		{"a specifier it settles on and restricts", "aaab", 0, true, 0},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			notes := map[string]int{}
+			ruleContext := rule.Context{RecordNote: func(key string) { notes[key]++ }}
+			checker, compiled := newNoRestrictedImportsChecker(ruleContext, NoRestrictedImportsOptions{
+				Patterns: []NoRestrictedImportsPattern{{Regex: pathological, CaseSensitive: true}},
+			})
+			if !compiled {
+				test.Fatal("the pattern did not compile")
+			}
+			if testCase.bound > 0 {
+				checker.patterns[0].regularExpression.Unwrap().MatchTimeout = testCase.bound
+			}
+			if got := checker.patternMatches(checker.patterns[0], testCase.specifier); got != testCase.wantMatch {
+				test.Errorf("patternMatches = %t, want %t", got, testCase.wantMatch)
+			}
+			timedOut := rule.PatternTimedOutNotePrefix + "/" + pathological + "/u"
+			if notes[timedOut] != testCase.wantGapped {
+				test.Errorf(
+					"noted %q %d times, want %d; every note: %v",
+					timedOut,
+					notes[timedOut],
+					testCase.wantGapped,
+					notes,
+				)
+			}
+		})
 	}
 }

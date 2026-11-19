@@ -414,6 +414,7 @@ func runTypedFiles(
 	bound, captured := bindAt(directory)
 
 	var diagnostics []rule.Diagnostic
+	notes := map[string]int{}
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
 		Program:     rule.ViewProgram(graph.Program, sourceFile, bound.Traits),
@@ -426,6 +427,7 @@ func runTypedFiles(
 			}
 			diagnostics = append(diagnostics, diagnostic)
 		},
+		RecordNote: func(key string) { notes[key]++ },
 	}
 
 	listeners := bound.Run(ruleContext)
@@ -437,6 +439,7 @@ func runTypedFiles(
 	return Result{
 		Diagnostics: diagnostics,
 		SourceFile:  sourceFile,
+		Notes:       notes,
 		capture:     captured,
 	}
 }

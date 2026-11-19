@@ -190,7 +190,7 @@ var NoRequireImports = rule.Rule[NoRequireImportsOptions]{
 				// while relaxing this test to `>= 0` fails none.
 				if len(settings.Allow) > 0 && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
 					if path, isStatic := requiredPathForAllow(ruleContext, call.Arguments.Nodes[0]); isStatic {
-						if matchesAnyAllowPattern(settings.Allow, path) {
+						if matchesAnyAllowPattern(settings.Allow, path, ruleContext.PatternTimedOut) {
 							return
 						}
 					}
@@ -225,8 +225,11 @@ var NoRequireImports = rule.Rule[NoRequireImportsOptions]{
 
 				expression := node.AsExternalModuleReference().Expression
 				if expression != nil && expression.Kind == ast.KindStringLiteral {
-					if len(settings.Allow) > 0 &&
-						matchesAnyAllowPattern(settings.Allow, expression.AsStringLiteral().Text) {
+					if len(settings.Allow) > 0 && matchesAnyAllowPattern(
+						settings.Allow,
+						expression.AsStringLiteral().Text,
+						ruleContext.PatternTimedOut,
+					) {
 						return
 					}
 				}
@@ -347,10 +350,10 @@ func requiredPathForAllow(ruleContext rule.Context, argument *ast.Node) (string,
 
 // matchesAnyAllowPattern reports whether a path matches any configured allow pattern. A match that
 // overruns the time bound allows the path too: a match here silences a report, so no answer would be
-// a report (#7mztrdd).
-func matchesAnyAllowPattern(allow []*esregexp.RegExp, path string) bool {
+// a report (#7mztrdd). Overrun is told of each overrun, so the run names it as a gap.
+func matchesAnyAllowPattern(allow []*esregexp.RegExp, path string, overrun esregexp.Overrun) bool {
 	for _, pattern := range allow {
-		if pattern.TestOrTimeout(path) {
+		if pattern.TestOrTimeout(path, overrun) {
 			return true
 		}
 	}

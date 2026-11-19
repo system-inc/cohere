@@ -175,7 +175,10 @@ func checkEmptyInterface(ruleContext rule.Context, settings NoEmptyObjectTypeOpt
 	if name == nil {
 		return
 	}
-	if settings.allowWithNameTester != nil && settings.allowWithNameTester.Test(name.Text()) {
+	// An allow pattern: a match that overruns the time bound allows too, since no answer here is a report, and the
+	// run names the overrun as a gap.
+	if settings.allowWithNameTester != nil &&
+		settings.allowWithNameTester.TestOrTimeout(name.Text(), ruleContext.PatternTimedOut) {
 		return
 	}
 	if declaration.Members != nil && len(declaration.Members.Nodes) != 0 {
@@ -337,7 +340,7 @@ func checkEmptyTypeLiteral(ruleContext rule.Context, settings NoEmptyObjectTypeO
 		return
 	}
 	if settings.allowWithNameTester != nil && parent != nil && parent.Kind == ast.KindTypeAliasDeclaration &&
-		settings.allowWithNameTester.Test(parent.Name().Text()) {
+		settings.allowWithNameTester.TestOrTimeout(parent.Name().Text(), ruleContext.PatternTimedOut) {
 		return
 	}
 

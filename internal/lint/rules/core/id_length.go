@@ -220,8 +220,9 @@ func checkIdLengthName(ruleContext rule.Context, node *ast.Node, settings IdLeng
 		return
 	}
 	for _, pattern := range settings.ExceptionPatterns {
-		// A match that overruns the time bound exempts too: no answer here is a report.
-		if pattern.TestOrTimeout(name) {
+		// A match that overruns the time bound exempts too: no answer here is a report. The run names the
+		// overrun as a gap.
+		if pattern.TestOrTimeout(name, ruleContext.PatternTimedOut) {
 			return
 		}
 	}

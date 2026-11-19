@@ -1047,6 +1047,31 @@
                             "items": { "type": "string" },
                             "description": "Files whose text changed between the fix phase's walk and its fix, under another agent or an editor's save. The walk's fixes for each were refused, since their offsets point into bytes the file no longer holds, and asked for again against the text it holds; its findings describe the text the walk read. The run is incomplete, and is never replayed. Absent when there are none."
                         },
+                        "patternTimeouts": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["rule", "pattern", "path", "count"],
+                                "properties": {
+                                    "rule": {
+                                        "type": "string",
+                                        "description": "The rule that was handed the pattern."
+                                    },
+                                    "pattern": {
+                                        "type": "string",
+                                        "description": "The pattern as JavaScript writes it, `/source/flags`."
+                                    },
+                                    "path": { "type": "string", "description": "The file it ran out of time in." },
+                                    "count": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "description": "How many of the rule's questions in the file it left unanswered."
+                                    }
+                                }
+                            },
+                            "description": "Each regular expression a rule was handed, by its options or by the source under lint, that ran past its time bound in a file, sorted by file, rule and pattern. The rule acted on a stand-in for the pattern's answer there: an allow pattern's overrun allowed, a restricting pattern's reported nothing, so a finding may be missing. The run is incomplete. Absent when there are none."
+                        },
                         "withheldInDependencyCgo": {
                             "type": "array",
                             "items": {

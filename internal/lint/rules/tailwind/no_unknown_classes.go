@@ -116,7 +116,8 @@ var NoUnknownClasses = rule.Rule[NoUnknownClassesOptions]{
 					if isConcatenatedEdgeClass(literal, index, len(classes)) {
 						continue
 					}
-					if isIgnored(className, ignored) || classExistsIn(className, designSystem.System) {
+					if isIgnored(className, ignored, ruleContext.PatternTimedOut) ||
+						classExistsIn(className, designSystem.System) {
 						continue
 					}
 					ruleContext.ReportRange(literal.Range, messageUnknownClass(className))
@@ -131,7 +132,8 @@ var NoUnknownClasses = rule.Rule[NoUnknownClassesOptions]{
 					if class.GluedLeading || class.GluedTrailing {
 						continue
 					}
-					if isIgnored(class.Text, ignored) || classExistsIn(class.Text, designSystem.System) {
+					if isIgnored(class.Text, ignored, ruleContext.PatternTimedOut) ||
+						classExistsIn(class.Text, designSystem.System) {
 						continue
 					}
 					ruleContext.ReportRange(class.Range, messageUnknownClass(class.Text))

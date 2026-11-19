@@ -307,7 +307,7 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		// destructured from an array is an ignored array element first.
 		arrayElement := destructuredArrayIgnore != nil && isDestructuredFromAnArray(candidate, candidateWrites)
 		// A match that overruns the time bound ignores too: no answer here is a report.
-		if arrayElement && destructuredArrayIgnore.TestOrTimeout(name) {
+		if arrayElement && destructuredArrayIgnore.TestOrTimeout(name, ruleContext.PatternTimedOut) {
 			reportUsedIgnoredName(
 				ruleContext,
 				candidate,
@@ -333,7 +333,7 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		if candidate.kind == bindingParameter && settings.Arguments == "none" {
 			continue
 		}
-		if matchesIgnorePattern(candidate, settings) {
+		if matchesIgnorePattern(candidate, settings, ruleContext.PatternTimedOut) {
 			option, pattern, noun := ignorePatternFor(candidate.kind, settings)
 			reportUsedIgnoredName(
 				ruleContext,
@@ -378,10 +378,10 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		message := noUnusedVariablesMessage(
 			name,
 			len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name),
-			nameMatchesIgnorePattern("_"+name, candidate.kind, settings) ||
+			nameMatchesIgnorePattern("_"+name, candidate.kind, settings, ruleContext.PatternTimedOut) ||
 				// Asked the way the gate above asks it, so the escape is offered exactly when the
 				// renamed binding would be ignored.
-				(arrayElement && destructuredArrayIgnore.TestOrTimeout("_"+name)),
+				(arrayElement && destructuredArrayIgnore.TestOrTimeout("_"+name, ruleContext.PatternTimedOut)),
 		)
 		// Marked before the removal is computed, as upstream's report does: the removal asks whether
 		// every binding of the declaration has been reported yet, this one included.
@@ -1543,8 +1543,12 @@ func isUsingDeclaration(candidate candidateBinding) bool {
 }
 
 // matchesIgnorePattern reports whether a binding's name says the omission is deliberate.
-func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVariablesOptions) bool {
-	return nameMatchesIgnorePattern(candidate.name.Text(), candidate.kind, settings)
+func matchesIgnorePattern(
+	candidate candidateBinding,
+	settings NoUnusedVariablesOptions,
+	overrun esregexp.Overrun,
+) bool {
+	return nameMatchesIgnorePattern(candidate.name.Text(), candidate.kind, settings, overrun)
 }
 
 // nameMatchesIgnorePattern reports whether a name, declared as this kind of binding, matches the
@@ -1560,7 +1564,12 @@ func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVariables
 // Asked by name rather than by candidate so the report can ask the same question of a name the
 // binding does not have yet: whether prefixing an underscore would silence it, which decides
 // whether the message may offer that escape.
-func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUnusedVariablesOptions) bool {
+func nameMatchesIgnorePattern(
+	name string,
+	kind unusedBindingKind,
+	settings NoUnusedVariablesOptions,
+	overrun esregexp.Overrun,
+) bool {
 	pattern := settings.VariablesIgnorePattern
 	switch kind {
 	case bindingParameter:
@@ -1580,8 +1589,9 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 		// silence the whole rule on a typo in a config file, which is the failure that looks clean.
 		return false
 	}
-	// A match that overruns the time bound ignores too: no answer here is a report.
-	return compiled.TestOrTimeout(name)
+	// A match that overruns the time bound ignores too: no answer here is a report. The run names the
+	// overrun as a gap.
+	return compiled.TestOrTimeout(name, overrun)
 }
 
 // NoUnusedVariablesAutofixRemoval is enableAutofixRemoval's object. Decoded strictly like the rest, so a key
