@@ -2,7 +2,7 @@ package calls
 
 import "testing"
 
-// stops stops the test it is given, which the resolver reads from its body.
+// stops stops the test it is given, which the resolver reads from its body. The pin stubs it and keeps Starts.
 func stops(test *testing.T) {
 	test.FailNow()
 }

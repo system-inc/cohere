@@ -774,11 +774,13 @@ func TestTheIsolatedRulesLearnOnlyFactsTheVariantKeeps(test *testing.T) {
 
 // pinnedFindings are the findings the pin keeps, each resting on one fact or answer about a callee the variant stubs:
 // Unreached's value is never used because halt never returns, Leaks drops its cancel function on a path that exists
-// because proceed returns, and Discards drops the result of double, which is pure.
+// because proceed returns, Discards drops the result of double, which is pure, and Starts starts stops as a goroutine,
+// which stops the test.
 var pinnedFindings = map[string]string{
 	rule.Namespace + "SA4006":     "Unreached",
 	rule.Namespace + "lostcancel": "Leaks",
 	rule.Namespace + "SA4017":     "Discards",
+	rule.Namespace + "SA2002":     "Starts",
 }
 
 // pinnedRules are the isolated rules whose findings the pin keeps.
@@ -796,10 +798,10 @@ type pinnedRun struct {
 	variant map[string][]string
 }
 
-// runPinned loads the test's own fixture twice, runs the pinned rules whole and on a variant stubbing halt, proceed
-// and double, and is what each found in the units the pin keeps. Faithful, the variant is the isolation test's own:
-// each stub returns as ctrlflow reads it exactly when the whole run found its function returns, and every answer is
-// the whole run's. Otherwise every stub is panic(0), and the variant computes its answers from the stubs.
+// runPinned loads the test's own fixture twice, runs the pinned rules whole and on a variant stubbing halt, proceed,
+// double and stops, and is what each found in the units the pin keeps. Faithful, the variant is the isolation test's
+// own: each stub returns as ctrlflow reads it exactly when the whole run found its function returns, and every answer
+// is the whole run's. Otherwise every stub is panic(0), and the variant computes its answers from the stubs.
 func runPinned(test *testing.T, faithful bool) pinnedRun {
 	test.Helper()
 	fixture := gopathFixture(test, "unit_isolation", filepath.Join("testdata", "unit_isolation"))
@@ -817,7 +819,7 @@ func runPinned(test *testing.T, faithful bool) pinnedRun {
 	}
 	units := functionUnits(whole.Roots[0])
 	stubbed := slices.DeleteFunc(slices.Clone(units), func(unit functionUnit) bool {
-		return unit.name != "halt" && unit.name != "proceed" && unit.name != "double"
+		return unit.name != "halt" && unit.name != "proceed" && unit.name != "double" && unit.name != "stops"
 	})
 	noReturn := wholeRun.noReturn
 	var held fact_resolver.Held
@@ -866,10 +868,10 @@ func runPinned(test *testing.T, faithful bool) pinnedRun {
 
 // The pin (#h350vqr): a kept unit whose finding rests on a fact or answer about a callee the variant stubs keeps the
 // finding, the fact or answer held at the whole run's. Unreached keeps SA4006 with halt, which never returns, stubbed;
-// Leaks keeps both lostcancel findings with proceed, which returns, stubbed by a panic, which would not; and Discards
-// keeps SA4017 with double, which is pure, stubbed. The control runs the same variant with every stub a bare panic(0)
-// and answers computed from the stubs, and loses Leaks's and Discards's findings, so the pin holds something a naive
-// stub breaks.
+// Leaks keeps both lostcancel findings with proceed, which returns, stubbed by a panic, which would not; Discards
+// keeps SA4017 with double, which is pure, stubbed; and Starts keeps SA2002 with stops, which stops the test, stubbed.
+// The control runs the same variant with every stub a bare panic(0) and answers computed from the stubs, and loses
+// Leaks's, Discards's and Starts's findings, so the pin holds something a naive stub breaks.
 func TestAKeptUnitKeepsTheFindingThatRestsOnAStubbedCallee(test *testing.T) {
 	test.Parallel()
 	faithful := runPinned(test, true)
@@ -883,7 +885,7 @@ func TestAKeptUnitKeepsTheFindingThatRestsOnAStubbedCallee(test *testing.T) {
 		}
 	}
 	naive := runPinned(test, false)
-	for _, unit := range []string{"Leaks", "Discards"} {
+	for _, unit := range []string{"Leaks", "Discards", "Starts"} {
 		if slices.Equal(naive.variant[unit], naive.whole[unit]) {
 			test.Errorf("%s: with bare stubs and answers computed from them the variant still finds %q, so the pin "+
 				"holds nothing a naive stub breaks", unit, naive.variant[unit])

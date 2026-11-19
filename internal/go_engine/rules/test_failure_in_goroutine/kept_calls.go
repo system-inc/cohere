@@ -15,8 +15,8 @@ type keptCalls struct {
 }
 
 // read is the stopping calls among the own instructions of declared, the built function whose object is function,
-// kept. No call is a nil answer, the zero Value a fact resolver's store holds no answer for. The caller holds the
-// package's lock.
+// kept. No call is a nil answer, the zero Value fact_resolver.Ask answers for no fact. The caller holds the package's
+// lock.
 func (state *keptCalls) read(
 	resolver *fact_resolver.Resolver,
 	function *types.Func,
@@ -32,28 +32,4 @@ func (state *keptCalls) read(
 	state.calls[function] = calls
 	resolver.Counts(Kind).Computed.Add(1)
 	return calls
-}
-
-// whole is the stopping calls of every function of home that has any, each source function read, or its calls kept,
-// for the entries a run writes and the standard library's table, where a function absent has none.
-func whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object][]StoppingCall {
-	home.Lock()
-	defer home.Unlock()
-	state := fact_resolver.StateOf[keptCalls](home, Kind)
-	answers := map[types.Object][]StoppingCall{}
-	for _, declared := range home.SourceFunctions() {
-		function, isFunction := declared.Object().(*types.Func)
-		if !isFunction {
-			// The package's synthetic initializer, which has no object and so no answer a question could name.
-			continue
-		}
-		calls, isKept := state.calls[function]
-		if !isKept {
-			calls = state.read(resolver, function, declared)
-		}
-		if len(calls) > 0 {
-			answers[function] = calls
-		}
-	}
-	return answers
 }

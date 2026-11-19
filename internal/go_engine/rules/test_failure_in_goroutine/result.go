@@ -12,22 +12,16 @@ import (
 )
 
 // Kind keys the stopping calls kept in each package the resolver holds, and its counts.
+//
+// It is deliberately not registered with fact_resolver.Register: a registered kind is computed whole for every package
+// a run saves, the standard library's too, and copied into the standard library's table, where a value naming a file
+// by its path on one machine does not belong. It is asked only through fact_resolver.Ask, by the rule, about a
+// function of the package being analyzed, and the resolver records each such answer, which is all a build compares.
 var Kind = &fact_resolver.Kind{Name: "test_stopping_calls"}
-
-func init() {
-	fact_resolver.Register(Kind, whole,
-		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) []StoppingCall {
-			function, isFunction := object.(*types.Func)
-			if !isFunction {
-				return nil
-			}
-			return callsIn(resolver, home, function)
-		}, bodilessCalls)
-}
 
 // bodilessCalls is the stopping calls of a function declared without a body, from its types alone (fact_resolver.Ask):
 // none. Built from its declaration, it has no blocks, so callsIn reads no call in it.
-func bodilessCalls(types.Object) []StoppingCall {
+func bodilessCalls() []StoppingCall {
 	return nil
 }
 
@@ -92,7 +86,7 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, functi
 	}
 	return fact_resolver.Ask(resolver, reader, Kind, function, func(home *fact_resolver.Package) []StoppingCall {
 		return callsIn(resolver, home, function)
-	}, func() []StoppingCall { return bodilessCalls(function) })
+	}, bodilessCalls)
 }
 
 // callsIn is the stopping calls of function, of home, read there under home's lock, or those kept. Reading builds the
