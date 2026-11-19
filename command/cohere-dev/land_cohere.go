@@ -20,10 +20,10 @@ import (
 // vet, the rule CPU budget, the tests and the docs check, and never cohere on cohere. Now a landing is refused
 // unless every engine's run reads 0 findings, 0 type errors and no gap, so main can't go red under our own rules.
 //
-// The run checks every build cohere's Go files name, `--other-builds`, beside the host's (#72n9mq0). A plain run names
-// each file only another platform or tag builds as a gap, which is true of it, and the gate would refuse every
-// landing over those; with the switch each such file is checked by a build that compiles it, and only a file no build
-// compiles stays a gap the gate refuses.
+// The run checks every build cohere's Go files name beside the host's, as every run does without `--host-build-only`
+// (#72n9mq0, #qqyq61s). A run of the host's build alone names each file only another platform or tag builds as a gap,
+// which is true of it, and the gate would refuse every landing over those; checking every build, each such file is
+// checked by a build that compiles it, and only a file no build compiles stays a gap the gate refuses.
 
 // cohereSource is cohere's own command, relative to the repository. A repository without it has no cohere to
 // run on itself, and the step says so.
@@ -49,13 +49,14 @@ type cohereRecord struct {
 	Gaps       map[string]json.RawMessage `json:"gaps"`
 }
 
-// gateCohereArguments are the gate's run of cohere: write nothing, check every build, and print the records.
-var gateCohereArguments = []string{"--no-fix", "--other-builds", "--json"}
+// gateCohereArguments are the gate's run of cohere: write nothing, check every build, as a run without
+// `--host-build-only` does, and print the records.
+var gateCohereArguments = []string{"--no-fix", "--json"}
 
-// checkCohere builds cohere at the worktree's tree and runs `cohere --no-fix --other-builds --json` at its root, and
-// refuses the landing unless every summary passes with 0 findings, 0 type errors and no gap. The boolean reports
-// whether the check ran. build and run are the environments for the build and the run, each asked when it
-// starts, so either widens once the pool goes idle.
+// checkCohere builds cohere at the worktree's tree and runs `cohere --no-fix --json` at its root, and refuses the
+// landing unless every summary passes with 0 findings, 0 type errors and no gap. The boolean reports whether the check
+// ran. build and run are the environments for the build and the run, each asked when it starts, so either widens once
+// the pool goes idle.
 func checkCohere(worktree string, build func() []string, run func() []string) (int, bool) {
 	binary := os.Getenv(gateCohereVariable)
 	if binary == "" {

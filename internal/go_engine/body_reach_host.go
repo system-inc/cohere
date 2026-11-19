@@ -20,7 +20,7 @@ import (
 // value bodies a difference reaches, from stage 1's record of what each declaration uses (build_reads.FunctionUses)
 // joined with the build's judgment of each object (build_dependence.Dependence.ObjectBits). Nothing is skipped by it
 // yet: it is a census, counted beside today's verdict under `COHERE_BODY_REACH_CENSUS=<file>` with
-// `--build-dependence --other-builds`, and written to that file at the end of the builds, changing no finding and no
+// `--build-dependence`, and written to that file at the end of the builds, changing no finding and no
 // record. Every body it leaves unreached that the dependence graph's own unit verdict calls dependent
 // (Dependence.UnitDependent) is listed, a lead to read before anything is skipped by it.
 //

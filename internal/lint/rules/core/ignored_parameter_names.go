@@ -8,14 +8,15 @@ type ignoredParameterNames struct {
 	patterns []*esregexp.RegExp
 }
 
-// matches reports whether a parameter's property writes are excused.
-func (ignored ignoredParameterNames) matches(name string) bool {
+// matches reports whether a parameter's property writes are excused, telling overrun of a pattern that ran
+// past the time bound.
+func (ignored ignoredParameterNames) matches(name string, overrun esregexp.Overrun) bool {
 	if ignored.literal[name] {
 		return true
 	}
 	for _, pattern := range ignored.patterns {
 		// A match that overruns the time bound excuses too: no answer here is a report.
-		if pattern.TestOrTimeout(name) {
+		if pattern.TestOrTimeout(name, overrun) {
 			return true
 		}
 	}

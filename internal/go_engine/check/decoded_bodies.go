@@ -18,9 +18,6 @@ import (
 // decision are the record's or the build's, so each is left out here and set from the hit's own record. Decoding is a
 // function of the body's bytes and the analyzers alone, so a decode is shared only with a session whose analyzers
 // decode alike known's (decodesAlike), the host's.
-//
-// Only a body read from the store is kept, never one from the binary's table, whose Withheld names this run's
-// `GOROOT` after the decode (renameWithheldFiles) and which no record names by BodyAt.
 type decodedBodies struct {
 	known *cacheAnalyzers
 

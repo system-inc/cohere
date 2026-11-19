@@ -24,7 +24,9 @@
 // rewriting the pattern before handing it over. Unicode property escapes use
 // cohere-generated Unicode 17.0.0 tables, including exact ECMAScript aliases. It also bounds how long a
 // match may run: a backtracking engine on a pattern a user wrote is a way to
-// hang the linter, and a match that overruns is reported as no match.
+// hang the linter. A match that overruns has no answer, so the caller says
+// which answer stands in for it, and is told the pattern overran so the run
+// can name the gap rather than read the stand-in as the pattern's.
 //
 // Three things are deliberately not covered:
 //
@@ -40,6 +42,7 @@ package regexp
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -49,9 +52,25 @@ import (
 // MatchTimeout bounds how long one subject may spend in one pattern. A pattern
 // written by a user can backtrack exponentially (`(a|aa)+$` against a long
 // run of `a` is the shape of it) and a linter that hangs on a config typo is
-// worse than one that answers no. A pattern that matches settles in
-// microseconds, so a match still running after this has found nothing.
-const MatchTimeout = time.Second
+// worse than one that answers no.
+//
+// The bound is wall time because it is all regexp2 can count: it has no step or
+// backtrack budget, so a pattern's own work cannot be told apart from the
+// machine's load. So it sits far above what any real match takes. `Base`
+// against `XBaseY` crossed the one second this used to be in a `-race` run on a
+// busy box (#s4dy4e0), by regexp2's stale clock rather than by the match (see
+// overranSpuriously). With that handled, the same match settled in under a
+// millisecond under -race, 128 at once, and ten seconds is over ten thousand
+// times that. A pattern still running after it is pathological, and the caller
+// names it as a gap.
+const MatchTimeout = 10 * time.Second
+
+// Overrun is told of a pattern that ran past MatchTimeout, as JavaScript writes
+// it, so the caller can say the answer that stood in was not the pattern's. A
+// lint rule passes its context's PatternTimedOut, which names the gap in the
+// run's footer and its --json. Nil drops the news, for a caller with nowhere to
+// send it, which says why where it passes nil.
+type Overrun func(pattern string)
 
 // ErrUnsupportedFlag is returned for a flag this package does not implement.
 var ErrUnsupportedFlag = errors.New("unsupported regexp flag")
@@ -169,27 +188,33 @@ func MustCompile(source string, flags string) *RegExp {
 }
 
 // Test reports whether the regexp matches anywhere in `text`, as
-// `RegExp.prototype.test` does.
+// `RegExp.prototype.test` does, for a caller whose yes answer is what produces a
+// report: a restricting pattern, or one that picks what a rule checks.
 //
-// A match that overruns MatchTimeout counts as no match: the alternative is
-// making every caller handle an error that only ever means "this pattern is
-// pathological", and a lint rule has nothing better to do with that than skip.
-func (exp *RegExp) Test(text string) bool {
-	if exp == nil || exp.re == nil {
+// A match that overruns MatchTimeout counts as no match, the answer that reports
+// nothing, and overrun is told: a finding that may have been missed is the run's
+// gap, never a clean answer.
+func (exp *RegExp) Test(text string, overrun Overrun) bool {
+	matched, testOrError := exp.TestOrError(text)
+	if testOrError != nil {
+		exp.overran(overrun)
 		return false
 	}
-	matched, matchStringError := exp.re.MatchString(text)
-	return matchStringError == nil && matched
+	return matched
 }
 
 // TestOrTimeout is Test for a caller whose no answer is what produces a
 // report: an allow-pattern, an ignore-pattern, a pattern a name is required to
 // match. Reading a bound match as no match would turn a skipped report into a
 // false positive there, so a match that overruns MatchTimeout counts as a
-// match and the report is skipped.
-func (exp *RegExp) TestOrTimeout(text string) bool {
+// match, the report is skipped, and overrun is told.
+func (exp *RegExp) TestOrTimeout(text string, overrun Overrun) bool {
 	matched, testOrError := exp.TestOrError(text)
-	return matched || testOrError != nil
+	if testOrError != nil {
+		exp.overran(overrun)
+		return true
+	}
+	return matched
 }
 
 // TestOrError is Test for a caller that has to tell "no match" apart from "the
@@ -199,7 +224,62 @@ func (exp *RegExp) TestOrError(text string) (bool, error) {
 	if exp == nil || exp.re == nil {
 		return false, nil
 	}
-	return exp.re.MatchString(text)
+	began := time.Now()
+	for {
+		matched, matchStringError := exp.re.MatchString(text)
+		if !exp.overranSpuriously(matchStringError, began) {
+			return matched, matchStringError
+		}
+	}
+}
+
+// ExecOrError is TestOrError for a caller that needs where the first match is
+// and what it holds, as `RegExp.prototype.exec` returns it, rather than only
+// whether there is one. Nil with no error is no match.
+func (exp *RegExp) ExecOrError(text string) (*regexp2.Match, error) {
+	if exp == nil || exp.re == nil {
+		return nil, nil
+	}
+	began := time.Now()
+	for {
+		match, findStringMatchError := exp.re.FindStringMatch(text)
+		if !exp.overranSpuriously(findStringMatchError, began) {
+			return match, findStringMatchError
+		}
+	}
+}
+
+// overranSpuriously reports whether regexp2 said a match ran into its timeout
+// when it has not run that long, after yielding so the next attempt meets a
+// clock that has moved.
+//
+// regexp2 reads its deadline off a clock a background goroutine ticks every
+// tenth of a second, and two ways that clock runs behind hand a match a
+// deadline already past, which times out a trivial pattern on its first step.
+// One is callers racing to restart the clock after it went idle, where one
+// keeps the reading from before the idle spell (dlclark/regexp2#117, fixed
+// upstream by v2.13.1, past the v2.5.2 this module takes). The other is the
+// ticking goroutine starved by the scheduler under load. So an overrun is
+// believed only once the bound has truly passed since the match began, measured
+// on Go's monotonic clock. Before that the match is asked again, its deadline
+// now drawn from the clock the first attempt woke. A pathological pattern still
+// stops: by the bound when the clock is right, by at most twice it when a stale
+// clock cut the first attempt short.
+//
+// regexp2's only error from a match is its timeout, so any error is read as one.
+func (exp *RegExp) overranSpuriously(matchError error, began time.Time) bool {
+	if matchError == nil || time.Since(began) >= exp.re.MatchTimeout {
+		return false
+	}
+	runtime.Gosched()
+	return true
+}
+
+// overran tells overrun, when there is one, that this pattern ran past its bound.
+func (exp *RegExp) overran(overrun Overrun) {
+	if overrun != nil {
+		overrun(exp.String())
+	}
 }
 
 // Source returns the pattern as it was written, the way `RegExp.prototype

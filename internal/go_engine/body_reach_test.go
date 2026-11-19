@@ -14,13 +14,15 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
-// Under the body reach census, with `--other-builds --build-dependence`, windows's census of the body-reach fixture
+// Under the body reach census, with `--build-dependence`, windows's census of the body-reach fixture
 // judges each of the host's bodies by what stage 1 recorded it using (#w72zxtq):
 //   - PlatformName calls platformName, which a host-only file declares: reached by its name bit, Named.
-//   - Accepted and Shifted take a Number, whose underlying type alone differs: reached by their signatures, through
-//     ValueType's underlying bit, though Accepted's block reads nothing of it.
-//   - Positive converts to Number, whose underlying type alone differs: reached through ValueType's underlying bit,
-//     which reading the name bit alone misses.
+//   - Accepted and Shifted take a Number, whose underlying type alone differs: reached by their signatures, though
+//     Accepted's block reads nothing of it. Number is defined from platformInteger's name, so the graph reads
+//     platformInteger in full into Number's name bit as well as its underlying one (build_dependence's defined-from
+//     edge, #9paaen9's block 1): the Named row reaches them first, by the name bit. The ValueType underlying row is
+//     pinned on its own by body-reach-moved's bodies, whose types spell their structs.
+//   - Positive converts to Number, reached the same way, by Number's name bit.
 //   - Spinner takes holder.Spin, Holder gaining Spin on windows through platformPart, a windows file's type it
 //     embeds: reached by the selection's receiver's underlying bit, Selected, before holder's own name bit, Named,
 //     which ignoring the receiver leaves it to. That row is redundant today rather than untested: dropping it, or the
@@ -36,8 +38,8 @@ import (
 //     Box's underlying bit, which the field sets too.
 //   - Limit reads platformLimit, a constant each build's own file declares: Constant, before Named, and so do
 //     limitTwice, declared from it, and Twice, reading limitTwice, a shared file's constant whose value differs.
-//   - Typed instantiates Sized with Number: the type argument is also a type expression, recorded as ValueType, which
-//     reads the same bits first, so it is ValueType; Sized itself is unreached.
+//   - Typed instantiates Sized with Number: the type argument is recorded as ValueType as well as Named, and Named
+//     reaches first by Number's name bit; Sized itself is unreached.
 //   - Bytes takes a byte, which windows declares at package level: Shadowed by its signature.
 //   - linked names a symbol by go:linkname, so the host records no function uses of it: its one body is reached,
 //     Unrecorded.
@@ -63,18 +65,16 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	fromSource := test.TempDir()
 	// A plain run records the packages each build checks from source, which the census then counts apart.
 	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
-		func(engine *pipeline) { engine.bodyReachFromSourceRecord = fromSource }, "--no-cache", "--no-fix",
-		"--other-builds")
+		func(engine *pipeline) { engine.bodyReachFromSourceRecord = fromSource }, "--no-cache", "--no-fix")
 	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
 	on, onStream := runOverConfigured(test, root, exitFindings,
 		func(engine *pipeline) {
 			engine.bodyReachCensus = censusFile
 			engine.bodyDifferential = true
 			engine.bodyReachFromSource = fromSource
-		}, "--no-cache", "--no-fix", "--other-builds",
-		"--build-dependence")
+		}, "--no-cache", "--no-fix", "--build-dependence")
 	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
-		"--no-fix", "--other-builds", "--build-dependence")
+		"--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))
@@ -103,7 +103,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	}
 	want := map[string]string{
 		"PlatformName": "Named",
-		"Positive":     "ValueType",
+		"Positive":     "Named",
 		"Spinner":      "Selected",
 		"Size":         "Shadowed",
 		"Configured":   "Unknown",
@@ -119,7 +119,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"Limit":        "Constant",
 		"limitTwice":   "Constant",
 		"Twice":        "Constant",
-		"Typed":        "ValueType",
+		"Typed":        "Named",
 		"Sized":        "unreached",
 		"Bytes":        "Shadowed",
 		"size":         "Named",
@@ -132,7 +132,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	}
 	wantDrivers := map[string]string{
 		"PlatformName": "example.com/reach.platformName (reach_other.go) Named name in the body",
-		"Positive":     "example.com/reach.Number (reach.go) ValueType underlying in the body",
+		"Positive":     "example.com/reach.Number (reach.go) Named name in the body",
 		"Spinner":      "example.com/reach.Holder (reach.go) Selected receiver underlying in the body",
 		"Size":         "universe.len shadowed in the body",
 		"Configured":   "an unknown identity in the body",
@@ -141,14 +141,14 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"High":         "",
 		"Before":       "",
 		"After":        "example.com/reach.platformName (reach_other.go) Named name in the body",
-		"Accepted":     "example.com/reach.Number (reach.go) ValueType underlying in the signature",
-		"Shifted":      "example.com/reach.Number (reach.go) ValueType underlying in the signature",
+		"Accepted":     "example.com/reach.Number (reach.go) Named name in the signature",
+		"Shifted":      "example.com/reach.Number (reach.go) Named name in the signature",
 		"Paired":       "an unknown identity in the signature",
 		"Parted":       "example.com/reach.Box.UF0 (reach.go) Selected name in the body",
 		"Limit":        "example.com/reach.platformLimit (reach_other.go) Constant name in the body",
 		"limitTwice":   "example.com/reach.platformLimit (reach_other.go) Constant name in the body",
 		"Twice":        "example.com/reach.limitTwice (reach.go) Constant name in the body",
-		"Typed":        "example.com/reach.Number (reach.go) ValueType underlying in the body",
+		"Typed":        "example.com/reach.Number (reach.go) Named name in the body",
 		"Sized":        "",
 		"Bytes":        "universe.byte shadowed in the signature",
 		"size":         "example.com/reach.platformSize (reach_other.go) Named name in the body",
@@ -269,7 +269,7 @@ func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T
 				engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 				engine.bodyDifferential = true
 				engine.bodyDifferentialCensus = census
-			}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+			}, "--no-cache", "--no-fix", "--build-dependence")
 		if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
 			test.Fatal("want windows's body differential")
 		}
@@ -372,7 +372,7 @@ func TestABuildUnderOtherSizesReachesEveryBody(test *testing.T) {
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 		engine.bodyReachCensus = censusFile
-	}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+	}, "--no-cache", "--no-fix", "--build-dependence")
 
 	censuses := map[string]*buildBodyReach{}
 	for _, run := range on.buildRuns[1:] {
@@ -424,7 +424,7 @@ func TestAValueMovedToAnEmptyInterfaceReachesItsBodyThroughTheTypesBelowIt(test 
 	root := copyFixture(test, filepath.Join("testdata", "body-reach-moved"))
 	on, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 		engine.bodyDifferential = true
-	}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+	}, "--no-cache", "--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))
@@ -555,7 +555,7 @@ func Plain() string {
 			test.Fatal(writeError)
 		}
 	}
-	runOverConfigured(test, root, exitFindings, nil, "--no-fix", "--other-builds", "--build-dependence")
+	runOverConfigured(test, root, exitFindings, nil, "--no-fix", "--build-dependence")
 	// user changes, so the warm run checks it from source and records its uses, while reach's record is decoded.
 	userFile := filepath.Join(root, "user", "user.go")
 	contents, readError := os.ReadFile(userFile)
@@ -568,7 +568,7 @@ func Plain() string {
 	}
 	warm, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-	}, "--no-fix", "--other-builds", "--build-dependence")
+	}, "--no-fix", "--build-dependence")
 
 	hosted, isHosted := warm.bodyReachHost.packages["example.com/reach"]
 	if !isHosted || !warm.dependence.decoded[hosted.Types] {

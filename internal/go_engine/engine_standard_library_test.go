@@ -8,7 +8,6 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
@@ -110,25 +109,6 @@ func TestTheSystemCachesEntriesChangeNoRecordInACachedRun(test *testing.T) {
 	if warm.withoutCounts != plain.withoutCounts {
 		test.Fatalf("warm with the table\n%s\nplain\n%s", warm.withoutCounts, plain.withoutCounts)
 	}
-}
-
-// plantedAnalysis is one analyzer's part of a plantedEntry.
-type plantedAnalysis struct {
-	Findings     []check.Finding
-	ObjectFacts  []plantedObjectFact
-	PackageFacts []plantedFact
-}
-
-// plantedObjectFact is a fact about one object, by its objectpath.
-type plantedObjectFact struct {
-	Path string
-	Fact plantedFact
-}
-
-// plantedFact is one fact as its type's name and its gob bytes.
-type plantedFact struct {
-	Type    string
-	Encoded []byte
 }
 
 // equalEntries reports whether two listings of a store name the same files with the same modification times.

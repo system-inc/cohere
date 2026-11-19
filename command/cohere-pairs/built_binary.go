@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 )
 
 // The two sides of a pair, which name their sources, their releases and every run's record.
@@ -26,8 +24,9 @@ type builtBinary struct {
 	commit string
 	path   string
 	sha256 string
-	// tableLine is the binary's `--version` line saying which standard library table it carries.
-	tableLine string
+	// everyBuildArguments are what every run of the binary's engine is given to check every build the corpus's files
+	// name, read from the binary once it is built (see everyBuildArguments).
+	everyBuildArguments []string
 }
 
 // sideDirectory is where under output a side's source is checked out.
@@ -62,8 +61,7 @@ func checkOutSide(checked preflight, side string, say progress) error {
 }
 
 // buildSide builds one side's cohere as a release builds it, from the side's source checkOutSide laid out, with that
-// commit's own cohere-release, held off the network, and refuses a binary without its standard library table, which a
-// local build lacks, so it would measure other work.
+// commit's own cohere-release, held off the network.
 func buildSide(checked preflight, side string, say progress) (builtBinary, error) {
 	source := sideDirectory(checked.output, side)
 	commit := sideLayers(checked, side)[0].commit
@@ -100,36 +98,18 @@ func buildSide(checked preflight, side string, say progress) (builtBinary, error
 	if digestError != nil {
 		return builtBinary{}, digestError
 	}
-	versionCommand := exec.Command(binaryPath, "--version")
-	versionCommand.Env = environmentWithout(checked.goEnvironment, "GOFLAGS")
-	versionOutput, versionError := versionCommand.CombinedOutput()
-	if versionError != nil {
-		return builtBinary{}, fmt.Errorf("%s --version: %w: %s", binaryPath, versionError, versionOutput)
+	everyBuild, everyBuildError := everyBuildArguments(binaryPath, source, checked.goEnvironment)
+	if everyBuildError != nil {
+		return builtBinary{}, everyBuildError
 	}
-	tableLine, readTableError := releaseTableLine(string(versionOutput))
-	if readTableError != nil {
-		return builtBinary{}, fmt.Errorf("%s: %w", binaryPath, readTableError)
-	}
-	say.say("%s: %s, sha256 %s, %s\n", side, binaryPath, digest, tableLine)
-	return builtBinary{side: side, commit: commit, path: binaryPath, sha256: digest, tableLine: tableLine}, nil
-}
-
-// releaseTableLine is a `--version` output's standard library table line, refusing an output whose line does not say
-// the binary carries a table it reads: a binary without its table is not release-shaped, and its cold runs compute
-// the standard library a release's read.
-func releaseTableLine(versionOutput string) (string, error) {
-	_, size, carries, says := standard_library_table.ReadVersionLine(versionOutput)
-	if !says || !carries || size <= 0 {
-		return "", fmt.Errorf("--version does not say it carries a standard library table it reads, so the binary "+
-			"is not release-shaped:\n%s", strings.TrimSpace(versionOutput))
-	}
-	for line := range strings.SplitSeq(versionOutput, "\n") {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, standard_library_table.VersionPrefix) {
-			return trimmed, nil
-		}
-	}
-	// ReadVersionLine read the line, so it is there.
-	return "", fmt.Errorf("--version's table line was read and then not found:\n%s", versionOutput)
+	say.say("%s: %s, sha256 %s, given %q to check every build\n", side, binaryPath, digest, everyBuild)
+	return builtBinary{
+		side:                side,
+		commit:              commit,
+		path:                binaryPath,
+		sha256:              digest,
+		everyBuildArguments: everyBuild,
+	}, nil
 }
 
 // stagedBinary is the one platform package's cohere a release staged under release, read from what was staged rather

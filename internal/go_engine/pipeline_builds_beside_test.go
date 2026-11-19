@@ -38,8 +38,8 @@ func thirdPlatform() string {
 }
 
 // threeExtraBuilds is a copy of the other-builds fixture with a package one more platform alone compiles beside the
-// tagged build and windows, the first of linux, darwin and freebsd that is not the host's, so a run under
-// `--other-builds` checks three builds beside the host's.
+// tagged build and windows, the first of linux, darwin and freebsd that is not the host's, so a run checks three
+// builds beside the host's.
 func threeExtraBuilds(test *testing.T) string {
 	test.Helper()
 	third := thirdPlatform()
@@ -149,13 +149,13 @@ func (planted plantedEnds) configure(engine *pipeline) {
 	}
 }
 
-// runPlanted runs the engine over a fresh copy of threeExtraBuilds under `--no-cache` and `--other-builds` with
+// runPlanted runs the engine over a fresh copy of threeExtraBuilds, every build checked, under `--no-cache` with
 // planted, and returns the pipeline, its stream normalized, its stderr with the root read as /project, and its stream
 // as written.
 func runPlanted(test *testing.T, planted plantedEnds, wantExit int) (*pipeline, string, string, string) {
 	test.Helper()
 	root := threeExtraBuilds(test)
-	engine, stream, noted := runOverNoted(test, root, wantExit, planted.configure, "--no-cache", "--other-builds")
+	engine, stream, noted := runOverNoted(test, root, wantExit, planted.configure, "--no-cache")
 	return engine, normalize(stream, root), strings.ReplaceAll(noted, root, "/project"), stream
 }
 
@@ -264,8 +264,8 @@ func TestTheBuildsWidthReachesNoKey(test *testing.T) {
 			engine.buildsWidthUnguarded = true
 		}
 	}
-	one, oneRaw := runOverConfigured(test, root, exitFindings, configure(1), "--other-builds")
-	three, threeRaw := runOverConfigured(test, root, exitFindings, configure(3), "--other-builds")
+	one, oneRaw := runOverConfigured(test, root, exitFindings, configure(1))
+	three, threeRaw := runOverConfigured(test, root, exitFindings, configure(3))
 	if len(one.buildRuns) != 4 || len(three.buildRuns) != 4 || three.buildsAtOnce != 3 {
 		test.Fatalf("the runs handed the merge %d and %d runs, the second %d at once, want 4 each and 3 at once",
 			len(one.buildRuns), len(three.buildRuns), three.buildsAtOnce)
@@ -314,8 +314,7 @@ func TestBuildsSideBySideNeverPassTheCapPlusOneAllowance(test *testing.T) {
 		engine.loads = newLoadMemory(engine.memory, false)
 		engine.buildsWidthForced = 3
 	}
-	engine, _ := runOverConfigured(test, threeExtraBuilds(test), exitFindings, configure, "--no-cache",
-		"--other-builds")
+	engine, _ := runOverConfigured(test, threeExtraBuilds(test), exitFindings, configure, "--no-cache")
 	if engine.buildsAtOnce != 3 || len(engine.buildRuns) != 4 {
 		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(engine.buildRuns)-1,
 			engine.buildsAtOnce)
@@ -652,7 +651,7 @@ func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
 	engine, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
 		engine.keepsHostRestoreOff = true
 		engine.buildsWidthForced = 3
-	}, "--no-cache", "--other-builds")
+	}, "--no-cache")
 	if len(engine.buildRuns) != 4 || engine.buildsAtOnce != 1 {
 		test.Fatalf("with the restore off the run ran %d builds beside the host's, %d at once, want 3, one at a time",
 			len(engine.buildRuns)-1, engine.buildsAtOnce)
@@ -672,7 +671,7 @@ func TestBuildsThatRestoreNothingOverAColdStoreRunOneAtATime(test *testing.T) {
 	engine, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
 		engine.keepsHostRestoreOff = true
 		engine.buildsWidthForced = 3
-	}, "--other-builds")
+	})
 	if lint := lintRecordOf(test, raw); !engine.withFindingsStore() || lint.Cache.Hit != 0 || lint.Cache.Missed == 0 {
 		test.Fatalf("the run has a store %t, its host hitting %d packages and missing %d, want a store and every "+
 			"package missed: the premise", engine.withFindingsStore(), lint.Cache.Hit, lint.Cache.Missed)
@@ -689,8 +688,8 @@ func TestBuildsThatRestoreNothingOverAColdStoreRunOneAtATime(test *testing.T) {
 // A run judging each build's dependence runs its extra builds at the width a plain run does (#f9br7sg): the facts
 // census turns off the builds' restore from the host's run for the census alone, and the width asks whether they would
 // restore as a plain run's do. Over a copy of threeExtraBuilds each, with the findings cache on, a cold run and then a
-// warm one under `--other-builds --build-dependence` keep as many host entries for the builds as under
-// `--other-builds` alone, and run as many builds at once, which the lint record says, while the switch's builds still
+// warm one under `--build-dependence` keep as many host entries for the builds as a run of every build without it,
+// and run as many builds at once, which the lint record says, while the switch's builds still
 // restore nothing from the host. Cold, the host keeps its packages and the width is the one a test forces, 3; warm,
 // it restored every package from its store, which it keeps none of, and a host that mostly hit its store lets the
 // builds past the guard for builds that restore nothing, so both run at the forced width again (#s1hdd3z).
@@ -726,8 +725,8 @@ func TestADependenceRunKeepsAPlainRunsWidth(test *testing.T) {
 		}
 		return widths, kept, restored
 	}
-	plainWidths, plainKept, _ := runsUnder("--other-builds")
-	switchedWidths, switchedKept, switchedRestored := runsUnder("--other-builds", "--build-dependence")
+	plainWidths, plainKept, _ := runsUnder()
+	switchedWidths, switchedKept, switchedRestored := runsUnder("--build-dependence")
 	if !slices.Equal(plainWidths, []int{3, 3}) || plainKept[0] == 0 || plainKept[1] != 0 {
 		test.Fatalf("the plain runs ran %v builds at once, the host keeping %v entries, cold then warm, want 3 "+
 			"keeping some and then 3 keeping none", plainWidths, plainKept)
@@ -833,8 +832,7 @@ func TestNoLintHoldsWeightBesideANearFullOne(test *testing.T) {
 			}
 		}
 	}
-	engine, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, configure, "--no-cache",
-		"--other-builds")
+	engine, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, configure, "--no-cache")
 	if engine.buildsAtOnce != 3 || len(engine.buildRuns) != 4 {
 		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(engine.buildRuns)-1,
 			engine.buildsAtOnce)
@@ -930,8 +928,7 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 			}
 		}
 	}
-	engine, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, configure, "--no-cache",
-		"--other-builds")
+	engine, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, configure, "--no-cache")
 	if engine.buildsAtOnce != 3 || len(engine.buildRuns) != 4 {
 		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(engine.buildRuns)-1,
 			engine.buildsAtOnce)
@@ -979,8 +976,7 @@ func TestManyLightBuildsAndANearFullOneNeverPassTheOneRaise(test *testing.T) {
 		engine.buildsWidthForced = 4
 		engine.lintSteps = steps.step
 	}
-	engine, raw := runOverConfigured(test, nearFullWindows(test, 4), exitFindings, configure, "--no-cache",
-		"--other-builds")
+	engine, raw := runOverConfigured(test, nearFullWindows(test, 4), exitFindings, configure, "--no-cache")
 	if engine.buildsAtOnce != 4 || len(engine.buildRuns) != 8 {
 		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 7, 4 at once", len(engine.buildRuns)-1,
 			engine.buildsAtOnce)
@@ -1035,7 +1031,7 @@ func TestOneBuildAtATimeNeverWaitsAtTheGate(test *testing.T) {
 	engine, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, func(engine *pipeline) {
 		engine.buildsWidthForced = 1
 		engine.lintSteps = steps.step
-	}, "--no-cache", "--other-builds")
+	}, "--no-cache")
 	if engine.buildsAtOnce != 1 || len(engine.buildRuns) != 4 {
 		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3, one at a time",
 			len(engine.buildRuns)-1, engine.buildsAtOnce)

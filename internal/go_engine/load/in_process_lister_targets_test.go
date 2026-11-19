@@ -29,7 +29,7 @@ var targetedModuleFiles = map[string]string{
 
 // The in-process listing is go list's on every target the toolchain lists, file for file and import for import,
 // a command's linker dependencies among them, and a target whose every command links externally is doubted, so go
-// list answers it: the extra builds of `--other-builds` list in this process as the host's does (#37vy8cm).
+// list answers it: the extra builds a run checks beside the host's list in this process as the host's does (#37vy8cm).
 func TestInProcessListingIsGoListsAnswerOnEveryTarget(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -70,7 +70,7 @@ func TestInProcessListingIsGoListsAnswerOnEveryTarget(test *testing.T) {
 	}
 }
 
-// The same holds for each extra build `--other-builds` checks at cohere's own root, listed as the engine lists it:
+// The same holds for each extra build a run checks at cohere's own root, listed as the engine lists it:
 // the builds the engine reads for cohere's census, each under the workspace's environment and the build's own
 // (see the engine's extraBuildRun), so no extra build forks go list.
 func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
@@ -85,8 +85,8 @@ func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 	}
 }
 
-// coheresBuilds is cohere's own workspace and the builds the engine checks it under, as `--other-builds` reads them
-// for cohere's census, the host's first: its go block's targets matched to the toolchain's ports.
+// coheresBuilds is cohere's own workspace and the builds the engine checks it under, as a run of every build reads
+// them for cohere's census, the host's first: its go block's targets matched to the toolchain's ports.
 func coheresBuilds(test *testing.T) (project.Workspace, []project.Build) {
 	test.Helper()
 	root, absoluteError := filepath.Abs(filepath.Join("..", "..", ".."))

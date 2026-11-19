@@ -42,7 +42,7 @@ func TestEveryBuildSharesTheRunsOnePool(test *testing.T) {
 			lock.Unlock()
 			awaitStep(test, allReady, "every build's load ending")
 		}
-	}, "--no-cache", "--other-builds")
+	}, "--no-cache")
 	if engine.buildsAtOnce != 3 {
 		test.Fatalf("the builds ran %d at once, want 3, so the pool is shared by builds side by side",
 			engine.buildsAtOnce)
@@ -102,7 +102,7 @@ func TestEachBuildsLoadAndRulesTakeThePoolsSlots(test *testing.T) {
 				mark, previousEnded = taken, true
 			}
 		}
-	}, "--no-cache", "--other-builds")
+	}, "--no-cache")
 	if engine.buildsAtOnce != 1 || len(windows) != 3 {
 		test.Fatalf("%d builds ran %d at once, want 3, one at a time", len(windows), engine.buildsAtOnce)
 	}
@@ -132,7 +132,7 @@ func TestTheWidthChangesNothingUnderTheOnePool(test *testing.T) {
 		root := threeExtraBuilds(test)
 		_, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 			engine.buildsWidthForced = width
-		}, "--no-cache", "--other-builds")
+		}, "--no-cache")
 		streams[width] = normalize(stream, root)
 	}
 	if streams[1] != streams[4] {
@@ -158,7 +158,7 @@ func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	measured := threeExtraBuilds(test)
 	engine, raw := runOverConfigured(test, measured, exitFindings, func(engine *pipeline) {
 		engine.memory = underCap()
-	}, "--no-cache", "--other-builds")
+	}, "--no-cache")
 	if engine.buildsWidthBuildBytes == 0 || engine.buildsWidthLiveBytes == 0 || engine.buildsAtOnce < 1 ||
 		engine.buildsWidthFromHostLive {
 		test.Fatalf("the width %d was decided by a live heap of %d and a holding of %d, from the live heap alone %t, "+
@@ -174,7 +174,7 @@ func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	stored := threeExtraBuilds(test)
 	_, storedStream := runOverConfigured(test, stored, exitFindings, func(engine *pipeline) {
 		engine.memory = underCap()
-	}, "--other-builds")
+	})
 	if !strings.Contains(storedStream, `"buildsWidthPeakFactor":3.5`) {
 		test.Errorf("a run with a findings store names no peak factor of 3.5:\n%s", storedStream)
 	}
@@ -182,7 +182,7 @@ func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	_, oneStream := runOverConfigured(test, one, exitFindings, func(engine *pipeline) {
 		engine.memory = underCap()
 		engine.buildsWidthForced = 1
-	}, "--no-cache", "--other-builds")
+	}, "--no-cache")
 	if normalize(raw, measured) != normalize(oneStream, one) {
 		test.Errorf("the stream at the measured width differs from one at a time's:\nmeasured\n%s\nwidth 1\n%s",
 			normalize(raw, measured), normalize(oneStream, one))
@@ -231,7 +231,7 @@ func TestTimingRecordsEachBuildsHoldings(test *testing.T) {
 				startedLock.Unlock()
 			}
 		}
-	}, "--no-cache", "--other-builds", "--timing")
+	}, "--no-cache", "--timing")
 	startedLock.Lock()
 	defer startedLock.Unlock()
 	if engine.buildsAtOnce != 1 {

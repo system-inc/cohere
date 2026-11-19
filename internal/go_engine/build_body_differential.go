@@ -19,7 +19,7 @@ import (
 )
 
 // The body differential, stage 2's own soundness machine (#w72zxtq), under `COHERE_BODY_DIFFERENTIAL=1` with
-// `--build-dependence --other-builds`: the object differential covers declarations, not bodies, so every body the reach
+// `--build-dependence`: the object differential covers declarations, not bodies, so every body the reach
 // would leave unreached in a build is checked against the host's, two ways. Its types: the build checks every package
 // from source whole today, so its type information holds the body, rendered as the host's walk rendered the host's
 // (build_reads.BodyRenderings), its signature's and its block's every expression's type, each named type in it by its

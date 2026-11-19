@@ -279,9 +279,10 @@ var IdMatch = rule.Rule[IdMatchSettings]{
 }
 
 // idMatchIsInvalid answers upstream's `isInvalid`: the name fails the pattern. A match that overruns
-// the time bound counts as a match, because no answer here would be a report (#7mztrdd).
-func idMatchIsInvalid(settings IdMatchSettings, name string) bool {
-	return !settings.Pattern.TestOrTimeout(name)
+// the time bound counts as a match, because no answer here would be a report (#7mztrdd), and overrun is
+// told, so the run names it as a gap.
+func idMatchIsInvalid(settings IdMatchSettings, name string, overrun esregexp.Overrun) bool {
+	return !settings.Pattern.TestOrTimeout(name, overrun)
 }
 
 // reportIdMatch emits the finding, rendering the name and the pattern the way upstream does.
@@ -319,7 +320,7 @@ func checkIdMatchPrivateIdentifier(ruleContext rule.Context, node *ast.Node, set
 	if len(name) > 0 && name[0] == '#' {
 		name = name[1:]
 	}
-	if idMatchIsInvalid(settings, name) {
+	if idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 		reportIdMatch(ruleContext, node, settings)
 	}
 }
@@ -361,7 +362,7 @@ func checkIdMatchIdentifier(ruleContext rule.Context, node *ast.Node, settings I
 		parent.Parent.Kind == ast.KindObjectLiteralExpression &&
 		parent.AsPropertyAssignment() != nil && parent.AsPropertyAssignment().Name() == node &&
 		!idDenylistIsDestructuringTarget(parent.Parent):
-		if settings.CheckProperties && idMatchIsInvalid(settings, name) {
+		if settings.CheckProperties && idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 			reportIdMatch(ruleContext, node, settings)
 		}
 
@@ -385,20 +386,20 @@ func checkIdMatchIdentifier(ruleContext rule.Context, node *ast.Node, settings I
 	// was chosen by the module we import from.
 	case parent.Kind == ast.KindImportSpecifier || parent.Kind == ast.KindImportClause ||
 		parent.Kind == ast.KindNamespaceImport:
-		if idMatchIsLocalImportBinding(node, parent) && idMatchIsInvalid(settings, name) {
+		if idMatchIsLocalImportBinding(node, parent) && idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 			reportIdMatch(ruleContext, node, settings)
 		}
 
 	// A class field's name, public. The private spelling is a different node kind and has its own
 	// listener above.
 	case parent.Kind == ast.KindPropertyDeclaration:
-		if settings.CheckClassFields && idMatchIsInvalid(settings, name) {
+		if settings.CheckClassFields && idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 			reportIdMatch(ruleContext, node, settings)
 		}
 
 	// Everything else, gated by `onlyDeclarations` and by the callee exclusion.
 	default:
-		if idMatchShouldReport(idMatchEffectiveParentOf(node), name, settings) {
+		if idMatchShouldReport(idMatchEffectiveParentOf(node), name, settings, ruleContext.PatternTimedOut) {
 			reportIdMatch(ruleContext, node, settings)
 		}
 	}
@@ -420,7 +421,12 @@ func idMatchEffectiveParentOf(node *ast.Node) *ast.Node {
 //
 // Two gates and the pattern test. `onlyDeclarations` narrows to the two shapes that introduce a
 // name into a scope, and the callee exclusion drops a name that was declared somewhere else.
-func idMatchShouldReport(effectiveParent *ast.Node, name string, settings IdMatchSettings) bool {
+func idMatchShouldReport(
+	effectiveParent *ast.Node,
+	name string,
+	settings IdMatchSettings,
+	overrun esregexp.Overrun,
+) bool {
 	if effectiveParent == nil {
 		return false
 	}
@@ -430,7 +436,7 @@ func idMatchShouldReport(effectiveParent *ast.Node, name string, settings IdMatc
 	if idMatchIsAllowedParent(effectiveParent) {
 		return false
 	}
-	return idMatchIsInvalid(settings, name)
+	return idMatchIsInvalid(settings, name, overrun)
 }
 
 // idMatchIsDeclaration is upstream's DECLARATION_TYPES: a function declaration or a variable
@@ -466,7 +472,7 @@ func checkIdMatchMemberAccess(ruleContext rule.Context, node *ast.Node, access *
 	// `no_under.no_under` with properties on, the installed rule reports twice.
 	if expression.Expression != nil && expression.Expression.Kind == ast.KindIdentifier &&
 		expression.Expression.Text() == name {
-		if idMatchIsInvalid(settings, name) {
+		if idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 			reportIdMatch(ruleContext, node, settings)
 		}
 		return
@@ -486,7 +492,7 @@ func checkIdMatchMemberAccess(ruleContext rule.Context, node *ast.Node, access *
 	if assignment.Left != nil && assignment.Left.Kind == ast.KindPropertyAccessExpression {
 		if left := assignment.Left.AsPropertyAccessExpression(); left != nil &&
 			left.Name() != nil && left.Name().Text() == name {
-			if idMatchIsInvalid(settings, name) {
+			if idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 				reportIdMatch(ruleContext, node, settings)
 			}
 			return
@@ -497,7 +503,7 @@ func checkIdMatchMemberAccess(ruleContext rule.Context, node *ast.Node, access *
 	// `foo.no_under = boom.bam_pow` from reporting `bam_pow`: reading a property off an object we
 	// may not own is not our naming decision.
 	if assignment.Right != nil && assignment.Right.Kind != ast.KindPropertyAccessExpression {
-		if idMatchIsInvalid(settings, name) {
+		if idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 			reportIdMatch(ruleContext, node, settings)
 		}
 	}
@@ -539,7 +545,7 @@ func checkIdMatchBindingElement(ruleContext rule.Context, node *ast.Node, elemen
 	// An array pattern's elements are positional, so nothing about them comes from a property name
 	// and upstream reaches them through its default arm rather than its Property branch.
 	if element.Parent != nil && element.Parent.Kind == ast.KindArrayBindingPattern {
-		if idMatchShouldReport(idMatchEffectiveParentOf(node), name, settings) {
+		if idMatchShouldReport(idMatchEffectiveParentOf(node), name, settings, ruleContext.PatternTimedOut) {
 			reportIdMatch(ruleContext, node, settings)
 		}
 		return
@@ -573,7 +579,7 @@ func checkIdMatchBindingElement(ruleContext rule.Context, node *ast.Node, elemen
 	if settings.OnlyDeclarations && !idMatchIsDeclaration(idMatchEnclosingDeclarationOf(element)) {
 		return
 	}
-	if idMatchIsInvalid(settings, name) {
+	if idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 		reportIdMatch(ruleContext, node, settings)
 	}
 }
@@ -652,7 +658,7 @@ func checkIdMatchAssignmentPattern(ruleContext rule.Context, node *ast.Node, pro
 	// falls through rather than returning, so a name reported there has already been reported by
 	// the time either gate is consulted. Reproducing the gates here reproduced a structure upstream
 	// does not have.
-	if idMatchIsInvalid(settings, name) {
+	if idMatchIsInvalid(settings, name, ruleContext.PatternTimedOut) {
 		reportIdMatch(ruleContext, node, settings)
 	}
 }

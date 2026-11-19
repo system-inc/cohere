@@ -44,8 +44,8 @@ func writeSharedPackages(test *testing.T, root string) {
 	writeFixtureFiles(test, root, files)
 }
 
-// underCapRun runs the engine over root under `--other-builds` and the 8 GiB cap, so the memory, not a fixed rule,
-// decides the width, with configure, when not nil, given the pipeline first, and extra after the switches. It returns
+// underCapRun runs the engine over root checking every build under the 8 GiB cap, so the memory, not a fixed rule,
+// decides the width, with configure, when not nil, given the pipeline first, and extra as its switches. It returns
 // the pipeline, its stream as written and its stderr.
 func underCapRun(
 	test *testing.T,
@@ -61,7 +61,7 @@ func underCapRun(
 		if configure != nil {
 			configure(engine)
 		}
-	}, append([]string{"--other-builds"}, extra...)...)
+	}, extra...)
 }
 
 // shareGateRun is underCapRun without a findings store, under `--no-cache`, the only run whose width the share gate

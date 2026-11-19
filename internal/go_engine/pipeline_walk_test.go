@@ -28,8 +28,8 @@ const (
 	walkDormant   = "example.com/walksquare/dormant"
 )
 
-// walkDifferential is the walk's differential, the unit's bar (#154dr43): fixture run four ways under
-// `--other-builds`, with the walk, with every package the host kept visited and judged as before it (keepsWalkOff),
+// walkDifferential is the walk's differential, the unit's bar (#154dr43): fixture run four ways, every build checked,
+// with the walk, with every package the host kept visited and judged as before it (keepsWalkOff),
 // restoring nothing from the host's run (keepsHostRestoreOff), and with the walk and the findings cache on, each over a
 // copy of its own. Their streams must be byte for byte the same but for the counts of the restore, of the cache, and of
 // an extra build's packages analyzed, which its untouched packages leave out. wantExit is the exit every run makes. It
@@ -37,13 +37,13 @@ const (
 func walkDifferential(test *testing.T, fixture string, wantExit int) *pipeline {
 	test.Helper()
 
-	walking, walked := runOver(test, copyFixture(test, fixture), wantExit, "--other-builds")
+	walking, walked := runOver(test, copyFixture(test, fixture), wantExit)
 	configured := func(configure func(*pipeline)) string {
 		root := copyFixture(test, fixture)
-		_, raw := runOverConfigured(test, root, wantExit, configure, "--other-builds", "--no-cache")
+		_, raw := runOverConfigured(test, root, wantExit, configure, "--no-cache")
 		return normalize(raw, root)
 	}
-	_, cached := runOverWith(test, copyFixture(test, fixture), wantExit, "--other-builds")
+	_, cached := runOverWith(test, copyFixture(test, fixture), wantExit)
 	for name, stream := range map[string]string{
 		"visiting every package":    configured(func(engine *pipeline) { engine.keepsWalkOff = true }),
 		"checking every package":    configured(func(engine *pipeline) { engine.keepsHostRestoreOff = true }),
@@ -131,8 +131,7 @@ func copiesALock(run buildRun) bool {
 func TestTheSquaresUserIsVisitedAndJudged(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings,
-		"--other-builds")
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
 	host, windows := engine.buildRuns[0], buildRunOf(test, engine, "windows")
 	if slices.Contains(windows.result.FromHost.Untouched, walkU) {
 		test.Errorf("windows left u untouched, %q, want it visited", windows.result.FromHost.Untouched)
@@ -154,8 +153,7 @@ func TestTheSquaresUserIsVisitedAndJudged(test *testing.T) {
 func TestAClosureLookupOfAnAbsentPackageReadsNothing(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings,
-		"--other-builds")
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
 	windows, tagged := buildRunOf(test, engine, "windows"), buildRunOf(test, engine, "cohere_extra")
 	if slices.Contains(windows.result.FromHost.Untouched, walkHasher) {
 		test.Fatal("windows left hasher untouched, so nothing of hash changed there and the case proves nothing")
@@ -173,8 +171,7 @@ func TestAClosureLookupOfAnAbsentPackageReadsNothing(test *testing.T) {
 func TestATagBuildLeavesUntouchedAllButTheLeafsReaders(test *testing.T) {
 	test.Parallel()
 
-	engine, streamed := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings,
-		"--other-builds")
+	engine, streamed := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
 	tagged := buildRunOf(test, engine, "cohere_extra")
 	want := []string{walkDormant, walkH, walkHasher, walkLonely, walkOther, walkS1, walkS2, walkU}
 	slices.Sort(want)
@@ -202,16 +199,16 @@ func TestATagBuildLeavesUntouchedAllButTheLeafsReaders(test *testing.T) {
 	}
 }
 
-// warmSystemCacheRun is a `--no-cache --other-builds` run over a copy of the walk-square fixture whose system cache a
+// warmSystemCacheRun is a `--no-cache` run of every build over a copy of the walk-square fixture whose system cache a
 // cold run filled first, so the host restores the standard library from it and keeps no entry of any of it, and each
 // extra build hits its own there (#syscache).
 func warmSystemCacheRun(test *testing.T) *pipeline {
 	test.Helper()
 	sharing := sharingSystemCache(test.TempDir())
 	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings, sharing,
-		"--no-cache", "--other-builds")
+		"--no-cache")
 	warm, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings,
-		sharing, "--no-cache", "--other-builds")
+		sharing, "--no-cache")
 	if restored := warm.buildRuns[0].result.Cache.FromSystemCache; restored == 0 {
 		test.Fatal("the warm run's host restored nothing from the system cache, so it kept the standard library and " +
 			"the case proves nothing")
@@ -256,7 +253,7 @@ func TestAnUntouchedPackagesFilesAreTheHostsChecked(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "walk-square"))
-	engine, streamed := runOver(test, root, exitFindings, "--other-builds")
+	engine, streamed := runOver(test, root, exitFindings)
 	dormantFile := filepath.Join(root, "dormant", "dormant.go")
 	tagged := buildRunOf(test, engine, "cohere_extra")
 	if !slices.Contains(tagged.result.FromHost.Untouched, walkDormant) || tagged.said[dormantFile] ||
@@ -291,8 +288,7 @@ const (
 func TestAnUntouchedPackageAboveACheckDeclineStaysUntouched(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-reload")), exitFindings,
-		"--other-builds")
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-reload")), exitFindings)
 	tagged := buildRunOf(test, engine, "cohere_extra")
 	if !strings.HasPrefix(tagged.result.FromHost.Declined[walkReloadLogger], "F ") ||
 		tagged.result.Cache.ReloadRoundsBy["hostDecline"] != 1 {
@@ -316,11 +312,11 @@ func TestAWarmRunRestoresTheUntouchedFromItsOwnStore(test *testing.T) {
 	// One system cache for both runs, as a person's: the standard library each build computed cold is kept there, and
 	// never in the build's own store.
 	sharing := sharingSystemCache(test.TempDir())
-	cold, _ := runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+	cold, _ := runOverConfigured(test, root, exitFindings, sharing)
 	if untouched := buildRunOf(test, cold, "cohere_extra").result.FromHost.Untouched; len(untouched) == 0 {
 		test.Fatal("the cold run's tag build left nothing untouched, so nothing tells the warm run's restore apart")
 	}
-	warm, warmRaw := runOverConfigured(test, root, exitFindings, sharing, "--other-builds")
+	warm, warmRaw := runOverConfigured(test, root, exitFindings, sharing)
 	warmStream := normalize(warmRaw, root)
 	for _, run := range warm.buildRuns[1:] {
 		fromHost, counts := run.result.FromHost, run.result.Cache
@@ -330,8 +326,7 @@ func TestAWarmRunRestoresTheUntouchedFromItsOwnStore(test *testing.T) {
 				len(fromHost.Restored), run.checkedFromSource, counts.Missed)
 		}
 	}
-	_, unstored := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings,
-		"--other-builds")
+	_, unstored := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
 	if withoutCache(warmStream) != withoutCache(unstored) {
 		test.Errorf("the warm run's stream differs from --no-cache's:\nwarm\n%s\nno cache\n%s", warmStream, unstored)
 	}
@@ -354,8 +349,7 @@ const (
 func TestACheckDeclinesImporterIsRejudgedAndRestored(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-rejudge")), exitFindings,
-		"--other-builds")
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-rejudge")), exitFindings)
 	windows := buildRunOf(test, engine, "windows")
 	fromHost := windows.result.FromHost
 	if !strings.HasPrefix(fromHost.Declined[rejudgeLogger], "F ") ||
@@ -378,8 +372,7 @@ func TestACheckDeclinesImporterIsRejudgedAndRestored(test *testing.T) {
 func TestARejudgedImporterOfAChangedAnswerDeclines(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-redecline")), exitFindings,
-		"--other-builds")
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-redecline")), exitFindings)
 	host, windows := engine.buildRuns[0], buildRunOf(test, engine, "windows")
 	fromHost := windows.result.FromHost
 	if !strings.HasPrefix(fromHost.Declined[redeclineOpener], "A ") ||

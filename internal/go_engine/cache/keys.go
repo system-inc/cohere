@@ -37,8 +37,8 @@ type Keyed struct {
 	Portable map[*packages.Package]Key
 
 	// Files are the digests of every file Keys keyed, those it was given included, which StandardLibraryKeys reads
-	// rather than hashing the standard library's files again in the same run, and an extra build's Keys under
-	// `--other-builds` reads rather than hashing again the files the host's build shares with it.
+	// rather than hashing the standard library's files again in the same run, and an extra build's Keys in a run of
+	// every build reads rather than hashing again the files the host's build shares with it.
 	Files FileDigests
 }
 

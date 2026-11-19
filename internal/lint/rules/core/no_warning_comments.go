@@ -309,8 +309,9 @@ func checkNoWarningComments(ruleContext rule.Context, compiled noWarningComments
 				(!hasFirst || !noWarningCommentsFoldEqual(lead, first)) {
 				continue
 			}
-			// A match that overruns the time bound reports nothing: a match here is the report.
-			if !matcher.Test(value) {
+			// A match that overruns the time bound reports nothing: a match here is the report. The run
+			// names the overrun as a gap, since a warning comment it missed must not read as clean.
+			if !matcher.Test(value, ruleContext.PatternTimedOut) {
 				continue
 			}
 			if !selfDirectiveChecked {

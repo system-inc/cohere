@@ -10,12 +10,12 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
-// methodCandidate is one type name a rule could match for a Method or Interface lookup's name, as either verdict holds
-// it, of this run's types or persisted (methodLookupHolds): whether it is an interface or generic, the shape of its
-// method of the name, the digest of the lines it is compared across builds by, its method's signature, for a generic
-// type its type parameters with their constraints (renderedTypeParameters) and, for an interface, every method of its
-// method set, and, for an interface, whether its method set holds the lookup's answer. unconstrained is whether it is
-// generic with every type parameter's constraint of all types, which no type argument can fail (#8fbkkp4).
+// methodCandidate is one type name a rule could match for a Method or Interface lookup's name, as the verdict holds it
+// (methodLookupHolds): whether it is an interface or generic, the shape of its method of the name, the digest of the
+// lines it is compared across builds by, its method's signature, for a generic type its type parameters with their
+// constraints (renderedTypeParameters) and, for an interface, every method of its method set, and, for an interface,
+// whether its method set holds the lookup's answer. unconstrained is whether it is generic with every type parameter's
+// constraint of all types, which no type argument can fail (#8fbkkp4).
 type methodCandidate struct {
 	isInterface   bool
 	isGeneric     bool
@@ -93,24 +93,22 @@ func interfaceLine(interfaceType *types.Interface) string {
 	return strings.Join(lines, "\n")
 }
 
-// ownLinesDigest is the digest of lines, mixed with version, the renderer's, as a persisted read holds a digest
-// (persistedDigest), so a candidate of this run and one persisted by a binary of the same renderer compare alike, and
-// one of another renderer never does.
-func ownLinesDigest(version string, lines ...string) []byte {
+// ownLinesDigest is the digest of lines, which the host's side and the build's compare, both rendered by this binary.
+func ownLinesDigest(lines ...string) []byte {
 	parts := make([][]byte, 0, len(lines))
 	for _, line := range lines {
 		parts = append(parts, []byte(line))
 	}
-	return persistedDigest(version, cache.DigestOf(parts...))
+	digest := cache.DigestOf(parts...)
+	return digest[:]
 }
 
-// answerLinesOf is the digest of the own lines of a lookup's answer under version, the renderer's, as the verdict
-// compares it across builds: an interface's every method, or a method's signature, each with the type parameters of
-// the generic type that declares it (renderedTypeParameters), and nil for anything else, which no build can answer
-// alike. A generic answer's parameters are its lines because a rule that matched it by shape alone, none of its
-// parameters bare, matches it by instance in a build where one is, and the signature renders alike in both
-// (#8fbkkp4).
-func answerLinesOf(answer types.Object, version string) []byte {
+// answerLinesOf is the digest of the own lines of a lookup's answer, as the verdict compares it across builds: an
+// interface's every method, or a method's signature, each with the type parameters of the generic type that declares it
+// (renderedTypeParameters), and nil for anything else, which no build can answer alike. A generic answer's parameters
+// are its lines because a rule that matched it by shape alone, none of its parameters bare, matches it by instance in a
+// build where one is, and the signature renders alike in both (#8fbkkp4).
+func answerLinesOf(answer types.Object) []byte {
 	switch declared := answer.(type) {
 	case *types.TypeName:
 		if interfaceType, isInterface := declared.Type().Underlying().(*types.Interface); isInterface {
@@ -118,11 +116,11 @@ func answerLinesOf(answer types.Object, version string) []byte {
 			if named, isNamed := types.Unalias(declared.Type()).(*types.Named); isNamed {
 				parameters = named.TypeParams()
 			}
-			return ownLinesDigest(version, "interface", interfaceLine(interfaceType),
+			return ownLinesDigest("interface", interfaceLine(interfaceType),
 				renderedTypeParameters(parameters))
 		}
 	case *types.Func:
-		return ownLinesDigest(version, "method", signatureLine(declared),
+		return ownLinesDigest("method", signatureLine(declared),
 			renderedTypeParameters(receiverTypeParameters(declared)))
 	}
 	return nil
@@ -130,15 +128,13 @@ func answerLinesOf(answer types.Object, version string) []byte {
 
 // methodCandidateOf is typeName as the rules index it for a lookup of query and name, and false when no rule could
 // match it: an interface by the method of its method set, which Interface takes only of an interface a type can
-// implement, and for Method a named type by the method it declares, never one an embedded field promotes, which no
-// rule indexes. answer is the lookup's answer, nil for none, which an interface's method set may hold, and version the
-// renderer's the lines are digested under.
+// implement, and for Method a named type by the method it declares, never one an embedded field promotes, which no rule
+// indexes. answer is the lookup's answer, nil for none, which an interface's method set may hold.
 func methodCandidateOf(
 	typeName *types.TypeName,
 	query string,
 	name string,
 	answer types.Object,
-	version string,
 ) (methodCandidate, bool) {
 	named, isNamed := types.Unalias(typeName.Type()).(*types.Named)
 	isGeneric := isNamed && named.TypeParams().Len() > 0
@@ -154,7 +150,7 @@ func methodCandidateOf(
 		for method := range interfaceType.Methods() {
 			if method.Name() == name {
 				return methodCandidate{isInterface: true, isGeneric: isGeneric, unconstrained: unconstrained,
-					shape: shapeOf(method.Signature()), lines: ownLinesDigest(version, signatureLine(method),
+					shape: shapeOf(method.Signature()), lines: ownLinesDigest(signatureLine(method),
 						interfaceLine(interfaceType), renderedTypeParameters(parameters)),
 					holdsAnswer: holdsAnswer(interfaceType, answer)}, true
 			}
@@ -168,7 +164,7 @@ func methodCandidateOf(
 		if method.Name() == name {
 			return methodCandidate{isGeneric: isGeneric, unconstrained: unconstrained,
 				shape: shapeOf(method.Signature()),
-				lines: ownLinesDigest(version, signatureLine(method), renderedTypeParameters(parameters))}, true
+				lines: ownLinesDigest(signatureLine(method), renderedTypeParameters(parameters))}, true
 		}
 	}
 	return methodCandidate{}, false
@@ -181,7 +177,7 @@ func holdsAnswer(interfaceType *types.Interface, answer types.Object) bool {
 }
 
 // methodCandidatesOf are the candidates among typeNames, a side's type names with a method of the name, by their
-// package's path and name, their lines digested under this binary's renderer, each rendered once in build (candidate).
+// package's path and name, each rendered once in build (candidate).
 func methodCandidatesOf(
 	build *ReadsBuild,
 	typeNames []*types.TypeName,

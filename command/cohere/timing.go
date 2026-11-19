@@ -452,9 +452,9 @@ func printEngineTimings(out *bufio.Writer, record *contract.TimingRecord) {
 }
 
 // printExtraBuildsFromSource says, under a Go table's first line, that the run's extra builds restored nothing from the
-// host's run (#4y4qd3z), so their packages' work is in the rows below: a reader of a timed run with `--other-builds`
-// would otherwise take its lint figures for an untimed run's, where most of each build is restored and runs nothing.
-// A run with no extra builds, whose count is 0, has nothing to say.
+// host's run (#4y4qd3z), so their packages' work is in the rows below: a reader of a timed run of every build would
+// otherwise take its lint figures for an untimed run's, where most of each build is restored and runs nothing. A run
+// with no extra builds, whose count is 0, has nothing to say.
 func printExtraBuildsFromSource(out *bufio.Writer, extraBuilds int) {
 	if extraBuilds == 0 {
 		return

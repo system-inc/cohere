@@ -135,33 +135,34 @@ func TestTimingReachesTheGoEngine(test *testing.T) {
 	}
 }
 
-// TestOtherBuildsReachTheGoEngineAlone: `--other-builds` is forwarded to the Go engine, which checks every build the
-// project's files name (#72n9mq0). Swift's run refuses it by name, and discovery hands it to no project's run but a Go
-// one's, so at a root holding a Swift package beside a Go module the Swift run is not refused over it.
-func TestOtherBuildsReachTheGoEngineAlone(test *testing.T) {
+// TestHostBuildOnlyReachesTheGoEngineAlone: `--host-build-only` is forwarded to the Go engine, which then checks the
+// host's build alone, where a run without it checks every build the project's files name (#72n9mq0, #qqyq61s). Swift's
+// run refuses it by name, and discovery hands it to no project's run but a Go one's, so at a root holding a Swift
+// package beside a Go module the Swift run is not refused over it.
+func TestHostBuildOnlyReachesTheGoEngineAlone(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	arguments, mode, argumentsError := engineArguments(goLanguage("module"), goFlags, goTestLocation(root),
-		map[string]bool{"no-fix": true, "other-builds": true}, typedTrue, nil)
+		map[string]bool{"no-fix": true, "host-build-only": true}, typedTrue, nil)
 	if argumentsError != nil {
-		test.Fatalf("--other-builds was refused for Go: %v", argumentsError)
+		test.Fatalf("--host-build-only was refused for Go: %v", argumentsError)
 	}
-	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--other-builds"}
+	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--host-build-only"}
 	if !slices.Equal(arguments, expected) || mode != engineModeCheck {
 		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
 			engineModeCheck)
 	}
 
 	_, _, swiftError := engineArguments(swiftLanguage, swiftFlags, goTestLocation(root),
-		map[string]bool{"no-fix": true, "other-builds": true}, typedTrue, nil)
-	if swiftError == nil || !strings.Contains(swiftError.Error(), "--other-builds is not implemented for Swift") {
-		test.Errorf("--other-builds was not refused by name for Swift: %v", swiftError)
+		map[string]bool{"no-fix": true, "host-build-only": true}, typedTrue, nil)
+	if swiftError == nil || !strings.Contains(swiftError.Error(), "--host-build-only is not implemented for Swift") {
+		test.Errorf("--host-build-only was not refused by name for Swift: %v", swiftError)
 	}
 
-	given := []string{"--no-fix", "--other-builds", "-other-builds=true", "--json", "--lint-config", "/a/b.json"}
+	given := []string{"--no-fix", "--host-build-only", "-host-build-only=true", "--json", "--lint-config", "/a/b.json"}
 	if kept := withoutGoOnlySwitches(given); !slices.Equal(kept,
 		[]string{"--no-fix", "--json", "--lint-config", "/a/b.json"}) {
-		test.Errorf("another engine's child is handed %q, want every flag but --other-builds", kept)
+		test.Errorf("another engine's child is handed %q, want every flag but --host-build-only", kept)
 	}
 }
 
@@ -192,11 +193,11 @@ func TestNoSystemCacheReachesTheGoEngineAndIsAcceptedElsewhere(test *testing.T) 
 	}
 }
 
-// TestOtherBuildsAreRefusedAtARootWithNoGoProject: discovery hands `--other-builds` to a Go project's run alone, so
-// at a root of only TypeScript and Swift projects it would reach no run and the run would read as one that checked
+// TestHostBuildOnlyIsRefusedAtARootWithNoGoProject: discovery hands `--host-build-only` to a Go project's run alone,
+// so at a root of only TypeScript and Swift projects it would reach no run and the run would read as one that checked
 // what was asked. Such a root refuses it before any project runs, the way a run at a TypeScript project does, while
-// a root holding a Go module takes it, and `--other-builds=false` asks for nothing to refuse.
-func TestOtherBuildsAreRefusedAtARootWithNoGoProject(test *testing.T) {
+// a root holding a Go module takes it, and `--host-build-only=false` asks for nothing to refuse.
+func TestHostBuildOnlyIsRefusedAtARootWithNoGoProject(test *testing.T) {
 	test.Parallel()
 	typeScriptAndSwift := map[string]string{
 		"web/tsconfig.json":   discoveryTsconfig,
@@ -224,7 +225,7 @@ func TestOtherBuildsAreRefusedAtARootWithNoGoProject(test *testing.T) {
 			}
 			refuseError := refuseGoOnlySwitchesWithoutGo(
 				found,
-				map[string]bool{"other-builds": true},
+				map[string]bool{"host-build-only": true},
 				func(string) string { return testCase.value },
 			)
 			if refused := refuseError != nil; refused != testCase.refused {
@@ -243,10 +244,10 @@ func TestOtherBuildsAreRefusedAtARootWithNoGoProject(test *testing.T) {
 		"admin/tsconfig.json": discoveryTsconfig,
 		"admin/source/b.ts":   "export const b = 2;\n",
 	})
-	output, exitCode := runCohere(test, binary, root, "--no-fix", "--other-builds")
-	if exitCode == 0 || !strings.Contains(output, "--other-builds checks the other builds of a Go project's files") ||
+	output, exitCode := runCohere(test, binary, root, "--no-fix", "--host-build-only")
+	if exitCode == 0 || !strings.Contains(output, "--host-build-only narrows which builds of a Go project's files") ||
 		strings.Contains(output, "(TypeScript) ==") || strings.Contains(output, "✓") {
-		test.Errorf("a root with no Go project exited %d over --other-builds, want it refused before any run:\n%s",
+		test.Errorf("a root with no Go project exited %d over --host-build-only, want it refused before any run:\n%s",
 			exitCode, output)
 	}
 }
@@ -413,10 +414,10 @@ func TestAGoEngineThatDoesNotFinishChecksNothing(test *testing.T) {
 
 // TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds: the real binary at a module whose `_windows.go` file and
 // `//go:build plan9` file each hold a finding the printf rule reports, and whose third file imports "C" with cgo off.
-// The engine checks the host's build alone, so it loads none of the three: the run is green with the exit a clean
-// module has, its footer says "⚠ 3 Go files not checked", the account names each file with the engine's reason, and
-// `--json` lists each under the gaps with its reason. Windows and plan9 are never the host a unix test runs on, so
-// the proof holds on Linux as on a Mac (#72n9mq0).
+// Under `--host-build-only` the engine checks the host's build alone, so it loads none of the three: the run is green
+// with the exit a clean module has, its footer says "⚠ 3 Go files not checked", the account names each file with the
+// engine's reason, and `--json` lists each under the gaps with its reason. Windows and plan9 are never the host a unix
+// test runs on, so the proof holds on Linux as on a Mac (#72n9mq0, #qqyq61s).
 func TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -444,7 +445,8 @@ func TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds(test *testing.T) {
 		"plan9.go":        "excluded by build constraints on ",
 	}
 
-	output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache")
+	output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache",
+		"--host-build-only")
 	if exitCode != 0 || strings.Contains(output, "cohere-go/printf") {
 		test.Fatalf("exit %d, want the 0 of a clean module whose only findings are in files no host build reads:\n%s",
 			exitCode, output)
@@ -458,7 +460,8 @@ func TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds(test *testing.T) {
 		}
 	}
 
-	output, exitCode = runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache", "--json")
+	output, exitCode = runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache",
+		"--host-build-only", "--json")
 	if exitCode != 0 {
 		test.Fatalf("under --json the run exited %d, want 0:\n%s", exitCode, output)
 	}
@@ -587,10 +590,10 @@ func TestAManifestIsNoReasonANothingCheckedRunCounts(test *testing.T) {
 }
 
 // TestADiscoveredGoProjectNamesItsBuildsAndWhatNoRuleRanOn: at a root discovery splits into a TypeScript project and
-// a Go workspace, adamic's shape, `--other-builds --json` writes the `. (Go)` summary with the builds it checked and
-// its lint phase run, though a windows-only file fails to type-check (#rw6tg3a, #ytnvt8k). The windows build's load
-// found that type error and analyzed no package, so its files were compiled and never linted: they are named as not
-// checked, with why, never as checked by the windows build.
+// a Go workspace, adamic's shape, `--json` writes the `. (Go)` summary with the builds it checked and its lint phase
+// run, though a windows-only file fails to type-check (#rw6tg3a, #ytnvt8k). The windows build's load found that type
+// error and analyzed no package, so its files were compiled and never linted: they are named as not checked, with
+// why, never as checked by the windows build.
 func TestADiscoveredGoProjectNamesItsBuildsAndWhatNoRuleRanOn(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -610,7 +613,7 @@ func TestADiscoveredGoProjectNamesItsBuildsAndWhatNoRuleRanOn(test *testing.T) {
 	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
 		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
 	}
-	output, _ := runCohere(test, binary, root, "--no-fix", "--no-cache", "--other-builds", "--json")
+	output, _ := runCohere(test, binary, root, "--no-fix", "--no-cache", "--json")
 	type goSummaryRecord struct {
 		Kind   string         `json:"kind"`
 		Label  string         `json:"label"`
@@ -656,7 +659,7 @@ func TestADiscoveredGoProjectNamesItsBuildsAndWhatNoRuleRanOn(test *testing.T) {
 
 // TestANamedDirectoryHoldingSeveralProjectsChecksEach: `--directory` naming a directory that holds a tsconfig.json and
 // a go.work, adamic's shape, checks both projects and the TypeScript project nested below them, as `cd` there and
-// `cohere` would, never TypeScript's alone in silence (#pswhv5q). `--other-builds`, a Go switch, then reaches the Go
+// `cohere` would, never TypeScript's alone in silence (#pswhv5q). `--host-build-only`, a Go switch, then reaches the Go
 // project rather than being refused as no Go project.
 func TestANamedDirectoryHoldingSeveralProjectsChecksEach(test *testing.T) {
 	test.Parallel()
@@ -678,7 +681,7 @@ func TestANamedDirectoryHoldingSeveralProjectsChecksEach(test *testing.T) {
 	}
 	// The TypeScript fixture's own findings fail the run, which is beside the point: each project's summary is.
 	output, _ := runCohere(test, binary, test.TempDir(), "--directory", root, "--no-fix", "--no-cache",
-		"--other-builds", "--json")
+		"--host-build-only", "--json")
 	var labels []string
 	for _, line := range strings.Split(output, "\n") {
 		var record struct {

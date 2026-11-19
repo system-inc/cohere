@@ -37,8 +37,8 @@ import (
 // restored, by ID, sorted, how many
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
 // facts or answers did not hold), how many times the build was loaded again for those, and every decline and every
-// package never a candidate by the first word of why: inputs, noEntry, sizes, never, unknown, unpersisted, unreadable,
-// export, T, L, F, D or A.
+// package never a candidate by the first word of why: inputs, noEntry, sizes, never, unknown, noReads, export, T, L, F,
+// D or A.
 // Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
 // wall time it ran within.
@@ -89,6 +89,12 @@ type hostState struct {
 	// visitsEvery has the walk visit every package the host kept, leaving none untouched (VisitEvery).
 	visitsEvery bool
 
+	// judgesSkipped, set only by a test (JudgeSkipped), is told each package the build skipped without judging as the
+	// plain path judges a visited one, by which judgment and with why it declines, and skipsTold each such package as
+	// a load skips it, once a load, so the test counts every load's skips; both nil in every run.
+	judgesSkipped func(identifier string, judgment SkippedJudgment, why string)
+	skipsTold     func(identifier string)
+
 	// writtenThrough are this load's packages written through to the build's own store (writeThrough), each once: an
 	// untouched package is settled from the start, so the first wave's save would write it, and every later one again.
 	writtenThrough map[*packages.Package]bool
@@ -138,6 +144,36 @@ func (session *CacheSession) VisitEvery() {
 	}
 }
 
+// SkippedJudgment names how JudgeSkipped judged a package the build skipped: by TypesHold, or by unrestorableReads
+// alone, for reads no verdict can judge, which the plain path declines before TypesHold is asked.
+type SkippedJudgment string
+
+// The judgments JudgeSkipped tells of.
+const (
+	SkippedByTypes        SkippedJudgment = "TypesHold"
+	SkippedByUnrestorable SkippedJudgment = "Unrestorable"
+)
+
+// JudgeSkipped has the session's restore from the host's run also judge each package the build skips without judging,
+// today each the walk leaves untouched (untouchedOf), as the plain path judges a visited one (#wcwx8vf): one whose
+// reads no verdict can judge is told at once, by unrestorableReads's why; every other by TypesHold against the build's
+// types once its imports are done. judged is told each, by ID, by which judgment and with why it declines, empty where
+// it holds, from the load's goroutines. A skip must be a cheaper proof of what the plain path would conclude, so a test
+// sets it to fail on a why. The package stays untouched whatever the judgment says, and nothing else of the run
+// changes but that the load reads the types of what the package reaches, as it does for a visited one, which a
+// hookless run leaves unread where nothing checked imports it. skipped is told each such package, by ID, as a load
+// skips it, before it is judged, once in each load that skips it, so a test counts the skips of every load and not
+// the last load's alone (HostRestoreCounts.Untouched). Only a test calls it, after RestoreFromHost; a run never does.
+func (session *CacheSession) JudgeSkipped(
+	skipped func(identifier string),
+	judged func(identifier string, judgment SkippedJudgment, why string),
+) {
+	if session.host != nil {
+		session.host.skipsTold = skipped
+		session.host.judgesSkipped = judged
+	}
+}
+
 // declineKeys spell out, for the record people read, the first word of each reason a package was not restored from the
 // host: a reason starts with a short tag so a test can match it, but a reader of the record took `T` for a leaked type
 // parameter.
@@ -155,12 +191,6 @@ var declineKeys = map[string]string{
 
 	// A package the host kept, in a build whose sizes are not the host's, which restores nothing from it (#61qj12v).
 	"sizes": "buildSizes",
-
-	// A package whose entry persisted no reads, counted apart from reads never recorded.
-	"unpersisted": "readsNotPersisted",
-
-	// A package whose persisted reads name something the record does not hold.
-	"unreadable": "readsUnreadable",
 }
 
 // reasonWord is why a package was not restored from the host, as the record counts it: the reason's first word,
@@ -325,6 +355,9 @@ func (session *CacheSession) restoreFromHost(
 			// Its reads are never judged: by the walk's induction they read as on the host, so its restore is settled.
 			restored.types.Untouched = true
 			hosted.settled = true
+			if state.judgesSkipped != nil {
+				session.judgeSkipped(candidate, hosted)
+			}
 			session.hits[candidate] = restored
 			session.trusted[candidate] = true
 			state.untouched[candidate] = hosted
@@ -375,15 +408,11 @@ func LoadedSizes(loaded []*packages.Package) types.Sizes {
 }
 
 // unrestorableReads is why a visited package's reads can never hold, as a reason the record counts by its first word,
-// empty for reads a verdict judges: a package kept with persisted reads has its record judged by
-// the verdict, which declines a record it cannot read or match before any read; one kept with none, or whose reads
-// are marked never or were never recorded, is declined here.
+// empty for reads a verdict judges: one kept with none, or whose reads are marked never or were never recorded, is
+// declined here.
 func unrestorableReads(restoring Restoring) string {
 	if restoring.Reads == nil {
-		if restoring.persisted == nil {
-			return unpersistedReads
-		}
-		return ""
+		return noReads
 	}
 	if restorable, why := restoring.Reads.Restorable(); !restorable {
 		if restoring.Reads.Never() != "" {
@@ -424,6 +453,29 @@ func (session *CacheSession) typesHoldFunction(
 			hosted.lock.Unlock()
 		}
 		return holds
+	}
+}
+
+// judgeSkipped tells a test's JudgeSkipped that the load skipped candidate, hosted's package, and how the plain path
+// judges it: by unrestorableReads at once, or by TypesHold as the load decides it (typesHoldFunction), whose answer is
+// told and never kept, so the package is read from the host's export data, untouched, as it would be without the
+// hook.
+//
+// Mutates: hosted its restore gains a late decision that always holds
+func (session *CacheSession) judgeSkipped(candidate *packages.Package, hosted *hostRestore) {
+	if session.host.skipsTold != nil {
+		session.host.skipsTold(candidate.ID)
+	}
+	if why := unrestorableReads(hosted.kept.restoring); why != "" {
+		session.host.judgesSkipped(candidate.ID, SkippedByUnrestorable, why)
+		return
+	}
+	hosted.restored.types.Holds = func(closure map[string]*types.Package) bool {
+		session.host.renderings.measureBy(candidate.TypesSizes)
+		_, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
+			session.host.host.renderings, session.host.renderings)
+		session.host.judgesSkipped(candidate.ID, SkippedByTypes, why)
+		return true
 	}
 }
 

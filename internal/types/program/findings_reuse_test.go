@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -341,6 +343,50 @@ func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(test *testing.T) {
 			"the second run replayed %d files and named %d rule crashes, want 0 and 1",
 			second.FilesReplayed,
 			len(second.Coverage.RulesCrashed),
+		)
+	}
+}
+
+// A file a rule's pattern ran out of time on is not recorded, so the next run walks it and gives its true verdict
+// rather than replaying the stand-in (#s4dy4e0). The rule restricts: a match is the finding, and the overrun reads
+// as no match, so the first run misses the finding and notes the gap. A negative bound hands regexp2 a deadline
+// already past, so the pattern overruns on its first step whatever it is; the second run restores the real bound.
+func TestAFileAPatternTimedOutOnIsWalkedAgainNotReplayed(test *testing.T) {
+	test.Parallel()
+	root := writeProject(test, map[string]string{
+		"tsconfig.json": minimalConfiguration,
+		"a.ts":          "export const forbidden = 1;\n",
+	})
+	pattern := esregexp.MustCompile("^forbidden$", "u")
+	restricting := rule.Rule[rule.NoOptions]{
+		Name: "test-restricts-a-name-by-pattern",
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindIdentifier: func(node *ast.Node) {
+				if pattern.Test(node.Text(), ruleContext.PatternTimedOut) {
+					ruleContext.ReportNode(node, rule.Message{Id: "restricted", Description: "A restricted name."})
+				}
+			}}
+		},
+	}
+	rules := rule_testing.EntriesOf(test, restricting)
+
+	pattern.Unwrap().MatchTimeout = -time.Second
+	first, recorded := walkAndRecord(test, root, rules, nil)
+	if len(first.Diagnostics) != 0 {
+		test.Fatalf("the overrunning run reported %d findings, want 0, so the replay below proves nothing",
+			len(first.Diagnostics))
+	}
+	if len(recorded.Entries) != 0 {
+		test.Errorf("the overrunning run recorded %d entries, want 0", len(recorded.Entries))
+	}
+
+	pattern.Unwrap().MatchTimeout = esregexp.MatchTimeout
+	second, _ := walkAndRecord(test, root, rules, recorded)
+	if second.FilesReplayed != 0 || len(second.Diagnostics) != 1 {
+		test.Errorf(
+			"the run with the bound restored replayed %d files and reported %d findings, want 0 and 1",
+			second.FilesReplayed,
+			len(second.Diagnostics),
 		)
 	}
 }

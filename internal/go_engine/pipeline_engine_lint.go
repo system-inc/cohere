@@ -33,11 +33,11 @@ var lintSuppressionRules = []string{suppression.RuleNoUnusedIgnore, suppression.
 // over this load, written as it is, or nil to run one here. It returns the load its pass ran over: loaded, or the last
 // a reload loaded again (reloadedPass), which the inputs record reads.
 //
-// Under `--other-builds`, every other build the census needs checks what can differ from the host's,
-// read beside the host's pass before anything is written, and the phase writes the merge of every build's findings
-// (#72n9mq0): the findings, the withheld counts and the crashes are every build's, merged; another build's type
-// errors are written as the compiler's findings, since the host's lint ran only on a host load without any; and the
-// lint record names each build.
+// Unless `--host-build-only` narrows the run to the host's build, every other build the census needs checks what can
+// differ from the host's, read beside the host's pass before anything is written, and the phase writes the merge of
+// every build's findings (#72n9mq0, #qqyq61s): the findings, the withheld counts and the crashes are every build's,
+// merged; another build's type errors are written as the compiler's findings, since the host's lint ran only on a host
+// load without any; and the lint record names each build.
 func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *lintPass) *load.Loaded {
 	if !engine.request.requests(contract.PhaseLint) {
 		engine.phase(contract.PhaseLint, contract.OutcomeSkipped, 0, detailNotRequested)
@@ -86,7 +86,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	result := pass.result
 	var verdict *buildsVerdict
 	var outcome suppressedFindings
-	if engine.request.switches["other-builds"] {
+	if engine.request.checksEveryBuild() {
 		// The host's reads, pass.result.Reads, are what an extra build will restore a package by (#b2t9xmf). Their
 		// type-read walks run beside the host's lint and past its end, so otherBuilds waits for every one before any
 		// build decides anything (wholeReads); a run with no extra builds never waits, so the host's verdict never
@@ -147,13 +147,6 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.write(finding)
 	}
 
-	// A run that collected the standard library's entries for the release's table persists each one's reads beside it
-	// once every type-read walk has ended, so the table carries them and a host restoring a package from it can keep it
-	// for its extra builds (#pcv6eff). A run that collected none never waits for the walks, which a run with no extra
-	// builds otherwise leaves running past its verdict.
-	if engine.session != nil && engine.session.HasCollected() {
-		engine.session.PersistCollectedReads(wholeReads(pass.result))
-	}
 	engine.systemCache.failedAt(engine.session)
 	// Every build has read and written the system cache's store by now, so a trim takes nothing from under a build of
 	// this run. A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it

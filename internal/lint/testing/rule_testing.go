@@ -126,6 +126,7 @@ func runParsed(
 	}
 
 	var diagnostics []rule.Diagnostic
+	notes := map[string]int{}
 	context := rule.Context{
 		SourceFile: sourceFile,
 		FileCache:  rule.NewFileCache(),
@@ -133,6 +134,7 @@ func runParsed(
 			diagnostic.RuleName = subject.Name
 			diagnostics = append(diagnostics, diagnostic)
 		},
+		RecordNote: func(key string) { notes[key]++ },
 	}
 
 	listeners := subject.Run(context)
@@ -141,7 +143,7 @@ func runParsed(
 	}
 
 	expectEachFixParses(test, sourceFile, diagnostics)
-	return Result{Diagnostics: diagnostics, SourceFile: sourceFile, capture: captured}
+	return Result{Diagnostics: diagnostics, SourceFile: sourceFile, Notes: notes, capture: captured}
 }
 
 // walk visits every node, calling any listener registered for its kind.

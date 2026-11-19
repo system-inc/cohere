@@ -1471,7 +1471,8 @@ func TestSwitchExhaustivenessCheckNamesTheMissingBranches(test *testing.T) {
 
 // TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran: a user's pattern whose match overruns the time
 // bound (#7mztrdd) is no answer. It may spare a missing default, and must not be reported as the dangerous default
-// case it would be had it matched. `(a|aa)+$` against a long run of `a` backtracks past the bound.
+// case it would be had it matched. The overrun is noted, so the run names it as a gap (#s4dy4e0). `(a|aa)+$`
+// against a long run of `a` backtracks past the bound, waited out here since the rule compiles its pattern itself.
 func TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran(test *testing.T) {
 	test.Parallel()
 	source := `
@@ -1485,13 +1486,14 @@ switch (myBoolean) {
   // ` + strings.Repeat("a", 64) + `b
 }
 `
-	rule_testing.ExpectClean(
-		test,
-		rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
-			SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
-				RequireDefaultForNonUnion:           type_checking.Reference(false),
-				DefaultCaseCommentPattern:           type_checking.Reference("(a|aa)+$"),
-			}),
-	)
+	result := rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
+		SwitchExhaustivenessCheckOptions{
+			AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+			RequireDefaultForNonUnion:           type_checking.Reference(false),
+			DefaultCaseCommentPattern:           type_checking.Reference("(a|aa)+$"),
+		})
+	rule_testing.ExpectClean(test, result)
+	if timedOut := rule.PatternTimedOutNotePrefix + "/(a|aa)+$/u"; result.Notes[timedOut] != 1 {
+		test.Errorf("want %q noted once, got every note %v", timedOut, result.Notes)
+	}
 }

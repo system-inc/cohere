@@ -121,7 +121,7 @@ type Counts struct {
 	Dependencies contract.DependenceCounts
 }
 
-// Under `--other-builds --build-dependence`, the windows build's record holds the counts the library's own judgment
+// Under `--build-dependence`, the windows build's record holds the counts the library's own judgment
 // gives the same fixture, loaded whole: of the workspace's four units, Separator, which reads os.PathSeparator, a
 // dependency's constant windows declares apart, Mode, which reads the module's own platform constant, and that
 // constant, in a file windows does not compile, are dependent, and Joined is not. The host's record writes none. The
@@ -130,9 +130,8 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "build-dependence"))
-	on, onStream := runOver(test, root, exitClean, "--other-builds", "--build-dependence")
-	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean,
-		"--other-builds")
+	on, onStream := runOver(test, root, exitClean, "--build-dependence")
+	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean)
 
 	lint := lintRecordOf(test, onStream)
 	if len(lint.Builds) != 2 || len(on.buildRuns) != 2 {
@@ -176,18 +175,20 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 	}
 }
 
-// `--build-dependence` without `--other-builds` has no extra build to judge, so it builds no graph and the run's
-// stream is the plain run's.
-func TestBuildDependenceAloneChangesNothing(test *testing.T) {
+// `--build-dependence` under `--host-build-only` has no extra build to judge, so it builds no graph and the run's
+// stream is that of the host's build alone (#qqyq61s).
+func TestBuildDependenceOfTheHostsBuildAloneChangesNothing(test *testing.T) {
 	test.Parallel()
 
 	switched, switchedStream := runOver(test, copyFixture(test, filepath.Join("testdata", "build-dependence")),
-		exitClean, "--build-dependence")
-	_, plainStream := runOver(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean)
+		exitClean, "--host-build-only", "--build-dependence")
+	_, plainStream := runOver(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean,
+		"--host-build-only")
 	if switched.dependence != nil {
-		test.Error("the switch without --other-builds built the host's graph")
+		test.Error("the switch under --host-build-only built the host's graph")
 	}
 	if switchedStream != plainStream {
-		test.Errorf("the stream with the switch alone is\n%s\nwant the plain run's\n%s", switchedStream, plainStream)
+		test.Errorf("the stream with the switch under --host-build-only is\n%s\nwant the run's without it\n%s",
+			switchedStream, plainStream)
 	}
 }

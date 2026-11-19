@@ -132,8 +132,9 @@ var NoHtmlLinkForPages = rule.Rule[NoHtmlLinkForPagesOptions]{
 			// Upstream normalizes hrefPath a second time before each test. A normalized path ends in
 			// `/` and has no query, fragment or trailing index.html left, so that second pass returns
 			// it unchanged and is not repeated here.
+			// A route restricts: a match that overruns the time bound reports nothing, and the run names it as a gap.
 			for _, route := range model.routes {
-				if route.Test(hrefPath) {
+				if route.Test(hrefPath, ruleContext.PatternTimedOut) {
 					ruleContext.ReportNode(node, noHtmlLinkForPagesMessage(hrefPath))
 				}
 			}

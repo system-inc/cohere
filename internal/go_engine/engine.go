@@ -23,7 +23,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/format"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
-	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
 )
 
@@ -68,10 +67,9 @@ var mainHasRun atomic.Bool
 
 // Main runs the engine over the command line the front door sends, writing records to standardOutput and
 // prose to standardError, and returns the exit code. availableMemoryBytes is the memory the front door's policy
-// read as available when this process started, 0 when it could not, which the memory limit is sized from. A command
-// line that names one of the release's hidden verbs for the standard library's table runs that verb instead (see
-// runStandardLibraryVerb), under the same memory limit. standardInput is read only by the editor's save, whose buffer
-// it is, and whose standardOutput is that file's text rather than records (pipeline.runStdin).
+// read as available when this process started, 0 when it could not, which the memory limit is sized from.
+// standardInput is read only by the editor's save, whose buffer it is, and whose standardOutput is that file's text
+// rather than records (pipeline.runStdin).
 func Main(
 	arguments []string,
 	availableMemoryBytes uint64,
@@ -95,14 +93,6 @@ func Main(
 		setMemoryLimit: debug.SetMemoryLimit,
 		collecting:     collectorMarking,
 	}
-	if isStandardLibraryVerb(arguments) {
-		generator, generatorError := binaryGenerator()
-		if generatorError != nil {
-			return refuse(standardError, generatorError)
-		}
-		return runStandardLibraryVerb(arguments, standardOutput, standardError, rules.All(),
-			cache.NewStandardLibraryTable(standard_library_table.Contents), generator)
-	}
 	// A save writes no file, refused where every write of a source file passes (format.RefuseWrites), so no phase, one
 	// added later included, can write over a file the editor holds unsaved. Here rather than in run, as the memory
 	// limit is, since the refusal is process-wide, and a test running the engine in process writes files beside it.
@@ -115,9 +105,8 @@ func Main(
 
 // runWithStandardLibrary is Main with the analyzer rules handed in, no standard input, and source as where its standard
 // library comes from and goes, so a test can run the engine with a rule planted in place of the registry's, such as
-// one that panics, give a run a system cache and a stamp of its own, or collect the entries a run saves, without a
-// release build. memory is what Main decided about the memory limit, nil in a test, which decides nothing and never
-// raises the limit.
+// one that panics, or give a run a system cache and a stamp of its own. memory is what Main decided about the memory
+// limit, nil in a test, which decides nothing and never raises the limit.
 func runWithStandardLibrary(
 	arguments []string,
 	standardOutput io.Writer,

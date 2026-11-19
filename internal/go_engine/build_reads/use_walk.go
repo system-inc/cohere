@@ -897,9 +897,11 @@ type looker interface {
 
 // lookThrough hands reader each named type a look through a value of type looked can reach: through fields, elements,
 // keys and pointers at any depth, and through the declaration of each named type reader says it looks into, as
-// printf's matching and a marshaller's walk go, and never into a function or a channel, which no such look enters.
-// printf looks through a pointer only at the top, but a marshaller follows every one, so every pointer is followed. A
-// named type's type arguments are looked through whether or not its declaration is.
+// printf's matching and a marshaller's walk go, and never into a function's parameters or results, which no such look
+// enters. printf looks through a pointer only at the top, but a marshaller follows every one, so every pointer is
+// followed. A channel's element is entered as a slice's is: staticcheck's SA1003 judges the data given to
+// binary.Write by the element of a channel and then by the element's fields. A named type's type arguments are looked
+// through whether or not its declaration is.
 //
 // Both grains of the reads look by this one walk, so neither looks through a kind of type the other does not.
 func lookThrough(looked types.Type, reader looker) {
@@ -920,6 +922,8 @@ func lookThrough(looked types.Type, reader looker) {
 	case *types.Array:
 		lookThrough(looked.Elem(), reader)
 	case *types.Slice:
+		lookThrough(looked.Elem(), reader)
+	case *types.Chan:
 		lookThrough(looked.Elem(), reader)
 	case *types.Map:
 		lookThrough(looked.Key(), reader)

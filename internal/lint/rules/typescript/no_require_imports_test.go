@@ -511,10 +511,10 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if len(decoded.Allow) != 2 {
 			test.Fatalf("compiled %d patterns, want 2", len(decoded.Allow))
 		}
-		if !decoded.Allow[0].Test("../packages/package.json") {
+		if !decoded.Allow[0].Test("../packages/package.json", nil) {
 			test.Error("the escaped-dot pattern did not match a path upstream permits")
 		}
-		if decoded.Allow[0].Test("./package.jsonc") {
+		if decoded.Allow[0].Test("./package.jsonc", nil) {
 			test.Error("the anchored pattern matched a path upstream reports")
 		}
 	})
@@ -531,7 +531,7 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if len(decoded.Allow) != 1 {
 			test.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(decoded.Allow))
 		}
-		if !decoded.Allow[0].Test("xy") {
+		if !decoded.Allow[0].Test("xy", nil) {
 			test.Error("the lookbehind did not match a path JavaScript matches")
 		}
 	})
@@ -548,7 +548,7 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if len(decoded.Allow) != 1 {
 			test.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(decoded.Allow))
 		}
-		if !decoded.Allow[0].Test("ok") {
+		if !decoded.Allow[0].Test("ok", nil) {
 			test.Error("the surviving pattern is not the compilable one")
 		}
 	})

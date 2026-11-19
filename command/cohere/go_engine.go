@@ -50,9 +50,11 @@ func runGoEngineVerb(
 // library's entries in the user's cache directory, which `no-cache` leaves on. The run cache admits it, since its key
 // holds every argument, so a run under it never replays one without it, nor the reverse.
 //
-// `other-builds` is Go's alone: the engine checks every build the project's files name beside the host's, so a file
-// only another build compiles is checked and no gap (#72n9mq0). The run cache admits it, as its own record, since the
-// key holds every argument and the engine's inputs record names every build's load (#e4b08k7).
+// `host-build-only` is Go's alone. Without it the engine checks every build the project's files name beside the
+// host's, so a file only another build compiles is checked and no gap (#72n9mq0, #qqyq61s); with it the engine checks
+// the host's build alone and names each such file as a gap. The run cache admits it, as its own record, since the key
+// holds every argument, and a run without it is replayed only while every build's inputs are unchanged, since the
+// engine's inputs record names every build's load (#e4b08k7).
 //
 // `timing` asks the engine for its timing record, what the run's CPU went to, which the front door prints as
 // TypeScript's timing table (#3apgjer). The run cache never admits it (see runCacheAdmits).
@@ -62,7 +64,7 @@ func runGoEngineVerb(
 var goFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-		"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "other-builds", "timing", "duplicates",
+		"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "host-build-only", "timing", "duplicates",
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open", "stdin-filepath",

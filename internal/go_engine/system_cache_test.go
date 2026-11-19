@@ -32,6 +32,24 @@ func TestTheTestsSystemCacheIsNotTheUsers(test *testing.T) {
 // another.
 var testsSystemCache string
 
+func TestMain(suite *testing.M) {
+	if os.Getenv(timingMarginChildVariable) != "" {
+		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
+	}
+	// Every run in this process, and every child it starts, reads a system cache of this test binary's own rather
+	// than the person's (#syscache). The engine's test helpers give each run a system cache of its own beside that
+	// (isolatedSource), and a test that names one on the run (standardLibrarySource's systemCacheRoot), or sets the
+	// variable itself, reads that one.
+	removeSystemCache, isolateError := system_cache_testing.Isolate()
+	if isolateError != nil {
+		os.Exit(refuse(os.Stderr, isolateError))
+	}
+	testsSystemCache = os.Getenv(system_cache_testing.Variable)
+	code := suite.Run()
+	removeSystemCache()
+	os.Exit(code)
+}
+
 // isolatedSource is source with a new, empty system cache of the run's own, unless source names one or the test set
 // the variable to one of its own, which the run then reads. Each run of a test that names none computes the standard
 // library and writes its table where no other run reads it, so its records are what they are for a cold system cache
@@ -295,13 +313,11 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 		}
 		return restored, written
 	}
-	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--other-builds").stream)
+	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if len(cold.Builds) < 2 || cold.Builds[0].SystemCacheWritten == 0 || cold.Builds[0].SystemCacheRestored != 0 {
 		test.Fatalf("want the cold host to write to the system cache and restore nothing, got %+v", cold.Builds)
 	}
-	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--other-builds").stream)
+	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if warm.Builds[0].SystemCacheRestored != cold.Builds[0].SystemCacheWritten ||
 		warm.Builds[0].SystemCacheWritten != 0 {
 		test.Errorf("want the warm host to restore the %d entries the cold one wrote and write none, got %+v",
@@ -316,7 +332,7 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 		}
 	}
 	off := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--no-system-cache", "--other-builds").stream)
+		"--no-system-cache").stream)
 	if restored, written := summed(off); !off.Cache.SystemCacheOff || off.Cache.FromSystemCache != 0 ||
 		restored+written != 0 {
 		test.Errorf("want a run under --no-system-cache to say the system cache was off and count nothing of it, "+
@@ -340,10 +356,8 @@ func TestAWarmExtraBuildRestoresTheStandardLibraryItWroteFromTheSystemCache(test
 		test.Fatal(writeError)
 	}
 	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--other-builds").stream)
-	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
-		"--other-builds").stream)
+	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
+	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if len(warm.Builds) < 2 || len(warm.Builds) != len(cold.Builds) {
 		test.Fatalf("want the warm run to run the cold run's builds and one beside the host's, got %+v", warm.Builds)
 	}
@@ -430,5 +444,47 @@ func TestAFailedSystemCacheWriteIsWhyItWasNotKept(test *testing.T) {
 	if unwritable.exitCode != plain.exitCode || unwritable.withoutCounts != plain.withoutCounts {
 		test.Errorf("over an unwritable store the run exited %d, want %d, or its records differ:\n%s\nplain\n%s",
 			unwritable.exitCode, plain.exitCode, unwritable.withoutCounts, plain.withoutCounts)
+	}
+}
+
+// One project's standard-library entries serve another's (#znqfjw2): the system cache is keyed by the engine, the
+// standard library's build and its facts, never by the project, so a second module on the same machine restores from
+// the store the first one filled every package both reach, computes only those the first never reached, and reads as
+// it does with no system cache at all. The second module reaches `text/tabwriter`, which the first fixture never
+// imports, so the run has something of its own to write.
+func TestOneProjectsStandardLibraryEntriesServeAnothers(test *testing.T) {
+	test.Parallel()
+	shared := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	first := runEngineWith(test, copyFixture(test, standardLibraryFixture), shared, rules.All(), "--no-cache")
+	if first.counts.SystemCacheWritten == 0 {
+		test.Fatalf("want the first project to fill the system cache, got %+v", first.counts)
+	}
+
+	second := test.TempDir()
+	for name, contents := range map[string]string{
+		"go.mod": "module example.com/secondproject\n\ngo 1.24\n",
+		"second.go": "// Package second writes a table, and holds printf's finding of a verb that does not fit.\n" +
+			"package second\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\t\"strings\"\n\t\"text/tabwriter\"\n)\n\n" +
+			"// Print writes name under a header, padded.\nfunc Print(name string) {\n" +
+			"\twriter := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)\n" +
+			"\tfmt.Fprintf(writer, \"%d\\t%s\\n\", strings.ToUpper(name), name)\n" +
+			"\t// Ignored: a fixture's flush has nowhere to report to.\n\t_ = writer.Flush()\n}\n",
+	} {
+		if writeError := os.WriteFile(filepath.Join(second, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	alone := runEngineWith(test, second, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
+	served := runEngineWith(test, second, shared, rules.All(), "--no-cache")
+	if served.counts.FromSystemCache == 0 || served.counts.SystemCacheWritten == 0 {
+		test.Errorf("want the second project to restore what the first wrote and write what only it reaches, "+
+			"got %+v", served.counts)
+	}
+	if !strings.Contains(alone.stream, "cohere-go/printf") {
+		test.Fatalf("the second project's run found no printf finding, so it tells nothing:\n%s", alone.stream)
+	}
+	if served.withoutCounts != alone.withoutCounts {
+		test.Errorf("the second project served by the first's entries\n%s\nwith no system cache\n%s",
+			served.withoutCounts, alone.withoutCounts)
 	}
 }

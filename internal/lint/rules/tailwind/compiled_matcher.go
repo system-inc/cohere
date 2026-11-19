@@ -22,5 +22,8 @@ func (matcher compiledMatcher) matchesPath(path string) bool {
 	if matcher.path == nil {
 		return false
 	}
-	return matcher.path.Test(path)
+	// A path filter picks what the class rules read, so a match that overruns the time bound reads as no
+	// match. Nil drops the overrun unnamed: the class surfaces are found once for every class rule, through
+	// the reader the file cache shares, below any one rule's context to name it in (#s4dy4e0).
+	return matcher.path.Test(path, nil)
 }

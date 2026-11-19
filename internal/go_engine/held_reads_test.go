@@ -105,7 +105,7 @@ func TestTheBuildsReadFromTheDescriptionsReadsAreTheDisks(test *testing.T) {
 	}
 }
 
-// A run under `--other-builds` opens each file of its census once (#ghb3rcn): every file is read through the run's
+// A run of every build opens each file of its census once (#ghb3rcn): every file is read through the run's
 // reader once, and the builds are the bytes it handed, never the disk's. The disk names freebsd where the reader
 // names openbsd, so a selection that read the disk again would choose freebsd's build.
 func TestARunWithBuildsReadsEachFileOnce(test *testing.T) {
@@ -114,7 +114,7 @@ func TestARunWithBuildsReadsEachFileOnce(test *testing.T) {
 	chosen := filepath.Join(root, "chosen.go")
 	writeTestFile(test, chosen, "//go:build freebsd\n\npackage sample\n")
 	request, parseError := parseInvocation([]string{"--contract", fmt.Sprint(contract.Version), "--root", root,
-		"--no-fix", "--other-builds"})
+		"--no-fix"})
 	if parseError != nil {
 		test.Fatal(parseError)
 	}

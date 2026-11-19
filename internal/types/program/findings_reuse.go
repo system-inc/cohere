@@ -425,7 +425,8 @@ func mergeNotes(first RuleNotes, second RuleNotes) RuleNotes {
 // one.
 //
 // A file is not recorded when any cacheable rule's finding carries a fix or a suggestion, since a cached
-// finding stores neither and the fix phase needs the edit itself. A file with directives is recorded with the
+// finding stores neither and the fix phase needs the edit itself. Nor when any rule's pattern ran out of time
+// on it (patternTimedOut), whichever rules are cached. A file with directives is recorded with the
 // findings they withheld from its cacheable rules, which a replay marks applied again (#kdee854): a directive's
 // accounting spans every rule in the file, cached and walked alike, and those are what the cached part adds.
 //
@@ -441,6 +442,9 @@ func recordableEntry(
 	visited int,
 	silenced suppressionTally,
 ) (LintCacheEntry, bool) {
+	if patternTimedOut(fileNotes) {
+		return LintCacheEntry{}, false
+	}
 	cacheable := append(
 		append(append(append(append([]string{}, keys.pure...), keys.typed...), keys.shaped...), keys.design...),
 		keys.derived...,
@@ -489,6 +493,23 @@ func recordableEntry(
 	return entry, true
 }
 
+// patternTimedOut reports whether any rule noted a pattern running out of time on the file
+// (rule.Context.PatternTimedOut), which keeps the file out of the cache (#s4dy4e0). The rule acted on a
+// stand-in for the pattern's answer, so its verdict is not the file's: a restricting pattern dropped a finding,
+// and an allow pattern allowed what it may not have. And it is one run's accident, a match that ran past its
+// bound on a busy box. Recorded, the stand-in and its gap would replay on every run until the file changed.
+// Asked of every rule walked, cached or not, so a timeout anywhere sends the whole file to be walked again.
+func patternTimedOut(fileNotes RuleNotes) bool {
+	for _, counts := range fileNotes {
+		for key := range counts {
+			if strings.HasPrefix(key, rule.PatternTimedOutNotePrefix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // withheldBy is the withheld findings of the named rules, nil when none.
 func withheldBy(withheld []LintCacheWithheld, names map[string]bool) []LintCacheWithheld {
 	var kept []LintCacheWithheld
@@ -503,7 +524,8 @@ func withheldBy(withheld []LintCacheWithheld, names map[string]bool) []LintCache
 // refreshClasses is an entry whose pure part was replayed and one or more of whose keyed classes just ran
 // again: the old findings, listening and notes of every class that replayed, and the fresh ones of every class
 // that ran, under this run's fingerprints. Refused, like any recording, when a fresh finding carries a fix or a
-// suggestion.
+// suggestion, or a rule's pattern ran out of time on the file (patternTimedOut). Refused, the file has no entry
+// in the cache this run leaves, so the next run walks it whole.
 //
 // A design-system class that ran takes a zero fingerprint, settled to this run's design system in Recorded.
 //
@@ -519,6 +541,9 @@ func refreshClasses(
 	fileAdamic *AdamicRecord,
 	silenced suppressionTally,
 ) (LintCacheEntry, bool) {
+	if patternTimedOut(fileNotes) {
+		return LintCacheEntry{}, false
+	}
 	ran := map[string]bool{}
 	for _, name := range append(
 		append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),

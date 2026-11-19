@@ -288,7 +288,7 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 				return
 			}
 			for subjectIndex, subject := range subjects {
-				got := re.Test(subject)
+				got := re.Test(subject, nil)
 				checks++
 				if got != answers[fixtureIndex].Bits[subjectIndex] {
 					test.Fatalf(

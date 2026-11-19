@@ -29,6 +29,10 @@ type bitWalker struct {
 	// seen are the types the current walk has walked.
 	seen      map[walkKey]bool
 	collected []reference
+
+	// entering is set for a walk that reads in full behind pointers, slices, maps, channels, signatures and interface
+	// methods too (borrowedEnteringReferences).
+	entering bool
 }
 
 // references are the bits walked reaches, read in full or as a name, each once, in a slice of their own, for a caller
@@ -44,6 +48,17 @@ func (walker *bitWalker) borrowedReferences(walked types.Type, full bool) []refe
 	walker.collected = walker.collected[:0]
 	walker.walk(walked, full)
 	return walker.collected
+}
+
+// borrowedEnteringReferences are borrowedReferences' bits of walked read in full, everything it reaches entered in
+// full too, behind pointers, slices, maps, channels, signatures and interface methods as well: whatever a type taken
+// from walked by an operation could hold, as an element, a pointer's target or a result, for a var whose type its
+// initializer infers (collector.collectValue).
+func (walker *bitWalker) borrowedEnteringReferences(walked types.Type) []reference {
+	walker.entering = true
+	referenced := walker.borrowedReferences(walked, true)
+	walker.entering = false
+	return referenced
 }
 
 // emit records object's name bit, and with full its underlying bit too.
@@ -92,14 +107,14 @@ func (walker *bitWalker) walk(walked types.Type, full bool) {
 	case *types.TypeParam:
 		walker.walk(walked.Constraint(), full)
 	case *types.Pointer:
-		walker.walk(walked.Elem(), false)
+		walker.walk(walked.Elem(), walker.entering)
 	case *types.Slice:
-		walker.walk(walked.Elem(), false)
+		walker.walk(walked.Elem(), walker.entering)
 	case *types.Chan:
-		walker.walk(walked.Elem(), false)
+		walker.walk(walked.Elem(), walker.entering)
 	case *types.Map:
-		walker.walk(walked.Key(), false)
-		walker.walk(walked.Elem(), false)
+		walker.walk(walked.Key(), walker.entering)
+		walker.walk(walked.Elem(), walker.entering)
 	case *types.Array:
 		walker.walk(walked.Elem(), full)
 	case *types.Struct:
@@ -108,17 +123,17 @@ func (walker *bitWalker) walk(walked types.Type, full bool) {
 		}
 	case *types.Signature:
 		for parameter := range walked.TypeParams().TypeParams() {
-			walker.walk(parameter.Constraint(), false)
+			walker.walk(parameter.Constraint(), walker.entering)
 		}
-		walker.walk(walked.Params(), false)
-		walker.walk(walked.Results(), false)
+		walker.walk(walked.Params(), walker.entering)
+		walker.walk(walked.Results(), walker.entering)
 	case *types.Tuple:
 		for variable := range walked.Variables() {
 			walker.walk(variable.Type(), full)
 		}
 	case *types.Interface:
 		for method := range walked.ExplicitMethods() {
-			walker.walk(method.Type(), false)
+			walker.walk(method.Type(), walker.entering)
 		}
 		for embedded := range walked.EmbeddedTypes() {
 			walker.walk(embedded, true)

@@ -50,8 +50,7 @@ func foundIn(run buildRun, file string) bool {
 func TestAnExtraBuildRestoresWhatReadsTheSameAndChecksTheRest(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), exitFindings,
-		"--other-builds")
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), exitFindings)
 	host, windows := engine.buildRuns[0], windowsRun(test, engine)
 	fromHost := windows.result.FromHost
 	if !slices.Equal(fromHost.Restored, []string{restoreReader}) {
@@ -90,7 +89,7 @@ func TestAReloadsChecksFromSourceReachTheRecord(test *testing.T) {
 
 	// The stream as written, since normalize blanks each build's target.
 	_, stream := runOverRaw(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), exitFindings,
-		"--no-cache", "--other-builds")
+		"--no-cache")
 	var lint contract.LintRecord
 	for line := range strings.SplitSeq(stream, "\n") {
 		if strings.HasPrefix(line, `{"kind":"lint"`) {
@@ -133,17 +132,17 @@ func TestTheMergeIsTheSameWhetherTheBuildsRestoreFromTheHostOrNot(test *testing.
 	fixture := filepath.Join("testdata", "restore-from-host")
 	restoringNothing := func(engine *pipeline) { engine.keepsHostRestoreOff = true }
 	offRoot := copyFixture(test, fixture)
-	_, offRaw := runOverConfigured(test, offRoot, exitFindings, restoringNothing, "--other-builds", "--no-cache",
+	_, offRaw := runOverConfigured(test, offRoot, exitFindings, restoringNothing, "--no-cache",
 		"--no-system-cache")
 	off := normalize(offRaw, offRoot)
-	_, on := runOver(test, copyFixture(test, fixture), exitFindings, "--other-builds", "--no-system-cache")
+	_, on := runOver(test, copyFixture(test, fixture), exitFindings, "--no-system-cache")
 	if withoutHostRestore(on) != withoutHostRestore(off) {
 		test.Errorf("restoring from the host changed the stream:\nrestoring\n%s\nchecking every package\n%s", on, off)
 	}
 	if on == off {
 		test.Error("the run restoring from the host wrote no count of it, so nothing tells the two runs apart")
 	}
-	_, cached := runOverWith(test, copyFixture(test, fixture), exitFindings, "--other-builds", "--no-system-cache")
+	_, cached := runOverWith(test, copyFixture(test, fixture), exitFindings, "--no-system-cache")
 	if withoutCache(cached) != withoutCache(off) {
 		test.Errorf("restoring from the host with the findings cache on changed the stream:\ncached\n%s\nchecking "+
 			"every package\n%s", cached, off)
@@ -165,9 +164,9 @@ func TestAnExtraBuildDeclinesAnInstanceWhoseInferredTypeArgumentDiffers(test *te
 	fixture := filepath.Join("testdata", "restore-instance")
 	offRoot := copyFixture(test, fixture)
 	_, offRaw := runOverConfigured(test, offRoot, exitFindings,
-		func(engine *pipeline) { engine.keepsHostRestoreOff = true }, "--other-builds", "--no-cache")
+		func(engine *pipeline) { engine.keepsHostRestoreOff = true }, "--no-cache")
 	off := normalize(offRaw, offRoot)
-	engine, on := runOver(test, copyFixture(test, fixture), exitFindings, "--other-builds")
+	engine, on := runOver(test, copyFixture(test, fixture), exitFindings)
 	host, windows := engine.buildRuns[0], windowsRun(test, engine)
 	if why := windows.result.FromHost.Declined[restoreInferrer]; !strings.HasPrefix(why,
 		"T object example.com/restoreinstance/platform.Handle renders differently") {
@@ -200,14 +199,14 @@ func TestAnExtraBuildAnswersABodilessFunctionWithoutLoadingAgain(test *testing.T
 	fixture := filepath.Join("testdata", "restore-bodiless")
 	offRoot := copyFixture(test, fixture)
 	_, offRaw := runOverConfigured(test, offRoot, exitClean,
-		func(engine *pipeline) { engine.keepsHostRestoreOff = true }, "--other-builds", "--no-cache")
+		func(engine *pipeline) { engine.keepsHostRestoreOff = true }, "--no-cache")
 	off := normalize(offRaw, offRoot)
 	for name, run := range map[string]func() (*pipeline, string){
 		"without the findings cache": func() (*pipeline, string) {
-			return runOver(test, copyFixture(test, fixture), exitClean, "--other-builds")
+			return runOver(test, copyFixture(test, fixture), exitClean)
 		},
 		"with the findings cache": func() (*pipeline, string) {
-			return runOverWith(test, copyFixture(test, fixture), exitClean, "--other-builds")
+			return runOverWith(test, copyFixture(test, fixture), exitClean)
 		},
 	} {
 		engine, on := run()
@@ -230,10 +229,10 @@ func TestAnExtraBuildAnswersABodilessFunctionWithoutLoadingAgain(test *testing.T
 }
 
 // A timed run restores nothing from the host's run, so its timing record says so (#4y4qd3z): over the restore
-// fixture, `--timing --other-builds` writes extraBuildsFromSource as the count of builds beside the host's, and
-// `--timing` alone, which checks no extra build, leaves it out of the line. Each build's own result is read too, so the
-// record's claim is held by what happened: under `--no-cache` the host's session keeps its entries in memory for the
-// builds, and there windows restores a package from the host whenever a timed run is let keep one.
+// fixture, `--timing` writes extraBuildsFromSource as the count of builds beside the host's, and `--timing` under
+// `--host-build-only`, which checks no extra build, leaves it out of the line. Each build's own result is read too, so
+// the record's claim is held by what happened: under `--no-cache` the host's session keeps its entries in memory for
+// the builds, and there windows restores a package from the host whenever a timed run is let keep one.
 func TestATimedRunWithExtraBuildsSaysTheyRestoredNothing(test *testing.T) {
 	test.Parallel()
 
@@ -248,12 +247,12 @@ func TestATimedRunWithExtraBuildsSaysTheyRestoredNothing(test *testing.T) {
 		return ""
 	}
 	fixture := filepath.Join("testdata", "restore-from-host")
-	for _, flags := range [][]string{{"--timing", "--other-builds"}, {"--timing", "--other-builds", "--no-cache"}} {
+	for _, flags := range [][]string{{"--timing"}, {"--timing", "--no-cache"}} {
 		engine, stream := runOverRaw(test, copyFixture(test, fixture), exitFindings, flags...)
 		checkTimedRunRestoredNothing(test, engine, timingLine(stream), strings.Join(flags, " "))
 	}
 
-	_, alone := runOverRaw(test, copyFixture(test, fixture), exitFindings, "--timing")
+	_, alone := runOverRaw(test, copyFixture(test, fixture), exitFindings, "--timing", "--host-build-only")
 	if line := timingLine(alone); strings.Contains(line, `"extraBuildsFromSource"`) {
 		test.Errorf("a timed run with no extra builds wrote extraBuildsFromSource: %s", line)
 	}
@@ -297,7 +296,7 @@ func TestEachBuildsRecordSaysWhereItsTimeWent(test *testing.T) {
 	test.Parallel()
 
 	engine, stream := runOverRaw(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")),
-		exitFindings, "--no-cache", "--other-builds")
+		exitFindings, "--no-cache")
 	host, windows := engine.buildRuns[0], windowsRun(test, engine)
 	for name, measured := range map[string]time.Duration{
 		"the host's load":    host.loading,

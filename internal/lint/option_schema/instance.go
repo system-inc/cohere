@@ -160,8 +160,10 @@ func validate(schema *node, value json_value.Value, path string) *Violation {
 			}
 		}
 		// A match that runs past esregexp's time bound counts as a match: this check may only refuse
-		// what ajv refuses, and a refusal stops the whole run.
-		if schema.pattern != nil && !schema.pattern.TestOrTimeout(string(typed)) {
+		// what ajv refuses, and a refusal stops the whole run. Nil drops the overrun unnamed: the pattern
+		// is an upstream schema's, checked once as the config loads, with no rule or file to name a gap
+		// against.
+		if schema.pattern != nil && !schema.pattern.TestOrTimeout(string(typed), nil) {
 			return &Violation{
 				Path:     pathOrRoot(path),
 				Expected: fmt.Sprintf("a string matching /%s/, got %s", schema.patternSource, describe(value)),
@@ -308,7 +310,8 @@ func validateObject(schema *node, object json_value.Object, path string) *Violat
 			}
 		}
 		for _, patterned := range schema.patternProperties {
-			if patterned.pattern.TestOrTimeout(key) {
+			// Counted as a match on an overrun, unnamed, for the reason the string pattern above gives.
+			if patterned.pattern.TestOrTimeout(key, nil) {
 				declared = true
 				if violation := validate(patterned.schema, object[key], keyPath); violation != nil {
 					return violation

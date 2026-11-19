@@ -103,6 +103,14 @@ type pipeline struct {
 	// the test can compare the two.
 	keepsWalkOff bool
 
+	// judgedSkipped, set only by a test, has every extra build also judge each package it skips without judging, as
+	// the plain path judges a visited one, and is told, with the build, each it judged, by which judgment, and why it
+	// declines, empty where it holds: a package the build must never have skipped when why is not (#wcwx8vf,
+	// check.CacheSession's JudgeSkipped). skippedAtLoad, set only by a test beside it, is told each package a load of
+	// the build skips, as it skips it, once a load. Both are called from the builds' loads, side by side.
+	judgedSkipped func(build project.Build, identifier string, judgment check.SkippedJudgment, why string)
+	skippedAtLoad func(build project.Build, identifier string)
+
 	// keepsInheritanceOff, set only by a test, has every extra build run its syntax-only rules on every file it checks
 	// rather than take the host's findings on the files the host checked (#y6q1x2j), so the test can compare the two.
 	keepsInheritanceOff bool
@@ -231,9 +239,9 @@ type pipeline struct {
 	// whose finding still stands is not asked for, and counted, again by the next.
 	refusedRenames map[[3]string]bool
 
-	// dependence is the host's graph of its package-level declarations under `--build-dependence` beside
-	// `--other-builds` (#qkq4gx5), which every extra build is judged on, nil in any other run, so a run without the
-	// switch builds no graph and judges nothing (buildDependenceGraph).
+	// dependence is the host's graph of its package-level declarations under `--build-dependence` in a run of every
+	// build (#qkq4gx5), which every extra build is judged on, nil in any other run, so a run without the switch builds
+	// no graph and judges nothing (buildDependenceGraph).
 	dependence *hostDependence
 
 	// bodyReachCensus is the file the body reach census is written to, from `COHERE_BODY_REACH_CENSUS`, empty for a
@@ -254,8 +262,8 @@ type pipeline struct {
 	bodyReachFromSourceRecord string
 	bodyReachFromSource       string
 
-	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
-	// beside the host's to check.
+	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil under `--host-build-only` and when the
+	// run found no build beside the host's to check.
 	buildRuns []buildRun
 
 	// overlaps is whether a run whose findings cache has no store may start the lint phase's rules beside the load,

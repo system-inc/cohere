@@ -26,8 +26,12 @@ type CallIndex struct {
 // NewCallIndex is the call index over host's units and then standardLibrary's, standardLibrary nil when the host has
 // no graph of the standard library, whose units the index then leaves out. With no such graph a unit's calls are the
 // host's graph's, which the index shares, read and never written; with one, nearly every host unit gains a call into
-// it, so the index holds calls of its own.
+// it, so the index holds calls of its own. A declarations-only graph, either of the two, panics
+// (refuseDeclarationsOnly), having collected no call.
 func NewCallIndex(host *Graph, standardLibrary *Graph) *CallIndex {
+	refuseDeclarationsOnly(host.declarationsOnly || standardLibrary != nil && standardLibrary.declarationsOnly,
+		"build a call index over", "the index would hold none of that graph's units' calls, and the verdicts it reads "+
+			"(CallIndex.Dependent) would rest on declared objects alone")
 	index := &CallIndex{host: host.resolve()}
 	if standardLibrary == nil {
 		index.calls = index.host.calls
@@ -107,7 +111,11 @@ func (index *CallIndex) Callers(unit int) []int32 {
 
 // Dependent reports whether a build makes unit dependent, read from the build's judgment of each graph: host is its
 // judgment of the host's graph, and standardLibrary of the standard library's, nil when the index has no such graph.
+// A declarations-only graph's judgment, either of the two, panics (refuseDeclarationsOnly), having judged no unit.
 func (index *CallIndex) Dependent(host *Dependence, standardLibrary *Dependence, unit int) bool {
+	refuseDeclarationsOnly(host.declarationsOnly || standardLibrary != nil && standardLibrary.declarationsOnly,
+		"read a unit's verdict through a call index from", "the verdict would rest on the unit's declared objects "+
+			"alone")
 	if unit < index.host.unitCount() {
 		return host.unitDependent[unit]
 	}

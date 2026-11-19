@@ -402,11 +402,9 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 
 // recordsReadsOf is which packages the load and lint record what each read of other packages (#b2t9xmf), as
 // load.Caching.RecordReads takes it. Every package, when the host keeps its packages for extra builds
-// (keepsForBuilds), and when the run collects the standard library's entries for the release's table, which persists
-// each one's reads beside it (#pcv6eff). A run that does neither records nothing, since it would pay for reads nothing
-// reads.
+// (keepsForBuilds). A run that does not records nothing, since it would pay for reads nothing reads.
 func (engine *pipeline) recordsReadsOf() func(*packages.Package) bool {
-	if engine.keepsForBuilds() || engine.request.standardLibrary.collected != nil {
+	if engine.keepsForBuilds() {
 		return load.EveryPackage
 	}
 	return nil
@@ -416,7 +414,7 @@ func (engine *pipeline) recordsReadsOf() func(*packages.Package) bool {
 // only when the run checks extra builds and the census needs at least one.
 func (engine *pipeline) keepsForBuilds() bool {
 	_, extras, buildsError := engine.buildsBeside()
-	return engine.request.switches["other-builds"] && buildsError == nil && len(extras) > 0
+	return engine.request.checksEveryBuild() && buildsError == nil && len(extras) > 0
 }
 
 // readBuilds is the host's build, as go env's answer reads it, then the extra builds the census needs beside it
@@ -553,6 +551,15 @@ func (engine *pipeline) extraBuildRun(
 			session.RestoreFromHost(host)
 			if engine.keepsWalkOff {
 				session.VisitEvery()
+			}
+			if engine.judgedSkipped != nil {
+				session.JudgeSkipped(func(identifier string) {
+					if engine.skippedAtLoad != nil {
+						engine.skippedAtLoad(extra, identifier)
+					}
+				}, func(identifier string, judgment check.SkippedJudgment, why string) {
+					engine.judgedSkipped(extra, identifier, judgment, why)
+				})
 			}
 			// Only a build restoring from the host's run inherits from it: the same run read the same bytes for both.
 			if !engine.keepsInheritanceOff {

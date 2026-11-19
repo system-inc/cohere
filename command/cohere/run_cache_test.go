@@ -205,8 +205,10 @@ func TestRunCacheEligibility(test *testing.T) {
 		{[]string{"--fix"}, false},
 		{[]string{"--lint"}, false},
 		{[]string{"--no-fix", "--lint"}, false},
-		// The land gate's run, its own record since the key holds every argument (#72n9mq0).
-		{[]string{"--no-fix", "--other-builds", "--json"}, true},
+		// The land gate's run, which checks every build (#72n9mq0).
+		{[]string{"--no-fix", "--json"}, true},
+		// The host's build alone, its own record since the key holds every argument (#qqyq61s).
+		{[]string{"--no-fix", "--host-build-only", "--json"}, true},
 		// A measurement, never replayed and never recorded: a replay would print the last run's CPU as this run's.
 		{[]string{"--no-fix", "--timing"}, false},
 		{[]string{"source/a.ts"}, false},

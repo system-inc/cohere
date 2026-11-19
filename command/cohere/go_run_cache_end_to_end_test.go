@@ -71,8 +71,9 @@ func newGoReplayFixture(test *testing.T) *goReplayFixture {
 	fixture.write("embedded.go", "package replay\n\nimport _ \"embed\"\n\n// Message is embedded.\n//\n"+
 		"//go:embed data/message.txt\nvar Message string\n")
 	fixture.write("data/message.txt", "hello\n")
-	// Files no load reads until a scenario's environment builds them, each with a finding so the verdict says when
-	// one is loaded.
+	// Files no load of the host's build reads until a scenario's environment builds them, each with a finding so the
+	// verdict says when one is loaded. A run of every build checks each under a build of its own (#qqyq61s), so a
+	// test that reads them as unread runs under `--host-build-only`.
 	fixture.write("tagged.go", "//go:build replaytest\n\n"+goReplaySource("replay", "Tagged"))
 	fixture.write("only_linux.go", goReplaySource("replay", "OnLinux"))
 	fixture.write("with_cgo.go", "//go:build cgo\n\n"+goReplaySource("replay", "WithCgo"))
@@ -194,10 +195,11 @@ func (fixture *goReplayFixture) establishHit(arguments ...string) {
 // goReplayFooter is the footer a `--verbose` replay renders of its own, which says it was replayed.
 var goReplayFooter = regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s(?: •[^\n]*)? • replayed`)
 
-// goEveryFileCachedFooter is the default view's footer when no file was checked and every one was cached, followed
-// by whatever the run did not check, such as the fixture's files only another platform or cgo builds.
+// goEveryFileCachedFooter is the default view's footer when no file was checked and every one was cached, with the
+// builds a run of every build names (#qqyq61s), followed by whatever the run did not check, such as the fixture's
+// files only another platform or cgo builds under `--host-build-only`.
 var goEveryFileCachedFooter = regexp.MustCompile(
-	`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s •.*\(\d+ rules • \d+ cached\)(?: • ⚠ [^\n]*)?$`,
+	`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s •.*\(\d+ rules • \d+ cached(?: • \d+ builds?)?\)(?: • ⚠ [^\n]*)?$`,
 )
 
 // isGoReplay reports a run the cache answered, by what the run itself says: the framing on its first line and the
@@ -224,6 +226,8 @@ func goKeepLines(output string, drop ...string) string {
 // which a replay deliberately does not print and a cold run does, and without the footer, which is the
 // invocation's too. A replay's own framing comes off in goReplayBody. These are the lines the TypeScript run
 // cache's end-to-end test drops, with the Go project line, for a module or a workspace, in place of the graph line.
+// Each build's line under lint goes too, since a run of every build counts there what each build analyzed, restored
+// or left untouched, which moves with what the findings cache held as the package cache's line does (#qqyq61s).
 func goVerdict(cold string) string {
 	return goKeepLines(cold,
 		"module described in ",
@@ -231,6 +235,8 @@ func goVerdict(cold string) string {
 		"types: ",
 		"lint: ",
 		"  lint: package cache ",
+		"  lint: the host's build, ",
+		"  lint: build ",
 		"phases: ",
 		"  total ",
 		"  memory: ",
@@ -241,6 +247,33 @@ func goVerdict(cold string) string {
 	)
 }
 
+// goReplayLintPrefix opens each build's lint line a replay prints, which counts what the recorded run's builds did, so
+// it is compared with the recording run's own lines (goReplayBuildLines), never with a cold run's.
+const goReplayLintPrefix = "  lint (from the cached run at "
+
+// goReplayBuildLines is each build's lint line a replay printed, as the run it replays printed it.
+func goReplayBuildLines(replay string) []string {
+	lines := []string{}
+	for _, line := range strings.Split(replay, "\n") {
+		if rest, isBuild := strings.CutPrefix(line, goReplayLintPrefix); isBuild {
+			_, counts, _ := strings.Cut(rest, "): ")
+			lines = append(lines, "  lint: "+counts)
+		}
+	}
+	return lines
+}
+
+// goRunBuildLines is each build's lint line a run of the engine printed under `--verbose`.
+func goRunBuildLines(run string) []string {
+	lines := []string{}
+	for _, line := range strings.Split(run, "\n") {
+		if strings.HasPrefix(line, "  lint: the host's build, ") || strings.HasPrefix(line, "  lint: build ") {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
 // goProvenance is the label a replay gives a phase's line, which comes off before a comparison.
 var goProvenance = regexp.MustCompile(`(?m)^(fix|format scope) \(from the cached run at \d\d:\d\d:\d\d\): `)
 
@@ -249,6 +282,7 @@ func goReplayBody(replay string) string {
 	return goProvenance.ReplaceAllString(goKeepLines(replay,
 		"cached: ",
 		"phases: replayed ",
+		goReplayLintPrefix,
 		"  this run: ",
 		"  memory: ",
 		"✓ 💎 ",
@@ -266,7 +300,9 @@ func goNormalized(output string) string {
 }
 
 // goSummaryVerdict is a `--json` run's summary line without what is the invocation's: its time, its phases and
-// their times, what the cache did, and what it checked fresh against what the cache answered for.
+// their times, what the cache did, what it checked fresh against what the cache answered for, and its builds, whose
+// counts and times, and the width they ran at with the heap it was decided from, a replay carries from the run it
+// replays.
 func goSummaryVerdict(test *testing.T, output string) map[string]json.RawMessage {
 	test.Helper()
 	var summary map[string]json.RawMessage
@@ -275,94 +311,152 @@ func goSummaryVerdict(test *testing.T, output string) map[string]json.RawMessage
 	}
 	for _, invocation := range []string{
 		"seconds", "graphSeconds", "formattingSeconds", "phases", "cache", "packageCache", "checked", "cached", "nodes",
-		"memoryRaisedToBytes",
+		"memoryRaisedToBytes", "builds", "buildsAtOnce", "buildsWidthLiveBytes", "buildsWidthFromHostLive",
 	} {
 		delete(summary, invocation)
 	}
 	return summary
 }
 
+// goSummaryField is one field of a `--json` run's summary line, as its bytes.
+func goSummaryField(test *testing.T, output string, field string) string {
+	test.Helper()
+	var summary map[string]json.RawMessage
+	if decodeError := json.Unmarshal([]byte(summaryJsonOf(test, output)), &summary); decodeError != nil {
+		test.Fatalf("the summary line does not decode: %v\n%s", decodeError, output)
+	}
+	return string(summary[field])
+}
+
 // TestAGoReplayIsTheColdRunsVerdict: with nothing changed, the second run replays the first without starting the
 // engine, and what it prints is a `--no-cache` run's verdict byte for byte in every view, with the same exit:
 // `--verbose` once the replay's framing and the cold run's invocation lines are off, as the TypeScript run cache's
-// test compares them; `--json` line for line, the summary but for what is the invocation's; and the default view
-// but for the footer, which is the invocation's and says it was replayed.
+// test compares them; `--json` line for line, the summary but for what is the invocation's; and the default view but
+// for the footer, which is the invocation's and says it was replayed. It holds for a plain run, which checks every
+// build (#qqyq61s), and for `--host-build-only`. A plain run's cold run is required to have checked the other builds,
+// its builds' lines and the packs clause in `--verbose`, an extra build in `--json`, and the footer's builds, which the
+// replay's footer names as the cold run's does, so the plain case can never pass as a run of the host's build alone.
+// The builds' counts and times a replay carries are the recording run's, byte for byte: each build's line under
+// `--verbose`, and under `--json` the summary's builds and the width they ran at.
 func TestAGoReplayIsTheColdRunsVerdict(test *testing.T) {
 	test.Parallel()
-	for _, view := range []string{"--verbose", "--json", "the default view"} {
-		test.Run(view, func(test *testing.T) {
-			test.Parallel()
-			fixture := newGoReplayFixture(test)
-			arguments := []string{"--no-fix"}
-			if strings.HasPrefix(view, "--") {
-				arguments = append(arguments, view)
-			}
-			recorded := fixture.run(true, arguments...)
-			replayed := fixture.run(true, arguments...)
-			cold := fixture.run(false, arguments...)
-			if recorded.exitCode != 1 || !strings.Contains(recorded.stdout, "cohere-go/printf") {
-				test.Fatalf("the recording run exited %d without the fixture's finding, so it proves nothing:\n%s%s",
-					recorded.exitCode, recorded.stdout, recorded.stderr)
-			}
-			if !isGoReplay(replayed) {
-				test.Fatalf("the second run did not replay:\n%s%s", replayed.stdout, replayed.stderr)
-			}
-			if replayed.exitCode != cold.exitCode {
-				test.Errorf("the replay exited %d and the cold run %d", replayed.exitCode, cold.exitCode)
-			}
-			if replayed.stderr != cold.stderr {
-				test.Errorf("stderr differs:\n--- replay\n%s\n--- cold\n%s", replayed.stderr, cold.stderr)
-			}
-			switch view {
-			case "--verbose":
-				if !goProvenance.MatchString(replayed.stdout) {
-					test.Errorf("the replay printed the fix line as though the fix phase had just run:\n%s",
-						replayed.stdout)
-				}
-				// Every line that describes the invocation is the replay's own or left out, never the recorded run's.
-				if !strings.HasPrefix(replayed.stdout, "cached: ") || !goReplayFooter.MatchString(replayed.stdout) ||
-					!strings.Contains(replayed.stdout, "\nphases: replayed the run at ") {
-					test.Errorf("the replay is not framed as one, first line to footer:\n%s", replayed.stdout)
-				}
-				for _, claim := range []string{
-					"module described in ", "workspace described in ", "types: ", "lint: ", "  total ",
-				} {
-					if regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(claim)).MatchString(replayed.stdout) {
-						test.Errorf("the replay printed the recorded run's %q line as this run's:\n%s", claim,
-							replayed.stdout)
-					}
-				}
-				if goReplayBody(replayed.stdout) != goVerdict(cold.stdout) {
-					test.Fatalf("the replay is not the cold run's verdict:\n--- replay\n%s\n--- cold verdict\n%s",
-						goReplayBody(replayed.stdout), goVerdict(cold.stdout))
-				}
-			case "--json":
-				replayLines := goKeepLines(replayed.stdout, `{"kind":"summary"`)
-				coldLines := goKeepLines(cold.stdout, `{"kind":"summary"`)
-				if replayLines != coldLines {
-					test.Fatalf("the replay's records differ:\n--- replay\n%s\n--- cold\n%s", replayLines, coldLines)
-				}
-				// A replay started no engine, so it says nothing of the engine's package cache, nor of a memory raise
-				// (#5shepvt).
-				for _, invocationOnly := range []string{`"packageCache"`, `"memoryRaisedToBytes"`} {
-					if strings.Contains(summaryJsonOf(test, replayed.stdout), invocationOnly) {
-						test.Errorf("the replay's summary claims the engine's %s:\n%s", invocationOnly, replayed.stdout)
-					}
-				}
-				replaySummary := jsonText(test, goSummaryVerdict(test, replayed.stdout))
-				coldSummary := jsonText(test, goSummaryVerdict(test, cold.stdout))
-				if replaySummary != coldSummary {
-					test.Fatalf("the replay's summary differs:\n--- replay\n%s\n--- cold\n%s",
-						replaySummary, coldSummary)
-				}
-			default:
-				replayBody := goKeepLines(replayed.stdout, "✓ 💎 ", "✗ ☠️ ")
-				if replayBody != goKeepLines(cold.stdout, "✓ 💎 ", "✗ ☠️ ") {
-					test.Fatalf("the replay is not the cold run's verdict:\n--- replay\n%s\n--- cold\n%s",
-						replayed.stdout, cold.stdout)
+	for _, builds := range []string{"every build", "the host's build alone"} {
+		for _, view := range []string{"--verbose", "--json", "the default view"} {
+			test.Run(builds+", "+view, func(test *testing.T) {
+				test.Parallel()
+				replayedAsCold(test, builds == "every build", view)
+			})
+		}
+	}
+}
+
+// goFooterBuilds is the builds a Go run's default footer names, which a run of the host's build alone never has.
+var goFooterBuilds = regexp.MustCompile(`(?m)^(?:✓ 💎|✗ ☠️) [^\n]* • (\d+ builds)\)`)
+
+// replayedAsCold is TestAGoReplayIsTheColdRunsVerdict's case for one view, over every build or the host's alone.
+func replayedAsCold(test *testing.T, everyBuild bool, view string) {
+	fixture := newGoReplayFixture(test)
+	arguments := []string{"--no-fix"}
+	if !everyBuild {
+		arguments = append(arguments, "--host-build-only")
+	}
+	if strings.HasPrefix(view, "--") {
+		arguments = append(arguments, view)
+	}
+	recorded := fixture.run(true, arguments...)
+	replayed := fixture.run(true, arguments...)
+	cold := fixture.run(false, arguments...)
+	if recorded.exitCode != 1 || !strings.Contains(recorded.stdout, "cohere-go/printf") {
+		test.Fatalf("the recording run exited %d without the fixture's finding, so it proves nothing:\n%s%s",
+			recorded.exitCode, recorded.stdout, recorded.stderr)
+	}
+	if !isGoReplay(replayed) {
+		test.Fatalf("the second run did not replay:\n%s%s", replayed.stdout, replayed.stderr)
+	}
+	if replayed.exitCode != cold.exitCode {
+		test.Errorf("the replay exited %d and the cold run %d", replayed.exitCode, cold.exitCode)
+	}
+	if replayed.stderr != cold.stderr {
+		test.Errorf("stderr differs:\n--- replay\n%s\n--- cold\n%s", replayed.stderr, cold.stderr)
+	}
+	if everyBuild {
+		checkedEveryBuild := false
+		switch view {
+		case "--verbose":
+			replayBuilds, recordedBuilds := goReplayBuildLines(replayed.stdout), goRunBuildLines(recorded.stdout)
+			checkedEveryBuild = strings.Contains(cold.stdout, "\n  lint: build ") &&
+				strings.Contains(cold.stdout, ", builds' packs: ") && len(recordedBuilds) > 1 &&
+				slices.Equal(replayBuilds, recordedBuilds)
+		case "--json":
+			replayBuilds := goSummaryField(test, replayed.stdout, "builds")
+			checkedEveryBuild = strings.Contains(cold.stdout, `"host":false`) &&
+				strings.Contains(replayBuilds, `"host":false`)
+			for _, field := range []string{
+				"builds", "buildsAtOnce", "buildsWidthLiveBytes", "buildsWidthFromHostLive",
+			} {
+				if goSummaryField(test, replayed.stdout, field) != goSummaryField(test, recorded.stdout, field) {
+					test.Errorf("the replay's %s is %s, want the recording run's %s", field,
+						goSummaryField(test, replayed.stdout, field), goSummaryField(test, recorded.stdout, field))
 				}
 			}
-		})
+		default:
+			coldBuilds, replayBuilds := goFooterBuilds.FindStringSubmatch(cold.stdout),
+				goFooterBuilds.FindStringSubmatch(replayed.stdout)
+			checkedEveryBuild = coldBuilds != nil && replayBuilds != nil && coldBuilds[1] == replayBuilds[1]
+		}
+		if !checkedEveryBuild {
+			test.Fatalf("the plain run's cold run or its replay does not show every build checked:\n"+
+				"--- replay\n%s\n--- cold\n%s", replayed.stdout, cold.stdout)
+		}
+	}
+	switch view {
+	case "--verbose":
+		if !goProvenance.MatchString(replayed.stdout) {
+			test.Errorf("the replay printed the fix line as though the fix phase had just run:\n%s",
+				replayed.stdout)
+		}
+		// Every line that describes the invocation is the replay's own or left out, never the recorded run's.
+		if !strings.HasPrefix(replayed.stdout, "cached: ") || !goReplayFooter.MatchString(replayed.stdout) ||
+			!strings.Contains(replayed.stdout, "\nphases: replayed the run at ") {
+			test.Errorf("the replay is not framed as one, first line to footer:\n%s", replayed.stdout)
+		}
+		for _, claim := range []string{
+			"module described in ", "workspace described in ", "types: ", "lint: ", "  total ",
+		} {
+			if regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(claim)).MatchString(replayed.stdout) {
+				test.Errorf("the replay printed the recorded run's %q line as this run's:\n%s", claim,
+					replayed.stdout)
+			}
+		}
+		if goReplayBody(replayed.stdout) != goVerdict(cold.stdout) {
+			test.Fatalf("the replay is not the cold run's verdict:\n--- replay\n%s\n--- cold verdict\n%s",
+				goReplayBody(replayed.stdout), goVerdict(cold.stdout))
+		}
+	case "--json":
+		replayLines := goKeepLines(replayed.stdout, `{"kind":"summary"`)
+		coldLines := goKeepLines(cold.stdout, `{"kind":"summary"`)
+		if replayLines != coldLines {
+			test.Fatalf("the replay's records differ:\n--- replay\n%s\n--- cold\n%s", replayLines, coldLines)
+		}
+		// A replay started no engine, so it says nothing of the engine's package cache, nor of a memory raise
+		// (#5shepvt).
+		for _, invocationOnly := range []string{`"packageCache"`, `"memoryRaisedToBytes"`} {
+			if strings.Contains(summaryJsonOf(test, replayed.stdout), invocationOnly) {
+				test.Errorf("the replay's summary claims the engine's %s:\n%s", invocationOnly, replayed.stdout)
+			}
+		}
+		replaySummary := jsonText(test, goSummaryVerdict(test, replayed.stdout))
+		coldSummary := jsonText(test, goSummaryVerdict(test, cold.stdout))
+		if replaySummary != coldSummary {
+			test.Fatalf("the replay's summary differs:\n--- replay\n%s\n--- cold\n%s",
+				replaySummary, coldSummary)
+		}
+	default:
+		replayBody := goKeepLines(replayed.stdout, "✓ 💎 ", "✗ ☠️ ")
+		if replayBody != goKeepLines(cold.stdout, "✓ 💎 ", "✗ ☠️ ") {
+			test.Fatalf("the replay is not the cold run's verdict:\n--- replay\n%s\n--- cold\n%s",
+				replayed.stdout, cold.stdout)
+		}
 	}
 }
 
@@ -380,7 +474,8 @@ func jsonText(test *testing.T, summary map[string]json.RawMessage) string {
 // TestAGoRunWithAStaleInputIsNeverReplayed: for every kind of input a Go verdict depends on, a module that replays
 // is changed in that input alone, and the next run is not a replay and prints what a cold run prints. One
 // scenario per kind, since each reaches the record by its own path: the engine's files, its listed directories,
-// its absent paths, the settings file the front door declares, and the key's environment and toolchain.
+// its absent paths, the settings file the front door declares, and the key's environment and toolchain. Each run checks
+// the host's build alone, so a file only the scenario's environment builds joins the load only once it is changed.
 func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 	test.Parallel()
 	scenarios := []struct {
@@ -524,7 +619,7 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			if scenario.prepare != nil {
 				scenario.prepare(fixture)
 			}
-			arguments := []string{"--no-fix", "--verbose"}
+			arguments := []string{"--no-fix", "--verbose", "--host-build-only"}
 			fixture.establishHit(arguments...)
 			scenario.change(fixture)
 			afterChange := fixture.run(true, arguments...)
@@ -574,10 +669,15 @@ func TestAGoReplayNeverCrossesTheSystemCache(test *testing.T) {
 	}
 }
 
-// packageCacheOffLine is the account's lint line of a run whose engine's per-package cache was off, the standard
-// library's packages from the system cache beside it or not.
+// packageCacheOffLine is the account's lint line of a plain run whose engine's per-package cache was off, then what
+// the system cache did, and then what the extra builds did with their packs, which a plain run over the replay
+// fixture always says, since it checks every build (#qqyq61s). A `--no-cache` run still reads and writes the system
+// cache, and the account says the packages restored from it and the entries written to it each on its own
+// (packageCacheUse.systemCacheClause), so either clause may be there or not: which entries are left to write depends
+// on what the package's other tests wrote to the system cache they share first.
 var packageCacheOffLine = regexp.MustCompile(
-	`\n  lint: package cache off(, standard library: [0-9,]+ from the system cache)?\n`)
+	`\n  lint: package cache off(, standard library: [0-9,]+ from the system cache)?` +
+		`(, [0-9,]+ entr(y|ies) written to the system cache)?, builds' packs: [^\n]+\n`)
 
 // TestAGoRunUnderNoCacheNeitherReplaysNorRecords: on a module whose run replays, `--no-cache` checks it fresh, says
 // its cache was off in the account and in `--json`, and leaves the cache table exactly as it found it.

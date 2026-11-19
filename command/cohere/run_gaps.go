@@ -70,9 +70,9 @@ type runGaps struct {
 	// says nobody expects checked (engineLanguage.ExpectedExclusionReasons). In a Swift run that today means no
 	// target of the package compiles them and they are no standalone script the run checks alone (#13nbb1s), less
 	// those the runs of the Swift projects below it account for (#ybspptb). In a Go run it means a file only another
-	// platform builds, or one that imports "C" while cgo is off, since the engine checks the host's build alone; under
-	// `--other-builds` a file another build checked is expected, and only one no build the run checked compiles stays
-	// (#72n9mq0). A gap, not a failure.
+	// platform builds, or one that imports "C" while cgo is off, under `--host-build-only`, since the engine then
+	// checks the host's build alone; by default a file another build checked is expected, and only one no build the
+	// run checked compiles stays (#72n9mq0, #qqyq61s). A gap, not a failure.
 	// Each is named, never only counted: a gap nobody can find is half a gap.
 	Unchecked []uncheckedEngineFile `json:"unchecked,omitempty"`
 	// NotWritten is the files an engine's fix phase would have written and did not, since each is reached through a
@@ -85,6 +85,12 @@ type runGaps struct {
 	// file no longer holds, and asked for again against the text it holds; its findings describe the text the walk
 	// read. A gap that makes the run incomplete, named by file.
 	ChangedDuringRun []string `json:"changedDuringRun,omitempty"`
+	// PatternTimeouts is each regular expression a rule was handed, by its options or by the source under lint,
+	// that ran past esregexp.MatchTimeout in a file (#s4dy4e0). The rule acted on a stand-in for the pattern's
+	// answer there: an allow pattern's overrun allowed, a restricting pattern's reported nothing, so a finding may
+	// be missing. A gap that makes the run incomplete, not a failure. Each is named, never only counted, sorted by
+	// file, rule and pattern.
+	PatternTimeouts []patternTimeout `json:"patternTimeouts,omitempty"`
 	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,
 	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the engine sends
 	// them. A gap, not a failure: they are a dependency's, not the project's to fix. Each is named, never only
@@ -109,6 +115,15 @@ type excludedReason struct {
 	Reason string `json:"reason"`
 	Count  int    `json:"count"`
 	Source string `json:"source,omitempty"`
+}
+
+// patternTimeout is one regular expression that ran past esregexp.MatchTimeout in one file: the rule that was handed
+// it, the pattern as JavaScript writes it, the file, and how many of the rule's questions there it left unanswered.
+type patternTimeout struct {
+	Rule    string `json:"rule"`
+	Pattern string `json:"pattern"`
+	Path    string `json:"path"`
+	Count   int    `json:"count"`
 }
 
 // unrecordedReason is what a run that checked nothing says of the files no reason counted. Such a file was kept
@@ -154,6 +169,10 @@ func (gaps *runGaps) addExcluded(reason string, source string, files int) {
 // each reached through a link outside the root. TypeScript's run and an engine's say it in the same words.
 const notWrittenSentence = "the notes above name the files whose fixes were not written, each reached through a link " +
 	"outside the root"
+
+// patternTimeoutsSentence is the run's account when every phase ran and a pattern ran out of time.
+const patternTimeoutsSentence = "the notes above name the patterns that ran out of time, whose rules acted on a " +
+	"stand-in for their answer"
 
 // changedDuringRunSentence is the run's account when every phase ran and a file changed under it.
 const changedDuringRunSentence = "the notes above name the files that changed during the run, whose findings " +

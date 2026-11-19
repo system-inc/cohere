@@ -53,6 +53,13 @@ const firstBaselineReason = "the first quiet night, now the baseline"
 const checkingBaselineReason = "the instrument changed: the cold runs now check without fixing and the baseline " +
 	"fixed, so this first quiet checking night is the new baseline"
 
+// everyBuildBaselineReason is the reason on record when a quiet night of every build replaces a baseline of the host's
+// build alone, the change of instrument the default's flip made (#qqyq61s): a plain run checks every build the Go files
+// name, so the nightly measures what a person runs, the two are never compared, and the first quiet night of every
+// build starts the new baseline.
+const everyBuildBaselineReason = "the instrument changed: the cold runs now check every build and the baseline " +
+	"checked the host's build alone, so this first quiet night of every build is the new baseline"
+
 // verdictLine is one night in verdicts-<project>.jsonl.
 type verdictLine struct {
 	RecordedAt           string                     `json:"recordedAt"`
@@ -173,6 +180,19 @@ func judge(state string, tonightPath string, threshold float64, stdout io.Writer
 			var newBaselineNightError error
 			if result, newBaselineNightError = newBaselineNight(state, tonight, retired,
 				checkingBaselineReason); newBaselineNightError != nil {
+				return 1, newBaselineNightError
+			}
+			break
+		}
+		if !baseline.EveryBuild && tonight.EveryBuild {
+			retired := fmt.Sprintf(
+				"the cold runs now check every build, and the baseline of %s checked the host's build alone, "+
+					"so it is never compared with them",
+				baseline.RecordedAt,
+			)
+			var newBaselineNightError error
+			if result, newBaselineNightError = newBaselineNight(state, tonight, retired,
+				everyBuildBaselineReason); newBaselineNightError != nil {
 				return 1, newBaselineNightError
 			}
 			break

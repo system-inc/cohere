@@ -172,7 +172,7 @@ func noInlineCommentsIsInline(
 
 	// The user's escape hatch, tested against the inner text. A match that overruns the time bound
 	// excuses too: no answer here is a report.
-	if ignorePattern != nil && ignorePattern.TestOrTimeout(body) {
+	if ignorePattern != nil && ignorePattern.TestOrTimeout(body, ruleContext.PatternTimedOut) {
 		return false
 	}
 

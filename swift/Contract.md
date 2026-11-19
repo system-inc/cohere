@@ -712,7 +712,7 @@ out, said once in `measuringCpuMicroseconds` beside `measuredCalls`, the pieces 
 - `processCpuMicroseconds` is every CPU microsecond the process spent up to the record. The rows (rules, shared, the
   load's own phases and measuring) are said against it, and what they leave is printed as its own line, what no row
   measures, never spread over the rows.
-- `extraBuildsFromSource` is how many builds beside the host's the run checked under `--other-builds`, written only
+- `extraBuildsFromSource` is how many builds beside the host's the run checked, written only
   when there were any and absent otherwise. None of them restored anything from the host's run, since a timed run keeps
   nothing for them, so every package of every build was checked from source and the rows include that work
   (#4y4qd3z). The front door says so in a sentence beside the table, so the rows are never read as a run that restored.
@@ -910,8 +910,8 @@ The Go engine's lint record carries `childProcessesAfterLoad` and `childProcesse
 after its first load began, and each by go and its first arguments, sorted, as
 `"childProcessesAfterLoad":2,"childProcessesAfterLoadNamed":["go list -e -f","go list -m -json"]`. On
 darwin go starts a child with fork, which marks the whole address space copy-on-write, so each child
-started once the engine's heap has grown makes every resident page fault again; a run under
-`--other-builds` with builds beside the host's starts every go command they need before that load, and
+started once the engine's heap has grown makes every resident page fault again; a run of
+every build with builds beside the host's starts every go command they need before that load, and
 reads 0. A run of one build starts its lister's two beside its census (#q9ezwvw), and reads 0 too,
 except under `--timing`, where it starts them inside its first load, as it always has. Both are absent
 when none started, and no key and no verdict reads them. They count the go commands of the run's
@@ -1039,8 +1039,8 @@ toolchain, and read back by a later run in place of that load (#6a3kjvz). `"stan
 standard-library record that could not be written counts in `"writeFailed"` too.
 
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
-which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive
-within contract 3, the host's first:
+which every file compiles at least once (#72n9mq0), unless `--host-build-only` names the host's alone (#qqyq61s), and
+when it checks more than one it writes `builds`, additive within contract 3, the host's first:
 
 ```
 {
@@ -1143,8 +1143,9 @@ then every other in build order, the host's own before the other platforms (#awb
 width in a run with a findings store, the first runs alone until its load has ended; there a collection measures the
 live heap, the build's holding is that heap less the host's, measured the same way as the builds started, and the rest
 start once the width is decided. A run without a store, under `--no-cache`, decides it at a share gate instead, and
-so does a run with a store whose host missed at most 0.10 of the packages its store hit or missed, the binary's
-standard-library packages left out since it holds them cold too, mostly restored (#ybjbqm2),
+so does a run with a store whose host missed at most 0.10 of the packages its store hit or missed, the
+standard-library packages left out since the system cache holds them cold too (`$COHERE_SYSTEM_CACHE`, or else the
+user cache directory, computed on a machine's first use and shared by every project), mostly restored (#ybjbqm2),
 unless it judges each build's dependence (`--build-dependence`), whose builds restore nothing from the host, so every
 share would be high and the measured rule is taken from the start: every build starts at once, lists, builds its
 graph and restores, and waits before its type check, until every build has
@@ -1184,7 +1185,7 @@ run's mode, 2.16 for a timed run, which reads no store, is named with its ratio 
 build under `--timing` restores nothing from the host's run, so it holds more as its load ends than one that restores,
 and its ratio reads lower than the width's case.
 
-Under `--build-dependence` beside `--other-builds`, each extra build's record writes `"dependence"`, additive within
+Under `--build-dependence` in a run of every build, each extra build's record writes `"dependence"`, additive within
 contract 3 and the Go engine's alone (#qkq4gx5): which of the host's package-level declarations the build can change,
 observed only, so no finding, key or verdict reads it. A unit is a function, a type spec, or a var or const spec, and
 it is dependent when its file is not one both builds compile, when an object it declares reaches a dependent object,
@@ -1193,19 +1194,20 @@ or when its body reads one by a kind of use the change reaches. `"workspace"` an
 units and the `"dependentPackages"` among them, those with a dependent unit or a unit only the build compiles, with
 their `"dependentPackageNodes"`, and the `"buildOnlyUnits"` and `"buildOnlyNodes"` only the build compiles, which no
 count of the host's holds. `"graphMilliseconds":900` is the host's graph, built once from its load for every build,
-and `"judgmentMilliseconds":40` this build's judgment on it. Such a run reads the findings cache and the binary's
-standard-library entries as any other run does, and its lint waits for the load to end. The host's graph holds only
-what the host checked from source, so when it restored packages from export data the record writes `"restored"`,
-additive (#ss4t5g6): `"packages"` it restored; the standard library among them is loaded from source once a run, beside
-the host's lint, onto a graph of its own, `"standardLibraryPackages"` that load reached, in `"loadMilliseconds"` for
-its list, parse and type check and `"graphMilliseconds"` for its graph, and judged per build, `"standardLibraryUnits"`
-and `"standardLibraryDependentUnits"`, which `"dependencies"` include, so the totals are those of a host that checked
-every package from source. Each object of a restored package a unit reads is answered by its counterpart in that graph,
-found by its path: `"answered"` counts those, `"withoutCounterpart"` those whose path names nothing alike there, and
-`"withoutPackage"` those of a package no graph holds, a warm store's say, the last two called dependent, failing wide.
-`"standardLibraryFromRecords"` counts the standard library's packages its graph took from the records the findings
-store keeps of them, which that load then skips, and `"standardLibrarySideLoaded"` those it loaded, each written only
-when not 0. The host's record never writes it, and neither does a run without the switch.
+and `"judgmentMilliseconds":40` this build's judgment on it. Such a run reads the findings cache and the system
+cache's standard-library entries (`$COHERE_SYSTEM_CACHE`, or else the user cache directory, computed on a machine's
+first use and shared by every project) as any other run does, and its lint waits for the load to end. The host's graph
+holds only what the host checked from source, so when it restored packages from export data the record writes
+`"restored"`, additive (#ss4t5g6): `"packages"` it restored; the standard library among them is loaded from source
+once a run, beside the host's lint, onto a graph of its own, `"standardLibraryPackages"` that load reached, in
+`"loadMilliseconds"` for its list, parse and type check and `"graphMilliseconds"` for its graph, and judged per build,
+`"standardLibraryUnits"` and `"standardLibraryDependentUnits"`, which `"dependencies"` include, so the totals are
+those of a host that checked every package from source. Each object of a restored package a unit reads is answered by
+its counterpart in that graph, found by its path: `"answered"` counts those, `"withoutCounterpart"` those whose path
+names nothing alike there, and `"withoutPackage"` those of a package no graph holds, a warm store's say, the last two
+called dependent, failing wide. `"standardLibraryFromRecords"` counts the standard library's packages its graph took
+from the records the findings store keeps of them, which that load then skips, and `"standardLibrarySideLoaded"` those
+it loaded, each written only when not 0. The host's record never writes it, and neither does a run without the switch.
 
 Its `"facts"` is the build's facts census (#0ghk7vj), written once its lint has run. Under the switch every extra build
 restores nothing from the host's run, so its facts are its own, and such a run is slower than a plain one. The standard
@@ -1342,6 +1344,7 @@ it where a run that did not finish prints green.
 | `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last check's and counts every file that check did not see as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report.                                                              |
 | `--duplicates`                              | The front door's for Swift, never given to the engine, which has no duplicates report: the run checks as it would and prints a duplicates report that did not run, saying why. The Go engine answers it with a `duplicates` record (see that record).                                                                                                                                                                                                                                                                                                                                                                                                |
 | `--timing`                                  | Go takes it: the Go engine writes one `timing` record after lint (see that record), which the front door prints as TypeScript's timing table. Not implemented for Swift yet: the Swift engine refuses it with exit 2 and names the flag.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `--host-build-only`                         | Go takes it: the Go engine checks the host's build alone, and names each file only another build compiles as a gap, where without it every build is checked (#qqyq61s). Not implemented for Swift: the front door refuses it by name against a Swift root, and never gives it to the engine.                                                                                                                                                                                                                                                                                                                                                         |
 | `--explain <file>`                          | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `--tsconfig`                                | Meaningless for Swift. The front door refuses it against a Swift root.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `--directory`                               | Resolved by the front door into `--root`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |

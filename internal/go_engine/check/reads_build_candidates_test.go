@@ -19,7 +19,7 @@ func TestACandidateIsRenderedOnceAndReadsEachLookupsAnswer(test *testing.T) {
 	closeMethod := methodSetMember(world.foreign, "Closer", "Close")
 	flushMethod := methodSetMember(world.foreign, "Closer", "Flush")
 	build := measuredReadsBuild()
-	want, wantFound := methodCandidateOf(closer, build_reads.QueryMethod, "Close", nil, ReadsRendererVersion)
+	want, wantFound := methodCandidateOf(closer, build_reads.QueryMethod, "Close", nil)
 	for _, step := range []struct {
 		answer      types.Object
 		holdsAnswer bool

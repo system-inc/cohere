@@ -44,16 +44,14 @@ import (
 //     those can differ by build while the lookup's candidates do not.
 //
 // A lookup only these rules ask is judged so, so a fourth rule that records one must be read first
-// (TestOnlyTheRulesReadForOneBitRecordMethodOrInterfaceLookups). The judgment is one, methodLookupHolds, over what
-// either verdict holds of a lookup (methodJudgment): the reads of this run (methodJudgmentOf) and those an entry
-// persisted (persistedMethodJudgment), so the two verdicts agree on every lookup.
+// (TestOnlyTheRulesReadForOneBitRecordMethodOrInterfaceLookups). The judgment is methodLookupHolds, over what the
+// verdict holds of a lookup (methodJudgment), read from the reads of this run (methodJudgmentOf).
 
-// methodJudgment is what methodLookupHolds reads of a Method or Interface lookup, from the reads of this run or from
-// those an entry persisted: its query and name, whether the host's rule found an answer, the subject's method shape,
-// whether its receiver is an interface and whether it embeds another package's type at any depth, whether its rule
-// instantiates generic candidates (build_reads.Lookup.Instantiates), and each side's candidates by their package's
-// path and name, a package the build restored from the host giving the host's. answer is the host's answer as the
-// build finds it, when the host found one.
+// methodJudgment is what methodLookupHolds reads of a Method or Interface lookup, from the reads of this run: its query
+// and name, whether the host's rule found an answer, the subject's method shape, whether its receiver is an interface
+// and whether it embeds another package's type at any depth, whether its rule instantiates generic candidates
+// (build_reads.Lookup.Instantiates), and each side's candidates by their package's path and name, a package the build
+// restored from the host giving the host's. answer is the host's answer as the build finds it, when the host found one.
 type methodJudgment struct {
 	query             string
 	name              string
@@ -142,7 +140,7 @@ func answerStillFixes(name string, judgment methodJudgment) (bool, string) {
 	if answer.counterpart == nil {
 		return false, name + ": its answer " + answer.name + " is not in the build: " + answer.missing
 	}
-	buildLines := answerLinesOf(answer.counterpart, ReadsRendererVersion)
+	buildLines := answerLinesOf(answer.counterpart)
 	_, buildIsMethod := answer.counterpart.(*types.Func)
 	switch {
 	case !answer.isMethod && (buildIsMethod || buildLines == nil || !bytes.Equal(buildLines, answer.hostLines)):
@@ -195,7 +193,7 @@ func (judged verdict) methodJudgmentOf(
 	default:
 		_, isMethod := answer.(*types.Func)
 		judgment.answer = answerInBuild{name: objectName(answer), isMethod: isMethod,
-			hostLines: answerLinesOf(answer, ReadsRendererVersion),
+			hostLines: answerLinesOf(answer),
 			restored:  answer.Pkg() != nil && judged.restored[judged.closure(answer.Pkg().Path())]}
 		if !judgment.answer.restored {
 			judgment.answer.counterpart, judgment.answer.missing = judged.counterpart(answer)
