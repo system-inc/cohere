@@ -878,12 +878,13 @@ func (session *CacheSession) filesOf(analyzedPackage *packages.Package) ([]store
 }
 
 // awaitLoaded waits, for a run beside the load, until ready has closed for every package the save and the keep for the
-// extra builds read (save, keepForBuilds), and reports whether the run may go on to them: false once abandon is
-// closed (#641hyrh). The checker waits for a package only where an action runs on it, but the save asks about every
-// package keyed, the standard library's that no action reached among them, as every one is when nothing is analyzed,
-// and the keep reads every package the load reached: each may still be in the load's check, which writes its types,
-// errors and IllTyped. The pass's result is read only once the load has ended (speculativePass), so waiting here
-// costs the run nothing, and the rules ran beside the load all the same.
+// extra builds read (save, keepForBuilds), and the restored facts and answers (unnamedFacts, restoredAnswers), and
+// reports whether the run may go on to them: false once abandon is closed (#641hyrh). The checker waits for a package
+// only where an action runs on it, but the save asks about every package keyed, the standard library's that no action
+// reached among them, as every one is when nothing is analyzed, the restored packages are keyed ones too, and the keep
+// reads every package the load reached: each may still be in the load's check, which writes its types, errors and
+// IllTyped, or in its restore, which writes its types from export data. The pass's result is read only once the load
+// has ended (speculativePass), so waiting here costs the run nothing, and the rules ran beside the load all the same.
 func (session *CacheSession) awaitLoaded(ready func(*packages.Package) <-chan struct{}, abandon <-chan struct{}) bool {
 	read := []map[*packages.Package]cache.Key{session.keys}
 	if session.keptKeys != nil {
