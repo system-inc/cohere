@@ -499,3 +499,53 @@ func TestAnEveryBuildNightReplacesAHostBuildBaseline(test *testing.T) {
 			exit, said)
 	}
 }
+
+// tableEraField is the field a record of a release that carried the standard library's table held, before the table
+// left the binary (#znqfjw2), which Record no longer has.
+const tableEraField = `"standardLibraryTable":{"releaseStamp":"x","bytes":1}`
+
+// withTableEraField is the record at path with tableEraField spliced in as its first field.
+func withTableEraField(test *testing.T, path string) {
+	test.Helper()
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	spliced := strings.Replace(string(contents), "{", "{"+tableEraField+",", 1)
+	if writeError := os.WriteFile(path, []byte(spliced), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+}
+
+// A record from a release that carried the standard library's table is refused whichever side of the comparison it
+// is on, naming the field Record lacks, and no verdict is on record: the strict decoder is the only thing that keeps
+// a table-reading release's night from being judged against a table-less baseline.
+func TestATableEraRecordIsRefusedTonightAndAsTheBaseline(test *testing.T) {
+	test.Parallel()
+	records := test.TempDir()
+
+	tonightState := test.TempDir()
+	tableEraTonight := writeRecord(test, records, "table-era-tonight.json", 10, true)
+	withTableEraField(test, tableEraTonight)
+	exit, printed, said := runGuard("-state", tonightState, "-tonight", tableEraTonight)
+	if exit != 1 || !strings.Contains(said, "standardLibraryTable") {
+		test.Errorf("a table-era night exited %d and said %q, printing %q; want 1, naming the field", exit, said,
+			printed)
+	}
+	if nights := lines(test, filepath.Join(tonightState, "verdicts-ahra.jsonl")); len(nights) != 0 {
+		test.Errorf("a refused night is on record: %q", nights)
+	}
+
+	baselineState := test.TempDir()
+	writeRecord(test, baselineState, "baseline-ahra.json", 10, true)
+	withTableEraField(test, filepath.Join(baselineState, "baseline-ahra.json"))
+	exit, printed, said = runGuard("-state", baselineState, "-tonight",
+		writeRecord(test, records, "tonight.json", 10, true))
+	if exit != 1 || !strings.Contains(said, "standardLibraryTable") {
+		test.Errorf("a night against a table-era baseline exited %d and said %q, printing %q; want 1, naming the field",
+			exit, said, printed)
+	}
+	if nights := lines(test, filepath.Join(baselineState, "verdicts-ahra.jsonl")); len(nights) != 0 {
+		test.Errorf("a night against a refused baseline is on record: %q", nights)
+	}
+}

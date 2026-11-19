@@ -1143,8 +1143,9 @@ then every other in build order, the host's own before the other platforms (#awb
 width in a run with a findings store, the first runs alone until its load has ended; there a collection measures the
 live heap, the build's holding is that heap less the host's, measured the same way as the builds started, and the rest
 start once the width is decided. A run without a store, under `--no-cache`, decides it at a share gate instead, and
-so does a run with a store whose host missed at most 0.10 of the packages its store hit or missed, the binary's
-standard-library packages left out since it holds them cold too, mostly restored (#ybjbqm2),
+so does a run with a store whose host missed at most 0.10 of the packages its store hit or missed, the
+standard-library packages left out since the system cache holds them cold too (`$COHERE_SYSTEM_CACHE`, or else the
+user cache directory, computed on a machine's first use and shared by every project), mostly restored (#ybjbqm2),
 unless it judges each build's dependence (`--build-dependence`), whose builds restore nothing from the host, so every
 share would be high and the measured rule is taken from the start: every build starts at once, lists, builds its
 graph and restores, and waits before its type check, until every build has
@@ -1193,19 +1194,20 @@ or when its body reads one by a kind of use the change reaches. `"workspace"` an
 units and the `"dependentPackages"` among them, those with a dependent unit or a unit only the build compiles, with
 their `"dependentPackageNodes"`, and the `"buildOnlyUnits"` and `"buildOnlyNodes"` only the build compiles, which no
 count of the host's holds. `"graphMilliseconds":900` is the host's graph, built once from its load for every build,
-and `"judgmentMilliseconds":40` this build's judgment on it. Such a run reads the findings cache and the binary's
-standard-library entries as any other run does, and its lint waits for the load to end. The host's graph holds only
-what the host checked from source, so when it restored packages from export data the record writes `"restored"`,
-additive (#ss4t5g6): `"packages"` it restored; the standard library among them is loaded from source once a run, beside
-the host's lint, onto a graph of its own, `"standardLibraryPackages"` that load reached, in `"loadMilliseconds"` for
-its list, parse and type check and `"graphMilliseconds"` for its graph, and judged per build, `"standardLibraryUnits"`
-and `"standardLibraryDependentUnits"`, which `"dependencies"` include, so the totals are those of a host that checked
-every package from source. Each object of a restored package a unit reads is answered by its counterpart in that graph,
-found by its path: `"answered"` counts those, `"withoutCounterpart"` those whose path names nothing alike there, and
-`"withoutPackage"` those of a package no graph holds, a warm store's say, the last two called dependent, failing wide.
-`"standardLibraryFromRecords"` counts the standard library's packages its graph took from the records the findings
-store keeps of them, which that load then skips, and `"standardLibrarySideLoaded"` those it loaded, each written only
-when not 0. The host's record never writes it, and neither does a run without the switch.
+and `"judgmentMilliseconds":40` this build's judgment on it. Such a run reads the findings cache and the system
+cache's standard-library entries (`$COHERE_SYSTEM_CACHE`, or else the user cache directory, computed on a machine's
+first use and shared by every project) as any other run does, and its lint waits for the load to end. The host's graph
+holds only what the host checked from source, so when it restored packages from export data the record writes
+`"restored"`, additive (#ss4t5g6): `"packages"` it restored; the standard library among them is loaded from source
+once a run, beside the host's lint, onto a graph of its own, `"standardLibraryPackages"` that load reached, in
+`"loadMilliseconds"` for its list, parse and type check and `"graphMilliseconds"` for its graph, and judged per build,
+`"standardLibraryUnits"` and `"standardLibraryDependentUnits"`, which `"dependencies"` include, so the totals are
+those of a host that checked every package from source. Each object of a restored package a unit reads is answered by
+its counterpart in that graph, found by its path: `"answered"` counts those, `"withoutCounterpart"` those whose path
+names nothing alike there, and `"withoutPackage"` those of a package no graph holds, a warm store's say, the last two
+called dependent, failing wide. `"standardLibraryFromRecords"` counts the standard library's packages its graph took
+from the records the findings store keeps of them, which that load then skips, and `"standardLibrarySideLoaded"` those
+it loaded, each written only when not 0. The host's record never writes it, and neither does a run without the switch.
 
 Its `"facts"` is the build's facts census (#0ghk7vj), written once its lint has run. Under the switch every extra build
 restores nothing from the host's run, so its facts are its own, and such a run is slower than a plain one. The standard

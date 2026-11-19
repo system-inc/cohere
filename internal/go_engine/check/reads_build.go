@@ -438,19 +438,19 @@ type candidateKey struct {
 	name     string
 }
 
-// memoizedCandidate is methodCandidateOf's answer for a candidateKey under this binary's renderer, asked with no
-// answer, whether the type name is a candidate at all, and its name as a side's candidates are keyed (objectName).
+// memoizedCandidate is methodCandidateOf's answer for a candidateKey, asked with no answer, whether the type name is a
+// candidate at all, and its name as a side's candidates are keyed (objectName).
 type memoizedCandidate struct {
 	candidate   methodCandidate
 	isCandidate bool
 	key         string
 }
 
-// candidate is methodCandidateOf of typeName for a lookup of query and name under this binary's renderer, rendered
-// once per type name, query and name in the build, since every lookup of one name asks the same type names: on
-// deeafbf4 hundreds of lookups of Clone rendered every type name with a Clone again for each (#8fbkkp4). answer, which
-// only an interface's holdsAnswer reads, is read past the memo. It is the candidate, its name as a side's candidates
-// are keyed, and false when typeName is no candidate.
+// candidate is methodCandidateOf of typeName for a lookup of query and name, rendered once per type name, query and
+// name in the build, since every lookup of one name asks the same type names: on deeafbf4 hundreds of lookups of Clone
+// rendered every type name with a Clone again for each (#8fbkkp4). answer, which only an interface's holdsAnswer reads,
+// is read past the memo. It is the candidate, its name as a side's candidates are keyed, and false when typeName is no
+// candidate.
 func (build *ReadsBuild) candidate(
 	typeName *types.TypeName,
 	query string,
@@ -460,7 +460,7 @@ func (build *ReadsBuild) candidate(
 	key := candidateKey{typeName: typeName, query: query, name: name}
 	stored, found := build.candidates.Load(key)
 	if !found {
-		candidate, isCandidate := methodCandidateOf(typeName, query, name, nil, ReadsRendererVersion)
+		candidate, isCandidate := methodCandidateOf(typeName, query, name, nil)
 		stored, _ = build.candidates.LoadOrStore(key, memoizedCandidate{candidate: candidate,
 			isCandidate: isCandidate, key: objectName(typeName)})
 	}
@@ -488,12 +488,9 @@ type Restoring struct {
 	// names (untouchedOf).
 	Name string
 
-	// Reads are its reads on the host's run, for a package the host checked this run.
+	// Reads are its reads on the host's run, for a package the host checked this run. A package with none is declined
+	// (noReads).
 	Reads *build_reads.Reads
-
-	// persisted are its reads as the entry it was restored from persisted them (persistReads), which a verdict judges
-	// in place of Reads, for a package the host restored rather than checked. A package with neither is declined.
-	persisted *heldReads
 
 	// Assembly is whether it has assembly files, whose frames vet's asmdecl lays out field by field: the name, offset,
 	// size and kind of every field of each argument's type, another package's unexported ones too, which no property
@@ -501,8 +498,8 @@ type Restoring struct {
 	Assembly bool
 }
 
-// unpersistedReads is why a package with no reads, neither recorded this run nor persisted by its entry, is declined.
-const unpersistedReads = "unpersisted: its reads were not persisted"
+// noReads is why a package that holds no reads is declined: no verdict can judge it.
+const noReads = "noReads: it holds no reads"
 
 // listingsRead are the analyzers whose listings of every inherited fact are read one recorded question at a time
 // (checker.Options.ListingsRead). It is no carve-out from the listing's rule but the rule's own soundness argument,
@@ -533,8 +530,7 @@ var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 // the type checker records.
 //
 // Every read fails closed: an object with no objectpath, a package the build lacks, and a lookup of a kind it does not
-// know each fail it. Persisted reads are judged by the same rules (persistedTypesHold), and a package with no reads at
-// all, recorded or persisted, is declined as unpersisted.
+// know each fail it. A package with no reads is declined (noReads).
 func TypesHold(
 	restoring Restoring,
 	closure map[string]*types.Package,
@@ -542,11 +538,8 @@ func TypesHold(
 	host *ReadsBuild,
 	build *ReadsBuild,
 ) (bool, string) {
-	switch {
-	case restoring.persisted != nil:
-		return persistedTypesHold(restoring, closure, restored, build)
-	case restoring.Reads == nil:
-		return false, unpersistedReads
+	if restoring.Reads == nil {
+		return false, noReads
 	}
 	if restorable, why := restoring.Reads.Restorable(); !restorable {
 		if restoring.Reads.Never() != "" {
@@ -596,11 +589,8 @@ func FactsHold(
 	fact FactLookup,
 	factTypes map[reflect.Type]bool,
 ) (bool, string) {
-	switch {
-	case restoring.persisted != nil:
-		return persistedFactsHold(restoring, closure, build, fact, factTypes)
-	case restoring.Reads == nil:
-		return false, unpersistedReads
+	if restoring.Reads == nil {
+		return false, noReads
 	}
 	judged := verdict{host: host, build: build, closure: closure, fact: fact}
 	for _, read := range restoring.Reads.Facts() {
@@ -628,10 +618,7 @@ func FactsHold(
 // ReadFactTypes are the fact types restoring's fact reads asked, and the deprecated fact's when it looked up a
 // deprecation, every type FactsHold must be asked of before its fact reads are all decided.
 func ReadFactTypes(restoring Restoring) map[reflect.Type]bool {
-	switch {
-	case restoring.persisted != nil:
-		return persistedFactTypes(restoring.persisted)
-	case restoring.Reads == nil:
+	if restoring.Reads == nil {
 		return map[reflect.Type]bool{}
 	}
 	asked := map[reflect.Type]bool{}

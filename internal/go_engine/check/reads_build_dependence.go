@@ -83,12 +83,12 @@ type DependenceSet struct {
 //   - a fact read: the fact's owner.
 //
 // Every object whose counterpart the verdict finds by objectpath reaches its owner and the packages its path's
-// interfaces embed (counterpart). Persisted reads, reads never recorded or marked never, reads judged by closure alone
+// interfaces embed (counterpart). Reads never recorded or marked never, reads judged by closure alone
 // (build_reads.Reads.ClosureOnly), and an Interface or Method lookup, which reads every type name of the closure with
 // a method of its name, or a lookup of a kind the set does not know, are the whole import closure. The answers an
 // entry read are answersDependence's.
 func (build *ReadsBuild) Dependence(restoring Restoring) DependenceSet {
-	if restoring.persisted != nil || restoring.Reads == nil {
+	if restoring.Reads == nil {
 		return DependenceSet{WholeClosure: true}
 	}
 	if known, isKnown := build.dependences.Load(restoring.Reads); isKnown {

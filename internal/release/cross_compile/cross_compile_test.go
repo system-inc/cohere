@@ -86,7 +86,6 @@ func TestEveryReleaseTargetCompiles(test *testing.T) {
 				target,
 				strings.Join(release.StripFlags, " "),
 				filepath.Join(test.TempDir(), target.BinaryFileName()),
-				"",
 			)
 			if output, outputError := command.CombinedOutput(); outputError != nil {
 				test.Fatalf(
@@ -269,7 +268,6 @@ func TestCrossCompileCatchesAPlatformOnlyBreak(test *testing.T) {
 		darwin,
 		"",
 		filepath.Join(test.TempDir(), "cohere"),
-		"",
 	).CombinedOutput(); outputError != nil {
 		test.Fatalf(
 			"the control does not compile even for darwin, so it cannot show anything: %v\n%s",
@@ -284,7 +282,6 @@ func TestCrossCompileCatchesAPlatformOnlyBreak(test *testing.T) {
 		windows,
 		"",
 		filepath.Join(test.TempDir(), "cohere.exe"),
-		"",
 	).CombinedOutput()
 	if outputError == nil {
 		test.Fatal(

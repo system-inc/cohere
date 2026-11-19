@@ -1,7 +1,7 @@
 # cohere pair: base 111111111111 against branch 222222222222
 
-- base `1111111111111111111111111111111111111111`, binary sha256 `0a4601b8`, go standard library table: release 0.2.0-measure.111111111111 1111 go1.27.3, 51234567 bytes, every build checked, given `--other-builds`
-- branch `2222222222222222222222222222222222222222`, binary sha256 `bfa25050`, go standard library table: release 0.2.0-measure.222222222222 2222 go1.27.3, 51234999 bytes, every build checked, given nothing
+- base `1111111111111111111111111111111111111111`, binary sha256 `0a4601b8`, every build checked, given `--other-builds`
+- branch `2222222222222222222222222222222222222222`, binary sha256 `bfa25050`, every build checked, given nothing
 - host pupa, linux/amd64, 64 cores, go version go1.27.3 linux/amd64
 - 2 rounds per corpus, base first in odd rounds and branch first in even ones, each side a cache-on cold run then a `--no-cache` run, `go-engine --contract 3 --no-fix`; one-minute load before each run 0.40 to 15.40
 - corpora: root at `aaaaaaaaaaaa` (files in scope 1200 in all), loom at `9510c6baddda` (files in scope 1200 in all); a number here compares only with a pair over these same commits

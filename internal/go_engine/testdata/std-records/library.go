@@ -1,4 +1,4 @@
-// Package library calls into a few standard-library packages the engine's standard-library table holds.
+// Package library calls into a few standard-library packages, whose entries the system cache holds.
 package library
 
 import (
