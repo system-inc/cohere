@@ -171,6 +171,37 @@ func TestEveryFunctionAReplayJudgesHasAnAnswerOfItsOwn(test *testing.T) {
 	}
 }
 
+// The two walks keep the same functions (#kemy8sq): one declared without a body that has a result that may be nil,
+// whose answer may change by platform, assembly on one and Go on another, and never one none of whose results may be
+// nil, answered from its signature alone, the same in every build with the same types. Asked of Inner alone, the
+// resolver replays the push, which meets Length and Assembled as roots before Outer: it holds Assembled's answer, the
+// defaults of its signature, as no fact, and none of Length. Judged directly afterwards, Length goes through the
+// demand walk, which holds none of it either. What the run recorded for the store is Inner's answer alone.
+func TestTheWalksKeepABodilessFunctionAndNeverOneWithNoResultThatMayBeNil(test *testing.T) {
+	test.Parallel()
+	kept := askOnce(test, "assembled", "Inner")
+	requireKept(test, kept, map[string][]return_nil_ness.ValueNilness{
+		"Inner":     nil,
+		"Outer":     {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
+		"Assembled": nil,
+	}, map[string][]return_nil_ness.ValueNilness{"Inner": nil})
+	if fallbacks := kept.counts.Fallbacks.Load(); fallbacks != 1 {
+		test.Errorf("asking of Inner replayed %d times, want 1, so the replay's answers went untested", fallbacks)
+	}
+	length, isFunction := kept.home.Types.Scope().Lookup("Length").(*types.Func)
+	if !isFunction {
+		test.Fatal("assembled declares no function Length")
+	}
+	if judged := return_nil_ness.Judged(kept.resolver, kept.home, length); judged != nil {
+		test.Errorf("Length's verdict is %v, want no fact", judged)
+	}
+	for _, answer := range kept.resolver.Answered() {
+		if answer.Object == length {
+			test.Errorf("the demand walk held Length's answer, %s, which no walk keeps", answer.Encoded)
+		}
+	}
+}
+
 // What a replay keeps of a cycle is what a later question answers (#kemy8sq). CycleOuter and CycleInner call each
 // other, and asked of CycleInner alone the resolver replays the push, which begins at CycleOuter: CycleInner, reading
 // its begun partner as the defaults, may return nil, where judged first it would return what CycleOuter does, never

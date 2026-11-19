@@ -34,6 +34,11 @@ func stateIn(home *fact_resolver.Package) *verdicts {
 // The resolver records nothing for the store of it: a callee is recorded when a reader asks of it, as before. The
 // caller holds home's lock.
 //
+// Both walks hand over the same functions: each they judge, and each with a result that may be nil and no body, whose
+// defaults they keep as its verdict, since a function of assembly in one build may be one of Go in another, with
+// another answer, which a reader comparing the builds' answers needs. Neither hands over a function none of whose
+// results may be nil: its signature alone answers it, the same in every build with the same types.
+//
 // A verdict handed over is final, the one judgeIn answers of function from then on, which the resolver needs of it,
 // since it holds the answer as function's for the rest of the run (fact_resolver.Keep). Neither walk judges a function
 // twice: each returns a verdict held before it would judge, so one kept is never revised, and judgeIn reads the
