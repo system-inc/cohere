@@ -1105,8 +1105,8 @@ reason it had: `hostDecline` (a package its check declined, at most 2 such round
 reached a restored package with no answer of it kept). `"writtenThrough":301` counts the packages it restored whose
 entry it then wrote to its own findings cache, once their restore held, so its next run hits them there rather than
 check them from source, since the host, hitting its own store then, keeps nothing to restore them from; under
-`--no-cache` nothing is written, and it is absent. `"systemCacheRestored":290` counts the standard-library packages
-the build restored from the system cache's table of its own build context, and `"systemCacheWritten":12` the entries
+`--no-cache` nothing is written, and it is absent. `"systemCacheRestored":290` counts the packages, the standard
+library's and third-party modules', the build restored from the system cache's table of its own build context, and `"systemCacheWritten":12` the entries
 it added to that table, each absent when 0. `"sharedBodyHits":1561` counts the packages a build hit in its own
 findings cache whose body it took from the run's memo of decoded bodies, the bodies the host's run read from its
 store and those an earlier build read, rather than read and decode it again; a cold run, whose host read nothing

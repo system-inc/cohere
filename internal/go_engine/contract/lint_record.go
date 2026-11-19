@@ -157,10 +157,11 @@ type BuildRecord struct {
 	// Written only when not 0, so a run under `--no-cache` writes none.
 	WrittenThrough int `json:"writtenThrough,omitempty"`
 
-	// SystemCacheRestored counts the standard-library packages the build restored from the system cache's table of its
-	// own build context (#syscache), and SystemCacheWritten the entries it added to that table this run. Additive
-	// within contract 3, and the Go engine's alone. Each is written only when not 0, so a build under
-	// `--no-system-cache`, or one whose table held everything it reached, writes none.
+	// SystemCacheRestored counts the packages the build restored from the system cache's table of its own build
+	// context, the standard library's and third-party modules' (#syscache, #57wgzhp), and SystemCacheWritten the
+	// entries it added to that table this run. Additive within contract 3, and the Go engine's alone. Each is written
+	// only when not 0, so a build under `--no-system-cache`, or one whose table held everything it reached, writes
+	// none.
 	SystemCacheRestored int `json:"systemCacheRestored,omitempty"`
 	SystemCacheWritten  int `json:"systemCacheWritten,omitempty"`
 	// SharedBodyHits, additive within contract 3, counts the packages a build hit in its own findings cache whose body
