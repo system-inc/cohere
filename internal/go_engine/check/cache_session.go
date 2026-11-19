@@ -280,6 +280,13 @@ type CacheSession struct {
 	// host is the restore from the host's run of an extra build's session, nil for any other (see RestoreFromHost).
 	host *hostState
 
+	// stood are the IDs of the packages something stood in, in any load of an extra build's session, as its
+	// Options.StandingBodies answered (keepingStandingOut, #e4rd5dw): their findings in the standing bodies are the
+	// host's, which the build's own entry must never carry, so none is written (savable, writeThrough). stoodLock
+	// guards it, since the actions on a run's packages ask at once.
+	stoodLock sync.Mutex
+	stood     map[string]bool
+
 	// dependence is the host's session's block 1 dependence records, under `--build-dependence`, nil for any other
 	// session (KeepDependenceRecords, #6a3kjvz).
 	dependence *dependenceRecords
@@ -1100,13 +1107,15 @@ func (session *CacheSession) saveMisses(
 }
 
 // savable reports whether keyed, a package the run checked, can be saved from actions, every action on it: it has no
-// load error, every action finished clean, and its analysis ran on no guess, as one handed a placeholder did
-// (fact_resolver.Unsure), which the round that loads what the placeholder stood for analyzes again. saver names the
-// caller, which a read of the resolver after the keep names as its reader (readAfterKeep).
+// load error, every action finished clean, its analysis ran on no guess, as one handed a placeholder did
+// (fact_resolver.Unsure), which the round that loads what the placeholder stood for analyzes again, and nothing stood
+// in it (stoodIn), whose findings there are the host's. saver names the caller, which a read of the resolver after the
+// keep names as its reader (readAfterKeep).
 func (session *CacheSession) savable(saver string, keyed *packages.Package, actions []*checker.Action) bool {
 	unsure := !session.readAfterKeep(saver+", asking whether "+keyed.ID+" ran on a guess") &&
 		session.resolver != nil && keyed.Types != nil && session.resolver.Unsure(keyed.Types)
-	return len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actions) && !unsure
+	return len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actions) && !unsure &&
+		!session.stoodIn(keyed.ID)
 }
 
 // KeptBySystemCache reports whether keyed is a package the session keys apart in a run that keeps a system cache, the

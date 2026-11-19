@@ -150,7 +150,8 @@ type Options struct {
 	// as its own. StandingAfter, when StandingBodies is set too, is the analyzer every dispatcher's action on a package
 	// follows and whose result there StandingBodies is asked with, standing_facts' on the census path, which this
 	// package never imports. Where it is FactReachSettle and the run roots that nowhere (settlingIn), nothing stands.
-	// Both are called from several actions at once. Only an extra build sets them.
+	// Both are called from several actions at once. Only an extra build sets them, and no package StandingBodies
+	// answers anything for is written to the findings cache (CacheSession.keepingStandingOut).
 	StandingBodies func(packageId string, after any) rule.StandingBodies
 	StandingAfter  *analysis.Analyzer
 
@@ -427,6 +428,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		resolver.RecordAskers()
 	}
 	session := options.Cache
+	// A package anything stands in is never written to the store, whose entry would carry the host's findings there.
+	if checkerOptions.StandingBodies != nil && session != nil {
+		checkerOptions.StandingBodies = session.keepingStandingOut(checkerOptions.StandingBodies)
+	}
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.
 		return nil, fmt.Errorf("running report %s: the findings cache was opened without it", options.Report.Name)
