@@ -13,10 +13,12 @@
 # PackageExit. SA2002 is PerUnit because it asks the fact resolver which calls of the same-package function a go
 # statement starts stop the test (its test_stopping_calls answers), where testinggoroutine reads that function's body.
 #
-# SA4029 and SA5008 are Composes for a package-wide gate the reach does not carry, which the standing gate modules
-# showed (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26): SA4029 judges no assignment
-# unless the package's type index holds one of sort's slice types, which a use in any file puts there, and SA5008
-# accepts a repeated go-flags key in a struct tag in a package any of whose files imports go-flags.
+# Four are Composes for a package-wide gate the reach does not carry, which the standing gate modules showed
+# (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26): SA4029 judges no assignment unless
+# the package's type index holds one of sort's slice types, which an import or a use in any file puts there; SA5008
+# accepts a repeated go-flags key in a struct tag in a package any of whose files imports go-flags; tests judges an
+# example's name by the package's scope and every import; and consistency-no-abbreviated-identifier suggests a name
+# no file of the package declares, and leaves a method named Len alone once any file uses or imports sort.
 
 cohere-go/S1000 PerUnit
 cohere-go/S1001 PerUnit FullKind
@@ -172,7 +174,7 @@ cohere-go/concurrency-no-kill-by-name PerUnit
 cohere-go/concurrency-require-escape-hatch-reason PerUnit
 cohere-go/concurrency-require-joined-pipe-reader PerUnit
 cohere-go/consistency-no-abbreviated-file-name FileSyntax
-cohere-go/consistency-no-abbreviated-identifier PerUnit FullKind
+cohere-go/consistency-no-abbreviated-identifier Composes FullKind
 cohere-go/consistency-no-ambiguous-identifier PerUnit FullKind
 cohere-go/consistency-no-any Composes FullKind
 cohere-go/consistency-no-boolean-outcome PerUnit FullKind
@@ -247,7 +249,7 @@ cohere-go/testing-no-uncached-run PerUnit
 cohere-go/testing-require-failure-path PerUnit
 cohere-go/testing-require-parallel Composes
 cohere-go/testinggoroutine Composes FullKind
-cohere-go/tests PerUnit FullKind
+cohere-go/tests Composes FullKind
 cohere-go/timeformat PerUnit
 cohere-go/unmarshal PerUnit
 cohere-go/unreachable PerUnit
