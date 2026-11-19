@@ -45,7 +45,7 @@ func (plantedStands) Took(string, string, int, int) {
 // none does.
 func standingOptions(stands bool) *checker.Options {
 	return &checker.Options{
-		StandingBodies: func(string) rule.StandingBodies { return plantedStands{stands: stands} },
+		StandingBodies: func(string, any) rule.StandingBodies { return plantedStands{stands: stands} },
 		Standing:       rule.Standing,
 	}
 }
