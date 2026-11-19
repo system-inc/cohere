@@ -13,9 +13,10 @@
 # PackageExit. SA2002 is PerUnit because it asks the fact resolver which calls of the same-package function a go
 # statement starts stop the test (its test_stopping_calls answers), where testinggoroutine reads that function's body.
 #
-# SA4029 is Composes for a package-wide gate the reach does not carry, which the standing gate modules showed
-# (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26): it judges no assignment unless the
-# package's type index holds one of sort's slice types, which a use in any file puts there.
+# SA4029 and SA5008 are Composes for a package-wide gate the reach does not carry, which the standing gate modules
+# showed (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26): SA4029 judges no assignment
+# unless the package's type index holds one of sort's slice types, which a use in any file puts there, and SA5008
+# accepts a repeated go-flags key in a struct tag in a package any of whose files imports go-flags.
 
 cohere-go/S1000 PerUnit
 cohere-go/S1001 PerUnit FullKind
@@ -119,6 +120,8 @@ cohere-go/SA4028 PerUnit
 cohere-go/SA4029 Composes FullKind
 cohere-go/SA4030 PerUnit FullKind
 cohere-go/SA4031 PerUnit FullKind
+# SA4032 is carried by construction: it reads only its own file's build constraint and name, and a body stands only in
+# a file both builds compile, where both read them the same.
 cohere-go/SA4032 PerUnit
 cohere-go/SA5000 PerUnit
 cohere-go/SA5001 PerUnit FullKind
@@ -127,7 +130,7 @@ cohere-go/SA5003 PerUnit
 cohere-go/SA5004 PerUnit
 cohere-go/SA5005 PerUnit
 cohere-go/SA5007 PerUnit
-cohere-go/SA5008 PerUnit FullKind
+cohere-go/SA5008 Composes FullKind
 cohere-go/SA5010 PerUnit FullKind
 cohere-go/SA5012 PerUnit FullKind
 cohere-go/SA6000 PerUnit FullKind
