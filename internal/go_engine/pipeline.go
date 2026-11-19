@@ -237,10 +237,13 @@ type pipeline struct {
 	dependence *hostDependence
 
 	// bodyReachCensus is the file the body reach census is written to, from `COHERE_BODY_REACH_CENSUS`, empty for a
-	// run that writes none, and bodyReachHost the census's side of the host, made as the extra builds start in a run
-	// that judges their dependence, nil in any other (body_reach.go, #w72zxtq).
-	bodyReachCensus string
-	bodyReachHost   *bodyReachHost
+	// run that writes none; bodyDifferential whether each body the reach leaves unreached is compared with the host's,
+	// from `COHERE_BODY_DIFFERENTIAL=1` (build_body_differential.go); and bodyReachHost the census's side of the host,
+	// made as the extra builds start in a run that judges their dependence and asked for either, nil in any other
+	// (body_reach_host.go, #w72zxtq).
+	bodyReachCensus  string
+	bodyDifferential bool
+	bodyReachHost    *bodyReachHost
 
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
 	// beside the host's to check.

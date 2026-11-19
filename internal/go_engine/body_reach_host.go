@@ -11,6 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
@@ -38,6 +39,9 @@ import (
 // bodyReachCensusVariable names the file the census is written to, unset for a run that writes none.
 const bodyReachCensusVariable = "COHERE_BODY_REACH_CENSUS"
 
+// bodyDifferentialVariable, set to 1, turns on the body differential (build_body_differential.go).
+const bodyDifferentialVariable = "COHERE_BODY_DIFFERENTIAL"
+
 // bodyReachReason is why the census calls a body reached in a build.
 type bodyReachReason string
 
@@ -58,18 +62,25 @@ var bodyReachReasons = []bodyReachReason{reachedUnrecorded, reachedUnknown, reac
 	reachedConstant, reachedSelected, reachedValueType, reachedTypeArgument, reachedShadowed}
 
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
-// by its ID, with its reads, whose function uses stage 1 recorded, and the host's graph, with the types of the
-// packages it took from the findings store's records rather than from their syntax (hostDependence.decoded).
+// by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its
+// walk rendered them; the host's graph, with the types of the packages it took from the findings store's records
+// rather than from their syntax (hostDependence.decoded); and the host's findings by file, before the merge, which the
+// differential compares each skipped body's with.
 type bodyReachHost struct {
 	packages   map[string]*packages.Package
 	reads      map[*packages.Package]*build_reads.Reads
 	dependence *hostDependence
+	findings   map[string][]check.Finding
 }
 
-// newBodyReachHost is the census's host side from the host's whole reads (wholeReads) and its graph.
-func newBodyReachHost(dependence *hostDependence, reads map[*packages.Package]*build_reads.Reads) *bodyReachHost {
+// newBodyReachHost is the census's host side from the host's whole reads (wholeReads), its graph and its findings.
+func newBodyReachHost(
+	dependence *hostDependence,
+	reads map[*packages.Package]*build_reads.Reads,
+	findings []check.Finding,
+) *bodyReachHost {
 	host := &bodyReachHost{packages: make(map[string]*packages.Package, len(reads)), reads: reads,
-		dependence: dependence}
+		dependence: dependence, findings: findingsByFile(findings)}
 	for each := range reads {
 		host.packages[each.ID] = each
 	}

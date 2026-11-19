@@ -56,6 +56,8 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 		caching.Begin = engine.beginSpeculativeLint
 	}
 	caching.RecordReads = engine.recordsReadsOf()
+	// The body differential compares each build's bodies with the host's as its walk rendered them.
+	caching.RendersBodies = engine.bodyDifferential && engine.request.judgesDependence()
 	started := time.Now()
 	defer func() { engine.hostLoading.Add(int64(time.Since(started))) }()
 	return engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})

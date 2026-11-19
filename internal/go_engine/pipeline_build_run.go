@@ -82,6 +82,9 @@ type buildRun struct {
 	// files it shares with the host's, which its facts are compared through once its lint has run (compareFacts).
 	judged *buildJudgment
 	// bodyReach is an extra build's alone, under the body reach census: which of the host's bodies its difference
-	// reaches (body_reach.go, #w72zxtq), nil otherwise.
+	// reaches (body_reach_host.go, #w72zxtq), nil otherwise.
 	bodyReach *buildBodyReach
+	// bodyDifferential is an extra build's alone, under the body differential: each body its reach leaves unreached
+	// compared with the host's (build_body_differential.go), nil otherwise.
+	bodyDifferential *buildBodyDifferential
 }

@@ -62,8 +62,8 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
-	if engine.bodyReachCensus != "" && engine.dependence != nil {
-		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads)
+	if (engine.bodyReachCensus != "" || engine.bodyDifferential) && engine.dependence != nil {
+		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
 	}
 	// And the host's dependence sets are in its memo, each computed as its package's walk ended, so no build computes
 	// one again beside the pass; the walks are over, so this waits for the last sets alone.
@@ -667,12 +667,16 @@ func (engine *pipeline) extraBuildRun(
 	if inheritance != nil {
 		inherits = inheritance
 	}
-	// The packages the build's last load checked from source, as the body reach census reads them, taken before its
-	// rules let their syntax go, under the census alone.
-	var reachBuilt []*reachBuiltPackage
 	runRules := func(over *load.Loaded) (*check.Result, error) {
-		if engine.bodyReachHost != nil {
-			reachBuilt = reachBuiltPackages(over, engine.dependence.files)
+		// The body reach census of the build's last load, and its bodies the reach leaves unreached compared with the
+		// host's, taken before its rules let its syntax and types go, under the census alone. On the build's own
+		// goroutine, before the facts census, so its judgment is asked from one goroutine at a time.
+		if engine.bodyReachHost != nil && run.judged != nil {
+			run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence,
+				reachBuiltPackages(over, engine.dependence.files))
+			if engine.bodyDifferential {
+				run.bodyDifferential = newBuildBodyDifferential(engine.bodyReachHost, over, run.bodyReach)
+			}
 		}
 		started := time.Now()
 		defer func() { linting += time.Since(started) }()
@@ -755,9 +759,9 @@ func (engine *pipeline) extraBuildRun(
 	if run.judged != nil && run.dependence != nil {
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
 	}
-	// On the build's own goroutine, after the facts census, so its judgment is asked from one goroutine at a time.
-	if engine.bodyReachHost != nil && run.judged != nil {
-		run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence, reachBuilt)
+	// The findings of each body the differential compared, the last load's, whose result stands.
+	if run.bodyDifferential != nil {
+		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings))
 	}
 	run.loading, run.linting, run.shareGateWait = loading, linting, shareGateWait
 	if engine.buildLoadTimes != nil {

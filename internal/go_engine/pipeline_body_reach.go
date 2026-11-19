@@ -12,9 +12,10 @@ import (
 const bodyReachListed = 20
 
 // writeBodyReachCensus writes each extra build's census of runs to the census file, when the run asked for one and
-// judged its builds' dependence. A file that cannot be written is noted and changes nothing else.
+// judged its builds' dependence, and notes each body differential failure on stderr, in build order, under the
+// differential. A file that cannot be written is noted and changes nothing else.
 func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
-	if engine.bodyReachCensus == "" || engine.bodyReachHost == nil {
+	if engine.bodyReachHost == nil {
 		return
 	}
 	var written strings.Builder
@@ -23,6 +24,18 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 			continue
 		}
 		writeBuildBodyReach(&written, run.build.String(), run.bodyReach)
+		if run.bodyDifferential == nil {
+			continue
+		}
+		fmt.Fprintf(&written, "  body differential: compared %d, failures %d\n", run.bodyDifferential.compared,
+			len(run.bodyDifferential.failures))
+		for _, failure := range run.bodyDifferential.failures {
+			fmt.Fprintf(&written, "    %s\n", failure)
+			engine.note("the body differential of the build %s: %s", run.build, failure)
+		}
+	}
+	if engine.bodyReachCensus == "" {
+		return
 	}
 	if writeError := os.WriteFile(engine.bodyReachCensus, []byte(written.String()), 0o644); writeError != nil {
 		engine.note("the body reach census: %v", writeError)

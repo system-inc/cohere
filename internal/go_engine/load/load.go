@@ -267,6 +267,10 @@ type Caching struct {
 	// Overlap.Reads are nil.
 	RecordReads func(reachable *packages.Package) bool
 
+	// RendersBodies has each package's reads render its bodies as well, by the load's file set, for stage 2's body
+	// differential (build_reads.BodyRenderings, #w72zxtq). Unset, as in every run but that one, nothing is rendered.
+	RendersBodies bool
+
 	// AnalyzedRootsOnly leaves out of the load every root no action reaches: a package whose in-package test variant
 	// "p [p.test]" is analyzed in its place (analyzedOfGraph) and which no package of the graph imports, as a command
 	// main with tests is. The variant holds every file of it, so nothing goes unanalyzed, and the files a load reports
@@ -551,7 +555,11 @@ func fromSource(
 		typeChecker.reads = make(map[*packages.Package]*build_reads.Reads, len(reachable))
 		for _, current := range reachable {
 			if caching.RecordReads(current.loaded) {
-				typeChecker.reads[current.loaded] = &build_reads.Reads{}
+				packageReads := &build_reads.Reads{}
+				if caching.RendersBodies {
+					packageReads.RenderBodiesBy(typeChecker.fileSet)
+				}
+				typeChecker.reads[current.loaded] = packageReads
 			}
 		}
 	}

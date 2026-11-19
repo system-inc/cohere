@@ -13,6 +13,7 @@ package build_reads
 import (
 	"cmp"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"maps"
 	"reflect"
@@ -63,6 +64,11 @@ type Reads struct {
 	// functionUses are what each top-level declaration of the package uses, its signature and its body apart
 	// (#kr1m304), recorded in its type reads' walk, nil while unrecorded: unrecorded uses are unknown, never empty.
 	functionUses *FunctionUses
+
+	// bodyFileSet is the file set the walk renders the package's bodies by, for the body differential (#w72zxtq),
+	// nil in a run that renders none (RenderBodies), and bodyRenderings what it rendered, nil until then.
+	bodyFileSet    *token.FileSet
+	bodyRenderings *BodyRenderings
 }
 
 // UseKind is how a package used an object of another package, which decides what of the object another build must
@@ -320,6 +326,31 @@ func (reads *Reads) Claimed() bool {
 // is whole: the kinds are read from where each expression sits.
 func (reads *Reads) Record(own *types.Package, info *types.Info, files []*ast.File) {
 	reads.publishTypes(collectTypeReads(own, info, files))
+	reads.lock.Lock()
+	fileSet := reads.bodyFileSet
+	reads.lock.Unlock()
+	if fileSet == nil {
+		return
+	}
+	rendered := RenderBodies(fileSet, own, info, files, nil)
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	reads.bodyRenderings = rendered
+}
+
+// RenderBodiesBy has the walk render the package's bodies as well, each placed by fileSet, the load's, for the body
+// differential (BodyRenderings): asked before the walk, under the differential alone, so a plain run renders nothing.
+func (reads *Reads) RenderBodiesBy(fileSet *token.FileSet) {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	reads.bodyFileSet = fileSet
+}
+
+// BodyRenderings are the package's bodies as its walk rendered them, and whether it did.
+func (reads *Reads) BodyRenderings() (*BodyRenderings, bool) {
+	reads.lock.Lock()
+	defer reads.lock.Unlock()
+	return reads.bodyRenderings, reads.bodyRenderings != nil
 }
 
 // FunctionUses are what each top-level declaration of the package uses, its signature and its body apart, and

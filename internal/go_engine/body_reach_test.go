@@ -22,14 +22,19 @@ import (
 //   - Gadget.Spin and Joined use nothing that differs: unreached, and the graph's unit verdict agrees on both.
 //
 // platformName's body in the host-only file is absent on windows, and windows's own platformName, Spin and len are
-// new. The census is written to its file, and the findings are the run's without it, which writes no census.
+// new. The body differential compares the two unreached bodies' types, uses and findings on windows with the host's,
+// and none differs. The census is written to its file, and the findings are the run's without it, which writes no
+// census.
 func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	test.Parallel()
 
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
 	on, onStream := runOverConfigured(test, root, exitFindings,
-		func(engine *pipeline) { engine.bodyReachCensus = censusFile }, "--no-cache", "--no-fix", "--other-builds",
+		func(engine *pipeline) {
+			engine.bodyReachCensus = censusFile
+			engine.bodyDifferential = true
+		}, "--no-cache", "--no-fix", "--other-builds",
 		"--build-dependence")
 	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
 		"--no-fix", "--other-builds", "--build-dependence")
@@ -78,6 +83,15 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 			"%d and %v", census.recorded, census.buildOnlyPackages, census.declarationsOnly)
 	}
 
+	differential := on.buildRuns[1].bodyDifferential
+	if differential == nil {
+		test.Fatal("windows's run has no body differential")
+	}
+	if differential.compared != 2 || len(differential.failures) != 0 {
+		test.Errorf("want the 2 unreached bodies compared with the host's and none differing, got %d compared and "+
+			"the failures\n%s", differential.compared, strings.Join(differential.failures, "\n"))
+	}
+
 	written, readError := os.ReadFile(censusFile)
 	if readError != nil {
 		test.Fatal(readError)
@@ -86,6 +100,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"build " + on.buildRuns[1].build.String(),
 		"  bodies: 7, reached 5, unreached 2, absent 1, new 3",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
+		"  body differential: compared 2, failures 0",
 	} {
 		if !slices.Contains(strings.Split(string(written), "\n"), line) {
 			test.Errorf("the census file has no line %q:\n%s", line, written)
@@ -96,6 +111,12 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		return run.bodyReach != nil
 	}) {
 		test.Error("a run without the census took one")
+	}
+	// Nor does the host's walk render a body for a differential that was never asked for.
+	for _, reads := range off.buildRuns[0].reads {
+		if _, isRendered := reads.BodyRenderings(); isRendered {
+			test.Error("a run without the body differential rendered the host's bodies")
+		}
 	}
 	if !slices.Equal(findingLines(normalize(onStream, root)), findingLines(offStream)) {
 		test.Errorf("the findings with the census are\n%q\nwant those without it\n%q",

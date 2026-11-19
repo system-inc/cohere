@@ -49,7 +49,7 @@ func (reacher *bodyReacher) reachPackage(
 			continue
 		}
 		bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
-			line: position.Line, name: name,
+			line: position.Line, offset: declared.Declaration.Offset, name: name,
 			reason: reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
 				read.dotImports[position.Filename]),
 			unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
