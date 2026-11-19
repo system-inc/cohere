@@ -24,6 +24,8 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		return
 	}
 	var written strings.Builder
+	fmt.Fprintf(&written, "The reach stands for no finding that turns on a callee's fact, stage 4's (#h0k644s), nor "+
+		"for a package-wide rule's, stage 5's (#xeafx79): the body differential classes their findings apart.\n")
 	for index, run := range runs {
 		if run.bodyReach == nil {
 			if index == 0 {
@@ -50,6 +52,13 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		for _, failure := range run.bodyDifferential.failures {
 			fmt.Fprintf(&written, "    %s\n", failure)
 			engine.note("the body differential of the build %s: %s", run.build, failure)
+		}
+		for _, owed := range findingStages {
+			classed := run.bodyDifferential.classed[owed.stage]
+			fmt.Fprintf(&written, "  findings differing %s: %d\n", owed.written, len(classed))
+			for _, line := range classed {
+				fmt.Fprintf(&written, "    %s\n", line)
+			}
 		}
 	}
 	if engine.bodyReachCensus == "" {

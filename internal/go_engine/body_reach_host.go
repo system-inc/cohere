@@ -40,6 +40,13 @@ import (
 // differs from the host's (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift
 // past a word or `math.MaxInt` type-check to other constants there with no file differing, which no bit says, as the
 // restore's own sizes gate refuses such a build every package (check's hostSizesDiffer, #61qj12v).
+//
+// What the reach does not stand for, which the census says at its head: a finding that turns on a fact about a
+// function a body calls, its purity, that it never returns or that it wraps printf, is stage 4's (#h0k644s), since the
+// callee's fact moves with the callee's own body while the callee's bit, its signature, stays unset; and a
+// package-wide rule's finding, U1000's or vet's tests', which turns on what the rest of the package holds rather than
+// on what the body uses, is stage 5's (#xeafx79). The body differential classes a findings failure that only such
+// rules make apart, with its own count and lines (findingStage), rather than passing or failing on it.
 
 // bodyReachCensusVariable names the file the census is written to, unset for a run that writes none.
 const bodyReachCensusVariable = "COHERE_BODY_REACH_CENSUS"

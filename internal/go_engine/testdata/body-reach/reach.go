@@ -113,3 +113,23 @@ func Typed() int {
 func Bytes(value byte) int {
 	return 0
 }
+
+// calls counts the host's platformSize calls.
+var calls int
+
+// size calls platformSize, pure on windows alone.
+func size(count int) int {
+	return platformSize(count)
+}
+
+// Warm calls size and drops its result: a pure call discarded where size is pure, which turns on the fact of a
+// function it calls, not on anything it uses.
+func Warm() {
+	size(2)
+}
+
+// helper is called only by windows's init, so it is unused on every other build, which turns on what the rest of the
+// package holds.
+func helper() int {
+	return 1
+}

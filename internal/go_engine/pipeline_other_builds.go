@@ -781,7 +781,8 @@ func (engine *pipeline) extraBuildRun(
 	}
 	// The findings of each body the differential compared, the last load's, whose result stands.
 	if run.bodyDifferential != nil {
-		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings))
+		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings),
+			findingStagesOf(enabled))
 	}
 	run.loading, run.linting, run.shareGateWait = loading, linting, shareGateWait
 	if engine.buildLoadTimes != nil {

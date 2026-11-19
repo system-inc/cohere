@@ -15,3 +15,9 @@ const platformLimit = 8
 func platformName() string {
 	return "other"
 }
+
+// platformSize counts its calls, so it is no pure function.
+func platformSize(count int) int {
+	calls++
+	return count * 8
+}

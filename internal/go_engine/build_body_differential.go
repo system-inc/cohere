@@ -7,11 +7,15 @@ import (
 	"slices"
 	"strings"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
 // The body differential, stage 2's own soundness machine (#w72zxtq), under `COHERE_BODY_DIFFERENTIAL=1` with
@@ -25,15 +29,83 @@ import (
 // the body's lines must be the host's. A body that differs is a failure, named by its build, package, file,
 // declaration and first difference, written to stderr and counted in the census. So is a build with recorded packages
 // that compares no body, unless its sizes reached every body, and a build the census has no judgment of
-// (writeBodyReachCensus), since a machine that compares nothing passes nothing.
+// (writeBodyReachCensus), since a machine that compares nothing passes nothing. A body whose findings differ only by
+// rules a later stage owns, those that read a callee's facts (stage 4's, #h0k644s) or judge the package whole (stage
+// 5's, #xeafx79), all of one stage, is classed apart under that stage, counted and listed, and no failure: the reach
+// does not stand for them.
 
 // buildBodyDifferential is one build's body differential: how many unreached bodies it compared, each one's failure
-// line where it differed, and the bodies compared by their types, whose findings are compared once the build's rules
-// have run.
+// line where it differed, each findings difference a later stage owns by that stage (findingStage), and the bodies
+// compared by their types, whose findings are compared once the build's rules have run.
 type buildBodyDifferential struct {
 	compared int
 	failures []string
+	classed  map[findingStage][]string
 	bodies   []comparedBody
+}
+
+// findingStage is the later stage of #9paaen9 a rule's findings are owed to, where the reach does not stand for them.
+type findingStage string
+
+const (
+	// stageCalleeFacts is a rule that reads facts about the functions a body calls, which move with the callees' own
+	// bodies: stage 4's (#h0k644s).
+	stageCalleeFacts findingStage = "CalleeFacts"
+	// stagePackageWide is a rule that judges its package whole (rules.InputsComposes): stage 5's (#xeafx79).
+	stagePackageWide findingStage = "PackageWide"
+)
+
+// findingStages are the stages, in the order the census writes them, each with the words it is written with.
+var findingStages = []struct {
+	stage   findingStage
+	written string
+}{
+	{stageCalleeFacts, "turning on a callee's fact, stage 4's (#h0k644s)"},
+	{stagePackageWide, "of a package-wide rule, stage 5's (#xeafx79)"},
+}
+
+// findingStagesOf are the stages enabled's rules' findings are owed to, by rule name, those of neither left out: a
+// rule that reads facts of its own (readsFacts) is stage 4's, and one the inputs table declares Composes, stage 5's.
+// Facts are asked first, so printf, which is both, is stage 4's.
+func findingStagesOf(enabled []rule.Rule) map[string]findingStage {
+	// Ignored: a table that does not parse is TestTheInputsTableParses's to fail, and leaves every rule unclassed,
+	// so its differences stay failures.
+	declared, _ := rules.DeclaredInputs()
+	stages := map[string]findingStage{}
+	for _, each := range enabled {
+		switch {
+		case readsFacts(each.Analyzer):
+			stages[each.Name] = stageCalleeFacts
+		case declared[each.Name].Inputs == rules.InputsComposes:
+			stages[each.Name] = stagePackageWide
+		}
+	}
+	return stages
+}
+
+// readsFacts reports whether analyzer, or what it requires, learns facts, as staticcheck's purity does through
+// ctrlflow's, but for what a dispatcher requires for its walk and every listener on it: a dispatched rule's analyzer
+// requires what its own listener does beside the dispatcher (dispatch.ListenerRequirement), and the dispatcher's
+// requirements are every rule's on it, which would class nearly every rule.
+func readsFacts(analyzer *analysis.Analyzer) bool {
+	seen := map[*analysis.Analyzer]bool{}
+	var reads func(current *analysis.Analyzer) bool
+	reads = func(current *analysis.Analyzer) bool {
+		if seen[current] {
+			return false
+		}
+		seen[current] = true
+		if len(current.FactTypes) > 0 {
+			return true
+		}
+		for _, required := range current.Requires {
+			if !dispatch.IsDispatcher(required) && reads(required) {
+				return true
+			}
+		}
+		return false
+	}
+	return reads(analyzer)
 }
 
 // comparedBody is a body the differential compared, by where it lies, its declaration's first line to its body's
@@ -165,10 +237,12 @@ func firstFactDifference(
 }
 
 // compareFindings compares, for each body compared by its types, the build's findings within its lines with the
-// host's, hostFindings and builtFindings each by file, adding a failure for each body where they differ.
+// host's, hostFindings and builtFindings each by file, adding a failure for each body where they differ, but where
+// every finding one side has and the other lacks is of rules stages owes to one later stage, which classes it there.
 func (differential *buildBodyDifferential) compareFindings(
 	hostFindings map[string][]check.Finding,
 	builtFindings map[string][]check.Finding,
+	stages map[string]findingStage,
 ) {
 	for _, compared := range differential.bodies {
 		hostWritten := findingsWithin(hostFindings[compared.body.file], compared.firstLine, compared.lastLine)
@@ -176,9 +250,37 @@ func (differential *buildBodyDifferential) compareFindings(
 		if slices.Equal(hostWritten, builtWritten) {
 			continue
 		}
-		differential.failures = append(differential.failures, fmt.Sprintf("%s: findings differ: host [%s], build [%s]",
-			compared.body, strings.Join(hostWritten, "; "), strings.Join(builtWritten, "; ")))
+		line := fmt.Sprintf("%s: findings differ: host [%s], build [%s]", compared.body,
+			strings.Join(hostWritten, "; "), strings.Join(builtWritten, "; "))
+		if stage := differingStage(hostWritten, builtWritten, stages); stage != "" {
+			if differential.classed == nil {
+				differential.classed = map[findingStage][]string{}
+			}
+			differential.classed[stage] = append(differential.classed[stage], line)
+			continue
+		}
+		differential.failures = append(differential.failures, line)
 	}
+}
+
+// differingStage is the one stage every finding hostWritten or builtWritten holds and the other lacks is owed to, by
+// its rule, the written finding's first word (findingsWithin), empty when one is owed to none or they are owed to two.
+func differingStage(hostWritten []string, builtWritten []string, stages map[string]findingStage) findingStage {
+	var stage findingStage
+	for _, sides := range [][2][]string{{hostWritten, builtWritten}, {builtWritten, hostWritten}} {
+		for _, written := range sides[0] {
+			if slices.Contains(sides[1], written) {
+				continue
+			}
+			ruleName, _, _ := strings.Cut(written, " ")
+			owed := stages[ruleName]
+			if owed == "" || stage != "" && owed != stage {
+				return ""
+			}
+			stage = owed
+		}
+	}
+	return stage
 }
 
 // findingsWithin are findings that start between firstLine and lastLine, each written as `rule line:column message`,

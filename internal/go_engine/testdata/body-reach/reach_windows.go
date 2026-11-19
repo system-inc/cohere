@@ -28,3 +28,13 @@ func len(values []int) int {
 	}
 	return count
 }
+
+// platformSize is pure on windows.
+func platformSize(count int) int {
+	return count * 8
+}
+
+// init calls helper on windows alone.
+func init() {
+	_ = helper()
+}
