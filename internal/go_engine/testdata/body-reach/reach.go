@@ -57,3 +57,8 @@ func Joined(first string, second string) string {
 func Configured() int {
 	return settings.A
 }
+
+// High shifts by half a word on a 64-bit build and by all of one on a 32-bit build, which only the sizes reach.
+func High(value uint) uint {
+	return value >> 32
+}

@@ -681,13 +681,14 @@ func (engine *pipeline) extraBuildRun(
 			for _, read := range built {
 				fromSource[read.identifier] = true
 			}
-			run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence, built, fromSource)
+			sizesDiffer := buildSizesDiffer(engine.dependence.from, over)
+			run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence, built, fromSource, sizesDiffer)
 			// The same census again over the packages a plain run of the build checks from source, beside the whole.
 			if recorded := engine.recordedFromSource(extra); recorded != nil {
 				run.bodyReachFromSource = engine.bodyReachHost.reach(run.judged.dependence,
 					slices.DeleteFunc(slices.Clone(built), func(read *reachBuiltPackage) bool {
 						return !recorded[read.identifier]
-					}), fromSource)
+					}), fromSource, sizesDiffer)
 			}
 			if engine.bodyDifferential {
 				run.bodyDifferential = newBuildBodyDifferential(engine.bodyReachHost, over, run.bodyReach)

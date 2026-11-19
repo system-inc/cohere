@@ -33,9 +33,12 @@ import (
 //     path is its own selection in the record, so reads its own name bit the same way.
 //   - ValueType and TypeArgument: both bits, since a value's copy, comparison or conversion and a constraint's check
 //     read its layout and its method set alike.
-// A body is reached by the first of: its package unrecorded, a part of it unknown, its signature reaching (its body
-// type-checks against the signature), its body reaching, by the first use in the record's order that does, and a
-// shadowed name in either part.
+// A body is reached by the first of: the build's sizes differing from the host's, its package unrecorded, a part of it
+// unknown, its signature reaching (its body type-checks against the signature), its body reaching, by the first use in
+// the record's order that does, and a shadowed name in either part. A build whose word size or maximum alignment
+// differs from the host's (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift
+// past a word or `math.MaxInt` type-check to other constants there with no file differing, which no bit says, as the
+// restore's own sizes gate refuses such a build every package (check's hostSizesDiffer, #61qj12v).
 
 // bodyReachCensusVariable names the file the census is written to, unset for a run that writes none.
 const bodyReachCensusVariable = "COHERE_BODY_REACH_CENSUS"
@@ -47,6 +50,7 @@ const bodyDifferentialVariable = "COHERE_BODY_DIFFERENTIAL"
 type bodyReachReason string
 
 const (
+	reachedSizes        bodyReachReason = "Sizes"
 	reachedUnrecorded   bodyReachReason = "Unrecorded"
 	reachedUnknown      bodyReachReason = "Unknown"
 	reachedSignature    bodyReachReason = "Signature"
@@ -60,8 +64,9 @@ const (
 )
 
 // bodyReachReasons are the reasons in the order the census writes them, the order a body is judged by.
-var bodyReachReasons = []bodyReachReason{reachedUnrecorded, reachedUnknown, reachedSignature, reachedNamed,
-	reachedConstant, reachedLoadMode, reachedSelected, reachedValueType, reachedTypeArgument, reachedShadowed}
+var bodyReachReasons = []bodyReachReason{reachedSizes, reachedUnrecorded, reachedUnknown, reachedSignature,
+	reachedNamed, reachedConstant, reachedLoadMode, reachedSelected, reachedValueType, reachedTypeArgument,
+	reachedShadowed}
 
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
 // by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its
@@ -204,14 +209,16 @@ type buildBodyReach struct {
 }
 
 // reach is the census of one build judged as dependence, over built, packages its final load checked from source,
-// every such package's ID in fromSource, which the load mode rule reads whether built is all of them or a subset.
+// every such package's ID in fromSource, which the load mode rule reads whether built is all of them or a subset, and
+// with sizesDiffer every body reached by the build's sizes (buildSizesDiffer).
 func (host *bodyReachHost) reach(
 	dependence *build_dependence.Dependence,
 	built []*reachBuiltPackage,
 	fromSource map[string]bool,
+	sizesDiffer bool,
 ) *buildBodyReach {
 	census := &buildBodyReach{checkedFromSource: len(built), byReason: map[bodyReachReason]int{}}
-	reacher := &bodyReacher{host: host, dependence: dependence, fromSource: fromSource}
+	reacher := &bodyReacher{host: host, dependence: dependence, fromSource: fromSource, sizesDiffer: sizesDiffer}
 	for _, read := range slices.SortedFunc(slices.Values(built), func(first, second *reachBuiltPackage) int {
 		return cmp.Compare(first.identifier, second.identifier)
 	}) {
@@ -229,7 +236,7 @@ func (host *bodyReachHost) reach(
 		if !isRecorded {
 			census.total += read.sharedBodies
 			census.reached += read.sharedBodies
-			census.byReason[reachedUnrecorded] += read.sharedBodies
+			census.byReason[cmp.Or(reacher.sizesReason(), reachedUnrecorded)] += read.sharedBodies
 			continue
 		}
 		census.recorded++
@@ -250,4 +257,24 @@ func (host *bodyReachHost) reach(
 		}
 	}
 	return census
+}
+
+// buildSizesDiffer reports whether built, a build's load, checked its packages under other sizes than host, the host's
+// load, by the measure the restore's sizes gate compares (check.MeasureOf, #61qj12v): a word size or a maximum
+// alignment apart, or either load checked under no sizes, which nothing says are alike.
+func buildSizesDiffer(host *load.Loaded, built *load.Loaded) bool {
+	hostSizes, builtSizes := loadSizes(host), loadSizes(built)
+	if hostSizes == nil || builtSizes == nil {
+		return true
+	}
+	hostWordSize, hostMaximumAlignment := check.MeasureOf(hostSizes)
+	wordSize, maximumAlignment := check.MeasureOf(builtSizes)
+	return wordSize != hostWordSize || maximumAlignment != hostMaximumAlignment
+}
+
+// loadSizes are the sizes loaded's packages were checked by (check.LoadedSizes), nil when it checked none.
+func loadSizes(loaded *load.Loaded) types.Sizes {
+	var every []*packages.Package
+	packages.Visit(loaded.Roots, nil, func(each *packages.Package) { every = append(every, each) })
+	return check.LoadedSizes(every)
 }

@@ -2,9 +2,11 @@ package go_engine
 
 import (
 	"cmp"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -25,10 +27,11 @@ import (
 //     and the differential's mutants are the Named row and the shadow rule.
 //   - Size reads the universe's len, which windows declares at package level: reached, Shadowed, by no bit at all.
 //   - Configured reads settings.A, whose identity is unknown: reached, Unknown, though no bit it reads is set.
-//   - Gadget.Spin and Joined use nothing that differs: unreached, and the graph's unit verdict agrees on both.
+//   - Gadget.Spin, Joined and High use nothing that differs: unreached, and the graph's unit verdict agrees on each.
+//     High's shift reads the word size, which windows's arm64 shares with the host.
 //
 // platformName's body in the host-only file is absent on windows, and windows's own platformName, Spin and len are
-// new. The body differential compares the two unreached bodies' types, uses and findings on windows with the host's,
+// new. The body differential compares the three unreached bodies' types, uses and findings on windows with the host's,
 // and none differs. The census is written to its file, and the findings are the run's without it, which writes no
 // census.
 func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
@@ -84,6 +87,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"Configured":   "Unknown",
 		"Gadget.Spin":  "unreached",
 		"Joined":       "unreached",
+		"High":         "unreached",
 	}
 	if !maps.Equal(got, want) {
 		test.Errorf("windows's census judges the host's bodies\n%v\nwant\n%v", got, want)
@@ -96,6 +100,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"Configured":   "an unknown identity in the body",
 		"Gadget.Spin":  "",
 		"Joined":       "",
+		"High":         "",
 	}
 	if !maps.Equal(drivers, wantDrivers) {
 		test.Errorf("windows's census says each body is reached first by\n%v\nwant\n%v", drivers, wantDrivers)
@@ -111,8 +116,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		within.reached != census.reached {
 		test.Errorf("want the census within the plain run's from-source packages the whole, got %+v", within)
 	}
-	if census.total != 7 || census.reached != 5 || census.absent != 1 || census.new != 3 {
-		test.Errorf("want 7 bodies, 5 reached, 1 absent and 3 new, got %d, %d, %d and %d", census.total,
+	if census.total != 8 || census.reached != 5 || census.absent != 1 || census.new != 3 {
+		test.Errorf("want 8 bodies, 5 reached, 1 absent and 3 new, got %d, %d, %d and %d", census.total,
 			census.reached, census.absent, census.new)
 	}
 	if census.recorded != 1 || census.buildOnlyPackages != 0 || len(census.declarationsOnly) != 0 {
@@ -124,8 +129,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	if differential == nil {
 		test.Fatal("windows's run has no body differential")
 	}
-	if differential.compared != 2 || len(differential.failures) != 0 {
-		test.Errorf("want the 2 unreached bodies compared with the host's and none differing, got %d compared and "+
+	if differential.compared != 3 || len(differential.failures) != 0 {
+		test.Errorf("want the 3 unreached bodies compared with the host's and none differing, got %d compared and "+
 			"the failures\n%s", differential.compared, strings.Join(differential.failures, "\n"))
 	}
 
@@ -135,9 +140,9 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	}
 	for _, line := range []string{
 		"build " + on.buildRuns[1].build.String(),
-		"  bodies: 7, reached 5, unreached 2, absent 1, new 3",
+		"  bodies: 8, reached 5, unreached 3, absent 1, new 3",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
-		"  body differential: compared 2, failures 0",
+		"  body differential: compared 3, failures 0",
 	} {
 		if !slices.Contains(strings.Split(string(written), "\n"), line) {
 			test.Errorf("the census file has no line %q:\n%s", line, written)
@@ -158,6 +163,58 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	if !slices.Equal(findingLines(normalize(onStream, root)), findingLines(offStream)) {
 		test.Errorf("the findings with the census are\n%q\nwant those without it\n%q",
 			findingLines(normalize(onStream, root)), findingLines(offStream))
+	}
+}
+
+// A build on another architecture checks every package under other sizes (#w72zxtq, the review's must 2), so
+// `unsafe.Sizeof`, a shift past a word and `math.MaxInt` type-check to other constants there with no file differing
+// and no bit set: on linux/386, a target the settings name, every body is reached by the sizes, High among them,
+// whose shift by 32 is all of 386's word and half of arm64's, while windows on the host's architecture leaves High
+// unreached as before. The census file counts the reason.
+func TestABuildUnderOtherSizesReachesEveryBody(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
+	settingsFile := filepath.Join(root, "CohereSettings.json")
+	if writeError := os.WriteFile(settingsFile, []byte(`{"go": {"rules": {}, "targets": ["linux/386"]}}`),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	censusFile := filepath.Join(test.TempDir(), "reach.txt")
+	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.bodyReachCensus = censusFile
+	}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+
+	censuses := map[string]*buildBodyReach{}
+	for _, run := range on.buildRuns[1:] {
+		censuses[run.build.OperatingSystem+"/"+run.build.Architecture] = run.bodyReach
+	}
+	narrow := censuses["linux/386"]
+	if narrow == nil {
+		test.Fatalf("want a census of linux/386, got the builds %v", slices.Collect(maps.Keys(censuses)))
+	}
+	if narrow.total == 0 || narrow.reached != narrow.total || narrow.byReason[reachedSizes] != narrow.total {
+		test.Errorf("want every body of linux/386 reached by its sizes, got %d of %d, %d by Sizes", narrow.reached,
+			narrow.total, narrow.byReason[reachedSizes])
+	}
+	reasons := map[string]map[string]string{}
+	for build, census := range censuses {
+		reasons[build] = map[string]string{}
+		for _, body := range census.bodies {
+			if body.packageIdentifier == "example.com/reach" {
+				reasons[build][body.name] = cmp.Or(string(body.reason), "unreached")
+			}
+		}
+	}
+	if reasons["linux/386"]["High"] != "Sizes" || reasons["windows/"+runtime.GOARCH]["High"] != "unreached" {
+		test.Errorf("want High reached by the sizes on linux/386 and unreached on windows, got %v", reasons)
+	}
+	written, readError := os.ReadFile(censusFile)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if !strings.Contains(string(written), fmt.Sprintf("  reached by reason: Sizes %d, ", narrow.total)) {
+		test.Errorf("the census file counts no body of linux/386 reached by its sizes:\n%s", written)
 	}
 }
 

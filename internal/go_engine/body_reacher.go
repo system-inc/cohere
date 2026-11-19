@@ -30,6 +30,8 @@ type bodyReacher struct {
 	// count of what the general rule costs (loadModeReaches).
 	fromSource    map[string]bool
 	constantsOnly bool
+	// sizesDiffer is whether the build's sizes are not the host's, which reaches every body (buildSizesDiffer).
+	sizesDiffer bool
 }
 
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
@@ -59,6 +61,14 @@ func (reacher *bodyReacher) reachPackage(
 			absent++
 			continue
 		}
+		if reacher.sizesDiffer {
+			bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
+				line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reachedSizes,
+				driver: "the build's sizes", constantsOnlyReason: reachedSizes,
+				unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
+					declared.Declaration.Offset)})
+			continue
+		}
 		if reacher.identities == nil || reacher.fileSet != hosted.Fset {
 			reacher.identities, reacher.fileSet = build_reads.NewIdentityRenderer(hosted.Fset, nil), hosted.Fset
 		}
@@ -81,6 +91,14 @@ func (reacher *bodyReacher) reachPackage(
 				declared.Declaration.Offset)})
 	}
 	return bodies, absent
+}
+
+// sizesReason is Sizes when the build's sizes are not the host's, which reaches every body, and empty when they are.
+func (reacher *bodyReacher) sizesReason() bodyReachReason {
+	if reacher.sizesDiffer {
+		return reachedSizes
+	}
+	return ""
 }
 
 // reason is why declared's body is reached in the build, empty when it is not, own being its package's types,

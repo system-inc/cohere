@@ -146,13 +146,13 @@ func (build *ReadsBuild) measuredSizes() (int64, int64, bool) {
 	if sizes == nil {
 		return 0, 0, false
 	}
-	wordSize, maximumAlignment := measureOf(sizes)
+	wordSize, maximumAlignment := MeasureOf(sizes)
 	return wordSize, maximumAlignment, true
 }
 
-// measureOf are the word size and the maximum alignment of sizes, which are all a load's sizes, the gc compiler's
-// (types.SizesFor), are made of.
-func measureOf(sizes types.Sizes) (int64, int64) {
+// MeasureOf are the word size and the maximum alignment of sizes, which are all a load's sizes, the gc compiler's
+// (types.SizesFor), are made of: what hostSizesDiffer compares, and the body reach's sizes rule too (#w72zxtq).
+func MeasureOf(sizes types.Sizes) (int64, int64) {
 	return sizes.Sizeof(types.Typ[types.Uintptr]), sizes.Alignof(types.Typ[types.Int64])
 }
 

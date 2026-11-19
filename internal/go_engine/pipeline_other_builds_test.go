@@ -100,6 +100,8 @@ func runOverRegistered(
 	if optionsError := configureRules(ruleSettings, registered); optionsError != nil {
 		test.Fatal(optionsError)
 	}
+	// The settings' targets widen the builds, as the engine's own run reads them.
+	request.targets = ruleSettings.Targets
 	described, describeError := describeProject(request)
 	if describeError != nil {
 		test.Fatal(describeError)

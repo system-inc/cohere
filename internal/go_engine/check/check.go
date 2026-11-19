@@ -361,7 +361,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		if !session.opened {
 			var reachable []*packages.Package
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
-			session.Restore(load.LoaderSource, loadedSizes(reachable), reachable, analyzed)
+			session.Restore(load.LoaderSource, LoadedSizes(reachable), reachable, analyzed)
 		}
 		// The resolver reads answers of the packages the session restored, and keeps those it computes for the store.
 		// It is made once the session has restored, which lets go of the last run's. Under a run beside the load the
