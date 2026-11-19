@@ -138,7 +138,8 @@ func TestARunHashesEachFileOnce(test *testing.T) {
 	goRoot := goRootOf(test)
 	rules := []rule.Rule{countingFactRule(&sync.Map{})}
 	caching := testCaching(test, rules)
-	caching.StandardLibrary = &StandardLibraryCaching{Context: standardLibraryContext("check tests", goRoot)}
+	caching.StandardLibrary = &StandardLibraryCaching{System: systemStore(test),
+		Context: standardLibraryContext("check tests", goRoot)}
 	before := cache.FilesHashed()
 	cached := runWithSession(test, directory, caching, rules)
 	files, moduleFiles := filesKeyed(cached.loaded.Packages, "example.com/standard")
@@ -146,9 +147,8 @@ func TestARunHashesEachFileOnce(test *testing.T) {
 		test.Errorf("want each of the %d files hashed once in a cached run, got %d hashed", files, hashed)
 	}
 	before = cache.FilesHashed()
-	runWithSession(test, directory, &Caching{StandardLibrary: &StandardLibraryCaching{
-		Context: standardLibraryContext("check tests", goRoot),
-	}}, rules)
+	storeless := systemCacheCaching(systemStore(test), standardLibraryContext("check tests", goRoot))
+	runWithSession(test, directory, storeless, rules)
 	if hashed := cache.FilesHashed() - before; hashed != int64(files-moduleFiles) {
 		test.Errorf("want the %d standard-library files hashed once with no store, got %d hashed",
 			files-moduleFiles, hashed)
@@ -386,7 +386,6 @@ func TestTheProjectStoreHoldsNoStandardLibraryEntryWhileTheSystemCacheIsKept(tes
 	}
 
 	withoutSystemCache := testCaching(test, rules)
-	withoutSystemCache.StandardLibrary = &StandardLibraryCaching{Context: context}
 	plain := runWithSession(test, directory, withoutSystemCache, rules)
 	for _, path := range []string{"strings", "unicode/utf8", "example.com/standard"} {
 		if !withoutSystemCache.Store.Holds(sessionKey(test, plain.session, path)) {

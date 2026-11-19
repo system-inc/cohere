@@ -556,8 +556,7 @@ func entryOf(body []byte, record entryRecord) (cacheEntry, error) {
 	return entry, nil
 }
 
-// restoredOf is an entry gob has decoded, read whole as decodeEntry reads it: the system cache's table holds its
-// entries in a form of its own (see standardLibraryEntry), which is read through here too.
+// restoredOf is entry, a body and its record as entryOf joined them, read whole for decodeEntry.
 func restoredOf(
 	known *cacheAnalyzers,
 	restoring *packages.Package,

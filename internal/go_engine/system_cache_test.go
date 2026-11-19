@@ -446,3 +446,45 @@ func TestAFailedSystemCacheWriteIsWhyItWasNotKept(test *testing.T) {
 			unwritable.exitCode, plain.exitCode, unwritable.withoutCounts, plain.withoutCounts)
 	}
 }
+
+// One project's standard-library entries serve another's (#znqfjw2): the system cache is keyed by the engine, the
+// standard library's build and its facts, never by the project, so a second module on the same machine restores from
+// the store the first one filled every package both reach, computes only those the first never reached, and reads as
+// it does with no system cache at all. The second module reaches `text/tabwriter`, which the first fixture never
+// imports, so the run has something of its own to write.
+func TestOneProjectsStandardLibraryEntriesServeAnothers(test *testing.T) {
+	test.Parallel()
+	shared := standardLibrarySource{systemCacheRoot: test.TempDir()}
+	first := runEngineWith(test, copyFixture(test, standardLibraryFixture), shared, rules.All(), "--no-cache")
+	if first.counts.SystemCacheWritten == 0 {
+		test.Fatalf("want the first project to fill the system cache, got %+v", first.counts)
+	}
+
+	second := test.TempDir()
+	for name, contents := range map[string]string{
+		"go.mod": "module example.com/secondproject\n\ngo 1.24\n",
+		"second.go": "// Package second writes a table, and holds printf's finding of a verb that does not fit.\n" +
+			"package second\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\t\"strings\"\n\t\"text/tabwriter\"\n)\n\n" +
+			"// Print writes name under a header, padded.\nfunc Print(name string) {\n" +
+			"\twriter := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)\n" +
+			"\tfmt.Fprintf(writer, \"%d\\t%s\\n\", strings.ToUpper(name), name)\n" +
+			"\t// Ignored: a fixture's flush has nowhere to report to.\n\t_ = writer.Flush()\n}\n",
+	} {
+		if writeError := os.WriteFile(filepath.Join(second, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	alone := runEngineWith(test, second, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
+	served := runEngineWith(test, second, shared, rules.All(), "--no-cache")
+	if served.counts.FromSystemCache == 0 || served.counts.SystemCacheWritten == 0 {
+		test.Errorf("want the second project to restore what the first wrote and write what only it reaches, "+
+			"got %+v", served.counts)
+	}
+	if !strings.Contains(alone.stream, "cohere-go/printf") {
+		test.Fatalf("the second project's run found no printf finding, so it tells nothing:\n%s", alone.stream)
+	}
+	if served.withoutCounts != alone.withoutCounts {
+		test.Errorf("the second project served by the first's entries\n%s\nwith no system cache\n%s",
+			served.withoutCounts, alone.withoutCounts)
+	}
+}

@@ -61,8 +61,9 @@ type Caching struct {
 
 // StandardLibraryCaching is the standard library's entries as a run keeps them (#syscache): System, the system
 // cache's store, which holds each standard-library package's entry under its standard-library key in its build's
-// context, and what every such key shares but the fact analyzers and the loader, which the session names. It keeps the
-// standard library alone, so no standard-library package keyed apart is written to the project's store (storeFor).
+// context, and what every such key shares but the fact analyzers and the loader, which the session names. System is
+// never nil: a run that keeps no system cache is given no StandardLibraryCaching. It keeps the standard library alone,
+// so no standard-library package keyed apart is written to the project's store (storeFor).
 type StandardLibraryCaching struct {
 	System  *cache.Store
 	Context cache.StandardLibraryContext
@@ -204,7 +205,7 @@ type CacheSession struct {
 	given map[*packages.Package]bool
 
 	// standardLibraryKeys are the standard-library packages' keys, by which the system cache's store holds their
-	// entries (storeFor) and the release's table its own, nil when the run keeps no system cache and collects nothing.
+	// entries (storeFor), nil when the run keeps no system cache.
 	standardLibraryKeys map[*packages.Package]cache.Key
 
 	// standardLibraryByPath are the packages of standardLibraryKeys by import path, each path's in ID order, which
@@ -493,10 +494,10 @@ func (session *CacheSession) HasStore() bool {
 }
 
 // KeepsSystemCache reports whether the session reads and writes the system cache's store: a run keeping a system
-// cache, under neither `--no-system-cache` nor a root it could not keep.
+// cache, under neither `--no-system-cache` nor a root it could not keep, which is the one run given a
+// StandardLibraryCaching (lintCache), whose System is never nil.
 func (session *CacheSession) KeepsSystemCache() bool {
-	standardLibrary := session.caching.StandardLibrary
-	return standardLibrary != nil && standardLibrary.System != nil
+	return session.caching.StandardLibrary != nil
 }
 
 // Kept is what a run kept in the session's store under key beside the entries, go list's answer for

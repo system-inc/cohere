@@ -29,12 +29,12 @@ const markPollInterval = time.Millisecond
 // fixedBuildsWidth is how many of the run's extras extra builds run side by side when no heap need be measured for it,
 // and true then, decided once as they start (#b2t9xmf): one at a time when the builds would restore no package from
 // host, the host's run, as a plain run's do (wouldRestoreFromHost), unless hostMostlyHit, the host mostly hit its
-// findings store (hostMostlyHitStore), a test's forced width when it set one, and one at a time when no heap could
-// make it more (buildsWidth over the smallest heap). It
-// is false when the width is the memory's to decide: by what the first build holds (measuredBuildsWidth), and in a run
-// that takes the share gate (takesShareGate, shareGate), by the host's live heap when every share is low
-// (hostLiveBuildsWidth). The width never reaches a key or the verdict, only the lint record's buildsAtOnce and the heap
-// it was decided by: the builds' results and notes are taken in one order whatever it is (extraBuildRuns).
+// findings store (hostMostlyHitStore), a test's forced width when it set one, and one at a time when no heap could make
+// it more (buildsWidth over the smallest heap). It is false when the width is the memory's to decide: by what the first
+// build holds (measuredBuildsWidth), and in a run that takes the share gate (takesShareGate, shareGate), by the host's
+// live heap when every share is low (hostLiveBuildsWidth). The width never reaches a key or the verdict, only the lint
+// record's buildsAtOnce and the heap it was decided by: the builds' results and notes are taken in one order whatever
+// it is (extraBuildRuns).
 //
 // Builds that restore nothing each check every package, about what the host's did: two of those side by side under
 // the cap drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
