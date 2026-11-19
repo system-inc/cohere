@@ -181,6 +181,34 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 	}
 }
 
+// The engine's own scan for a line directive reaches a build's judgment (#9paaen9): under `--build-dependence`, the
+// windows build's record counts 5 of the build-dependence-line-directive fixture's 6 workspace units dependent. p's
+// gen_other.go, which windows does not compile, declares Helper under `//line shared.go:1`, so its unit is named by a
+// file both builds compile, and only the scan of that host-only file seeds p whole: Helper and Shared, and with them
+// q's Prints and PrintsShared, which read them. r's extra_windows.go, which windows alone compiles, holds
+// `//line steady.go:1`, and only the scan of that build-only file seeds r's Steady. q's Alone reads nothing of either
+// and is the one unit left independent. With no scan the count is 0, with none of the host-only file 1, Steady alone,
+// and with none of the build-only file 4. The run's one finding is windows's own, printf's of Helper, a string there,
+// formatted with %d.
+func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "build-dependence-line-directive"))
+	engine, stream := runOver(test, root, exitFindings, "--build-dependence")
+	lint := lintRecordOf(test, stream)
+	if len(lint.Builds) != 2 || len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
+		test.Fatalf("want the host's build and windows's, got the records %+v", lint.Builds)
+	}
+	recorded := lint.Builds[1].Dependence
+	if recorded == nil {
+		test.Fatal("the windows build's record writes no dependence")
+	}
+	if recorded.Workspace.Units != 6 || recorded.Workspace.DependentUnits != 5 {
+		test.Errorf("want 5 of the workspace's 6 units dependent on windows, every one but q's Alone, got %d of %d",
+			recorded.Workspace.DependentUnits, recorded.Workspace.Units)
+	}
+}
+
 // `--build-dependence` under `--host-build-only` has no extra build to judge, so it builds no graph and the run's
 // stream is that of the host's build alone (#qqyq61s).
 func TestBuildDependenceOfTheHostsBuildAloneChangesNothing(test *testing.T) {
