@@ -81,8 +81,9 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, func
 	defer home.Unlock()
 	asked := home.Function(function)
 	if asked == nil {
-		// No declared function of the package, as an instantiated method's object is not, which fact_resolver.Ask
-		// answers with no fact before it computes.
+		// No function of the package in its program, as an interface's method has none: no body to walk, so not
+		// trivial, as the walk takes a call with no static callee. An instantiated method's object never reaches
+		// here, since fact_resolver.Ask answers it with no fact before it computes.
 		return triviality{}
 	}
 	trivial, entered := intermediate_representation.IsTrivialEntering(asked,

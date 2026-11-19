@@ -376,3 +376,29 @@ func TestAQuestionAboutAnotherPackagesFunctionPanics(test *testing.T) {
 		test.Errorf("the refused question judged %d functions", after-computed)
 	}
 }
+
+// A function of the package that the package's program holds no function for, as an interface's method, has no body
+// to walk, and is not trivial, as the walk takes a call with no static callee: the answer is the zero one, naming
+// nothing, and judges no function. It is not a function declared without a body, which is built from its declaration
+// and trivial (TestABodilessFunctionAnswersAsItsTypesDo).
+func TestAFunctionWithNoFunctionInTheProgramIsNotTrivial(test *testing.T) {
+	test.Parallel()
+	ran := askRoots(test, "abstract")
+	stopper, isType := ran.roots[0].Types.Scope().Lookup("Stopper").(*types.TypeName)
+	if !isType {
+		test.Fatal("abstract declares no Stopper")
+	}
+	declared, isInterface := stopper.Type().Underlying().(*types.Interface)
+	if !isInterface || declared.NumExplicitMethods() != 1 {
+		test.Fatal("Stopper is no interface of one method")
+	}
+	computed := ran.resolver.Counts(function_triviality.Kind).Computed.Load()
+	stop := declared.ExplicitMethod(0)
+	answer := function_triviality.Ask(ran.resolver, ran.resolver.Package(ran.roots[0].Types), stop)
+	if !reflect.DeepEqual(answer, function_triviality.Triviality{}) {
+		test.Errorf("%s's answer is %+v, want not trivial, naming nothing", stop.FullName(), answer)
+	}
+	if after := ran.resolver.Counts(function_triviality.Kind).Computed.Load(); after != computed {
+		test.Errorf("the question about %s judged %d functions, want none", stop.FullName(), after-computed)
+	}
+}
