@@ -32,3 +32,12 @@ func (OldType) OldMethod() int { return OldFunction() }
 //
 // It stays for old callers.
 func RetiredFunction() int { return 0 }
+
+var (
+	// GroupedOld is deprecated, alone of its group.
+	//
+	// Deprecated: use another.
+	GroupedOld = 1
+	// GroupedNew is not.
+	GroupedNew = 2
+)
