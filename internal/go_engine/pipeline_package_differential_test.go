@@ -219,12 +219,12 @@ var packageDifferentialFixtures = []struct {
 	{fixture: "build-dependence", wantExit: exitClean},
 }
 
-// Over every fixture of the walk and of block 1 with extra builds, under `--no-cache --other-builds`, each package an
-// extra build skips without judging is judged as a visited one is, and the differential fails naming each the
-// judgment declines, by build, package, judgment and why. Each package a build's last load skipped must have been
+// Over every fixture of the walk and of block 1 with extra builds, under `--no-cache`, which checks every build, each
+// package an extra build skips without judging is judged as a visited one is, and the differential fails naming each
+// the judgment declines, by build, package, judgment and why. Each package a build's last load skipped must have been
 // judged, and some build of the fixture must have judged one by TypesHold, the floor, so a fixture whose builds stop
-// skipping fails rather than pass judging nothing, unless it says why it skips nothing. The hook changes nothing of
-// the run: the stream, restore, findings and counts with it, normalized, are the run's without it.
+// skipping fails rather than pass judging nothing, unless it says why it skips nothing. The hook changes nothing of the
+// run: the stream, restore, findings and counts with it, normalized, are the run's without it.
 func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 	test.Parallel()
 
@@ -235,8 +235,7 @@ func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 			fixture := filepath.Join("testdata", step.fixture)
 			recorder := &skippedRecorder{}
 			root := copyFixture(test, fixture)
-			engine, judgedRaw := runOverConfigured(test, root, step.wantExit, recorder.hook, "--no-cache",
-				"--other-builds")
+			engine, judgedRaw := runOverConfigured(test, root, step.wantExit, recorder.hook, "--no-cache")
 			if len(engine.buildRuns) < 2 {
 				test.Fatalf("the run checked %d builds, want an extra build beside the host's", len(engine.buildRuns))
 			}
@@ -250,7 +249,7 @@ func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 				test.Error("no build judged a package it skipped by TypesHold, so the fixture proves nothing")
 			}
 
-			_, plain := runOver(test, copyFixture(test, fixture), step.wantExit, "--other-builds")
+			_, plain := runOver(test, copyFixture(test, fixture), step.wantExit)
 			if judgedStream := normalize(judgedRaw, root); judgedStream != plain {
 				test.Errorf("the hook changed the run's stream:\nwith it\n%s\nwithout it\n%s", judgedStream, plain)
 			}
@@ -265,7 +264,7 @@ func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 const packageDifferentialRootVariable = "COHERE_VERDICT_DIFFERENTIAL_ROOT"
 
 // The package differential over the tree packageDifferentialRootVariable names, run in place under `--no-fix`, so
-// nothing of the tree is written, with the findings cache off, under `--other-builds`, every package an extra build
+// nothing of the tree is written, with the findings cache off, every build checked, every package an extra build
 // skips judged as a visited one is. It logs, for each extra build, the packages its last load skipped, the judgments
 // made and those declined, and fails naming every decline and every skipped package never judged. A tree whose census
 // needs no extra build is skipped.
@@ -278,7 +277,7 @@ func TestABuildSkipsNothingTypesHoldDeclinesInARealTree(test *testing.T) {
 	}
 	recorder := &skippedRecorder{}
 	engine, _, standardError, exitCode := runOverExiting(test, root, rules.All(), recorder.hook, "--no-cache",
-		"--no-fix", "--other-builds")
+		"--no-fix")
 	if exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("the run over %s exited %d:\n%s", root, exitCode, standardError)
 	}
