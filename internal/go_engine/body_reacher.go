@@ -32,6 +32,11 @@ type bodyReacher struct {
 	constantsOnly bool
 	// sizesDiffer is whether the build's sizes are not the host's, which reaches every body (buildSizesDiffer).
 	sizesDiffer bool
+	// carried are the objects declared by a value spec that reads what the load mode reaches, which hold the other
+	// load's value and so reach their users by the load mode too (carryLoadMode), and carriedGrew whether a judgment
+	// carried one it had not, which judges the build again (bodyReachHost.reach).
+	carried     map[types.Object]bool
+	carriedGrew bool
 }
 
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
@@ -77,6 +82,7 @@ func (reacher *bodyReacher) reachPackage(
 		// A body the general rule reaches is judged again under the constants-only load mode rule, the census's count
 		// of what the general one costs: the load mode may have reached it through its signature as well as its body.
 		// An unreached body is unreached by both, the narrower rule reaching nothing the general one does not.
+		reacher.carryLoadMode(record, declared)
 		constantsOnlyReason := reason
 		if reason != "" {
 			reacher.constantsOnly = true
@@ -195,6 +201,42 @@ func (reacher *bodyReacher) useReason(
 	return "", nil, ""
 }
 
+// carryLoadMode carries the load mode through declared when it is a value spec that reads anything the load mode
+// reaches (#w72zxtq, the review's must 3): `const twoPi = 2 * math.Pi` holds the other load's value of math.Pi as
+// surely as the expression does, so every object it declares reaches its users by the load mode as well, the users of
+// those it declares in turn, to a fixed point over the build (bodyReachHost.reach). An import's name carries nothing,
+// as useReason reads none.
+func (reacher *bodyReacher) carryLoadMode(record *build_reads.FunctionUses, declared build_reads.DeclarationUses) {
+	if len(declared.Declaration.Objects) == 0 {
+		return
+	}
+	if _, isFunction := declared.Declaration.Objects[0].(*types.Func); isFunction {
+		return
+	}
+	reads := false
+	for _, use := range slices.Concat(declared.Signature, declared.Body) {
+		entry := record.Used(use)
+		if _, isImport := entry.Object.(*types.PkgName); isImport {
+			continue
+		}
+		if entry.Object.Pkg() != nil && reacher.loadModeReaches(entry.Object, use.Kinds()) ||
+			entry.Receiver != nil && entry.Receiver.Pkg() != nil &&
+				reacher.loadModeReaches(entry.Receiver, use.Kinds()) {
+			reads = true
+			break
+		}
+	}
+	if !reads {
+		return
+	}
+	for _, object := range declared.Declaration.Objects {
+		if !reacher.carried[object] {
+			reacher.carried[object] = true
+			reacher.carriedGrew = true
+		}
+	}
+}
+
 // loadModeReaches reports whether a use of kinds of object reaches its body by the load mode (the soundness contract's
 // point 5, #9paaen9): object's package is one the host and the build load in different modes, one from export data
 // and the other from source, which expose the same files differently. Export data holds an untyped float as a binary
@@ -203,7 +245,9 @@ func (reacher *bodyReacher) useReason(
 // from source, though no declaration differs. The Square ruled the rule general (#w72zxtq): every use of any object
 // of such a package reaches. With constantsOnly, the census's count of the narrower rule it replaced, only an untyped
 // float or complex constant read by its value does, since an integer, string or boolean constant is written exactly in
-// both and a typed float is rounded to its type in both. A package the host does not hold is never asked.
+// both and a typed float is rounded to its type in both. A package the host does not hold is never asked. An object a
+// value spec declared from what the load mode reaches reaches it as well, under either rule (carryLoadMode): the
+// constants-only rule reads the general rule's carried objects, of them the untyped float and complex constants alone.
 func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_reads.UseKinds) bool {
 	if reacher.constantsOnly {
 		constant, isConstant := object.(*types.Const)
@@ -211,7 +255,7 @@ func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_rea
 			return false
 		}
 	}
-	return reacher.loadModeDiffers(object.Pkg())
+	return reacher.carried[object] || reacher.loadModeDiffers(object.Pkg())
 }
 
 // loadModeDiffers reports whether the host and the build load own in different modes.

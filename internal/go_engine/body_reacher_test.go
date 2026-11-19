@@ -1,12 +1,21 @@
 package go_engine
 
 import (
+	"cmp"
+	"go/ast"
 	"go/constant"
+	"go/parser"
 	"go/token"
 	"go/types"
+	"maps"
+	"slices"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // A use reaches its body by the load mode (#w72zxtq) when its object's package is one the host and the build load in
@@ -71,5 +80,138 @@ func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 			test.Errorf("%s: the constants-only rule reaches its body %t, want %t", each.name, got,
 				each.constantsOnly)
 		}
+	}
+}
+
+// recordedSource is one package the reach's unit tests type-check and record: its path, its imports' paths, and its
+// files' sources by name.
+type recordedSource struct {
+	path    string
+	imports []string
+	files   map[string]string
+}
+
+// recordedPackages type-checks sources, each after those it imports, in one file set, and records each one's reads as
+// the host's walk does, by its path as its ID, so the reach's judgment can be held to records it really makes.
+func recordedPackages(
+	test *testing.T,
+	sources []recordedSource,
+) (map[string]*packages.Package, map[*packages.Package]*build_reads.Reads) {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	checked := map[string]*packages.Package{}
+	reads := map[*packages.Package]*build_reads.Reads{}
+	for _, source := range sources {
+		loaded := &packages.Package{ID: source.path, PkgPath: source.path, Fset: fileSet,
+			Imports: map[string]*packages.Package{}}
+		for _, name := range slices.Sorted(maps.Keys(source.files)) {
+			file, parseError := parser.ParseFile(fileSet, name, source.files[name], parser.ParseComments)
+			if parseError != nil {
+				test.Fatal(parseError)
+			}
+			loaded.Syntax = append(loaded.Syntax, file)
+			loaded.GoFiles = append(loaded.GoFiles, name)
+		}
+		for _, imported := range source.imports {
+			loaded.Imports[imported] = checked[imported]
+		}
+		loaded.TypesInfo = &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{},
+			Uses: map[*ast.Ident]types.Object{}, Implicits: map[ast.Node]types.Object{},
+			Selections: map[*ast.SelectorExpr]*types.Selection{}, Instances: map[*ast.Ident]types.Instance{},
+			Scopes: map[ast.Node]*types.Scope{}}
+		configuration := types.Config{Importer: importerFunction(func(path string) (*types.Package, error) {
+			return checked[path].Types, nil
+		})}
+		typesPackage, checkError := configuration.Check(source.path, fileSet, loaded.Syntax, loaded.TypesInfo)
+		if checkError != nil {
+			test.Fatal(checkError)
+		}
+		loaded.Types = typesPackage
+		recorded := &build_reads.Reads{}
+		recorded.Claim()
+		recorded.Record(typesPackage, loaded.TypesInfo, loaded.Syntax)
+		checked[source.path], reads[loaded] = loaded, recorded
+	}
+	return checked, reads
+}
+
+// importerFunction is a function as a types.Importer.
+type importerFunction func(path string) (*types.Package, error)
+
+// Import is the package at path.
+func (imported importerFunction) Import(path string) (*types.Package, error) {
+	return imported(path)
+}
+
+// reachRecorded is the census of a build judged against an empty graph whose every object answers unchanged, over
+// checked's packages, math among them, which the host read from export data and the build
+// checks from source, so only the load mode reaches anything.
+func reachRecorded(
+	test *testing.T,
+	checked map[string]*packages.Package,
+	reads map[*packages.Package]*build_reads.Reads,
+) *buildBodyReach {
+	test.Helper()
+	host := newBodyReachHost(&hostDependence{exportData: map[string]bool{"math": true},
+		decoded: map[*types.Package]bool{}}, reads, nil)
+	dependence := build_dependence.NewGraph().Against(build_dependence.Difference{
+		DependentObject: func(types.Object) (bool, bool) { return false, false }})
+	hostFiles := map[string][]string{}
+	var roots []*packages.Package
+	fromSource := map[string]bool{}
+	for identifier, each := range checked {
+		hostFiles[identifier] = each.GoFiles
+		fromSource[identifier] = true
+		roots = append(roots, each)
+	}
+	return host.reach(dependence, reachBuiltPackages(&load.Loaded{Roots: roots}, hostFiles), fromSource, false)
+}
+
+// mathSource is a math package of one untyped float constant, which the reach's unit tests load two ways.
+var mathSource = recordedSource{path: "math", files: map[string]string{"/math/math.go": `package math
+
+const Pi = 3.14159265358979323846264338327950288419716939937510582097494459
+`}}
+
+// A constant declared from what the load mode reaches holds the other load's value too (#w72zxtq, the review's must 3):
+// `const twoPi = 2 * math.Pi` is reached by math.Pi, and so is Turn, which reads twoPi alone, a constant of a package
+// loaded alike in both, and TwoPi, declared from twoPi, and a's Around, reading TwoPi from another package judged
+// before q's: the load mode is carried through each declaration to a fixed point over the build. Plain and Still read
+// nothing loaded otherwise, and stay unreached.
+func TestTheLoadModeIsCarriedThroughEachDeclaration(test *testing.T) {
+	test.Parallel()
+
+	checked, reads := recordedPackages(test, []recordedSource{mathSource,
+		{path: "example.com/q", imports: []string{"math"}, files: map[string]string{"/q/q.go": `package q
+
+import "math"
+
+const twoPi = 2 * math.Pi
+
+const TwoPi = twoPi
+
+func Turn(angle float64) float64 { return angle * twoPi }
+
+func Plain(angle float64) float64 { return angle }
+`}},
+		{path: "example.com/a", imports: []string{"example.com/q"}, files: map[string]string{"/a/a.go": `package a
+
+import "example.com/q"
+
+func Around(angle float64) float64 { return angle * q.TwoPi }
+
+func Still(angle float64) float64 { return -angle }
+`}}})
+	census := reachRecorded(test, checked, reads)
+	got := map[string]string{}
+	for _, body := range census.bodies {
+		if body.packageIdentifier != "math" {
+			got[body.name] = cmp.Or(string(body.reason), "unreached")
+		}
+	}
+	want := map[string]string{"twoPi": "LoadMode", "TwoPi": "LoadMode", "Turn": "LoadMode", "Plain": "unreached",
+		"Around": "LoadMode", "Still": "unreached"}
+	if !maps.Equal(got, want) {
+		test.Errorf("the census judges\n%v\nwant\n%v", got, want)
 	}
 }

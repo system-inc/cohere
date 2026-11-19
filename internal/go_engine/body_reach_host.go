@@ -217,11 +217,26 @@ func (host *bodyReachHost) reach(
 	fromSource map[string]bool,
 	sizesDiffer bool,
 ) *buildBodyReach {
-	census := &buildBodyReach{checkedFromSource: len(built), byReason: map[bodyReachReason]int{}}
-	reacher := &bodyReacher{host: host, dependence: dependence, fromSource: fromSource, sizesDiffer: sizesDiffer}
-	for _, read := range slices.SortedFunc(slices.Values(built), func(first, second *reachBuiltPackage) int {
+	reacher := &bodyReacher{host: host, dependence: dependence, fromSource: fromSource, sizesDiffer: sizesDiffer,
+		carried: map[types.Object]bool{}}
+	sorted := slices.SortedFunc(slices.Values(built), func(first, second *reachBuiltPackage) int {
 		return cmp.Compare(first.identifier, second.identifier)
-	}) {
+	})
+	// A value spec the load mode reaches carries it to its objects' users (bodyReacher.carryLoadMode), which may be
+	// judged before it, in its package or another, so the build is judged again until a judgment carries nothing new.
+	for {
+		reacher.carriedGrew = false
+		census := host.judge(reacher, sorted)
+		if !reacher.carriedGrew {
+			return census
+		}
+	}
+}
+
+// judge is the census of reacher's build over built, packages its final load checked from source, sorted by ID.
+func (host *bodyReachHost) judge(reacher *bodyReacher, built []*reachBuiltPackage) *buildBodyReach {
+	census := &buildBodyReach{checkedFromSource: len(built), byReason: map[bodyReachReason]int{}}
+	for _, read := range built {
 		census.new += read.buildOnlyBodies
 		hosted, isHosted := host.packages[read.identifier]
 		if !isHosted {
