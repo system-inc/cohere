@@ -361,7 +361,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		if !session.opened {
 			var reachable []*packages.Package
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
-			session.Restore(load.LoaderSource, loadedSizes(reachable), reachable, analyzed)
+			session.Restore(load.LoaderSource, LoadedSizes(reachable), reachable, analyzed)
 		}
 		// The resolver reads answers of the packages the session restored, and keeps those it computes for the store.
 		// It is made once the session has restored, which lets go of the last run's. Under a run beside the load the
@@ -562,6 +562,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			}
 		}
 		result.Reads = options.Reads
+	}
+	// Beside the load, nothing is read, saved or kept of a package before the load has made it final, and nothing at
+	// all once the pass is abandoned (awaitLoaded): a restored package's facts and answers read its types, which the
+	// load sets from export data on its own goroutine (#641hyrh).
+	if session != nil && options.Ready != nil && !session.awaitLoaded(options.Ready, options.Abandon) {
+		return nil, ErrAbandoned
 	}
 	// A restored package's facts by path and its answers are read before the run keeps its packages for the extra
 	// builds, which lets the session's answers go.

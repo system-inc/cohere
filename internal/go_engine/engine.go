@@ -183,6 +183,10 @@ func runOverlapping(
 	}
 	engine := newPipeline(request, described, ruleSettings, registered, standardOutput, standardError, memory)
 	engine.overlaps = overlaps
+	engine.bodyReachCensus = os.Getenv(bodyReachCensusVariable)
+	engine.bodyDifferential = os.Getenv(bodyDifferentialVariable) == "1"
+	engine.bodyReachFromSourceRecord = os.Getenv(bodyReachFromSourceRecordVariable)
+	engine.bodyReachFromSource = os.Getenv(bodyReachFromSourceVariable)
 	return engine.run()
 }
 

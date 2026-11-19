@@ -3,9 +3,15 @@ package middle
 
 import "bodiless/bottom"
 
-// Middle passes its slice on to bottom.Slices, so SA5012 asks whether that parameter is marked.
+// Middle passes its slice on to bottom.Slices.
 func Middle(values []int) {
 	bottom.Slices(values)
+}
+
+// odd passes bottom.Slices a slice of one, so SA5012 asks whether that parameter is marked: it asks a mark only where
+// a call passes a slice of known odd length.
+func odd() {
+	bottom.Slices([]int{1})
 }
 
 // Fresh returns a fresh pointer and reaches nothing of bottom, so the nilness of its result is judged in middle alone.

@@ -81,4 +81,15 @@ type buildRun struct {
 	// judged is an extra build's alone, under `--build-dependence`: the judgment its record was counted from and the
 	// files it shares with the host's, which its facts are compared through once its lint has run (compareFacts).
 	judged *buildJudgment
+	// bodyReach is an extra build's alone, under the body reach census: which of the host's bodies its difference
+	// reaches (body_reach_host.go, #w72zxtq), nil otherwise.
+	bodyReach *buildBodyReach
+	// bodyDifferential is an extra build's alone, under the body differential: each body its reach leaves unreached
+	// compared with the host's (build_body_differential.go), nil otherwise.
+	bodyDifferential *buildBodyDifferential
+	// fromSourceIdentifiers and bodyReachFromSource are an extra build's alone: the IDs of the packages its last load
+	// checked from source, under the census's from-source record, and its census over the packages a plain run of it
+	// recorded so, under the census reading that record (pipeline_body_reach_from_source.go), each nil otherwise.
+	fromSourceIdentifiers []string
+	bodyReachFromSource   *buildBodyReach
 }

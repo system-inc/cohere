@@ -171,7 +171,7 @@ func TestAReloadedEntryKeepsThePlacedAnswersItHeld(test *testing.T) {
 		}
 		var reachable []*packages.Package
 		packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
-		session.Restore(load.LoaderSource, loadedSizes(reachable), reachable, analyzed)
+		session.Restore(load.LoaderSource, LoadedSizes(reachable), reachable, analyzed)
 		result, runError := Run(analyzed, rules, Options{Cache: session})
 		if runError != nil {
 			test.Fatalf("running the probe: %v", runError)

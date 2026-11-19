@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"slices"
 	"strings"
 	"sync"
@@ -41,6 +42,14 @@ type hostDependence struct {
 	// restoredAnswers are the answers the host's store holds of each package it restored, by package ID, indexed with
 	// its facts (indexHostFacts), which the facts census reads by objectpath.
 	restoredAnswers map[string]*fact_resolver.Answers
+	// decoded are the types of the packages the host checked from source whose graph it took from the findings store's
+	// records rather than their syntax, which hold no live object, so the body reach census asks of their objects by
+	// name (bodyReacher.bits).
+	decoded map[*types.Package]bool
+	// exportData are the IDs of the packages the host read from export data rather than checking from source, the
+	// system cache's or the store's, whose untyped float constants the body reach census reads as another build's
+	// check from source may not (bodyReacher.loadModeReaches).
+	exportData map[string]bool
 	// calls is the units of graph and of the standard library's graph and the calls between them, which every build's
 	// facts census counts by its own verdicts (#f9br7sg), built once a run by the first census to ask (callIndex,
 	// under callsOnce), since the builds' censuses run at once.
@@ -143,12 +152,14 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 	var every []*packages.Package
 	packages.Visit(loaded.Roots, nil, func(each *packages.Package) { every = append(every, each) })
 	host := &hostDependence{
-		graph:    build_dependence.NewGraph(),
-		from:     loaded,
-		files:    make(map[string][]string, len(every)),
-		cgoFiles: map[string][]string{},
-		paths:    make(map[string]string, len(every)),
-		restored: map[string]bool{},
+		graph:      build_dependence.NewGraph(),
+		from:       loaded,
+		files:      make(map[string][]string, len(every)),
+		cgoFiles:   map[string][]string{},
+		paths:      make(map[string]string, len(every)),
+		restored:   map[string]bool{},
+		decoded:    map[*types.Package]bool{},
+		exportData: map[string]bool{},
 	}
 	var restoredStandardLibrary []string
 	recordedStandardLibrary := map[string]*build_dependence.Record{}
@@ -162,6 +173,12 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		host.paths[each.ID] = each.PkgPath
 		if engine.session != nil {
 			records[index], _ = engine.session.DependenceRecord(each)
+		}
+		if records[index] != nil && each.Types != nil {
+			host.decoded[each.Types] = true
+		}
+		if each.TypesInfo == nil {
+			host.exportData[each.ID] = true
 		}
 		if each.TypesInfo != nil || records[index] != nil {
 			continue
@@ -368,7 +385,8 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	// Every build-only file is parsed from the bytes the run holds of it, those the build's load parsed, or the disk's
 	// for one it holds nothing for (sourceReader).
 	read := engine.sourceReader(nil, nil)
-	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{}}
+	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
+		filesDiffer: map[string]bool{}}
 	for identifier, hostFiles := range engine.dependence.files {
 		counterpart, isShared := built[identifier]
 		asVariant := false
@@ -411,6 +429,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.EveryUnitDependent ||
 			differing.KeepsCgo {
 			difference.Packages[identifier] = differing
+			judged.filesDiffer[identifier] = true
 		}
 	}
 	for identifier, each := range built {

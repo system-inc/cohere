@@ -8,32 +8,21 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
-// Kind keys SA5012's marks in each package the resolver holds, and its counts.
-var Kind = &fact_resolver.Kind{Name: "odd_slice_argument"}
-
-func init() {
-	fact_resolver.Register(Kind, whole,
-		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) bool {
-			parameter, isParameter := object.(*types.Var)
-			return isParameter && judgeIn(resolver, home, parameter)
-		}, bodilessMark)
-}
-
-// bodilessMark is whether a parameter of a function declared without a body is marked, from its types alone
-// (fact_resolver.Ask): never. The push marks a parameter only by a check or a call in its function's blocks, and such
-// a function, built from its declaration, has none.
-func bodilessMark(types.Object) bool {
-	return false
-}
-
-// marks is SA5012's state in one package: the parameters of each function judged that it marks, by the function,
-// each function's parameters by their objects, and, once the package was computed whole the push's way, every mark it
-// made.
+// marks is SA5012's state in one package: the marks of each function judged, by the function, every one of them the
+// definition's and so final (see demandWalk), and where each parameter asked of is declared, nil for one no function
+// of the package declares (see ownerOf).
 type marks struct {
 	functions map[*intermediate_representation.Function]map[types.Object]bool
-	owners    map[*types.Var]parameterOwner
-	fellBack  bool
-	recorded  map[types.Object]bool
+	owners    map[*types.Var]*parameterOwner
+}
+
+// walk is a demand walk over home's marks, with state's map made when it is the package's first.
+func (state *marks) walk(resolver *fact_resolver.Resolver, home *fact_resolver.Package) *demandWalk {
+	if state.functions == nil {
+		state.functions = map[*intermediate_representation.Function]map[types.Object]bool{}
+	}
+	return &demandWalk{resolver: resolver, home: home, irPackage: home.IntermediateRepresentation(), state: state,
+		byFunction: map[*intermediate_representation.Function]*reachedFunction{}}
 }
 
 // parameterOwner is where a parameter is declared: a declared function, or a function literal inside one, or inside a
@@ -41,44 +30,6 @@ type marks struct {
 type parameterOwner struct {
 	declared *types.Func
 	literal  *ast.FuncLit
-}
-
-// ask is whether parameter is marked as a reader in reader holds it: the mark crossed here (fact_resolver.Visible), and
-// parameter's function marks it. Its package's answer comes through fact_resolver.Ask: the store's, or the function
-// judged in its own package, under that package's lock, once, and each answer after is the verdict kept.
-func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, parameter *types.Var) bool {
-	if !fact_resolver.Visible(reader, parameter) {
-		return false
-	}
-	return fact_resolver.Ask(resolver, reader, Kind, parameter, func(home *fact_resolver.Package) bool {
-		return judgeIn(resolver, home, parameter)
-	}, func() bool { return bodilessMark(parameter) })
-}
-
-// judgeIn is whether parameter, of home, is marked, judged there under home's lock, or the verdict kept.
-func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, parameter *types.Var) bool {
-	home.Lock()
-	defer home.Unlock()
-	state := fact_resolver.StateOf[marks](home, Kind)
-	if state.fellBack {
-		return state.recorded[parameter]
-	}
-	owner := state.function(resolver, home, parameter)
-	if owner == nil {
-		// A parameter of no function the package declares, as an instantiation's is, which the push marks only in
-		// the package that calls it, never here.
-		return false
-	}
-	walk := &demandWalk{resolver: resolver, home: home, irPackage: home.IntermediateRepresentation(), state: state,
-		partial: map[*intermediate_representation.Function]map[types.Object]bool{}}
-	marked := walk.verdict(owner)
-	if walk.orderDependent {
-		// A question answered by the push's walk of the package is a replay; a whole package for the store is not.
-		resolver.Counts(Kind).Fallbacks.Add(1)
-		state.fallBack(resolver, home)
-		return state.recorded[parameter]
-	}
-	return marked[parameter]
 }
 
 // function is the function of home that declares parameter, built, or nil for a parameter no source function of home
@@ -89,22 +40,26 @@ func (state *marks) function(
 	parameter *types.Var,
 ) *intermediate_representation.Function {
 	if state.owners == nil {
-		state.owners = parameterOwners(home)
+		state.owners = map[*types.Var]*parameterOwner{}
 	}
-	owner, declared := state.owners[parameter]
-	if !declared {
+	owner, found := state.owners[parameter]
+	if !found {
+		owner = ownerOf(home, parameter)
+		state.owners[parameter] = owner
+	}
+	if owner == nil {
 		return nil
 	}
 	var enclosing *intermediate_representation.Function
 	if owner.declared != nil {
+		// Built by its package's Function, as any function a question reaches is.
 		enclosing = home.Function(owner.declared)
-	} else {
-		enclosing = home.IntermediateRepresentation().Function("init")
+	} else if enclosing = home.IntermediateRepresentation().Function("init"); enclosing != nil {
+		resolver.Build(enclosing)
 	}
 	if enclosing == nil {
 		return nil
 	}
-	resolver.Build(enclosing)
 	if owner.literal == nil {
 		return enclosing
 	}
@@ -127,87 +82,94 @@ func anonymousOf(
 	return nil
 }
 
-// parameterOwners is where each named parameter of home's functions and function literals is declared, read from its
-// syntax. A receiver is left out, since no call passes a slice to one as a parameter.
-func parameterOwners(home *fact_resolver.Package) map[*types.Var]parameterOwner {
-	owners := map[*types.Var]parameterOwner{}
-	add := func(fields *ast.FieldList, owner parameterOwner) {
-		for _, field := range fields.List {
-			for _, name := range field.Names {
-				if variable, isVariable := home.Info().Defs[name].(*types.Var); isVariable {
-					owners[variable] = owner
-				}
-			}
-		}
-	}
-	addLiterals := func(node ast.Node, declared *types.Func) {
-		ast.Inspect(node, func(inspected ast.Node) bool {
-			if literal, isLiteral := inspected.(*ast.FuncLit); isLiteral {
-				add(literal.Type.Params, parameterOwner{declared: declared, literal: literal})
-			}
-			return true
-		})
-	}
+// ownerOf is where parameter is declared, as a named parameter of one of home's declared functions or of a function
+// literal in home, read from the syntax at parameter's position, or nil when home declares it so nowhere: a result, a
+// receiver, an interface method's parameter, another package's parameter, or an instance's, which no name of home
+// defines. Only the declaration holding the position is read, and only down to it. A receiver is left out, since no
+// call passes a slice to one as a parameter.
+func ownerOf(home *fact_resolver.Package, parameter *types.Var) *parameterOwner {
 	for _, file := range home.Files() {
+		if parameter.Pos() < file.FileStart || parameter.Pos() > file.FileEnd {
+			continue
+		}
 		for _, declaration := range file.Decls {
+			if parameter.Pos() < declaration.Pos() || parameter.Pos() >= declaration.End() {
+				continue
+			}
 			function, isFunction := declaration.(*ast.FuncDecl)
 			if !isFunction {
-				addLiterals(declaration, nil)
-				continue
+				// A function literal at package level runs in the package's initializer.
+				return literalOwner(home, parameter, declaration, nil)
 			}
 			declared, isDeclared := home.Info().Defs[function.Name].(*types.Func)
 			if !isDeclared {
-				continue
+				return nil
 			}
-			add(function.Type.Params, parameterOwner{declared: declared})
-			if function.Body != nil {
-				addLiterals(function.Body, declared)
+			if declares(home, function.Type.Params, parameter) {
+				return &parameterOwner{declared: declared}
+			}
+			if function.Body == nil {
+				return nil
+			}
+			return literalOwner(home, parameter, function.Body, declared)
+		}
+		return nil
+	}
+	return nil
+}
+
+// literalOwner is the function literal inside node whose own parameters declare parameter, the innermost one holding
+// parameter's position, inside declared, nil for a literal at package level, or nil when none declares it.
+func literalOwner(
+	home *fact_resolver.Package,
+	parameter *types.Var,
+	node ast.Node,
+	declared *types.Func,
+) *parameterOwner {
+	var owner *parameterOwner
+	ast.Inspect(node, func(inspected ast.Node) bool {
+		if owner != nil || inspected == nil || parameter.Pos() < inspected.Pos() || parameter.Pos() >= inspected.End() {
+			return false
+		}
+		if literal, isLiteral := inspected.(*ast.FuncLit); isLiteral && declares(home, literal.Type.Params, parameter) {
+			owner = &parameterOwner{declared: declared, literal: literal}
+			return false
+		}
+		return true
+	})
+	return owner
+}
+
+// declares is whether one of the names fields declares is parameter's.
+func declares(home *fact_resolver.Package, fields *ast.FieldList, parameter *types.Var) bool {
+	if fields == nil {
+		return false
+	}
+	for _, field := range fields.List {
+		for _, name := range field.Names {
+			if home.Info().Defs[name] == types.Object(parameter) {
+				return true
 			}
 		}
 	}
-	return owners
+	return false
 }
 
-// fallBack marks every parameter of home the push's way, every source function's own checks and then the calls in
-// buildir's order with one seen set, and keeps every mark, for a package where an answer depended on that order (see
-// demandWalk). A function's marks kept before are the push's by the reasoning there; one the push contradicts is
-// counted, so the differential can require none.
-func (state *marks) fallBack(resolver *fact_resolver.Resolver, home *fact_resolver.Package) {
-	counts := resolver.Counts(Kind)
-	recorded := &packageFacts{resolver: resolver, home: home, recorded: map[types.Object]bool{}}
-	walk := &pushWalk{facts: recorded}
-	functions := sourceFunctions(home)
-	walk.markLengthChecks(functions)
-	walk.markIndirectLengthChecks(functions)
-	for _, function := range functions {
-		kept, judged := state.functions[function]
-		if !judged {
-			counts.Computed.Add(1)
-			continue
-		}
-		for _, parameter := range function.Parameters {
-			if kept[parameter.Object()] != recorded.recorded[parameter.Object()] {
-				counts.Contradicted.Add(1)
-			}
-		}
-	}
-	state.fellBack = true
-	state.recorded = recorded.recorded
-	state.functions = nil
-}
-
-// whole is every parameter of home marked, computed whole the push's way, each with its answer, true, for the standard
-// library's table, where a parameter absent is not marked.
+// whole is every parameter of home marked, every source function judged or its marks kept, each with its answer, true,
+// for the standard library's table, where a parameter absent is not marked. The order the functions are judged in
+// changes no mark (see demandWalk).
 func whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object]bool {
 	home.Lock()
 	defer home.Unlock()
 	state := fact_resolver.StateOf[marks](home, Kind)
-	if !state.fellBack {
-		state.fallBack(resolver, home)
+	walk := state.walk(resolver, home)
+	for _, function := range sourceFunctions(home) {
+		walk.begin(function)
 	}
+	walk.settle()
 	answers := map[types.Object]bool{}
-	for parameter, marked := range state.recorded {
-		if marked {
+	for _, marked := range state.functions {
+		for parameter := range marked {
 			answers[parameter] = true
 		}
 	}
