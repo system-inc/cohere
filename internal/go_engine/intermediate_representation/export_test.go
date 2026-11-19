@@ -1,8 +1,10 @@
 package intermediate_representation
 
-// The lifting options the external tests set on a Program before building it (lifting.go). Compiled into the
-// package's tests only. Each entry is deleted when the test that stored it ends, so the map holds nothing a
-// finished test set.
+// What the package's tests reach of its unexported parts, compiled into the package's tests only. Most are the
+// lifting options the external tests set on a Program before building it (lifting.go): each entry is deleted when
+// the test that stored it ends, so the map holds nothing a finished test set. The rest are unaliasDeeply, for the
+// tests of the instance names it makes canonical, and the build of one function's body alone, on a builder that
+// takes no further turn.
 
 import (
 	"go/types"
