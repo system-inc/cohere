@@ -236,8 +236,9 @@ func (host *bodyReachHost) reach(
 	sorted := slices.SortedFunc(slices.Values(built), func(first, second *reachBuiltPackage) int {
 		return cmp.Compare(first.identifier, second.identifier)
 	})
-	// A value spec the load mode reaches carries it to its objects' users (bodyReacher.carryLoadMode), which may be
-	// judged before it, in its package or another, so the build is judged again until a judgment carries nothing new.
+	// A value spec the load mode reaches carries it to its objects' users (bodyReacher.carryLoadMode), and so does
+	// every value of an unrecorded package (bodyReacher.carryUnrecorded), whose users may be judged before it, in its
+	// package or another, so the build is judged again until a judgment carries nothing new.
 	for {
 		reacher.carriedGrew = false
 		census := host.judge(reacher, sorted)
@@ -263,6 +264,7 @@ func (host *bodyReachHost) judge(reacher *bodyReacher, built []*reachBuiltPackag
 			record, isRecorded = reads.FunctionUses()
 		}
 		if !isRecorded {
+			reacher.carryUnrecorded(hosted.Types)
 			census.total += read.sharedBodies
 			census.reached += read.sharedBodies
 			census.byReason[cmp.Or(reacher.sizesReason(), reachedUnrecorded)] += read.sharedBodies

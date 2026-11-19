@@ -37,6 +37,11 @@ type bodyReacher struct {
 	// carried one it had not, which judges the build again (bodyReachHost.reach).
 	carried     map[types.Object]bool
 	carriedGrew bool
+	// someLoadModeDiffers is whether any package the host holds loads in another mode in the build, which an
+	// unrecorded package's values are carried by (carryUnrecorded), read at the first such package, and
+	// someLoadModeRead whether it has been.
+	someLoadModeDiffers bool
+	someLoadModeRead    bool
 }
 
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
@@ -232,11 +237,59 @@ func (reacher *bodyReacher) carryLoadMode(record *build_reads.FunctionUses, decl
 		return
 	}
 	for _, object := range declared.Declaration.Objects {
-		if !reacher.carried[object] {
-			reacher.carried[object] = true
-			reacher.carriedGrew = true
+		reacher.carry(object)
+	}
+}
+
+// carryUnrecorded carries the load mode through every package-level const and var of own, the types of a package the
+// host recorded no uses of, when any package the host holds loads in another mode in the build (#w72zxtq, the review's
+// must A). The reach judges none of such a package's declarations, reaching its bodies whole, so it cannot tell which
+// of its value specs read what the load mode reaches, as carryLoadMode tells of a recorded one's: `const Scale =
+// math.Pi / 180` in a package checked for its types alone holds the other load's value, and every use of Scale
+// elsewhere reaches. Carrying each is wider than needed, costing re-checks and never a body left unreached. A build
+// loading every package as the host does carries nothing, since no value can then hold another load's.
+func (reacher *bodyReacher) carryUnrecorded(own *types.Package) {
+	if own == nil || !reacher.anyLoadModeDiffers() {
+		return
+	}
+	scope := own.Scope()
+	for _, name := range scope.Names() {
+		switch object := scope.Lookup(name).(type) {
+		case *types.Const, *types.Var:
+			reacher.carry(object)
 		}
 	}
+}
+
+// carry marks object carried, and the judgment as having carried one it had not when it is new (carriedGrew).
+func (reacher *bodyReacher) carry(object types.Object) {
+	if !reacher.carried[object] {
+		reacher.carried[object] = true
+		reacher.carriedGrew = true
+	}
+}
+
+// anyLoadModeDiffers reports whether the host and the build load any package the host holds in different modes, by
+// every ID of the host's graph and of its reads, read once a build. A value can hold another load's only through a
+// package so loaded, and every package an unrecorded package's values read is one the host holds, having checked it.
+func (reacher *bodyReacher) anyLoadModeDiffers() bool {
+	if reacher.someLoadModeRead {
+		return reacher.someLoadModeDiffers
+	}
+	reacher.someLoadModeRead = true
+	for identifier := range reacher.host.dependence.files {
+		if reacher.identifiedLoadModeDiffers(identifier) {
+			reacher.someLoadModeDiffers = true
+			return true
+		}
+	}
+	for identifier := range reacher.host.packages {
+		if reacher.identifiedLoadModeDiffers(identifier) {
+			reacher.someLoadModeDiffers = true
+			return true
+		}
+	}
+	return false
 }
 
 // loadModeReaches reports whether a use of kinds of object reaches its body by the load mode (the soundness contract's
@@ -267,6 +320,12 @@ func (reacher *bodyReacher) loadModeDiffers(own *types.Package) bool {
 	if !isHeld {
 		return true
 	}
+	return reacher.identifiedLoadModeDiffers(identifier)
+}
+
+// identifiedLoadModeDiffers reports whether the host and the build load the package the host holds by identifier in
+// different modes: one from export data and the other from source.
+func (reacher *bodyReacher) identifiedLoadModeDiffers(identifier string) bool {
 	return reacher.host.dependence.exportData[identifier] == reacher.fromSource[identifier]
 }
 

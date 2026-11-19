@@ -230,6 +230,69 @@ func Still(angle float64) float64 { return -angle }
 	}
 }
 
+// An unrecorded package's value specs carry the load mode too (#w72zxtq, the review's must A): the reach judges no
+// declaration of a package the host recorded no uses of, reaching its bodies whole, so it cannot tell which of its
+// constants read what the load mode reaches. While any package loads otherwise, every package-level const and var of
+// one is carried, wider than needed: q's TwoPi, declared from math.Pi, reaches a's Around, which reads it alone, and
+// a's turn, declared from it, carries it to Turn, though a is judged before q. Still reads nothing of q, and stays
+// unreached.
+func TestAnUnrecordedPackagesValuesCarryTheLoadMode(test *testing.T) {
+	test.Parallel()
+
+	checked, reads := recordedPackages(test, []recordedSource{mathSource,
+		{path: "example.com/q", imports: []string{"math"}, files: map[string]string{"/q/q.go": `package q
+
+import "math"
+
+const TwoPi = 2 * math.Pi
+`}},
+		{path: "example.com/a", imports: []string{"example.com/q"}, files: map[string]string{"/a/a.go": `package a
+
+import "example.com/q"
+
+const turn = 2 * q.TwoPi
+
+func Turn(angle float64) float64 { return angle * turn }
+
+func Around(angle float64) float64 { return angle * q.TwoPi }
+
+func Still(angle float64) float64 { return -angle }
+`}}})
+	// q's record taken away, as a package checked for its types alone or with cgo holds none.
+	reads[checked["example.com/q"]] = nil
+	census := reachRecorded(test, checked, reads, nil)
+	got := map[string]string{}
+	for _, body := range census.bodies {
+		if body.packageIdentifier == "example.com/a" {
+			got[body.name] = cmp.Or(string(body.reason), "unreached")
+		}
+	}
+	want := map[string]string{"turn": "LoadMode", "Turn": "LoadMode", "Around": "LoadMode", "Still": "unreached"}
+	if !maps.Equal(got, want) {
+		test.Errorf("the census judges\n%v\nwant\n%v", got, want)
+	}
+	if census.byReason[reachedUnrecorded] != 1 {
+		test.Errorf("want q's one body reached, Unrecorded, got %d", census.byReason[reachedUnrecorded])
+	}
+	// A build loading every package as the host does carries none of q's values, which can hold no other load's.
+	fromSource := map[string]bool{"math": true, "example.com/q": true, "example.com/a": true}
+	for _, mathExportData := range []bool{false, true} {
+		reacher := &bodyReacher{host: newBodyReachHost(&hostDependence{
+			exportData: map[string]bool{"math": mathExportData}, decoded: map[*types.Package]bool{}}, reads, nil),
+			fromSource: fromSource, carried: map[types.Object]bool{}}
+		reacher.carryUnrecorded(checked["example.com/q"].Types)
+		// TwoPi, q's one value, carried only where math loads otherwise.
+		want := 0
+		if mathExportData {
+			want = 1
+		}
+		if len(reacher.carried) != want {
+			test.Errorf("with math read from export data on the host %t, %d of q's values are carried, want %d",
+				mathExportData, len(reacher.carried), want)
+		}
+	}
+}
+
 // A name a file imports by a dot, which a build-only file of the package declares at package level, means that file's
 // object in the build rather than the one the host recorded (#w72zxtq): Measured calls Area, dot-imported from shapes,
 // and is reached, Shadowed, though no bit is set. Such a build does not compile, the two names clashing in the file's
