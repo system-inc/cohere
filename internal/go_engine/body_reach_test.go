@@ -61,9 +61,10 @@ import (
 // platformName's, platformLimit's and platformSize's bodies in the host-only file are absent on windows, and windows's
 // own platformName, platformLimit, platformSize, Spin, len and init are new. The body differential compares the eight
 // unreached bodies' types, uses and findings on windows with the host's: helper's findings are classed apart under
-// stage 5, its package holding dependent units, and Warm's fail, owed to stage 4, since the build cannot yet show that
-// size's purity differs (findingCauses, #5vbs1np). The census is written to its file, saying what the reach does not
-// stand for, and the findings are the run's without it, which writes no census.
+// stage 5, its package holding dependent units, and Warm, whose callee size's purity differs, is taken out by the
+// facts' reach (#5vbs1np), so its findings are the build's to lint, counted and never compared. The census is written
+// to its file, saying what the reach does not stand for, and the findings are the run's without it, which writes no
+// census.
 func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	test.Parallel()
 
@@ -200,16 +201,14 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	if differential == nil {
 		test.Fatal("windows's run has no body differential")
 	}
-	wantFailures := []string{"example.com/reach reach.go:135 Warm: findings differ: host [], build [cohere-go/SA4017 " +
-		"136:2 size doesn't have side effects and its return value is ignored], owed by its rules to CalleeFacts, " +
-		"whose cause the build does not show"}
 	var failures []string
 	for _, failure := range differential.failures {
 		failures = append(failures, strings.ReplaceAll(failure, root+string(filepath.Separator), ""))
 	}
-	if differential.compared != 8 || !slices.Equal(failures, wantFailures) {
-		test.Errorf("want the 8 unreached bodies compared with the host's and Warm alone failing, got %d compared and "+
-			"the failures\n%s", differential.compared, strings.Join(failures, "\n"))
+	if differential.compared != 8 || len(failures) > 0 || differential.takenOut != 1 {
+		test.Errorf("want the 8 unreached bodies compared with the host's, Warm taken out by the facts' reach and "+
+			"none failing, got %d compared, %d taken out and the failures\n%s", differential.compared,
+			differential.takenOut, strings.Join(failures, "\n"))
 	}
 	classed := map[findingStage]string{}
 	for stage, lines := range differential.classed {
@@ -236,7 +235,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 			"(#5vbs1np).",
 		"  bodies: 25, reached 17, unreached 8, absent 3, new 6",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
-		"  body differential: compared 8, failures 1",
+		"  body differential: compared 8, failures 0",
+		"  taken out by the facts' reach 1",
 		"  findings differing turning on a callee's fact, stage 4's (#h0k644s): 0",
 		"  findings differing of a package-wide rule, stage 5's (#xeafx79): 1",
 	} {
@@ -335,14 +335,15 @@ func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T
 			test.Errorf("want %s failed by %q, got %q", name, wanted, failed[name])
 		}
 	}
-	// Beside them, Warm, which the reach leaves unreached, fails by its findings, owed to stage 4, whose cause the
-	// build cannot yet show (findingCauses).
-	if len(differential.failures) != len(wronglyUnreached)+2 ||
-		!slices.ContainsFunc(differential.failures, func(failure string) bool {
-			return strings.Contains(failure, " Warm: findings differ: ")
-		}) {
-		test.Errorf("want a failure for each body wrongly left unreached, a second for Shifted and one for Warm, "+
-			"got\n%s", strings.Join(differential.failures, "\n"))
+	// Beside them, Warm, which the reach leaves unreached and whose findings turn on its callee's purity, is taken out
+	// by the facts' reach (#5vbs1np), so its findings are the build's to lint and are never compared, only counted.
+	if len(differential.failures) != len(wronglyUnreached)+1 ||
+		slices.ContainsFunc(differential.failures, func(failure string) bool {
+			return strings.Contains(failure, " Warm: ")
+		}) || !differential.factsSettled || differential.takenOut != 1 {
+		test.Errorf("want a failure for each body wrongly left unreached and a second for Shifted, and Warm alone "+
+			"taken out by the facts' reach, got the settlement read %t, %d taken out, and\n%s",
+			differential.factsSettled, differential.takenOut, strings.Join(differential.failures, "\n"))
 	}
 
 	none := run(func(census *buildBodyReach) *buildBodyReach {
@@ -708,7 +709,7 @@ func TestABodyIsClassedOnlyWhereOneStageOwnsEveryDifference(test *testing.T) {
 		}
 	}
 	differential.compareFindings(hostFindings, builtFindings, stages,
-		&findingCauses{filesDiffer: map[string]bool{"example.com/mixed": true}})
+		&findingCauses{filesDiffer: map[string]bool{"example.com/mixed": true}}, nil)
 	for _, each := range cases {
 		got := findingStage("")
 		for stage, lines := range differential.classed {

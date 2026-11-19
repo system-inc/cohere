@@ -82,6 +82,9 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		}
 		fmt.Fprintf(&written, "  body differential: compared %d, failures %d\n", run.bodyDifferential.compared,
 			len(run.bodyDifferential.failures))
+		if run.bodyDifferential.factsSettled {
+			fmt.Fprintf(&written, "  taken out by the facts' reach %d\n", run.bodyDifferential.takenOut)
+		}
 		if run.bodyDifferential.standingCompared != nil {
 			fmt.Fprintf(&written, "  standing facts: compared %s; failures %s\n",
 				byKind(run.bodyDifferential.standingCompared), byKind(run.bodyDifferential.standingFailed))

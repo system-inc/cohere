@@ -37,7 +37,9 @@ import (
 // rules a later stage owns, those that read a callee's facts (stage 4's, #h0k644s) or judge the package whole (stage
 // 5's, #xeafx79), all owed to one stage, is classed apart under that stage, counted and listed, and no failure, but
 // only where the build shows that stage's cause for the body (findingCauses): the reach does not stand for them, and
-// the later stage redoes the body only where its cause holds.
+// the later stage redoes the body only where its cause holds. Where the facts' reach settled a package (#5vbs1np), a
+// body it took out of the standing set is the build's to lint, so its findings are the build's own and no comparison
+// with the host's: it is counted apart, taken out by the facts' reach, and its findings are not compared.
 //
 // Its second leg (#adq5ahd) checks what the facts' reach left standing (#aswfm7a), once the build's rules have run:
 // the build lints whole today, so every answer its own run holds is real, and of each body the facts' fixed point left
@@ -56,6 +58,11 @@ type buildBodyDifferential struct {
 	failures []string
 	classed  map[findingStage][]string
 	bodies   []comparedBody
+
+	// factsSettled is whether the findings were compared beside the facts' reach's settlement, and takenOut how many
+	// bodies compared by their types it took out of the standing set, whose findings were then left alone.
+	factsSettled bool
+	takenOut     int
 
 	// standingCompared and standingFailed are the second leg's comparisons and failures by kind, an answer's kind or
 	// standingNoReturn; each failure's line is among failures too.
@@ -260,14 +267,23 @@ func firstFactDifference(
 // host's, hostFindings and builtFindings each by file, adding a failure for each body where they differ, but where
 // every finding one side has and the other lacks is of rules stages owes to one later stage whose cause causes shows
 // for the body, which classes it there. A difference its rules owe to a stage whose cause is not shown stays a
-// failure, saying so.
+// failure, saying so. settled is the facts' reach's result by package ID (check.Result.FactReachSettled), nil where
+// it never ran: a body it took out of a package it settled in part is counted, never compared (takenOutByFacts).
 func (differential *buildBodyDifferential) compareFindings(
 	hostFindings map[string][]check.Finding,
 	builtFindings map[string][]check.Finding,
 	stages map[string][]findingStage,
 	causes *findingCauses,
+	settled map[string]any,
 ) {
+	differential.factsSettled = settled != nil
+	takenOut := takenOutByFacts(settled)
 	for _, compared := range differential.bodies {
+		if takenOut[compared.body.packageIdentifier][fact_reach.Place{File: compared.body.file,
+			Offset: compared.body.offset}] {
+			differential.takenOut++
+			continue
+		}
 		hostWritten := findingsWithin(hostFindings[compared.body.file], compared.firstLine, compared.lastLine)
 		builtWritten := findingsWithin(builtFindings[compared.body.file], compared.firstLine, compared.lastLine)
 		if slices.Equal(hostWritten, builtWritten) {
@@ -292,6 +308,24 @@ func (differential *buildBodyDifferential) compareFindings(
 		}
 		differential.failures = append(differential.failures, line)
 	}
+}
+
+// takenOutByFacts are the bodies the facts' reach took out of the standing set, by package ID and place, of each
+// package settled holds a result of in part: the build lints them, so their findings are the build's own. A body the
+// reach never held standing, as a value's initializer, is not among them, nor is any of a package it did not settle.
+func takenOutByFacts(settled map[string]any) map[string]map[fact_reach.Place]bool {
+	takenOut := map[string]map[fact_reach.Place]bool{}
+	for identifier, result := range settled {
+		packageSettled, isResult := result.(*standing_facts.Result)
+		if !isResult || !packageSettled.Partial || packageSettled.Settlement == nil {
+			continue
+		}
+		takenOut[identifier] = map[fact_reach.Place]bool{}
+		for _, removal := range packageSettled.Settlement.Removed {
+			takenOut[identifier][removal.Place] = true
+		}
+	}
+	return takenOut
 }
 
 // classingStage is the first of owed whose cause causes shows for body, empty when none is.

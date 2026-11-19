@@ -816,13 +816,14 @@ func (engine *pipeline) extraBuildRun(
 		}
 	}
 	// The findings of each body the differential compared, the last load's, whose result stands, a difference classed
-	// under a later stage only where the judgment shows its cause (findingCauses), and its second leg, over the facts
-	// of each body the facts' reach left standing, whose capture goes once it is read: its no-return predicates hold
-	// the build's resolver's packages. A differential is made only of a judged build (runRules).
+	// under a later stage only where the judgment shows its cause (findingCauses) and a body the facts' reach took out
+	// left to the build, and its second leg, over the facts of each body the facts' reach left standing, whose capture
+	// goes once it is read: its no-return predicates hold the build's resolver's packages. A differential is made only
+	// of a judged build (runRules).
 	if run.bodyDifferential != nil {
 		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings),
 			findingStagesOf(enabled), &findingCauses{dependence: run.judged.dependence,
-				filesDiffer: run.judged.filesDiffer})
+				filesDiffer: run.judged.filesDiffer}, result.FactReachSettled)
 		if result.FactReach != nil && result.FactReachSettled != nil {
 			built := make(map[string]*packages.Package, len(loaded.Packages))
 			for _, each := range loaded.Packages {

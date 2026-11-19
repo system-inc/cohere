@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,27 +13,31 @@ import (
 )
 
 // factKindsSettled is what windows's build settled of the fact-kinds fixture's one package under the body reach census
-// and the body differential (#73k3wge): the settlement, each of the package's bodies by name, and the build's run.
+// and the body differential (#73k3wge): the settlement, each of the package's bodies by name, the build's run and the
+// host's, and the census file the run wrote.
 type factKindsSettled struct {
 	settlement *fact_reach.Settlement
 	bodies     map[string]reachedBody
 	run        buildRun
 	host       buildRun
+	censusFile string
 }
 
 // settleFactKinds runs the fact-kinds fixture under the census and the body differential, and reads what windows's
 // build settled of its package.
 func settleFactKinds(test *testing.T) *factKindsSettled {
 	test.Helper()
+	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "fact-kinds")), exitFindings,
 		func(engine *pipeline) {
-			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+			engine.bodyReachCensus = censusFile
 			engine.bodyDifferential = true
 		}, "--no-cache", "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyReach == nil || on.buildRuns[1].result == nil {
 		test.Fatalf("want the host's build and windows's census, got %d runs", len(on.buildRuns))
 	}
-	settled := &factKindsSettled{bodies: map[string]reachedBody{}, run: on.buildRuns[1], host: on.buildRuns[0]}
+	settled := &factKindsSettled{bodies: map[string]reachedBody{}, run: on.buildRuns[1], host: on.buildRuns[0],
+		censusFile: censusFile}
 	for _, body := range settled.run.bodyReach.bodies {
 		if body.packageIdentifier == "example.com/kinds" {
 			settled.bodies[body.name] = body
@@ -193,4 +198,42 @@ func TestTheOrderRuleNamesEachShapeSoItsUsersNeverStand(test *testing.T) {
 	settled.requireRemovedBy(test, "CycleUser", "cycleHead", order)
 	settled.requireRemovedBy(test, "viaInstance", "makeFailure", order)
 	settled.requireRemovedBy(test, "viaWrapper", "fresh", order)
+}
+
+// The first leg reads the facts' reach's settlement: a body it took out is the build's to lint, so its findings are
+// the build's own and never compared with the host's, only counted, on a line of their own. Five of the fourteen it
+// took out differ by their findings, Warm, Warmer, OddUser, TrivialUser and StoppingUser, each a finding that turns on
+// a callee's answer, and none of them is a failure or a difference owed to a later stage.
+func TestTheFirstLegLeavesTheBodiesTheFactsReachTookOutToTheBuild(test *testing.T) {
+	test.Parallel()
+
+	settled := settleFactKinds(test)
+	differential := settled.run.bodyDifferential
+	if differential == nil {
+		test.Fatal("windows's build ran no body differential")
+	}
+	if !differential.factsSettled || differential.takenOut != len(settled.settlement.Removed) ||
+		differential.takenOut != 14 {
+		test.Errorf("the first leg read the settlement %t and left %d bodies to the build, want it read and the 14 "+
+			"the facts' reach took out, %d", differential.factsSettled, differential.takenOut,
+			len(settled.settlement.Removed))
+	}
+	var lines []string
+	lines = append(lines, differential.failures...)
+	for _, classed := range differential.classed {
+		lines = append(lines, classed...)
+	}
+	for _, name := range []string{"Warm", "Warmer", "OddUser", "TrivialUser", "StoppingUser"} {
+		if slices.ContainsFunc(lines, func(line string) bool { return strings.Contains(line, " "+name+": ") }) {
+			test.Errorf("the first leg compared %s's findings, which the facts' reach left to the build:\n%s", name,
+				strings.Join(lines, "\n"))
+		}
+	}
+	written, readError := os.ReadFile(settled.censusFile)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if line := "  taken out by the facts' reach 14"; !slices.Contains(strings.Split(string(written), "\n"), line) {
+		test.Errorf("the census file has no line %q:\n%s", line, written)
+	}
 }
