@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are fifteen.
+// The changes are sixteen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -215,6 +215,16 @@
 // checker never reads it. Unset, or for a package FactHosts answers nil
 // of, ResultOf holds no host's side.
 //
+// The sixteenth is Options.Beside, one analyzer more that Analyze roots
+// on each package it is given that Options.Restored does not name, as it
+// roots the analyzers, and keeps apart from them in Graph.Beside: a
+// root whose result its caller reads, as an extra build reads which of a
+// package's bodies stand for the facts' reach (#aswfm7a), that is no
+// rule and no report. Graph.Roots and Graph.All never hold it, so a
+// reader of the roots, the cache's save among them, never meets it; it
+// is reached, grouped and scheduled as a root is. Unset, nothing is
+// rooted beside, and Graph.Beside is empty.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -412,6 +422,13 @@ type Options struct {
 	FactHosts func(packageId string) fact_reach.Host
 	FactHost  *analysis.Analyzer
 
+	// cohere: Beside, when set, is rooted on each package Analyze is
+	// given that Restored does not name, beside the analyzers, and its
+	// actions are Graph.Beside's rather than Graph.Roots'. It must be
+	// none of the analyzers, whose root action on a package it would
+	// otherwise share.
+	Beside *analysis.Analyzer
+
 	// cohere: Reads, when set, holds the reads of each package whose
 	// fact reads are recorded: every ObjectFact and PackageFact an action
 	// on such a package asks of another package's object, or of another
@@ -495,6 +512,11 @@ type Graph struct {
 	// These two kind of edges are called "vertical" and "horizontal",
 	// respectively.
 	Roots []*Action
+
+	// cohere: Beside holds Options.Beside's root action on each package
+	// given that is not restored, in the order the packages were given,
+	// which neither Roots nor All holds.
+	Beside []*Action
 
 	// cohere: requiredFacts is what this graph's construction read of
 	// factAnalyzersRequired, kept so a test reads that each analyzer's was
@@ -727,6 +749,21 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 	}
 
+	// cohere: Options.Beside's roots, on each package given that is not
+	// restored, which nothing on it runs, and reached is every root,
+	// beside ones too, which the walks below start from.
+	var beside []*Action
+	if opts.Beside != nil {
+		for _, pkg := range pkgs {
+			if opts.Restored == nil || !opts.Restored(pkg) {
+				root := mkAction(opts.Beside, pkg)
+				root.IsRoot = true
+				beside = append(beside, root)
+			}
+		}
+	}
+	allRoots := append(roots[:len(roots):len(roots)], beside...)
+
 	// cohere: Options.ForDependents, which drops the edges an analyzer
 	// holds only for dependents that are not in this graph, and then the
 	// actions only those edges reached, so none of them is counted below
@@ -738,7 +775,8 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 		keepForDependents(all, opts.ForDependents)
 		reached := make(map[*Action]bool, len(actions))
-		forEach(roots, func(act *Action) error {
+		// cohere: from every root, beside ones too.
+		forEach(allRoots, func(act *Action) error {
 			reached[act] = true
 			return nil
 		})
@@ -777,7 +815,8 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	}
 	readers := make(map[*packages.Package]*syntaxReaders)
 	var groups []*syntaxReaders
-	forEach(roots, func(act *Action) error {
+	// cohere: from every root, beside ones too, so each is scheduled.
+	forEach(allRoots, func(act *Action) error {
 		shared, ok := readers[act.Package]
 		if !ok {
 			shared = &syntaxReaders{given: given[act.Package]}
@@ -810,8 +849,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 	}
 
-	// cohere: the graph keeps requiredFacts for a test to read.
-	return &Graph{Roots: roots, requiredFacts: requiredFacts}, nil
+	// cohere: the graph keeps requiredFacts for a test to read, and the
+	// roots beside apart from Roots.
+	return &Graph{Roots: roots, Beside: beside, requiredFacts: requiredFacts}, nil
 }
 
 func init() {

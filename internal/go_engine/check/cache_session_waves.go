@@ -104,7 +104,10 @@ func (session *CacheSession) firstWave(
 		graphs = append(graphs, graph)
 	}
 	if len(firstOthers) > 0 {
-		graph, analyzeError := checker.Analyze(session.known.facts, firstOthers, &firstOptions)
+		// A dependency is no package the run analyzes, so nothing is rooted on it beside the rules' facts.
+		othersOptions := firstOptions
+		othersOptions.Beside = nil
+		graph, analyzeError := checker.Analyze(session.known.facts, firstOthers, &othersOptions)
 		if analyzeError != nil {
 			return nil, fmt.Errorf("analyzing %d dependencies: %w", len(firstOthers), analyzeError)
 		}
