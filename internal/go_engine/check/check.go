@@ -151,7 +151,7 @@ type Options struct {
 	// follows and whose result there StandingBodies is asked with, standing_facts' on the census path, which this
 	// package never imports. Where it is FactReachSettle and the run roots that nowhere (settlingIn), nothing stands.
 	// Both are called from several actions at once. Only an extra build sets them, and no package StandingBodies
-	// answers anything for is written to the findings cache (CacheSession.keepingStandingOut).
+	// answers anything for is written to the findings cache (CacheSession.markStood).
 	StandingBodies func(packageId string, after any) rule.StandingBodies
 	StandingAfter  *analysis.Analyzer
 
@@ -429,8 +429,14 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 	session := options.Cache
 	// A package anything stands in is never written to the store, whose entry would carry the host's findings there.
-	if checkerOptions.StandingBodies != nil && session != nil {
-		checkerOptions.StandingBodies = session.keepingStandingOut(checkerOptions.StandingBodies)
+	if answer := checkerOptions.StandingBodies; answer != nil && session != nil {
+		checkerOptions.StandingBodies = func(packageId string, after any) rule.StandingBodies {
+			standing := answer(packageId, after)
+			if standing != nil {
+				session.markStood(packageId)
+			}
+			return standing
+		}
 	}
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.

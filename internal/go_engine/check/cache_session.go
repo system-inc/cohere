@@ -281,7 +281,7 @@ type CacheSession struct {
 	host *hostState
 
 	// stood are the IDs of the packages something stood in, in any load of an extra build's session, as its
-	// Options.StandingBodies answered (keepingStandingOut, #e4rd5dw): their findings in the standing bodies are the
+	// Options.StandingBodies answered (markStood, #e4rd5dw): their findings in the standing bodies are the
 	// host's, which the build's own entry must never carry, so none is written (savable, writeThrough). stoodLock
 	// guards it, since the actions on a run's packages ask at once.
 	stoodLock sync.Mutex

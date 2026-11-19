@@ -120,7 +120,7 @@ func TestAPackageSomethingStoodInIsNeverWrittenThrough(test *testing.T) {
 	host := throughHost(test, root, filepath.Join(stores, "host"))
 	result, session := standingBuild(test, root, windowsCachingAt(filepath.Join(stores, "build"), throughRules()),
 		host, nil, func(session *CacheSession) {
-			session.keepingStandingOut(standingAt(throughUserPath))(throughUserPath, nil)
+			session.markStood(throughUserPath)
 		})
 
 	for _, path := range []string{throughBasePath, throughUserPath} {
