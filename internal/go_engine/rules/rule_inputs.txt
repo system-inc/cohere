@@ -18,7 +18,8 @@
 # the package's type index holds one of sort's slice types, which an import or a use in any file puts there; SA5008
 # accepts a repeated go-flags key in a struct tag in a package any of whose files imports go-flags; tests judges an
 # example's name by the package's scope and every import; and consistency-no-abbreviated-identifier suggests a name
-# no file of the package declares, and leaves a method named Len alone once any file uses or imports sort.
+# no file of the package declares and no package of its whole import closure is named, not only its own imports', and
+# leaves a method named Len alone once any file uses or imports sort.
 
 cohere-go/S1000 PerUnit
 cohere-go/S1001 PerUnit FullKind

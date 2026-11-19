@@ -336,11 +336,13 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 	}
 }
 
-// standingGate is one module of testdata/standing-gates (#zvwfe26), each a rule's package-wide gate: one build's own
-// file opens or closes the gate that judges a body in shared.go, or in example_test.go, which both builds compile and
-// whose declaration, stood, is one windows's difference never reaches. stood names that declaration as the census does,
-// and want the finding the gate decides there: its rule, its line in file, a fragment of its message, and finder, the
-// build that finds it, "host" or "windows", the other finding nothing of the rule on that line with that fragment.
+// standingGate is one module of testdata/standing-gates (#zvwfe26), each a rule's package-wide gate: the other build's
+// own file, windows's in every module but abbreviated-closure, whose other build is the tag audit_b's, or the host's
+// own file opens or closes the gate that judges a body in shared.go, or in example_test.go, which both builds compile
+// and whose declaration, stood, is one the other build's difference never reaches. stood names that declaration as
+// the census does, and want the finding the gate decides there: its rule, its line in file, a fragment of its
+// message, and finder, the build that finds it, "host" or "build" for the other, the second finding nothing of the
+// rule on that line with that fragment.
 type standingGate struct {
 	module   string
 	stood    string
@@ -352,8 +354,8 @@ type standingGate struct {
 }
 
 // standingGates are the modules, two for each gate the table holds Composes for, one of each direction: the gate
-// opened in windows's file alone, a finding the host's would hide, and in the host's alone, one the host's would
-// invent.
+// opened in the other build's file alone, a finding the host's would hide, and in the host's alone, one the host's
+// would invent.
 //   - SA4029 by a method of sort used through an alias (sort-alias-*), from a shared file that imports no sort, and by
 //     a bare import of sort (sort-import-*): either puts sort's slice types in the package's type index.
 //   - SA5008 by an import of go-flags (import-goflags-*), a stub by the module's replace, after which a repeated
@@ -361,33 +363,37 @@ type standingGate struct {
 //   - tests by the package's scope: `ExampleFoo` refers to an unknown identifier unless some file declares Foo
 //     (example-*).
 //   - consistency-no-abbreviated-identifier by the package's scope, `callerContext` being the name it suggests for a
-//     context parameter only while no file declares it (abbreviated-scope-*), and by a use of sort, after which it
-//     leaves a method named Len alone (abbreviated-sort-*).
+//     context parameter only while no file declares it (abbreviated-scope-*), by a use of sort, after which it leaves
+//     a method named Len alone (abbreviated-sort-*), and by the package's whole import closure, whose packages' names
+//     it keeps free (abbreviated-closure): the package imports dep alone in both builds, and dep imports context
+//     under the tag alone, so `context` is the name it suggests for a local ctx on the host only.
 var standingGates = []standingGate{
 	{module: "sort-alias-win", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
-		fragment: "sort.IntSlice is a type, not a function", finder: "windows"},
+		fragment: "sort.IntSlice is a type, not a function", finder: "build"},
 	{module: "sort-alias-host", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
 		fragment: "sort.IntSlice is a type, not a function", finder: "host"},
 	{module: "sort-import-win", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
-		fragment: "sort.IntSlice is a type, not a function", finder: "windows"},
+		fragment: "sort.IntSlice is a type, not a function", finder: "build"},
 	{module: "sort-import-host", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
 		fragment: "sort.IntSlice is a type, not a function", finder: "host"},
 	{module: "import-goflags-win", stood: "Target", file: "shared.go", rule: "SA5008", line: 5,
 		fragment: `duplicate struct tag "default"`, finder: "host"},
 	{module: "import-goflags-host", stood: "Target", file: "shared.go", rule: "SA5008", line: 5,
-		fragment: `duplicate struct tag "default"`, finder: "windows"},
+		fragment: `duplicate struct tag "default"`, finder: "build"},
 	{module: "example-win", stood: "ExampleFoo", file: "example_test.go", rule: "tests", line: 3,
 		fragment: "ExampleFoo refers to unknown identifier: Foo", finder: "host"},
 	{module: "example-host", stood: "ExampleFoo", file: "example_test.go", rule: "tests", line: 3,
-		fragment: "ExampleFoo refers to unknown identifier: Foo", finder: "windows"},
+		fragment: "ExampleFoo refers to unknown identifier: Foo", finder: "build"},
 	{module: "abbreviated-scope-win", stood: "target", file: "shared.go", rule: "consistency-no-abbreviated-identifier",
 		line: 5, fragment: `Use "callerContext"`, finder: "host"},
 	{module: "abbreviated-scope-host", stood: "target", file: "shared.go",
-		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Use "callerContext"`, finder: "windows"},
+		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Use "callerContext"`, finder: "build"},
 	{module: "abbreviated-sort-win", stood: "Items.Len", file: "shared.go",
 		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "host"},
 	{module: "abbreviated-sort-host", stood: "Items.Len", file: "shared.go",
-		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "windows"},
+		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "build"},
+	{module: "abbreviated-closure", stood: "Target", file: "shared.go",
+		rule: "consistency-no-abbreviated-identifier", line: 9, fragment: `Use "context"`, finder: "host"},
 }
 
 // runStandingGate runs the engine over a copy of the standing gate module named with the registry's rules, under the
@@ -431,11 +437,11 @@ func stoodIn(run buildRun, stood string, file string) bool {
 }
 
 // A body left standing keeps no package-wide gate that another file of its build flips (#zvwfe26): over each standing
-// gate module, the gated declaration stands in windows's build with the switch on, the gate's finding is in the build
-// that opens it and not in the other, with the switch on as off, and windows's own findings, and the stream's, with the
-// switch on are those with it off. A rule whose finding in a body hangs on such a gate is Composes in the inputs table,
-// so it is never confined, and windows judges the standing body itself for it, where the host's findings there would be
-// wrong.
+// gate module, the gated declaration stands in the other build with the switch on, the gate's finding is in the build
+// that opens it and not in the other, with the switch on as off, and the other build's own findings, and the
+// stream's, with the switch on are those with it off. A rule whose finding in a body hangs on such a gate is Composes
+// in the inputs table, so it is never confined, and the other build judges the standing body itself for it, where the
+// host's findings there would be wrong.
 func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 	test.Parallel()
 
@@ -445,28 +451,28 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 			off, offStream, offRoot := runStandingGate(test, gate.module, false)
 			on, onStream, onRoot := runStandingGate(test, gate.module, true)
 			if len(off.buildRuns) != 2 || len(on.buildRuns) != 2 {
-				test.Fatalf("want the host's build and windows's in both runs, got %d and %d runs", len(off.buildRuns),
+				test.Fatalf("want the host's build and the other in both runs, got %d and %d runs", len(off.buildRuns),
 					len(on.buildRuns))
 			}
 			if !stoodIn(on.buildRuns[1], gate.stood, gate.file) {
-				test.Errorf("with the switch on %s did not stand in windows's build, so the module holds nothing of "+
+				test.Errorf("with the switch on %s did not stand in the other build, so the module holds nothing of "+
 					"the gate", gate.stood)
 			}
 			for _, each := range []struct {
 				switched string
 				engine   *pipeline
 			}{{"off", off}, {"on", on}} {
-				host, windows := findsGate(each.engine.buildRuns[0], gate), findsGate(each.engine.buildRuns[1], gate)
-				if host != (gate.finder == "host") || windows != (gate.finder == "windows") {
-					test.Errorf("with the switch %s %s at %s:%d %q is found by the host %t and by windows %t, want "+
-						"by %s alone", each.switched, gate.rule, gate.file, gate.line, gate.fragment, host, windows,
-						gate.finder)
+				host, other := findsGate(each.engine.buildRuns[0], gate), findsGate(each.engine.buildRuns[1], gate)
+				if host != (gate.finder == "host") || other != (gate.finder == "build") {
+					test.Errorf("with the switch %s %s at %s:%d %q is found by the host %t and by the other build "+
+						"%t, want by the %s alone", each.switched, gate.rule, gate.file, gate.line, gate.fragment, host,
+						other, gate.finder)
 				}
 			}
-			onWindows, offWindows := rawFindings(on.buildRuns[1], onRoot), rawFindings(off.buildRuns[1], offRoot)
-			if !slices.Equal(onWindows, offWindows) {
-				test.Errorf("windows's own findings with the switch on are\n%s\nwant those with it off\n%s",
-					strings.Join(onWindows, "\n"), strings.Join(offWindows, "\n"))
+			onOther, offOther := rawFindings(on.buildRuns[1], onRoot), rawFindings(off.buildRuns[1], offRoot)
+			if !slices.Equal(onOther, offOther) {
+				test.Errorf("the other build's own findings with the switch on are\n%s\nwant those with it off\n%s",
+					strings.Join(onOther, "\n"), strings.Join(offOther, "\n"))
 			}
 			if !slices.Equal(findingLines(onStream), findingLines(offStream)) {
 				test.Errorf("the findings with the switch on are\n%q\nwant those with it off\n%q",
