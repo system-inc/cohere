@@ -193,10 +193,11 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 // another host-only file, read after it, holds no directive and leaves p marked. r's extra_windows.go, which windows
 // alone compiles, holds `/*line steady.go:1*/`, the block comment's spelling, and only the scan of that build-only file
 // seeds r's Steady. So windows counts 6 dependent, every unit but q's Alone, which reads nothing of either, and freebsd
-// 5, Steady independent there too. The second build to ask about gen_other.go reads the first's scan of it
-// (hostDependence.lineDirectives). On windows, with no scan the count is 1, Plain alone, which its host-only file
-// seeds, with none of the host-only files 2, Plain and Steady, and with none of the build-only file 5. The run's one
-// finding is printf's of Helper, a string on windows and freebsd, formatted with %d.
+// 5, Steady independent there too. Both builds ask about gen_other.go, and the builds run at once, so either may scan
+// it first and the other read that scan (hostDependence.lineDirectives), or both scan it, alike. On windows, with no
+// scan the count is 1, Plain alone, which its host-only file seeds, with none of the host-only files 2, Plain and
+// Steady, and with none of the build-only file 5. The run's one finding is printf's of Helper, a string on windows and
+// freebsd, formatted with %d.
 //
 // The scan reads each file as the run holds it (pipeline.held), the bytes the load built the graph from, never the
 // disk again: with gen_other.go rewritten on disk without its directive once the run has read it, as a save in the
@@ -257,7 +258,7 @@ func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.
 // The engine's scan reads a file the run holds from the held bytes, never the disk's, and answers a second ask from
 // its first scan (hostDependence.lineDirectives), as a second build asks; a file the run holds nothing for, read from
 // disk, that cannot be read there is said to hold a directive, failing wide.
-func TestTheEnginesScanAnswersFromTheHeldBytesOnceAndFailsWide(test *testing.T) {
+func TestTheLineDirectiveScanAnswersFromTheHeldBytesOnceAndFailsWide(test *testing.T) {
 	test.Parallel()
 
 	directory := test.TempDir()
@@ -285,7 +286,7 @@ func TestTheEnginesScanAnswersFromTheHeldBytesOnceAndFailsWide(test *testing.T) 
 // A package whose one difference is a build-only file that cannot be read is seeded whole too: the scan says such a
 // file holds a directive, failing wide, though appendParsed leaves it out, unparsed. With p's host files named as
 // shared.go alone and the build's as shared.go and unread_windows.go, a file on no disk, all 3 units are dependent.
-func TestTheStandardLibrarysGraphIsJudgedWithTheEnginesScan(test *testing.T) {
+func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "build-dependence-line-directive"))
@@ -433,6 +434,20 @@ func TestABuildOnlyFileOfAPackageTheBuildChecksAsItsVariantIsJudged(test *testin
 			}
 			if !maps.Equal(got, want) {
 				test.Errorf("the dependent units of each package on windows are %v, want %v", got, want)
+			}
+			// The build-only units are counted from each build-only file's syntax as the run holds it: v [v.test]'s
+			// 8, a package the host does not have, counted whole, and String in each of plain v's, plain u's and
+			// u [u.test]'s comparisons, 11.
+			if buildOnly := engine.buildRuns[1].judged.dependence.Counts().Workspace.BuildOnlyUnits; buildOnly != 11 {
+				test.Errorf("want 11 build-only units on windows, got %d", buildOnly)
+			}
+			// The variants' own GoFiles, which the judgment compared less their test files, are the build's as it
+			// loaded them, each test file among the files windows has a say on.
+			for _, file := range []string{filepath.Join(root, "v", "shape_windows_test.go"),
+				filepath.Join(root, "u", "kind_test.go")} {
+				if !engine.buildRuns[1].said[file] {
+					test.Errorf("want windows to have a say on %s, got %v", file, engine.buildRuns[1].said)
+				}
 			}
 		})
 	}
