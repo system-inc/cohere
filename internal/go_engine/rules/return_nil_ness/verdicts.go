@@ -14,6 +14,13 @@ type verdicts struct {
 	results map[*types.Func][]ValueNilness
 	callees map[*types.Func][]*intermediate_representation.Function
 	replay  *replayWalk
+
+	// standIns is every declared function of the package a replay read through a stand-in, an instantiation or a
+	// method wrapper whose object is the declared function's, which OrderBound names when it may answer otherwise in
+	// another order. Only the replay records one: the demand walk keeps a verdict built from such a read only when
+	// the declared function's verdict is at its floor, or when it is the function judging itself, which is begun in
+	// every order, and stops for the replay otherwise (demandWalk.returns).
+	standIns map[*types.Func]bool
 }
 
 // stateIn is nilness's state in home, its maps made. The caller holds home's lock.
@@ -22,6 +29,7 @@ func stateIn(home *fact_resolver.Package) *verdicts {
 	if state.results == nil {
 		state.results = map[*types.Func][]ValueNilness{}
 		state.callees = map[*types.Func][]*intermediate_representation.Function{}
+		state.standIns = map[*types.Func]bool{}
 	}
 	return state
 }
