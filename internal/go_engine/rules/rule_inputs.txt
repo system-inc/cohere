@@ -13,13 +13,20 @@
 # PackageExit. SA2002 is PerUnit because it asks the fact resolver which calls of the same-package function a go
 # statement starts stop the test (its test_stopping_calls answers), where testinggoroutine reads that function's body.
 #
-# Four are Composes for a package-wide gate the reach does not carry, which the standing gate modules showed
-# (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26): SA4029 judges no assignment unless
-# the package's type index holds one of sort's slice types, which an import or a use in any file puts there; SA5008
-# accepts a repeated go-flags key in a struct tag in a package any of whose files imports go-flags; tests judges an
-# example's name by the package's scope and every import; and consistency-no-abbreviated-identifier suggests a name
-# no file of the package declares and no package of its whole import closure is named, not only its own imports', and
-# leaves a method named Len alone once any file uses or imports sort.
+# Seven are Composes for a package-wide gate the reach does not carry, which the standing gate modules showed
+# (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26):
+#   - SA4029 judges no assignment unless the package's type index holds one of sort's slice types, which an import or
+#     a use in any file puts there.
+#   - SA5008 accepts a repeated go-flags key in a struct tag in a package any of whose files imports go-flags.
+#   - tests judges an example's name by the package's scope, by every import of its files, and by the fields and
+#     methods of the type it names.
+#   - consistency-no-abbreviated-identifier suggests a name no file of the package declares; keeps free the name of
+#     every package its imports reach, its whole import closure, not only its own imports (isTakenInGo); and leaves a
+#     method alone where an interface of any package its imports reach fixes its name and signature, as sort's does
+#     for Len, the receiver's whole method set read across the package's files.
+#   - S1018 offers copy() for a sliding loop, S1025 a conversion to string, and stringintconv an import of fmt under
+#     that name, only while no file of the package declares copy, string or fmt, a universe name or a free name looked
+#     up in the package's scope.
 
 cohere-go/S1000 PerUnit
 cohere-go/S1001 PerUnit FullKind
@@ -36,13 +43,13 @@ cohere-go/S1011 PerUnit FullKind
 cohere-go/S1012 PerUnit
 cohere-go/S1016 PerUnit FullKind
 cohere-go/S1017 PerUnit
-cohere-go/S1018 PerUnit
+cohere-go/S1018 Composes
 cohere-go/S1019 PerUnit
 cohere-go/S1020 PerUnit
 cohere-go/S1021 PerUnit
 cohere-go/S1023 PerUnit
 cohere-go/S1024 PerUnit FullKind
-cohere-go/S1025 PerUnit FullKind
+cohere-go/S1025 Composes FullKind
 cohere-go/S1028 PerUnit
 cohere-go/S1029 PerUnit FullKind
 cohere-go/S1030 PerUnit
@@ -242,7 +249,7 @@ cohere-go/slog PerUnit FullKind
 cohere-go/sqlrowserr Composes
 cohere-go/stdmethods PerUnit FullKind
 cohere-go/stdversion PerUnit
-cohere-go/stringintconv PerUnit FullKind
+cohere-go/stringintconv Composes FullKind
 cohere-go/structtag PerUnit FullKind
 cohere-go/testing-no-machine-path PerUnit
 cohere-go/testing-no-timing-assertion PerUnit
