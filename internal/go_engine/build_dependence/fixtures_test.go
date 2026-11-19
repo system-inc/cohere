@@ -773,7 +773,12 @@ func TestUnitsCarryTheirStaticCallsAndHoldTheirObjects(test *testing.T) {
 // reads Holder, and a field selection reads every type on its path by it, as Label reads Inner. So Label and Boxed are
 // dependent, and Label's records really differ between the builds (checkUnits). Steady, defined from Base, which no
 // build changes, keeps both bits unset, and so do Kept, which embeds a pointer to it, and Named, which reads its Name.
-// The graph read back from its records resolves and judges alike.
+//
+// An alias on either side is the same: FromAlias, defined from Target, an alias of platformExtra, has platformExtra's
+// shape through the alias, so its name bit is set, and AliasInner's and AliasLabel's with it; and Embeds, which embeds
+// a pointer to ExtraAlias, an alias of Extra, promotes Extra's fields through the alias, so its name bit is set, where
+// its underlying bit alone would be set by the pointer it holds. The graph read back from its records resolves and
+// judges alike.
 func TestATypeDefinedFromAPlatformTypeReadsItsShape(test *testing.T) {
 	test.Parallel()
 
@@ -795,6 +800,13 @@ func TestATypeDefinedFromAPlatformTypeReadsItsShape(test *testing.T) {
 		"type Steady":        false,
 		"type Kept":          false,
 		"func Named":         false,
+		"type Target":        true,
+		"type FromAlias":     true,
+		"type AliasInner":    true,
+		"func AliasLabel":    true,
+		"type ExtraAlias":    true,
+		"type Embeds":        true,
+		"func EmbedsLabel":   true,
 	})
 
 	checked := checkUnits(judged.host, judged.build, judged.dependence)
@@ -830,6 +842,10 @@ func TestATypeDefinedFromAPlatformTypeReadsItsShape(test *testing.T) {
 			{"Part", true},
 			{"Inner", true},
 			{"Holder", true},
+			{"FromAlias", true},
+			{"AliasInner", true},
+			{"ExtraAlias", true},
+			{"Embeds", true},
 			{"Steady", false},
 			{"Kept", false},
 		} {

@@ -57,3 +57,31 @@ type Kept struct {
 
 // Named reads Kept's Name, Steady's own in every build: independent.
 func Named(kept Kept) any { return kept.Name }
+
+// Target is an alias of platformExtra, so its bits are platformExtra's.
+type Target = platformExtra
+
+// FromAlias is defined from the alias Target, so its fields are platformExtra's as Extra's are.
+type FromAlias Target
+
+// AliasInner embeds Wrap and a pointer to FromAlias, so its Name moves on linux as Inner's does.
+type AliasInner struct {
+	Wrap
+	*FromAlias
+}
+
+// AliasLabel reads AliasInner's Name, an int on the host and a string on linux: dependent.
+func AliasLabel(inner AliasInner) any { return inner.Name }
+
+// ExtraAlias is an alias of Extra, the defined type, so its bits are Extra's.
+type ExtraAlias = Extra
+
+// Embeds embeds Wrap and a pointer to ExtraAlias, so it promotes Extra's fields through the alias: its Name moves on
+// linux as Inner's does.
+type Embeds struct {
+	Wrap
+	*ExtraAlias
+}
+
+// EmbedsLabel reads Embeds' Name, an int on the host and a string on linux: dependent.
+func EmbedsLabel(embeds Embeds) any { return embeds.Name }
