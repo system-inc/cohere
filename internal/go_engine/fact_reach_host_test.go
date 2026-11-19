@@ -700,3 +700,23 @@ func TestADifferingAnswerAboutSizeTakesWarmOutAndNothingElse(test *testing.T) {
 			settlement.Differing)
 	}
 }
+
+// Two parsed files whose line directives name one file put a body each at one place, a name and an offset, so a place
+// cannot say which body it is (#e4rd5dw, must 6): First's and Other's are one. Such a name fails closed: no body
+// placed in it stands, whatever the reach left, while a body of the package placed in a name one file alone holds
+// would.
+func TestABodyPlacedInANameTwoParsedFilesShareNeverStands(test *testing.T) {
+	test.Parallel()
+
+	fixture := checkedFactReachFixture(test, "shared", "example.com/facts/shared")
+	first, other := fixture.places["First"], fixture.places["Other"]
+	if first != other || filepath.Base(first.File) != "shared_as_written.go" {
+		test.Fatalf("First is placed at %v and Other at %v, want one place in shared_as_written.go", first, other)
+	}
+	standing, partial := newFactReachPackage(fixture.inputs()).inBuild(map[fact_reach.Place]bool{first: true},
+		true).Standing()
+	if !partial || standing[first] {
+		test.Errorf("the build lints the package in part %t, with %v standing, want in part and the shared place "+
+			"not standing", partial, standing)
+	}
+}

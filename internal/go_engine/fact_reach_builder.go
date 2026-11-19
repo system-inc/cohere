@@ -80,6 +80,9 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
 		met: map[fact_reach.Object]bool{},
 	}
+	// The parsed files placing a body in each name a reader sees, so a name two of them share, by their //line
+	// directives, is known (factReachPackage.shared).
+	parsedFiles := map[string]map[string]bool{}
 	for declared := range inputs.record.Declarations() {
 		// A type has no body, and a value's initializer is no function's: neither is a place.
 		if declared.Declaration.Kind != build_reads.DeclaredFunction {
@@ -96,6 +99,10 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 				}
 				isPlaced = true
 				builder.hosted.places = append(builder.hosted.places, place)
+				if parsedFiles[place.File] == nil {
+					parsedFiles[place.File] = map[string]bool{}
+				}
+				parsedFiles[place.File][tokenFile.Name()] = true
 			} else {
 				// A record always places its declarations in the host's files. One that does not has a body the fixed
 				// point cannot name, so its package is one to lint whole.
@@ -105,6 +112,14 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		builder.declare(declared, place, isPlaced)
 		if isPlaced {
 			builder.use(place, declared)
+		}
+	}
+	for name, parsed := range parsedFiles {
+		if len(parsed) > 1 {
+			if builder.hosted.shared == nil {
+				builder.hosted.shared = map[string]bool{}
+			}
+			builder.hosted.shared[name] = true
 		}
 	}
 	for _, answer := range inputs.answers {

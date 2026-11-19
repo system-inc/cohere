@@ -19,12 +19,15 @@ type factReachHost struct {
 var _ fact_reach.Host = factReachHost{}
 
 // Standing is the bodies the reach leaves to the host in the build, a copy at each call, since its caller takes
-// bodies out of it. It is nil and false for a package the build lints whole: one it does not lint in part, and one
-// whose side holds anything unplaced, whatever the reach left, since an answer or a read the host's side could not
-// place is one no build is asked, and a body resting on it would stand unproven.
+// bodies out of it, but for those placed in a name two parsed files share, whose place may be another body's
+// (factReachPackage.shared). It is nil and false for a package the build lints whole: one it does not lint in part,
+// and one whose side holds anything unplaced, whatever the reach left, since an answer or a read the host's side could
+// not place is one no build is asked, and a body resting on it would stand unproven.
 func (host factReachHost) Standing() (map[fact_reach.Place]bool, bool) {
 	if !host.partial || host.unplaced > 0 {
 		return nil, false
 	}
-	return maps.Clone(host.standing), true
+	standing := maps.Clone(host.standing)
+	maps.DeleteFunc(standing, func(place fact_reach.Place, _ bool) bool { return host.shared[place.File] })
+	return standing, true
 }

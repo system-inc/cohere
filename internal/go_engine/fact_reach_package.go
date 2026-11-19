@@ -84,6 +84,12 @@ type factReachPackage struct {
 	// kinds are the fact kinds the host answered about the package's objects, by name, sorted.
 	kinds []string
 
+	// shared are the names a reader sees, past any //line directive, that bodies of two parsed files or more are
+	// placed in (#e4rd5dw). A place is a name and an offset in the file as parsed, so two bodies of two such files at
+	// one offset are one place, which cannot say which of them it is: no body placed in such a name stands
+	// (factReachHost.Standing).
+	shared map[string]bool
+
 	// declared are, by a body's place, the keys of the functions declared there, which the fixed point names where a
 	// body that left holds no record of a kind (fact_reach.Source.Declared), and which the body differential's second
 	// leg finds the build's own functions of a standing body by (build_body_differential.go). A cgo package may declare
