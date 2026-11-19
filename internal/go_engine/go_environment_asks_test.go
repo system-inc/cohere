@@ -35,13 +35,12 @@ func TestARunAsksGoEnvironmentOncePerBuild(test *testing.T) {
 	}
 }
 
-// The findings cache's key reads `GOROOT`, `GOMODCACHE`, every one of buildNames and the C toolchain
-// (load.CgoToolchainNames) from go env's one answer, so each is among what it asks: one left out would read as empty in
-// every key, and never miss, and an empty `GOMODCACHE` would keep no module in the system cache (#57wgzhp).
+// The findings cache's key reads `GOROOT`, every one of buildNames and the C toolchain (load.CgoToolchainNames) from go
+// env's one answer, so each is among what it asks: one left out would read as empty in every key, and never miss.
 func TestTheGoEnvironmentAnswersEveryNameTheCacheReads(test *testing.T) {
 	test.Parallel()
 	values := goEnvironmentIn(test, copyFixture(test, filepath.Join("testdata", "other-builds")), nil)
-	for _, name := range slices.Concat([]string{"GOROOT", "GOMODCACHE"}, buildNames, load.CgoToolchainNames) {
+	for _, name := range slices.Concat([]string{"GOROOT"}, buildNames, load.CgoToolchainNames) {
 		if _, answered := values[name]; !answered {
 			test.Errorf("go env's answer holds no %s, which the findings cache's key reads", name)
 		}
