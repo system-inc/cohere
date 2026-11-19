@@ -22,6 +22,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -126,6 +127,12 @@ type Options struct {
 	// handed every pass under rule.Inherited (see checker.Options.Inheritance). Only an extra build restoring from the
 	// host's run sets it (HostRun.Inheritance). The findings are the same either way.
 	Inheritance rule.Inheritance
+
+	// FactHosts, when not nil, is an extra build's host's side of each package for the facts' reach (#5vbs1np), by the
+	// package's ID, nil for a package it lints whole: handed every pass on that package under rule.FactHost (see
+	// checker.Options.FactHosts), so standing_facts compares the host's facts and answers with the build's before any
+	// rule runs there. It is called from several actions at once. Only an extra build sets it.
+	FactHosts func(packageId string) fact_reach.Host
 
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
@@ -345,6 +352,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
 	checkerOptions.Reads = options.Reads
 	checkerOptions.Inheritance = options.Inheritance
+	checkerOptions.FactHosts = options.FactHosts
 	checkerOptions.ListingsRead = listingsRead
 	checkerOptions.Pool = options.Pool
 	// The walks run beside the rules, and on past Run's return, so no package's walk sits at the end of the run's
@@ -736,7 +744,8 @@ func abandoned(abandon <-chan struct{}) bool {
 // the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat), with no
 // store, which Run gives the resolver of a run with the findings cache. Recorded hands each rule its package's reads,
 // to record its lookups of other packages in, once Run sets Reads (#b2t9xmf). Inherited hands each syntax-only rule the
-// host's findings it inherits, once Run sets Inheritance (#y6q1x2j).
+// host's findings it inherits, once Run sets Inheritance (#y6q1x2j). FactHost hands each pass on a package the host's
+// side of it for the facts' reach, once Run sets FactHosts (#5vbs1np).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
@@ -747,6 +756,7 @@ func DispatchOptions() *checker.Options {
 		Resolved:      rule.Resolved,
 		Recorded:      rule.Recorded,
 		Inherited:     rule.Inherited,
+		FactHost:      rule.FactHost,
 	}
 }
 
