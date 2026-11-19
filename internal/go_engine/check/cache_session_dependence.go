@@ -135,10 +135,11 @@ func (session *CacheSession) KeepDependenceRecords(decode func(encoded []byte) (
 
 // KeepDeclarationsRecords has the session read the declarations-only records of its host's load, and backfill a hit
 // with none, as KeepDependenceRecords has it read whole ones: on a plain run asked for the must-check census, on a
-// session with a store (#anfjtr3). decode is the declarations-only graph's decoding of a record's bytes, refusing a
-// whole record. Their writes are WriteDeclarationsRecords', once the graph is whole.
+// session with a store or a system cache (#anfjtr3), the system cache's for the standard library it restores
+// (readStandardLibraryDeclarations), under `--no-cache` too. decode is the declarations-only graph's decoding of a
+// record's bytes, refusing a whole record. Their writes are WriteDeclarationsRecords', once the graph is whole.
 func (session *CacheSession) KeepDeclarationsRecords(decode func(encoded []byte) (*build_dependence.Record, error)) {
-	if session.caching.Store != nil {
+	if session.caching.Store != nil || session.caching.StandardLibrary != nil {
 		session.dependence = &dependenceRecords{declarationsOnly: true, decode: decode}
 	}
 }
@@ -185,7 +186,8 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	records.counts = DependenceRecordCounts{}
 	var keyed []*packages.Package
 	for _, each := range reachable {
-		if _, hasKey := session.keys[each]; hasKey {
+		// A session with no store of its own, a plain run's under `--no-cache`, keeps only the system cache's records.
+		if _, hasKey := session.keys[each]; hasKey && session.caching.Store != nil {
 			keyed = append(keyed, each)
 		}
 	}
@@ -230,8 +232,11 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 		delete(session.stored, each)
 		records.counts.Backfilled++
 	}
-	// The standard library's declarations-only records are the system cache's, which a plain run does not read yet.
-	if !records.declarationsOnly {
+	// The standard library's declarations-only records are in the system cache's store, beside its entries, and its
+	// whole records in the project's.
+	if records.declarationsOnly {
+		session.readStandardLibraryDeclarations(reachable)
+	} else {
 		session.readStandardLibraryRecords(reachable)
 	}
 }
@@ -268,20 +273,25 @@ func (session *CacheSession) dependenceRecordToWrite(saved *packages.Package) ([
 // target's is written its own, as dependenceRecordToWrite does for whole records. An entry is under the first key when
 // the last save wrote it, or when the package hit by that key: a hit backfilled for want of a record is checked from
 // source by the load, but a later wave can restore it by the same key again, its entry never written, and recordOf
-// holds it all the same. recordOf answers false for a package its graph holds no live record of, one restored with no
-// type information, which is then written none. recordOf is the plain run's
-// declarations-only graph's, and the caller calls this once the host's type-read walks have ended, so the graph holds
-// every package it will: a record asked before its package's walk ended would be missing, and its package restored
-// with no record by the next run. Each record is encoded on the run's pool and written with no slot held
-// (fanOutWriting), and counted written; it returns how many writes failed and the first one's reason, since the
-// session's counts were handed on with the host's result before it runs. A package the system cache keeps has its
-// entry in that store, and no record written here.
+// holds it all the same. It writes too, into the system cache's store, the record of each standard-library package the
+// system cache keeps (standardLibraryDeclarationsKey) with none there: one the last save wrote to that store, and one
+// it restored from there, which the caller's graph holds once its side load has run. recordOf answers false for a
+// package its graph holds no live record of, one restored with no type information or a side load that failed, which
+// is then written none.
+//
+// recordOf is the plain run's declarations-only graph's, and the caller calls this once the host's type-read walks
+// have ended, so the graph holds every package it will: a record asked before its package's walk ended would be
+// missing, and its package restored with no record by the next run. Each record is encoded on the run's pool and
+// written with no slot held (fanOutWriting), and counted written; it returns how many writes failed and the first
+// one's reason, since the session's counts were handed on with the host's result before it runs.
 func (session *CacheSession) WriteDeclarationsRecords(recordOf func(*packages.Package) ([]byte, bool)) (int, error) {
 	records := session.dependence
 	if records == nil || !records.declarationsOnly {
 		return 0, nil
 	}
 	var writing []*packages.Package
+	var stores []*cache.Store
+	var keys []cache.Key
 	for saved, key := range session.keys {
 		_, hit := session.hits[saved]
 		if !session.written[saved] && !(hit && session.stored[saved] == key) ||
@@ -291,7 +301,20 @@ func (session *CacheSession) WriteDeclarationsRecords(recordOf func(*packages.Pa
 		if _, isFound := records.found[saved]; isFound && !records.throughAlias[saved] {
 			continue
 		}
-		writing = append(writing, saved)
+		writing, stores, keys = append(writing, saved), append(stores, session.caching.Store),
+			append(keys, DeclarationsRecordKey(key))
+	}
+	standardLibraryFrom := len(writing)
+	for keyed := range session.standardLibraryKeys {
+		key, isKeyed := session.standardLibraryDeclarationsKey(keyed)
+		if !isKeyed || !session.written[keyed] && !session.restoredFromSystemCache(keyed) {
+			continue
+		}
+		if _, isFound := records.standardLibrary[keyed]; isFound {
+			continue
+		}
+		writing, stores, keys = append(writing, keyed), append(stores, session.caching.StandardLibrary.System),
+			append(keys, key)
 	}
 	failed := 0
 	var firstFailure error
@@ -302,20 +325,22 @@ func (session *CacheSession) WriteDeclarationsRecords(recordOf func(*packages.Pa
 		if !isHeld {
 			return nil
 		}
-		key := DeclarationsRecordKey(session.keys[saved])
 		// The write and its counting run with no slot held: the counting is a counter's, under a lock.
 		return func() {
-			putError := session.caching.Store.Put(key, record)
+			putError := stores[index].Put(keys[index], record)
 			countsLock.Lock()
 			defer countsLock.Unlock()
-			if putError != nil {
+			switch {
+			case putError != nil:
 				if failed == 0 {
 					firstFailure = fmt.Errorf("writing the declarations record of %s: %w", saved.ID, putError)
 				}
 				failed++
-				return
+			case index >= standardLibraryFrom:
+				records.counts.StandardLibraryWritten++
+			default:
+				records.counts.Written++
 			}
-			records.counts.Written++
 		}
 	})
 	return failed, firstFailure

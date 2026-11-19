@@ -67,7 +67,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	if pass.declarations != nil {
 		engine.declarationsStepped(declarationsWalksWhole)
 		engine.plainBits = newPlainBits(pass.declarations, loaded)
-		defer engine.writeDeclarationsRecords(pass.declarations)()
+		defer engine.completePlainBits(engine.plainBits, loaded)()
 	}
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
 	if engine.takesBodyReach() {

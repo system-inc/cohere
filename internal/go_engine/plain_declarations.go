@@ -13,14 +13,16 @@ import (
 // whole (check.Options.Declarations), and so tied to that pass: a pass dropped, beside the load or for a reload, drops
 // its graph with it. inScope says which packages are the workspace's, and withheldOf what the load withheld of a
 // package (load.PackageWithheld.Declarations), read once the package is final. Each package is added once, from the
-// findings store's declarations-only record of it before any walk starts (addRecord), or else by the first walk that
-// hands it on, every other caller waiting for that add (added), and held records the IDs of the packages added.
+// findings store's or the system cache's declarations-only record of it before any walk starts (addRecord), or else by
+// the first walk that hands it on, every other caller waiting for that add (added), or by the standard library's side
+// load (addLoaded). held records the IDs of the packages added, recorded those of them added from a record.
 type plainDeclarations struct {
 	graph      *build_dependence.Graph
 	inScope    func(*packages.Package) bool
 	withheldOf func(*packages.Package) []string
 	added      sync.Map
 	held       sync.Map
+	recorded   sync.Map
 }
 
 // newPlainDeclarations is an empty declarations-only graph, its packages' workspace said by inScope and what the load
@@ -60,6 +62,20 @@ func (declarations *plainDeclarations) add(loaded *packages.Package) {
 func (declarations *plainDeclarations) addRecord(identifier string, record *build_dependence.Record) {
 	declarations.graph.AddDecoded(record)
 	declarations.held.Store(identifier, true)
+	declarations.recorded.Store(identifier, true)
+}
+
+// addLoaded adds loaded, a package of the side load of the standard library (sideLoadStandardLibrary), from its live
+// syntax and type information, which no walk of the host's hands on, with withheld what its load withheld of it.
+func (declarations *plainDeclarations) addLoaded(loaded *packages.Package, withheld []string) {
+	declarations.graph.AddPackage(loaded, false, withheld)
+	declarations.held.Store(loaded.ID, true)
+}
+
+// fromRecord reports whether the package of identifier was added from a record (addRecord).
+func (declarations *plainDeclarations) fromRecord(identifier string) bool {
+	_, isRecorded := declarations.recorded.Load(identifier)
+	return isRecorded
 }
 
 // holds reports whether the package of identifier was added to the graph.

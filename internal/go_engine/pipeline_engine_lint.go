@@ -336,6 +336,8 @@ func (engine *pipeline) lintPackages(
 			for each := range options.Reads {
 				if record, isRecorded := session.DependenceRecord(each); isRecorded {
 					declarations.addRecord(each.ID, record)
+				} else if record, isRecorded := session.StandardLibraryRecord(each); isRecorded {
+					declarations.addRecord(each.ID, record)
 				}
 			}
 		}

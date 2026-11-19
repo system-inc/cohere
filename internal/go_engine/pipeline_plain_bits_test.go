@@ -177,3 +177,66 @@ func TestAPlainRunsDeclarationsRecordsStandInTheStore(test *testing.T) {
 		}
 	}
 }
+
+// A plain run's standard library stands in the system cache's store by its declarations-only records, under
+// `--no-cache` too, where the system cache is the run's only store (#anfjtr3). Over the build-dependence fixture, whose
+// package reads os, and so syscall: a census run over a cold system cache checks the standard library from source and
+// writes each package's record beside its entry there, and the next reads every one back, syscall among them, side
+// loading nothing. A system cache a run without the census filled holds no record: the census run side-loads its
+// standard library, syscall among it, and writes the records, and the next reads them. A run under `--no-cache` writes
+// no cache counts, so the records are told by the graph, which says which packages it took from one. Every census run
+// writes the whole graph's census, nothing answered wide. Read no system record, and syscall is side-loaded again on
+// every run.
+func TestAPlainRunsStandardLibraryRecordsStandInTheSystemCache(test *testing.T) {
+	test.Parallel()
+
+	reference := test.TempDir()
+	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean,
+		func(engine *pipeline) { engine.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
+		"--build-dependence")
+	want := censusFiles(test, reference)
+	censusRun := func(systemCache string) (*pipeline, map[string]string) {
+		directory := test.TempDir()
+		engine, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence")),
+			exitClean, func(engine *pipeline) {
+				sharingSystemCache(systemCache)(engine)
+				engine.mustCheckCensus = directory
+			}, "--no-cache")
+		return engine, censusFiles(test, directory)
+	}
+
+	checkedCache, filledCache := test.TempDir(), test.TempDir()
+	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean,
+		sharingSystemCache(filledCache), "--no-cache")
+	for _, side := range []struct {
+		name        string
+		systemCache string
+		sideLoads   bool
+	}{{"a cold system cache", checkedCache, false}, {"one filled without the census", filledCache, true}} {
+		first, firstCensus := censusRun(side.systemCache)
+		second, secondCensus := censusRun(side.systemCache)
+		for _, census := range []map[string]string{firstCensus, secondCensus} {
+			if !maps.Equal(census, want) {
+				test.Errorf("%s: the census is\n%v\nwant the whole graph's\n%v", side.name, census, want)
+			}
+		}
+		recorded := 0
+		second.plainBits.declarations.recorded.Range(func(any, any) bool {
+			recorded++
+			return true
+		})
+		if recorded == 0 {
+			test.Errorf("%s: want the second run's standard library from its records, got no package from one",
+				side.name)
+		}
+		if sideLoaded := slices.Contains(first.plainBits.sideLoaded, "syscall"); sideLoaded != side.sideLoads {
+			test.Errorf("%s: want syscall side-loaded %t by the first run, got %t", side.name, side.sideLoads,
+				sideLoaded)
+		}
+		if !second.plainBits.declarations.fromRecord("syscall") || len(second.plainBits.sideLoaded) != 0 {
+			test.Errorf("%s: want syscall from its record on the second run and nothing side-loaded, got from a "+
+				"record %t, side-loaded %q", side.name, second.plainBits.declarations.fromRecord("syscall"),
+				second.plainBits.sideLoaded)
+		}
+	}
+}
