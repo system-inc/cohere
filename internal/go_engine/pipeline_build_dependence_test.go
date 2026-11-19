@@ -283,9 +283,10 @@ func TestTheLineDirectiveScanAnswersFromTheHeldBytesOnceAndFailsWide(test *testi
 // its load on darwin is the standard library's graph, which the host restored, and its load on windows the build's.
 // All 3 of its units, Helper, Plain and Shared, are dependent; with no scan only Plain, in its host-only file, is.
 //
-// A package whose one difference is a build-only file that cannot be read is seeded whole too: the scan says such a
-// file holds a directive, failing wide, though appendParsed leaves it out, unparsed. With p's host files named as
-// shared.go alone and the build's as shared.go and unread_windows.go, a file on no disk, all 3 units are dependent.
+// A package whose one difference is a build-only file that cannot be read or parsed is seeded whole too, since what
+// the file declares is unknown, though appendParsed leaves it out. With p's host files named as shared.go alone and
+// the build's as shared.go and unread_windows.go, a file on no disk, or broken_windows.go, which holds no directive and
+// does not parse, written once the loads have read p, all 3 units are dependent.
 func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.T) {
 	test.Parallel()
 
@@ -294,6 +295,8 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.
 	host := loadedFromSource(test, root, "darwin", identifier)
 	built := loadedFromSource(test, root, "windows", identifier)
 	shared := filepath.Join(root, "p", "shared.go")
+	broken := filepath.Join(root, "p", "broken_windows.go")
+	writeTestFile(test, broken, "package p\n\nfunc Broken( {\n")
 	for _, each := range []struct {
 		name      string
 		hostFiles []string
@@ -304,6 +307,11 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.
 			ID:      identifier,
 			PkgPath: identifier,
 			GoFiles: []string{shared, filepath.Join(root, "p", "unread_windows.go")},
+		}},
+		{name: "a build-only file that does not parse", hostFiles: []string{shared}, built: &packages.Package{
+			ID:      identifier,
+			PkgPath: identifier,
+			GoFiles: []string{shared, broken},
 		}},
 	} {
 		test.Run(each.name, func(test *testing.T) {
@@ -335,33 +343,45 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.
 	}
 }
 
-// A package whose one difference is a build-only file that does not parse is seeded by the scan alone (#9paaen9): the
+// A package whose one difference is a build-only file that does not parse is seeded whole (#9paaen9): the
 // build-dependence-unparsed fixture's s is given broken_windows.go, which windows alone compiles and no parser reads,
-// and which holds `//line steady.go:1`, written into the copy, since a file of the repository's own that does not
-// parse fails the walks that parse them all. appendParsed leaves a file it cannot parse out, so s has no build-only
-// file to count, while the scan reads its bytes and marks s, so Steady, in steady.go, which both builds compile, is
-// dependent on windows.
-func TestAPackageWhoseBuildOnlyFileDoesNotParseIsSeededByItsLineDirective(test *testing.T) {
+// written into the copy, since a file of the repository's own that does not parse fails the walks that parse them all.
+// appendParsed leaves a file it cannot parse out, so s has no build-only file to count, and what that file declares is
+// unknown, so Steady, in steady.go, which both builds compile, is dependent on windows, whether the file holds
+// `//line steady.go:1`, which the scan reads in its bytes, or no directive at all.
+func TestAPackageWhoseBuildOnlyFileIsUnparsedIsSeededWhole(test *testing.T) {
 	test.Parallel()
 
-	root := copyFixture(test, filepath.Join("testdata", "build-dependence-unparsed"))
-	writeTestFile(test, filepath.Join(root, "s", "broken_windows.go"),
-		"package s\n\n//line steady.go:1\nfunc Broken( {\n")
-	engine, _ := runOverConfigured(test, root, exitFindings, nil, "--no-cache", "--build-dependence")
-	if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
-		test.Fatalf("want the host's build and windows's, got %d builds", len(engine.buildRuns))
-	}
-	if engine.buildRuns[1].judged == nil {
-		test.Fatal("the windows build judged no dependence")
-	}
-	var workspace []build_dependence.Unit
-	for _, unit := range engine.buildRuns[1].judged.dependence.Units() {
-		if unit.Workspace {
-			workspace = append(workspace, unit)
-		}
-	}
-	if len(workspace) != 1 || !workspace[0].Dependent {
-		test.Errorf("want s's one unit, Steady, dependent on windows, got the workspace's units %+v", workspace)
+	for _, each := range []struct {
+		name   string
+		broken string
+	}{
+		{name: "under a directive", broken: "package s\n\n//line steady.go:1\nfunc Broken( {\n"},
+		{name: "with no directive", broken: "package s\n\nfunc Broken( {\n"},
+	} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+
+			root := copyFixture(test, filepath.Join("testdata", "build-dependence-unparsed"))
+			writeTestFile(test, filepath.Join(root, "s", "broken_windows.go"), each.broken)
+			engine, _ := runOverConfigured(test, root, exitFindings, nil, "--no-cache", "--build-dependence")
+			if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
+				test.Fatalf("want the host's build and windows's, got %d builds", len(engine.buildRuns))
+			}
+			if engine.buildRuns[1].judged == nil {
+				test.Fatal("the windows build judged no dependence")
+			}
+			var workspace []build_dependence.Unit
+			for _, unit := range engine.buildRuns[1].judged.dependence.Units() {
+				if unit.Workspace {
+					workspace = append(workspace, unit)
+				}
+			}
+			if len(workspace) != 1 || !workspace[0].Dependent {
+				test.Errorf("want s's one unit, Steady, dependent on windows, got the workspace's units %+v",
+					workspace)
+			}
+		})
 	}
 }
 
