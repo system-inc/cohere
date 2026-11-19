@@ -880,47 +880,70 @@ func (walk *useWalk) pointedToByValue(pointed types.Type) {
 	}
 }
 
-// reachable records each named type of another package a look through a value of type looked can reach, as a use of
-// the type whole: through fields, elements, keys and pointers at any depth, and through the declarations of the
-// package's own named types, as printf's matching and a marshaller's walk go, and never into a function or a channel,
-// which no such look enters. printf looks through a pointer only at the top, but a marshaller follows every one, so
-// every pointer is followed. A named interface of another package is its method set.
+// reachable records what a look through a value of type looked can reach, at both grains of the reads, each by the one
+// walk of a look (lookThrough): for the package, each named type of another package, as a use of the type whole, or, a
+// named interface, of its method set (useWalk.looksInto), and for the declaration being walked, every named type, as
+// a use of a value's type (functionUsesRecorder.looked).
 func (walk *useWalk) reachable(looked types.Type) {
+	lookThrough(looked, walk)
+	walk.recorder.looked(looked)
+}
+
+// looker is one reader of a look through a value's type: looksInto takes each named type the look reaches, and reports
+// whether the look goes on into the type's declaration (lookThrough).
+type looker interface {
+	looksInto(named *types.Named) bool
+}
+
+// lookThrough hands reader each named type a look through a value of type looked can reach: through fields, elements,
+// keys and pointers at any depth, and through the declaration of each named type reader says it looks into, as
+// printf's matching and a marshaller's walk go, and never into a function or a channel, which no such look enters.
+// printf looks through a pointer only at the top, but a marshaller follows every one, so every pointer is followed. A
+// named type's type arguments are looked through whether or not its declaration is.
+//
+// Both grains of the reads look by this one walk, so neither looks through a kind of type the other does not.
+func lookThrough(looked types.Type, reader looker) {
 	switch looked := types.Unalias(looked).(type) {
 	case *types.Named:
-		if walk.isForeign(looked) {
-			if types.IsInterface(looked) {
-				walk.use(looked, UseMethodSet)
-			} else {
-				walk.use(looked, UseWhole)
-			}
-			for argument := range looked.TypeArgs().Types() {
-				walk.reachable(argument)
-			}
-			return
+		if reader.looksInto(looked) {
+			lookThrough(looked.Underlying(), reader)
 		}
-		if walk.seen[looked] {
-			return
-		}
-		walk.seen[looked] = true
-		walk.reachable(looked.Underlying())
 		for argument := range looked.TypeArgs().Types() {
-			walk.reachable(argument)
+			lookThrough(argument, reader)
 		}
 	case *types.Pointer:
-		walk.reachable(looked.Elem())
+		lookThrough(looked.Elem(), reader)
 	case *types.Struct:
 		for field := range looked.Fields() {
-			walk.reachable(field.Type())
+			lookThrough(field.Type(), reader)
 		}
 	case *types.Array:
-		walk.reachable(looked.Elem())
+		lookThrough(looked.Elem(), reader)
 	case *types.Slice:
-		walk.reachable(looked.Elem())
+		lookThrough(looked.Elem(), reader)
 	case *types.Map:
-		walk.reachable(looked.Key())
-		walk.reachable(looked.Elem())
+		lookThrough(looked.Key(), reader)
+		lookThrough(looked.Elem(), reader)
 	}
+}
+
+// looksInto records named, a named type a look reached, when another package declares it, as a use of the type whole,
+// or, a named interface, of its method set, and reports whether the look goes on into its declaration: never into
+// another package's, and into each of the package's own once a walk (seen), which also ends a recursive type.
+func (walk *useWalk) looksInto(named *types.Named) bool {
+	if walk.isForeign(named) {
+		if types.IsInterface(named) {
+			walk.use(named, UseMethodSet)
+		} else {
+			walk.use(named, UseWhole)
+		}
+		return false
+	}
+	if walk.seen[named] {
+		return false
+	}
+	walk.seen[named] = true
+	return true
 }
 
 // deep records every named type of another package reached may reach, through every kind of type, signatures and

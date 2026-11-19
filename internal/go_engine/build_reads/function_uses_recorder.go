@@ -12,9 +12,10 @@ import (
 
 // functionUsesRecorder records what each top-level declaration of one package uses as the use walk reaches each node
 // of it (useWalk), in the walk's one pass rather than a second (#kr1m304): an identifier's resolved object and its
-// instance's type arguments as the walk reaches the identifier, a selection as it places the selector, and the named
-// types an expression's type reaches as it applies the expression. The use walk reaches each node of a declaration
-// once, a function literal's and a composite literal's included, so each is recorded once.
+// instance's type arguments as the walk reaches the identifier, a selection as it places the selector, the named
+// types an expression's type reaches as it applies the expression, and those a look through a value reaches as it
+// moves the value to an empty interface. The use walk reaches each node of a declaration once, a function literal's
+// and a composite literal's included, so each is recorded once.
 //
 // It keeps the package's record compact as it goes (FunctionUses): each thing used gets an entry once, by
 // objectEntries and selectionEntries, and each part's uses are appended to the record's as packed entries, an entry
@@ -46,12 +47,13 @@ type functionUsesRecorder struct {
 	selectionsUnknown []bool
 	partUnknown       bool
 
-	// namedReached are, by type, the named types its structure reaches (addNamed), each type walked once a package
-	// however many expressions hold it, and visited and reaching the types one walk has reached so far and the named
-	// types among them.
-	namedReached map[types.Type][]*types.TypeName
-	visited      map[types.Type]bool
-	reaching     []*types.TypeName
+	// namedReached are, by type, the named types its structure reaches (addNamed), and lookedReached those a look
+	// through a value of it reaches (looked), each type walked once a package however many expressions hold it, and
+	// visited and reaching the types one walk of either has reached so far and the named types among them.
+	namedReached  map[types.Type][]*types.TypeName
+	lookedReached map[types.Type][]*types.TypeName
+	visited       map[types.Type]bool
+	reaching      []*types.TypeName
 
 	// declaring is whether the walk is in a declaration, declaration the one it is in, and recording whether its uses
 	// are recorded as the walk reaches them, which a const spec repeating another's are not. rangeStart and rangeEnd
@@ -85,7 +87,8 @@ func newFunctionUsesRecorder(own *types.Package, info *types.Info, files []*ast.
 	}
 	return &functionUsesRecorder{own: own, info: info, objectEntries: map[types.Object]uint32{},
 		selectionEntries: map[usedSelection]uint32{}, indexes: map[string]string{},
-		namedReached: map[types.Type][]*types.TypeName{}, visited: map[types.Type]bool{}, inherited: -1}
+		namedReached: map[types.Type][]*types.TypeName{}, lookedReached: map[types.Type][]*types.TypeName{},
+		visited: map[types.Type]bool{}, inherited: -1}
 }
 
 // startFile starts file, whose declarations' ordinals count from 0.
@@ -272,6 +275,65 @@ func (recorder *functionUsesRecorder) valueType(typed types.Type) {
 		return
 	}
 	recorder.addNamed(typed, UsedValueType)
+}
+
+// looked records, as a use of a value's type, every named type a look through a value of type typed reaches
+// (lookThrough), as the walk moves the value to an empty interface or to a place it cannot see (useWalk.movedTo). A
+// rule handed such a value judges types the value's own type holds by name alone, behind a slice, a map or a pointer,
+// whose difference in another build sets neither bit of the value's type: printf's verb match, staticcheck's SA1026 on
+// `json.Marshal` and its SA1003 on `binary.Write` each report on a named slice of a struct in one build and not in
+// another by a field of the struct alone (#h0k644s). So every named type on the way is recorded, the package's own and
+// another's alike, and the look goes on into each one's declaration, since each type's bits are its own.
+func (recorder *functionUsesRecorder) looked(typed types.Type) {
+	if recorder == nil || !recorder.recording {
+		return
+	}
+	// A look through a pointer, a slice or an array is a look through what it holds, and each `&` and each literal
+	// makes such a type anew, so the look is kept by the first type below them, which most often is basic and holds
+	// nothing.
+	held := types.Unalias(typed)
+	for {
+		switch outer := held.(type) {
+		case *types.Pointer:
+			held = types.Unalias(outer.Elem())
+			continue
+		case *types.Slice:
+			held = types.Unalias(outer.Elem())
+			continue
+		case *types.Array:
+			held = types.Unalias(outer.Elem())
+			continue
+		}
+		break
+	}
+	if _, isBasic := held.(*types.Basic); isBasic {
+		return
+	}
+	reached, walked := recorder.lookedReached[held]
+	if !walked {
+		clear(recorder.visited)
+		recorder.reaching = recorder.reaching[:0]
+		lookThrough(held, recorder)
+		reached = slices.Clone(recorder.reaching)
+		recorder.lookedReached[held] = reached
+	}
+	for _, name := range reached {
+		recorder.add(name, UsedValueType)
+	}
+}
+
+// looksInto adds named, as its generic declares it, to reaching, and reports whether the look that reached it goes on
+// into its declaration: once a look for each generic, whichever instance of it comes first, since another instance
+// holds the same types but for its type arguments, which the look goes through on their own. So a type that comes
+// round to itself ends the look.
+func (recorder *functionUsesRecorder) looksInto(named *types.Named) bool {
+	generic := named.Origin()
+	if recorder.visited[generic] {
+		return false
+	}
+	recorder.visited[generic] = true
+	recorder.reaching = append(recorder.reaching, generic.Obj())
+	return true
 }
 
 // selection records selection, from the named type it starts from to what it selects, by the path through embedded
