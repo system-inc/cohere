@@ -27,6 +27,11 @@ type collector struct {
 	walker           *bitWalker
 	bodies           *bodyWalk
 
+	// declarationsOnly says the walk collects no unit's references or callees, its graph's mode
+	// (Graph.declarationsOnly), set for each package's walk (Graph.addPackage). Every unit's size, universe names
+	// and declares and every kind edge are collected as a whole walk collects them.
+	declarationsOnly bool
+
 	// calleeSeen are the callees of the unit staticCallees is collecting, and calleeStore every unit's callees, each
 	// unit's a slice of it, which newRecord reads into the record's own.
 	calleeSeen  map[types.Object]bool
@@ -123,10 +128,10 @@ func (collecting *collector) owning(object types.Object) []types.Object {
 }
 
 // collectFunction collects a FuncDecl's unit: its function, the fields of anonymous structs in its signature, and its
-// body's references.
+// body's references and callees, which a declarations-only walk leaves out.
 func (collecting *collector) collectFunction(tokenFile *token.File, declaration *ast.FuncDecl) {
 	unit := collecting.newUnit(tokenFile, declaration)
-	if declaration.Body != nil {
+	if declaration.Body != nil && !collecting.declarationsOnly {
 		unit.references = collecting.bodies.references(declaration.Body)
 		unit.callees = collecting.staticCallees(declaration.Body)
 	}
@@ -173,9 +178,10 @@ func (collecting *collector) collectType(tokenFile *token.File, spec *ast.TypeSp
 }
 
 // collectTypeKinds is a type spec's edges. The name bit reads its type parameters' constraints in full, its declared
-// methods, the name bits of its embedded fields, whose methods it promotes, and for an interface its own underlying,
-// since an interface's methods are its underlying. The underlying bit reads everything the underlying type reaches in
-// full, as a value.
+// methods, the name bits of its embedded fields, whose methods it promotes, for an interface its own underlying,
+// since an interface's methods are its underlying, and for a type defined from another type's name, `type T S`, S in
+// full, since T's fields and promoted methods are S's. The underlying bit reads everything the underlying type reaches
+// in full, as a value.
 func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *ast.TypeSpec) {
 	switch declared := typeName.Type().(type) {
 	case *types.Named:
@@ -184,6 +190,14 @@ func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *as
 			// `type T S` keeps S in its expression's type, where the resolved underlying has lost it, so S is read in
 			// full into T's underlying.
 			collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(typeAndValue.Type, true))
+			switch typeAndValue.Type.(type) {
+			case *types.Named, *types.Alias:
+				// T's shape is S's too: its fields, and the methods its embedded fields promote, are S's, and a struct
+				// that embeds T reads them through T's name bit, so S is read in full into that as well (#9paaen9). A
+				// type that spells its struct reads alike in every build, and its embedded fields' edges below cover
+				// it.
+				collecting.addEdges(typeName, false, collecting.walker.borrowedReferences(typeAndValue.Type, true))
+			}
 		}
 		collecting.addUses(typeName, true, false, spec.Type)
 		if spec.TypeParams != nil {
@@ -319,7 +333,8 @@ func (collecting *collector) collectInterfaceMethods(
 
 // collectValue collects a ValueSpec's unit, specType and specValues being the type and values it takes, a const
 // spec's repeated from the last one that had them: its names, the fields of anonymous structs in its type, and a
-// var's initializers as its body.
+// var's initializers as its body, whose references and callees a declarations-only walk leaves out. The types the
+// initializers pass through and the objects they use are a var's kind edges, collected in either mode.
 func (collecting *collector) collectValue(
 	tokenFile *token.File,
 	keyword token.Token,
@@ -329,7 +344,7 @@ func (collecting *collector) collectValue(
 ) {
 	unit := collecting.newUnit(tokenFile, spec)
 	isVariable := keyword == token.VAR
-	if isVariable && len(spec.Values) > 0 {
+	if isVariable && len(spec.Values) > 0 && !collecting.declarationsOnly {
 		initializers := expressionNodes(spec.Values)
 		unit.references = collecting.bodies.references(initializers...)
 		unit.callees = collecting.staticCallees(initializers...)
