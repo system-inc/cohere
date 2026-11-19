@@ -1453,6 +1453,7 @@ func run() error {
 					sumRuleNotes(reusableWalk.Notes),
 					reusableWalk.Coverage.RulesOffered,
 				)
+				declineRunCacheOnPatternTimeouts(patternTimeoutsIn(reusableWalk.Notes))
 			}
 			if adamicReadinessRequested {
 				activeSummary.Adamic = notMeasured("types bailed")

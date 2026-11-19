@@ -800,6 +800,9 @@ func TestCoverageNamesWhatRulesSkipped(test *testing.T) {
 // file stay notes (#s4dy4e0).
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAPatternThatTimedOutIsNamedAsAGap(test *testing.T) {
+	previous := activeRunCache
+	defer func() { activeRunCache = previous }()
+	activeRunCache = &runCacheSession{}
 	ruleName := "no-restricted-exports"
 	timedOut := rule.PatternTimedOutNotePrefix + "/(a|aa)+$/u"
 	result := program.Result{
@@ -833,6 +836,10 @@ func TestAPatternThatTimedOutIsNamedAsAGap(test *testing.T) {
 		"⚠ 2 patterns timed out",
 	) {
 		test.Errorf("the footer's markers are %v", markers)
+	}
+	// Never replayed: the stand-in is one run's accident, not the tree's verdict.
+	if activeRunCache.declined != "a pattern ran out of time" {
+		test.Errorf("the run cache was declined for %q, want the pattern timeout", activeRunCache.declined)
 	}
 }
 

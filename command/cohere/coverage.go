@@ -657,6 +657,17 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	activeSummary.Skips = rulesSkippingEveryFile(summary.Notes, coverage.RulesOffered)
 	activeSummary.Gaps.PatternTimeouts = patternTimeoutsIn(report.Result.Notes)
 	writePatternTimeouts(account, activeSummary.Gaps.PatternTimeouts)
+	declineRunCacheOnPatternTimeouts(activeSummary.Gaps.PatternTimeouts)
+}
+
+// declineRunCacheOnPatternTimeouts keeps a run any pattern ran out of time in out of the run cache, as the findings
+// cache keeps the file out (program.patternTimedOut): the rule acted on a stand-in for the pattern's answer, and a
+// match that ran past its bound is one run's accident. Replayed, the stand-in and its gap would read as the tree's
+// verdict until something it reads changed (#s4dy4e0).
+func declineRunCacheOnPatternTimeouts(timeouts []patternTimeout) {
+	if len(timeouts) > 0 {
+		declineRunCache("a pattern ran out of time")
+	}
 }
 
 // patternTimeoutsIn gathers, from every file's notes, each pattern a rule noted as running past esregexp.MatchTimeout
