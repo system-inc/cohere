@@ -38,6 +38,14 @@ func TestPortExportsTheOriginalsFacts(test *testing.T) {
 		"parity", "parity/pairs")
 }
 
+// A finding never turns on the order a package declares its functions in (#8d9r2rh). Packages order/forward and
+// order/back hold one cycle of calls in two orders, a walk in declaration order entering it at another function in
+// each, and a slice of one passed into the cycle reaches its length check in both, so each wants the finding.
+func TestACycleReportsTheSameInEitherDeclarationOrder(test *testing.T) {
+	test.Parallel()
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "order/forward", "order/back")
+}
+
 // The differences fixture holds the calls where the two could most plausibly part, a slice whose length depends on
 // the path taken, one reaching the call through a loop's phi, arguments spread over lines and slices of slices of an
 // array. It records no difference, since the port parts from the original nowhere it can run, so the two must agree
