@@ -3,10 +3,7 @@ package odd_slice_argument
 import (
 	"go/types"
 
-	"honnef.co/go/tools/go/types/typeutil"
-
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
 // Kind keys SA5012's marks in each package the resolver holds, and its counts.
@@ -16,7 +13,7 @@ func init() {
 	fact_resolver.Register(Kind, whole,
 		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) bool {
 			parameter, isParameter := object.(*types.Var)
-			return isParameter && markIn(resolver, home, parameter)
+			return isParameter && judgeIn(resolver, home, parameter)
 		}, bodilessMark)
 }
 
@@ -60,73 +57,35 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, parame
 		return false
 	}
 	return fact_resolver.Ask(resolver, reader, Kind, parameter, func(home *fact_resolver.Package) bool {
-		return markIn(resolver, home, parameter)
+		return judgeIn(resolver, home, parameter)
 	}, func() bool { return bodilessMark(parameter) })
 }
 
-// markIn is whether parameter, of home, is marked, judged there, and has every other mark that judgment settled
-// recorded as an asked one is.
+// judgeIn is whether parameter, of home, is marked, judged there under home's lock, or the mark kept.
 //
 // One judgment settles the marks of every function the asked one's marks rest on (see demandWalk), and keeps them in
-// home's state, where no question ever reaches the resolver's own record of answers. An answer the resolver holds is a
-// sound place to stop comparing two builds only when everything it read is on record beside it, so each mark settled
-// for a parameter of another declared function is asked here in its turn, of home itself, once home's lock is given
-// back: the question finds the mark final, computes nothing, and is memoized, recorded for the store and told to a
-// test's hand exactly as the first was. A package asking of its own parameter is no read (fact_resolver.Ask records
-// one only of another package's object), so its entry never comes to depend on itself, and a judgment that settled no
-// other mark asks nothing.
-//
-// This is an interim, to be replaced and not copied. The resolver has no door for an answer nobody asked: it records,
-// memoizes and tells an answer only inside the one question that computed it. A seam for exactly this, a kind
-// recording the verdicts its walk keeps, is being added to the resolver by another unit, for return_nil_ness, and
-// when it lands these questions give way to it.
-func markIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, parameter *types.Var) bool {
-	marked, settled := judgeIn(resolver, home, parameter)
-	for _, other := range settled {
-		ask(resolver, home, other)
-	}
-	return marked
-}
-
-// judgeIn is whether parameter, of home, is marked, judged there under home's lock, or the mark kept, and each other
-// parameter of a declared function of home whose mark this call settled, none when the mark was kept.
-func judgeIn(
-	resolver *fact_resolver.Resolver,
-	home *fact_resolver.Package,
-	parameter *types.Var,
-) (marked bool, settled []*types.Var) {
+// home's state, which every later question there reads them from. Only the asked mark reaches the resolver's record,
+// through the question that asked it (fact_resolver.Ask); a mark the judgment settled and nobody asked is never
+// recorded. Recording those would make the record turn on which judgment settled them first: slices.Insert's `s`
+// would be recorded where a question of its `v` judges Insert, and not where slices's whole marks, computed as the run
+// saves, settle Insert before that question comes, so two runs over the same standard library would record different
+// answers.
+// A reader comparing two builds at an answer (unit B) needs the marks that answer read from home's state on record
+// too, and the record by place (#k7k3wwc), which records the answers a kind keeps, gives it them.
+func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, parameter *types.Var) bool {
 	home.Lock()
 	defer home.Unlock()
 	state := fact_resolver.StateOf[marks](home, Kind)
 	owner := state.function(resolver, home, parameter)
 	if owner == nil {
 		// A parameter of no function the package declares, which no call names (declaredParameter).
-		return false, nil
+		return false
 	}
 	if kept, judged := state.functions[owner]; judged {
-		return kept[parameter], nil
+		return kept[parameter]
 	}
 	walk := state.walk(resolver, home)
 	walk.reach(owner)
-	for _, function := range walk.settle() {
-		settled = append(settled, declaredSlices(function, parameter)...)
-	}
-	return state.functions[owner][parameter], settled
-}
-
-// declaredSlices is each slice parameter of function, a declared function or method of a package, but for asked: the
-// parameters whose marks are answers of their own. A function literal's parameter is left out, since nothing outside
-// its function can name it, and so are the initializer, which takes none, and a receiver, which no call passes a
-// slice to as a parameter.
-func declaredSlices(function *intermediate_representation.Function, asked *types.Var) []*types.Var {
-	if function.Parent() != nil || function.Object() == nil {
-		return nil
-	}
-	var declared []*types.Var
-	for parameter := range function.Signature.Params().Variables() {
-		if parameter != asked && typeutil.All(parameter.Type(), typeutil.IsSlice) {
-			declared = append(declared, parameter)
-		}
-	}
-	return declared
+	walk.settle()
+	return state.functions[owner][parameter]
 }

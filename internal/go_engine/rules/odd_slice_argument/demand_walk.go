@@ -152,9 +152,9 @@ func (walk *demandWalk) holder(
 	return holder
 }
 
-// settle passes the definition over the reached functions until a pass adds no mark, keeps each one's marks, final,
-// and returns the functions it settled, leaving the walk with none reached.
-func (walk *demandWalk) settle() []*intermediate_representation.Function {
+// settle passes the definition over the reached functions until a pass adds no mark and keeps each one's marks, final,
+// leaving the walk with none reached.
+func (walk *demandWalk) settle() {
 	for added := true; added; {
 		added = false
 		for _, reached := range walk.reached {
@@ -171,16 +171,13 @@ func (walk *demandWalk) settle() []*intermediate_representation.Function {
 			break
 		}
 	}
-	settled := make([]*intermediate_representation.Function, 0, len(walk.reached))
 	for _, reached := range walk.reached {
 		walk.state.functions[reached.function] = reached.marked
-		settled = append(settled, reached.function)
 		walk.resolver.Counts(Kind).Computed.Add(1)
 	}
 	walk.reached = nil
 	walk.cyclic = false
 	clear(walk.byFunction)
-	return settled
 }
 
 // marked is whether the parameter pass passes to is marked, as far as settle has come: by its holder's marks, final
