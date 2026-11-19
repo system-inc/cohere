@@ -162,6 +162,44 @@ func TestAFunctionIsAskedOfByItsLineDirectivesFileAtItsParsedOffset(test *testin
 	}
 }
 
+// Two parsed files of one package whose `//line` directives name one file, each with a function at the same parsed
+// offset, put two bodies at one key, so an answer for the one could stand for the other: neither file stands in any
+// part, and neither is asked of, though every function asked of would stand. A third file, asked under its own name,
+// still stands.
+func TestALineDirectivesNameTwoFilesShareLeavesNeitherStanding(test *testing.T) {
+	test.Parallel()
+	sources := map[string]string{
+		"/project/first.go":  "package planted\n\n//line shared.go:10\nfunc first() int {\n\treturn 1\n}\n",
+		"/project/second.go": "package planted\n\n//line shared.go:10\nfunc other() int {\n\treturn 2\n}\n",
+		"/project/kept.go":   "package planted\n\nfunc kept() int {\n\treturn 3\n}\n",
+	}
+	fileSet := token.NewFileSet()
+	files := []*ast.File{}
+	offsets := []int{}
+	for _, filename := range []string{"/project/first.go", "/project/second.go", "/project/kept.go"} {
+		file, parseError := parser.ParseFile(fileSet, filename, sources[filename], parser.ParseComments)
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		files = append(files, file)
+		offsets = append(offsets, fileSet.File(file.FileStart).Offset(file.Decls[0].Pos()))
+	}
+	if offsets[0] != offsets[1] {
+		test.Fatalf("the two functions are at %d and %d as parsed, want one offset", offsets[0], offsets[1])
+	}
+	standing := &everyFunctionStands{}
+	pass := &analysis.Pass{Fset: fileSet, Files: files, ResultOf: map[*analysis.Analyzer]any{Standing: standing}}
+
+	spans := StandingSpans(pass)
+	kept := fileSet.File(files[2].FileStart)
+	if len(spans) != 1 || len(spans[kept]) != 1 {
+		test.Errorf("the package has the spans %v, want kept.go's function alone", spans)
+	}
+	if !slices.Equal(standing.askedFiles, []string{"/project/kept.go"}) {
+		test.Errorf("the standing bodies were asked of %v, want kept.go alone", standing.askedFiles)
+	}
+}
+
 // A function whose body's brace is not between its start and its end stands for nothing, though the standing bodies
 // would say it stands: a span read from it would leave a confined rule deaf to what is not the body's. The brace is
 // knocked out of a parsed declaration, as a parse past an error can leave one.

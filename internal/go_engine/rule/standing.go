@@ -67,16 +67,19 @@ type StandingSpan struct {
 // StandingSpans is each standing function declaration of pass's package, by its token file and sorted by where it
 // starts, from the package's StandingBodies, which the checker hands pass under Standing. A dispatcher reads them
 // once as it starts, for every listener. A pass without a StandingBodies, the host's and any driver's but the
-// engine's, has none, and neither has a package nothing stands in.
+// engine's, has none, and neither has a package nothing stands in. A parsed file whose bodies are asked under a name
+// another parsed file of the package asks its own under too has none either (sharingAName), so it lints whole.
 func StandingSpans(pass *analysis.Pass) map[*token.File][]StandingSpan {
 	standing, stands := pass.ResultOf[Standing].(StandingBodies)
 	if !stands {
 		return nil
 	}
+	// Counted over every file before any body is asked of.
+	sharing := sharingAName(pass)
 	var spans map[*token.File][]StandingSpan
 	for _, file := range pass.Files {
 		tokenFile := pass.Fset.File(file.FileStart)
-		if tokenFile == nil {
+		if tokenFile == nil || sharing[tokenFile] {
 			continue
 		}
 		var fileSpans []StandingSpan
@@ -114,6 +117,46 @@ func StandingSpans(pass *analysis.Pass) map[*token.File][]StandingSpan {
 		spans[tokenFile] = fileSpans
 	}
 	return spans
+}
+
+// sharingAName is each of pass's parsed files whose function bodies are asked under a name (StandingSpans), the file a
+// `//line` directive names or else the file's own, that another of the package's parsed files asks a body under too.
+// A body is keyed by that name and the offset of its `func` in the file as parsed, so two files whose directives name
+// one file can each place a body at one key, and an answer for the one would stand for the other, dropping a finding
+// of the body the build changed. Every file sharing a name is left out whole, whichever of its bodies stands, so a
+// doubt lints.
+func sharingAName(pass *analysis.Pass) map[*token.File]bool {
+	namesOf := make(map[*token.File]map[string]bool, len(pass.Files))
+	filesAsking := map[string]int{}
+	for _, file := range pass.Files {
+		tokenFile := pass.Fset.File(file.FileStart)
+		if tokenFile == nil || namesOf[tokenFile] != nil {
+			continue
+		}
+		names := map[string]bool{}
+		for _, declaration := range file.Decls {
+			if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Body != nil {
+				names[tokenFile.Position(function.Pos()).Filename] = true
+			}
+		}
+		namesOf[tokenFile] = names
+		for name := range names {
+			filesAsking[name]++
+		}
+	}
+	var sharing map[*token.File]bool
+	for tokenFile, names := range namesOf {
+		for name := range names {
+			if filesAsking[name] > 1 {
+				if sharing == nil {
+					sharing = map[*token.File]bool{}
+				}
+				sharing[tokenFile] = true
+				break
+			}
+		}
+	}
+	return sharing
 }
 
 // StandingFiles is what the rule named ruleName takes of the host over pass's standing declarations, spans
