@@ -1,6 +1,8 @@
 package go_engine
 
 import (
+	"cmp"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -12,9 +14,12 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/types/objectpath"
+
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
 // factReachFixture is one package of the fact-reach fixture, checked from its source by the test itself, with no
@@ -28,9 +33,15 @@ type factReachFixture struct {
 }
 
 // checkedFactReachFixture is the package of path in directory, a directory of the fact-reach fixture, empty for its
-// root. The package imports nothing, so it is checked with no importer, and go/types takes a function without a body
-// as the compiler takes one beside assembly.
-func checkedFactReachFixture(test *testing.T, directory string, path string) *factReachFixture {
+// root, checked in the file set of below, the packages it imports, so one renderer places the objects of them all,
+// and in a file set of its own with none. go/types takes a function without a body as the compiler takes one beside
+// assembly.
+func checkedFactReachFixture(
+	test *testing.T,
+	directory string,
+	path string,
+	below ...*factReachFixture,
+) *factReachFixture {
 	test.Helper()
 
 	names, globError := filepath.Glob(filepath.Join("testdata", "fact-reach", directory, "*.go"))
@@ -38,6 +49,17 @@ func checkedFactReachFixture(test *testing.T, directory string, path string) *fa
 		test.Fatalf("the fixture's files in %q: %v (%v)", directory, names, globError)
 	}
 	fixture := &factReachFixture{fileSet: token.NewFileSet(), places: map[string]fact_reach.Place{}}
+	checked := map[string]*types.Package{}
+	for _, imported := range below {
+		fixture.fileSet = imported.fileSet
+		checked[imported.own.Path()] = imported.own
+	}
+	importer := importerByPath(func(path string) (*types.Package, error) {
+		if imported, isChecked := checked[path]; isChecked {
+			return imported, nil
+		}
+		return nil, fmt.Errorf("the fixture has no package %s checked", path)
+	})
 	var files []*ast.File
 	for _, name := range names {
 		file, parseError := parser.ParseFile(fixture.fileSet, name, nil,
@@ -71,7 +93,7 @@ func checkedFactReachFixture(test *testing.T, directory string, path string) *fa
 		Implicits:  map[ast.Node]types.Object{},
 		Instances:  map[*ast.Ident]types.Instance{},
 	}
-	own, checkError := (&types.Config{}).Check(path, fixture.fileSet, files, info)
+	own, checkError := (&types.Config{Importer: importer}).Check(path, fixture.fileSet, files, info)
 	if checkError != nil {
 		test.Fatalf("type-checking %s: %v", path, checkError)
 	}
@@ -84,6 +106,14 @@ func checkedFactReachFixture(test *testing.T, directory string, path string) *fa
 	}
 	fixture.record = record
 	return fixture
+}
+
+// checkedFactsFixture is the fixture's root package, facts, and lower, the package it imports.
+func checkedFactsFixture(test *testing.T) (*factReachFixture, *factReachFixture) {
+	test.Helper()
+
+	lower := checkedFactReachFixture(test, "lower", "example.com/facts/lower")
+	return checkedFactReachFixture(test, "", "example.com/facts", lower), lower
 }
 
 // function is the function of name, a method's as `Type.Method`.
@@ -114,10 +144,12 @@ func (fixture *factReachFixture) key(test *testing.T, object types.Object) fact_
 	return key
 }
 
-// hosted is the fixture's host side, with answers the host's.
-func (fixture *factReachFixture) hosted(answers []check.ExportedFact) *factReachPackage {
-	return newFactReachPackage(fixture.fileSet, fixture.record, answers,
-		build_reads.NewIdentityRenderer(fixture.fileSet, nil))
+// inputs are what the fixture's host side is made from with no answer, no read, no object bound to the order and no
+// function holding the no-return fact, for a test to add its own to.
+func (fixture *factReachFixture) inputs() factReachInputs {
+	return factReachInputs{fileSet: fixture.fileSet, record: fixture.record,
+		renderer: build_reads.NewIdentityRenderer(fixture.fileSet, nil),
+		noReturn: func(*types.Func) bool { return false }}
 }
 
 // placesOf are the places of names, in their order.
@@ -135,21 +167,44 @@ func (fixture *factReachFixture) placesOf(test *testing.T, names ...string) []fa
 	return places
 }
 
+// standing is every body of the fixture but those of names, as a reach that reached those alone leaves them.
+func (fixture *factReachFixture) standing(names ...string) map[fact_reach.Place]bool {
+	standing := map[fact_reach.Place]bool{}
+	for name, place := range fixture.places {
+		if !slices.Contains(names, name) {
+			standing[place] = true
+		}
+	}
+	return standing
+}
+
 // purity is a hand-made answer of function_purity about object, encoded as written.
 func purity(object types.Object, encoded string) check.ExportedFact {
 	return check.ExportedFact{Analyzer: "function_purity", Object: object, Answer: true, Encoded: []byte(encoded)}
 }
 
+// readOf is a hand-made read of the answer of kind about object, another package's, by the objectpath that names it
+// there.
+func readOf(test *testing.T, kind string, object types.Object, value string) fact_resolver.Read {
+	test.Helper()
+
+	path, pathError := objectpath.For(object)
+	if pathError != nil {
+		test.Fatalf("%s has no objectpath: %v", object, pathError)
+	}
+	return fact_resolver.Read{Kind: kind, Owner: object.Pkg(), Path: path, Value: []byte(value)}
+}
+
 // An object's users are the bodies that name or select it, each once, in the order they are declared: a function
 // called, a method called and one taken as a value, each by the method's own key, a generic function called by an
-// instance, by the generic's, and a function declared without a body, which is used though it is no place. A value's
-// initializer is no body's place, so started, which calls size, is no user of it, and a type only a signature names
-// has no user, a signature's uses being no body's.
+// instance, by the generic's, a function declared without a body, which is used though it is no place, an
+// interface's method and another package's function. A value's initializer is no body's place, so started, which
+// calls size, is no user of it, and a type only a signature names has no user, a signature's uses being no body's.
 func TestAnObjectsUsersAreTheBodiesThatNameOrSelectIt(test *testing.T) {
 	test.Parallel()
 
-	fixture := checkedFactReachFixture(test, "", "example.com/facts")
-	hosted := fixture.hosted(nil)
+	fixture, lower := checkedFactsFixture(test)
+	hosted := newFactReachPackage(fixture.inputs())
 	for _, each := range []struct {
 		object types.Object
 		users  []string
@@ -160,6 +215,8 @@ func TestAnObjectsUsersAreTheBodiesThatNameOrSelectIt(test *testing.T) {
 		{fixture.function(test, "Box.Close"), []string{"Closer"}},
 		{fixture.function(test, "First"), []string{"Leading"}},
 		{fixture.function(test, "declared"), []string{"Sized"}},
+		{fixture.function(test, "Opener.Open"), []string{"Through"}},
+		{lower.function(test, "Depth"), []string{"Deep"}},
 		{fixture.function(test, "Open"), nil},
 		{fixture.own.Scope().Lookup("Label"), nil},
 	} {
@@ -171,14 +228,76 @@ func TestAnObjectsUsersAreTheBodiesThatNameOrSelectIt(test *testing.T) {
 	if hosted.unplaced != 0 {
 		test.Errorf("want nothing unplaced with no answer, got %d", hosted.unplaced)
 	}
-	// Each function with a body stands at its place, by its key, and one without stands nowhere.
-	for name, want := range fixture.places {
-		if got, isPlaced := hosted.placeOf(fixture.key(test, fixture.function(test, name))); !isPlaced || got != want {
-			test.Errorf("%s is placed at %v (%t), want %v", name, got, isPlaced, want)
+}
+
+// A package's places are its function bodies in the order its file declares them, a function declared without a body
+// not among them.
+func TestAPackagesPlacesAreItsFunctionBodiesInTheOrderDeclared(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	want := slices.SortedFunc(maps.Values(fixture.places), func(first fact_reach.Place, second fact_reach.Place) int {
+		return cmp.Compare(first.Offset, second.Offset)
+	})
+	if got := newFactReachPackage(fixture.inputs()).Places(); !slices.Equal(got, want) {
+		test.Errorf("the places are %v, want the %d bodies by their offsets in the one file, %v", got, len(want), want)
+	}
+}
+
+// The functions a no-return fact is compared on are each function the package declares with a body, where it is
+// declared, and each function a body uses, where it is first used: a method, a generic function's origin, a function
+// declared without a body and another package's functions among them, each once however many bodies use it, with the
+// fact the host holds of it and the identity a build finds its own by. An interface's method, called in Through's
+// body, is none of them, there being no body for a fact to be about.
+func TestTheFunctionsAFactIsComparedOnAreEachDeclaredOrUsedOnce(test *testing.T) {
+	test.Parallel()
+
+	fixture, lower := checkedFactsFixture(test)
+	want := []string{"platformSize", "size", "Warm", "Pair", "Box.Open", "Box.Close", "Open", "Use", "Closer", "First",
+		"Leading", "Sized", "declared", "Labelled", "Through", "Deep", "lower.Depth", "Halved", "lower.Halve"}
+	objects := map[string]*types.Func{}
+	names := map[fact_reach.Object]string{}
+	for _, name := range want {
+		function := fixture.function
+		lookup := name
+		if inLower, isLower := strings.CutPrefix(name, "lower."); isLower {
+			function, lookup = lower.function, inLower
+		}
+		objects[name] = function(test, lookup)
+		names[fixture.key(test, objects[name])] = name
+	}
+	noReturn := map[*types.Func]bool{objects["declared"]: true, objects["lower.Depth"]: true}
+	inputs := fixture.inputs()
+	inputs.noReturn = func(function *types.Func) bool { return noReturn[function] }
+	functions := newFactReachPackage(inputs).Functions()
+
+	var got []string
+	renderer := build_reads.NewIdentityRenderer(fixture.fileSet, nil)
+	for _, function := range functions {
+		name, isExpected := names[function.Object]
+		if !isExpected {
+			name = "one unexpected, " + function.Identity.String()
+		}
+		got = append(got, name)
+		if !isExpected {
+			continue
+		}
+		if function.NoReturn != noReturn[objects[name]] {
+			test.Errorf("%s holds the no-return fact %t, want the host's, %t", name, function.NoReturn,
+				noReturn[objects[name]])
+		}
+		if !function.Identity.Equal(renderer.Object(objects[name])) {
+			test.Errorf("%s has the identity %v, want its own", name, function.Identity)
 		}
 	}
-	if place, isPlaced := hosted.placeOf(fixture.key(test, fixture.function(test, "declared"))); isPlaced {
-		test.Errorf("declared, which has no body, is placed at %v, want nowhere", place)
+	if !slices.Equal(got, want) {
+		test.Errorf("the functions are\n%v\nwant, in the order first met,\n%v", got, want)
+	}
+	interfaceMethod := fixture.key(test, fixture.function(test, "Opener.Open"))
+	if slices.ContainsFunc(functions, func(function fact_reach.Function) bool {
+		return function.Object == interfaceMethod
+	}) {
+		test.Error("Opener.Open, an interface's method, is among the functions, want it left out")
 	}
 }
 
@@ -190,12 +309,13 @@ func TestAnObjectsUsersAreTheBodiesThatNameOrSelectIt(test *testing.T) {
 func TestAnAnswerIsRecordedUnderItsFunctionsPlaceAndAboutItsFunction(test *testing.T) {
 	test.Parallel()
 
-	fixture := checkedFactReachFixture(test, "", "example.com/facts")
+	fixture, _ := checkedFactsFixture(test)
 	size, pair := fixture.function(test, "size"), fixture.function(test, "Pair")
 	oddSlice := check.ExportedFact{Analyzer: "odd_slice_argument", Object: pair.Signature().Params().At(0),
 		Answer: true, Encoded: []byte(`{"odd":true}`)}
-	hosted := fixture.hosted([]check.ExportedFact{oddSlice, purity(size, "true"), purity(pair, "false"),
-		purity(size, "true")})
+	inputs := fixture.inputs()
+	inputs.answers = []check.ExportedFact{oddSlice, purity(size, "true"), purity(pair, "false"), purity(size, "true")}
+	hosted := newFactReachPackage(inputs)
 	if hosted.unplaced != 0 {
 		test.Errorf("want every answer placed, got %d unplaced", hosted.unplaced)
 	}
@@ -205,11 +325,11 @@ func TestAnAnswerIsRecordedUnderItsFunctionsPlaceAndAboutItsFunction(test *testi
 	if len(ofSize) != 1 || ofSize[0].Kind != "function_purity" || ofSize[0].About != fixture.key(test, size) {
 		test.Fatalf("size's place holds %+v, want one question of function_purity about size", ofSize)
 	}
-	asked, isRecorded := hosted.question(ofSize[0].Key)
-	if !isRecorded || asked.kind != "function_purity" || !asked.function.Equal(renderer.Object(size)) ||
-		asked.parameter != -1 || string(asked.encoded) != "true" {
-		test.Errorf("size's question asks %+v (%t), want function_purity of size itself, answered true", asked,
-			isRecorded)
+	asking, isAsked := hosted.Asking(ofSize[0].Key)
+	if !isAsked || asking.Kind != "function_purity" || !asking.Function.Equal(renderer.Object(size)) ||
+		asking.Parameter != -1 || string(asking.Encoded) != "true" {
+		test.Errorf("size's question asks %+v (%t), want function_purity of size itself, answered true", asking,
+			isAsked)
 	}
 
 	ofPair := hosted.Recorded(fixture.places["Pair"])
@@ -223,20 +343,23 @@ func TestAnAnswerIsRecordedUnderItsFunctionsPlaceAndAboutItsFunction(test *testi
 				question.About, fixture.key(test, pair))
 		}
 	}
-	asked, isRecorded = hosted.question(ofPair[1].Key)
-	if !isRecorded || asked.kind != "odd_slice_argument" || !asked.function.Equal(renderer.Object(pair)) ||
-		asked.parameter != 0 || string(asked.encoded) != `{"odd":true}` {
-		test.Errorf("the parameter's question asks %+v (%t), want odd_slice_argument of Pair's parameter 0", asked,
-			isRecorded)
+	asking, isAsked = hosted.Asking(ofPair[1].Key)
+	if !isAsked || asking.Kind != "odd_slice_argument" || !asking.Function.Equal(renderer.Object(pair)) ||
+		asking.Parameter != 0 || string(asking.Encoded) != `{"odd":true}` {
+		test.Errorf("the parameter's question asks %+v (%t), want odd_slice_argument of Pair's parameter 0", asking,
+			isAsked)
 	}
-	if asked, isRecorded = hosted.question(ofPair[0].Key); !isRecorded || asked.parameter != -1 {
-		test.Errorf("Pair's own question asks %+v (%t), want no parameter", asked, isRecorded)
+	if asking, isAsked = hosted.Asking(ofPair[0].Key); !isAsked || asking.Parameter != -1 {
+		test.Errorf("Pair's own question asks %+v (%t), want no parameter", asking, isAsked)
 	}
-	if _, isRecorded = hosted.question("function_purity"); isRecorded {
+	if _, isAsked = hosted.Asking("function_purity"); isAsked {
 		test.Error("a key no answer made names a question")
 	}
 	if got := hosted.Recorded(fixture.places["Warm"]); len(got) != 0 {
 		test.Errorf("Warm's place, which no answer is about, holds %+v", got)
+	}
+	if got := hosted.Imported(); len(got) != 0 {
+		test.Errorf("with no read, the imported questions are %+v", got)
 	}
 }
 
@@ -246,7 +369,7 @@ func TestAnAnswerIsRecordedUnderItsFunctionsPlaceAndAboutItsFunction(test *testi
 func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 	test.Parallel()
 
-	fixture := checkedFactReachFixture(test, "", "example.com/facts")
+	fixture, _ := checkedFactsFixture(test)
 	use, open := fixture.function(test, "Use"), fixture.function(test, "Box.Open")
 	elsewhere := types.NewFunc(token.NoPos, fixture.own, "elsewhere", types.NewSignatureType(nil, nil, nil, nil, nil,
 		false))
@@ -260,16 +383,146 @@ func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 		{"a package-level value", fixture.own.Scope().Lookup("started")},
 		{"a function no declaration declares", elsewhere},
 	} {
-		hosted := fixture.hosted([]check.ExportedFact{purity(each.object, "true")})
-		if hosted.unplaced != 1 || len(hosted.questions) != 0 {
+		inputs := fixture.inputs()
+		inputs.answers = []check.ExportedFact{purity(each.object, "true")}
+		hosted := newFactReachPackage(inputs)
+		if hosted.unplaced != 1 || len(hosted.askings) != 0 {
 			test.Errorf("an answer about %s: %d unplaced and %d questions, want 1 and none", each.name,
-				hosted.unplaced, len(hosted.questions))
+				hosted.unplaced, len(hosted.askings))
 		}
 	}
-	hosted := fixture.hosted([]check.ExportedFact{purity(fixture.function(test, "declared"), "false")})
-	if hosted.unplaced != 0 || len(hosted.questions) != 0 {
+	inputs := fixture.inputs()
+	inputs.answers = []check.ExportedFact{purity(fixture.function(test, "declared"), "false")}
+	hosted := newFactReachPackage(inputs)
+	if hosted.unplaced != 0 || len(hosted.askings) != 0 {
 		test.Errorf("an answer about declared, which has no body: %d unplaced and %d questions, want neither",
-			hosted.unplaced, len(hosted.questions))
+			hosted.unplaced, len(hosted.askings))
+	}
+}
+
+// An answer the host's analysis took from another package is a question asked before any body leaves, in the order
+// the reads came: a read of a function is about it, and a read of a function's parameter, a method's too, is about
+// the function with the parameter's index, found by the path and held to the function's own parameter. A read handed
+// twice is one question, and what a build is asked of each is kept by its key beside the recorded ones.
+func TestAReadOfAnotherPackageIsAQuestionAboutItsFunction(test *testing.T) {
+	test.Parallel()
+
+	fixture, lower := checkedFactsFixture(test)
+	depth, halve := lower.function(test, "Depth"), lower.function(test, "Halve")
+	apply := lower.function(test, "Scale.Apply")
+	inputs := fixture.inputs()
+	inputs.answers = []check.ExportedFact{purity(fixture.function(test, "size"), "true")}
+	inputs.reads = []fact_resolver.Read{
+		readOf(test, "function_purity", depth, "true"),
+		readOf(test, "odd_slice_argument", halve.Signature().Params().At(1), `{"odd":true}`),
+		readOf(test, "odd_slice_argument", apply.Signature().Params().At(0), `{"odd":false}`),
+		readOf(test, "function_purity", depth, "true"),
+	}
+	hosted := newFactReachPackage(inputs)
+	if hosted.unplaced != 0 {
+		test.Errorf("want every read placed, got %d unplaced", hosted.unplaced)
+	}
+	imported := hosted.Imported()
+	renderer := build_reads.NewIdentityRenderer(fixture.fileSet, nil)
+	want := []struct {
+		kind      string
+		function  *types.Func
+		parameter int
+		encoded   string
+	}{
+		{"function_purity", depth, -1, "true"},
+		{"odd_slice_argument", halve, 1, `{"odd":true}`},
+		{"odd_slice_argument", apply, 0, `{"odd":false}`},
+	}
+	if len(imported) != len(want) {
+		test.Fatalf("the imported questions are %+v, want %d, a read handed twice being one", imported, len(want))
+	}
+	for index, each := range want {
+		question := imported[index]
+		if question.Kind != each.kind || question.About != fixture.key(test, each.function) {
+			test.Errorf("imported question %d is of %s about %q, want %s about %s, key %q", index, question.Kind,
+				question.About, each.kind, each.function.Name(), fixture.key(test, each.function))
+		}
+		asking, isAsked := hosted.Asking(question.Key)
+		if !isAsked || asking.Kind != each.kind || !asking.Function.Equal(renderer.Object(each.function)) ||
+			asking.Parameter != each.parameter || string(asking.Encoded) != each.encoded {
+			test.Errorf("imported question %d asks %+v (%t), want %s of %s, parameter %d, answered %s", index, asking,
+				isAsked, each.kind, each.function.Name(), each.parameter, each.encoded)
+		}
+	}
+	// The recorded question answers by its key beside the imported ones, and neither list holds the other's.
+	recorded := hosted.Recorded(fixture.places["size"])
+	if len(recorded) != 1 {
+		test.Fatalf("size's place holds %+v, want its one question", recorded)
+	}
+	if asking, isAsked := hosted.Asking(recorded[0].Key); !isAsked || asking.Parameter != -1 ||
+		string(asking.Encoded) != "true" {
+		test.Errorf("size's recorded question asks %+v (%t), want its purity, answered true", asking, isAsked)
+	}
+	if slices.Contains(imported, recorded[0]) {
+		test.Error("size's recorded question is among the imported ones")
+	}
+}
+
+// A read no function can take is counted unplaced, each kind of one by itself: a path that names nothing, a result, a
+// value, a type, a parameter whose path leads to a value of a function type and no function, and a read with no owner.
+func TestAReadNoFunctionCanTakeIsCountedUnplaced(test *testing.T) {
+	test.Parallel()
+
+	fixture, lower := checkedFactsFixture(test)
+	halve := lower.function(test, "Halve")
+	hook, isSignature := lower.own.Scope().Lookup("Hook").Type().(*types.Signature)
+	if !isSignature {
+		test.Fatal("want Hook of a function type")
+	}
+	for _, each := range []struct {
+		name string
+		read fact_resolver.Read
+	}{
+		{"a path that names nothing", fact_resolver.Read{Kind: "function_purity", Owner: lower.own, Path: "Missing"}},
+		{"a result", readOf(test, "function_purity", halve.Signature().Results().At(0), "true")},
+		{"a value", readOf(test, "function_purity", lower.own.Scope().Lookup("Limit"), "true")},
+		{"a type", readOf(test, "function_purity", lower.own.Scope().Lookup("Scale"), "true")},
+		{"a parameter of a value of a function type", readOf(test, "odd_slice_argument", hook.Params().At(0), "{}")},
+		{"no owner", fact_resolver.Read{Kind: "function_purity", Path: "Depth"}},
+	} {
+		inputs := fixture.inputs()
+		inputs.reads = []fact_resolver.Read{each.read}
+		hosted := newFactReachPackage(inputs)
+		if hosted.unplaced != 1 || len(hosted.Imported()) != 0 || len(hosted.askings) != 0 {
+			test.Errorf("a read of %s: %d unplaced, %d imported and %d askings, want 1 and none", each.name,
+				hosted.unplaced, len(hosted.Imported()), len(hosted.askings))
+		}
+	}
+}
+
+// The objects bound to the host's order are named by their keys, each for the order, in the order given, and one no
+// identity names is counted unplaced, since no build could take its users out.
+func TestTheOrderBoundObjectsAreNamedByTheirKeys(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	size, open := fixture.function(test, "size"), fixture.function(test, "Box.Open")
+	inputs := fixture.inputs()
+	inputs.orderBound = []types.Object{size, open}
+	hosted := newFactReachPackage(inputs)
+	want := []fact_reach.Named{{Object: fixture.key(test, size), Reason: "order"},
+		{Object: fixture.key(test, open), Reason: "order"}}
+	if got := hosted.OrderBound(); !slices.Equal(got, want) || hosted.unplaced != 0 {
+		test.Errorf("the order-bound objects are %q with %d unplaced, want %q and none", got, hosted.unplaced, want)
+	}
+
+	unfollowed := checkedFactReachFixture(test, "unfollowed", "example.com/facts/unfollowed")
+	settings, isStruct := unfollowed.own.Scope().Lookup("settings").Type().(*types.Struct)
+	if !isStruct {
+		test.Fatal("want settings of a struct type with no name")
+	}
+	inputs = unfollowed.inputs()
+	inputs.orderBound = []types.Object{settings.Field(0)}
+	hosted = newFactReachPackage(inputs)
+	if got := hosted.OrderBound(); len(got) != 0 || hosted.unplaced != 1 {
+		test.Errorf("an order-bound field no identity names: %q named and %d unplaced, want none and 1", got,
+			hosted.unplaced)
 	}
 }
 
@@ -280,7 +533,7 @@ func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 func TestTwoKeysAreEqualExactlyWhenTheirIdentitiesAre(test *testing.T) {
 	test.Parallel()
 
-	fixture := checkedFactReachFixture(test, "", "example.com/facts")
+	fixture, _ := checkedFactsFixture(test)
 	size := fixture.function(test, "size")
 	first, second := build_reads.NewIdentityRenderer(fixture.fileSet, nil).Object(size),
 		build_reads.NewIdentityRenderer(fixture.fileSet, nil).Object(size)
@@ -337,7 +590,7 @@ func TestABodyWithAUseNoIdentityNamesUsesEveryObject(test *testing.T) {
 	test.Parallel()
 
 	fixture := checkedFactReachFixture(test, "unfollowed", "example.com/facts/unfollowed")
-	hosted := fixture.hosted(nil)
+	hosted := newFactReachPackage(fixture.inputs())
 	for _, each := range []struct {
 		name  string
 		users []string
@@ -357,26 +610,69 @@ func TestABodyWithAUseNoIdentityNamesUsesEveryObject(test *testing.T) {
 	}
 }
 
-// The fixed point over the host's side (fact_reach.Settle): size is reached, so its recorded purity is asked in the
-// build, and where that differs Warm, its one user, leaves the standing set, with size named as what took it out.
-// Warm's own purity reads equal, so nothing above it moves and every other body stands.
+// A build's standing set is handed out as a copy at each call, since its caller takes bodies out of it: taking one
+// out of the first leaves the second, and the build's own, whole. A package the build lints whole has none, whether
+// the build does not lint it in part or the host's side holds anything unplaced, where a body left standing would
+// rest on an answer no build was asked.
+func TestABuildsStandingSetIsACopyAndNoneForAPackageLintedWhole(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	standing := fixture.standing("size")
+	bodies := len(standing)
+	warm := fixture.places["Warm"]
+	hosted := newFactReachPackage(fixture.inputs())
+
+	inPart := hosted.inBuild(standing, true)
+	first, isPartial := inPart.Standing()
+	if !isPartial || !maps.Equal(first, standing) {
+		test.Fatalf("a build that lints in part stands on %v (%t), want its %d bodies", first, isPartial, bodies)
+	}
+	delete(first, warm)
+	second, _ := inPart.Standing()
+	if !second[warm] || len(second) != bodies || !standing[warm] || len(standing) != bodies {
+		test.Errorf("after Warm left one copy, the next holds %d bodies and the build's own %d, want %d in both",
+			len(second), len(standing), bodies)
+	}
+
+	if whole, isPartial := hosted.inBuild(standing, false).Standing(); isPartial || whole != nil {
+		test.Errorf("a build that lints the package whole stands on %v (%t), want nothing", whole, isPartial)
+	}
+
+	inputs := fixture.inputs()
+	inputs.answers = []check.ExportedFact{purity(nil, "true")}
+	unplaced := newFactReachPackage(inputs)
+	if whole, isPartial := unplaced.inBuild(standing, true).Standing(); unplaced.unplaced != 1 || isPartial ||
+		whole != nil {
+		test.Errorf("a package with %d unplaced stands on %v (%t), want 1 unplaced and nothing standing",
+			unplaced.unplaced, whole, isPartial)
+	}
+}
+
+// The fixed point over the host's side in a build (fact_reach.Settle over a fact_reach.Host): size is reached, so its
+// recorded purity is asked in the build, and where that differs Warm, its one user, leaves the standing set, with size
+// named as what took it out. Warm's own purity reads equal, so nothing above it moves and every other body stands.
 func TestADifferingAnswerAboutSizeTakesWarmOutAndNothingElse(test *testing.T) {
 	test.Parallel()
 
-	fixture := checkedFactReachFixture(test, "", "example.com/facts")
+	fixture, _ := checkedFactsFixture(test)
 	size, warm := fixture.function(test, "size"), fixture.function(test, "Warm")
-	hosted := fixture.hosted([]check.ExportedFact{purity(size, "true"), purity(warm, "false")})
-	standing := map[fact_reach.Place]bool{}
-	for name, place := range fixture.places {
-		if name != "size" {
-			standing[place] = true
-		}
+	inputs := fixture.inputs()
+	inputs.answers = []check.ExportedFact{purity(size, "true"), purity(warm, "false")}
+	host := newFactReachPackage(inputs).inBuild(fixture.standing("size"), true)
+	standing, isPartial := host.Standing()
+	if !isPartial {
+		test.Fatal("want the build to lint the package in part")
 	}
 	bodies := len(standing)
 	var asked []string
-	settlement := fact_reach.Settle(standing, fixture.placesOf(test, "size"), nil, hosted,
+	settlement := fact_reach.Settle(standing, fixture.placesOf(test, "size"), nil, host,
 		func(question fact_reach.Question) fact_reach.Comparison {
-			asked = append(asked, question.Kind+" of "+hosted.questions[question.Key].function.String())
+			asking, isAsked := host.Asking(question.Key)
+			if !isAsked {
+				test.Errorf("the question %q has nothing to ask a build", question.Key)
+			}
+			asked = append(asked, asking.Kind+" of "+asking.Function.String())
 			if question.About == fixture.key(test, size) {
 				return fact_reach.Differs
 			}

@@ -1,8 +1,11 @@
 // Package facts holds a body for each way the host's side of the facts' reach reads a package (#5vbs1np): a chain of
 // calls, a method called and one taken as a value, a generic function called by an instance, a parameter an answer is
 // about, a function declared without a body, whose stub.s makes this a package go build takes, a value whose
-// initializer calls, and a type only a signature names.
+// initializer calls, a type only a signature names, an interface's method called, and another package's functions
+// called.
 package facts
+
+import "example.com/facts/lower"
 
 // platformSize is the size a build's own file would declare.
 func platformSize() int { return 8 }
@@ -54,3 +57,15 @@ type Label string
 
 // Labelled takes a Label and never reads it.
 func Labelled(_ Label) int { return 0 }
+
+// Opener is an interface whose method a body calls.
+type Opener interface{ Open() *Box }
+
+// Through calls Open through the interface, which names no function with a body.
+func Through(opener Opener) *Box { return opener.Open() }
+
+// Deep calls another package's function.
+func Deep() int { return lower.Depth() }
+
+// Halved calls another package's function with a slice.
+func Halved(names []string) int { return len(lower.Halve(2, names)) }
