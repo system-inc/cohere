@@ -14,6 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // dependenceModule is the build-dependence fixture's module, whose packages are its workspace.
@@ -182,19 +183,22 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 	}
 }
 
-// The engine's own scan for a line directive reaches a build's judgment (#9paaen9): under `--build-dependence`, the
-// windows build's record counts 5 of the build-dependence-line-directive fixture's 6 workspace units dependent. p's
-// gen_other.go, which windows does not compile, declares Helper under `//line shared.go:1`, so its unit is named by a
-// file both builds compile, and only the scan of that host-only file seeds p whole: Helper and Shared, and with them
-// q's Prints and PrintsShared, which read them. r's extra_windows.go, which windows alone compiles, holds
-// `//line steady.go:1`, and only the scan of that build-only file seeds r's Steady. q's Alone reads nothing of either
-// and is the one unit left independent. With no scan the count is 0, with none of the host-only file 1, Steady alone,
-// and with none of the build-only file 4. The run's one finding is windows's own, printf's of Helper, a string there,
-// formatted with %d.
+// The engine's own scan for a line directive reaches each build's judgment (#9paaen9): under `--build-dependence`, the
+// build-dependence-line-directive fixture's 7 workspace units are judged on windows and on freebsd, each of which
+// declares p's Helper a string. p's gen_other.go, which neither compiles, declares Helper an int under
+// `//line shared.go:1`, so its unit is named by a file every build compiles, and only the scan of that host-only file
+// seeds p whole: Helper, Plain and Shared, and with them q's Prints and PrintsShared, which read them. plain_other.go,
+// another host-only file, read after it, holds no directive and leaves p marked. r's extra_windows.go, which windows
+// alone compiles, holds `/*line steady.go:1*/`, the block comment's spelling, and only the scan of that build-only file
+// seeds r's Steady. So windows counts 6 dependent, every unit but q's Alone, which reads nothing of either, and freebsd
+// 5, Steady independent there too. The second build to ask about gen_other.go reads the first's scan of it
+// (hostDependence.lineDirectives). On windows, with no scan the count is 1, Plain alone, which its host-only file
+// seeds, with none of the host-only files 2, Plain and Steady, and with none of the build-only file 5. The run's one
+// finding is printf's of Helper, a string on windows and freebsd, formatted with %d.
 //
 // The scan reads each file as the run holds it (pipeline.held), the bytes the load built the graph from, never the
 // disk again: with gen_other.go rewritten on disk without its directive once the run has read it, as a save in the
-// middle of a run leaves it, the graph still names Helper by shared.go, the scan still seeds p, and the count is the
+// middle of a run leaves it, the graph still names Helper by shared.go, the scan still seeds p, and the counts are the
 // same.
 func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.T) {
 	test.Parallel()
@@ -215,24 +219,93 @@ func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.
 				// Given the pipeline once describeProject has read every file, before the run's first phase.
 				configure = func(*pipeline) {
 					writeTestFile(test, filepath.Join(root, "p", "gen_other.go"),
-						"//go:build !windows\n\npackage p\n\nfunc Helper() int { return 1 }\n")
+						"//go:build !windows && !freebsd\n\npackage p\n\nfunc Helper() int { return 1 }\n")
 				}
 			}
 			engine, stream := runOverConfigured(test, root, exitFindings, configure, "--no-cache", "--build-dependence")
 			lint := lintRecordOf(test, stream)
-			if len(lint.Builds) != 2 || len(engine.buildRuns) != 2 ||
-				engine.buildRuns[1].build.OperatingSystem != "windows" {
-				test.Fatalf("want the host's build and windows's, got the records %+v", lint.Builds)
+			if len(lint.Builds) != 3 || len(engine.buildRuns) != 3 {
+				test.Fatalf("want the host's build, windows's and freebsd's, got the records %+v", lint.Builds)
 			}
-			recorded := lint.Builds[1].Dependence
-			if recorded == nil {
-				test.Fatal("the windows build's record writes no dependence")
-			}
-			if recorded.Workspace.Units != 6 || recorded.Workspace.DependentUnits != 5 {
-				test.Errorf("want 5 of the workspace's 6 units dependent on windows, every one but q's Alone, got %d "+
-					"of %d", recorded.Workspace.DependentUnits, recorded.Workspace.Units)
+			for index, want := range []struct {
+				operatingSystem string
+				dependent       int
+				independent     string
+			}{
+				{operatingSystem: "windows", dependent: 6, independent: "q's Alone"},
+				{operatingSystem: "freebsd", dependent: 5, independent: "q's Alone and r's Steady"},
+			} {
+				if got := engine.buildRuns[index+1].build.OperatingSystem; got != want.operatingSystem {
+					test.Fatalf("want extra build %d on %s, got %s", index+1, want.operatingSystem, got)
+				}
+				recorded := lint.Builds[index+1].Dependence
+				if recorded == nil {
+					test.Fatalf("the %s build's record writes no dependence", want.operatingSystem)
+				}
+				if recorded.Workspace.Units != 7 || recorded.Workspace.DependentUnits != want.dependent {
+					test.Errorf("want %d of the workspace's 7 units dependent on %s, every one but %s, got %d of %d",
+						want.dependent, want.operatingSystem, want.independent, recorded.Workspace.DependentUnits,
+						recorded.Workspace.Units)
+				}
 			}
 		})
+	}
+}
+
+// The engine's scan reads a file the run holds from the held bytes, never the disk's, and answers a second ask from
+// its first scan (hostDependence.lineDirectives), as a second build asks; a file the run holds nothing for, read from
+// disk, that cannot be read there is said to hold a directive, failing wide.
+func TestTheEnginesScanAnswersFromTheHeldBytesOnceAndFailsWide(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	held := filepath.Join(directory, "held.go")
+	writeTestFile(test, held, "package p\n\nfunc Helper() int { return 1 }\n")
+	engine := &pipeline{dependence: &hostDependence{}, described: &describedProject{contents: map[string][]byte{
+		held: []byte("package p\n\n//line shared.go:1\nfunc Helper() int { return 1 }\n"),
+	}}}
+	for _, ask := range []string{"first", "again"} {
+		if !engine.holdsLineDirective(held) {
+			test.Errorf("asked %s, want the directive the run holds of held.go, which its disk lacks", ask)
+		}
+	}
+	if !engine.holdsLineDirective(filepath.Join(directory, "unread.go")) {
+		test.Error("want unread.go, which neither the run nor the disk holds, said to hold a directive")
+	}
+}
+
+// The standard library's graph is judged with the engine's scan too (standardLibraryDifference): a package of it with
+// a host-only file under a line directive naming a shared file is seeded whole. No file of the standard library the
+// builds do not share holds a directive today, so the build-dependence-line-directive fixture's p stands in for one:
+// its load on darwin is the standard library's graph, which the host restored, and its load on windows the build's.
+// All 3 of its units, Helper, Plain and Shared, are dependent; with no scan only Plain, in its host-only file, is.
+func TestTheStandardLibrarysGraphIsJudgedWithTheEnginesScan(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "build-dependence-line-directive"))
+	const identifier = "example.com/dependenceline/p"
+	host := loadedFromSource(test, root, "darwin", identifier)
+	built := loadedFromSource(test, root, "windows", identifier)
+	standardLibrary := build_dependence.NewGraph()
+	standardLibrary.AddPackage(host, false)
+	// The standard library's graph has ended, as every build waits for it to.
+	done := make(chan struct{})
+	close(done)
+	engine := &pipeline{described: &describedProject{}, dependence: &hostDependence{
+		graph:    build_dependence.NewGraph(),
+		files:    map[string][]string{},
+		paths:    map[string]string{},
+		restored: map[string]bool{identifier: true},
+		standardLibrary: &standardLibraryDependence{done: done, graph: standardLibrary,
+			files: map[string][]string{identifier: host.GoFiles}},
+	}}
+	record, _ := engine.dependenceOf(&load.Loaded{Roots: []*packages.Package{built}})
+	if record == nil || record.Restored == nil {
+		test.Fatalf("want a record of the restored standard library's judgment, got %+v", record)
+	}
+	if record.Restored.StandardLibraryUnits != 3 || record.Restored.StandardLibraryDependentUnits != 3 {
+		test.Errorf("want all 3 of the standard library's units dependent on windows, p's Helper, Plain and Shared, "+
+			"got %d of %d", record.Restored.StandardLibraryDependentUnits, record.Restored.StandardLibraryUnits)
 	}
 }
 
