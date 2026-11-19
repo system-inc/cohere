@@ -101,6 +101,9 @@ func liftingRound(function *Function, options liftingOptions, scratch *liftingSc
 	scratch.work = liftingCleared(scratch.work, len(function.Blocks))
 	liftingNumber(function, scratch)
 	scratch.runDefers = liftingCleared(scratch.runDefers, len(function.Blocks))
+	// Taken before the array starts again, so allocationsUsed holds the most any earlier round lifted, at no cost to
+	// the appends below.
+	scratch.allocationsUsed = max(scratch.allocationsUsed, len(scratch.allocations))
 	scratch.allocations = scratch.allocations[:0]
 	// Cleared whether or not the function has Locals, so a lookup never finds an earlier round's.
 	clear(scratch.localsInBlocks)

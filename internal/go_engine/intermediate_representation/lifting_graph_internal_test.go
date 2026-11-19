@@ -40,23 +40,63 @@ func TestMintGrowsTheTableTheResolveIsSizedBy(test *testing.T) {
 	}
 }
 
-// liftingScratchRound prepares and resolves, in scratch, a round over a function of count blocks, each holding one
-// Allocation to lift, and returns the Allocations. Nothing stores to one or loads from it, so the core has nothing
-// to name and the round goes from the prepare straight to the resolve.
-//
-// Mutates: scratch its tables hold the round
-func liftingScratchRound(scratch *liftingScratch, count int) []*Allocation {
+// liftingScratchFunction is a function of count blocks, each holding one Allocation, a Store of a constant to it and
+// a Load from it, so a round lifts every Allocation and leaves the blocks empty.
+func liftingScratchFunction(count int) *Function {
 	function := &Function{}
-	var allocations []*Allocation
 	for index := range count {
+		block := &BasicBlock{Index: index, parent: function}
 		allocation := &Allocation{}
-		block := &BasicBlock{Index: index, Instructions: []Instruction{allocation}}
-		allocation.setBlock(block)
+		store := &Store{Address: allocation, Value: &Constant{}}
+		load := &Load{X: allocation}
+		allocation.referrers = []Instruction{store, load}
+		block.Instructions = []Instruction{allocation, store, load}
+		for _, instruction := range block.Instructions {
+			instruction.setBlock(block)
+		}
 		function.Blocks = append(function.Blocks, block)
-		allocations = append(allocations, allocation)
 	}
-	liftingResolve(liftingPrepare(function, allocations, liftingOptions{}, scratch), scratch)
-	return allocations
+	return function
+}
+
+// liftingScratchLift lifts a function of count blocks in scratch, round after round until one lifts nothing, as
+// liftFunction does but for the pool and the release: the first round lifts count Allocations and the last none.
+//
+// Mutates: scratch its tables hold the function's rounds
+func liftingScratchLift(scratch *liftingScratch, count int) {
+	function := liftingScratchFunction(count)
+	for liftingRound(function, liftingOptions{}, scratch) {
+	}
+}
+
+// liftingScratchHeldPast is the index of the first element of array past prefix, read to array's capacity, that is
+// not zero, or -1 when every one is.
+func liftingScratchHeldPast[Element any](array []Element, prefix int) int {
+	for offset, element := range array[prefix:cap(array)] {
+		if !reflect.ValueOf(element).IsZero() {
+			return prefix + offset
+		}
+	}
+	return -1
+}
+
+// liftingScratchTail is what liftingScratchHeldPast finds of one of scratch's arrays.
+type liftingScratchTail struct {
+	array string
+	held  int
+}
+
+// liftingScratchTails reads each array release clears only as far as the function used it, past a function of
+// count blocks: the first count entries of each, and of definitions its whole length, the core minting an
+// identifier for each Store beyond the Allocations' own.
+func liftingScratchTails(scratch *liftingScratch, count int) []liftingScratchTail {
+	return []liftingScratchTail{
+		{array: "allocations", held: liftingScratchHeldPast(scratch.allocations, count)},
+		{array: "lifting's blocks", held: liftingScratchHeldPast(scratch.lifting.blocks, count)},
+		{array: "blockValues", held: liftingScratchHeldPast(scratch.blockValues, count)},
+		{array: "order", held: liftingScratchHeldPast(scratch.order, count)},
+		{array: "definitions", held: liftingScratchHeldPast(scratch.definitions, len(scratch.definitions))},
+	}
 }
 
 // liftingPanicked runs run and reports whether it panicked.
@@ -66,56 +106,65 @@ func liftingPanicked(run func()) (panicked bool) {
 	return false
 }
 
-// TestReleaseClearsTheTailALargerRoundLeft takes one scratch through a function's large round and then its small
-// one, releases it, and runs the next function's round in it, then reads blockValues, order and definitions to
-// each array's capacity: past what the next function used, nothing of the earlier one is left. release clears
-// those three only as far as the function used them (#w5dbvdm), so what it clears to has to be the longest round
-// since the last release, not the last round, whose tables stop short of the large one's tail.
+// TestReleaseClearsTheTailALargerRoundLeft takes one scratch through a large function's rounds and then a small
+// one's, releases it, and lifts the next function in it, then reads allocations, lifting's blocks, blockValues,
+// order and definitions to each array's capacity: past what the next function used, nothing of the earlier ones is
+// left. release clears those five only as far as they were used (#w5dbvdm), so what it clears to has to be the
+// longest round since the last release, not the last round, whose tables stop short of the large one's tail. The
+// two functions before the release stand for one function's larger and smaller rounds, a function built here
+// lifting everything in its first.
 func TestReleaseClearsTheTailALargerRoundLeft(test *testing.T) {
 	test.Parallel()
 	const large = 32
 	const small = 2
 	var scratch liftingScratch
-	earlier := liftingScratchRound(&scratch, large)
-	liftingScratchRound(&scratch, small)
-	// The small round left the large one's tail in each array, or release would have nothing to clear there.
-	if scratch.definitions[:large][large-1].zero != earlier[large-1] ||
-		scratch.blockValues[:large][large-1].block != earlier[large-1].block ||
-		scratch.order[:large][large-1].block != earlier[large-1].block {
-		test.Fatal("after the small round, the large round's last block is not at the end of each array")
+	liftingScratchLift(&scratch, large)
+	definitionsOfLarge := len(scratch.definitions)
+	liftingScratchLift(&scratch, small)
+	// The small function left the large one's tail in each array, or release would have nothing to clear there.
+	for _, tail := range liftingScratchTails(&scratch, small) {
+		if tail.held == -1 {
+			test.Fatalf("before the release, %s holds nothing of the large function past the small one's",
+				tail.array)
+		}
 	}
 	scratch.release()
 
-	next := liftingScratchRound(&scratch, small)
-	if cap(scratch.definitions) < large || cap(scratch.blockValues) < large || cap(scratch.order) < large {
-		test.Fatalf("the next function's round runs in arrays of %d, %d and %d, not the %d the large round grew",
-			cap(scratch.definitions), cap(scratch.blockValues), cap(scratch.order), large)
+	liftingScratchLift(&scratch, small)
+	if cap(scratch.allocations) < large || cap(scratch.lifting.blocks) < large || cap(scratch.blockValues) < large ||
+		cap(scratch.order) < large || cap(scratch.definitions) < definitionsOfLarge {
+		test.Fatalf("the next function lifts in arrays of %d, %d, %d, %d and %d, not the ones the large one grew",
+			cap(scratch.allocations), cap(scratch.lifting.blocks), cap(scratch.blockValues), cap(scratch.order),
+			cap(scratch.definitions))
 	}
-	for index, allocation := range next {
-		if scratch.definitions[index].zero != allocation || scratch.blockValues[index].block != allocation.block {
-			test.Errorf("entry %d is not the next function's own", index)
+	if len(scratch.lifting.blocks) != small || len(scratch.blockValues) != small || len(scratch.order) != small ||
+		len(scratch.definitions) >= definitionsOfLarge {
+		test.Fatalf("the next function used %d, %d, %d and %d entries, want %d of each and fewer than %d definitions",
+			len(scratch.lifting.blocks), len(scratch.blockValues), len(scratch.order), len(scratch.definitions),
+			small, definitionsOfLarge)
+	}
+	for _, tail := range liftingScratchTails(&scratch, small) {
+		if tail.held != -1 {
+			test.Errorf("%s entry %d, past what the next function used, still holds an earlier function's",
+				tail.array, tail.held)
 		}
 	}
-	for offset, definition := range scratch.definitions[small:cap(scratch.definitions)] {
-		if definition != (liftingDefinition{}) {
-			test.Errorf("definition %d, past the next function's %d, still holds the earlier function's",
-				small+offset, small)
-			break
-		}
+}
+
+// TestReleaseClearsTheAllocationsOfARoundThatLifted releases a scratch right after a round that lifted, where
+// allocations still holds that round's and no later round has taken their length into allocationsUsed: release
+// clears to the longer of the mark and the array's own length. liftFunction's last round lifts nothing, so on its
+// path the mark alone covers every round, and this pins release for a caller that stops sooner.
+func TestReleaseClearsTheAllocationsOfARoundThatLifted(test *testing.T) {
+	test.Parallel()
+	const count = 4
+	var scratch liftingScratch
+	if !liftingRound(liftingScratchFunction(count), liftingOptions{}, &scratch) || len(scratch.allocations) != count {
+		test.Fatalf("the round lifted %d Allocations, want %d", len(scratch.allocations), count)
 	}
-	for offset, block := range scratch.blockValues[small:cap(scratch.blockValues)] {
-		if !reflect.ValueOf(block).IsZero() {
-			test.Errorf("block value %d, past the next function's %d, still holds the earlier function's",
-				small+offset, small)
-			break
-		}
-	}
-	for offset, block := range scratch.order[small:cap(scratch.order)] {
-		if block != nil {
-			test.Errorf("order entry %d, past the next function's %d, still holds the earlier function's",
-				small+offset, small)
-			break
-		}
+	scratch.release()
+	if held := liftingScratchHeldPast(scratch.allocations, 0); held != -1 {
+		test.Errorf("after release, allocations entry %d still holds what the round lifted", held)
 	}
 }
 
