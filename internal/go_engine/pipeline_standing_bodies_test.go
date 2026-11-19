@@ -70,8 +70,8 @@ func standingProbe(heard *heardLiterals) rule.Rule {
 }
 
 // runStanding runs the engine over a copy of the standing-bodies fixture with the registry's rules and the standing
-// probe, declared PerUnit, under the body reach census with `--no-cache --no-fix --other-builds --build-dependence`,
-// with the standing bodies' switch as switched, and returns the pipeline, its stream, normalized, the literals the
+// probe, declared PerUnit, under the body reach census with `--no-cache --no-fix --build-dependence`, every build
+// checked as a plain run's are, with the standing bodies' switch as switched, and returns the pipeline, its stream, normalized, the literals the
 // probe heard over every build, and the copy's root.
 func runStanding(test *testing.T, switched bool) (*pipeline, string, map[string]int, string) {
 	test.Helper()
@@ -82,7 +82,7 @@ func runStanding(test *testing.T, switched bool) (*pipeline, string, map[string]
 			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 			engine.standingBodies = switched
 			engine.plantedInputs = map[string]rules.Declared{standingProbeName: {Inputs: rules.InputsPerUnit}}
-		}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+		}, "--no-cache", "--no-fix", "--build-dependence")
 	heard.lock.Lock()
 	defer heard.lock.Unlock()
 	return engine, normalize(stream, root), maps.Clone(heard.heard), root
