@@ -76,6 +76,11 @@ type buildRun struct {
 	// each file once (check.HostInheritance.Counts, #y6q1x2j).
 	inheritedFiles    int
 	inheritedFindings int
+	// standingDeclarations and standingFindings are an extra build's alone, under the standing bodies' switch on the
+	// census path: the standing declarations its confined rules took the host's findings in, and how many findings they
+	// took there (check.HostStanding.Counts, #e4rd5dw).
+	standingDeclarations int
+	standingFindings     int
 	// dependence is an extra build's alone, under `--build-dependence`: its judgment on the host's graph from its first
 	// load (dependenceOf), nil otherwise.
 	dependence *contract.BuildDependence

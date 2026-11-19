@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"go/token"
 	"reflect"
 	"slices"
 
@@ -18,7 +19,10 @@ import (
 // Instructions list its kind, then every FunctionExit; and once the functions are walked, every PackageExit.
 // Listeners are called in the order they were registered.
 //
-// The package is built whole by build_intermediate_representation, an action the walk requires, before it starts.
+// The package is built whole by build_intermediate_representation, an action the walk requires, before it starts. In
+// an extra build's package where a function stands (#e4rd5dw), that action leaves the building to its readers, a
+// listener whose rule is confined on a file is called for no function standing there, and the walk builds the package
+// less the functions that stand for every listener it started (see run).
 type IntermediateRepresentation struct {
 	*listeners
 }
@@ -73,6 +77,13 @@ func (dispatcher *IntermediateRepresentation) RuleAnalyzer(
 // several runs at once: the listeners marked FileLocal by one run per shard of its files, each hearing the functions
 // declared in its files, every other listener by one run over all of them (#0jnq91n). The package is built whole
 // before any run starts, so a file-local listener reading another file's function finds it built.
+//
+// A run confined on a file hears no function standing there, whose findings are the host's (rule.StandingFiles), and
+// a function standing for every started run is one nobody is called for, so the package is built without it, still
+// before any run starts (#e4rd5dw). A listener that reads the blocks of a function it was not handed, a callee's, may
+// then find one that was never built, so it must call that function's Build first, which builds a function once
+// whoever asks: a rule is confined only when its findings in a function depend on that function alone. With a started
+// run that is confined on no file, and in every pass nothing stands in, the package is built whole.
 func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, error) {
 	// Started first, which refuses a pass whose representation failed, so that failure is named as one.
 	whole, parts, startError := dispatcher.start(pass, dispatcher.shardsOf(pass))
@@ -87,9 +98,16 @@ func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, err
 	if len(whole.runs) == 0 && (len(parts) == 0 || len(parts[0].runs) == 0) {
 		return finishShards(whole, parts), nil
 	}
-	functions := slices.Collect(built.SourceFunctions())
+	// Nil in a pass where no started run is confined, every host's, which is built and walked as it always was.
+	standing := standingDeclarationsOf(whole, parts)
+	var functions []*intermediate_representation.Function
+	if standing == nil || len(standing.unheard) == 0 {
+		functions = slices.Collect(built.SourceFunctions())
+	} else {
+		functions = slices.Collect(built.SourceFunctionsBut(standing.isUnheard))
+	}
 	if len(parts) == 0 {
-		walkFunctions(whole, functions)
+		walkFunctions(whole, functions, standing)
 		return finish(whole), nil
 	}
 	shardOf := shardOfFile(pass, len(parts))
@@ -103,35 +121,58 @@ func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, err
 		}
 		shardFunctions[shard] = append(shardFunctions[shard], function)
 	}
-	walks := []shardWalk{{started: whole, walk: func() { walkFunctions(whole, functions) }}}
+	walks := []shardWalk{{started: whole, walk: func() { walkFunctions(whole, functions, standing) }}}
 	for index, part := range parts {
-		walks = append(walks, shardWalk{started: part, walk: func() { walkFunctions(part, shardFunctions[index]) }})
+		walks = append(walks, shardWalk{
+			started: part,
+			walk:    func() { walkFunctions(part, shardFunctions[index], standing) },
+		})
 	}
 	walkConcurrently(walks)
 	return finishShards(whole, parts), nil
 }
 
 // walkFunctions calls every one of started's listeners over functions: Function, each instruction in block order to
-// the listeners whose Instructions list its kind, FunctionExit.
-func walkFunctions(started *startedRuns, functions []*intermediate_representation.Function) {
+// the listeners whose Instructions list its kind, FunctionExit. A function that stands in a file (standing.fileOf)
+// is heard only by the runs that are not confined on that file, which are found once for the file and called as
+// started's own are for any other function. With standing nil no function is asked where it stands.
+func walkFunctions(
+	started *startedRuns,
+	functions []*intermediate_representation.Function,
+	standing *standingDeclarations,
+) {
 	if len(started.runs) == 0 {
 		return
 	}
+	// Made by the first function found standing, so a walk that meets none allocates nothing for them.
+	var hearingStanding map[*token.File]*startedRuns
 	for _, function := range functions {
-		for _, run := range started.runs {
+		hearing := started
+		if standing != nil {
+			if tokenFile := standing.fileOf(function); tokenFile != nil {
+				if hearingStanding == nil {
+					hearingStanding = map[*token.File]*startedRuns{}
+				}
+				if hearingStanding[tokenFile] == nil {
+					hearingStanding[tokenFile] = started.notConfinedOn(tokenFile)
+				}
+				hearing = hearingStanding[tokenFile]
+			}
+		}
+		for _, run := range hearing.runs {
 			run.function(function)
 		}
 		// With no started listener hearing an instruction, the blocks are not walked at all.
-		if len(started.byKind) > 0 {
+		if len(hearing.byKind) > 0 {
 			for _, block := range function.Blocks {
 				for _, instruction := range block.Instructions {
-					for _, run := range started.byKind[reflect.TypeOf(instruction)] {
+					for _, run := range hearing.byKind[reflect.TypeOf(instruction)] {
 						run.instruction(instruction)
 					}
 				}
 			}
 		}
-		for _, run := range started.runs {
+		for _, run := range hearing.runs {
 			run.functionExit(function)
 		}
 	}

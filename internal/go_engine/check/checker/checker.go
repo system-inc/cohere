@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are sixteen.
+// The changes are seventeen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -225,6 +225,30 @@
 // is reached, grouped and scheduled as a root is. Unset, nothing is
 // rooted beside, and Graph.Beside is empty.
 //
+// The seventeenth is Options.StandingBodies, the seam an extra build takes
+// the host's findings of a confined rule through, inside the function
+// bodies its difference does not reach (#e4rd5dw). It answers, for a
+// package's ID, what stands there, once for the package, and
+// Options.Standing keys that one answer in the ResultOf of every pass on
+// the package, as Options.Recorded keys a package's reads, so a
+// dispatcher calls a confined rule for nothing inside a standing body and
+// the rule reports the host's findings there as its own.
+// Options.StandingAfter names an analyzer whose action on a package
+// every follower's action there follows, a follower being an analyzer
+// Options.FollowsStanding names, the engine's dispatchers and the build
+// of its representation, which then leaves unbuilt what stands for
+// every rule its dispatcher starts: Analyze adds the edge, no analyzer's
+// Requires changes, and StandingBodies is asked with that action's
+// result. Then only a pass that runs after that action holds the
+// answer, a follower's and one that follows a follower, as a rule's own
+// follows its dispatcher. Where that action failed, the follower runs
+// all the same with nothing standing, and a failure of the added edge is
+// no part of its own nor of what it reads under Options.Failed. The
+// checker never reads the answer. Analyze refuses a StandingAfter that
+// is a follower, or requires one through what it requires, since every
+// such follower's action would then wait on one that waits on it. With
+// StandingBodies unset, the graph and every pass are as they were.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -298,7 +322,8 @@ import (
 	// Options.Timing measures into.
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
-	// cohere: the inheritance Options.Inheritance hands every pass.
+	// cohere: the inheritance Options.Inheritance hands every pass, and the
+	// standing bodies Options.StandingBodies hands a package's.
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	// cohere: the host's side Options.FactHosts hands a package's passes.
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
@@ -428,6 +453,33 @@ type Options struct {
 	// none of the analyzers, whose root action on a package it would
 	// otherwise share.
 	Beside *analysis.Analyzer
+
+	// cohere: StandingBodies, when set, answers for a package's ID the
+	// function bodies an extra build leaves to the host there, whose
+	// findings a confined rule takes rather than hear the body again, or
+	// nil for a package nothing stands in. It is asked once for a
+	// package, by whichever action on it reads the answer first, and
+	// Standing, when StandingBodies is set too, keys that one answer in
+	// the ResultOf of every pass on the package, a key never run, as
+	// Dependents is. StandingAfter, when StandingBodies and
+	// FollowsStanding are set too, is an analyzer whose action on a
+	// package each action there that FollowsStanding names follows, by an
+	// edge Analyze adds where the analyzer does not require it already,
+	// and whose result there StandingBodies is asked with as after, nil
+	// without StandingAfter. With StandingAfter only a pass that runs
+	// after its action holds the answer: one that follows that action,
+	// and one that follows such a one, as a rule's own follows its
+	// dispatcher. Where that action failed, no pass holds one, and a
+	// failure of the edge Analyze added fails no action and is not under
+	// Failed. StandingAfter must not be or require an analyzer
+	// FollowsStanding names, since that one would then wait on itself,
+	// and Analyze refuses one that does, naming it. With StandingBodies
+	// unset, no action is added, and unset or where it answers nil,
+	// ResultOf holds no standing bodies.
+	Standing        *analysis.Analyzer
+	StandingBodies  func(packageId string, after any) rule.StandingBodies
+	StandingAfter   *analysis.Analyzer
+	FollowsStanding func(*analysis.Analyzer) bool
 
 	// cohere: Reads, when set, holds the reads of each package whose
 	// fact reads are recorded: every ObjectFact and PackageFact an action
@@ -574,6 +626,12 @@ type Action struct {
 	// reads under Options.Dependents, and nil while that is unset.
 	dependents map[*analysis.Analyzer]bool
 
+	// cohere: standingEdge is the prerequisite Analyze added to this action
+	// under Options.StandingAfter, which its analyzer does not require, and
+	// nil when it added none. Its failure is run past and its Result is no
+	// input of the pass, only what Options.StandingBodies is asked with.
+	standingEdge *Action
+
 	// cohere: syntax is shared by every action on this action's package,
 	// so the last of them to finish can release the package's syntax
 	// (see releaseSyntax).
@@ -609,6 +667,13 @@ type syntaxReaders struct {
 	// is set, to take what it reads before the syntax goes.
 	given    bool
 	finished func(*packages.Package)
+
+	// cohere: standing is the package's answer under
+	// Options.StandingBodies, which standingAsked asks for once, so every
+	// pass on the package that holds one holds the same (see
+	// Action.standing).
+	standingAsked sync.Once
+	standing      rule.StandingBodies
 }
 
 // cohere: factAnalyzersRequired are the analyzers that learn facts among
@@ -684,6 +749,16 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 
 	if err := analysis.Validate(analyzers); err != nil {
 		return nil, err
+	}
+
+	// cohere: refuse an Options.StandingAfter that is a follower or
+	// requires one, whose edge would have that follower wait on itself.
+	if opts.StandingBodies != nil && opts.StandingAfter != nil && opts.FollowsStanding != nil {
+		if follower := requiredFollower(opts.StandingAfter, opts.FollowsStanding); follower != nil {
+			return nil, fmt.Errorf("the analyzer every follower follows for its standing bodies, %s, "+
+				"requires the follower %s, itself or through what it requires, so that follower's action "+
+				"would wait on itself", opts.StandingAfter.Name, follower.Name)
+		}
 	}
 
 	// Construct the action graph.
@@ -783,6 +858,28 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		for k, act := range actions {
 			if !reached[act] {
 				delete(actions, k)
+			}
+		}
+	}
+
+	// cohere: Options.StandingAfter, the action each follower's action on
+	// a package follows (Options.FollowsStanding). The edge is added here,
+	// once ForDependents has dropped what it drops, so this one stays, and
+	// before the readers are counted, so the Result is kept until the
+	// follower has read it. A restored package runs nothing, so nothing
+	// there follows anything.
+	if opts.StandingBodies != nil && opts.StandingAfter != nil && opts.FollowsStanding != nil {
+		var followers []*Action
+		for _, act := range actions {
+			if opts.FollowsStanding(act.Analyzer) && (opts.Restored == nil || !opts.Restored(act.Package)) {
+				followers = append(followers, act)
+			}
+		}
+		for _, act := range followers {
+			after := mkAction(opts.StandingAfter, act.Package)
+			if !requiredByAny([]*Action{act}, after) {
+				act.Deps = append(act.Deps, after)
+				act.standingEdge = after
 			}
 		}
 	}
@@ -909,8 +1006,13 @@ func (act *Action) execOnce() {
 	var tolerated map[*analysis.Analyzer]error
 	for _, dep := range act.Deps {
 		if dep.Err != nil {
-			// cohere: a tolerant action runs past a failed horizontal edge.
+			// cohere: a tolerant action runs past a failed horizontal edge,
+			// and any action past the edge Options.StandingAfter added, which
+			// no listener requires, so it is not among what was tolerated.
 			if act.RanPast(dep) {
+				if dep == act.standingEdge {
+					continue
+				}
 				if tolerated == nil {
 					tolerated = make(map[*analysis.Analyzer]error)
 				}
@@ -937,8 +1039,9 @@ func (act *Action) execOnce() {
 			// in-memory outputs of prerequisite analyzers
 			// become inputs to this analysis pass.
 			// cohere: one that failed, which only a tolerant action reaches, is
-			// absent, its error under Options.Failed instead.
-			if dep.Err != nil {
+			// absent, its error under Options.Failed instead, and so is the
+			// edge Options.StandingAfter added, which the analyzer never asked for.
+			if dep.Err != nil || dep == act.standingEdge {
 				continue
 			}
 			inputs[dep.Analyzer] = dep.Result
@@ -971,6 +1074,10 @@ func (act *Action) execOnce() {
 	// cohere: Options.Inherited, the inheritance under Options.Inheritance.
 	if act.opts.Inherited != nil && act.opts.Inheritance != nil {
 		inputs[act.opts.Inherited] = act.opts.Inheritance
+	}
+	// cohere: Options.Standing, the package's answer under Options.StandingBodies.
+	if standing := act.standing(); standing != nil {
+		inputs[act.opts.Standing] = standing
 	}
 	// cohere: Options.Recorded, the package's reads under Options.Reads.
 	if act.opts.Recorded != nil && act.opts.Reads != nil {
@@ -1227,6 +1334,30 @@ func requiredByAny(acts []*Action, dep *Action) bool {
 	return false
 }
 
+// cohere: requiredFollower is the first analyzer follows names that after
+// is or requires, depth first through what each requires, and nil when
+// there is none.
+func requiredFollower(after *analysis.Analyzer, follows func(*analysis.Analyzer) bool) *analysis.Analyzer {
+	seen := map[*analysis.Analyzer]bool{}
+	var find func(current *analysis.Analyzer) *analysis.Analyzer
+	find = func(current *analysis.Analyzer) *analysis.Analyzer {
+		if seen[current] {
+			return nil
+		}
+		seen[current] = true
+		if follows(current) {
+			return current
+		}
+		for _, required := range current.Requires {
+			if found := find(required); found != nil {
+				return found
+			}
+		}
+		return nil
+	}
+	return find(after)
+}
+
 // cohere: tolerant is whether act runs past a failed prerequisite on its
 // own package, which it does only when Options.Failed and Options.Tolerant
 // are both set, so it is always told what it ran past.
@@ -1235,11 +1366,69 @@ func (act *Action) tolerant() bool {
 }
 
 // cohere: RanPast is whether act runs past dep, a failed prerequisite on
-// its own package, as a tolerant action does. dep's failure is then no part
+// its own package, as a tolerant action does, and as any action does past
+// the edge Options.StandingAfter added to it. dep's failure is then no part
 // of act's error: act ran without dep's input, and an error it ends with is
 // its own, which a caller tracing a failure to its cause stops at.
 func (act *Action) RanPast(dep *Action) bool {
-	return dep.Err != nil && act.tolerant() && dep.Package == act.Package
+	return dep.Err != nil && (dep == act.standingEdge || act.tolerant() && dep.Package == act.Package)
+}
+
+// cohere: standing is what act's pass holds under Options.Standing, nil for
+// nothing: the answer of Options.StandingBodies for act's package, asked
+// once for the package by the first action here, and the same for every
+// action after. Without Options.StandingAfter that is every action on a
+// package that runs. With it, it is each action that follows that
+// analyzer's action on the package, which is asked with its Result, or
+// leaves nothing standing where it failed, and each action that follows
+// such an action, a rule's own after its dispatcher, which reads what
+// was answered. Any other action may run before the answer, so it holds
+// none, whenever it runs.
+func (act *Action) standing() rule.StandingBodies {
+	opts := act.opts
+	if opts.Standing == nil || opts.StandingBodies == nil || (opts.Restored != nil && opts.Restored(act.Package)) {
+		return nil
+	}
+	after := act.standingAfter()
+	if opts.StandingAfter != nil && after == nil && !act.followsStanding() {
+		return nil
+	}
+	shared := act.syntax
+	// An action that only follows one that follows finds the answer made,
+	// since that one finished first. Were it ever here first it would
+	// leave nothing standing, for every action on the package alike.
+	shared.standingAsked.Do(func() {
+		switch {
+		case opts.StandingAfter == nil:
+			shared.standing = opts.StandingBodies(act.Package.ID, nil)
+		case after != nil && after.Err == nil:
+			shared.standing = opts.StandingBodies(act.Package.ID, after.Result)
+		}
+	})
+	return shared.standing
+}
+
+// cohere: standingAfter is the action of Options.StandingAfter on act's
+// package that act follows, by its analyzer's own requirement or by the
+// edge Analyze added, and nil when it follows none.
+func (act *Action) standingAfter() *Action {
+	for _, dep := range act.Deps {
+		if dep.Analyzer == act.opts.StandingAfter && dep.Package == act.Package {
+			return dep
+		}
+	}
+	return nil
+}
+
+// cohere: followsStanding is whether act follows, on its own package, an
+// action that follows Options.StandingAfter's there (standingAfter).
+func (act *Action) followsStanding() bool {
+	for _, dep := range act.Deps {
+		if dep.Package == act.Package && dep.standingAfter() != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // cohere: PackageActions is every action of act's graph on act's package,

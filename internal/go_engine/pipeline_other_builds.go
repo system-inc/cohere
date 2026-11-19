@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
@@ -71,6 +72,11 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		if pass.result.FactReach != nil {
 			engine.factReachSides = newFactReachSides(engine.bodyReachHost, pass.result.FactReach, loaded.Packages)
 			pass.result.FactReach = nil
+		}
+		// The rules confined for the standing bodies, judged once for every build, and only where any body may stand.
+		if engine.leavesBodiesStanding() {
+			enabled, _ := engine.enabledRules()
+			engine.standingConfined = engine.standingConfinedRules(enabled)
 		}
 	}
 	// And the host's dependence sets are in its memo, each computed as its package's walk ended, so no build computes
@@ -678,6 +684,12 @@ func (engine *pipeline) extraBuildRun(
 		run.lintWait = time.Since(waitStarted)
 	}
 	engine.lintStepped(extra, lintStepTaken, weight)
+	// The build's standing bodies, made once for every load of it, only where the run leaves bodies standing, and read
+	// by a load only where its passes are handed the host's sides.
+	var standing *buildStanding
+	if engine.standingConfined != nil {
+		standing = newBuildStanding(host, enabled, engine.standingConfined)
+	}
 	// A nil *check.HostInheritance would be a non-nil rule.Inheritance, which every pass would read as one.
 	var inherits rule.Inheritance
 	if inheritance != nil {
@@ -721,6 +733,15 @@ func (engine *pipeline) extraBuildRun(
 			run.factHosts = hosts
 			factHosts = func(packageId string) fact_reach.Host { return hosts[packageId] }
 		}
+		settle := engine.factReachSettle(factHosts != nil)
+		// A package whose pass is handed a host's side lints only what does not stand once standing_facts has settled
+		// it there, whose action every dispatcher's action on the package follows, and the representation's build too,
+		// which then leaves unbuilt what stands for every rule its dispatcher starts.
+		var standingBodies func(packageId string, after any) rule.StandingBodies
+		var standingAfter *analysis.Analyzer
+		if standing != nil && settle != nil {
+			standingBodies, standingAfter = standing.bodiesOf, settle
+		}
 		started := time.Now()
 		defer func() { linting += time.Since(started) }()
 		return check.Run(over.Packages, enabled, check.Options{
@@ -739,8 +760,10 @@ func (engine *pipeline) extraBuildRun(
 			FactHosts:   factHosts,
 			// The standing bodies each pass's side leaves are settled, for the census to count, and under the body
 			// differential the build's own facts are captured, for its second leg to compare those left standing by.
-			FactReachSettle: engine.factReachSettle(factHosts != nil),
+			FactReachSettle: settle,
 			FactReach:       engine.bodyDifferential && factHosts != nil,
+			StandingBodies:  standingBodies,
+			StandingAfter:   standingAfter,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -842,6 +865,7 @@ func (engine *pipeline) extraBuildRun(
 		engine.buildLoadTimes(extra, loadWall, shareGateWait)
 	}
 	run.inheritedFiles, run.inheritedFindings = inheritance.Counts()
+	run.standingDeclarations, run.standingFindings = standing.counts()
 	if engine.extraBuildEnds != nil {
 		if endError := engine.extraBuildEnds(extra, notes); endError != nil {
 			return buildRun{}, fmt.Errorf("the build %s: %w", extra, endError)
@@ -938,8 +962,10 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			// An extra build's alone, under `--build-dependence`: nil otherwise, which the record leaves out.
 			Dependence: run.dependence,
 			// An extra build's alone: 0 otherwise, which the record leaves out.
-			InheritedFiles:    run.inheritedFiles,
-			InheritedFindings: run.inheritedFindings,
+			InheritedFiles:       run.inheritedFiles,
+			InheritedFindings:    run.inheritedFindings,
+			StandingDeclarations: run.standingDeclarations,
+			StandingFindings:     run.standingFindings,
 		}
 		recordTimes(&record, run)
 		if run.result != nil {

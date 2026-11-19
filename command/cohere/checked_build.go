@@ -50,6 +50,10 @@ type checkedBuild struct {
 	// than walk again, and the findings it took, each absent when 0.
 	InheritedFiles    int `json:"inheritedFiles,omitempty"`
 	InheritedFindings int `json:"inheritedFindings,omitempty"`
+	// StandingDeclarations and StandingFindings are the standing declarations its confined rules took the host's
+	// findings in rather than hear the bodies again, and the findings they took there, each absent when 0.
+	StandingDeclarations int `json:"standingDeclarations,omitempty"`
+	StandingFindings     int `json:"standingFindings,omitempty"`
 	// LoadMilliseconds, LintMilliseconds, DecideMilliseconds (summed across goroutines), KeepMilliseconds and
 	// WaitMilliseconds (the host's) are where the build's time went, and ShareGateWaitMilliseconds another build's
 	// wait at the share gate, which its load time leaves out (#ghb3rcn), each absent when 0.

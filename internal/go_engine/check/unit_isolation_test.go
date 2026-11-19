@@ -153,10 +153,12 @@ type heldAnswerKey struct {
 	at                unitAt
 }
 
-// isolationRun is one run of the isolated rules over some packages: each package's findings, the rules that crashed
-// on it, and the places of its functions ctrlflow found never return.
+// isolationRun is one run of the isolated rules over some packages: each package's findings, as compared and as the
+// engine writes them (checked), the rules that crashed on it, and the places of its functions ctrlflow found never
+// return.
 type isolationRun struct {
 	findings map[*packages.Package][]isolationFinding
+	checked  map[*packages.Package][]Finding
 	crashed  map[*packages.Package]map[string]string
 	noReturn map[unitAt]bool
 }
@@ -165,6 +167,17 @@ type isolationRun struct {
 // each package's findings,
 // the rules that crashed on it, and the places of the functions ctrlflow found never return.
 func runIsolated(isolated []rule.Rule, analyzed []*packages.Package, held fact_resolver.Held) (*isolationRun, error) {
+	return runIsolatedWith(isolated, analyzed, held, nil)
+}
+
+// runIsolatedWith is runIsolated with configure, when not nil, given the checker's options before Analyze, as the
+// standing isolation hands them its standing bodies.
+func runIsolatedWith(
+	isolated []rule.Rule,
+	analyzed []*packages.Package,
+	held fact_resolver.Held,
+	configure func(options *checker.Options),
+) (*isolationRun, error) {
 	ruleOf := make(map[*analysis.Analyzer]rule.Rule, len(isolated))
 	analyzers := make([]*analysis.Analyzer, 0, len(isolated))
 	for _, registered := range isolated {
@@ -180,12 +193,16 @@ func runIsolated(isolated []rule.Rule, analyzed []*packages.Package, held fact_r
 		resolver.HoldAnswers(held)
 	}
 	options.Resolver = resolver
+	if configure != nil {
+		configure(options)
+	}
 	graph, analyzeError := checker.Analyze(analyzers, analyzed, options)
 	if analyzeError != nil {
 		return nil, analyzeError
 	}
 	run := &isolationRun{findings: map[*packages.Package][]isolationFinding{},
-		crashed: map[*packages.Package]map[string]string{}, noReturn: map[unitAt]bool{}}
+		checked: map[*packages.Package][]Finding{}, crashed: map[*packages.Package]map[string]string{},
+		noReturn: map[unitAt]bool{}}
 	for action := range graph.All() {
 		if action.Analyzer == ctrlflow.Analyzer && slices.Contains(analyzed, action.Package) {
 			for _, fact := range action.AllObjectFacts() {
@@ -213,6 +230,8 @@ func runIsolated(isolated []rule.Rule, analyzed []*packages.Package, held fact_r
 			if !isPlaced {
 				continue
 			}
+			run.checked[action.Package] = append(run.checked[action.Package],
+				newFinding(registered, action.Package.Fset, diagnostic))
 			finding := isolationFinding{rule: registered.Name, at: at, end: at.offset, message: diagnostic.Message}
 			if end, isEnded := positionAt(action.Package.Fset, diagnostic.End); isEnded && end.file == at.file {
 				finding.end = end.offset
