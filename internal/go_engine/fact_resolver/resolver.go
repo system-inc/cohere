@@ -73,11 +73,13 @@ type Resolver struct {
 	recordedLock sync.Mutex
 	recorded     map[*types.Package]map[string]map[objectpath.Path][]byte
 
-	// reads are each package's reads (see Read), under readsLock; paths memoizes each object's objectpath; probing
-	// counts the probes asking now, Probe's between the analysis's waves and WholeIfComplete's as the run saves.
+	// reads are each package's reads (see Read), under readsLock; paths memoizes each object's objectpath, which
+	// encoders find (see objectPath); probing counts the probes asking now, Probe's between the analysis's waves and
+	// WholeIfComplete's as the run saves.
 	readsLock sync.Mutex
 	reads     map[*types.Package]*readSet
 	paths     sync.Map
+	encoders  sync.Map
 	probing   atomic.Int64
 
 	// unsure counts, by each package's types, the unsure answers its analysis was handed (see Unsure).
