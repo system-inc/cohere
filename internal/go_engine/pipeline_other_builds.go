@@ -395,11 +395,9 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 
 // recordsReadsOf is which packages the load and lint record what each read of other packages (#b2t9xmf), as
 // load.Caching.RecordReads takes it. Every package, when the host keeps its packages for extra builds
-// (keepsForBuilds), and when the run collects the standard library's entries for the release's table, which persists
-// each one's reads beside it (#pcv6eff). A run that does neither records nothing, since it would pay for reads nothing
-// reads.
+// (keepsForBuilds). A run that does not records nothing, since it would pay for reads nothing reads.
 func (engine *pipeline) recordsReadsOf() func(*packages.Package) bool {
-	if engine.keepsForBuilds() || engine.request.standardLibrary.collected != nil {
+	if engine.keepsForBuilds() {
 		return load.EveryPackage
 	}
 	return nil

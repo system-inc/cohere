@@ -388,20 +388,6 @@ func encodeBody(entry cacheEntry) ([]byte, error) {
 	return body.Bytes(), nil
 }
 
-// wholeEntry is encoded's entry as one gob, its body with its record's reads, for a reader of a whole entry, as the
-// standard library's table is written from.
-func wholeEntry(encoded encodedEntry) ([]byte, error) {
-	entry, decodeError := entryOf(encoded.body, encoded.record)
-	if decodeError != nil {
-		return nil, decodeError
-	}
-	var whole bytes.Buffer
-	if gobError := gob.NewEncoder(&whole).Encode(entry); gobError != nil {
-		return nil, gobError
-	}
-	return whole.Bytes(), nil
-}
-
 // encodeRecord is record's bytes, as the store keeps them under a package's key.
 func encodeRecord(record entryRecord) ([]byte, error) {
 	var encoded bytes.Buffer

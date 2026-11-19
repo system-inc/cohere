@@ -1,7 +1,6 @@
 package check
 
 import (
-	"cmp"
 	"fmt"
 	"go/types"
 	"maps"
@@ -42,19 +41,6 @@ func sortedAnswers(answers map[string]map[objectpath.Path][]byte, complete bool)
 		sorted = append(sorted, held)
 	}
 	return sorted
-}
-
-// sortAnswers sorts answers in place, by kind's name and then each kind's by objectpath.
-func sortAnswers(answers []kindAnswers) {
-	slices.SortFunc(
-		answers,
-		func(left kindAnswers, right kindAnswers) int { return cmp.Compare(left.Kind, right.Kind) },
-	)
-	for index := range answers {
-		slices.SortFunc(answers[index].Answers, func(left pathAnswer, right pathAnswer) int {
-			return cmp.Compare(left.Path, right.Path)
-		})
-	}
 }
 
 // addAnswers adds held to answers, the fact_resolver's shape of what a store holds.

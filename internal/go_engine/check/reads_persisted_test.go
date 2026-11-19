@@ -1,8 +1,6 @@
 package check
 
 import (
-	"bytes"
-	"encoding/gob"
 	"go/types"
 	"reflect"
 	"slices"
@@ -65,45 +63,6 @@ func persistedRestoring(test *testing.T, restoring Restoring, host *ReadsBuild, 
 		persisted: newHeldReads(decoded, persistedLearned)}
 }
 
-// tableRestoring is restoring with its reads persisted as the release's table carries them, their digests taken by
-// host: beside an entry of the package in a variant's table (StandardLibraryTableOf), written again as the canonical
-// table, read back from it, and held as a host restoring the package from the binary's table holds them
-// (heldReadsOf, as keepBinaryHit reads them), its fact types read by persistedLearned.
-func tableRestoring(test *testing.T, restoring Restoring, host *ReadsBuild) Restoring {
-	test.Helper()
-
-	record, persisted := persistReads(restoring, host, ReadsRendererVersion)
-	if !persisted {
-		test.Fatalf("the reads of %s were not persisted", restoring.Path)
-	}
-	reads, encodeError := encodePersistedReads(record)
-	if encodeError != nil {
-		test.Fatal(encodeError)
-	}
-	var entry bytes.Buffer
-	if gobError := gob.NewEncoder(&entry).Encode(cacheEntry{Version: CacheFormatVersion}); gobError != nil {
-		test.Fatal(gobError)
-	}
-	key := cache.DigestOf([]byte(restoring.Path))
-	written, _, writeError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{key: {
-		PackagePath: restoring.Path, Entry: entry.Bytes(), Reads: reads, AnswersWhole: true, ReadsJudged: true}},
-		"/goroot",
-		[]cache.StandardLibraryVariant{{Target: "darwin/amd64", CgoEnabled: "0", GoVersion: "go1.27.0", Packages: 1}})
-	if writeError != nil {
-		test.Fatal(writeError)
-	}
-	canonical, canonicalError := CanonicalStandardLibraryTable([][]byte{written}, nil)
-	if canonicalError != nil {
-		test.Fatal(canonicalError)
-	}
-	tableEntry, held := cache.NewStandardLibraryTable(canonical).Lookup(key)
-	if !held || tableEntry.Reads == nil {
-		test.Fatalf("the canonical table holds no reads of %s: held %t", restoring.Path, held)
-	}
-	return Restoring{Path: restoring.Path, Imports: restoring.Imports, Assembly: restoring.Assembly,
-		persisted: heldReadsOf(tableEntry.Reads, persistedLearned)}
-}
-
 // wholeVerdict is the whole verdict on restoring in a build: its types' half as the load asks it, then its facts' half
 // over every fact type it read.
 func wholeVerdict(
@@ -129,28 +88,26 @@ func verdictFactsOf(facts map[string]analysis.Fact) FactLookup {
 }
 
 // persistedComparison is one verdict of the differential, judged from the reads of this run, from the same reads
-// persisted, and from them as the release's table carries them, named for its failure, and, where the case states one,
-// the reason it is to give. In a build of other sizes the persisted and table verdicts are to decline as unknown
-// (otherSizesDeclined), whatever the reads of this run give.
+// persisted, named for its failure, and, where the case states one, the reason it is to give. In a build of other sizes
+// the persisted verdict is to decline as unknown (otherSizesDeclined), whatever the reads of this run give.
 type persistedComparison struct {
 	name       string
 	inMemory   func() (bool, string)
 	persisted  func() (bool, string)
-	table      func() (bool, string)
 	want       string
 	wantStated bool
 	otherSizes bool
 }
 
 // The differential: on the verdict fixture's darwin host and three builds, darwin again, linux and freebsd, and on the
-// kind-of-use fixture's darwin host, windows and darwin again, every user package's verdict from its persisted reads,
-// and from them as the release's table carries them, is the verdict from its reads of this run, holds and reason
-// alike, with reads that hold and reads that do not of every kind: types that change by target, every kind of use and
-// selections (#mjdf7ah), a fact found in one build and missing in another, a package fact of another value, lookups
-// answered differently and deprecations of another message. The restored fixture adds Interface and Method lookups
-// over a package the build restored from the host, whose export data drops an unexported type with the methods, and
-// over a restored package the host's closure lacks. A fourth build, darwin again measured by 386's sizes, declines
-// every persisted and table verdict as unknown, where the reads of this run, compared, hold some (#pcv6eff).
+// kind-of-use fixture's darwin host, windows and darwin again, every user package's verdict from its persisted reads is
+// the verdict from its reads of this run, holds and reason alike, with reads that hold and reads that do not of every
+// kind: types that change by target, every kind of use and selections (#mjdf7ah), a fact found in one build and missing
+// in another, a package fact of another value, lookups answered differently and deprecations of another message. The
+// restored fixture adds Interface and Method lookups over a package the build restored from the host, whose export data
+// drops an unexported type with the methods, and over a restored package the host's closure lacks. A fourth build,
+// darwin again measured by 386's sizes, declines every persisted verdict as unknown, where the reads of this run,
+// compared, hold some (#pcv6eff).
 func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 	test.Parallel()
 
@@ -283,7 +240,6 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 					restoring.Reads.AddLookup(lookup)
 				}
 				persisted := persistedRestoring(test, restoring, host, ReadsRendererVersion)
-				tabled := tableRestoring(test, restoring, host)
 				judged = append(judged, persistedComparison{
 					name: "the " + user + " user with " + extra + " in " + buildName,
 					inMemory: func() (bool, string) {
@@ -292,9 +248,6 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 					persisted: func() (bool, string) {
 						return wholeVerdict(persisted, closure, nil, host, buildMemo, fact)
 					},
-					table: func() (bool, string) {
-						return wholeVerdict(tabled, closure, nil, host, buildMemo, fact)
-					},
 					otherSizes: build.sizes == otherSizes,
 				})
 			}
@@ -302,7 +255,6 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 	}
 	for _, step := range persistedRestoredSteps(test) {
 		persisted := persistedRestoring(test, step.restoring, step.host, ReadsRendererVersion)
-		tabled := tableRestoring(test, step.restoring, step.host)
 		judged = append(judged, persistedComparison{
 			name: "the restored fixture " + step.name,
 			inMemory: func() (bool, string) {
@@ -311,20 +263,16 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 			persisted: func() (bool, string) {
 				return TypesHold(persisted, step.closure, step.restored, step.host, step.build)
 			},
-			table: func() (bool, string) {
-				return TypesHold(tabled, step.closure, step.restored, step.host, step.build)
-			},
 			want:       step.want,
 			wantStated: true,
 		})
 	}
 	// The kind-of-use fixture (#mjdf7ah): every kind of use, and selections, judged on windows, where each user's read
-	// differs, and on the host's twin, where each holds, so the persisted kinds, and the table's, decline and hold as
-	// the kinds of this run do.
+	// differs, and on the host's twin, where each holds, so the persisted kinds decline and hold as the kinds of this
+	// run do.
 	for user := range kindUsers {
 		restoring := kindRestoring(test, user)
 		persisted := persistedRestoring(test, restoring, host, ReadsRendererVersion)
-		tabled := tableRestoring(test, restoring, host)
 		for _, goos := range []string{"windows", "darwin"} {
 			closure, buildMemo := kindPackages(test, goos), measuredReadsBuild()
 			judged = append(judged, persistedComparison{
@@ -335,19 +283,16 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 				persisted: func() (bool, string) {
 					return TypesHold(persisted, closure, nil, host, buildMemo)
 				},
-				table: func() (bool, string) {
-					return TypesHold(tabled, closure, nil, host, buildMemo)
-				},
 			})
 		}
 	}
-	verdicts := make([][3]struct {
+	verdicts := make([][2]struct {
 		holds bool
 		why   string
 	}, len(judged))
 	var waiting sync.WaitGroup
 	for index, each := range judged {
-		for side, judge := range []func() (bool, string){each.inMemory, each.persisted, each.table} {
+		for side, judge := range []func() (bool, string){each.inMemory, each.persisted} {
 			waiting.Go(func() {
 				verdicts[index][side].holds, verdicts[index][side].why = judge()
 			})
@@ -356,16 +301,15 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 	waiting.Wait()
 	holding, declined, otherSizesHolding, reasons := 0, map[string]int{}, 0, []string{}
 	for index, each := range judged {
-		inMemory, persisted, table := verdicts[index][0], verdicts[index][1], verdicts[index][2]
+		inMemory, persisted := verdicts[index][0], verdicts[index][1]
 		if each.otherSizes {
 			if inMemory.holds {
 				otherSizesHolding++
 			}
 			// Measured by other sizes, a record is declined as unknown before any read, never compared.
-			if persisted.holds || persisted.why != otherSizesDeclined || table != persisted {
-				test.Errorf("%s: want the persisted and table verdicts declined, %q, in memory %t, %q, persisted "+
-					"%t, %q, table %t, %q", each.name, otherSizesDeclined, inMemory.holds, inMemory.why,
-					persisted.holds, persisted.why, table.holds, table.why)
+			if persisted.holds || persisted.why != otherSizesDeclined {
+				test.Errorf("%s: want the persisted verdict declined, %q, in memory %t, %q, persisted %t, %q",
+					each.name, otherSizesDeclined, inMemory.holds, inMemory.why, persisted.holds, persisted.why)
 			}
 			continue
 		}
@@ -375,9 +319,9 @@ func TestPersistedReadsJudgeAsTheReadsOfThisRun(test *testing.T) {
 			declined[strings.Fields(inMemory.why)[0]]++
 			reasons = append(reasons, inMemory.why)
 		}
-		if persisted != inMemory || table != inMemory || each.wantStated && inMemory.why != each.want {
-			test.Errorf("%s: want %q, in memory %t, %q, persisted %t, %q, table %t, %q", each.name, each.want,
-				inMemory.holds, inMemory.why, persisted.holds, persisted.why, table.holds, table.why)
+		if persisted != inMemory || each.wantStated && inMemory.why != each.want {
+			test.Errorf("%s: want %q, in memory %t, %q, persisted %t, %q", each.name, each.want, inMemory.holds,
+				inMemory.why, persisted.holds, persisted.why)
 		}
 	}
 	// The build of other sizes tells something only when a verdict compared would have held there.

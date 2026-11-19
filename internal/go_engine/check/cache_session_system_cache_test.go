@@ -1,8 +1,6 @@
 package check
 
 import (
-	"bytes"
-	"encoding/gob"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,7 +12,6 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
@@ -108,69 +105,6 @@ func standardRuns(runs *sync.Map) int {
 	return total
 }
 
-// The table is written for any machine: an entry's withheld files are renamed to `$GOROOT` and its findings left out,
-// while an entry naming a file outside `GOROOT`, or holding the walk of its files, is refused.
-func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
-	test.Parallel()
-
-	goRoot := filepath.Join(string(filepath.Separator), "usr", "local", "go")
-	encoded := func(entry cacheEntry) []byte {
-		test.Helper()
-		var written bytes.Buffer
-		if encodeError := gob.NewEncoder(&written).Encode(entry); encodeError != nil {
-			test.Fatal(encodeError)
-		}
-		return written.Bytes()
-	}
-	inRoot := filepath.Join(goRoot, "src", "net", "cgo_unix.go")
-	portable := cacheEntry{
-		Version: CacheFormatVersion,
-		Analyzers: map[string]storedAnalysis{"printf": {Findings: []Finding{{Rule: "printf", File: inRoot,
-			Line: 3}}}},
-		Withheld: load.PackageWithheld{
-			Errors:       []load.WithheldError{{File: inRoot, Line: 3, Column: 2, Message: "withheld"}},
-			Declarations: []string{inRoot + ":7:6"},
-		},
-	}
-	key := cache.Key{0x01}
-	written, _, writeError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
-		key: {PackagePath: "net", Entry: encoded(portable), AnswersWhole: true, ReadsJudged: true},
-	}, goRoot, nil)
-	if writeError != nil {
-		test.Fatalf("writing a portable entry: %v", writeError)
-	}
-	read, held := cache.NewStandardLibraryTable(written).Lookup(key)
-	if !held {
-		test.Fatal("want the entry in the table")
-	}
-	entry, decodeError := decodeStandardLibraryEntry(read.Entry)
-	if decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	marked := "$GOROOT/src/net/cgo_unix.go"
-	want := load.PackageWithheld{
-		Errors:       []load.WithheldError{{File: marked, Line: 3, Column: 2, Message: "withheld"}},
-		Declarations: []string{marked + ":7:6"},
-	}
-	if !reflect.DeepEqual(entry.Withheld, want) || entry.PackagePath != "net" || len(entry.Analyzers) != 1 ||
-		entry.Analyzers[0].Slot != "printf" || len(entry.Analyzers[0].Analysis.Findings) != 0 {
-		test.Errorf("want net's entry, its withheld files renamed and no finding, got %+v", entry)
-	}
-
-	outside := portable
-	outside.Withheld = load.PackageWithheld{Declarations: []string{filepath.Join(string(filepath.Separator), "opt",
-		"other-go", "src", "net", "cgo_unix.go") + ":7:6"}}
-	walked := portable
-	walked.Files = []storedFile{{Name: inRoot, Nodes: 1}}
-	for name, refused := range map[string]cacheEntry{"outside GOROOT": outside, "with its files' walk": walked} {
-		if _, _, refusedError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
-			key: {PackagePath: "net", Entry: encoded(refused), AnswersWhole: true, ReadsJudged: true},
-		}, goRoot, nil); refusedError == nil {
-			test.Errorf("%s: want the entry refused", name)
-		}
-	}
-}
-
 // filesKeyed is every distinct file of the packages loaded reaches that a key hashes, all of them but unsafe's and
 // those of a package with no files, and of those the files of the packages in module, the ones no standard-library
 // key reads.
@@ -227,16 +161,6 @@ func systemCacheCaching(system *cache.Store, context cache.StandardLibraryContex
 	return &Caching{StandardLibrary: &StandardLibraryCaching{System: system, Context: context}}
 }
 
-// collectingCaching is a findings cache with a project store of the test's own that collects the standard library's
-// entries under context for the release's table, as the release's generator does.
-func collectingCaching(test *testing.T, rules []rule.Rule, context cache.StandardLibraryContext) *Caching {
-	test.Helper()
-	caching := testCaching(test, rules)
-	caching.StandardLibrary = &StandardLibraryCaching{Context: context,
-		Collected: map[cache.Key]StandardLibraryRunEntry{}}
-	return caching
-}
-
 // systemStore is a system cache's store of the test's own.
 func systemStore(test *testing.T) *cache.Store {
 	test.Helper()
@@ -245,7 +169,7 @@ func systemStore(test *testing.T) *cache.Store {
 
 // runSessionWith is runWithSession with the session opened for sessionRules and the run made of runRules, so a test
 // can have the session expect an analyzer the run never runs, and with what each package read of others recorded, as
-// a run keeping a system cache records it, so the entries it collects persist their reads (PersistCollectedReads).
+// a run keeping a system cache records it.
 func runSessionWith(
 	test *testing.T,
 	directory string,
@@ -266,25 +190,6 @@ func runSessionWith(
 		test.Fatalf("running %d rules: %v", len(runRules), runError)
 	}
 	return sessionRun{loaded: loaded, result: result, session: session}
-}
-
-// persistRunReads has run's session persist its collected entries' reads once every type-read walk has ended, as a
-// finished run does (PersistCollectedReads).
-func persistRunReads(run sessionRun) {
-	run.result.ReadWalks.Wait()
-	run.session.PersistCollectedReads(run.result.Reads)
-}
-
-// standardKeyOf is the standard-library key run's session gave the package at path.
-func standardKeyOf(test *testing.T, run sessionRun, path string) cache.Key {
-	test.Helper()
-	for keyed, key := range run.session.standardLibraryKeys {
-		if keyed.PkgPath == path {
-			return key
-		}
-	}
-	test.Fatalf("the session keyed no standard-library package %s", path)
-	return cache.Key{}
 }
 
 // A run without a project's store, as under `--no-cache`, names the owner of every answer a standard-library package
@@ -324,82 +229,6 @@ func TestARunWithoutAStoreNamesEveryStandardLibraryRead(test *testing.T) {
 	if withReads == 0 {
 		test.Errorf("no entry of the %d written read an answer of another package, so the run tells nothing",
 			len(run.session.standardLibraryKeys))
-	}
-}
-
-// An entry the release's table would refuse is never collected for it (wholeForTable): a run whose session expects a
-// fact analyzer its rules never run collects only the standard-library packages its first wave ran that analyzer on,
-// every one of them with its analysis, and none it never reached, and a run whose strings answers were computed in
-// part collects no strings.
-func TestAnEntryTheTableWouldRefuseIsNeverCollected(test *testing.T) {
-	test.Parallel()
-
-	directory := standardLibraryModule(test)
-	context := standardLibraryContext("check tests", goRootOf(test))
-	counting := countingFactRule(&sync.Map{})
-	clauses := houseRule(packageClauseAnalyzer)
-	factless := collectingCaching(test, []rule.Rule{counting, clauses}, context)
-	factlessRun := runSessionWith(test, directory, factless, []rule.Rule{counting, clauses}, []rule.Rule{clauses})
-	countingSlot := factlessRun.session.known.slots[counting.Analyzer]
-	for _, collected := range factless.StandardLibrary.Collected {
-		var entry cacheEntry
-		if decodeError := gob.NewDecoder(bytes.NewReader(collected.Entry)).Decode(&entry); decodeError != nil {
-			test.Fatal(decodeError)
-		}
-		if _, analyzed := entry.Analyzers[countingSlot]; !analyzed {
-			test.Errorf("%s was collected without its fact analyzer's analysis", collected.PackagePath)
-		}
-	}
-	if len(factless.StandardLibrary.Collected) == len(factlessRun.session.standardLibraryKeys) {
-		test.Error("want the packages no fact analyzer reached left out, so the run tells something")
-	}
-
-	rules := []rule.Rule{counting, houseRule(ctrlflow.Analyzer)}
-	inPart := collectingCaching(test, rules, context)
-	inPart.AnswersInPart = map[string]bool{"strings": true}
-	partial := runSessionWith(test, directory, inPart, rules, rules)
-	if _, collected := inPart.StandardLibrary.Collected[standardKeyOf(test, partial, "strings")]; collected {
-		test.Error("want strings, its answers computed in part, never collected")
-	}
-	if _, collected := inPart.StandardLibrary.Collected[standardKeyOf(test, partial, "unicode/utf8")]; !collected {
-		test.Error("want unicode/utf8, whole, collected")
-	}
-}
-
-// standardLibraryEntryWhole reads each of its three things on its own: an entry whole in each is taken, and one short
-// in any one of them is refused, a fact analyzer's analysis missing, its answers computed in part or a kind of them
-// not complete, or its reads never judged.
-func TestTheWholeCheckReadsEachOfItsThings(test *testing.T) {
-	test.Parallel()
-
-	whole := StandardLibraryRunEntry{FactAnalyzers: []string{"facts"}, AnswersWhole: true, ReadsJudged: true}
-	entry := cacheEntry{
-		Analyzers: map[string]storedAnalysis{"facts": {}},
-		Answers:   []kindAnswers{{Kind: "purity", Complete: true}},
-	}
-	if !standardLibraryEntryWhole(whole, entry) {
-		test.Fatal("want a whole entry taken")
-	}
-	missingFacts := whole
-	missingFacts.FactAnalyzers = []string{"facts", "other"}
-	answersInPart := whole
-	answersInPart.AnswersWhole = false
-	readsUnjudged := whole
-	readsUnjudged.ReadsJudged = false
-	kindInPart := entry
-	kindInPart.Answers = []kindAnswers{{Kind: "purity", Complete: false}}
-	for name, short := range map[string]struct {
-		collected StandardLibraryRunEntry
-		entry     cacheEntry
-	}{
-		"a fact analyzer's analysis missing": {missingFacts, entry},
-		"answers computed in part":           {answersInPart, entry},
-		"a kind of answers not complete":     {whole, kindInPart},
-		"reads never judged":                 {readsUnjudged, entry},
-	} {
-		if standardLibraryEntryWhole(short.collected, short.entry) {
-			test.Errorf("%s: want the entry refused", name)
-		}
 	}
 }
 

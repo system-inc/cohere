@@ -104,21 +104,9 @@ type Record struct {
 	// the same in every one of those runs. Absent when they name none: no Go project, or a record written before the
 	// benchmark read them.
 	Builds []string `json:"builds,omitempty"`
-	// StandardLibraryTable is the Go standard library's analysis entries the engine binary carries and reads, as a
-	// release's binary does, from its `--version`. Absent, the binary computed the standard library in every cold
-	// run, as a local build does, and so did every record before it: the bar is read on the binary a user runs
-	// (#b2t9xmf's ruling), so Guard never compares a local build's number with a release's (#ccqee0e).
-	StandardLibraryTable *StandardLibraryTable `json:"standardLibraryTable,omitempty"`
 
 	Runs  []Run                `json:"runs"`
 	Modes map[Mode]ModeSummary `json:"modes"`
-}
-
-// StandardLibraryTable is the table of the Go standard library's analysis entries a release writes into its binary:
-// the release stamp its keys hold, and its size.
-type StandardLibraryTable struct {
-	ReleaseStamp string `json:"releaseStamp"`
-	Bytes        int    `json:"bytes"`
 }
 
 // BuildsSeparator joins the builds one run checked in the benchmark's runs table, since a build's label holds spaces

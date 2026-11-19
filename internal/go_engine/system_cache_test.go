@@ -32,6 +32,24 @@ func TestTheTestsSystemCacheIsNotTheUsers(test *testing.T) {
 // another.
 var testsSystemCache string
 
+func TestMain(suite *testing.M) {
+	if os.Getenv(timingMarginChildVariable) != "" {
+		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
+	}
+	// Every run in this process, and every child it starts, reads a system cache of this test binary's own rather
+	// than the person's (#syscache). The engine's test helpers give each run a system cache of its own beside that
+	// (isolatedSource), and a test that names one on the run (standardLibrarySource's systemCacheRoot), or sets the
+	// variable itself, reads that one.
+	removeSystemCache, isolateError := system_cache_testing.Isolate()
+	if isolateError != nil {
+		os.Exit(refuse(os.Stderr, isolateError))
+	}
+	testsSystemCache = os.Getenv(system_cache_testing.Variable)
+	code := suite.Run()
+	removeSystemCache()
+	os.Exit(code)
+}
+
 // isolatedSource is source with a new, empty system cache of the run's own, unless source names one or the test set
 // the variable to one of its own, which the run then reads. Each run of a test that names none computes the standard
 // library and writes its table where no other run reads it, so its records are what they are for a cold system cache

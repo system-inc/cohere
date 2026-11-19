@@ -61,43 +61,15 @@ type Caching struct {
 
 // StandardLibraryCaching is the standard library's entries as a run keeps them (#syscache): System, the system
 // cache's store, which holds each standard-library package's entry under its standard-library key in its build's
-// context, and what every such key shares but the fact analyzers and the loader, which the session names. A System
-// that is nil holds nothing, as in a run that only collects entries; one that is not keeps the standard library
-// alone, so no standard-library package keyed apart is written to the project's store (storeFor). Collected, when it
-// is not nil, gains each standard-library package the run computed, by its standard-library key, for the release's
-// table, which StandardLibraryTableOf writes.
+// context, and what every such key shares but the fact analyzers and the loader, which the session names. It keeps the
+// standard library alone, so no standard-library package keyed apart is written to the project's store (storeFor).
 type StandardLibraryCaching struct {
-	System    *cache.Store
-	Context   cache.StandardLibraryContext
-	Collected map[cache.Key]StandardLibraryRunEntry
+	System  *cache.Store
+	Context cache.StandardLibraryContext
 
 	// Toolchain is the Go version and `GOROOT` go env reports, which every standard-library dependence record's key
 	// holds beside the engine (StandardLibraryDependenceRecordKey, #6a3kjvz).
 	Toolchain string
-}
-
-// StandardLibraryRunEntry is one standard-library package a run computed: its import path, its entry and export data
-// as the run encoded them, which still name this machine's files, and its reads of other packages as persistReads
-// persisted them once the run's reads were whole (PersistCollectedReads), nil until then and for reads that cannot be
-// persisted. The rest is what standardLibraryEntryWhole judges it by before the release's table takes it.
-type StandardLibraryRunEntry struct {
-	PackagePath string
-	Entry       []byte
-	ExportData  []byte
-	Reads       []byte
-
-	// FactAnalyzers are the slots of every analyzer that learns facts in the run that computed the entry, each of
-	// which a whole entry holds an analysis of.
-	FactAnalyzers []string
-
-	// AnswersWhole is whether the entry's answers are every answer of its package, computed whole (demandOf's
-	// answersWhole), rather than those the run's questions happened to compute in it.
-	AnswersWhole bool
-
-	// ReadsJudged is set once the run's reads were whole and PersistCollectedReads judged the package's recorded reads:
-	// persisted in Reads, or left nil for reads no record can hold, which an extra build declines, as the generator
-	// leaves them. A package whose reads the run never recorded, in a run keeping no system cache, is never judged.
-	ReadsJudged bool
 }
 
 // CacheCounts is what the cache did in one run, by package: every package the load reached is a hit, restored from
@@ -1038,7 +1010,6 @@ func (session *CacheSession) saveMisses(
 				if entry.hasOutput {
 					session.outputs[saved] = entry.output
 				}
-				session.collect(saved, entry, demanded, actionsOf[saved])
 			}
 			switch {
 			case errors.Is(encodeError, errorUnstorable):

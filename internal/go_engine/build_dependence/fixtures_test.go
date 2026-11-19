@@ -293,7 +293,7 @@ func TestDependentObjectsAnswerForAPackageTheGraphDoesNotHold(test *testing.T) {
 }
 
 // restoredFromExportData is host's workspace packages checked again against the dependency's types read from export
-// data, as the engine's host reads a package it restored from the binary's table: each object the workspace reads of
+// data, as the engine's host reads a package it restored from the system cache: each object the workspace reads of
 // the dependency is another than the one the dependency's own load declares, and a graph of these packages holds
 // nothing of the dependency.
 func restoredFromExportData(test *testing.T, host loadedBuild) loadedBuild {
