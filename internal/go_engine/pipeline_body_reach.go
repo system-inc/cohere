@@ -68,6 +68,11 @@ func writeBuildBodyReach(written *strings.Builder, heading string, census *build
 	for _, identifier := range census.declarationsOnly {
 		fmt.Fprintf(written, "    %s\n", identifier)
 	}
+	fmt.Fprintf(written, "  bodies judged not the build's count, each package reached whole: %d packages\n",
+		len(census.miscounted))
+	for _, identifier := range census.miscounted {
+		fmt.Fprintf(written, "    %s\n", identifier)
+	}
 	var unreachedDependent []reachedBody
 	var reachedIndependent []reachedBody
 	for _, body := range census.bodies {

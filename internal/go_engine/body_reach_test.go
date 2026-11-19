@@ -27,11 +27,13 @@ import (
 //     and the differential's mutants are the Named row and the shadow rule.
 //   - Size reads the universe's len, which windows declares at package level: reached, Shadowed, by no bit at all.
 //   - Configured reads settings.A, whose identity is unknown: reached, Unknown, though no bit it reads is set.
-//   - Gadget.Spin, Joined and High use nothing that differs: unreached, and the graph's unit verdict agrees on each.
-//     High's shift reads the word size, which windows's arm64 shares with the host.
+//   - After, which a //line directive places in reach.rl, a file no build lists, calls platformName: reached, Named,
+//     its file decided by the file as parsed, so it is neither counted absent nor left out of the count.
+//   - Gadget.Spin, Joined, High and Before use nothing that differs: unreached, and the graph's unit verdict agrees on
+//     each. High's shift reads the word size, which windows's arm64 shares with the host.
 //
 // platformName's body in the host-only file is absent on windows, and windows's own platformName, Spin and len are
-// new. The body differential compares the three unreached bodies' types, uses and findings on windows with the host's,
+// new. The body differential compares the four unreached bodies' types, uses and findings on windows with the host's,
 // and none differs. The census is written to its file, and the findings are the run's without it, which writes no
 // census.
 func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
@@ -88,6 +90,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"Gadget.Spin":  "unreached",
 		"Joined":       "unreached",
 		"High":         "unreached",
+		"Before":       "unreached",
+		"After":        "Named",
 	}
 	if !maps.Equal(got, want) {
 		test.Errorf("windows's census judges the host's bodies\n%v\nwant\n%v", got, want)
@@ -101,6 +105,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"Gadget.Spin":  "",
 		"Joined":       "",
 		"High":         "",
+		"Before":       "",
+		"After":        "example.com/reach.platformName (reach_other.go) Named name in the body",
 	}
 	if !maps.Equal(drivers, wantDrivers) {
 		test.Errorf("windows's census says each body is reached first by\n%v\nwant\n%v", drivers, wantDrivers)
@@ -116,21 +122,28 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		within.reached != census.reached {
 		test.Errorf("want the census within the plain run's from-source packages the whole, got %+v", within)
 	}
-	if census.total != 8 || census.reached != 5 || census.absent != 1 || census.new != 3 {
-		test.Errorf("want 8 bodies, 5 reached, 1 absent and 3 new, got %d, %d, %d and %d", census.total,
+	if census.total != 10 || census.reached != 6 || census.absent != 1 || census.new != 3 {
+		test.Errorf("want 10 bodies, 6 reached, 1 absent and 3 new, got %d, %d, %d and %d", census.total,
 			census.reached, census.absent, census.new)
 	}
-	if census.recorded != 1 || census.buildOnlyPackages != 0 || len(census.declarationsOnly) != 0 {
-		test.Errorf("want the one package recorded, none the build's alone and none of declarations only, got %d, "+
-			"%d and %v", census.recorded, census.buildOnlyPackages, census.declarationsOnly)
+	if census.recorded != 1 || census.buildOnlyPackages != 0 || len(census.declarationsOnly) != 0 ||
+		len(census.miscounted) != 0 {
+		test.Errorf("want the one package recorded, none the build's alone, none of declarations only and none "+
+			"miscounted, got %d, %d, %v and %v", census.recorded, census.buildOnlyPackages, census.declarationsOnly,
+			census.miscounted)
+	}
+	for _, body := range census.bodies {
+		if body.name == "After" && filepath.Base(body.file) != "reach.rl" {
+			test.Errorf("After is reported in %s, want the file its //line directive names", body.file)
+		}
 	}
 
 	differential := on.buildRuns[1].bodyDifferential
 	if differential == nil {
 		test.Fatal("windows's run has no body differential")
 	}
-	if differential.compared != 3 || len(differential.failures) != 0 {
-		test.Errorf("want the 3 unreached bodies compared with the host's and none differing, got %d compared and "+
+	if differential.compared != 4 || len(differential.failures) != 0 {
+		test.Errorf("want the 4 unreached bodies compared with the host's and none differing, got %d compared and "+
 			"the failures\n%s", differential.compared, strings.Join(differential.failures, "\n"))
 	}
 
@@ -140,9 +153,9 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	}
 	for _, line := range []string{
 		"build " + on.buildRuns[1].build.String(),
-		"  bodies: 8, reached 5, unreached 3, absent 1, new 3",
+		"  bodies: 10, reached 6, unreached 4, absent 1, new 3",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
-		"  body differential: compared 3, failures 0",
+		"  body differential: compared 4, failures 0",
 	} {
 		if !slices.Contains(strings.Split(string(written), "\n"), line) {
 			test.Errorf("the census file has no line %q:\n%s", line, written)

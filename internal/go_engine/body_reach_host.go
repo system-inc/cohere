@@ -33,9 +33,10 @@ import (
 //     path is its own selection in the record, so reads its own name bit the same way.
 //   - ValueType and TypeArgument: both bits, since a value's copy, comparison or conversion and a constraint's check
 //     read its layout and its method set alike.
-// A body is reached by the first of: the build's sizes differing from the host's, its package unrecorded, a part of it
-// unknown, its signature reaching (its body type-checks against the signature), its body reaching, by the first use in
-// the record's order that does, and a shadowed name in either part. A build whose word size or maximum alignment
+// A body is reached by the first of: the build's sizes differing from the host's, its package unrecorded, its
+// package's bodies judged not the bodies the build counts in the files both compile (Miscounted), a part of it
+// unknown, its signature reaching (its body type-checks against the signature), its body reaching, by the first use
+// in the record's order that does, and a shadowed name in either part. A build whose word size or maximum alignment
 // differs from the host's (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift
 // past a word or `math.MaxInt` type-check to other constants there with no file differing, which no bit says, as the
 // restore's own sizes gate refuses such a build every package (check's hostSizesDiffer, #61qj12v).
@@ -52,6 +53,7 @@ type bodyReachReason string
 const (
 	reachedSizes        bodyReachReason = "Sizes"
 	reachedUnrecorded   bodyReachReason = "Unrecorded"
+	reachedMiscounted   bodyReachReason = "Miscounted"
 	reachedUnknown      bodyReachReason = "Unknown"
 	reachedSignature    bodyReachReason = "Signature"
 	reachedNamed        bodyReachReason = "Named"
@@ -64,9 +66,9 @@ const (
 )
 
 // bodyReachReasons are the reasons in the order the census writes them, the order a body is judged by.
-var bodyReachReasons = []bodyReachReason{reachedSizes, reachedUnrecorded, reachedUnknown, reachedSignature,
-	reachedNamed, reachedConstant, reachedLoadMode, reachedSelected, reachedValueType, reachedTypeArgument,
-	reachedShadowed}
+var bodyReachReasons = []bodyReachReason{reachedSizes, reachedUnrecorded, reachedMiscounted, reachedUnknown,
+	reachedSignature, reachedNamed, reachedConstant, reachedLoadMode, reachedSelected, reachedValueType,
+	reachedTypeArgument, reachedShadowed}
 
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
 // by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its
@@ -104,7 +106,8 @@ func newBodyReachHost(
 // reachBuiltPackage is what the census reads of one package a build checked from source, from the build's own syntax,
 // taken before its rules let the syntax go: the files it compiles as written, the bodies in the files the host's
 // package of its ID compiles too and in those only the build compiles, every file's when the host has no such package,
-// the names its build-only files declare at package level, and the paths each shared file imports by a dot.
+// the names its build-only files declare at package level, and the paths each shared file imports by a dot, by the
+// file as parsed.
 type reachBuiltPackage struct {
 	identifier      string
 	files           map[string]bool
@@ -135,9 +138,11 @@ func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*r
 			bodies := syntaxBodies(file)
 			if isHosted && slices.Contains(hosted, name) {
 				read.sharedBodies += bodies
+				parsed := each.Fset.File(file.FileStart).Name()
 				for _, imported := range file.Imports {
 					if imported.Name != nil && imported.Name.Name == "." {
-						read.dotImports[name] = append(read.dotImports[name], strings.Trim(imported.Path.Value, "\"`"))
+						read.dotImports[parsed] = append(read.dotImports[parsed],
+							strings.Trim(imported.Path.Value, "\"`"))
 					}
 				}
 				continue
@@ -193,8 +198,9 @@ func syntaxBodies(file *ast.File) int {
 // buildBodyReach is one build's census: the packages it checked from source, those of them the host recorded and
 // those only the build has; their bodies, reached by reason, absent (in the host's files the build does not compile)
 // and new (in files only the build compiles, always checked); the recorded packages none of whose bodies is reached
-// and none new, which need their declarations alone; and every body of a recorded package, in the order the packages'
-// IDs and their records give, which the disagreements with the graph's unit verdict are read from.
+// and none new, which need their declarations alone; the recorded packages whose judged bodies are not the bodies the
+// build counts in the files both compile, each reached whole; and every body of a recorded package, in the order the
+// packages' IDs and their records give, which the disagreements with the graph's unit verdict are read from.
 type buildBodyReach struct {
 	checkedFromSource int
 	recorded          int
@@ -205,6 +211,7 @@ type buildBodyReach struct {
 	new               int
 	byReason          map[bodyReachReason]int
 	declarationsOnly  []string
+	miscounted        []string
 	bodies            []reachedBody
 }
 
@@ -257,6 +264,22 @@ func (host *bodyReachHost) judge(reacher *bodyReacher, built []*reachBuiltPackag
 		census.recorded++
 		bodies, absent := reacher.reachPackage(hosted, record, read)
 		census.absent += absent
+		// The bodies judged must be every body the build counts in the files both compile, or one of them was
+		// counted absent, or judged in a file the build does not compile, so none is left unreached: the package is
+		// reached whole, its count the build's.
+		if len(bodies) != read.sharedBodies {
+			census.miscounted = append(census.miscounted, read.identifier)
+			reason := cmp.Or(reacher.sizesReason(), reachedMiscounted)
+			for index := range bodies {
+				bodies[index].reason, bodies[index].constantsOnlyReason = reason, reason
+				bodies[index].driver = "the package's bodies miscounted"
+			}
+			census.total += read.sharedBodies
+			census.reached += read.sharedBodies
+			census.byReason[reason] += read.sharedBodies
+			census.bodies = append(census.bodies, bodies...)
+			continue
+		}
 		census.total += len(bodies)
 		packageReached := 0
 		for _, body := range bodies {

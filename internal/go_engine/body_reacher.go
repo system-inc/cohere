@@ -40,7 +40,9 @@ type bodyReacher struct {
 }
 
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
-// and counts those in files it does not, absent.
+// and counts those in files it does not, absent. Whether the build compiles a body's file is read by the file as
+// parsed, never as a //line directive renames it, which names no file the build lists (#w72zxtq, the review's must 8);
+// the renamed file is the one the census reports and the graph's units are placed in.
 func (reacher *bodyReacher) reachPackage(
 	hosted *packages.Package,
 	record *build_reads.FunctionUses,
@@ -61,11 +63,11 @@ func (reacher *bodyReacher) reachPackage(
 				constantsOnlyReason: reachedUnknown, unitDependent: true})
 			continue
 		}
-		position := tokenFile.Position(declared.Declaration.File + token.Pos(declared.Declaration.Offset))
-		if !read.files[position.Filename] {
+		if !read.files[tokenFile.Name()] {
 			absent++
 			continue
 		}
+		position := tokenFile.Position(declared.Declaration.File + token.Pos(declared.Declaration.Offset))
 		if reacher.sizesDiffer {
 			bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
 				line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reachedSizes,
@@ -78,7 +80,7 @@ func (reacher *bodyReacher) reachPackage(
 			reacher.identities, reacher.fileSet = build_reads.NewIdentityRenderer(hosted.Fset, nil), hosted.Fset
 		}
 		reason, driver := reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
-			read.dotImports[position.Filename])
+			read.dotImports[tokenFile.Name()])
 		// A body the general rule reaches is judged again under the constants-only load mode rule, the census's count
 		// of what the general one costs: the load mode may have reached it through its signature as well as its body.
 		// An unreached body is unreached by both, the narrower rule reaching nothing the general one does not.
@@ -87,7 +89,7 @@ func (reacher *bodyReacher) reachPackage(
 		if reason != "" {
 			reacher.constantsOnly = true
 			constantsOnlyReason, _ = reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
-				read.dotImports[position.Filename])
+				read.dotImports[tokenFile.Name()])
 			reacher.constantsOnly = false
 		}
 		bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
