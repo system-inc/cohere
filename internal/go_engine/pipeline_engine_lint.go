@@ -319,9 +319,11 @@ func (engine *pipeline) lintPackages(
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
 	}
-	// Under `--timeline` the host's check stamps its analysis and its save, and its end below, in the pass's round: 0
-	// for the run's first, 1 for the pass over the wrap's load, a rename's or a reload's after it.
-	options.Timeline = engine.request.timeline.Hook(nil, int(engine.hostChecks.Add(1)-1), "host.")
+	// Under `--timeline` the host's check stamps its analysis and its save, and its end below, in the round of the load
+	// it runs over, as a build's check does, so a reader joins a check to its load by round: the host's last load, the
+	// one a pass beside the load is begun inside and every other pass follows, a rename's counted though it stamps
+	// nothing (hostLoads).
+	options.Timeline = engine.request.timeline.Hook(nil, int(engine.hostLoads.Load()-1), "host.")
 	result, checkError := check.Run(analyzed, enabled, options)
 	timeline.Tell(options.Timeline, "lint.check.end")
 	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()

@@ -190,11 +190,13 @@ type pipeline struct {
 	hostLoading atomic.Int64
 	hostLinting atomic.Int64
 
-	// hostLoads and hostChecks count the host's loads of the workspace (loadWorkspacePackages) and its lint passes
-	// (lintPackages) as each starts, so under `--timeline` each one's stamps carry its round, 0 for the first, and no
-	// two stamps of the run are alike (#3v2zp7g). A pass beside the load starts on a goroutine of its own.
-	hostLoads  atomic.Int32
-	hostChecks atomic.Int32
+	// hostLoads counts the host's loads of the workspace as each starts, every one through loadWorkspacePackages and
+	// the load of what a rename wrote (runRename), so under `--timeline` each load's stamps, and the stamps of the lint
+	// pass over it (lintPackages), carry its round, 0 for the first, and no two stamps of the run are alike (#3v2zp7g).
+	// The rename's load stamps nothing, since it reads no findings cache to hand a hook, and counts all the same, so
+	// the pass over it is a round of its own. A pass beside the load reads it on a goroutine of its own, once the load
+	// that begins it has counted itself, and before any other load starts.
+	hostLoads atomic.Int32
 
 	// reads are the directory and file reads every in-process listing of the run shares, the host's and each extra
 	// build's, so an extra build's listing reads nothing the host's already did (#yyvstj6). Every load of the run may

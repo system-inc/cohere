@@ -8,6 +8,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
@@ -128,6 +130,56 @@ func TestTimelineIsRefusedAtARootWithNoGoProject(test *testing.T) {
 					testCase.refused, found.Projects)
 			}
 		})
+	}
+}
+
+// TestARealGoRunUnderTheTimelinePrintsIt: the built binary over a small Go module under `--timeline`, end to end, the
+// engine making its recorder as it reads the command line and the front door taking the record because the run asked
+// (#3v2zp7g). Under `--json` the timeline line comes before the summary, its host's stamps in their order from the
+// engine's start through the host's load to the run's end; without it the table is on the terminal, ending at the
+// run's end. No other test reaches the two lines that make this work in a real run: the engine's recorder made in
+// runOverlapping, and the front door's run told it asked (runGoEngine).
+func TestARealGoRunUnderTheTimelinePrintsIt(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		goModuleMarker: "module example.com/mapped\n\ngo 1.27\n",
+		"mapped.go": "// Package mapped is a module with one function to map a run over.\npackage mapped\n\n" +
+			"// Mapped is one.\nfunc Mapped() int {\n\treturn 1\n}\n",
+	})
+	// A finding of a house rule would exit 1 and still be a whole run, so only a run that did not end is refused here.
+	output, exit := runCohere(test, binary, root, "--no-fix", "--timeline", "--json")
+	if exit != 0 && exit != 1 {
+		test.Fatalf("the run exited %d, want a run that ended:\n%s", exit, output)
+	}
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	timeline := slices.IndexFunc(lines, func(line string) bool { return strings.HasPrefix(line, `{"kind":"timeline"`) })
+	summary := slices.IndexFunc(lines, func(line string) bool { return strings.Contains(line, `"kind":"summary"`) })
+	if timeline < 0 || summary < timeline {
+		test.Fatalf("no timeline line before the summary:\n%s", output)
+	}
+	var record contract.TimelineRecord
+	if decodeError := json.Unmarshal([]byte(lines[timeline]), &record); decodeError != nil {
+		test.Fatalf("decoding the timeline line %q: %v", lines[timeline], decodeError)
+	}
+	var labels []string
+	for _, stamp := range record.Stamps {
+		if slices.Contains([]string{"engine.main.begin", "host.load.end", "run.end"}, stamp.Label) {
+			labels = append(labels, stamp.Label)
+		}
+	}
+	if want := []string{"engine.main.begin", "host.load.end", "run.end"}; !slices.Equal(labels, want) {
+		test.Errorf("the timeline stamped %q of the host's steps, want %q in that order:\n%s", labels, want,
+			lines[timeline])
+	}
+
+	output, exit = runCohere(test, binary, root, "--no-fix", "--timeline")
+	if exit != 0 && exit != 1 || !strings.Contains(output, "\ntimeline: when each step began or ended") ||
+		!strings.Contains(output, "\n  run.end ") {
+		test.Errorf("the run without --json exited %d, want a run that ended with the timeline's table through the "+
+			"run's end:\n%s",
+			exit, output)
 	}
 }
 

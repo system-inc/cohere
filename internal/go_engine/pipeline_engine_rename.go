@@ -166,6 +166,9 @@ func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.L
 	// The first load and its lint pass served only the rename, and the load of what it wrote is the types phase's. The
 	// last round's proof is unread from here, so it goes as the written tree loads.
 	engine.fix.elapsed += loaded.Elapsed + time.Since(started)
+	// A load of the host's, counted for the round of the lint pass over it under `--timeline`, though it stamps
+	// nothing.
+	engine.hostLoads.Add(1)
 	reloaded, reloadError := engine.loadPackages(loadRequest{environment: engine.described.workspace.Environment()})
 	return reloaded, nil, reloadError
 }

@@ -225,31 +225,57 @@ func TestATimelineMapsEveryPhaseAndBuildInOrder(test *testing.T) {
 	}
 }
 
+// hostLoadTimeline is every stamp of one host load, in the order taken: its listing, its restore from the findings
+// cache, its first parse and its end.
+var hostLoadTimeline = []string{
+	"host.listing.end",
+	"host.restore.begin",
+	"host.restore.end",
+	"host.parse.first",
+	"host.load.end",
+}
+
+// hostCheckTimeline is every stamp of one host lint pass with a findings cache, in the order taken.
+var hostCheckTimeline = []string{
+	"host.check.analyze.begin",
+	"host.check.analyze.end",
+	"host.check.save.begin",
+	"host.check.save.end",
+	"host.lint.check.end",
+}
+
 // A load or a check that runs again stamps in its own round: a fixing run whose long-line wrap wrote loads the
-// workspace a second time, whose steps carry round 1, every load's steps end in their own `host.load.end`, and no two
-// stamps are alike. A run that loads nothing, `--format-only`, stamps no load at all.
+// workspace a second time, whose steps carry round 1, each load's steps whole and in order, and its one lint pass, over
+// the wrap's load, carries that load's round, 1, so a reader joins the check to its load. No two stamps are alike. A
+// run that loads nothing, `--format-only`, stamps no load at all.
 func TestATimelineTellsALoadThatRunsAgainByItsRound(test *testing.T) {
 	test.Parallel()
 	record := timelineOf(test, timelineRun(test, copyFixture(test, filepath.Join("testdata", "long-lines")), 0, nil,
 		exitFindings, "--timeline"))
 	requireUniqueStamps(test, record)
 	loads := map[int][]string{}
+	checks := map[int][]string{}
 	for _, stamp := range record.Stamps {
-		if strings.HasPrefix(stamp.Label, "host.") && !strings.HasPrefix(stamp.Label, "host.check.") &&
-			stamp.Label != "host.lint.check.end" {
+		switch {
+		case slices.Contains(hostLoadTimeline, stamp.Label):
 			loads[stamp.Round] = append(loads[stamp.Round], stamp.Label)
+		case slices.Contains(hostCheckTimeline, stamp.Label):
+			checks[stamp.Round] = append(checks[stamp.Round], stamp.Label)
 		}
 	}
 	for round := range 2 {
-		if steps := loads[round]; len(steps) == 0 || steps[len(steps)-1] != "host.load.end" ||
-			!slices.Contains(steps, "host.listing.end") {
-			test.Errorf("the load of round %d stamped %q, want its listing and its own end last", round, steps)
+		if !slices.Equal(loads[round], hostLoadTimeline) {
+			test.Errorf("the load of round %d stamped\n  %q\nwant\n  %q", round, loads[round], hostLoadTimeline)
 		}
 	}
 	if len(loads) != 2 {
+		test.Errorf("the run stamped loads of rounds %v, want the first and the wrap's",
+			slices.Sorted(maps.Keys(loads)))
+	}
+	if len(checks) != 1 || !slices.Equal(checks[1], hostCheckTimeline) {
 		test.Errorf(
-			"the run stamped loads of rounds %v, want the first and the wrap's",
-			slices.Sorted(maps.Keys(loads)),
+			"the run stamped checks %v, want one, in round 1, the round of the wrap's load it runs over",
+			checks,
 		)
 	}
 
@@ -258,6 +284,48 @@ func TestATimelineTellsALoadThatRunsAgainByItsRound(test *testing.T) {
 	for _, stamp := range formatOnly.Stamps {
 		if strings.HasPrefix(stamp.Label, "host.") {
 			test.Errorf("a run that loads nothing stamped %+v", stamp)
+		}
+	}
+}
+
+// buildReloadTimeline is every stamp a build's reload for a question takes, in its round, in the order taken: its
+// load's listing, restore, first parse and end, then its check over that load.
+var buildReloadTimeline = []string{
+	"listing.end",
+	"restore.begin",
+	"restore.end",
+	"parse.first",
+	"load.end",
+	"check.analyze.begin",
+	"check.analyze.end",
+	"check.save.begin",
+	"check.save.end",
+}
+
+// A build loaded again stamps the reload in its own round: over the fixture whose windows build declines two packages
+// at its check and loads once more (TestAReloadsChecksFromSourceReachTheRecord), windows stamps the reload's load,
+// its end among them, and the check over it in round 1, every other build stamps nothing past round 0, and no two
+// stamps are alike.
+func TestATimelineTellsABuildsReloadByItsRound(test *testing.T) {
+	test.Parallel()
+	record := timelineOf(test, timelineRun(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), 0,
+		nil, exitFindings, "--no-cache", "--timeline"))
+	requireUniqueStamps(test, record)
+	reloads := map[string][]string{}
+	for _, stamp := range record.Stamps {
+		if stamp.Build != "" && stamp.Round > 0 {
+			if stamp.Round != 1 {
+				test.Errorf("stamp %+v is of round %d, and the fixture reloads once", stamp, stamp.Round)
+			}
+			reloads[stamp.Build] = append(reloads[stamp.Build], stamp.Label)
+		}
+	}
+	if len(reloads) != 1 {
+		test.Fatalf("builds %v stamped a reload, want windows alone", slices.Sorted(maps.Keys(reloads)))
+	}
+	for build, steps := range reloads {
+		if !strings.HasPrefix(build, "windows/") || !slices.Equal(steps, buildReloadTimeline) {
+			test.Errorf("build %s stamped its reload\n  %q\nwant windows's\n  %q", build, steps, buildReloadTimeline)
 		}
 	}
 }
