@@ -876,6 +876,11 @@ func runPinned(test *testing.T, faithful bool) pinnedRun {
 // Typed keeps SA4023 with typed, which is not trivial, stubbed by a lone panic, which is. The control runs the same
 // variant with every stub a bare panic(0) and answers computed from the stubs, and loses Leaks's, Discards's, Starts's
 // and Typed's findings, so the pin holds something a naive stub breaks.
+//
+// For SA2002 this is the only proof that the finding itself rests on the answer. A rule that asks about a function the
+// package declares and then reads that function's blocks whenever they happen to be built passes every test beside
+// the rule, parity and each function judged alone among them, and is red only here, where the blocks built are the
+// stub's. One that reads them without asking is red here too, and in the rule's own census of what it asked.
 func TestAKeptUnitKeepsTheFindingThatRestsOnAStubbedCallee(test *testing.T) {
 	test.Parallel()
 	faithful := runPinned(test, true)
