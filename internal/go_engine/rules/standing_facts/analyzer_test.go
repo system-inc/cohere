@@ -56,6 +56,9 @@ func TestACalleeWhoseAnswerDiffersTakesItsStandingCallerOut(test *testing.T) {
 	if result.Stands(warm.File, warm.Offset) {
 		test.Errorf("Warm stands, though size's answer differs in the build")
 	}
+	if !host.standing[warm] {
+		test.Errorf("the pass took Warm out of the host's own set, which is the host's and only read")
+	}
 	if !result.Partial || result.Settlement.Asked != 1 || result.Settlement.Differing[purity] != 1 {
 		test.Errorf("partial %t, asked %d, differing %v, want a partial package, one question, one differing",
 			result.Partial, result.Settlement.Asked, result.Settlement.Differing)

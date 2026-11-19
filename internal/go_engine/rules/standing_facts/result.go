@@ -9,7 +9,8 @@ type Result struct {
 	// package the checker handed no host's side of, and for one the host's side says the build lints whole.
 	Partial bool
 
-	// Settlement is what the fixed point took out and asked (fact_reach.Settle), nil when Partial is false.
+	// Settlement is what the fixed point left standing, took out and asked (fact_reach.Settle), nil when Partial is
+	// false. Its Standing is the bodies still standing once the walk ended, only read once run has returned.
 	Settlement *fact_reach.Settlement
 
 	// FunctionsCompared is how many functions' no-return facts were compared with the host's, and FunctionsNamed how
@@ -21,14 +22,11 @@ type Result struct {
 	// and ImportedNamed how many of them named their object: the answer differed, or could not be read.
 	ImportedAsked int
 	ImportedNamed int
-
-	// standing is the bodies still standing once the walk ended, the host's own copy with every body the facts reach
-	// taken out, and only read once run has returned.
-	standing map[fact_reach.Place]bool
 }
 
 // Stands is whether the function body declared in the file parsed from filename, its `func` at offset, is left to the
 // host's findings in this build. It only reads, so every rule of the package may ask it at once.
 func (result *Result) Stands(filename string, offset int) bool {
-	return result != nil && result.standing[fact_reach.Place{File: filename, Offset: offset}]
+	return result != nil && result.Settlement != nil &&
+		result.Settlement.Standing[fact_reach.Place{File: filename, Offset: offset}]
 }

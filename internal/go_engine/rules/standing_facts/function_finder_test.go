@@ -1,7 +1,6 @@
 package standing_facts_test
 
 import (
-	"fmt"
 	"go/types"
 	"slices"
 	"testing"
@@ -76,35 +75,5 @@ func TestTheBuildsFunctionIsFoundByEachKindOfIdentity(test *testing.T) {
 	if result.FunctionsCompared != len(host.functions) || result.FunctionsNamed != len(wantNamed) {
 		test.Errorf("compared %d functions and named %d, want %d and %d", result.FunctionsCompared,
 			result.FunctionsNamed, len(host.functions), len(wantNamed))
-	}
-}
-
-// Each name the finder looks up in another package's scope is recorded in the package's reads, as a rule's lookup is
-// (#b2t9xmf), found or not, and a name of the package's own is not: which bodies stand turns on what the packages
-// below declare.
-func TestALookIntoAnotherPackagesScopeIsRecorded(test *testing.T) {
-	test.Parallel()
-	found := loadFacts(test)
-	caller := found.place(test, "Caller")
-	host := &fakeHost{
-		standing: map[fact_reach.Place]bool{caller: true},
-		places:   []fact_reach.Place{caller},
-		functions: []fact_reach.Function{
-			{Object: "facts.stop", Identity: found.identity("stop"), NoReturn: true},
-			{Object: "below.Stop", Identity: imported("below", "Stop"), NoReturn: true},
-			{Object: "deep.Missing", Identity: imported("deep", "Missing")},
-		},
-	}
-	reads := &build_reads.Reads{}
-	settleRecording(test, found, host, reads)
-	var recorded []string
-	for _, lookup := range reads.Lookups() {
-		if lookup.Query == build_reads.QueryScope {
-			recorded = append(recorded, fmt.Sprintf("%s.%s %t", lookup.Path, lookup.Name, lookup.Found))
-		}
-	}
-	slices.Sort(recorded)
-	if want := []string{"below.Stop true", "deep.Missing false"}; !slices.Equal(recorded, want) {
-		test.Errorf("the package's reads hold the scope lookups %q, want %q", recorded, want)
 	}
 }

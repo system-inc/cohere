@@ -1,8 +1,8 @@
 package standing_facts
 
 import (
+	"go/token"
 	"go/types"
-	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/objectpath"
@@ -13,12 +13,14 @@ import (
 // functionFinder finds the build's own function for an identity the host names one by, for one pass, on one
 // goroutine. The host's objects are another run's, of another type-check, so nothing of them but the identity crosses,
 // and the build looks its own object up by it.
+//
+// It reads only the build's own types, those of the pass's package and of what that imports, in the pass that asks,
+// and keeps nothing past the pass: the finder and its map of the imports go when run returns, so no later pass, build
+// or run can be answered from a look it made. None of its looks is recorded in the package's reads (#b2t9xmf): what it
+// finds decides only which build lints a body, a wrong find is caught by the findings differential, and an entry's key
+// holds the whole import closure the looks read (readHostNamed, in the rules' guard of cross-package reads).
 type functionFinder struct {
 	pass *analysis.Pass
-
-	// reads is the package's reads, where each look into another package's scope is recorded as any rule's is
-	// (#b2t9xmf): which bodies stand turns on what those packages declare. It is nil in a run that records none.
-	reads *build_reads.Reads
 
 	// imported is every package the pass's package imports, directly or through imports, by its path, with nil for a
 	// path two of them share. It is nil until an identity first names another package, since most name the pass's own.
@@ -44,7 +46,7 @@ func (finder *functionFinder) function(identity build_reads.Identity) (*types.Fu
 	var function *types.Func
 	switch identity.Kind {
 	case build_reads.IdentityObject:
-		object, found := finder.objectAt(home, identity.Path)
+		object, found := objectAt(home, identity.Path)
 		if !found {
 			return nil, false
 		}
@@ -54,7 +56,7 @@ func (finder *functionFinder) function(identity build_reads.Identity) (*types.Fu
 		}
 		function = declared
 	case build_reads.IdentityMethod:
-		method, found := finder.methodAt(home, string(identity.Path), identity.Method)
+		method, found := methodAt(home, string(identity.Path), identity.Method)
 		if !found {
 			return nil, false
 		}
@@ -102,17 +104,12 @@ func (finder *functionFinder) packageAt(path string) *types.Package {
 }
 
 // objectAt is the object at path in home, as build_reads' renderer names one (IdentityObject): a path that is a plain
-// name is a package-level object, unexported ones among them, which objectpath's own encoding never names, and any
-// other is an objectpath, whose first part, up to its first dot, is the package-level name it starts from. That name
-// is looked up through the package's reads either way, so the question is recorded when home is another package.
-func (finder *functionFinder) objectAt(home *types.Package, path objectpath.Path) (types.Object, bool) {
-	name, _, isLonger := strings.Cut(string(path), ".")
-	declared := finder.reads.ScopeLookup(finder.pass.Pkg, home, name)
-	if declared == nil {
-		return nil, false
-	}
-	if !isLonger {
-		return declared, true
+// identifier is a package-level name, unexported ones among them, which objectpath's own encoding never names, and
+// any other is an objectpath.
+func objectAt(home *types.Package, path objectpath.Path) (types.Object, bool) {
+	if token.IsIdentifier(string(path)) {
+		object := home.Scope().Lookup(string(path))
+		return object, object != nil
 	}
 	object, pathError := objectpath.Object(home, path)
 	if pathError != nil {
@@ -122,11 +119,11 @@ func (finder *functionFinder) objectAt(home *types.Package, path objectpath.Path
 }
 
 // methodAt is the method named methodName declared on the named type that typeName names at home's package level, as
-// build_reads' renderer names one (IdentityMethod), exported or not, the type's name looked up through the package's
-// reads as objectAt looks one up. A generic type's methods are its origin's. An interface declares no method this way,
-// so one of an interface type is not found, which is fine: the host leaves those out, since no body is theirs.
-func (finder *functionFinder) methodAt(home *types.Package, typeName string, methodName string) (*types.Func, bool) {
-	declared, isTypeName := finder.reads.ScopeLookup(finder.pass.Pkg, home, typeName).(*types.TypeName)
+// build_reads' renderer names one (IdentityMethod), exported or not. A generic type's methods are its origin's. An
+// interface declares no method this way, so one of an interface type is not found, which is fine: the host leaves
+// those out, since no body is theirs.
+func methodAt(home *types.Package, typeName string, methodName string) (*types.Func, bool) {
+	declared, isTypeName := home.Scope().Lookup(typeName).(*types.TypeName)
 	if !isTypeName || declared.IsAlias() {
 		return nil, false
 	}

@@ -93,22 +93,7 @@ func imported(packagePath string, name string) build_reads.Identity {
 // under rule.FactHost, or nothing for a nil host, and returns what the analyzer found and the run's resolver.
 func settle(test *testing.T, found fixture, host fact_reach.Host) (*standing_facts.Result, *fact_resolver.Resolver) {
 	test.Helper()
-	return settleRecording(test, found, host, nil)
-}
-
-// settleRecording is settle with the fixture's reads recorded into reads, as a run that keeps each package's reads
-// records them, or into none when reads is nil.
-func settleRecording(
-	test *testing.T,
-	found fixture,
-	host fact_reach.Host,
-	reads *build_reads.Reads,
-) (*standing_facts.Result, *fact_resolver.Resolver) {
-	test.Helper()
 	options := check.DispatchOptions()
-	if reads != nil {
-		options.Reads = map[*packages.Package]*build_reads.Reads{found.root: reads}
-	}
 	options.FactHost = rule.FactHost
 	options.FactHosts = func(packageId string) fact_reach.Host {
 		if host == nil || packageId != found.root.ID {

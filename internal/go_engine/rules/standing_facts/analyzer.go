@@ -20,7 +20,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 
-	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -75,10 +74,8 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("settling the standing bodies of %s: ctrlflow's result is a %T", pass.Pkg.Path(),
 			pass.ResultOf[ctrlflow.Analyzer])
 	}
-	result := &Result{Partial: true, standing: standing}
-	// The package's reads, as a rule's context takes them, nil in a run that records none, which records nothing.
-	reads, _ := pass.ResultOf[rule.Recorded].(*build_reads.Reads)
-	functions := &functionFinder{pass: pass, reads: reads}
+	result := &Result{Partial: true}
+	functions := &functionFinder{pass: pass}
 	// A copy, since the host's own list is not this pass's to append to.
 	named := slices.Clone(host.OrderBound())
 
@@ -121,7 +118,8 @@ func run(pass *analysis.Pass) (any, error) {
 		result.ImportedNamed++
 	}
 
-	// The bodies the build lints already, whose recorded answers the walk asks first.
+	// The bodies the build lints already, whose recorded answers the walk asks first. The host's set is only read,
+	// here and by the walk: what still stands is the settlement's own map.
 	var reached []fact_reach.Place
 	for _, place := range host.Places() {
 		if !standing[place] {

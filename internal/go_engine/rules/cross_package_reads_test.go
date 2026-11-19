@@ -24,6 +24,14 @@ const (
 	readDirectImports = "direct imports only (the import map is an own input)"
 	// readUnsafe is a look into unsafe's scope, which the type checker owns and no build changes.
 	readUnsafe = "unsafe, the same in every build"
+	// readHostNamed finds the build's own object for a function the host named, to compare a fact or an answer of it
+	// (#5vbs1np). It rests on three things, each to be checked where it is written. It decides only which build lints
+	// a body, the host or this one, and never what a finding says. A wrong look is caught by the findings
+	// differential, which compares what the build left standing with the host's findings, not by a restore. And no
+	// restore needs to ask it again, since an entry is kept under its package's whole key, which holds every
+	// dependency's key, so the closure the look read is the closure the entry is restored into (cache.keyer.key).
+	readHostNamed = "the build's own object for a function the host named: who lints a body, checked by the " +
+		"differential, its closure in the entry's key"
 )
 
 // listedRead is why one function's reads of a scope or of imports are covered: its class, and what the class leaves
@@ -76,9 +84,16 @@ var listedCrossPackageReads = map[string]listedRead{
 		reason: "hands the judged package's imports to build_reads.ClosureInterface and records what it found",
 	},
 	"standing_facts/function_finder.go:(*functionFinder).packageAt": {
-		class: readRecorded,
-		reason: "finds the package a host's identity names, in which objectAt and methodAt look the name up through " +
-			"the package's reads",
+		class:  readHostNamed,
+		reason: "walks the import closure for the package at the path a host's identity names",
+	},
+	"standing_facts/function_finder.go:methodAt": {
+		class:  readHostNamed,
+		reason: "looks up the named type a host's identity names a method by",
+	},
+	"standing_facts/function_finder.go:objectAt": {
+		class:  readHostNamed,
+		reason: "looks up the package-level name a host's identity names a function by",
 	},
 	"staticcheck_code/is_main_like.go:IsMainLike": {class: readDirectImports},
 	"unused_code/graph_entry.go:(*graph).entry": {
@@ -184,7 +199,7 @@ func expressionText(fileSet *token.FileSet, expression ast.Expr) string {
 }
 
 // crossPackageReadProblems is each read of found in a function listed does not name, each listed function of a class
-// that is none of the four, and each listed function with no such read left, so the list neither misses a new read
+// that is none of the five, and each listed function with no such read left, so the list neither misses a new read
 // nor keeps a stale entry.
 func crossPackageReadProblems(found []crossPackageRead, listed map[string]listedRead) []string {
 	problems := []string{}
@@ -197,11 +212,11 @@ func crossPackageReadProblems(found []crossPackageRead, listed map[string]listed
 				"with its class", read.position, read.call, read.key))
 		}
 	}
-	classes := []string{readRecorded, readOwnPackage, readDirectImports, readUnsafe}
+	classes := []string{readRecorded, readOwnPackage, readDirectImports, readUnsafe, readHostNamed}
 	for _, key := range slices.Sorted(maps.Keys(listed)) {
 		if !slices.Contains(classes, listed[key].class) {
 			problems = append(problems, fmt.Sprintf("listedCrossPackageReads gives %s the class %q, which is none of "+
-				"the four", key, listed[key].class))
+				"the five", key, listed[key].class))
 		}
 		if !seen[key] {
 			problems = append(problems, fmt.Sprintf("listedCrossPackageReads names %s, which makes no such call any "+
