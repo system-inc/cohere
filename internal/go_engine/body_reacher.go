@@ -123,6 +123,14 @@ func (reacher *bodyReacher) reachPackage(
 				read.dotImports[tokenFile.Name()])
 			reacher.constantsOnly = false
 		}
+		// A body a //line directive moves onto a file the builds do not share is judged by that file, whatever it uses
+		// (unsharedLineClaims).
+		if claimed, isClaimed := read.lineClaims[tokenFile.Name()][declared.Declaration.Offset]; isClaimed {
+			if reason == "" {
+				reason, driver = reachedLineClaim, claimed+" claimed by a //line directive"
+			}
+			constantsOnlyReason = cmp.Or(constantsOnlyReason, reachedLineClaim)
+		}
 		bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
 			line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reason, driver: driver,
 			constantsOnlyReason: constantsOnlyReason,
