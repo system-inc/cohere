@@ -23,17 +23,20 @@ type Inputs string
 const (
 	// InputsPerUnit is a rule whose finding in a unit is a function of that unit's syntax, its types, and the facts and
 	// resolver answers it reads, never of another unit's body or initializer, so a unit every build judges
-	// independent has the host's findings in each. The unit-isolation test holds it to that by stubbing other units'
-	// bodies and comparing what the rule finds in the units it kept.
+	// independent has the host's findings in each. A constant's value is part of what a unit names, and a same-package
+	// callee's no-return is a fact the unit reads, though ctrlflow computes it in place (#3rcmc3h). The unit-isolation
+	// test holds it to that by stubbing other units' bodies and comparing what the rule finds in the units it kept.
 	InputsPerUnit Inputs = "PerUnit"
 	// InputsFileSyntax is a rule that reads only its file's syntax, bytes and name, as comments, imports and build
 	// constraints, and no types, so a file both builds compile gives every build the same findings and only a file one
 	// build alone compiles is judged in that build.
 	InputsFileSyntax Inputs = "FileSyntax"
-	// InputsComposes is a package-wide rule, judging every unit of its package together, whose judgment is a union or a
-	// fixed point over per-unit pieces, as the inventory read each. Until it is rewritten into its per-unit
-	// contribution and package-level judgment, a package with a unit some build judges dependent is checked whole for
-	// it in that build, so it is never judged per declaration on a promise it does not keep.
+	// InputsComposes is a package-wide rule, judging every unit of its package together: one whose judgment is a union
+	// or a fixed point over per-unit pieces, as the inventory read each, or one that judges each unit behind a gate the
+	// whole package decides, as an import or a name in any of its files, which a build's own file can flip for a unit
+	// its difference never reaches (#zvwfe26). Until it is rewritten into its per-unit contribution and package-level
+	// judgment, a package with a unit some build judges dependent is checked whole for it in that build, so it is never
+	// judged per declaration on a promise it does not keep.
 	InputsComposes Inputs = "Composes"
 )
 

@@ -895,8 +895,9 @@ order taken, which is the order of their wall, and `[]` when there are none, nev
 
 A stamp's `label` names a moment, such as `host.load.end`, `handover.begin` or a build's `gate.taken`. `build` is the
 extra build the stamp is of, its name as the lint record's `builds` name it, and omitted for the host's run and the
-run's own steps. `round` is 1 for a load or a check that runs again after its first, as the long-line wrap's load or
-a reload for a question does, 2 for the next, and omitted for the first. No two stamps of a record share their build,
+run's own steps. `round` is a load's: 1 for a load that runs again after its first, as the long-line wrap's load or a
+reload for a question does, 2 for the next, and omitted for the first. A check carries the round of the load it runs
+over, so a run's only check can read 1. No two stamps of a record share their build,
 round and label. Begins and ends do not always pair: a run with no extra build stamps `handover.begin` and no
 `handover.end`, and a build that fails or finds type errors stamps no `end`.
 
@@ -1279,7 +1280,10 @@ from the records the findings store keeps of them, which that load then skips, a
 it loaded, each written only when not 0. The host's record never writes it, and neither does a run without the switch.
 
 Its `"facts"` is the build's facts census (#0ghk7vj), written once its lint has run. Under the switch every extra build
-restores nothing from the host's run, so its facts are its own, and such a run is slower than a plain one. The standard
+restores nothing from the host's run, so its facts are its own, and such a run is slower than a plain one. It reads and
+writes its own stores as a plain run's build does, the project's and the system cache's (#wzre5eg), so it restores the
+standard library the system cache holds under its own build context, and checks from source and writes there what it
+does not. The standard
 library the host restored from the system cache's table is compared through the table: its facts by their objects'
 counterparts in the standard library's graph, its answers by the unit of that graph declaring each function, an answer
 the build asked compared with the table's for the function the build's answer is about, never by the build's own
@@ -1312,7 +1316,13 @@ pairs exactly, with the build's facts of its kind in its unit that no named host
 of one kind meeting under one unit and name on either side, which nothing tells apart, with the other side's fact
 there, or where the host's meet, the build's facts of the kind in the unit; and `"answers"`, a build's answer about a
 function, or about a parameter or result of one, that no unit of the graph places, or that two of the host's answers
-meet at. Both are always written, since every count beside them leaves those out.
+meet at. Both are always written, since every count beside them leaves those out. `"withoutSyntax"`, additive
+(#wzre5eg), counts the facts the census left out, on either side, of a package both builds have by one ID that the
+build restored rather than checked from source, from the system cache or from its own store: the build has no syntax
+of such a package, so none of its facts is compared, the standard library's in every build that restores it. A fact is
+counted where it would have been compared, about the package itself or about an object in a file both builds compile,
+one both sides hold counted on each, and so is each fact the build's entry holds by a path alone. It is always written
+too: a census that counts no fact as different has compared only what `"kinds"` counts, and this says what it did not.
 `"milliseconds"` is the comparison's wall time.
 
 ### `phase`

@@ -24,3 +24,20 @@ type OldType struct{}
 //
 // Deprecated: use another.
 func (OldType) OldMethod() int { return OldFunction() }
+
+// RetiredFunction is deprecated with a paragraph after its notice, so the notice's message ends with its sentence, not
+// the space a closing line break becomes, and a record can name it.
+//
+// Deprecated: use another.
+//
+// It stays for old callers.
+func RetiredFunction() int { return 0 }
+
+var (
+	// GroupedOld is deprecated, alone of its group.
+	//
+	// Deprecated: use another.
+	GroupedOld = 1
+	// GroupedNew is not.
+	GroupedNew = 2
+)

@@ -222,18 +222,22 @@ type buildBodyReach struct {
 	declarationsOnly  []string
 	miscounted        []string
 	bodies            []reachedBody
+	// lackedImported are the IDs of the host's packages the build holds nothing of the path of that a file it compiles
+	// imports all the same, which the load mode's carry rules out and checks (bodyReacher.startsCarry): none, in every
+	// run its argument holds of.
+	lackedImported []string
 }
 
 // reach is the census of one build judged as dependence, over built, packages its final load checked from source,
-// every such package's ID in fromSource, which the load mode rule reads whether built is all of them or a subset, and
+// graph being what its whole graph holds, which the load mode rule reads whether built is all of them or a subset, and
 // with sizesDiffer every body reached by the build's sizes (buildSizesDiffer).
 func (host *bodyReachHost) reach(
 	dependence *build_dependence.Dependence,
 	built []*reachBuiltPackage,
-	fromSource map[string]bool,
+	graph *reachBuiltGraph,
 	sizesDiffer bool,
 ) *buildBodyReach {
-	reacher := &bodyReacher{host: host, dependence: dependence, fromSource: fromSource, sizesDiffer: sizesDiffer,
+	reacher := &bodyReacher{host: host, dependence: dependence, graph: graph, sizesDiffer: sizesDiffer,
 		carried: map[types.Object]bool{}}
 	sorted := slices.SortedFunc(slices.Values(built), func(first, second *reachBuiltPackage) int {
 		return cmp.Compare(first.identifier, second.identifier)
@@ -245,6 +249,8 @@ func (host *bodyReachHost) reach(
 		reacher.carriedGrew = false
 		census := host.judge(reacher, sorted)
 		if !reacher.carriedGrew {
+			// Read whether or not a package asked for the carry, so the census's count is of every build.
+			census.lackedImported = reacher.lackedYetImported()
 			return census
 		}
 	}
@@ -283,6 +289,7 @@ func (host *bodyReachHost) judge(reacher *bodyReacher, built []*reachBuiltPackag
 			reason := cmp.Or(reacher.sizesReason(), reachedMiscounted)
 			for index := range bodies {
 				bodies[index].reason, bodies[index].constantsOnlyReason = reason, reason
+				bodies[index].partReason = reason
 				bodies[index].driver = "the package's bodies miscounted"
 			}
 			census.total += read.sharedBodies

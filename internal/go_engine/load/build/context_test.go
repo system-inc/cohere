@@ -86,7 +86,7 @@ func TestEveryCopyIsOfTheCopiedToolchain(test *testing.T) {
 // names its release and the copy's.
 func TestOnlyACopiedReleaseShares(test *testing.T) {
 	test.Parallel()
-	for _, linked := range []string{CopiedToolchain, CopiedToolchain + " X:nodwarf5", "go1.27.3"} {
+	for _, linked := range []string{CopiedToolchain, CopiedToolchain + " X:nodwarf5", "go1.27.3", "go1.27.4"} {
 		if sharing, unshared := Sharing(linked); !sharing || unshared != "" {
 			test.Errorf("%s does not share: %s", linked, unshared)
 		}
