@@ -16,7 +16,12 @@ import (
 //     which reading the name bit alone misses.
 //   - Spinner takes holder.Spin, Holder gaining Spin on windows through platformPart, a windows file's type it
 //     embeds: reached by the selection's receiver's underlying bit, Selected, before holder's own name bit, Named,
-//     which ignoring the receiver leaves it to.
+//     which ignoring the receiver leaves it to. That row is redundant today rather than untested: dropping it, or the
+//     whole Selected row, only moves Spinner's reason, and leaves no body unreached for the differential to catch. The
+//     use walk records every selector's operand's type as a ValueType use, which reads both bits of the type the
+//     selection starts from, and a method set that moves through embedding sets that type's name bit by the
+//     embedding's edge, which a Named use of the operand reads too. So the census pins the row by Spinner's reason,
+//     and the differential's mutants are the Named row and the shadow rule.
 //   - Size reads the universe's len, which windows declares at package level: reached, Shadowed, by no bit at all.
 //   - Configured reads settings.A, whose identity is unknown: reached, Unknown, though no bit it reads is set.
 //   - Gadget.Spin and Joined use nothing that differs: unreached, and the graph's unit verdict agrees on both.

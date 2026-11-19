@@ -24,6 +24,9 @@ type bodyReacher struct {
 	decoded    *build_dependence.Counterparts
 	identities *build_reads.IdentityRenderer
 	fileSet    *token.FileSet
+	// fromSource are the IDs of the packages the build checked from source, against which the load mode rule reads
+	// how the host loaded each.
+	fromSource map[string]bool
 }
 
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
@@ -142,6 +145,8 @@ func (reacher *bodyReacher) useReason(
 	switch {
 	case kinds&build_reads.UsedNamed != 0 && bits.Name && kinds&build_reads.UsedConstant != 0:
 		return reachedConstant, entry.Object, "name"
+	case kinds&build_reads.UsedConstant != 0 && reacher.loadModeDiffers(entry.Object):
+		return reachedLoadMode, entry.Object, "load mode"
 	case kinds&build_reads.UsedNamed != 0 && bits.Name:
 		return reachedNamed, entry.Object, "name"
 	case kinds&build_reads.UsedValueType != 0 && (bits.Name || bits.Underlying):
@@ -150,6 +155,32 @@ func (reacher *bodyReacher) useReason(
 		return reachedTypeArgument, entry.Object, writtenBits(bits)
 	}
 	return "", nil, ""
+}
+
+// loadModeDiffers reports whether object is an untyped float or complex constant of a package the host and the build
+// load in different modes, one from export data and the other from source (the soundness contract's point 5, #9paaen9).
+// Export data holds such a value as a binary fraction of 512 bits, and a check from source holds it exactly, so a body
+// reading it type-checks to another value in each, though no declaration differs: goja's math.Sqrt2 / 2 does at
+// cohere's root, where the host reads math from the system cache and every build under `--build-dependence` checks it
+// from source. An integer, string or boolean constant is written exactly in both, and a typed float's value is rounded
+// to its type in both, so neither reaches. A package the host does not hold is the host's own question, never asked.
+func (reacher *bodyReacher) loadModeDiffers(object types.Object) bool {
+	constant, isConstant := object.(*types.Const)
+	if !isConstant || !isUntypedFloatingPoint(constant.Type()) {
+		return false
+	}
+	identifier, isHeld := reacher.host.identifiers[object.Pkg()]
+	if !isHeld {
+		return false
+	}
+	return reacher.host.dependence.exportData[identifier] == reacher.fromSource[identifier]
+}
+
+// isUntypedFloatingPoint reports whether typed is the untyped float or untyped complex type, whose constants hold
+// values past any machine type's.
+func isUntypedFloatingPoint(typed types.Type) bool {
+	basic, isBasic := typed.(*types.Basic)
+	return isBasic && (basic.Kind() == types.UntypedFloat || basic.Kind() == types.UntypedComplex)
 }
 
 // writtenBits are the bits set of bits, as the census's drivers write them.

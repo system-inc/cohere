@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"slices"
 	"strings"
 
@@ -55,11 +56,12 @@ const (
 	reachedValueType    bodyReachReason = "ValueType"
 	reachedTypeArgument bodyReachReason = "TypeArgument"
 	reachedShadowed     bodyReachReason = "Shadowed"
+	reachedLoadMode     bodyReachReason = "LoadMode"
 )
 
 // bodyReachReasons are the reasons in the order the census writes them, the order a body is judged by.
 var bodyReachReasons = []bodyReachReason{reachedUnrecorded, reachedUnknown, reachedSignature, reachedNamed,
-	reachedConstant, reachedSelected, reachedValueType, reachedTypeArgument, reachedShadowed}
+	reachedConstant, reachedLoadMode, reachedSelected, reachedValueType, reachedTypeArgument, reachedShadowed}
 
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
 // by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its
@@ -71,6 +73,9 @@ type bodyReachHost struct {
 	reads      map[*packages.Package]*build_reads.Reads
 	dependence *hostDependence
 	findings   map[string][]check.Finding
+	// identifiers are the IDs of the host's packages by their types, by which the reach finds how a build loaded the
+	// package of an object the host's record names.
+	identifiers map[*types.Package]string
 }
 
 // newBodyReachHost is the census's host side from the host's whole reads (wholeReads), its graph and its findings.
@@ -80,9 +85,13 @@ func newBodyReachHost(
 	findings []check.Finding,
 ) *bodyReachHost {
 	host := &bodyReachHost{packages: make(map[string]*packages.Package, len(reads)), reads: reads,
-		dependence: dependence, findings: findingsByFile(findings)}
+		dependence: dependence, findings: findingsByFile(findings),
+		identifiers: make(map[*types.Package]string, len(reads))}
 	for each := range reads {
 		host.packages[each.ID] = each
+		if each.Types != nil {
+			host.identifiers[each.Types] = each.ID
+		}
 	}
 	return host
 }
@@ -194,13 +203,15 @@ type buildBodyReach struct {
 	bodies            []reachedBody
 }
 
-// reach is the census of one build judged as dependence, over built, the packages its final load checked from source.
+// reach is the census of one build judged as dependence, over built, packages its final load checked from source,
+// every such package's ID in fromSource, which the load mode rule reads whether built is all of them or a subset.
 func (host *bodyReachHost) reach(
 	dependence *build_dependence.Dependence,
 	built []*reachBuiltPackage,
+	fromSource map[string]bool,
 ) *buildBodyReach {
 	census := &buildBodyReach{checkedFromSource: len(built), byReason: map[bodyReachReason]int{}}
-	reacher := &bodyReacher{host: host, dependence: dependence}
+	reacher := &bodyReacher{host: host, dependence: dependence, fromSource: fromSource}
 	for _, read := range slices.SortedFunc(slices.Values(built), func(first, second *reachBuiltPackage) int {
 		return cmp.Compare(first.identifier, second.identifier)
 	}) {

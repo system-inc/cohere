@@ -44,6 +44,10 @@ type hostDependence struct {
 	// records rather than their syntax, which hold no live object, so the body reach census asks of their objects by
 	// name (bodyReacher.bits).
 	decoded map[*types.Package]bool
+	// exportData are the IDs of the packages the host read from export data rather than checking from source, the
+	// system cache's or the store's, whose untyped float constants the body reach census reads as another build's
+	// check from source may not (bodyReacher.loadModeDiffers).
+	exportData map[string]bool
 	// calls is the units of graph and of the standard library's graph and the calls between them, which every build's
 	// facts census counts by its own verdicts (#f9br7sg), built once a run by the first census to ask (callIndex,
 	// under callsOnce), since the builds' censuses run at once.
@@ -120,12 +124,13 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 	var every []*packages.Package
 	packages.Visit(loaded.Roots, nil, func(each *packages.Package) { every = append(every, each) })
 	host := &hostDependence{
-		graph:    build_dependence.NewGraph(),
-		from:     loaded,
-		files:    make(map[string][]string, len(every)),
-		paths:    make(map[string]string, len(every)),
-		restored: map[string]bool{},
-		decoded:  map[*types.Package]bool{},
+		graph:      build_dependence.NewGraph(),
+		from:       loaded,
+		files:      make(map[string][]string, len(every)),
+		paths:      make(map[string]string, len(every)),
+		restored:   map[string]bool{},
+		decoded:    map[*types.Package]bool{},
+		exportData: map[string]bool{},
 	}
 	var restoredStandardLibrary []string
 	recordedStandardLibrary := map[string]*build_dependence.Record{}
@@ -138,6 +143,9 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		}
 		if records[index] != nil && each.Types != nil {
 			host.decoded[each.Types] = true
+		}
+		if each.TypesInfo == nil {
+			host.exportData[each.ID] = true
 		}
 		if each.TypesInfo != nil || records[index] != nil {
 			continue
