@@ -129,9 +129,12 @@ func TestTheFactsReachTakesOutWarmWhoseCalleesPurityDiffers(test *testing.T) {
 // For each fact kind a build compares, the user of a callee whose answer differs on windows leaves the standing set,
 // taken out by that callee for that kind, and the user of a callee whose answer is the same stands (#73k3wge). The
 // no-return fact is compared for every function before any answer is asked; each other kind's answer is asked of the
-// callee, which the reach lints since it names a function or type each platform's file declares. Triviality and the
-// stopping calls are not registered with the resolver, so the build can ask neither again: their differing callees
-// take their users out as unknown, and their equal ones do too, which no stable user here asserts.
+// callee, which the reach lints since it names a function or type each platform's file declares.
+//
+// Triviality and the stopping calls are not registered with the resolver (fact_resolver.Register), so the build cannot
+// ask either again and reads every answer of theirs as unknown: the users of their equal callees leave too, as
+// unknown, which is the sound answer until the build can ask them. The day it can, their stable users stand, and this
+// test says so.
 func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndLeavesAnEqualOnesStanding(test *testing.T) {
 	test.Parallel()
 
@@ -142,13 +145,18 @@ func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndLeavesAnEqualOnesStandi
 		callee string
 		reason fact_reach.Reason
 		stable string
+		// stableCallee names the equal callee that still takes stable out, for reason, where the build cannot ask the
+		// kind; empty where stable stands.
+		stableCallee string
 	}{
-		{"no-return", "NoReturnUser", "halt", "no-return", "NoReturnStable"},
-		{"nil-ness", "NilnessUser", "wrapped", fact_reach.DiffersReason("return_nil_ness"), "NilnessStable"},
-		{"purity", "Warm", "size", fact_reach.DiffersReason("function_purity"), "PurityStable"},
-		{"odd slice", "OddUser", "pairs", fact_reach.DiffersReason("odd_slice_argument"), "OddStable"},
-		{"triviality", "TrivialUser", "typedNil", fact_reach.UnknownReason("function_triviality"), ""},
-		{"stopping calls", "StoppingUser", "stopVia", fact_reach.UnknownReason("test_stopping_calls"), ""},
+		{"no-return", "NoReturnUser", "halt", "no-return", "NoReturnStable", ""},
+		{"nil-ness", "NilnessUser", "wrapped", fact_reach.DiffersReason("return_nil_ness"), "NilnessStable", ""},
+		{"purity", "Warm", "size", fact_reach.DiffersReason("function_purity"), "PurityStable", ""},
+		{"odd slice", "OddUser", "pairs", fact_reach.DiffersReason("odd_slice_argument"), "OddStable", ""},
+		{"triviality", "TrivialUser", "typedNil", fact_reach.UnknownReason("function_triviality"), "TrivialStable",
+			"typedNilAlways"},
+		{"stopping calls", "StoppingUser", "stopVia", fact_reach.UnknownReason("test_stopping_calls"),
+			"StoppingStable", "stopAlways"},
 	} {
 		test.Run(kind.name, func(test *testing.T) {
 			// The settlement is only read, by every kind at once.
@@ -158,7 +166,11 @@ func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndLeavesAnEqualOnesStandi
 					settled.bodies[kind.user].reason)
 			}
 			settled.requireRemovedBy(test, kind.user, kind.callee, kind.reason)
-			if kind.stable != "" && !settled.stands(test, kind.stable) {
+			if kind.stableCallee != "" {
+				settled.requireRemovedBy(test, kind.stable, kind.stableCallee, kind.reason)
+				return
+			}
+			if !settled.stands(test, kind.stable) {
 				removal, _ := settled.removal(test, kind.stable)
 				test.Errorf("%s left the standing set, by %q for %q, want it standing", kind.stable, removal.Object,
 					removal.Reason)
