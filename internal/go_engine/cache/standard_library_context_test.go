@@ -188,9 +188,10 @@ func relocatedKeys(test *testing.T, keys map[string]Key) {
 // Each field of the context changes what it must, and only that: the format version, the engine identity, each
 // entry of the build and a fact analyzer's flag change every key; the loader changes the key of a package with cgo
 // files and of every package that imports one, and of no other; the C toolchain, `CGO_CFLAGS` alone, changes those
-// same keys under the cgo-translated loader and none under the source loader, where the cgo tool never runs; and the
-// root changes every key, the files below it the same. A new field without a case here fails, since the fields
-// are found by reflection.
+// same keys under the cgo-translated loader and none under the source loader, where the cgo tool never runs; the
+// root changes every key, the files below it the same; and the module cache changes no standard-library key, byte for
+// byte, set or not, since nothing below the root reads a module (system_modules_keys_test.go keys a module's package
+// by it). A new field without a case here fails, since the fields are found by reflection.
 func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 	test.Parallel()
 
@@ -238,6 +239,11 @@ func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 		},
 		"Goroot": func(test *testing.T) {
 			relocatedKeys(test, keys)
+		},
+		"ModuleCache": func(test *testing.T) {
+			moduleCache := standardContextAt(goroot)
+			moduleCache.ModuleCache = test.TempDir()
+			expectChanged(test, "a module cache named", keys, keyStandard(test, graph, moduleCache))
 		},
 	}
 	fields := reflect.TypeFor[StandardLibraryContext]()

@@ -68,13 +68,13 @@ func (session *CacheSession) openPacks(loader string) {
 	if session.KeepsSystemCache() && session.standardLibraryContext != nil &&
 		session.caching.StandardLibrary.System.ShardStamps() != nil {
 		context := session.standardLibraryContext
-		// The system cache's pack is named by every part of the standard library's context its keys hold, and by the
+		// The system cache's pack is named by every part of the system cache's context its keys hold, and by the
 		// project, so two projects on the machine checking the same build never write over each other's pack each run.
 		packs.open(session.caching.StandardLibrary.System, true, cache.PackPlace{
 			Identity: cache.PackIdentity(context.EngineIdentity),
 			Name: cache.PackName([]string{"system", packs.project},
-				[]string{context.FormatVersion, context.EngineIdentity, context.Loader, context.Goroot}, context.Build,
-				context.Facts, context.CgoToolchain)})
+				[]string{context.FormatVersion, context.EngineIdentity, context.Loader, context.Goroot,
+					context.ModuleCache}, context.Build, context.Facts, context.CgoToolchain)})
 	}
 }
 

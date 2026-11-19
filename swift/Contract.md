@@ -950,22 +950,29 @@ under `--no-cache` write the same stream but for this field and the elapsed time
 the engine reads and writes no entry, and every count is 0 with `"on":false`. A project with cgo of
 its own is cached the same way, its packages with cgo files keyed on the cgo tool's outputs.
 
-The Go engine also keeps a system cache: the Go standard library's entries, one table for each build
-context, in the user's cache directory (`$COHERE_SYSTEM_CACHE` when set, an absolute directory, and
-otherwise `cohere` in the directory Go's `os.UserCacheDir` names), shared by every project the same
-engine checks. Each table is keyed on everything its entries read: the engine's own identity, the Go
-version, the target, cgo, the go flags, and the analyzers that learn facts with their options, and
-each entry in it on its files' bytes by their paths below `GOROOT`. A standard-library package whose
-key matches is restored from it, in a cached run and under `--no-cache` alike, since those entries are
-of cohere and the Go installation and nothing of the project's tree; any mismatch computes it.
-`"standardLibraryFromSystemCache":258` counts those packages, every build's summed, which are neither
-`hit` nor `missed`, and is written only when it is not 0. Under `--no-cache` it, and `factsSkipped`
-of what it restored, are the only counts that can be other than 0, with `reloads`. Under
-`--no-system-cache` the engine neither reads nor writes the system cache. A system cache the run
+The Go engine also keeps a system cache: the entries of everything that is not the project, the Go
+standard library's and third-party modules', one table for each build context, in the user's cache
+directory (`$COHERE_SYSTEM_CACHE` when set, an absolute directory, and otherwise `cohere` in the
+directory Go's `os.UserCacheDir` names), shared by every project the same engine checks. Each table is
+keyed on everything its entries read: the engine's own identity, the Go version, the target, cgo, the
+go flags, and the analyzers that learn facts with their options, and each entry in it on its files'
+bytes by their paths below `GOROOT`, or for a module's package below the module cache (`GOMODCACHE`),
+with the module's path, version and go version. A module's package is kept there only when its module
+is not a main module and every file of it is in the module cache, so a vendored module, or one
+replaced by a directory of the project's, stays the project's. A package whose key matches is restored
+from it, in a cached run and under `--no-cache` alike, since those entries are of cohere, the Go
+installation and the module cache and nothing of the project's tree; any mismatch computes it. It is
+a dependency, analyzed for its facts alone, so no finding of it is ever reported.
+`"standardLibraryFromSystemCache":258` counts the standard library's packages restored so, every
+build's summed, and `"modulesFromSystemCache":31` the modules' packages, each apart from `hit` and
+`missed` and from the other, and each written only when it is not 0. Under `--no-cache` they, and
+`factsSkipped` of what they restored, are the only counts that can be other than 0, with `reloads`.
+Under `--no-system-cache` the engine neither reads nor writes the system cache. A system cache the run
 cannot keep, a directory it cannot find or write, is never an error: the run computes what it would
 have held, and `"systemCacheNotKept"` says why in one line, written only when there is a reason.
-`"systemCacheWritten"` counts the entries the run's builds added to their tables, summed, and `"systemCacheOff":true`
-says the run was under `--no-system-cache`, each written only when not 0 or false.
+`"systemCacheWritten"` counts the entries the run's builds added to their tables, the standard
+library's and modules', summed, and `"systemCacheOff":true` says the run was under
+`--no-system-cache`, each written only when not 0 or false.
 
 A few facts are computed only when a rule asks of a function (#w7zmvat), from the function's
 package's syntax, which a restored package does not have. Every entry a run writes holds every
