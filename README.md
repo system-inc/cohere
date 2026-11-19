@@ -231,6 +231,7 @@ is an engine check, so it is configurable without being an entry in `cohere --ru
 | `--coverage`            | name every rule under the coverage fact that describes it, not only count them                                                                                                 |
 | `--adamic-readiness`    | say what share of the files are Adamic-ready, in the footer and in `--json` (see [Output](#output))                                                                            |
 | `--timing`              | report what building the graph cost and the CPU each rule cost, most expensive rule first, for TypeScript and Go                                                               |
+| `--timeline`            | in a Go project, report when each phase and each build began and ended on the run's clock, with the cores busy between                                                         |
 | `--single-threaded`     | use one type checker instead of several                                                                                                                                        |
 | `--profile FILE`        | write a Go CPU profile of the run to FILE                                                                                                                                      |
 | `--cache-dump`          | print what this project's cache holds, and exit                                                                                                                                |
@@ -328,6 +329,11 @@ clock, so a rule that waits or is descheduled costs nothing. Reading that clock 
 overhead; the phase times are free. A Go run prints the same table from each analyzer's thread clock, with
 the intermediate representation builds and the load's phases as rows of their own, and a run under
 `--timing` is never replayed from the cache or recorded in it.
+
+`--timeline`, in a Go project, prints when each phase of the run and each build began and ended, on one clock from
+the engine's start, with the cores the process kept busy between each step and the one before. Unlike `--timing` it
+changes nothing about the run, so the map is of the run you make; beside `--timing` it says it is a timed run's shape.
+It is never replayed from the cache or recorded in it either.
 
 `--verbose` prints everything a run can say: each phase and why any did not run, the coverage summary,
 overrides, skips, notes, memory and the total. Its footer adds the syntax nodes the run walked, and

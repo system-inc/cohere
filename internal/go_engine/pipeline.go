@@ -426,6 +426,7 @@ func (engine *pipeline) run() int {
 			loaded, loadError = engine.loadWorkspace(needsTypes)
 		}
 	}
+	engine.request.timeline.Stamp("host.load.end")
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
 	// The host's graph is built from the load's syntax before any rules let go of it, the rename's first pass's
 	// included, for the extra builds to be judged on under `--build-dependence`.
@@ -470,6 +471,12 @@ func (engine *pipeline) run() int {
 	exitCode := exitClean
 	if engine.findingsWritten > 0 || engine.incomplete {
 		exitCode = exitFindings
+	}
+	// The timeline, under `--timeline`, is the last record before the summary, so its last stamp is the run's end. A
+	// run also under `--timing` says so, since its shape is a timed run's: no cache, and the builds one at a time.
+	if engine.request.timeline != nil {
+		engine.request.timeline.Stamp("run.end")
+		engine.write(engine.request.timeline.Record(engine.timing != nil))
 	}
 	engine.write(contract.SummaryRecord{
 		Findings: engine.findingsWritten, Complete: !engine.incomplete, ExitCode: exitCode,

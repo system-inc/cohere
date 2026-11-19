@@ -22,6 +22,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
 // errorRefusedAtGate is the error a build refused at the share gate ends its load with, since a build before it in
@@ -42,6 +43,7 @@ var errorRefusedAtGate = errors.New("refused at the share gate: a build before i
 func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []buildRun {
 	// The standard library's graph under `--build-dependence` ran beside the host's lint, and is over before anything
 	// of the builds is measured or started.
+	engine.request.timeline.Stamp("handover.begin")
 	engine.awaitStandardLibrary()
 	host, extras, buildsError := engine.buildsBeside()
 	if buildsError != nil {
@@ -62,6 +64,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
+	engine.request.timeline.Stamp("host.readwalks.end")
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
 	if engine.takesBodyReach() {
 		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
@@ -148,8 +151,10 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 			return measured
 		}
 	}
+	engine.request.timeline.Stamp("handover.end")
 	extraRuns, extraError := engine.extraBuildRuns(extras, heaviestFirst(host, extras), ours, pass.result.Host, width,
 		fromHostLive, measure)
+	engine.request.timeline.Stamp("builds.end")
 	if extraError != nil {
 		engine.otherBuildsFailed(extraError)
 		return nil
@@ -529,6 +534,9 @@ func (engine *pipeline) extraBuildRun(
 	afterLoad func(loaded bool),
 	atGate func(fromSource int, packages int) error,
 ) (buildRun, error) {
+	// Under `--timeline` the build's stamps, each label after the build's name, its check's too.
+	stamp := engine.request.timeline.Prefixed("build " + extra.String() + ".")
+	timeline.Tell(stamp, "start")
 	environment := extraBuildEnvironment(engine.described.workspace, extra)
 	// The build's one go env, which its findings cache's key and its load, the lister and the kept listing among it,
 	// all read (#4rpt1jh), read with its lister state before the host's first load (earlyStart, startChildrenFirst),
@@ -589,6 +597,8 @@ func (engine *pipeline) extraBuildRun(
 		SharedReads:       engine.reads,
 		Fingerprints:      engine.fingerprints,
 		Walks:             engine.walks,
+		// Under `--timeline` the build's load stamps its listing's end, its restore and its first parse.
+		Timeline: stamp,
 	}
 	if session != nil {
 		caching.Restorer = session
@@ -627,6 +637,7 @@ func (engine *pipeline) extraBuildRun(
 	elapsed := time.Since(started)
 	loading += elapsed
 	loadWall += elapsed
+	timeline.Tell(stamp, "load.end")
 	// The first build's load has ended and its rules have not started: it holds none of the run's slots, and every
 	// other build waits at the share gate, before its type check, so the width is measured here, before any other
 	// build is admitted (extraBuildRuns). Their listings, graphs and restores are live as it measures, so the holding
@@ -678,6 +689,7 @@ func (engine *pipeline) extraBuildRun(
 		run.lintWait = time.Since(waitStarted)
 	}
 	engine.lintStepped(extra, lintStepTaken, weight)
+	timeline.Tell(stamp, "gate.taken")
 	// A nil *check.HostInheritance would be a non-nil rule.Inheritance, which every pass would read as one.
 	var inherits rule.Inheritance
 	if inheritance != nil {
@@ -741,6 +753,7 @@ func (engine *pipeline) extraBuildRun(
 			// differential the build's own facts are captured, for its second leg to compare those left standing by.
 			FactReachSettle: engine.factReachSettle(factHosts != nil),
 			FactReach:       engine.bodyDifferential && factHosts != nil,
+			Timeline:        stamp,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -847,6 +860,7 @@ func (engine *pipeline) extraBuildRun(
 			return buildRun{}, fmt.Errorf("the build %s: %w", extra, endError)
 		}
 	}
+	timeline.Tell(stamp, "end")
 	return run, nil
 }
 

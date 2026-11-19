@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
 // invocation is one command line, read and checked.
@@ -42,6 +43,10 @@ type invocation struct {
 	// answersInPart is check.Caching's AnswersInPart, the packages whose entries the run writes with only the answers
 	// its questions computed, for a test of the reload such an entry makes, never read from the command line.
 	answersInPart map[string]bool
+
+	// timeline is the run's recorder under `--timeline`, made as the command line is read (newTimeline), nil for a run
+	// that did not ask, never read from the command line.
+	timeline *timeline.Recorder
 
 	// readFromDisk is how read reads a file from disk, os.ReadFile unless a test watches the run's reads, never read
 	// from the command line.

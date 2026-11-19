@@ -46,6 +46,8 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 		SharedReads:   engine.reads,
 		// The fingerprints the builds share (#t7h2sm4): the host's last load reads the bytes the builds read.
 		Fingerprints: engine.fingerprints,
+		// Under `--timeline` the host's load stamps its listing's end and its first parse.
+		Timeline: engine.request.timeline.Prefixed("host."),
 	}
 	if engine.session != nil {
 		caching.Restorer = engine.session

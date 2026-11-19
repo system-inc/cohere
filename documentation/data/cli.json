@@ -117,6 +117,10 @@
             "usage": "with --fix, read one file's text from stdin and print what --fix (and --format, if named) would write for the file at this path, writing nothing to disk"
         },
         {
+            "name": "timeline",
+            "usage": "in a Go project, report when each phase and each build began and ended on the run's clock, with the process's CPU at each"
+        },
+        {
             "name": "timing",
             "usage": "report what building the graph cost and the CPU each rule cost, most expensive rule first"
         },

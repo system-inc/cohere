@@ -27,6 +27,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -143,6 +144,12 @@ type Options struct {
 	// are the same either way. Its failure on a package is in Result.FactReachCrashes, never a finding and never a
 	// failed run.
 	FactReachSettle *analysis.Analyzer
+
+	// Timeline is told each boundary of the run's analysis and its save under `--timeline`, as `check.analyze.begin`
+	// and `.end` and `check.save.begin` and `.end`, nil for a run that did not ask, which tells nothing (#3v2zp7g). A
+	// field rather than package state, so two runs in one process never stamp each other's timeline. The findings are
+	// the same either way.
+	Timeline func(label string)
 
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
@@ -461,7 +468,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			session.counts.Waves++
 		}
 	}
+	timeline.Tell(options.Timeline, "check.analyze.begin")
 	graph, analyzeError := checker.Analyze(roots, toAnalyze, checkerOptions)
+	timeline.Tell(options.Timeline, "check.analyze.end")
 	if analyzeError != nil {
 		return nil, fmt.Errorf("analyzing %d packages: %w", len(toAnalyze), analyzeError)
 	}
@@ -649,7 +658,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		result.FactReach = captureFactReach(resolver, analyzed, graphs)
 	}
 	if session != nil {
+		timeline.Tell(options.Timeline, "check.save.begin")
 		session.save(graph, options.Withheld, files)
+		timeline.Tell(options.Timeline, "check.save.end")
 		result.Cache = session.counts
 		result.FromHost = session.hostCounts()
 		if options.KeepForBuilds && options.Reads != nil {

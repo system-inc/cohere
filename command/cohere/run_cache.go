@@ -122,6 +122,9 @@ func recordRunSummary(summary runSummary) {
 //
 // `--timing` is never admitted, on any engine, so such a run neither replays nor is recorded. A timing run is a
 // measurement, and a replay would print the last run's CPU as this run's, a table of costs this run never spent.
+// `--timeline` is never admitted either, for the same reason: it changes nothing the run computes, but its table is
+// the run's own clock, and a replay would print when another run's phases began and ended as this one's (#3v2zp7g).
+// Each is refused by name in runCacheAdmits, and a test holds each out.
 //
 // `--no-cache` is refused by name rather than left to the argument shape. Most flags make a run
 // ineligible, but the promise that flag makes, nothing read and nothing written, should not rest on which
@@ -170,6 +173,10 @@ func runCacheAdmits(arguments []string) bool {
 		switch argument {
 		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases", "--adamic-readiness",
 			"--host-build-only", "--no-system-cache":
+		// Named, though the default refuses them too, so admitting either above is a duplicate case the compiler
+		// refuses rather than a replay of another run's clock (runCacheEligible).
+		case "--timing", "--timeline":
+			return false
 		default:
 			return false
 		}

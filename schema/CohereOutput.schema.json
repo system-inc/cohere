@@ -12,6 +12,7 @@
         { "$ref": "#/$defs/duplicateRefused" },
         { "$ref": "#/$defs/duplicateCoverage" },
         { "$ref": "#/$defs/timing" },
+        { "$ref": "#/$defs/timeline" },
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
@@ -283,6 +284,53 @@
                 "measuringCpuMicroseconds": {
                     "type": "integer",
                     "description": "What those reads cost, already taken out of the rows."
+                }
+            }
+        },
+        "timeline": {
+            "description": "When each phase and each build of a Go run began and ended, under --timeline: the Go engine's timeline record, written through once before the summary. Every stamp is on one clock from the engine process's start, with the process's user and system CPU from that start to then, so the cores busy between two stamps are their CPU's difference over their wall's. It changes nothing of the run. A run that is not Go, or not under --timeline, writes none.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "stamps"],
+            "properties": {
+                "kind": { "const": "timeline" },
+                "unavailable": {
+                    "type": "string",
+                    "description": "Why no CPU was read, when the process's CPU clock cannot be read. Every CPU figure is then 0 and means nothing; the wall is still real. Absent when the CPU was read."
+                },
+                "timed": {
+                    "const": true,
+                    "description": "The run was also under --timing, so its shape is a timed run's: no cache, and the builds one at a time. Absent otherwise."
+                },
+                "stamps": {
+                    "type": "array",
+                    "description": "Each stamp in the order taken, which is the order of its wall. Empty when nothing was stamped.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["label", "wallMicroseconds", "userMicroseconds", "systemMicroseconds"],
+                        "properties": {
+                            "label": {
+                                "type": "string",
+                                "description": "The moment, such as host.load.end, handover.begin, or a build's target name, a dot and its step, as build windows/amd64.gate.taken."
+                            },
+                            "wallMicroseconds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "Wall time from the engine process's start."
+                            },
+                            "userMicroseconds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "The process's user CPU from its start."
+                            },
+                            "systemMicroseconds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "The process's system CPU from its start."
+                            }
+                        }
+                    }
                 }
             }
         },

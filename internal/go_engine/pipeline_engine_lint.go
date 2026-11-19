@@ -97,6 +97,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				ran = append(ran, enabledRule.Name)
 			}
 			verdict = engine.mergeBuildRuns(runs, ran)
+			engine.request.timeline.Stamp("merge.end")
 			outcome = suppressedFindings{
 				kept:              verdict.merged.kept,
 				directiveFindings: verdict.merged.directiveFindings,
@@ -317,7 +318,10 @@ func (engine *pipeline) lintPackages(
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
 	}
+	// Under `--timeline` the host's check stamps its analysis and its save.
+	options.Timeline = engine.request.timeline.Prefixed("host.")
 	result, checkError := check.Run(analyzed, enabled, options)
+	engine.request.timeline.Stamp("host.lint.check.end")
 	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}

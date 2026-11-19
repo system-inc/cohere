@@ -106,6 +106,10 @@ type loader struct {
 	// timing is the run's collector under `--timing`, which each file's read and parse, each type check and each read
 	// of export data is added to, measured on the goroutine that does it. Nil measures nothing.
 	timing *timing.Collector
+
+	// timeline is the load's Caching.Timeline, told the load's first parse once, as firstParse has it, nil for none.
+	timeline   func(label string)
+	firstParse sync.Once
 }
 
 // parsedFile is one file's parse, ready once done is closed. reserved is closed once the package that claimed the file
@@ -530,6 +534,10 @@ func (loader *loader) parseClaimed(taken *claim, current *node) ([]*ast.File, []
 			defer close(parse.done)
 			loader.acquire(current, slotWorkParse)
 			defer loader.slots.Release()
+			// The load's first parse, its slot held, under `--timeline`.
+			if loader.timeline != nil {
+				loader.firstParse.Do(func() { loader.timeline("parse.first") })
+			}
 			loader.timing.Parse(loader.timing.Measure(func() {
 				parse.file, parse.parseError = loader.parseInto(
 					taken.files[index],
