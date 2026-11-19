@@ -66,9 +66,19 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	parity.RequireIdentical(test, sa1019.Analyzer, Analyzer, analysistest.TestData(), "parity", "parity_older")
 }
 
-// The differences fixture holds the uses whose judgment hangs on the state the walk carries or on the shape of a
-// selector, and records no difference, since there is none, so the test holds that the two agree there.
+// The differences fixture holds the uses whose judgment hangs on the enclosing declaration or on the shape of a
+// selector, and the two agree on every one but the package-level variable after a deprecated function, which the port
+// alone finds (#zvwfe26). The fixture is a module, whose records the harness reads from its own folder and not from
+// the package below it, so that one is given here.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
-	parity.RequireIdentical(test, sa1019.Analyzer, Analyzer, analysistest.TestData(), "differences")
+	parity.RequireOnlyAdjudicated(test, sa1019.Analyzer, Analyzer, analysistest.TestData(), "differences",
+		parity.Record{
+			File: "differences/uses/after_deprecated.go",
+			Line: 13,
+			Text: "finds: example.com/differences/library.RetiredFunction is deprecated: use another.",
+			Reason: "The original keeps the last function declaration it walked until the next one, so it judges a " +
+				"package-level variable after a deprecated function as if inside it and misses the use; the port " +
+				"judges each use by the declaration that holds it.",
+		})
 }

@@ -1,6 +1,7 @@
-// Package uses holds the uses where the port and the original could plausibly disagree, and records no difference,
-// since there is none: both keep the same state over the same walk. A deprecated function's literals, a selector
-// chain, a file's start clearing the state, a dot import, and a method of a deprecated type are all judged alike.
+// Package uses holds the uses where the port and the original could plausibly disagree. A deprecated function's
+// literals, a selector chain, a file's start, a dot import, and a method of a deprecated type are all judged alike.
+// They differ in one place, after_deprecated.go's package-level variable after a deprecated function, which the
+// original judges as if inside that function and the port judges by its own declaration.
 package uses
 
 import (
