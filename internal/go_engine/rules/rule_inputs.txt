@@ -106,7 +106,7 @@ cohere-go/SA4019 FileSyntax
 cohere-go/SA4020 PerUnit FullKind
 cohere-go/SA4021 PerUnit
 cohere-go/SA4022 PerUnit
-cohere-go/SA4023 Composes
+cohere-go/SA4023 PerUnit
 cohere-go/SA4024 PerUnit
 cohere-go/SA4025 PerUnit
 cohere-go/SA4026 PerUnit
